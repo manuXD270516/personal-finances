@@ -13,9 +13,12 @@ invariants: []
 priority: low
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/api/test/api/api-conventions.api.test.ts
+- apps/api/test/db/idempotency-key.int.test.ts
+- packages/platform/src/api/idempotency/policy.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:

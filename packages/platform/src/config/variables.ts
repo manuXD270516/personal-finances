@@ -212,6 +212,62 @@ export const VARIABLES = {
     default: '25000',
   }),
 
+  // ── Convenciones de API (add-api-conventions) ──
+  API_PROBLEM_TYPE_BASE: variable(
+    z.string().regex(/^https:\/\/[^\s?#]+\/$/, 'debe ser una URL https:// terminada en /'),
+    {
+      group: 'Convenciones de API',
+      description:
+        'Base del `type` de los errores RFC 9457 (`<base><code-en-kebab>`). Dominio placeholder hasta confirmarlo (docs/10 §18.3).',
+      default: 'https://pfos.dev/problems/',
+    },
+  ),
+  IDEMPOTENCY_RETENTION: variable(
+    z
+      .string()
+      .regex(/^\d+[hd]$/, 'duración en horas (`24h`) o días (`7d`)')
+      .transform((v) => Number(v.slice(0, -1)) * (v.endsWith('d') ? 24 : 1) * 3_600_000)
+      .refine((ms) => ms >= 24 * 3_600_000 && ms <= 7 * 24 * 3_600_000, 'entre 24h y 7d'),
+    {
+      group: 'Convenciones de API',
+      description:
+        'Retención de las claves `Idempotency-Key` y sus respuestas (mínimo 24h, máximo 7d). Pasada, la clave se trata como nueva.',
+      default: '24h',
+    },
+  ),
+  CURSOR_SIGNING_KEY: variable(
+    z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_-]{1,32}:[^,\s]{32,}(,[A-Za-z0-9_-]{1,32}:[^,\s]{32,})*$/,
+        'formato kid:secreto[,kid:secreto…] con secretos de ≥ 32 caracteres',
+      ),
+    {
+      group: 'Convenciones de API',
+      description:
+        'Claves HMAC de los cursores de paginación (`kid:secreto`, separadas por coma; la primera firma, todas verifican: rotación por `kid`). Obligatoria en staging/production; en local/ci, si falta, se genera una efímera.',
+      optional: true,
+      requiredWhen: '`PFOS_ENV=staging|production`',
+      secret: true,
+    },
+  ),
+  RATE_LIMIT_STORE: variable(z.enum(['memory', 'valkey']), {
+    group: 'Convenciones de API',
+    description:
+      'Almacén del límite de tasa. `memory` es válido con una réplica de API (Phase 1); `valkey` aún no tiene adapter (falla al arrancar).',
+    default: 'memory',
+  }),
+  RATE_LIMIT_READS_PER_MIN: variable(positiveInt, {
+    group: 'Convenciones de API',
+    description: 'Lecturas (GET) por minuto por usuario y por workspace (docs/10 §10).',
+    default: '600',
+  }),
+  RATE_LIMIT_WRITES_PER_MIN: variable(positiveInt, {
+    group: 'Convenciones de API',
+    description: 'Escrituras por minuto por usuario y por workspace (docs/10 §10).',
+    default: '120',
+  }),
+
   // ── Worker ──
   WORKER_CONCURRENCY: variable(positiveInt, {
     group: 'Worker',
@@ -294,6 +350,12 @@ export const APP_VARIABLES = {
     'API_BIND_ADDRESS',
     'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
+    'API_PROBLEM_TYPE_BASE',
+    'IDEMPOTENCY_RETENTION',
+    'CURSOR_SIGNING_KEY',
+    'RATE_LIMIT_STORE',
+    'RATE_LIMIT_READS_PER_MIN',
+    'RATE_LIMIT_WRITES_PER_MIN',
   ],
   worker: [
     ...GENERAL,

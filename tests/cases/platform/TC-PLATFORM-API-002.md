@@ -13,9 +13,10 @@ invariants: []
 priority: high
 type: platform
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- scripts/contract/test/oasdiff.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:

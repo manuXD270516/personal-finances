@@ -13,9 +13,11 @@ invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/api/test/api/api-conventions.api.test.ts
+- packages/platform/src/api/rate-limit/rate-limiter.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:

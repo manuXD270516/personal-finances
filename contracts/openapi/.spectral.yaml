@@ -1,6 +1,9 @@
 # Spectral ruleset for contracts/openapi/finance-api.v1.yaml
 # PFOS rules of docs/10-api-design.md §1.2 + add-api-conventions (design §Contratos #12).
 # Run: npx @stoplight/spectral-cli lint contracts/openapi/finance-api.v1.yaml --ruleset contracts/openapi/.spectral.yaml
+functions:
+  - pfos-sunset-window
+
 extends:
   - [spectral:oas, recommended]
 
@@ -194,19 +197,12 @@ rules:
         match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[a-z][a-zA-Z0-9]*\}))+$'
 
   pfos-sunset-on-deprecated:
-    description: Deprecated operations declare x-sunset (Sunset header date, at least 90 days after the announcement).
+    description: Deprecated operations declare x-deprecated-at and x-sunset (YYYY-MM-DD), the sunset at least 90 days after the announcement.
     severity: error
     given: '#Operations'
     then:
-      function: schema
-      functionOptions:
-        schema:
-          if:
-            required: [deprecated]
-            properties:
-              deprecated: { const: true }
-          then:
-            required: [x-sunset]
+      function: pfos-sunset-window
+    message: '{{error}}'
 
 overrides:
   # Side-effect-free calculations exposed as POST (no Idempotency-Key by design).

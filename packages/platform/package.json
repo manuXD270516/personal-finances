@@ -53,6 +53,16 @@
       "@pf/source": "./src/otel/register.ts",
       "types": "./dist/otel/register.d.ts",
       "default": "./dist/otel/register.js"
+    },
+    "./api": {
+      "@pf/source": "./src/api/index.ts",
+      "types": "./dist/api/index.d.ts",
+      "default": "./dist/api/index.js"
+    },
+    "./errors": {
+      "@pf/source": "./src/api/errors/error-catalog.ts",
+      "types": "./dist/api/errors/error-catalog.d.ts",
+      "default": "./dist/api/errors/error-catalog.js"
     }
   },
   "files": [
@@ -75,11 +85,15 @@
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/instrumentation": "catalog:",
     "@opentelemetry/sdk-node": "catalog:",
+    "@pf/shared-kernel": "workspace:*",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "pino": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
+    "yaml": "2.9.1",
     "zod": "catalog:"
   },
   "devDependencies": {

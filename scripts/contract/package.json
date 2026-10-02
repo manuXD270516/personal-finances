@@ -1,0 +1,23 @@
+{
+  "name": "@pf/contract-checks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gates del contrato OpenAPI (add-api-conventions): cambios incompatibles con oasdiff (TC-PLATFORM-API-002) y reglas Spectral propias (TC-PLATFORM-API-003).",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "breaking": "tsx src/cli.ts breaking"
+  },
+  "dependencies": {
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

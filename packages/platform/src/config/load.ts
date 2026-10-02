@@ -86,6 +86,24 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     }
   }
 
+  const cloud = values['PFOS_ENV'] === 'staging' || values['PFOS_ENV'] === 'production';
+  if (names.includes('CURSOR_SIGNING_KEY') && cloud && values['CURSOR_SIGNING_KEY'] === undefined) {
+    if (!problems.some((p) => p.variable === 'CURSOR_SIGNING_KEY')) {
+      problems.push({
+        variable: 'CURSOR_SIGNING_KEY',
+        reason: 'falta (obligatoria con PFOS_ENV=staging|production)',
+      });
+    }
+  }
+  if (
+    names.includes('RATE_LIMIT_STORE') &&
+    values['RATE_LIMIT_STORE'] === 'valkey' &&
+    values['VALKEY_URL'] === undefined &&
+    !problems.some((p) => p.variable === 'VALKEY_URL')
+  ) {
+    problems.push({ variable: 'VALKEY_URL', reason: 'falta (obligatoria cuando RATE_LIMIT_STORE=valkey)' });
+  }
+
   // Comportamientos solo de desarrollo se rechazan fuera de local/ci (docs/19 §6.1).
   if (
     values['OBJECT_STORAGE_ENSURE_BUCKET'] === true &&

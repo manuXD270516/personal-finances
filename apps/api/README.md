@@ -9,6 +9,7 @@ Composition root NestJS 12 (ESM). Una imagen, cuatro comandos (ADR-0011):
 | `src/main.migrate.ts` | `pnpm --filter @pf/api migrate` | Placeholder: loguea `sin migraciones` y sale con 0 (tarea 4.5) |
 | `src/main.seed.ts` | `pnpm --filter @pf/api seed` | Placeholder: `sin seeds`; rechaza staging/production |
 
+- Convenciones de `/api/v1` (`platform/api-conventions`): `src/api/api-conventions.ts` arma contrato, idempotencia (PostgreSQL), cursores y límite de tasa; el contrato se lee de `contracts/openapi` en el repo y de `contract/` (copia que deja `pnpm build`) en la imagen. El worker purga claves de idempotencia vencidas cada 15 min.
 - Configuración: `@pf/platform/config` (ver `docs/config-reference.md`). Variable faltante → exit 78.
 - OTel: `start:*` cargan `--import @pf/platform/otel/register`; activo solo con `OTEL_ENABLED=true`.
 - Apagado ordenado: SIGTERM/SIGINT → deja de aceptar trabajo, espera lo activo, cierra recursos, exit 0.

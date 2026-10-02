@@ -17,7 +17,7 @@ info:
     * Every operation declares `x-openspec-capability` (OpenSpec taxonomy, ARCHITECTURE §14) and `x-required-role`.
     * Insufficient role → 403 `INSUFFICIENT_ROLE`; not an active member → 403 `WORKSPACE_ACCESS_DENIED`.
     * Deprecated operations answer with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, at least 90 days after the
-      announcement) and `Link: <…>; rel="deprecation"`; they are flagged `deprecated: true` with `x-sunset`.
+      announcement) and `Link: <…>; rel="deprecation"`; they are flagged `deprecated: true` with `x-deprecated-at` and `x-sunset` (YYYY-MM-DD).
     * Responses carry `RateLimit` / `RateLimit-Policy` (IETF draft); exceeding the quota returns 429 `RATE_LIMITED`
       with `Retry-After`.
 
@@ -3277,7 +3277,13 @@ components:
       type: object
       required: [pointer, code]
       properties:
-        pointer: { type: string, description: 'JSON Pointer (RFC 6901) into the request body, e.g. /splits/1/amount' }
+        pointer:
+          type: string
+          description: 'JSON Pointer (RFC 6901) into the request body (e.g. /splits/1/amount), or `/<name>` of the parameter when `in` is not `body`'
+        in:
+          type: string
+          enum: [body, query, header, path]
+          description: Location of the invalid value (absent means body)
         code: { $ref: '#/components/schemas/ErrorCode' }
         detail: { type: string }
     ErrorCode:
