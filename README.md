@@ -2,7 +2,7 @@
 
 Sistema integral de finanzas personales multi-moneda (fiat + cripto) con ledger de doble entrada interno, planificación mensual, presupuestos, compromisos recurrentes, deudas, metas, imports, reportes y —en fases tardías— forecasting y un asistente IA de solo lectura.
 
-> **Estado (2026-10-02):** DESIGN GATE aprobado (2026-10-01) · **Implementation Gate en curso** · **Phase 0 bootstrap implementado** (`bootstrap-platform-foundation`: monorepo, observabilidad base, contenedores y stack local, quality gate de CI y trazabilidad de tests). Todavía no hay bounded contexts de negocio. Ver [docs/DESIGN-GATE.md](docs/DESIGN-GATE.md).
+> **Estado (2026-10-02):** DESIGN GATE aprobado (2026-10-01) · **Phase 0 bootstrap implementado y archivado** · **Phase 1 lista para implementar** (11 changes especificados) (`bootstrap-platform-foundation`: monorepo, observabilidad base, contenedores y stack local, quality gate de CI y trazabilidad de tests). Todavía no hay bounded contexts de negocio. Ver [docs/DESIGN-GATE.md](docs/DESIGN-GATE.md).
 
 ## Inicio rápido
 
