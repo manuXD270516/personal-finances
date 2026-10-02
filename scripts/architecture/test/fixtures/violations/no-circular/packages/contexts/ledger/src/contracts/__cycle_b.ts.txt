@@ -1,0 +1,2 @@
+import { a } from '../../../transactions/src/contracts/__cycle_a.js';
+export const b = { name: 'b', a };

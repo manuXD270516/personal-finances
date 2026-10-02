@@ -1,7 +1,7 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "agentGuidance": false,
-  "globalDependencies": ["tsconfig.base.json", "eslint.config.js"],
+  "globalDependencies": ["tsconfig.base.json", "eslint.config.js", ".dependency-cruiser.cjs"],
   "tasks": {
     "transit": {
       "dependsOn": ["^transit"]
@@ -30,6 +30,11 @@
     "test": {
       "dependsOn": ["^transit"],
       "outputs": []
+    },
+    "@pf/architecture#test": {
+      "dependsOn": ["^transit"],
+      "outputs": [],
+      "cache": false
     },
     "test:integration": {
       "dependsOn": ["^build"],

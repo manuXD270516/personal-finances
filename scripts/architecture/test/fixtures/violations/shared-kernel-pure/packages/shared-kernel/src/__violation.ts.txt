@@ -1,0 +1,2 @@
+import type { PostEntryCommand } from '../../contexts/ledger/src/contracts/index.js';
+export type Cmd = PostEntryCommand;

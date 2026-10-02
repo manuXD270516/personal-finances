@@ -1,0 +1,2 @@
+import { b } from '../../../ledger/src/contracts/__cycle_b.js';
+export const a = (): string => `a${b.name}`;

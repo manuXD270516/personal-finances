@@ -1,0 +1,243 @@
+# PR gate (platform/delivery-pipeline, docs/23 §5.1 y §6). Todos los jobs son checks requeridos en `main`
+# (lista en docs/23 §16). Acciones de terceros fijadas por SHA de commit completo; binarios (Trivy, gitleaks)
+# por versión + SHA-256 verificado. El comentario junto a cada SHA es el tag de origen verificado.
+name: pr
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+  OPENSPEC_TELEMETRY: '0'
+  OPENSPEC_NO_UPDATE_CHECK: '1'
+  TRIVY_VERSION: 0.74.0
+  TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm format:check
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm typecheck
+
+  openspec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      # Flags confirmados en SPIKE-01; telemetría desactivada por env (workflow) y por el propio script.
+      - run: pnpm spec:validate
+
+  config-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm config:docs:check
+
+  architecture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      # Las pruebas "cada regla falla con su fixture" (TC-PLATFORM-ARCH-001) corren en el job `unit`.
+      - run: pnpm arch:check
+
+  traceability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # historial completo: R11 compara contra origin/main (TC borrados)
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm traceability:check -- --base origin/main
+      - name: Matriz de trazabilidad (artefacto)
+        if: ${{ !cancelled() }}
+        run: pnpm traceability:matrix
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: traceability-matrix
+          path: |
+            tests/traceability/matrix.md
+            tests/traceability/matrix.json
+          if-no-files-found: error
+          retention-days: 7
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm test
+
+  integration:
+    runs-on: ubuntu-latest # Docker disponible en los runners Linux hospedados
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm test:integration
+
+  image:
+    name: image (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: finance-api
+            dockerfile: docker/api.Dockerfile
+          - image: finance-web
+            dockerfile: docker/web.Dockerfile
+    env:
+      IMAGE_REF: pfos/${{ matrix.image }}:ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build (buildx, sin push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: runtime
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_REF }}
+          build-args: |
+            GIT_SHA=${{ github.event.pull_request.head.sha }}
+            VERSION=0.0.0-pr.${{ github.event.pull_request.number }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+      - name: Non-root
+        run: |
+          user="$(docker image inspect --format '{{.Config.User}}' "$IMAGE_REF")"
+          echo "USER=${user}"
+          case "${user%%:*}" in ''|0|root) echo "::error::${IMAGE_REF} corre como root"; exit 1;; esac
+      - name: Instalar Trivy (versión fijada + SHA-256)
+        run: |
+          curl -fsSLo trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tgz" | sha256sum --check --strict
+          tar -xzf trivy.tgz -C "$RUNNER_TEMP" trivy && rm trivy.tgz
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # Falla ante CRITICAL con corrección disponible; excepciones con vencimiento en .trivyignore.yaml.
+      - name: Trivy image
+        run: >-
+          trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1
+          --ignorefile .trivyignore.yaml --no-progress "$IMAGE_REF"
+      - name: Exportar imagen para stack-smoke (build once)
+        run: docker save "$IMAGE_REF" -o "$RUNNER_TEMP/${{ matrix.image }}.tar"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-${{ matrix.image }}
+          path: ${{ runner.temp }}/${{ matrix.image }}.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  stack-smoke:
+    needs: [image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PF_STACK_PREBUILT_IMAGES: '1'
+      FINANCE_API_IMAGE: pfos/finance-api:ci
+      FINANCE_WEB_IMAGE: pfos/finance-web:ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: image-*
+          path: ${{ runner.temp }}/images
+          merge-multiple: true
+      - name: Cargar las imágenes del job `image` (sin reconstruir)
+        run: for f in "$RUNNER_TEMP"/images/*.tar; do docker load -i "$f"; done
+      # TC-PLATFORM-STACK-*: perfil core healthy, migrate, reset+seed, backup/restore… (tarea 4.3 en Linux).
+      - run: pnpm test:stack
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Instalar Trivy (versión fijada + SHA-256)
+        run: |
+          curl -fsSLo trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tgz" | sha256sum --check --strict
+          tar -xzf trivy.tgz -C "$RUNNER_TEMP" trivy && rm trivy.tgz
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # Misma política y mismo archivo de excepciones que las imágenes (pnpm-lock.yaml; spikes/ fuera del producto).
+      - name: Trivy fs (pnpm-lock.yaml)
+        run: >-
+          trivy fs --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1
+          --ignorefile .trivyignore.yaml --skip-dirs spikes --no-progress .
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Instalar gitleaks (versión fijada + SHA-256)
+        run: |
+          curl -fsSLo gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum --check --strict
+          tar -xzf gitleaks.tgz -C "$RUNNER_TEMP" gitleaks && rm gitleaks.tgz
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # Solo los commits que aporta la PR: la historia previa de main contiene falsos positivos conocidos
+      # (credenciales de desarrollo de spikes, claves de idempotencia en TC) ya revisados.
+      - name: gitleaks (commits de la PR)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gitleaks git --log-opts="${BASE_SHA}..${HEAD_SHA}" --redact --no-banner --exit-code 1 .

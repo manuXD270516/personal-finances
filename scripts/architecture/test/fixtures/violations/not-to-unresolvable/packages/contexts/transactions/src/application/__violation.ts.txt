@@ -1,0 +1,3 @@
+// Deep import a internals de otro contexto por nombre de paquete: package.json#exports lo bloquea.
+import { JournalEntry } from '@pf/ledger/src/domain/journal-entry.js';
+export const entry = JournalEntry;

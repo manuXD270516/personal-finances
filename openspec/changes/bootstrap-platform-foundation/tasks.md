@@ -34,11 +34,11 @@
 
 ## 5. Quality gate y entrega (platform/delivery-pipeline)
 
-- [ ] 5.1 Redactar los TC de gate de OpenSpec, gate de arquitectura, gate de CVE crítico y promoción por digest
-- [ ] 5.2 Agregar reglas de dependency-cruiser y un fixture que falle a propósito; verificar que el chequeo falla ante un import domain→infrastructure
-- [ ] 5.3 Agregar `.github/workflows/pr.yml` con todos los chequeos requeridos (OpenSpec strict, formato, lint, typecheck, unit, integración con Testcontainers, arquitectura, build, Trivy, escaneo de dependencias, gitleaks); verificar en una PR de prueba
-- [ ] 5.4 Agregar `main.yml` que publique imágenes con tag `sha-<commit>` y registre digests; verificar que un segundo job descarga por digest sin reconstruir
-- [ ] 5.5 Configurar branch protection con chequeos requeridos; verificar que un chequeo fallido bloquea el merge
+- [x] 5.1 Redactar los TC de gate de OpenSpec, gate de arquitectura, gate de CVE crítico y promoción por digest _(2026-10-02: TC-PLATFORM-PIPELINE-001…004 y TC-PLATFORM-ARCH-001/002 existentes; TC-PLATFORM-ARCH-001 ajustado al comando `pnpm arch:check` y a los fixtures implementados)_
+- [x] 5.2 Agregar reglas de dependency-cruiser y un fixture que falle a propósito; verificar que el chequeo falla ante un import domain→infrastructure _(2026-10-02: `.dependency-cruiser.cjs` + `pnpm arch:check` (0 violaciones en el repo real); `scripts/architecture` prueba con fixtures que cada una de las 12 reglas falla con su violación y pasa sin ella, más la regla `process.env` de ESLint — TC-PLATFORM-ARCH-001)_
+- [ ] 5.3 Agregar `.github/workflows/pr.yml` con todos los chequeos requeridos (OpenSpec strict, formato, lint, typecheck, unit, integración con Testcontainers, arquitectura, build, Trivy, escaneo de dependencias, gitleaks); verificar en una PR de prueba _(2026-10-02: workflow escrito y validado con actionlint 1.7.12; pendiente de ejecución en GitHub)_
+- [ ] 5.4 Agregar `main.yml` que publique imágenes con tag `sha-<commit>` y registre digests; verificar que un segundo job descarga por digest sin reconstruir _(2026-10-02: workflow escrito y validado con actionlint 1.7.12; pendiente de ejecución en GitHub)_
+- [ ] 5.5 Configurar branch protection con chequeos requeridos; verificar que un chequeo fallido bloquea el merge _(2026-10-02: lista de checks requeridos en docs/23 §16; pendiente de ejecución en GitHub por el lead con permiso del owner)_
 
 ## 6. Trazabilidad de tests (quality/test-traceability)
 

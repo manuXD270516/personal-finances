@@ -1,0 +1,5 @@
+import { Transaction } from '../domain/transaction.js';
+// Consumo cruzado permitido: solo vía contracts del otro contexto.
+import type { PostEntryCommand } from '../../../ledger/src/contracts/index.js';
+
+export const recordTransaction = (cmd: PostEntryCommand): Transaction => new Transaction(cmd);

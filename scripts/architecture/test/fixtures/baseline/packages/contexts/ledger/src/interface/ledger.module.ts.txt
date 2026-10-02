@@ -1,0 +1,4 @@
+import { postEntry } from '../application/post-entry.service.js';
+import { JournalEntryRepository } from '../infrastructure/journal-entry.repository.js';
+
+export const LedgerModule = { postEntry, repository: JournalEntryRepository };

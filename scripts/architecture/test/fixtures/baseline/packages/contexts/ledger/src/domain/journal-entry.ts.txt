@@ -1,0 +1,5 @@
+import type { Money } from '../../../../shared-kernel/src/index.js';
+
+export class JournalEntry {
+  constructor(readonly debit: Money, readonly credit: Money) {}
+}

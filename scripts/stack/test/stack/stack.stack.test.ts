@@ -43,6 +43,9 @@ async function downVolumes(): Promise<void> {
 describe('stack local en contenedores (pfos-test)', () => {
   beforeAll(async () => {
     await downVolumes();
+    // CI (.github/workflows/pr.yml, job stack-smoke) prueba las imágenes construidas UNA vez por el job `image`:
+    // las carga con `docker load` y las inyecta con FINANCE_API_IMAGE / FINANCE_WEB_IMAGE, sin reconstruir.
+    if (process.env['PF_STACK_PREBUILT_IMAGES'] === '1') return;
     const build = await pnpm('images:build', [], processEnv);
     expect(build.code, build.stderr).toBe(0);
   });

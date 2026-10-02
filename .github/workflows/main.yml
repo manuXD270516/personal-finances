@@ -1,0 +1,130 @@
+# Build once (platform/delivery-pipeline, NFR-PORT-006, docs/23 §5.2): cada push a main construye UNA vez
+# finance-api y finance-web, las publica en GHCR con tag `sha-<commit>` y registra sus digests. Un segundo job
+# descarga las imágenes POR DIGEST y verifica que corren sin reconstruir. Sin deploy (aún no hay cloud).
+# Acciones de terceros fijadas por SHA de commit completo (comentario = tag verificado).
+name: main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main
+  cancel-in-progress: false # nunca cancelar un build en curso: cada commit produce su artefacto
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ghcr.io/manuxd270516
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+
+jobs:
+  build-push:
+    name: build-push (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: finance-api
+            dockerfile: docker/api.Dockerfile
+          - image: finance-web
+            dockerfile: docker/web.Dockerfile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build y push (sha-<commit>)
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: runtime
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:sha-${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            VERSION=0.0.0-sha.${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+      - name: Registrar digest
+        env:
+          IMAGE: ${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '{"image":"%s","tag":"sha-%s","digest":"%s","ref":"%s@%s"}\n' \
+            "$IMAGE" "$GITHUB_SHA" "$DIGEST" "$IMAGE" "$DIGEST" > "$RUNNER_TEMP/digests/${{ matrix.image }}.json"
+          {
+            echo "### ${{ matrix.image }}"
+            echo ""
+            echo "| tag | digest |"
+            echo "|---|---|"
+            echo "| \`sha-${GITHUB_SHA}\` | \`${DIGEST}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.image }}
+          path: ${{ runner.temp }}/digests/${{ matrix.image }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+  verify-by-digest:
+    name: verify-by-digest (pull sin rebuild + stack core)
+    needs: [build-push]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: read
+    env:
+      PF_STACK_PREBUILT_IMAGES: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Este job NO tiene buildx ni pasos de build: solo pull por digest (inmutable).
+      - name: Pull por digest y verificación de procedencia
+        run: |
+          for name in finance-api finance-web; do
+            ref="$(jq -r .ref "$RUNNER_TEMP/digests/${name}.json")"
+            digest="$(jq -r .digest "$RUNNER_TEMP/digests/${name}.json")"
+            docker pull "$ref"
+            docker image inspect --format '{{join .RepoDigests "\n"}}' "$ref" | grep -qx "${ref}" \
+              || { echo "::error::${name}: el digest descargado no coincide con ${digest}"; exit 1; }
+            revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$ref")"
+            [ "$revision" = "$GITHUB_SHA" ] \
+              || { echo "::error::${name}: revision=${revision}, esperado ${GITHUB_SHA}"; exit 1; }
+            var="$(echo "${name#finance-}" | tr '[:lower:]' '[:upper:]')"
+            echo "FINANCE_${var}_IMAGE=${ref}" >> "$GITHUB_ENV"
+            echo "| ${name} | \`${ref}\` | revision \`${revision}\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: ./.github/actions/setup-workspace
+      # Las imágenes ya están presentes por digest: Compose no construye (PF_STACK_PREBUILT_IMAGES=1).
+      - run: pnpm test:stack

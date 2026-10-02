@@ -1,0 +1,2 @@
+import type { RecordTransactionCommand } from '../../../transactions/src/contracts/index.js';
+export type Cmd = RecordTransactionCommand;
