@@ -1,0 +1,45 @@
+{
+  "name": "@pf/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "finance-api: composition root NestJS (comandos api | worker | migrate | seed).",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "start:api": "node --import @pf/platform/otel/register dist/main.api.js",
+    "start:worker": "node --import @pf/platform/otel/register dist/main.worker.js",
+    "migrate": "node dist/entrypoint.js migrate",
+    "seed": "node dist/entrypoint.js seed"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "dbmate": "2.36.0",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "catalog:",
+    "@testcontainers/postgresql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/supertest": "catalog:",
+    "supertest": "catalog:",
+    "testcontainers": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "db"
+  ]
+}

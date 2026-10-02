@@ -1,0 +1,2 @@
+import { JournalEntryRepository } from '../infrastructure/journal-entry.repository.js';
+export const repo = new JournalEntryRepository();

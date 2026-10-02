@@ -1,0 +1,2 @@
+import type { JournalEntry } from '../domain/journal-entry.js';
+export type Entry = JournalEntry;

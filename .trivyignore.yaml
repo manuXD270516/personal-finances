@@ -1,0 +1,11 @@
+# Excepciones del escaneo de vulnerabilidades (Trivy: imágenes y dependencias) — NFR-SEC-013, TC-PLATFORM-PIPELINE-002.
+#
+# Política (docs/23 §6): el PR gate falla ante cualquier vulnerabilidad CRITICAL con corrección disponible.
+# Una excepción solo es válida si está aquí, con motivo y vencimiento. Al pasar `expired_at`, Trivy deja de
+# aplicarla y el gate vuelve a fallar. Formato de cada entrada:
+#
+#   - id: CVE-AAAA-NNNNN
+#     paths: ['usr/local/lib/node_modules/...']   # opcional: acota el paquete afectado
+#     statement: 'Motivo, mitigación y enlace al issue de seguimiento'
+#     expired_at: 2026-12-31                      # obligatorio en este repo; máximo 90 días
+vulnerabilities: []

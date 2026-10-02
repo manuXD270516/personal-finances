@@ -12,17 +12,17 @@ invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["scripts/stack/test/stack/stack.stack.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["compose", "windows", "healthcheck"]
 error_code: null
 preconditions:
   - "Docker Desktop con WSL2 (Windows) o Docker Engine (CI en Linux)"
-  - "Imágenes finance-api y finance-web construidas"
-  - ".env creado a partir de .env.example"
+  - "Imágenes finance-api y finance-web construidas (pnpm images:build)"
+  - ".env creado con pnpm setup:env a partir de .env.example"
 input:
   command: "docker compose --profile core up -d"
   timeout: "5 min"
@@ -32,7 +32,7 @@ steps:
   - "Inspeccionar el código de salida de migrate"
   - "Verificar los usuarios de los contenedores"
 expected_result:
-  - "postgres, redis, object-storage, mailpit, keycloak, finance-api, finance-worker, finance-web están healthy"
+  - "postgres, object-storage, mailpit, keycloak, finance-api, finance-worker, finance-web están healthy (Valkey ya no forma parte de core: perfil opcional `valkey`)"
   - "migrate terminó con código 0"
   - "finance-api /health/ready = 200 y /health/live = 200"
   - "Los contenedores finance-* se ejecutan como non-root"

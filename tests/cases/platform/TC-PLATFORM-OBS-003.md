@@ -14,9 +14,9 @@ invariants: []
 priority: critical
 type: security
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/correlation.api.test.ts", "packages/platform/src/logging/logger.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags:

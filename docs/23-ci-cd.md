@@ -639,3 +639,28 @@ Política: **no hay "down migrations" en entornos compartidos** (dbmate `down` s
 5. ¿Usuario técnico de smoke también en producción (datos aislados en un workspace técnico) o solo verificaciones anónimas?
 6. Merge queue: ¿desde que haya ≥ 2 colaboradores?
 7. ¿Un único `vX.Y.Z` de producto o versiones por deployable desde Phase 1?
+
+## 16. Workflows implementados y checks requeridos (bootstrap-platform-foundation, 2026-10-02)
+
+Implementados en `.github/workflows/pr.yml` y `.github/workflows/main.yml` (setup común en `.github/actions/setup-workspace`). Diferencias con los ejemplos ilustrativos de §5: sin path filters ni `--affected` (todos los jobs corren en cada PR), sin job `gate` agregador, GHCR en lugar de ECR y sin deploy. Trivy y gitleaks se instalan como **binarios con versión y SHA-256 fijados** (no `trivy-action`); el escaneo de dependencias usa `trivy fs` sobre `pnpm-lock.yaml` para compartir política y excepciones con vencimiento (`.trivyignore.yaml`) con el escaneo de imágenes — `pnpm audit` no admite excepciones con vencimiento. Actions fijadas por SHA de commit completo con el tag verificado como comentario (Renovate `helpers:pinGitHubActionDigests` las mantendrá).
+
+**Branch protection / ruleset de `main` — checks requeridos (nombres exactos de los jobs de `pr.yml`):**
+
+| Check | Qué verifica |
+|---|---|
+| `format` | `pnpm format:check` |
+| `lint` | `pnpm lint` (incluye `process.env` solo en `@pf/platform`) |
+| `typecheck` | `pnpm typecheck` |
+| `openspec` | `pnpm spec:validate` (`--all --strict --no-interactive`, telemetría off) |
+| `config-docs` | `pnpm config:docs:check` |
+| `architecture` | `pnpm arch:check` (dependency-cruiser) |
+| `traceability` | `pnpm traceability:check -- --base origin/main` + matriz como artefacto |
+| `unit` | `pnpm test` (incluye las pruebas de fixtures de arquitectura, TC-PLATFORM-ARCH-001) |
+| `integration` | `pnpm test:integration` (Testcontainers) |
+| `image (finance-api)` | build buildx sin push, non-root, Trivy CRITICAL con fix |
+| `image (finance-web)` | idem |
+| `stack-smoke` | `pnpm test:stack` (perfil core) con las imágenes del job `image`, sin reconstruir |
+| `dependency-scan` | `trivy fs` CRITICAL con fix |
+| `secrets` | gitleaks sobre los commits de la PR |
+
+Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branches up to date*, historial lineal, sin force-push ni borrado. `main.yml` (jobs `build-push (finance-api)`, `build-push (finance-web)`, `verify-by-digest`) corre tras el merge y **no** es un check requerido.

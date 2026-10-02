@@ -27,6 +27,16 @@ preconditions:
 - EDITOR autenticado de W1
 - Bank A (BOB) con saldo 1000.00 BOB
 - Categoría Groceries
+input:
+  expenses:
+  - amount: "45.90"
+    currency: BOB
+    paymentMethod: QR
+  - amount: "45.90"
+    currency: BOB
+    paymentMethod: DEBIT_CARD
+  filter:
+    paymentMethod: QR
 steps:
 - Registrar gasto 45.90 BOB con paymentMethod QR
 - Registrar gasto 45.90 BOB con paymentMethod DEBIT_CARD

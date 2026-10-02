@@ -1,0 +1,24 @@
+{
+  "name": "@pf/traceability",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Chequeo de trazabilidad FR/NFR → requirement → scenario → TC → test y generación de la matriz (docs/17).",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "tsx src/cli.ts check",
+    "matrix": "tsx src/cli.ts matrix"
+  },
+  "dependencies": {
+    "yaml": "2.9.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

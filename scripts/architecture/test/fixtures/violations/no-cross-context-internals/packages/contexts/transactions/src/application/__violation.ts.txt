@@ -1,0 +1,2 @@
+import { JournalEntry } from '../../../ledger/src/domain/journal-entry.js';
+export const entry = JournalEntry;

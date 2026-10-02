@@ -27,6 +27,11 @@ error_code: INSUFFICIENT_ROLE
 preconditions:
 - W1 con un VIEWER
 - Gasto de 45.90 BOB editado
+input:
+  role: VIEWER
+  requests:
+  - historial del gasto de 45.90 BOB
+  - GET /audit-log
 steps:
 - Como VIEWER abrir el historial del gasto
 - Como VIEWER consultar /audit-log

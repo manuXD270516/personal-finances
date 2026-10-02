@@ -14,9 +14,9 @@ invariants: []
 priority: high
 type: platform
 level: architecture
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["scripts/stack/test/hosts-check.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -25,7 +25,7 @@ tags:
 error_code: null
 preconditions:
 - Chequeo estático de hosts fijos configurado en el quality gate
-- 'Exclusiones declaradas: documentación (docs/, *.md) y fixtures de test'
+- 'Exclusiones declaradas: documentación (docs/, *.md), fixtures y arneses de test, bloques healthcheck de Compose / HEALTHCHECK de Dockerfile (loopback del propio contenedor) y líneas marcadas pf-allow-loopback'
 input:
   patterns:
   - localhost
@@ -39,6 +39,8 @@ input:
   - docs/**
   - '**/*.md'
   - '**/__fixtures__/**'
+  - '**/test/**'
+  - '**/*.test.ts'
 steps:
 - Ejecutar el chequeo estático de hosts fijos sobre el repositorio
 - Ejecutar el chequeo contra un fixture que contiene una URL http://localhost:5432 fija en código de aplicación

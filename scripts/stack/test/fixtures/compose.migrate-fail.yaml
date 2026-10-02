@@ -1,0 +1,6 @@
+# Override de TC-PLATFORM-STACK-008: añade una migración rota a la imagen de `migrate` (rutas relativas al
+# directorio del primer compose: deploy/compose).
+services:
+  migrate:
+    volumes:
+      - ../../scripts/stack/test/fixtures/migrate-fail/20991231000000_tc_stack_008_broken.sql:/app/db/migrations/20991231000000_tc_stack_008_broken.sql:ro

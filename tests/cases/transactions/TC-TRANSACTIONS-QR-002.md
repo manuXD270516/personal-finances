@@ -26,6 +26,15 @@ preconditions:
 - EDITOR autenticado de W1
 - Bank A (BOB) con saldo 1000.00 BOB
 - Categoría Freelance
+input:
+  kind: INCOME
+  account: Bank A
+  amount: "300.00"
+  currency: BOB
+  paymentMethod: QR
+  counterparty: Cliente Demo
+  category: Freelance
+  businessDate: "2026-03-14"
 steps:
 - Registrar ingreso 300.00 BOB por QR de Cliente Demo, categoría Freelance, fecha 2026-03-14
 - Consultar saldo e ingresos de marzo

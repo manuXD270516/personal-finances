@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- scripts/traceability/test/cli.test.ts
+- scripts/traceability/test/rules.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["traceability", "ci"]

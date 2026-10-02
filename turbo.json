@@ -1,0 +1,51 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "agentGuidance": false,
+  "globalDependencies": ["tsconfig.base.json", "eslint.config.js", ".dependency-cruiser.cjs"],
+  "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "app/**",
+        "i18n/**",
+        "messages/**",
+        "public/**",
+        "*.ts",
+        "*.mjs",
+        "tsconfig*.json",
+        "package.json"
+      ],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^transit"]
+    },
+    "lint": {
+      "dependsOn": ["^transit"]
+    },
+    "test": {
+      "dependsOn": ["^transit"],
+      "outputs": []
+    },
+    "@pf/architecture#test": {
+      "dependsOn": ["^transit"],
+      "outputs": [],
+      "cache": false
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": false
+    },
+    "config:docs": {
+      "cache": false
+    },
+    "config:docs:check": {
+      "cache": false
+    }
+  }
+}

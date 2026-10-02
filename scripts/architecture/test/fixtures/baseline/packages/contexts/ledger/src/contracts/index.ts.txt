@@ -1,0 +1,5 @@
+// API pública del contexto: TypeScript plano, dinero como string decimal.
+export interface PostEntryCommand {
+  readonly amount: string;
+  readonly currency: string;
+}

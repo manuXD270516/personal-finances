@@ -1,0 +1,5 @@
+// Composition root: solo módulo Nest (interface/<ctx>.module.ts) y contracts.
+import { LedgerModule } from '../../../packages/contexts/ledger/src/interface/ledger.module.js';
+import type { PostEntryCommand } from '../../../packages/contexts/ledger/src/contracts/index.js';
+
+export const bootstrap = (cmd: PostEntryCommand) => LedgerModule.postEntry(cmd);

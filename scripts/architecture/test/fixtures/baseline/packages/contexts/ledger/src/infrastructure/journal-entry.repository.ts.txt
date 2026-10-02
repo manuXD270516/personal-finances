@@ -1,0 +1,5 @@
+import type { JournalEntry } from '../domain/journal-entry.js';
+
+export class JournalEntryRepository {
+  readonly saved: JournalEntry[] = [];
+}

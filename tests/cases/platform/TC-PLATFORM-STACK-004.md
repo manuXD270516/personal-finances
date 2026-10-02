@@ -13,9 +13,9 @@ invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["scripts/stack/test/stack/stack.stack.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -64,3 +64,4 @@ Entonces la base y el object storage vuelven al estado respaldado
 ## Notas
 
 - Se ejecuta también en PowerShell para verificar que ningún comando depende de un shell exclusivo de POSIX.
+- El invariant checker del ledger se aplica cuando exista el contexto Ledger; mientras tanto el dataset de plataforma se verifica por conteos y `platform.seed_run`.

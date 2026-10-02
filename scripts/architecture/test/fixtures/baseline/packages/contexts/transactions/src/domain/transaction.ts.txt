@@ -1,0 +1,5 @@
+import type { Money } from '../../../../shared-kernel/src/index.js';
+
+export class Transaction {
+  constructor(readonly amount: Money) {}
+}

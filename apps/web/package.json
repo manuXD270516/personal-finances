@@ -1,0 +1,29 @@
+{
+  "name": "@pf/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "finance-web: shell Next.js (App Router, UI + BFF), salida standalone.",
+  "scripts": {
+    "dev": "next dev --port 23000",
+    "build": "next build",
+    "start": "node .next/standalone/apps/web/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pf/platform": "workspace:*",
+    "next": "catalog:",
+    "next-intl": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

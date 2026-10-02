@@ -13,9 +13,9 @@ invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["scripts/stack/test/stack/stack.stack.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -32,7 +32,7 @@ steps:
 - Listar los contenedores en ejecución y su estado de salud
 - Levantar core sin observability y listar los servicios de telemetría
 expected_result:
-- postgres, redis, object-storage, keycloak y mailpit quedan healthy
+- "postgres, object-storage, keycloak y mailpit quedan healthy (Valkey no forma parte de deps: perfil opcional `valkey`)"
 - No existe ningún contenedor finance-api, finance-worker ni finance-web en ejecución
 - Levantar core sin observability no inicia ningún servicio de telemetría
 created: 2026-10-02

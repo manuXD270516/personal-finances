@@ -10,40 +10,40 @@
 
 ## 2. Skeleton del repositorio
 
-- [ ] 2.1 Crear workspace pnpm + Turborepo, tsconfig raíz estricto, ESLint/Prettier, `.editorconfig`; verificar que `pnpm install && pnpm turbo run typecheck` pasa
-- [ ] 2.2 Crear `packages/shared-kernel` y `packages/platform` vacíos con carpetas por capa; verificar que los paquetes compilan
-- [ ] 2.3 Crear el host NestJS `apps/api` con entrypoints `api`, `worker`, `migrate`, `seed` (sin módulos de negocio); verificar que cada uno arranca y termina/sirve según lo esperado
-- [ ] 2.4 Crear el shell Next.js `apps/web` con ruta de salud; verificar que compila en modo standalone
-- [ ] 2.5 Configurar i18n del web shell con español como locale por defecto y catálogos preparados para `en` y `pt`; verificar que cambiar de locale no rompe el build
+- [x] 2.1 Crear workspace pnpm + Turborepo, tsconfig raíz estricto, ESLint/Prettier, `.editorconfig`; verificar que `pnpm install && pnpm turbo run typecheck` pasa
+- [x] 2.2 Crear `packages/shared-kernel` y `packages/platform` vacíos con carpetas por capa; verificar que los paquetes compilan
+- [x] 2.3 Crear el host NestJS `apps/api` con entrypoints `api`, `worker`, `migrate`, `seed` (sin módulos de negocio); verificar que cada uno arranca y termina/sirve según lo esperado
+- [x] 2.4 Crear el shell Next.js `apps/web` con ruta de salud; verificar que compila en modo standalone
+- [x] 2.5 Configurar i18n del web shell con español como locale por defecto y catálogos preparados para `en` y `pt`; verificar que cambiar de locale no rompe el build
 
 ## 3. Observabilidad base (platform/observability)
 
-- [ ] 3.1 Redactar los TC de liveness/readiness/correlación/redacción de logs en tests/cases/platform; verificar que el chequeo del catálogo los acepta
-- [ ] 3.2 Implementar `/health/live` y `/health/ready` con chequeo de dependencias (PG, object storage; Valkey solo si está habilitado por `JOB_QUEUE_DRIVER`/`SESSION_STORE`); verificar con tests de integración nombrados con sus TC-ids
-- [ ] 3.3 Implementar logging JSON estructurado con propagación del ID de correlación API → worker y redacción de tokens; verificar con tests nombrados con sus TC-ids
+- [x] 3.1 Redactar los TC de liveness/readiness/correlación/redacción de logs en tests/cases/platform; verificar que el chequeo del catálogo los acepta
+- [x] 3.2 Implementar `/health/live` y `/health/ready` con chequeo de dependencias (PG, object storage; Valkey solo si está habilitado por `JOB_QUEUE_DRIVER`/`SESSION_STORE`); verificar con tests de integración nombrados con sus TC-ids
+- [x] 3.3 Implementar logging JSON estructurado con propagación del ID de correlación API → worker y redacción de tokens; verificar con tests nombrados con sus TC-ids
 
 ## 4. Contenedores y stack local (platform/local-environment)
 
-- [ ] 4.1 Redactar los TC de salud del stack, arranque por readiness, reset+seed, ida y vuelta backup/restore y ausencia de hosts fijos
-- [ ] 4.2 Crear Dockerfiles multi-stage (`docker/api.Dockerfile`, `docker/web.Dockerfile`), non-root y con healthchecks; verificar que las imágenes compilan y corren como non-root
-- [ ] 4.3 Crear `deploy/compose/compose.yaml` con perfiles `deps`, `core`, `seed`, `observability`, `ml`, volúmenes nombrados y `depends_on` por salud; verificar que `pnpm stack:up` llega a todo healthy en Windows y en CI Linux
-- [ ] 4.4 Crear `.env.example` (sin secretos, puertos `PF_*` con defaults 2xxxx en 127.0.0.1), `pnpm setup:env`, el esquema de configuración validado al arrancar (docs/19 §0.3) e import del realm de desarrollo de Keycloak; verificar que gitleaks no reporta hallazgos y que el arranque falla con una variable faltante
-- [ ] 4.5 Crear la migración SQL de bootstrap (schema `platform`, roles `pf_migrator`/`pf_app` sin BYPASSRLS); verificar que `migrate` termina y que el rol de app no puede saltarse RLS
-- [ ] 4.6 Implementar scripts multiplataforma (`stack:up|down|restart|logs|reset`, `db:migrate`, `db:seed`, `backup:local`, `restore:local`) y verificarlos en Windows; automatizar el test de ida y vuelta backup/restore
-- [ ] 4.7 Implementar apagado ordenado de api y worker; verificar con un test que envía SIGTERM a mitad de un job
+- [x] 4.1 Redactar los TC de salud del stack, arranque por readiness, reset+seed, ida y vuelta backup/restore y ausencia de hosts fijos
+- [x] 4.2 Crear Dockerfiles multi-stage (`docker/api.Dockerfile`, `docker/web.Dockerfile`), non-root y con healthchecks; verificar que las imágenes compilan y corren como non-root
+- [ ] 4.3 Crear `deploy/compose/compose.yaml` con perfiles `deps`, `core`, `seed`, `observability`, `ml`, volúmenes nombrados y `depends_on` por salud; verificar que `pnpm stack:up` llega a todo healthy en Windows y en CI Linux _(2026-10-02: Windows verificado — core healthy en 36,7 s con volúmenes vacíos e imágenes en caché, suite `pnpm test:stack`; pendiente CI Linux con 5.3)_
+- [x] 4.4 Crear `.env.example` (sin secretos, puertos `PF_*` con defaults 2xxxx en 127.0.0.1), `pnpm setup:env`, el esquema de configuración validado al arrancar (docs/19 §0.3) e import del realm de desarrollo de Keycloak; verificar que gitleaks no reporta hallazgos y que el arranque falla con una variable faltante
+- [x] 4.5 Crear la migración SQL de bootstrap (schema `platform`, roles `pf_migrator`/`pf_app` sin BYPASSRLS); verificar que `migrate` termina y que el rol de app no puede saltarse RLS
+- [x] 4.6 Implementar scripts multiplataforma (`stack:up|down|restart|logs|reset`, `db:migrate`, `db:seed`, `backup:local`, `restore:local`) y verificarlos en Windows; automatizar el test de ida y vuelta backup/restore
+- [x] 4.7 Implementar apagado ordenado de api y worker; verificar con un test que envía SIGTERM a mitad de un job
 
 ## 5. Quality gate y entrega (platform/delivery-pipeline)
 
-- [ ] 5.1 Redactar los TC de gate de OpenSpec, gate de arquitectura, gate de CVE crítico y promoción por digest
-- [ ] 5.2 Agregar reglas de dependency-cruiser y un fixture que falle a propósito; verificar que el chequeo falla ante un import domain→infrastructure
-- [ ] 5.3 Agregar `.github/workflows/pr.yml` con todos los chequeos requeridos (OpenSpec strict, formato, lint, typecheck, unit, integración con Testcontainers, arquitectura, build, Trivy, escaneo de dependencias, gitleaks); verificar en una PR de prueba
-- [ ] 5.4 Agregar `main.yml` que publique imágenes con tag `sha-<commit>` y registre digests; verificar que un segundo job descarga por digest sin reconstruir
-- [ ] 5.5 Configurar branch protection con chequeos requeridos; verificar que un chequeo fallido bloquea el merge
+- [x] 5.1 Redactar los TC de gate de OpenSpec, gate de arquitectura, gate de CVE crítico y promoción por digest _(2026-10-02: TC-PLATFORM-PIPELINE-001…004 y TC-PLATFORM-ARCH-001/002 existentes; TC-PLATFORM-ARCH-001 ajustado al comando `pnpm arch:check` y a los fixtures implementados)_
+- [x] 5.2 Agregar reglas de dependency-cruiser y un fixture que falle a propósito; verificar que el chequeo falla ante un import domain→infrastructure _(2026-10-02: `.dependency-cruiser.cjs` + `pnpm arch:check` (0 violaciones en el repo real); `scripts/architecture` prueba con fixtures que cada una de las 12 reglas falla con su violación y pasa sin ella, más la regla `process.env` de ESLint — TC-PLATFORM-ARCH-001)_
+- [ ] 5.3 Agregar `.github/workflows/pr.yml` con todos los chequeos requeridos (OpenSpec strict, formato, lint, typecheck, unit, integración con Testcontainers, arquitectura, build, Trivy, escaneo de dependencias, gitleaks); verificar en una PR de prueba _(2026-10-02: workflow escrito y validado con actionlint 1.7.12; pendiente de ejecución en GitHub)_
+- [ ] 5.4 Agregar `main.yml` que publique imágenes con tag `sha-<commit>` y registre digests; verificar que un segundo job descarga por digest sin reconstruir _(2026-10-02: workflow escrito y validado con actionlint 1.7.12; pendiente de ejecución en GitHub)_
+- [ ] 5.5 Configurar branch protection con chequeos requeridos; verificar que un chequeo fallido bloquea el merge _(2026-10-02: lista de checks requeridos en docs/23 §16; pendiente de ejecución en GitHub por el lead con permiso del owner)_
 
 ## 6. Trazabilidad de tests (quality/test-traceability)
 
-- [ ] 6.1 Implementar `scripts/traceability` (validación del schema del catálogo, búsqueda de TC-ids en tests, cobertura de Must, chequeo de TC activo borrado) con TDD, verificando con tests unitarios sobre fixtures
-- [ ] 6.2 Generar `tests/traceability/matrix.md` y `.json` en CI como artefactos; verificar que listan todos los TC catalogados
+- [x] 6.1 Implementar `scripts/traceability` (validación del schema del catálogo, búsqueda de TC-ids en tests, cobertura de Must, chequeo de TC activo borrado) con TDD, verificando con tests unitarios sobre fixtures
+- [x] 6.2 Generar `tests/traceability/matrix.md` y `.json` en CI como artefactos; verificar que listan todos los TC catalogados (generador `pnpm --filter @pf/traceability matrix` verificado con TC-PLATFORM-TRACE-006; la publicación como artefacto en CI la completa la tarea 5.3)
 
 ## 7. Cierre
 

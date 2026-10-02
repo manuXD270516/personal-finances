@@ -1,0 +1,19 @@
+{
+  "name": "@pf/architecture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Prueba de las reglas de arquitectura (.dependency-cruiser.cjs y la regla process.env de ESLint): cada regla falla con su fixture y pasa sin él (docs/16 §5.17, TC-PLATFORM-ARCH-001).",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "dependency-cruiser": "18.5.0",
+    "eslint": "10.11.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

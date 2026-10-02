@@ -1,0 +1,2 @@
+import { postEntry } from '../../../packages/contexts/ledger/src/application/post-entry.service.js';
+export const handler = postEntry;

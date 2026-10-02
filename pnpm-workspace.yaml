@@ -1,0 +1,67 @@
+# Workspace del producto. `spikes/` queda FUERA a propósito (código descartable con sus propios workspaces).
+packages:
+  - apps/*
+  - packages/*
+  - packages/contexts/*
+  - scripts/*
+
+# Versiones fijadas en un solo lugar (ADR-0018). Renovate las actualiza vía PR.
+# TypeScript 6.0.3 en todo el repo: dependency-cruiser y typescript-eslint aún no soportan TS 7 (SPIKE-04, R1).
+catalog:
+  typescript: 6.0.3
+  '@types/node': 24.19.1
+  vitest: 5.0.3
+  tsx: 4.23.15
+  zod: 4.6.5
+  pino: 10.3.1
+  pg: 8.23.1
+  '@types/pg': 8.23.1
+  pg-boss: 12.35.1
+  '@aws-sdk/client-s3': 3.1145.0
+  '@nestjs/common': 12.1.2
+  '@nestjs/core': 12.1.2
+  '@nestjs/platform-express': 12.1.2
+  '@nestjs/testing': 12.1.2
+  reflect-metadata: 0.2.2
+  rxjs: 7.8.2
+  '@opentelemetry/api': 1.9.1
+  '@opentelemetry/core': 2.11.0
+  '@opentelemetry/sdk-node': 0.222.0
+  '@opentelemetry/auto-instrumentations-node': 0.80.0
+  '@opentelemetry/instrumentation': 0.222.0
+  testcontainers: 12.2.0
+  '@testcontainers/postgresql': 12.2.0
+  supertest: 7.3.0
+  '@types/supertest': 7.2.1
+  next: 16.3.8
+  react: 19.3.0
+  react-dom: 19.3.0
+  '@types/react': 19.3.0
+  '@types/react-dom': 19.3.0
+  next-intl: 4.14.9
+
+minimumReleaseAgeExclude:
+  - '@aws-sdk/client-s3@3.1145.0'
+  - '@types/node@24.19.1'
+  - icu-minify@4.14.9
+  - next-intl-swc-plugin-extractor@4.14.9
+  - next-intl@4.14.9
+  - use-intl@4.14.9
+
+# pnpm >= 11 bloquea scripts de instalación por defecto: lista explícita y revisada (SPIKE-04 R5).
+allowBuilds:
+  esbuild: true
+  # protobufjs: su postinstall solo avisa de versiones; no es necesario (SPIKE-10).
+  protobufjs: false
+  # ssh2/cpu-features: aceleración nativa opcional de ssh2 (testcontainers); no se usa SSH.
+  cpu-features: false
+  ssh2: false
+  # @parcel/watcher y @swc/core: los trae next-intl (extractor de mensajes, no usado); el binario nativo viene como optionalDependency.
+  '@parcel/watcher': false
+  '@swc/core': false
+
+# @swc/core 1.16.x no carga en Windows con ACL heredadas de AppContainer en %LOCALAPPDATA%\swc
+# (ERR_SWC_NATIVE_CACHE; SPIKE-04 R2, ADR-0018). next-intl lo requiere al cargar su plugin (solo lo usa el
+# extractor de mensajes, que no usamos): se fija la última 1.15.x. Revisar en cada upgrade de next-intl.
+overrides:
+  '@swc/core': 1.15.47

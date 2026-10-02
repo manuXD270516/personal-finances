@@ -1,0 +1,2 @@
+// Fixture: shared-kernel puro (sin dependencias).
+export type Money = { readonly amount: string; readonly currency: string };

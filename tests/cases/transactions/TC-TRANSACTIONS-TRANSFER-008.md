@@ -25,6 +25,12 @@ error_code: null
 preconditions:
 - Bank A (BOB) con 1000.00 BOB
 - Bank B (BOB) con 0.00 BOB
+input:
+  from: Bank A
+  to: Bank B
+  amount: "200.00"
+  currency: BOB
+  paymentMethod: QR
 steps:
 - Transferir 200.00 BOB de Bank A a Bank B con paymentMethod QR
 - Consultar saldos y patrimonio

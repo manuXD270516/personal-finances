@@ -27,6 +27,15 @@ preconditions:
 - Bank A (BOB) con saldo 1000.00 BOB
 - Categoría Health
 - Contraparte Farmacia Demo
+input:
+  kind: EXPENSE
+  account: Bank A
+  amount: "85.50"
+  currency: BOB
+  paymentMethod: QR
+  counterparty: Farmacia Demo
+  category: Health
+  businessDate: "2026-03-12"
 steps:
 - Registrar gasto 85.50 BOB, paymentMethod QR, contraparte Farmacia Demo, categoría Health, fecha 2026-03-12
 - Consultar saldo, gasto de marzo en Health y la transacción

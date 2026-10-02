@@ -1,0 +1,3 @@
+export interface RecordTransactionCommand {
+  readonly amount: string;
+}
