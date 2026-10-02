@@ -1,0 +1,91 @@
+{
+  "name": "@pf/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@pf/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./config": {
+      "@pf/source": "./src/config/index.ts",
+      "types": "./dist/config/index.d.ts",
+      "default": "./dist/config/index.js"
+    },
+    "./logging": {
+      "@pf/source": "./src/logging/index.ts",
+      "types": "./dist/logging/index.d.ts",
+      "default": "./dist/logging/index.js"
+    },
+    "./health": {
+      "@pf/source": "./src/health/index.ts",
+      "types": "./dist/health/index.d.ts",
+      "default": "./dist/health/index.js"
+    },
+    "./queue": {
+      "@pf/source": "./src/queue/index.ts",
+      "types": "./dist/queue/index.d.ts",
+      "default": "./dist/queue/index.js"
+    },
+    "./storage": {
+      "@pf/source": "./src/storage/index.ts",
+      "types": "./dist/storage/index.d.ts",
+      "default": "./dist/storage/index.js"
+    },
+    "./lifecycle": {
+      "@pf/source": "./src/lifecycle/index.ts",
+      "types": "./dist/lifecycle/index.d.ts",
+      "default": "./dist/lifecycle/index.js"
+    },
+    "./nest": {
+      "@pf/source": "./src/nest/index.ts",
+      "types": "./dist/nest/index.d.ts",
+      "default": "./dist/nest/index.js"
+    },
+    "./otel": {
+      "@pf/source": "./src/otel/index.ts",
+      "types": "./dist/otel/index.d.ts",
+      "default": "./dist/otel/index.js"
+    },
+    "./otel/register": {
+      "types": "./dist/otel/register.d.ts",
+      "default": "./dist/otel/register.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "config:docs": "tsx scripts/generate-config-docs.ts",
+    "config:docs:check": "tsx scripts/generate-config-docs.ts --check"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/auto-instrumentations-node": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "pg": "catalog:",
+    "pg-boss": "catalog:",
+    "pino": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

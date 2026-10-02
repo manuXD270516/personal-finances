@@ -12,3 +12,5 @@ backups/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 .gitleaks-report.json
+*.tsbuildinfo
+next-env.d.ts

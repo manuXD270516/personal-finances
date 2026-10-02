@@ -1,0 +1,16 @@
+# Generados / dependencias
+node_modules
+dist
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+next-env.d.ts
+# Documentación y artefactos de diseño (se revisan en PR, no se reformatean)
+docs
+openspec
+tests/cases
+contracts
+spikes
+.claude
+README.md

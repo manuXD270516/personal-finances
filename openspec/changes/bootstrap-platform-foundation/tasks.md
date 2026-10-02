@@ -10,17 +10,17 @@
 
 ## 2. Skeleton del repositorio
 
-- [ ] 2.1 Crear workspace pnpm + Turborepo, tsconfig raíz estricto, ESLint/Prettier, `.editorconfig`; verificar que `pnpm install && pnpm turbo run typecheck` pasa
-- [ ] 2.2 Crear `packages/shared-kernel` y `packages/platform` vacíos con carpetas por capa; verificar que los paquetes compilan
-- [ ] 2.3 Crear el host NestJS `apps/api` con entrypoints `api`, `worker`, `migrate`, `seed` (sin módulos de negocio); verificar que cada uno arranca y termina/sirve según lo esperado
-- [ ] 2.4 Crear el shell Next.js `apps/web` con ruta de salud; verificar que compila en modo standalone
-- [ ] 2.5 Configurar i18n del web shell con español como locale por defecto y catálogos preparados para `en` y `pt`; verificar que cambiar de locale no rompe el build
+- [x] 2.1 Crear workspace pnpm + Turborepo, tsconfig raíz estricto, ESLint/Prettier, `.editorconfig`; verificar que `pnpm install && pnpm turbo run typecheck` pasa
+- [x] 2.2 Crear `packages/shared-kernel` y `packages/platform` vacíos con carpetas por capa; verificar que los paquetes compilan
+- [x] 2.3 Crear el host NestJS `apps/api` con entrypoints `api`, `worker`, `migrate`, `seed` (sin módulos de negocio); verificar que cada uno arranca y termina/sirve según lo esperado
+- [x] 2.4 Crear el shell Next.js `apps/web` con ruta de salud; verificar que compila en modo standalone
+- [x] 2.5 Configurar i18n del web shell con español como locale por defecto y catálogos preparados para `en` y `pt`; verificar que cambiar de locale no rompe el build
 
 ## 3. Observabilidad base (platform/observability)
 
-- [ ] 3.1 Redactar los TC de liveness/readiness/correlación/redacción de logs en tests/cases/platform; verificar que el chequeo del catálogo los acepta
-- [ ] 3.2 Implementar `/health/live` y `/health/ready` con chequeo de dependencias (PG, object storage; Valkey solo si está habilitado por `JOB_QUEUE_DRIVER`/`SESSION_STORE`); verificar con tests de integración nombrados con sus TC-ids
-- [ ] 3.3 Implementar logging JSON estructurado con propagación del ID de correlación API → worker y redacción de tokens; verificar con tests nombrados con sus TC-ids
+- [x] 3.1 Redactar los TC de liveness/readiness/correlación/redacción de logs en tests/cases/platform; verificar que el chequeo del catálogo los acepta
+- [x] 3.2 Implementar `/health/live` y `/health/ready` con chequeo de dependencias (PG, object storage; Valkey solo si está habilitado por `JOB_QUEUE_DRIVER`/`SESSION_STORE`); verificar con tests de integración nombrados con sus TC-ids
+- [x] 3.3 Implementar logging JSON estructurado con propagación del ID de correlación API → worker y redacción de tokens; verificar con tests nombrados con sus TC-ids
 
 ## 4. Contenedores y stack local (platform/local-environment)
 

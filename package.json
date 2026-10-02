@@ -1,0 +1,35 @@
+{
+  "name": "pfos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22.12 <27"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration --concurrency=1",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "spec:validate": "cross-env OPENSPEC_TELEMETRY=0 DO_NOT_TRACK=1 OPENSPEC_NO_UPDATE_CHECK=1 openspec validate --all --strict --no-interactive",
+    "config:docs": "pnpm --filter @pf/platform run config:docs",
+    "config:docs:check": "pnpm --filter @pf/platform run config:docs:check"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@fission-ai/openspec": "1.14.0",
+    "@next/eslint-plugin-next": "16.3.8",
+    "cross-env": "10.1.0",
+    "eslint": "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "turbo": "2.11.6",
+    "typescript": "catalog:",
+    "typescript-eslint": "8.71.0"
+  }
+}

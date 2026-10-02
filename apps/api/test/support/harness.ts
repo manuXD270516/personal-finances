@@ -1,0 +1,58 @@
+import { Writable } from 'node:stream';
+import { loadConfig, type ApiConfig, type WorkerConfig } from '@pf/platform/config';
+import { createLogger, type Logger, type ProcessRole } from '@pf/platform/logging';
+import type { Dependencies } from './global-setup.js';
+
+export type LogRecord = Record<string, unknown>;
+
+/** Logger real (mismas opciones que producción) con salida capturada en memoria. */
+export function capturingLogger(service: string, role: ProcessRole, level = 'info') {
+  const lines: string[] = [];
+  const stream = new Writable({
+    write(chunk: Buffer, _enc, cb) {
+      lines.push(...chunk.toString('utf8').split('\n').filter(Boolean));
+      cb();
+    },
+  });
+  const logger: Logger = createLogger({ service, role, environment: 'ci', level, destination: stream });
+  return {
+    logger,
+    lines,
+    records: (): LogRecord[] => lines.map((l) => JSON.parse(l) as LogRecord),
+  };
+}
+
+export function baseEnv(deps: Dependencies, overrides: Record<string, string> = {}): Record<string, string> {
+  return {
+    PFOS_ENV: 'ci',
+    LOG_LEVEL: 'info',
+    DATABASE_URL: deps.databaseUrl,
+    OBJECT_STORAGE_ENDPOINT: deps.s3Endpoint,
+    OBJECT_STORAGE_BUCKET: deps.bucket,
+    OBJECT_STORAGE_ACCESS_KEY: deps.s3AccessKey,
+    OBJECT_STORAGE_SECRET_KEY: deps.s3SecretKey,
+    HEALTH_CHECK_TIMEOUT_MS: '1500',
+    ...overrides,
+  };
+}
+
+export const apiConfig = (env: Record<string, string>): ApiConfig => loadConfig('api', env);
+export const workerConfig = (env: Record<string, string>): WorkerConfig => loadConfig('worker', env);
+
+/** Reemplaza host:puerto de una URL de conexión (para pasar por el proxy TCP). */
+export function viaPort(url: string, port: number): string {
+  const u = new URL(url);
+  u.hostname = '127.0.0.1';
+  u.port = String(port);
+  return u.toString();
+}
+
+export async function waitFor<T>(fn: () => T | undefined, timeoutMs = 20_000, stepMs = 100): Promise<T> {
+  const started = Date.now();
+  for (;;) {
+    const value = fn();
+    if (value !== undefined) return value;
+    if (Date.now() - started > timeoutMs) throw new Error('waitFor: timeout');
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+}
