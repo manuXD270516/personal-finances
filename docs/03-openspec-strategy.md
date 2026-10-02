@@ -29,7 +29,7 @@ openspec/
 │  ├─ transactions/transfers/spec.md
 │  └─ …                            # taxonomía en ARCHITECTURE.md §14
 └─ changes/
-   ├─ bootstrap-platform-foundation/   # primer change (Phase 0 → Implementation Gate)
+   ├─ bootstrap-platform-foundation/   # archivado en changes/archive/2026-10-02-bootstrap-platform-foundation
    │  ├─ .openspec.yaml
    │  ├─ proposal.md  design.md  tasks.md
    │  └─ specs/{platform,quality}/…/spec.md
@@ -95,7 +95,7 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|
-| 0 | `bootstrap-platform-foundation` ✅ redactado y validado | `platform/local-environment`, `platform/observability`, `platform/delivery-pipeline`, `quality/test-traceability` | Implementation Gate |
+| 0 | `bootstrap-platform-foundation` ✅ implementado y **archivado** (2026-10-02, PRs #1–#4) | `platform/local-environment`, `platform/observability`, `platform/delivery-pipeline`, `quality/test-traceability` | Implementation Gate |
 | 1 | `add-api-conventions` | `platform/api-conventions` (idempotency, problem+json, paginación) | 1 |
 | 2 | `add-workspace-identity` | `identity/authentication`, `identity/workspace-membership`, `security/access-control`; incluye como **primer grupo de tareas** la migración del catálogo `fx.currency` + datos de referencia, porque `iam.workspace.base_currency` lo referencia (el comportamiento del catálogo sigue especificado en `fx/market-rates`) | 1 |
 | 3 | `add-audit-trail` | `audit/audit-trail` | 1 |
