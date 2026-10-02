@@ -28,6 +28,12 @@ error_code: null
 preconditions:
 - W1 con un EDITOR y un VIEWER
 - Gasto de 120.00 BOB editado por el EDITOR a 102.00 BOB
+input:
+  role: VIEWER
+  edit:
+    from: "120.00"
+    to: "102.00"
+    currency: BOB
 steps:
 - Como VIEWER consultar el historial de la transacción
 - Como VIEWER intentar consultar el historial de otra entidad y de otro workspace

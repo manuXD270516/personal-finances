@@ -13,9 +13,9 @@ invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["scripts/stack/test/stack/stack.stack.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags:

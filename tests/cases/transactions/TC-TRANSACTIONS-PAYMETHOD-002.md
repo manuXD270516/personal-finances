@@ -24,6 +24,11 @@ error_code: null
 preconditions:
 - EDITOR autenticado de W1
 - Cash (BOB) con saldo 100.00 BOB
+input:
+  account: Cash
+  amount: "20.00"
+  currency: BOB
+  paymentMethod: null
 steps:
 - Registrar gasto 20.00 BOB en Cash sin paymentMethod
 - Consultar la transacción y el saldo

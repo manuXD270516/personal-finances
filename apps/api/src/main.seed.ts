@@ -1,6 +1,7 @@
-// Entrypoint `seed` (one-shot). Placeholder: los datasets minimal/demo/large llegan con docs/29 y la tarea 4.6.
+// Comando `seed` (one-shot): `seed --profile=minimal|demo|large`. Solo local/CI (docs/19 §8, docs/29).
 import { loadConfigOrExit } from '@pf/platform/config';
 import { createLogger } from '@pf/platform/logging';
+import { parseSeedProfile, runSeed, SeedRejectedError } from './seed/run-seed.js';
 
 const config = loadConfigOrExit('seed');
 const logger = createLogger({
@@ -10,10 +11,10 @@ const logger = createLogger({
   level: config.LOG_LEVEL,
 });
 
-// Los seeds son solo de desarrollo/CI (docs/19 §6.1, docs/29): nunca contra staging/production.
-if (config.PFOS_ENV === 'staging' || config.PFOS_ENV === 'production') {
-  logger.error({ environment: config.PFOS_ENV }, 'seed rejected outside local/ci');
-  process.exit(1);
+try {
+  await runSeed(config, logger, parseSeedProfile(process.argv.slice(2)));
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  logger.error({ err: { type: err instanceof Error ? err.name : typeof err, message } }, 'seed failed');
+  process.exit(err instanceof SeedRejectedError ? 64 : 1);
 }
-
-logger.info({ seeded: 0 }, 'sin seeds');

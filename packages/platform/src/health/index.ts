@@ -11,6 +11,7 @@ export {
 export { postgresCheck } from './checks/postgres.js';
 export { objectStorageCheck } from './checks/object-storage.js';
 export { valkeyCheck } from './checks/valkey.js';
+export { startHealthServer, type HealthServer, type HealthServerOptions } from './http-server.js';
 
 /** Valkey solo es dependencia crítica si algún toggle lo exige (docs/19 §0.3 punto 6, ADR-0008). */
 export function isValkeyEnabled(config: {

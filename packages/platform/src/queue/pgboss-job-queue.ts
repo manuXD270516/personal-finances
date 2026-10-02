@@ -23,6 +23,9 @@ export interface PgBossJobQueueOptions {
   readonly schema?: string;
 }
 
+/** Schema de pg-boss. Lo crea la migración de bootstrap y lo instala/actualiza `migrate` (rol pf_migrator). */
+export const PGBOSS_SCHEMA = 'pgboss';
+
 const tracer = trace.getTracer('@pf/platform/queue');
 
 export class PgBossJobQueue implements JobQueue {
@@ -35,12 +38,12 @@ export class PgBossJobQueue implements JobQueue {
     const consumer = options.role === 'consumer';
     this.boss = new PgBoss({
       connectionString: options.connectionString,
-      schema: options.schema ?? 'pgboss',
+      schema: options.schema ?? PGBOSS_SCHEMA,
       application_name: `pfos-${options.role}`,
       max: options.poolMax ?? 4,
-      // TODO(grupo 4.5): instalar el schema de pg-boss desde `migrate` (rol pf_migrator) y arrancar
-      // la app con `migrate: false`. Mientras tanto pg-boss lo instala/migra bajo advisory lock.
-      migrate: true,
+      // La app (rol pf_app, sin DDL) nunca instala ni migra el schema: lo hace el comando `migrate`
+      // (installPgBossSchema). Si falta o está desactualizado, start() falla en vez de intentar DDL.
+      migrate: false,
       supervise: consumer,
       schedule: false,
       useListenNotify: consumer,
@@ -154,6 +157,27 @@ export class PgBossJobQueue implements JobQueue {
     await this.boss.stop({ graceful: true, close: true, timeout: 10_000 });
     this.started = false;
   }
+}
+
+/**
+ * Instala o actualiza el schema de pg-boss (DDL). Solo lo llama el comando `migrate` con el rol propietario
+ * (`pf_migrator`); los permisos de `pf_app` sobre el schema los fijan la migración de bootstrap
+ * (default privileges) y `grantPgBossToApp`.
+ */
+export async function installPgBossSchema(connectionString: string, schema = PGBOSS_SCHEMA): Promise<void> {
+  const boss = new PgBoss({
+    connectionString,
+    schema,
+    application_name: 'pfos-migrate',
+    max: 2,
+    migrate: true,
+    supervise: false,
+    schedule: false,
+    useListenNotify: false,
+  });
+  boss.on('error', () => undefined);
+  await boss.start();
+  await boss.stop({ graceful: false, close: true });
 }
 
 /** Solo nombre/código/mensaje: los errores de `pg` pueden traer detalles del servidor, nunca parámetros. */

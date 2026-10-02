@@ -1,13 +1,41 @@
 // Levanta UNA vez por corrida las dependencias reales (postgres:18 + SeaweedFS) y comparte sus coordenadas.
 import { randomBytes } from 'node:crypto';
-import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import { loadConfig } from '@pf/platform/config';
+import { createLogger } from '@pf/platform/logging';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { Client } from 'pg';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
+import { runMigrate } from '../../src/migrate/run-migrate.js';
 import { POSTGRES_IMAGE, SEAWEEDFS_IMAGE } from './images.js';
 
+/** Mismo bootstrap que el init de postgres en Compose (deploy/compose/compose.yaml → configs.postgres-init). */
+async function bootstrapMigratorRole(superuserUrl: string, password: string): Promise<void> {
+  const client = new Client({ connectionString: superuserUrl });
+  await client.connect();
+  try {
+    await client.query(
+      `CREATE ROLE pf_migrator LOGIN CREATEROLE NOSUPERUSER NOBYPASSRLS PASSWORD ${client.escapeLiteral(password)}`,
+    );
+    await client.query('ALTER DATABASE pfos OWNER TO pf_migrator');
+  } finally {
+    await client.end();
+  }
+}
+
+function withCredentials(url: string, user: string, password: string): string {
+  const u = new URL(url);
+  u.username = user;
+  u.password = password;
+  u.searchParams.set('sslmode', 'disable');
+  return u.toString();
+}
+
 export interface Dependencies {
+  /** Rol de la app (`pf_app`, sin BYPASSRLS ni DDL), igual que en Compose y cloud. */
   readonly databaseUrl: string;
+  /** Rol propietario de migraciones (`pf_migrator`). */
+  readonly migratorUrl: string;
   readonly postgresHost: string;
   readonly postgresPort: number;
   readonly s3Endpoint: string;
@@ -65,28 +93,28 @@ export default async function setup(project: TestProject) {
   ]);
 
   const s3Endpoint = `http://${s3.getHost()}:${s3.getMappedPort(8333)}`;
-  const client = new S3Client({
-    endpoint: s3Endpoint,
-    region: 'us-east-1',
-    forcePathStyle: true,
-    credentials: { accessKeyId: s3AccessKey, secretAccessKey: s3SecretKey },
-    requestChecksumCalculation: 'WHEN_REQUIRED',
-    responseChecksumValidation: 'WHEN_REQUIRED',
-  });
-  // El servidor S3 de `weed mini` puede tardar unos segundos más que /healthz.
-  for (let attempt = 1; ; attempt++) {
-    try {
-      await client.send(new CreateBucketCommand({ Bucket: bucket }));
-      break;
-    } catch (err) {
-      if (attempt >= 30) throw err;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-  client.destroy();
+  const migratorUrl = withCredentials(pg.getConnectionUri(), 'pf_migrator', randomBytes(18).toString('hex'));
+  const databaseUrl = withCredentials(pg.getConnectionUri(), 'pf_app', randomBytes(18).toString('hex'));
+  await bootstrapMigratorRole(pg.getConnectionUri(), new URL(migratorUrl).password);
+  // El comando `migrate` real: dbmate (binario del host) + rol pf_app + pg-boss + bucket.
+  await runMigrate(
+    loadConfig('migrate', {
+      PFOS_ENV: 'ci',
+      LOG_LEVEL: 'warn',
+      DATABASE_MIGRATOR_URL: migratorUrl,
+      DATABASE_URL: databaseUrl,
+      OBJECT_STORAGE_ENDPOINT: s3Endpoint,
+      OBJECT_STORAGE_BUCKET: bucket,
+      OBJECT_STORAGE_ACCESS_KEY: s3AccessKey,
+      OBJECT_STORAGE_SECRET_KEY: s3SecretKey,
+      OBJECT_STORAGE_ENSURE_BUCKET: 'true',
+    }),
+    createLogger({ service: 'finance-api', role: 'migrate', environment: 'ci', level: 'warn' }),
+  );
 
   project.provide('deps', {
-    databaseUrl: pg.getConnectionUri(),
+    databaseUrl,
+    migratorUrl,
     postgresHost: pg.getHost(),
     postgresPort: pg.getPort(),
     s3Endpoint,

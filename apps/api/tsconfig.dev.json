@@ -1,0 +1,5 @@
+{
+  "//": "Solo para `pnpm dev` (modo A con tsx): aplica los decoradores de Nest también a los paquetes del workspace cargados desde src (condición @pf/source).",
+  "extends": "./tsconfig.json",
+  "include": ["src", "../../packages/*/src"]
+}

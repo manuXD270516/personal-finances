@@ -1,0 +1,21 @@
+# Contexto de build de docker/*.Dockerfile (raíz del repo). Nada de secretos ni artefactos locales.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+backups
+spikes
+docs
+openspec
+tests/cases
+tests/traceability
+**/*.dump
+**/*.log

@@ -84,11 +84,39 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(err.problems.map((p) => p.variable)).toEqual(['OTEL_NODE_RESOURCE_DETECTORS']);
   });
 
-  it('cada proceso valida solo sus variables (migrate no exige object storage)', () => {
+  it('cada proceso valida solo sus variables (migrate no exige puertos HTTP ni la cola)', () => {
     const config = loadConfig('migrate', {
+      ...API_ENV,
       PFOS_ENV: 'local',
-      DATABASE_MIGRATOR_URL: 'postgres://pf_migrator:x@127.0.0.1:25432/pfos',
+      DATABASE_MIGRATOR_URL: 'postgres://pf_migrator:x@db.internal:5432/pfos',
+      API_PORT: 'no-se-valida-en-migrate',
     });
-    expect(Object.keys(config).sort()).toEqual(['DATABASE_MIGRATOR_URL', 'LOG_LEVEL', 'PFOS_ENV']);
+    expect(Object.keys(config)).not.toContain('API_PORT');
+    expect(Object.keys(config)).not.toContain('JOB_QUEUE_DRIVER');
+    expect(config.OBJECT_STORAGE_ENSURE_BUCKET).toBe(false);
+    expect(config.DATABASE_URL).toBe(API_ENV.DATABASE_URL);
+  });
+
+  it('rechaza OBJECT_STORAGE_ENSURE_BUCKET=true fuera de local/ci', () => {
+    const env = {
+      ...API_ENV,
+      DATABASE_MIGRATOR_URL: 'postgres://pf_migrator:x@db.internal:5432/pfos',
+      OBJECT_STORAGE_ENSURE_BUCKET: 'true',
+    };
+    expect(() => loadConfig('migrate', { ...env, PFOS_ENV: 'ci' })).not.toThrow();
+    const err = captureError(() => loadConfig('migrate', { ...env, PFOS_ENV: 'production' }));
+    expect(err.problems.map((p) => p.variable)).toEqual(['OBJECT_STORAGE_ENSURE_BUCKET']);
+  });
+
+  it('valida la lista de orígenes CORS del bucket', () => {
+    const env = { ...API_ENV, DATABASE_MIGRATOR_URL: 'postgres://pf_migrator:x@db.internal:5432/pfos' };
+    expect(
+      loadConfig('migrate', { ...env, OBJECT_STORAGE_CORS_ORIGINS: 'https://app.example, http://web:3000' })
+        .OBJECT_STORAGE_CORS_ORIGINS,
+    ).toBe('https://app.example, http://web:3000');
+    const err = captureError(() =>
+      loadConfig('migrate', { ...env, OBJECT_STORAGE_CORS_ORIGINS: 'https://app.example/path' }),
+    );
+    expect(err.problems.map((p) => p.variable)).toEqual(['OBJECT_STORAGE_CORS_ORIGINS']);
   });
 });

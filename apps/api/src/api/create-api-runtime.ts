@@ -9,7 +9,12 @@ import { createApiResources, type ApiResources } from '../runtime/platform-resou
 import { ApiModule } from './api.module.js';
 
 /** Rutas operativas fuera de la API versionada (proposal: los probes no dependen de auth ni de versionado). */
-const UNVERSIONED_ROUTES = ['health/live', 'health/ready', 'internal/platform/ping'];
+const UNVERSIONED_ROUTES = [
+  'health/live',
+  'health/ready',
+  'internal/platform/ping',
+  'internal/platform/probe',
+];
 
 export interface ApiRuntime {
   readonly app: INestApplication;

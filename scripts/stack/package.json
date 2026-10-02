@@ -1,0 +1,24 @@
+{
+  "name": "@pf/stack",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scripts multiplataforma del stack local (docs/19 §0.5): setup:env, stack:*, db:*, backup/restore, dev y su suite test:stack.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:stack": "vitest run --config vitest.stack.config.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -28,6 +28,12 @@ error_code: null
 preconditions:
 - Bank A (BOB) con saldo 1000.00 BOB
 - Credit Card (pasivo BOB) con deuda 350.00 BOB
+input:
+  from: Bank A
+  to: Credit Card
+  amount: "350.00"
+  currency: BOB
+  paymentMethod: QR
 steps:
 - Registrar transferencia 350.00 BOB de Bank A a Credit Card con paymentMethod QR
 - Consultar saldos, gasto del mes y patrimonio

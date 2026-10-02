@@ -85,6 +85,7 @@ export const VARIABLES = {
     group: 'PostgreSQL',
     description: 'Conexión de la aplicación (rol `pf_app`, sin BYPASSRLS ni DDL). Contiene credenciales.',
     secret: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'postgres://pf_app:<PF_DEV_DB_PASSWORD>@127.0.0.1:25432/pfos',
   }),
   DATABASE_MIGRATOR_URL: variable(postgresUrl, {
@@ -92,6 +93,7 @@ export const VARIABLES = {
     description:
       'Conexión del rol propietario de migraciones (`pf_migrator`). Solo la usa el comando `migrate`.',
     secret: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'postgres://pf_migrator:<PF_DEV_DB_PASSWORD>@127.0.0.1:25432/pfos',
   }),
   DATABASE_POOL_MAX: variable(positiveInt, {
@@ -104,6 +106,7 @@ export const VARIABLES = {
   OBJECT_STORAGE_ENDPOINT: variable(httpUrl, {
     group: 'Object storage',
     description: 'Endpoint S3 interno (SeaweedFS en local, S3 en cloud).',
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'http://127.0.0.1:29000',
   }),
   OBJECT_STORAGE_REGION: variable(z.string().min(1), {
@@ -134,6 +137,29 @@ export const VARIABLES = {
     description: 'Direccionamiento path-style (obligatorio con SeaweedFS).',
     default: 'true',
   }),
+  OBJECT_STORAGE_ENSURE_BUCKET: variable(bool, {
+    group: 'Object storage',
+    description:
+      'Solo local/CI: `migrate` crea el bucket (idempotente) con CORS y versioning. Rechazado en staging/production (allí lo crea la IaC).',
+    default: 'false',
+  }),
+  OBJECT_STORAGE_CORS_ORIGINS: variable(
+    z
+      .string()
+      .min(1)
+      .refine(
+        (v) => v.split(',').every((o) => /^https?:\/\/[^\s/]+$/.test(o.trim())),
+        'lista separada por comas de orígenes http(s)://host[:puerto] sin ruta',
+      ),
+    {
+      group: 'Object storage',
+      description:
+        'Orígenes del navegador permitidos por la regla CORS del bucket (subida directa con URL presignada). Solo lo usa `migrate` con `OBJECT_STORAGE_ENSURE_BUCKET=true`.',
+      optional: true,
+      // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+      example: 'http://localhost:23000',
+    },
+  ),
 
   // ── Cola y sesiones ──
   JOB_QUEUE_DRIVER: variable(z.enum(['pgboss', 'bullmq']), {
@@ -158,6 +184,7 @@ export const VARIABLES = {
     optional: true,
     requiredWhen: '`JOB_QUEUE_DRIVER=bullmq` o `SESSION_STORE=valkey`',
     secret: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'redis://127.0.0.1:26379/0',
   }),
 
@@ -191,6 +218,17 @@ export const VARIABLES = {
     description: 'Jobs procesados en paralelo por cola en cada proceso worker.',
     default: '4',
   }),
+  WORKER_HEALTH_PORT: variable(port, {
+    group: 'Worker',
+    description:
+      'Puerto de los probes `/health/live` y `/health/ready` del worker (8082 en el contenedor, no publicado; 28082 en modo A).',
+    default: '8082',
+  }),
+  WORKER_HEALTH_BIND_ADDRESS: variable(z.string().min(1), {
+    group: 'Worker',
+    description: 'Dirección de escucha de los probes del worker.',
+    default: '0.0.0.0',
+  }),
 
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
@@ -203,6 +241,7 @@ export const VARIABLES = {
     group: 'OpenTelemetry',
     description: 'Endpoint OTLP (p. ej. otel-lgtm con el perfil `observability`).',
     optional: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'http://127.0.0.1:24318',
   }),
   OTEL_NODE_RESOURCE_DETECTORS: variable(
@@ -264,9 +303,20 @@ export const APP_VARIABLES = {
     ...OBJECT_STORAGE,
     ...QUEUE,
     'WORKER_CONCURRENCY',
+    'WORKER_HEALTH_PORT',
+    'WORKER_HEALTH_BIND_ADDRESS',
+    'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
   ],
-  migrate: [...GENERAL, 'DATABASE_MIGRATOR_URL'],
+  // `migrate` también lee DATABASE_URL: asegura que el rol de la app (`pf_app`) tenga esa credencial.
+  migrate: [
+    ...GENERAL,
+    'DATABASE_MIGRATOR_URL',
+    'DATABASE_URL',
+    ...OBJECT_STORAGE,
+    'OBJECT_STORAGE_ENSURE_BUCKET',
+    'OBJECT_STORAGE_CORS_ORIGINS',
+  ],
   seed: [...GENERAL, ...PRODUCT, ...DATABASE],
   web: [...GENERAL],
 } as const satisfies Record<AppName, readonly VariableName[]>;

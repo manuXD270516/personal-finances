@@ -14,3 +14,8 @@ backups/
 .gitleaks-report.json
 *.tsbuildinfo
 next-env.d.ts
+
+# Archivos que `next dev` genera al detectar un agente
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
+tests/traceability/matrix.md

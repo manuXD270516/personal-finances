@@ -1,0 +1,371 @@
+# PFOS — stack local (ARCHITECTURE §10, docs/19 §0, ADR-0011/0012). Proyecto Compose fijo `pfos`.
+#
+#   pnpm setup:env                      # crea ../../.env (secretos dev aleatorios, puertos libres)
+#   pnpm stack:up                       # modo A: perfil deps (apps en el host con `pnpm dev`)
+#   pnpm stack:up -- --profile core     # modo B: producto completo en contenedores (mismas imágenes que prod)
+#
+# Perfiles: deps | core | seed | observability | ml | valkey. Los servicios de `deps` declaran también `core`.
+# Contrato de configuración (docs/19 §0.3): un solo `.env` en la raíz con los valores del modo A; en modo B cada
+# servicio de app hereda ese `.env` y aquí solo se sobrescriben las DIRECCIONES (nombres de servicio y puertos
+# canónicos de la red Compose). Puertos de host: `${PF_BIND_ADDR}:${PF_<SVC>_PORT}` (defaults "2 + canónico").
+# Imágenes de terceros fijadas por versión y digest (docs/20 §15). Sin hosts fijos: toda dirección viene del
+# `.env`; el loopback solo aparece en `healthcheck` (se ejecutan dentro del propio contenedor).
+name: pfos
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-deps: &deps
+  profiles: [deps, core]
+  restart: unless-stopped
+  logging: *default-logging
+  stop_grace_period: 20s
+
+x-app: &app
+  image: ${FINANCE_API_IMAGE:-pfos/finance-api:local}
+  build: &api-build
+    context: ../..
+    dockerfile: docker/api.Dockerfile
+    target: runtime
+  env_file:
+    - path: ${PF_APP_ENV_FILE:-../../.env} # los scripts fijan la ruta absoluta del .env en uso
+      required: true
+  init: true # tini como PID 1: reenvía SIGTERM a node y recolecta zombies (SPIKE-08)
+  read_only: true
+  tmpfs: ['/tmp:size=64m']
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+  logging: *default-logging
+
+# Overrides de direcciones del modo B (docs/19 §0.3 punto 5). El resto de variables se hereda del `.env`.
+x-app-addresses: &app-addresses
+  DATABASE_URL: postgres://pf_app:${PF_DEV_DB_APP_PASSWORD:?run pnpm setup:env}@postgres:5432/pfos?sslmode=disable
+  OBJECT_STORAGE_ENDPOINT: http://object-storage:8333
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+  VALKEY_URL: redis://valkey:6379/0
+
+services:
+  # ───────────────────────────── deps ─────────────────────────────
+  postgres:
+    <<: *deps
+    image: postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PF_DEV_PG_SUPERUSER_PASSWORD:?run pnpm setup:env}
+      POSTGRES_DB: pfos
+    configs:
+      - source: postgres-init
+        target: /docker-entrypoint-initdb.d/01-roles-and-databases.sql
+    volumes:
+      - pg-data:/var/lib/postgresql
+    ports:
+      - '${PF_BIND_ADDR:?run pnpm setup:env}:${PF_POSTGRES_PORT:?run pnpm setup:env}:5432'
+    shm_size: 256m
+    healthcheck:
+      # TCP (no socket): durante el initdb el servidor temporal solo escucha en el socket local.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres -d pfos']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 1g }
+
+  object-storage:
+    <<: *deps
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    command:
+      - mini
+      - -dir=/data
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -webdav=false
+      - -admin.ui=false
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+    environment:
+      GOMEMLIMIT: 200MiB
+    configs:
+      - source: seaweedfs-s3
+        target: /etc/seaweedfs/s3.json
+    volumes:
+      - object-storage-data:/data
+    ports:
+      - '${PF_BIND_ADDR}:${PF_OBJECT_STORAGE_PORT:?run pnpm setup:env}:8333'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8333/healthz']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 60s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 256m }
+
+  mailpit:
+    <<: *deps
+    image: axllent/mailpit:v1.27.7@sha256:cae83a33cd9b9598e4acb210be673dda7e741d5271ed4045310ab456950a136a
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: '1'
+      MP_SMTP_AUTH_ALLOW_INSECURE: '1'
+      MP_MAX_MESSAGES: '2000'
+    ports:
+      - '${PF_BIND_ADDR}:${PF_MAILPIT_UI_PORT:?run pnpm setup:env}:8025'
+      - '${PF_BIND_ADDR}:${PF_MAILPIT_SMTP_PORT:?run pnpm setup:env}:1025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128m }
+
+  keycloak:
+    <<: *deps
+    image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
+    command: ['start-dev', '--import-realm', '--http-port=8080']
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${PF_DEV_KEYCLOAK_DB_PASSWORD:?run pnpm setup:env}
+      KC_BOOTSTRAP_ADMIN_USERNAME: pfos-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${PF_DEV_KEYCLOAK_ADMIN_PASSWORD:?run pnpm setup:env}
+      KC_HEALTH_ENABLED: 'true'
+      # Issuer = URL que ve el navegador (modo A y B); back-channel dinámico para el BFF dentro de la red.
+      KC_HOSTNAME: ${OIDC_PUBLIC_BASE_URL:?run pnpm setup:env}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
+      # Placeholders del realm de desarrollo (Keycloak los sustituye al importar; el JSON no contiene secretos).
+      PF_DEV_OIDC_CLIENT_SECRET: ${PF_DEV_OIDC_CLIENT_SECRET:?run pnpm setup:env}
+      PF_DEV_KC_OWNER_PASSWORD: ${PF_DEV_KC_OWNER_PASSWORD:?run pnpm setup:env}
+      PF_DEV_KC_EDITOR_PASSWORD: ${PF_DEV_KC_EDITOR_PASSWORD:?run pnpm setup:env}
+      PF_DEV_KC_VIEWER_PASSWORD: ${PF_DEV_KC_VIEWER_PASSWORD:?run pnpm setup:env}
+      PF_WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:?run pnpm setup:env}
+    volumes:
+      - ./keycloak/realm-pfos-dev.json:/opt/keycloak/data/import/realm-pfos-dev.json:ro
+    ports:
+      - '${PF_BIND_ADDR}:${PF_KEYCLOAK_PORT:?run pnpm setup:env}:8080'
+    depends_on:
+      postgres: { condition: service_healthy, restart: true }
+    healthcheck:
+      # La imagen no trae curl/wget: HTTP por /dev/tcp contra el puerto de management (9000).
+      test:
+        [
+          'CMD-SHELL',
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: keycloak\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+      start_interval: 2s
+    deploy:
+      resources:
+        limits: { cpus: '1.5', memory: 1280m }
+
+  # ─────────────────────── valkey (opcional) ───────────────────────
+  # Solo si JOB_QUEUE_DRIVER=bullmq o SESSION_STORE=valkey (ADR-0008). Ya no forma parte de deps/core.
+  valkey:
+    profiles: [valkey]
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+    command:
+      ['valkey-server', '--appendonly', 'yes', '--maxmemory', '256mb', '--maxmemory-policy', 'noeviction']
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - valkey-data:/data
+    ports:
+      - '${PF_BIND_ADDR}:${PF_VALKEY_PORT:-26379}:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+      start_interval: 1s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 320m }
+
+  # ───────────────────────────── core ─────────────────────────────
+  migrate:
+    <<: *app
+    profiles: [core]
+    command: ['migrate']
+    restart: 'no'
+    environment:
+      <<: *app-addresses
+      DATABASE_MIGRATOR_URL: postgres://pf_migrator:${PF_DEV_DB_MIGRATOR_PASSWORD:?run pnpm setup:env}@postgres:5432/pfos?sslmode=disable
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres: { condition: service_healthy }
+      object-storage: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 256m }
+
+  finance-api:
+    <<: *app
+    profiles: [core]
+    command: ['api']
+    restart: unless-stopped
+    environment:
+      <<: *app-addresses
+      API_PORT: '8080'
+      API_BIND_ADDRESS: 0.0.0.0
+    ports:
+      - '${PF_BIND_ADDR}:${PF_API_PORT:?run pnpm setup:env}:8080'
+    depends_on: &app-depends
+      migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy, restart: true }
+      object-storage: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+      valkey: { condition: service_healthy, required: false }
+    healthcheck:
+      test: ['CMD', 'node', '/usr/local/lib/pfos/healthcheck.mjs', 'http://127.0.0.1:8080/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+      start_interval: 1s
+    stop_grace_period: 30s # > SHUTDOWN_TIMEOUT_MS (25 s)
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 512m }
+
+  finance-worker:
+    <<: *app
+    profiles: [core]
+    command: ['worker']
+    restart: unless-stopped
+    environment:
+      <<: *app-addresses
+      WORKER_HEALTH_PORT: '8082' # solo red interna, no se publica
+      WORKER_HEALTH_BIND_ADDRESS: 0.0.0.0
+    depends_on: *app-depends
+    healthcheck:
+      test: ['CMD', 'node', '/usr/local/lib/pfos/healthcheck.mjs', 'http://127.0.0.1:8082/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+      start_interval: 1s
+    stop_grace_period: 45s # drena el job en curso (SHUTDOWN_TIMEOUT_MS 25 s) antes del SIGKILL
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 512m }
+
+  finance-web:
+    image: ${FINANCE_WEB_IMAGE:-pfos/finance-web:local}
+    build:
+      context: ../..
+      dockerfile: docker/web.Dockerfile
+      target: runtime
+    profiles: [core]
+    env_file:
+      - path: ${PF_APP_ENV_FILE:-../../.env} # los scripts fijan la ruta absoluta del .env en uso
+        required: true
+    environment:
+      PORT: '3000'
+      HOSTNAME: 0.0.0.0
+    init: true
+    read_only: true
+    tmpfs:
+      - '/tmp:size=64m'
+      - '/app/apps/web/.next/cache:size=256m,uid=1000,gid=1000'
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    logging: *default-logging
+    restart: unless-stopped
+    ports:
+      - '${PF_BIND_ADDR}:${PF_WEB_PORT:?run pnpm setup:env}:3000'
+    depends_on:
+      finance-api: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '/usr/local/lib/pfos/healthcheck.mjs', 'http://127.0.0.1:3000/api/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+      start_interval: 1s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 512m }
+
+  # ───────────────────────────── seed ─────────────────────────────
+  # One-shot: `pnpm db:seed -- --profile=minimal` → `docker compose --profile core run --rm seed seed --profile=…`.
+  # Nunca dentro de `up --wait` (un one-shot hoja hace salir 1 a --wait aunque termine en 0, SPIKE-08).
+  seed:
+    <<: *app
+    profiles: [seed]
+    command: ['seed', '--profile=minimal']
+    restart: 'no'
+    environment:
+      <<: *app-addresses
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 256m }
+
+  # ─────────────────────── observability ───────────────────────
+  # Con este perfil, OTEL_ENABLED=true en `.env` envía trazas/métricas/logs de api y worker a Grafana.
+  otel-lgtm:
+    profiles: [observability]
+    image: grafana/otel-lgtm:0.34.0@sha256:b966ea107831d526d9eb8fe4d2d86c9e5731392fad9dce8296bcf2072031f07c
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - otel-lgtm-data:/data
+    ports:
+      - '${PF_BIND_ADDR}:${PF_GRAFANA_PORT:-23001}:3000'
+      - '${PF_BIND_ADDR}:${PF_OTLP_GRPC_PORT:-24317}:4317'
+      - '${PF_BIND_ADDR}:${PF_OTLP_HTTP_PORT:-24318}:4318'
+    healthcheck:
+      test: ['CMD', 'test', '-f', '/tmp/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
+      start_interval: 2s
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 1536m }
+
+  # ─────────────────────────── ml ───────────────────────────
+  # Perfil reservado para `ml-forecasting` (finance-ml, Phase 8). Sin servicios todavía.
+
+configs:
+  # Init de PostgreSQL (solo con el volumen vacío). Roles de la app: `pf_migrator` (propietario, CREATEROLE)
+  # aquí; `pf_app` lo crea la migración de bootstrap y `migrate` le fija la contraseña. Keycloak usa su propia
+  # base `keycloak` dentro del mismo servidor (no un volumen aparte).
+  postgres-init:
+    content: |
+      CREATE ROLE pf_migrator LOGIN CREATEROLE NOSUPERUSER NOBYPASSRLS PASSWORD '${PF_DEV_DB_MIGRATOR_PASSWORD}';
+      ALTER DATABASE pfos OWNER TO pf_migrator;
+      CREATE ROLE keycloak LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '${PF_DEV_KEYCLOAK_DB_PASSWORD}';
+      CREATE DATABASE keycloak OWNER keycloak;
+  # Identidad S3 de SeaweedFS con las credenciales del `.env` (sin fichero de secretos en el repo).
+  seaweedfs-s3:
+    content: |
+      {"identities":[{"name":"pfos","credentials":[{"accessKey":"${PF_DEV_S3_ACCESS_KEY:?run pnpm setup:env}","secretKey":"${PF_DEV_S3_SECRET_KEY:?run pnpm setup:env}"}],"actions":["Admin","Read","Write","List","Tagging"]}]}
+
+volumes:
+  pg-data:
+  object-storage-data:
+  valkey-data:
+  otel-lgtm-data:

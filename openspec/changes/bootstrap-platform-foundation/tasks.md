@@ -24,13 +24,13 @@
 
 ## 4. Contenedores y stack local (platform/local-environment)
 
-- [ ] 4.1 Redactar los TC de salud del stack, arranque por readiness, reset+seed, ida y vuelta backup/restore y ausencia de hosts fijos
-- [ ] 4.2 Crear Dockerfiles multi-stage (`docker/api.Dockerfile`, `docker/web.Dockerfile`), non-root y con healthchecks; verificar que las imágenes compilan y corren como non-root
-- [ ] 4.3 Crear `deploy/compose/compose.yaml` con perfiles `deps`, `core`, `seed`, `observability`, `ml`, volúmenes nombrados y `depends_on` por salud; verificar que `pnpm stack:up` llega a todo healthy en Windows y en CI Linux
-- [ ] 4.4 Crear `.env.example` (sin secretos, puertos `PF_*` con defaults 2xxxx en 127.0.0.1), `pnpm setup:env`, el esquema de configuración validado al arrancar (docs/19 §0.3) e import del realm de desarrollo de Keycloak; verificar que gitleaks no reporta hallazgos y que el arranque falla con una variable faltante
-- [ ] 4.5 Crear la migración SQL de bootstrap (schema `platform`, roles `pf_migrator`/`pf_app` sin BYPASSRLS); verificar que `migrate` termina y que el rol de app no puede saltarse RLS
-- [ ] 4.6 Implementar scripts multiplataforma (`stack:up|down|restart|logs|reset`, `db:migrate`, `db:seed`, `backup:local`, `restore:local`) y verificarlos en Windows; automatizar el test de ida y vuelta backup/restore
-- [ ] 4.7 Implementar apagado ordenado de api y worker; verificar con un test que envía SIGTERM a mitad de un job
+- [x] 4.1 Redactar los TC de salud del stack, arranque por readiness, reset+seed, ida y vuelta backup/restore y ausencia de hosts fijos
+- [x] 4.2 Crear Dockerfiles multi-stage (`docker/api.Dockerfile`, `docker/web.Dockerfile`), non-root y con healthchecks; verificar que las imágenes compilan y corren como non-root
+- [ ] 4.3 Crear `deploy/compose/compose.yaml` con perfiles `deps`, `core`, `seed`, `observability`, `ml`, volúmenes nombrados y `depends_on` por salud; verificar que `pnpm stack:up` llega a todo healthy en Windows y en CI Linux _(2026-10-02: Windows verificado — core healthy en 36,7 s con volúmenes vacíos e imágenes en caché, suite `pnpm test:stack`; pendiente CI Linux con 5.3)_
+- [x] 4.4 Crear `.env.example` (sin secretos, puertos `PF_*` con defaults 2xxxx en 127.0.0.1), `pnpm setup:env`, el esquema de configuración validado al arrancar (docs/19 §0.3) e import del realm de desarrollo de Keycloak; verificar que gitleaks no reporta hallazgos y que el arranque falla con una variable faltante
+- [x] 4.5 Crear la migración SQL de bootstrap (schema `platform`, roles `pf_migrator`/`pf_app` sin BYPASSRLS); verificar que `migrate` termina y que el rol de app no puede saltarse RLS
+- [x] 4.6 Implementar scripts multiplataforma (`stack:up|down|restart|logs|reset`, `db:migrate`, `db:seed`, `backup:local`, `restore:local`) y verificarlos en Windows; automatizar el test de ida y vuelta backup/restore
+- [x] 4.7 Implementar apagado ordenado de api y worker; verificar con un test que envía SIGTERM a mitad de un job
 
 ## 5. Quality gate y entrega (platform/delivery-pipeline)
 
@@ -42,8 +42,8 @@
 
 ## 6. Trazabilidad de tests (quality/test-traceability)
 
-- [ ] 6.1 Implementar `scripts/traceability` (validación del schema del catálogo, búsqueda de TC-ids en tests, cobertura de Must, chequeo de TC activo borrado) con TDD, verificando con tests unitarios sobre fixtures
-- [ ] 6.2 Generar `tests/traceability/matrix.md` y `.json` en CI como artefactos; verificar que listan todos los TC catalogados
+- [x] 6.1 Implementar `scripts/traceability` (validación del schema del catálogo, búsqueda de TC-ids en tests, cobertura de Must, chequeo de TC activo borrado) con TDD, verificando con tests unitarios sobre fixtures
+- [x] 6.2 Generar `tests/traceability/matrix.md` y `.json` en CI como artefactos; verificar que listan todos los TC catalogados (generador `pnpm --filter @pf/traceability matrix` verificado con TC-PLATFORM-TRACE-006; la publicación como artefacto en CI la completa la tarea 5.3)
 
 ## 7. Cierre
 

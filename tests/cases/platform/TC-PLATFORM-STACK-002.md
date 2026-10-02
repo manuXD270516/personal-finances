@@ -1,6 +1,6 @@
 ---
 id: TC-PLATFORM-STACK-002
-title: "finance-api no está listo hasta que PostgreSQL, Valkey y el object storage responden"
+title: "finance-api no está listo hasta que PostgreSQL y el object storage (y Valkey, solo si está habilitado) responden"
 spec: platform/observability
 related_specs: ["platform/local-environment"]
 requirement: "Readiness refleja dependencias críticas"
@@ -12,16 +12,16 @@ invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/health.api.test.ts", "packages/platform/src/health/readiness.test.ts", "scripts/stack/test/stack/stack.stack.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["healthcheck", "readiness"]
 error_code: null
 preconditions: ["Stack core en ejecución y healthy"]
 input:
-  dependency_to_stop: ["postgres", "redis", "object-storage"]
+  dependency_to_stop: ["postgres", "object-storage"]
 steps:
   - "Detener una dependencia"
   - "Llamar a /health/ready y /health/live"
@@ -35,11 +35,11 @@ created: 2026-10-01
 updated: 2026-10-02
 ---
 
-# TC-PLATFORM-STACK-002 — finance-api no está listo hasta que PostgreSQL, Valkey y el object storage responden
+# TC-PLATFORM-STACK-002 — finance-api no está listo hasta que PostgreSQL y el object storage (y Valkey, solo si está habilitado) responden
 
 ## Intención
 
-ARCHITECTURE §10: finance-api está healthy solo si PG, Redis y el storage responden; liveness es independiente para evitar ciclos de reinicio.
+ARCHITECTURE §10: finance-api está healthy solo si PG y el storage responden (Valkey solo cuando `JOB_QUEUE_DRIVER=bullmq` o `SESSION_STORE=valkey`, perfil `valkey`); liveness es independiente para evitar ciclos de reinicio.
 
 ## Escenario
 

@@ -1,4 +1,4 @@
-// Entrypoint `api` de la imagen finance-api. Con OTel: node --import @pf/platform/otel/register dist/main.api.js
+// Comando `api` de la imagen finance-api (vía dist/entrypoint.js, que registra OTel antes de cargar este módulo).
 import 'reflect-metadata';
 import { loadConfigOrExit } from '@pf/platform/config';
 import { installGracefulShutdown } from '@pf/platform/lifecycle';

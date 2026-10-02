@@ -86,6 +86,17 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     }
   }
 
+  // Comportamientos solo de desarrollo se rechazan fuera de local/ci (docs/19 §6.1).
+  if (
+    values['OBJECT_STORAGE_ENSURE_BUCKET'] === true &&
+    (values['PFOS_ENV'] === 'staging' || values['PFOS_ENV'] === 'production')
+  ) {
+    problems.push({
+      variable: 'OBJECT_STORAGE_ENSURE_BUCKET',
+      reason: 'solo se permite con PFOS_ENV=local|ci (en cloud el bucket lo crea la IaC)',
+    });
+  }
+
   if (problems.length > 0) throw new ConfigError(app, problems);
   return Object.freeze(values) as AppConfig<A>;
 }

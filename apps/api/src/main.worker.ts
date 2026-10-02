@@ -1,4 +1,4 @@
-// Entrypoint `worker` de la imagen finance-api. Con OTel: node --import @pf/platform/otel/register dist/main.worker.js
+// Comando `worker` de la imagen finance-api (vía dist/entrypoint.js, que registra OTel antes de cargar este módulo).
 import 'reflect-metadata';
 import { loadConfigOrExit } from '@pf/platform/config';
 import { installGracefulShutdown } from '@pf/platform/lifecycle';
@@ -17,6 +17,7 @@ const logger = createLogger({
 try {
   const runtime = await createWorkerRuntime(config, logger);
   installGracefulShutdown(() => runtime.close(), { logger, timeoutMs: config.SHUTDOWN_TIMEOUT_MS });
+  await runtime.listenHealth();
   logger.info('worker started');
 } catch (err) {
   logger.fatal({ err }, 'worker failed to start');

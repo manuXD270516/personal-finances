@@ -50,6 +50,7 @@
       "default": "./dist/otel/index.js"
     },
     "./otel/register": {
+      "@pf/source": "./src/otel/register.ts",
       "types": "./dist/otel/register.d.ts",
       "default": "./dist/otel/register.js"
     }

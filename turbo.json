@@ -32,7 +32,7 @@
       "outputs": []
     },
     "test:integration": {
-      "dependsOn": ["^transit"],
+      "dependsOn": ["^build"],
       "outputs": [],
       "cache": false
     },

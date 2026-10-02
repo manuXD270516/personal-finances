@@ -46,6 +46,17 @@ export interface PlatformPingPayload {
   readonly requestedAt: string;
 }
 
+/**
+ * Job de diagnóstico (solo PFOS_ENV=local|ci): tarda `durationMs` y luego confirma un efecto idempotente
+ * (`platform.diagnostic_probe`, una fila por `key`). Lo usa el test de apagado ordenado (TC-PLATFORM-STACK-006).
+ */
+export const PLATFORM_PROBE_QUEUE = 'platform.probe';
+
+export interface PlatformProbePayload {
+  readonly key: string;
+  readonly durationMs: number;
+}
+
 export function isJobEnvelope(value: unknown): value is JobEnvelope {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Partial<JobEnvelope>;

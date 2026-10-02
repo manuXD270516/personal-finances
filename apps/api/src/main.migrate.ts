@@ -1,8 +1,8 @@
-// Entrypoint `migrate` (one-shot). Placeholder: la migración SQL de bootstrap (schema `platform`, roles
-// pf_migrator / pf_app) y dbmate llegan con la tarea 4.5. Termina con 0 para que Compose pueda encadenar
-// `service_completed_successfully`.
+// Comando `migrate` (one-shot) de la imagen finance-api: dbmate up + rol pf_app + pg-boss + bucket (local/CI).
+// Termina con 0 si todo quedó aplicado; Compose encadena api/worker con `service_completed_successfully`.
 import { loadConfigOrExit } from '@pf/platform/config';
 import { createLogger } from '@pf/platform/logging';
+import { runMigrate } from './migrate/run-migrate.js';
 
 const config = loadConfigOrExit('migrate');
 const logger = createLogger({
@@ -12,4 +12,12 @@ const logger = createLogger({
   level: config.LOG_LEVEL,
 });
 
-logger.info({ applied: 0 }, 'sin migraciones');
+try {
+  await runMigrate(config, logger);
+} catch (err) {
+  logger.fatal(
+    { err: { type: err instanceof Error ? err.name : typeof err, message: (err as Error).message } },
+    'migrate failed',
+  );
+  process.exit(1);
+}

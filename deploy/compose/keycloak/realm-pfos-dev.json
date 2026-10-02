@@ -1,0 +1,104 @@
+{
+  "realm": "pfos",
+  "enabled": true,
+  "displayName": "PFOS (desarrollo local)",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "pfos-web",
+      "name": "PFOS BFF (Next.js)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${PF_DEV_OIDC_CLIENT_SECRET}",
+      "fullScopeAllowed": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": ["${PF_WEB_PUBLIC_URL}/api/auth/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${PF_WEB_PUBLIC_URL}/",
+        "use.refresh.tokens": "true",
+        "backchannel.logout.session.required": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-finance-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "finance-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "owner",
+      "enabled": true,
+      "email": "owner@pfos.test",
+      "emailVerified": true,
+      "firstName": "Owner",
+      "lastName": "Dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${PF_DEV_KC_OWNER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "editor",
+      "enabled": true,
+      "email": "editor@pfos.test",
+      "emailVerified": true,
+      "firstName": "Editor",
+      "lastName": "Dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${PF_DEV_KC_EDITOR_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "email": "viewer@pfos.test",
+      "emailVerified": true,
+      "firstName": "Viewer",
+      "lastName": "Dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${PF_DEV_KC_VIEWER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
+    }
+  ]
+}

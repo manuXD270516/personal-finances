@@ -14,8 +14,8 @@
 | Proceso | Variables |
 |---|---|
 | `api` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_NODE_RESOURCE_DETECTORS`, `DATABASE_URL`, `DATABASE_POOL_MAX`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `JOB_QUEUE_DRIVER`, `JOB_QUEUE_POLLING_INTERVAL_SECONDS`, `SESSION_STORE`, `VALKEY_URL`, `API_PORT`, `API_BIND_ADDRESS`, `HEALTH_CHECK_TIMEOUT_MS`, `SHUTDOWN_TIMEOUT_MS` |
-| `worker` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_NODE_RESOURCE_DETECTORS`, `DATABASE_URL`, `DATABASE_POOL_MAX`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `JOB_QUEUE_DRIVER`, `JOB_QUEUE_POLLING_INTERVAL_SECONDS`, `SESSION_STORE`, `VALKEY_URL`, `WORKER_CONCURRENCY`, `SHUTDOWN_TIMEOUT_MS` |
-| `migrate` | `PFOS_ENV`, `LOG_LEVEL`, `DATABASE_MIGRATOR_URL` |
+| `worker` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_NODE_RESOURCE_DETECTORS`, `DATABASE_URL`, `DATABASE_POOL_MAX`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `JOB_QUEUE_DRIVER`, `JOB_QUEUE_POLLING_INTERVAL_SECONDS`, `SESSION_STORE`, `VALKEY_URL`, `WORKER_CONCURRENCY`, `WORKER_HEALTH_PORT`, `WORKER_HEALTH_BIND_ADDRESS`, `HEALTH_CHECK_TIMEOUT_MS`, `SHUTDOWN_TIMEOUT_MS` |
+| `migrate` | `PFOS_ENV`, `LOG_LEVEL`, `DATABASE_MIGRATOR_URL`, `DATABASE_URL`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `OBJECT_STORAGE_ENSURE_BUCKET`, `OBJECT_STORAGE_CORS_ORIGINS` |
 | `seed` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `DATABASE_URL`, `DATABASE_POOL_MAX` |
 | `web` | `PFOS_ENV`, `LOG_LEVEL` |
 
@@ -38,7 +38,7 @@
 
 | Variable | Obligatoria | Default | Secreto | Procesos | Descripción | Ejemplo (modo A) |
 |---|---|---|---|---|---|---|
-| `DATABASE_URL` | **sí** | — | sí | `api`, `worker`, `seed` | Conexión de la aplicación (rol `pf_app`, sin BYPASSRLS ni DDL). Contiene credenciales. | `postgres://pf_app:<PF_DEV_DB_PASSWORD>@127.0.0.1:25432/pfos` |
+| `DATABASE_URL` | **sí** | — | sí | `api`, `worker`, `migrate`, `seed` | Conexión de la aplicación (rol `pf_app`, sin BYPASSRLS ni DDL). Contiene credenciales. | `postgres://pf_app:<PF_DEV_DB_PASSWORD>@127.0.0.1:25432/pfos` |
 | `DATABASE_MIGRATOR_URL` | **sí** | — | sí | `migrate` | Conexión del rol propietario de migraciones (`pf_migrator`). Solo la usa el comando `migrate`. | `postgres://pf_migrator:<PF_DEV_DB_PASSWORD>@127.0.0.1:25432/pfos` |
 | `DATABASE_POOL_MAX` | no | `10` | no | `api`, `worker`, `seed` | Tamaño máximo del pool de conexiones por proceso. | — |
 
@@ -46,12 +46,14 @@
 
 | Variable | Obligatoria | Default | Secreto | Procesos | Descripción | Ejemplo (modo A) |
 |---|---|---|---|---|---|---|
-| `OBJECT_STORAGE_ENDPOINT` | **sí** | — | no | `api`, `worker` | Endpoint S3 interno (SeaweedFS en local, S3 en cloud). | `http://127.0.0.1:29000` |
-| `OBJECT_STORAGE_REGION` | no | `us-east-1` | no | `api`, `worker` | Región S3. | — |
-| `OBJECT_STORAGE_BUCKET` | **sí** | — | no | `api`, `worker` | Bucket de documentos. La readiness verifica que exista y sea accesible. | `pfos-local-documents` |
-| `OBJECT_STORAGE_ACCESS_KEY` | **sí** | — | sí | `api`, `worker` | Access key S3. | — |
-| `OBJECT_STORAGE_SECRET_KEY` | **sí** | — | sí | `api`, `worker` | Secret key S3. | — |
-| `OBJECT_STORAGE_FORCE_PATH_STYLE` | no | `true` | no | `api`, `worker` | Direccionamiento path-style (obligatorio con SeaweedFS). | — |
+| `OBJECT_STORAGE_ENDPOINT` | **sí** | — | no | `api`, `worker`, `migrate` | Endpoint S3 interno (SeaweedFS en local, S3 en cloud). | `http://127.0.0.1:29000` |
+| `OBJECT_STORAGE_REGION` | no | `us-east-1` | no | `api`, `worker`, `migrate` | Región S3. | — |
+| `OBJECT_STORAGE_BUCKET` | **sí** | — | no | `api`, `worker`, `migrate` | Bucket de documentos. La readiness verifica que exista y sea accesible. | `pfos-local-documents` |
+| `OBJECT_STORAGE_ACCESS_KEY` | **sí** | — | sí | `api`, `worker`, `migrate` | Access key S3. | — |
+| `OBJECT_STORAGE_SECRET_KEY` | **sí** | — | sí | `api`, `worker`, `migrate` | Secret key S3. | — |
+| `OBJECT_STORAGE_FORCE_PATH_STYLE` | no | `true` | no | `api`, `worker`, `migrate` | Direccionamiento path-style (obligatorio con SeaweedFS). | — |
+| `OBJECT_STORAGE_ENSURE_BUCKET` | no | `false` | no | `migrate` | Solo local/CI: `migrate` crea el bucket (idempotente) con CORS y versioning. Rechazado en staging/production (allí lo crea la IaC). | — |
+| `OBJECT_STORAGE_CORS_ORIGINS` | no | — | no | `migrate` | Orígenes del navegador permitidos por la regla CORS del bucket (subida directa con URL presignada). Solo lo usa `migrate` con `OBJECT_STORAGE_ENSURE_BUCKET=true`. | `http://localhost:23000` |
 
 ## Cola y sesiones
 
@@ -68,7 +70,7 @@
 |---|---|---|---|---|---|---|
 | `API_PORT` | no | `8080` | no | `api` | Puerto en el que escucha finance-api (8080 dentro del contenedor; `PF_API_PORT` en modo A). | — |
 | `API_BIND_ADDRESS` | no | `0.0.0.0` | no | `api` | Dirección de escucha de finance-api. | — |
-| `HEALTH_CHECK_TIMEOUT_MS` | no | `2000` | no | `api` | Tiempo máximo por chequeo de dependencia en `/health/ready`. | — |
+| `HEALTH_CHECK_TIMEOUT_MS` | no | `2000` | no | `api`, `worker` | Tiempo máximo por chequeo de dependencia en `/health/ready`. | — |
 | `SHUTDOWN_TIMEOUT_MS` | no | `25000` | no | `api`, `worker` | Tiempo máximo de apagado ordenado tras SIGTERM antes de forzar la salida (menor que `stop_grace_period`). | — |
 
 ## Worker
@@ -76,6 +78,8 @@
 | Variable | Obligatoria | Default | Secreto | Procesos | Descripción | Ejemplo (modo A) |
 |---|---|---|---|---|---|---|
 | `WORKER_CONCURRENCY` | no | `4` | no | `worker` | Jobs procesados en paralelo por cola en cada proceso worker. | — |
+| `WORKER_HEALTH_PORT` | no | `8082` | no | `worker` | Puerto de los probes `/health/live` y `/health/ready` del worker (8082 en el contenedor, no publicado; 28082 en modo A). | — |
+| `WORKER_HEALTH_BIND_ADDRESS` | no | `0.0.0.0` | no | `worker` | Dirección de escucha de los probes del worker. | — |
 
 ## OpenTelemetry
 

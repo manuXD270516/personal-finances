@@ -1,0 +1,8 @@
+services:
+  api:
+    image: example/api
+    healthcheck:
+      test: ['CMD', 'node', 'healthcheck.mjs', 'http://127.0.0.1:8080/health/ready']
+      interval: 10s
+    environment:
+      API_URL: http://127.0.0.1:8080
