@@ -71,6 +71,7 @@ export {
   currentSqlExecutor,
   type CommandTransaction,
 } from './db/command-transaction.js';
+export { unitOfWorkKysely } from './db/uow-kysely.js';
 export {
   CursorCodec,
   DEFAULT_PAGE_LIMIT,
@@ -91,3 +92,9 @@ export {
   type RateLimitPolicy,
   type RateLimiter,
 } from './rate-limit/rate-limiter.js';
+export {
+  DEFAULT_JWT_ALGORITHMS,
+  JwtVerifier,
+  type JwtVerifierOptions,
+  type VerifiedAccessToken,
+} from './auth/jwt-verifier.js';

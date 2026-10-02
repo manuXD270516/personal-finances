@@ -251,6 +251,36 @@ export const VARIABLES = {
       secret: true,
     },
   ),
+  // ── Identidad (OIDC, finance-api como resource server) ──
+  OIDC_ISSUER_URL: variable(httpUrl, {
+    group: 'Identidad (OIDC)',
+    description:
+      'Emisor (`iss`) exacto de los access tokens (realm de Keycloak). Sin ella, en local/ci las rutas de identidad no se montan; obligatoria en staging/production.',
+    optional: true,
+    requiredWhen: '`PFOS_ENV=staging|production`',
+    example: 'https://auth.example.test/realms/pfos',
+  }),
+  OIDC_JWKS_URI: variable(httpUrl, {
+    group: 'Identidad (OIDC)',
+    description:
+      'URL del JWKS del emisor (back-channel). Si falta se usa `${OIDC_ISSUER_URL}/protocol/openid-connect/certs`. Caché de 10 min con refetch limitado por `kid` desconocido.',
+    optional: true,
+  }),
+  OIDC_API_AUDIENCE: variable(z.string().min(1), {
+    group: 'Identidad (OIDC)',
+    description: 'Audiencia (`aud`) exigida en los access tokens de finance-api.',
+    default: 'finance-api',
+  }),
+  OIDC_REQUIRED_SCOPE: variable(z.string().min(1), {
+    group: 'Identidad (OIDC)',
+    description: 'Scope que todo access token debe incluir.',
+    default: 'pfos.api',
+  }),
+  OIDC_CLOCK_SKEW_SECONDS: variable(z.coerce.number().int().min(0).max(120), {
+    group: 'Identidad (OIDC)',
+    description: 'Tolerancia de reloj en segundos para `exp`/`nbf`.',
+    default: '30',
+  }),
   RATE_LIMIT_STORE: variable(z.enum(['memory', 'valkey']), {
     group: 'Convenciones de API',
     description:
@@ -356,6 +386,11 @@ export const APP_VARIABLES = {
     'RATE_LIMIT_STORE',
     'RATE_LIMIT_READS_PER_MIN',
     'RATE_LIMIT_WRITES_PER_MIN',
+    'OIDC_ISSUER_URL',
+    'OIDC_JWKS_URI',
+    'OIDC_API_AUDIENCE',
+    'OIDC_REQUIRED_SCOPE',
+    'OIDC_CLOCK_SKEW_SECONDS',
   ],
   worker: [
     ...GENERAL,

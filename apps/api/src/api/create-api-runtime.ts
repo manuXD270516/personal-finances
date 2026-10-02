@@ -14,6 +14,8 @@ import { shutdownTelemetry } from '@pf/platform/otel';
 import { createApiResources, type ApiResources } from '../runtime/platform-resources.js';
 import { ApiModule } from './api.module.js';
 import { createApiConventions, type ApiConventionsOverrides } from './api-conventions.js';
+import { identityImports } from '../identity/identity-wiring.js';
+import type { JwtVerifierOptions } from '@pf/platform/api';
 
 /** Rutas operativas fuera de la API versionada (proposal: los probes no dependen de auth ni de versionado). */
 const UNVERSIONED_ROUTES = [
@@ -40,6 +42,8 @@ export interface ApiRuntimeOptions extends ApiConventionsOverrides {
   ) => NonNullable<ModuleMetadata['imports']>;
   /** Middleware previo a las rutas (tests: fija el usuario autenticado hasta que exista add-workspace-identity). */
   readonly middleware?: Parameters<NestExpressApplication['use']>[0];
+  /** Monta IDENTITY (`/me`, `/workspaces*`): por defecto según `OIDC_ISSUER_URL`; `false` lo omite (harness). */
+  readonly identity?: false | { readonly jwt?: JwtVerifierOptions };
 }
 
 export async function createApiRuntime(
@@ -59,7 +63,18 @@ export async function createApiRuntime(
       logger,
       diagnostics: config.PFOS_ENV === 'local' || config.PFOS_ENV === 'ci',
       conventions,
-      imports: options.imports?.(resources, conventions) ?? [],
+      imports: [
+        ...(options.identity === false
+          ? []
+          : identityImports({
+              config,
+              pool: resources.pool,
+              conventions,
+              logger,
+              ...(options.identity?.jwt ? { jwt: options.identity.jwt } : {}),
+            })),
+        ...(options.imports?.(resources, conventions) ?? []),
+      ],
     }),
     { logger: new PinoNestLogger(logger), abortOnError: false, bodyParser: false },
   );

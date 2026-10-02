@@ -68,6 +68,8 @@ export interface ContractOperation {
   readonly requiresIfMatch: boolean;
   readonly supportsIfNoneMatch: boolean;
   readonly hasWorkspaceScope: boolean;
+  /** `x-required-role` del contrato (`AUTHENTICATED`, `VIEWER`, `EDITOR`, `OWNER`); lo aplican los guards. */
+  readonly requiredRole?: string;
   readonly deprecation?: DeprecationInfo;
   readonly requestBody?: { readonly required: boolean; readonly mediaTypes: readonly string[] };
   validateRequest(input: RequestInput): RequestValidation;
@@ -316,6 +318,9 @@ export class ApiContract {
       requiresIfMatch: has('IfMatch') || headerParam('if-match')?.required === true,
       supportsIfNoneMatch: headerParam('if-none-match') !== undefined,
       hasWorkspaceScope: path.includes('{workspaceId}'),
+      ...(typeof operation['x-required-role'] === 'string'
+        ? { requiredRole: operation['x-required-role'] }
+        : {}),
       ...(deprecation ? { deprecation } : {}),
       ...(requestBody ? { requestBody: { required: requestBody['required'] === true, mediaTypes } } : {}),
       validateRequest: (input) => {

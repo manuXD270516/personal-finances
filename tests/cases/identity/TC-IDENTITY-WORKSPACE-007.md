@@ -15,9 +15,10 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/api/test/api/identity.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:

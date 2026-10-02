@@ -87,6 +87,14 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
   }
 
   const cloud = values['PFOS_ENV'] === 'staging' || values['PFOS_ENV'] === 'production';
+  if (names.includes('OIDC_ISSUER_URL') && cloud && values['OIDC_ISSUER_URL'] === undefined) {
+    if (!problems.some((p) => p.variable === 'OIDC_ISSUER_URL')) {
+      problems.push({
+        variable: 'OIDC_ISSUER_URL',
+        reason: 'falta (obligatoria con PFOS_ENV=staging|production)',
+      });
+    }
+  }
   if (names.includes('CURSOR_SIGNING_KEY') && cloud && values['CURSOR_SIGNING_KEY'] === undefined) {
     if (!problems.some((p) => p.variable === 'CURSOR_SIGNING_KEY')) {
       problems.push({

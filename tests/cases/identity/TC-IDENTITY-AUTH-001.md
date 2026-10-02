@@ -14,9 +14,11 @@ invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/api/test/api/identity.api.test.ts
+- packages/platform/src/api/auth/jwt-verifier.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:

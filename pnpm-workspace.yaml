@@ -39,6 +39,8 @@ catalog:
   '@types/react': 19.3.0
   '@types/react-dom': 19.3.0
   next-intl: 4.14.9
+  kysely: 0.29.6
+  jose: 6.2.12
 
 minimumReleaseAgeExclude:
   - '@aws-sdk/client-s3@3.1145.0'

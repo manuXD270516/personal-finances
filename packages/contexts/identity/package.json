@@ -9,6 +9,11 @@
       "@pf/source": "./src/contracts/index.ts",
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
+    },
+    "./interface/identity.module": {
+      "@pf/source": "./src/interface/identity.module.ts",
+      "types": "./dist/interface/identity.module.d.ts",
+      "default": "./dist/interface/identity.module.js"
     }
   },
   "files": [
@@ -22,15 +27,20 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
     "@pf/platform": "workspace:*",
-    "@pf/shared-kernel": "workspace:*"
+    "@pf/shared-kernel": "workspace:*",
+    "kysely": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

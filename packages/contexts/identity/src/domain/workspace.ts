@@ -40,6 +40,8 @@ export interface WorkspaceProps {
   readonly personalOfUserId: string | null;
   readonly status: WorkspaceStatus;
   readonly version: number;
+  /** Instante de alta (ISO 8601 UTC) cuando viene de persistencia; ausente en un agregado recién creado. */
+  readonly createdAt?: string;
 }
 
 /** Cambios pedidos: valores crudos del borde; el agregado los valida. Las monedas ya vienen resueltas del catálogo. */
@@ -172,6 +174,9 @@ export class Workspace {
   }
   get personalOfUserId(): string | null {
     return this.props.personalOfUserId;
+  }
+  get createdAt(): string | null {
+    return this.props.createdAt ?? null;
   }
   get status(): WorkspaceStatus {
     return this.props.status;
