@@ -52,3 +52,63 @@ export class PgCommandTransaction implements CommandTransaction {
     }
   }
 }
+
+/** Contexto de autenticación/RLS de una unidad de trabajo (design §1). `null` = sin contexto (falla con PF002). */
+export interface AuthContext {
+  readonly userId: string | null;
+  readonly workspaceId: string | null;
+}
+
+/** Fija el contexto RLS con `set_config(..., true)` (= `SET LOCAL`): nunca sobrevive a la transacción. */
+export async function setRlsContext(tx: SqlExecutor, ctx: AuthContext): Promise<void> {
+  await tx.query(`SELECT set_config('app.user_id', $1, true), set_config('app.workspace_id', $2, true)`, [
+    ctx.userId ?? '',
+    ctx.workspaceId ?? '',
+  ]);
+}
+
+/**
+ * Unit of Work de `add-workspace-identity`: ÚNICO punto autorizado para fijar el contexto RLS (lint contra
+ * `SET app.` sin `LOCAL`). Abre una transacción, fija `app.user_id`/`app.workspace_id` LOCAL y expone la conexión
+ * por `currentSqlExecutor()` a los repositorios. Si ya hay una transacción en curso en el mismo flujo async la
+ * reutiliza (re-fijando el contexto), de modo que un caso de uso puede componer otros sin anidar transacciones.
+ */
+export class PgUnitOfWork {
+  constructor(private readonly pool: Pool) {}
+
+  async run<T>(ctx: AuthContext, fn: () => Promise<T>): Promise<T> {
+    const outer = current.getStore();
+    if (outer) {
+      await setRlsContext(outer, ctx);
+      return fn();
+    }
+    const client = await this.pool.connect();
+    let broken = false;
+    try {
+      await client.query('BEGIN');
+      await setRlsContext(client, ctx);
+      const result = await current.run(client, fn);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {
+        broken = true;
+      });
+      throw err;
+    } finally {
+      client.release(broken);
+    }
+  }
+
+  /** Re-fija el contexto dentro de la transacción en curso (p. ej. tras dar de alta la identidad). */
+  async bind(ctx: AuthContext): Promise<void> {
+    await setRlsContext(requireSqlExecutor(), ctx);
+  }
+}
+
+/** Conexión de la unidad de trabajo en curso; lanza si se usa un repositorio fuera de una. */
+export function requireSqlExecutor(): SqlExecutor {
+  const tx = current.getStore();
+  if (!tx) throw new Error('no hay una unidad de trabajo en curso (PgUnitOfWork.run)');
+  return tx;
+}

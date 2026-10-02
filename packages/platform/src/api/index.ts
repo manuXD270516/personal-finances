@@ -63,6 +63,10 @@ export { InMemoryIdempotencyStore } from './idempotency/memory-store.js';
 export { PgIdempotencyStore, purgeExpiredIdempotencyKeys } from './idempotency/pg-store.js';
 export {
   PgCommandTransaction,
+  PgUnitOfWork,
+  requireSqlExecutor,
+  setRlsContext,
+  type AuthContext,
   applyRlsContext,
   currentSqlExecutor,
   type CommandTransaction,

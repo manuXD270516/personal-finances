@@ -1,0 +1,37 @@
+{
+  "name": "@pf/identity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context IDENTITY: usuarios, workspaces, membresías y autorización (openspec add-workspace-identity).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
