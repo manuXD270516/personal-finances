@@ -1,8 +1,8 @@
 # 23 — CI/CD y estrategia de release
 
-> **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §5 (ADR-0015), §9, §11, §12, §15 · [03-openspec-strategy.md](03-openspec-strategy.md) · [16-testing-strategy.md](16-testing-strategy.md) §10 · [17-test-traceability.md](17-test-traceability.md) · [19-local-development.md](19-local-development.md) · [20-container-strategy.md](20-container-strategy.md) · [21-cloud-deployment-options.md](21-cloud-deployment-options.md) · [22-infrastructure.md](22-infrastructure.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · ADR-0015, ADR-0016, ADR-0024 · Spec: `openspec/changes/bootstrap-platform-foundation/specs/platform/delivery-pipeline/spec.md` · SPIKE-01
+> **Estado:** Aceptado — PR gate y build once implementados en Phase 0 (`bootstrap-platform-foundation`); secciones marcadas **as-built (2026-10-02)** · **Fecha:** 2026-10-01 (diseño) / 2026-10-02 (as-built) · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §5 (ADR-0015), §9, §11, §12, §15 · [03-openspec-strategy.md](03-openspec-strategy.md) · [16-testing-strategy.md](16-testing-strategy.md) §10 · [17-test-traceability.md](17-test-traceability.md) · [19-local-development.md](19-local-development.md) · [20-container-strategy.md](20-container-strategy.md) · [21-cloud-deployment-options.md](21-cloud-deployment-options.md) · [22-infrastructure.md](22-infrastructure.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · ADR-0015, ADR-0016, ADR-0024 · Spec: `openspec/changes/bootstrap-platform-foundation/specs/platform/delivery-pipeline/spec.md` · SPIKE-01
 
-> Los workflows de este documento son **ilustrativos** (Phase 0). No se crean ficheros en `.github/workflows/` hasta el DESIGN GATE, salvo que el lead decida adelantar el gate de Phase 0 (OpenSpec validate + format + secrets). Todas las actions de terceros se fijan por **commit SHA** (aquí abreviado como `@<sha>`).
+> **As-built (2026-10-02).** Existen y son la fuente de verdad [`.github/workflows/pr.yml`](../.github/workflows/pr.yml), [`.github/workflows/main.yml`](../.github/workflows/main.yml) y la acción compuesta [`.github/actions/setup-workspace`](../.github/actions/setup-workspace/action.yml); la política de excepciones de vulnerabilidades está en [`.trivyignore.yaml`](../.trivyignore.yaml) y las reglas de arquitectura en [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs). §5.1 y §5.2 se reemplazaron por un resumen de esos ficheros; el estado real del gate está en §16. `release.yml`, `deploy.yml`, `nightly.yml` e `infra.yml` (§5.3–§5.6) siguen siendo **ilustrativos** (no hay despliegue en cloud todavía). Todas las actions de terceros se fijan por **commit SHA** completo (en los ejemplos ilustrativos, abreviado como `@<sha>`).
 
 ---
 
@@ -22,12 +22,14 @@ flowchart LR
   PR --> MAIN --> REL
 ```
 
+> **As-built (2026-10-02):** hoy existen solo el subgrafo `PR` (sin E2E ni contract) y, de `MAIN`, el build único con push a **GHCR** (`sha-<commit>`) + verificación por digest; no hay ECR, deploy ni `release.yml`. Detalle en §5.1, §5.2 y §16.
+
 Orden de gates alineado con ARCHITECTURE §11 y la progresión de [16-testing-strategy.md](16-testing-strategy.md) §10 (que define **qué bloquea y desde cuándo**; este documento define **cómo se ejecuta**).
 
 ## 2. Estrategia de ramas y repositorio
 
 - **Trunk-based**: `main` siempre desplegable; ramas cortas (`feat/…`, `fix/…`, `chore/…`, ≤ 2–3 días), PR obligatorio; **squash merge** con título Conventional Commit.
-- **Ruleset/branch protection en `main`**: PR requerido (1 aprobación — para un owner único, ver nota), checks requeridos (`pr / gate`), historial lineal, sin force-push, sin borrado, conversaciones resueltas, *require branches up to date* (o **merge queue** cuando haya colaboradores).
+- **Ruleset/branch protection en `main`**: PR requerido (1 aprobación — para un owner único, ver nota), checks requeridos (`pr / gate`), historial lineal, sin force-push, sin borrado, conversaciones resueltas, *require branches up to date* (o **merge queue** cuando haya colaboradores). **As-built (2026-10-02):** se aplicó con 0 aprobaciones y los **14 jobs de `pr.yml` como checks requeridos** (no hay job `gate`); ver §16.1.
   - Nota equipo de 1: GitHub no permite aprobar el propio PR. Opciones: (a) 0 aprobaciones requeridas pero checks obligatorios + autorevisión con plantilla; (b) revisión asistida por bot. Se propone (a) mientras el equipo sea 1 (Preguntas abiertas).
 - **CODEOWNERS** (ilustrativo):
 
@@ -63,266 +65,30 @@ Orden de gates alineado con ARCHITECTURE §11 y la progresión de [16-testing-st
 
 **Sin credenciales AWS de larga vida**: todo vía OIDC ([22](22-infrastructure.md) §7). Los únicos secrets en GitHub son tokens no-AWS (p. ej. `RELEASE_PLEASE_TOKEN` si se usa una GitHub App para que el release PR dispare workflows; infracost API key opcional).
 
-## 5. Workflows (ilustrativos)
+## 5. Workflows
 
-### 5.1 `pr.yml`
+### 5.1 `pr.yml` — as-built (2026-10-02)
 
-```yaml
-name: pr
-on:
-  pull_request:
-    branches: [main]
-  workflow_call:                    # reutilizado por main.yml con full=true (sin --affected)
-    inputs:
-      full: { type: boolean, default: false }
-permissions:
-  contents: read
-concurrency:
-  group: pr-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true          # un push nuevo cancela el run anterior
+Fichero real: [`.github/workflows/pr.yml`](../.github/workflows/pr.yml). Resumen:
 
-env:
-  TURBO_TELEMETRY_DISABLED: 1
-  NODE_OPTIONS: --max-old-space-size=4096
+- **Disparo:** `pull_request` hacia `main`; `permissions: contents: read`; `concurrency` por número de PR con `cancel-in-progress: true`; telemetría desactivada (`TURBO_TELEMETRY_DISABLED`, `DO_NOT_TRACK`, `OPENSPEC_TELEMETRY=0`, `OPENSPEC_NO_UPDATE_CHECK=1`).
+- **Setup común:** `.github/actions/setup-workspace` = `pnpm/action-setup` (versión de `packageManager`) + `actions/setup-node` (`node-version-file: .nvmrc`, `cache: pnpm`) + `pnpm install --frozen-lockfile`.
+- **14 jobs, todos en paralelo salvo `stack-smoke`** (que depende de `image`), sin path filters ni `--affected` y sin job `gate` agregador: `format`, `lint`, `typecheck`, `openspec`, `config-docs`, `architecture`, `traceability` (con `fetch-depth: 0`, `--base origin/main` y la matriz como artefacto), `unit`, `integration`, `image (finance-api)`, `image (finance-web)`, `stack-smoke`, `dependency-scan`, `secrets`. Qué ejecuta cada uno: tabla de §16.
+- **Build once en el PR:** `image` construye con buildx (`linux/amd64`, `load: true`, sin push, caché `type=gha`), verifica non-root, escanea con Trivy y exporta la imagen como artefacto; `stack-smoke` la carga con `docker load` y corre `pnpm test:stack` con `PF_STACK_PREBUILT_IMAGES=1` (sin reconstruir).
+- **Binarios verificados:** Trivy 0.74.0 y gitleaks 8.30.1 se descargan por versión y se comprueban con SHA-256 (`sha256sum --check --strict`).
 
-jobs:
-  changes:
-    runs-on: ubuntu-24.04
-    outputs:
-      code: ${{ steps.f.outputs.code }}
-      images: ${{ steps.f.outputs.images }}
-      migrations: ${{ steps.f.outputs.migrations }}
-      infra: ${{ steps.f.outputs.infra }}
-    steps:
-      - uses: actions/checkout@<sha>
-      - id: f
-        uses: dorny/paths-filter@<sha>
-        with:
-          filters: |
-            code: ['apps/**','packages/**','contracts/**','db/**','seeds/**','package.json','pnpm-lock.yaml']
-            images: ['docker/**','apps/**','packages/**','deploy/compose/**','pnpm-lock.yaml']
-            migrations: ['db/migrations/**']
-            infra: ['infra/**']
+Diferencias con el diseño ilustrativo de Phase 0: sin `changes`/path filters, sin `--affected`, sin job `gate` (cada job es un check requerido), sin `contracts:lint`, sin pre-pull de imágenes de Testcontainers, sin reportes JUnit, sin `dependency-review-action` ni presupuesto de tamaño de imagen, y Trivy bloquea solo **CRITICAL con fix** (no HIGH).
 
-  static:
-    name: format · lint · typecheck · openspec · architecture
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@<sha>
-        with: { fetch-depth: 0 }                 # turbo --affected necesita base
-      - uses: pnpm/action-setup@<sha>             # lee packageManager de package.json
-      - uses: actions/setup-node@<sha>
-        with: { node-version-file: .node-version, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check                    # Prettier + markdownlint (docs, TCs)
-      - run: pnpm turbo run lint typecheck --affected
-      - name: OpenSpec validate (flags confirmados en SPIKE-01)
-        env: { OPENSPEC_TELEMETRY: "0", DO_NOT_TRACK: "1", OPENSPEC_NO_UPDATE_CHECK: "1" }
-        run: pnpm exec openspec validate --all --strict --no-interactive   # devDependency fijada 1.14.0
-      - run: pnpm arch:check                      # dependency-cruiser (reglas ARCHITECTURE §6)
-      - run: pnpm contracts:lint                  # Spectral/Redocly OpenAPI + JSON Schema de eventos + oasdiff vs main (Phase 2+)
-      - run: pnpm traceability:check              # front matter TCs + reglas doc 17
+### 5.2 `main.yml` — as-built (2026-10-02)
 
-  unit:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@<sha>
-        with: { fetch-depth: 0 }
-      - uses: pnpm/action-setup@<sha>
-      - uses: actions/setup-node@<sha>
-        with: { node-version-file: .node-version, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run test --affected -- --reporter=junit --outputFile=reports/unit.xml   # incluye PBT numRuns=100
-      - uses: actions/upload-artifact@<sha>
-        if: always()
-        with: { name: unit-reports, path: '**/reports/*.xml', retention-days: 7 }
+Fichero real: [`.github/workflows/main.yml`](../.github/workflows/main.yml). En cada `push` a `main` (concurrencia `main`, sin cancelación):
 
-  integration:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04            # Docker disponible en runners hosted Linux → Testcontainers
-    timeout-minutes: 25
-    env:
-      TESTCONTAINERS_RYUK_DISABLED: "false"
-    steps:
-      - uses: actions/checkout@<sha>
-      - uses: pnpm/action-setup@<sha>
-      - uses: actions/setup-node@<sha>
-        with: { node-version-file: .node-version, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - name: Pre-pull imágenes de Testcontainers (fijadas por digest en tests/containers.ts)
-        run: pnpm tsx scripts/ci/prepull-test-images.ts
-      - run: pnpm test:integration              # PG 18, Valkey, S3-compatible; API + contract conformance
-      - if: needs.changes.outputs.migrations == 'true'
-        name: Migration validation (informativo → bloquea al primer release)
-        run: pnpm test:migrations               # up-from-empty, up-from-release-snapshot, squawk, N-1
-        continue-on-error: ${{ vars.MIGRATION_GATE_BLOCKING != 'true' }}
+1. `build-push (finance-api)` / `build-push (finance-web)`: **un solo build** por imagen (`linux/amd64`, `sbom: true`, `provenance: mode=max`), push a `ghcr.io/manuxd270516/<imagen>:sha-<commit>` y registro del digest (artefacto `digest-<imagen>` 90 días + resumen del job).
+2. `verify-by-digest`: sin buildx ni pasos de build; descarga cada imagen **por digest**, verifica digest y label `org.opencontainers.image.revision` = commit, y corre `pnpm test:stack` (perfil `core`) con esas imágenes.
 
-  images:
-    needs: [changes]
-    if: needs.changes.outputs.images == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        image: [finance-api, finance-web]
-    steps:
-      - uses: actions/checkout@<sha>
-      - uses: docker/setup-buildx-action@<sha>
-      - uses: docker/build-push-action@<sha>
-        with:
-          context: .
-          file: docker/${{ matrix.image }}.Dockerfile
-          target: runtime
-          platforms: linux/amd64
-          load: true                              # no se publica en PR
-          tags: pfos/${{ matrix.image }}:pr-${{ github.event.pull_request.number }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,scope=${{ matrix.image }},mode=max
-      - name: Image size budget
-        run: pnpm tsx scripts/ci/image-budget.ts pfos/${{ matrix.image }}:pr-${{ github.event.pull_request.number }}
-      - name: Trivy image scan (binario verificado, versión fijada)
-        run: |
-          pnpm tsx scripts/ci/install-trivy.ts      # descarga versión fijada + verifica checksum/firma
-          trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
-            --ignorefile .trivyignore.yaml pfos/${{ matrix.image }}:pr-${{ github.event.pull_request.number }}
-      - name: Non-root assertion
-        run: docker run --rm --entrypoint id pfos/${{ matrix.image }}:pr-${{ github.event.pull_request.number }} -u | grep -qv '^0$'
+No re-ejecuta los gates del PR, no publica multi-arch y no despliega (no hay cloud). Primera ejecución: run `37046732572` (merge de PR #1, commit `ff6b8e0`), 3/3 jobs en verde.
 
-  security:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@<sha>
-        with: { fetch-depth: 0 }
-      - name: Secret scan (gitleaks, binario fijado)
-        run: pnpm tsx scripts/ci/gitleaks.ts --log-opts="${{ github.event.pull_request.base.sha }}..HEAD"
-      - name: Dependency scan
-        run: pnpm tsx scripts/ci/deps-scan.ts       # osv-scanner/trivy fs sobre pnpm-lock.yaml (+ uv.lock en Phase 8)
-      - uses: actions/dependency-review-action@<sha>
-        with: { fail-on-severity: high }
-
-  e2e-smoke:
-    needs: [images]
-    if: vars.E2E_GATE_ENABLED == 'true' && !contains(github.event.pull_request.labels.*.name, 'skip-e2e')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@<sha>
-      - uses: pnpm/action-setup@<sha>
-      - uses: actions/setup-node@<sha>
-        with: { node-version-file: .node-version, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm env:init --ci                   # credenciales dev aleatorias efímeras
-      - run: pnpm test:platform                   # compose smoke: todos healthy, migrate/seed exit 0
-      - run: pnpm test:e2e -- --project=chromium  # core + seed minimal
-      - uses: actions/upload-artifact@<sha>
-        if: failure()
-        with: { name: playwright-report, path: tests/e2e/playwright-report, retention-days: 7 }
-
-  infra-plan:
-    needs: [changes]
-    if: needs.changes.outputs.infra == 'true'
-    uses: ./.github/workflows/infra.yml
-    with: { mode: plan }
-    permissions: { id-token: write, contents: read, pull-requests: write }
-
-  gate:                                         # ÚNICO check requerido en branch protection
-    if: always()
-    needs: [static, unit, integration, images, security, e2e-smoke, infra-plan]
-    runs-on: ubuntu-24.04
-    steps:
-      - run: |
-          echo '${{ toJSON(needs) }}' | node -e "
-            const n=JSON.parse(require('fs').readFileSync(0,'utf8'));
-            const bad=Object.entries(n).filter(([,v])=>!['success','skipped'].includes(v.result));
-            if(bad.length){console.error('Failed:',bad.map(([k])=>k).join(', '));process.exit(1)}"
-```
-
-> Patrón "gate job": un único check requerido que tolera jobs `skipped` por path filters (evita PRs bloqueados por checks que no corrieron). Phase 0: solo `static` (format, OpenSpec, traceability schema) y `security` (secrets) tienen contenido; el resto se salta.
-
-### 5.2 `main.yml`
-
-```yaml
-name: main
-on:
-  push:
-    branches: [main]
-permissions:
-  contents: read
-concurrency:
-  group: main
-  cancel-in-progress: false         # nunca cancelar un build/deploy en curso; se encolan
-
-jobs:
-  verify:
-    uses: ./.github/workflows/pr.yml     # reutilizable (workflow_call) — mismos gates, sin --affected
-    with: { full: true }
-
-  build-push:
-    needs: [verify]
-    runs-on: ${{ matrix.runner }}
-    permissions: { id-token: write, contents: read, attestations: write }
-    strategy:
-      matrix:
-        image: [finance-api, finance-web]
-        include:
-          - { platform: linux/amd64, runner: ubuntu-24.04 }
-          - { platform: linux/arm64, runner: ubuntu-24.04-arm }   # runner arm nativo (verificar plan)
-    steps:
-      - uses: actions/checkout@<sha>
-      - uses: aws-actions/configure-aws-credentials@<sha>
-        with:
-          role-to-assume: ${{ vars.CI_BUILD_ROLE_ARN }}   # cuenta shared, solo push ECR
-          aws-region: ${{ vars.AWS_REGION }}
-      - uses: aws-actions/amazon-ecr-login@<sha>
-        id: ecr
-      - uses: docker/setup-buildx-action@<sha>
-      - id: build
-        uses: docker/build-push-action@<sha>
-        with:
-          context: .
-          file: docker/${{ matrix.image }}.Dockerfile
-          target: runtime
-          platforms: ${{ matrix.platform }}
-          outputs: type=image,name=${{ steps.ecr.outputs.registry }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
-          build-args: |
-            GIT_SHA=${{ github.sha }}
-            VERSION=0.0.0-sha.${{ github.sha }}
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-          sbom: true
-          provenance: mode=max
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
-          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }},mode=max
-      # … export digest como artefacto; job `merge-manifest` crea el índice multi-arch:
-      #   docker buildx imagetools create -t <repo>:sha-${{ github.sha }} <repo>@<digest-amd64> <repo>@<digest-arm64>
-      # y publica deploy-manifest.json { image: digest } como artefacto + attestation (actions/attest-build-provenance)
-
-  deploy-staging:
-    needs: [build-push]
-    uses: ./.github/workflows/deploy.yml
-    with:
-      environment: staging
-      git_sha: ${{ github.sha }}
-    secrets: inherit
-
-  release-please:
-    needs: [deploy-staging]
-    runs-on: ubuntu-24.04
-    permissions: { contents: write, pull-requests: write }
-    steps:
-      - uses: googleapis/release-please-action@<sha>
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}   # GitHub App token para que el tag dispare release.yml
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-```
-
-### 5.3 `release.yml`
+### 5.3 `release.yml` (ilustrativo — no implementado)
 
 ```yaml
 name: release
@@ -365,7 +131,7 @@ jobs:
 
 > `release.yml` corre scripts con shell bash **en el runner Linux de CI** (permitido: la regla "nada solo-bash" de ADR-0012 aplica a los comandos de desarrollo local; aun así la lógica no trivial vive en scripts TS).
 
-### 5.4 `deploy.yml` (reutilizable)
+### 5.4 `deploy.yml` (reutilizable; ilustrativo — no implementado)
 
 ```yaml
 name: deploy
@@ -448,7 +214,7 @@ jobs:
 
 Los comandos `pnpm deploy:*` son scripts TypeScript (`tools/deploy/`) sobre AWS SDK v3 — testeables, cross-platform y reutilizables desde el portátil del owner en break-glass.
 
-### 5.5 `nightly.yml`
+### 5.5 `nightly.yml` (ilustrativo — no implementado)
 
 ```yaml
 name: nightly
@@ -469,7 +235,7 @@ jobs:
   perf:              # k6 con seed large (Phase 2+)
 ```
 
-### 5.6 `infra.yml` (reutilizable; detalle conceptual en [22-infrastructure.md](22-infrastructure.md) §8)
+### 5.6 `infra.yml` (ilustrativo — no implementado; reutilizable; detalle conceptual en [22-infrastructure.md](22-infrastructure.md) §8)
 
 ```yaml
 name: infra
@@ -521,6 +287,8 @@ jobs:
 
 Fuente de verdad de la progresión: [16-testing-strategy.md](16-testing-strategy.md) §10.
 
+> **As-built (2026-10-02):** el bootstrap adelantó a Phase 0 los gates de la columna Phase 1 que ya tienen contenido: format, lint, typecheck, OpenSpec, `config-docs`, architecture, traceability, unit, integration, build de imágenes (sin size budget), Trivy imagen + `trivy fs` (**CRITICAL** con fix), secretos y el compose smoke (`stack-smoke` = `pnpm test:stack`, en todo PR). Aún no existen: markdownlint, OpenAPI lint, migration validation, E2E, coverage ni mutation.
+
 ### 6.1 OpenSpec en CI
 
 - CLI `@fission-ai/openspec` fijada como **devDependency** (lockfile) — el lead verificó que la v1.14.0 expone `validate`. Comando **confirmado en SPIKE-01** (2026-10-01): `openspec validate --all --strict --no-interactive [--json]` — exit 0/1; `--json` entrega `summary.totals` y `byType` para anotaciones. Variables de entorno en CI: `OPENSPEC_TELEMETRY=0`, `DO_NOT_TRACK=1`, `OPENSPEC_NO_UPDATE_CHECK=1`. Ver [spikes/SPIKE-01-openspec-ci](../spikes/SPIKE-01-openspec-ci/README.md).
@@ -530,9 +298,12 @@ Fuente de verdad de la progresión: [16-testing-strategy.md](16-testing-strategy
 
 `pnpm arch:check` = dependency-cruiser con las reglas de capas de ARCHITECTURE §6 (domain → solo shared-kernel; contextos solo vía `contracts`) + ESLint custom (`pf/no-float-money`, `pf/no-nondeterminism`). Salida nombra el import ofensor (scenario *Architecture violation blocks merge*).
 
+> **As-built (2026-10-02):** `pnpm arch:check` ejecuta dependency-cruiser con [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs) sobre `apps`, `packages` y `scripts`; cada regla tiene un fixture que la hace fallar (`scripts/architecture`, TC-PLATFORM-ARCH-001, en el job `unit`). La prohibición de leer `process.env` fuera de `@pf/platform` es la regla ESLint `no-restricted-properties` (job `lint`). Las reglas ESLint propias `pf/no-float-money` y `pf/no-nondeterminism` aún no existen.
+
 ### 6.3 Testcontainers en CI
 
-- Runners `ubuntu-24.04` hosted (Docker disponible). Imágenes fijadas por digest en un único módulo (`tests/containers.ts`) y **pre-pulled** en un paso previo para aislar el tiempo de red.
+- **As-built (2026-10-02):** runners `ubuntu-latest` hosted (Docker disponible); las imágenes de Testcontainers están en `apps/api/test/support/images.ts` (mismas que Compose) y **no** se pre-descargan. `pnpm test:integration` corre con `--concurrency=1`.
+- Diseño: imágenes fijadas por digest en un único módulo y **pre-pulled** en un paso previo para aislar el tiempo de red.
 - Reutilización por suite (un contenedor PG por worker de Vitest, schemas/databases aislados por test file) para mantener < 10 min.
 - Ryuk activo para limpieza. Logs de contenedores adjuntos como artefacto en fallo.
 
@@ -664,3 +435,10 @@ Implementados en `.github/workflows/pr.yml` y `.github/workflows/main.yml` (setu
 | `secrets` | gitleaks sobre los commits de la PR |
 
 Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branches up to date*, historial lineal, sin force-push ni borrado. `main.yml` (jobs `build-push (finance-api)`, `build-push (finance-web)`, `verify-by-digest`) corre tras el merge y **no** es un check requerido.
+
+### 16.1 Estado real — as-built (2026-10-02)
+
+- **Gate verificado en GitHub:** run [`37045925393`](https://github.com/manuXD270516/personal-finances/actions/runs/37045925393) del workflow `pr` sobre el PR #1 (`feat/bootstrap-platform-foundation`, commit `a3a7bed`): **14/14 jobs en verde** (los 14 checks de la tabla anterior).
+- **Branch protection aplicada en `main`** (verificada con `gh api repos/manuXD270516/personal-finances/branches/main/protection`): **14 checks requeridos** (los de la tabla), *require branches up to date* (`strict`), **PR obligatorio** con 0 aprobaciones, resolución de conversaciones obligatoria, **historial lineal**, **sin force push** y sin borrado de la rama. `enforce_admins` está desactivado (el owner puede saltarse la protección en una emergencia).
+- **Tras el merge:** el PR #1 se fusionó en `main` (commit `ff6b8e0`) y el run `37046732572` de `main.yml` terminó en verde (`build-push` ×2 y `verify-by-digest`).
+- Reproducción local de los checks que no necesitan GitHub (verificado en Windows 11, PowerShell y Git Bash): `pnpm format:check`, `pnpm turbo run typecheck lint test`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm test:integration`. `pnpm test:stack` requiere Docker y tarda varios minutos.
