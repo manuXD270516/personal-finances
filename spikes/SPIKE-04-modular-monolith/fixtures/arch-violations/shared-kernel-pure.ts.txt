@@ -1,0 +1,3 @@
+// VIOLACIÓN: shared-kernel depende de otro paquete del workspace.
+import { UNIT_OF_WORK } from '../../platform/src/index.js';
+export const t = UNIT_OF_WORK;

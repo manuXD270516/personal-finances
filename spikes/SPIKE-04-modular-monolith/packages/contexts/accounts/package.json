@@ -1,0 +1,14 @@
+{
+  "name": "@pf/accounts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contracts": { "@pf/source": "./src/contracts/index.ts", "types": "./dist/contracts/index.d.ts", "default": "./dist/contracts/index.js" },
+    "./nest": { "@pf/source": "./src/interface/accounts.module.ts", "types": "./dist/interface/accounts.module.d.ts", "default": "./dist/interface/accounts.module.js" }
+  },
+  "scripts": { "build": "tsc -p tsconfig.build.json", "typecheck": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests" },
+  "dependencies": { "@pf/shared-kernel": "workspace:*", "@pf/platform": "workspace:*", "@pf/ledger": "workspace:*" },
+  "peerDependencies": { "@nestjs/common": "^12.0.0" },
+  "devDependencies": { "@nestjs/common": "catalog:", "reflect-metadata": "catalog:", "rxjs": "catalog:", "typescript": "catalog:", "vitest": "catalog:", "@types/node": "catalog:" }
+}

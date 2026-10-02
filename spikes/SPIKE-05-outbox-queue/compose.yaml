@@ -1,0 +1,39 @@
+# SPIKE-05 — descartable. Proyecto: pf-spike-05. Puertos de host 615xx.
+name: pf-spike-05
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: spike
+      POSTGRES_PASSWORD: spike
+      POSTGRES_DB: spike05
+    command: ["postgres", "-c", "max_connections=300"]
+    ports: ["127.0.0.1:61532:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spike -d spike05"]
+      interval: 2s
+      retries: 30
+  valkey:
+    image: valkey/valkey:9-alpine
+    # Efímero a propósito (sin RDB/AOF) para demostrar pérdida de jobs y el "sweeper".
+    # noeviction es obligatorio para BullMQ.
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:61579:6379"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 2s
+      retries: 30
+  # Worker en Linux para probar SIGTERM/SIGKILL reales (en Windows no hay SIGTERM real).
+  worker:
+    build: .
+    profiles: ["worker"]
+    init: true
+    stop_grace_period: 30s
+    environment:
+      PG_URL: postgres://spike:spike@postgres:5432/spike05
+      REDIS_URL: redis://valkey:6379
+      OPTION: ${OPTION:-A}
+      JOB_MS: ${JOB_MS:-4000}
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }

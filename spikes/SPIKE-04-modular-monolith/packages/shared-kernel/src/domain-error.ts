@@ -1,0 +1,10 @@
+/** Error de dominio base. Sin dependencias de framework. */
+export class DomainError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'DomainError';
+  }
+}

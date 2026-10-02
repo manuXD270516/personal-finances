@@ -1,0 +1,12 @@
+{
+  "n": 30,
+  "viaBffMs": {
+    "p50": "15.3",
+    "p95": "16.3"
+  },
+  "directApiMs": {
+    "p50": "15.2",
+    "p95": "15.7"
+  },
+  "note": "next start local, Valkey en Docker; incluye GET+decrypt de sesión por request"
+}

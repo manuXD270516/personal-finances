@@ -1,0 +1,3 @@
+// VIOLACIÓN: Accounts importa el dominio de Ledger por ruta relativa (esquiva package.json#exports).
+import { JournalEntry } from '../../../ledger/src/domain/journal-entry.js';
+export const je = JournalEntry;

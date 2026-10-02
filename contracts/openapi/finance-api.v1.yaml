@@ -1,0 +1,2711 @@
+openapi: 3.1.0
+# DRAFT — Phase 0 (DESIGN GATE). Contract-first source of truth for finance-api HTTP surface.
+# Conventions: docs/10-api-design.md · Canonical decisions: docs/ARCHITECTURE.md §8 · ADR-0022
+info:
+  title: PFOS finance-api
+  version: 1.0.0-draft.1
+  summary: Personal Finance Operating System — REST API v1 (draft)
+  description: |
+    REST API of the Personal Finance Operating System (PFOS).
+
+    * All business resources live under `/workspaces/{workspaceId}`.
+    * Money is always `{ "amount": "<decimal string>", "currency": "<code>" }`. Never JSON numbers.
+    * Business dates are `YYYY-MM-DD` (workspace timezone); instants are RFC 3339 UTC.
+    * Errors are RFC 9457 `application/problem+json` with a stable domain `code`.
+    * Financial `POST` operations require `Idempotency-Key`; updates and actions on existing aggregates require `If-Match`.
+    * Every operation declares `x-openspec-capability` (OpenSpec taxonomy, ARCHITECTURE §14) and `x-required-role`.
+
+    Only Phase 1 paths are specified. Later-phase resources are listed as tags (description only).
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  contact:
+    name: PFOS owner
+servers:
+  - url: /api/v1
+    description: Relative base path (served behind the finance-web BFF)
+security:
+  - bearerAuth: []
+tags:
+  - name: Identity
+    description: Current user and workspaces (identity/authentication, identity/workspace-membership). Phase 1.
+  - name: Accounts
+    description: User accounts (ASSET/LIABILITY) and institutions. Phase 1.
+  - name: Transactions
+    description: Transactions with legs and splits, transfers and conversions. Phase 1.
+  - name: Classification
+    description: Categories, category groups, tags and counterparties. Phase 1.
+  - name: FX
+    description: Currency catalog (Phase 1). Manual fx-rates (Phase 1, not yet specified) and providers (Phase 5).
+  - name: Reporting
+    description: Basic dashboard KPIs (Phase 1). Advanced reports in Phase 7 (see docs/14-reporting.md).
+  - name: Platform
+    description: Cross-cutting resources such as long-running operations (202 + operation pattern).
+  - name: Members
+    description: "LATER (Phase 9): workspace members and invitations."
+  - name: Reconciliation
+    description: "LATER (Phase 2): account reconciliations against statements; bulk edit of classification."
+  - name: CustomFields
+    description: "LATER (Phase 2): custom field definitions and values on splits."
+  - name: Planning
+    description: "LATER (Phase 2): financial periods, budgets, versioned budget templates, month closing."
+  - name: Notifications
+    description: "LATER (Phase 2): in-app/email notifications and preferences."
+  - name: Commitments
+    description: "LATER (Phase 3): recurring definitions, occurrences and subscriptions."
+  - name: Goals
+    description: "LATER (Phase 4): savings goals and contributions (transfer or earmark)."
+  - name: Debt
+    description: "LATER (Phase 4): loans, amortization schedules, installments, credit cards and statements."
+  - name: FxRates
+    description: "LATER (Phase 1 manual / Phase 5 providers): historical, immutable fx rates."
+  - name: Documents
+    description: "LATER (Phase 6): documents, presigned uploads/downloads and attachment links."
+  - name: Imports
+    description: "LATER (Phase 6, basic CSV may move to Phase 3): import jobs, staged rows, mapping profiles, connections."
+  - name: Rules
+    description: "LATER (Phase 6): rules engine (conditions/actions)."
+  - name: Forecasts
+    description: "LATER (Phase 8): statistical forecasts (async)."
+  - name: Audit
+    description: "LATER (Phase 1 storage, API Phase 2): read-only audit log."
+  - name: Assistant
+    description: "LATER (Phase 10): read-only AI assistant."
+
+paths:
+  # ───────────────────────────── Identity ─────────────────────────────
+  /me:
+    get:
+      tags: [Identity]
+      operationId: getMe
+      summary: Get the authenticated user and their workspace memberships
+      x-openspec-capability: identity/authentication
+      x-required-role: AUTHENTICATED
+      responses:
+        '200':
+          description: Current user
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    patch:
+      tags: [Identity]
+      operationId: updateMe
+      summary: Update the authenticated user's profile and preferences
+      x-openspec-capability: identity/authentication
+      x-required-role: AUTHENTICATED
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/MeUpdate' }
+      responses:
+        '200':
+          description: Updated user
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces:
+    get:
+      tags: [Identity]
+      operationId: listWorkspaces
+      summary: List workspaces where the user is an active member
+      x-openspec-capability: identity/workspace-membership
+      x-required-role: AUTHENTICATED
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Workspaces page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspacePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Identity]
+      operationId: createWorkspace
+      summary: Create a workspace (caller becomes OWNER; system categories and ledger system accounts are provisioned)
+      x-openspec-capability: identity/workspace-membership
+      x-required-role: AUTHENTICATED
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkspaceCreate' }
+      responses:
+        '201':
+          description: Workspace created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workspace' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Identity]
+      operationId: getWorkspace
+      summary: Get a workspace
+      x-openspec-capability: identity/workspace-membership
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Workspace
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workspace' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [Identity]
+      operationId: updateWorkspace
+      summary: Update workspace settings (name, timezone, locale, base currency)
+      x-openspec-capability: identity/workspace-membership
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/WorkspaceUpdate' }
+      responses:
+        '200':
+          description: Updated workspace
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workspace' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  # ───────────────────────────── Accounts ─────────────────────────────
+  /workspaces/{workspaceId}/accounts:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Accounts]
+      operationId: listAccounts
+      summary: List accounts with current balances
+      x-openspec-capability: accounts/account-management
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - name: type
+          in: query
+          description: Filter by account type (repeatable)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/AccountType' }
+          style: form
+          explode: true
+        - name: currency
+          in: query
+          description: Filter by currency code (repeatable)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/CurrencyCode' }
+          style: form
+          explode: true
+        - name: institutionId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: sort
+          in: query
+          description: Sort keys. Default `displayOrder`.
+          schema:
+            type: string
+            enum: [displayOrder, name, -name, createdAt, -createdAt]
+            default: displayOrder
+      responses:
+        '200':
+          description: Accounts page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      tags: [Accounts]
+      operationId: createAccount
+      summary: Create an account (optionally with an opening balance, which posts an OPENING_BALANCE transaction)
+      x-openspec-capability: [accounts/account-management, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountCreate' }
+      responses:
+        '201':
+          description: Account created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      tags: [Accounts]
+      operationId: getAccount
+      summary: Get an account with balances
+      x-openspec-capability: accounts/account-management
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Accounts]
+      operationId: updateAccount
+      summary: Update account attributes (currency is immutable)
+      x-openspec-capability: accounts/account-management
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/AccountUpdate' }
+      responses:
+        '200':
+          description: Updated account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/AccountId'
+    post:
+      tags: [Accounts]
+      operationId: archiveAccount
+      summary: Archive an account (soft-archive; it stops accepting new postings)
+      x-openspec-capability: accounts/account-management
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArchiveRequest' }
+      responses:
+        '200':
+          description: Archived account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/AccountId'
+    post:
+      tags: [Accounts]
+      operationId: unarchiveAccount
+      summary: Reactivate an archived account
+      x-openspec-capability: accounts/account-management
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Reactivated account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/institutions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Accounts]
+      operationId: listInstitutions
+      summary: List institutions
+      x-openspec-capability: accounts/institutions
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: Institutions page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstitutionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Accounts]
+      operationId: createInstitution
+      summary: Create an institution
+      x-openspec-capability: accounts/institutions
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstitutionCreate' }
+      responses:
+        '201':
+          description: Institution created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Institution' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/institutions/{institutionId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/InstitutionId'
+    get:
+      tags: [Accounts]
+      operationId: getInstitution
+      summary: Get an institution
+      x-openspec-capability: accounts/institutions
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Institution
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Institution' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Accounts]
+      operationId: updateInstitution
+      summary: Update an institution
+      x-openspec-capability: accounts/institutions
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/InstitutionUpdate' }
+      responses:
+        '200':
+          description: Updated institution
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Institution' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/institutions/{institutionId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/InstitutionId'
+    post:
+      tags: [Accounts]
+      operationId: archiveInstitution
+      summary: Archive an institution
+      x-openspec-capability: accounts/institutions
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archived institution
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Institution' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  # ─────────────────────────── Transactions ───────────────────────────
+  /workspaces/{workspaceId}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Transactions]
+      operationId: listTransactions
+      summary: List transactions (legs and splits inline)
+      x-openspec-capability: transactions/transaction-recording
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Query'
+        - name: accountId
+          in: query
+          description: Transactions with at least one leg on any of these accounts
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/Uuid' }
+          style: form
+          explode: true
+        - name: categoryId
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/Uuid' }
+          style: form
+          explode: true
+        - name: tagId
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/Uuid' }
+          style: form
+          explode: true
+        - name: counterpartyId
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/Uuid' }
+          style: form
+          explode: true
+        - name: kind
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/TransactionKind' }
+          style: form
+          explode: true
+        - name: status
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/TransactionStatus' }
+          style: form
+          explode: true
+        - name: currency
+          in: query
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: dateFrom
+          in: query
+          description: Inclusive lower bound on transactionDate
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: dateTo
+          in: query
+          description: Inclusive upper bound on transactionDate
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: amountMin
+          in: query
+          description: Inclusive lower bound on the transaction amount magnitude
+          schema: { $ref: '#/components/schemas/PositiveDecimalString' }
+        - name: amountMax
+          in: query
+          description: Inclusive upper bound on the transaction amount magnitude
+          schema: { $ref: '#/components/schemas/PositiveDecimalString' }
+        - name: sort
+          in: query
+          description: Default `-transactionDate` (ties broken by id).
+          schema:
+            type: string
+            enum: [transactionDate, -transactionDate, amount, -amount, createdAt, -createdAt]
+            default: -transactionDate
+      responses:
+        '200':
+          description: Transactions page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      tags: [Transactions]
+      operationId: createTransaction
+      summary: Record an income, expense, refund or adjustment with splits
+      description: |
+        Transfers and conversions have dedicated endpoints. Amounts in commands are positive magnitudes;
+        direction is given by `kind`. If `splits` is omitted a single split in the system category
+        UNCATEGORIZED is created. Non-PENDING transactions are posted to the ledger in the same DB transaction.
+      x-openspec-capability: [transactions/transaction-recording, transactions/splits, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionCreate' }
+            examples:
+              splitExpense:
+                summary: Supermarket expense split in two categories
+                value:
+                  kind: EXPENSE
+                  transactionDate: '2026-09-30'
+                  accountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01
+                  amount: { amount: '350.00', currency: BOB }
+                  description: Hipermaxi
+                  splits:
+                    - amount: { amount: '300.00', currency: BOB }
+                      categoryId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d11
+                    - amount: { amount: '50.00', currency: BOB }
+                      categoryId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d12
+                      tagIds: [0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d21]
+      responses:
+        '201':
+          description: Transaction recorded
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      tags: [Transactions]
+      operationId: getTransaction
+      summary: Get a transaction (legs, splits and conversion detail inline)
+      x-openspec-capability: transactions/transaction-recording
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Transaction
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Transactions]
+      operationId: updateTransaction
+      summary: Edit a transaction
+      description: |
+        Classification-only changes (description, notes, counterparty, split categories/tags) never touch the ledger.
+        Changes to amount, account, date or split amounts on a posted transaction create a reversal entry plus a
+        new entry (revision + 1). `splits`, when present, replaces the whole split list. Conversions and transfers
+        cannot change kind; conversion pricing is immutable (void and re-create).
+      x-openspec-capability: [transactions/transaction-recording, transactions/splits]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/TransactionUpdate' }
+      responses:
+        '200':
+          description: Updated transaction
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}/void:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    post:
+      tags: [Transactions]
+      operationId: voidTransaction
+      summary: Void a transaction (reversal entry; never deleted)
+      x-openspec-capability: [transactions/transaction-recording, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VoidRequest' }
+      responses:
+        '200':
+          description: Voided transaction
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}/post:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    post:
+      tags: [Transactions]
+      operationId: postTransaction
+      summary: Move a PENDING transaction to POSTED (creates its journal entry)
+      x-openspec-capability: [transactions/transaction-recording, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Posted transaction
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/transfers:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Transactions]
+      operationId: createTransfer
+      summary: Transfer between two accounts in the same currency (creates a TRANSFER transaction)
+      description: Cross-currency movements must use `/conversions`. A credit-card payment is a transfer ASSET → LIABILITY.
+      x-openspec-capability: [transactions/transfers, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferCreate' }
+      responses:
+        '201':
+          description: Transfer recorded
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/conversions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Transactions]
+      operationId: listConversions
+      summary: List conversions with their immutable pricing detail
+      x-openspec-capability: [transactions/conversions, fx/conversion-pricing]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: sourceCurrency
+          in: query
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: targetCurrency
+          in: query
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: dateFrom
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: dateTo
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [transactionDate, -transactionDate, executedAt, -executedAt]
+            default: -transactionDate
+      responses:
+        '200':
+          description: Conversions page (transactions of kind CONVERSION)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Transactions]
+      operationId: createConversion
+      summary: Record a currency/crypto conversion (one journal entry balanced via FX_TRADING accounts)
+      x-openspec-capability: [transactions/conversions, fx/conversion-pricing, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConversionCreate' }
+            examples:
+              usdtToBob:
+                summary: Canonical USDT → BOB P2P conversion (ARCHITECTURE §4.2)
+                value:
+                  transactionDate: '2026-09-30'
+                  sourceAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d02
+                  targetAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01
+                  sourceAmount: { amount: '100.000000', currency: USDT }
+                  targetAmount: { amount: '685.00', currency: BOB }
+                  quotedRate: { base: USDT, quote: BOB, value: '6.90' }
+                  fees:
+                    - type: PROVIDER
+                      amount: { amount: '5.00', currency: BOB }
+                  provider: { name: Binance P2P }
+                  executedAt: '2026-09-30T18:42:00Z'
+      responses:
+        '201':
+          description: Conversion recorded
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/conversions/{transactionId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      tags: [Transactions]
+      operationId: getConversion
+      summary: Get a conversion (transaction of kind CONVERSION with its pricing detail)
+      x-openspec-capability: [transactions/conversions, fx/conversion-pricing]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Conversion
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ────────────────────────── Classification ──────────────────────────
+  /workspaces/{workspaceId}/category-groups:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Classification]
+      operationId: listCategoryGroups
+      summary: List category groups
+      x-openspec-capability: classification/categories
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/CategoryKind' }
+      responses:
+        '200':
+          description: Category groups page
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroupPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Classification]
+      operationId: createCategoryGroup
+      summary: Create a category group
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryGroupCreate' }
+      responses:
+        '201':
+          description: Category group created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/category-groups/{categoryGroupId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryGroupId'
+    get:
+      tags: [Classification]
+      operationId: getCategoryGroup
+      summary: Get a category group
+      x-openspec-capability: classification/categories
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Category group
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Classification]
+      operationId: updateCategoryGroup
+      summary: Rename or reorder a category group
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/CategoryGroupUpdate' }
+      responses:
+        '200':
+          description: Updated category group
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/category-groups/{categoryGroupId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryGroupId'
+    post:
+      tags: [Classification]
+      operationId: archiveCategoryGroup
+      summary: Archive a category group (only if all its categories are archived)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archived category group
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/categories:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Classification]
+      operationId: listCategories
+      summary: List categories
+      x-openspec-capability: classification/categories
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - $ref: '#/components/parameters/Query'
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/CategoryKind' }
+        - name: groupId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Categories page
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Classification]
+      operationId: createCategory
+      summary: Create a category
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryCreate' }
+      responses:
+        '201':
+          description: Category created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /workspaces/{workspaceId}/categories/{categoryId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    get:
+      tags: [Classification]
+      operationId: getCategory
+      summary: Get a category
+      x-openspec-capability: classification/categories
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Category
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Classification]
+      operationId: updateCategory
+      summary: Update a category (rename, move group, color, icon, order)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/CategoryUpdate' }
+      responses:
+        '200':
+          description: Updated category
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/categories/{categoryId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    post:
+      tags: [Classification]
+      operationId: archiveCategory
+      summary: Archive a category (history keeps referencing it; system categories cannot be archived)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archived category
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/tags:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Classification]
+      operationId: listTags
+      summary: List tags
+      x-openspec-capability: classification/tags
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: Tags page
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TagPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Classification]
+      operationId: createTag
+      summary: Create a tag
+      x-openspec-capability: classification/tags
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagCreate' }
+      responses:
+        '201':
+          description: Tag created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/tags/{tagId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TagId'
+    get:
+      tags: [Classification]
+      operationId: getTag
+      summary: Get a tag
+      x-openspec-capability: classification/tags
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Tag
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Classification]
+      operationId: updateTag
+      summary: Rename or recolor a tag
+      x-openspec-capability: classification/tags
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/TagUpdate' }
+      responses:
+        '200':
+          description: Updated tag
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/tags/{tagId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TagId'
+    post:
+      tags: [Classification]
+      operationId: archiveTag
+      summary: Archive a tag
+      x-openspec-capability: classification/tags
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archived tag
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/counterparties:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Classification]
+      operationId: listCounterparties
+      summary: List counterparties (merchants, people, providers, exchanges…)
+      x-openspec-capability: classification/counterparties
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - $ref: '#/components/parameters/Query'
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/CounterpartyKind' }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, -name, createdAt, -createdAt]
+            default: name
+      responses:
+        '200':
+          description: Counterparties page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CounterpartyPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Classification]
+      operationId: createCounterparty
+      summary: Create a counterparty
+      x-openspec-capability: classification/counterparties
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CounterpartyCreate' }
+      responses:
+        '201':
+          description: Counterparty created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counterparty' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    get:
+      tags: [Classification]
+      operationId: getCounterparty
+      summary: Get a counterparty
+      x-openspec-capability: classification/counterparties
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Counterparty
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counterparty' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Classification]
+      operationId: updateCounterparty
+      summary: Update a counterparty
+      x-openspec-capability: classification/counterparties
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/CounterpartyUpdate' }
+      responses:
+        '200':
+          description: Updated counterparty
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counterparty' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    post:
+      tags: [Classification]
+      operationId: archiveCounterparty
+      summary: Archive a counterparty
+      x-openspec-capability: classification/counterparties
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archived counterparty
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counterparty' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  # ──────────────────────────────── FX ────────────────────────────────
+  /workspaces/{workspaceId}/currencies:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [FX]
+      operationId: listCurrencies
+      summary: List currencies visible to the workspace (global catalog + workspace custom), with enabled flag
+      x-openspec-capability: fx/market-rates
+      x-required-role: VIEWER
+      parameters:
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/CurrencyKind' }
+        - name: enabled
+          in: query
+          description: Only currencies enabled (or not) in this workspace
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: Currencies (small catalog, not paginated)
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrencyList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───────────────────────────── Reporting ─────────────────────────────
+  /workspaces/{workspaceId}/reports/summary:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getReportSummary
+      summary: Basic dashboard KPIs for a period (income, expenses, net, balances, top categories)
+      description: |
+        Served from derived read models (eventually consistent; see `meta.dataFreshness`).
+        Figures are reported per currency. A consolidated figure in `reportingCurrency` is included only when
+        rates are available for every currency involved; it is flagged `approx: true`.
+      x-openspec-capability: reporting/dashboard
+      x-required-role: VIEWER
+      parameters:
+        - name: month
+          in: query
+          description: Calendar month `YYYY-MM`. Mutually exclusive with dateFrom/dateTo. Defaults to the current month.
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        - name: dateFrom
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: dateTo
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: reportingCurrency
+          in: query
+          description: Defaults to the workspace base currency
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: topCategories
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 20, default: 5 }
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # ───────────────────────────── Platform ─────────────────────────────
+  /workspaces/{workspaceId}/operations/{operationId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/OperationId'
+    get:
+      tags: [Platform]
+      operationId: getOperation
+      summary: Poll a long-running operation (202 + operation pattern)
+      x-openspec-capability: platform/api-conventions
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Operation status
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Operation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OIDC access token (JWT) issued by the workspace IdP (Keycloak locally). Obtained by the finance-web BFF via
+        Authorization Code + PKCE and forwarded server-side; never exposed to browser JavaScript.
+        The API validates signature (JWKS), `iss`, `aud`, `exp`, `nbf`.
+        IdP discovery: `<issuer>/.well-known/openid-configuration` (issuer configured per environment;
+        locally Keycloak realm `pfos`). An `openIdConnect` scheme is not declared because the browser never
+        talks to the API directly (BFF pattern, ADR-0010/ADR-0019).
+
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      description: Workspace UUIDv7. Caller must be an active member.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    InstitutionId:
+      name: institutionId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    TransactionId:
+      name: transactionId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    CategoryGroupId:
+      name: categoryGroupId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    TagId:
+      name: tagId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    CounterpartyId:
+      name: counterpartyId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    OperationId:
+      name: operationId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    Limit:
+      name: limit
+      in: query
+      description: Page size
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `page.nextCursor`. Valid only for the same filters and sort.
+      schema: { type: string, maxLength: 1024 }
+    Query:
+      name: q
+      in: query
+      description: Free-text search
+      schema: { type: string, minLength: 1, maxLength: 200 }
+    IncludeArchived:
+      name: includeArchived
+      in: query
+      schema: { type: boolean, default: false }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Required on financial POSTs. Same key + same payload within retention replays the stored response
+        (`Idempotent-Replayed: true`); same key + different payload → 422 IDEMPOTENCY_KEY_REUSED;
+        key still in progress → 409 IDEMPOTENCY_REQUEST_IN_PROGRESS.
+      schema: { $ref: '#/components/schemas/IdempotencyKeyValue' }
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional; honoured with the same semantics when present.
+      schema: { $ref: '#/components/schemas/IdempotencyKeyValue' }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: ETag of the version being modified. Missing → 428; mismatch → 412.
+      schema: { type: string, examples: ['"7"'] }
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema: { type: string }
+
+  headers:
+    ETag:
+      description: Strong entity tag derived from the aggregate `version`
+      schema: { type: string, examples: ['"3"'] }
+    Location:
+      description: URI of the created resource or of the operation to poll
+      schema: { type: string, format: uri-reference }
+    IdempotentReplayed:
+      description: Present and `true` when the response is a replay of a stored idempotent response
+      schema: { type: boolean }
+    RetryAfter:
+      description: Seconds to wait before retrying / polling again
+      schema: { type: integer, minimum: 0 }
+    RateLimit:
+      description: 'Remaining quota (IETF RateLimit header draft), e.g. `"default";r=412;t=23`'
+      schema: { type: string }
+    RateLimitPolicy:
+      description: 'Quota policy (IETF RateLimit header draft), e.g. `"default";q=600;w=60`'
+      schema: { type: string }
+
+  responses:
+    NotModified:
+      description: Not modified (If-None-Match matched)
+    BadRequest:
+      description: Malformed request or schema validation failure (VALIDATION_FAILED, INVALID_CURSOR, INVALID_SORT, INVALID_FILTER)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Missing or invalid access token (UNAUTHENTICATED)
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Not an active member of the workspace (WORKSPACE_ACCESS_DENIED) or role too low (INSUFFICIENT_ROLE)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Resource does not exist in this workspace (RESOURCE_NOT_FOUND)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Domain state conflict (e.g. PERIOD_CLOSED, ACCOUNT_ARCHIVED, INVALID_STATUS_TRANSITION, CONCURRENCY_CONFLICT, NAME_TAKEN, IDEMPOTENCY_REQUEST_IN_PROGRESS)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: If-Match does not match the current version (PRECONDITION_FAILED)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionRequired:
+      description: Missing If-Match (PRECONDITION_REQUIRED) or Idempotency-Key (IDEMPOTENCY_KEY_REQUIRED)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnprocessableEntity:
+      description: Domain validation failed (e.g. SPLITS_DO_NOT_SUM, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: Rate limit exceeded (RATE_LIMITED)
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        RateLimit: { $ref: '#/components/headers/RateLimit' }
+        RateLimit-Policy: { $ref: '#/components/headers/RateLimitPolicy' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    # ── Primitives ──
+    Uuid:
+      type: string
+      format: uuid
+      description: UUIDv7
+      examples: [0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d8e]
+    IdempotencyKeyValue:
+      type: string
+      minLength: 16
+      maxLength: 128
+      pattern: '^[A-Za-z0-9_-]+$'
+    DecimalString:
+      type: string
+      description: Signed decimal number as string (max 20 integer digits, 18 fraction digits). Never a JSON number.
+      pattern: '^-?(0|[1-9][0-9]{0,19})(\.[0-9]{1,18})?$'
+      examples: ['685.00', '-100.000000']
+    PositiveDecimalString:
+      type: string
+      description: Strictly positive decimal string (validated > 0 by the server)
+      pattern: '^(0|[1-9][0-9]{0,19})(\.[0-9]{1,18})?$'
+      examples: ['685.00']
+    CurrencyCode:
+      type: string
+      pattern: '^[A-Z0-9][A-Z0-9_.-]{1,15}$'
+      examples: [BOB, USD, USDT, BTC]
+    LocalDate:
+      type: string
+      format: date
+      description: Business date (YYYY-MM-DD) in the workspace timezone
+      examples: ['2026-09-30']
+    Instant:
+      type: string
+      format: date-time
+      description: RFC 3339 UTC instant
+      examples: ['2026-09-30T18:42:00Z']
+    Version:
+      type: integer
+      minimum: 1
+      description: Optimistic locking version of the aggregate (also exposed as ETag)
+    Money:
+      type: object
+      description: Monetary amount. `amount` uses the canonical scale of `currency`.
+      additionalProperties: false
+      required: [amount, currency]
+      properties:
+        amount: { $ref: '#/components/schemas/DecimalString' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+    PositiveMoney:
+      type: object
+      description: Monetary magnitude used in commands (must be > 0)
+      additionalProperties: false
+      required: [amount, currency]
+      properties:
+        amount: { $ref: '#/components/schemas/PositiveDecimalString' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+    Rate:
+      type: object
+      description: 1 `base` = `value` `quote`
+      additionalProperties: false
+      required: [base, quote, value]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        value: { $ref: '#/components/schemas/PositiveDecimalString' }
+    PageInfo:
+      type: object
+      required: [limit, hasMore]
+      properties:
+        limit: { type: integer }
+        hasMore: { type: boolean }
+        nextCursor: { type: [string, 'null'] }
+    ArchiveRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: string, maxLength: 500 }
+
+    # ── Problem details (RFC 9457) ──
+    Problem:
+      type: object
+      description: RFC 9457 problem details with PFOS extensions
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri
+          examples: ['https://pfos.dev/problems/splits-do-not-sum']
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        requestId: { type: string }
+        currentVersion:
+          type: integer
+          description: Present on PRECONDITION_FAILED / CONCURRENCY_CONFLICT
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+    FieldError:
+      type: object
+      required: [pointer, code]
+      properties:
+        pointer: { type: string, description: 'JSON Pointer (RFC 6901) into the request body, e.g. /splits/1/amount' }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        detail: { type: string }
+    ErrorCode:
+      description: Stable domain error code. Open set — clients must handle unknown values. Catalog in docs/10-api-design.md §9.1.
+      anyOf:
+        - type: string
+          enum:
+            - VALIDATION_FAILED
+            - INVALID_CURSOR
+            - INVALID_SORT
+            - INVALID_FILTER
+            - UNAUTHENTICATED
+            - WORKSPACE_ACCESS_DENIED
+            - INSUFFICIENT_ROLE
+            - RESOURCE_NOT_FOUND
+            - CONCURRENCY_CONFLICT
+            - IDEMPOTENCY_REQUEST_IN_PROGRESS
+            - PRECONDITION_FAILED
+            - PRECONDITION_REQUIRED
+            - IDEMPOTENCY_KEY_REQUIRED
+            - IDEMPOTENCY_KEY_REUSED
+            - REFERENCE_NOT_FOUND
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+            - SERVICE_UNAVAILABLE
+            - WORKSPACE_PENDING_DELETION
+            - LAST_OWNER_CANNOT_LEAVE
+            - ACCOUNT_ARCHIVED
+            - ACCOUNT_CURRENCY_IMMUTABLE
+            - ACCOUNT_NAME_TAKEN
+            - LEDGER_UNBALANCED_ENTRY
+            - PERIOD_CLOSED
+            - CURRENCY_MISMATCH
+            - SPLITS_DO_NOT_SUM
+            - INVALID_STATUS_TRANSITION
+            - TRANSACTION_RECONCILED
+            - TRANSFER_SAME_ACCOUNT
+            - CONVERSION_SAME_CURRENCY
+            - CONVERSION_AMOUNTS_INCONSISTENT
+            - AMOUNT_SCALE_EXCEEDED
+            - AMOUNT_NOT_POSITIVE
+            - CATEGORY_ARCHIVED
+            - TAG_ARCHIVED
+            - COUNTERPARTY_ARCHIVED
+            - CATEGORY_KIND_MISMATCH
+            - SYSTEM_CATEGORY_IMMUTABLE
+            - NAME_TAKEN
+            - FX_RATE_NOT_FOUND
+            - CURRENCY_NOT_ENABLED
+        - type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+
+    # ── Identity ──
+    WorkspaceRole:
+      type: string
+      enum: [OWNER, EDITOR, VIEWER]
+    Me:
+      type: object
+      required: [id, email, displayName, locale, memberships, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        locale: { type: string, examples: [es-BO] }
+        preferences:
+          type: object
+          additionalProperties: true
+          description: Free-form UI preferences (no financial data)
+        memberships:
+          type: array
+          items:
+            type: object
+            required: [workspaceId, workspaceName, role]
+            properties:
+              workspaceId: { $ref: '#/components/schemas/Uuid' }
+              workspaceName: { type: string }
+              role: { $ref: '#/components/schemas/WorkspaceRole' }
+        version: { $ref: '#/components/schemas/Version' }
+    MeUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+        locale: { type: string, maxLength: 20 }
+        preferences: { type: object, additionalProperties: true }
+    Workspace:
+      type: object
+      required: [id, name, baseCurrency, timezone, locale, status, role, version, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        timezone: { type: string, examples: [America/La_Paz] }
+        locale: { type: string, examples: [es-BO] }
+        status:
+          type: string
+          enum: [ACTIVE, PENDING_DELETION]
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+    WorkspaceCreate:
+      type: object
+      additionalProperties: false
+      required: [name, baseCurrency]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        timezone: { type: string, default: America/La_Paz }
+        locale: { type: string, default: es-BO }
+        enabledCurrencies:
+          type: array
+          items: { $ref: '#/components/schemas/CurrencyCode' }
+          examples: [[BOB, USD, USDT]]
+    WorkspaceUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        timezone: { type: string }
+        locale: { type: string }
+        baseCurrency:
+          $ref: '#/components/schemas/CurrencyCode'
+    WorkspacePage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Workspace' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+
+    # ── Accounts ──
+    AccountType:
+      type: string
+      enum: [CASH, CHECKING, SAVINGS, CREDIT_CARD, LOAN, CRYPTO_WALLET, EXCHANGE, P2P, INVESTMENT, OTHER_ASSET, OTHER_LIABILITY]
+    AccountClassification:
+      type: string
+      enum: [ASSET, LIABILITY]
+    Account:
+      type: object
+      required: [id, name, type, classification, currency, balance, includeInNetWorth, version, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/AccountType' }
+        classification: { $ref: '#/components/schemas/AccountClassification' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        institutionId: { type: [string, 'null'], format: uuid }
+        openedOn: { type: [string, 'null'], format: date }
+        closedOn: { type: [string, 'null'], format: date }
+        balance:
+          $ref: '#/components/schemas/Money'
+          description: Presented balance (ASSET as is; LIABILITY as positive amount owed). Includes posted, cleared and reconciled.
+        clearedBalance:
+          $ref: '#/components/schemas/Money'
+          description: Balance of cleared + reconciled transactions only
+        pendingAmount:
+          $ref: '#/components/schemas/Money'
+          description: Net amount of PENDING transactions (not in the ledger)
+        includeInNetWorth: { type: boolean }
+        includeInBudget: { type: boolean }
+        displayOrder: { type: integer }
+        accountNumberLast4: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+        color: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+    AccountCreate:
+      type: object
+      additionalProperties: false
+      required: [name, type, currency]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        type: { $ref: '#/components/schemas/AccountType' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        institutionId: { $ref: '#/components/schemas/Uuid' }
+        openedOn: { $ref: '#/components/schemas/LocalDate' }
+        openingBalance:
+          type: object
+          description: Posts an OPENING_BALANCE transaction against EQUITY:OPENING_BALANCE:<CCY>
+          additionalProperties: false
+          required: [amount, date]
+          properties:
+            amount:
+              $ref: '#/components/schemas/Money'
+              description: Presented balance (for LIABILITY, positive = amount owed). Must use the account currency.
+            date: { $ref: '#/components/schemas/LocalDate' }
+        includeInNetWorth: { type: boolean, default: true }
+        includeInBudget: { type: boolean, default: true }
+        accountNumberLast4: { type: string, pattern: '^[0-9]{4}$' }
+        color: { type: string, maxLength: 20 }
+        notes: { type: string, maxLength: 2000 }
+    AccountUpdate:
+      type: object
+      additionalProperties: false
+      description: Currency and type classification are immutable.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        institutionId: { type: [string, 'null'], format: uuid }
+        closedOn: { type: [string, 'null'], format: date }
+        includeInNetWorth: { type: boolean }
+        includeInBudget: { type: boolean }
+        displayOrder: { type: integer }
+        accountNumberLast4: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+        color: { type: [string, 'null'], maxLength: 20 }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+    AccountPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Account' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    InstitutionKind:
+      type: string
+      enum: [BANK, EXCHANGE, WALLET_PROVIDER, BROKER, P2P_PLATFORM, OTHER]
+    Institution:
+      type: object
+      required: [id, name, kind, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/InstitutionKind' }
+        countryCode: { type: [string, 'null'], pattern: '^[A-Z]{2}$' }
+        website: { type: [string, 'null'], format: uri }
+        notes: { type: [string, 'null'] }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+    InstitutionCreate:
+      type: object
+      additionalProperties: false
+      required: [name, kind]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        kind: { $ref: '#/components/schemas/InstitutionKind' }
+        countryCode: { type: string, pattern: '^[A-Z]{2}$' }
+        website: { type: string, format: uri }
+        notes: { type: string, maxLength: 2000 }
+    InstitutionUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        kind: { $ref: '#/components/schemas/InstitutionKind' }
+        countryCode: { type: [string, 'null'], pattern: '^[A-Z]{2}$' }
+        website: { type: [string, 'null'], format: uri }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+    InstitutionPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Institution' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+
+    # ── Transactions ──
+    TransactionKind:
+      type: string
+      enum: [INCOME, EXPENSE, TRANSFER, REFUND, ADJUSTMENT, OPENING_BALANCE, CONVERSION, LOAN_DISBURSEMENT, LOAN_PAYMENT, CARD_PAYMENT]
+    TransactionStatus:
+      type: string
+      enum: [PENDING, POSTED, CLEARED, RECONCILED, VOIDED]
+    TransactionSource:
+      type: string
+      enum: [MANUAL, IMPORT, RECURRING, DEBT, GOAL, SYSTEM]
+    TransactionLeg:
+      type: object
+      description: Money movement on a user account, signed from the account perspective (outflow negative).
+      required: [accountId, amount, role]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount: { $ref: '#/components/schemas/Money' }
+        role:
+          type: string
+          enum: [MAIN, SOURCE, TARGET, FEE]
+    TransactionSplit:
+      type: object
+      required: [id, amount, categoryId]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        amount:
+          $ref: '#/components/schemas/Money'
+          description: Positive magnitude; direction given by the transaction kind
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId: { type: [string, 'null'], format: uuid }
+        tagIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        memo: { type: [string, 'null'] }
+        customFields:
+          type: object
+          description: Custom field values keyed by field key (Phase 2)
+          additionalProperties:
+            type: [string, number, boolean, 'null']
+    SplitInput:
+      type: object
+      additionalProperties: false
+      required: [amount, categoryId]
+      properties:
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        tagIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+        memo: { type: string, maxLength: 500 }
+    ExternalRef:
+      type: object
+      additionalProperties: false
+      required: [namespace, id]
+      properties:
+        namespace: { type: string, maxLength: 100 }
+        id: { type: string, maxLength: 200 }
+    ConversionFeeType:
+      type: string
+      enum: [PROVIDER, NETWORK, BANK, TAX, OTHER]
+    ConversionFee:
+      type: object
+      required: [type, amount]
+      properties:
+        type: { $ref: '#/components/schemas/ConversionFeeType' }
+        amount: { $ref: '#/components/schemas/Money' }
+        paidFromAccountId: { type: [string, 'null'], format: uuid }
+    ConversionDetail:
+      type: object
+      description: Immutable pricing metadata of a conversion (docs/09-ledger-design.md §7). Never recalculated with current rates.
+      required: [sourceAccountId, targetAccountId, sourceAmount, convertedSourceAmount, grossTargetAmount, targetAmount, effectiveRate, fees, executedAt]
+      properties:
+        sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+        targetAccountId: { $ref: '#/components/schemas/Uuid' }
+        sourceAmount:
+          $ref: '#/components/schemas/Money'
+          description: Gross amount delivered (includes fees deducted in source currency)
+        convertedSourceAmount: { $ref: '#/components/schemas/Money' }
+        grossTargetAmount: { $ref: '#/components/schemas/Money' }
+        targetAmount:
+          $ref: '#/components/schemas/Money'
+          description: Net amount received
+        quotedRate:
+          oneOf:
+            - $ref: '#/components/schemas/Rate'
+            - type: 'null'
+        effectiveRate: { $ref: '#/components/schemas/Rate' }
+        referenceRate:
+          oneOf:
+            - $ref: '#/components/schemas/ReferenceRate'
+            - type: 'null'
+        spread:
+          oneOf:
+            - $ref: '#/components/schemas/Spread'
+            - type: 'null'
+        fees:
+          type: array
+          items: { $ref: '#/components/schemas/ConversionFee' }
+        provider: { $ref: '#/components/schemas/ConversionProvider' }
+        executedAt: { $ref: '#/components/schemas/Instant' }
+        externalRef: { type: [string, 'null'] }
+    ReferenceRate:
+      type: object
+      required: [rate, fxRateId, source]
+      properties:
+        rate: { $ref: '#/components/schemas/Rate' }
+        fxRateId: { $ref: '#/components/schemas/Uuid' }
+        source: { type: string }
+    Spread:
+      type: object
+      required: [percentage, amount]
+      properties:
+        percentage:
+          $ref: '#/components/schemas/DecimalString'
+          description: Positive = unfavourable to the user
+        amount: { $ref: '#/components/schemas/Money' }
+    ConversionProvider:
+      type: object
+      additionalProperties: false
+      properties:
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, maxLength: 100, examples: [Binance P2P] }
+    Transaction:
+      type: object
+      required: [id, kind, status, transactionDate, amount, legs, splits, source, revision, version, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        kind: { $ref: '#/components/schemas/TransactionKind' }
+        status: { $ref: '#/components/schemas/TransactionStatus' }
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        amount:
+          $ref: '#/components/schemas/Money'
+          description: Magnitude in the main/source account currency
+        description: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        counterpartyId: { type: [string, 'null'], format: uuid }
+        legs:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/TransactionLeg' }
+        splits:
+          type: array
+          description: Current splits (nominal part). Empty for plain transfers/conversions without fees.
+          items: { $ref: '#/components/schemas/TransactionSplit' }
+        conversion:
+          description: Present only for kind CONVERSION
+          oneOf:
+            - $ref: '#/components/schemas/ConversionDetail'
+            - type: 'null'
+        source: { $ref: '#/components/schemas/TransactionSource' }
+        externalRef:
+          oneOf:
+            - $ref: '#/components/schemas/ExternalRef'
+            - type: 'null'
+        revision:
+          type: integer
+          minimum: 1
+          description: Increments each time the transaction is re-posted to the ledger
+        voidedAt: { type: [string, 'null'], format: date-time }
+        voidReason: { type: [string, 'null'] }
+        attachmentCount: { type: integer, minimum: 0 }
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+    TransactionCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, transactionDate, accountId, amount]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        kind:
+          type: string
+          enum: [INCOME, EXPENSE, REFUND, ADJUSTMENT]
+        direction:
+          type: string
+          enum: [INCREASE, DECREASE]
+          description: Required only for ADJUSTMENT (effect on the presented account balance)
+        status:
+          type: string
+          enum: [PENDING, POSTED, CLEARED]
+          default: POSTED
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount:
+          $ref: '#/components/schemas/PositiveMoney'
+          description: Must use the account currency
+        description: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 4000 }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: Must sum to `amount` (SPLITS_DO_NOT_SUM). Omit for a single UNCATEGORIZED split.
+          items: { $ref: '#/components/schemas/SplitInput' }
+    TransactionUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        description: { type: [string, 'null'], maxLength: 500 }
+        notes: { type: [string, 'null'], maxLength: 4000 }
+        counterpartyId: { type: [string, 'null'], format: uuid }
+        status:
+          type: string
+          enum: [CLEARED, POSTED]
+          description: Toggle cleared flag on a posted transaction (RECONCILED is set by reconciliation only)
+        splits:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: Full replacement of the split list
+          items: { $ref: '#/components/schemas/SplitInput' }
+    VoidRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        correctInCurrentPeriod:
+          type: boolean
+          default: false
+          description: If the original period is closed, date the reversal on the first open date instead of failing with PERIOD_CLOSED
+    TransferCreate:
+      type: object
+      additionalProperties: false
+      required: [transactionDate, fromAccountId, toAccountId, amount]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        status:
+          type: string
+          enum: [PENDING, POSTED, CLEARED]
+          default: POSTED
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        fromAccountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId: { $ref: '#/components/schemas/Uuid' }
+        amount:
+          $ref: '#/components/schemas/PositiveMoney'
+          description: Same currency as both accounts
+        fee:
+          type: object
+          additionalProperties: false
+          required: [amount]
+          description: Optional fee paid from the source account (EXPENSE split in system category Fees unless categoryId is given)
+          properties:
+            amount: { $ref: '#/components/schemas/PositiveMoney' }
+            categoryId: { $ref: '#/components/schemas/Uuid' }
+        description: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 4000 }
+    ConversionFeeInput:
+      type: object
+      additionalProperties: false
+      required: [type, amount]
+      properties:
+        type: { $ref: '#/components/schemas/ConversionFeeType' }
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        paidFromAccountId:
+          $ref: '#/components/schemas/Uuid'
+          description: Account paying the fee when it is not deducted from source/target (third-currency fees)
+        categoryId: { $ref: '#/components/schemas/Uuid' }
+    ConversionCreate:
+      type: object
+      additionalProperties: false
+      required: [transactionDate, sourceAccountId, targetAccountId, sourceAmount, targetAmount, executedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        status:
+          type: string
+          enum: [PENDING, POSTED, CLEARED]
+          default: POSTED
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+        targetAccountId: { $ref: '#/components/schemas/Uuid' }
+        sourceAmount:
+          $ref: '#/components/schemas/PositiveMoney'
+          description: Gross amount delivered, in the source account currency
+        targetAmount:
+          $ref: '#/components/schemas/PositiveMoney'
+          description: Net amount received, in the target account currency
+        quotedRate:
+          $ref: '#/components/schemas/Rate'
+          description: Rate as quoted by the provider (informative; real amounts prevail)
+        referenceFxRateId:
+          $ref: '#/components/schemas/Uuid'
+          description: Optional explicit reference rate; otherwise FX resolves the rate at executedAt if available
+        fees:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/ConversionFeeInput' }
+        provider: { $ref: '#/components/schemas/ConversionProvider' }
+        executedAt: { $ref: '#/components/schemas/Instant' }
+        externalRef: { type: string, maxLength: 200, description: Order id or tx hash }
+        description: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 4000 }
+    TransactionPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+
+    # ── Classification ──
+    CategoryKind:
+      type: string
+      enum: [EXPENSE, INCOME]
+    CategoryGroup:
+      type: object
+      required: [id, name, kind, sortOrder, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/CategoryKind' }
+        sortOrder: { type: integer }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+    CategoryGroupCreate:
+      type: object
+      additionalProperties: false
+      required: [name, kind]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        kind: { $ref: '#/components/schemas/CategoryKind' }
+        sortOrder: { type: integer }
+    CategoryGroupUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        sortOrder: { type: integer }
+    CategoryGroupPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CategoryGroup' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    Category:
+      type: object
+      required: [id, groupId, name, kind, sortOrder, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        groupId: { $ref: '#/components/schemas/Uuid' }
+        parentId: { type: [string, 'null'], format: uuid }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/CategoryKind' }
+        systemCode:
+          type: [string, 'null']
+          enum: [FEES, FX_FEES, INTEREST, INSURANCE, TAXES, UNCATEGORIZED, null]
+        color: { type: [string, 'null'] }
+        icon: { type: [string, 'null'] }
+        sortOrder: { type: integer }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+    CategoryCreate:
+      type: object
+      additionalProperties: false
+      required: [groupId, name]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        groupId: { $ref: '#/components/schemas/Uuid' }
+        parentId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { type: string, maxLength: 20 }
+        icon: { type: string, maxLength: 50 }
+        sortOrder: { type: integer }
+    CategoryUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        groupId: { $ref: '#/components/schemas/Uuid' }
+        parentId: { type: [string, 'null'], format: uuid }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { type: [string, 'null'], maxLength: 20 }
+        icon: { type: [string, 'null'], maxLength: 50 }
+        sortOrder: { type: integer }
+    CategoryPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    Tag:
+      type: object
+      required: [id, name, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        color: { type: [string, 'null'] }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+    TagCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        color: { type: string, maxLength: 20 }
+    TagUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        color: { type: [string, 'null'], maxLength: 20 }
+    TagPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Tag' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    CounterpartyKind:
+      type: string
+      enum: [MERCHANT, PERSON, EMPLOYER, SERVICE_PROVIDER, LENDER, EXCHANGE, P2P_TRADER, GOVERNMENT, OTHER]
+    Counterparty:
+      type: object
+      required: [id, name, kind, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        kind: { $ref: '#/components/schemas/CounterpartyKind' }
+        defaultCategoryId: { type: [string, 'null'], format: uuid }
+        aliases:
+          type: array
+          items: { type: string }
+        website: { type: [string, 'null'], format: uri }
+        notes: { type: [string, 'null'] }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+    CounterpartyCreate:
+      type: object
+      additionalProperties: false
+      required: [name, kind]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { $ref: '#/components/schemas/CounterpartyKind' }
+        defaultCategoryId: { $ref: '#/components/schemas/Uuid' }
+        aliases:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 120 }
+        website: { type: string, format: uri }
+        notes: { type: string, maxLength: 2000 }
+    CounterpartyUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        kind: { $ref: '#/components/schemas/CounterpartyKind' }
+        defaultCategoryId: { type: [string, 'null'], format: uuid }
+        aliases:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 120 }
+        website: { type: [string, 'null'], format: uri }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+    CounterpartyPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Counterparty' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+
+    # ── FX ──
+    CurrencyKind:
+      type: string
+      enum: [FIAT, CRYPTO, COMMODITY, CUSTOM]
+    Currency:
+      type: object
+      required: [code, kind, name, scale, enabled]
+      properties:
+        code: { $ref: '#/components/schemas/CurrencyCode' }
+        kind: { $ref: '#/components/schemas/CurrencyKind' }
+        name: { type: string }
+        scale: { type: integer, minimum: 0, maximum: 18, description: 'Valid decimal places (BOB 2, USDT 6, BTC 8, ETH 18)' }
+        symbol: { type: [string, 'null'] }
+        enabled: { type: boolean, description: Enabled in this workspace }
+    CurrencyList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Currency' }
+
+    # ── Reporting ──
+    CurrencyTotals:
+      type: object
+      required: [currency, income, expense, net]
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        income: { $ref: '#/components/schemas/Money' }
+        expense: { $ref: '#/components/schemas/Money' }
+        net: { $ref: '#/components/schemas/Money' }
+        assets: { $ref: '#/components/schemas/Money' }
+        liabilities: { $ref: '#/components/schemas/Money' }
+        netWorth: { $ref: '#/components/schemas/Money' }
+    ReportSummary:
+      type: object
+      required: [period, byCurrency, accounts, topExpenseCategories, meta]
+      properties:
+        period:
+          type: object
+          required: [from, to]
+          properties:
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
+        byCurrency:
+          type: array
+          items: { $ref: '#/components/schemas/CurrencyTotals' }
+        consolidated:
+          description: Totals converted to reportingCurrency (null if any rate is missing)
+          oneOf:
+            - $ref: '#/components/schemas/CurrencyTotals'
+            - type: 'null'
+        accounts:
+          type: array
+          items:
+            type: object
+            required: [accountId, name, balance]
+            properties:
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              balance: { $ref: '#/components/schemas/Money' }
+        topExpenseCategories:
+          type: array
+          items:
+            type: object
+            required: [categoryId, name, amount]
+            properties:
+              categoryId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
+        meta:
+          type: object
+          required: [generatedAt, reportingCurrency, approx]
+          properties:
+            generatedAt: { $ref: '#/components/schemas/Instant' }
+            reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+            approx: { type: boolean, description: True when consolidated figures use reference rates }
+            dataFreshness:
+              $ref: '#/components/schemas/Instant'
+              description: Last event applied to the underlying read models
+            ratesUsed:
+              type: array
+              items: { $ref: '#/components/schemas/ReferenceRate' }
+
+    # ── Platform ──
+    Operation:
+      type: object
+      required: [id, kind, status, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        kind:
+          type: string
+          description: Open set (IMPORT_PARSE, IMPORT_COMMIT, FORECAST, EXPORT, WORKSPACE_DELETE, REBUILD, ...)
+        status:
+          type: string
+          enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED]
+        progressPct: { type: integer, minimum: 0, maximum: 100 }
+        resource:
+          type: object
+          properties:
+            type: { type: string }
+            id: { $ref: '#/components/schemas/Uuid' }
+        result:
+          type: [object, 'null']
+          additionalProperties: true
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/Problem'
+            - type: 'null'
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }

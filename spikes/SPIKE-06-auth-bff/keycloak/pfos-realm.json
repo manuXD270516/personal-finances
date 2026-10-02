@@ -1,0 +1,228 @@
+{
+  "realm": "pfos",
+  "enabled": true,
+  "displayName": "PFOS (dev, SPIKE-06)",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 43200,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "groups": [
+    {
+      "name": "workspaces",
+      "subGroups": [
+        {
+          "name": "ws-demo",
+          "subGroups": [
+            {
+              "name": "owner"
+            },
+            {
+              "name": "editor"
+            },
+            {
+              "name": "viewer"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "pfos-bff",
+      "name": "PFOS BFF (Next.js)",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-dfNrnpo1IhLi8dEX91xHv51VN1VcRfDU",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": [
+        "http://localhost:61600/api/bff/auth/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:61600/",
+        "use.refresh.tokens": "true",
+        "backchannel.logout.session.required": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-finance-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "finance-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "pfos-e2e",
+      "name": "E2E only: direct grant con audience (token corto)",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-EBZc3zCTdF3v_KB3hqLO2j6ZCWRjInQ9",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "attributes": {
+        "access.token.lifespan": "10"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-finance-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "finance-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "pfos-e2e-noaud",
+      "name": "E2E only: direct grant SIN audience finance-api",
+      "enabled": true,
+      "fullScopeAllowed": false,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-HY9d8u2BOBN5qbv2YKhPmut9_enhh_zv",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "attributes": {},
+      "protocolMappers": []
+    }
+  ],
+  "users": [
+    {
+      "id": "0b4f1c1e-0000-4000-8000-000000000001",
+      "username": "owner",
+      "enabled": true,
+      "email": "owner@pfos.test",
+      "emailVerified": true,
+      "firstName": "Owner",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-cnpya5ePYSCb-Aa1!",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "groups": [
+        "/workspaces/ws-demo/owner"
+      ]
+    },
+    {
+      "id": "0b4f1c1e-0000-4000-8000-000000000002",
+      "username": "editor",
+      "enabled": true,
+      "email": "editor@pfos.test",
+      "emailVerified": true,
+      "firstName": "Editor",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-wCuDwTm30cVk-Aa1!",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "groups": [
+        "/workspaces/ws-demo/editor"
+      ]
+    },
+    {
+      "id": "0b4f1c1e-0000-4000-8000-000000000003",
+      "username": "viewer",
+      "enabled": true,
+      "email": "viewer@pfos.test",
+      "emailVerified": true,
+      "firstName": "Viewer",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-LdItie75rhb7-Aa1!",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "groups": [
+        "/workspaces/ws-demo/viewer"
+      ]
+    },
+    {
+      "id": "0b4f1c1e-0000-4000-8000-000000000004",
+      "username": "outsider",
+      "enabled": true,
+      "email": "outsider@pfos.test",
+      "emailVerified": true,
+      "firstName": "Outsider",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-only-KBSYPFbn9bNI-Aa1!",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "groups": []
+    }
+  ]
+}

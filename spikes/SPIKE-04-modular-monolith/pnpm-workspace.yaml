@@ -1,0 +1,35 @@
+# Workspace PROPIO del spike: no se mezcla con un futuro workspace raíz del repo.
+packages:
+  - apps/*
+  - packages/*
+  - packages/contexts/*
+
+catalog:
+  typescript: 7.0.2
+  vitest: 5.0.3
+  turbo: 2.11.6
+  dependency-cruiser: 18.5.0
+  "@nestjs/common": 12.1.2
+  "@nestjs/core": 12.1.2
+  "@nestjs/testing": 12.1.2
+  "@nestjs/platform-express": 12.1.2
+  reflect-metadata: 0.2.2
+  rxjs: 7.8.2
+  unplugin-swc: 2.0.0
+  "@swc/core": 1.15.47
+  supertest: 7.3.0
+  "@types/node": ^22.0.0
+
+minimumReleaseAgeExclude:
+  - '@turbo/darwin-64@2.11.6'
+  - '@turbo/darwin-arm64@2.11.6'
+  - '@turbo/linux-64@2.11.6'
+  - '@turbo/linux-arm64@2.11.6'
+  - '@turbo/windows-64@2.11.6'
+  - '@turbo/windows-arm64@2.11.6'
+  - turbo@2.11.6
+
+# pnpm >=11 bloquea scripts de build por defecto: lista explícita.
+allowBuilds:
+  '@swc/core': true
+  unrs-resolver: true

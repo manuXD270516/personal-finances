@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/prisma/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["fx", "iam", "ledger"]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model currency {
+  code                                             String           @id @db.VarChar(16)
+  kind                                             String
+  scale                                            Int              @db.SmallInt
+  ledger_account_ledger_account_currencyTocurrency ledger_account[] @relation("ledger_account_currencyTocurrency")
+  posting_posting_currencyTocurrency               posting[]        @relation("posting_currencyTocurrency")
+
+  @@schema("fx")
+}
+
+model workspace {
+  id             String           @id @db.Uuid
+  name           String
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  journal_entry  journal_entry[]
+  ledger_account ledger_account[]
+
+  @@schema("iam")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model journal_entry {
+  id                                                           String          @id @db.Uuid
+  workspace_id                                                 String          @db.Uuid
+  sequence                                                     BigInt          @default(autoincrement())
+  entry_date                                                   DateTime        @db.Date
+  entry_type                                                   String
+  source_type                                                  String
+  source_id                                                    String          @db.Uuid
+  source_revision                                              Int
+  reverses_entry_id                                            String?         @db.Uuid
+  memo                                                         String?
+  created_at                                                   DateTime        @default(now()) @db.Timestamptz(6)
+  journal_entry                                                journal_entry?  @relation("journal_entryTojournal_entry", fields: [workspace_id, reverses_entry_id], references: [workspace_id, id], onDelete: NoAction, onUpdate: NoAction, map: "journal_entry_reversal_fk")
+  other_journal_entry                                          journal_entry[] @relation("journal_entryTojournal_entry")
+  workspace                                                    workspace       @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  posting_posting_journal_entry_id_entry_dateTojournal_entry   posting[]       @relation("posting_journal_entry_id_entry_dateTojournal_entry")
+  posting_posting_workspace_id_journal_entry_idTojournal_entry posting[]       @relation("posting_workspace_id_journal_entry_idTojournal_entry")
+
+  @@unique([id, entry_date], map: "journal_entry_id_date_uk")
+  @@unique([workspace_id, id], map: "journal_entry_ws_id_uk")
+  @@schema("ledger")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ledger_account {
+  id                                                                      String    @id @db.Uuid
+  workspace_id                                                            String    @db.Uuid
+  type                                                                    String
+  currency                                                                String    @db.VarChar(16)
+  system_kind                                                             String?
+  source_account_id                                                       String?   @db.Uuid
+  code                                                                    String
+  created_at                                                              DateTime  @default(now()) @db.Timestamptz(6)
+  archived_at                                                             DateTime? @db.Timestamptz(6)
+  currency_ledger_account_currencyTocurrency                              currency  @relation("ledger_account_currencyTocurrency", fields: [currency], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  workspace                                                               workspace @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  posting_posting_ledger_account_id_currency_account_typeToledger_account posting[] @relation("posting_ledger_account_id_currency_account_typeToledger_account")
+  posting_posting_workspace_id_ledger_account_idToledger_account          posting[] @relation("posting_workspace_id_ledger_account_idToledger_account")
+
+  @@unique([id, currency, type], map: "ledger_account_id_ccy_uk")
+  @@unique([workspace_id, id], map: "ledger_account_ws_id_uk")
+  @@schema("ledger")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model posting {
+  id                                                                             String         @id @db.Uuid
+  workspace_id                                                                   String         @db.Uuid
+  journal_entry_id                                                               String         @db.Uuid
+  entry_date                                                                     DateTime       @db.Date
+  line_no                                                                        Int            @db.SmallInt
+  ledger_account_id                                                              String         @db.Uuid
+  account_type                                                                   String
+  currency                                                                       String         @db.VarChar(16)
+  amount                                                                         Decimal        @db.Decimal(38, 18)
+  split_id                                                                       String?        @db.Uuid
+  memo                                                                           String?
+  created_at                                                                     DateTime       @default(now()) @db.Timestamptz(6)
+  ledger_account_posting_ledger_account_id_currency_account_typeToledger_account ledger_account @relation("posting_ledger_account_id_currency_account_typeToledger_account", fields: [ledger_account_id, currency, account_type], references: [id, currency, type], onDelete: NoAction, onUpdate: NoAction, map: "posting_account_ccy_fk")
+  ledger_account_posting_workspace_id_ledger_account_idToledger_account          ledger_account @relation("posting_workspace_id_ledger_account_idToledger_account", fields: [workspace_id, ledger_account_id], references: [workspace_id, id], onDelete: NoAction, onUpdate: NoAction, map: "posting_account_ws_fk")
+  currency_posting_currencyTocurrency                                            currency       @relation("posting_currencyTocurrency", fields: [currency], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  journal_entry_posting_journal_entry_id_entry_dateTojournal_entry               journal_entry  @relation("posting_journal_entry_id_entry_dateTojournal_entry", fields: [journal_entry_id, entry_date], references: [id, entry_date], onDelete: NoAction, onUpdate: NoAction, map: "posting_entry_date_fk")
+  journal_entry_posting_workspace_id_journal_entry_idTojournal_entry             journal_entry  @relation("posting_workspace_id_journal_entry_idTojournal_entry", fields: [workspace_id, journal_entry_id], references: [workspace_id, id], onDelete: NoAction, onUpdate: NoAction, map: "posting_entry_fk")
+
+  @@unique([journal_entry_id, line_no], map: "posting_line_uk")
+  @@index([workspace_id, ledger_account_id, entry_date, id, amount], map: "posting_balance_ix")
+  @@schema("ledger")
+}

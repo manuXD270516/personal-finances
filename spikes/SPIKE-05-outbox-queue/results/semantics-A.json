@@ -1,0 +1,44 @@
+{
+  "relayCrash": {
+    "events": 300,
+    "crashedBatches": 3,
+    "duplicateDeliveriesSeenByConsumer": 0,
+    "atomicPublish": false
+  },
+  "dlq": {
+    "attempts": 3,
+    "msToDeadLetter": 539,
+    "queueCounts": {
+      "waiting": 0,
+      "active": 0,
+      "delayed": 0,
+      "completed": 20,
+      "failed": 1
+    }
+  },
+  "ordering": {
+    "events": 500,
+    "aggregates": 20,
+    "concurrency": 8,
+    "handlerJitterMs": 10,
+    "withoutGuarantee": {
+      "inversions": 0,
+      "drainMs": 875
+    },
+    "withGuarantee": {
+      "inversions": 0,
+      "drainMs": 6262,
+      "mechanism": "detección de huecos aggregateVersion + reintento"
+    }
+  },
+  "gracefulInProcess": {
+    "stopWaitedMs": 1495,
+    "countsAfterStop": {
+      "waiting": 0,
+      "active": 0,
+      "delayed": 0,
+      "completed": 1,
+      "failed": 0
+    }
+  }
+}

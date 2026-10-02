@@ -1,0 +1,127 @@
+# SPIKE-07 — object storage local (código descartable).
+# Uso: docker compose -p pf-spike-07 --profile <seaweedfs|garage|rustfs> up -d --wait
+# Credenciales: valores de prueba SOLO para este spike (nunca reutilizar).
+name: pf-spike-07
+
+x-init: &init
+  image: amazon/aws-cli:2.37.8@sha256:420ab345e847291b541b45d989535f55bcff957c27fa1100fae4aa233e86398c
+  entrypoint: ["/bin/sh", "/init/init-bucket.sh"]
+  restart: "no"
+  environment: &init-env
+    AWS_REGION: us-east-1
+    AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+    AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    BUCKETS: "pfos-documents pfos-imports"
+  volumes:
+    - ./scripts/init-bucket.sh:/init/init-bucket.sh:ro
+    - ./config/cors.json:/init/cors.json:ro
+
+services:
+  # ---------------- SeaweedFS (Apache-2.0) ----------------
+  seaweedfs:
+    profiles: ["seaweedfs"]
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    command:
+      - mini
+      - -dir=/data
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.allowedOrigins=http://localhost:61600
+      - -webdav=false
+      - -admin.ui=false
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+    ports: ["127.0.0.1:61733:8333"]
+    volumes:
+      - seaweedfs-data:/data
+      - ./config/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+      start_interval: 1s
+
+  seaweedfs-init:
+    <<: *init
+    profiles: ["seaweedfs"]
+    environment:
+      <<: *init-env
+      S3_ENDPOINT: http://seaweedfs:8333
+      AWS_ACCESS_KEY_ID: pfosdevseaweedkey
+      AWS_SECRET_ACCESS_KEY: pfos-dev-seaweed-secret-0123456789
+    depends_on:
+      seaweedfs: { condition: service_healthy }
+
+  # ---------------- Garage (AGPL-3.0) ----------------
+  garage:
+    profiles: ["garage"]
+    image: dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_RPC_SECRET: 3f1c0a9e5b7d24681357924680ace0bdf13579bdf02468ace13579bdf0246813
+      GARAGE_ADMIN_TOKEN: pfos-dev-garage-admin-token
+      GARAGE_DEFAULT_ACCESS_KEY: GK0123456789abcdef01234567
+      GARAGE_DEFAULT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GARAGE_DEFAULT_BUCKET: pfos-documents
+    ports:
+      - "127.0.0.1:61790:3900"
+      - "127.0.0.1:61793:3903"
+    volumes:
+      - garage-data:/var/lib/garage
+      - ./config/garage.toml:/etc/garage.toml:ro
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+      start_interval: 1s
+
+  garage-init:
+    <<: *init
+    profiles: ["garage"]
+    environment:
+      <<: *init-env
+      S3_ENDPOINT: http://garage:3900
+      AWS_ACCESS_KEY_ID: GK0123456789abcdef01234567
+      AWS_SECRET_ACCESS_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ENABLE_VERSIONING: "true"
+    depends_on:
+      garage: { condition: service_healthy }
+
+  # ---------------- RustFS (Apache-2.0) ----------------
+  rustfs:
+    profiles: ["rustfs"]
+    image: rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
+    environment:
+      RUSTFS_ACCESS_KEY: pfosdevrustfskey
+      RUSTFS_SECRET_KEY: pfos-dev-rustfs-secret-0123456789
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+    ports: ["127.0.0.1:61720:9000"]
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+      start_interval: 1s
+
+  rustfs-init:
+    <<: *init
+    profiles: ["rustfs"]
+    environment:
+      <<: *init-env
+      S3_ENDPOINT: http://rustfs:9000
+      AWS_ACCESS_KEY_ID: pfosdevrustfskey
+      AWS_SECRET_ACCESS_KEY: pfos-dev-rustfs-secret-0123456789
+    depends_on:
+      rustfs: { condition: service_healthy }
+
+volumes:
+  seaweedfs-data:
+  garage-data:
+  rustfs-data:

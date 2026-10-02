@@ -1,0 +1,40 @@
+{
+  "gracefulInProcess": {
+    "stopWaitedMs": 1512,
+    "countsAfterStop": {
+      "queued": 0,
+      "active": 0,
+      "failed": 0
+    }
+  },
+  "relayCrash": {
+    "events": 300,
+    "crashedBatches": 3,
+    "duplicateDeliveriesSeenByConsumer": 0,
+    "atomicPublish": true
+  },
+  "dlq": {
+    "attempts": 3,
+    "msToDeadLetter": 6747,
+    "queueCounts": {
+      "queued": 0,
+      "active": 0,
+      "failed": 0
+    }
+  },
+  "ordering": {
+    "events": 500,
+    "aggregates": 20,
+    "concurrency": 8,
+    "handlerJitterMs": 10,
+    "withoutGuarantee": {
+      "inversions": 0,
+      "drainMs": 367
+    },
+    "withGuarantee": {
+      "inversions": 0,
+      "drainMs": 769,
+      "mechanism": "policy key_strict_fifo (singletonKey=aggregateId)"
+    }
+  }
+}

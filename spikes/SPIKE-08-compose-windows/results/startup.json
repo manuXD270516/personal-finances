@@ -1,0 +1,47 @@
+{
+  "at": "2026-10-02T01:15:43.921Z",
+  "summary": {
+    "cold_build_no_cache": {
+      "runs_ms": [
+        15758
+      ],
+      "median_ms": 15758
+    },
+    "cold_up_with_valkey_pull": {
+      "runs_ms": [
+        14027
+      ],
+      "median_ms": 14027
+    },
+    "cold_volumes_up (images cached, empty volumes: initdb+migrate)": {
+      "runs_ms": [
+        6089,
+        6528,
+        7150
+      ],
+      "median_ms": 6528
+    },
+    "warm_down_up (volumes kept, containers recreated)": {
+      "runs_ms": [
+        5726,
+        5576,
+        5767
+      ],
+      "median_ms": 5726
+    },
+    "warm_stop_up (containers exist, stopped)": {
+      "runs_ms": [
+        5076,
+        5262,
+        4971
+      ],
+      "median_ms": 5076
+    },
+    "noop_up (already running)": {
+      "runs_ms": [
+        2363
+      ],
+      "median_ms": 2363
+    }
+  }
+}

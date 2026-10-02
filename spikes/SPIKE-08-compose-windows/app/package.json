@@ -1,0 +1,7 @@
+{
+  "name": "spike-08-dummy-app",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node api.mjs" },
+  "dependencies": { "pg": "8.16.3", "chokidar": "4.0.3" }
+}

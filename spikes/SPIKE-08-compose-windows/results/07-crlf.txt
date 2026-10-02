@@ -1,0 +1,20 @@
+================ no-gitattributes ================
+warning: in the working copy of 'Dockerfile', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'entrypoint.sh', LF will be replaced by CRLF the next time Git touches it
+CRLF line endings in checked-out entrypoint.sh: 4
+--- docker run (exec-form ENTRYPOINT /entrypoint.sh):
+exec /entrypoint.sh: no such file or directory
+exit=255
+--- docker run --entrypoint sh (sh /entrypoint.sh):
+/entrypoint.sh: set: line 2: illegal option -
+exit=2
+================ with-gitattributes ================
+CRLF line endings in checked-out entrypoint.sh: 0
+--- docker run (exec-form ENTRYPOINT /entrypoint.sh):
+entrypoint OK: running echo app started
+app started
+exit=0
+--- docker run --entrypoint sh (sh /entrypoint.sh):
+entrypoint OK: running echo hi
+hi
+exit=0

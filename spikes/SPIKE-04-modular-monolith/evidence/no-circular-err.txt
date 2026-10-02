@@ -1,0 +1,7 @@
+
+  error no-circular: packages/contexts/accounts/src/contracts/__violation_cycle_a.ts → 
+      packages/contexts/ledger/src/contracts/__violation_cycle_b.ts →
+      packages/contexts/accounts/src/contracts/__violation_cycle_a.ts
+
+x 1 dependency violations (1 errors, 0 warnings). 27 modules, 52 dependencies cruised.
+

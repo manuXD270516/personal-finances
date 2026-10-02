@@ -1,0 +1,66 @@
+### PowerShell 7.6.6 :: pnpm tsx scripts/stack.ts up
+
+$ docker compose -p pf-spike-08 -f D:\projects\personal-finances\spikes\SPIKE-08-compose-windows\compose.yaml --project-directory D:\projects\personal-finances\spikes\SPIKE-08-compose-windows --profile core up -d --wait --wait-timeout 180
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-redis-1 Healthy 
+ Container pf-spike-08-redis-1 Healthy 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-migrate-1 Exited 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-migrate-1 Exited 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-migrate-1 Exited 
+ Container pf-spike-08-redis-1 Healthy 
+ Container pf-spike-08-api-1 Healthy 
+ Container pf-spike-08-worker-1 Healthy 
+[stack] up --profile core exit=0 in 7.4s
+[stack] postgres  localhost:61832
+[stack] valkey    localhost:61837
+[stack] api       http://localhost:61880/health/ready
+
+### insert probe row
+1
+INSERT 0 1
+OK
+### pnpm tsx scripts/stack.ts down
+
+[stack] down exit=0 in 4.9s
+
+### volumes after down
+pf-spike-08_pg-data
+pf-spike-08_redis-data
+### up again -> row and key persist?
+
+[stack] up --profile core exit=0 in 5.3s
+[stack] postgres  localhost:61832
+[stack] valkey    localhost:61837
+[stack] api       http://localhost:61880/health/ready
+
+survives-down
+survives
+### logs (no-follow, tail 3, api)
+$ docker compose -p pf-spike-08 -f D:\projects\personal-finances\spikes\SPIKE-08-compose-windows\compose.yaml --project-directory D:\projects\personal-finances\spikes\SPIKE-08-compose-windows --profile deps --profile core --profile seed --profile observability logs --timestamps --tail 3 api
+api-1  | 2026-10-02T06:21:45.864582063Z 2026-10-02T06:21:45.863Z [api pid=7] SIGTERM handler installed for api
+api-1  | 2026-10-02T06:21:45.865158842Z 2026-10-02T06:21:45.865Z [api pid=7] api listening on 8080
+### reset without --yes and without TTY
+[stack] destructive command without TTY: pass --yes
+exit=2
+### reset --yes
+
+ Volume pf-spike-08_pg-data Removing 
+ Volume pf-spike-08_redis-data Removing 
+ Volume pf-spike-08_pg-data Removed 
+ Volume pf-spike-08_redis-data Removed 
+[stack] down -v exit=0 in 4.6s
+ Volume pf-spike-08_redis-data Creating 
+ Volume pf-spike-08_redis-data Creating 
+ Volume pf-spike-08_pg-data Creating 
+ Volume pf-spike-08_pg-data Creating 
+ Volume pf-spike-08_pg-data Created 
+ Volume pf-spike-08_pg-data Created 
+ Volume pf-spike-08_redis-data Created 
+ Volume pf-spike-08_redis-data Created 
+[stack] up --profile core exit=0 in 6.3s
+
+0
+

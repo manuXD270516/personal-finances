@@ -1,0 +1,44 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "agentGuidance": false,
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "tsconfig*.json",
+        "package.json"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^transit"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "tsconfig*.json"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^transit"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vitest.config.*"
+      ]
+    },
+    "transit": {
+      "dependsOn": [
+        "^transit"
+      ]
+    }
+  }
+}

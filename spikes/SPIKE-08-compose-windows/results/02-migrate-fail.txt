@@ -1,0 +1,61 @@
+### (stack down -v) PF_MIGRATE_FILE=fail.sql docker compose --profile core up -d --wait
+ Volume pf-spike-08_pg-data Creating 
+ Volume pf-spike-08_pg-data Creating 
+ Volume pf-spike-08_redis-data Creating 
+ Volume pf-spike-08_redis-data Creating 
+ Network pf-spike-08_default Creating 
+ Network pf-spike-08_default Creating 
+ Volume pf-spike-08_redis-data Created 
+ Volume pf-spike-08_redis-data Created 
+ Volume pf-spike-08_pg-data Created 
+ Volume pf-spike-08_pg-data Created 
+ Network pf-spike-08_default Created 
+ Network pf-spike-08_default Created 
+ Container pf-spike-08-postgres-1 Creating 
+ Container pf-spike-08-redis-1 Creating 
+ Container pf-spike-08-redis-1 Created 
+ Container pf-spike-08-postgres-1 Created 
+ Container pf-spike-08-migrate-1 Creating 
+ Container pf-spike-08-migrate-1 Created 
+ Container pf-spike-08-worker-1 Creating 
+ Container pf-spike-08-api-1 Creating 
+ Container pf-spike-08-api-1 Created 
+ Container pf-spike-08-worker-1 Created 
+ Container pf-spike-08-redis-1 Starting 
+ Container pf-spike-08-postgres-1 Starting 
+ Container pf-spike-08-redis-1 Started 
+ Container pf-spike-08-postgres-1 Started 
+ Container pf-spike-08-postgres-1 Waiting 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-migrate-1 Starting 
+ Container pf-spike-08-migrate-1 Started 
+ Container pf-spike-08-postgres-1 Waiting 
+ Container pf-spike-08-redis-1 Waiting 
+ Container pf-spike-08-migrate-1 Waiting 
+ Container pf-spike-08-postgres-1 Waiting 
+ Container pf-spike-08-redis-1 Waiting 
+ Container pf-spike-08-migrate-1 Waiting 
+ Container pf-spike-08-migrate-1 Error service "migrate" didn't complete successfully: exit 3
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-redis-1 Healthy 
+ Container pf-spike-08-postgres-1 Error dependency postgres failed to start
+ Container pf-spike-08-redis-1 Healthy 
+ Container pf-spike-08-migrate-1 Error service "migrate" didn't complete successfully: exit 3
+service "migrate" didn't complete successfully: exit 3
+EXIT=1 elapsed_ms=3627
+### ps -a
+api	created	Created
+migrate	exited	Exited (3) 1 second ago
+postgres	running	Up 2 seconds (healthy)
+redis	running	Up 3 seconds (healthy)
+worker	created	Created
+### logs migrate
+CREATE SCHEMA
+psql:/migrations/fail.sql:3: ERROR:  syntax error at or near ";"
+LINE 1: ...e.broken (id int PRIMARY KEY, amount numeric(20,4) NOT NULL;
+                                                                      ^
+### api/worker logs (should be empty: never started)
+### docker inspect api State
+Status=created StartedAt=0001-01-01T00:00:00Z
+### curl api
+curl failed (api not listening)

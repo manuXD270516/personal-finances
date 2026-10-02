@@ -1,0 +1,30 @@
+{
+  "name": "pf-spike-03-money",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "SPIKE-03: Money VO con decimal.js (ADR-0006). Código descartable/promovible a @pf/shared-kernel.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src",
+    "bench": "tsx bench/bench.ts",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
+  },
+  "devDependencies": {
+    "@types/big.js": "7.0.0",
+    "@types/node": "^22.20.4",
+    "@typescript-eslint/utils": "8.71.0",
+    "big.js": "7.0.1",
+    "dinero.js": "2.0.2",
+    "eslint": "10.11.0",
+    "fast-check": "4.10.2",
+    "tsx": "^4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,0 +1,60 @@
+schema: spec-driven
+
+# Contexto del proyecto — se inyecta en todo artefacto/workflow de OpenSpec.
+# Las decisiones canónicas viven en docs/ARCHITECTURE.md; esto es el conjunto condensado de restricciones.
+context: |
+  IDIOMA: escribe TODOS los artefactos (proposal, specs, design, tasks) en español. Excepción obligatoria: los
+  encabezados estructurales que el CLI parsea quedan en inglés: "## Purpose", "## ADDED Requirements",
+  "## MODIFIED Requirements", "## REMOVED Requirements", "## RENAMED Requirements", "### Requirement:",
+  "#### Scenario:", "**Reason**", "**Migration**", "FROM:"/"TO:". El texto normativo usa "DEBE (MUST)",
+  "DEBEN (MUST)" y "NO DEBE (MUST NOT)" porque `openspec validate --strict` exige SHALL/MUST. Los scenarios usan
+  viñetas "- **CUANDO** …", "- **ENTONCES** …", "- **Y** …". IDs (FR-, NFR-, TC-, INV-, RISK-), rutas de capability
+  y códigos de error se mantienen como códigos.
+  Producto: Personal Finance Operating System (multi-moneda fiat + cripto, ledger de doble entrada interno invisible para el usuario).
+  Parámetros base: moneda de reporte BOB, zona horaria America/La_Paz, UI en español con i18n preparado para inglés y portugués.
+  Inicialmente un usuario/workspace (Bolivia: BOB, USD, USDT), pero todo registro de negocio está acotado por workspace_id.
+  Arquitectura: modular monolith, DDD, hexagonal (ports & adapters), clean architecture, eventos de dominio internos vía transactional outbox.
+  Decisiones canónicas: docs/ARCHITECTURE.md. ADRs: docs/adr/. Un change que las contradiga DEBE incluir un ADR (nuevo o que reemplace).
+  Contextos y carpetas de specs: identity, accounts, ledger, transactions, classification, planning, commitments, goals, debt, fx,
+  documents, imports, rules, reporting, forecast, notifications, audit, assistant, más los transversales platform, security, quality.
+  Las rutas de capability son <contexto>/<capability> (docs/ARCHITECTURE.md §14). Reutiliza rutas existentes; nunca crees casi-duplicados.
+  Reglas de integridad financiera (no negociables): el dinero nunca usa punto flotante; todo monto tiene moneda; los postings del ledger
+  suman cero por moneda en cada journal entry; los postings son inmutables (las correcciones son reversas); las tasas de cambio
+  históricas son inmutables; los periodos cerrados no cambian en silencio; el redondeo es HALF_EVEN a la escala de la moneda y
+  determinista. Invariantes catalogadas como INV-NNN en docs/09-ledger-design.md.
+  Trazabilidad: FR-<CONTEXTO>-NNN / NFR-<CAT>-NNN -> Requirement -> Scenario -> TC-<CONTEXTO>-<FEATURE>-NNN (tests/cases) -> test
+  automatizado cuyo nombre contiene el TC-id. Cada requirement termina con la línea "Trace: <FR/NFR ids> · Priority: Must|Should|Could".
+  El core DEBE funcionar sin IA, ML ni integraciones bancarias. El asistente IA es solo Phase 10, primero solo lectura, vía tools autorizadas.
+  La máquina principal de desarrollo es Windows (Docker Desktop + WSL2): los scripts deben ser multiplataforma (TypeScript vía pnpm), nunca solo bash.
+
+rules:
+  proposal:
+    - "Usa los encabezados '## Por qué', '## Qué cambia', '## Capacidades' (con '### Capacidades nuevas' y '### Capacidades modificadas') y '## Impacto'."
+    - "La sección Impacto DEBE responder, cada punto con su etiqueta en negrita: Specs impactadas; Componentes/contextos impactados; APIs impactadas (contracts/openapi); Tablas impactadas (schema.tabla); Eventos impactados (contracts/events, con versión); Migraciones requeridas (expand/contract, ¿destructiva?); Test cases (AÑADIDOS / MODIFICADOS / DEPRECADOS, por TC-id); Impacto de regresión; Riesgos introducidos (RISK-ids si están registrados)."
+    - "Declara explícitamente qué queda fuera de alcance."
+    - "Si el change toca dinero, ledger, FX, periodos o redondeo, lista las invariantes INV-NNN afectadas."
+  specs:
+    - "Escribe requirements y scenarios en español; texto normativo con 'DEBE (MUST)' / 'NO DEBE (MUST NOT)'; scenarios con **CUANDO** / **ENTONCES** / **Y**; una conducta por requirement."
+    - "Todo requirement que codifique una regla financiera DEBE incluir al menos un scenario con montos y monedas concretos."
+    - "Expresa el dinero como '<monto> <MONEDA>' con escala explícita (p. ej. 685.00 BOB, 100.000000 USDT). Nunca implicar punto flotante."
+    - "No nombres librerías, clases ni tablas en las specs; eso va en design.md."
+    - "Cierra la descripción de cada requirement con 'Trace: <FR/NFR ids> · Priority: Must|Should|Could'."
+  design:
+    - "Usa los encabezados '## Contexto', '## Objetivos / No objetivos', '## Decisiones', '## Riesgos / Trade-offs', '## Plan de migración', '## Preguntas abiertas'."
+    - "Referencia los bounded contexts, agregados y puertos afectados, y qué capa cambia (domain/application/infrastructure/interface)."
+    - "Describe cambios de modelo de datos como schema.tabla con estrategia de migración (expand/contract) e implicancias de RLS."
+    - "Describe eventos producidos/consumidos como <context>.<EventName>.v<N> y su estrategia de idempotencia."
+  tasks:
+    - "Sigue el flujo obligatorio por vertical slice: SPEC -> TEST CASE -> DOMAIN -> APPLICATION -> INFRASTRUCTURE -> API -> UI -> AUTOMATED TESTS -> E2E -> DOCUMENTATION."
+    - "Cada grupo de tareas DEBE incluir redactar/actualizar los TC en tests/cases y los tests automatizados que referencian sus TC-ids."
+    - "La lógica de dominio financieramente crítica DEBE implementarse test-first (TDD); indícalo en la tarea."
+    - "Incluye una tarea final para actualizar docs, la matriz de trazabilidad y ejecutar `openspec validate --strict`."
+
+operations:
+  apply:
+    guidance:
+      - "No inicies la implementación de un change cuyo diseño dependa de una pregunta abierta sin resolver en docs/DESIGN-GATE.md."
+      - "Mantén CI en verde tras cada grupo de tareas; nunca debilites ni borres un test existente sin registrar el motivo en el change."
+  archive:
+    guidance:
+      - "Antes de archivar, confirma la Definition of Done (docs/16-testing-strategy.md) y que los estados de tests/cases se actualizaron."

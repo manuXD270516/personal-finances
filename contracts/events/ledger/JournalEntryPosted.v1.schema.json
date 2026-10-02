@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/ledger/JournalEntryPosted.v1.schema.json",
+  "title": "ledger.JournalEntryPosted.v1",
+  "description": "Se registró un asiento (STANDARD, REVERSAL u OPENING) balanceado por moneda. Productor: LEDGER. Consumidores: REPORTING, GOALS. Idempotencia natural: journalEntryId. Ordenar proyecciones de saldo por sequence. Sin PII.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "ledger.JournalEntryPosted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "JournalEntry"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journalEntryId",
+        "entryDate",
+        "entryType",
+        "sequence",
+        "sourceRef",
+        "reversesEntryId",
+        "postings"
+      ],
+      "properties": {
+        "journalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "entryDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "entryType": {
+          "enum": [
+            "STANDARD",
+            "REVERSAL",
+            "OPENING"
+          ]
+        },
+        "sequence": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "description": "bigint monotónico por workspace, como string"
+        },
+        "sourceRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context",
+            "type",
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "context": {
+              "const": "TRANSACTIONS"
+            },
+            "type": {
+              "const": "Transaction"
+            },
+            "id": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "reversesEntryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "postings": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/Posting"
+          }
+        }
+      },
+      "description": "Invariante no expresable en JSON Schema (verificada en tests de contrato): para cada currency, la suma de postings[].amount.amount es exactamente 0. Exactamente uno de accountId/systemAccountCode es no nulo."
+    },
+    "Posting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "postingId",
+        "ledgerAccountId",
+        "accountId",
+        "systemAccountCode",
+        "amount",
+        "splitId"
+      ],
+      "properties": {
+        "postingId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "ledgerAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "systemAccountCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(INCOME|EXPENSE|EQUITY:(OPENING_BALANCE|FX_TRADING|ADJUSTMENTS)):[A-Z0-9][A-Z0-9_.-]{1,15}$"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "splitId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "ledger.JournalEntryPosted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "JournalEntry",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+        "entryDate": "2026-10-01",
+        "entryType": "STANDARD",
+        "sequence": "1042",
+        "sourceRef": {
+          "context": "TRANSACTIONS",
+          "type": "Transaction",
+          "id": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+          "revision": 1
+        },
+        "reversesEntryId": null,
+        "postings": [
+          {
+            "postingId": "01928c4e-0000-7000-8000-0000000b0001",
+            "ledgerAccountId": "01928c4e-0000-7000-8000-0000000aa001",
+            "accountId": "01928c4e-0000-7000-8000-000000acc002",
+            "systemAccountCode": null,
+            "amount": {
+              "amount": "-100.000000",
+              "currency": "USDT"
+            },
+            "splitId": null
+          },
+          {
+            "postingId": "01928c4e-0000-7000-8000-0000000b0002",
+            "ledgerAccountId": "01928c4e-0000-7000-8000-0000000aa002",
+            "accountId": null,
+            "systemAccountCode": "EQUITY:FX_TRADING:USDT",
+            "amount": {
+              "amount": "100.000000",
+              "currency": "USDT"
+            },
+            "splitId": null
+          },
+          {
+            "postingId": "01928c4e-0000-7000-8000-0000000b0003",
+            "ledgerAccountId": "01928c4e-0000-7000-8000-0000000aa003",
+            "accountId": null,
+            "systemAccountCode": "EQUITY:FX_TRADING:BOB",
+            "amount": {
+              "amount": "-690.00",
+              "currency": "BOB"
+            },
+            "splitId": null
+          },
+          {
+            "postingId": "01928c4e-0000-7000-8000-0000000b0004",
+            "ledgerAccountId": "01928c4e-0000-7000-8000-0000000aa004",
+            "accountId": "01928c4e-0000-7000-8000-000000acc001",
+            "systemAccountCode": null,
+            "amount": {
+              "amount": "685.00",
+              "currency": "BOB"
+            },
+            "splitId": null
+          },
+          {
+            "postingId": "01928c4e-0000-7000-8000-0000000b0005",
+            "ledgerAccountId": "01928c4e-0000-7000-8000-0000000aa005",
+            "accountId": null,
+            "systemAccountCode": "EXPENSE:BOB",
+            "amount": {
+              "amount": "5.00",
+              "currency": "BOB"
+            },
+            "splitId": "01928c4e-0000-7000-8000-0000000005a1"
+          }
+        ]
+      }
+    }
+  ]
+}

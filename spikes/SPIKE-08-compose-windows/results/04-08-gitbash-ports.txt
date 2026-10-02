@@ -1,0 +1,24 @@
+### Git Bash (GNU bash, version 5.3.15(2)-release (x86_64-pc-cygwin)) :: pnpm stack:ps
+SERVICE    STATE     STATUS                      PORTS
+api        exited    Exited (0) 20 seconds ago   
+migrate    exited    Exited (0) 43 seconds ago   
+postgres   running   Up 46 seconds (healthy)     127.0.0.1:61832->5432/tcp
+redis      running   Up 45 seconds (healthy)     127.0.0.1:61837->6379/tcp
+worker     exited    Exited (0) 19 seconds ago   
+### NOTE: first attempt PF_API_PORT=61980 -> stack 'started' but curl hit ANOTHER host process (NestJS 404) already listening on 127.0.0.1:61980 (Windows allowed both binds?)
+### custom ports via env: PF_PG_PORT=61932 PF_API_PORT=61942 pnpm tsx scripts/stack.ts up
+[stack] up --profile core exit=0 in 6.5s
+[stack] postgres  localhost:61932
+[stack] valkey    localhost:61837
+[stack] api       http://localhost:61942/health/ready
+api 127.0.0.1:61942->8080/tcp
+postgres 127.0.0.1:61932->5432/tcp
+{"status":"ready","postgres":{"ok":true,"migrations":1},"valkey":{"ok":true}}
+### canonical default PF_PG_PORT=5432 (occupied by another project)
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint pf-spike-08-postgres-1 (2f786a74c2ceff06eadb6eb25c48a3393abc7e9234a079bcddb4fdd609af51ea): Bind for 127.0.0.1:5432 failed: port is already allocated
+[stack] up --profile core exit=1 in 5.4s
+### canonical PF_VALKEY_PORT=6379
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint pf-spike-08-redis-1 (4d1614302b43148f6b2f3b9cc04e3f9462e67401a0056f0b5c5103062e668b3c): Bind for 0.0.0.0:6379 failed: port is already allocated
+[stack] up --profile core exit=1 in 2.2s
+### restore defaults
+[stack] up --profile core exit=0 in 4.4s

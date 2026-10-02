@@ -1,0 +1,14 @@
+@pf/ledger:test:  ✓ test/journal-entry.test.ts (3 tests) 4ms
+@pf/ledger:test:  Test Files  1 passed (1)
+@pf/ledger:test:       Tests  3 passed (3)
+@pf/accounts:test:  ✓ test/open-account.test.ts (3 tests) 5ms
+@pf/accounts:test:  Test Files  1 passed (1)
+@pf/accounts:test:       Tests  3 passed (3)
+@pf/api:test:  ✓ test/decorator-metadata.test.ts (1 test) 193ms
+@pf/api:test:  ✓ test/app.e2e.test.ts (2 tests) 144ms
+@pf/api:test:  Test Files  2 passed (2)
+@pf/api:test:       Tests  3 passed (3)
+ Tasks:    5 successful, 5 total
+  Time:    2.722s 
+Cached:    5 cached, 5 total
+  Time:    21ms >>> FULL TURBO

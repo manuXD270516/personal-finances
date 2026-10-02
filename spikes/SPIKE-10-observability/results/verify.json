@@ -1,0 +1,368 @@
+{
+  "checks": {
+    "tempoTrace": {
+      "ok": true,
+      "traceId": "c36b17f14c7ee7bef3661cf8ce444db9",
+      "services": [
+        "finance-api",
+        "finance-worker"
+      ],
+      "spanCount": 7,
+      "spans": [
+        {
+          "service": "finance-api",
+          "name": "POST",
+          "scope": "@opentelemetry/instrumentation-undici"
+        },
+        {
+          "service": "finance-api",
+          "name": "usecase.RecordTransaction",
+          "scope": "pf-spike-api"
+        },
+        {
+          "service": "finance-api",
+          "name": "POST /transactions",
+          "scope": "@opentelemetry/instrumentation-http"
+        },
+        {
+          "service": "finance-api",
+          "name": "POST /internal/ack",
+          "scope": "@opentelemetry/instrumentation-http"
+        },
+        {
+          "service": "finance-worker",
+          "name": "POST",
+          "scope": "@opentelemetry/instrumentation-http"
+        },
+        {
+          "service": "finance-worker",
+          "name": "POST",
+          "scope": "@opentelemetry/instrumentation-undici"
+        },
+        {
+          "service": "finance-worker",
+          "name": "job.process transactions.TransactionPosted.v1",
+          "scope": "pf-spike-worker"
+        }
+      ],
+      "waitedMs": 6143
+    },
+    "tempoSearch": {
+      "ok": true,
+      "query": "{ resource.service.name = \"finance-worker\" && name =~ \"job.process.*\" }",
+      "found": 50,
+      "containsCanaryTrace": true,
+      "waitedMs": 42806
+    },
+    "lokiByTraceId": {
+      "ok": true,
+      "query": "{service_name=~\"finance-.*\"} | trace_id=\"c36b17f14c7ee7bef3661cf8ce444db9\"",
+      "count": 6,
+      "services": [
+        "finance-worker",
+        "finance-api"
+      ],
+      "sampleLabels": {
+        "correlation_id": "verify-1790904734354",
+        "deployment_environment_name": "spike",
+        "detected_level": "info",
+        "event_id": "7a2dc31f-1eb4-4d94-99f9-561c8f16e9ba",
+        "event_type": "transactions.TransactionPosted.v1",
+        "flags": "1",
+        "job_queue": "spike.in-memory",
+        "observed_timestamp": "1790904734372000000",
+        "os_type": "windows",
+        "os_version": "10.0.26200",
+        "process_role": "worker",
+        "scope_name": "@opentelemetry/instrumentation-pino",
+        "scope_version": "0.68.0",
+        "service_instance_id": "ca0e932e-5429-4918-aa8b-f158cf91d812",
+        "service_name": "finance-worker",
+        "service_name_extracted": "finance-worker",
+        "service_version": "sha-spike",
+        "severity_number": "9",
+        "severity_text": "info",
+        "span_id": "d01f3f76c5828412",
+        "telemetry_sdk_language": "nodejs",
+        "telemetry_sdk_name": "opentelemetry",
+        "telemetry_sdk_version": "2.11.0",
+        "trace_id": "c36b17f14c7ee7bef3661cf8ce444db9"
+      },
+      "lines": [
+        {
+          "service": "finance-worker",
+          "line": "job processing"
+        },
+        {
+          "service": "finance-api",
+          "line": "transaction recorded"
+        },
+        {
+          "service": "finance-worker",
+          "line": "job completed"
+        },
+        {
+          "service": "finance-api",
+          "line": "record transaction requested"
+        },
+        {
+          "service": "finance-api",
+          "line": "request completed"
+        },
+        {
+          "service": "finance-api",
+          "line": "request completed"
+        }
+      ],
+      "waitedMs": 67
+    },
+    "lokiByCorrelationId": {
+      "ok": true,
+      "query": "{service_name=~\"finance-.*\"} | correlation_id=\"verify-1790904734354\"",
+      "count": 4,
+      "waitedMs": 13
+    },
+    "redactionLoki": {
+      "ok": true,
+      "scannedStreams": 578,
+      "canaryHits": {
+        "CANARY-SECRET-7731": 0,
+        "CANARY-7731.42": 0,
+        "CANARY-DESC-9911": 0
+      },
+      "authRedacted": 1,
+      "amountRedacted": 1,
+      "piiResourceAttrsPresent": []
+    },
+    "redactionStdout": {
+      "ok": true,
+      "hits": {
+        "CANARY-SECRET-7731": 0,
+        "CANARY-7731.42": 0,
+        "CANARY-DESC-9911": 0
+      }
+    },
+    "prom_httpRedHistogram": {
+      "ok": true,
+      "query": "sum by (service_name, http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count[5m]))",
+      "series": [
+        {
+          "metric": {
+            "http_response_status_code": "200",
+            "http_route": "/ping",
+            "service_name": "bench-api"
+          },
+          "value": "21.854166666666668"
+        },
+        {
+          "metric": {
+            "http_response_status_code": "202",
+            "service_name": "bench-worker"
+          },
+          "value": "6.66"
+        },
+        {
+          "metric": {
+            "http_response_status_code": "201",
+            "http_route": "/transactions",
+            "service_name": "bench-api"
+          },
+          "value": "6.380000000000001"
+        },
+        {
+          "metric": {
+            "http_response_status_code": "204",
+            "http_route": "/internal/ack",
+            "service_name": "bench-api"
+          },
+          "value": "6.640000000000001"
+        },
+        {
+          "metric": {
+            "http_response_status_code": "202",
+            "service_name": "finance-worker"
+          },
+          "value": "0.11056820781954636"
+        },
+        {
+          "metric": {
+            "http_response_status_code": "200",
+            "http_route": "/ping",
+            "service_name": "finance-api"
+          },
+          "value": "0"
+        }
+      ],
+      "waitedMs": 22
+    },
+    "prom_httpP95": {
+      "ok": true,
+      "query": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{service_name=\"finance-api\"}[5m])))",
+      "series": [
+        {
+          "metric": {
+            "http_route": "/ping"
+          },
+          "value": "NaN"
+        },
+        {
+          "metric": {
+            "http_route": "/transactions"
+          },
+          "value": "0.023943181818181822"
+        },
+        {
+          "metric": {
+            "http_route": "/internal/ack"
+          },
+          "value": "0.00475"
+        }
+      ],
+      "waitedMs": 19
+    },
+    "prom_transactionsRecorded": {
+      "ok": true,
+      "query": "sum by (kind) (pf_transactions_recorded_total)",
+      "series": [
+        {
+          "metric": {
+            "kind": "expense"
+          },
+          "value": "1962"
+        },
+        {
+          "metric": {
+            "kind": "income"
+          },
+          "value": "20"
+        }
+      ],
+      "waitedMs": 18
+    },
+    "prom_outboxLag": {
+      "ok": true,
+      "query": "pf_outbox_lag_seconds",
+      "series": [
+        {
+          "metric": {
+            "__name__": "pf_outbox_lag_seconds",
+            "deployment_environment_name": "spike-bench",
+            "instance": "b12a48b7-18ed-484a-9dae-ab8235d3bce9",
+            "job": "bench-api",
+            "service_instance_id": "b12a48b7-18ed-484a-9dae-ab8235d3bce9",
+            "service_name": "bench-api",
+            "service_version": "sha-spike"
+          },
+          "value": "0.016"
+        },
+        {
+          "metric": {
+            "__name__": "pf_outbox_lag_seconds",
+            "deployment_environment_name": "spike-bench",
+            "instance": "3de3f3c2-b50f-4bcd-88a3-1d64c192f9c7",
+            "job": "bench-api",
+            "service_instance_id": "3de3f3c2-b50f-4bcd-88a3-1d64c192f9c7",
+            "service_name": "bench-api",
+            "service_version": "sha-spike"
+          },
+          "value": "0.09"
+        },
+        {
+          "metric": {
+            "__name__": "pf_outbox_lag_seconds",
+            "deployment_environment_name": "spike",
+            "instance": "25ac320c-3da1-4351-a2d8-3b836c61f5cd",
+            "job": "finance-api",
+            "service_instance_id": "25ac320c-3da1-4351-a2d8-3b836c61f5cd",
+            "service_name": "finance-api",
+            "service_version": "sha-spike"
+          },
+          "value": "0"
+        }
+      ],
+      "waitedMs": 23
+    },
+    "prom_outboxPending": {
+      "ok": true,
+      "query": "pf_outbox_pending",
+      "series": [
+        {
+          "metric": {
+            "__name__": "pf_outbox_pending",
+            "deployment_environment_name": "spike-bench",
+            "instance": "b12a48b7-18ed-484a-9dae-ab8235d3bce9",
+            "job": "bench-api",
+            "service_instance_id": "b12a48b7-18ed-484a-9dae-ab8235d3bce9",
+            "service_name": "bench-api",
+            "service_version": "sha-spike"
+          },
+          "value": "20"
+        },
+        {
+          "metric": {
+            "__name__": "pf_outbox_pending",
+            "deployment_environment_name": "spike-bench",
+            "instance": "3de3f3c2-b50f-4bcd-88a3-1d64c192f9c7",
+            "job": "bench-api",
+            "service_instance_id": "3de3f3c2-b50f-4bcd-88a3-1d64c192f9c7",
+            "service_name": "bench-api",
+            "service_version": "sha-spike"
+          },
+          "value": "4"
+        },
+        {
+          "metric": {
+            "__name__": "pf_outbox_pending",
+            "deployment_environment_name": "spike",
+            "instance": "25ac320c-3da1-4351-a2d8-3b836c61f5cd",
+            "job": "finance-api",
+            "service_instance_id": "25ac320c-3da1-4351-a2d8-3b836c61f5cd",
+            "service_name": "finance-api",
+            "service_version": "sha-spike"
+          },
+          "value": "0"
+        }
+      ],
+      "waitedMs": 18
+    },
+    "prom_workerJobDuration": {
+      "ok": true,
+      "query": "sum by (outcome) (pf_queue_job_duration_seconds_count)",
+      "series": [
+        {
+          "metric": {
+            "outcome": "completed"
+          },
+          "value": "1958"
+        }
+      ],
+      "waitedMs": 18
+    }
+  },
+  "datasources": {
+    "loki": "loki",
+    "prometheus": "prometheus",
+    "grafana-pyroscope-datasource": "pyroscope",
+    "tempo": "tempo"
+  },
+  "request": {
+    "status": 201,
+    "eventId": "7a2dc31f-1eb4-4d94-99f9-561c8f16e9ba",
+    "correlationId": "verify-1790904734354",
+    "traceId": "c36b17f14c7ee7bef3661cf8ce444db9"
+  },
+  "summary": {
+    "tempoTrace": true,
+    "tempoSearch": true,
+    "lokiByTraceId": true,
+    "lokiByCorrelationId": true,
+    "redactionLoki": true,
+    "redactionStdout": true,
+    "prom_httpRedHistogram": true,
+    "prom_httpP95": true,
+    "prom_transactionsRecorded": true,
+    "prom_outboxLag": true,
+    "prom_outboxPending": true,
+    "prom_workerJobDuration": true
+  }
+}

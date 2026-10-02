@@ -1,0 +1,1 @@
+src/probes/neg-probe.ts(4,3): error TS2578: Unused '@ts-expect-error' directive.

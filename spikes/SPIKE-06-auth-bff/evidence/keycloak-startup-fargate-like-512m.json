@@ -1,0 +1,18 @@
+{
+  "image": "quay.io/keycloak/keycloak:26.8.0",
+  "mode": "start-dev --import-realm",
+  "limits": {
+    "cpus": 0.5,
+    "mem": "512m"
+  },
+  "date": "2026-10-02T01:38:54.962Z",
+  "results": [
+    {
+      "run": 1,
+      "readyMs": 76706,
+      "keycloakLogStartedS": 40.402,
+      "memAtReady": "505.5MiB / 512MiB|0.25%",
+      "memIdle30s": "501.9MiB / 512MiB|0.19%"
+    }
+  ]
+}

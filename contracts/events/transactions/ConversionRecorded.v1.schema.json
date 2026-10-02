@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/ConversionRecorded.v1.schema.json",
+  "title": "transactions.ConversionRecorded.v1",
+  "description": "Se registró (posteó) una conversión entre monedas con su ConversionDetail inmutable. source.amount = bruto entregado; target.amount = neto recibido. Productor: TRANSACTIONS. Consumidores: FX (observación de tasa), REPORTING. Idempotencia natural: (transactionId, journalEntryId). PII baja: provider.name.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.ConversionRecorded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "journalEntryId",
+        "businessDate",
+        "executedAt",
+        "source",
+        "target",
+        "quotedRate",
+        "effectiveRate",
+        "referenceRate",
+        "fees",
+        "spread",
+        "provider"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "journalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "executedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "source": {
+          "$ref": "#/$defs/Side"
+        },
+        "target": {
+          "$ref": "#/$defs/Side"
+        },
+        "quotedRate": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Rate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effectiveRate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Rate"
+        },
+        "referenceRate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReferenceRate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Fee"
+          }
+        },
+        "spread": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Spread"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "counterpartyId",
+            "name"
+          ],
+          "properties": {
+            "counterpartyId": {
+              "oneOf": [
+                {
+                  "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 200
+            }
+          }
+        }
+      }
+    },
+    "Side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "amount"
+      ],
+      "properties": {
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+        }
+      }
+    },
+    "Fee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "amount",
+        "paidFromAccountId"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "PROVIDER",
+            "NETWORK",
+            "BANK",
+            "TAX",
+            "OTHER"
+          ]
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+        },
+        "paidFromAccountId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ReferenceRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rate",
+        "fxRateId",
+        "source"
+      ],
+      "properties": {
+        "rate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Rate"
+        },
+        "fxRateId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "source": {
+          "enum": [
+            "MANUAL",
+            "PROVIDER",
+            "USER_CONVERSION"
+          ]
+        }
+      }
+    },
+    "Spread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "percentage",
+        "amount"
+      ],
+      "properties": {
+        "percentage": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "transactions.ConversionRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+        "businessDate": "2026-10-01",
+        "executedAt": "2026-10-01T13:58:00Z",
+        "source": {
+          "accountId": "01928c4e-0000-7000-8000-000000acc002",
+          "amount": {
+            "amount": "100.000000",
+            "currency": "USDT"
+          }
+        },
+        "target": {
+          "accountId": "01928c4e-0000-7000-8000-000000acc001",
+          "amount": {
+            "amount": "685.00",
+            "currency": "BOB"
+          }
+        },
+        "quotedRate": {
+          "base": "USDT",
+          "quote": "BOB",
+          "value": "6.90"
+        },
+        "effectiveRate": {
+          "base": "USDT",
+          "quote": "BOB",
+          "value": "6.85"
+        },
+        "referenceRate": {
+          "rate": {
+            "base": "USDT",
+            "quote": "BOB",
+            "value": "6.95"
+          },
+          "fxRateId": "01928c4e-0000-7000-8000-0000000fa001",
+          "source": "MANUAL"
+        },
+        "fees": [
+          {
+            "type": "PROVIDER",
+            "amount": {
+              "amount": "5.00",
+              "currency": "BOB"
+            },
+            "paidFromAccountId": null
+          }
+        ],
+        "spread": {
+          "percentage": "0.719424460431654676",
+          "amount": {
+            "amount": "5.00",
+            "currency": "BOB"
+          }
+        },
+        "provider": {
+          "counterpartyId": null,
+          "name": "Binance P2P"
+        }
+      }
+    }
+  ]
+}

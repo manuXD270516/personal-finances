@@ -1,0 +1,8 @@
+// VIOLACIÓN: domain importa framework (Nest) e I/O de Node.
+import { Injectable } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+
+@Injectable()
+export class FrameworkInDomain {
+  read = readFileSync;
+}

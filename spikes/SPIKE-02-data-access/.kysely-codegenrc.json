@@ -1,0 +1,8 @@
+{
+  "dialect": "postgres",
+  "url": "postgres://pf_migrator:spike-only-migrator@127.0.0.1:61432/pf_spike",
+  "includePattern": "(ledger|fx|iam).*",
+  "dateParser": "string",
+  "overrides": { "columns": { "ledger.posting.amount": "ColumnType<string, string, never>" } },
+  "outFile": "src/kysely/db.generated.ts"
+}

@@ -1,0 +1,133 @@
+# SPIKE-08 — stand-in for deploy/compose/compose.yaml (THROWAWAY).
+# Host ports are configurable: PF_<SERVICE>_PORT. Spike defaults live in the 618xx range.
+name: pf-spike-08
+
+x-app-common: &app-common
+  image: pf-spike-08/app:local
+  build: { context: ./app }
+  init: true                       # tini as PID 1 (see signals experiment)
+  stop_signal: SIGTERM
+  stop_grace_period: 10s
+  restart: unless-stopped
+  read_only: true
+  tmpfs: ["/tmp:size=16m"]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  environment: &app-env
+    DATABASE_URL: postgres://pf:${PF_PG_PASSWORD:-pf_dev_only}@postgres:5432/pf
+    REDIS_URL: redis://redis:6379
+  depends_on: &app-deps
+    migrate: { condition: service_completed_successfully }
+    postgres: { condition: service_healthy, restart: true }
+    redis: { condition: service_healthy, restart: true }
+
+services:
+  # ───────────── deps ─────────────
+  postgres:
+    profiles: [deps, core]
+    image: postgres:18
+    environment:
+      POSTGRES_USER: pf
+      POSTGRES_PASSWORD: ${PF_PG_PASSWORD:-pf_dev_only}
+      POSTGRES_DB: pf
+    volumes:
+      - pg-data:/var/lib/postgresql        # PG 18 image: PGDATA=/var/lib/postgresql/18/docker
+    ports: ["${PF_BIND_ADDR:-127.0.0.1}:${PF_PG_PORT:-61832}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pf -d pf"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 1s
+    stop_grace_period: 20s
+
+  redis:
+    profiles: [deps, core]
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redis-data:/data]
+    ports: ["${PF_BIND_ADDR:-127.0.0.1}:${PF_VALKEY_PORT:-61837}:6379"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s          # REQUIRED by Docker 29 when start_interval is set
+      start_interval: 1s
+
+  # ───────────── core ─────────────
+  migrate:
+    profiles: [core]
+    image: postgres:18                     # stand-in for finance-api `migrate` (dbmate)
+    entrypoint: ["psql"]
+    command: ["-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "pf", "-d", "pf",
+              "-f", "/migrations/${PF_MIGRATE_FILE:-001_ok.sql}"]
+    environment:
+      PGPASSWORD: ${PF_PG_PASSWORD:-pf_dev_only}
+    volumes: ["./migrate:/migrations:ro"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    <<: *app-common
+    profiles: [core]
+    command: ["api.mjs"]
+    environment:
+      <<: *app-env
+      PF_PROCESS: api
+      HTTP_PORT: "8080"
+    ports: ["${PF_BIND_ADDR:-127.0.0.1}:${PF_API_PORT:-61880}:8080"]
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+      start_interval: 1s
+
+  worker:
+    <<: *app-common
+    profiles: [core]
+    command: ["worker.mjs"]
+    environment:
+      <<: *app-env
+      PF_PROCESS: worker
+      WORKER_HEALTH_PORT: "8082"
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs", "http://127.0.0.1:8082/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+      start_interval: 1s
+    stop_grace_period: 15s
+
+  # ───────────── seed (one-shot) ─────────────
+  seed:
+    profiles: [seed]
+    image: postgres:18
+    entrypoint: ["psql"]
+    command: ["-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "pf", "-d", "pf", "-f", "/migrations/seed.sql"]
+    environment: { PGPASSWORD: "${PF_PG_PASSWORD:-pf_dev_only}" }
+    volumes: ["./migrate:/migrations:ro"]
+    restart: "no"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # ───────────── observability (stand-in for otel-lgtm) ─────────────
+  otel:
+    profiles: [observability]
+    image: busybox:1.36
+    command: ["httpd", "-f", "-v", "-p", "4318", "-h", "/tmp"]
+    ports: ["${PF_BIND_ADDR:-127.0.0.1}:${PF_OTLP_HTTP_PORT:-61838}:4318"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "4318"]
+      interval: 5s
+      start_period: 5s
+      start_interval: 1s
+
+volumes:
+  pg-data:
+  redis-data:

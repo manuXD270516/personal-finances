@@ -1,0 +1,5 @@
+# Override para medir Keycloak con límites tipo task Fargate (0.5 vCPU / 1 GiB). Solo medición.
+services:
+  keycloak:
+    cpus: 0.5
+    mem_limit: ${KC_MEM_LIMIT:-1g}

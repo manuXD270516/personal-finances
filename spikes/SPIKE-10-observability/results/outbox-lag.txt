@@ -1,0 +1,7 @@
+# Simulación de outbox atascado (worker detenido) — 2026-10-01
+# 1) Stop worker; 2) POST /transactions -> 500 (fetch al worker falla) y el evento queda en el "outbox" en memoria
+# 3) tras ~25 s:
+query: max(pf_outbox_lag_seconds{service_name="finance-api"})  -> 23.536
+query: pf_outbox_pending{service_name="finance-api"}           -> 1
+query: sum by (http_route, http_response_status_code) (http_server_request_duration_seconds_count{service_name="finance-api"})
+  /ping 200 -> 1 | /transactions 201 -> 31 | /internal/ack 204 -> 31 | /transactions 500 -> 1

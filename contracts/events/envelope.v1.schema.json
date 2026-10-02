@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/envelope.v1.schema.json",
+  "title": "PFOS domain event envelope v1",
+  "description": "Envelope estándar de todo evento de integración (ARCHITECTURE §7). El nombre completo del evento es `${eventType}.v${eventVersion}`. Los $defs comunes (Money, Decimal, Rate, …) se referencian desde los schemas de cada evento.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "eventVersion", "occurredAt", "workspaceId",
+    "aggregateType", "aggregateId", "aggregateVersion", "correlationId",
+    "causationId", "actor", "payload"
+  ],
+  "properties": {
+    "eventId": { "$ref": "#/$defs/UuidV7", "description": "Identidad única del evento; clave de idempotencia (platform.inbox)." },
+    "eventType": { "type": "string", "pattern": "^[a-z]+[.][A-Z][A-Za-z0-9]+$", "description": "<context>.<EventName>, p. ej. transactions.TransactionPosted" },
+    "eventVersion": { "type": "integer", "minimum": 1 },
+    "occurredAt": { "$ref": "#/$defs/Instant" },
+    "workspaceId": { "$ref": "#/$defs/Uuid" },
+    "aggregateType": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$" },
+    "aggregateId": { "$ref": "#/$defs/Uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 1 },
+    "correlationId": { "$ref": "#/$defs/Uuid" },
+    "causationId": { "oneOf": [ { "$ref": "#/$defs/Uuid" }, { "type": "null" } ] },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["USER", "SYSTEM", "SERVICE"] },
+        "id": { "type": ["string", "null"], "maxLength": 200 }
+      }
+    },
+    "payload": { "type": "object" }
+  },
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "UuidV7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "RFC 3339 en UTC (sufijo Z)."
+    },
+    "LocalDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "Fecha de negocio YYYY-MM-DD en la zona horaria del workspace."
+    },
+    "CurrencyCode": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9_.-]{1,15}$",
+      "description": "Código del catálogo currency (ISO 4217 para FIAT; tickers para CRYPTO/COMMODITY; prefijo X- para CUSTOM)."
+    },
+    "Decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]{0,19})([.][0-9]{1,18})?$",
+      "description": "Decimal firmado como string (compatible con NUMERIC(38,18)). Nunca number/float."
+    },
+    "PositiveDecimal": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})([.][0-9]{1,18})?$",
+      "not": { "pattern": "^0([.]0+)?$" },
+      "description": "Decimal estrictamente positivo como string."
+    },
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": { "$ref": "#/$defs/Decimal", "description": "Monto con exactamente currency.scale decimales (validado en dominio)." },
+        "currency": { "$ref": "#/$defs/CurrencyCode" }
+      }
+    },
+    "PositiveMoney": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": { "$ref": "#/$defs/PositiveDecimal" },
+        "currency": { "$ref": "#/$defs/CurrencyCode" }
+      }
+    },
+    "Rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "quote", "value"],
+      "description": "1 base = value quote.",
+      "properties": {
+        "base": { "$ref": "#/$defs/CurrencyCode" },
+        "quote": { "$ref": "#/$defs/CurrencyCode" },
+        "value": { "$ref": "#/$defs/PositiveDecimal" }
+      }
+    }
+  }
+}

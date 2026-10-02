@@ -1,0 +1,3 @@
+// VIOLACIÓN: domain importa infrastructure.
+import { InMemoryJournalEntryRepository } from '../infrastructure/in-memory-journal-entry.repository.js';
+export const leak = InMemoryJournalEntryRepository;

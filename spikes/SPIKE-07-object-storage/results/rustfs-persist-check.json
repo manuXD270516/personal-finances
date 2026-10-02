@@ -1,0 +1,7 @@
+[
+  {
+    "id": "persistence.afterRestart",
+    "status": "PASS",
+    "detail": "objeto intacto; CORS ok"
+  }
+]

@@ -1,0 +1,3 @@
+// VIOLACIÓN (2/2): ciclo entre contratos de Ledger y Accounts.
+import type { CycleA } from '../../../accounts/src/contracts/__violation_cycle_a.js';
+export interface CycleB { a?: CycleA }

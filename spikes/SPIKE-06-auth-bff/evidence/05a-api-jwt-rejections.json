@@ -1,0 +1,12 @@
+{
+  "valid": "200",
+  "noAuthorizationHeader": "401 AUTH_MISSING_BEARER",
+  "garbage": "401 ERR_JWS_INVALID",
+  "algNone": "401 ERR_JOSE_ALG_NOT_ALLOWED",
+  "algHS256": "401 ERR_JOSE_ALG_NOT_ALLOWED",
+  "forgedUnknownKid": "401 ERR_JWKS_NO_MATCHING_KEY",
+  "tamperedPayload": "401 ERR_JWS_SIGNATURE_VERIFICATION_FAILED",
+  "wrongAudience": "401 ERR_JWT_CLAIM_VALIDATION_FAILED",
+  "viewerMutationDirect": "403 WORKSPACE_ROLE_INSUFFICIENT",
+  "outsiderReadDirect": "403 WORKSPACE_NOT_MEMBER"
+}

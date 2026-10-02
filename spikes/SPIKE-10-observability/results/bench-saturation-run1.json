@@ -1,0 +1,90 @@
+{
+  "durationS": 15,
+  "rounds": 2,
+  "results": [
+    {
+      "round": 1,
+      "mode": "nosdk",
+      "ping_rps": 2786,
+      "ping_p50_ms": 12,
+      "ping_p99_ms": 73,
+      "ping_errors": 0,
+      "tx_rps": 493,
+      "tx_p50_ms": 38,
+      "tx_p99_ms": 72,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 90,
+      "api_rss_after_mib": 285
+    },
+    {
+      "round": 1,
+      "mode": "sdk",
+      "ping_rps": 1060,
+      "ping_p50_ms": 43,
+      "ping_p99_ms": 158,
+      "ping_errors": 0,
+      "tx_rps": 239,
+      "tx_p50_ms": 80,
+      "tx_p99_ms": 181,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 162,
+      "api_rss_after_mib": 317
+    },
+    {
+      "round": 2,
+      "mode": "nosdk",
+      "ping_rps": 1640,
+      "ping_p50_ms": 21,
+      "ping_p99_ms": 166,
+      "ping_errors": 0,
+      "tx_rps": 335,
+      "tx_p50_ms": 50,
+      "tx_p99_ms": 186,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 91,
+      "api_rss_after_mib": 259
+    },
+    {
+      "round": 2,
+      "mode": "sdk",
+      "ping_rps": 1706,
+      "ping_p50_ms": 26,
+      "ping_p99_ms": 79,
+      "ping_errors": 0,
+      "tx_rps": 484,
+      "tx_p50_ms": 38,
+      "tx_p99_ms": 86,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 165,
+      "api_rss_after_mib": 367
+    }
+  ],
+  "summary": {
+    "ping_rps": {
+      "nosdk": 2213,
+      "sdk": 1383,
+      "overheadPct": 37.5
+    },
+    "tx_rps": {
+      "nosdk": 414,
+      "sdk": 362,
+      "overheadPct": 12.6
+    },
+    "ping_p99_ms": {
+      "nosdk": 120,
+      "sdk": 119
+    },
+    "tx_p99_ms": {
+      "nosdk": 129,
+      "sdk": 134
+    },
+    "api_rss_idle_mib": {
+      "nosdk": 91,
+      "sdk": 164
+    },
+    "api_rss_after_mib": {
+      "nosdk": 272,
+      "sdk": 342
+    }
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/TransactionCategorized.v1.schema.json",
+  "title": "transactions.TransactionCategorized.v1",
+  "description": "Cambió la categoría y/o tags de uno o más splits. No afecta el ledger (INV-033). Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING. Idempotencia natural: (transactionId, aggregateVersion). Sin PII.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.TransactionCategorized"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "status",
+        "businessDate",
+        "appliedBy",
+        "ruleId",
+        "changes"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "status": {
+          "enum": [
+            "PENDING",
+            "POSTED",
+            "CLEARED",
+            "RECONCILED"
+          ]
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "appliedBy": {
+          "enum": [
+            "USER",
+            "RULE",
+            "IMPORT"
+          ]
+        },
+        "ruleId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/SplitClassificationChange"
+          }
+        }
+      }
+    },
+    "SplitClassificationChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "splitId",
+        "amount",
+        "previousCategoryId",
+        "newCategoryId",
+        "addedTagIds",
+        "removedTagIds"
+      ],
+      "properties": {
+        "splitId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "previousCategoryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "newCategoryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "addedTagIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        },
+        "removedTagIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "transactions.TransactionCategorized",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "rules-engine"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "status": "POSTED",
+        "businessDate": "2026-10-01",
+        "appliedBy": "RULE",
+        "ruleId": "01928c4e-0000-7000-8000-0000000d0001",
+        "changes": [
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005a1",
+            "amount": {
+              "amount": "300.00",
+              "currency": "BOB"
+            },
+            "previousCategoryId": null,
+            "newCategoryId": "01928c4e-0000-7000-8000-0000000ca001",
+            "addedTagIds": [],
+            "removedTagIds": []
+          }
+        ]
+      }
+    }
+  ]
+}

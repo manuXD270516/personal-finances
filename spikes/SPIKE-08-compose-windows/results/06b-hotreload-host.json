@@ -1,0 +1,17 @@
+{
+  "location": "D: (host Windows, Mode A)",
+  "mode": "node-watch",
+  "detected": "8/8",
+  "p50": 267,
+  "max": 283,
+  "all": [
+    283,
+    266,
+    267,
+    265,
+    267,
+    281,
+    264,
+    265
+  ]
+}

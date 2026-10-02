@@ -1,0 +1,5 @@
+Primer intento de `docker compose --profile core up -d --wait` (2026-10-01):
+FALLÓ en validación antes de crear contenedores:
+  service:redis:1 healthcheck.start_interval requires healthcheck.start_period to be set
+(Docker Engine 29.8.1 / Compose v5.5.1). El compose ilustrativo de docs/19 §5 tiene el mismo defecto en `redis`.
+Corregido añadiendo start_period. Tiempos válidos de arranque en startup.json (scripts/measure-startup.ts).

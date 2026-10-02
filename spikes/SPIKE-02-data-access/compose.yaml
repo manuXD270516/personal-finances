@@ -1,0 +1,40 @@
+# SPIKE-02 — throwaway. Usar SIEMPRE: docker compose -p pf-spike-02 ...
+name: pf-spike-02
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: spike-only-postgres
+      POSTGRES_DB: pf_spike
+    ports:
+      - "127.0.0.1:61432:5432"
+    volumes:
+      # PG 18 image: PGDATA vive bajo /var/lib/postgresql/18/docker -> se monta el padre
+      - pgdata:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pf_spike"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Variante con la imagen oficial de dbmate (alternativa al paquete npm `dbmate`)
+  migrate:
+    image: ghcr.io/amacneil/dbmate:2.36.0
+    profiles: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://pf_migrator:spike-only-migrator@postgres:5432/pf_spike?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /db/migrations
+      DBMATE_SCHEMA_FILE: /db/schema.sql
+      DBMATE_NO_DUMP_SCHEMA: "true"
+    volumes:
+      - ./db:/db
+    command: ["--wait", "up"]
+
+volumes:
+  pgdata:

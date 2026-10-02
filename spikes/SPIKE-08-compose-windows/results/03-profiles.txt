@@ -1,0 +1,62 @@
+### docker compose --profile deps up -d --wait
+ Volume pf-spike-08_pg-data Creating 
+ Volume pf-spike-08_pg-data Creating 
+ Volume pf-spike-08_redis-data Creating 
+ Volume pf-spike-08_redis-data Creating 
+ Network pf-spike-08_default Creating 
+ Network pf-spike-08_default Creating 
+ Volume pf-spike-08_redis-data Created 
+ Volume pf-spike-08_redis-data Created 
+ Volume pf-spike-08_pg-data Created 
+ Volume pf-spike-08_pg-data Created 
+ Network pf-spike-08_default Created 
+ Network pf-spike-08_default Created 
+ Container pf-spike-08-redis-1 Creating 
+ Container pf-spike-08-postgres-1 Creating 
+ Container pf-spike-08-redis-1 Created 
+ Container pf-spike-08-postgres-1 Created 
+ Container pf-spike-08-postgres-1 Starting 
+ Container pf-spike-08-redis-1 Starting 
+ Container pf-spike-08-postgres-1 Started 
+ Container pf-spike-08-redis-1 Started 
+ Container pf-spike-08-redis-1 Healthy 
+ Container pf-spike-08-postgres-1 Healthy 
+EXIT=0 elapsed_ms=4369
+### containers of project (all states)
+postgres	running	127.0.0.1:61832->5432/tcp
+redis	running	127.0.0.1:61837->6379/tcp
+### host connectivity from Windows (Mode A)
+61832 OPEN
+61837 OPEN
+61880 ECONNREFUSED
+### + observability
+ Container pf-spike-08-otel-1 Healthy 
+otel	Up 2 seconds (healthy)
+postgres	Up 8 seconds (healthy)
+redis	Up 7 seconds (healthy)
+### --profile seed alone (config)
+service "seed" depends on undefined service "migrate": invalid compose project
+### core + seed
+ Container pf-spike-08-redis-1 Healthy 
+container pf-spike-08-seed-1 exited (0)
+api	Up 2 seconds (healthy)
+migrate	Exited (0) 2 seconds ago
+otel	Up 7 seconds (healthy)
+postgres	Up 13 seconds (healthy)
+redis	Up 12 seconds (healthy)
+seed	Exited (0) 1 second ago
+worker	Up 1 second (healthy)
+10
+### re-run core+seed up --wait exit code
+EXIT=1
+### docker compose run --rm seed (no --profile flag; core running)
+no such service: migrate
+EXIT=0
+20
+
+### Hallazgo seed (re-ejecutado aislando exit codes)
+docker compose --profile core --profile seed up -d --wait  -> EXIT=1  ("container pf-spike-08-seed-1 exited (0)")
+docker compose --profile core up -d --wait                 -> EXIT=0  (migrate one-shot OK porque api/worker dependen de él)
+docker compose run --rm seed   (sin --profile)             -> EXIT=1  ("no such service: migrate")
+docker compose --profile core run --rm seed                -> EXIT=0  (INSERT 0 10)
+Conclusión: un one-shot "hoja" (nadie depende de él) rompe `up --wait` aunque salga 0. db:seed debe usar `--profile core run --rm seed`.

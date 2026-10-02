@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/accounts/AccountArchived.v1.schema.json",
+  "title": "accounts.AccountArchived.v1",
+  "description": "Una cuenta fue archivada (soft-archive); no acepta nuevos movimientos (INV-026). Productor: ACCOUNTS. Consumidores: REPORTING, COMMITMENTS, GOALS. Idempotencia natural: (accountId, aggregateVersion). PII baja: reason.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "accounts.AccountArchived"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Account"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "archivedOn",
+        "reason"
+      ],
+      "properties": {
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "archivedOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "accounts.AccountArchived",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Account",
+      "aggregateId": "01928c4e-0000-7000-8000-000000acc003",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "accountId": "01928c4e-0000-7000-8000-000000acc003",
+        "archivedOn": "2026-10-01",
+        "reason": "Cuenta cerrada en el banco"
+      }
+    }
+  ]
+}

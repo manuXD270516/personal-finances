@@ -1,0 +1,22 @@
+{
+  "endSessionParams": [
+    "id_token_hint",
+    "post_logout_redirect_uri",
+    "client_id"
+  ],
+  "valkeySessionExists": 0,
+  "sessionEndpointAfterLogout": 401,
+  "revokedRefreshToken": {
+    "status": 400,
+    "error": "invalid_grant",
+    "description": "Session not active"
+  },
+  "loginFormShownAfterLogout": true,
+  "idTokenHintAgainstApi": {
+    "status": 401,
+    "reason": "ERR_JWT_CLAIM_VALIDATION_FAILED",
+    "typ": "ID",
+    "aud": "pfos-bff"
+  },
+  "oldAccessTokenAgainstApiAfterLogout": 200
+}

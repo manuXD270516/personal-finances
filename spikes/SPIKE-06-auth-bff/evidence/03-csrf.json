@@ -1,0 +1,24 @@
+{
+  "positiveControl": 201,
+  "missingCsrfToken": "403 CSRF_TOKEN_INVALID",
+  "foreignOrigin": "403 CSRF_ORIGIN_MISMATCH",
+  "missingOrigin": "403 CSRF_ORIGIN_MISSING",
+  "textPlain": "415 CSRF_CONTENT_TYPE",
+  "crossSiteFormPost": {
+    "status": 403,
+    "body": {
+      "type": "about:blank",
+      "status": 403,
+      "title": "CSRF_ORIGIN_MISMATCH",
+      "code": "CSRF_ORIGIN_MISMATCH"
+    },
+    "origin": "http://127.0.0.1:61600",
+    "secFetchSite": "cross-site",
+    "cookieSent": false
+  },
+  "transactionsAfterAttacks": [
+    "rbac",
+    "rbac",
+    "legit"
+  ]
+}

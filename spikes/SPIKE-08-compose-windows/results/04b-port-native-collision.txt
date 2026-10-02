@@ -1,0 +1,10 @@
+### PF_API_PORT=61980 (port held by a NATIVE Windows process, not a container)
+[stack] up --profile core exit=0 in 5.9s
+api 127.0.0.1:61980->8080/tcp
+curl localhost:61980 ->
+{"status":"ready","postgres":{"ok":true,"migrations":1},"valkey":{"ok":true}}
+curl 127.0.0.1:61980 ->
+{"status":"ready","postgres":{"ok":true,"migrations":1},"valkey":{"ok":true}}
+  TCP    127.0.0.1:61980        0.0.0.0:0              LISTENING       100868
+### restore defaults
+[stack] up --profile core exit=0 in 6.1s

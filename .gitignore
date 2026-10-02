@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+dist/
+.next/
+.turbo/
+coverage/
+tests/traceability/*.json
+backups/
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+.gitleaks-report.json

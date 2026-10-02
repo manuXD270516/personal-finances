@@ -1,0 +1,8 @@
+# SPIKE-07 — override para probar SeaweedFS con límite de memoria (como en docs/19).
+services:
+  seaweedfs:
+    environment:
+      GOMEMLIMIT: 200MiB
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 256m }

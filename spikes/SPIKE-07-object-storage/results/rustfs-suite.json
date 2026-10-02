@@ -1,0 +1,117 @@
+[
+  {
+    "id": "buckets.init",
+    "status": "PASS",
+    "detail": "buckets=pfos-documents,pfos-imports"
+  },
+  {
+    "id": "presignPut.signedHeaders",
+    "status": "PASS",
+    "detail": "X-Amz-SignedHeaders=content-length;content-type;host"
+  },
+  {
+    "id": "presignPut.upload.fetch",
+    "status": "PASS",
+    "detail": "HTTP 200 ETag=\"ae406c24b4e01ae6680010d678a99164\""
+  },
+  {
+    "id": "presignPut.rejects.wrongContentType",
+    "status": "PASS",
+    "detail": "HTTP 403 (esperado 403) <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match the signature you pro"
+  },
+  {
+    "id": "presignPut.rejects.biggerBody",
+    "status": "PASS",
+    "detail": "HTTP 403 (esperado 403, content-length firmado) <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match the signature you pro"
+  },
+  {
+    "id": "presignPut.rejects.missingContentType",
+    "status": "PASS",
+    "detail": "HTTP 403 (AWS devuelve 403; cualquier 4xx = rechazado)"
+  },
+  {
+    "id": "head.sizeEtagType",
+    "status": "PASS",
+    "detail": "size=2041/2041 etag=ae406c24b4e01ae6680010d678a99164 md5=ae406c24b4e01ae6680010d678a99164 type=application/pdf"
+  },
+  {
+    "id": "list.prefix",
+    "status": "PASS",
+    "detail": "KeyCount=1"
+  },
+  {
+    "id": "presignGet.contentDisposition",
+    "status": "PASS",
+    "detail": "HTTP 200 bytesOk=true content-disposition=attachment; filename=\"doc.pdf\""
+  },
+  {
+    "id": "presignGet.expiryEnforced",
+    "status": "PASS",
+    "detail": "t0=HTTP 200, t+5s=HTTP 403 (AWS: 403 AccessDenied) <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>AccessDenied</Code><Message>Request has expired</Message></Error>"
+  },
+  {
+    "id": "presignPost.withinRange",
+    "status": "PASS",
+    "detail": "HTTP 204 "
+  },
+  {
+    "id": "presignPost.rejects.tooLarge",
+    "status": "PASS",
+    "detail": "HTTP 400 objetoCreado=false <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>EntityTooLarge</Code><Message>Your proposed upload exceeds the maximum allowed object size.</Message></Error>"
+  },
+  {
+    "id": "checksum.sdkPut.valid+head",
+    "status": "PASS",
+    "detail": "HEAD x-amz-checksum-sha256=IiHVcZbIcriJC2ogrZyrTMjYoKhGk6TSAqMrVCw5bXU="
+  },
+  {
+    "id": "checksum.sdkPut.rejectsWrong",
+    "status": "PASS",
+    "detail": "rechazado: BadDigest HTTP 400"
+  },
+  {
+    "id": "checksum.presignPut.tamperedBodyRejected",
+    "status": "PASS",
+    "detail": "signed=content-length;content-type;host;x-amz-checksum-sha256; manipulado=HTTP 400 <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>BadDigest</Code><Message>The ; correcto=HTTP 200"
+  },
+  {
+    "id": "cors.getBucketCors",
+    "status": "PASS",
+    "detail": "[\"http://localhost:61600\"]"
+  },
+  {
+    "id": "cors.preflight.allowedOrigin",
+    "status": "PASS",
+    "detail": "HTTP 200 ACAO=http://localhost:61600 ACAM=GET, PUT, POST, HEAD ACAH=content-type"
+  },
+  {
+    "id": "cors.preflight.deniedOrigin",
+    "status": "PASS",
+    "detail": "HTTP 403 ACAO=null (navegador bloquea si status!=2xx o ACAO no coincide)"
+  },
+  {
+    "id": "cors.actualPut.exposeEtag",
+    "status": "PASS",
+    "detail": "HTTP 200 ACAO=http://localhost:61600 ACEH=etag, x-amz-version-id, x-amz-checksum-sha256"
+  },
+  {
+    "id": "versioning.status",
+    "status": "PASS",
+    "detail": "Status=Enabled"
+  },
+  {
+    "id": "versioning.twoVersions+restore+deleteMarker",
+    "status": "PASS",
+    "detail": "versiones=2 v1=v1 deleteMarker=true headTrasDelete=404 v2Recuperable=true ids=21eaf70a-986…,cd596dbd-9f0…"
+  },
+  {
+    "id": "multipart.50MiB.presignedParts",
+    "status": "PASS",
+    "detail": "size=52428800 etag=85e769fec6328ed92f255142fed60177-5 sha256Igual=true subida=618ms (81 MiB/s)"
+  },
+  {
+    "id": "delete.object",
+    "status": "PASS",
+    "detail": "HEAD tras delete → HTTP 404"
+  }
+]

@@ -1,0 +1,93 @@
+{
+  "durationS": 10,
+  "rounds": 2,
+  "rate": {
+    "overallRate": 100
+  },
+  "results": [
+    {
+      "round": 1,
+      "mode": "nosdk",
+      "ping_rps": 100,
+      "ping_p50_ms": 5,
+      "ping_p99_ms": 19,
+      "ping_errors": 0,
+      "tx_rps": 100,
+      "tx_p50_ms": 14,
+      "tx_p99_ms": 55,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 92,
+      "api_rss_after_mib": 211
+    },
+    {
+      "round": 1,
+      "mode": "sdk",
+      "ping_rps": 100,
+      "ping_p50_ms": 9,
+      "ping_p99_ms": 36,
+      "ping_errors": 0,
+      "tx_rps": 100,
+      "tx_p50_ms": 17,
+      "tx_p99_ms": 66,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 161,
+      "api_rss_after_mib": 297
+    },
+    {
+      "round": 2,
+      "mode": "nosdk",
+      "ping_rps": 100,
+      "ping_p50_ms": 5,
+      "ping_p99_ms": 18,
+      "ping_errors": 0,
+      "tx_rps": 100,
+      "tx_p50_ms": 11,
+      "tx_p99_ms": 54,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 92,
+      "api_rss_after_mib": 215
+    },
+    {
+      "round": 2,
+      "mode": "sdk",
+      "ping_rps": 100,
+      "ping_p50_ms": 7,
+      "ping_p99_ms": 31,
+      "ping_errors": 0,
+      "tx_rps": 100,
+      "tx_p50_ms": 15,
+      "tx_p99_ms": 61,
+      "tx_errors": 0,
+      "api_rss_idle_mib": 162,
+      "api_rss_after_mib": 283
+    }
+  ],
+  "summary": {
+    "ping_rps": {
+      "nosdk": 100,
+      "sdk": 100,
+      "overheadPct": 0
+    },
+    "tx_rps": {
+      "nosdk": 100,
+      "sdk": 100,
+      "overheadPct": 0
+    },
+    "ping_p99_ms": {
+      "nosdk": 19,
+      "sdk": 34
+    },
+    "tx_p99_ms": {
+      "nosdk": 55,
+      "sdk": 64
+    },
+    "api_rss_idle_mib": {
+      "nosdk": 92,
+      "sdk": 162
+    },
+    "api_rss_after_mib": {
+      "nosdk": 213,
+      "sdk": 290
+    }
+  }
+}

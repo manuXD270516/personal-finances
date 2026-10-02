@@ -1,0 +1,35 @@
+{
+  "name": "spike-02-data-access",
+  "private": true,
+  "type": "module",
+  "description": "SPIKE-02 (throwaway): Kysely vs Prisma 7 vs Drizzle sobre PostgreSQL 18 con RLS y constraint triggers diferidos",
+  "scripts": {
+    "db:up": "docker compose -p pf-spike-02 up -d --wait postgres",
+    "db:down": "docker compose -p pf-spike-02 down -v",
+    "migrate": "dbmate --url \"postgres://pf_migrator:spike-only-migrator@127.0.0.1:61432/pf_spike?sslmode=disable\" --migrations-dir db/migrations --schema-file db/schema.sql --wait up",
+    "migrate:docker": "docker compose -p pf-spike-02 run --rm migrate",
+    "gen:kysely": "kysely-codegen --config-file .kysely-codegenrc.json",
+    "gen:prisma": "prisma db pull && prisma generate",
+    "gen:drizzle": "drizzle-kit pull",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "decimal.js": "10.6.0",
+    "drizzle-orm": "1.0.0-rc.4",
+    "kysely": "0.29.6",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/pg": "8.23.1",
+    "dbmate": "2.36.0",
+    "drizzle-kit": "1.0.0-rc.4",
+    "kysely-codegen": "0.20.0",
+    "prisma": "7.10.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

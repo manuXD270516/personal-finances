@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/TransactionVoided.v1.schema.json",
+  "title": "transactions.TransactionVoided.v1",
+  "description": "La transacción fue anulada; si estaba posteada se creó un asiento de reversa. Incluye legs/splits vigentes para que los consumidores reviertan efectos sin consultar. Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS. Idempotencia natural: transactionId. PII baja: reason.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.TransactionVoided"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "kind",
+        "businessDate",
+        "previousStatus",
+        "reversalJournalEntryId",
+        "reason",
+        "legs",
+        "splits"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "kind": {
+          "$ref": "TransactionCreated.v1.schema.json#/$defs/TransactionKind"
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "previousStatus": {
+          "enum": [
+            "PENDING",
+            "POSTED",
+            "CLEARED"
+          ]
+        },
+        "reversalJournalEntryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "legs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "TransactionCreated.v1.schema.json#/$defs/Leg"
+          }
+        },
+        "splits": {
+          "type": "array",
+          "items": {
+            "$ref": "TransactionCreated.v1.schema.json#/$defs/Split"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "transactions.TransactionVoided",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "kind": "EXPENSE",
+        "businessDate": "2026-10-01",
+        "previousStatus": "POSTED",
+        "reversalJournalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e2",
+        "reason": "Registrada por error",
+        "legs": [
+          {
+            "accountId": "01928c4e-0000-7000-8000-000000acc001",
+            "amount": {
+              "amount": "-300.00",
+              "currency": "BOB"
+            }
+          }
+        ],
+        "splits": [
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005a1",
+            "amount": {
+              "amount": "300.00",
+              "currency": "BOB"
+            },
+            "categoryId": "01928c4e-0000-7000-8000-0000000ca001",
+            "tagIds": []
+          }
+        ]
+      }
+    }
+  ]
+}

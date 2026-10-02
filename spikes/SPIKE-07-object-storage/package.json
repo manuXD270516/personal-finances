@@ -1,0 +1,21 @@
+{
+  "name": "spike-07-object-storage",
+  "private": true,
+  "type": "module",
+  "description": "SPIKE-07 (descartable): SeaweedFS vs Garage vs RustFS como S3 local",
+  "scripts": {
+    "suite": "tsx src/s3-suite.ts",
+    "run-all": "tsx src/run-all.ts",
+    "browser": "tsx src/browser-check.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1145.0",
+    "@aws-sdk/s3-presigned-post": "3.1145.0",
+    "@aws-sdk/s3-request-presigner": "3.1145.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

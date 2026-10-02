@@ -1,0 +1,41 @@
+### PF_MIGRATE_FILE=fail.sql docker compose --profile core up -d --wait
+ Container pf-spike-08-postgres-1 Running 
+ Container pf-spike-08-redis-1 Running 
+ Container pf-spike-08-api-1 Running 
+ Container pf-spike-08-worker-1 Running 
+ Container pf-spike-08-migrate-1 Recreate 
+ Container pf-spike-08-migrate-1 Recreated 
+ Container pf-spike-08-postgres-1 Waiting 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-migrate-1 Starting 
+ Container pf-spike-08-migrate-1 Started 
+ Container pf-spike-08-migrate-1 Waiting 
+ Container pf-spike-08-postgres-1 Waiting 
+ Container pf-spike-08-redis-1 Waiting 
+ Container pf-spike-08-migrate-1 Waiting 
+ Container pf-spike-08-postgres-1 Waiting 
+ Container pf-spike-08-redis-1 Waiting 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-postgres-1 Healthy 
+ Container pf-spike-08-migrate-1 Error service "migrate" didn't complete successfully: exit 3
+ Container pf-spike-08-redis-1 Error dependency redis failed to start
+ Container pf-spike-08-migrate-1 Error service "migrate" didn't complete successfully: exit 3
+ Container pf-spike-08-redis-1 Healthy 
+service "migrate" didn't complete successfully: exit 3
+EXIT=1 elapsed_ms=2094
+### ps -a
+api	running	Up 16 seconds (healthy)
+migrate	exited	Exited (3) 1 second ago
+postgres	running	Up 19 seconds (healthy)
+redis	running	Up 18 seconds (healthy)
+worker	running	Up 16 seconds (healthy)
+### logs migrate
+psql:/migrations/fail.sql:2: NOTICE:  schema "spike" already exists, skipping
+CREATE SCHEMA
+psql:/migrations/fail.sql:3: ERROR:  syntax error at or near ";"
+LINE 1: ...e.broken (id int PRIMARY KEY, amount numeric(20,4) NOT NULL;
+                                                                      ^
+### api container exists?
+pf-spike-08-api-1 running
+### curl api
+{"status":"live"}

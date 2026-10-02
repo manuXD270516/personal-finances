@@ -1,0 +1,17 @@
+{
+  "name": "spike-08-compose-windows",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "stack:up": "tsx scripts/stack.ts up",
+    "stack:down": "tsx scripts/stack.ts down",
+    "stack:reset": "tsx scripts/stack.ts reset",
+    "stack:logs": "tsx scripts/stack.ts logs",
+    "stack:ps": "tsx scripts/stack.ts ps"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0"
+  }
+}

@@ -1,0 +1,40 @@
+Baseline sin fixtures: exit=0 violaciones=0
+
+| Regla | Con fixture (exit / reglas disparadas) | Sin fixture (exit) | Resultado |
+|---|---|---|---|
+| `domain-no-infra` | 2 / domain-only-shared-kernel, domain-no-infra | 0 | OK |
+| `domain-no-framework` | 4 / domain-only-shared-kernel, domain-no-framework | 0 | OK |
+| `domain-only-shared-kernel` | 1 / domain-only-shared-kernel | 0 | OK |
+| `application-no-infra` | 1 / application-no-infra | 0 | OK |
+| `no-cross-context-internals` | 1 / no-cross-context-internals | 0 | OK |
+| `not-to-unresolvable` (deep import @pf/ledger/src/... (bloqueado por exports)) | 1 / not-to-unresolvable | 0 | OK |
+| `no-circular` | 1 / no-circular | 0 | OK |
+| `composition-root-only-public-entrypoints` | 1 / composition-root-only-public-entrypoints | 0 | OK |
+| `shared-kernel-pure` | 1 / shared-kernel-pure | 0 | OK |
+
+tsc (accounts) con deep import: exit=1 → src/infrastructure/__violation.ts(2,30): error TS2307: Cannot find module '@pf/ledger/src/domain/journal-entry.js' or its corresponding type declarations.
+node import('@pf/ledger/src/domain/journal-entry.js'): exit=1 → ERR_PACKAGE_PATH_NOT_EXPORTED
+
+Detalle de violaciones reportadas por dependency-cruiser:
+## domain-no-infra
+  error domain-only-shared-kernel: packages/contexts/ledger/src/domain/__violation.ts → packages/contexts/ledger/src/infrastructure/in-memory-journal-entry.repository.ts
+  error domain-no-infra: packages/contexts/ledger/src/domain/__violation.ts → packages/contexts/ledger/src/infrastructure/in-memory-journal-entry.repository.ts
+## domain-no-framework
+  error domain-only-shared-kernel: packages/contexts/ledger/src/domain/__violation.ts → node_modules/.pnpm/@nestjs+common@12.1.2_refle_51e5e3264ed75ec2e2aa45205a662a3a/node_modules/@nestjs/common/index.js
+  error domain-only-shared-kernel: packages/contexts/ledger/src/domain/__violation.ts → fs
+  error domain-no-framework: packages/contexts/ledger/src/domain/__violation.ts → node_modules/.pnpm/@nestjs+common@12.1.2_refle_51e5e3264ed75ec2e2aa45205a662a3a/node_modules/@nestjs/common/index.js
+  error domain-no-framework: packages/contexts/ledger/src/domain/__violation.ts → fs
+## domain-only-shared-kernel
+  error domain-only-shared-kernel: packages/contexts/ledger/src/domain/__violation.ts → packages/platform/src/index.ts
+## application-no-infra
+  error application-no-infra: packages/contexts/accounts/src/application/__violation.ts → packages/contexts/accounts/src/infrastructure/in-memory-account.repository.ts
+## no-cross-context-internals
+  error no-cross-context-internals: packages/contexts/accounts/src/infrastructure/__violation.ts → packages/contexts/ledger/src/domain/journal-entry.ts
+## not-to-unresolvable
+  error not-to-unresolvable: packages/contexts/accounts/src/infrastructure/__violation.ts → @pf/ledger/src/domain/journal-entry.js
+## no-circular
+  error no-circular: packages/contexts/accounts/src/contracts/__violation_cycle_a.ts → 
+## composition-root-only-public-entrypoints
+  error composition-root-only-public-entrypoints: apps/api/src/__violation.ts → packages/contexts/ledger/src/application/ledger.service.ts
+## shared-kernel-pure
+  error shared-kernel-pure: packages/shared-kernel/src/__violation.ts → packages/platform/src/index.ts

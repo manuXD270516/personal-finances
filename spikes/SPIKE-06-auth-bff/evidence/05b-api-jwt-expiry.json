@@ -1,0 +1,7 @@
+{
+  "lifetimeS": 10,
+  "clockToleranceS": 30,
+  "atIssue": 200,
+  "exp+5s": 200,
+  "exp+32s": "401 ERR_JWT_EXPIRED"
+}

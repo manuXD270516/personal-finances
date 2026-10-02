@@ -1,0 +1,21 @@
+SPIKE-07 — verificación en navegador real (Chromium del Browser pane de Claude Code), 2026-10-01
+Página servida por src/browser-check.ts; presigned PUT firmado con content-type, content-length y x-amz-checksum-sha256.
+
+1) Origen PERMITIDO http://localhost:61600
+seaweedfs PUT 200 ETag(expuesto)="577dd14b9b4b75a885227d02e69ab6aa"
+seaweedfs GET 200 igual=true
+seaweedfs PUT content-type incorrecto → HTTP 403
+garage PUT 200 ETag(expuesto)="3d4e69e5d78719cfb5dd54b2b0e33e0a"
+garage GET 200 igual=true
+garage PUT content-type incorrecto → HTTP 403
+rustfs PUT 200 ETag(expuesto)="a0647a38853727af627a978f967e4171"
+rustfs GET 200 igual=true
+rustfs PUT content-type incorrecto → HTTP 403
+
+2) Origen NO permitido http://127.0.0.1:61600 (misma página, otro origen)
+seaweedfs ERROR Failed to fetch — consola: "blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header"
+garage    ERROR Failed to fetch — consola: "blocked by CORS policy: ... It does not have HTTP ok status."
+rustfs    ERROR Failed to fetch — consola: "blocked by CORS policy: ... No 'Access-Control-Allow-Origin' header"
+
+Nota: la primera ejecución contra RustFS dio PUT 400 porque extra-checks.ts había dejado SSE-S3 por defecto en el bucket
+("SSE-S3 requires RUSTFS_SSE_S3_MASTER_KEY ..."); tras DeleteBucketEncryption (src/cleanup-sse.ts) pasó. Ver extra-checks.log.

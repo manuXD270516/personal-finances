@@ -1,0 +1,39 @@
+{
+  "name": "pf-spike-06-auth-bff",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "scripts": {
+    "env:init": "node scripts/init-env.mjs",
+    "deps:up": "docker compose -p pf-spike-06 --env-file .env up -d --wait",
+    "deps:down": "docker compose -p pf-spike-06 down -v",
+    "api": "node --env-file=.env --import tsx api/src/main.ts",
+    "web:build": "node scripts/with-env.mjs next build web",
+    "web": "node scripts/with-env.mjs next start web -p 61600",
+    "test:e2e": "playwright test",
+    "measure:keycloak": "node scripts/measure-keycloak.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-express": "12.1.2",
+    "ioredis": "6.0.0",
+    "jose": "6.2.12",
+    "next": "16.3.8",
+    "openid-client": "6.8.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "@types/react": "19.3.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

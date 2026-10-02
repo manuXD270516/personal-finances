@@ -1,0 +1,119 @@
+{
+  "A": {
+    "events": 10000,
+    "writers": 16,
+    "consumerConcurrency": 16,
+    "api": {
+      "totalMs": 16969,
+      "writesPerSec": 589,
+      "p50ms": 24.4,
+      "p99ms": 63.7
+    },
+    "endToEnd": {
+      "totalMs": 17400,
+      "eventsPerSec": 575,
+      "p50ms": 106,
+      "p99ms": 259
+    },
+    "outboxLag": {
+      "p50ms": 29,
+      "p95ms": 51,
+      "p99ms": 74,
+      "maxms": 231
+    },
+    "duplicates": 0
+  },
+  "B": {
+    "events": 10000,
+    "writers": 16,
+    "consumerConcurrency": 16,
+    "api": {
+      "totalMs": 21095,
+      "writesPerSec": 474,
+      "p50ms": 30.2,
+      "p99ms": 103
+    },
+    "endToEnd": {
+      "totalMs": 21533,
+      "eventsPerSec": 464,
+      "p50ms": 223,
+      "p99ms": 556
+    },
+    "outboxLag": {
+      "p50ms": 85,
+      "p95ms": 164,
+      "p99ms": 218,
+      "maxms": 382
+    },
+    "duplicates": 0
+  },
+  "C": {
+    "events": 10000,
+    "writers": 16,
+    "consumerConcurrency": 16,
+    "api": {
+      "totalMs": 28401,
+      "writesPerSec": 352,
+      "p50ms": 34.3,
+      "p99ms": 189.9
+    },
+    "endToEnd": {
+      "totalMs": 28609,
+      "eventsPerSec": 350,
+      "p50ms": 104,
+      "p99ms": 600
+    },
+    "outboxLag": {
+      "p50ms": 57,
+      "p95ms": 177,
+      "p99ms": 321,
+      "maxms": 1395
+    },
+    "duplicates": 0
+  },
+  "C-transactional": {
+    "events": 10000,
+    "writers": 16,
+    "consumerConcurrency": 16,
+    "api": {
+      "totalMs": 30106,
+      "writesPerSec": 332,
+      "p50ms": 32.3,
+      "p99ms": 259.2
+    },
+    "endToEnd": {
+      "totalMs": 76798,
+      "eventsPerSec": 130,
+      "p50ms": 2606,
+      "p99ms": 43247
+    },
+    "outboxLag": {
+      "p50ms": 50,
+      "p95ms": 191,
+      "p99ms": 419,
+      "maxms": 812
+    },
+    "duplicates": 0
+  },
+  "A backlog": {
+    "events": 10000,
+    "relayPublishMs": 1204,
+    "relayEventsPerSec": 8306,
+    "drainMs": 9788,
+    "consumeEventsPerSec": 1022
+  },
+  "B backlog": {
+    "events": 10000,
+    "relayPublishMs": 2006,
+    "relayEventsPerSec": 4985,
+    "drainMs": 15765,
+    "consumeEventsPerSec": 634
+  },
+  "C backlog": {
+    "events": 10000,
+    "relayPublishMs": 2384,
+    "relayEventsPerSec": 4195,
+    "drainMs": 10004,
+    "consumeEventsPerSec": 1000
+  }
+}

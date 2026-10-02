@@ -1,0 +1,3 @@
+// VIOLACIÓN: el composition root importa application de un contexto (debe usar /nest o /contracts).
+import { LedgerService } from '../../../packages/contexts/ledger/src/application/ledger.service.js';
+export const svc = LedgerService;

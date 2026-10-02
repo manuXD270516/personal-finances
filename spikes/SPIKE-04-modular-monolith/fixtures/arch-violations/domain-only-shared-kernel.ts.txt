@@ -1,0 +1,3 @@
+// VIOLACIÓN: domain importa un paquete del workspace distinto de @pf/shared-kernel.
+import { UNIT_OF_WORK } from '@pf/platform';
+export const token = UNIT_OF_WORK;

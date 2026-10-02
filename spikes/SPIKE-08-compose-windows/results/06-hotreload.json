@@ -1,0 +1,191 @@
+{
+  "at": "2026-10-02T01:30:24.568Z",
+  "iterations": 8,
+  "filler": 2000,
+  "results": [
+    {
+      "location": "D",
+      "mode": "native",
+      "detected": "0/8",
+      "p50": null,
+      "max": null,
+      "all": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "idleCpu": "0.00% / 0.01% / 0.00%",
+      "clock": {
+        "offset": 0,
+        "rtt": 4
+      },
+      "logs": "READY mode=native interval=100 files=2004 in 3137ms"
+    },
+    {
+      "location": "D",
+      "mode": "polling-100",
+      "detected": "8/8",
+      "p50": 133,
+      "max": 170,
+      "all": [
+        142,
+        170,
+        20,
+        91,
+        127,
+        165,
+        133,
+        60
+      ],
+      "idleCpu": "52.12% / 50.95% / 56.22%",
+      "clock": {
+        "offset": 2,
+        "rtt": 3
+      },
+      "logs": "DETECT token=1790904413924 at=1790904414058 lat_raw=134\nDETECT token=1790904415165 at=1790904415226 lat_raw=61\nREADY mode=polling interval=100 files=2004 in 13471ms"
+    },
+    {
+      "location": "D",
+      "mode": "polling-1000",
+      "detected": "8/8",
+      "p50": 814,
+      "max": 988,
+      "all": [
+        791,
+        879,
+        983,
+        988,
+        814,
+        105,
+        757,
+        76
+      ],
+      "idleCpu": "20.04% / 20.75% / 18.41%",
+      "clock": {
+        "offset": 2,
+        "rtt": 1
+      },
+      "logs": "DETECT token=1790904437226 at=1790904437332 lat_raw=106\nDETECT token=1790904438574 at=1790904439332 lat_raw=758\nDETECT token=1790904440255 at=1790904440332 lat_raw=77"
+    },
+    {
+      "location": "D",
+      "mode": "node-watch",
+      "detected": "0/8",
+      "p50": null,
+      "max": null,
+      "all": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "idleCpu": "0.00% / 0.00% / 0.10%",
+      "clock": {
+        "offset": 1,
+        "rtt": 1
+      },
+      "logs": "DETECT token=1790904440255 at=1790904448176 lat_raw=7921 (process restarted)"
+    },
+    {
+      "location": "ext4",
+      "mode": "native",
+      "detected": "8/8",
+      "p50": 0,
+      "max": 1,
+      "all": [
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      "idleCpu": "0.00% / 0.00% / 0.01%",
+      "clock": {
+        "offset": 1,
+        "rtt": 1
+      },
+      "logs": "DETECT token=1790904555329 at=1790904555329 lat_raw=0\nDETECT token=1790904556125 at=1790904556125 lat_raw=0\nDETECT token=1790904556905 at=1790904556905 lat_raw=0"
+    },
+    {
+      "location": "ext4",
+      "mode": "polling-100",
+      "detected": "8/8",
+      "p50": 67,
+      "max": 94,
+      "all": [
+        46,
+        22,
+        67,
+        94,
+        86,
+        79,
+        54,
+        19
+      ],
+      "idleCpu": "7.63% / 7.86% / 8.58%",
+      "clock": {
+        "offset": 1,
+        "rtt": 1
+      },
+      "logs": "DETECT token=1790904573625 at=1790904573704 lat_raw=79\nDETECT token=1790904574651 at=1790904574705 lat_raw=54\nDETECT token=1790904575788 at=1790904575807 lat_raw=19"
+    },
+    {
+      "location": "ext4",
+      "mode": "polling-1000",
+      "detected": "8/8",
+      "p50": 668,
+      "max": 861,
+      "all": [
+        746,
+        202,
+        668,
+        793,
+        861,
+        225,
+        123,
+        30
+      ],
+      "idleCpu": "1.30% / 1.26% / 1.17%",
+      "clock": {
+        "offset": 1,
+        "rtt": 1
+      },
+      "logs": "DETECT token=1790904595882 at=1790904596107 lat_raw=225\nDETECT token=1790904596985 at=1790904597108 lat_raw=123\nDETECT token=1790904598078 at=1790904598108 lat_raw=30"
+    },
+    {
+      "location": "ext4",
+      "mode": "node-watch",
+      "detected": "8/8",
+      "p50": 258,
+      "max": 266,
+      "all": [
+        256,
+        258,
+        266,
+        259,
+        257,
+        255,
+        258,
+        262
+      ],
+      "idleCpu": "0.00% / 0.00% / 0.11%",
+      "clock": {
+        "offset": 1,
+        "rtt": 2
+      },
+      "logs": "DETECT token=1790904614889 at=1790904615147 lat_raw=258 (process restarted)\nRestarting '/app/src/app.mjs'\nDETECT token=1790904616322 at=1790904616584 lat_raw=262 (process restarted)"
+    }
+  ]
+}

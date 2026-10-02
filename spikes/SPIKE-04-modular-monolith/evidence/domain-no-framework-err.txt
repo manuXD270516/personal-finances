@@ -1,0 +1,8 @@
+
+  error domain-only-shared-kernel: packages/contexts/ledger/src/domain/__violation.ts → node_modules/.pnpm/@nestjs+common@12.1.2_refle_51e5e3264ed75ec2e2aa45205a662a3a/node_modules/@nestjs/common/index.js
+  error domain-only-shared-kernel: packages/contexts/ledger/src/domain/__violation.ts → fs
+  error domain-no-framework: packages/contexts/ledger/src/domain/__violation.ts → node_modules/.pnpm/@nestjs+common@12.1.2_refle_51e5e3264ed75ec2e2aa45205a662a3a/node_modules/@nestjs/common/index.js
+  error domain-no-framework: packages/contexts/ledger/src/domain/__violation.ts → fs
+
+x 4 dependency violations (4 errors, 0 warnings). 27 modules, 52 dependencies cruised.
+

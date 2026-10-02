@@ -1,0 +1,87 @@
+{
+  "host": {
+    "platform": "win32",
+    "sigtermHandlerRan": false,
+    "exit": {
+      "code": null,
+      "signal": "SIGTERM"
+    }
+  },
+  "container-A": {
+    "sigterm": {
+      "jobMs": 4000,
+      "dockerStopMs": 3898,
+      "exitCode": 0,
+      "effectCommitted": true,
+      "countsAfter": {
+        "waiting": 0,
+        "active": 0,
+        "delayed": 0,
+        "completed": 1,
+        "failed": 0
+      }
+    },
+    "sigkill": {
+      "effectRolledBack": true,
+      "countsRightAfterKill": {
+        "waiting": 0,
+        "active": 1,
+        "delayed": 0,
+        "completed": 1,
+        "failed": 0
+      },
+      "redeliveryMsFromKill": 8908,
+      "appliedTimes": 1
+    }
+  },
+  "container-B": {
+    "sigterm": {
+      "jobMs": 4000,
+      "dockerStopMs": 3987,
+      "exitCode": 0,
+      "effectCommitted": true,
+      "countsAfter": {
+        "waiting": 0,
+        "active": 0,
+        "delayed": 0,
+        "completed": 1,
+        "failed": 0
+      }
+    },
+    "sigkill": {
+      "effectRolledBack": true,
+      "countsRightAfterKill": {
+        "waiting": 0,
+        "active": 1,
+        "delayed": 0,
+        "completed": 1,
+        "failed": 0
+      },
+      "redeliveryMsFromKill": 9168,
+      "appliedTimes": 1
+    }
+  },
+  "container-C": {
+    "sigterm": {
+      "jobMs": 4000,
+      "dockerStopMs": 3867,
+      "exitCode": 0,
+      "effectCommitted": true,
+      "countsAfter": {
+        "queued": 0,
+        "active": 0,
+        "failed": 0
+      }
+    },
+    "sigkill": {
+      "effectRolledBack": true,
+      "countsRightAfterKill": {
+        "queued": 0,
+        "active": 0,
+        "failed": 0
+      },
+      "redeliveryMsFromKill": 49496,
+      "appliedTimes": 1
+    }
+  }
+}

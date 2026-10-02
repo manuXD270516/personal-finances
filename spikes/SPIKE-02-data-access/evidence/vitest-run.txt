@@ -1,0 +1,120 @@
+
+ RUN  v5.0.3 D:/projects/personal-finances/spikes/SPIKE-02-data-access
+
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (a) inserta en una transacción la conversión USDT→BOB balanceada (SET LOCAL app.workspace_id)
+[prisma] (a) OK 5 postings; sums={"BOB":"0.000000000000000000","USDT":"0.000000000000000000"}
+
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (a) inserta en una transacción la conversión USDT→BOB balanceada (SET LOCAL app.workspace_id) 44ms
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (b) entry desbalanceada: los INSERT pasan y el constraint trigger diferido falla en COMMIT
+[prisma] (b) error en COMMIT: DriverAdapterError(code=undefined, cause=Object(code=PF001)): LEDGER_UNBALANCED_ENTRY: entry 272e3890-5f7d-4c1f-b3bf-e18976056b6f currency BOB sum -1.000000000000000000 | SQLSTATE PF001 accesible=true
+
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (c) round-trip exacto de NUMERIC(38,18) como string (sin float)
+[prisma] (c) tipo runtime de amount=Decimal2; leído=0.000000000000000001 | 99999999999999999999.999999999999999999 | 123456789012345678.123456789012345678
+
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d1) RLS: repo SIN filtro por workspace solo ve filas del workspace del contexto
+[prisma] (d1) W1 ve 11 postings propios; entry de W2 -> 0 filas
+
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d2) RLS fail-closed: sin contexto (conexión nueva) la query falla
+[prisma] (d2) sin contexto, conexión nueva: PrismaClientKnownRequestError(code=P2039): Database error. Code: `42704`. Message: `unrecognized configuration parameter "app.workspace_id"`
+
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d3) pool safety: una conexión reutilizada tras SET LOCAL no hereda el workspace
+[prisma] (d3) misma conexión, sin contexto tras tx previa: PrismaClientKnownRequestError(code=P2007): Invalid input value: invalid input syntax for type uuid: ""
+
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (b) entry desbalanceada: los INSERT pasan y el constraint trigger diferido falla en COMMIT 19ms
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (c) round-trip exacto de NUMERIC(38,18) como string (sin float) 23ms
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d1) RLS: repo SIN filtro por workspace solo ve filas del workspace del contexto 13ms
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d2) RLS fail-closed: sin contexto (conexión nueva) la query falla 19ms
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d3) pool safety: una conexión reutilizada tras SET LOCAL no hereda el workspace 28ms
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d4) concurrencia: 40 tx en paralelo (pool=4) alternando W1/W2 sin fuga de contexto
+[prisma] (d4) 40/40 transacciones vieron solo su workspace
+
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (e) pf_app no puede UPDATE ni DELETE de un posting
+[prisma] (e) UPDATE: PrismaClientKnownRequestError(code=P2039): Database error. Code: `42501`. Message: `permission denied for table posting`
+[prisma] (e) DELETE: PrismaClientKnownRequestError(code=P2039): Database error. Code: `42501`. Message: `permission denied for table posting`
+
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d4) concurrencia: 40 tx en paralelo (pool=4) alternando W1/W2 sin fuga de contexto 70ms
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (e) pf_app no puede UPDATE ni DELETE de un posting 35ms
+stdout | test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (bench) 10000 entries de 5 postings, una tx por entry
+[prisma] (bench) 10000 entries en 97601 ms -> 9.76 ms/entry
+
+ ✓ test/prisma.test.ts > prisma: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (bench) 10000 entries de 5 postings, una tx por entry 97657ms
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (a) inserta en una transacción la conversión USDT→BOB balanceada (SET LOCAL app.workspace_id)
+[kysely] (a) OK 5 postings; sums={"BOB":"0.000000000000000000","USDT":"0.000000000000000000"}
+
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (b) entry desbalanceada: los INSERT pasan y el constraint trigger diferido falla en COMMIT
+[kysely] (b) error en COMMIT: DatabaseError(code=PF001): LEDGER_UNBALANCED_ENTRY: entry 4d0ec2dc-993d-4d3a-b278-d16ea509a9c6 currency BOB sum -1.000000000000000000 | SQLSTATE PF001 accesible=true
+
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (c) round-trip exacto de NUMERIC(38,18) como string (sin float)
+[kysely] (c) tipo runtime de amount=string; leído=0.000000000000000001 | 99999999999999999999.999999999999999999 | 123456789012345678.123456789012345678
+
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d1) RLS: repo SIN filtro por workspace solo ve filas del workspace del contexto
+[kysely] (d1) W1 ve 11 postings propios; entry de W2 -> 0 filas
+
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d2) RLS fail-closed: sin contexto (conexión nueva) la query falla
+[kysely] (d2) sin contexto, conexión nueva: DatabaseError(code=42704): unrecognized configuration parameter "app.workspace_id"
+
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d3) pool safety: una conexión reutilizada tras SET LOCAL no hereda el workspace
+[kysely] (d3) misma conexión, sin contexto tras tx previa: DatabaseError(code=22P02): invalid input syntax for type uuid: ""
+
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (a) inserta en una transacción la conversión USDT→BOB balanceada (SET LOCAL app.workspace_id) 21ms
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (b) entry desbalanceada: los INSERT pasan y el constraint trigger diferido falla en COMMIT 16ms
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (c) round-trip exacto de NUMERIC(38,18) como string (sin float) 18ms
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d1) RLS: repo SIN filtro por workspace solo ve filas del workspace del contexto 10ms
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d2) RLS fail-closed: sin contexto (conexión nueva) la query falla 11ms
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d3) pool safety: una conexión reutilizada tras SET LOCAL no hereda el workspace 22ms
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d4) concurrencia: 40 tx en paralelo (pool=4) alternando W1/W2 sin fuga de contexto
+[kysely] (d4) 40/40 transacciones vieron solo su workspace
+
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (e) pf_app no puede UPDATE ni DELETE de un posting
+[kysely] (e) UPDATE: DatabaseError(code=42501): permission denied for table posting
+[kysely] (e) DELETE: DatabaseError(code=42501): permission denied for table posting
+
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d4) concurrencia: 40 tx en paralelo (pool=4) alternando W1/W2 sin fuga de contexto 46ms
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (e) pf_app no puede UPDATE ni DELETE de un posting 25ms
+stdout | test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (bench) 10000 entries de 5 postings, una tx por entry
+[kysely] (bench) 10000 entries en 141116 ms -> 14.11 ms/entry
+
+ ✓ test/kysely.test.ts > kysely: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (bench) 10000 entries de 5 postings, una tx por entry 141167ms
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (a) inserta en una transacción la conversión USDT→BOB balanceada (SET LOCAL app.workspace_id)
+[drizzle] (a) OK 5 postings; sums={"BOB":"0.000000000000000000","USDT":"0.000000000000000000"}
+
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (b) entry desbalanceada: los INSERT pasan y el constraint trigger diferido falla en COMMIT
+[drizzle] (b) error en COMMIT: DrizzleQueryError(code=undefined, cause=DatabaseError(code=PF001)): params:  | SQLSTATE PF001 accesible=true
+
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (c) round-trip exacto de NUMERIC(38,18) como string (sin float)
+[drizzle] (c) tipo runtime de amount=string; leído=0.000000000000000001 | 99999999999999999999.999999999999999999 | 123456789012345678.123456789012345678
+
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d1) RLS: repo SIN filtro por workspace solo ve filas del workspace del contexto
+[drizzle] (d1) W1 ve 11 postings propios; entry de W2 -> 0 filas
+
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d2) RLS fail-closed: sin contexto (conexión nueva) la query falla
+[drizzle] (d2) sin contexto, conexión nueva: DrizzleQueryError(code=undefined, cause=DatabaseError(code=42704)): params: 
+
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (a) inserta en una transacción la conversión USDT→BOB balanceada (SET LOCAL app.workspace_id) 22ms
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (b) entry desbalanceada: los INSERT pasan y el constraint trigger diferido falla en COMMIT 17ms
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (c) round-trip exacto de NUMERIC(38,18) como string (sin float) 22ms
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d1) RLS: repo SIN filtro por workspace solo ve filas del workspace del contexto 16ms
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d2) RLS fail-closed: sin contexto (conexión nueva) la query falla 12ms
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d3) pool safety: una conexión reutilizada tras SET LOCAL no hereda el workspace
+[drizzle] (d3) misma conexión, sin contexto tras tx previa: DrizzleQueryError(code=undefined, cause=DatabaseError(code=22P02)): params: 
+
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d4) concurrencia: 40 tx en paralelo (pool=4) alternando W1/W2 sin fuga de contexto
+[drizzle] (d4) 40/40 transacciones vieron solo su workspace
+
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d3) pool safety: una conexión reutilizada tras SET LOCAL no hereda el workspace 93ms
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (d4) concurrencia: 40 tx en paralelo (pool=4) alternando W1/W2 sin fuga de contexto 54ms
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (e) pf_app no puede UPDATE ni DELETE de un posting
+[drizzle] (e) UPDATE: DrizzleQueryError(code=undefined, cause=DatabaseError(code=42501)): params: 999.00,4a4e91a1-0e84-49c4-8c41-b2d155dcd584
+[drizzle] (e) DELETE: DrizzleQueryError(code=undefined, cause=DatabaseError(code=42501)): params: 4a4e91a1-0e84-49c4-8c41-b2d155dcd584
+
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (e) pf_app no puede UPDATE ni DELETE de un posting 24ms
+stdout | test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (bench) 10000 entries de 5 postings, una tx por entry
+[drizzle] (bench) 10000 entries en 65149 ms -> 6.51 ms/entry
+
+ ✓ test/drizzle.test.ts > drizzle: ledger + RLS + NUMERIC sobre PostgreSQL 18 > (bench) 10000 entries de 5 postings, una tx por entry 65199ms
+
+ Test Files  3 passed (3)
+      Tests  27 passed (27)
+   Start at  21:19:07
+   Duration  306.89s (tests 100%)
+

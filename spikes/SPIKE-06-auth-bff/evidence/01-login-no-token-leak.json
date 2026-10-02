@@ -1,0 +1,40 @@
+{
+  "loginMs": 2504,
+  "authorizeRequest": {
+    "redirect_uri": "http://localhost:61600/api/bff/auth/callback",
+    "scope": "openid profile email",
+    "code_challenge": "OM8yQA…(43)",
+    "code_challenge_method": "S256",
+    "state": "a557OX…(43)",
+    "nonce": "MPix2d…(43)",
+    "client_id": "pfos-bff",
+    "response_type": "code"
+  },
+  "cookie": {
+    "name": "__Host-pfos_sid",
+    "value": "eAdi…(43 chars)",
+    "domain": "localhost",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  "documentCookie": "",
+  "localStorageKeys": [],
+  "sessionStorageKeys": [],
+  "responsesInspected": 24,
+  "responsesFromApp": 12,
+  "responsesFromKeycloak": 12,
+  "leaksOfAccessOrRefreshToken": 0,
+  "jwtsInAppResponses": 0,
+  "valkeyValueContainsJwt": false,
+  "accessTokenClaims": {
+    "iss": "http://localhost:61681/realms/pfos",
+    "aud": "finance-api",
+    "azp": "pfos-bff",
+    "typ": "Bearer",
+    "scope": "openid email profile",
+    "lifetimeS": 300
+  }
+}

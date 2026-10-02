@@ -1,0 +1,22 @@
+{
+  "owner": {
+    "GET accounts (VIEWER)": "200",
+    "POST transactions (EDITOR)": "201",
+    "POST periods/reopen (OWNER)": "200"
+  },
+  "editor": {
+    "GET accounts (VIEWER)": "200",
+    "POST transactions (EDITOR)": "201",
+    "POST periods/reopen (OWNER)": "403 WORKSPACE_ROLE_INSUFFICIENT"
+  },
+  "viewer": {
+    "GET accounts (VIEWER)": "200",
+    "POST transactions (EDITOR)": "403 WORKSPACE_ROLE_INSUFFICIENT",
+    "POST periods/reopen (OWNER)": "403 WORKSPACE_ROLE_INSUFFICIENT"
+  },
+  "outsider": {
+    "GET accounts (VIEWER)": "403 WORKSPACE_NOT_MEMBER",
+    "POST transactions (EDITOR)": "403 WORKSPACE_NOT_MEMBER",
+    "POST periods/reopen (OWNER)": "403 WORKSPACE_NOT_MEMBER"
+  }
+}

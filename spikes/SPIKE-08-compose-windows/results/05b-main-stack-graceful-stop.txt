@@ -1,0 +1,28 @@
+# Nota: las líneas "unexpected argument -s" son de pnpm 12 (no acepta -s); la evidencia válida de esta captura es el bloque de graceful stop. Puertos: ver 04-08-gitbash-ports.txt
+### Git Bash (GNU bash, version 5.3.15(2)-release (x86_64-pc-cygwin)) :: pnpm stack:ps
+error: unexpected argument '-s' found
+
+Usage: pnpm [OPTIONS] <COMMAND>
+
+For more information, try '--help'.
+### custom ports via env: PF_PG_PORT=61932 PF_API_PORT=61980 pnpm tsx scripts/stack.ts up
+api 127.0.0.1:61880->8080/tcp
+postgres 127.0.0.1:61832->5432/tcp
+{"message":"Cannot GET /health/ready","error":"Not Found","statusCode":404}
+### canonical default PF_PG_PORT=5432 (occupied by another project)
+error: unexpected argument '-s' found
+### canonical PF_VALKEY_PORT=6379
+error: unexpected argument '-s' found
+### restore defaults
+### worker+api graceful stop in main stack (init:true, stop_grace_period 10s/15s)
+ Container pf-spike-08-worker-1 Stopped 
+stop_ms=6158
+2026-10-02T06:22:19.393Z [api pid=7] SHUTDOWN_HANDLER_START signal=SIGTERM
+2026-10-02T06:22:19.394Z [api pid=7] closing HTTP server (stop accepting new connections)
+2026-10-02T06:22:19.394Z [api pid=7] simulating in-flight drain 2000ms
+2026-10-02T06:22:21.396Z [api pid=7] SHUTDOWN_HANDLER_DONE in 2003ms -> exit 0
+2026-10-02T06:22:19.394Z [worker pid=7] SHUTDOWN_HANDLER_START signal=SIGTERM
+2026-10-02T06:22:19.395Z [worker pid=7] stopped taking jobs after 40; finishing in-flight job 3000ms
+2026-10-02T06:22:22.396Z [worker pid=7] SHUTDOWN_HANDLER_DONE in 3002ms -> exit 0
+/pf-spike-08-api-1 exit=0
+/pf-spike-08-worker-1 exit=0

@@ -1,0 +1,70 @@
+# SPIKE-08 — SIGTERM / PID 1 matrix. Same app image, different PID-1 setups. THROWAWAY.
+# Run: docker compose -p pf-spike-08 -f signals/compose.signals.yaml up -d ; then stop each service and time it.
+name: pf-spike-08
+
+x-sig: &sig
+  image: pf-spike-08/app:local
+  build: { context: ../app }
+  stop_grace_period: 10s
+  environment: &sig-env
+    PF_DRAIN_MS: "1500"
+  # no depends_on: health endpoints are not used here, only signal handling
+  profiles: [signals]
+
+services:
+  # A) exec form, node is PID 1, handler installed, no init
+  sig-node-pid1-handler:
+    <<: *sig
+    command: ["api.mjs"]
+    init: false
+    environment: { <<: *sig-env, PF_PROCESS: A-node-pid1-handler }
+  # B) exec form, node is PID 1, NO handler, no init -> kernel ignores SIGTERM for PID 1 without handler
+  sig-node-pid1-nohandler:
+    <<: *sig
+    command: ["api.mjs"]
+    init: false
+    environment: { <<: *sig-env, PF_PROCESS: B-node-pid1-nohandler, PF_NO_HANDLER: "1" }
+  # C) init: true (tini PID 1) + handler
+  sig-tini-handler:
+    <<: *sig
+    command: ["api.mjs"]
+    init: true
+    environment: { <<: *sig-env, PF_PROCESS: C-tini-handler }
+  # D) init: true + NO handler -> node dies with default SIGTERM action (exit 143), no drain
+  sig-tini-nohandler:
+    <<: *sig
+    command: ["api.mjs"]
+    init: true
+    environment: { <<: *sig-env, PF_PROCESS: D-tini-nohandler, PF_NO_HANDLER: "1" }
+  # E) shell wrapper as PID 1 (`sh -c "node ...; echo"` = what a shell-form CMD / entrypoint.sh without exec gives)
+  sig-shell-wrapper:
+    <<: *sig
+    entrypoint: ["sh", "-c", "node api.mjs; echo node exited $$?"]
+    command: []
+    init: false
+    environment: { <<: *sig-env, PF_PROCESS: E-shell-wrapper }
+  # F) shell wrapper + init: true (tini forwards only to its direct child, the shell)
+  sig-shell-wrapper-tini:
+    <<: *sig
+    entrypoint: ["sh", "-c", "node api.mjs; echo node exited $$?"]
+    command: []
+    init: true
+    environment: { <<: *sig-env, PF_PROCESS: F-shell-wrapper-tini }
+  # G) npm start as PID 1 (common anti-pattern)
+  sig-npm-start:
+    <<: *sig
+    entrypoint: ["npm", "start", "--silent"]
+    command: []
+    init: false
+    environment: { <<: *sig-env, PF_PROCESS: G-npm-start }
+  # Zombie reaping: worker spawns orphaned grandchildren every 500 ms
+  zombie-no-init:
+    <<: *sig
+    command: ["worker.mjs"]
+    init: false
+    environment: { <<: *sig-env, PF_PROCESS: Z-no-init, PF_SPAWN_ORPHANS: "1", DATABASE_URL: "postgres://x@127.0.0.1:1/x" }
+  zombie-tini:
+    <<: *sig
+    command: ["worker.mjs"]
+    init: true
+    environment: { <<: *sig-env, PF_PROCESS: Z-tini, PF_SPAWN_ORPHANS: "1", DATABASE_URL: "postgres://x@127.0.0.1:1/x" }

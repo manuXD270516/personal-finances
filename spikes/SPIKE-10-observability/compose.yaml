@@ -1,0 +1,17 @@
+# SPIKE-10 — backend local de observabilidad (descartable)
+# Uso: docker compose -p pf-spike-10 up -d   |   docker compose -p pf-spike-10 down -v
+name: pf-spike-10
+services:
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.34.0
+    ports:
+      - "127.0.0.1:61930:3000"   # Grafana (admin/admin, anónimo habilitado)
+      - "127.0.0.1:61917:4317"   # OTLP gRPC
+      - "127.0.0.1:61918:4318"   # OTLP HTTP
+    environment:
+      GF_PATHS_DATA: /data/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 60

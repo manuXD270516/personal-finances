@@ -1,0 +1,5 @@
+# Paquete único (no workspace del producto).
+allowBuilds:
+  esbuild: true
+  sharp: false
+  unrs-resolver: false

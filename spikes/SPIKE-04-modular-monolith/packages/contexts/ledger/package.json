@@ -1,0 +1,14 @@
+{
+  "name": "@pf/ledger",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contracts": { "@pf/source": "./src/contracts/index.ts", "types": "./dist/contracts/index.d.ts", "default": "./dist/contracts/index.js" },
+    "./nest": { "@pf/source": "./src/interface/ledger.module.ts", "types": "./dist/interface/ledger.module.d.ts", "default": "./dist/interface/ledger.module.js" }
+  },
+  "scripts": { "build": "tsc -p tsconfig.build.json", "typecheck": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests" },
+  "dependencies": { "@pf/shared-kernel": "workspace:*", "@pf/platform": "workspace:*" },
+  "peerDependencies": { "@nestjs/common": "^12.0.0" },
+  "devDependencies": { "@nestjs/common": "catalog:", "reflect-metadata": "catalog:", "rxjs": "catalog:", "typescript": "catalog:", "vitest": "catalog:", "@types/node": "catalog:" }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@pf/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": { "@pf/source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./in-memory": { "@pf/source": "./src/in-memory/index.ts", "types": "./dist/in-memory/index.d.ts", "default": "./dist/in-memory/index.js" }
+  },
+  "scripts": { "build": "tsc -p tsconfig.build.json", "typecheck": "tsc -p tsconfig.json", "test": "vitest run --passWithNoTests" },
+  "devDependencies": { "typescript": "catalog:", "vitest": "catalog:", "@types/node": "catalog:" }
+}

@@ -1,0 +1,3 @@
+// VIOLACIÓN: application importa infrastructure (debería depender del puerto).
+import { InMemoryAccountRepository } from '../infrastructure/in-memory-account.repository.js';
+export const repo = InMemoryAccountRepository;

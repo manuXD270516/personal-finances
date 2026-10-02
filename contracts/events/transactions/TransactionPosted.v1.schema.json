@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/TransactionPosted.v1.schema.json",
+  "title": "transactions.TransactionPosted.v1",
+  "description": "La transacción tiene un JournalEntry activo (creación directa en posted, pending→posted o amend que repostea). Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING. Idempotencia natural: (transactionId, revision). Sin PII.",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.TransactionPosted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "revision",
+        "kind",
+        "businessDate",
+        "journalEntryId",
+        "previousStatus",
+        "counterpartyId",
+        "legs",
+        "splits",
+        "supersedesJournalEntryId"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "$ref": "TransactionCreated.v1.schema.json#/$defs/TransactionKind"
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "journalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "previousStatus": {
+          "enum": [
+            "PENDING",
+            "POSTED",
+            "CLEARED",
+            null
+          ]
+        },
+        "counterpartyId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "legs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "TransactionCreated.v1.schema.json#/$defs/Leg"
+          }
+        },
+        "splits": {
+          "type": "array",
+          "items": {
+            "$ref": "TransactionCreated.v1.schema.json#/$defs/Split"
+          }
+        },
+        "supersedesJournalEntryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "transactions.TransactionPosted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "revision": 1,
+        "kind": "EXPENSE",
+        "businessDate": "2026-10-01",
+        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+        "previousStatus": null,
+        "counterpartyId": null,
+        "legs": [
+          {
+            "accountId": "01928c4e-0000-7000-8000-000000acc001",
+            "amount": {
+              "amount": "-300.00",
+              "currency": "BOB"
+            }
+          }
+        ],
+        "splits": [
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005a1",
+            "amount": {
+              "amount": "300.00",
+              "currency": "BOB"
+            },
+            "categoryId": "01928c4e-0000-7000-8000-0000000ca001",
+            "tagIds": []
+          }
+        ],
+        "supersedesJournalEntryId": null
+      }
+    }
+  ]
+}

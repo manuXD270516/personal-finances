@@ -1,0 +1,14 @@
+{
+  "apiWritesWhileValkeyDown": {
+    "count": 100,
+    "failed": 0,
+    "p50ms": 4.8,
+    "p99ms": 24.9
+  },
+  "relayErrorsWhileDown": 6,
+  "recoveryMsAfterValkeyBack": 3549,
+  "valkeyDataLoss": {
+    "publishedButLost": 50,
+    "recoveredBySweeper": 50
+  }
+}

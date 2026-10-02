@@ -1,0 +1,20 @@
+{
+  "parallelStatuses": [
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "refreshCount": 1,
+  "accessTokenChanged": true,
+  "refreshTokenRotated": true,
+  "iatBefore": 1790922213,
+  "iatAfter": 1790922214,
+  "oldRefreshTokenReuse": {
+    "status": 400,
+    "error": "invalid_grant",
+    "description": "Maximum allowed refresh token reuse exceeded"
+  },
+  "refreshWithCurrentTokenAfterReuseAttempt": "401 SESSION_EXPIRED"
+}

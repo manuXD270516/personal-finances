@@ -1,0 +1,23 @@
+{
+  "name": "pf-spike-04",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "arch": "depcruise packages apps --config .dependency-cruiser.cjs",
+    "arch:prove": "node scripts/prove-arch-rules.mjs",
+    "lint:boundaries": "eslint packages"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "catalog:",
+    "eslint": "10.11.0",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-boundaries": "7.2.0",
+    "turbo": "catalog:",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0"
+  }
+}

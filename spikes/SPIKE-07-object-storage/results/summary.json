@@ -1,0 +1,91 @@
+{
+  "date": "2026-10-02T01:24:14.426Z",
+  "docker": "29.8.1",
+  "node": "v22.23.1",
+  "results": {
+    "seaweedfs": {
+      "image": "chrislusf/seaweedfs:4.48",
+      "imageSizeBytesLocal": 723693732,
+      "license": "Apache-2.0",
+      "coldStart": {
+        "healthyMs": 4052,
+        "s3ReadyMs": 3839
+      },
+      "initMs": 10402,
+      "idleMemMiB": 70.1,
+      "memAfterSuiteMiB": 377.6,
+      "restartToHealthy": {
+        "healthyMs": 4138,
+        "s3ReadyMs": 4138
+      },
+      "recreateToHealthy": {
+        "healthyMs": 2249,
+        "s3ReadyMs": 2050
+      },
+      "suite": {
+        "pass": 23,
+        "warn": 0,
+        "fail": 0
+      },
+      "persistenceAfterRestart": true,
+      "persistenceAfterRecreate": true,
+      "initIdempotentOnRerun": true
+    },
+    "garage": {
+      "image": "dxflrs/garage:v2.4.1",
+      "imageSizeBytesLocal": 99380898,
+      "license": "AGPL-3.0",
+      "coldStart": {
+        "healthyMs": 2317,
+        "s3ReadyMs": 2065
+      },
+      "initMs": 8134,
+      "idleMemMiB": 6.9,
+      "memAfterSuiteMiB": 13.3,
+      "restartToHealthy": {
+        "healthyMs": 3945,
+        "s3ReadyMs": 2715
+      },
+      "recreateToHealthy": {
+        "healthyMs": 2503,
+        "s3ReadyMs": 1388
+      },
+      "suite": {
+        "pass": 18,
+        "warn": 3,
+        "fail": 2
+      },
+      "persistenceAfterRestart": true,
+      "persistenceAfterRecreate": true,
+      "initIdempotentOnRerun": true
+    },
+    "rustfs": {
+      "image": "rustfs/rustfs:1.0.0",
+      "imageSizeBytesLocal": 399849224,
+      "license": "Apache-2.0",
+      "coldStart": {
+        "healthyMs": 8839,
+        "s3ReadyMs": 8839
+      },
+      "initMs": 17944,
+      "idleMemMiB": 120.9,
+      "memAfterSuiteMiB": 232.9,
+      "restartToHealthy": {
+        "healthyMs": 2128,
+        "s3ReadyMs": 1193
+      },
+      "recreateToHealthy": {
+        "healthyMs": 2225,
+        "s3ReadyMs": 882
+      },
+      "suite": {
+        "pass": 23,
+        "warn": 0,
+        "fail": 0
+      },
+      "persistenceAfterRestart": true,
+      "persistenceAfterRecreate": true,
+      "initIdempotentOnRerun": true
+    }
+  }
+}

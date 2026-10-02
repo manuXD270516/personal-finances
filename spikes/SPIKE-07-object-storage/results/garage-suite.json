@@ -1,0 +1,117 @@
+[
+  {
+    "id": "buckets.init",
+    "status": "PASS",
+    "detail": "buckets=pfos-documents,pfos-imports"
+  },
+  {
+    "id": "presignPut.signedHeaders",
+    "status": "PASS",
+    "detail": "X-Amz-SignedHeaders=content-length;content-type;host"
+  },
+  {
+    "id": "presignPut.upload.fetch",
+    "status": "PASS",
+    "detail": "HTTP 200 ETag=\"ae406c24b4e01ae6680010d678a99164\""
+  },
+  {
+    "id": "presignPut.rejects.wrongContentType",
+    "status": "PASS",
+    "detail": "HTTP 403 (esperado 403) <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>AccessDenied</Code><Message>Forbidden: Invalid signature</Message><Resource>/pfos-documents/ws/ad3c0639-e26a-"
+  },
+  {
+    "id": "presignPut.rejects.biggerBody",
+    "status": "PASS",
+    "detail": "HTTP 403 (esperado 403, content-length firmado) <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>AccessDenied</Code><Message>Forbidden: Invalid signature</Message><Resource>/pfos-documents/ws/ad3c0639-e26a-"
+  },
+  {
+    "id": "presignPut.rejects.missingContentType",
+    "status": "WARN",
+    "detail": "HTTP 400 (AWS devuelve 403; cualquier 4xx = rechazado)"
+  },
+  {
+    "id": "head.sizeEtagType",
+    "status": "PASS",
+    "detail": "size=2041/2041 etag=ae406c24b4e01ae6680010d678a99164 md5=ae406c24b4e01ae6680010d678a99164 type=application/pdf"
+  },
+  {
+    "id": "list.prefix",
+    "status": "PASS",
+    "detail": "KeyCount=1"
+  },
+  {
+    "id": "presignGet.contentDisposition",
+    "status": "PASS",
+    "detail": "HTTP 200 bytesOk=true content-disposition=attachment; filename=\"doc.pdf\""
+  },
+  {
+    "id": "presignGet.expiryEnforced",
+    "status": "WARN",
+    "detail": "t0=HTTP 200, t+5s=HTTP 400 (AWS: 403 AccessDenied) <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>InvalidRequest</Code><Message>Bad request: Date is too old</Message><Resource>/pfos-documents/ws/ad3c0639-e26"
+  },
+  {
+    "id": "presignPost.withinRange",
+    "status": "PASS",
+    "detail": "HTTP 204 "
+  },
+  {
+    "id": "presignPost.rejects.tooLarge",
+    "status": "PASS",
+    "detail": "HTTP 400 objetoCreado=false <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>InvalidRequest</Code><Message>Bad request: File size does not match policy</Message><Resource>/pfos-documents"
+  },
+  {
+    "id": "checksum.sdkPut.valid+head",
+    "status": "PASS",
+    "detail": "HEAD x-amz-checksum-sha256=IiHVcZbIcriJC2ogrZyrTMjYoKhGk6TSAqMrVCw5bXU="
+  },
+  {
+    "id": "checksum.sdkPut.rejectsWrong",
+    "status": "PASS",
+    "detail": "rechazado: InvalidDigest HTTP 400"
+  },
+  {
+    "id": "checksum.presignPut.tamperedBodyRejected",
+    "status": "PASS",
+    "detail": "signed=content-length;content-type;host;x-amz-checksum-sha256; manipulado=HTTP 400 <?xml version=\"1.0\" encoding=\"UTF-8\"?><Error><Code>InvalidDigest</Code><Message>; correcto=HTTP 200"
+  },
+  {
+    "id": "cors.getBucketCors",
+    "status": "PASS",
+    "detail": "[\"http://localhost:61600\"]"
+  },
+  {
+    "id": "cors.preflight.allowedOrigin",
+    "status": "PASS",
+    "detail": "HTTP 200 ACAO=http://localhost:61600 ACAM=GET, PUT, POST, HEAD ACAH=*"
+  },
+  {
+    "id": "cors.preflight.deniedOrigin",
+    "status": "WARN",
+    "detail": "HTTP 403 ACAO=* (navegador bloquea si status!=2xx o ACAO no coincide)"
+  },
+  {
+    "id": "cors.actualPut.exposeEtag",
+    "status": "PASS",
+    "detail": "HTTP 200 ACAO=http://localhost:61600 ACEH=etag, x-amz-version-id, x-amz-checksum-sha256"
+  },
+  {
+    "id": "versioning.status",
+    "status": "FAIL",
+    "detail": "Status=(sin configurar)"
+  },
+  {
+    "id": "versioning.twoVersions+restore+deleteMarker",
+    "status": "FAIL",
+    "detail": "omitido: versioning no disponible"
+  },
+  {
+    "id": "multipart.50MiB.presignedParts",
+    "status": "PASS",
+    "detail": "size=52428800 etag=ca1e335c5dff361566f69ed294678491-5 sha256Igual=true subida=597ms (84 MiB/s)"
+  },
+  {
+    "id": "delete.object",
+    "status": "PASS",
+    "detail": "HEAD tras delete → HTTP 404"
+  }
+]

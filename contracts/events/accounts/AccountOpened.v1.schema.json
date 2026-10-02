@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/accounts/AccountOpened.v1.schema.json",
+  "title": "accounts.AccountOpened.v1",
+  "description": "Se abrió una cuenta del usuario. El saldo inicial NO viaja aquí (es una transacción OPENING_BALANCE). Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: accountId. PII baja: name (nunca número de cuenta).",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "accounts.AccountOpened"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Account"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "name",
+        "type",
+        "nature",
+        "currency",
+        "institutionId",
+        "openedOn",
+        "includeInNetWorth"
+      ],
+      "properties": {
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "type": {
+          "enum": [
+            "CASH",
+            "CHECKING",
+            "SAVINGS",
+            "CREDIT_CARD",
+            "LOAN",
+            "CRYPTO_WALLET",
+            "EXCHANGE",
+            "BROKERAGE",
+            "INVESTMENT",
+            "RECEIVABLE",
+            "OTHER_ASSET",
+            "OTHER_LIABILITY"
+          ]
+        },
+        "nature": {
+          "enum": [
+            "ASSET",
+            "LIABILITY"
+          ]
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "institutionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openedOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "includeInNetWorth": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
+      "eventType": "accounts.AccountOpened",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Account",
+      "aggregateId": "01928c4e-0000-7000-8000-000000acc002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "accountId": "01928c4e-0000-7000-8000-000000acc002",
+        "name": "Binance USDT",
+        "type": "EXCHANGE",
+        "nature": "ASSET",
+        "currency": "USDT",
+        "institutionId": "01928c4e-0000-7000-8000-0000000a1001",
+        "openedOn": "2026-10-01",
+        "includeInNetWorth": true
+      }
+    }
+  ]
+}

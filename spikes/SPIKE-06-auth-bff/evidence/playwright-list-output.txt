@@ -1,0 +1,12 @@
+Running 8 tests using 1 worker
+
+  ok 1 e2e\01-login-no-token-leak.spec.ts:6:1 › login Code+PKCE end-to-end y el navegador nunca ve access/refresh token (3.0s)
+  ok 2 e2e\02-rbac.spec.ts:17:1 › matriz rol × operación a través del BFF (VIEWER recibe 403 en mutación) (2.8s)
+  ok 3 e2e\03-csrf.spec.ts:6:1 › CSRF: SameSite=Lax + Origin + Content-Type JSON + X-CSRF-Token (855ms)
+  ok 4 e2e\04-refresh-logout.spec.ts:6:1 › refresh transparente, single-flight y rotación de refresh token (2.0s)
+  ok 5 e2e\04-refresh-logout.spec.ts:55:1 › logout: revoca refresh, borra sesión, RP-initiated logout en Keycloak (809ms)
+  ok 6 e2e\05-api-jwt.spec.ts:12:1 › finance-api valida JWT: firma, alg, iss, aud, exp (+skew), azp (323ms)
+  ok 7 e2e\05-api-jwt.spec.ts:61:1 › token expirado: aceptado dentro del skew de 30 s, rechazado después (41.8s)
+  ok 8 e2e\05-api-jwt.spec.ts:87:1 › latencia: BFF (navegador→Next→Nest) vs API directa (1.8s)
+
+  8 passed (1.0m)
