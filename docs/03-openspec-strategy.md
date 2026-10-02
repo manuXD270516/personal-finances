@@ -68,7 +68,7 @@ OpenSpec no tiene un campo de estado propio más allá del progreso de artefacto
 
 ## 4. Contenido obligatorio de cada change
 
-Lo exigido por el proyecto (qué cambia, por qué, specs/componentes/APIs/tablas/eventos impactados, test cases, migraciones, riesgos) está **codificado como regla** en `openspec/config.yaml → rules.proposal`, de modo que cada `/opsx:propose` lo recibe como restricción. Sección `## Impacto` de `proposal.md` con estas etiquetas en negrita:
+Lo exigido por el proyecto (qué cambia, por qué, specs/componentes/APIs/tablas/eventos impactados, test cases, migraciones, riesgos) está **codificado como regla** en `openspec/config.yaml → rules.proposal`, de modo que cada `/opsx:propose` lo recibe como restricción. Sección `## Impact` de `proposal.md` con estas etiquetas en negrita:
 
 - **Specs impactadas** · **Componentes/contextos impactados** · **APIs impactadas** · **Tablas impactadas** · **Eventos impactados** · **Migraciones requeridas** · **Test cases** (AÑADIDOS / MODIFICADOS / DEPRECADOS por TC-id) · **Impacto de regresión** · **Riesgos introducidos** · y, si toca dinero/ledger/FX/periodos/redondeo, **Invariantes afectadas (INV-NNN)**.
 
@@ -76,7 +76,7 @@ Para features significativas, la spec debe permitir derivar: propósito, context
 
 ## 5. Convenciones de autoría
 
-- **Idioma: todo en español** (decisión del owner, 2026-10-01). Se mantienen en inglés solo los encabezados que el CLI parsea (`## Purpose`, `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`, `### Requirement:`, `#### Scenario:`, `**Reason**`, `**Migration**`). Texto normativo: `El sistema DEBE (MUST) …` / `NO DEBE (MUST NOT)`. Scenarios: `- **CUANDO** …`, `- **ENTONCES** …`, `- **Y** …`. Verificado el 2026-10-01: un change en español pasa `validate --strict`, se archiva y la spec principal resultante también valida. Sin el `(MUST)`, `--strict` falla con *should contain SHALL or MUST*. Los encabezados de proposal/design/tasks van en español (`## Por qué`, `## Qué cambia`, `## Capacidades`, `## Impacto`…), codificados en `config.yaml → rules`.
+- **Idioma: todo en español** (decisión del owner, 2026-10-01). Se mantienen en inglés solo los encabezados que el CLI parsea (`## Purpose`, `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`, `### Requirement:`, `#### Scenario:`, `**Reason**`, `**Migration**`). Texto normativo: `El sistema DEBE (MUST) …` / `NO DEBE (MUST NOT)`. Scenarios: `- **CUANDO** …`, `- **ENTONCES** …`, `- **Y** …`. Verificado el 2026-10-01: un change en español pasa `validate --strict`, se archiva y la spec principal resultante también valida. Sin el `(MUST)`, `--strict` falla con *should contain SHALL or MUST*. Los encabezados de **proposal.md** quedan en inglés (`## Why`, `## What Changes`, `## Capabilities`, `### New Capabilities`, `### Modified Capabilities`, `## Impact`): `validate` y `archive` aceptan español, pero `openspec show --json` (usado por los skills `/opsx:*` y por el script de trazabilidad) falla sin ellos — verificado el 2026-10-02. Los encabezados de design.md y tasks.md sí van en español. Regla codificada en `config.yaml → rules`.
 - **Nombre del change:** `verbo-objeto` en kebab-case: `add-ledger-core`, `change-budget-rollover-rules`, `remove-legacy-csv-mapper`, `refactor-…` (este último normalmente con `skip_specs: true`).
 - **Una conducta por requirement**, descripción ≤ 500 caracteres; ejemplos en scenarios.
 - **Montos explícitos** con escala y moneda (`685.00 BOB`, `100.000000 USDT`) en todo requirement financiero.
@@ -96,18 +96,19 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|
 | 0 | `bootstrap-platform-foundation` ✅ redactado y validado | `platform/local-environment`, `platform/observability`, `platform/delivery-pipeline`, `quality/test-traceability` | Implementation Gate |
-| 1 | `add-workspace-identity` | `identity/authentication`, `identity/workspace-membership`, `security/access-control` | 1 |
-| 2 | `add-audit-trail` | `audit/audit-trail` | 1 |
-| 3 | `add-accounts-management` | `accounts/account-management`, `accounts/institutions` | 1 |
+| 1 | `add-api-conventions` | `platform/api-conventions` (idempotency, problem+json, paginación) | 1 |
+| 2 | `add-workspace-identity` | `identity/authentication`, `identity/workspace-membership`, `security/access-control`; incluye como **primer grupo de tareas** la migración del catálogo `fx.currency` + datos de referencia, porque `iam.workspace.base_currency` lo referencia (el comportamiento del catálogo sigue especificado en `fx/market-rates`) | 1 |
+| 3 | `add-audit-trail` | `audit/audit-trail` | 1 |
 | 4 | `add-ledger-core` | `ledger/journal-posting`, `ledger/balances` | 1 |
 | 5 | `add-classification` | `classification/categories`, `classification/tags`, `classification/counterparties` | 1 |
-| 6 | `add-transaction-recording` | `transactions/transaction-recording`, `transactions/splits` | 1 |
-| 7 | `add-transfers` | `transactions/transfers` | 1 |
-| 8 | `add-manual-conversions` | `transactions/conversions`, `fx/conversion-pricing`, `fx/market-rates` (manual) | 1 |
-| 9 | `add-basic-dashboard` | `reporting/dashboard` | 1 |
-| 10 | `add-api-conventions` | `platform/api-conventions` (idempotency, problem+json, paginación) — puede fusionarse con 1 | 1 |
+| 6 | `add-accounts-management` | `accounts/account-management`, `accounts/institutions` | 1 |
+| 7 | `add-transaction-recording` | `transactions/transaction-recording`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection` | 1 |
+| 8 | `add-transfers` | `transactions/transfers` | 1 |
+| 9 | `add-manual-conversions` | `transactions/conversions`, `fx/conversion-pricing`, `fx/market-rates` (manual) | 1 |
+| 9b | `add-market-rate-providers` | `fx/market-rate-providers` (paralelo.bo principal, bo.dolarapi.com respaldo/oficial; docs/31 D29, ADR-0025) | 1 |
+| 10 | `add-basic-dashboard` | `reporting/dashboard`, `reporting/net-worth` (valoración USD/USDT con la tasa paralela del provider) | 1 |
 
-Los changes 1–10 se redactan **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0.
+Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
 
 ## 8. Integración con CI y herramientas
 

@@ -1,20 +1,20 @@
 ---
 id: TC-PLATFORM-STACK-002
 title: "finance-api no está listo hasta que PostgreSQL, Valkey y el object storage responden"
-spec: platform/local-environment
-related_specs: ["platform/observability"]
-requirement: "Sondas de salud y disponibilidad"
-scenario: null
-requirement_status: provisional
+spec: platform/observability
+related_specs: ["platform/local-environment"]
+requirement: "Readiness refleja dependencias críticas"
+scenario: "API no lista sin base de datos"
+requirement_status: confirmed
 fr: []
-nfr: [NFR-REL-002]
+nfr: [NFR-REL-011]
 invariants: []
 priority: high
 type: platform
 level: container-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 1
 tags: ["healthcheck", "readiness"]
@@ -32,7 +32,7 @@ expected_result:
   - "Tras reiniciarla: /health/ready devuelve 200 sin reiniciar finance-api"
   - "En un arranque limpio, finance-api no reporta ready antes de que las dependencias estén healthy"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-PLATFORM-STACK-002 — finance-api no está listo hasta que PostgreSQL, Valkey y el object storage responden

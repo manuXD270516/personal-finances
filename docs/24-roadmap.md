@@ -20,9 +20,9 @@ Los ajustes provienen de [ARCHITECTURE §13](./ARCHITECTURE.md#13-roadmap-ajuste
 | # | Ajuste | Justificación por dependencia |
 |---|--------|-------------------------------|
 | A1 | **Multi-moneda en el ledger desde Phase 1** | El invariante "Σ por moneda = 0" y la existencia de una moneda por `LedgerAccount` definen el schema de `ledger.posting`; retro-adaptar un ledger mono-moneda implicaría migrar todos los postings y reescribir el dominio. Además el owner opera BOB/USD/USDT desde el día 1. |
-| A2 | **Conversiones manuales (USDT↔BOB↔USD) en Phase 1**; providers automáticos en Phase 5 | La conversión es un caso de uso diario del owner; depende solo de LEDGER (FX_TRADING) + TRANSACTIONS + FX (tasas manuales), todos en Phase 1. Los providers dependen de integraciones externas y scheduler, no críticos. |
+| A2 | **Conversiones manuales (USDT↔BOB↔USD) en Phase 1**; **providers automáticos de tasa paralela también en Phase 1** (rev. 2026-10-02, docs/31 D29, ADR-0025); más providers, cripto y commodities en Phase 5 | La conversión es un caso de uso diario del owner; depende solo de LEDGER (FX_TRADING) + TRANSACTIONS + FX (tasas manuales), todos en Phase 1. El owner adelantó la tasa paralela automática (paralelo.bo principal, bo.dolarapi.com respaldo) porque cargarla a mano a diario es la mayor fricción del Home; el scheduler ya existe (pg-boss, ADR-0008) y el core sigue funcionando sin providers (degradación a tasas manuales). |
 | A3 | **Audit trail base en Phase 1** | Las transacciones son editables desde Phase 1 (reversa + nueva entry); sin audit síncrono no hay forma de explicar cambios ni de cumplir NFR-DATA-007. Audit es prerrequisito de integridad, no un "nice to have" posterior. |
-| A4 | **Reporting básico incremental desde Phase 1**; avanzado en Phase 7 | El dashboard (Q1, Q2, Q3, Q6, Q7 básico) es lo que hace útil Phase 1. Los reportes avanzados dependen de Planning (2), Commitments (3), Goals/Debt (4) y FX providers (5). |
+| A4 | **Reporting básico incremental desde Phase 1**; avanzado en Phase 7 | El dashboard (Q1, Q2, Q3, Q6, Q7 básico) es lo que hace útil Phase 1. Los reportes avanzados dependen de Planning (2), Commitments (3), Goals/Debt (4) y FX avanzado (5). |
 | A5 | **Notifications base en Phase 2** | Las alertas de umbral de presupuesto (FR-PLANNING-022) son el primer productor real de notificaciones; antes no hay casos de uso que lo justifiquen. |
 | A6 | **CSV import básico adelantable a Phase 3 (Could)**; pipeline completo en Phase 6 | Permite cargar histórico real temprano para que Planning/Commitments tengan datos. El pipeline completo depende de DOCUMENTS (almacenamiento de archivos) y RULES, ambos de Phase 6. El CSV básico de Phase 3 procesa el archivo en memoria/temporal sin depender de DOCUMENTS. |
 | A7 *(este doc)* | **Reconciliación por sesiones y bulk edit en Phase 2** (marcar `cleared` en Phase 1) | La reconciliación formal se integra con el cierre de mes (Phase 2); en Phase 1 basta con estados `cleared`. Reduce el alcance del MVP sin comprometer integridad. |
@@ -115,12 +115,12 @@ flowchart LR
 ### 5.1 Phase 1 — Core financiero (MVP)
 
 - **Objetivo:** el owner registra **todas** sus finanzas reales en BOB/USD/USDT con integridad garantizada y ve un dashboard básico confiable.
-- **Alcance:** autenticación y workspace; cuentas e instituciones; ledger multi-moneda; transacciones (6 tipos), splits, transferencias, conversiones manuales con `ConversionDetail`; categorías, tags, counterparties; tasas manuales; audit síncrono; dashboard básico (Q1, Q2, Q3, Q6, Q7 básico); backup/restore local.
-- **Capabilities:** `identity/authentication`, `identity/workspace-membership`, `accounts/account-management`, `accounts/institutions`, `ledger/journal-posting`, `ledger/balances`, `transactions/transaction-recording`, `transactions/transfers`, `transactions/conversions`, `transactions/splits`, `transactions/reconciliation` (solo `cleared`), `transactions/duplicate-detection` (advertencia manual), `classification/categories`, `classification/tags`, `classification/counterparties`, `fx/market-rates` (manual), `fx/conversion-pricing`, `audit/audit-trail`, `reporting/dashboard`, `reporting/net-worth` (actual), `security/access-control`.
-- **Orden de vertical slices:** (1) cuenta + saldo inicial → (2) gasto/ingreso con categoría → (3) transferencia → (4) edición/void con reversa + audit → (5) splits → (6) tasas manuales + conversión USDT→BOB → (7) refund y adjustment → (8) dashboard básico → (9) tags/counterparties/filtros → (10) backup/restore local.
+- **Alcance:** autenticación y workspace; cuentas e instituciones; ledger multi-moneda; transacciones (6 tipos), splits, transferencias, conversiones manuales con `ConversionDetail`; categorías, tags, counterparties; tasas manuales; **providers automáticos de tasa paralela** (paralelo.bo + bo.dolarapi.com, histórico diario, fallback, anomalías, atribución; ADR-0025); audit síncrono; dashboard básico (Q1, Q2, Q3, Q6, Q7 básico); backup/restore local.
+- **Capabilities:** `identity/authentication`, `identity/workspace-membership`, `accounts/account-management`, `accounts/institutions`, `ledger/journal-posting`, `ledger/balances`, `transactions/transaction-recording`, `transactions/transfers`, `transactions/conversions`, `transactions/splits`, `transactions/reconciliation` (solo `cleared`), `transactions/duplicate-detection` (advertencia manual), `classification/categories`, `classification/tags`, `classification/counterparties`, `fx/market-rates` (manual), `fx/market-rate-providers` (tasa paralela y oficial de Bolivia), `fx/conversion-pricing`, `audit/audit-trail`, `reporting/dashboard`, `reporting/net-worth` (actual), `security/access-control`.
+- **Orden de vertical slices:** (1) cuenta + saldo inicial → (2) gasto/ingreso con categoría → (3) transferencia → (4) edición/void con reversa + audit → (5) splits → (6) tasas manuales + conversión USDT→BOB → (7) refund y adjustment → (7b) providers de tasa paralela (paralelo.bo/bo.dolarapi.com) → (8) dashboard básico valorado con la tasa paralela → (9) tags/counterparties/filtros → (10) backup/restore local.
 - **Exit criteria:** todos los FR `Must` de Phase 1 `READY`; invariant checker sin violaciones con seed `large`; NFR-PERF-001/003/004 cumplidos; NFR-DATA-* de Phase 1 verificados; owner usa el sistema 2 semanas con ≥ 90 % de movimientos registrados; backup/restore local probado.
 - **Dependencias:** Phase 0 (Implementation Gate).
-- **Riesgos clave:** RISK-001, RISK-002, RISK-003, RISK-008 (auth), RISK-017 (multi-moneda), RISK-004.
+- **Riesgos clave:** RISK-001, RISK-002, RISK-003, RISK-008 (auth), RISK-017 (multi-moneda), RISK-023 (providers de tasa de terceros), RISK-004.
 
 ### 5.2 Phase 2 — Planificación, presupuestos y cierre
 
@@ -151,11 +151,11 @@ flowchart LR
 
 ### 5.5 Phase 5 — FX y cripto avanzado
 
-- **Objetivo:** tasas de referencia automáticas confiables y análisis del costo real de convertir.
-- **Alcance:** `MarketRateProvider` port + adapters (oficial, P2P pública, cripto), scheduler, fallback, staleness/anomalías, tasas cruzadas, análisis de spread/fees por provider, precios de commodities/inversiones, valoración de activos no monetarios.
-- **Capabilities:** `fx/market-rates`, `fx/conversion-pricing`, `reporting/net-worth` (valoración).
-- **Exit criteria:** tasas diarias de los pares del owner sin intervención manual por 30 días; ninguna tasa histórica modificada (test de inmutabilidad); alertas de staleness funcionando.
-- **Dependencias:** Phase 1 (FX manual, conversiones), Phase 2 (NOTIFY para alertas).
+- **Objetivo:** ampliar las tasas automáticas más allá del dólar paralelo y analizar el costo real de convertir.
+- **Alcance:** (el puerto `MarketRateProvider`, el scheduler, el fallback, staleness/anomalías y los providers paralelo.bo / bo.dolarapi.com ya están en Phase 1, ADR-0025) **más providers** (casas de cambio, bancos, exchanges cripto), precios cripto (BTC, ETH) y de commodities/inversiones, alertas de staleness/anomalía vía Notifications, análisis de spread/fees por provider (FR-FX-011), valoración de activos no monetarios (FR-FX-012).
+- **Capabilities:** `fx/market-rate-providers` (nuevos adapters), `fx/market-rates`, `fx/conversion-pricing`, `reporting/net-worth` (valoración).
+- **Exit criteria:** tasas diarias de todos los pares del owner (incl. cripto) sin intervención manual por 30 días; ninguna tasa histórica modificada (test de inmutabilidad); alertas de staleness funcionando.
+- **Dependencias:** Phase 1 (FX manual, providers de tasa paralela, conversiones), Phase 2 (NOTIFY para alertas).
 - **Riesgos clave:** RISK-023 (fuentes FX/ToS), RISK-003.
 
 ### 5.6 Phase 6 — Documentos, imports y reglas
@@ -277,12 +277,12 @@ gantt
   section Fundaciones
   Phase 0 Design + Implementation Gate :p0, 2026-10-01, 8w
   section Núcleo
-  Phase 1 Core financiero              :p1, after p0, 14w
+  Phase 1 Core financiero              :p1, after p0, 15w
   Phase 2 Planning & cierre            :p2, after p1, 8w
   Phase 3 Commitments                  :p3, after p2, 6w
   Phase 4 Goals & Debt                 :p4, after p3, 8w
   section Extensiones
-  Phase 5 FX providers                 :p5, after p4, 4w
+  Phase 5 FX avanzado y cripto         :p5, after p4, 3w
   Phase 6 Docs, Imports, Rules         :p6, after p5, 10w
   Phase 7 Reportes avanzados           :p7, after p6, 6w
   section Inteligencia y operación
@@ -298,11 +298,11 @@ gantt
 | Fase | Contextos | Q del Home habilitadas | FR Must (aprox.) | Duración indicativa |
 |------|-----------|------------------------|------------------|---------------------|
 | 0 | Platform, Quality | — | — | 8 sem |
-| 1 | IDENTITY, ACCOUNTS, LEDGER, TRANSACTIONS, CLASSIFICATION, FX (manual), AUDIT, REPORTING (básico) | Q1, Q2, Q3, Q6, Q7 básico | ~95 | 14 sem |
+| 1 | IDENTITY, ACCOUNTS, LEDGER, TRANSACTIONS, CLASSIFICATION, FX (manual + providers de tasa paralela), AUDIT, REPORTING (básico) | Q1, Q2, Q3, Q6, Q7 básico | ~100 | 15 sem |
 | 2 | PLANNING, NOTIFY (+ reconciliación, bulk edit, custom fields) | Q5 (presupuesto) | ~25 | 8 sem |
 | 3 | COMMITMENTS (+ CSV básico) | Q4, Q8 (lista) | ~12 | 6 sem |
 | 4 | GOALS, DEBT | Q5 completo, Q9 | ~15 | 8 sem |
-| 5 | FX (providers) | — (mejora Q1) | ~2 | 4 sem |
+| 5 | FX (más providers, cripto, commodities) | — (mejora Q1) | ~1 | 3 sem |
 | 6 | DOCUMENTS, IMPORTS, RULES | — | ~25 | 10 sem |
 | 7 | REPORTING (avanzado) | Q7, Q8 completos | ~10 | 6 sem |
 | 8 | FORECAST | — | ~6 | 6 sem |
@@ -315,7 +315,7 @@ gantt
 
 1. ¿Aprueba el owner tratar el hardening de producción como Hito H paralelo (no como fase) y la Colaboración como track posterior no numerado?
 2. ¿Se hará el **despliegue personal mínimo** al final de Phase 2 o el owner prefiere operar local-only hasta el Hito H? (Depende de SPIKE-09 y del presupuesto.)
-3. ¿Phase 5 (FX providers) puede adelantarse a Phase 3 si la carga manual de tasas resulta molesta en el día a día?
+3. ~~¿Phase 5 (FX providers) puede adelantarse?~~ Resuelta 2026-10-02: los providers de tasa paralela se adelantan a Phase 1 (docs/31 D29, ADR-0025); Phase 5 conserva más providers, cripto y commodities.
 4. ¿El CSV básico (Phase 3, Could) se considera necesario para cargar el histórico del owner, o el owner empezará "desde cero" con saldos iniciales?
 5. ¿El umbral "≥ 6 meses de datos cerrados" para Phase 8 se cumplirá a tiempo según el cronograma? Si no, Phase 8 puede posponerse sin bloquear Phase 9/10.
 6. ¿Qué dedicación semanal real tiene el owner? Las duraciones asumen ~20 h/semana.

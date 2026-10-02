@@ -85,7 +85,7 @@ sequenceDiagram
   actor U as Navegador
   participant W as finance-web (BFF)
   participant I as IdP (Keycloak)
-  participant S as Session store (Redis)
+  participant S as Session store (PostgreSQL iam.bff_session)
   participant A as finance-api
 
   U->>W: GET /app (sin sesión)
@@ -107,7 +107,7 @@ sequenceDiagram
 ```
 
 - **Cliente OIDC confidencial** (el BFF tiene client secret / `private_key_jwt` en cloud) + PKCE S256 aunque sea confidencial (defensa adicional, recomendado por OAuth 2.1).
-- **Tokens**: access token corto (5 min), refresh token rotativo con detección de reutilización (IdP), guardados **cifrados** (AES-256-GCM, clave en Secrets Manager) en el store de sesión server-side; la cookie solo lleva un `sid` opaco de 256 bits.
+- **Tokens**: access token corto (5 min), refresh token rotativo con detección de reutilización (IdP), guardados **cifrados** (AES-256-GCM, clave en Secrets Manager) en el store de sesión server-side, la tabla `iam.bff_session` de PostgreSQL ([08-data-model.md](08-data-model.md) §5.1), a la que solo accede el rol `pf_bff`; la cookie solo lleva un `sid` opaco de 256 bits y en BD se guarda `sha256(sid)`.
 - **Cookie**: prefijo `__Host-`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, sin `Domain`. Rotación del `sid` en login y elevación de privilegio.
 - **CSRF**: SameSite=Lax bloquea la mayoría; además *synchronizer token* (`X-CSRF-Token` derivado de `csrfSecret` de la sesión) obligatorio en métodos no seguros y verificación de `Origin`/`Sec-Fetch-Site`. Las rutas BFF solo aceptan `application/json` (no forms simples).
 - **Logout**: borra sesión server-side, revoca refresh token en el IdP, RP-initiated logout (`end_session_endpoint`).
@@ -153,7 +153,7 @@ sequenceDiagram
 **Primera línea:** el guard verifica membership para el `{workspaceId}` de la ruta. **Segunda línea (defense-in-depth):** PostgreSQL RLS, de modo que un bug en un repositorio (olvidar `WHERE workspace_id = …`) no pueda filtrar datos.
 
 1. **Contexto por transacción**: el Unit of Work ejecuta, dentro de cada transacción, `SELECT set_config('app.workspace_id', $1, true)` (equivalente a `SET LOCAL`) y `app.user_id`. Al terminar la transacción el valor desaparece → seguro con *connection pooling* (incluido PgBouncer en modo transaction, si se usara).
-2. **Políticas** `USING/WITH CHECK (workspace_id = platform.current_workspace_id())` en **todas** las tablas de negocio, con `FORCE ROW LEVEL SECURITY` (ver [08-data-model.md](08-data-model.md) §1.4, §10.3). Sin setting ⇒ `NULL` ⇒ 0 filas (fail-closed).
+2. **Políticas** `USING/WITH CHECK (workspace_id = platform.current_workspace_id())` en **todas** las tablas de negocio, con `FORCE ROW LEVEL SECURITY` (ver [08-data-model.md](08-data-model.md) §1.4, §10.3). Sin setting ⇒ la consulta **falla** con `SQLSTATE PF002` (fail-closed ruidoso, ADR-0023, validado en SPIKE-02); nunca un resultado vacío silencioso.
 3. **Roles**:
 
 | Rol | Uso | Atributos |
@@ -161,7 +161,8 @@ sequenceDiagram
 | `pf_migrator` | Migraciones (contenedor `migrate`, pipeline) | Owner de schemas/tablas; no `SUPERUSER`; credencial distinta, solo disponible en el job de migración |
 | `pf_app` | Proceso `api` | `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`; grants DML mínimos por tabla; sin DDL |
 | `pf_worker` | Proceso `worker` | Igual a `pf_app` + políticas del relay de outbox y escritura de read models |
-| `pf_maintenance` | Purgas por retención | DELETE solo en tablas técnicas/purgables |
+| `pf_bff` | BFF (`finance-web`): store de sesiones | `LOGIN NOSUPERUSER NOBYPASSRLS`; `SELECT/INSERT/UPDATE/DELETE` **solo** sobre `iam.bff_session`; sin acceso a tablas de negocio; credencial separada |
+| `pf_maintenance` | Purgas por retención (incl. sesiones expiradas de `iam.bff_session`) | DELETE solo en tablas técnicas/purgables |
 | `pf_purge` | Borrado de workspace a pedido del usuario (función `SECURITY DEFINER`) | Único que desactiva triggers de inmutabilidad dentro de la función; auditado |
 | `pf_backup` | Dumps lógicos | `BYPASSRLS`, solo lectura, usado únicamente por el job de backup |
 | `pf_readonly` (opcional) | Soporte / análisis manual | `NOBYPASSRLS`; requiere fijar workspace explícitamente |
@@ -170,7 +171,7 @@ sequenceDiagram
 5. **Tests que prueban que la fuga es imposible** (`TC-IDENTITY-RLS-*`, [16-testing-strategy.md](16-testing-strategy.md) §5.5):
    - Catálogo: toda tabla con columna `workspace_id` tiene `relrowsecurity = relforcerowsecurity = true` y al menos una política; ninguna tabla de negocio sin `workspace_id` salvo allowlist explícita.
    - Roles: `pf_app`/`pf_worker` no tienen `rolbypassrls`, no son owners de ninguna tabla.
-   - Por tabla (parametrizado): con WS-A fijado no se leen filas de WS-B; `INSERT` con `workspace_id` de WS-B falla (`WITH CHECK`); sin setting se leen 0 filas.
+   - Por tabla (parametrizado): con WS-A fijado no se leen filas de WS-B; `INSERT` con `workspace_id` de WS-B falla (`WITH CHECK`); sin setting la consulta **falla** con `SQLSTATE PF002` (nunca 0 filas).
    - API (property-based con fast-check): para operaciones aleatorias del contrato con IDs de otro workspace, la respuesta es siempre 403/404/422 y nunca contiene IDs de WS-B.
    - E2E: dos usuarios en dos workspaces; navegación manipulando URLs.
 
@@ -348,7 +349,7 @@ Cache-Control: no-store            # en respuestas con datos financieros (BFF y 
 
 ## 17. Preguntas abiertas
 
-1. **Store de sesión del BFF**: Redis (revocación inmediata, cookie pequeña) vs cookie cifrada stateless (sin dependencia). Propuesta: Redis; ADR-0010 dice "sesión cifrada" sin fijar el store. Cerrar en SPIKE-06.
+1. ~~**Store de sesión del BFF**~~: resuelta — PostgreSQL (`iam.bff_session`, rol `pf_bff`), según `add-workspace-identity` y [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D23).
 2. **IdP en cloud** (Cognito vs Keycloak): afecta MFA/passkeys, paridad local y costo (ADR-0010/ADR-0013).
 3. **TLS interno BFF→API** en cloud: Service Connect con TLS vs ALB interno HTTPS (costo) vs aceptar tráfico plano en subred privada con SG estrictos. Propuesta: TLS (ASVS L2).
 4. **Malware scanning**: ClamAV self-hosted (costo de RAM) vs GuardDuty Malware Protection for S3 (costo por GB). ¿Desde Phase 6 o diferido?

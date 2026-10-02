@@ -1,0 +1,150 @@
+# Diseño
+
+## Contexto
+
+El owner adelantó a Phase 1 los providers automáticos de tasa paralela (docs/31 D29; decisión y análisis de fuentes en [ADR-0025](../../../docs/adr/0025-fuentes-de-tipo-de-cambio-bolivia.md)). Las fuentes se verificaron en vivo el 2026-10-02:
+
+| Fuente | Endpoint | Respuesta relevante | Términos |
+|---|---|---|---|
+| paralelo.bo (principal) | `GET https://paralelo.bo/api/v1/rate` | `{"timestamp":"2026-10-02T08:53:07.532Z","buy":12.12,"sell":11.92,"median":12.02,"spreadPct":-1.6972,"sourceCount":4,"methodologyVersion":"ec2-backend"}` — mediana P2P USDT/BOB de Binance, Bybit y Bitget | CC BY 4.0 con atribución "paralelo.bo (https://paralelo.bo)"; `Cache-Control: public, max-age=60`; `Ratelimit-Limit: 60` por minuto; CORS `*`; uso comercial o límites mayores vía contacto |
+| paralelo.bo (histórico) | `GET https://paralelo.bo/api/v1/historical.json` | `{currencyPair:"USD/BOB", market:"parallel", resolution:"daily", license:"CC-BY-4.0", source, methodologyUrl, points:[{t, v}]}` — 788 puntos desde 2024-08-06 | ídem; también `/api/v1/rate.txt` y `/openapi.json` |
+| bo.dolarapi.com (respaldo + oficial) | `GET https://bo.dolarapi.com/v1/dolares` (también `/v1/dolares/oficial`, `/v1/dolares/binance`; no existe `/blue`) | `{"moneda":"USD","casa":"oficial","compra":12,"venta":12,"fechaActualizacion":"2026-10-01T00:00:00.000Z"}` y `{"casa":"binance","compra":12.04,"venta":12.07,…}`; sin histórico | Código open source MIT |
+| dolarbluebolivia.click | endpoints públicos | — | Sin licencia explícita; histórico con registro → **no se usa** (solo contraste manual) |
+
+Todas devuelven montos como **números JSON**: leerlos con `JSON.parse` los convertiría a `number` (IEEE-754) y violaría INV-001.
+
+**Dependencia de `fx/market-rates`.** Esa capability aún no existe en `openspec/specs/`: vive como delta del change `add-manual-conversions` (catálogo, tasas inmutables, *supersede*, resolución *as-of* con ventana de 7 días, inversa, cruzada, preferencia de tipo por par). Este change se aplica **después** de `add-manual-conversions` y **antes** de `add-basic-dashboard` (docs/03 §7). Para no crear deltas MODIFIED sobre una spec que todavía no está archivada, todo el comportamiento nuevo se modela como ADDED en la capability `fx/market-rate-providers`; el `RateResolver` de `fx/market-rates` se amplía en implementación (obsolescencia, anomalías, procedencia) sin cambiar ninguno de sus scenarios. Cuando ambos changes se archiven, una revisión puede mover requirements entre capabilities.
+
+Bounded contexts, agregados y puertos:
+
+| Contexto | Elemento | Capa | Cambio |
+|---|---|---|---|
+| FX (`@pf/fx`) | Puerto `MarketRateProvider` (`fetchLatest(): ProviderSample[]`, `fetchHistory(range): ProviderSample[]`, `descriptor(): {id, feeds, attribution, limits}`) | domain (puerto) | Nuevo |
+| FX | VO `ProviderSample` (`provider`, `base`, `quote`, `rateType`, `value: Decimal`, `asOf`, `fetchedAt`, `rawPayload`), VO `RateAttribution` | domain | Nuevo |
+| FX | DS `ValuationRateSelector` (fallback + obsolescencia, puro), DS `AnomalyDetector` (puro), política `StalenessPolicy` | domain | Nuevo (TDD) |
+| FX | AR `ExchangeRate` | domain | Se amplía con `provider`, `fetchedAt`, `rawPayload`, `anomaly` (inmutables); invariantes de `add-manual-conversions` intactas |
+| FX | `PollMarketRates`, `BackfillHistoricalRates`, `FillRateGaps`, `ReviewRateAnomaly`, query `GetProviderStatus`; `RateResolver` usa `ValuationRateSelector` | application | Nuevo / ampliado |
+| FX | Adapters `ParaleloBoProvider`, `DolarApiBoProvider` (ACL), `ProviderHttpClient` (rate limit, caché, timeout, `Retry-After`), `LosslessJsonReader`, repositorios `ProviderRunRepository`, `RateAnomalyReviewRepository`, jobs pg-boss | infrastructure | Nuevo |
+| FX | Controllers `fx-providers` (status) y `fx-rates/{id}/anomaly-review` | interface | Nuevo |
+| Identity | `identity.WorkspaceCreated.v1` | — | Se consume (FX pasa a ser consumidor) |
+| Reporting | `RateResolver` vía `@pf/fx/contracts` | — | Se consume; ver change `add-basic-dashboard` |
+| Audit | `AuditPort` | — | Se consume (revisión de anomalías, INV-029) |
+
+## Objetivos / No objetivos
+
+**Objetivos:**
+- Tasas `PARALLEL` USD/BOB y USDT/BOB y `OFFICIAL` USD/BOB sin intervención manual, con procedencia completa y sin pérdida de precisión.
+- Valoración con fallback determinista y honesto (obsolescencia y antigüedad visibles) que nunca inventa valores.
+- Cumplir la licencia CC BY 4.0 de paralelo.bo (atribución visible) y los límites de uso de cada fuente (NFR-COMP-007).
+- Core 100 % funcional sin providers.
+
+**No objetivos:**
+- Más providers, precios cripto/commodities (Phase 5).
+- Alertas por email/in-app (Phase 2, Notifications); aquí solo estado consultable y marca en la tasa.
+- Configuración de providers por workspace desde la UI (Phase 1: variables de entorno de la instalación).
+- Tipos de tasa `BUY`/`SELL` (compra/venta quedan en la respuesta cruda).
+
+## Decisiones
+
+1. **Puerto + adapters como ACL.** `MarketRateProvider` es el único contrato que conoce el dominio. Cada adapter traduce el modelo del tercero (`median`, `compra`/`venta`, `casa`, `fechaActualizacion`, `points[{t,v}]`) a `ProviderSample` y valida la respuesta contra un JSON Schema propio del adapter (*consumer contract*); una respuesta que no lo cumple es `PROVIDER_SCHEMA_CHANGED` (falla del provider, nunca una tasa). Mapeo:
+   - `ParaleloBoProvider.fetchLatest()` → 2 muestras `PARALLEL` (USD/BOB y USDT/BOB) con `value = median`, `asOf = timestamp`; `buy`, `sell`, `spreadPct`, `sourceCount`, `methodologyVersion` solo en `rawPayload`. USD/BOB se deriva de la misma mediana USDT/BOB (convención del mercado boliviano: el "dólar paralelo" se cotiza vía USDT P2P; documentado en ADR-0025).
+   - `ParaleloBoProvider.fetchHistory()` → por cada punto `{t, v}` de un día completo `D = fecha UTC de t` (D < hoy en America/La_Paz), 2 muestras con `asOf = D 23:59:59 America/La_Paz` (vigente al cierre del día; así la resolución "a fin del día D" toma el punto de D y no el de D+1).
+   - `DolarApiBoProvider.fetchLatest()` → casa `oficial`: `OFFICIAL` USD/BOB con `value = (compra + venta) / 2` (12 cuando ambas son 12); casa `binance`: `PARALLEL` USD/BOB y USDT/BOB con `value = (compra + venta) / 2` = 12.055; `asOf = fechaActualizacion`. Punto medio calculado con decimal.js precisión 40 sin redondeo (valor exacto; si excediera 18 decimales se cuantiza HALF_EVEN a 18, caso imposible con entradas de ≤ 17 decimales).
+2. **Lectura lossless.** `LosslessJsonReader` parsea el cuerpo con un parser que entrega los números como texto (p. ej. `lossless-json` con `parseNumber: (s) => s`, MIT; alternativa: tokenizer propio de ~100 líneas) y los convierte a `Decimal` validando `^-?\d+(\.\d+)?([eE][+-]?\d+)?$`, positivo y ≤ 18 decimales tras normalizar. Prohibido `response.json()`/`JSON.parse` en el paquete `@pf/fx/infrastructure/providers` (regla ESLint `no-restricted-syntax` + test de arquitectura). La respuesta cruda se guarda como **texto exacto** (`raw_payload text`), no `jsonb`, para auditar byte a byte.
+3. **Tasas por workspace a partir de una sola solicitud.** El job hace **una** solicitud por provider y ciclo (privacidad y límites) y luego, por cada workspace activo, en una transacción propia con `SET LOCAL app.workspace_id` (ADR-0023), inserta las muestras en `fx.exchange_rate` con `source = 'PROVIDER'` (`INSERT … ON CONFLICT DO NOTHING` sobre el índice único `(workspace_id, provider, base_currency, quote_currency, rate_type, as_of)`), calcula la anomalía contra la última tasa aceptada **de ese workspace**, y escribe `fx.RateRecorded.v1` en el outbox solo si hubo inserción. Se eligió copia por workspace frente a filas globales (`workspace_id IS NULL`, que docs/08 WS+G admite) porque la aceptación de una anomalía es una decisión del workspace, los eventos exigen `workspaceId` en el envelope y la carga histórica ocurre "al configurar el workspace". Costo: filas × workspaces (1 workspace en Phase 1; hasta ~35 000 filas por par y año con polling de 15 min, trivial para PostgreSQL).
+4. **Job programado con pg-boss** (ADR-0008, enmienda 2026-10-02). Colas: `fx.poll-market-rates` (cron derivado de `FX_POLL_INTERVAL`, por defecto `*/15 * * * *`, `singletonKey` = minuto del ciclo para no duplicar con dos réplicas del worker), `fx.backfill-historical-rates` (encolado por el consumidor de `identity.WorkspaceCreated.v1`, `singletonKey = workspaceId`), `fx.fill-rate-gaps` (cron diario 02:00 `America/La_Paz`: vuelve a leer el histórico y rellena días sin tasa de provider; idempotente por el mismo índice único). Cada intento por provider deja una fila en `fx.provider_run` (resultado, código de error, latencia, muestras nuevas, `retry_after_until`). Reintentos: no se reintenta dentro del ciclo (el siguiente ciclo es el reintento); backoff exponencial de ciclos tras 5 fallas consecutivas (máx. 1 h).
+5. **Configuración por entorno** (contrato único de configuración, ADR-0012; validada con zod al arrancar el worker; error ⇒ providers no se inician, se registra `FX_PROVIDER_CONFIG_INVALID` en el estado y el resto del worker sigue):
+
+   | Variable | Default | Valores |
+   |---|---|---|
+   | `FX_PROVIDER_PRIMARY` | `paralelo_bo` | `paralelo_bo`, `dolarapi_bo`, `none` |
+   | `FX_PROVIDER_FALLBACK` | `dolarapi_bo` | `dolarapi_bo`, `paralelo_bo`, `none` (distinto del principal) |
+   | `FX_PROVIDER_OFFICIAL` | `dolarapi_bo` | `dolarapi_bo`, `none` |
+   | `FX_POLL_INTERVAL` | `15m` | duración en minutos enteros, mínimo `1m` (60 s) |
+   | `FX_STALE_AFTER_PARALLEL` / `FX_STALE_AFTER_OFFICIAL` | `60m` / `48h` | duración |
+   | `FX_ANOMALY_THRESHOLD_PCT` | `5` | decimal > 0 |
+   | `FX_PROVIDER_TIMEOUT` | `10s` | duración ≤ 30 s |
+   | `FX_BACKFILL_ENABLED` | `true` | bool |
+6. **Selección de la tasa de valoración (`ValuationRateSelector`, puro, TDD).** Entrada: par, instante `t`, tipo resuelto por la preferencia del par (sembrada `PARALLEL` para USD/BOB y USDT/BOB al crear el workspace; si el usuario fija otro tipo, se respeta FR-FX-006), candidatos no reemplazados y no anómalos-pendientes/rechazados con `asOf ≤ t` dentro de la ventana (7 días). Orden: (1) última del provider principal con `t − asOf ≤ staleAfter(tipo)` → `selection = PRIMARY`; (2) ídem respaldo → `FALLBACK`; (3) la más reciente entre la última de provider y la última manual → `LAST_KNOWN_STALE` (provider, `stale = true`) o `MANUAL`; (4) `FX_RATE_NOT_FOUND`. Para tipos sin provider (`P2P`, `BANK`, `CUSTOM`) el resultado es el de `fx/market-rates` con `selection = MANUAL`. Inversas y cruzadas siguen las reglas de `fx/market-rates` sobre la tasa elegida. `ageSeconds = t − asOf`; `ageDays` se mantiene.
+7. **Referencia de conversiones.** `RateResolver.resolveForConversion` no cambia salvo que excluye anomalías pendientes/rechazadas; un `referenceFxRateId` explícito (tasa manual indicada por el usuario) siempre gana (FR-FX-008). Los providers nunca insertan con `supersedes_id` ni tocan filas `MANUAL`.
+8. **Anomalías.** `AnomalyDetector(sample, baseline, thresholdPct)`: `variationPct = (v − b)/b × 100` a precisión 40, cuantizado HALF_EVEN a 4 decimales para persistir; `|variationPct| > threshold` ⇒ `anomaly_flagged = true`, `anomaly_baseline_rate_id`, `anomaly_variation_pct` (columnas inmutables de la propia fila). `baseline` = última tasa del mismo workspace/provider/par/tipo no marcada, o marcada y confirmada. La decisión vive en `fx.rate_anomaly_review` (append-only, PK `exchange_rate_id`): `ReviewRateAnomaly` (EDITOR/OWNER, `Idempotency-Key`, motivo obligatorio, audit en la misma transacción, outbox `fx.RateRecorded.v1` no se re-emite). Segunda revisión ⇒ 409 `FX_RATE_ANOMALY_ALREADY_REVIEWED`; revisar una tasa no marcada ⇒ 422 `FX_RATE_NOT_ANOMALOUS`. La carga histórica **no** marca anomalías (serie publicada y ya consolidada; la crisis cambiaria de 2025 generaría decenas de confirmaciones inútiles) — trade-off documentado.
+9. **Límites y caché (`ProviderHttpClient`).** Token bucket por provider (paralelo.bo 60/min; dolarapi 30/min conservador al no publicar límite); caché en memoria por URL respetando `Cache-Control: max-age` (y `Age`); `429` ⇒ no consultar hasta `now + Retry-After` (o 60 s si falta), persistido en `fx.provider_run.retry_after_until` para sobrevivir reinicios; timeout `FX_PROVIDER_TIMEOUT`; sin redirecciones a otros hosts (allowlist `paralelo.bo`, `bo.dolarapi.com`).
+10. **Privacidad (NFR-COMP-001).** Solicitudes `GET` sin query string, sin cookies, sin `Authorization`, cabeceras fijas `Accept: application/json` y `User-Agent: PFOS-fx/<versión> (+https://github.com/<repo>)` sin datos de instalación; el cliente HTTP del adapter no recibe ningún contexto de workspace (se construye fuera del bucle por workspace). Test de contrato con servidor HTTP local que registra la solicitud y verifica bytes idénticos con dos workspaces.
+11. **Atribución.** `descriptor().attribution` del adapter es la única fuente del texto: paralelo.bo → `{text: "Fuente: paralelo.bo", url: "https://paralelo.bo", license: "CC BY 4.0", licenseUrl: "https://creativecommons.org/licenses/by/4.0/"}`; bo.dolarapi.com → `{text: "Fuente: bo.dolarapi.com", url: "https://bo.dolarapi.com", license: null, licenseUrl: null}`. Viaja en `FxRate.attribution`, `ResolvedRate.attribution` y `ReportSummary.meta.attributions` (sin duplicados). La UI la muestra junto a cada tasa (componente `RateSourceBadge`) y en el pie del Home.
+12. **Degradación.** Ninguna request HTTP del usuario llama a un provider: la API solo lee `fx.exchange_rate`. Con `none` en todos los roles no se registran colas de providers. El estado (`GetProviderStatus`) se calcula desde `fx.provider_run` + última tasa por feed: `HEALTHY` (último intento ok y feed principal no obsoleto), `DEGRADED` (último intento fallido, feed aún no obsoleto), `DOWN` (feed obsoleto), `DISABLED`.
+13. **Eventos.** `fx.RateRecorded.v1` (aditivo): `provider` (`PARALELO_BO`|`DOLARAPI_BO`|null) y `anomalyFlagged` (bool) opcionales; `source = PROVIDER`, `actor = {type: SYSTEM, id: "fx-provider:<id>"}`, `causationId = null`, `correlationId` = id del ciclo. Idempotencia natural `rateId`; consumidor REPORTING (invalida `dataVersion`). La carga histórica emite un único evento por workspace y ejecución (`rateId` = última tasa insertada) para no inundar el outbox con 1 576 eventos. FX consume `identity.WorkspaceCreated.v1` con inbox (INV-028).
+14. **Pruebas.** Contract tests de cada adapter contra **respuestas grabadas** (fixtures con el texto exacto verificado el 2026-10-02, incluidos casos 429, 503, cuerpo truncado, `median: null`, cambio de schema y valor con 18 decimales) servidas por un servidor HTTP local; sin red en CI. Smoke opcional en vivo (`pnpm fx:smoke-live`, nightly, `continue-on-error`, 1 solicitud por endpoint, compara contra el JSON Schema del adapter y el hash de `/openapi.json`); su falla abre un aviso, nunca bloquea el pipeline.
+
+Modelo de datos (schema.tabla, expand-only):
+
+| Tabla | Cambio | RLS / grants |
+|---|---|---|
+| `fx.exchange_rate` | `ADD COLUMN provider text NULL CHECK (provider IN ('PARALELO_BO','DOLARAPI_BO'))`, `fetched_at timestamptz NULL`, `raw_payload text NULL`, `anomaly_flagged boolean NOT NULL DEFAULT false`, `anomaly_baseline_rate_id uuid NULL`, `anomaly_variation_pct numeric(12,4) NULL`; `CHECK ((source = 'PROVIDER') = (provider IS NOT NULL))`; índice único `(workspace_id, provider, base_currency, quote_currency, rate_type, as_of) WHERE provider IS NOT NULL` | Sin cambio: **WS+G** append-only (`SELECT, INSERT` para `pf_app`/`pf_worker`; INV-011). `pf_worker` inserta con `SET LOCAL app.workspace_id` |
+| `fx.rate_anomaly_review` | Crear: `exchange_rate_id uuid PK`, `workspace_id`, `decision text CHECK IN ('CONFIRMED','REJECTED')`, `reason text NOT NULL`, `decided_by uuid`, `decided_at timestamptz` | **WS**, append-only (`SELECT, INSERT`) |
+| `fx.provider_run` | Crear: `id`, `provider`, `started_at`, `finished_at`, `outcome text CHECK IN ('OK','NO_NEW_SAMPLE','FAILED','SKIPPED_RATE_LIMIT','SKIPPED_CACHE')`, `error_code text NULL`, `http_status int NULL`, `latency_ms int`, `new_samples int`, `retry_after_until timestamptz NULL`, `kind text CHECK IN ('POLL','BACKFILL','GAP_FILL')`; purga > 90 días | Tabla de instalación **sin `workspace_id`** (no contiene datos de usuario; excepción explícita como `platform.inbox`, a registrar en docs/08 §1); `pf_worker` INSERT/SELECT, `pf_app` SELECT |
+| `fx.rate_preference` | Sin cambio de esquema; el consumidor de `WorkspaceCreated` siembra USD/BOB y USDT/BOB = `PARALLEL` (`ON CONFLICT DO NOTHING`) | WS |
+
+## Contratos
+
+Cambios **exactos** (aplicados en este mismo ciclo de consolidación a `contracts/`).
+
+**`contracts/openapi/finance-api.v1.yaml`**
+
+Operaciones nuevas:
+
+| Método y path | operationId | Rol | Request | Respuestas |
+|---|---|---|---|---|
+| `GET /workspaces/{workspaceId}/fx-providers/status` | `getFxProviderStatus` | VIEWER | — | 200 `FxProviderStatusList`; 401, 403, 429 |
+| `POST /workspaces/{workspaceId}/fx-rates/{fxRateId}/anomaly-review` | `reviewFxRateAnomaly` | EDITOR | header `IdempotencyKey`; body `FxRateAnomalyReview` | 200 `FxRate`; 401, 403, 404, 409 (`FX_RATE_ANOMALY_ALREADY_REVIEWED`, `IDEMPOTENCY_REQUEST_IN_PROGRESS`), 422 (`FX_RATE_NOT_ANOMALOUS`, `VALIDATION_FAILED`, `IDEMPOTENCY_KEY_REUSED`), 428 |
+
+Operaciones existentes modificadas:
+- `listFxRates`: summary "List historical fx rates (manual and provider)"; parámetros nuevos `source` (`FxRateSource`) y `provider` (`FxRateProvider`).
+- `getLatestFxRate`: descripción con el orden de selección (principal → respaldo → última conocida obsoleta o manual) y `ResolvedRate.selection`.
+- Tag `FxRates`: descripción pasa a "Phase 1: market rate providers (paralelo.bo, bo.dolarapi.com), provider status and anomaly review".
+
+Schemas nuevos:
+- `FxRateProvider`: enum `[PARALELO_BO, DOLARAPI_BO]`.
+- `RateAttribution`: required `[provider, text, url]`; `provider` (`FxRateProvider`), `text` (string), `url` (uri), `license` (string|null), `licenseUrl` (uri|null).
+- `FxRateAnomaly`: required `[baselineRateId, variationPct, thresholdPct, status]`; `baselineRateId` (Uuid), `variationPct`, `thresholdPct` (`DecimalString`), `status` enum `[PENDING, CONFIRMED, REJECTED]`, `reviewedBy` (Uuid|null), `reviewedAt` (Instant|null), `reason` (string|null).
+- `FxRateAnomalyReview` (additionalProperties false): required `[decision, reason]`; `decision` enum `[CONFIRM, REJECT]`, `reason` string 3–500.
+- `RateSelection`: enum `[PRIMARY, FALLBACK, LAST_KNOWN_STALE, MANUAL]`.
+- `FxProviderFeed`: required `[base, quote, rateType, role, lastRate, stale, ageSeconds]`; `role` enum `[PRIMARY, FALLBACK]`, `lastRate` (`FxRate`|null), `stale` (bool), `ageSeconds` (integer|null).
+- `FxProviderStatus`: required `[provider, enabled, health, feeds, lastAttemptAt, lastSuccessAt, lastError, consecutiveFailures, nextAttemptAt, pollIntervalSeconds, backfill, attribution]`; `health` enum `[HEALTHY, DEGRADED, DOWN, DISABLED]`; `lastError` `{code: FxProviderErrorCode, httpStatus: integer|null, at: Instant}`|null; `rateLimit` `{limitPerMinute, retryAfterUntil}`; `backfill` `{status: enum [NOT_APPLICABLE, PENDING, RUNNING, COMPLETED, FAILED], pointsImported, from, to, lastRunAt}`.
+- `FxProviderErrorCode`: enum `[PROVIDER_UNAVAILABLE, PROVIDER_TIMEOUT, PROVIDER_RATE_LIMITED, PROVIDER_PAYLOAD_INVALID, PROVIDER_SCHEMA_CHANGED, FX_PROVIDER_CONFIG_INVALID]`.
+- `FxProviderStatusList`: `{data: FxProviderStatus[]}`.
+
+Schemas existentes modificados (aditivo):
+- `FxRate`: `provider` (`FxRateProvider`|null), `fetchedAt` (Instant|null), `attribution` (`RateAttribution`|null), `anomaly` (`FxRateAnomaly`|null). La respuesta cruda **no** se expone en la API (solo auditoría interna).
+- `ResolvedRate`: `provider` (`FxRateProvider`|null), `selection` (`RateSelection`), `stale` (bool), `ageSeconds` (integer ≥ 0), `attribution` (`RateAttribution`|null).
+- `ReportSummary.meta`: `attributions` (`RateAttribution[]`, sin duplicados).
+- `ErrorCode`: `FX_RATE_ANOMALY_ALREADY_REVIEWED` (409), `FX_RATE_NOT_ANOMALOUS` (422).
+
+**`contracts/events/`**
+- `fx/RateRecorded.v1.schema.json` (aditivo, misma versión): `payload.provider` (`PARALELO_BO|DOLARAPI_BO|null`) y `payload.anomalyFlagged` (bool) **opcionales**; descripción con productor por provider (`actor.type = SYSTEM`); segundo ejemplo con USD/BOB `PARALLEL` 12.02 de paralelo.bo.
+- `README.md`: `identity.WorkspaceCreated.v1` suma FX como consumidor.
+
+> Consolidado en contracts/ el 2026-10-02.
+
+## Riesgos / Trade-offs
+
+- [Dependencia de terceros sin SLA (caída, cambio de API, de términos o de licencia)] → puerto + ACL, respaldo, contract tests con fixtures, smoke en vivo nightly no bloqueante, revisión de ToS registrada en ADR-0025, degradación a manual (RISK-023).
+- [Mediana USDT/BOB usada como USD/BOB] → convención explícita del mercado y del propio provider (`currencyPair: "USD/BOB"` en el histórico); el usuario puede fijar otra preferencia o registrar tasas manuales.
+- [`spreadPct` negativo: `buy` 12.12 > `sell` 11.92 desde la perspectiva del anunciante] → solo se usa la mediana; compra/venta quedan en el crudo para análisis futuro (FR-FX-011).
+- [Punto medio de dolarapi ≠ mediana de paralelo.bo (12.055 vs 12.02)] → la selección informa provider y nivel; el salto entre fuentes al conmutar no dispara anomalía porque la línea base es por provider.
+- [Obsolescencia de 60 min con polling de 15 min] → tolera 3 fallas seguidas antes de conmutar; configurable.
+- [Carga histórica sin detección de anomalías] → aceptado; los puntos quedan con `source = PROVIDER` y procedencia, y el usuario puede registrar manuales.
+- [Filas duplicadas por workspace] → volumen trivial en Phase 1; si crece, migrar a filas globales + revisión por workspace (ADR nuevo).
+- [Ejecución duplicada del cron con 2 réplicas de worker, no verificada en SPIKE-05] → `singletonKey` por ciclo + índice único ⇒ como mucho una solicitud extra, sin filas duplicadas.
+
+## Plan de migración
+
+Expand-only: `ALTER TABLE fx.exchange_rate ADD COLUMN …` (columnas nullables o con default, sin reescritura), índice único parcial con `CREATE UNIQUE INDEX CONCURRENTLY`, `CREATE TABLE fx.rate_anomaly_review` y `fx.provider_run` con grants y RLS, registro de colas pg-boss al arrancar el worker. Sin datos productivos previos. Despliegue: primero migraciones, luego worker con `FX_PROVIDER_PRIMARY=none` (verificación), luego activar providers. Rollback: `FX_PROVIDER_PRIMARY=none FX_PROVIDER_FALLBACK=none FX_PROVIDER_OFFICIAL=none` (las tasas ya registradas quedan, son históricas válidas).
+
+Dependencias (aplicadas antes): `add-api-conventions`, `add-workspace-identity` (`WorkspaceCreated`, roles, RLS), `add-audit-trail`, `add-manual-conversions` (`fx.exchange_rate`, `fx.rate_preference`, `RateResolver`, `fx.RateRecorded.v1`). Lo consume `add-basic-dashboard`.
+
+## Preguntas abiertas
+
+- **Uso comercial**: la licencia CC BY 4.0 permite uso comercial con atribución; paralelo.bo pide contacto para "uso comercial/límites mayores". Mientras PFOS sea personal no aplica; reevaluar antes de abrir el producto a terceros (ADR-0025 §Validación).
+- **Umbral de anomalía** (5 %) y obsolescencia (60 min) calibrados a ojo; revisar con 30 días de datos de `fx.provider_run`.
+- **FR nuevas** (FR-FX-013..017) y cambio de fase/prioridad de FR-FX-009/010 (Phase 5 → 1; FR-FX-010 Should → Must) pendientes de incorporar a docs/01 por el lead.
+- ¿Registrar también `BUY`/`SELL` como tipos para el análisis de spread (FR-FX-011, Phase 5)?

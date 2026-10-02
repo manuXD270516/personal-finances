@@ -3,19 +3,26 @@ openapi: 3.1.0
 # Conventions: docs/10-api-design.md · Canonical decisions: docs/ARCHITECTURE.md §8 · ADR-0022
 info:
   title: PFOS finance-api
-  version: 1.0.0-draft.1
+  version: 1.0.0-draft.2
   summary: Personal Finance Operating System — REST API v1 (draft)
   description: |
     REST API of the Personal Finance Operating System (PFOS).
 
     * All business resources live under `/workspaces/{workspaceId}`.
     * Money is always `{ "amount": "<decimal string>", "currency": "<code>" }`. Never JSON numbers.
-    * Business dates are `YYYY-MM-DD` (workspace timezone); instants are RFC 3339 UTC.
-    * Errors are RFC 9457 `application/problem+json` with a stable domain `code`.
-    * Financial `POST` operations require `Idempotency-Key`; updates and actions on existing aggregates require `If-Match`.
+    * Business dates are `YYYY-MM-DD` (workspace timezone); instants are RFC 3339 UTC with `Z` suffix.
+    * Errors are RFC 9457 `application/problem+json` with a stable domain `code` and a `requestId`.
+    * Financial `POST` operations require `Idempotency-Key` (missing → 428 `IDEMPOTENCY_KEY_REQUIRED`; reused with a
+      different payload → 422 `IDEMPOTENCY_KEY_REUSED`); updates and actions on existing aggregates require `If-Match`.
     * Every operation declares `x-openspec-capability` (OpenSpec taxonomy, ARCHITECTURE §14) and `x-required-role`.
+    * Insufficient role → 403 `INSUFFICIENT_ROLE`; not an active member → 403 `WORKSPACE_ACCESS_DENIED`.
+    * Deprecated operations answer with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, at least 90 days after the
+      announcement) and `Link: <…>; rel="deprecation"`; they are flagged `deprecated: true` with `x-sunset`.
+    * Responses carry `RateLimit` / `RateLimit-Policy` (IETF draft); exceeding the quota returns 429 `RATE_LIMITED`
+      with `Retry-After`.
 
     Only Phase 1 paths are specified. Later-phase resources are listed as tags (description only).
+    Phase 1 consolidation: 2026-10-02 (docs/31-phase-1-consolidation-decisions.md).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -36,7 +43,11 @@ tags:
   - name: Classification
     description: Categories, category groups, tags and counterparties. Phase 1.
   - name: FX
-    description: Currency catalog (Phase 1). Manual fx-rates (Phase 1, not yet specified) and providers (Phase 5).
+    description: Currency catalog, manual historical fx-rates and per-pair preferred rate type (Phase 1). Providers in Phase 5.
+  - name: Ledger
+    description: Read-only views of the internal double-entry ledger (Phase 1, trial balance).
+  - name: Audit
+    description: "Phase 1: read-only audit log (history by entity and by date range)."
   - name: Reporting
     description: Basic dashboard KPIs (Phase 1). Advanced reports in Phase 7 (see docs/14-reporting.md).
   - name: Platform
@@ -58,7 +69,7 @@ tags:
   - name: Debt
     description: "LATER (Phase 4): loans, amortization schedules, installments, credit cards and statements."
   - name: FxRates
-    description: "LATER (Phase 1 manual / Phase 5 providers): historical, immutable fx rates."
+    description: "Phase 1 (docs/31 D29, ADR-0025): market rate providers (paralelo.bo primary, bo.dolarapi.com fallback/official), provider status and anomaly review. Manual rates are under FX. More providers, crypto and commodities: Phase 5."
   - name: Documents
     description: "LATER (Phase 6): documents, presigned uploads/downloads and attachment links."
   - name: Imports
@@ -67,8 +78,6 @@ tags:
     description: "LATER (Phase 6): rules engine (conditions/actions)."
   - name: Forecasts
     description: "LATER (Phase 8): statistical forecasts (async)."
-  - name: Audit
-    description: "LATER (Phase 1 storage, API Phase 2): read-only audit log."
   - name: Assistant
     description: "LATER (Phase 10): read-only AI assistant."
 
@@ -81,6 +90,8 @@ paths:
       summary: Get the authenticated user and their workspace memberships
       x-openspec-capability: identity/authentication
       x-required-role: AUTHENTICATED
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Current user
@@ -89,8 +100,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Me' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Identity]
       operationId: updateMe
@@ -115,7 +129,12 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'INVALID_TIMEZONE (timezone is not a valid IANA zone).'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces:
     get:
@@ -135,10 +154,16 @@ paths:
               schema: { $ref: '#/components/schemas/WorkspacePage' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Identity]
       operationId: createWorkspace
-      summary: Create a workspace (caller becomes OWNER; system categories and ledger system accounts are provisioned)
+      summary: Create a workspace (caller becomes OWNER)
+      description: |
+        The caller becomes OWNER. System categories (and, when `seedDefaultCategories` is true, the default catalog)
+        are seeded asynchronously by Classification when it consumes `identity.WorkspaceCreated.v1`; ledger system
+        accounts are created on demand at the first posting.
       x-openspec-capability: identity/workspace-membership
       x-required-role: AUTHENTICATED
       parameters:
@@ -163,6 +188,8 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}:
     parameters:
@@ -173,6 +200,8 @@ paths:
       summary: Get a workspace
       x-openspec-capability: identity/workspace-membership
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Workspace
@@ -181,12 +210,15 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Workspace' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Identity]
       operationId: updateWorkspace
-      summary: Update workspace settings (name, timezone, locale, base currency)
+      summary: Update workspace settings (name, timezone, locale, base currency, fiscal month start, liquidity reserve)
       x-openspec-capability: identity/workspace-membership
       x-required-role: OWNER
       parameters:
@@ -210,6 +242,8 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ───────────────────────────── Accounts ─────────────────────────────
   /workspaces/{workspaceId}/accounts:
@@ -244,13 +278,39 @@ paths:
         - name: institutionId
           in: query
           schema: { $ref: '#/components/schemas/Uuid' }
+        - name: status
+          in: query
+          description: Filter by status (repeatable). Default `ACTIVE` and `CLOSED` (ARCHIVED only with `includeArchived=true` or an explicit `status=ARCHIVED`).
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/AccountStatus' }
+          style: form
+          explode: true
+        - name: tagId
+          in: query
+          description: Accounts carrying this tag
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: liquidity
+          in: query
+          description: Filter by liquidity (repeatable)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/AccountLiquidity' }
+          style: form
+          explode: true
         - name: sort
           in: query
-          description: Sort keys. Default `displayOrder`.
+          description: Sort keys. Default `displayOrder` (manual order).
           schema:
             type: string
-            enum: [displayOrder, name, -name, createdAt, -createdAt]
+            enum: [displayOrder, name, -name, type, institution, createdAt, -createdAt]
             default: displayOrder
+        - name: groupBy
+          in: query
+          description: When present, the page also returns `groups` (account ids grouped by type or institution).
+          schema:
+            type: string
+            enum: [type, institution]
       responses:
         '200':
           description: Accounts page
@@ -261,6 +321,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Accounts]
       operationId: createAccount
@@ -287,10 +349,44 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_NAME_TAKEN, INSTITUTION_ARCHIVED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED, ACCOUNT_CURRENCY_KIND_MISMATCH, AMOUNT_SCALE_EXCEEDED, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/accounts/order:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    put:
+      tags: [Accounts]
+      operationId: reorderAccounts
+      summary: Set the manual display order of the accounts
+      description: The listed accounts receive `displayOrder` 0..n-1 in the given order; accounts not listed keep their relative order after them.
+      x-openspec-capability: accounts/account-management
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountOrder' }
+      responses:
+        '204':
+          description: Order saved
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND (an id is not an account of this workspace).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/accounts/{accountId}:
     parameters:
@@ -316,10 +412,16 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Accounts]
       operationId: updateAccount
-      summary: Update account attributes (currency is immutable)
+      summary: Update account attributes (type is immutable; currency only while the account has no movements)
+      description: |
+        `type` cannot be changed (`additionalProperties: false` ⇒ 400 VALIDATION_FAILED). `currency` can change only
+        while the account has no transactions or journal postings (otherwise 409 ACCOUNT_CURRENCY_IMMUTABLE).
+        Closing uses `closeAccount`.
       x-openspec-capability: accounts/account-management
       x-required-role: EDITOR
       parameters:
@@ -341,10 +443,14 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_CURRENCY_IMMUTABLE, ACCOUNT_NAME_TAKEN, ACCOUNT_ARCHIVED, INSTITUTION_ARCHIVED, CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/accounts/{accountId}/archive:
     parameters:
@@ -371,21 +477,63 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already archived).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
-  /workspaces/{workspaceId}/accounts/{accountId}/unarchive:
+  /workspaces/{workspaceId}/accounts/{accountId}/close:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
       - $ref: '#/components/parameters/AccountId'
     post:
       tags: [Accounts]
-      operationId: unarchiveAccount
-      summary: Reactivate an archived account
+      operationId: closeAccount
+      summary: Close an account (balance must be zero; it stops accepting new movements but stays visible)
+      x-openspec-capability: accounts/account-management
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountClose' }
+      responses:
+        '200':
+          description: Closed account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_BALANCE_NOT_ZERO, INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/AccountId'
+    post:
+      tags: [Accounts]
+      operationId: reactivateAccount
+      summary: Reactivate a CLOSED or ARCHIVED account (back to ACTIVE)
       x-openspec-capability: accounts/account-management
       x-required-role: EDITOR
       parameters:
@@ -401,9 +549,13 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_NAME_TAKEN (an active account already uses the name), INVALID_STATUS_TRANSITION (already ACTIVE).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/institutions:
     parameters:
@@ -419,6 +571,14 @@ paths:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/IncludeArchived'
         - $ref: '#/components/parameters/Query'
+        - name: kind
+          in: query
+          description: Filter by institution kind (repeatable)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/InstitutionKind' }
+          style: form
+          explode: true
       responses:
         '200':
           description: Institutions page
@@ -428,6 +588,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Accounts]
       operationId: createInstitution
@@ -453,7 +615,11 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN (an active institution already uses the name).'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/institutions/{institutionId}:
     parameters:
@@ -465,6 +631,8 @@ paths:
       summary: Get an institution
       x-openspec-capability: accounts/institutions
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Institution
@@ -473,9 +641,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Institution' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Accounts]
       operationId: updateInstitution
@@ -501,9 +672,13 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN, CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/institutions/{institutionId}/archive:
     parameters:
@@ -530,6 +705,8 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ─────────────────────────── Transactions ───────────────────────────
   /workspaces/{workspaceId}/transactions:
@@ -539,6 +716,9 @@ paths:
       tags: [Transactions]
       operationId: listTransactions
       summary: List transactions (legs and splits inline)
+      description: |
+        `q` searches description, notes and counterparty name, case- and accent-insensitive. `categoryId` also matches
+        splits in its subcategories. Transfers appear for both accounts when filtering by `accountId`.
       x-openspec-capability: transactions/transaction-recording
       x-required-role: VIEWER
       parameters:
@@ -553,8 +733,17 @@ paths:
             items: { $ref: '#/components/schemas/Uuid' }
           style: form
           explode: true
+        - name: source
+          in: query
+          description: Filter by origin of the transaction (repeatable)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/TransactionSource' }
+          style: form
+          explode: true
         - name: categoryId
           in: query
+          description: Splits in any of these categories or their subcategories
           schema:
             type: array
             items: { $ref: '#/components/schemas/Uuid' }
@@ -567,6 +756,14 @@ paths:
             items: { $ref: '#/components/schemas/Uuid' }
           style: form
           explode: true
+        - name: paymentMethod
+          in: query
+          description: Filtra por medio de pago (D27)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/PaymentMethod' }
+          style: form
+          explode: false
         - name: counterpartyId
           in: query
           schema:
@@ -624,6 +821,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Transactions]
       operationId: createTransaction
@@ -631,8 +830,14 @@ paths:
       description: |
         Transfers and conversions have dedicated endpoints. Amounts in commands are positive magnitudes;
         direction is given by `kind`. If `splits` is omitted a single split in the system category
-        UNCATEGORIZED is created. Non-PENDING transactions are posted to the ledger in the same DB transaction.
-      x-openspec-capability: [transactions/transaction-recording, transactions/splits, ledger/journal-posting]
+        UNCATEGORIZED (UNCATEGORIZED_INCOME for income) is created. Non-PENDING transactions are posted to the
+        ledger in the same DB transaction.
+
+        * `REFUND` may reference the original expense (`refundOfTransactionId`); a refund larger than the
+          non-refunded remainder is rejected with `REFUND_EXCEEDS_ORIGINAL` unless `confirmRefundExceedsOriginal=true`.
+        * `ADJUSTMENT` requires `direction` and `reason`, never accepts `splits` in Phase 1 and its amount must be > 0.
+        * The response may carry non-blocking `warnings` (e.g. `POSSIBLE_DUPLICATE`); the transaction is still recorded.
+      x-openspec-capability: [transactions/transaction-recording, transactions/splits, transactions/duplicate-detection, ledger/journal-posting]
       x-required-role: EDITOR
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -656,23 +861,123 @@ paths:
                     - amount: { amount: '50.00', currency: BOB }
                       categoryId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d12
                       tagIds: [0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d21]
+              refund:
+                summary: Partial refund of a previous expense
+                value:
+                  kind: REFUND
+                  transactionDate: '2026-10-02'
+                  accountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01
+                  amount: { amount: '50.00', currency: BOB }
+                  refundOfTransactionId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9e01
+                  description: Devolución Hipermaxi
+              adjustment:
+                summary: Balance adjustment (decrease)
+                value:
+                  kind: ADJUSTMENT
+                  direction: DECREASE
+                  transactionDate: '2026-10-02'
+                  accountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d03
+                  amount: { amount: '12.50', currency: BOB }
+                  reason: Diferencia de arqueo de caja
       responses:
         '201':
-          description: Transaction recorded
+          description: Transaction recorded (with non-blocking warnings)
           headers:
             Location: { $ref: '#/components/headers/Location' }
             ETag: { $ref: '#/components/headers/ETag' }
             Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Transaction' }
+              schema: { $ref: '#/components/schemas/TransactionCreateResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_MISMATCH, SPLITS_DO_NOT_SUM, AMOUNT_SCALE_EXCEEDED, AMOUNT_NOT_POSITIVE, REFUND_EXCEEDS_ORIGINAL, CATEGORY_KIND_MISMATCH, REFERENCE_NOT_FOUND, VALIDATION_FAILED, IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/transactions/mark-cleared:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Transactions]
+      operationId: markTransactionsCleared
+      summary: Mark (or unmark) several posted transactions as cleared in one atomic operation
+      description: |
+        All-or-nothing: every item carries the expected `version`; any mismatch fails the whole request with 412 and
+        one entry per stale item in `errors[]` (`code: PRECONDITION_FAILED`). Never touches the ledger.
+      x-openspec-capability: transactions/reconciliation
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClearedMarkRequest' }
+      responses:
+        '200':
+          description: Updated transactions
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClearedMarkResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION, TRANSACTION_RECONCILED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+          description: 'PRECONDITION_FAILED, with one `errors[]` entry per stale item.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/transactions/duplicate-check:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Transactions]
+      operationId: checkTransactionDuplicates
+      summary: Find possible duplicates of a transaction being entered (no side effects)
+      description: Same account, same amount and a business date within ±3 days; safe to repeat, so no `Idempotency-Key`.
+      x-openspec-capability: transactions/duplicate-detection
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DuplicateCheckRequest' }
+      responses:
+        '200':
+          description: Duplicate candidates (possibly empty)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DuplicateCheckResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND, CURRENCY_MISMATCH, AMOUNT_SCALE_EXCEEDED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/transactions/{transactionId}:
     parameters:
@@ -698,6 +1003,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Transactions]
       operationId: updateTransaction
@@ -706,8 +1013,10 @@ paths:
         Classification-only changes (description, notes, counterparty, split categories/tags) never touch the ledger.
         Changes to amount, account, date or split amounts on a posted transaction create a reversal entry plus a
         new entry (revision + 1). `splits`, when present, replaces the whole split list. Conversions and transfers
-        cannot change kind; conversion pricing is immutable (void and re-create).
-      x-openspec-capability: [transactions/transaction-recording, transactions/splits]
+        cannot change kind; conversions are amended with `amendConversion`. A RECONCILED transaction must be
+        un-reconciled (`unreconcileTransaction`) before any financial change. `status` changes (POSTED↔CLEARED,
+        CLEARED→RECONCILED) cannot be combined with financial fields (VALIDATION_FAILED).
+      x-openspec-capability: [transactions/transaction-recording, transactions/splits, transactions/reconciliation]
       x-required-role: EDITOR
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -728,11 +1037,43 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'TRANSACTION_RECONCILED, INVALID_STATUS_TRANSITION, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, PERIOD_CLOSED, CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/transactions/{transactionId}/history:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      tags: [Transactions]
+      operationId: getTransactionHistory
+      summary: Historial de cambios de una transacción (visible para VIEWER, D28)
+      description: |
+        Devuelve solo las entradas de auditoría de esta transacción (y de sus splits y asiento vinculado), en orden cronológico.
+        A diferencia de `/audit-log` (EDITOR+), lo puede leer todo miembro que pueda ver la transacción, incluido VIEWER.
+      x-openspec-capability: transactions/transaction-recording
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Historial de la transacción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/transactions/{transactionId}/void:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -764,9 +1105,56 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already VOIDED), TRANSACTION_RECONCILED, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (empty reason), IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}/unreconcile:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    post:
+      tags: [Transactions]
+      operationId: unreconcileTransaction
+      summary: Move a RECONCILED transaction back to CLEARED (requires a reason; audited)
+      x-openspec-capability: transactions/reconciliation
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UnreconcileRequest' }
+      responses:
+        '200':
+          description: Un-reconciled transaction (status CLEARED)
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (not RECONCILED).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (missing or blank reason).'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/transactions/{transactionId}/post:
     parameters:
@@ -786,15 +1174,23 @@ paths:
           description: Posted transaction
           headers:
             ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Transaction' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (not PENDING), ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/transfers:
     parameters:
@@ -803,7 +1199,12 @@ paths:
       tags: [Transactions]
       operationId: createTransfer
       summary: Transfer between two accounts in the same currency (creates a TRANSFER transaction)
-      description: Cross-currency movements must use `/conversions`. A credit-card payment is a transfer ASSET → LIABILITY.
+      description: |
+        Facade over `Transaction`: the response has `kind=TRANSFER`, one `SOURCE` leg (−(amount + fee)) and one
+        `TARGET` leg (+amount) and, when a fee is given, a single split in the system category *Fees* (or the given
+        expense category). Cross-currency movements must use `/conversions`: a currency mismatch returns 422
+        `TRANSFER_CURRENCY_MISMATCH` with `suggestedOperationId: createConversion`. A credit-card payment is a plain
+        transfer ASSET → LIABILITY (kind `TRANSFER`).
       x-openspec-capability: [transactions/transfers, ledger/journal-posting]
       x-required-role: EDITOR
       parameters:
@@ -813,6 +1214,31 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/TransferCreate' }
+            examples:
+              samePeriodTransfer:
+                summary: 300.00 BOB from Bank A to Bank B
+                value:
+                  transactionDate: '2026-10-02'
+                  fromAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01
+                  toAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d04
+                  amount: { amount: '300.00', currency: BOB }
+              transferWithFee:
+                summary: 1000.00 BOB with a 10.00 BOB fee charged to the source account
+                value:
+                  transactionDate: '2026-10-02'
+                  fromAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01
+                  toAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d04
+                  amount: { amount: '1000.00', currency: BOB }
+                  fee:
+                    amount: { amount: '10.00', currency: BOB }
+              creditCardPayment:
+                summary: Credit card payment of 350.00 BOB from Bank A (ASSET → LIABILITY)
+                value:
+                  transactionDate: '2026-10-02'
+                  fromAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01
+                  toAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d05
+                  amount: { amount: '350.00', currency: BOB }
+                  description: Pago tarjeta
       responses:
         '201':
           description: Transfer recorded
@@ -826,9 +1252,15 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'TRANSFER_SAME_ACCOUNT, TRANSFER_CURRENCY_MISMATCH (with suggestedOperationId), AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, CATEGORY_KIND_MISMATCH, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/conversions:
     parameters:
@@ -869,6 +1301,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Transactions]
       operationId: createConversion
@@ -897,6 +1331,22 @@ paths:
                       amount: { amount: '5.00', currency: BOB }
                   provider: { name: Binance P2P }
                   executedAt: '2026-09-30T18:42:00Z'
+              usdtToBtcWithTrxNetworkFee:
+                summary: USDT → BTC swap with a provider fee in USDT and a network fee paid in TRX (docs/09 §6.15)
+                value:
+                  transactionDate: '2026-09-30'
+                  sourceAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d02
+                  targetAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d06
+                  sourceAmount: { amount: '1000.000000', currency: USDT }
+                  targetAmount: { amount: '0.01600000', currency: BTC }
+                  quotedRate: { base: BTC, quote: USDT, value: '62375' }
+                  fees:
+                    - type: PROVIDER
+                      amount: { amount: '2.000000', currency: USDT }
+                    - type: NETWORK
+                      amount: { amount: '15.000000', currency: TRX }
+                      paidFromAccountId: 0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d07
+                  executedAt: '2026-09-30T20:10:00Z'
       responses:
         '201':
           description: Conversion recorded
@@ -910,9 +1360,48 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CONVERSION_SAME_CURRENCY, CONVERSION_AMOUNTS_INCONSISTENT, AMOUNT_SCALE_EXCEEDED, AMOUNT_NOT_POSITIVE, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/conversions/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Transactions]
+      operationId: previewConversion
+      summary: Compute the pricing of a conversion without recording it (no side effects)
+      description: |
+        Exactly two of `sourceAmount`, `targetAmount` and `quotedRate` must be given; the third is derived.
+        Safe to repeat, so no `Idempotency-Key`.
+      x-openspec-capability: [transactions/conversions, fx/conversion-pricing]
+      x-required-role: VIEWER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConversionPreviewRequest' }
+      responses:
+        '200':
+          description: Conversion pricing preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversionPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CONVERSION_AMOUNTS_INCONSISTENT, AMOUNT_SCALE_EXCEEDED, CONVERSION_SAME_CURRENCY, CURRENCY_NOT_ENABLED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/conversions/{transactionId}:
     parameters:
@@ -924,6 +1413,8 @@ paths:
       summary: Get a conversion (transaction of kind CONVERSION with its pricing detail)
       x-openspec-capability: [transactions/conversions, fx/conversion-pricing]
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Conversion
@@ -932,9 +1423,72 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Transaction' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [Transactions]
+      operationId: amendConversion
+      summary: Amend a conversion (reversal + new journal entry + new ConversionDetail revision)
+      description: |
+        Full replacement of the conversion data. The previous journal entry is reversed, a new one is posted and a
+        new `ConversionDetail` revision is stored (previous revisions remain readable via `listConversionRevisions`).
+      x-openspec-capability: [transactions/conversions, fx/conversion-pricing, ledger/journal-posting]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConversionAmend' }
+      responses:
+        '200':
+          description: Amended conversion
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'TRANSACTION_RECONCILED, INVALID_STATUS_TRANSITION, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, PERIOD_CLOSED, CONCURRENCY_CONFLICT.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CONVERSION_SAME_CURRENCY, CONVERSION_AMOUNTS_INCONSISTENT, AMOUNT_SCALE_EXCEEDED, AMOUNT_NOT_POSITIVE, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/conversions/{transactionId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      tags: [Transactions]
+      operationId: listConversionRevisions
+      summary: List the pricing revisions of a conversion (oldest first; small, not paginated)
+      x-openspec-capability: [transactions/conversions, fx/conversion-pricing]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Conversion revisions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversionRevisionList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ────────────────────────── Classification ──────────────────────────
   /workspaces/{workspaceId}/category-groups:
@@ -964,6 +1518,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Classification]
       operationId: createCategoryGroup
@@ -990,6 +1546,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/category-groups/{categoryGroupId}:
     parameters:
@@ -1001,6 +1559,8 @@ paths:
       summary: Get a category group
       x-openspec-capability: classification/categories
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Category group
@@ -1009,9 +1569,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Classification]
       operationId: updateCategoryGroup
@@ -1040,6 +1603,8 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/category-groups/{categoryGroupId}/archive:
     parameters:
@@ -1064,9 +1629,44 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CATEGORY_GROUP_NOT_EMPTY (it still has active categories), SYSTEM_CATEGORY_IMMUTABLE.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/category-groups/{categoryGroupId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryGroupId'
+    post:
+      tags: [Classification]
+      operationId: unarchiveCategoryGroup
+      summary: Unarchive a category group (its categories stay archived)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Unarchived category group
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryGroup' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN (an active group of the same kind uses the name), INVALID_STATUS_TRANSITION (not archived).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/categories:
     parameters:
@@ -1099,6 +1699,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Classification]
       operationId: createCategory
@@ -1124,8 +1726,80 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN (same normalized name under the same parent), CATEGORY_ARCHIVED (archived parent or group), SYSTEM_CATEGORY_IMMUTABLE (system parent).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CATEGORY_DEPTH_EXCEEDED (more than group → category → subcategory), CATEGORY_KIND_MISMATCH, REFERENCE_NOT_FOUND.'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/categories/reorder:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Classification]
+      operationId: reorderCategories
+      summary: Reorder sibling categories (same group and parent)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryReorder' }
+      responses:
+        '200':
+          description: Reordered siblings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (`orderedIds` is not exactly the set of active siblings), REFERENCE_NOT_FOUND.'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/categories/apply-default-catalog:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Classification]
+      operationId: applyDefaultCategoryCatalog
+      summary: Apply the default category catalog (creates only what is missing; idempotent by name)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DefaultCatalogRequest' }
+      responses:
+        '200':
+          description: Catalog applied
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DefaultCatalogResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (unknown catalogVersion), IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/categories/{categoryId}:
     parameters:
@@ -1137,6 +1811,8 @@ paths:
       summary: Get a category
       x-openspec-capability: classification/categories
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Category
@@ -1145,9 +1821,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Category' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Classification]
       operationId: updateCategory
@@ -1173,10 +1852,16 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'SYSTEM_CATEGORY_IMMUTABLE (system categories cannot be renamed or moved), NAME_TAKEN, CATEGORY_ARCHIVED (archived target parent or group), CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CATEGORY_DEPTH_EXCEEDED, CATEGORY_KIND_MISMATCH (target group/parent of another kind), REFERENCE_NOT_FOUND.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/categories/{categoryId}/archive:
     parameters:
@@ -1201,9 +1886,44 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'SYSTEM_CATEGORY_IMMUTABLE, INVALID_STATUS_TRANSITION (already archived).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/categories/{categoryId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    post:
+      tags: [Classification]
+      operationId: unarchiveCategory
+      summary: Unarchive a category (its parent and group must be active)
+      x-openspec-capability: classification/categories
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Unarchived category
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CATEGORY_ARCHIVED (archived parent or group), NAME_TAKEN, INVALID_STATUS_TRANSITION (not archived).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/tags:
     parameters:
@@ -1230,6 +1950,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Classification]
       operationId: createTag
@@ -1256,6 +1978,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/tags/{tagId}:
     parameters:
@@ -1267,6 +1991,8 @@ paths:
       summary: Get a tag
       x-openspec-capability: classification/tags
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Tag
@@ -1275,9 +2001,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Tag' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Classification]
       operationId: updateTag
@@ -1306,6 +2035,8 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/tags/{tagId}/archive:
     parameters:
@@ -1330,8 +2061,44 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already archived).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/tags/{tagId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TagId'
+    post:
+      tags: [Classification]
+      operationId: unarchiveTag
+      summary: Unarchive a tag
+      x-openspec-capability: classification/tags
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Unarchived tag
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN (an active tag uses the name), INVALID_STATUS_TRANSITION (not archived).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/counterparties:
     parameters:
@@ -1365,6 +2132,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Classification]
       operationId: createCounterparty
@@ -1390,8 +2159,41 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN (problem includes `existingId` of the active counterparty), COUNTERPARTY_ALIAS_TAKEN, CATEGORY_ARCHIVED (archived default category).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND, VALIDATION_FAILED.'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/counterparties/resolve:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Classification]
+      operationId: resolveCounterparty
+      summary: Recognize the counterparty of a free-text description by name or alias (case- and accent-insensitive)
+      x-openspec-capability: classification/counterparties
+      x-required-role: VIEWER
+      parameters:
+        - name: description
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200':
+          description: Resolution result (counterparty null when nothing matches)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CounterpartyResolution' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/counterparties/{counterpartyId}:
     parameters:
@@ -1403,6 +2205,8 @@ paths:
       summary: Get a counterparty
       x-openspec-capability: classification/counterparties
       x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Counterparty
@@ -1411,9 +2215,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Counterparty' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     patch:
       tags: [Classification]
       operationId: updateCounterparty
@@ -1439,9 +2246,13 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN (with `existingId`), COUNTERPARTY_ALIAS_TAKEN, CATEGORY_ARCHIVED, CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/counterparties/{counterpartyId}/archive:
     parameters:
@@ -1466,8 +2277,72 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already archived).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    post:
+      tags: [Classification]
+      operationId: unarchiveCounterparty
+      summary: Unarchive a counterparty (assignable again)
+      x-openspec-capability: classification/counterparties
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Unarchived counterparty
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counterparty' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN, COUNTERPARTY_ALIAS_TAKEN (an active counterparty already uses the name or an alias), INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/category-suggestion:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    get:
+      tags: [Classification]
+      operationId: getCounterpartyCategorySuggestion
+      summary: Suggest a category for a new transaction with this counterparty (default category, else last used)
+      x-openspec-capability: classification/counterparties
+      x-required-role: VIEWER
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/CategoryKind' }
+      responses:
+        '200':
+          description: Suggestion (categoryId null with source NONE when there is none)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorySuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ──────────────────────────────── FX ────────────────────────────────
   /workspaces/{workspaceId}/currencies:
@@ -1496,9 +2371,497 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CurrencyList' }
+              examples:
+                phase1Catalog:
+                  summary: Phase 1 seed catalog with canonical scales
+                  value:
+                    data:
+                      - { code: BOB, kind: FIAT, name: Boliviano, scale: 2, symbol: Bs, enabled: true }
+                      - { code: USD, kind: FIAT, name: US Dollar, scale: 2, symbol: $, enabled: true }
+                      - { code: USDT, kind: CRYPTO, name: Tether USD, scale: 6, symbol: null, enabled: true }
+                      - { code: BTC, kind: CRYPTO, name: Bitcoin, scale: 8, symbol: null, enabled: false }
+                      - { code: ETH, kind: CRYPTO, name: Ether, scale: 18, symbol: null, enabled: false }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rates:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [FX]
+      operationId: listFxRates
+      summary: List historical fx rates, manual and provider (newest `asOf` first)
+      x-openspec-capability: fx/market-rates
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: base
+          in: query
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: quote
+          in: query
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: rateType
+          in: query
+          schema: { $ref: '#/components/schemas/FxRateType' }
+        - name: asOfFrom
+          in: query
+          description: Inclusive lower bound on `asOf`
+          schema: { $ref: '#/components/schemas/Instant' }
+        - name: asOfTo
+          in: query
+          description: Inclusive upper bound on `asOf`
+          schema: { $ref: '#/components/schemas/Instant' }
+        - name: includeSuperseded
+          in: query
+          schema: { type: boolean, default: false }
+        - name: source
+          in: query
+          description: Filter by origin (MANUAL or PROVIDER)
+          schema: { $ref: '#/components/schemas/FxRateSource' }
+        - name: provider
+          in: query
+          description: Filter provider rates by provider (fx/market-rate-providers)
+          schema: { $ref: '#/components/schemas/FxRateProvider' }
+      responses:
+        '200':
+          description: Fx rates page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRatePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [FX]
+      operationId: createFxRate
+      summary: Record a manual fx rate (immutable; corrections use supersede)
+      x-openspec-capability: fx/market-rates
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FxRateCreate' }
+            examples:
+              usdtBobP2p:
+                summary: USDT/BOB P2P rate
+                value:
+                  base: USDT
+                  quote: BOB
+                  value: '6.95'
+                  rateType: P2P
+                  asOf: '2026-10-02T14:00:00Z'
+                  sourceLabel: Binance P2P (mediana manual)
+      responses:
+        '201':
+          description: Fx rate recorded
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRate' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (non-positive value, base = quote), CURRENCY_NOT_ENABLED, IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rates/latest:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [FX]
+      operationId: getLatestFxRate
+      summary: Resolve the applicable rate for a pair at an instant (direct, inverse or cross)
+      description: |
+        Uses the preferred rate type of the pair when `rateType` is omitted; otherwise the most recent rate of any
+        type, indicating which. Cross rates are only derived when `allowCross=true` (then `approx=true`).
+        For types fed by market rate providers (`PARALLEL` USD/BOB and USDT/BOB, `OFFICIAL` USD/BOB) the selection is
+        (fx/market-rate-providers): non-stale rate of the primary provider (`selection=PRIMARY`) → non-stale rate of the
+        fallback provider (`FALLBACK`) → the most recent of the last provider rate (`LAST_KNOWN_STALE`, `stale=true`)
+        and the last manual rate of the pair (`MANUAL`) within the window → `FX_RATE_NOT_FOUND`. Provider rates flagged
+        as anomalous and not confirmed are never used. Provider rates carry `attribution` (e.g. "Fuente: paralelo.bo",
+        CC BY 4.0) that clients must display next to the rate.
+      x-openspec-capability: [fx/market-rates, fx/market-rate-providers]
+      x-required-role: VIEWER
+      parameters:
+        - name: base
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: quote
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - name: asOf
+          in: query
+          description: Defaults to now
+          schema: { $ref: '#/components/schemas/Instant' }
+        - name: rateType
+          in: query
+          schema: { $ref: '#/components/schemas/FxRateType' }
+        - name: allowCross
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Resolved rate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResolvedRate' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'FX_RATE_NOT_FOUND (no rate at or before asOf).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rates/{fxRateId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/FxRateId'
+    get:
+      tags: [FX]
+      operationId: getFxRate
+      summary: Get a fx rate
+      x-openspec-capability: fx/market-rates
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Fx rate
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRate' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rates/{fxRateId}/supersede:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/FxRateId'
+    post:
+      tags: [FX]
+      operationId: supersedeFxRate
+      summary: Correct a fx rate by recording a new version that supersedes it (the original is kept)
+      x-openspec-capability: fx/market-rates
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FxRateSupersede' }
+      responses:
+        '201':
+          description: New fx rate version
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRate' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'FX_RATE_ALREADY_SUPERSEDED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rates/{fxRateId}/anomaly-review:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/FxRateId'
+    post:
+      tags: [FxRates]
+      operationId: reviewFxRateAnomaly
+      summary: Confirm or reject a provider rate flagged as anomalous (it is not used for valuation until confirmed)
+      description: |
+        The rate itself is immutable; the decision is stored per workspace and audited. A rejected rate is never used and
+        never becomes the anomaly baseline.
+      x-openspec-capability: fx/market-rate-providers
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FxRateAnomalyReview' }
+            examples:
+              confirm:
+                summary: Confirm a +12.31 % jump (12.02 → 13.50)
+                value: { decision: CONFIRM, reason: devaluación anunciada }
+      responses:
+        '200':
+          description: The reviewed rate with its anomaly decision
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRate' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'FX_RATE_ANOMALY_ALREADY_REVIEWED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'FX_RATE_NOT_ANOMALOUS, VALIDATION_FAILED, IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-providers/status:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [FxRates]
+      operationId: getFxProviderStatus
+      summary: Status of the market rate providers (health, feeds, last rate, failures, historical backfill, attribution)
+      description: |
+        Read-only. Rates are fetched by the worker on a schedule (default every 15 minutes); no user request ever calls a
+        provider synchronously. `health`: HEALTHY (last attempt ok and primary feed not stale), DEGRADED (last attempt
+        failed, feed not yet stale), DOWN (feed stale), DISABLED (provider set to `none` by configuration).
+      x-openspec-capability: fx/market-rate-providers
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Provider status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxProviderStatusList' }
+              examples:
+                primaryDegraded:
+                  summary: paralelo.bo with 3 consecutive failures, rate still fresh (2026-10-02T09:45:30Z)
+                  value:
+                    data:
+                      - provider: PARALELO_BO
+                        enabled: true
+                        health: DEGRADED
+                        feeds:
+                          - base: USD
+                            quote: BOB
+                            rateType: PARALLEL
+                            role: PRIMARY
+                            lastRate:
+                              id: 01928c4e-0000-7000-8000-0000000fa101
+                              base: USD
+                              quote: BOB
+                              value: '12.02'
+                              rateType: PARALLEL
+                              source: PROVIDER
+                              sourceLabel: paralelo.bo (mediana P2P USDT/BOB)
+                              asOf: '2026-10-02T08:53:07.532Z'
+                              effectiveDate: '2026-10-02'
+                              supersedesRateId: null
+                              supersededByRateId: null
+                              supersedeReason: null
+                              createdAt: '2026-10-02T09:00:00.120Z'
+                              provider: PARALELO_BO
+                              fetchedAt: '2026-10-02T09:00:00Z'
+                              attribution:
+                                provider: PARALELO_BO
+                                text: 'Fuente: paralelo.bo'
+                                url: https://paralelo.bo
+                                license: CC BY 4.0
+                                licenseUrl: https://creativecommons.org/licenses/by/4.0/
+                              anomaly: null
+                            stale: false
+                            ageSeconds: 3142
+                        lastAttemptAt: '2026-10-02T09:45:00Z'
+                        lastSuccessAt: '2026-10-02T09:00:00Z'
+                        lastError: { code: PROVIDER_UNAVAILABLE, httpStatus: 503, at: '2026-10-02T09:45:00Z' }
+                        consecutiveFailures: 3
+                        nextAttemptAt: '2026-10-02T10:00:00Z'
+                        pollIntervalSeconds: 900
+                        rateLimit: { limitPerMinute: 60, retryAfterUntil: null }
+                        backfill: { status: COMPLETED, pointsImported: 787, from: '2024-08-06', to: '2026-10-01', lastRunAt: '2026-10-02T06:00:00Z' }
+                        attribution:
+                          provider: PARALELO_BO
+                          text: 'Fuente: paralelo.bo'
+                          url: https://paralelo.bo
+                          license: CC BY 4.0
+                          licenseUrl: https://creativecommons.org/licenses/by/4.0/
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rate-preferences:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [FX]
+      operationId: listFxRatePreferences
+      summary: List the preferred rate type per currency pair (small, not paginated)
+      x-openspec-capability: fx/market-rates
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Preferences
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRatePreferenceList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [FX]
+      operationId: replaceFxRatePreferences
+      summary: Replace the preferred rate type per currency pair
+      x-openspec-capability: fx/market-rates
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FxRatePreferenceList' }
+      responses:
+        '200':
+          description: Saved preferences
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRatePreferenceList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED (duplicate pair), CURRENCY_NOT_ENABLED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ─────────────────────────────── Ledger ───────────────────────────────
+  /workspaces/{workspaceId}/ledger/trial-balance:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Ledger]
+      operationId: getLedgerTrialBalance
+      summary: Trial balance per currency (every currency totals zero)
+      x-openspec-capability: [ledger/balances]
+      x-required-role: VIEWER
+      parameters:
+        - name: asOf
+          in: query
+          description: Inclusive business date; defaults to today in the workspace timezone
+          schema: { $ref: '#/components/schemas/LocalDate' }
+      responses:
+        '200':
+          description: Trial balance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrialBalance' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ─────────────────────────────── Audit ───────────────────────────────
+  /workspaces/{workspaceId}/audit-log:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Audit]
+      operationId: listAuditLog
+      summary: Read the audit log (history of an entity or search by date range)
+      description: |
+        Default sort: `occurredAt` (chronological) when `aggregateId` is given (entity history), otherwise
+        `-occurredAt` (most recent first). `from`/`to` are business dates in the workspace timezone (inclusive).
+        Readable by OWNER and EDITOR only (VIEWER → 403 INSUFFICIENT_ROLE).
+        VIEWER sees the history of a single transaction through `getTransactionHistory` (D28).
+      x-openspec-capability: audit/audit-trail
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: aggregateType
+          in: query
+          schema: { type: string, pattern: '^[A-Za-z]+$', maxLength: 64, examples: [Transaction] }
+        - name: aggregateId
+          in: query
+          description: Requires `aggregateType`
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [occurredAt, -occurredAt]
+      responses:
+        '200':
+          description: Audit log page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED, INVALID_CURSOR, INVALID_FILTER (aggregateId without aggregateType, from > to).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ───────────────────────────── Reporting ─────────────────────────────
   /workspaces/{workspaceId}/reports/summary:
@@ -1509,10 +2872,13 @@ paths:
       operationId: getReportSummary
       summary: Basic dashboard KPIs for a period (income, expenses, net, balances, top categories)
       description: |
-        Served from derived read models (eventually consistent; see `meta.dataFreshness`).
-        Figures are reported per currency. A consolidated figure in `reportingCurrency` is included only when
-        rates are available for every currency involved; it is flagged `approx: true`.
-      x-openspec-capability: reporting/dashboard
+        In Phase 1 the summary is computed from the source of truth (ledger + posted transactions), without read
+        models. Figures are reported per currency (`byCurrency`) and consolidated in `reportingCurrency`: the
+        consolidated block is always present; when a rate is missing for some currency it has `complete=false` and
+        the excluded native amounts are listed in `unconverted[]` (never invented). Stocks (balances, net worth) are
+        valued at the query date; flows (income, expense) at the rate of their own date. `meta.approx` is true when
+        any consolidated figure uses reference or cross rates.
+      x-openspec-capability: [reporting/dashboard, reporting/net-worth]
       x-required-role: VIEWER
       parameters:
         - name: month
@@ -1534,16 +2900,32 @@ paths:
         - name: topCategories
           in: query
           schema: { type: integer, minimum: 0, maximum: 20, default: 5 }
+        - name: compare
+          in: query
+          description: Comparison period. `PREVIOUS_PERIOD_TO_DATE` compares with the same number of elapsed days of the previous period.
+          schema:
+            type: string
+            enum: [PREVIOUS_PERIOD_TO_DATE, PREVIOUS_PERIOD, NONE]
+            default: PREVIOUS_PERIOD_TO_DATE
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Summary
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReportSummary' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ───────────────────────────── Platform ─────────────────────────────
   /workspaces/{workspaceId}/operations/{operationId}:
@@ -1567,6 +2949,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
 components:
   securitySchemes:
@@ -1621,6 +3005,11 @@ components:
       schema: { $ref: '#/components/schemas/Uuid' }
     CounterpartyId:
       name: counterpartyId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    FxRateId:
+      name: fxRateId
       in: path
       required: true
       schema: { $ref: '#/components/schemas/Uuid' }
@@ -1694,6 +3083,15 @@ components:
     RateLimitPolicy:
       description: 'Quota policy (IETF RateLimit header draft), e.g. `"default";q=600;w=60`'
       schema: { type: string }
+    Deprecation:
+      description: Deprecation date of the operation (RFC 9745 structured field date)
+      schema: { type: string, examples: ['@1798761600'] }
+    Sunset:
+      description: Retirement date of the operation (RFC 8594 HTTP-date, at least 90 days after the announcement)
+      schema: { type: string, examples: ['Thu, 31 Dec 2026 00:00:00 GMT'] }
+    Link:
+      description: 'Link to the deprecation notice, with `rel="deprecation"`'
+      schema: { type: string, examples: ['<https://pfos.dev/deprecations/2026-10>; rel="deprecation"'] }
 
   responses:
     NotModified:
@@ -1722,7 +3120,9 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Conflict:
-      description: Domain state conflict (e.g. PERIOD_CLOSED, ACCOUNT_ARCHIVED, INVALID_STATUS_TRANSITION, CONCURRENCY_CONFLICT, NAME_TAKEN, IDEMPOTENCY_REQUEST_IN_PROGRESS)
+      description: Domain state conflict (e.g. PERIOD_CLOSED, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, INVALID_STATUS_TRANSITION, CONCURRENCY_CONFLICT, NAME_TAKEN, LEDGER_ENTRY_ALREADY_REVERSED, IDEMPOTENCY_REQUEST_IN_PROGRESS — the latter with Retry-After)
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -1737,7 +3137,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     UnprocessableEntity:
-      description: Domain validation failed (e.g. SPLITS_DO_NOT_SUM, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED)
+      description: Domain validation failed (e.g. SPLITS_DO_NOT_SUM, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND, LEDGER_UNBALANCED_ENTRY, IDEMPOTENCY_KEY_REUSED)
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -1747,6 +3147,18 @@ components:
         Retry-After: { $ref: '#/components/headers/RetryAfter' }
         RateLimit: { $ref: '#/components/headers/RateLimit' }
         RateLimit-Policy: { $ref: '#/components/headers/RateLimitPolicy' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalServerError:
+      description: Unexpected server error (INTERNAL_ERROR). Never includes stack traces, SQL or table names; `requestId` is logged.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: A dependency (e.g. the database) is temporarily unavailable (SERVICE_UNAVAILABLE). Not stored as an idempotent result.
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -1780,12 +3192,14 @@ components:
     LocalDate:
       type: string
       format: date
-      description: Business date (YYYY-MM-DD) in the workspace timezone
+      pattern: '^\d{4}-\d{2}-\d{2}$'
+      description: Business date (YYYY-MM-DD) in the workspace timezone; never converted to another timezone
       examples: ['2026-09-30']
     Instant:
       type: string
       format: date-time
-      description: RFC 3339 UTC instant
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$'
+      description: RFC 3339 UTC con sufijo Z (RFC 3339 UTC instant with `Z` suffix)
       examples: ['2026-09-30T18:42:00Z']
     Version:
       type: integer
@@ -1818,7 +3232,8 @@ components:
         value: { $ref: '#/components/schemas/PositiveDecimalString' }
     PageInfo:
       type: object
-      required: [limit, hasMore]
+      additionalProperties: false
+      required: [limit, hasMore, nextCursor]
       properties:
         limit: { type: integer }
         hasMore: { type: boolean }
@@ -1833,7 +3248,7 @@ components:
     Problem:
       type: object
       description: RFC 9457 problem details with PFOS extensions
-      required: [type, title, status, code]
+      required: [type, title, status, code, requestId]
       properties:
         type:
           type: string
@@ -1844,10 +3259,17 @@ components:
         detail: { type: string }
         instance: { type: string, format: uri-reference }
         code: { $ref: '#/components/schemas/ErrorCode' }
-        requestId: { type: string }
+        requestId: { type: string, description: Correlates the response with server logs }
         currentVersion:
           type: integer
           description: Present on PRECONDITION_FAILED / CONCURRENCY_CONFLICT
+        suggestedOperationId:
+          type: string
+          description: RFC 9457 extension. Operation the client should use instead (e.g. `createConversion` on TRANSFER_CURRENCY_MISMATCH).
+          examples: [createConversion]
+        existingId:
+          $ref: '#/components/schemas/Uuid'
+          description: RFC 9457 extension. Id of the existing active resource on NAME_TAKEN (e.g. counterparties) so the UI can select it.
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
@@ -1863,48 +3285,76 @@ components:
       anyOf:
         - type: string
           enum:
-            - VALIDATION_FAILED
-            - INVALID_CURSOR
-            - INVALID_SORT
-            - INVALID_FILTER
-            - UNAUTHENTICATED
-            - WORKSPACE_ACCESS_DENIED
-            - INSUFFICIENT_ROLE
-            - RESOURCE_NOT_FOUND
-            - CONCURRENCY_CONFLICT
-            - IDEMPOTENCY_REQUEST_IN_PROGRESS
-            - PRECONDITION_FAILED
-            - PRECONDITION_REQUIRED
-            - IDEMPOTENCY_KEY_REQUIRED
-            - IDEMPOTENCY_KEY_REUSED
-            - REFERENCE_NOT_FOUND
-            - RATE_LIMITED
-            - INTERNAL_ERROR
-            - SERVICE_UNAVAILABLE
-            - WORKSPACE_PENDING_DELETION
-            - LAST_OWNER_CANNOT_LEAVE
-            - ACCOUNT_ARCHIVED
-            - ACCOUNT_CURRENCY_IMMUTABLE
-            - ACCOUNT_NAME_TAKEN
-            - LEDGER_UNBALANCED_ENTRY
-            - PERIOD_CLOSED
-            - CURRENCY_MISMATCH
-            - SPLITS_DO_NOT_SUM
-            - INVALID_STATUS_TRANSITION
-            - TRANSACTION_RECONCILED
-            - TRANSFER_SAME_ACCOUNT
-            - CONVERSION_SAME_CURRENCY
-            - CONVERSION_AMOUNTS_INCONSISTENT
-            - AMOUNT_SCALE_EXCEEDED
-            - AMOUNT_NOT_POSITIVE
-            - CATEGORY_ARCHIVED
-            - TAG_ARCHIVED
-            - COUNTERPARTY_ARCHIVED
-            - CATEGORY_KIND_MISMATCH
-            - SYSTEM_CATEGORY_IMMUTABLE
-            - NAME_TAKEN
-            - FX_RATE_NOT_FOUND
-            - CURRENCY_NOT_ENABLED
+            # platform / api-conventions
+            - VALIDATION_FAILED                 # 400
+            - INVALID_CURSOR                    # 400
+            - INVALID_SORT                      # 400
+            - INVALID_FILTER                    # 400
+            - RESOURCE_NOT_FOUND                # 404
+            - CONCURRENCY_CONFLICT              # 409
+            - IDEMPOTENCY_REQUEST_IN_PROGRESS   # 409 + Retry-After
+            - PRECONDITION_FAILED               # 412
+            - PRECONDITION_REQUIRED             # 428
+            - IDEMPOTENCY_KEY_REQUIRED          # 428
+            - IDEMPOTENCY_KEY_REUSED            # 422
+            - REFERENCE_NOT_FOUND               # 422
+            - RATE_LIMITED                      # 429
+            - INTERNAL_ERROR                    # 500
+            - SERVICE_UNAVAILABLE               # 503
+            # identity / security
+            - UNAUTHENTICATED                   # 401
+            - WORKSPACE_ACCESS_DENIED           # 403 (not an active member)
+            - INSUFFICIENT_ROLE                 # 403 (role too low)
+            - INVALID_TIMEZONE                  # 422
+            - WORKSPACE_PENDING_DELETION        # 409 (later phase)
+            - LAST_OWNER_CANNOT_LEAVE           # 409 (later phase)
+            # money / ledger
+            - MONEY_INVALID_AMOUNT              # 422
+            - AMOUNT_OUT_OF_RANGE               # 422
+            - AMOUNT_SCALE_EXCEEDED             # 422
+            - AMOUNT_NOT_POSITIVE               # 422
+            - CURRENCY_MISMATCH                 # 422
+            - LEDGER_UNBALANCED_ENTRY           # 422
+            - LEDGER_ENTRY_TOO_FEW_POSTINGS     # 422
+            - LEDGER_ZERO_AMOUNT_POSTING        # 422
+            - LEDGER_SPLIT_REQUIRED             # 422
+            - LEDGER_ENTRY_ALREADY_REVERSED     # 409
+            - LEDGER_ENTRY_NOT_REVERSIBLE       # 409
+            - LEDGER_IMMUTABLE                  # 409 (DB immutability guard PF003, if surfaced)
+            - PERIOD_CLOSED                     # 409
+            # accounts
+            - ACCOUNT_ARCHIVED                  # 409
+            - ACCOUNT_CLOSED                    # 409
+            - ACCOUNT_BALANCE_NOT_ZERO          # 409
+            - ACCOUNT_CURRENCY_IMMUTABLE        # 409
+            - ACCOUNT_CURRENCY_KIND_MISMATCH    # 422
+            - ACCOUNT_NAME_TAKEN                # 409
+            - INSTITUTION_ARCHIVED              # 409
+            # transactions
+            - SPLITS_DO_NOT_SUM                 # 422
+            - INVALID_STATUS_TRANSITION         # 409
+            - TRANSACTION_RECONCILED            # 409
+            - REFUND_EXCEEDS_ORIGINAL           # 422
+            - TRANSFER_SAME_ACCOUNT             # 422
+            - TRANSFER_CURRENCY_MISMATCH        # 422 (+ suggestedOperationId)
+            - CONVERSION_SAME_CURRENCY          # 422
+            - CONVERSION_AMOUNTS_INCONSISTENT   # 422
+            # classification
+            - CATEGORY_ARCHIVED                 # 409
+            - TAG_ARCHIVED                      # 409
+            - COUNTERPARTY_ARCHIVED             # 409
+            - CATEGORY_KIND_MISMATCH            # 422
+            - CATEGORY_DEPTH_EXCEEDED           # 422
+            - CATEGORY_GROUP_NOT_EMPTY          # 409
+            - SYSTEM_CATEGORY_IMMUTABLE         # 409
+            - COUNTERPARTY_ALIAS_TAKEN          # 409
+            - NAME_TAKEN                        # 409 (+ existingId for counterparties)
+            # fx
+            - FX_RATE_NOT_FOUND                 # 422
+            - FX_RATE_ALREADY_SUPERSEDED        # 409
+            - FX_RATE_ANOMALY_ALREADY_REVIEWED  # 409
+            - FX_RATE_NOT_ANOMALOUS             # 422
+            - CURRENCY_NOT_ENABLED              # 422
         - type: string
           pattern: '^[A-Z][A-Z0-9_]*$'
 
@@ -1914,12 +3364,13 @@ components:
       enum: [OWNER, EDITOR, VIEWER]
     Me:
       type: object
-      required: [id, email, displayName, locale, memberships, version]
+      required: [id, email, displayName, locale, timezone, memberships, version]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         email: { type: string, format: email }
         displayName: { type: string }
         locale: { type: string, examples: [es-BO] }
+        timezone: { type: string, description: IANA time zone of the user, examples: [America/La_Paz] }
         preferences:
           type: object
           additionalProperties: true
@@ -1940,16 +3391,23 @@ components:
       properties:
         displayName: { type: string, minLength: 1, maxLength: 100 }
         locale: { type: string, maxLength: 20 }
+        timezone: { type: string, maxLength: 64, description: IANA time zone (INVALID_TIMEZONE otherwise) }
         preferences: { type: object, additionalProperties: true }
     Workspace:
       type: object
-      required: [id, name, baseCurrency, timezone, locale, status, role, version, createdAt]
+      required: [id, name, baseCurrency, timezone, locale, fiscalMonthStartDay, status, role, version, createdAt]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         name: { type: string }
         baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
         timezone: { type: string, examples: [America/La_Paz] }
         locale: { type: string, examples: [es-BO] }
+        fiscalMonthStartDay: { type: integer, minimum: 1, maximum: 28, description: Day of month on which the financial month starts }
+        minimumLiquidityReserve:
+          description: Minimum liquid balance the owner wants to keep (base currency); null when not set
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
         status:
           type: string
           enum: [ACTIVE, PENDING_DELETION]
@@ -1968,6 +3426,11 @@ components:
         baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
         timezone: { type: string, default: America/La_Paz }
         locale: { type: string, default: es-BO }
+        fiscalMonthStartDay: { type: integer, minimum: 1, maximum: 28, default: 1 }
+        seedDefaultCategories:
+          type: boolean
+          default: true
+          description: Also apply the default category catalog (system categories are always seeded)
         enabledCurrencies:
           type: array
           items: { $ref: '#/components/schemas/CurrencyCode' }
@@ -1981,6 +3444,12 @@ components:
         locale: { type: string }
         baseCurrency:
           $ref: '#/components/schemas/CurrencyCode'
+        fiscalMonthStartDay: { type: integer, minimum: 1, maximum: 28 }
+        minimumLiquidityReserve:
+          description: Amount ≥ 0 in the base currency with its canonical scale (validated by the server); null clears it
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
     WorkspacePage:
       type: object
       required: [data, page]
@@ -1993,25 +3462,57 @@ components:
     # ── Accounts ──
     AccountType:
       type: string
-      enum: [CASH, CHECKING, SAVINGS, CREDIT_CARD, LOAN, CRYPTO_WALLET, EXCHANGE, P2P, INVESTMENT, OTHER_ASSET, OTHER_LIABILITY]
+      description: |
+        Canonical account types (docs/01, docs/31 D3). Nature is derived: CREDIT_CARD, LOAN and MANUAL_LIABILITY are
+        LIABILITY; all others are ASSET. Immutable after creation.
+      enum: [BANK, CASH, DIGITAL_WALLET, CREDIT_CARD, LOAN, CRYPTO_WALLET, INVESTMENT, SAVINGS, VIRTUAL, MANUAL_ASSET, MANUAL_LIABILITY]
     AccountClassification:
       type: string
       enum: [ASSET, LIABILITY]
+    AccountLiquidity:
+      type: string
+      description: |
+        Only LIQUID accounts count as available money (docs/31 D5). Default by type: LIQUID for BANK, CASH,
+        DIGITAL_WALLET, CRYPTO_WALLET and SAVINGS; SEMI_LIQUID for INVESTMENT; ILLIQUID for the rest.
+      enum: [LIQUID, SEMI_LIQUID, ILLIQUID]
+    AccountStatus:
+      type: string
+      description: ACTIVE accepts movements; CLOSED (balance zero) and ARCHIVED do not (docs/31 D4).
+      enum: [ACTIVE, CLOSED, ARCHIVED]
+    BaseCurrencyBalance:
+      type: object
+      description: Balance valued in the workspace base currency with the rate used (never invented when no rate exists)
+      additionalProperties: false
+      required: [amount, rateDate, rateSource, fxRateId]
+      properties:
+        amount: { $ref: '#/components/schemas/Money' }
+        rateDate: { $ref: '#/components/schemas/LocalDate' }
+        rateSource: { type: string, examples: [MANUAL] }
+        fxRateId: { $ref: '#/components/schemas/Uuid' }
     Account:
       type: object
-      required: [id, name, type, classification, currency, balance, includeInNetWorth, version, createdAt]
+      required: [id, name, type, classification, status, liquidity, currency, balance, includeInNetWorth, version, createdAt]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         name: { type: string }
         type: { $ref: '#/components/schemas/AccountType' }
         classification: { $ref: '#/components/schemas/AccountClassification' }
+        status: { $ref: '#/components/schemas/AccountStatus' }
+        liquidity: { $ref: '#/components/schemas/AccountLiquidity' }
         currency: { $ref: '#/components/schemas/CurrencyCode' }
         institutionId: { type: [string, 'null'], format: uuid }
         openedOn: { type: [string, 'null'], format: date }
         closedOn: { type: [string, 'null'], format: date }
         balance:
           $ref: '#/components/schemas/Money'
-          description: Presented balance (ASSET as is; LIABILITY as positive amount owed). Includes posted, cleared and reconciled.
+          description: |
+            Presented balance derived from the ledger (ASSET as is; LIABILITY as positive amount owed, negative when
+            the issuer owes the user). Includes posted, cleared and reconciled.
+        baseCurrencyBalance:
+          description: Equivalent in the workspace base currency; null when the account is in the base currency or no rate is available
+          oneOf:
+            - $ref: '#/components/schemas/BaseCurrencyBalance'
+            - type: 'null'
         clearedBalance:
           $ref: '#/components/schemas/Money'
           description: Balance of cleared + reconciled transactions only
@@ -2021,8 +3522,13 @@ components:
         includeInNetWorth: { type: boolean }
         includeInBudget: { type: boolean }
         displayOrder: { type: integer }
-        accountNumberLast4: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+        accountNumberLast4: { type: [string, 'null'], pattern: '^[A-Za-z0-9]{4}$' }
         color: { type: [string, 'null'] }
+        icon: { type: [string, 'null'] }
+        tagIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        cryptoNetwork: { type: [string, 'null'], maxLength: 20, examples: [TRC20] }
         notes: { type: [string, 'null'] }
         archivedAt: { type: [string, 'null'], format: date-time }
         version: { $ref: '#/components/schemas/Version' }
@@ -2041,33 +3547,84 @@ components:
         openedOn: { $ref: '#/components/schemas/LocalDate' }
         openingBalance:
           type: object
-          description: Posts an OPENING_BALANCE transaction against EQUITY:OPENING_BALANCE:<CCY>
+          description: Posts an OPENING_BALANCE transaction against EQUITY:OPENING_BALANCE:<CCY> (atomic with the account)
           additionalProperties: false
           required: [amount, date]
           properties:
             amount:
               $ref: '#/components/schemas/Money'
-              description: Presented balance (for LIABILITY, positive = amount owed). Must use the account currency.
+              description: |
+                Presented balance (for LIABILITY, positive = amount owed). Must use the account currency and its
+                canonical scale (AMOUNT_SCALE_EXCEEDED). Zero ⇒ no journal entry.
             date: { $ref: '#/components/schemas/LocalDate' }
+        liquidity:
+          $ref: '#/components/schemas/AccountLiquidity'
+          description: Defaults by type (see AccountLiquidity)
         includeInNetWorth: { type: boolean, default: true }
         includeInBudget: { type: boolean, default: true }
-        accountNumberLast4: { type: string, pattern: '^[0-9]{4}$' }
+        accountNumberLast4: { type: string, pattern: '^[A-Za-z0-9]{4}$' }
         color: { type: string, maxLength: 20 }
+        icon: { type: string, maxLength: 40 }
+        tagIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+        cryptoNetwork: { type: string, maxLength: 20 }
         notes: { type: string, maxLength: 2000 }
     AccountUpdate:
       type: object
       additionalProperties: false
-      description: Currency and type classification are immutable.
+      description: |
+        `type` is immutable (not accepted ⇒ VALIDATION_FAILED). `currency` only while the account has no movements
+        (ACCOUNT_CURRENCY_IMMUTABLE). Closing uses `closeAccount`.
       properties:
         name: { type: string, minLength: 1, maxLength: 100 }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
         institutionId: { type: [string, 'null'], format: uuid }
-        closedOn: { type: [string, 'null'], format: date }
+        liquidity: { $ref: '#/components/schemas/AccountLiquidity' }
         includeInNetWorth: { type: boolean }
         includeInBudget: { type: boolean }
         displayOrder: { type: integer }
-        accountNumberLast4: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+        accountNumberLast4: { type: [string, 'null'], pattern: '^[A-Za-z0-9]{4}$' }
         color: { type: [string, 'null'], maxLength: 20 }
+        icon: { type: [string, 'null'], maxLength: 40 }
+        tagIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+        cryptoNetwork: { type: [string, 'null'], maxLength: 20 }
         notes: { type: [string, 'null'], maxLength: 2000 }
+    AccountClose:
+      type: object
+      additionalProperties: false
+      required: [closedOn]
+      properties:
+        closedOn: { $ref: '#/components/schemas/LocalDate' }
+        reason: { type: string, maxLength: 500 }
+    AccountOrder:
+      type: object
+      additionalProperties: false
+      required: [accountIds]
+      properties:
+        accountIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+    AccountGroup:
+      type: object
+      additionalProperties: false
+      required: [key, label, accountIds]
+      properties:
+        key:
+          type: [string, 'null']
+          description: AccountType value or institution id; null for accounts without institution
+        label: { type: [string, 'null'] }
+        accountIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
     AccountPage:
       type: object
       required: [data, page]
@@ -2076,9 +3633,13 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Account' }
         page: { $ref: '#/components/schemas/PageInfo' }
+        groups:
+          type: array
+          description: Present only when `groupBy` is given
+          items: { $ref: '#/components/schemas/AccountGroup' }
     InstitutionKind:
       type: string
-      enum: [BANK, EXCHANGE, WALLET_PROVIDER, BROKER, P2P_PLATFORM, OTHER]
+      enum: [BANK, FINTECH, EXCHANGE, BROKER, WALLET_PROVIDER, OTHER]
     Institution:
       type: object
       required: [id, name, kind, version]
@@ -2088,6 +3649,8 @@ components:
         kind: { $ref: '#/components/schemas/InstitutionKind' }
         countryCode: { type: [string, 'null'], pattern: '^[A-Z]{2}$' }
         website: { type: [string, 'null'], format: uri }
+        icon: { type: [string, 'null'], maxLength: 40 }
+        color: { type: [string, 'null'], maxLength: 20 }
         notes: { type: [string, 'null'] }
         archivedAt: { type: [string, 'null'], format: date-time }
         version: { $ref: '#/components/schemas/Version' }
@@ -2101,6 +3664,8 @@ components:
         kind: { $ref: '#/components/schemas/InstitutionKind' }
         countryCode: { type: string, pattern: '^[A-Z]{2}$' }
         website: { type: string, format: uri }
+        icon: { type: string, maxLength: 40 }
+        color: { type: string, maxLength: 20 }
         notes: { type: string, maxLength: 2000 }
     InstitutionUpdate:
       type: object
@@ -2110,6 +3675,8 @@ components:
         kind: { $ref: '#/components/schemas/InstitutionKind' }
         countryCode: { type: [string, 'null'], pattern: '^[A-Z]{2}$' }
         website: { type: [string, 'null'], format: uri }
+        icon: { type: [string, 'null'], maxLength: 40 }
+        color: { type: [string, 'null'], maxLength: 20 }
         notes: { type: [string, 'null'], maxLength: 2000 }
     InstitutionPage:
       type: object
@@ -2123,13 +3690,20 @@ components:
     # ── Transactions ──
     TransactionKind:
       type: string
-      enum: [INCOME, EXPENSE, TRANSFER, REFUND, ADJUSTMENT, OPENING_BALANCE, CONVERSION, LOAN_DISBURSEMENT, LOAN_PAYMENT, CARD_PAYMENT]
+      description: |
+        A credit-card payment is a `TRANSFER` ASSET → LIABILITY (docs/31 D18); there is no dedicated kind.
+        LOAN_DISBURSEMENT and LOAN_PAYMENT are produced by Debt (Phase 4).
+      enum: [INCOME, EXPENSE, TRANSFER, REFUND, ADJUSTMENT, OPENING_BALANCE, CONVERSION, LOAN_DISBURSEMENT, LOAN_PAYMENT]
     TransactionStatus:
       type: string
       enum: [PENDING, POSTED, CLEARED, RECONCILED, VOIDED]
     TransactionSource:
       type: string
       enum: [MANUAL, IMPORT, RECURRING, DEBT, GOAL, SYSTEM]
+    PaymentMethod:
+      type: string
+      description: Medio de pago de una transacción (QR = QR Simple interoperable de la banca boliviana)
+      enum: [CASH, QR, DEBIT_CARD, CREDIT_CARD, BANK_TRANSFER, DIGITAL_WALLET, OTHER]
     TransactionLeg:
       type: object
       description: Money movement on a user account, signed from the account perspective (outflow negative).
@@ -2156,9 +3730,9 @@ components:
         memo: { type: [string, 'null'] }
         customFields:
           type: object
-          description: Custom field values keyed by field key (Phase 2)
+          description: Custom field values keyed by field key (Phase 2). Numeric values travel as decimal strings (never JSON numbers).
           additionalProperties:
-            type: [string, number, boolean, 'null']
+            type: [string, boolean, 'null']
     SplitInput:
       type: object
       additionalProperties: false
@@ -2192,9 +3766,12 @@ components:
         paidFromAccountId: { type: [string, 'null'], format: uuid }
     ConversionDetail:
       type: object
-      description: Immutable pricing metadata of a conversion (docs/09-ledger-design.md §7). Never recalculated with current rates.
-      required: [sourceAccountId, targetAccountId, sourceAmount, convertedSourceAmount, grossTargetAmount, targetAmount, effectiveRate, fees, executedAt]
+      description: |
+        Pricing metadata of the active revision of a conversion (docs/09-ledger-design.md §7). Never recalculated
+        with current rates; an amend creates a new revision (docs/31 D11).
+      required: [revision, sourceAccountId, targetAccountId, sourceAmount, convertedSourceAmount, grossTargetAmount, targetAmount, effectiveRate, fees, executedAt]
       properties:
+        revision: { type: integer, minimum: 1 }
         sourceAccountId: { $ref: '#/components/schemas/Uuid' }
         targetAccountId: { $ref: '#/components/schemas/Uuid' }
         sourceAmount:
@@ -2218,6 +3795,14 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Spread'
             - type: 'null'
+        quotedRateDeviation:
+          description: Gross target minus converted source × quoted rate, when it exceeds one minimal unit of the target currency
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        totalCost:
+          $ref: '#/components/schemas/ConversionCost'
+          description: Derived, response only (fees + spread valued in the reporting currency)
         fees:
           type: array
           items: { $ref: '#/components/schemas/ConversionFee' }
@@ -2230,7 +3815,21 @@ components:
       properties:
         rate: { $ref: '#/components/schemas/Rate' }
         fxRateId: { $ref: '#/components/schemas/Uuid' }
-        source: { type: string }
+        source: { $ref: '#/components/schemas/FxRateSource' }
+        rateType: { $ref: '#/components/schemas/FxRateType' }
+        asOf: { $ref: '#/components/schemas/Instant' }
+    ConversionCost:
+      type: object
+      additionalProperties: false
+      required: [amount, complete]
+      properties:
+        amount:
+          $ref: '#/components/schemas/Money'
+          description: Total cost (fees + spread) in the reporting currency
+        complete: { type: boolean, description: False when some component could not be valued (see missingValuations) }
+        missingValuations:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
     Spread:
       type: object
       required: [percentage, amount]
@@ -2253,10 +3852,26 @@ components:
         kind: { $ref: '#/components/schemas/TransactionKind' }
         status: { $ref: '#/components/schemas/TransactionStatus' }
         transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        postingDate:
+          type: [string, 'null']
+          format: date
+          description: Date the bank applied the movement (informative; the ledger uses transactionDate)
         amount:
           $ref: '#/components/schemas/Money'
           description: Magnitude in the main/source account currency
+        refundOfTransactionId: { type: [string, 'null'], format: uuid, description: Original expense of a REFUND }
+        adjustmentReason: { type: [string, 'null'] }
+        adjustmentDirection:
+          type: [string, 'null']
+          enum: [INCREASE, DECREASE, null]
+        activeJournalEntryId:
+          type: [string, 'null']
+          format: uuid
+          description: Journal entry currently representing the transaction (null for PENDING and VOIDED)
         description: { type: [string, 'null'] }
+        paymentMethod:
+          anyOf: [{ $ref: '#/components/schemas/PaymentMethod' }, { type: 'null' }]
+          description: Medio de pago (D27); no afecta el ledger
         notes: { type: [string, 'null'] }
         counterpartyId: { type: [string, 'null'], format: uuid }
         legs:
@@ -2293,18 +3908,22 @@ components:
       required: [kind, transactionDate, accountId, amount]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
+        paymentMethod:
+          anyOf: [{ $ref: '#/components/schemas/PaymentMethod' }, { type: 'null' }]
+          description: Medio de pago (D27); no afecta el ledger
         kind:
           type: string
           enum: [INCOME, EXPENSE, REFUND, ADJUSTMENT]
         direction:
           type: string
           enum: [INCREASE, DECREASE]
-          description: Required only for ADJUSTMENT (effect on the presented account balance)
+          description: Required for ADJUSTMENT (effect on the presented account balance); not accepted for other kinds
         status:
           type: string
           enum: [PENDING, POSTED, CLEARED]
           default: POSTED
         transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        postingDate: { $ref: '#/components/schemas/LocalDate' }
         accountId: { $ref: '#/components/schemas/Uuid' }
         amount:
           $ref: '#/components/schemas/PositiveMoney'
@@ -2312,17 +3931,59 @@ components:
         description: { type: string, maxLength: 500 }
         notes: { type: string, maxLength: 4000 }
         counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        refundOfTransactionId:
+          $ref: '#/components/schemas/Uuid'
+          description: Only for REFUND; the original EXPENSE being refunded
+        confirmRefundExceedsOriginal:
+          type: boolean
+          default: false
+          description: Only for REFUND; accept a refund larger than the non-refunded remainder (otherwise REFUND_EXCEEDS_ORIGINAL)
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Required when kind = ADJUSTMENT
+        externalRef: { $ref: '#/components/schemas/ExternalRef' }
         splits:
           type: array
           minItems: 1
           maxItems: 50
-          description: Must sum to `amount` (SPLITS_DO_NOT_SUM). Omit for a single UNCATEGORIZED split.
+          description: |
+            Must sum to `amount` (SPLITS_DO_NOT_SUM). Omit for a single UNCATEGORIZED split. Not applicable to
+            ADJUSTMENT in Phase 1.
           items: { $ref: '#/components/schemas/SplitInput' }
+    TransactionWarning:
+      type: object
+      additionalProperties: false
+      required: [code, transactionIds, detail]
+      properties:
+        code:
+          type: string
+          enum: [POSSIBLE_DUPLICATE]
+        transactionIds:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Uuid' }
+        detail: { type: string }
+    TransactionCreateResult:
+      description: The recorded transaction plus non-blocking warnings
+      allOf:
+        - $ref: '#/components/schemas/Transaction'
+        - type: object
+          required: [warnings]
+          properties:
+            warnings:
+              type: array
+              items: { $ref: '#/components/schemas/TransactionWarning' }
     TransactionUpdate:
       type: object
       additionalProperties: false
       properties:
         transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        paymentMethod:
+          anyOf: [{ $ref: '#/components/schemas/PaymentMethod' }, { type: 'null' }]
+          description: Medio de pago (D27); no afecta el ledger
+        postingDate: { type: [string, 'null'], format: date }
         accountId: { $ref: '#/components/schemas/Uuid' }
         amount: { $ref: '#/components/schemas/PositiveMoney' }
         description: { type: [string, 'null'], maxLength: 500 }
@@ -2330,8 +3991,10 @@ components:
         counterpartyId: { type: [string, 'null'], format: uuid }
         status:
           type: string
-          enum: [CLEARED, POSTED]
-          description: Toggle cleared flag on a posted transaction (RECONCILED is set by reconciliation only)
+          enum: [POSTED, CLEARED, RECONCILED]
+          description: |
+            Allowed transitions: POSTED↔CLEARED and CLEARED→RECONCILED. RECONCILED→CLEARED only via
+            `unreconcileTransaction`. Cannot be combined with financial fields (VALIDATION_FAILED).
         splits:
           type: array
           minItems: 1
@@ -2354,24 +4017,30 @@ components:
       required: [transactionDate, fromAccountId, toAccountId, amount]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
+        paymentMethod:
+          anyOf: [{ $ref: '#/components/schemas/PaymentMethod' }, { type: 'null' }]
+          description: Medio de pago (D27); no afecta el ledger
         status:
           type: string
           enum: [PENDING, POSTED, CLEARED]
           default: POSTED
         transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        postingDate: { $ref: '#/components/schemas/LocalDate' }
         fromAccountId: { $ref: '#/components/schemas/Uuid' }
         toAccountId: { $ref: '#/components/schemas/Uuid' }
         amount:
           $ref: '#/components/schemas/PositiveMoney'
-          description: Same currency as both accounts
+          description: Same currency as both accounts (TRANSFER_CURRENCY_MISMATCH otherwise)
         fee:
           type: object
           additionalProperties: false
           required: [amount]
-          description: Optional fee paid from the source account (EXPENSE split in system category Fees unless categoryId is given)
+          description: Optional fee paid from the source account, in the same currency (EXPENSE split in system category Fees unless categoryId is given)
           properties:
             amount: { $ref: '#/components/schemas/PositiveMoney' }
-            categoryId: { $ref: '#/components/schemas/Uuid' }
+            categoryId:
+              $ref: '#/components/schemas/Uuid'
+              description: Must be an EXPENSE category (CATEGORY_KIND_MISMATCH); defaults to the system category Fees
         description: { type: string, maxLength: 500 }
         notes: { type: string, maxLength: 4000 }
     ConversionFeeInput:
@@ -2427,6 +4096,155 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Transaction' }
         page: { $ref: '#/components/schemas/PageInfo' }
+    ClearedMarkRequest:
+      type: object
+      additionalProperties: false
+      required: [items, cleared]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, version]
+            properties:
+              id: { $ref: '#/components/schemas/Uuid' }
+              version: { $ref: '#/components/schemas/Version' }
+        cleared:
+          type: boolean
+          description: true ⇒ POSTED→CLEARED; false ⇒ CLEARED→POSTED
+    ClearedMarkResult:
+      type: object
+      required: [data, bulkOperationId]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
+        bulkOperationId:
+          $ref: '#/components/schemas/Uuid'
+          description: Common correlation of the per-item audit records
+    UnreconcileRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    DuplicateCheckRequest:
+      type: object
+      additionalProperties: false
+      required: [accountId, amount, transactionDate]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        description: { type: string, maxLength: 500 }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        excludeTransactionId:
+          $ref: '#/components/schemas/Uuid'
+          description: Transaction being edited (excluded from the candidates)
+    DuplicateCandidate:
+      type: object
+      additionalProperties: false
+      required: [transactionId, transactionDate, amount, description, counterpartyId, status]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        amount: { $ref: '#/components/schemas/Money' }
+        description: { type: [string, 'null'] }
+        counterpartyId: { type: [string, 'null'], format: uuid }
+        status: { $ref: '#/components/schemas/TransactionStatus' }
+    DuplicateCheckResult:
+      type: object
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/DuplicateCandidate' }
+    ConversionPreviewRequest:
+      type: object
+      additionalProperties: false
+      description: Exactly two of `sourceAmount`, `targetAmount` and `quotedRate` (CONVERSION_AMOUNTS_INCONSISTENT otherwise).
+      required: [sourceCurrency, targetCurrency]
+      properties:
+        sourceCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        targetCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        sourceAmount: { $ref: '#/components/schemas/PositiveMoney' }
+        targetAmount: { $ref: '#/components/schemas/PositiveMoney' }
+        quotedRate: { $ref: '#/components/schemas/Rate' }
+        fees:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/ConversionFeeInput' }
+        executedAt: { $ref: '#/components/schemas/Instant' }
+        referenceFxRateId: { $ref: '#/components/schemas/Uuid' }
+    ConversionPreview:
+      type: object
+      required: [sourceAmount, convertedSourceAmount, grossTargetAmount, targetAmount, effectiveRate, totalCost]
+      properties:
+        sourceAmount: { $ref: '#/components/schemas/Money' }
+        convertedSourceAmount: { $ref: '#/components/schemas/Money' }
+        grossTargetAmount: { $ref: '#/components/schemas/Money' }
+        targetAmount: { $ref: '#/components/schemas/Money' }
+        effectiveRate: { $ref: '#/components/schemas/Rate' }
+        quotedRate:
+          oneOf:
+            - $ref: '#/components/schemas/Rate'
+            - type: 'null'
+        referenceRate:
+          oneOf:
+            - $ref: '#/components/schemas/ReferenceRate'
+            - type: 'null'
+        spread:
+          oneOf:
+            - $ref: '#/components/schemas/Spread'
+            - type: 'null'
+        quotedRateDeviation:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        totalCost: { $ref: '#/components/schemas/ConversionCost' }
+    ConversionAmend:
+      type: object
+      additionalProperties: false
+      description: Same body as ConversionCreate without `id` and `status`, plus the reason of the amendment.
+      required: [transactionDate, sourceAccountId, targetAccountId, sourceAmount, targetAmount, executedAt]
+      properties:
+        transactionDate: { $ref: '#/components/schemas/LocalDate' }
+        sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+        targetAccountId: { $ref: '#/components/schemas/Uuid' }
+        sourceAmount: { $ref: '#/components/schemas/PositiveMoney' }
+        targetAmount: { $ref: '#/components/schemas/PositiveMoney' }
+        quotedRate: { $ref: '#/components/schemas/Rate' }
+        referenceFxRateId: { $ref: '#/components/schemas/Uuid' }
+        fees:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/ConversionFeeInput' }
+        provider: { $ref: '#/components/schemas/ConversionProvider' }
+        executedAt: { $ref: '#/components/schemas/Instant' }
+        externalRef: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 4000 }
+        reason: { type: string, maxLength: 500 }
+    ConversionRevision:
+      type: object
+      required: [revision, journalEntryId, active, createdAt, detail]
+      properties:
+        revision: { type: integer, minimum: 1 }
+        journalEntryId: { $ref: '#/components/schemas/Uuid' }
+        active: { type: boolean }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        detail: { $ref: '#/components/schemas/ConversionDetail' }
+    ConversionRevisionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ConversionRevision' }
 
     # ── Classification ──
     CategoryKind:
@@ -2467,16 +4285,18 @@ components:
         page: { $ref: '#/components/schemas/PageInfo' }
     Category:
       type: object
-      required: [id, groupId, name, kind, sortOrder, version]
+      required: [id, groupId, name, kind, isSystem, sortOrder, version]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         groupId: { $ref: '#/components/schemas/Uuid' }
-        parentId: { type: [string, 'null'], format: uuid }
-        name: { type: string }
+        parentId: { type: [string, 'null'], format: uuid, description: Parent category for a subcategory (max depth group → category → subcategory) }
+        name: { type: string, description: For system categories the name is returned in the user's locale }
         kind: { $ref: '#/components/schemas/CategoryKind' }
         systemCode:
           type: [string, 'null']
-          enum: [FEES, FX_FEES, INTEREST, INSURANCE, TAXES, UNCATEGORIZED, null]
+          description: Canonical system categories (docs/31 D9); null for user categories
+          enum: [FEES, FX_FEES, INTEREST, LOAN_FEES, INSURANCE, TAXES, ADJUSTMENTS, UNCATEGORIZED, INTEREST_EARNED, ADJUSTMENTS_INCOME, UNCATEGORIZED_INCOME, null]
+        isSystem: { type: boolean, description: 'Derived (systemCode is not null); system categories cannot be renamed, moved or archived' }
         color: { type: [string, 'null'] }
         icon: { type: [string, 'null'] }
         sortOrder: { type: integer }
@@ -2512,6 +4332,40 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Category' }
         page: { $ref: '#/components/schemas/PageInfo' }
+    CategoryReorder:
+      type: object
+      additionalProperties: false
+      required: [groupId, parentId, orderedIds]
+      properties:
+        groupId: { $ref: '#/components/schemas/Uuid' }
+        parentId: { type: [string, 'null'], format: uuid }
+        orderedIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Exactly the set of active siblings, in the new order
+          items: { $ref: '#/components/schemas/Uuid' }
+    DefaultCatalogRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        catalogVersion: { type: string, default: es-BO.v1, maxLength: 40 }
+    DefaultCatalogResult:
+      type: object
+      required: [catalogVersion, createdGroups, createdCategories, skipped]
+      properties:
+        catalogVersion: { type: string }
+        createdGroups: { type: integer, minimum: 0 }
+        createdCategories: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0, description: Catalog entries that already existed (by normalized name) }
+    CategorySuggestion:
+      type: object
+      required: [categoryId, source]
+      properties:
+        categoryId: { type: [string, 'null'], format: uuid }
+        source:
+          type: string
+          enum: [DEFAULT, LAST_USED, NONE]
     Tag:
       type: object
       required: [id, name, version]
@@ -2545,7 +4399,7 @@ components:
         page: { $ref: '#/components/schemas/PageInfo' }
     CounterpartyKind:
       type: string
-      enum: [MERCHANT, PERSON, EMPLOYER, SERVICE_PROVIDER, LENDER, EXCHANGE, P2P_TRADER, GOVERNMENT, OTHER]
+      enum: [MERCHANT, PERSON, EMPLOYER, SERVICE_PROVIDER, FINANCIAL_INSTITUTION, LENDER, EXCHANGE, P2P_TRADER, GOVERNMENT, OTHER]
     Counterparty:
       type: object
       required: [id, name, kind, version]
@@ -2557,6 +4411,7 @@ components:
         aliases:
           type: array
           items: { type: string }
+        icon: { type: [string, 'null'], maxLength: 50 }
         website: { type: [string, 'null'], format: uri }
         notes: { type: [string, 'null'] }
         archivedAt: { type: [string, 'null'], format: date-time }
@@ -2564,16 +4419,19 @@ components:
     CounterpartyCreate:
       type: object
       additionalProperties: false
-      required: [name, kind]
+      required: [name]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         name: { type: string, minLength: 1, maxLength: 120 }
-        kind: { $ref: '#/components/schemas/CounterpartyKind' }
+        kind:
+          $ref: '#/components/schemas/CounterpartyKind'
+          default: OTHER
         defaultCategoryId: { $ref: '#/components/schemas/Uuid' }
         aliases:
           type: array
           maxItems: 20
-          items: { type: string, maxLength: 120 }
+          items: { type: string, minLength: 3, maxLength: 120 }
+        icon: { type: string, maxLength: 50 }
         website: { type: string, format: uri }
         notes: { type: string, maxLength: 2000 }
     CounterpartyUpdate:
@@ -2586,9 +4444,22 @@ components:
         aliases:
           type: array
           maxItems: 20
-          items: { type: string, maxLength: 120 }
+          items: { type: string, minLength: 3, maxLength: 120 }
+        icon: { type: [string, 'null'], maxLength: 50 }
         website: { type: [string, 'null'], format: uri }
         notes: { type: [string, 'null'], maxLength: 2000 }
+    CounterpartyResolution:
+      type: object
+      required: [counterparty, matchedOn, matchedText]
+      properties:
+        counterparty:
+          oneOf:
+            - $ref: '#/components/schemas/Counterparty'
+            - type: 'null'
+        matchedOn:
+          type: [string, 'null']
+          enum: [NAME, ALIAS, null]
+        matchedText: { type: [string, 'null'] }
     CounterpartyPage:
       type: object
       required: [data, page]
@@ -2619,6 +4490,335 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/Currency' }
+    FxRateType:
+      type: string
+      description: Rate types of FR-FX-002 (docs/31 D13)
+      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM]
+    FxRateSource:
+      type: string
+      enum: [MANUAL, PROVIDER, USER_CONVERSION]
+    FxRateProvider:
+      type: string
+      description: Market rate providers (fx/market-rate-providers, ADR-0025)
+      enum: [PARALELO_BO, DOLARAPI_BO]
+    RateAttribution:
+      type: object
+      description: Source attribution that clients must display next to a provider rate (CC BY 4.0 for paralelo.bo)
+      additionalProperties: false
+      required: [provider, text, url]
+      properties:
+        provider: { $ref: '#/components/schemas/FxRateProvider' }
+        text: { type: string, examples: ['Fuente: paralelo.bo'] }
+        url: { type: string, format: uri, examples: ['https://paralelo.bo'] }
+        license: { type: [string, 'null'], examples: [CC BY 4.0] }
+        licenseUrl: { type: [string, 'null'], format: uri }
+    RateSelection:
+      type: string
+      description: How the valuation rate was selected (fx/market-rate-providers)
+      enum: [PRIMARY, FALLBACK, LAST_KNOWN_STALE, MANUAL]
+    FxRateAnomaly:
+      type: object
+      description: Present when a provider sample varied more than the threshold vs the previous accepted rate
+      additionalProperties: false
+      required: [baselineRateId, variationPct, thresholdPct, status]
+      properties:
+        baselineRateId: { $ref: '#/components/schemas/Uuid' }
+        variationPct:
+          $ref: '#/components/schemas/DecimalString'
+          description: Percentage, HALF_EVEN to 4 decimals (e.g. 12.3128 for 12.02 → 13.50)
+        thresholdPct: { $ref: '#/components/schemas/DecimalString' }
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, REJECTED]
+        reviewedBy: { type: [string, 'null'], format: uuid }
+        reviewedAt: { type: [string, 'null'], format: date-time }
+        reason: { type: [string, 'null'] }
+    FxRateAnomalyReview:
+      type: object
+      additionalProperties: false
+      required: [decision, reason]
+      properties:
+        decision:
+          type: string
+          enum: [CONFIRM, REJECT]
+        reason: { type: string, minLength: 3, maxLength: 500 }
+    FxProviderErrorCode:
+      type: string
+      enum: [PROVIDER_UNAVAILABLE, PROVIDER_TIMEOUT, PROVIDER_RATE_LIMITED, PROVIDER_PAYLOAD_INVALID, PROVIDER_SCHEMA_CHANGED, FX_PROVIDER_CONFIG_INVALID]
+    FxProviderFeed:
+      type: object
+      additionalProperties: false
+      required: [base, quote, rateType, role, lastRate, stale, ageSeconds]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        rateType: { $ref: '#/components/schemas/FxRateType' }
+        role:
+          type: string
+          enum: [PRIMARY, FALLBACK]
+        lastRate:
+          oneOf:
+            - $ref: '#/components/schemas/FxRate'
+            - type: 'null'
+        stale: { type: boolean }
+        ageSeconds: { type: [integer, 'null'], minimum: 0 }
+    FxProviderStatus:
+      type: object
+      additionalProperties: false
+      required: [provider, enabled, health, feeds, lastAttemptAt, lastSuccessAt, lastError, consecutiveFailures, nextAttemptAt, pollIntervalSeconds, backfill, attribution]
+      properties:
+        provider: { $ref: '#/components/schemas/FxRateProvider' }
+        enabled: { type: boolean }
+        health:
+          type: string
+          enum: [HEALTHY, DEGRADED, DOWN, DISABLED]
+        feeds:
+          type: array
+          items: { $ref: '#/components/schemas/FxProviderFeed' }
+        lastAttemptAt: { type: [string, 'null'], format: date-time }
+        lastSuccessAt: { type: [string, 'null'], format: date-time }
+        lastError:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [code, httpStatus, at]
+              properties:
+                code: { $ref: '#/components/schemas/FxProviderErrorCode' }
+                httpStatus: { type: [integer, 'null'] }
+                at: { $ref: '#/components/schemas/Instant' }
+            - type: 'null'
+        consecutiveFailures: { type: integer, minimum: 0 }
+        nextAttemptAt: { type: [string, 'null'], format: date-time }
+        pollIntervalSeconds: { type: [integer, 'null'], minimum: 60 }
+        rateLimit:
+          type: object
+          additionalProperties: false
+          properties:
+            limitPerMinute: { type: [integer, 'null'], minimum: 1 }
+            retryAfterUntil: { type: [string, 'null'], format: date-time }
+        backfill:
+          type: object
+          additionalProperties: false
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [NOT_APPLICABLE, PENDING, RUNNING, COMPLETED, FAILED]
+            pointsImported: { type: integer, minimum: 0 }
+            from: { type: [string, 'null'], format: date }
+            to: { type: [string, 'null'], format: date }
+            lastRunAt: { type: [string, 'null'], format: date-time }
+        attribution: { $ref: '#/components/schemas/RateAttribution' }
+    FxProviderStatusList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FxProviderStatus' }
+    FxRate:
+      type: object
+      description: Immutable historical rate; 1 `base` = `value` `quote`. Corrections create a superseding version.
+      required: [id, base, quote, value, rateType, source, asOf, effectiveDate, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        value: { $ref: '#/components/schemas/PositiveDecimalString' }
+        rateType: { $ref: '#/components/schemas/FxRateType' }
+        source: { $ref: '#/components/schemas/FxRateSource' }
+        sourceLabel: { type: [string, 'null'], maxLength: 200 }
+        asOf: { $ref: '#/components/schemas/Instant' }
+        effectiveDate:
+          $ref: '#/components/schemas/LocalDate'
+          description: Business date of `asOf` in the workspace timezone
+        supersedesRateId: { type: [string, 'null'], format: uuid }
+        supersededByRateId: { type: [string, 'null'], format: uuid }
+        supersedeReason: { type: [string, 'null'] }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        createdBy:
+          $ref: '#/components/schemas/Uuid'
+          description: User id for manual rates; absent for provider rates (recorded by the worker)
+        provider:
+          description: Provider that produced the rate (source = PROVIDER); null for manual rates
+          oneOf:
+            - $ref: '#/components/schemas/FxRateProvider'
+            - type: 'null'
+        fetchedAt:
+          type: [string, 'null']
+          format: date-time
+          description: When the worker fetched the sample (provider rates); `asOf` is the instant published by the provider
+        attribution:
+          oneOf:
+            - $ref: '#/components/schemas/RateAttribution'
+            - type: 'null'
+        anomaly:
+          oneOf:
+            - $ref: '#/components/schemas/FxRateAnomaly'
+            - type: 'null'
+    FxRateCreate:
+      type: object
+      additionalProperties: false
+      required: [base, quote, value, rateType, asOf]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        value: { $ref: '#/components/schemas/PositiveDecimalString' }
+        rateType: { $ref: '#/components/schemas/FxRateType' }
+        asOf: { $ref: '#/components/schemas/Instant' }
+        sourceLabel: { type: string, maxLength: 200 }
+    FxRateSupersede:
+      type: object
+      additionalProperties: false
+      required: [value, reason]
+      properties:
+        value: { $ref: '#/components/schemas/PositiveDecimalString' }
+        reason: { type: string, minLength: 3, maxLength: 500 }
+        sourceLabel: { type: string, maxLength: 200 }
+    FxRatePage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FxRate' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    ResolvedRate:
+      type: object
+      required: [rate, derivation, rateType, source, asOf, ageDays, approx]
+      properties:
+        rate: { $ref: '#/components/schemas/Rate' }
+        fxRateId:
+          type: [string, 'null']
+          format: uuid
+          description: Null when derivation is CROSS
+        derivation:
+          type: string
+          enum: [DIRECT, INVERSE, CROSS]
+        components:
+          type: array
+          description: Stored rates used for INVERSE / CROSS derivations
+          items: { $ref: '#/components/schemas/FxRate' }
+        rateType: { $ref: '#/components/schemas/FxRateType' }
+        source: { $ref: '#/components/schemas/FxRateSource' }
+        asOf: { $ref: '#/components/schemas/Instant' }
+        ageDays: { type: integer, minimum: 0 }
+        approx: { type: boolean, description: True for cross rates or rates older than the freshness window }
+        ageSeconds: { type: integer, minimum: 0, description: Seconds between the rate `asOf` and the requested instant }
+        provider:
+          oneOf:
+            - $ref: '#/components/schemas/FxRateProvider'
+            - type: 'null'
+        selection: { $ref: '#/components/schemas/RateSelection' }
+        stale:
+          type: boolean
+          description: True when a provider rate older than the staleness threshold (default 60 min PARALLEL, 48 h OFFICIAL) is used as last known rate
+        attribution:
+          description: Must be displayed next to the rate when present
+          oneOf:
+            - $ref: '#/components/schemas/RateAttribution'
+            - type: 'null'
+    FxRatePreference:
+      type: object
+      additionalProperties: false
+      required: [base, quote, rateType]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        rateType: { $ref: '#/components/schemas/FxRateType' }
+    FxRatePreferenceList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FxRatePreference' }
+
+    # ── Ledger ──
+    LedgerAccountNature:
+      type: string
+      enum: [ASSET, LIABILITY, EQUITY, INCOME, EXPENSE]
+    TrialBalanceLine:
+      type: object
+      required: [ledgerAccountId, code, nature, accountId, balance]
+      properties:
+        ledgerAccountId: { $ref: '#/components/schemas/Uuid' }
+        code: { type: string, examples: ['EXPENSE:BOB', 'ASSET:0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9d01'] }
+        nature: { $ref: '#/components/schemas/LedgerAccountNature' }
+        accountId: { type: [string, 'null'], format: uuid, description: 'User account; null for system ledger accounts' }
+        balance:
+          $ref: '#/components/schemas/Money'
+          description: Signed with accounting convention (debit +, credit −)
+    TrialBalanceCurrency:
+      type: object
+      required: [currency, lines, total]
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/TrialBalanceLine' }
+        total:
+          $ref: '#/components/schemas/Money'
+          description: Always zero at the currency scale (e.g. "0.00")
+    TrialBalance:
+      type: object
+      required: [asOf, currencies]
+      properties:
+        asOf: { $ref: '#/components/schemas/LocalDate' }
+        currencies:
+          type: array
+          items: { $ref: '#/components/schemas/TrialBalanceCurrency' }
+
+    # ── Audit ──
+    AuditActorType:
+      type: string
+      enum: [USER, SYSTEM, WORKER]
+    AuditOrigin:
+      type: string
+      enum: [ui, api, import, rule, recurring, system]
+    AuditActor:
+      type: object
+      required: [type]
+      properties:
+        type: { $ref: '#/components/schemas/AuditActorType' }
+        userId: { type: [string, 'null'], format: uuid }
+        process: { type: [string, 'null'], description: 'System process identifier (job, rule, importer…)' }
+    AuditChange:
+      type: object
+      description: Field-level diff. Amounts appear as Money (decimal string + currency), never as JSON numbers.
+      required: [field, before, after]
+      properties:
+        field: { type: string }
+        before: { description: Previous value (any JSON) or null }
+        after: { description: New value (any JSON) or null }
+    AuditLogEntry:
+      type: object
+      required: [id, occurredAt, actor, action, aggregateType, aggregateId, changes, correlationId, origin]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        occurredAt: { $ref: '#/components/schemas/Instant' }
+        actor: { $ref: '#/components/schemas/AuditActor' }
+        action: { type: string, examples: [transactions.transaction.amended] }
+        aggregateType: { type: string, examples: [Transaction] }
+        aggregateId: { $ref: '#/components/schemas/Uuid' }
+        aggregateVersion: { type: [integer, 'null'], minimum: 1 }
+        changes:
+          type: array
+          items: { $ref: '#/components/schemas/AuditChange' }
+        reason: { type: [string, 'null'] }
+        correlationId: { $ref: '#/components/schemas/Uuid' }
+        origin: { $ref: '#/components/schemas/AuditOrigin' }
+        userAgent: { type: [string, 'null'] }
+    AuditLogPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AuditLogEntry' }
+        page: { $ref: '#/components/schemas/PageInfo' }
 
     # ── Reporting ──
     CurrencyTotals:
@@ -2628,13 +4828,149 @@ components:
         currency: { $ref: '#/components/schemas/CurrencyCode' }
         income: { $ref: '#/components/schemas/Money' }
         expense: { $ref: '#/components/schemas/Money' }
-        net: { $ref: '#/components/schemas/Money' }
+        net:
+          $ref: '#/components/schemas/Money'
+          description: Savings of the period (income − expense)
+        liquidBalance:
+          $ref: '#/components/schemas/Money'
+          description: Sum of balances of LIQUID accounts in this currency
+        savingsRate:
+          description: Savings / income in %, 1 decimal; null when income is zero (undefined)
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
         assets: { $ref: '#/components/schemas/Money' }
         liabilities: { $ref: '#/components/schemas/Money' }
         netWorth: { $ref: '#/components/schemas/Money' }
+    ConsolidatedTotals:
+      type: object
+      description: Totals in the reporting currency. Always present; `complete=false` when some amount could not be converted.
+      required: [currency, income, expense, net, liquidBalance, assets, liabilities, netWorth, complete, unconverted]
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        income: { $ref: '#/components/schemas/Money' }
+        expense: { $ref: '#/components/schemas/Money' }
+        net: { $ref: '#/components/schemas/Money' }
+        liquidBalance: { $ref: '#/components/schemas/Money' }
+        assets: { $ref: '#/components/schemas/Money' }
+        liabilities: { $ref: '#/components/schemas/Money' }
+        netWorth: { $ref: '#/components/schemas/Money' }
+        savingsRate:
+          description: Savings / income in %, 1 decimal; null = not defined
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        complete: { type: boolean }
+        unconverted:
+          type: array
+          description: Native amounts per currency excluded for lack of a rate
+          items: { $ref: '#/components/schemas/Money' }
+    MoneyVariation:
+      type: object
+      required: [current, previous, deltaAbs, isNew]
+      properties:
+        current: { $ref: '#/components/schemas/Money' }
+        previous: { $ref: '#/components/schemas/Money' }
+        deltaAbs: { $ref: '#/components/schemas/Money' }
+        deltaPct:
+          description: Variation in %, 2 decimals; null when the previous value is zero
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        isNew: { type: boolean, description: True when there was nothing in the previous period }
+    PeriodComparison:
+      type: object
+      required: [mode, previousPeriod, income, expense, savings]
+      properties:
+        mode:
+          type: string
+          enum: [PREVIOUS_PERIOD_TO_DATE, PREVIOUS_PERIOD]
+        previousPeriod:
+          type: object
+          required: [from, to]
+          properties:
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
+        income: { $ref: '#/components/schemas/MoneyVariation' }
+        expense: { $ref: '#/components/schemas/MoneyVariation' }
+        savings: { $ref: '#/components/schemas/MoneyVariation' }
+    AccountBalanceLine:
+      type: object
+      required: [accountId, name, type, nature, balance, includeInNetWorth, liquid]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/AccountType' }
+        nature:
+          type: string
+          enum: [ASSET, LIABILITY]
+        balance:
+          $ref: '#/components/schemas/Money'
+          description: Presented balance in the account currency
+        convertedBalance:
+          description: Balance in the reporting currency; null when no rate is available
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        rate:
+          oneOf:
+            - $ref: '#/components/schemas/ResolvedRate'
+            - type: 'null'
+        includeInNetWorth: { type: boolean }
+        liquid: { type: boolean }
+    NetWorthBreakdown:
+      type: object
+      required: [assets, liabilities, netWorth, complete, byCurrency, byAccountType, unvalued]
+      properties:
+        assets: { $ref: '#/components/schemas/Money' }
+        liabilities: { $ref: '#/components/schemas/Money' }
+        netWorth: { $ref: '#/components/schemas/Money' }
+        complete: { type: boolean }
+        byCurrency:
+          type: array
+          items:
+            type: object
+            required: [currency, assets, liabilities, net, converted]
+            properties:
+              currency: { $ref: '#/components/schemas/CurrencyCode' }
+              assets: { $ref: '#/components/schemas/Money' }
+              liabilities: { $ref: '#/components/schemas/Money' }
+              net:
+                $ref: '#/components/schemas/Money'
+                description: Native currency
+              converted:
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
+        byAccountType:
+          type: array
+          items:
+            type: object
+            required: [type, amount]
+            properties:
+              type: { $ref: '#/components/schemas/AccountType' }
+              amount:
+                $ref: '#/components/schemas/Money'
+                description: Reporting currency; liabilities negative
+        unvalued:
+          type: array
+          description: Native amounts that could not be valued (no rate)
+          items: { $ref: '#/components/schemas/Money' }
+    HomeQuestionStatus:
+      type: object
+      required: [question, status, actionHint]
+      properties:
+        question:
+          type: string
+          enum: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9]
+          description: Home questions of docs/00 §6
+        status:
+          type: string
+          enum: [AVAILABLE, NO_DATA, NOT_AVAILABLE_IN_PHASE]
+        actionHint: { type: [string, 'null'] }
     ReportSummary:
       type: object
-      required: [period, byCurrency, accounts, topExpenseCategories, meta]
+      required: [period, byCurrency, consolidated, accounts, topExpenseCategories, netWorth, questions, meta]
       properties:
         period:
           type: object
@@ -2645,42 +4981,51 @@ components:
         byCurrency:
           type: array
           items: { $ref: '#/components/schemas/CurrencyTotals' }
-        consolidated:
-          description: Totals converted to reportingCurrency (null if any rate is missing)
+        consolidated: { $ref: '#/components/schemas/ConsolidatedTotals' }
+        comparison:
+          description: Null when compare=NONE
           oneOf:
-            - $ref: '#/components/schemas/CurrencyTotals'
+            - $ref: '#/components/schemas/PeriodComparison'
             - type: 'null'
         accounts:
           type: array
-          items:
-            type: object
-            required: [accountId, name, balance]
-            properties:
-              accountId: { $ref: '#/components/schemas/Uuid' }
-              name: { type: string }
-              balance: { $ref: '#/components/schemas/Money' }
+          items: { $ref: '#/components/schemas/AccountBalanceLine' }
         topExpenseCategories:
           type: array
           items:
             type: object
-            required: [categoryId, name, amount]
+            required: [categoryId, name, amount, complete]
             properties:
               categoryId: { $ref: '#/components/schemas/Uuid' }
               name: { type: string }
-              amount: { $ref: '#/components/schemas/Money' }
+              amount:
+                $ref: '#/components/schemas/Money'
+                description: Net expense (expenses − refunds) in the reporting currency; may be negative
+              complete: { type: boolean }
+        netWorth: { $ref: '#/components/schemas/NetWorthBreakdown' }
+        questions:
+          type: array
+          items: { $ref: '#/components/schemas/HomeQuestionStatus' }
         meta:
           type: object
-          required: [generatedAt, reportingCurrency, approx]
+          required: [generatedAt, reportingCurrency, approx, timeZone, rateWindowDays, complete]
           properties:
             generatedAt: { $ref: '#/components/schemas/Instant' }
             reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
-            approx: { type: boolean, description: True when consolidated figures use reference rates }
+            approx: { type: boolean, description: True if any consolidated figure uses reference or cross rates }
+            timeZone: { type: string, examples: [America/La_Paz] }
+            rateWindowDays: { type: integer, minimum: 0 }
+            complete: { type: boolean }
             dataFreshness:
               $ref: '#/components/schemas/Instant'
-              description: Last event applied to the underlying read models
+              description: Instant of the latest data included (Phase 1 reads the ledger directly)
             ratesUsed:
               type: array
-              items: { $ref: '#/components/schemas/ReferenceRate' }
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            attributions:
+              type: array
+              description: 'Distinct attributions of the provider rates used (e.g. "Fuente: paralelo.bo", CC BY 4.0); clients must display them'
+              items: { $ref: '#/components/schemas/RateAttribution' }
 
     # ── Platform ──
     Operation:

@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/TransactionUpdated.v1.schema.json",
+  "title": "transactions.TransactionUpdated.v1",
+  "description": "La transacción cambió: edición descriptiva, cambio cleared/reconciled, des-reconciliación o amend financiero (en ese caso se emite junto a TransactionPosted, ledgerImpact = true). Sin montos ni texto libre salvo reason. Productor: TRANSACTIONS. Consumidores: REPORTING. Idempotencia natural: (transactionId, aggregateVersion). PII baja: reason.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.TransactionUpdated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "revision",
+        "status",
+        "previousStatus",
+        "changedFields",
+        "ledgerImpact",
+        "reason"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": [
+            "PENDING",
+            "POSTED",
+            "CLEARED",
+            "RECONCILED"
+          ]
+        },
+        "previousStatus": {
+          "enum": [
+            "PENDING",
+            "POSTED",
+            "CLEARED",
+            "RECONCILED",
+            null
+          ]
+        },
+        "changedFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "description",
+              "notes",
+              "counterpartyId",
+              "postingDate",
+              "status",
+              "amount",
+              "businessDate",
+              "accountId",
+              "splits"
+            ]
+          }
+        },
+        "ledgerImpact": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "paymentMethod": {
+          "description": "Medio de pago (D27, aditivo 2026-10-02)",
+          "enum": [
+            "CASH",
+            "QR",
+            "DEBIT_CARD",
+            "CREDIT_CARD",
+            "BANK_TRANSFER",
+            "DIGITAL_WALLET",
+            "OTHER",
+            null
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000109",
+      "eventType": "transactions.TransactionUpdated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "revision": 1,
+        "status": "CLEARED",
+        "previousStatus": "RECONCILED",
+        "changedFields": [
+          "status"
+        ],
+        "ledgerImpact": false,
+        "reason": "monto mal conciliado"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000110",
+      "eventType": "transactions.TransactionUpdated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "revision": 2,
+        "status": "CLEARED",
+        "previousStatus": null,
+        "changedFields": [
+          "amount",
+          "splits"
+        ],
+        "ledgerImpact": true,
+        "reason": null
+      }
+    }
+  ]
+}

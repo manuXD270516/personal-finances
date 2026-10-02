@@ -1,12 +1,12 @@
 ---
 id: TC-CLASSIFICATION-DELETE-001
-title: "Se rechaza eliminar una categoría referenciada por transacciones"
+title: 'No existe eliminación de categorías: la solicitud se rechaza y nada cambia'
 spec: classification/categories
-related_specs: []
-requirement: "Archivado de categorías"
-scenario: null
-requirement_status: provisional
-fr: [FR-CLASSIFICATION-001]
+related_specs: [transactions/splits]
+requirement: Las categorías se archivan en lugar de eliminarse
+scenario: Intento de eliminar una categoría usada
+requirement_status: confirmed
+fr: [FR-CLASSIFICATION-002]
 nfr: []
 invariants: [INV-019]
 priority: high
@@ -14,36 +14,44 @@ type: api
 level: api
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["archive", "cross-context"]
-error_code: "CATEGORY_IN_USE"
+tags: [archive, cross-context]
+error_code: null
 preconditions:
-  - "Categoría \"Groceries\" referenciada por splits en el esquema transactions"
-  - "Categoría \"Unused\" sin referencias"
+- Categoría "Supermercado" referenciada por porciones que suman 1,240.00 BOB
+- Categoría "Sin uso" sin referencias
 input:
-  - request: "DELETE /api/v1/workspaces/{W1}/categories/{Groceries}"
-  - request: "DELETE /api/v1/workspaces/{W1}/categories/{Unused}"
-steps: ["Enviar cada DELETE"]
+- request: DELETE /api/v1/workspaces/{W1}/categories/{Supermercado}
+- request: DELETE /api/v1/workspaces/{W1}/categories/{SinUso}
+steps:
+- Enviar cada DELETE
+- Consultar ambas categorías y las porciones de "Supermercado"
 expected_result:
-  - "Groceries: 409 problem+json con código CATEGORY_IN_USE, sugiriendo archivar; la categoría y los splits no cambian"
-  - "Unused: se permite (204) o se convierte en archivado, según la especificación final"
-  - "Después, ningún split referencia una categoría inexistente"
+- Ambas solicitudes responden 405 problem+json; ninguna categoría cambia de estado ni de datos
+- Las porciones que suman 1,240.00 BOB siguen referenciando "Supermercado"
+- Ninguna porción referencia una categoría inexistente
+- La operación disponible para retirar una categoría es POST …/archive
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
-# TC-CLASSIFICATION-DELETE-001 — Se rechaza eliminar una categoría referenciada por transacciones
+# TC-CLASSIFICATION-DELETE-001 — No existe eliminación de categorías: la solicitud se rechaza y nada cambia
 
 ## Intención
 
-No existen FKs entre esquemas (ARCHITECTURE §2), por lo que la protección referencial debe aplicarla la aplicación mediante el contrato de Transactions.
+INV-019 y docs/10 §3: nunca DELETE sobre datos financieros; el único retiro es el archivado. No hay FKs entre esquemas (ARCHITECTURE §2), por lo que la protección referencial no puede depender de la BD.
 
 ## Escenario
 
 ```gherkin
-Dado que la categoría "Groceries" es usada por transacciones
-Cuando el usuario elimina "Groceries"
-Entonces se rechaza con el código "CATEGORY_IN_USE"
+Dado que la categoría "Supermercado" es usada por transacciones que suman 1,240.00 BOB
+Cuando el usuario solicita eliminar "Supermercado"
+Entonces la solicitud se rechaza sin cambios
+  Y todas las porciones siguen referenciando una categoría existente
 ```
+
+## Notas
+
+- Cambio respecto del borrador: ya no se espera CATEGORY_IN_USE ni borrado de categorías sin uso (design.md §3).

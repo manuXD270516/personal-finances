@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/transactions/TransactionVoided.v1.schema.json",
   "title": "transactions.TransactionVoided.v1",
   "description": "La transacción fue anulada; si estaba posteada se creó un asiento de reversa. Incluye legs/splits vigentes para que los consumidores reviertan efectos sin consultar. Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS. Idempotencia natural: transactionId. PII baja: reason.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"

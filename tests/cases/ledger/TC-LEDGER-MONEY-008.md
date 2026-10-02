@@ -1,38 +1,39 @@
 ---
 id: TC-LEDGER-MONEY-008
-title: "Propiedad: la suma de Money es exacta, conmutativa y asociativa"
+title: 'Propiedad: la suma de Money es exacta, conmutativa y asociativa'
 spec: ledger/journal-posting
 related_specs: []
-requirement: "Aritmética monetaria decimal exacta"
+requirement: Aritmética monetaria decimal exacta
 scenario: null
-requirement_status: provisional
-fr: [FR-LEDGER-006]
-nfr: []
+requirement_status: confirmed
+fr: [FR-LEDGER-007]
+nfr: [NFR-DATA-001]
 invariants: [INV-001]
 priority: high
 type: property
 level: property
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["fast-check", "money"]
+tags: [fast-check, money]
 error_code: null
 preconditions:
-  - "Arbitrary arbMoney(c) para una moneda fija c, magnitudes de hasta 10^20 con hasta 18 decimales"
+- Arbitrary arbMoney(c) para una moneda fija c, magnitudes de hasta 10^20 con hasta 18 decimales
 input:
   numRuns_pr: 100
   numRuns_nightly: 10000
-steps: ["Generar a, b, c en la misma moneda y evaluar las leyes"]
+steps:
+- Generar a, b, c en la misma moneda y evaluar las leyes
 expected_result:
-  - "a + b = b + a"
-  - "(a + b) + c = a + (b + c)"
-  - "a + b - b = a"
-  - "a + 0 = a"
-  - "a - a = 0"
+- a + b = b + a
+- (a + b) + c = a + (b + c)
+- a + b - b = a
+- a + 0 = a
+- a - a = 0
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-LEDGER-MONEY-008 — Propiedad: la suma de Money es exacta, conmutativa y asociativa

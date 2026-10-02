@@ -1,10 +1,10 @@
 # Propuesta: bootstrap-platform-foundation
 
-## Por qué
+## Why
 
 Bajo las reglas del proyecto no se puede construir ningún slice funcional hasta contar con una plataforma local reproducible, un quality gate automatizado y una cadena de trazabilidad spec→test funcionando. Este change convierte el diseño de plataforma de Phase 0 (docs/19–23, ADR-0011/0012/0015/0016/0024) en comportamiento verificable. Se aplica **después de aprobar el DESIGN GATE**, como primer paso del Implementation Gate y antes de cualquier capability de negocio de Phase 1.
 
-## Qué cambia
+## What Changes
 
 - Se introduce un entorno local en contenedores que se levanta con un solo comando, con perfiles seleccionables (`deps`, `core`, `seed`, `observability`, `ml`), arranque ordenado por salud y volúmenes nombrados persistentes.
 - Se introducen endpoints estándar de liveness/readiness en todo contenedor de aplicación; readiness refleja las dependencias críticas.
@@ -13,18 +13,18 @@ Bajo las reglas del proyecto no se puede construir ningún slice funcional hasta
 - Se introduce el mecanismo de trazabilidad: catálogo de test cases, IDs TC en los nombres de tests automatizados, matriz generada y chequeos de CI que fallan ante enlaces rotos.
 - **Fuera de alcance:** cualquier capability de negocio (cuentas, ledger, transacciones…), aprovisionamiento cloud (Terraform sigue solo en diseño hasta aceptar el ADR de cloud), despliegue a producción, tests E2E de navegador más allá de un smoke, dashboards de observabilidad más allá del perfil local opcional.
 
-## Capacidades
+## Capabilities
 
-### Capacidades nuevas
+### New Capabilities
 - `platform/local-environment`: stack local reproducible en contenedores — perfiles, arranque ordenado por salud, configuración por entorno, volúmenes y comandos operativos (start/stop/reset/seed/backup/restore).
 - `platform/observability`: endpoints de salud base (liveness/readiness), logs estructurados con IDs de correlación y perfil opcional de telemetría local.
 - `platform/delivery-pipeline`: quality gates de pull request y política de promoción de imágenes *build once*.
 - `quality/test-traceability`: catálogo versionado de test cases, vínculo por TC-id en tests automatizados y matriz de trazabilidad exigida desde requerimientos hasta tests.
 
-### Capacidades modificadas
+### Modified Capabilities
 - Ninguna (aún no existen capabilities).
 
-## Impacto
+## Impact
 
 **Specs impactadas:** crea `platform/local-environment`, `platform/observability`, `platform/delivery-pipeline`, `quality/test-traceability`.
 
@@ -38,7 +38,7 @@ Bajo las reglas del proyecto no se puede construir ningún slice funcional hasta
 
 **Migraciones requeridas:** solo la migración inicial de bootstrap (crear schemas y roles: rol propietario de migraciones y rol de aplicación sin `BYPASSRLS`). No destructiva.
 
-**Test cases:** AÑADIDOS (ya redactados en `tests/cases/platform/`) — TC-PLATFORM-STACK-001, TC-PLATFORM-STACK-002, TC-PLATFORM-PIPELINE-001, TC-PLATFORM-ARCH-001, TC-PLATFORM-ARCH-002, TC-PLATFORM-TRACE-001. AÑADIDOS (a redactar en los grupos de tareas 3–6) — TC-PLATFORM-STACK-003..006 (reset+seed, ida y vuelta backup/restore, sin hosts fijos, apagado ordenado del worker), TC-PLATFORM-OBS-001..003 (liveness, readiness, correlación/redacción de logs), TC-PLATFORM-PIPELINE-002..003 (gate de CVE crítico, promoción por digest), TC-PLATFORM-TRACE-002..004 (TC-id desconocido, requirement Must sin cobertura, borrado de TC activo). MODIFICADOS — ninguno. DEPRECADOS — ninguno.
+**Test cases:** AÑADIDOS (ya redactados en `tests/cases/platform/`, re-apuntados a los requirements de este change) — TC-PLATFORM-STACK-001, TC-PLATFORM-STACK-002, TC-PLATFORM-PIPELINE-001, TC-PLATFORM-ARCH-001, TC-PLATFORM-ARCH-002, TC-PLATFORM-TRACE-001. AÑADIDOS (nuevos) — TC-PLATFORM-STACK-003..008 (reset+seed, ida y vuelta backup/restore, sin hosts fijos, apagado ordenado del worker, perfil `deps`, migración fallida condiciona a la API), TC-PLATFORM-OBS-001..003 (liveness, correlación de logs, redacción de datos sensibles en logs; la readiness la cubre TC-PLATFORM-STACK-002), TC-PLATFORM-PIPELINE-002..004 (gate de CVE crítico, promoción por digest, aprobación de migración destructiva), TC-PLATFORM-TRACE-002..006 (TC-id desconocido, requirement Must sin cobertura, borrado de TC activo, TC sin campo obligatorio, matriz publicada). MODIFICADOS — ninguno. DEPRECADOS — ninguno.
 
 **Impacto de regresión:** ninguno (no existe comportamiento previo). Desde este change toda PR ejecuta el gate completo; la suite de regresión comienza aquí.
 

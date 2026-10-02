@@ -1,42 +1,43 @@
 ---
 id: TC-LEDGER-IMMUTABILITY-001
-title: "Los postings y asientos no pueden actualizarse ni eliminarse a nivel de base de datos"
+title: Los postings y asientos no pueden actualizarse ni eliminarse a nivel de base de datos
 spec: ledger/journal-posting
 related_specs: []
-requirement: "Ledger de solo inserción (append-only)"
-scenario: null
-requirement_status: provisional
-fr: [FR-LEDGER-002]
-nfr: []
-invariants: [INV-004, INV-015]
+requirement: Ledger de solo inserción (append-only)
+scenario: Intento de modificar un posting a nivel de base de datos
+requirement_status: confirmed
+fr: [FR-LEDGER-005]
+nfr: [NFR-DATA-005]
+invariants: [INV-007]
 priority: critical
 type: integration
 level: database-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["immutability", "database", "defense-in-depth"]
+tags: [immutability, database, defense-in-depth]
 error_code: null
 preconditions:
-  - "PostgreSQL vía Testcontainers, migraciones aplicadas"
-  - "Rol pf_app, workspace W1"
-  - "Un asiento registrado E1 con los postings P1 (+120.00 BOB) y P2 (-120.00 BOB)"
+- PostgreSQL vía Testcontainers, migraciones aplicadas
+- Rol pf_app, workspace W1
+- Un asiento registrado E1 con los postings P1 (+120.00 BOB) y P2 (-120.00 BOB)
 input:
   statements:
-    - "UPDATE ledger.posting SET amount = 100 WHERE id = P1"
-    - "DELETE FROM ledger.posting WHERE id = P2"
-    - "UPDATE ledger.journal_entry SET entry_date = '2026-01-01' WHERE id = E1"
-    - "DELETE FROM ledger.journal_entry WHERE id = E1"
-    - "TRUNCATE ledger.posting"
-steps: ["Ejecutar cada sentencia como pf_app en su propia transacción"]
+  - UPDATE ledger.posting SET amount = 100 WHERE id = P1
+  - DELETE FROM ledger.posting WHERE id = P2
+  - UPDATE ledger.journal_entry SET entry_date = '2026-01-01' WHERE id = E1
+  - DELETE FROM ledger.journal_entry WHERE id = E1
+  - TRUNCATE ledger.posting
+steps:
+- Ejecutar cada sentencia como pf_app en su propia transacción
 expected_result:
-  - "Cada sentencia falla (privilegio no otorgado o trigger de inmutabilidad)"
-  - "P1, P2 y E1 quedan sin cambios después"
-  - "La falla se mapea a LEDGER_IMMUTABLE si se expone a través de la aplicación"
+- Cada sentencia falla (privilegio no otorgado o trigger de inmutabilidad)
+- P1, P2 y E1 quedan sin cambios después
+- La falla se mapea a LEDGER_IMMUTABLE si se expone a través de la aplicación
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-LEDGER-IMMUTABILITY-001 — Los postings y asientos no pueden actualizarse ni eliminarse a nivel de base de datos

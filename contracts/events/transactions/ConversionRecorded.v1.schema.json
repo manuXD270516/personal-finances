@@ -2,7 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/transactions/ConversionRecorded.v1.schema.json",
   "title": "transactions.ConversionRecorded.v1",
-  "description": "Se registró (posteó) una conversión entre monedas con su ConversionDetail inmutable. source.amount = bruto entregado; target.amount = neto recibido. Productor: TRANSACTIONS. Consumidores: FX (observación de tasa), REPORTING. Idempotencia natural: (transactionId, journalEntryId). PII baja: provider.name.",
+  "description": "Se registró (posteó) una conversión entre monedas con su ConversionDetail inmutable. source.amount = bruto entregado; target.amount = neto recibido. Productor: TRANSACTIONS. Consumidores: FX (observación de tasa), REPORTING. Idempotencia natural: (transactionId, journalEntryId). PII baja: provider.name. Un amend se publica de nuevo con revision + 1 y el journalEntryId activo.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"
@@ -124,6 +125,30 @@
               "maxLength": 200
             }
           }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Revisión de ConversionDetail (1 en el registro; +1 por cada amend). Opcional por cambio aditivo."
+        },
+        "convertedSource": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money",
+          "description": "Monto origen efectivamente convertido (bruto − fees en moneda origen). Opcional por cambio aditivo."
+        },
+        "grossTarget": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money",
+          "description": "Monto destino antes de fees en moneda destino. Opcional por cambio aditivo."
+        },
+        "quotedRateDeviation": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bruto destino − convertido × tasa cotizada, si supera una unidad mínima. Opcional por cambio aditivo."
         }
       }
     },
@@ -197,6 +222,16 @@
             "PROVIDER",
             "USER_CONVERSION"
           ]
+        },
+        "rateType": {
+          "enum": [
+            "OFFICIAL",
+            "PARALLEL",
+            "P2P",
+            "BANK",
+            "CUSTOM"
+          ],
+          "description": "FxRateType (opcional, cambio aditivo)."
         }
       }
     },
@@ -269,7 +304,8 @@
             "value": "6.95"
           },
           "fxRateId": "01928c4e-0000-7000-8000-0000000fa001",
-          "source": "MANUAL"
+          "source": "MANUAL",
+          "rateType": "P2P"
         },
         "fees": [
           {
@@ -291,7 +327,17 @@
         "provider": {
           "counterpartyId": null,
           "name": "Binance P2P"
-        }
+        },
+        "revision": 1,
+        "convertedSource": {
+          "amount": "100.000000",
+          "currency": "USDT"
+        },
+        "grossTarget": {
+          "amount": "690.00",
+          "currency": "BOB"
+        },
+        "quotedRateDeviation": null
       }
     }
   ]

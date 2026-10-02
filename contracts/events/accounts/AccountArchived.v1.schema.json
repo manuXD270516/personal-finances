@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/accounts/AccountArchived.v1.schema.json",
   "title": "accounts.AccountArchived.v1",
   "description": "Una cuenta fue archivada (soft-archive); no acepta nuevos movimientos (INV-026). Productor: ACCOUNTS. Consumidores: REPORTING, COMMITMENTS, GOALS. Idempotencia natural: (accountId, aggregateVersion). PII baja: reason.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"

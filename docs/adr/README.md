@@ -30,6 +30,7 @@ Registro de decisiones de arquitectura de PFOS. Formato MADR adaptado (ver [ADR-
 | [0022](0022-api-style-and-versioning.md) | Estilo de API y versionado | Propuesto | 2026-10-01 | REST `/api/v1` contract-first OpenAPI 3.1, RFC 9457, Idempotency-Key, ETag/If-Match, cursor pagination. |
 | [0023](0023-multi-tenancy-and-row-level-security.md) | Multi-tenancy y RLS | Aceptado | 2026-10-02 | `workspace_id` en toda tabla + RLS forzado con `SET LOCAL`; rol app sin BYPASSRLS; test SQL de cobertura RLS. |
 | [0024](0024-spec-driven-development-with-openspec.md) | Spec Driven Development con OpenSpec | Aceptado | 2026-10-02 | OpenSpec 1.14.0 `spec-driven`, deltas, `validate --strict` en CI, Impact obligatorio, trazabilidad FR→Scenario→TC→test. |
+| [0025](0025-fuentes-de-tipo-de-cambio-bolivia.md) | Fuentes de tipo de cambio para Bolivia | Aceptado | 2026-10-02 | paralelo.bo (mediana P2P, CC BY 4.0, histórico) principal y bo.dolarapi.com (Binance + oficial, MIT) respaldo, adelantados a Phase 1; dolarbluebolivia.click y Binance P2P directo descartados; fallback a manual. |
 
 "Propuesto (spike)" indica que la aceptación depende del spike citado en la sección *Validación* del ADR (ver ARCHITECTURE §15).
 

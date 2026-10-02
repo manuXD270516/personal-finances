@@ -413,11 +413,11 @@ Ganancia realizada (200 − 180 = 20.00 USD bruto, por lote FIFO) **no** es un p
 | `CONVERSION` | −origen, +FX_TRADING:src, −FX_TRADING:tgt, +destino, [+EXPENSE fees por moneda] | 0 (o 1 por fee) |
 | `LOAN_DISBURSEMENT` | +ASSET, −LIABILITY [+EXPENSE fee retenido] | 0 (o fees) |
 | `LOAN_PAYMENT` | +LIABILITY (principal), +EXPENSE (interés/fees/seguro/impuestos), −ASSET | 1 por componente no-principal |
-| `CARD_PAYMENT` | subtipo de `TRANSFER` ASSET→LIABILITY | 0 |
+| `CARD_PAYMENT` | reservado para `debt/credit-cards` (Phase 4); en Phase 1 el pago de tarjeta se registra como `TRANSFER` ASSET→LIABILITY (§6.8) | 0 |
 
 ## 7. `ConversionDetail` (propiedad de Transactions)
 
-Una conversión es **una** `Transaction` de kind `CONVERSION` con **un** `ConversionDetail` inmutable (value object persistido 1:1). FX guarda la tasa de referencia histórica usada y puede registrar la operación como *observación de mercado* propia del usuario.
+Una conversión es **una** `Transaction` de kind `CONVERSION` con **un** `ConversionDetail` inmutable por revisión (value object persistido con PK `(transactionId, revision)`). Editar una conversión = reversa + nuevo asiento + nueva revisión del `ConversionDetail`, que conserva las anteriores (FR-TRANSACTIONS-024). FX guarda la tasa de referencia histórica usada y puede registrar la operación como *observación de mercado* propia del usuario.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
@@ -553,12 +553,15 @@ ALTER TABLE ledger.posting ADD CONSTRAINT posting_nonzero CHECK (amount <> 0);
 -- 2) Cuadre por moneda: constraint trigger diferido (se evalúa al COMMIT)
 CREATE FUNCTION ledger.assert_entry_balanced() RETURNS trigger AS $$
 BEGIN
+  IF (SELECT count(*) FROM ledger.posting WHERE journal_entry_id = NEW.journal_entry_id) < 2 THEN
+    RAISE EXCEPTION 'LEDGER_ENTRY_TOO_FEW_POSTINGS %', NEW.journal_entry_id USING ERRCODE = 'PF005';
+  END IF;
   IF EXISTS (
     SELECT 1 FROM ledger.posting p
     WHERE p.journal_entry_id = NEW.journal_entry_id
     GROUP BY p.currency HAVING SUM(p.amount) <> 0
-  ) OR (SELECT count(*) FROM ledger.posting WHERE journal_entry_id = NEW.journal_entry_id) < 2 THEN
-    RAISE EXCEPTION 'LEDGER_UNBALANCED_ENTRY %', NEW.journal_entry_id USING ERRCODE = 'P0001';
+  ) THEN
+    RAISE EXCEPTION 'LEDGER_UNBALANCED_ENTRY %', NEW.journal_entry_id USING ERRCODE = 'PF001';
   END IF;
   RETURN NULL;
 END $$ LANGUAGE plpgsql;
@@ -572,12 +575,14 @@ CREATE CONSTRAINT TRIGGER posting_balanced
 REVOKE UPDATE, DELETE, TRUNCATE ON ledger.posting, ledger.journal_entry, ledger.entry_reversal FROM pf_app;
 GRANT INSERT, SELECT ON ledger.posting, ledger.journal_entry, ledger.entry_reversal TO pf_app;
 CREATE FUNCTION ledger.forbid_mutation() RETURNS trigger AS $$
-BEGIN RAISE EXCEPTION 'LEDGER_IMMUTABLE'; END $$ LANGUAGE plpgsql;
+BEGIN RAISE EXCEPTION 'LEDGER_IMMUTABLE' USING ERRCODE = 'PF003'; END $$ LANGUAGE plpgsql;
 CREATE TRIGGER posting_immutable BEFORE UPDATE OR DELETE ON ledger.posting
   FOR EACH ROW EXECUTE FUNCTION ledger.forbid_mutation();
 
 -- 4) Periodo bloqueado
---    BEFORE INSERT ON ledger.journal_entry: rechaza si existe period_lock para (workspace_id, to_char(entry_date,'YYYY-MM'))
+--    BEFORE INSERT ON ledger.journal_entry: rechaza (PF004, PERIOD_CLOSED) si existe period_lock para (workspace_id, to_char(entry_date,'YYYY-MM'))
+-- SQLSTATE propios: PF001 desbalanceado, PF002 contexto de workspace ausente (RLS, la consulta falla), PF003 mutación prohibida,
+--                   PF004 periodo cerrado, PF005 menos de 2 postings (docs/08 §10).
 
 -- 5) Reversa única
 --    ledger.entry_reversal(original_entry_id PRIMARY KEY, reversal_entry_id UNIQUE)
@@ -728,7 +733,7 @@ Leyenda de "Dónde": **D** = dominio (agregado/VO), **A** = aplicación (caso de
 | INV-024 | Los legs de una transacción posteada son iguales a los postings de su asiento activo sobre cuentas de usuario. | D (translator), A | PBT | ∀ txn: `legs(txn) == userPostings(activeEntry(txn))` |
 | INV-025 | Aislamiento de workspace: todos los postings de un asiento y sus ledger accounts pertenecen al mismo workspace. | D, BD (RLS + FK compuesta) | I (RLS tests) | — |
 | INV-026 | Cuentas archivadas no reciben nuevos postings (incluidas reversas): hay que reactivarlas primero. | A, D | U, I | ∀ cuenta archivada: cualquier `post` que la toque ⇒ `ACCOUNT_ARCHIVED` |
-| INV-027 | Comandos financieros idempotentes: mismo `Idempotency-Key` + mismo payload ⇒ mismo resultado sin efectos duplicados; payload distinto ⇒ 409. | A, BD (`platform.idempotency_key`) | I, PBT | ∀ cmd: `exec(k,cmd); exec(k,cmd)` ⇒ 1 transacción |
+| INV-027 | Comandos financieros idempotentes: mismo `Idempotency-Key` + mismo payload ⇒ mismo resultado sin efectos duplicados; payload distinto ⇒ `422 IDEMPOTENCY_KEY_REUSED`; clave ausente donde es obligatoria ⇒ `428 IDEMPOTENCY_KEY_REQUIRED` (rev. 2026-10-02, D1). | A, BD (`platform.idempotency_key`) | I, PBT | ∀ cmd: `exec(k,cmd); exec(k,cmd)` ⇒ 1 transacción |
 | INV-028 | Consumidores de eventos idempotentes: reprocesar un evento no cambia el resultado (inbox por `(consumer, eventId)`). | A, BD | I, PBT | ∀ stream con duplicados/reordenamiento entre agregados: proyección final == proyección sin duplicados |
 | INV-029 | Toda mutación financiera escribe `AuditLog` en la misma transacción BD. | A | I (rollback ⇒ sin audit, commit ⇒ audit) | — |
 | INV-030 | Un pago de tarjeta y un préstamo operan sobre cuentas `LIABILITY`; desembolso aumenta la deuda por el principal completo. | D | U | ∀ loan: `nature(liabilityAccount) == LIABILITY` |

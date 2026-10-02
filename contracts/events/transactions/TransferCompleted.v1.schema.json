@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/transactions/TransferCompleted.v1.schema.json",
   "title": "transactions.TransferCompleted.v1",
   "description": "Transferencia entre cuentas del usuario en la misma moneda quedó posteada (creación, pending→posted o emparejamiento de dos transacciones importadas). Productor: TRANSACTIONS. Consumidores: GOALS, DEBT, REPORTING. Idempotencia natural: (transactionId, journalEntryId). Sin PII.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"
@@ -102,6 +103,38 @@
           "currency": "BOB"
         },
         "fee": null,
+        "matchedTransactionIds": []
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000111",
+      "eventType": "transactions.TransferCompleted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f3",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f3",
+        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e3",
+        "businessDate": "2026-10-01",
+        "fromAccountId": "01928c4e-0000-7000-8000-000000acc001",
+        "toAccountId": "01928c4e-0000-7000-8000-000000acc003",
+        "amount": {
+          "amount": "1000.00",
+          "currency": "BOB"
+        },
+        "fee": {
+          "amount": "10.00",
+          "currency": "BOB"
+        },
         "matchedTransactionIds": []
       }
     }

@@ -52,7 +52,7 @@ El schema canónico (JSON Schema) está en [docs/17-test-traceability.md §4.1](
 | `scenario` | no | texto (español) o `null` | Nombre del `#### Scenario:` |
 | `requirement_status` | sí | `provisional` \| `confirmed` | `provisional` hasta que las specs de Phase 1 existan (post Design Gate) |
 | `fr` / `nfr` | sí (al menos uno) | `FR-<CONTEXT>-NNN` / `NFR-<CAT>-NNN` | Requerimientos de origen (provisionales en Phase 0) |
-| `invariants` | sí (puede ser `[]`) | `INV-001`..`INV-020` | Invariantes financieras protegidas ([docs/09](../../docs/09-ledger-design.md)) |
+| `invariants` | sí (puede ser `[]`) | `INV-001`..`INV-034` | Invariantes financieras protegidas ([docs/09](../../docs/09-ledger-design.md)) |
 | `priority` | sí | `critical` \| `high` \| `medium` \| `low` | `critical` = integridad financiera o seguridad |
 | `type` | sí | `unit` \| `domain` \| `property` \| `integration` \| `api` \| `e2e` \| `security` \| `platform` | Familia del test |
 | `level` | sí | ver [docs/16 §5](../../docs/16-testing-strategy.md) | Nivel concreto de la estrategia |
@@ -73,7 +73,7 @@ El schema canónico (JSON Schema) está en [docs/17-test-traceability.md §4.1](
 ## Reglas del catálogo
 
 - **Nunca borrar** un TC: se depreca (`status: deprecated`) mediante un change de OpenSpec. Ver [docs/17 §5](../../docs/17-test-traceability.md).
-- Toda invariante `INV-001..INV-020` debe tener al menos un TC activo.
+- Toda invariante `INV-001..INV-034` debe tener al menos un TC activo.
 - Los ejemplos numéricos de un TC **deben cuadrar** (Σ postings = 0 por moneda) — se revisan en el PR.
 - Fechas de ejemplo fijas (nunca "hoy"); el test usa `FixedClock`.
 - Datos de ejemplo siempre ficticios; preferir los de la Minimal Seed ([docs/29](../../docs/29-seed-datasets.md)).

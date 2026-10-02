@@ -3,18 +3,18 @@ id: TC-PLATFORM-TRACE-001
 title: "La verificación de trazabilidad falla ante IDs de TC desconocidos y casos automatizados sin pruebas"
 spec: quality/test-traceability
 related_specs: ["platform/delivery-pipeline"]
-requirement: "Matriz de trazabilidad de pruebas"
-scenario: null
-requirement_status: provisional
+requirement: "Los tests automatizados referencian IDs de test case"
+scenario: "Caso automatizado sin test"
+requirement_status: confirmed
 fr: []
-nfr: [NFR-MAINT-003]
+nfr: [NFR-MAINT-005]
 invariants: []
 priority: high
 type: platform
 level: smoke
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 1
 tags: ["traceability", "ci"]
@@ -38,7 +38,7 @@ expected_result:
   - "Cada fixture inconsistente termina con código distinto de cero y reporta el id de regla esperado"
   - "El fixture consistente termina con 0 y escribe tests/traceability/matrix.md y matrix.json"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-PLATFORM-TRACE-001 — La verificación de trazabilidad falla ante IDs de TC desconocidos y casos automatizados sin pruebas

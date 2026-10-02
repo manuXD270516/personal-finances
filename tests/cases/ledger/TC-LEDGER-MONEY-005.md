@@ -1,45 +1,77 @@
 ---
 id: TC-LEDGER-MONEY-005
-title: "La distribución por mayor residuo reparte las unidades menores de forma determinista"
+title: La distribución por mayor residuo reparte las unidades menores de forma determinista
 spec: ledger/journal-posting
-related_specs: ["transactions/splits"]
-requirement: "Redondeo y distribución deterministas"
-scenario: null
-requirement_status: provisional
-fr: [FR-LEDGER-006]
-nfr: []
+related_specs: [transactions/splits]
+requirement: Distribución determinista por mayor residuo
+scenario: Tres partes iguales
+requirement_status: confirmed
+fr: [FR-LEDGER-007]
+nfr: [NFR-DATA-003]
 invariants: [INV-020, INV-001]
 priority: critical
 type: unit
 level: unit
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["allocation", "tdd"]
+tags: [allocation, tdd]
 error_code: null
 preconditions:
-  - "Regla de desempate (provisional): ante residuos iguales se favorece el índice menor"
+- 'Regla de desempate (docs/09 §12 regla 3): cada parte se trunca hacia cero y, ante residuos iguales, se favorece el índice menor'
 input:
-  - total: "100.00 BOB"
-    weights: [1, 1, 1]
-    expected: ["33.34", "33.33", "33.33"]
-  - total: "10.01 BOB"
-    weights: [50, 30, 20]
-    expected: ["5.01", "3.00", "2.00"]
-  - total: "-100.00 BOB"
-    weights: [1, 1, 1]
-    expected: ["-33.34", "-33.33", "-33.33"]
-  - total: "0.000001 USDT"
-    weights: [1, 1]
-    expected: ["0.000001", "0.000000"]
-steps: ["Llamar a Money.allocate(weights) para cada caso"]
+- total: 100.00 BOB
+  weights:
+  - 1
+  - 1
+  - 1
+  expected:
+  - '33.34'
+  - '33.33'
+  - '33.33'
+- total: 10.01 BOB
+  weights:
+  - 50
+  - 30
+  - 20
+  expected:
+  - '5.01'
+  - '3.00'
+  - '2.00'
+- total: -100.00 BOB
+  weights:
+  - 1
+  - 1
+  - 1
+  expected:
+  - '-33.34'
+  - '-33.33'
+  - '-33.33'
+- total: 0.000001 USDT
+  weights:
+  - 1
+  - 1
+  expected:
+  - '0.000001'
+  - '0.000000'
+- total: 99.99 BOB
+  weights:
+  - 50
+  - 30
+  - 20
+  expected:
+  - '49.99'
+  - '30.00'
+  - '20.00'
+steps:
+- Llamar a Money.allocate(weights) para cada caso
 expected_result:
-  - "Los resultados son exactamente iguales a las partes esperadas"
-  - "Las partes siempre suman el total"
+- Los resultados son exactamente iguales a las partes esperadas
+- Las partes siempre suman el total
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-LEDGER-MONEY-005 — La distribución por mayor residuo reparte las unidades menores de forma determinista

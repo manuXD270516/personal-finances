@@ -1,37 +1,39 @@
 ---
 id: TC-LEDGER-MONEY-004
-title: "Propiedad: el redondeo es determinista, idempotente, simétrico y acotado"
+title: 'Propiedad: el redondeo es determinista, idempotente, simétrico y acotado'
 spec: ledger/journal-posting
 related_specs: []
-requirement: "Redondeo y distribución deterministas"
+requirement: Redondeo HALF_EVEN determinista
 scenario: null
-requirement_status: provisional
-fr: [FR-LEDGER-006]
-nfr: []
+requirement_status: confirmed
+fr: [FR-LEDGER-007]
+nfr: [NFR-DATA-002]
 invariants: [INV-020, INV-001]
 priority: critical
 type: property
 level: property
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["fast-check", "rounding"]
+tags: [fast-check, rounding]
 error_code: null
-preconditions: ["Arbitraries: arbCurrency(), arbDecimalString(escala de hasta 18)"]
+preconditions:
+- 'Arbitraries: arbCurrency(), arbDecimalString(escala de hasta 18)'
 input:
   numRuns_pr: 100
   numRuns_nightly: 10000
-steps: ["Para x y moneda c generados, calcular r = round(x, c)"]
+steps:
+- Para x y moneda c generados, calcular r = round(x, c)
 expected_result:
-  - "round(r, c) = r (idempotente)"
-  - "scale(r) <= c.scale"
-  - "|r - x| <= 0.5 * 10^-c.scale"
-  - "round(-x, c) = -round(x, c)"
-  - "La misma entrada siempre produce la misma salida (sin dependencia del entorno ni del locale)"
+- round(r, c) = r (idempotente)
+- scale(r) <= c.scale
+- '|r - x| <= 0.5 * 10^-c.scale'
+- round(-x, c) = -round(x, c)
+- La misma entrada siempre produce la misma salida (sin dependencia del entorno ni del locale)
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-LEDGER-MONEY-004 — Propiedad: el redondeo es determinista, idempotente, simétrico y acotado

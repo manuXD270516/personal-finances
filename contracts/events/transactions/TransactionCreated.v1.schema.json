@@ -3,61 +3,223 @@
   "$id": "https://contracts.pfos.local/events/transactions/TransactionCreated.v1.schema.json",
   "title": "transactions.TransactionCreated.v1",
   "description": "Se aceptó una nueva transacción (pending o posted). Productor: TRANSACTIONS. Consumidores: RULES, COMMITMENTS, REPORTING. PII baja: description. Define $defs compartidos por los eventos del contexto transactions (v1).",
-  "allOf": [ { "$ref": "../envelope.v1.schema.json" } ],
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
   "properties": {
-    "eventType": { "const": "transactions.TransactionCreated" },
-    "eventVersion": { "const": 1 },
-    "aggregateType": { "const": "Transaction" },
-    "payload": { "$ref": "#/$defs/Payload" }
+    "eventType": {
+      "const": "transactions.TransactionCreated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
   },
   "$defs": {
     "Payload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["transactionId", "kind", "status", "businessDate", "description", "counterpartyId", "origin", "legs", "splits"],
+      "required": [
+        "transactionId",
+        "kind",
+        "status",
+        "businessDate",
+        "description",
+        "counterpartyId",
+        "origin",
+        "legs",
+        "splits",
+        "postingDate",
+        "refundOfTransactionId"
+      ],
       "properties": {
-        "transactionId": { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" },
-        "kind": { "$ref": "#/$defs/TransactionKind" },
-        "status": { "enum": ["PENDING", "POSTED"] },
-        "businessDate": { "$ref": "../envelope.v1.schema.json#/$defs/LocalDate" },
-        "description": { "type": ["string", "null"], "maxLength": 500 },
-        "counterpartyId": { "oneOf": [ { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" } ] },
-        "origin": { "$ref": "#/$defs/Origin" },
-        "legs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Leg" } },
-        "splits": { "type": "array", "items": { "$ref": "#/$defs/Split" } }
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "kind": {
+          "$ref": "#/$defs/TransactionKind"
+        },
+        "status": {
+          "enum": [
+            "PENDING",
+            "POSTED",
+            "CLEARED"
+          ]
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "counterpartyId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "origin": {
+          "$ref": "#/$defs/Origin"
+        },
+        "legs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Leg"
+          }
+        },
+        "splits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Split"
+          }
+        },
+        "postingDate": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "refundOfTransactionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentMethod": {
+          "description": "Medio de pago (D27, aditivo 2026-10-02)",
+          "enum": [
+            "CASH",
+            "QR",
+            "DEBIT_CARD",
+            "CREDIT_CARD",
+            "BANK_TRANSFER",
+            "DIGITAL_WALLET",
+            "OTHER",
+            null
+          ]
+        }
       }
     },
     "TransactionKind": {
-      "enum": ["INCOME", "EXPENSE", "TRANSFER", "REFUND", "ADJUSTMENT", "OPENING_BALANCE", "CONVERSION", "LOAN_DISBURSEMENT", "LOAN_PAYMENT"]
+      "description": "TransactionKind del OpenAPI (docs/31 D18): el pago de tarjeta es TRANSFER; no hay kind propio.",
+      "enum": [
+        "INCOME",
+        "EXPENSE",
+        "TRANSFER",
+        "REFUND",
+        "ADJUSTMENT",
+        "OPENING_BALANCE",
+        "CONVERSION",
+        "LOAN_DISBURSEMENT",
+        "LOAN_PAYMENT"
+      ]
     },
     "Origin": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "refId"],
+      "required": [
+        "type",
+        "refId"
+      ],
       "properties": {
-        "type": { "enum": ["MANUAL", "IMPORT", "RECURRING", "DEBT", "GOALS", "SYSTEM"] },
-        "refId": { "oneOf": [ { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" } ] }
+        "type": {
+          "description": "TransactionSource del OpenAPI (docs/31 D18: GOAL en singular).",
+          "enum": [
+            "MANUAL",
+            "IMPORT",
+            "RECURRING",
+            "DEBT",
+            "GOAL",
+            "SYSTEM"
+          ]
+        },
+        "refId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
     "Leg": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["accountId", "amount"],
+      "required": [
+        "accountId",
+        "amount"
+      ],
       "description": "Efecto sobre una cuenta del usuario. Monto firmado con convención contable (débito +, crédito −).",
       "properties": {
-        "accountId": { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" },
-        "amount": { "$ref": "../envelope.v1.schema.json#/$defs/Money" }
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        }
       }
     },
     "Split": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["splitId", "amount", "categoryId", "tagIds"],
+      "required": [
+        "splitId",
+        "amount",
+        "categoryId",
+        "tagIds"
+      ],
       "properties": {
-        "splitId": { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" },
-        "amount": { "$ref": "../envelope.v1.schema.json#/$defs/Money" },
-        "categoryId": { "oneOf": [ { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" } ] },
-        "tagIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "../envelope.v1.schema.json#/$defs/Uuid" } }
+        "splitId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "categoryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tagIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        }
       }
     }
   },
@@ -73,7 +235,10 @@
       "aggregateVersion": 1,
       "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
       "causationId": null,
-      "actor": { "type": "USER", "id": "01928c4e-0000-7000-8000-00000000b001" },
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
       "payload": {
         "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
         "kind": "EXPENSE",
@@ -81,12 +246,91 @@
         "businessDate": "2026-10-01",
         "description": "Hipermercado",
         "counterpartyId": null,
-        "origin": { "type": "MANUAL", "refId": null },
-        "legs": [ { "accountId": "01928c4e-0000-7000-8000-0000000acc01", "amount": { "amount": "-300.00", "currency": "BOB" } } ],
+        "origin": {
+          "type": "MANUAL",
+          "refId": null
+        },
+        "legs": [
+          {
+            "accountId": "01928c4e-0000-7000-8000-0000000acc01",
+            "amount": {
+              "amount": "-300.00",
+              "currency": "BOB"
+            }
+          }
+        ],
         "splits": [
-          { "splitId": "01928c4e-0000-7000-8000-0000000005a1", "amount": { "amount": "220.00", "currency": "BOB" }, "categoryId": "01928c4e-0000-7000-8000-0000000ca001", "tagIds": [] },
-          { "splitId": "01928c4e-0000-7000-8000-0000000005a2", "amount": { "amount": "80.00", "currency": "BOB" }, "categoryId": "01928c4e-0000-7000-8000-0000000ca002", "tagIds": [] }
-        ]
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005a1",
+            "amount": {
+              "amount": "220.00",
+              "currency": "BOB"
+            },
+            "categoryId": "01928c4e-0000-7000-8000-0000000ca001",
+            "tagIds": []
+          },
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005a2",
+            "amount": {
+              "amount": "80.00",
+              "currency": "BOB"
+            },
+            "categoryId": "01928c4e-0000-7000-8000-0000000ca002",
+            "tagIds": []
+          }
+        ],
+        "postingDate": null,
+        "refundOfTransactionId": null
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000108",
+      "eventType": "transactions.TransactionCreated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f2",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f2",
+        "kind": "REFUND",
+        "status": "CLEARED",
+        "businessDate": "2026-10-02",
+        "description": "Devolución Hipermercado",
+        "counterpartyId": null,
+        "origin": {
+          "type": "MANUAL",
+          "refId": null
+        },
+        "legs": [
+          {
+            "accountId": "01928c4e-0000-7000-8000-0000000acc01",
+            "amount": {
+              "amount": "80.00",
+              "currency": "BOB"
+            }
+          }
+        ],
+        "splits": [
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005b1",
+            "amount": {
+              "amount": "80.00",
+              "currency": "BOB"
+            },
+            "categoryId": "01928c4e-0000-7000-8000-0000000ca002",
+            "tagIds": []
+          }
+        ],
+        "postingDate": "2026-10-03",
+        "refundOfTransactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1"
       }
     }
   ]

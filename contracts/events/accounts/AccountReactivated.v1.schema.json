@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/accounts/AccountReactivated.v1.schema.json",
+  "title": "accounts.AccountReactivated.v1",
+  "description": "Una cuenta CLOSED o ARCHIVED volvió a ACTIVE. Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: (accountId, aggregateVersion). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "accounts.AccountReactivated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Account"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "previousStatus",
+        "reactivatedOn"
+      ],
+      "properties": {
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "previousStatus": {
+          "enum": [
+            "ARCHIVED",
+            "CLOSED"
+          ]
+        },
+        "reactivatedOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000104",
+      "eventType": "accounts.AccountReactivated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Account",
+      "aggregateId": "01928c4e-0000-7000-8000-000000acc003",
+      "aggregateVersion": 6,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "accountId": "01928c4e-0000-7000-8000-000000acc003",
+        "previousStatus": "CLOSED",
+        "reactivatedOn": "2026-10-02"
+      }
+    }
+  ]
+}

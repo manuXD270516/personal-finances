@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/transactions/TransactionPosted.v1.schema.json",
   "title": "transactions.TransactionPosted.v1",
   "description": "La transacción tiene un JournalEntry activo (creación directa en posted, pending→posted o amend que repostea). Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING. Idempotencia natural: (transactionId, revision). Sin PII.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"

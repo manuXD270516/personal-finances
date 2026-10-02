@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/classification/CategoryArchived.v1.schema.json",
+  "title": "classification.CategoryArchived.v1",
+  "description": "Una categoría fue archivada (nunca se elimina, INV-019); el historial la sigue referenciando. Si se archivó en cascada desde su categoría padre, cascadedFromCategoryId lo indica. Productor: CLASSIFICATION. Consumidores: REPORTING (Phase 1); PLANNING y RULES en sus fases. Idempotencia natural: (categoryId, aggregateVersion). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "classification.CategoryArchived"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Category"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "categoryId",
+        "parentId",
+        "groupId",
+        "kind",
+        "archivedAt",
+        "cascadedFromCategoryId"
+      ],
+      "properties": {
+        "categoryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "parentId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groupId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "kind": {
+          "enum": [
+            "EXPENSE",
+            "INCOME"
+          ]
+        },
+        "archivedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "cascadedFromCategoryId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000106",
+      "eventType": "classification.CategoryArchived",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Category",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000ca003",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "categoryId": "01928c4e-0000-7000-8000-0000000ca003",
+        "parentId": null,
+        "groupId": "01928c4e-0000-7000-8000-0000000cb001",
+        "kind": "EXPENSE",
+        "archivedAt": "2026-10-02T14:03:22.120Z",
+        "cascadedFromCategoryId": null
+      }
+    }
+  ]
+}

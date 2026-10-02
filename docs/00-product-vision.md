@@ -92,7 +92,7 @@ El dashboard (capability `reporting/dashboard`, a especificar en Phase 1) existe
 
 | # | Pregunta | Definición operativa (borrador) | Fuente | Disponible desde |
 |---|----------|----------------------------------|--------|------------------|
-| Q1 | **¿Cuánto dinero tengo?** | Σ saldos de cuentas ASSET líquidas (banco, efectivo, wallet, cripto) convertidos a moneda base con la tasa de referencia vigente; desglose por moneda original. Net worth = activos − pasivos en vista separada. | Ledger balances + FX | Phase 1 (tasa manual) |
+| Q1 | **¿Cuánto dinero tengo?** | Σ saldos de cuentas ASSET líquidas (`liquidity = LIQUID`; por defecto banco, efectivo, billetera digital, cripto y ahorro) convertidos a moneda base con la tasa de referencia vigente; desglose por moneda original. Net worth = activos − pasivos en vista separada. | Ledger balances + FX | Phase 1 (tasa manual) |
 | Q2 | **¿Cuánto ingresó?** | Σ splits de tipo ingreso con fecha en el periodo actual (excluye transfers, conversiones y refunds). | Transactions/Reporting | Phase 1 |
 | Q3 | **¿Cuánto gasté?** | Σ splits de gasto del periodo, netos de refunds; excluye transfers y principal de deudas. Incluye fees de conversión. | Transactions/Reporting | Phase 1 |
 | Q4 | **¿Cuánto está comprometido?** | Σ de ocurrencias recurrentes pendientes del periodo (suscripciones, cuotas, pagos fijos) + transacciones `pending`. | Commitments + Transactions | Phase 3 (parcial en Phase 1 con `pending`) |

@@ -49,16 +49,16 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 
 ### 2.2 ACCOUNTS (`accounts`, `@pf/accounts`)
 - **Propósito:** catálogo de las cuentas e instituciones del usuario.
-- **Responsabilidades:** abrir/editar/archivar/reactivar cuentas; tipo → naturaleza ASSET/LIABILITY; moneda inmutable; instituciones; orden y visibilidad en net worth.
+- **Responsabilidades:** abrir/editar/archivar/cerrar/reactivar cuentas (estados `ACTIVE`, `CLOSED`, `ARCHIVED`); tipo → naturaleza ASSET/LIABILITY; moneda inmutable; liquidez (`LIQUID`, `SEMI_LIQUID`, `ILLIQUID`); instituciones; orden y visibilidad en net worth.
 - **NO responsabilidades:** saldos (Ledger); movimientos (Transactions); límites de crédito, cortes y préstamos (Debt); conexiones bancarias (Imports).
-- **API pública:** cmd `OpenAccount`, `UpdateAccount`, `ArchiveAccount`, `ReactivateAccount`, `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`; qry `GetAccount`, `GetAccountsByIds`, `ListAccounts`, `ListInstitutions`.
-- **Eventos publicados:** `accounts.AccountOpened`, `accounts.AccountUpdated`, `accounts.AccountArchived`, `accounts.AccountReactivated`. **Consumidos:** `identity.WorkspaceCreated` (opcional: cuenta "Efectivo" por defecto).
+- **API pública:** cmd `OpenAccount`, `UpdateAccount`, `ArchiveAccount`, `CloseAccount`, `ReactivateAccount`, `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`; qry `GetAccount`, `GetAccountsByIds`, `ListAccounts`, `ListInstitutions`.
+- **Eventos publicados:** `accounts.AccountOpened`, `accounts.AccountUpdated`, `accounts.AccountArchived`, `accounts.AccountClosed`, `accounts.AccountReactivated`. **Consumidos:** `identity.WorkspaceCreated` (opcional: cuenta "Efectivo" por defecto).
 - **Dependencias:** FX (catálogo de monedas, query), Audit (sync).
 - **Extracción:** Media — Transactions consulta Accounts sincrónicamente (moneda, estado); reemplazable por réplica local alimentada por eventos `AccountOpened/Archived`.
 
 ### 2.3 LEDGER — Financial Ledger (`ledger`, `@pf/ledger`)
 - **Propósito:** registro contable de doble entrada, inmutable y multi-moneda; fuente de verdad de saldos.
-- **Responsabilidades:** validar y persistir asientos balanceados por moneda; reversas; plan de cuentas (usuario + sistema por moneda); saldos y snapshots; bloqueo de periodos; verificación de integridad.
+- **Responsabilidades:** validar y persistir asientos balanceados por moneda; reversas; plan de cuentas (usuario + sistema por moneda, creadas con *get-or-create* al primer posting); saldo contable y snapshots; bloqueo de periodos mensuales; verificación de integridad. El saldo proyectado (con `pending`) no es del ledger: lo calcula Reporting (FR-LEDGER-013).
 - **NO responsabilidades:** clasificación (Transactions/Classification); valoración en moneda de reporte (Reporting); estados de transacción, conciliación (Transactions); decidir cuándo se cierra un mes (Planning).
 - **API pública:** port sync `LedgerPostingPort` (`PostJournalEntry`, `ReverseJournalEntry`), `LedgerPeriodLockPort` (`LockPeriod`, `UnlockPeriod`); qry `GetBalance`, `GetBalances`, `GetBalanceHistory`, `GetTrialBalance`, `GetEntriesBySource`.
 - **Eventos publicados:** `ledger.JournalEntryPosted`. **Consumidos:** ninguno (todo entra síncrono).
@@ -157,7 +157,7 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 
 ### 2.14 REPORTING — Reporting & Analytics (`reporting`, `@pf/reporting`)
 - **Propósito:** responder preguntas del usuario sobre su situación financiera.
-- **Responsabilidades:** read models (saldos, flujo mensual, gasto por categoría, net worth, calendario de flujo de caja, dashboard), valoración multi-moneda, exportaciones.
+- **Responsabilidades:** read models (saldos, flujo mensual, gasto por categoría, net worth, calendario de flujo de caja y saldo proyectado, dashboard), valoración multi-moneda, exportaciones. En Phase 1 el resumen del dashboard (`/reports/summary`) se calcula leyendo directamente el ledger y las transacciones, sin read models ([14-reporting.md](14-reporting.md) §2.2).
 - **NO responsabilidades:** ser fuente de verdad de nada; escribir en otros contextos.
 - **API pública:** qry `GetDashboard`, `GetNetWorth`, `GetCashflowReport`, `GetSpendingByCategory`, `GetCashFlowCalendar`, `ExportReport`; cmd interno `RebuildProjection`.
 - **Eventos publicados:** ninguno. **Consumidos:** prácticamente todos los de Transactions, Ledger, Accounts, Commitments, Goals, Debt, Planning, FX.

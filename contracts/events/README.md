@@ -1,6 +1,6 @@
 # contracts/events — Contratos de eventos de dominio (JSON Schema)
 
-> **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [docs/11-domain-events.md](../../docs/11-domain-events.md) · [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) §7 · [docs/09-ledger-design.md](../../docs/09-ledger-design.md) · ADR-0008, ADR-0016
+> **Estado:** Propuesto · **Fecha:** 2026-10-01 (consolidación Phase 1: 2026-10-02) · **Relacionado:** [docs/11-domain-events.md](../../docs/11-domain-events.md) · [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) §7 · [docs/09-ledger-design.md](../../docs/09-ledger-design.md) · ADR-0008, ADR-0016
 
 *Published Language* de los eventos de integración entre bounded contexts. Borrador de Phase 0: describe contratos, no implementación.
 
@@ -9,18 +9,29 @@
 ```
 contracts/events/
 ├─ envelope.v1.schema.json            # envelope + $defs comunes (Money, Decimal, Rate, Uuid, LocalDate, Instant, CurrencyCode)
+├─ identity/
+│  ├─ WorkspaceCreated.v1.schema.json
+│  └─ WorkspaceSettingsChanged.v1.schema.json
+├─ accounts/
+│  ├─ AccountOpened.v1.schema.json
+│  ├─ AccountUpdated.v1.schema.json
+│  ├─ AccountClosed.v1.schema.json
+│  ├─ AccountReactivated.v1.schema.json
+│  └─ AccountArchived.v1.schema.json
+├─ classification/
+│  └─ CategoryArchived.v1.schema.json
 ├─ transactions/
 │  ├─ TransactionCreated.v1.schema.json   # además define $defs del contexto: TransactionKind, Origin, Leg, Split
+│  ├─ TransactionUpdated.v1.schema.json
 │  ├─ TransactionPosted.v1.schema.json
 │  ├─ TransactionVoided.v1.schema.json
 │  ├─ TransactionCategorized.v1.schema.json
 │  ├─ TransferCompleted.v1.schema.json
 │  └─ ConversionRecorded.v1.schema.json
-├─ ledger/
-│  └─ JournalEntryPosted.v1.schema.json
-└─ accounts/
-   ├─ AccountOpened.v1.schema.json
-   └─ AccountArchived.v1.schema.json
+├─ fx/
+│  └─ RateRecorded.v1.schema.json
+└─ ledger/
+   └─ JournalEntryPosted.v1.schema.json
 ```
 
 Ruta: `contracts/events/<context>/<EventName>.v<N>.schema.json` (ARCHITECTURE §6).
@@ -28,14 +39,15 @@ Ruta: `contracts/events/<context>/<EventName>.v<N>.schema.json` (ARCHITECTURE §
 ## Convenciones
 
 - **Dialecto**: JSON Schema draft 2020-12. `$id` base `https://contracts.pfos.local/events/` (identificador, no resoluble por red: los validadores deben **precargar** todos los schemas, p. ej. `ajv.addSchema()`).
-- **Composición**: cada evento hace `allOf: [{$ref: "../envelope.v1.schema.json"}]` y fija `eventType` (`const`), `eventVersion` (`const`), `aggregateType` (`const`) y `payload` (`$ref: #/$defs/Payload`).
+- **Composición**: cada evento declara `type: object` (requisito de Ajv `strictTypes`) y hace `allOf: [{$ref: "../envelope.v1.schema.json"}]` y fija `eventType` (`const`), `eventVersion` (`const`), `aggregateType` (`const`) y `payload` (`$ref: #/$defs/Payload`).
 - **Nombre**: `eventType = <context>.<EventName>`; el nombre completo es `<eventType>.v<eventVersion>`, p. ej. `transactions.TransactionPosted.v1`.
 - **Dinero**: `$defs/Money` = `{ "amount": "<decimal string>", "currency": "<CurrencyCode>" }`. `amount` cumple `^-?(0|[1-9][0-9]{0,19})([.][0-9]{1,18})?$` (compatible con `NUMERIC(38,18)`). **Nunca** números JSON para montos o tasas. `PositiveMoney` para montos siempre positivos. La escala exacta por moneda (`currency.scale`) se valida en dominio, no en el schema.
 - **Signo**: los montos de `legs` y `postings` usan convención contable (débito +, crédito −); el resto de montos son magnitudes positivas salvo indicación.
 - **Tasas**: `$defs/Rate = {base, quote, value}` ⇒ *1 base = value quote*; `value` string positivo.
 - **Fechas**: `LocalDate` (`YYYY-MM-DD`, fecha de negocio en la TZ del workspace) vs `Instant` (RFC 3339 UTC con `Z`).
 - **IDs**: UUID en minúsculas; `eventId` debe ser UUIDv7.
-- **Nulos explícitos**: los campos opcionales están presentes con `null` (todos los campos son `required`), lo que hace el contrato explícito y facilita la detección de cambios.
+- **Nulos explícitos**: los campos opcionales están presentes con `null` (todos los campos son `required`), lo que hace el contrato explícito y facilita la detección de cambios. Excepciones documentadas: campos agregados de forma aditiva a un evento ya existente (p. ej. `revision`, `convertedSource`, `grossTarget`, `quotedRateDeviation` en `ConversionRecorded`) y los valores nuevos opcionales de `AccountUpdated` (solo viajan los campos de `changedFields` no sensibles).
+- **Enums compartidos con el OpenAPI** (docs/31 D18): el OpenAPI manda. `TransactionKind`, `TransactionSource` (`GOAL` singular; el pago de tarjeta es `TRANSFER`), `AccountType`, `AccountLiquidity`, `FxRateType`, `FxRateSource`, `ConversionFeeType` y `CategoryKind` se mantienen idénticos en ambos contratos.
 - **Estrictez**: `additionalProperties: false` en envelope y payloads ⇒ el **productor** debe emitir exactamente el contrato. Los **consumidores** NO validan estrictamente (tolerant reader): ignoran campos desconocidos para soportar cambios aditivos.
 - **Invariantes no expresables** (p. ej. Σ postings por moneda = 0 en `JournalEntryPosted`) se documentan en `description` y se verifican en los tests de contrato del productor.
 - **Ejemplos**: cada schema trae `examples` válidos usados por los tests de consumidores.
@@ -58,14 +70,22 @@ Resumen de [docs/11-domain-events.md §4](../../docs/11-domain-events.md):
 
 | Evento | Productor | Consumidores |
 |---|---|---|
+| `identity.WorkspaceCreated.v1` | IDENTITY | CLASSIFICATION, REPORTING, FX (carga del histórico de tasas y preferencias `PARALLEL`) |
+| `identity.WorkspaceSettingsChanged.v1` | IDENTITY | REPORTING |
+| `accounts.AccountOpened.v1` | ACCOUNTS | REPORTING |
+| `accounts.AccountUpdated.v1` | ACCOUNTS | REPORTING |
+| `accounts.AccountClosed.v1` | ACCOUNTS | REPORTING, COMMITMENTS |
+| `accounts.AccountReactivated.v1` | ACCOUNTS | REPORTING |
+| `accounts.AccountArchived.v1` | ACCOUNTS | REPORTING, COMMITMENTS, GOALS |
+| `classification.CategoryArchived.v1` | CLASSIFICATION | REPORTING, PLANNING, RULES |
 | `transactions.TransactionCreated.v1` | TRANSACTIONS | RULES, COMMITMENTS, REPORTING |
+| `transactions.TransactionUpdated.v1` | TRANSACTIONS | REPORTING |
 | `transactions.TransactionPosted.v1` | TRANSACTIONS | PLANNING, REPORTING |
 | `transactions.TransactionVoided.v1` | TRANSACTIONS | PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS |
 | `transactions.TransactionCategorized.v1` | TRANSACTIONS | PLANNING, REPORTING |
 | `transactions.TransferCompleted.v1` | TRANSACTIONS | GOALS, DEBT, REPORTING |
 | `transactions.ConversionRecorded.v1` | TRANSACTIONS | FX, REPORTING |
+| `fx.RateRecorded.v1` | FX | REPORTING |
 | `ledger.JournalEntryPosted.v1` | LEDGER | REPORTING, GOALS |
-| `accounts.AccountOpened.v1` | ACCOUNTS | REPORTING |
-| `accounts.AccountArchived.v1` | ACCOUNTS | REPORTING, COMMITMENTS, GOALS |
 
 (Varios consumidores pertenecen a fases posteriores; en Phase 1 el consumidor efectivo es REPORTING.)

@@ -1,0 +1,217 @@
+# Spectral ruleset for contracts/openapi/finance-api.v1.yaml
+# PFOS rules of docs/10-api-design.md §1.2 + add-api-conventions (design §Contratos #12).
+# Run: npx @stoplight/spectral-cli lint contracts/openapi/finance-api.v1.yaml --ruleset contracts/openapi/.spectral.yaml
+extends:
+  - [spectral:oas, recommended]
+
+aliases:
+  Operations:
+    - '$.paths[*][get,put,post,delete,patch]'
+
+rules:
+  # Example-heavy draft: descriptions on every operation are not mandatory (summary is).
+  operation-description: off
+  # Tags for later phases are declared as documentation only (no paths yet).
+  oas3-unused-component: info
+
+  pfos-operation-capability:
+    description: Every operation declares a valid x-openspec-capability (string or list, <context>/<capability>).
+    severity: error
+    given: '#Operations'
+    then:
+      field: x-openspec-capability
+      function: schema
+      functionOptions:
+        schema:
+          oneOf:
+            - type: string
+              pattern: '^(platform|identity|security|audit|ledger|classification|accounts|transactions|fx|reporting)/[a-z][a-z-]*$'
+            - type: array
+              minItems: 1
+              items:
+                type: string
+                pattern: '^(platform|identity|security|audit|ledger|classification|accounts|transactions|fx|reporting)/[a-z][a-z-]*$'
+
+  pfos-required-role:
+    description: Every operation declares x-required-role.
+    severity: error
+    given: '#Operations'
+    then:
+      field: x-required-role
+      function: enumeration
+      functionOptions:
+        values: [AUTHENTICATED, VIEWER, EDITOR, OWNER]
+
+  pfos-required-role-present:
+    description: x-required-role must be present.
+    severity: error
+    given: '#Operations'
+    then:
+      field: x-required-role
+      function: truthy
+
+  pfos-standard-error-responses:
+    description: Every operation documents 401, 500 and 503.
+    severity: error
+    given: '#Operations.responses'
+    then:
+      - field: '401'
+        function: truthy
+      - field: '500'
+        function: truthy
+      - field: '503'
+        function: truthy
+
+  pfos-problem-json-errors:
+    description: 4xx/5xx responses use application/problem+json (directly or via components.responses).
+    severity: error
+    resolved: false
+    given:
+      - '#Operations.responses[?(@property.match(/^[45]/))]'
+      - '$.components.responses[?(@property != "NotModified")]'
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          anyOf:
+            - required: ['$ref']
+            - required: [content]
+              properties:
+                content:
+                  type: object
+                  required: [application/problem+json]
+
+  pfos-no-json-number:
+    description: Money, rates and decimals are strings (Money / PositiveMoney / DecimalString / Rate); `type number` is forbidden.
+    severity: error
+    resolved: false
+    given: '$..[?(@ && @.type)]'
+    then:
+      field: type
+      function: schema
+      functionOptions:
+        schema:
+          not:
+            anyOf:
+              - const: number
+              - type: array
+                contains: { const: number }
+
+  pfos-money-via-schema:
+    description: Monetary properties must reference Money/PositiveMoney/DecimalString (no inline scalar type).
+    severity: error
+    resolved: false
+    given: '$.components.schemas..properties[?(@property.match(/^(amount|balance|.*Amount|.*Balance|total|.*Cost|fee)$/))]'
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          description: inline objects wrapping Money (e.g. openingBalance, fee) are allowed; scalar types are not
+          properties:
+            type:
+              not:
+                anyOf:
+                  - enum: [string, number, integer]
+                  - type: array
+                    contains: { enum: [string, number, integer] }
+
+  pfos-idempotency-key-financial-post:
+    description: Financial POSTs (tags Accounts, Transactions, FX) require Idempotency-Key, or If-Match when acting on an existing aggregate.
+    severity: error
+    resolved: false
+    given: '$.paths[*].post'
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          if:
+            required: [tags]
+            properties:
+              tags:
+                contains: { enum: [Transactions, Accounts, FX] }
+          then:
+            required: [parameters]
+            properties:
+              parameters:
+                type: array
+                contains:
+                  type: object
+                  required: ['$ref']
+                  properties:
+                    $ref:
+                      enum:
+                        - '#/components/parameters/IdempotencyKey'
+                        - '#/components/parameters/IdempotencyKeyOptional'
+                        - '#/components/parameters/IfMatch'
+
+  pfos-if-match-on-patch:
+    description: PATCH (and PUT replacements) require If-Match.
+    severity: error
+    resolved: false
+    given: '$.paths[*].patch'
+    then:
+      field: parameters
+      function: schema
+      functionOptions:
+        schema:
+          type: array
+          contains:
+            type: object
+            properties:
+              $ref: { const: '#/components/parameters/IfMatch' }
+            required: ['$ref']
+
+  pfos-camel-case-properties:
+    description: Schema property names are camelCase.
+    severity: error
+    given: '$.components.schemas..properties'
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^[a-z][a-zA-Z0-9]*$'
+
+  pfos-camel-case-query-params:
+    description: Query parameter names are camelCase.
+    severity: error
+    given:
+      - '#Operations.parameters[?(@.in == "query")]'
+      - '$.components.parameters[?(@.in == "query")]'
+    then:
+      field: name
+      function: pattern
+      functionOptions:
+        match: '^[a-z][a-zA-Z0-9]*$'
+
+  pfos-kebab-case-paths:
+    description: Path segments are kebab-case (parameters camelCase).
+    severity: error
+    given: '$.paths'
+    then:
+      field: '@key'
+      function: pattern
+      functionOptions:
+        match: '^(/([a-z0-9]+(-[a-z0-9]+)*|\{[a-z][a-zA-Z0-9]*\}))+$'
+
+  pfos-sunset-on-deprecated:
+    description: Deprecated operations declare x-sunset (Sunset header date, at least 90 days after the announcement).
+    severity: error
+    given: '#Operations'
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          if:
+            required: [deprecated]
+            properties:
+              deprecated: { const: true }
+          then:
+            required: [x-sunset]
+
+overrides:
+  # Side-effect-free calculations exposed as POST (no Idempotency-Key by design).
+  - files:
+      - 'finance-api.v1.yaml#/paths/~1workspaces~1%7BworkspaceId%7D~1conversions~1preview/post'
+      - 'finance-api.v1.yaml#/paths/~1workspaces~1%7BworkspaceId%7D~1transactions~1duplicate-check/post'
+    rules:
+      pfos-idempotency-key-financial-post: off

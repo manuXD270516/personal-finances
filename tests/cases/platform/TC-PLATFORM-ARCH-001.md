@@ -3,18 +3,18 @@ id: TC-PLATFORM-ARCH-001
 title: "Las reglas de arquitectura rechazan que el dominio importe infraestructura, frameworks o internos de otros contextos"
 spec: platform/delivery-pipeline
 related_specs: []
-requirement: "Control de reglas de arquitectura"
-scenario: null
-requirement_status: provisional
+requirement: "Quality gate de pull request"
+scenario: "Una violación de arquitectura bloquea el merge"
+requirement_status: confirmed
 fr: []
-nfr: [NFR-MAINT-002]
+nfr: [NFR-MAINT-001, NFR-MAINT-006, NFR-MAINT-008]
 invariants: []
 priority: high
 type: platform
 level: architecture
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 1
 tags: ["dependency-cruiser", "architecture"]
@@ -33,7 +33,7 @@ expected_result:
   - "Cada fixture produce una violación de la regla esperada y un código de salida distinto de cero"
   - "El código real produce cero violaciones"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-PLATFORM-ARCH-001 — Las reglas de arquitectura rechazan que el dominio importe infraestructura, frameworks o internos de otros contextos

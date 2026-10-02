@@ -64,7 +64,7 @@ flowchart LR
 | Sin anidamiento > 2 niveles bajo el workspace | — |
 | Sin extensiones de archivo; formato por `Accept` | `Accept: text/csv` en exports |
 
-Verbos: `GET` (lectura, seguro), `POST` (crear / acción), `PATCH` (actualización parcial, `application/merge-patch+json` — RFC 7396), `PUT` solo para reemplazos completos idempotentes de recursos de configuración (p. ej. preferencias), `DELETE` solo para recursos no financieros (desvincular adjunto, revocar conexión). **Nunca `DELETE` sobre datos financieros** (ARCHITECTURE §9): se usa `void` o `archive`.
+Verbos: `GET` (lectura, seguro), `POST` (crear / acción), `PATCH` (actualización parcial, `application/merge-patch+json` — RFC 7396), `PUT` solo para reemplazos completos idempotentes de recursos de configuración (p. ej. preferencias), `DELETE` solo para recursos no financieros (desvincular adjunto, revocar conexión). **Nunca `DELETE` sobre datos financieros ni sobre catálogos referenciables** (ARCHITECTURE §9; cuentas, instituciones, categorías, grupos de categorías, tags, counterparties): se usa `void` o `archive`. Un `DELETE` sobre esos recursos responde `405 Method Not Allowed` (problem+json) sin efectos.
 
 ---
 
@@ -309,7 +309,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | me | `GET/PATCH /api/v1/me` | `identity/authentication` | 1 |
 | workspaces | `GET/POST /api/v1/workspaces`, `GET/PATCH /api/v1/workspaces/{id}` | `identity/workspace-membership` | 1 |
 | members, invitations | `GET W/members`, `PATCH W/members/{userId}`, `POST W/invitations`, `POST /api/v1/invitations/{token}/accept` | `identity/workspace-membership` | 9 |
-| accounts | `GET/POST W/accounts`, `GET/PATCH W/accounts/{id}`, `POST …/archive`, `POST …/unarchive`, `GET …/balance-history` (P7) | `accounts/account-management` | 1 |
+| accounts | `GET/POST W/accounts`, `GET/PATCH W/accounts/{id}`, `POST …/archive`, `POST …/close`, `POST …/reactivate` (estados `ACTIVE`/`CLOSED`/`ARCHIVED`), `GET …/balance-history` (P7) | `accounts/account-management` | 1 |
 | institutions | `GET/POST W/institutions`, `GET/PATCH …/{id}`, `POST …/archive` | `accounts/institutions` | 1 |
 | transactions | `GET/POST W/transactions`, `GET/PATCH …/{id}`, `POST …/{id}/void`, `POST …/{id}/post` | `transactions/transaction-recording`, `transactions/splits` | 1 |
 | transactions bulk | `POST W/transactions/bulk-edit` | `transactions/bulk-edit` | 2 |
@@ -335,7 +335,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | documents | `POST W/documents/uploads`, `POST …/{id}/complete`, `GET …/{id}`, `GET …/{id}/download`, `POST/DELETE W/documents/{id}/links` | `documents/attachments` | 6 |
 | imports | `POST W/imports`, `POST …/{id}/upload-complete`, `GET …/{id}`, `GET …/{id}/preview`, `PATCH …/{id}/rows/{rowId}`, `POST …/{id}/approve|cancel|revert|retry`, `…/mapping-profiles`, `…/connections` | `imports/import-pipeline`, `imports/banking-providers` | 6 (CSV P3) |
 | rules | `GET/POST W/rules`, `GET/PATCH …/{id}`, `POST …/{id}/test`, `POST …/reorder`, `POST …/{id}/archive` | `rules/rule-engine` | 6 |
-| reports | `GET W/reports/summary` (P1), `GET W/reports/{kpis,income-expenses,budget-vs-actual,expenses/by-category,…}` ([14-reporting.md](14-reporting.md)) | `reporting/*` | 1 / 7 |
+| reports | `GET W/reports/summary` (P1: calculado leyendo el ledger y las transacciones directamente, sin read models; consolidado en moneda de reporte siempre presente con `complete` y `unconverted[]`), `GET W/reports/{kpis,income-expenses,budget-vs-actual,expenses/by-category,…}` ([14-reporting.md](14-reporting.md)) | `reporting/*` | 1 / 7 |
 | forecasts | `POST W/forecasts` (202), `GET …/{id}`, `GET W/forecasts/latest?kind=` | `forecast/expense-forecasting` | 8 |
 | notifications | `GET W/notifications`, `POST …/{id}/read`, `GET/PUT W/notification-preferences` | `notifications/alerts` | 2 |
 | audit-log | `GET W/audit-log?aggregateType=&aggregateId=&actor=&from=&to=` | `audit/audit-trail` | 1 |

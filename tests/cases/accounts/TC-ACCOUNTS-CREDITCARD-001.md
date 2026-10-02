@@ -4,24 +4,24 @@ title: "La compra con tarjeta de crédito aumenta el pasivo y el pago es una tra
 spec: accounts/account-management
 related_specs: ["transactions/transfers", "debt/credit-cards"]
 requirement: "Tarjeta de crédito como cuenta de pasivo"
-scenario: null
-requirement_status: provisional
-fr: [FR-ACCOUNTS-002, FR-TRANSACTIONS-003]
+scenario: "Compra y pago con tarjeta"
+requirement_status: confirmed
+fr: [FR-ACCOUNTS-003, FR-ACCOUNTS-002, FR-TRANSACTIONS-003]
 nfr: []
-invariants: [INV-009, INV-004]
+invariants: [INV-009, INV-004, INV-030]
 priority: critical
 type: domain
 level: application
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
 tags: ["credit-card", "liability", "net-worth"]
 error_code: null
 preconditions:
-  - "Bank A (ASSET, BOB) con saldo 1000.00"
-  - "Credit Card (LIABILITY, BOB) con saldo 0.00"
+  - "Bank A (bank, ASSET, BOB) con saldo 1000.00"
+  - "Credit Card (credit_card, LIABILITY, BOB) con saldo 0.00"
   - "Patrimonio neto 1000.00 BOB"
 input:
   purchase:
@@ -43,7 +43,7 @@ expected_result:
   - "Tras el pago: Bank A 650.00, Credit Card 0.00, patrimonio neto sigue en 650.00 BOB"
   - "Gasto de Household en marzo = 350.00 (contado una sola vez, no de nuevo en el pago)"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-ACCOUNTS-CREDITCARD-001 — La compra con tarjeta de crédito aumenta el pasivo y el pago es una transferencia que conserva el patrimonio neto

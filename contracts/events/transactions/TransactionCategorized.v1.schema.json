@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/transactions/TransactionCategorized.v1.schema.json",
   "title": "transactions.TransactionCategorized.v1",
   "description": "Cambió la categoría y/o tags de uno o más splits. No afecta el ledger (INV-033). Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING. Idempotencia natural: (transactionId, aggregateVersion). Sin PII.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"

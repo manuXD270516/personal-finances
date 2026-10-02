@@ -1,60 +1,66 @@
 ---
 id: TC-CLASSIFICATION-RECATEGORIZE-001
-title: "Recategorizar una transacción no afecta el ledger"
+title: Recategorizar una transacción no afecta el ledger
 spec: classification/categories
-related_specs: ["transactions/splits", "ledger/journal-posting"]
-requirement: "Recategorización fuera del ledger"
-scenario: null
-requirement_status: provisional
-fr: [FR-CLASSIFICATION-002]
+related_specs: [transactions/splits, ledger/journal-posting]
+requirement: Recategorizar no modifica el ledger
+scenario: Recategorizar un gasto contabilizado
+requirement_status: confirmed
+fr: [FR-LEDGER-008, FR-TRANSACTIONS-008]
 nfr: []
-invariants: [INV-004]
-priority: high
+invariants: [INV-033]
+priority: critical
 type: integration
 level: repository-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["classification", "ledger"]
+tags: [classification, ledger, regression]
 error_code: null
 preconditions:
-  - "Gasto contabilizado T1 de 150.00 BOB, categoría Groceries, asiento E1 con postings P1/P2"
-  - "El periodo de T1 está abierto"
+- Cuenta "Banco BOB" con saldo 2,000.00 BOB después de registrar el gasto
+- Gasto contabilizado T1 de 150.00 BOB desde "Banco BOB", categoría "Supermercado", asiento E1 con postings P1/P2
+- El periodo de T1 está abierto
 input:
-  transaction: "T1"
-  from: "Groceries"
-  to: "Household"
+  transaction: T1
+  from: Supermercado
+  to: Hogar
 steps:
-  - "Recategorizar T1"
-  - "Contar asientos y postings; comparar las filas P1/P2"
-  - "Consultar los totales por categoría del mes"
+- Contar asientos y postings y leer el saldo de "Banco BOB"
+- Recategorizar T1
+- Volver a contar asientos y postings; comparar las filas P1/P2
+- Consultar los totales por categoría del mes
 expected_result:
-  - "El número de asientos y postings no cambia; las filas P1/P2 son idénticas byte a byte"
-  - "Categoría del split = Household"
-  - "Totales del mes: Groceries -150.00, Household +150.00 respecto de antes"
-  - "Registro en la bitácora de auditoría con la categoría anterior/posterior"
-  - "Se emite el evento classification/transactions recategorized para las proyecciones de reportes"
+- El número de asientos y postings no cambia; P1/P2 son idénticos
+- El saldo de "Banco BOB" sigue siendo 2,000.00 BOB
+- Categoría de la porción = "Hogar"
+- 'Totales del mes: "Supermercado" -150.00 BOB y "Hogar" +150.00 BOB respecto de antes'
+- Registro de auditoría con la categoría anterior y la nueva
+- Se emite transactions.TransactionCategorized.v1
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-CLASSIFICATION-RECATEGORIZE-001 — Recategorizar una transacción no afecta el ledger
 
 ## Intención
 
-ARCHITECTURE §4.1: la clasificación vive en TransactionSplit; recategorizar nunca crea asientos en el ledger.
+INV-033 (ARCHITECTURE §4.1): la clasificación vive en la porción; recategorizar nunca crea, modifica ni revierte asientos.
 
 ## Escenario
 
 ```gherkin
-Dado un gasto contabilizado de 150.00 BOB categorizado como Groceries
-Cuando el usuario cambia su categoría a Household
+Dado un gasto contabilizado de 150.00 BOB categorizado como "Supermercado"
+  Y el saldo de "Banco BOB" es 2,000.00 BOB
+Cuando el usuario cambia su categoría a "Hogar"
 Entonces no se crea ni modifica ningún asiento ni posting
-  Y el gasto aparece bajo Household en el reporte del mes
+  Y el saldo de "Banco BOB" sigue siendo 2,000.00 BOB
+  Y el gasto aparece bajo "Hogar" en el reporte del mes
 ```
 
 ## Notas
 
-- Pregunta abierta: ¿se permite recategorizar en un periodo cerrado (cambia los reportes pero no el ledger)? Ver INV-015 en docs/09.
+- Recategorizar en periodo cerrado (INV-015) no aplica en Phase 1; se decide con planning/month-closing (Phase 2).
+- Se automatiza cuando exista add-transaction-recording (tasks 7.1).

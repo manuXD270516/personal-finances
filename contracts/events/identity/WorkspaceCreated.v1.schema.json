@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/identity/WorkspaceCreated.v1.schema.json",
+  "title": "identity.WorkspaceCreated.v1",
+  "description": "Se creó un workspace (personal por provisión JIT o adicional por el usuario). Productor: IDENTITY. Consumidores: CLASSIFICATION (siembra categorías de sistema y, si aplica, el catálogo por defecto), REPORTING. Idempotencia natural: workspaceId (aggregateVersion = 1). PII baja: name.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "identity.WorkspaceCreated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Workspace"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "name",
+        "baseCurrency",
+        "timeZone",
+        "locale",
+        "fiscalMonthStartDay",
+        "ownerUserId",
+        "origin"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "baseCurrency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Zona IANA, p. ej. America/La_Paz"
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "fiscalMonthStartDay": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 28
+        },
+        "ownerUserId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "origin": {
+          "enum": [
+            "PERSONAL_DEFAULT",
+            "USER_CREATED"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000101",
+      "eventType": "identity.WorkspaceCreated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Workspace",
+      "aggregateId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "identity-provisioning"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "name": "Personal",
+        "baseCurrency": "BOB",
+        "timeZone": "America/La_Paz",
+        "locale": "es-BO",
+        "fiscalMonthStartDay": 1,
+        "ownerUserId": "01928c4e-0000-7000-8000-00000000b001",
+        "origin": "PERSONAL_DEFAULT"
+      }
+    }
+  ]
+}

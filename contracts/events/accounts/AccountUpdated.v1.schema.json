@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/accounts/AccountUpdated.v1.schema.json",
+  "title": "accounts.AccountUpdated.v1",
+  "description": "Cambiaron metadatos, liquidez, inclusión en patrimonio o la moneda (solo sin movimientos) de una cuenta. Solo viajan los valores nuevos no sensibles (nunca notes ni identificadores de cuenta). Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: (accountId, aggregateVersion). PII baja: name.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "accounts.AccountUpdated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Account"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "changedFields"
+      ],
+      "properties": {
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "changedFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "name",
+              "institutionId",
+              "liquidity",
+              "includeInNetWorth",
+              "includeInBudget",
+              "displayOrder",
+              "color",
+              "icon",
+              "notes",
+              "tagIds",
+              "cryptoNetwork",
+              "currency",
+              "accountNumberLast4"
+            ]
+          }
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "institutionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "liquidity": {
+          "enum": [
+            "LIQUID",
+            "SEMI_LIQUID",
+            "ILLIQUID"
+          ]
+        },
+        "includeInNetWorth": {
+          "type": "boolean"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000105",
+      "eventType": "accounts.AccountUpdated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Account",
+      "aggregateId": "01928c4e-0000-7000-8000-000000acc003",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "accountId": "01928c4e-0000-7000-8000-000000acc003",
+        "changedFields": [
+          "name",
+          "liquidity",
+          "notes"
+        ],
+        "name": "Bank B (ahorro)",
+        "liquidity": "SEMI_LIQUID"
+      }
+    }
+  ]
+}

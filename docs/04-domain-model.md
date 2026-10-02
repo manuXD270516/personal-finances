@@ -15,7 +15,7 @@ Regla: el **código** usa el término en inglés; la **UI y la documentación** 
 | Usuario | `User` | IDENTITY | Persona autenticada vía OIDC (`sub`). |
 | Espacio de trabajo | `Workspace` | IDENTITY | Unidad de aislamiento de datos (tenant). Tiene moneda base, moneda de reporte y zona horaria. |
 | Membresía / rol | `Membership` / `Role` | IDENTITY | Relación usuario–workspace con rol `OWNER`, `EDITOR`, `VIEWER`. |
-| Institución | `Institution` | ACCOUNTS | Banco, exchange, broker, cooperativa, wallet provider. |
+| Institución | `Institution` | ACCOUNTS | Banco, fintech, exchange, broker, proveedor de billetera u otra (`InstitutionKind`). |
 | Cuenta | `Account` | ACCOUNTS | Contenedor de dinero del usuario en **una** moneda (activo o pasivo). |
 | Naturaleza de cuenta | `AccountNature` (`ASSET`/`LIABILITY`) | ACCOUNTS | Derivada del tipo de cuenta. |
 | Cuenta contable | `LedgerAccount` | LEDGER | Cuenta interna de doble entrada (ASSET, LIABILITY, EQUITY, INCOME, EXPENSE), una moneda. Invisible al usuario. |
@@ -41,8 +41,8 @@ Regla: el **código** usa el término en inglés; la **UI y la documentación** 
 | Saldo inicial | `OpeningBalance` | TRANSACTIONS | Saldo con el que la cuenta entra al sistema. |
 | Conciliación | `Reconciliation` | TRANSACTIONS | Cotejo contra un extracto a una fecha con saldo declarado. |
 | Duplicado candidato | `DuplicateCandidate` | TRANSACTIONS | Par de transacciones sospechosamente iguales. |
-| Categoría / grupo | `Category` / `CategoryGroup` | CLASSIFICATION | Clasificación jerárquica (grupo → categoría). |
-| Categoría de sistema | `SystemCategory` | CLASSIFICATION | Categorías protegidas: Comisiones, Intereses pagados, Intereses ganados, Seguros, Impuestos, Cashback, Ajustes. |
+| Categoría / grupo | `Category` / `CategoryGroup` | CLASSIFICATION | Clasificación jerárquica de tres niveles: grupo → categoría → subcategoría. |
+| Categoría de sistema | `SystemCategory` | CLASSIFICATION | 11 categorías protegidas con `systemCode` (FR-CLASSIFICATION-003): Comisiones, Comisiones de cambio, Intereses pagados, Comisiones de préstamo, Seguros, Impuestos, Ajustes y Sin categoría (gasto); Intereses ganados, Ajustes y Sin categoría (ingreso). |
 | Etiqueta | `Tag` | CLASSIFICATION | Marca libre transversal. |
 | Campo personalizado | `CustomFieldDefinition` / `CustomFieldValue` | CLASSIFICATION / TRANSACTIONS | Atributo definido por el usuario. |
 | Contraparte | `Counterparty` | CLASSIFICATION | Comercio, proveedor, empleador, persona, banco con quien se opera (antes "Provider/Merchant/Payee"). |
@@ -129,7 +129,7 @@ decimal.js configurado con `precision: 40`, `rounding: ROUND_HALF_EVEN`. Prohibi
 ```ts
 interface Rate { base: CurrencyCode; quote: CurrencyCode; value: Decimal } // 1 base = value quote; value > 0; base ≠ quote
 interface ExchangeRateSnapshot extends Rate {
-  asOf: Instant; source: RateSourceRef; rateType: 'MID' | 'BUY' | 'SELL' | 'P2P' | 'OFFICIAL';
+  asOf: Instant; source: RateSourceRef; rateType: 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM'; // FR-FX-002
 }
 // operaciones: invert() (precisión 40), convert(money) (una cuantización HALF_EVEN), normalize(displayOrientation)
 ```
@@ -185,15 +185,16 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.2 ACCOUNTS — Accounts & Institutions (`accounts`)
 
-- **AR `Account`**: `id, workspaceId, name, type, nature (derivada), currency, institutionId?, status (ACTIVE|ARCHIVED), openedOn, includeInNetWorth, displayOrder, maskedNumber?, notes, version`.
-  - `AccountType`: `CASH, CHECKING, SAVINGS, CREDIT_CARD, LOAN, CRYPTO_WALLET, EXCHANGE, BROKERAGE, INVESTMENT, RECEIVABLE, OTHER_ASSET, OTHER_LIABILITY` → `nature` ASSET/LIABILITY.
-- **AR `Institution`**: `id, workspaceId?, name, kind (BANK|EXCHANGE|BROKER|COOPERATIVE|WALLET_PROVIDER|OTHER), country, website?, status`.
-- **VO**: `AccountType`, `AccountNature`, `MaskedAccountNumber` (sólo últimos 4).
+- **AR `Account`**: `id, workspaceId, name, type, nature (derivada), currency, institutionId?, liquidity (LIQUID|SEMI_LIQUID|ILLIQUID), includeInNetWorth, status (ACTIVE|CLOSED|ARCHIVED), openedOn, closedOn?, displayOrder, maskedNumber?, notes, version`.
+  - `AccountType`: `BANK, CASH, DIGITAL_WALLET, CREDIT_CARD, LOAN, CRYPTO_WALLET, INVESTMENT, SAVINGS, VIRTUAL, MANUAL_ASSET, MANUAL_LIABILITY` (FR-ACCOUNTS-001) → `nature` LIABILITY para `CREDIT_CARD`, `LOAN`, `MANUAL_LIABILITY`; ASSET para el resto.
+  - `liquidity` por defecto según tipo (FR-ACCOUNTS-011): `LIQUID` para BANK, CASH, DIGITAL_WALLET, CRYPTO_WALLET, SAVINGS; `SEMI_LIQUID` para INVESTMENT; `ILLIQUID` para el resto. Solo `LIQUID` cuenta como dinero disponible.
+- **AR `Institution`**: `id, workspaceId, name, kind (BANK|FINTECH|EXCHANGE|BROKER|WALLET_PROVIDER|OTHER), country, website?, status`.
+- **VO**: `AccountType`, `AccountNature`, `AccountLiquidity`, `MaskedAccountNumber` (sólo últimos 4).
 - **Ports**: `AccountRepository`, `InstitutionRepository`, `CurrencyCatalog` (lectura, FX contracts), `AuditPort`.
-- **Comandos**: `OpenAccount`, `UpdateAccount` (nombre, institución, orden, includeInNetWorth), `ArchiveAccount`, `ReactivateAccount`, `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`.
+- **Comandos**: `OpenAccount`, `UpdateAccount` (nombre, institución, orden, liquidity, includeInNetWorth), `ArchiveAccount`, `CloseAccount` (exige saldo cero), `ReactivateAccount`, `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`.
 - **Queries**: `GetAccount`, `ListAccounts(filters)`, `GetAccountsByIds`, `ListInstitutions`.
-- **Eventos**: `AccountOpened`, `AccountUpdated`, `AccountArchived`, `AccountReactivated`.
-- **Invariantes**: `currency` y `type` (por ende `nature`) **inmutables** tras crear; nombre único entre cuentas activas del workspace; cuenta archivada no acepta movimientos nuevos (INV-026, verificado por Transactions vía query); no se borra nunca (soft-archive). El **saldo no vive aquí** (lo calcula Ledger). El saldo inicial se registra como transacción `OPENING_BALANCE` en Transactions (orquestado en la misma unidad de trabajo por la capa de composición, ver [06-context-map.md](06-context-map.md)).
+- **Eventos**: `AccountOpened`, `AccountUpdated`, `AccountArchived`, `AccountClosed`, `AccountReactivated`.
+- **Invariantes**: `type` (por ende `nature`) **inmutable** tras crear; `currency` solo puede cambiar mientras la cuenta no tenga movimientos (FR-ACCOUNTS-005, rev. 2026-10-02); nombre único entre cuentas activas del workspace; cuenta archivada o cerrada no acepta movimientos nuevos (INV-026, verificado por Transactions vía query); el `LedgerAccount` de la cuenta lo crea Ledger con *get-or-create* al primer posting (FR-ACCOUNTS-003, ARCHITECTURE §7); no se borra nunca (soft-archive). El **saldo no vive aquí** (lo calcula Ledger). El saldo inicial se registra como transacción `OPENING_BALANCE` en Transactions (orquestado en la misma unidad de trabajo por la capa de composición, ver [06-context-map.md](06-context-map.md)).
 
 ### 3.3 LEDGER — Financial Ledger (`ledger`)
 
@@ -212,7 +213,7 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.4 TRANSACTIONS (`txn`)
 
-- **AR `Transaction`**: `id, workspaceId, kind, status, businessDate, description, notes, counterpartyId?, legs: VO TransactionLeg[] (accountId, amount: Money firmado), splits: E TransactionSplit[] (id, amount, categoryId?, tagIds[], customFields: CustomFieldValue[], memo, originalAmount?), conversionDetail?: VO ConversionDetail, loanPaymentBreakdown?: VO, origin: VO Origin (MANUAL|IMPORT|RECURRING|DEBT|GOALS|RULE|SYSTEM + refId), externalRef?, fingerprint?, refundOfTransactionId?, transferPairRef?, activeJournalEntryId?, version`.
+- **AR `Transaction`**: `id, workspaceId, kind, status, businessDate, description, notes, counterpartyId?, legs: VO TransactionLeg[] (accountId, amount: Money firmado), splits: E TransactionSplit[] (id, amount, categoryId?, tagIds[], customFields: CustomFieldValue[], memo, originalAmount?), conversionDetail?: VO ConversionDetail (versionado por revisión: editar = reversa + nuevo asiento + nueva revisión), loanPaymentBreakdown?: VO, origin: VO Origin (MANUAL|IMPORT|RECURRING|DEBT|GOAL|RULE|SYSTEM + refId), externalRef?, fingerprint?, refundOfTransactionId?, transferPairRef?, activeJournalEntryId?, version`.
 - **AR `Reconciliation`**: `id, accountId, statementDate, statementBalance: Money, status (IN_PROGRESS|COMPLETED|CANCELLED), clearedTransactionIds, adjustmentTransactionId?, completedAt`.
 - **AR `DuplicateCandidate`**: `id, transactionIds[2], score, reasons[], status (OPEN|CONFIRMED_DUPLICATE|DISMISSED|MERGED)`.
 - **VO**: `TransactionKind`, `TransactionStatus`, `TransactionLeg`, `ConversionDetail`, `Fee`, `Rate`, `LoanPaymentBreakdown (principal, interest, fees, insurance, taxes)`, `Origin`, `TransactionFingerprint (accountId + date + amount + normalizedDescription hash)`.
@@ -226,7 +227,7 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.5 CLASSIFICATION (`classification`)
 
-- **AR `Category`**: `id, groupId, name, kind (EXPENSE|INCOME), isSystem, systemCode?, status (ACTIVE|ARCHIVED), icon, color, mergedInto?`.
+- **AR `Category`**: `id, groupId, parentId? (un solo nivel de subcategoría), name, kind (EXPENSE|INCOME), isSystem, systemCode? (FEES|FX_FEES|INTEREST|LOAN_FEES|INSURANCE|TAXES|ADJUSTMENTS|UNCATEGORIZED|INTEREST_EARNED|ADJUSTMENTS_INCOME|UNCATEGORIZED_INCOME), status (ACTIVE|ARCHIVED), icon, color, mergedInto?`.
 - **AR `CategoryGroup`**: `id, name, kind, order, status`.
 - **AR `Tag`**: `id, name, color, status`.
 - **AR `CustomFieldDefinition`**: `id, key, label, type (TEXT|NUMBER|DATE|BOOLEAN|SELECT|MULTI_SELECT|MONEY), options?, appliesTo (TRANSACTION|SPLIT|ACCOUNT), required, status`.
@@ -236,7 +237,7 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 - **Comandos**: `CreateCategory`, `UpdateCategory`, `MoveCategory`, `ArchiveCategory`, `MergeCategories`, `Create/Update/ArchiveCategoryGroup`, `Create/Rename/Archive/MergeTags`, `Define/Update/ArchiveCustomField`, `Create/Update/Archive/MergeCounterparty`, `AddCounterpartyAlias`, `SeedSystemCategories` (al crear workspace).
 - **Queries**: `ListCategories`, `GetCategoryTree`, `ValidateClassification(categoryIds, tagIds, customFields)`, `ResolveCounterparty(description)`, `ListTags`, `ListCustomFields`, `ListCounterparties`.
 - **Eventos**: `CategoryArchived`, `CategoriesMerged`, `TagsMerged`, `CounterpartiesMerged`, `CustomFieldDefinitionChanged`.
-- **Invariantes**: INV-019; las categorías de sistema no se archivan ni renombran su `systemCode`; jerarquía de 2 niveles (grupo → categoría); `kind` de la categoría compatible con el signo del split (gasto/ingreso; los refunds usan categoría de gasto).
+- **Invariantes**: INV-019 (nunca hard delete, solo archivar); las categorías de sistema no se archivan, renombran, cambian de tipo ni de jerarquía (`SYSTEM_CATEGORY_IMMUTABLE`); jerarquía de tres niveles grupo → categoría → subcategoría (una subcategoría no tiene hijas: `CATEGORY_DEPTH_EXCEEDED`), con nombre único entre activas del mismo padre; `kind` de la categoría compatible con el signo del split (gasto/ingreso; los refunds usan categoría de gasto).
 
 > Nota: los **valores** asignados (categoryId del split, tags del split, `CustomFieldValue`) son propiedad de Transactions; Classification es dueño de los **catálogos**.
 
@@ -291,7 +292,7 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 ### 3.10 FX — FX & Market Data (`fx`)
 
 - **AR `CurrencyDefinition`** (catálogo `currency`): ver §2.2. Fiat ISO 4217 y cripto/commodities globales sembrados; `CUSTOM`/`COMMODITY` por workspace.
-- **AR `ExchangeRate`**: `id, base, quote, value, asOf (Instant), effectiveDate, rateType, source (MANUAL|PROVIDER|USER_CONVERSION), providerCode?, supersedesRateId?, workspaceId? (manuales/observaciones son del workspace; las de proveedores globales pueden ser compartidas)`. Inmutable.
+- **AR `ExchangeRate`**: `id, base, quote, value, asOf (Instant), effectiveDate, rateType (OFFICIAL|PARALLEL|P2P|BANK|CUSTOM), source (MANUAL|PROVIDER|USER_CONVERSION), providerCode?, supersedesRateId?, workspaceId? (manuales/observaciones son del workspace; las de proveedores globales pueden ser compartidas)`. Inmutable.
 - **AR `RateProviderConfig`**: `providerCode, pairs[], schedule, priority, enabled`.
 - **DS**: `RateResolver` (directa → inversa → triangulación pivote, con política de fuente/staleness), `ConversionPricingService` (referencia + spread para una conversión).
 - **Repos**: `CurrencyRepository`, `ExchangeRateRepository` (append-only), `RateProviderConfigRepository`. **Ports**: `MarketRateProvider` (ACL; adapters BCB oficial, APIs fiat, Binance P2P, CoinGecko…), `Clock`.
@@ -525,7 +526,7 @@ Decisiones: **Mantener**, **Renombrar**, **Fusionar** (absorbida en otro concept
 | TransactionPosting | **Renombrar/mover** → `Posting` dentro de `JournalEntry` | LEDGER (`ledger.posting`, `ledger.journal_entry`) | La doble entrada es responsabilidad del Ledger; postings inmutables con reversa. |
 | TransactionSplit | Mantener | TRANSACTIONS | Portador de categoría/tags/custom fields; postings nominales referencian `split_id`. |
 | Category | Mantener | CLASSIFICATION | Catálogo; soft-archive y merge. |
-| CategoryGroup | Mantener | CLASSIFICATION | Jerarquía de 2 niveles. |
+| CategoryGroup | Mantener | CLASSIFICATION | Primer nivel de la jerarquía grupo → categoría → subcategoría. |
 | Tag | Mantener | CLASSIFICATION | Catálogo. |
 | TransactionTag | **Renombrar** → `SplitTag` | TRANSACTIONS (`txn.split_tag`) | El tag se asigna a nivel split (etiquetar la transacción = todos sus splits); la asignación es un valor de Transactions. |
 | CustomFieldDefinition | Mantener | CLASSIFICATION | Catálogo de definiciones. |
@@ -560,7 +561,7 @@ Decisiones: **Mantener**, **Renombrar**, **Fusionar** (absorbida en otro concept
 ## Preguntas abiertas
 
 1. **Dueño del catálogo `currency`**: propuesto FX; alternativa `platform`. Debe acordarse con [08-data-model.md](08-data-model.md). ¿Monedas `CUSTOM` por workspace con códigos prefijados (`X-…`) para evitar colisiones?
-2. **Jerarquía de categorías**: ¿2 niveles fijos (grupo → categoría) o subcategorías arbitrarias?
+2. ~~**Jerarquía de categorías**~~: resuelta — tres niveles fijos grupo → categoría → subcategoría ([31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md), D8).
 3. **Reapertura de periodos en cascada**: ¿reabrir M obliga a reabrir M+1…?
 4. **Cuentas multi-moneda** (Binance, Wise): una `Account` por moneda bajo la misma institución, ¿con agrupador visual?
 5. **Metas multi-moneda**: ¿permitir contribuciones en otra moneda valorizadas, o exigir conversión previa (propuesto)?

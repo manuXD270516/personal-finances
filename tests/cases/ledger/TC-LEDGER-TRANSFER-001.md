@@ -1,48 +1,48 @@
 ---
 id: TC-LEDGER-TRANSFER-001
-title: "La transferencia entre cuentas propias preserva el patrimonio neto y mantiene el ledger balanceado"
-spec: transactions/transfers
-related_specs: ["ledger/journal-posting", "ledger/balances"]
-requirement: "Transferencia entre cuentas propias"
-scenario: null
-requirement_status: provisional
-fr: [FR-TRANSACTIONS-003, FR-LEDGER-001]
-nfr: []
+title: La transferencia entre cuentas propias preserva el patrimonio neto y mantiene el ledger balanceado
+spec: ledger/journal-posting
+related_specs: [transactions/transfers, ledger/balances]
+requirement: Asientos balanceados por moneda
+scenario: Transferencia en la misma moneda balancea y preserva el patrimonio
+requirement_status: confirmed
+fr: [FR-LEDGER-001, FR-TRANSACTIONS-018]
+nfr: [NFR-DATA-004]
 invariants: [INV-001, INV-009, INV-004]
 priority: critical
 type: domain
 level: application
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
-tags: ["transfer", "net-worth", "ledger"]
+tags: [transfer, net-worth, ledger]
 error_code: null
 preconditions:
-  - "Workspace W1 con moneda base BOB"
-  - "Cuenta A (ASSET, BOB) con saldo 1000.00 BOB"
-  - "Cuenta B (ASSET, BOB) con saldo 0.00 BOB"
-  - "Sin transacciones pendientes ni de otro tipo"
+- Workspace W1 con moneda base BOB
+- Cuenta A (ASSET, BOB) con saldo 1000.00 BOB
+- Cuenta B (ASSET, BOB) con saldo 0.00 BOB
+- Sin transacciones pendientes ni de otro tipo
 input:
-  from: "Cuenta A"
-  to: "Cuenta B"
-  amount: "300.00"
-  currency: "BOB"
-  date: "2026-03-15"
+  from: Cuenta A
+  to: Cuenta B
+  amount: '300.00'
+  currency: BOB
+  date: '2026-03-15'
 steps:
-  - "Registrar una transferencia de 300.00 BOB de la Cuenta A a la Cuenta B"
-  - "Leer los saldos de A y B desde el ledger"
-  - "Calcular el patrimonio neto en BOB antes y después"
+- Registrar una transferencia de 300.00 BOB de la Cuenta A a la Cuenta B
+- Leer los saldos de A y B desde el ledger
+- Calcular el patrimonio neto en BOB antes y después
 expected_result:
-  - "Se crea exactamente un JournalEntry con dos postings: Cuenta B +300.00 BOB, Cuenta A -300.00 BOB"
-  - "La suma de los postings en BOB es 0.00"
-  - "Saldo de la Cuenta A = 700.00 BOB"
-  - "Saldo de la Cuenta B = 300.00 BOB"
-  - "Patrimonio neto antes = patrimonio neto después = 1000.00 BOB"
-  - "No se crea ningún posting de INCOME ni de EXPENSE"
+- 'Se crea exactamente un JournalEntry con dos postings: Cuenta B +300.00 BOB, Cuenta A -300.00 BOB'
+- La suma de los postings en BOB es 0.00
+- Saldo de la Cuenta A = 700.00 BOB
+- Saldo de la Cuenta B = 300.00 BOB
+- Patrimonio neto antes = patrimonio neto después = 1000.00 BOB
+- No se crea ningún posting de INCOME ni de EXPENSE
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-LEDGER-TRANSFER-001 — La transferencia entre cuentas propias preserva el patrimonio neto y mantiene el ledger balanceado

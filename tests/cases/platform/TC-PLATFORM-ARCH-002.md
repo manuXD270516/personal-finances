@@ -3,18 +3,18 @@ id: TC-PLATFORM-ARCH-002
 title: "Una regla de ESLint prohíbe tipos number y el parseo de flotantes para valores monetarios"
 spec: platform/delivery-pipeline
 related_specs: []
-requirement: "Control de reglas de arquitectura"
+requirement: "Quality gate de pull request"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
-nfr: [NFR-MAINT-002]
+nfr: [NFR-MAINT-001, NFR-MAINT-006, NFR-MAINT-008]
 invariants: [INV-001]
 priority: critical
 type: platform
 level: architecture
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 1
 tags: ["eslint", "money"]
@@ -36,7 +36,7 @@ expected_result:
   - "Cada muestra inválida reporta la regla correspondiente"
   - "Las muestras válidas no reportan nada (sin falsos positivos en números no monetarios)"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-PLATFORM-ARCH-002 — Una regla de ESLint prohíbe tipos number y el parseo de flotantes para valores monetarios

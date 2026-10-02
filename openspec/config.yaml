@@ -6,7 +6,8 @@ context: |
   IDIOMA: escribe TODOS los artefactos (proposal, specs, design, tasks) en español. Excepción obligatoria: los
   encabezados estructurales que el CLI parsea quedan en inglés: "## Purpose", "## ADDED Requirements",
   "## MODIFIED Requirements", "## REMOVED Requirements", "## RENAMED Requirements", "### Requirement:",
-  "#### Scenario:", "**Reason**", "**Migration**", "FROM:"/"TO:". El texto normativo usa "DEBE (MUST)",
+  "#### Scenario:", "**Reason**", "**Migration**", "FROM:"/"TO:", y en proposal.md "## Why", "## What Changes",
+  "## Capabilities", "### New Capabilities", "### Modified Capabilities", "## Impact". El texto normativo usa "DEBE (MUST)",
   "DEBEN (MUST)" y "NO DEBE (MUST NOT)" porque `openspec validate --strict` exige SHALL/MUST. Los scenarios usan
   viñetas "- **CUANDO** …", "- **ENTONCES** …", "- **Y** …". IDs (FR-, NFR-, TC-, INV-, RISK-), rutas de capability
   y códigos de error se mantienen como códigos.
@@ -29,8 +30,8 @@ context: |
 
 rules:
   proposal:
-    - "Usa los encabezados '## Por qué', '## Qué cambia', '## Capacidades' (con '### Capacidades nuevas' y '### Capacidades modificadas') y '## Impacto'."
-    - "La sección Impacto DEBE responder, cada punto con su etiqueta en negrita: Specs impactadas; Componentes/contextos impactados; APIs impactadas (contracts/openapi); Tablas impactadas (schema.tabla); Eventos impactados (contracts/events, con versión); Migraciones requeridas (expand/contract, ¿destructiva?); Test cases (AÑADIDOS / MODIFICADOS / DEPRECADOS, por TC-id); Impacto de regresión; Riesgos introducidos (RISK-ids si están registrados)."
+    - "Usa EXACTAMENTE los encabezados en inglés que el CLI parsea ('openspec show' falla sin ellos): '## Why', '## What Changes', '## Capabilities' (con '### New Capabilities' y '### Modified Capabilities') y '## Impact'. El contenido va en español."
+    - "La sección Impact DEBE responder, cada punto con su etiqueta en negrita: Specs impactadas; Componentes/contextos impactados; APIs impactadas (contracts/openapi); Tablas impactadas (schema.tabla); Eventos impactados (contracts/events, con versión); Migraciones requeridas (expand/contract, ¿destructiva?); Test cases (AÑADIDOS / MODIFICADOS / DEPRECADOS, por TC-id); Impacto de regresión; Riesgos introducidos (RISK-ids si están registrados)."
     - "Declara explícitamente qué queda fuera de alcance."
     - "Si el change toca dinero, ledger, FX, periodos o redondeo, lista las invariantes INV-NNN afectadas."
   specs:

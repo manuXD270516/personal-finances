@@ -69,7 +69,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 #### `transactions.TransactionCreated.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** RULES, COMMITMENTS (auto-match), REPORTING (pendientes).
 - **Trigger:** cualquier `Record*` o `ImportTransactions` acepta una transacción (pending o posted).
-- **Payload:** `transactionId: uuid`, `kind: TransactionKind`, `status: PENDING|POSTED`, `businessDate: date`, `description: string|null`, `counterpartyId: uuid|null`, `origin: {type: MANUAL|IMPORT|RECURRING|DEBT|GOALS|SYSTEM, refId: uuid|null}`, `legs: [{accountId: uuid, amount: Money(firmado)}]`, `splits: [{splitId, amount: Money, categoryId|null, tagIds: uuid[]}]`.
+- **Payload:** `transactionId: uuid`, `kind: TransactionKind`, `status: PENDING|POSTED`, `businessDate: date`, `description: string|null`, `counterpartyId: uuid|null`, `origin: {type: MANUAL|IMPORT|RECURRING|DEBT|GOAL|SYSTEM, refId: uuid|null}` (mismo enum que el OpenAPI), `legs: [{accountId: uuid, amount: Money(firmado)}]`, `splits: [{splitId, amount: Money, categoryId|null, tagIds: uuid[]}]`.
 - **Idem.:** `eventId`; natural `transactionId`. **Ord.:** por `Transaction`. **PII:** B (`description`).
 
 #### `transactions.TransactionPosted.v1`
@@ -91,7 +91,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `transactions.TransferCompleted.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** GOALS, DEBT, REPORTING.
-- **Trigger:** transferencia posteada (creación o pending→posted) o emparejamiento `LinkAsTransfer`.
+- **Trigger:** transferencia posteada (creación o pending→posted) o emparejamiento `LinkAsTransfer`. Incluye el pago de tarjeta de crédito, que es una transferencia (`kind = TRANSFER`, destino `LIABILITY`); no existe un kind propio en Phase 1 (`CARD_PAYMENT` queda reservado para `debt/credit-cards`, Phase 4).
 - **Payload:** `transactionId`, `journalEntryId`, `businessDate`, `fromAccountId`, `toAccountId`, `amount: Money (positivo)`, `fee: Money|null`, `matchedTransactionIds: uuid[]` (vacío si no hubo emparejamiento).
 - **Idem.:** natural `(transactionId, journalEntryId)`. **Ord.:** por `Transaction`. **PII:** N.
 
@@ -107,7 +107,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `accounts.AccountOpened.v1`
 - **Productor:** ACCOUNTS. **Consumidores:** REPORTING, (futuro) réplicas.
-- **Payload:** `accountId`, `name`, `type`, `nature: ASSET|LIABILITY`, `currency`, `institutionId|null`, `openedOn: date`, `includeInNetWorth: boolean`.
+- **Payload:** `accountId`, `name`, `type: BANK|CASH|DIGITAL_WALLET|CREDIT_CARD|LOAN|CRYPTO_WALLET|INVESTMENT|SAVINGS|VIRTUAL|MANUAL_ASSET|MANUAL_LIABILITY` (mismo enum que `AccountType` del OpenAPI), `nature: ASSET|LIABILITY`, `currency`, `institutionId|null`, `openedOn: date`, `liquidity: LIQUID|SEMI_LIQUID|ILLIQUID`, `includeInNetWorth: boolean`.
 - **Idem.:** natural `accountId`. **Ord.:** por `Account`. **PII:** B (`name` puede contener datos personales; no se incluye número de cuenta).
 
 #### `accounts.AccountArchived.v1`
@@ -115,12 +115,23 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 - **Payload:** `accountId`, `archivedOn: date`, `reason: string|null`.
 - **Idem.:** `(accountId, aggregateVersion)`. **Ord.:** por `Account`. **PII:** B.
 
+#### `transactions.TransactionUpdated.v1`
+- **Productor:** TRANSACTIONS. **Consumidores:** REPORTING (Phase 1); PLANNING y COMMITMENTS desde sus fases.
+- **Trigger:** edición de una transacción no cubierta por otros eventos (amend).
+- **Payload:** `transactionId`, `revision: int`, `changedFields: string[]`, `ledgerImpact: boolean`, valores `before/after` de los campos cambiados.
+- **Idem.:** natural `(transactionId, revision)`. **Ord.:** por `Transaction`. **PII:** B.
+
+#### `accounts.AccountClosed.v1` / `accounts.AccountReactivated.v1` / `accounts.AccountUpdated.v1`
+- **Productor:** ACCOUNTS. **Consumidores:** REPORTING.
+- **Payload:** `accountId` + `closedAt` (Closed) o `changedFields` (Updated/Reactivated).
+- **Idem.:** `(accountId, aggregateVersion)`. **Ord.:** por `Account`. **PII:** B (`name`).
+
+> Movidos a Phase 1 el 2026-10-02 al consolidar las specs ([31](31-phase-1-consolidation-decisions.md)); sus JSON Schemas viven en `contracts/events/`.
+
 ### 3.3 Fases posteriores (schemas se crean al implementar)
 
 | Evento | Productor | Consumidores | Trigger | Payload (resumen) | Idem. natural | PII |
 |---|---|---|---|---|---|---|
-| `transactions.TransactionUpdated.v1` | TRANSACTIONS | REPORTING, PLANNING, COMMITMENTS | Amend/edición no cubierta por otros eventos | `transactionId, revision, changedFields[], ledgerImpact: bool, before/after` de campos no sensibles | `(transactionId, aggregateVersion)` | B |
-| `accounts.AccountReactivated.v1` / `AccountUpdated.v1` | ACCOUNTS | REPORTING | — | `accountId, changedFields` | `(accountId, version)` | B |
 | `commitments.OccurrencesGenerated.v1` | COMMITMENTS | REPORTING | Job de ventana | `definitionId, window: DateRange, occurrences: [{occurrenceId, occurrenceDate, dueDate, expectedAmount: Money}]` | `(definitionId, window)` | N |
 | `commitments.RecurringOccurrenceDue.v1` | COMMITMENTS | NOTIFY | Ocurrencia pasa a `due` | `occurrenceId, definitionId, dueDate, expectedAmount, name` | `occurrenceId` | B |
 | `commitments.RecurringOccurrenceMaterialized.v1` | COMMITMENTS | REPORTING | Confirm/match | `occurrenceId, transactionId, mode: CREATED\|MATCHED` | `occurrenceId` | N |

@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/ledger/JournalEntryPosted.v1.schema.json",
   "title": "ledger.JournalEntryPosted.v1",
   "description": "Se registró un asiento (STANDARD, REVERSAL u OPENING) balanceado por moneda. Productor: LEDGER. Consumidores: REPORTING, GOALS. Idempotencia natural: journalEntryId. Ordenar proyecciones de saldo por sequence. Sin PII.",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"

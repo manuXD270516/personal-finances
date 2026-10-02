@@ -3,18 +3,18 @@ id: TC-PLATFORM-PIPELINE-001
 title: "El CI falla cuando falla la validación de OpenSpec"
 spec: platform/delivery-pipeline
 related_specs: ["quality/test-traceability"]
-requirement: "Control de validación de especificaciones"
-scenario: null
-requirement_status: provisional
+requirement: "Quality gate de pull request"
+scenario: "Una spec inválida bloquea el merge"
+requirement_status: confirmed
 fr: []
-nfr: [NFR-MAINT-001]
+nfr: [NFR-MAINT-001, NFR-MAINT-006, NFR-MAINT-008]
 invariants: []
 priority: high
 type: platform
 level: smoke
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 0
 tags: ["ci", "openspec"]
@@ -33,7 +33,7 @@ expected_result:
   - "Cambios inválidos: el job de OpenSpec falla y bloquea el merge"
   - "Cambio válido: el job pasa"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-PLATFORM-PIPELINE-001 — El CI falla cuando falla la validación de OpenSpec

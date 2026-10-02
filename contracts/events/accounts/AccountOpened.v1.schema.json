@@ -3,6 +3,7 @@
   "$id": "https://contracts.pfos.local/events/accounts/AccountOpened.v1.schema.json",
   "title": "accounts.AccountOpened.v1",
   "description": "Se abrió una cuenta del usuario. El saldo inicial NO viaja aquí (es una transacción OPENING_BALANCE). Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: accountId. PII baja: name (nunca número de cuenta).",
+  "type": "object",
   "allOf": [
     {
       "$ref": "../envelope.v1.schema.json"
@@ -34,7 +35,8 @@
         "currency",
         "institutionId",
         "openedOn",
-        "includeInNetWorth"
+        "includeInNetWorth",
+        "liquidity"
       ],
       "properties": {
         "accountId": {
@@ -47,19 +49,19 @@
         },
         "type": {
           "enum": [
+            "BANK",
             "CASH",
-            "CHECKING",
-            "SAVINGS",
+            "DIGITAL_WALLET",
             "CREDIT_CARD",
             "LOAN",
             "CRYPTO_WALLET",
-            "EXCHANGE",
-            "BROKERAGE",
             "INVESTMENT",
-            "RECEIVABLE",
-            "OTHER_ASSET",
-            "OTHER_LIABILITY"
-          ]
+            "SAVINGS",
+            "VIRTUAL",
+            "MANUAL_ASSET",
+            "MANUAL_LIABILITY"
+          ],
+          "description": "AccountType del OpenAPI (docs/31 D3)."
         },
         "nature": {
           "enum": [
@@ -85,6 +87,14 @@
         },
         "includeInNetWorth": {
           "type": "boolean"
+        },
+        "liquidity": {
+          "enum": [
+            "LIQUID",
+            "SEMI_LIQUID",
+            "ILLIQUID"
+          ],
+          "description": "AccountLiquidity del OpenAPI (docs/31 D5)."
         }
       }
     }
@@ -108,12 +118,13 @@
       "payload": {
         "accountId": "01928c4e-0000-7000-8000-000000acc002",
         "name": "Binance USDT",
-        "type": "EXCHANGE",
+        "type": "CRYPTO_WALLET",
         "nature": "ASSET",
         "currency": "USDT",
         "institutionId": "01928c4e-0000-7000-8000-0000000a1001",
         "openedOn": "2026-10-01",
-        "includeInNetWorth": true
+        "includeInNetWorth": true,
+        "liquidity": "LIQUID"
       }
     }
   ]

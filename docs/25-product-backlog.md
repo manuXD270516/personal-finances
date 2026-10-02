@@ -282,7 +282,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Prioridad:** Must · **FR:** FR-IDENTITY-005 · **Capability:** `identity/workspace-membership` · **Dependencias:** US-003
 - **Criterios de aceptación:**
   - **AC1** Given un `OWNER`, When cambia la moneda base de BOB a USD, Then los totales del dashboard se recalculan en USD y ningún posting ni `ConversionDetail` histórico cambia.
-  - **AC2** Given un `EDITOR`, When intenta modificar la configuración, Then recibe 403 `FORBIDDEN_ROLE`.
+  - **AC2** Given un `EDITOR`, When intenta modificar la configuración, Then recibe 403 `INSUFFICIENT_ROLE`.
   - **AC3** Given una zona horaria inválida, When se envía, Then responde 422 con `code` de validación.
 - **Test cases:** TC-IDENTITY-WORKSPACE-003, TC-IDENTITY-WORKSPACE-004, TC-SECURITY-RBAC-003
 
@@ -300,7 +300,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Descripción:** middleware que resuelve usuario, workspace y rol; UoW que ejecuta `SET LOCAL app.workspace_id` al abrir transacción.
 - **Prioridad:** Must · **Dependencias:** TS-014, TS-017
 - **Criterios de aceptación:**
-  - **AC1** Given una query fuera de UoW sobre tabla de negocio, When se ejecuta con el rol `app`, Then devuelve 0 filas (fail-closed).
+  - **AC1** Given una query fuera de UoW sobre tabla de negocio, When se ejecuta con el rol `app`, Then **falla** con `SQLSTATE PF002` (contexto de workspace ausente; fail-closed ruidoso, nunca 0 filas).
   - **AC2** Given una transacción, When termina, Then `app.workspace_id` no persiste en la conexión devuelta al pool.
 
 ### FEAT-04.3 — App shell
@@ -337,7 +337,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
   - **AC1** Given el tipo `bank`, moneda BOB y saldo inicial `"1500.00"` al 2026-10-01, When creo la cuenta, Then se crea un `LedgerAccount` ASSET BOB y una entry `+1500.00` cuenta / `−1500.00` `EQUITY:OPENING_BALANCE:BOB`, y el saldo mostrado es `Bs 1.500,00`.
   - **AC2** Given el tipo `credit_card` en USD con saldo adeudado `"200.00"`, When creo la cuenta, Then el `LedgerAccount` es LIABILITY y el saldo se muestra como deuda de US$ 200,00.
   - **AC3** Given saldo inicial `"10.005"` en BOB (escala 2), When envío, Then recibo 422 `AMOUNT_SCALE_EXCEEDED` y no se crea nada.
-  - **AC4** Given saldo inicial 0, When creo la cuenta, Then no se crea ninguna entry.
+  - **AC4** Given saldo inicial 0, When creo la cuenta, Then no se crea ninguna entry (el `LedgerAccount` se crea con *get-or-create* recién con el primer posting, FR-ACCOUNTS-003).
   - **AC5** Given el mismo `Idempotency-Key` reenviado, When repito el POST, Then obtengo la misma cuenta y no hay duplicado.
 - **Test cases:** TC-ACCOUNTS-LEDGERLINK-001, TC-ACCOUNTS-CREDITCARD-001, TC-LEDGER-OPENING-001, TC-LEDGER-SCALE-001, TC-ACCOUNTS-CREATE-001, TC-ACCOUNTS-CREATE-004, TC-ACCOUNTS-CREATE-006
 
@@ -358,9 +358,9 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Prioridad:** Must · **FR:** FR-ACCOUNTS-007, FR-ACCOUNTS-008 · **Capability:** `accounts/account-management` · **Dependencias:** US-007
 - **Criterios de aceptación:**
   - **AC1** Given una cuenta con saldo `Bs 10,00`, When intento cerrarla, Then recibo 409 `ACCOUNT_BALANCE_NOT_ZERO` con sugerencia de transferir o ajustar.
-  - **AC2** Given una cuenta con saldo 0, When la cierro, Then su estado es `closed` y no acepta nuevas transacciones (`ACCOUNT_NOT_ACTIVE`).
+  - **AC2** Given una cuenta con saldo 0, When la cierro, Then su estado es `closed` y no acepta nuevas transacciones (`ACCOUNT_CLOSED`).
   - **AC3** Given una cuenta archivada, When listo cuentas por defecto, Then no aparece; con filtro `status=archived` sí, y sus transacciones históricas siguen en reportes.
-  - **AC4** Given cualquier cuenta, When se intenta DELETE, Then la API no expone esa operación (405/404).
+  - **AC4** Given cualquier cuenta, When se intenta DELETE, Then la API no expone esa operación (`405 Method Not Allowed`).
 - **Test cases:** TC-ACCOUNTS-ARCHIVE-001, TC-ACCOUNTS-ARCHIVE-002, TC-ACCOUNTS-ARCHIVE-003, TC-ACCOUNTS-ARCHIVE-004
 
 #### US-010 — Ver mis cuentas con saldos
@@ -388,8 +388,8 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Valor:** organización por sobres sin distorsionar Q1.
 - **Prioridad:** Should · **FR:** FR-ACCOUNTS-011, FR-ACCOUNTS-015 · **Capability:** `accounts/account-management` · **Dependencias:** US-007, US-026
 - **Criterios de aceptación:**
-  - **AC1** Given una cuenta `virtual` con `includeInLiquidity=false`, When transfiero Bs 500 a ella, Then la liquidez total disminuye en Bs 500 y el net worth no cambia.
-  - **AC2** Given `includeInLiquidity=true`, When transfiero, Then la liquidez total no cambia.
+  - **AC1** Given una cuenta `virtual` con `liquidity=ILLIQUID` (default), When transfiero Bs 500 a ella, Then la liquidez total disminuye en Bs 500 y el net worth no cambia.
+  - **AC2** Given `liquidity=LIQUID`, When transfiero, Then la liquidez total no cambia.
 - **Test cases:** TC-ACCOUNTS-VIRTUAL-001, TC-ACCOUNTS-VIRTUAL-002
 
 ## EPIC-06 — Ledger multi-moneda y fundaciones de dominio
@@ -446,24 +446,25 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 
 ### FEAT-06.2 — Saldos (`ledger/balances`)
 
-#### US-014 — Saldo contable vs proyectado
-- **Historia:** Como owner quiero distinguir el saldo confirmado del saldo proyectado con movimientos pendientes para saber cuánto tengo realmente y cuánto tendré.
-- **Valor:** evita sorpresas por cargos pendientes.
-- **Prioridad:** Must · **FR:** FR-LEDGER-006, FR-LEDGER-012, FR-LEDGER-013 · **Capability:** `ledger/balances` · **Dependencias:** US-015
+#### US-014 — Saldo contable (pendientes fuera del ledger)
+- **Historia:** Como owner quiero que el saldo de mis cuentas refleje solo movimientos confirmados para saber cuánto tengo realmente.
+- **Valor:** evita confundir cargos pendientes con saldo real.
+- **Prioridad:** Must · **FR:** FR-LEDGER-006, FR-LEDGER-012 · **Capability:** `ledger/balances` · **Dependencias:** US-015
+- **Nota:** el saldo proyectado (contable + `pending`, FR-LEDGER-013) pertenece a `reporting/cash-flow-calendar` (Phase 7), no al ledger ([31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md), D21).
 - **Criterios de aceptación:**
-  - **AC1** Given saldo contable Bs 1.000 y un gasto `pending` de Bs 200, When veo la cuenta, Then saldo contable = Bs 1.000 y proyectado = Bs 800, claramente rotulados.
-  - **AC2** Given el gasto pasa a `posted`, When veo la cuenta, Then ambos saldos = Bs 800.
+  - **AC1** Given saldo contable Bs 1.000 y un gasto `pending` de Bs 200, When veo la cuenta, Then el saldo contable sigue en Bs 1.000 y el gasto pendiente se muestra aparte, rotulado como pendiente.
+  - **AC2** Given el gasto pasa a `posted`, When veo la cuenta, Then el saldo contable = Bs 800.
   - **AC3** Given una fecha pasada, When consulto saldo as-of, Then coincide con Σ postings con `entry_date ≤` esa fecha.
 - **Test cases:** TC-LEDGER-BALANCE-001, TC-LEDGER-BALANCE-003, TC-TRANSACTIONS-PENDING-001
 
 #### TS-021 — Snapshots de saldo reconstruibles
-- **Prioridad:** Should · **FR:** FR-LEDGER-014 · **Dependencias:** TS-019
+- **Prioridad:** Must · **FR:** FR-LEDGER-014 · **Dependencias:** TS-019
 - **Criterios de aceptación:**
   - **AC1** Given el seed `large`, When se ejecuta `rebuild-balances`, Then termina en < 5 min y los snapshots coinciden con Σ postings (NFR-DATA-009).
 - **Test cases:** TC-LEDGER-SNAPSHOT-001
 
 #### TS-022 — Invariant checker
-- **Prioridad:** Should (Must para salir de Phase 1 según exit criteria) · **FR:** FR-LEDGER-015 · **Dependencias:** TS-019
+- **Prioridad:** Must · **FR:** FR-LEDGER-015 · **Dependencias:** TS-019
 - **Criterios de aceptación:**
   - **AC1** Given una violación inyectada en una BD de test, When corre el job, Then emite métrica `ledger_invariant_violations > 0` y log de nivel error con el `INV-ID`.
   - **AC2** Given el seed `large` íntegro, When corre, Then 0 violaciones en < 60 s.
@@ -480,8 +481,8 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Criterios de aceptación:**
   - **AC1** Given la cuenta "Banco BOB" con Bs 1.500, When registro un gasto `posted` de `"85.50"` categoría *Alimentación* payee "Supermercado", Then el saldo queda Bs 1.414,50, se crea una entry (cuenta −85.50 / `EXPENSE:BOB` +85.50 con `split_id`), un AuditLog y el evento `transactions.TransactionPosted.v1`.
   - **AC2** Given un gasto en USD sobre una cuenta BOB, When lo envío, Then recibo `CURRENCY_MISMATCH` sugiriendo usar conversión.
-  - **AC3** Given el gasto en estado `pending`, When se guarda, Then no existe entry y el saldo proyectado refleja el gasto.
-  - **AC4** Given una cuenta `closed`, When registro un gasto, Then recibo `ACCOUNT_NOT_ACTIVE`.
+  - **AC3** Given el gasto en estado `pending`, When se guarda, Then no existe entry y el saldo contable no cambia.
+  - **AC4** Given una cuenta `closed`, When registro un gasto, Then recibo `ACCOUNT_CLOSED`.
   - **AC5** Given un reintento con el mismo `Idempotency-Key` y payload, When se procesa, Then devuelve la transacción original; con payload distinto, `IDEMPOTENCY_KEY_REUSED`.
 - **Test cases:** TC-TRANSACTIONS-EXPENSE-001, TC-TRANSACTIONS-EXPENSE-002, TC-TRANSACTIONS-PENDING-001, TC-TRANSACTIONS-EXPENSE-004, TC-TRANSACTIONS-IDEMPOTENCY-001
 
@@ -512,6 +513,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
   - **AC1** Given un gasto `posted`, When lo anulo con motivo "duplicado", Then su estado es `void`, existe una entry de reversa y el saldo vuelve al valor previo.
   - **AC2** Given una transacción `void`, When intento editarla o anularla de nuevo, Then recibo `INVALID_STATUS_TRANSITION`.
   - **AC3** Given el listado por defecto, When lo abro, Then las anuladas están ocultas pero accesibles con filtro `status=void`.
+  - **AC4** Given una transacción `reconciled`, When intento anularla, Then recibo `TRANSACTION_RECONCILED`; primero debo des-reconciliarla (con motivo, auditado).
 - **Test cases:** TC-TRANSACTIONS-VOID-001, TC-TRANSACTIONS-VOID-002, TC-TRANSACTIONS-VOID-003
 
 #### US-019 — Ciclo de estados y marcar como confirmado
@@ -558,6 +560,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Criterios de aceptación:**
   - **AC1** Given saldo calculado Bs 1.000 y banco Bs 995, When registro un ajuste de −5 con motivo, Then la contrapartida es `EQUITY:ADJUSTMENTS:BOB` y no afecta ingresos ni gastos del mes.
   - **AC2** Given un ajuste sin motivo, When lo envío, Then recibo 422.
+  - **AC3** Given un ajuste de monto cero, When lo envío, Then recibo `AMOUNT_NOT_POSITIVE` (no existen ajustes de monto cero, INV-005).
 - **Test cases:** TC-TRANSACTIONS-ADJUSTMENT-001, TC-TRANSACTIONS-ADJUSTMENT-002
 
 #### US-024 — Historial de cambios de una transacción
@@ -641,8 +644,8 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Prioridad:** Must · **FR:** FR-CLASSIFICATION-001, FR-CLASSIFICATION-004 · **Capability:** `classification/categories` · **Dependencias:** US-003
 - **Criterios de aceptación:**
   - **AC1** Given un workspace nuevo con seed de categorías opcional aceptado, When abro categorías, Then veo el catálogo sugerido editable.
-  - **AC2** Given la categoría *Vivienda*, When creo la subcategoría *Alquiler*, Then aparece anidada; intentar un tercer nivel devuelve `CATEGORY_MAX_DEPTH`.
-  - **AC3** Given dos categorías activas hermanas con el mismo nombre, When creo la segunda, Then recibo `CATEGORY_NAME_DUPLICATE`.
+  - **AC2** Given la categoría *Servicios básicos* del grupo *Vivienda*, When creo la subcategoría *Luz*, Then aparece anidada (grupo → categoría → subcategoría); intentar una subcategoría bajo *Luz* devuelve `CATEGORY_DEPTH_EXCEEDED`.
+  - **AC3** Given dos categorías activas hermanas (mismo padre) con el mismo nombre, When creo la segunda, Then recibo `NAME_TAKEN`.
 - **Test cases:** TC-CLASSIFICATION-CATEGORY-001, TC-CLASSIFICATION-CATEGORY-002, TC-CLASSIFICATION-CATEGORY-003
 
 #### US-032 — Archivar y renombrar sin perder historia
@@ -651,14 +654,16 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Criterios de aceptación:**
   - **AC1** Given una categoría con splits, When la archivo, Then no aparece en selectores y los reportes históricos la siguen mostrando.
   - **AC2** Given una categoría renombrada, When veo transacciones antiguas, Then muestran el nombre nuevo (referencia por ID).
+  - **AC3** Given cualquier categoría, usada o no, When se intenta DELETE, Then la API responde `405 Method Not Allowed` y no cambia nada (solo se archiva).
 - **Test cases:** TC-CLASSIFICATION-ARCHIVE-001, TC-CLASSIFICATION-DELETE-001, TC-CLASSIFICATION-CATEGORY-005 · **Invariantes:** INV-019
 
 #### US-033 — Categorías de sistema protegidas
 - **Historia:** Como owner quiero que categorías como *Fees* o *Uncategorized* existan siempre para que conversiones, préstamos y ajustes se clasifiquen de forma consistente.
 - **Prioridad:** Must · **FR:** FR-CLASSIFICATION-003 · **Capability:** `classification/categories` · **Dependencias:** US-031
 - **Criterios de aceptación:**
-  - **AC1** Given la categoría de sistema *Fees*, When intento archivarla o eliminarla, Then recibo `SYSTEM_CATEGORY_PROTECTED`.
-  - **AC2** Given un gasto sin categoría, When se guarda, Then su split queda en *Uncategorized*.
+  - **AC1** Given la categoría de sistema *Fees* (`FEES`), When intento archivarla o renombrarla, Then recibo `SYSTEM_CATEGORY_IMMUTABLE`.
+  - **AC2** Given un gasto sin categoría, When se guarda, Then su split queda en *Sin categoría* (`UNCATEGORIZED`); un ingreso sin categoría queda en `UNCATEGORIZED_INCOME`.
+  - **AC3** Given un workspace nuevo, When se crea, Then existen las 11 categorías de sistema de FR-CLASSIFICATION-003.
 - **Test cases:** TC-CLASSIFICATION-CATEGORY-006, TC-CLASSIFICATION-CATEGORY-007
 
 #### US-034 — Ordenar categorías y agrupar
@@ -700,7 +705,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Valor:** habilita Q1 multi-moneda sin providers.
 - **Prioridad:** Must · **FR:** FR-FX-001..004 · **Capability:** `fx/market-rates` · **Dependencias:** TS-014
 - **Criterios de aceptación:**
-  - **AC1** Given el par USDT/BOB, When registro `"6.95"` tipo `p2p` fuente "Binance P2P" el 2026-10-01 10:00, Then queda guardada con valor exacto y es la vigente para ese tipo.
+  - **AC1** Given el par USDT/BOB, When registro `"6.95"` tipo `P2P` fuente "Binance P2P" el 2026-10-01 10:00, Then queda guardada con valor exacto y es la vigente para ese tipo.
   - **AC2** Given una tasa registrada, When la corrijo a `"6.93"`, Then se crea una nueva versión que `supersedes` la anterior y la anterior sigue consultable.
   - **AC3** Given que no hay tasa USDT/BOB en los últimos 7 días, When se solicita lookup as-of hoy, Then se obtiene `FX_RATE_NOT_FOUND` (nunca un valor por defecto).
 - **Test cases:** TC-FX-RATE-001, TC-FX-HISTORICAL-001, TC-FX-RATE-003, TC-FX-CURRENCY-001 · **Invariantes:** INV-011
@@ -767,6 +772,7 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 
 #### TS-024 — Infraestructura de read models
 - **Descripción:** proyecciones idempotentes alimentadas por outbox en schema `reporting`, comando `rebuild`, metadato `asOf`.
+- **Nota:** en Phase 1 `/reports/summary` se calcula leyendo el ledger directamente, **sin read models**, con el consolidado en BOB siempre presente (`complete` + `unconverted[]`) ([31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md), D15); en Phase 1 esta historia se limita a `reporting.workspace_data_version` (ETag/frescura) y las proyecciones materializadas llegan en Phase 7.
 - **Prioridad:** Must · **FR:** FR-REPORTING-007 · **Dependencias:** TS-017
 - **Criterios de aceptación:**
   - **AC1** Given el mismo evento entregado dos veces, When se proyecta, Then los totales no cambian en la segunda entrega.
@@ -780,8 +786,8 @@ Cada spike produce: informe breve en el ADR correspondiente, código desechable 
 - **Prioridad:** Must · **FR:** FR-REPORTING-001..003, FR-FX-006 · **Capability:** `reporting/dashboard` · **Dependencias:** US-010, TS-024
 - **Criterios de aceptación:**
   - **AC1** Given Bs 1.000, US$ 200 (USD/BOB 6,96) y 100 USDT (USDT/BOB 6,95), When abro el Home, Then veo liquidez total Bs 3.087,00 y el desglose por moneda con la fecha y fuente de cada tasa.
-  - **AC2** Given una cuenta con `includeInLiquidity=false`, When abro el Home, Then no suma en la liquidez.
-  - **AC3** Given una moneda sin tasa, When abro el Home, Then el total indica "parcial: falta tasa USDT/BOB" y no suma esa moneda como 0 silenciosamente.
+  - **AC2** Given una cuenta con `liquidity` distinta de `LIQUID` (`SEMI_LIQUID` o `ILLIQUID`), When abro el Home, Then no suma en la liquidez.
+  - **AC3** Given una moneda sin tasa, When abro el Home, Then el consolidado en BOB sigue presente con `complete=false`, el monto sin tasa aparece en `unconverted[]` y la UI indica "parcial: falta tasa USDT/BOB" sin sumar esa moneda como 0 silenciosamente.
   - **AC4** Given el seed `large`, When cargo el Home, Then API p95 ≤ 300 ms y LCP ≤ 2,5 s (NFR-PERF-004).
 - **Test cases:** TC-REPORTING-DASHBOARD-001, TC-REPORTING-DASHBOARD-002, TC-REPORTING-DASHBOARD-003, TC-REPORTING-DASHBOARD-PERF-001
 
@@ -1035,7 +1041,7 @@ Explícitamente fuera del horizonte actual (se revisan al cerrar Phase 9):
 | W-11 | Borrado definitivo de workspace (FR-IDENTITY-012) antes de multi-usuario | Riesgo de pérdida de datos; export cubre portabilidad. |
 | W-12 | Custodia de cripto / manejo de llaves privadas / conexión a wallets on-chain | Seguridad; fuera de alcance. |
 | W-13 | Categorización por ML en Phase 1–7 | Rules engine primero; ML solo tras Phase 8 y si aporta. |
-| W-14 | Más de 2 niveles de jerarquía de categorías | Complejidad sin valor claro para el owner. |
+| W-14 | Más niveles que grupo → categoría → subcategoría en la jerarquía de categorías | Complejidad sin valor claro para el owner. |
 
 ## Preguntas abiertas
 

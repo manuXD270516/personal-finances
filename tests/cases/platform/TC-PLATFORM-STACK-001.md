@@ -2,19 +2,19 @@
 id: TC-PLATFORM-STACK-001
 title: "El perfil core de compose arranca y todos los servicios quedan saludables"
 spec: platform/local-environment
-related_specs: []
-requirement: "Stack local con perfiles de compose"
-scenario: null
-requirement_status: provisional
+related_specs: ["platform/observability"]
+requirement: "Stack local con un solo comando"
+scenario: "Clon limpio levanta el stack completo"
+requirement_status: confirmed
 fr: []
-nfr: [NFR-PORT-001]
+nfr: [NFR-PORT-001, NFR-PORT-002, NFR-PORT-003]
 invariants: []
 priority: high
 type: platform
 level: container-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 1
 tags: ["compose", "windows", "healthcheck"]
@@ -38,7 +38,7 @@ expected_result:
   - "Los contenedores finance-* se ejecutan como non-root"
   - "Mismo resultado mediante pnpm stack:up en Windows"
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # TC-PLATFORM-STACK-001 — El perfil core de compose arranca y todos los servicios quedan saludables

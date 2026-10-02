@@ -72,6 +72,8 @@ flowchart LR
 | Saldo actual de una cuenta / lista de cuentas | **Ledger directo** (Σ postings con índice + `AccountBalanceSnapshot` como acelerador) | Debe ser exacto e inmediato tras registrar |
 | Liquid balance / Safe to spend | Ledger directo (saldos) + Commitments/Planning queries | Exactitud de saldo; inputs de compromisos son pequeños |
 | Ingresos/gastos del **mes actual** (dashboard) | Ledger directo + join a splits (Phase 1); `txn_fact` desde Phase 7 si la latencia lo requiere | Read-your-writes |
+| Resumen del Home `GET /reports/summary` (Phase 1) | **Ledger directo** (saldos con `GetBalances` y flujos con la query pública de Transactions sobre postings `INCOME`/`EXPENSE`), **sin read models** | Exactitud y read-your-writes; las proyecciones llegan en Phase 7 |
+| Saldo proyectado (contable + `pending`, FR-LEDGER-013) | Saldo del ledger + transacciones `pending` (Transactions query); capability `reporting/cash-flow-calendar`, Phase 7 | No es un dato del ledger: es una proyección de Reporting |
 | Reconciliación | Ledger directo (Transactions) | Exactitud contable |
 | Reportes históricos (meses cerrados, tendencias, YoY) | **Proyecciones** | Volumen; los datos cerrados no cambian |
 | Net worth histórico | `daily_balance` + FX rates | Evitar recomputar Σ postings por día |
@@ -85,7 +87,7 @@ flowchart LR
 | Periodo | `entry_date` (fecha de negocio, TZ workspace). Mes calendario o **FinancialPeriod** de Planning (puede no coincidir con el mes, p. ej. del 25 al 24 por fecha de salario) | Setting `reportingPeriodMode = CALENDAR | FINANCIAL_PERIOD` |
 | Categoría / grupo | `TransactionSplit.category_id` → Classification | Jerarquía grupo → categoría; categorías archivadas siguen apareciendo en histórico |
 | Tag | `split_tag` (N:M) | Una transacción con 2 tags aparece en ambos: **no sumar totales de tags** (se advierte en UI) |
-| Cuenta / tipo de cuenta / institución | Accounts | `liquidity` atributo de cuenta: `LIQUID | SEMI_LIQUID | ILLIQUID` |
+| Cuenta / tipo de cuenta / institución | Accounts | `liquidity` atributo de cuenta: `LIQUID` \| `SEMI_LIQUID` \| `ILLIQUID` |
 | Counterparty | Classification | |
 | Moneda | posting currency | |
 | Kind | `INCOME | EXPENSE | TRANSFER | CONVERSION | ADJUSTMENT | OPENING` | Derivado del tipo de posting nominal |
@@ -156,8 +158,8 @@ SafeToSpend(h) = LiquidBalance(hoy)
 ## 5. Reporting multi-moneda
 
 - **Reporting currency (RC)** por workspace (default `BOB`), configurable; cambiarla no altera datos, solo la presentación (re-cálculo de agregados convertidos; los agregados nativos por moneda no cambian).
-- **Siempre disponibles dos vistas**: (a) **por moneda nativa** sin conversión (exacta) y (b) **consolidada en RC** (aproximada, con nota de tasas).
-- Fuente de tasas: FX context `GetReferenceRate(base, quote, date)` (manual en Phase 1, providers en Phase 5). Para BOB/USD distinguir tasa oficial vs referencial/paralela: el workspace elige `rateType` por par (setting); default para USDT↔BOB: **tasa efectiva promedio de las conversiones del propio usuario en el día/semana**, fallback a la referencial manual.
+- **Siempre disponibles dos vistas**: (a) **por moneda nativa** sin conversión (exacta) y (b) **consolidada en RC** (aproximada, con nota de tasas). En `/reports/summary` el consolidado en RC (BOB) está **siempre presente**, con `complete: boolean` y la lista `unconverted[]` de los saldos o flujos excluidos por falta de tasa (spec `reporting/dashboard`).
+- Fuente de tasas: FX context `GetReferenceRate(base, quote, date)`, alimentado por tasas manuales y, desde Phase 1, por **providers de tasa paralela** (docs/31 D29, ADR-0025, capability `fx/market-rate-providers`). Para BOB/USD distinguir tasa oficial vs paralela: el workspace elige `rateType` por par (setting); al crear el workspace se siembra `PARALLEL` para USD/BOB y USDT/BOB. **Phase 1**: la valoración de USD y USDT en BOB usa la **última tasa `PARALLEL` del provider a la fecha** (paralelo.bo — mediana P2P USDT/BOB; respaldo bo.dolarapi.com), mostrando tasa, tipo, **fuente con atribución** ("Fuente: paralelo.bo", CC BY 4.0), vigencia y antigüedad; si ningún provider tiene tasa no obsoleta (60 min) se usa la más reciente entre la última de provider (marcada obsoleta) y la última tasa manual; sin tasa en la ventana → `unconverted`. Los flujos de meses pasados usan el histórico diario del provider. El promedio de las conversiones propias quedó **descartado** como default (pregunta 9 cerrada).
 
 | Medida | Tasa | Justificación |
 |---|---|---|
@@ -168,7 +170,7 @@ SafeToSpend(h) = LiquidBalance(hoy)
 | Budget vs Actual | Gasto en moneda del budget con `conv_t`; si el budget es multi-moneda, por moneda | Coherente con flujos. |
 | Forecast | Moneda nativa; consolidado con tasa del `generatedAt` | Ver 15-ml-architecture.md. |
 
-- **Tasa faltante**: se usa la tasa disponible más cercana **anterior** (máx. 7 días; configurable) y se marca el valor con `approx: true` + fecha de la tasa usada. Sin tasa en la ventana → el monto se excluye del consolidado y se muestra en "no convertible" con link para cargar la tasa. Nunca se convierte con 1:1 implícito.
+- **Tasa faltante**: se usa la tasa disponible más cercana **anterior** (máx. 7 días; configurable) y se marca el valor con `approx: true` + fecha de la tasa usada. Sin tasa en la ventana → el monto se excluye del consolidado (que queda `complete = false`) y se lista en `unconverted[]` ("no convertible") con link para cargar la tasa. Nunca se convierte con 1:1 implícito.
 - Conversión aplicada **por agregado diario por moneda** (Σ por día × tasa del día) — equivalente a por-posting y mucho más barato.
 - Redondeo: los agregados internos se mantienen en `Decimal` sin redondear; se redondea HALF_EVEN a la escala de RC **solo al presentar**. Los totales mostrados se calculan del valor sin redondear (pueden diferir ±0.01 de la suma de filas redondeadas; se documenta en el tooltip).
 
@@ -279,21 +281,21 @@ input: workspace, horizon h ∈ {7, 30, 60, 90}, accounts = Liquid (default), th
 
 ### 9.1 Las 9 preguntas del home
 
-(Propuesta; confirmar redacción canónica en 00/01.)
+La lista, la numeración y la redacción canónicas son las de [00-product-vision.md §6](00-product-vision.md#6-las-9-preguntas-del-home-contrato-del-dashboard); esta tabla solo asigna widgets y KPIs.
 
-| # | Pregunta | Widget | KPI / fuente |
-|---|---|---|---|
-| Q1 | ¿Cuánto dinero tengo ahora? | `LiquidBalanceCard` (por moneda + consolidado) | Liquid balance (ledger directo) |
-| Q2 | ¿Cuánto puedo gastar sin comprometer mis pagos? | `SafeToSpendCard` | Safe to spend §4.2 |
-| Q3 | ¿Cuánto gasté este mes y cómo voy vs mi presupuesto? | `BudgetProgressWidget` | Expenses, Budget utilization, pace |
-| Q4 | ¿Qué pagos vencen pronto? | `UpcomingPaymentsList` (7 días) | Upcoming commitments |
-| Q5 | ¿Me va a faltar dinero en los próximos 30 días? | `CashFlowMiniChart` | Cash Flow Calendar: lowest, shortfallRisk |
-| Q6 | ¿En qué estoy gastando más? | `TopCategoriesWidget` (MoM a la fecha) | Expenses by category + Δ |
-| Q7 | ¿Estoy ahorrando? | `SavingsRateWidget` | Savings, savings rate (mes y promedio 3 m) |
-| Q8 | ¿Cómo van mis metas y mis deudas? | `GoalsDebtSummary` | Goal progress, total debt, DTI |
-| Q9 | ¿Qué necesita mi atención? | `AttentionInbox` | Transacciones sin categoría, pending vencidos, imports por revisar, cuentas no reconciliadas > 30 días, budgets excedidos, tasas faltantes |
+| # | Pregunta (docs/00 §6) | Widget | KPI / fuente | Disponible desde |
+|---|---|---|---|---|
+| Q1 | ¿Cuánto dinero tengo? | `LiquidBalanceCard` (por moneda + consolidado) + `NetWorthCard` | Liquid balance y Net worth (ledger directo) | Phase 1 |
+| Q2 | ¿Cuánto ingresó? | `IncomeCard` | Income del periodo | Phase 1 |
+| Q3 | ¿Cuánto gasté? | `ExpensesCard` + `TopCategoriesWidget` (+ `BudgetProgressWidget` desde Phase 2) | Expenses, expenses by category; Budget utilization y pace | Phase 1 / 2 |
+| Q4 | ¿Cuánto está comprometido? | `CommittedCard` | Pending outflows + Upcoming commitments del periodo | Phase 3 (parcial en Phase 1 con `pending`) |
+| Q5 | ¿Cuánto puedo gastar? | `SafeToSpendCard` | Safe to spend §4.2 | Phase 2 / 4 |
+| Q6 | ¿Cuánto ahorré? | `SavingsRateWidget` | Savings, savings rate (mes y promedio 3 m); aportes a metas | Phase 1 / 4 |
+| Q7 | ¿Cómo estoy respecto al mes pasado? | `MonthComparisonWidget` | Variación de Q2, Q3, Q6 y top categorías (§6, "a la fecha") | Phase 1 (básico) / 7 |
+| Q8 | ¿Qué pagos vienen? | `UpcomingPaymentsList` + `CashFlowMiniChart` | Upcoming commitments; Cash Flow Calendar (lowest, shortfallRisk) | Phase 3 / 7 |
+| Q9 | ¿Voy a cumplir mis metas? | `GoalsSummary` | Goal progress, estado `behind/on-track/ahead` | Phase 4 |
 
-Widgets adicionales: `NetWorthCard`, `RecentTransactions`, `FxRatesCard` (última tasa USDT/BOB usada), `FeesThisMonth`.
+Widgets adicionales: `AttentionInbox` (transacciones sin categoría, pending vencidos, imports por revisar, cuentas no reconciliadas > 30 días, budgets excedidos, tasas faltantes), `RecentTransactions`, `FxRatesCard` (última tasa USDT/BOB usada), `FeesThisMonth`, `DebtSummary` (total debt, DTI).
 
 ### 9.2 Configuración
 
@@ -339,11 +341,12 @@ Exports grandes son jobs BullMQ (`reporting.export`) con notificación al termin
 
 ## Preguntas abiertas
 
-1. ¿Reporting currency por defecto `BOB`? ¿Qué tasa BOB/USD usar para consolidar (oficial vs referencial/paralela) y USDT/BOB (efectiva propia vs referencia)?
+1. ¿Reporting currency por defecto `BOB`? ~~¿Qué tasa BOB/USD usar para consolidar?~~ Resuelto 2026-10-02: tasa paralela del provider (ver pregunta 9).
 2. ¿Periodo de reporte por mes calendario o por FinancialPeriod (p. ej. ciclo de salario)? ¿Configurable por reporte?
-3. Las **9 preguntas del home** propuestas en §9.1 deben fijarse en 00/01 (visión/requerimientos). ¿Coinciden con la lista del owner?
+3. ~~Las **9 preguntas del home**~~: resuelta — docs/00 §6 es canónico y §9.1 se alineó ([31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md), D14).
 4. ¿El pago de tarjeta en el Cash Flow Calendar usa saldo total del estado de cuenta o pago mínimo por defecto?
 5. ¿Safe to spend debe restar "esenciales presupuestados restantes" por defecto?
 6. Clasificación de liquidez de wallets cripto: ¿USDT es `LIQUID` y BTC `SEMI_LIQUID`?
 7. Atribución de refunds: ¿al periodo del refund (default) o al del gasto original?
 8. ¿PDF export en Phase 7 o posterior?
+9. ~~**Valoración USDT↔BOB**~~ — **Resuelta por el owner el 2026-10-02** (docs/31 D29, ADR-0025), cerrando la pregunta abierta de D26: USD y USDT se valoran con la **tasa `PARALLEL` del provider** (paralelo.bo, respaldo bo.dolarapi.com) con fallback a la última tasa conocida (marcada obsoleta) o manual; la tasa manual prevalece como referencia de una operación concreta. El promedio de conversiones propias no se adopta como default (podría revisarse como vista informativa en el reporte FX, Phase 7).

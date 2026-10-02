@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/fx/RateRecorded.v1.schema.json",
+  "title": "fx.RateRecorded.v1",
+  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "fx.RateRecorded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "ExchangeRate"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rateId",
+        "base",
+        "quote",
+        "value",
+        "rateType",
+        "source",
+        "sourceLabel",
+        "asOf",
+        "effectiveDate",
+        "supersedesRateId"
+      ],
+      "properties": {
+        "rateId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "base": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "quote": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "value": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+        },
+        "rateType": {
+          "enum": [
+            "OFFICIAL",
+            "PARALLEL",
+            "P2P",
+            "BANK",
+            "CUSTOM"
+          ]
+        },
+        "source": {
+          "enum": [
+            "MANUAL",
+            "PROVIDER",
+            "USER_CONVERSION"
+          ]
+        },
+        "sourceLabel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "asOf": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "effectiveDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "supersedesRateId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "description": "Provider que originó la tasa (source = PROVIDER); null para tasas manuales. Aditivo (opcional).",
+          "oneOf": [
+            {
+              "enum": [
+                "PARALELO_BO",
+                "DOLARAPI_BO"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "anomalyFlagged": {
+          "description": "true si la muestra del provider superó el umbral de variación y no se usa hasta que un editor la confirme. Aditivo (opcional).",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000107",
+      "eventType": "fx.RateRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ExchangeRate",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "rateId": "01928c4e-0000-7000-8000-0000000fa002",
+        "base": "USDT",
+        "quote": "BOB",
+        "value": "6.95",
+        "rateType": "P2P",
+        "source": "MANUAL",
+        "sourceLabel": "Binance P2P (mediana manual)",
+        "asOf": "2026-10-02T14:00:00Z",
+        "effectiveDate": "2026-10-02",
+        "supersedesRateId": null
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000201",
+      "eventType": "fx.RateRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T09:00:00.150Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ExchangeRate",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa101",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "fx-provider:PARALELO_BO"
+      },
+      "payload": {
+        "rateId": "01928c4e-0000-7000-8000-0000000fa101",
+        "base": "USD",
+        "quote": "BOB",
+        "value": "12.02",
+        "rateType": "PARALLEL",
+        "source": "PROVIDER",
+        "sourceLabel": "paralelo.bo (mediana P2P USDT/BOB)",
+        "asOf": "2026-10-02T08:53:07.532Z",
+        "effectiveDate": "2026-10-02",
+        "supersedesRateId": null,
+        "provider": "PARALELO_BO",
+        "anomalyFlagged": false
+      }
+    }
+  ]
+}

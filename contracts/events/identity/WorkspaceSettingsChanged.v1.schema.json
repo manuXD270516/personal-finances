@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/identity/WorkspaceSettingsChanged.v1.schema.json",
+  "title": "identity.WorkspaceSettingsChanged.v1",
+  "description": "Cambió la configuración de un workspace (UpdateWorkspaceSettings con cambios). Un evento por versión del agregado. Productor: IDENTITY. Consumidores: REPORTING (moneda base, zona horaria, mes fiscal). Idempotencia natural: (workspaceId, aggregateVersion). PII baja: name. Los montos viajan como Money (string decimal), nunca number.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "identity.WorkspaceSettingsChanged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Workspace"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "changes"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Change"
+          }
+        }
+      }
+    },
+    "Change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "before",
+        "after"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "name",
+            "baseCurrency",
+            "timeZone",
+            "locale",
+            "fiscalMonthStartDay",
+            "minimumLiquidityReserve"
+          ]
+        },
+        "before": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "after": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000102",
+      "eventType": "identity.WorkspaceSettingsChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Workspace",
+      "aggregateId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "changes": [
+          {
+            "field": "timeZone",
+            "before": "America/La_Paz",
+            "after": "UTC"
+          },
+          {
+            "field": "minimumLiquidityReserve",
+            "before": null,
+            "after": {
+              "amount": "1500.00",
+              "currency": "BOB"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

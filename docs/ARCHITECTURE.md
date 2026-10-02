@@ -37,7 +37,7 @@
 | 7 | Commitments (recurrence engine, recurring definitions, subscriptions) | `COMMITMENTS` | `commitments` | `@pf/commitments` | Core | 3 |
 | 8 | Savings Goals | `GOALS` | `goals` | `@pf/goals` | Supporting | 4 |
 | 9 | Debt & Credit (loans, amortization, credit cards) | `DEBT` | `debt` | `@pf/debt` | Core | 4 |
-| 10 | FX & Market Data (rates históricos, MarketRateProvider, pricing de conversiones) | `FX` | `fx` | `@pf/fx` | Supporting | 1 (manual) / 5 (providers) |
+| 10 | FX & Market Data (rates históricos, MarketRateProvider, pricing de conversiones) | `FX` | `fx` | `@pf/fx` | Supporting | 1 (manual + providers de tasa paralela paralelo.bo / bo.dolarapi.com, ADR-0025) / 5 (más providers, cripto, commodities) |
 | 11 | Documents & Attachments | `DOCUMENTS` | `documents` | `@pf/documents` | Generic | 6 |
 | 12 | Imports & Banking Integrations | `IMPORTS` | `imports` | `@pf/imports` | Supporting | 6 |
 | 13 | Rules Engine | `RULES` | `rules` | `@pf/rules` | Supporting | 6 |
@@ -102,10 +102,11 @@ Fusiones respecto a la lista original (justificadas en `docs/05-bounded-contexts
 | ML | Python + FastAPI + Polars + statsmodels/scikit-learn/Prophet; servicio separado; MLflow futuro | ADR-0017 | Propuesto |
 | IA | Asistente tardío (Phase 10), solo lectura, vía capa de *tools* autorizadas sobre casos de uso; jamás acceso directo a BD | ADR-0021 | Propuesto |
 | API | REST `/api/v1`, OpenAPI 3.1 **contract-first** en `contracts/openapi/`, errores RFC 9457, `Idempotency-Key` en POST financieros, ETag/If-Match | ADR-0022 | Propuesto |
+| Tasas de mercado (FX) | Puerto `MarketRateProvider`; principal **paralelo.bo** (mediana P2P USDT/BOB, CC BY 4.0, histórico diario), respaldo y oficial **bo.dolarapi.com** (MIT); polling pg-boss cada 15 min; parseo JSON lossless; atribución visible; fallback a tasa manual | ADR-0025 | Aceptado |
 
 ### Lista canónica de ADRs (`docs/adr/NNNN-titulo.md`, formato MADR)
 
-0001 Record architecture decisions · 0002 Architecture style (Modular Monolith + DDD + Hexagonal) · 0003 Module boundaries & extraction criteria · 0004 Ledger model · 0005 Database · 0006 Money representation · 0007 Data access & migrations (ORM) · 0008 Async jobs & domain events (outbox) · 0009 Object storage · 0010 Authentication & authorization · 0011 Container strategy · 0012 Local development environment · 0013 Cloud deployment strategy · 0014 Infrastructure as Code · 0015 CI/CD & release strategy · 0016 Testing strategy · 0017 ML separation · 0018 Monorepo & build tooling · 0019 Frontend architecture (Next.js + BFF) · 0020 Observability · 0021 AI assistant integration · 0022 API style & versioning · 0023 Multi-tenancy & Row-Level Security · 0024 Spec Driven Development with OpenSpec & test traceability.
+0001 Record architecture decisions · 0002 Architecture style (Modular Monolith + DDD + Hexagonal) · 0003 Module boundaries & extraction criteria · 0004 Ledger model · 0005 Database · 0006 Money representation · 0007 Data access & migrations (ORM) · 0008 Async jobs & domain events (outbox) · 0009 Object storage · 0010 Authentication & authorization · 0011 Container strategy · 0012 Local development environment · 0013 Cloud deployment strategy · 0014 Infrastructure as Code · 0015 CI/CD & release strategy · 0016 Testing strategy · 0017 ML separation · 0018 Monorepo & build tooling · 0019 Frontend architecture (Next.js + BFF) · 0020 Observability · 0021 AI assistant integration · 0022 API style & versioning · 0023 Multi-tenancy & Row-Level Security · 0024 Spec Driven Development with OpenSpec & test traceability · 0025 Fuentes de tipo de cambio para Bolivia (paralelo.bo + bo.dolarapi.com).
 
 ## 6. Estructura del repositorio (objetivo; en Phase 0 solo existen `docs/`, `openspec/`, `contracts/` borrador y `tests/cases/`)
 
@@ -223,7 +224,7 @@ PR: format → lint → typecheck → OpenSpec validate → architecture tests �
 ## 13. Roadmap (ajustes justificados respecto a la propuesta)
 
 Se conserva la secuencia propuesta con estos cambios por dependencias:
-1. **Multi-moneda en el ledger desde Phase 1** (el modelo de posting por moneda no puede retro-adaptarse barato) y **conversiones manuales (USDT↔BOB↔USD) en Phase 1** — caso de uso diario del owner. Providers automáticos de tasas siguen en Phase 5.
+1. **Multi-moneda en el ledger desde Phase 1** (el modelo de posting por moneda no puede retro-adaptarse barato) y **conversiones manuales (USDT↔BOB↔USD) en Phase 1** — caso de uso diario del owner. **Providers automáticos de tasa paralela también en Phase 1** (decisión del owner 2026-10-02, docs/31 D29, ADR-0025): paralelo.bo principal, bo.dolarapi.com respaldo/oficial, con degradación a tasas manuales; Phase 5 conserva más providers, precios cripto/commodities y análisis de costo.
 2. **Audit trail base en Phase 1** (prerrequisito de integridad para transacciones editables).
 3. **Reporting básico incremental** desde Phase 1 (saldos, ingresos/gastos del mes); avanzado en Phase 7.
 4. **Notifications base en Phase 2** (alertas de presupuesto).
@@ -242,7 +243,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | commitments | `commitments/recurrence-engine`, `commitments/subscriptions` |
 | goals | `goals/savings-goals` |
 | debt | `debt/loans`, `debt/amortization`, `debt/credit-cards` |
-| fx | `fx/market-rates`, `fx/conversion-pricing` |
+| fx | `fx/market-rates`, `fx/market-rate-providers`, `fx/conversion-pricing` |
 | documents | `documents/attachments` |
 | imports | `imports/import-pipeline`, `imports/banking-providers` |
 | rules | `rules/rule-engine` |
