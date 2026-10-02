@@ -1,8 +1,8 @@
 # 19 — Entorno de desarrollo local
 
-> **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §6, §10, §11, §15 · [07-c4-architecture.md](07-c4-architecture.md) · [12-security.md](12-security.md) · [16-testing-strategy.md](16-testing-strategy.md) · [18-observability.md](18-observability.md) · [20-container-strategy.md](20-container-strategy.md) · [23-ci-cd.md](23-ci-cd.md) · [29-seed-datasets.md](29-seed-datasets.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · ADR-0011, ADR-0012 · Spec: `openspec/changes/bootstrap-platform-foundation/specs/platform/local-environment/spec.md` · SPIKE-07, SPIKE-08
+> **Estado:** Aceptado — implementado en Phase 0 (`bootstrap-platform-foundation`); secciones marcadas **as-built (2026-10-02)** · **Fecha:** 2026-10-01 (diseño) / 2026-10-02 (as-built) · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §6, §10, §11, §15 · [07-c4-architecture.md](07-c4-architecture.md) · [12-security.md](12-security.md) · [16-testing-strategy.md](16-testing-strategy.md) · [18-observability.md](18-observability.md) · [20-container-strategy.md](20-container-strategy.md) · [23-ci-cd.md](23-ci-cd.md) · [29-seed-datasets.md](29-seed-datasets.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · [config-reference.md](config-reference.md) · ADR-0011, ADR-0012 · Spec: `openspec/changes/bootstrap-platform-foundation/specs/platform/local-environment/spec.md` · SPIKE-07, SPIKE-08
 
-> **Phase 0 = solo diseño.** Todo `compose.yaml`, `.env.example`, script o fichero de configuración de este documento es **ilustrativo**. Se materializa en `deploy/compose/`, `scripts/` y raíz del repo tras el DESIGN GATE, validado por SPIKE-07 (object storage) y SPIKE-08 (Compose en Windows/WSL2).
+> **As-built (2026-10-02).** Lo que en Phase 0 era ilustrativo ya existe como ficheros reales, que son la **fuente de verdad**: [`deploy/compose/compose.yaml`](../deploy/compose/compose.yaml), [`.env.example`](../.env.example), los scripts de [`scripts/stack/src/`](../scripts/stack/src/) (paquete `@pf/stack`), el realm [`deploy/compose/keycloak/realm-pfos-dev.json`](../deploy/compose/keycloak/realm-pfos-dev.json) y el esquema de configuración de [`packages/platform/src/config/`](../packages/platform/src/config/) (referencia generada: [config-reference.md](config-reference.md)). Este documento ya no duplica esos ficheros: los resume y conserva el análisis y las decisiones. Todos los comandos de §0.5 y §3 se verificaron tal cual en Windows 11 con PowerShell 7 y Git Bash (Node 22.23, pnpm 12.4.2, Docker Compose v5.5.1).
 
 ---
 
@@ -37,15 +37,15 @@ Regla: **todo PR debe pasar en modo B** (CI lo ejecuta). Un desarrollador puede 
 | Familia | Prefijo | Quién la lee | Ejemplos |
 |---|---|---|---|
 | Plataforma local (solo Compose / scripts) | `PF_` | `compose.yaml`, `scripts/*.ts` | `PF_BIND_ADDR=127.0.0.1`, `PF_POSTGRES_PORT=25432`, `PF_OBJECT_STORAGE_PORT=29000`, `PF_KEYCLOAK_PORT=28081`, `PF_MAILPIT_UI_PORT=28025`, `PF_API_PORT=28080`, `PF_WEB_PORT=23000`, `PF_COMPOSE_PROFILES` |
-| Runtime de la aplicación | sin prefijo, por dominio | apps (vía esquema) | `DATABASE_URL`, `DATABASE_MIGRATOR_URL`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `SMTP_URL`, `JOB_QUEUE_DRIVER`, `SESSION_STORE`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE=es-BO`, `APP_REPORTING_CURRENCY=BOB`, `APP_TIMEZONE=America/La_Paz` |
+| Runtime de la aplicación | sin prefijo, por dominio | apps (vía esquema) | `DATABASE_URL`, `DATABASE_MIGRATOR_URL`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `JOB_QUEUE_DRIVER`, `SESSION_STORE`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE=es-BO`, `APP_REPORTING_CURRENCY=BOB`, `APP_TIMEZONE=America/La_Paz` (lista completa as-built: [config-reference.md](config-reference.md); las variables `OIDC_*` de la app y `SMTP_*` llegan con los changes de identidad y notificaciones) |
 
 4. **Un solo `.env` en la raíz** (copiado de `.env.example`), leído por Compose y por los procesos del host. Los valores del `.env` son los del **modo A** y se derivan de los puertos `PF_*` por interpolación:
    ```dotenv
    PF_POSTGRES_PORT=25432
-   DATABASE_URL=postgres://pf_app:${PF_DEV_DB_PASSWORD}@127.0.0.1:${PF_POSTGRES_PORT}/pfos
-   OBJECT_STORAGE_ENDPOINT=http://127.0.0.1:${PF_OBJECT_STORAGE_PORT}
+   DATABASE_URL=postgres://pf_app:${PF_DEV_DB_APP_PASSWORD}@${PF_BIND_ADDR}:${PF_POSTGRES_PORT}/pfos?sslmode=disable
+   OBJECT_STORAGE_ENDPOINT=http://${PF_BIND_ADDR}:${PF_OBJECT_STORAGE_PORT}
    ```
-5. **Modo B sobrescribe solo las direcciones** en el bloque `environment:` de cada servicio de `compose.yaml` (nombres de servicio y puertos internos canónicos): `DATABASE_URL=postgres://pf_app:${PF_DEV_DB_PASSWORD}@postgres:5432/pfos`, `OBJECT_STORAGE_ENDPOINT=http://object-storage:8333`. El resto de variables se hereda del mismo `.env` → no hay dos configuraciones que mantener.
+5. **Modo B sobrescribe solo las direcciones** en el bloque `environment:` de cada servicio de `compose.yaml` (nombres de servicio y puertos internos canónicos): `DATABASE_URL=postgres://pf_app:${PF_DEV_DB_APP_PASSWORD}@postgres:5432/pfos?sslmode=disable`, `OBJECT_STORAGE_ENDPOINT=http://object-storage:8333`. El resto de variables se hereda del mismo `.env` → no hay dos configuraciones que mantener.
 6. **Toggles de dependencias**, no ramas de código: `JOB_QUEUE_DRIVER=pgboss|bullmq`, `SESSION_STORE=postgres|valkey`, `OTEL_ENABLED=true|false`, `OTEL_NODE_RESOURCE_DETECTORS=env,os,serviceinstance` (obligatorio, SPIKE-10). El adapter se elige en el composition root; el dominio no se entera.
 7. **Secretos:** `.env.example` solo contiene placeholders de desarrollo marcados `PF_DEV_*` (generados por `pnpm setup:env` con valores aleatorios en el primer arranque). Nunca en imágenes, nunca en el repo; en cloud se inyectan desde el secrets manager como variables con el **mismo nombre**.
 8. **Sin `localhost` en el código:** toda dirección viene del esquema. `localhost`/`127.0.0.1` solo aparece como *valor* en `.env.example` (modo A).
@@ -57,22 +57,31 @@ Regla: **todo PR debe pasar en modo B** (CI lo ejecuta). Un desarrollador puede 
 - Imágenes de terceros fijadas por versión **y digest** (p. ej. SeaweedFS `mini`, SPIKE-07); prohibidas imágenes Bitnami.
 - Profiles: `deps`, `core`, `seed`, `observability`, `ml` y **`valkey`** (solo si `JOB_QUEUE_DRIVER=bullmq` o `SESSION_STORE=valkey`; ya no forma parte de `deps`/`core`).
 - Todos los puertos publicados en `${PF_BIND_ADDR}:${PF_<SVC>_PORT}`; dentro de la red Compose se usan los puertos canónicos.
-- Volúmenes nombrados por proyecto (`pfos_pg-data`, `pfos_object-storage-data`); nombre de proyecto Compose fijo `pfos` para no mezclarse con otros proyectos de la máquina.
-- Futuro opcional: `compose.dev.yaml` con `develop.watch` para quien mueva el repo a WSL2 (no es el camino principal).
+- Volúmenes nombrados por proyecto (`pfos_pg-data`, `pfos_object-storage-data`, …) y red `pfos_default`; nombre de proyecto Compose fijo `pfos` para no mezclarse con otros proyectos de la máquina (los scripts solo operan sobre `-p pfos`).
+- Futuro opcional (no implementado): `compose.dev.yaml` con `develop.watch` para quien mueva el repo a WSL2 (no es el camino principal).
 
-### 0.5 Comandos (todos TypeScript vía `pnpm`, funcionan igual en PowerShell y Git Bash)
+### 0.5 Comandos — as-built (2026-10-02)
+
+Scripts TypeScript ejecutados con `tsx` vía `pnpm` (fuentes en `scripts/stack/src/`, scripts en el `package.json` raíz). `docker` se invoca con `spawn` y `shell: false`: mismo comportamiento en PowerShell, cmd y Git Bash (sin conversión de rutas MSYS). Los argumentos van tras `--` (`pnpm stack:up -- --profile core`); el parser ignora ese separador. Todos usan el proyecto Compose `pfos` y el `.env` de la raíz.
 
 | Comando | Modo | Efecto |
 |---|---|---|
-| `pnpm setup:env` | — | Crea `.env` desde `.env.example` con secretos de desarrollo aleatorios; detecta puertos ocupados y sugiere alternativas |
-| `pnpm stack:up` | A | Levanta `deps` y espera healthy |
-| `pnpm dev` | A | `migrate` + api/worker/web en el host con `node --watch` |
-| `pnpm stack:up -- --profile core` | B | Producto completo en contenedores |
-| `pnpm stack:down` / `stack:restart` / `stack:logs [svc]` | A/B | Ciclo de vida |
-| `pnpm stack:reset -- --seed=minimal\|demo\|large` | A/B | Borra volúmenes → migraciones → seed |
-| `pnpm db:migrate` / `db:seed` | A/B | `compose run --rm migrate|seed` |
-| `pnpm test:integration` | — | Testcontainers (independiente del stack) |
-| `pnpm backup:local` / `restore:local` | A/B | pg_dump + mirror de object storage |
+| `pnpm setup:env [-- --force] [--apply-ports] [--check]` | — | Crea o actualiza `.env` desde `.env.example`: cada `__generate__` se reemplaza por un secreto aleatorio; los valores de un `.env` existente se **conservan** (solo `--force` regenera). Comprueba que los puertos `PF_*_PORT` estén libres (también los rangos reservados por Windows) y sugiere alternativas; `--apply-ports` las escribe; `--check` solo informa (exit 3 si hay conflicto). Nunca imprime secretos. |
+| `pnpm stack:up [-- --profile <p>…] [--build] [--timeout=420]` | A / B | `docker compose up -d --wait --remove-orphans`; perfil por defecto `deps` (o `PF_COMPOSE_PROFILES`). Imprime las URLs. Si `migrate` falla, muestra su log y no arrancan api/worker. |
+| `pnpm stack:up -- --profile core` | B | Producto completo en contenedores con las imágenes `pfos/finance-*:local` (añadir `--build` o `pnpm images:build` para reconstruirlas). |
+| `pnpm dev [-- --skip-migrate]` | A | Exige `deps` healthy; ejecuta `migrate` en el host y arranca api y worker (`tsx watch`) y web (`next dev`) con salida prefijada `[api]`/`[worker]`/`[web]`. Ctrl+C detiene los tres. |
+| `pnpm stack:down [-- --volumes --yes]` | A / B | `compose down --remove-orphans` (todos los perfiles); conserva volúmenes salvo `--volumes` (pide confirmación). |
+| `pnpm stack:ps` · `pnpm stack:restart [-- <svc>…]` · `pnpm stack:logs [-- <svc>…] [--follow] [--tail=N] [--since=10m]` | A / B | Estado/health, reinicio y logs (`logs` sigue la salida por defecto solo en terminal interactiva). |
+| `pnpm stack:reset [-- --seed=minimal\|none] [--profile core] [--yes]` | A / B | Solo con `PFOS_ENV=local\|ci`: `down --volumes` → `up` → `migrate` → seed (§8.1). |
+| `pnpm db:migrate [-- --host]` | A / B | `migrate` en contenedor (`compose run --rm migrate`); `--host` lo ejecuta con el build local de `apps/api`. |
+| `pnpm db:seed [-- --profile=minimal] [--host]` | A / B | `compose --profile core run --rm seed seed --profile=…` (one-shot, nunca dentro de `up --wait`). |
+| `pnpm images:build` | B | Construye `pfos/finance-api:local` y `pfos/finance-web:local`. |
+| `pnpm backup:local [-- --name=<etiqueta>]` · `pnpm restore:local -- <id\|latest> [--yes] [--with-keycloak]` | A / B | Backup/restore local (§9). |
+| `pnpm check:hosts` | — | Falla si hay `localhost`/`127.0.0.1` fijos en `apps/`, `packages/`, `docker/` o `deploy/compose/` (TC-PLATFORM-STACK-005). |
+| `pnpm test:integration` | — | Testcontainers (independiente del stack Compose). |
+| `pnpm test:stack` | — | Suite TC-PLATFORM-STACK-* en un proyecto Compose desechable `pfos-test` con puertos propios (lenta; CI la corre en `stack-smoke`). |
+
+Verificado el 2026-10-02 en Windows 11 (PowerShell y Git Bash): `setup:env` (fichero nuevo y `.env` existente sin cambios), `stack:up` (deps healthy en ~31 s), `dev` (api, worker y web `/health/ready` = 200), `stack:up -- --profile core`, `stack:ps`, `stack:logs`, `db:migrate`, `db:seed -- --profile=minimal`, `stack:down`.
 
 ### 0.6 Matriz de paridad
 
@@ -90,501 +99,201 @@ Regla: **todo PR debe pasar en modo B** (CI lo ejecuta). Un desarrollador puede 
 
 | Objetivo | Cómo se cumple |
 |---|---|
-| Un comando para todo el producto | `pnpm stack:up` (profile `core`) |
-| Solo levantar lo necesario | Compose **profiles** `deps`, `core`, `seed`, `observability`, `ml` (+ `tools` opcional, ver §4.6) |
+| Un comando para todo el producto | `pnpm stack:up -- --profile core` (por defecto `stack:up` levanta `deps`, modo A) |
+| Solo levantar lo necesario | Compose **profiles** `deps`, `core`, `seed`, `observability`, `valkey`, `ml` (+ `tools` propuesto, ver §4.6) |
 | Cross-platform (owner en **Windows**) | Scripts TypeScript ejecutados con `tsx` vía `pnpm`; **cero scripts solo-bash** (ADR-0012) |
 | Paridad con cloud | Las mismas imágenes `finance-web` / `finance-api` que CI promueve a staging/producción ([20-container-strategy.md](20-container-strategy.md)) |
 | 12-factor | Configuración 100 % por env vars; `.env.example` sin secretos; hostnames de servicio Compose, nunca `localhost` hardcodeado |
 | Arranque determinista | `healthcheck` en cada servicio de larga vida; `depends_on` con `service_healthy` y `service_completed_successfully` (para `migrate`) |
-| Datos persistentes y reseteables | Volúmenes nombrados + `pnpm stack:reset` (BD limpia → migraciones → seed → arranque) |
+| Datos persistentes y reseteables | Volúmenes nombrados + `pnpm stack:reset` (volúmenes limpios → arranque → migraciones → seed) |
 
 ## 2. Prerrequisitos
 
-### 2.1 Windows 11 (entorno principal del owner)
+### 2.1 Windows 11 (entorno principal del owner) — as-built (2026-10-02)
 
-| Herramienta | Versión mínima propuesta | Notas |
+| Herramienta | Versión | Notas |
 |---|---|---|
-| **WSL2** | kernel actual (`wsl --update`) | Requerido por Docker Desktop (backend WSL2). Recomendada distro Ubuntu LTS para clonar el repo *dentro* del filesystem Linux (ver §11.2). |
-| **Docker Desktop** | 4.x reciente con Compose v2 ≥ 2.24 | Necesario para `depends_on.required`, `restart: true`, `healthcheck.start_interval`, `develop.watch`. Asignar ≥ 6 GB RAM / 4 CPU a WSL2 (`%UserProfile%\.wslconfig`). Alternativas: Rancher Desktop / Podman Desktop (no soportadas oficialmente; ver Preguntas abiertas). |
-| **Node.js LTS** | Node 24 (Active LTS hasta 2026-10-20) o **Node 26** (pasa a LTS el 2026-10-28) | Fijado en `.nvmrc`/`.node-version` y `engines`. Decisión de línea exacta en Preguntas abiertas y [20-container-strategy.md](20-container-strategy.md) §3. Instalar con `fnm` o `nvm-windows`/`volta`. |
-| **pnpm** | vía **corepack** (`corepack enable`) | Versión fijada en `package.json#packageManager` (`pnpm@<x.y.z>`); nunca `npm i -g pnpm`. Nota: corepack deja de venir incluido en futuras líneas de Node; si falta, `npm i -g corepack` (verificar en SPIKE-08). |
-| **Git** | 2.4x con `core.autocrlf=false` | Line endings gobernados por `.gitattributes` (§11.1). |
-| IDE | VS Code / WebStorm | Extensión *WSL* o *Dev Containers* si se usa §12. |
+| **WSL2** | kernel actual (`wsl --update`) | Requerido por Docker Desktop (backend WSL2). El repo puede vivir en `D:\` (modo A); WSL2 solo hace falta para el modo C / Dev Containers (§11.2). |
+| **Docker Desktop** | Compose v2 ≥ 2.24 (verificado con Compose v5.5.1) | Necesario para `depends_on.required`/`restart`, `healthcheck.start_interval`, `configs.content` y `up --wait`. Docker 29 rechaza `start_interval` sin `start_period` (SPIKE-08). |
+| **Node.js** | `engines`: `>=22.12 <27`; `.nvmrc` = **24** (misma línea que las imágenes `node:24.21.0-bookworm-slim` y que CI) | Verificado también con Node 22.23 en el host. Instalar con `fnm`, `nvm-windows` o `volta`. |
+| **pnpm** | `packageManager: pnpm@12.4.2` vía **corepack** (`corepack enable`) | Nunca `npm i -g pnpm`. Si corepack no viene con la línea de Node instalada: `npm i -g corepack`. |
+| **Git** | 2.4x | Line endings gobernados por [`.gitattributes`](../.gitattributes) (`eol=lf`, §11.1). |
 
-> No se requiere instalar PostgreSQL, Redis/Valkey, Keycloak ni Python en el host: todo corre en contenedores.
+> No se requiere instalar PostgreSQL, Valkey, Keycloak ni Python en el host: todo corre en contenedores.
 
 ### 2.2 macOS / Linux
 
-Docker Desktop, OrbStack o Docker Engine + plugin Compose v2; Node LTS; corepack. Mismos comandos.
+Docker Desktop, OrbStack o Docker Engine + plugin Compose v2; Node (ver `engines`); corepack. Mismos comandos (CI los ejecuta en `ubuntu-latest`).
 
 ### 2.3 Verificación
 
+No existe `pnpm doctor` (propuesto en Phase 0, no implementado). La verificación práctica es:
+
 ```powershell
-# PowerShell o bash — mismo comando
-pnpm doctor
+# PowerShell o Git Bash — mismo comando
+pnpm setup:env -- --check   # puertos PF_* libres (exit 3 si hay conflicto)
+pnpm stack:up               # falla con mensaje claro si Docker no responde o algo no llega a healthy
 ```
 
-`pnpm doctor` (`scripts/doctor.ts`) comprueba: versión de Node vs `engines`, pnpm vía corepack, `docker version` y `docker compose version` (≥ 2.24), memoria asignada a Docker, puertos libres (§11.3), presencia de `.env`, `core.autocrlf`, y en Windows si el repo está en `/mnt/c` (advertencia de rendimiento).
-
-## 3. Flujo de arranque: clone → install → stack:up
+## 3. Flujo de arranque: clone → install → stack:up — as-built (2026-10-02)
 
 ```mermaid
 flowchart LR
   A[git clone] --> B[corepack enable]
   B --> C[pnpm install]
-  C --> D[pnpm env:init<br/>.env desde .env.example<br/>+ credenciales dev aleatorias]
-  D --> E[pnpm stack:up<br/>profile core]
-  E --> F{servicios healthy}
-  F --> G[pnpm db:seed -- --profile=minimal]
-  G --> H[http://localhost:3000<br/>login con usuario dev]
+  C --> D[pnpm setup:env<br/>.env desde .env.example<br/>+ secretos dev aleatorios]
+  D --> E{modo}
+  E -->|A| F[pnpm stack:up<br/>perfil deps] --> G[pnpm dev<br/>migrate + api/worker/web en el host]
+  E -->|B| H[pnpm stack:up -- --profile core]
+  G --> I[pnpm stack:down]
+  H --> I
 ```
 
 ```powershell
-git clone https://github.com/<owner>/personal-finances.git
+git clone https://github.com/manuXD270516/personal-finances.git
 cd personal-finances
 corepack enable
 pnpm install
-pnpm env:init          # crea .env (no versionado) y genera passwords dev aleatorios
-pnpm stack:up          # build/pull imágenes y arranca profile core
-pnpm db:seed -- --profile=minimal
+pnpm setup:env                      # crea .env (no versionado); en un .env existente conserva los valores
+# Modo A — apps en el host
+pnpm stack:up                       # perfil deps: postgres, object-storage, mailpit, keycloak
+pnpm dev                            # Ctrl+C para salir
+# Modo B — todo en contenedores
+pnpm stack:up -- --profile core
+pnpm db:seed -- --profile=minimal   # opcional
 pnpm stack:logs -- finance-api
+pnpm stack:down
 ```
 
-Secuencia interna de `stack:up` (profile `core`):
+Secuencia interna de `stack:up -- --profile core` (`docker compose -p pfos --profile core up -d --wait`):
 
 ```mermaid
 sequenceDiagram
   participant S as pnpm stack:up
   participant C as docker compose
   participant PG as postgres
-  participant R as redis
   participant OS as object-storage
+  participant MP as mailpit
   participant KC as keycloak
   participant M as migrate (one-shot)
   participant API as finance-api
   participant W as finance-worker
   participant WEB as finance-web
   S->>C: compose --profile core up -d --wait
-  C->>PG: start (healthcheck pg_isready)
-  C->>R: start (healthcheck PING)
-  C->>OS: start (healthcheck HTTP)
+  C->>PG: start (pg_isready por TCP; init: roles pf_migrator/keycloak + BD keycloak)
+  C->>OS: start (SeaweedFS mini, /healthz)
+  C->>MP: start (mailpit readyz)
   PG-->>C: healthy
-  C->>KC: start (depends_on postgres healthy, realm import)
-  C->>M: run migrate (depends_on postgres, object-storage healthy)
+  C->>KC: start (depends_on postgres healthy, --import-realm)
+  C->>M: run migrate (depends_on postgres + object-storage healthy)
   M-->>C: exit 0 (service_completed_successfully)
-  C->>API: start (depends_on migrate completed + deps healthy)
+  C->>API: start (migrate completed + postgres/object-storage/mailpit healthy)
   C->>W: start (idem)
   API-->>C: healthy (/health/ready)
-  C->>WEB: start (depends_on finance-api healthy, keycloak healthy)
-  WEB-->>C: healthy
+  C->>WEB: start (depends_on finance-api + keycloak healthy)
+  WEB-->>C: healthy (/api/health/ready)
   C-->>S: --wait devuelve 0 → imprime URLs
 ```
 
-Si `migrate` falla, `finance-api` y `finance-worker` **no arrancan** y `stack:up` termina con código ≠ 0 mostrando los logs de `migrate` (scenario *Migrations gate the API*).
+Si `migrate` falla, `finance-api` y `finance-worker` **no arrancan** y `stack:up` termina con código ≠ 0 mostrando el log de `migrate` (scenario *Migrations gate the API*).
 
-## 4. Profiles de Compose
+## 4. Profiles de Compose — as-built (2026-10-02)
 
 | Profile | Servicios | Cuándo usarlo |
 |---|---|---|
-| `deps` | `postgres`, `redis`, `object-storage`, `mailpit`, `keycloak` | **Desarrollo diario con hot reload**: apps corren en el host (`pnpm dev`) contra dependencias en contenedores. Más rápido en Windows (sin bind mounts de código). |
-| `core` | `deps` + `migrate`, `finance-api`, `finance-worker`, `finance-web` | Producto completo en contenedores: demo, verificación pre-PR, E2E, compose smoke (paridad con cloud). |
-| `seed` | `seed` (one-shot) | Cargar datasets `minimal`/`demo`/`large`. Siempre invocado por `pnpm db:seed` junto con `core`. |
-| `observability` | `otel-lgtm` | Ver traces/metrics/logs locales (Grafana en `:3001`). Combinable con `deps` o `core`. Detalle en [18-observability.md](18-observability.md). |
-| `ml` | `ml-forecasting` | Solo desde Phase 8 (forecasting Python). |
-| `tools` *(propuesta, no canónica)* | p. ej. `db-admin` (pgweb/CloudBeaver) | Opcional; ver §4.6 y Preguntas abiertas. |
+| `deps` | `postgres`, `object-storage`, `mailpit`, `keycloak` | **Modo A** (por defecto de `pnpm stack:up`): apps en el host con `pnpm dev`. |
+| `core` | `deps` + `migrate`, `finance-api`, `finance-worker`, `finance-web` | **Modo B**: producto completo en contenedores (demo, verificación pre-PR, `test:stack`). |
+| `seed` | `seed` (one-shot) | Solo vía `pnpm db:seed` / `stack:reset` (`compose run --rm`). |
+| `observability` | `otel-lgtm` | Trazas/métricas/logs locales (Grafana en `PF_GRAFANA_PORT`, 23001). Combinable con `deps` o `core`; requiere `OTEL_ENABLED=true`. |
+| `valkey` | `valkey` | Solo si `JOB_QUEUE_DRIVER=bullmq` o `SESSION_STORE=valkey` (ADR-0008); ya no forma parte de `deps`/`core`. |
+| `ml` | — (reservado) | `ml-forecasting` en Phase 8. |
+| `tools` *(propuesta, no implementada)* | p. ej. `db-admin` | Ver §4.6. |
 
-> Los servicios de `deps` declaran `profiles: [deps, core]`, de modo que `--profile core` incluye dependencias sin necesidad de pasar ambos profiles.
+> Los servicios de `deps` declaran `profiles: [deps, core]`, de modo que `--profile core` incluye las dependencias.
 
 ### 4.1 Modo A — `deps` + apps en el host (recomendado para codificar)
 
 ```mermaid
 flowchart LR
-  subgraph Host[Host Windows / WSL2]
-    WEBH[pnpm --filter web dev<br/>Next.js :3000 HMR]
-    APIH[pnpm --filter api dev:api<br/>Nest :8080 watch]
-    WH[pnpm --filter api dev:worker]
+  subgraph Host[Host Windows]
+    WEBH[finance-web<br/>next dev :23000]
+    APIH[finance-api<br/>tsx watch :28080]
+    WH[finance-worker<br/>tsx watch, health :28082]
   end
   subgraph Docker[Docker - profile deps]
-    PG[(postgres :5432)]
-    RD[(redis :6379)]
-    OS[(object-storage :9000/9001)]
-    KC[keycloak :8081]
-    MP[mailpit :8025/1025]
+    PG[(postgres :25432)]
+    OS[(object-storage :29000)]
+    KC[keycloak :28081]
+    MP[mailpit :28025/21025]
   end
   WEBH --> APIH
   WEBH --> KC
-  APIH --> PG & RD & OS & KC & MP
-  WH --> PG & RD & OS & MP
+  APIH --> PG & OS & KC & MP
+  WH --> PG & OS & MP
 ```
 
 ```powershell
-pnpm stack:up -- --profile=deps
-pnpm db:migrate              # ejecuta dbmate desde el host contra localhost:5432
-pnpm dev                     # turbo run dev --filter=web --filter=api (api + worker + web)
+pnpm stack:up     # perfil deps
+pnpm dev          # migrate (host) + api/worker/web con recarga; Ctrl+C para salir
 ```
 
-En este modo la app lee **`.env.host`** (generado por `pnpm env:init`) donde las URLs apuntan a `localhost:<puerto publicado>`. No es "localhost hardcodeado": es configuración (§6.3). Los puertos publicados son los defaults de ARCHITECTURE §10, sobrescribibles con `HOST_PORT_*`.
+Las apps leen el **mismo `.env`** que Compose: sus valores ya son los del modo A (`127.0.0.1:${PF_*_PORT}`), así que no existe `.env.host` (propuesto en Phase 0, descartado por el contrato de §0.3). `pnpm dev` ejecuta las fuentes TypeScript (condición de export `@pf/source`), sin build previo.
 
 ### 4.2 Modo B — `core` (todo en contenedores)
 
 ```powershell
-pnpm stack:up                       # = --profile=core
-pnpm stack:up -- --profile=core --profile=observability
+pnpm stack:up -- --profile core
+pnpm stack:up -- --profile core --profile observability
 ```
 
-Las apps se comunican por hostnames de servicio (`postgres`, `redis`, `object-storage`, `keycloak`, `finance-api`). Se usa la imagen construida localmente (`pnpm images:build`) o una imagen publicada (`FINANCE_API_IMAGE=…@sha256:…`) para reproducir exactamente lo desplegado.
+Las apps se comunican por nombres de servicio (`postgres`, `object-storage`, `finance-api`…): `compose.yaml` sobrescribe solo las direcciones (`x-app-addresses`). Se usan las imágenes locales `pfos/finance-*:local` (`pnpm images:build` o `--build`) o imágenes publicadas por digest con `FINANCE_API_IMAGE` / `FINANCE_WEB_IMAGE` en `.env` (`stack:up` sin `--build` no reconstruye una imagen presente). En CI, `PF_STACK_PREBUILT_IMAGES=1` hace que `pnpm test:stack` use las imágenes ya cargadas sin construir.
 
-### 4.3 Modo C — `core` + Compose Watch (opcional)
+### 4.3 Modo C — `core` + Compose Watch (opcional, no implementado)
 
-Para depurar comportamiento solo-contenedor con recarga, un override `compose.watch.yaml` usa `develop.watch` (`action: sync` para `apps/*/src`, `action: rebuild` para `package.json`/`pnpm-lock.yaml`). En Windows es fiable solo con el repo dentro de WSL2 (§11.2). Se evaluará en SPIKE-08; no es el camino principal.
+Para depurar comportamiento solo-contenedor con recarga, un override `compose.watch.yaml` usaría `develop.watch`. SPIKE-08 confirmó que en Windows solo es fiable con el repo dentro de WSL2 (§11.2); no existe en el repo y no es el camino principal.
 
 ### 4.4 `seed`
 
-`pnpm db:seed -- --profile=minimal|demo|large` ejecuta `docker compose --profile core --profile seed run --rm seed --profile=<p>` (o en Modo A, `tsx scripts/db-seed.ts` directamente). Ver §8.
+`pnpm db:seed -- --profile=minimal` ejecuta `docker compose --profile core run --rm seed seed --profile=minimal` (o en el host con `--host`). Hoy solo existe el dataset `minimal` (registra la ejecución en `platform.seed_run`); `demo` y `large` se rechazan con "todavía no existe" hasta que lleguen los datasets de [29-seed-datasets.md](29-seed-datasets.md). Ver §8.
 
 ### 4.5 `observability` y `ml`
 
-`otel-lgtm` recibe OTLP en `4317` (gRPC) y `4318` (HTTP). Las apps exportan solo si `OTEL_EXPORTER_OTLP_ENDPOINT` está definido; sin el profile, el SDK queda en no-op (no falla). `ml-forecasting` es Phase 8 y **nunca** es dependencia de `finance-api` (ARCHITECTURE §2).
+`otel-lgtm` recibe OTLP en `4317`/`4318` (publicados en `PF_OTLP_GRPC_PORT`/`PF_OTLP_HTTP_PORT`). Las apps exportan solo con `OTEL_ENABLED=true`; si no, el SDK queda en no-op. `ml-forecasting` es Phase 8 y **nunca** es dependencia de `finance-api` (ARCHITECTURE §2).
 
 ### 4.6 `tools` (propuesta)
 
 Un profile `tools` con un cliente web de PostgreSQL facilitaría inspección sin instalar nada. No figura en ARCHITECTURE §10; se propone como opcional y **no** se incluye en el compose canónico hasta aprobarse (Preguntas abiertas).
 
-## 5. `compose.yaml` propuesto (ilustrativo)
+## 5. `compose.yaml` — as-built (2026-10-02)
 
-Ubicación objetivo: `deploy/compose/compose.yaml`, proyecto Compose `pfos`. El servicio `object-storage` usa **SeaweedFS** como candidato de trabajo porque MinIO community quedó sin mantenimiento y sin imágenes oficiales (ver §5.2); la decisión final es de **SPIKE-07** (ADR-0009). El puerto de host sigue siendo `9000`/`9001` según ARCHITECTURE §10, independientemente de la implementación.
+Fichero real: [`deploy/compose/compose.yaml`](../deploy/compose/compose.yaml) (proyecto Compose fijo `pfos`). El bloque ilustrativo de Phase 0 se eliminó de este documento; resumen de lo implementado:
 
-```yaml
-# deploy/compose/compose.yaml — ILUSTRATIVO (Phase 0). Materializar tras DESIGN GATE.
-name: pfos
+| Servicio | Imagen (tag + digest en el fichero) | Perfiles | Host (`PF_BIND_ADDR`, 127.0.0.1) → contenedor | Healthcheck |
+|---|---|---|---|---|
+| `postgres` | `postgres:18.6-trixie` | deps, core | `PF_POSTGRES_PORT` 25432 → 5432 | `pg_isready -h 127.0.0.1` |
+| `object-storage` | `chrislusf/seaweedfs:4.48` (`weed mini`, solo S3) | deps, core | `PF_OBJECT_STORAGE_PORT` 29000 → 8333 | `wget /healthz` |
+| `mailpit` | `axllent/mailpit:v1.27.7` | deps, core | `PF_MAILPIT_UI_PORT` 28025 → 8025, `PF_MAILPIT_SMTP_PORT` 21025 → 1025 | `mailpit readyz` |
+| `keycloak` | `quay.io/keycloak/keycloak:26.8.0` (`start-dev --import-realm`) | deps, core | `PF_KEYCLOAK_PORT` 28081 → 8080 | `/health/ready` en management 9000 vía `/dev/tcp` |
+| `valkey` | `valkey/valkey:9.1.2-alpine` | valkey | `PF_VALKEY_PORT` 26379 → 6379 | `valkey-cli ping` |
+| `migrate` | `${FINANCE_API_IMAGE:-pfos/finance-api:local}` (`migrate`) | core | — | desactivado (one-shot) |
+| `finance-api` | idem (`api`) | core | `PF_API_PORT` 28080 → 8080 | `healthcheck.mjs …:8080/health/ready` |
+| `finance-worker` | idem (`worker`) | core | — (8082 solo red interna) | `healthcheck.mjs …:8082/health/ready` |
+| `finance-web` | `${FINANCE_WEB_IMAGE:-pfos/finance-web:local}` | core | `PF_WEB_PORT` 23000 → 3000 | `healthcheck.mjs …:3000/api/health/ready` |
+| `seed` | finance-api (`seed --profile=…`) | seed | — | desactivado (one-shot) |
+| `otel-lgtm` | `grafana/otel-lgtm:0.34.0` | observability | `PF_GRAFANA_PORT` 23001 → 3000, `PF_OTLP_GRPC_PORT` 24317, `PF_OTLP_HTTP_PORT` 24318 | fichero `/tmp/ready` |
 
-x-app-common: &app-common
-  env_file:
-    - path: ../../.env            # generado por `pnpm env:init`, no versionado
-      required: true
-  init: true                      # tini como PID 1: reenvía señales y recolecta zombies
-  stop_signal: SIGTERM
-  stop_grace_period: 30s          # > timeout interno de shutdown de la app (25 s)
-  restart: unless-stopped
-  networks: [pfos]
-  security_opt: ["no-new-privileges:true"]
-  read_only: true
-  tmpfs: ["/tmp:size=64m"]
-  cap_drop: [ALL]
-  logging: &default-logging
-    driver: local
-    options: { max-size: "10m", max-file: "3" }
+### 5.1 Notas de diseño del compose (vigentes)
 
-x-deps-common: &deps-common
-  profiles: [deps, core]
-  restart: unless-stopped
-  networks: [pfos]
-  logging: *default-logging
-  stop_grace_period: 20s
-
-services:
-  # ───────────────────────── deps ─────────────────────────
-  postgres:
-    <<: *deps-common
-    image: postgres:18-bookworm@sha256:<digest>      # minor fijada por Renovate (18.x)
-    environment:
-      POSTGRES_USER: ${PG_SUPERUSER:-pfos_admin}
-      POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD:?run pnpm env:init}
-      POSTGRES_DB: ${PG_DATABASE:-pfos}
-      # Roles de app/migración/keycloak creados por init scripts (sin BYPASSRLS para app)
-      PFOS_MIGRATOR_PASSWORD: ${DATABASE_MIGRATOR_PASSWORD:?}
-      PFOS_APP_PASSWORD: ${DATABASE_APP_PASSWORD:?}
-      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
-    command: >
-      postgres -c shared_preload_libraries=pg_stat_statements
-               -c log_min_duration_statement=500
-               -c max_connections=100
-    volumes:
-      - pg-data:/var/lib/postgresql          # PG 18 image: PGDATA bajo /var/lib/postgresql/18/docker (verificar SPIKE-08)
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
-      - ../../.backups:/backups               # destino de backup:local / restore:local
-    ports: ["${HOST_PORT_POSTGRES:-5432}:5432"]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 20s
-      start_interval: 1s
-    shm_size: 256m
-    deploy:
-      resources:
-        limits: { cpus: "2", memory: 1g }
-
-  redis:
-    <<: *deps-common
-    image: valkey/valkey:8-bookworm@sha256:<digest>   # compatible protocolo Redis
-    command: ["valkey-server", "--appendonly", "yes", "--maxmemory", "256mb",
-              "--maxmemory-policy", "noeviction"]      # BullMQ exige noeviction
-    volumes: [redis-data:/data]
-    ports: ["${HOST_PORT_REDIS:-6379}:6379"]
-    healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s   # Docker 29 rechaza start_interval sin start_period (SPIKE-08)
-      start_interval: 1s
-    deploy:
-      resources:
-        limits: { cpus: "0.5", memory: 320m }
-
-  object-storage:
-    <<: *deps-common
-    image: chrislusf/seaweedfs:<version>@sha256:<digest>   # candidato; decide SPIKE-07
-    command: ["mini", "-dir=/data", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json"]
-    environment:
-      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:?}
-      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:?}
-    volumes:
-      - object-storage-data:/data
-      - ./object-storage/s3.json:/etc/seaweedfs/s3.json:ro   # credenciales vía env (plantilla)
-    ports:
-      - "${HOST_PORT_OBJECT_STORAGE:-9000}:8333"            # API S3
-      - "${HOST_PORT_OBJECT_STORAGE_UI:-9001}:23646"        # UI admin (puerto exacto: SPIKE-07)
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]  # endpoint exacto: SPIKE-07
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 15s
-    deploy:
-      resources:
-        limits: { cpus: "1", memory: 512m }
-
-  mailpit:
-    <<: *deps-common
-    image: axllent/mailpit:<version>@sha256:<digest>
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: "1"
-      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
-      MP_MAX_MESSAGES: "2000"
-    ports:
-      - "${HOST_PORT_MAILPIT_UI:-8025}:8025"
-      - "${HOST_PORT_MAILPIT_SMTP:-1025}:1025"
-    healthcheck:
-      test: ["CMD", "/mailpit", "readyz"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    deploy:
-      resources:
-        limits: { cpus: "0.25", memory: 128m }
-
-  keycloak:
-    <<: *deps-common
-    image: quay.io/keycloak/keycloak:26.<x>@sha256:<digest>
-    command: ["start-dev", "--import-realm", "--http-port=8080"]
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
-      KC_HEALTH_ENABLED: "true"                     # /health/* en management port 9000
-      KC_HOSTNAME: ${OIDC_PUBLIC_BASE_URL:?}        # p. ej. http://localhost:8081 (URL vista por el navegador)
-      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"        # back-channel por http://keycloak:8080 dentro de la red
-      # Variables consumidas por placeholders del realm (dev-only)
-      PFOS_DEV_OWNER_PASSWORD: ${PFOS_DEV_OWNER_PASSWORD:?}
-      PFOS_DEV_EDITOR_PASSWORD: ${PFOS_DEV_EDITOR_PASSWORD:?}
-      PFOS_DEV_VIEWER_PASSWORD: ${PFOS_DEV_VIEWER_PASSWORD:?}
-      PFOS_WEB_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
-      PFOS_WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:?}
-    volumes:
-      - ./keycloak/realm-pfos-dev.json:/opt/keycloak/data/import/realm-pfos-dev.json:ro
-    ports: ["${HOST_PORT_KEYCLOAK:-8081}:8080"]
-    depends_on:
-      postgres: { condition: service_healthy, restart: true }
-    healthcheck:
-      # La imagen no trae curl/wget: TCP + HTTP con bash (/dev/tcp)
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: kc\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
-    deploy:
-      resources:
-        limits: { cpus: "1.5", memory: 1g }
-
-  # ───────────────────────── core ─────────────────────────
-  migrate:
-    <<: *app-common
-    profiles: [core]
-    image: ${FINANCE_API_IMAGE:-pfos/finance-api:local}
-    build: &api-build
-      context: ../..
-      dockerfile: docker/finance-api.Dockerfile
-      target: runtime
-    command: ["migrate"]               # entrypoint: dbmate up + ensure buckets (solo si OBJECT_STORAGE_ENSURE_BUCKETS=true)
-    restart: "no"
-    environment:
-      PFOS_PROCESS: migrate
-      DATABASE_URL: postgres://pfos_migrator:${DATABASE_MIGRATOR_PASSWORD}@postgres:5432/${PG_DATABASE:-pfos}?sslmode=disable
-    depends_on:
-      postgres: { condition: service_healthy }
-      object-storage: { condition: service_healthy }
-    deploy:
-      resources:
-        limits: { cpus: "0.5", memory: 256m }
-
-  finance-api:
-    <<: *app-common
-    profiles: [core]
-    image: ${FINANCE_API_IMAGE:-pfos/finance-api:local}
-    build: *api-build
-    command: ["api"]
-    environment:
-      PFOS_PROCESS: api
-      HTTP_PORT: "8080"
-    ports: ["${HOST_PORT_API:-8080}:8080"]
-    depends_on: &app-deps
-      migrate: { condition: service_completed_successfully }
-      postgres: { condition: service_healthy, restart: true }
-      redis: { condition: service_healthy, restart: true }
-      object-storage: { condition: service_healthy }
-      keycloak: { condition: service_healthy }
-      mailpit: { condition: service_started }
-    healthcheck:
-      test: ["CMD", "node", "dist/healthcheck.js", "http://127.0.0.1:8080/health/ready"]
-      interval: 10s
-      timeout: 3s
-      retries: 6
-      start_period: 30s
-      start_interval: 2s
-    deploy:
-      resources:
-        limits: { cpus: "1", memory: 768m }
-
-  finance-worker:
-    <<: *app-common
-    profiles: [core]
-    image: ${FINANCE_API_IMAGE:-pfos/finance-api:local}
-    build: *api-build
-    command: ["worker"]
-    environment:
-      PFOS_PROCESS: worker
-      WORKER_HEALTH_PORT: "8082"        # solo red interna, no publicado
-      WORKER_SHUTDOWN_TIMEOUT_MS: "25000"
-    depends_on: *app-deps
-    healthcheck:
-      test: ["CMD", "node", "dist/healthcheck.js", "http://127.0.0.1:8082/health/ready"]
-      interval: 10s
-      timeout: 3s
-      retries: 6
-      start_period: 30s
-    stop_grace_period: 45s              # jobs largos (imports) — ver 20-container-strategy.md §6
-    deploy:
-      resources:
-        limits: { cpus: "1", memory: 768m }
-
-  finance-web:
-    <<: *app-common
-    profiles: [core]
-    image: ${FINANCE_WEB_IMAGE:-pfos/finance-web:local}
-    build:
-      context: ../..
-      dockerfile: docker/finance-web.Dockerfile
-      target: runtime
-    environment:
-      PORT: "3000"
-      HOSTNAME: "0.0.0.0"
-      API_INTERNAL_BASE_URL: http://finance-api:8080     # BFF → API dentro de la red
-    ports: ["${HOST_PORT_WEB:-3000}:3000"]
-    tmpfs: ["/tmp:size=64m", "/app/apps/web/.next/cache:size=256m"]
-    depends_on:
-      finance-api: { condition: service_healthy }
-      keycloak: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD", "node", "healthcheck.js", "http://127.0.0.1:3000/api/health/ready"]
-      interval: 10s
-      timeout: 3s
-      retries: 6
-      start_period: 20s
-    deploy:
-      resources:
-        limits: { cpus: "1", memory: 768m }
-
-  # ───────────────────────── seed ─────────────────────────
-  seed:
-    <<: *app-common
-    profiles: [seed]
-    image: ${FINANCE_API_IMAGE:-pfos/finance-api:local}
-    build: *api-build
-    command: ["seed", "--profile=minimal"]   # sobrescrito por `pnpm db:seed -- --profile=…`
-    restart: "no"
-    environment:
-      PFOS_PROCESS: seed
-      DATABASE_URL: postgres://pfos_migrator:${DATABASE_MIGRATOR_PASSWORD}@postgres:5432/${PG_DATABASE:-pfos}?sslmode=disable
-    depends_on:
-      migrate: { condition: service_completed_successfully }
-      keycloak: { condition: service_healthy }   # el seed resuelve los `sub` de los usuarios dev
-
-  # ───────────────────────── observability ─────────────────────────
-  otel-lgtm:
-    profiles: [observability]
-    image: grafana/otel-lgtm:<version>@sha256:<digest>
-    networks: [pfos]
-    ports:
-      - "${HOST_PORT_GRAFANA:-3001}:3000"
-      - "${HOST_PORT_OTLP_GRPC:-4317}:4317"
-      - "${HOST_PORT_OTLP_HTTP:-4318}:4318"
-    volumes: [otel-lgtm-data:/data]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:3000/api/health || exit 1"]
-      interval: 15s
-      retries: 10
-      start_period: 30s
-    deploy:
-      resources:
-        limits: { cpus: "1", memory: 1g }
-
-  # ───────────────────────── ml (Phase 8) ─────────────────────────
-  ml-forecasting:
-    <<: *app-common
-    profiles: [ml]
-    image: ${FINANCE_ML_IMAGE:-pfos/finance-ml:local}
-    build:
-      context: ../../services/ml-forecasting
-      dockerfile: ../../docker/finance-ml.Dockerfile
-    ports: ["${HOST_PORT_ML:-8090}:8090"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8090/health/ready', timeout=2)"]
-      interval: 15s
-      retries: 6
-      start_period: 30s
-    deploy:
-      resources:
-        limits: { cpus: "2", memory: 2g }
-
-networks:
-  pfos:
-    name: pfos
-    driver: bridge
-
-volumes:
-  pg-data:
-  redis-data:
-  object-storage-data:
-  otel-lgtm-data:
-```
-
-### 5.1 Notas de diseño del compose
-
-- **`127.0.0.1` en healthchecks**: se ejecutan *dentro* del propio contenedor (loopback del contenedor), no son direcciones de servicio. El escáner de "no hardcoded localhost" (spec `local-environment`) excluye el bloque `healthcheck` — regla a configurar en el script de verificación.
-- **Inyección de URLs de conexión**: el `.env` contiene `DATABASE_URL`, `REDIS_URL`, `OBJECT_STORAGE_ENDPOINT`, etc. con hostnames de servicio (§6). `migrate` y `seed` sobrescriben `DATABASE_URL` para usar el **rol de migración** (`pfos_migrator`, owner de tablas); `finance-api` y `finance-worker` usan `pfos_app` (sin `BYPASSRLS`, no owner) — ARCHITECTURE §9.
-- **`keycloak-db`**: ARCHITECTURE §10 lo lista entre volúmenes, pero no es un volumen: es la **base de datos `keycloak` dentro de `postgres`** (persistida en `pg-data`), creada por `postgres/init/01-roles-and-databases.sql`. Ver Preguntas abiertas.
-- **`redis-data`** es opcional: Valkey local con AOF evita perder jobs en un reinicio, pero Redis se trata como **no durable/reconstruible** (ver [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md)).
-- **`deploy.resources.limits`**: Compose v2 lo aplica sin Swarm. Los límites suman ≈ 7.5 CPU / 6.5 GB en el peor caso con todos los profiles; con `core` ≈ 5 GB.
-- **`read_only: true` + `tmpfs`** en apps: valida desde local la compatibilidad con FS de solo lectura que se usará en ECS (`readonlyRootFilesystem`).
-- **`restart: true`** en `depends_on` reinicia la app si Compose reinicia `postgres`/`redis` (Compose ≥ 2.17).
-- **Keycloak issuer**: el navegador ve `http://localhost:8081` (URL pública configurable vía `OIDC_PUBLIC_BASE_URL`); BFF y API resuelven JWKS/token por `http://keycloak:8080`. Por eso se separan `OIDC_ISSUER` (valor esperado del claim `iss`) y `OIDC_INTERNAL_BASE_URL` (§6). Validar en SPIKE-06.
-- **Buckets**: `migrate` ejecuta, además de `dbmate up`, un paso idempotente `storage:ensure-buckets` solo si `OBJECT_STORAGE_ENSURE_BUCKETS=true` (local/CI). En cloud los buckets los crea Terraform ([22-infrastructure.md](22-infrastructure.md)).
+- **Una sola fuente de configuración:** los servicios de app cargan el `.env` en uso (`env_file: ${PF_APP_ENV_FILE:-../../.env}`; los scripts fijan la ruta absoluta) y el ancla `x-app-addresses` sobrescribe solo `DATABASE_URL`, `OBJECT_STORAGE_ENDPOINT`, `OTEL_EXPORTER_OTLP_ENDPOINT` y `VALKEY_URL` con nombres de servicio y puertos canónicos (§0.3 punto 5).
+- **Roles de base de datos:** `migrate` usa `DATABASE_MIGRATOR_URL` con el rol `pf_migrator` (propietario, `CREATEROLE`, sin `BYPASSRLS`); api, worker y seed usan `pf_app`. La migración de bootstrap crea `pf_app` y `migrate` le fija la contraseña (ARCHITECTURE §9).
+- **Init sin ficheros sueltos:** el SQL de init de PostgreSQL (roles `pf_migrator` y `keycloak`, base `keycloak`) y la identidad S3 de SeaweedFS se definen como `configs.content` en el propio `compose.yaml`, interpolados desde `.env` — no hay secretos en el repo. `keycloak-db` no es un volumen: es la base `keycloak` dentro de `postgres` (persistida en `pg-data`).
+- **`127.0.0.1` solo en healthchecks:** se ejecutan dentro del propio contenedor; `pnpm check:hosts` excluye esos bloques (TC-PLATFORM-STACK-005).
+- **Hardening de apps:** `init: true` (tini como PID 1), `read_only: true` + `tmpfs` (`/tmp`; en web también `.next/cache`), `cap_drop: [ALL]`, `no-new-privileges`, logging `local` (10 MB × 3) y `deploy.resources.limits` (Compose v2 los aplica sin Swarm).
+- **Arranque determinista:** `migrate` con `service_completed_successfully`; `postgres` con `restart: true` (reinicia las apps si Compose reinicia la BD); `valkey` con `required: false`; web espera a `finance-api` y `keycloak` healthy.
+- **Shutdown:** `stop_grace_period` 30 s (api, web) y 45 s (worker) por encima de `SHUTDOWN_TIMEOUT_MS=25000`.
+- **Keycloak issuer:** `KC_HOSTNAME=${OIDC_PUBLIC_BASE_URL}` (URL que ve el navegador, `http://localhost:28081`) + `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` para el back-channel dentro de la red.
+- **Buckets:** `migrate` crea el bucket y su CORS solo con `OBJECT_STORAGE_ENSURE_BUCKET=true` (local/CI). En cloud los crea Terraform ([22-infrastructure.md](22-infrastructure.md)).
+- **Red y volúmenes:** red por defecto `pfos_default`; volúmenes `pfos_pg-data`, `pfos_object-storage-data`, `pfos_valkey-data`, `pfos_otel-lgtm-data`.
 
 ### 5.2 Estado de MinIO y alternativas (verificado 2026-10-01)
 
@@ -597,216 +306,65 @@ volumes:
 
 SPIKE-07 valida: presigned PUT/GET con el SDK v3 de AWS, `forcePathStyle`, checksums (`x-amz-checksum-*` por defecto en SDK v3 recientes), CORS para subida directa desde el navegador, versionado (para paridad con S3) y comportamiento de multipart.
 
-## 6. Variables de entorno
+## 6. Variables de entorno — as-built (2026-10-02)
 
 ### 6.1 Convenciones
 
-- `UPPER_SNAKE_CASE`; prefijo por componente: `PG_*` (contenedor postgres), `DATABASE_*` (app), `REDIS_*`, `OBJECT_STORAGE_*`, `OIDC_*`, `SMTP_*`, `WEB_*`, `API_*`, `WORKER_*`, `HOST_PORT_*` (solo Compose), `PFOS_*` (globales del producto), `OTEL_*` (**variables estándar** de OpenTelemetry, sin prefijo propio).
-- `NEXT_PUBLIC_*` **jamás** contiene secretos ni URLs internas (se embebe en el bundle del navegador). El BFF lee config server-side en runtime (no en build) para cumplir *build once* ([20-container-strategy.md](20-container-strategy.md) §7).
-- Toda variable se valida al arrancar con un schema (`zod`) en `@pf/platform/config`; variable faltante o inválida ⇒ el proceso termina con código 78 (`EX_CONFIG`) y mensaje claro, sin imprimir valores.
-- Secretos: sufijo `_PASSWORD`, `_SECRET`, `_KEY`, `_TOKEN`. El logger redacta claves con esos sufijos.
-- Ficheros: `.env.example` (versionado, sin secretos), `.env` (Compose/contenedores, ignorado), `.env.host` (Modo A, ignorado), `.env.test` (CI/Testcontainers, generado).
-- `PFOS_ENV` ∈ `local | ci | staging | production`. Comportamientos dev-only (`OBJECT_STORAGE_ENSURE_BUCKETS`, realm import, seeds) se **rechazan** si `PFOS_ENV ∈ {staging, production}`.
+- `UPPER_SNAKE_CASE`. Dos familias (§0.3): `PF_*` = plataforma local, solo la leen `compose.yaml` y `scripts/stack` (puertos `PF_<SVC>_PORT`, `PF_BIND_ADDR`, secretos de desarrollo `PF_DEV_*`, `PF_COMPOSE_PROFILES`); runtime de la app sin prefijo propio y por dominio (`DATABASE_*`, `OBJECT_STORAGE_*`, `JOB_QUEUE_*`, `SESSION_STORE`, `VALKEY_URL`, `API_*`, `WORKER_*`, `OIDC_*`, `WEB_*`, `APP_*`, `PFOS_ENV`, `LOG_LEVEL`) y `OTEL_*` estándar de OpenTelemetry.
+- `NEXT_PUBLIC_*` **jamás** contiene secretos ni URLs de entorno (se embebería en el bundle); la web lee y valida su configuración en runtime (`instrumentation.ts`) para cumplir *build once* ([20-container-strategy.md](20-container-strategy.md) §7).
+- Validación al arrancar con zod en `@pf/platform/config`: cada proceso valida solo las variables que usa; si alguna falta o es inválida termina con código 78 (`EX_CONFIG`) listándolas todas, sin imprimir valores. Ningún módulo fuera de `@pf/platform` lee `process.env` (regla ESLint `no-restricted-properties`).
+- Secretos: sufijo `_PASSWORD`, `_SECRET`, `_KEY`, `_TOKEN`; el logger los redacta.
+- Ficheros: `.env.example` (versionado, sin secretos) y `.env` (generado por `pnpm setup:env`, ignorado por git, leído por Compose **y** por los procesos del host). `PF_ENV_FILE` permite usar otro fichero (lo usa `test:stack`). No existen `.env.host` ni `.env.test`.
+- `PFOS_ENV` ∈ `local | ci | staging | production`. Comportamientos dev-only (`seed`, `stack:reset`, creación de buckets) se rechazan fuera de `local | ci`.
 
-### 6.2 `.env.example` (ilustrativo)
+### 6.2 `.env.example`
 
-```dotenv
-# ─────────────────────────────────────────────────────────────────────────────
-# PFOS — .env.example  (VERSIONADO, SIN SECRETOS)
-# `pnpm env:init` copia este fichero a .env y reemplaza cada __GENERATE__ por un
-# valor aleatorio (crypto.randomBytes). Todas las credenciales son SOLO PARA DEV
-# LOCAL. Nunca reutilizarlas en otro entorno ni en otro servicio.
-# ─────────────────────────────────────────────────────────────────────────────
-PFOS_ENV=local
-TZ=UTC
-LOG_LEVEL=info
-LOG_FORMAT=json                 # json | pretty (pretty solo en Modo A)
+Fichero real: [`.env.example`](../.env.example). Bloques: plataforma local (`PF_BIND_ADDR=127.0.0.1` y puertos `PF_*_PORT` con defaults "2 + puerto canónico"), secretos de desarrollo `PF_DEV_*=__generate__` (superusuario y roles de PostgreSQL, Keycloak, cliente OIDC, usuarios `owner|editor|viewer@pfos.test`, credenciales S3), runtime de la app (valores del modo A interpolados desde los `PF_*`, p. ej. `DATABASE_URL=postgres://pf_app:${PF_DEV_DB_APP_PASSWORD}@${PF_BIND_ADDR}:${PF_POSTGRES_PORT}/pfos?sslmode=disable`), identidad (`OIDC_PUBLIC_BASE_URL`, `WEB_PUBLIC_URL`), OpenTelemetry (`OTEL_ENABLED=false`) e imágenes (`FINANCE_API_IMAGE`/`FINANCE_WEB_IMAGE` vacías = build local). La referencia completa de variables de runtime, generada desde el esquema, es [config-reference.md](config-reference.md) (`pnpm config:docs`; CI falla si está desactualizada).
 
-# ── PostgreSQL (contenedor) ──
-PG_DATABASE=pfos
-PG_SUPERUSER=pfos_admin
-PG_SUPERUSER_PASSWORD=__GENERATE__          # dev-only
-DATABASE_MIGRATOR_PASSWORD=__GENERATE__     # dev-only, rol pfos_migrator (owner de schemas)
-DATABASE_APP_PASSWORD=__GENERATE__          # dev-only, rol pfos_app (sin BYPASSRLS)
+> El dominio `pfos.test` es un TLD reservado (RFC 2606), sin riesgo de envío real.
 
-# ── App → PostgreSQL ──
-DATABASE_URL=postgres://pfos_app:${DATABASE_APP_PASSWORD}@postgres:5432/pfos?sslmode=disable
-DATABASE_POOL_MAX=10
-DATABASE_STATEMENT_TIMEOUT_MS=15000
+### 6.3 Sin `.env.host`
 
-# ── Redis / Valkey ──
-REDIS_URL=redis://redis:6379/0
-QUEUE_PREFIX=pfos
+El diseño de Phase 0 proponía derivar un `.env.host` para el modo A. Se descartó: el `.env` único ya contiene los valores del modo A y el modo B sobrescribe solo direcciones en `compose.yaml` (§0.3, §5.1).
 
-# ── Object storage (API S3) ──
-OBJECT_STORAGE_ENDPOINT=http://object-storage:8333
-OBJECT_STORAGE_PUBLIC_ENDPOINT=http://localhost:9000   # URL de presigned URLs vista por el navegador
-OBJECT_STORAGE_REGION=us-east-1
-OBJECT_STORAGE_FORCE_PATH_STYLE=true
-OBJECT_STORAGE_BUCKET_DOCUMENTS=pfos-local-documents
-OBJECT_STORAGE_BUCKET_EXPORTS=pfos-local-exports
-OBJECT_STORAGE_ACCESS_KEY=pfos-dev
-OBJECT_STORAGE_SECRET_KEY=__GENERATE__      # dev-only
-OBJECT_STORAGE_ENSURE_BUCKETS=true          # rechazado fuera de local/ci
+## 7. Catálogo de scripts (`pnpm`, TypeScript cross-platform) — as-built (2026-10-02)
 
-# ── OIDC (Keycloak dev) ──
-OIDC_PUBLIC_BASE_URL=http://localhost:8081
-OIDC_ISSUER=http://localhost:8081/realms/pfos
-OIDC_INTERNAL_BASE_URL=http://keycloak:8080          # discovery/JWKS/token server-side
-OIDC_CLIENT_ID=pfos-web
-OIDC_CLIENT_SECRET=__GENERATE__             # dev-only (confidential client del BFF)
-OIDC_API_AUDIENCE=pfos-api
-KEYCLOAK_DB_PASSWORD=__GENERATE__           # dev-only
-KEYCLOAK_ADMIN_USER=admin
-KEYCLOAK_ADMIN_PASSWORD=__GENERATE__        # dev-only
-PFOS_DEV_OWNER_PASSWORD=__GENERATE__        # dev-only, usuario owner@pfos.test
-PFOS_DEV_EDITOR_PASSWORD=__GENERATE__       # dev-only, usuario editor@pfos.test
-PFOS_DEV_VIEWER_PASSWORD=__GENERATE__       # dev-only, usuario viewer@pfos.test
+Implementación en [`scripts/stack/src/`](../scripts/stack/src/), ejecutada con `tsx`; utilidades en `scripts/stack/src/lib/` (`compose.ts` construye `docker compose -p pfos -f deploy/compose/compose.yaml --env-file <.env> [--profile …]` con `spawn` y `shell: false`; `paths.ts` usa `node:path`; `cli.ts` pide confirmación en operaciones destructivas y, sin terminal interactiva, exige `--yes`; `ports.ts` consulta `netsh … excludedportrange` en Windows). Nada de `rm -rf`, `&&` dependiente de shell ni `$VAR` en `package.json`. Los scripts del `package.json` raíz son la fuente de verdad; la tabla de comandos está en §0.5.
 
-# ── Web (Next.js BFF) ──
-WEB_PUBLIC_URL=http://localhost:3000
-API_INTERNAL_BASE_URL=http://finance-api:8080
-SESSION_COOKIE_SECRET=__GENERATE__          # dev-only, ≥ 32 bytes
-SESSION_COOKIE_SECURE=false                 # true en staging/prod (HTTPS)
+Otros comandos del repo (fuera del stack):
 
-# ── SMTP (Mailpit) ──
-SMTP_HOST=mailpit
-SMTP_PORT=1025
-SMTP_FROM="PFOS Dev <no-reply@pfos.test>"
+| Comando | Qué hace |
+|---|---|
+| `pnpm build` · `pnpm typecheck` · `pnpm lint` · `pnpm test` | Turborepo sobre todos los paquetes (`pnpm turbo run typecheck lint test` los combina). |
+| `pnpm format` / `pnpm format:check` | Prettier (excluye `docs/`, `openspec/`, `README.md`… — ver `.prettierignore`). |
+| `pnpm spec:validate` | `openspec validate --all --strict --no-interactive` con telemetría desactivada. |
+| `pnpm arch:check` | dependency-cruiser con [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs) sobre `apps`, `packages` y `scripts`. |
+| `pnpm traceability:check` / `pnpm traceability:matrix` | Reglas de [17-test-traceability.md](17-test-traceability.md) y matriz en `tests/traceability/`. |
+| `pnpm config:docs` / `pnpm config:docs:check` | Genera / verifica [config-reference.md](config-reference.md). |
 
-# ── Worker ──
-WORKER_CONCURRENCY=4
-WORKER_SHUTDOWN_TIMEOUT_MS=25000
-OUTBOX_POLL_INTERVAL_MS=500
-
-# ── Producto ──
-PFOS_DEFAULT_TIMEZONE=America/La_Paz
-PFOS_DEFAULT_BASE_CURRENCY=BOB
-
-# ── OpenTelemetry (vacío = deshabilitado) ──
-OTEL_SERVICE_NAMESPACE=pfos
-OTEL_EXPORTER_OTLP_ENDPOINT=                # http://otel-lgtm:4318 con profile observability
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-OTEL_TRACES_SAMPLER=parentbased_always_on
-
-# ── Imágenes (vacío = build local) ──
-FINANCE_API_IMAGE=
-FINANCE_WEB_IMAGE=
-
-# ── Puertos de host (defaults ARCHITECTURE §10) ──
-HOST_PORT_POSTGRES=5432
-HOST_PORT_REDIS=6379
-HOST_PORT_OBJECT_STORAGE=9000
-HOST_PORT_OBJECT_STORAGE_UI=9001
-HOST_PORT_MAILPIT_UI=8025
-HOST_PORT_MAILPIT_SMTP=1025
-HOST_PORT_KEYCLOAK=8081
-HOST_PORT_API=8080
-HOST_PORT_WEB=3000
-HOST_PORT_GRAFANA=3001
-HOST_PORT_OTLP_GRPC=4317
-HOST_PORT_OTLP_HTTP=4318
-HOST_PORT_ML=8090
-```
-
-> El dominio `pfos.test` es un TLD reservado (RFC 2606), sin riesgo de envío real. Gitleaks se configura con allowlist para los literales `__GENERATE__` y `pfos-dev`.
-
-### 6.3 `.env.host` (Modo A)
-
-`pnpm env:init` deriva `.env.host` de `.env` reescribiendo hostnames de servicio por `localhost:${HOST_PORT_*}` (p. ej. `DATABASE_URL=…@localhost:5432/…`, `REDIS_URL=redis://localhost:6379/0`, `OIDC_INTERNAL_BASE_URL=http://localhost:8081`). Las apps cargan `.env.host` solo cuando `PFOS_RUN_MODE=host` (lo fija `pnpm dev`). La transformación vive en un único sitio (script), no en el código de la app.
-
-## 7. Catálogo de scripts (`pnpm`, TypeScript cross-platform)
-
-Implementación en `scripts/*.ts`, ejecutados con `tsx`. Utilidades compartidas en `scripts/lib/` (`compose.ts` construye `docker compose -p pfos -f deploy/compose/compose.yaml --env-file .env …` con `child_process.spawn` y `shell: false`; `paths.ts` usa `node:path`; `confirm.ts` para prompts destructivos con `--yes` para CI). Nada de `rm -rf`, `&&` dependiente de shell, `cp` ni variables `$VAR` en `package.json`.
-
-| Comando | Script | Acción |
-|---|---|---|
-| `pnpm doctor` | `doctor.ts` | Verifica prerrequisitos (§2.3). |
-| `pnpm env:init` | `env-init.ts` | Crea `.env` y `.env.host` desde `.env.example`; genera secretos dev; no sobrescribe sin `--force`. |
-| `pnpm stack:up [-- --profile=deps\|core …]` | `stack.ts up` | `compose --profile … up -d --wait --build`; imprime URLs; default `core`. |
-| `pnpm stack:down` | `stack.ts down` | `compose down` (conserva volúmenes). |
-| `pnpm stack:restart [-- <svc>]` | `stack.ts restart` | Reinicia todo o un servicio. |
-| `pnpm stack:logs [-- <svc>] [--since=10m]` | `stack.ts logs` | `compose logs -f`; filtra por servicio. |
-| `pnpm stack:ps` | `stack.ts ps` | Estado y health de cada servicio. |
-| `pnpm stack:reset [-- --seed=minimal\|demo\|large] [--yes]` | `stack-reset.ts` | Flujo §8.1 (destructivo, pide confirmación). |
-| `pnpm db:migrate` | `db-migrate.ts` | Modo B: `compose run --rm migrate`; Modo A: `dbmate up` desde host. |
-| `pnpm db:migrate:new -- <context> <name>` | `db-migrate-new.ts` | Crea `db/migrations/<schema>/<timestamp>_<name>.sql` con plantilla expand/contract. |
-| `pnpm db:seed -- --profile=minimal\|demo\|large` | `db-seed.ts` | Ejecuta el seed (§8.2). |
-| `pnpm db:psql [-- --role=app\|migrator]` | `db-psql.ts` | `compose exec postgres psql` con el rol elegido. |
-| `pnpm test` | turbo | Unit + domain + PBT (sin Docker). |
-| `pnpm test:integration` | turbo | Testcontainers (requiere Docker; independiente del stack Compose). |
-| `pnpm test:e2e` | `e2e.ts` | Levanta `core` + seed `minimal` en proyecto Compose aislado `pfos-e2e`, corre Playwright, baja todo. |
-| `pnpm test:platform` | Vitest | Compose smoke ([16-testing-strategy.md](16-testing-strategy.md) §5.11). |
-| `pnpm images:build` | `images.ts` | `docker buildx bake` local de `finance-api` y `finance-web`. |
-| `pnpm backup:local [-- --name=<label>]` | `backup-local.ts` | Ver §9 y [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md). |
-| `pnpm restore:local -- <backup-id> [--yes]` | `restore-local.ts` | Restaura BD + objetos. |
-| `pnpm stack:nuke [--yes]` | `stack.ts nuke` | `down -v --remove-orphans` + borra imágenes locales `pfos/*` (último recurso). |
-
-Esqueleto ilustrativo:
-
-```ts
-// scripts/lib/compose.ts — ILUSTRATIVO
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
-
-const ROOT = resolve(import.meta.dirname, '../..');
-const BASE = ['compose', '-p', 'pfos',
-  '-f', resolve(ROOT, 'deploy/compose/compose.yaml'),
-  '--env-file', resolve(ROOT, '.env')];
-
-export function compose(args: string[], opts: { profiles?: string[] } = {}): Promise<void> {
-  const profileArgs = (opts.profiles ?? ['core']).flatMap((p) => ['--profile', p]);
-  return new Promise((ok, fail) => {
-    const child = spawn('docker', [...BASE, ...profileArgs, ...args], { stdio: 'inherit', shell: false });
-    child.on('exit', (code) => (code === 0 ? ok() : fail(new Error(`docker compose exited ${code}`))));
-  });
-}
-```
-
-```jsonc
-// package.json (fragmento) — ILUSTRATIVO
-{
-  "packageManager": "pnpm@<x.y.z>",
-  "engines": { "node": ">=24 <27" },
-  "scripts": {
-    "doctor": "tsx scripts/doctor.ts",
-    "env:init": "tsx scripts/env-init.ts",
-    "stack:up": "tsx scripts/stack.ts up",
-    "stack:down": "tsx scripts/stack.ts down",
-    "stack:restart": "tsx scripts/stack.ts restart",
-    "stack:logs": "tsx scripts/stack.ts logs",
-    "stack:reset": "tsx scripts/stack-reset.ts",
-    "db:migrate": "tsx scripts/db-migrate.ts",
-    "db:seed": "tsx scripts/db-seed.ts",
-    "test": "turbo run test",
-    "test:integration": "turbo run test:integration",
-    "backup:local": "tsx scripts/backup-local.ts",
-    "restore:local": "tsx scripts/restore-local.ts",
-    "dev": "tsx scripts/dev.ts"
-  }
-}
-```
+Propuestos en Phase 0 y **no implementados** (pendientes, sin fecha): `pnpm doctor`, `db:migrate:new`, `db:psql`, `test:e2e`, `stack:nuke`, `keycloak:export`, `dev:users`. `env:init` pasó a llamarse `setup:env` y `test:platform` es `test:stack`.
 
 ## 8. Reset y seeds
 
-### 8.1 `pnpm stack:reset`
+### 8.1 `pnpm stack:reset` — as-built (2026-10-02)
 
 ```mermaid
 flowchart TD
-  A[pnpm stack:reset --seed=demo] --> B{confirmación<br/>o --yes}
-  B -->|no| X[abort]
-  B -->|sí| C[compose --profile core down -v<br/>borra pg-data, redis-data, object-storage-data]
-  C --> D[compose --profile deps up -d --wait]
-  D --> E[init scripts PG: roles + DB keycloak]
-  E --> F[compose run --rm migrate<br/>dbmate up + ensure buckets]
-  F --> G[keycloak realm import<br/>usuarios dev]
-  G --> H[compose --profile core --profile seed run --rm seed --profile=demo]
-  H --> I[compose --profile core up -d --wait]
-  I --> J[verificación: /health/ready + conteos esperados del seed]
+  A[pnpm stack:reset -- --seed=minimal] --> G{PFOS_ENV local o ci}
+  G -->|no| X0[error]
+  G -->|sí| B{confirmación<br/>o --yes}
+  B -->|no| X[cancelado]
+  B -->|sí| C[compose down --volumes<br/>borra pg-data, object-storage-data…]
+  C --> D[compose up -d --wait<br/>perfiles pedidos, deps por defecto]
+  D --> E[init PG: roles + BD keycloak<br/>keycloak importa el realm]
+  E --> F{¿perfil core?}
+  F -->|no| M[compose run --rm migrate]
+  F -->|sí, ya corrió como dependencia| S
+  M --> S[compose --profile core run --rm seed seed --profile=…<br/>se omite con --seed=none]
 ```
 
-- `--keep-objects` evita borrar `object-storage-data`; `--only-db` recrea solo el schema (drop de schemas de app + re-migrate) sin tocar Keycloak.
-- El reset nunca se ejecuta si `PFOS_ENV ≠ local|ci` (guard en el script **y** en el comando `seed` del contenedor).
+- Opciones: `--seed=minimal|none`, `--profile core`, `--yes`. Las opciones `--keep-objects` / `--only-db` propuestas en Phase 0 no se implementaron.
+- El reset nunca se ejecuta si `PFOS_ENV ∉ {local, ci}` (guard en el script **y** en el comando `seed` del contenedor).
 
 ### 8.2 Perfiles de seed
 
@@ -820,32 +378,24 @@ Definición detallada de datasets en [29-seed-datasets.md](29-seed-datasets.md);
 
 Reglas: seeds **deterministas** (PRNG sembrado, `Clock` fijo — regla `pf/no-nondeterminism`), escritos **a través de los casos de uso** de la capa `application` (respetan invariantes del ledger y Audit) y no por SQL crudo; idempotentes por `seed_run` (re-ejecutar no duplica). El seed resuelve el `sub` de cada usuario Keycloak dev para crear `iam.user` + membership.
 
-## 9. Backup / restore local (resumen)
+> **As-built (2026-10-02):** solo existe `minimal` (`dataset_version` 1), que por ahora solo registra su ejecución en `platform.seed_run` porque aún no hay bounded contexts; `demo` y `large` se rechazan con un error explícito hasta que lleguen los datasets de [29-seed-datasets.md](29-seed-datasets.md).
 
-`pnpm backup:local` → `.backups/<UTC timestamp>-<label>/` con `pfos.dump` (`pg_dump -Fc`), `keycloak.dump`, `objects/` (mirror del bucket vía SDK S3) y `manifest.json` (sha256, versión de migraciones, imagen). `pnpm restore:local -- <id>` hace la operación inversa con `pg_restore --clean --if-exists`. Detalle y garantías en [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) §3.
+## 9. Backup / restore local (resumen) — as-built (2026-10-02)
 
-## 10. Keycloak: realm de desarrollo
+`pnpm backup:local [-- --name=<etiqueta>]` → `backups/<UTC>-<etiqueta>/` (en la raíz del repo, ignorado por git) con `pfos.dump` y `keycloak.dump` (`pg_dump -Fc`), `objects/` (mirror del bucket vía S3) y `manifest.json` (sha256). `pnpm restore:local -- <backup-id|latest> [--yes] [--with-keycloak]` detiene api/worker/web, restaura base de datos y objetos y los vuelve a levantar. Detalle y garantías en [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) §3.
 
-- Fichero: `deploy/compose/keycloak/realm-pfos-dev.json` (versionado, **sin secretos**). Usa placeholders de variables de entorno (`${PFOS_DEV_OWNER_PASSWORD}`), que Keycloak sustituye al importar (comportamiento a confirmar en SPIKE-06; si no aplica, `env-init` renderiza el JSON a `.keycloak/realm.rendered.json` ignorado por git).
-- Contenido:
-  - Realm `pfos`; client `pfos-web` (confidential, Authorization Code + PKCE S256, redirect `${PFOS_WEB_PUBLIC_URL}/api/auth/callback`, post-logout redirect); audience mapper `pfos-api`.
-  - Usuarios: `owner@pfos.test`, `editor@pfos.test`, `viewer@pfos.test` (email verificado, sin required actions). **Los roles de workspace (`OWNER/EDITOR/VIEWER`) NO viven en Keycloak**: los asigna el seed en `iam.membership` (ARCHITECTURE §5, ADR-0010). Keycloak solo autentica.
-  - Políticas dev: tokens de acceso 5 min, sesión SSO 10 h, brute-force detection activo (paridad de comportamiento).
-- Credenciales: generadas por `pnpm env:init` en `.env`; `pnpm dev:users` las imprime en consola local cuando se necesitan. **Dev-only**, marcadas como tales en `.env.example`. La consola admin de Keycloak (`http://localhost:8081/admin`) usa `KEYCLOAK_ADMIN_*`.
-- Export de cambios al realm: `pnpm keycloak:export` (usa `kc.sh export --realm pfos` dentro del contenedor y elimina secretos/usuarios antes de escribir el JSON versionado).
+## 10. Keycloak: realm de desarrollo — as-built (2026-10-02)
+
+- Fichero: [`deploy/compose/keycloak/realm-pfos-dev.json`](../deploy/compose/keycloak/realm-pfos-dev.json) (versionado, **sin secretos**). Usa placeholders `${PF_DEV_OIDC_CLIENT_SECRET}`, `${PF_DEV_KC_OWNER_PASSWORD}`, `${PF_DEV_KC_EDITOR_PASSWORD}`, `${PF_DEV_KC_VIEWER_PASSWORD}` y `${PF_WEB_PUBLIC_URL}`, que Keycloak sustituye al importar (`--import-realm`) con las variables que le pasa `compose.yaml` — confirmado, no hace falta render previo.
+- Contenido: realm `pfos`; client confidencial del BFF con redirect `${PF_WEB_PUBLIC_URL}/api/auth/callback` y post-logout redirect; usuarios `owner@pfos.test`, `editor@pfos.test`, `viewer@pfos.test`. **Los roles de workspace (`OWNER/EDITOR/VIEWER`) NO viven en Keycloak**: los asigna la aplicación en `iam.membership` (ARCHITECTURE §5, ADR-0010). Keycloak solo autentica.
+- Credenciales: generadas por `pnpm setup:env` en `.env` (`PF_DEV_KC_*`, dev-only). Consola admin en `${OIDC_PUBLIC_BASE_URL}/admin` (`http://localhost:28081/admin`) con el usuario `pfos-admin` y `PF_DEV_KEYCLOAK_ADMIN_PASSWORD`.
+- Pendiente (no implementado): `pnpm keycloak:export` para exportar cambios al realm y `pnpm dev:users`.
 
 ## 11. Troubleshooting en Windows
 
 ### 11.1 Line endings
 
-`.gitattributes` (ilustrativo):
-
-```gitattributes
-* text=auto eol=lf
-*.{cmd,bat,ps1} text eol=crlf
-*.{png,jpg,jpeg,gif,webp,pdf,ico,woff2} binary
-*.dump binary
-```
+As-built (2026-10-02): [`.gitattributes`](../.gitattributes) fija `* text=auto eol=lf` (con `eol=lf` explícito para `*.sh`, `*.sql` y Dockerfiles, `eol=crlf` para `*.ps1` y binarios marcados) — imprescindible porque `core.autocrlf=true` rompe los entrypoints (SPIKE-08).
 
 Síntoma típico sin esto: `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory` o `$'\r': command not found` en scripts copiados a imágenes. Prettier con `endOfLine: "lf"`; `.editorconfig` `end_of_line = lf`.
 
@@ -856,21 +406,19 @@ Síntoma típico sin esto: `exec /usr/local/bin/docker-entrypoint.sh: no such fi
 - Excluir del antivirus (Defender) `node_modules`, `.turbo`, `.next` y la carpeta del repo (acción del owner; afecta a política de seguridad local → decisión suya).
 - `.wslconfig`: `memory=8GB`, `processors=4`, `autoMemoryReclaim=gradual`.
 
-### 11.3 Conflictos de puertos
+### 11.3 Conflictos de puertos — as-built (2026-10-02)
 
-| Puerto | Conflicto habitual | Solución |
-|---|---|---|
-| 5432 | PostgreSQL instalado en Windows | `HOST_PORT_POSTGRES=5433` en `.env` |
-| 3000/3001 | Otro dev server / Grafana local | `HOST_PORT_WEB`, `HOST_PORT_GRAFANA` |
-| 8080/8081 | Tomcat, proxies corporativos, IIS Express | `HOST_PORT_API`, `HOST_PORT_KEYCLOAK` (+ actualizar `OIDC_PUBLIC_BASE_URL`/`OIDC_ISSUER`) |
-| 9000 | Portainer, PHP-FPM | `HOST_PORT_OBJECT_STORAGE` (+ `OBJECT_STORAGE_PUBLIC_ENDPOINT`) |
-| Rangos reservados | Hyper-V/WinNAT reserva rangos dinámicos | `netsh interface ipv4 show excludedportrange protocol=tcp`; elegir puertos fuera del rango |
+Los puertos de host ya no son los canónicos: defaults "2 + puerto canónico" (25432, 28080, 23000, 28081, 28025/21025, 29000, 26379, 23001, 24317/24318) publicados solo en `PF_BIND_ADDR=127.0.0.1` (SPIKE-08).
 
-`pnpm doctor` detecta puertos ocupados con `net.createServer().listen()`.
+| Situación | Solución |
+|---|---|
+| Un puerto `PF_*_PORT` ocupado por otro proyecto o servicio | `pnpm setup:env -- --check` lo detecta y sugiere una alternativa libre; `pnpm setup:env -- --apply-ports` la escribe en `.env`. Los puertos ya publicados por el propio proyecto `pfos` no cuentan como conflicto. |
+| Rangos reservados por Hyper-V/WinNAT | `setup:env` consulta `netsh interface ipv4 show excludedportrange protocol=tcp` y trata esos puertos como ocupados. |
+| Cambiar `PF_KEYCLOAK_PORT` o `PF_WEB_PORT` | `OIDC_PUBLIC_BASE_URL`, `WEB_PUBLIC_URL` y `OBJECT_STORAGE_CORS_ORIGINS` se derivan por interpolación en `.env`; no hay que tocarlos a mano. |
 
 ### 11.4 Otros
 
-- **Keycloak tarda en estar healthy** (60–90 s en frío): normal; `start_period: 60s`.
+- **Keycloak tarda en estar healthy** (60–90 s en frío): normal; `start_period: 90s`. En caliente `pnpm stack:up` tarda ~30 s.
 - **`--wait` agota timeout**: `pnpm stack:ps` y `pnpm stack:logs -- <svc>`.
 - **Volumen PG con versión incompatible** tras subir major: `pnpm backup:local` → `stack:reset` → `restore:local`.
 - **Reloj desfasado en WSL2** tras suspender (tokens OIDC "not yet valid"): `wsl --shutdown`.
@@ -891,11 +439,11 @@ Síntoma típico sin esto: `exec /usr/local/bin/docker-entrypoint.sh: no such fi
 
 ## 13. Preguntas abiertas
 
-1. **Línea de Node:** ¿arrancar Phase 1 con Node 26 (LTS desde 2026-10-28, EOL abr-2029) o Node 24 (Maintenance desde 2026-10-20, EOL abr-2028)? Propuesta: Node 26 si Next.js/NestJS/dependencias nativas lo soportan en SPIKE-08; si no, 24.
-2. **Object storage local:** SeaweedFS (candidato) vs Garage vs RustFS — SPIKE-07. ¿Se acepta actualizar ARCHITECTURE §10 para no nombrar MinIO como primera opción?
+1. ~~**Línea de Node**~~ — resuelto (as-built): Node 24 (`.nvmrc`, imágenes `node:24.21.0-bookworm-slim`, CI); `engines` admite `>=22.12 <27`. Pregunta original: **Línea de Node:** ¿arrancar Phase 1 con Node 26 (LTS desde 2026-10-28, EOL abr-2029) o Node 24 (Maintenance desde 2026-10-20, EOL abr-2028)? Propuesta: Node 26 si Next.js/NestJS/dependencias nativas lo soportan en SPIKE-08; si no, 24.
+2. ~~**Object storage local**~~ — resuelto por SPIKE-07: SeaweedFS 4.48 (`weed mini`). Pregunta original: **Object storage local:** SeaweedFS (candidato) vs Garage vs RustFS — SPIKE-07. ¿Se acepta actualizar ARCHITECTURE §10 para no nombrar MinIO como primera opción?
 3. **`keycloak-db` en ARCHITECTURE §10** aparece como volumen; se propone corregir a "base de datos `keycloak` en `postgres`".
 4. **Profile `tools`:** ¿se incorpora (cliente web de BD) o se deja fuera?
-5. **Placeholders en el realm import** de Keycloak: confirmar en SPIKE-06 o usar render previo.
+5. ~~**Placeholders en el realm import**~~ — resuelto: Keycloak los sustituye al importar (§10). Pregunta original: **Placeholders en el realm import** de Keycloak: confirmar en SPIKE-06 o usar render previo.
 6. **Docker Desktop vs alternativas** (licencia de Docker Desktop para uso personal es gratuita; Rancher/Podman no se soportan oficialmente): ¿se exige Docker Desktop?
 7. **Ubicación del repo:** ¿mover el repo de `D:\projects` a WSL2 para habilitar Modo C y Dev Containers con buen rendimiento?
-8. **Valkey vs Redis** en local: se propone Valkey 8 (licencia BSD) por paridad con ElastiCache for Valkey ([21-cloud-deployment-options.md](21-cloud-deployment-options.md)).
+8. ~~**Valkey vs Redis**~~ — resuelto: Valkey 9.1 en el perfil opcional `valkey`. Pregunta original: se propone Valkey 8 (licencia BSD) por paridad con ElastiCache for Valkey ([21-cloud-deployment-options.md](21-cloud-deployment-options.md)).
