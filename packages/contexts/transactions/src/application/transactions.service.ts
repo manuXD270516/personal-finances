@@ -9,6 +9,7 @@ import {
   normalizeText,
   toJournalEntryDraft,
   Transaction,
+  transferFee,
   type AdjustmentDirection,
   type ChangedField,
   type ExternalRef,
@@ -59,6 +60,25 @@ export interface RecordTransactionCommand {
   readonly splits?: readonly SplitDto[];
 }
 
+/** `RecordTransfer` (add-transfers): fachada `POST W/transfers` sobre el agregado `Transaction`. */
+export interface RecordTransferCommand {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly id?: string;
+  readonly status?: 'PENDING' | 'POSTED' | 'CLEARED';
+  readonly transactionDate: string;
+  readonly postingDate?: string | null;
+  readonly fromAccountId: string;
+  readonly toAccountId: string;
+  readonly amount: MoneyDto;
+  readonly fee?: { readonly amount: MoneyDto; readonly categoryId?: string | null } | null;
+  readonly description?: string | null;
+  readonly notes?: string | null;
+  readonly paymentMethod?: PaymentMethod | null;
+  readonly source?: TransactionSource;
+  readonly externalRef?: ExternalRef | null;
+}
+
 export interface UpdateTransactionCommand {
   readonly workspaceId: string;
   readonly userId: string;
@@ -67,6 +87,8 @@ export interface UpdateTransactionCommand {
   readonly transactionDate?: string;
   readonly postingDate?: string | null;
   readonly accountId?: string;
+  /** Solo `TRANSFER`: nueva cuenta destino. */
+  readonly toAccountId?: string;
   readonly amount?: MoneyDto;
   readonly description?: string | null;
   readonly notes?: string | null;
@@ -263,6 +285,112 @@ export class TransactionsService {
     });
   }
 
+  /**
+   * `RecordTransfer` (add-transfers design.md decisiones 1–5): misma unidad de trabajo que `RecordTransaction`
+   * (Accounts `FOR SHARE` con INV-026 → agregado → ledger → persistencia → outbox → auditoría). Cuentas iguales ⇒
+   * `TRANSFER_SAME_ACCOUNT`; monedas distintas ⇒ `TRANSFER_CURRENCY_MISMATCH` (orienta a conversión).
+   */
+  recordTransfer(cmd: RecordTransferCommand): Promise<TransactionState> {
+    const { uow, ids } = this.deps;
+    return uow.run(cmd.workspaceId, async () => {
+      if (cmd.fromAccountId === cmd.toAccountId) {
+        throw new DomainError('TRANSFER_SAME_ACCOUNT', 'source and destination are the same account').at(
+          '/toAccountId',
+        );
+      }
+      const [from, to] = await this.deps.accounts.assertCanPost({
+        workspaceId: cmd.workspaceId,
+        accounts: [{ accountId: cmd.fromAccountId }, { accountId: cmd.toAccountId }],
+      });
+      if (!from) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/fromAccountId');
+      if (!to) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/toAccountId');
+      const amount = await this.parseMoney(cmd.amount, '/amount');
+      let fee: { amount: Money; categoryId: string; splitId: string } | null = null;
+      if (cmd.fee) {
+        const feeAmount = await this.parseMoney(cmd.fee.amount, '/fee/amount');
+        let categoryId = cmd.fee.categoryId ?? null;
+        if (categoryId) {
+          await this.deps.classification.validate({
+            userId: cmd.userId,
+            workspaceId: cmd.workspaceId,
+            categoryIds: [{ categoryId, splitKind: 'EXPENSE' }],
+          });
+        } else {
+          categoryId = await this.deps.categories.fees(cmd.workspaceId);
+          if (!categoryId) {
+            throw new DomainError('REFERENCE_NOT_FOUND', 'system category Fees is not provisioned').at(
+              '/fee/categoryId',
+            );
+          }
+        }
+        fee = { amount: feeAmount, categoryId, splitId: ids.next() };
+      }
+      const tx = Transaction.recordTransfer({
+        id: cmd.id ?? ids.next(),
+        workspaceId: cmd.workspaceId,
+        status: cmd.status ?? 'POSTED',
+        businessDate: cmd.transactionDate,
+        postingDate: cmd.postingDate ?? null,
+        from: { accountId: from.accountId, nature: from.nature, currency: from.currency },
+        to: { accountId: to.accountId, nature: to.nature, currency: to.currency },
+        amount,
+        fee,
+        description: cmd.description ?? null,
+        notes: cmd.notes ?? null,
+        paymentMethod: cmd.paymentMethod ?? null,
+        source: cmd.source ?? 'MANUAL',
+        externalRef: cmd.externalRef ?? null,
+      });
+      let entryId: string | null = null;
+      if (tx.needsEntry) {
+        entryId = await this.postEntry(tx);
+        tx.attachEntry(entryId);
+      }
+      await this.deps.transactions.insert(tx);
+      if (entryId) await this.link(tx, entryId, 'POSTED');
+      const s = tx.snapshot;
+      await this.publish(tx, TRANSACTION_EVENTS.created, {
+        transactionId: s.id,
+        kind: s.kind,
+        status: s.status,
+        businessDate: s.businessDate,
+        description: s.description,
+        counterpartyId: s.counterpartyId,
+        origin: { type: s.source, refId: null },
+        legs: legsPayload(s),
+        splits: splitsPayload(s),
+        postingDate: s.postingDate,
+        refundOfTransactionId: null,
+        paymentMethod: s.paymentMethod,
+      });
+      if (entryId) await this.publishPosted(tx, entryId, null, null);
+      const changes: AuditChangeInput[] = [
+        { field: 'kind', before: null, after: s.kind },
+        { field: 'status', before: null, after: s.status },
+        { field: 'transactionDate', before: null, after: s.businessDate },
+        { field: 'accountId', before: null, after: s.accountId },
+        { field: 'toAccountId', before: null, after: to.accountId },
+        { field: 'amount', before: null, after: s.amount },
+      ];
+      const feeMoney = transferFee(s);
+      if (feeMoney) changes.push({ field: 'fee', before: null, after: feeMoney });
+      if (s.splits.length > 0) changes.push({ field: 'splits', before: null, after: splitsAudit(s) });
+      for (const f of ['description', 'notes', 'paymentMethod', 'postingDate'] as const) {
+        if (s[f] !== null) changes.push({ field: f, before: null, after: s[f] });
+      }
+      if (entryId) changes.push({ field: 'journalEntryId', before: null, after: entryId });
+      await this.audit.append({
+        workspaceId: s.workspaceId,
+        action: 'transactions.transfer.created',
+        aggregateType: 'Transaction',
+        aggregateId: s.id,
+        aggregateVersion: s.version,
+        changes,
+      });
+      return tx.snapshot;
+    });
+  }
+
   /** `PostTransaction`: PENDING → POSTED creando el asiento (TC-TRANSACTIONS-PENDING-001). */
   postTransaction(
     workspaceId: string,
@@ -273,7 +401,10 @@ export class TransactionsService {
       const tx = await this.load(workspaceId, transactionId, expectedVersion);
       const previous = tx.status;
       tx.post();
-      await this.assertAccounts(workspaceId, [tx.snapshot.accountId]);
+      await this.assertAccounts(
+        workspaceId,
+        tx.snapshot.legs.map((l) => l.accountId),
+      );
       const entryId = await this.postEntry(tx);
       tx.attachEntry(entryId);
       await this.save(tx);
@@ -301,7 +432,7 @@ export class TransactionsService {
   updateTransaction(cmd: UpdateTransactionCommand): Promise<TransactionState> {
     const { workspaceId } = cmd;
     return this.deps.uow.run(workspaceId, async () => {
-      const financialKeys = ['transactionDate', 'accountId', 'amount', 'splits'] as const;
+      const financialKeys = ['transactionDate', 'accountId', 'toAccountId', 'amount', 'splits'] as const;
       if (cmd.status !== undefined && financialKeys.some((k) => cmd[k] !== undefined)) {
         throw new DomainError(
           'VALIDATION_FAILED',
@@ -316,6 +447,7 @@ export class TransactionsService {
         if (cmd[f] !== undefined) (changes as Record<string, unknown>)[f] = cmd[f];
       }
       let newAccountId: string | null = null;
+      let newToAccountId: string | null = null;
       if (cmd.accountId !== undefined && cmd.accountId !== before.accountId) {
         const [target] = await this.deps.accounts.assertCanPost({
           workspaceId,
@@ -325,12 +457,25 @@ export class TransactionsService {
         changes.account = { accountId: target.accountId, nature: target.nature, currency: target.currency };
         newAccountId = target.accountId;
       }
+      if (cmd.toAccountId !== undefined) {
+        const [target] = await this.deps.accounts.assertCanPost({
+          workspaceId,
+          accounts: [{ accountId: cmd.toAccountId }],
+        });
+        if (!target) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/toAccountId');
+        changes.toAccount = { accountId: target.accountId, nature: target.nature, currency: target.currency };
+        newToAccountId = target.accountId;
+      }
       if (cmd.amount !== undefined) changes.amount = await this.parseMoney(cmd.amount, '/amount');
       if (cmd.splits !== undefined) changes.splits = await this.parseSplits(cmd.splits);
       await this.validateClassification(cmd.userId, workspaceId, before.kind, cmd.splits, cmd.counterpartyId);
       // INV-026: las cuentas de los legs deben estar activas antes de revertir/repostear.
       if (tx.needsEntry && financialKeys.some((k) => cmd[k] !== undefined)) {
-        await this.assertAccounts(workspaceId, [before.accountId, ...(newAccountId ? [newAccountId] : [])]);
+        await this.assertAccounts(workspaceId, [
+          ...before.legs.map((l) => l.accountId),
+          ...(newAccountId ? [newAccountId] : []),
+          ...(newToAccountId ? [newToAccountId] : []),
+        ]);
       }
       const result = tx.amend(changes);
       let previousStatus: TransactionStatus | null = result.changedFields.includes('status')
@@ -788,7 +933,35 @@ export class TransactionsService {
     });
   }
 
-  private publishPosted(
+  /**
+   * `TransactionPosted` y, si `kind=TRANSFER`, `TransferCompleted` (add-transfers decisiones 5–6): en todos los
+   * caminos de posteo (creación, `pending→posted`, amend con nuevo asiento) y nunca en `pending`.
+   */
+  private async publishPosted(
+    tx: Transaction,
+    journalEntryId: string,
+    previousStatus: TransactionStatus | null,
+    supersedes: string | null,
+  ): Promise<void> {
+    await this.publishTransactionPosted(tx, journalEntryId, previousStatus, supersedes);
+    const s = tx.snapshot;
+    if (s.kind !== 'TRANSFER') return;
+    const source = s.legs.find((l) => l.role === 'SOURCE');
+    const target = s.legs.find((l) => l.role === 'TARGET');
+    if (!source || !target) throw new DomainError('INTERNAL_ERROR', 'transfer without SOURCE/TARGET legs');
+    await this.publish(tx, TRANSACTION_EVENTS.transferCompleted, {
+      transactionId: s.id,
+      journalEntryId,
+      businessDate: s.businessDate,
+      fromAccountId: source.accountId,
+      toAccountId: target.accountId,
+      amount: s.amount.toJSON(),
+      fee: transferFee(s)?.toJSON() ?? null,
+      matchedTransactionIds: [],
+    });
+  }
+
+  private publishTransactionPosted(
     tx: Transaction,
     journalEntryId: string,
     previousStatus: TransactionStatus | null,
@@ -860,6 +1033,12 @@ function diff(
   for (const f of new Set(fields)) {
     if (f === 'businessDate')
       out.push({ field: 'transactionDate', before: before.businessDate, after: after.businessDate });
+    else if (f === 'toAccountId')
+      out.push({
+        field: 'toAccountId',
+        before: before.legs.find((l) => l.role === 'TARGET')?.accountId ?? null,
+        after: after.legs.find((l) => l.role === 'TARGET')?.accountId ?? null,
+      });
     else if (f === 'splits')
       out.push({ field: 'splits', before: splitsAudit(before), after: splitsAudit(after) });
     else out.push({ field: f, before: before[f], after: after[f] });

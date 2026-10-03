@@ -12,9 +12,12 @@ invariants: [INV-009, INV-004, INV-021]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/transfer.test.ts
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
+  - packages/contexts/transactions/test/integration/pg-transfers.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["transfer", "fees"]

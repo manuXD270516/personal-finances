@@ -2,7 +2,7 @@ import { DomainError, Money } from '@pf/shared-kernel';
 import { assertTransition, hasActiveEntry, type TransactionStatus } from './transaction-status.js';
 
 /** Kinds de este change (transfers/conversions/opening los agregan otros changes sobre el mismo agregado). */
-export const TRANSACTION_KINDS = ['INCOME', 'EXPENSE', 'REFUND', 'ADJUSTMENT'] as const;
+export const TRANSACTION_KINDS = ['INCOME', 'EXPENSE', 'REFUND', 'ADJUSTMENT', 'TRANSFER'] as const;
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 export type AdjustmentDirection = 'INCREASE' | 'DECREASE';
 export type AccountNature = 'ASSET' | 'LIABILITY';
@@ -48,8 +48,11 @@ export interface Leg {
   readonly accountId: string;
   readonly nature: AccountNature;
   readonly amount: Money;
-  readonly role: 'MAIN';
+  readonly role: LegRole;
 }
+
+/** `MAIN` (una cuenta); `SOURCE`/`TARGET` en transferencias (add-transfers, docs/09 §6.4). */
+export type LegRole = 'MAIN' | 'SOURCE' | 'TARGET';
 
 export interface TransactionState {
   readonly id: string;
@@ -118,6 +121,8 @@ export interface TransactionChanges {
     readonly nature: AccountNature;
     readonly currency: string;
   };
+  /** Solo `TRANSFER`: nueva cuenta destino (la de `account` es el origen). */
+  readonly toAccount?: TransferAccount;
   readonly amount?: Money;
   readonly description?: string | null;
   readonly notes?: string | null;
@@ -137,6 +142,7 @@ export type ChangedField =
   | 'amount'
   | 'businessDate'
   | 'accountId'
+  | 'toAccountId'
   | 'splits';
 
 /** Cambio de clasificación de un split (payload de `TransactionCategorized.v1`). */
@@ -179,6 +185,8 @@ export function legAmount(
     case 'REFUND':
       return amount;
     case 'EXPENSE':
+    case 'TRANSFER':
+      // TRANSFER: leg de origen sin comisión (los legs completos los arma `transferLegs`).
       return amount.negate();
     case 'ADJUSTMENT': {
       // INCREASE = aumenta el saldo PRESENTADO: débito en ASSET, crédito en LIABILITY.
@@ -256,6 +264,83 @@ export function assertSplitsSum(amount: Money, splits: readonly { readonly amoun
       `splits sum ${total.toFixed()} but the transaction amount is ${amount.toFixed()}`,
     ).at('/splits');
   }
+}
+
+/** Cuenta de una transferencia, con la moneda y naturaleza que informa Accounts. */
+export interface TransferAccount {
+  readonly accountId: string;
+  readonly nature: AccountNature;
+  readonly currency: string;
+}
+
+export interface TransferFeeInput {
+  readonly amount: Money;
+  readonly categoryId: string;
+  readonly splitId: string;
+}
+
+export interface RecordTransferInput {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly status?: 'PENDING' | 'POSTED' | 'CLEARED';
+  readonly businessDate: string;
+  readonly postingDate?: string | null;
+  readonly from: TransferAccount;
+  readonly to: TransferAccount;
+  readonly amount: Money;
+  readonly fee?: TransferFeeInput | null;
+  readonly description?: string | null;
+  readonly notes?: string | null;
+  readonly paymentMethod?: PaymentMethod | null;
+  readonly source?: TransactionSource;
+  readonly externalRef?: ExternalRef | null;
+}
+
+/**
+ * Invariantes de una transferencia (add-transfers design.md decisión 3): cuentas distintas (`TRANSFER_SAME_ACCOUNT`),
+ * misma moneda en ambas cuentas y en el monto (`TRANSFER_CURRENCY_MISMATCH`, orientado a conversión; INV-002).
+ */
+export function assertTransferAccounts(from: TransferAccount, to: TransferAccount, amount: Money): void {
+  if (from.accountId === to.accountId) {
+    throw new DomainError('TRANSFER_SAME_ACCOUNT', 'source and destination are the same account').at(
+      '/toAccountId',
+    );
+  }
+  if (from.currency !== to.currency) {
+    throw new DomainError(
+      'TRANSFER_CURRENCY_MISMATCH',
+      `the accounts are in ${from.currency} and ${to.currency}; register a conversion instead`,
+    ).at('/toAccountId');
+  }
+  if (amount.currency.code !== from.currency) {
+    throw new DomainError(
+      'TRANSFER_CURRENCY_MISMATCH',
+      `the accounts are in ${from.currency}, not ${amount.currency.code}; register a conversion instead`,
+    ).at('/amount/currency');
+  }
+}
+
+/** Legs de una transferencia: `SOURCE` = −(monto + comisión), `TARGET` = +monto (docs/09 §6.4, §6.8). */
+export function transferLegs(
+  from: TransferAccount,
+  to: TransferAccount,
+  amount: Money,
+  fee: Money | null,
+): Leg[] {
+  const out = fee ? amount.add(fee) : amount;
+  return [
+    { accountId: from.accountId, nature: from.nature, amount: out.negate(), role: 'SOURCE' },
+    { accountId: to.accountId, nature: to.nature, amount, role: 'TARGET' },
+  ];
+}
+
+/** Comisión de la transferencia = Σ splits (solo el split de comisión; INV-021 no aplica a la parte transferida). */
+export function transferFee(s: Pick<TransactionState, 'splits' | 'amount'>): Money | null {
+  if (s.splits.length === 0) return null;
+  return Money.sum(
+    s.splits.map((x) => x.amount),
+    s.amount.currency,
+  );
 }
 
 /**
@@ -345,6 +430,74 @@ export class Transaction {
             role: 'MAIN',
           },
         ],
+        splits,
+        revision: 1,
+        version: 1,
+        activeEntryId: null,
+        voidedAt: null,
+        voidReason: null,
+        createdAt: null,
+        updatedAt: null,
+      },
+      null,
+    );
+  }
+
+  /**
+   * Transferencia entre cuentas propias de la misma moneda (add-transfers design.md decisiones 1–4): un único hecho
+   * con legs `SOURCE`/`TARGET`; la comisión opcional es el único split (categoría de gasto, p. ej. *Fees*). El pago de
+   * tarjeta es el caso ASSET → LIABILITY (INV-030). ΔPatrimonio = −comisión (INV-009).
+   */
+  static recordTransfer(input: RecordTransferInput): Transaction {
+    const { amount, from, to } = input;
+    if (!amount.isPositive()) {
+      throw new DomainError('AMOUNT_NOT_POSITIVE', 'amount must be > 0').at('/amount/amount');
+    }
+    assertTransferAccounts(from, to, amount);
+    assertText(input.description, 500, '/description');
+    assertText(input.notes, 4000, '/notes');
+    const fee = input.fee ?? null;
+    const splits: Split[] = [];
+    if (fee) {
+      if (fee.amount.currency.code !== amount.currency.code) {
+        throw new DomainError(
+          'TRANSFER_CURRENCY_MISMATCH',
+          `the fee is in ${fee.amount.currency.code}, not ${amount.currency.code}`,
+        ).at('/fee/amount/currency');
+      }
+      if (!fee.amount.isPositive()) {
+        throw new DomainError('AMOUNT_NOT_POSITIVE', 'fee must be > 0').at('/fee/amount/amount');
+      }
+      splits.push({
+        id: fee.splitId,
+        amount: fee.amount,
+        categoryId: fee.categoryId,
+        counterpartyId: null,
+        tagIds: [],
+        memo: null,
+      });
+    }
+    return new Transaction(
+      {
+        id: input.id,
+        workspaceId: input.workspaceId,
+        kind: 'TRANSFER',
+        status: input.status ?? 'POSTED',
+        businessDate: input.businessDate,
+        postingDate: input.postingDate ?? null,
+        accountId: from.accountId,
+        amount,
+        direction: null,
+        description: input.description ?? null,
+        notes: input.notes ?? null,
+        counterpartyId: null,
+        paymentMethod: input.paymentMethod ?? null,
+        source: input.source ?? 'MANUAL',
+        externalRef: input.externalRef ?? null,
+        refundOfTransactionId: null,
+        adjustmentReason: null,
+        confirmedRefundExcess: false,
+        legs: transferLegs(from, to, amount, fee?.amount ?? null),
         splits,
         revision: 1,
         version: 1,
@@ -468,12 +621,25 @@ export class Transaction {
       changed.push('businessDate');
       financial = true;
     }
+    const isTransfer = s.kind === 'TRANSFER';
     let nature = s.legs[0]?.nature ?? 'ASSET';
     if (changes.account && changes.account.accountId !== s.accountId) {
       nature = changes.account.nature;
       next = { ...next, accountId: changes.account.accountId };
       changed.push('accountId');
       financial = true;
+    }
+    const currentTarget = s.legs.find((l) => l.role === 'TARGET');
+    let target: TransferAccount | null = currentTarget
+      ? { accountId: currentTarget.accountId, nature: currentTarget.nature, currency: s.amount.currency.code }
+      : null;
+    if (changes.toAccount !== undefined) {
+      if (!isTransfer || !target) throw validation('toAccountId only applies to TRANSFER', '/toAccountId');
+      if (changes.toAccount.accountId !== target.accountId) {
+        changed.push('toAccountId');
+        financial = true;
+      }
+      target = changes.toAccount;
     }
     const accountCurrency = changes.account?.currency ?? s.amount.currency.code;
     let amount = s.amount;
@@ -484,6 +650,13 @@ export class Transaction {
       amount = changes.amount;
       changed.push('amount');
       financial = true;
+    }
+    if (isTransfer && target) {
+      assertTransferAccounts(
+        { accountId: next.accountId, nature, currency: accountCurrency },
+        target,
+        amount,
+      );
     }
     if (amount.currency.code !== accountCurrency) {
       throw new DomainError(
@@ -535,6 +708,11 @@ export class Transaction {
         );
         if (classificationChanges.length > 0 || memoOrCounterparty) changed.push('splits');
         next = { ...next, splits: reclassified };
+      } else if (isTransfer) {
+        throw validation(
+          'the fee split of a TRANSFER cannot be restructured; void and re-record it',
+          '/splits',
+        );
       } else {
         next = {
           ...next,
@@ -544,7 +722,7 @@ export class Transaction {
         financial = true;
         splitsReplaced = true;
       }
-    } else if (financial && changed.includes('amount') && hasNominalSplits(s.kind)) {
+    } else if (financial && changed.includes('amount') && hasNominalSplits(s.kind) && !isTransfer) {
       if (s.splits.length !== 1) {
         // Cambiar el monto de una transacción dividida exige reenviar los splits (no se reparte en silencio).
         assertSplitsSum(amount, s.splits);
@@ -571,14 +749,22 @@ export class Transaction {
     if (financial) {
       next = {
         ...next,
-        legs: [
-          {
-            accountId: next.accountId,
-            nature,
-            amount: legAmount(s.kind, nature, amount, s.direction),
-            role: 'MAIN',
-          },
-        ],
+        legs:
+          isTransfer && target
+            ? transferLegs(
+                { accountId: next.accountId, nature, currency: accountCurrency },
+                target,
+                amount,
+                transferFee(next),
+              )
+            : [
+                {
+                  accountId: next.accountId,
+                  nature,
+                  amount: legAmount(s.kind, nature, amount, s.direction),
+                  role: 'MAIN',
+                },
+              ],
       };
       if (ledgerImpact) {
         next = {

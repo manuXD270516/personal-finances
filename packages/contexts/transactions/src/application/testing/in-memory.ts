@@ -181,6 +181,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     categories: {
       uncategorized: async (_ws, kind) =>
         kind === 'INCOME' ? 'cat-uncategorized-income' : 'cat-uncategorized',
+      fees: async () => 'cat-fees',
       withDescendants: async (_ws, ids_) => [...ids_, ...ids_.map((i) => `${i}-child`)],
     },
     outbox: {

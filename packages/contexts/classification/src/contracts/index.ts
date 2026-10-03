@@ -39,7 +39,7 @@ export interface ClassificationLookup {
   systemCategoryId(input: {
     readonly userId: string;
     readonly workspaceId: string;
-    readonly systemCode: 'UNCATEGORIZED' | 'UNCATEGORIZED_INCOME';
+    readonly systemCode: 'UNCATEGORIZED' | 'UNCATEGORIZED_INCOME' | 'FEES';
   }): Promise<string | null>;
   categoryIdsWithDescendants(input: {
     readonly userId: string;

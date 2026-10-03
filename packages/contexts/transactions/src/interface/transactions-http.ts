@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Req, Res } from '@nestjs/common';
+import { isDomainError } from '@pf/shared-kernel';
 import { ApiProblem, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, buildPage } from '@pf/platform/api';
 import {
   API_CONVENTIONS,
@@ -14,6 +15,7 @@ import type { TransactionSort } from '../application/ports/index.js';
 import type {
   MoneyDto,
   RecordTransactionCommand,
+  RecordTransferCommand,
   SplitDto,
   TransactionsService,
   UpdateTransactionCommand,
@@ -199,6 +201,55 @@ export class TransactionsController {
       ...toTransactionDto(transaction),
       warnings: warnings.map((w) => ({ ...w, transactionIds: [...w.transactionIds] })),
     };
+  }
+
+  /**
+   * `POST W/transfers` (add-transfers tarea 5.1): fachada que devuelve el `Transaction` `kind=TRANSFER`. Ante
+   * `TRANSFER_CURRENCY_MISMATCH` el problem lleva `suggestedOperationId: createConversion` (RFC 9457).
+   */
+  @Post('workspaces/:workspaceId/transfers')
+  @HttpCode(201)
+  async createTransfer(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Body() body: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const fee = body['fee'] as { amount: MoneyDto; categoryId?: string } | undefined;
+    const cmd: RecordTransferCommand = {
+      workspaceId,
+      userId: userIdOf(req),
+      transactionDate: str(body, 'transactionDate') ?? '',
+      fromAccountId: str(body, 'fromAccountId') ?? '',
+      toAccountId: str(body, 'toAccountId') ?? '',
+      amount: body['amount'] as MoneyDto,
+      ...(str(body, 'id') ? { id: str(body, 'id') as string } : {}),
+      ...(body['status'] ? { status: body['status'] as 'PENDING' | 'POSTED' | 'CLEARED' } : {}),
+      postingDate: str(body, 'postingDate') ?? null,
+      description: str(body, 'description') ?? null,
+      notes: str(body, 'notes') ?? null,
+      paymentMethod: (body['paymentMethod'] as PaymentMethod | null | undefined) ?? null,
+      fee: fee ? { amount: fee.amount, categoryId: fee.categoryId ?? null } : null,
+    };
+    let transaction: TransactionState;
+    try {
+      transaction = await this.service.recordTransfer(cmd);
+    } catch (err) {
+      if (isDomainError(err) && err.code === 'TRANSFER_CURRENCY_MISMATCH') {
+        throw new ApiProblem('TRANSFER_CURRENCY_MISMATCH', err.message, {
+          fields: err.violations.map((v) => ({
+            pointer: v.pointer,
+            code: v.code,
+            detail: v.detail ?? err.message,
+          })),
+          extensions: { suggestedOperationId: 'createConversion' },
+          cause: err,
+        });
+      }
+      throw err;
+    }
+    res.setHeader('location', `/api/v1/workspaces/${workspaceId}/transactions/${transaction.id}`);
+    return toTransactionDto(transaction);
   }
 
   @Post('workspaces/:workspaceId/transactions/mark-cleared')
