@@ -49,6 +49,8 @@ Diseñado para que los test cases del catálogo se puedan ejecutar sobre él sin
 
 ### 2.2 Demo Seed
 
+> **Decisión del owner D36 (docs/31, 2026-10-03; ADR-0026; change `add-demo-data`, capability `identity/demo-data`).** Los datos demo pueden tener apariencia de terceros (bancos, comercios y personas **ficticios** con aspecto real), pero **solo se cargan por una acción explícita en la app** (OWNER: "Cargar datos de demostración" / "Limpiar datos de demostración" en la configuración del workspace), **siempre en un workspace de demostración dedicado** (`is_demo` inmutable), marcado de forma visible y **completamente removible** (archivo inmediato + purga física acotada a workspaces demo). Nunca se cargan al arrancar, migrar o iniciar sesión, ni dentro de un workspace real. El perfil `demo` de `pnpm db:seed` (solo local/CI) reutiliza el mismo cargador y crea el mismo tipo de workspace demo.
+
 Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`anchorDate: 2026-09-30`); opción `--anchor=today` desplaza todas las fechas para demos "actuales".
 
 **Personas (ficticias):**
@@ -188,7 +190,7 @@ scripts/seed/            # CLI TS: parse args, PRNG, clock, runner, verificació
 ## 7. Preguntas abiertas
 
 1. ¿Los snapshots de Large se guardan como artefacto de CI, en un bucket S3 de dev, o en GitHub Releases? (Tamaño estimado: cientos de MB).
-2. ¿El seed `demo` debe poder cargarse en **staging** para demos externas? Requiere decisión de seguridad.
+2. ¿El seed `demo` debe poder cargarse en **staging** para demos externas? Requiere decisión de seguridad. — Parcialmente resuelta por D36: la carga es una acción de la app en un workspace demo aislado y purgable; queda para el owner si `DEMO_DATA_ENABLED` se habilita en staging/producción (default propuesto: deshabilitado).
 3. ¿Montos del Demo Seed (salario 12 000 BOB, alquiler 3 500 BOB) representativos para el owner, o se prefiere escalarlos?
 4. ¿Las credenciales de los usuarios de prueba viven solo en el realm import de Keycloak dev ([19-local-development.md](./19-local-development.md)) o también en `.env.example`?
 5. ¿Generación del Large seed vía application services es suficientemente rápida? Si no, evaluar un "bulk use case" de dominio (sigue validando invariantes) en lugar de SQL directo.

@@ -5,6 +5,7 @@
 ## 1. SPEC y test cases
 
 - [ ] 1.1 Revisar con el owner las preguntas abiertas de design.md (re-emisión de `TransferCompleted`, comisiones en otra moneda, código `TRANSFER_CURRENCY_MISMATCH`); verificar que `openspec validate add-transfers --strict` pasa
+  - Nota (2026-10-03): resueltas por el owner en docs/31 D37 — `TransferCompleted` una sola vez + `TransferRevised.v1` por edición (se implementa en `add-lifecycle-timeline`), se mantiene `TRANSFER_CURRENCY_MISMATCH`; comisión en otra moneda: propuesta "no en Phase 1", pendiente de confirmación.
 - [ ] 1.2 Confirmar TC-TRANSACTIONS-TRANSFER-001..006, TC-TRANSACTIONS-CARDPAYMENT-001 y TC-LEDGER-TRANSFER-001 en estado `ready`; verificar con el chequeo del catálogo que ningún requirement Must queda sin TC
 - [ ] 1.3 Aplicar (o confirmar aplicados) los cambios de design.md § Contratos; verificar Redocly lint 0/0 y validación de `examples` de `TransferCompleted.v1`
 

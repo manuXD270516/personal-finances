@@ -7,7 +7,7 @@ Responde en el Home, con números honestos y explicables, las preguntas habilita
 ## ADDED Requirements
 
 ### Requirement: Saldos por cuenta y totales por moneda
-El resumen DEBE (MUST) mostrar el saldo de cada cuenta activa en su moneda original, calculado solo con transacciones posteadas, conciliadas o reconciliadas, y el total por moneda sin conversión.
+El resumen DEBE (MUST) mostrar el saldo de cada cuenta no archivada (activa o cerrada) en su moneda original, calculado solo con transacciones posteadas, conciliadas o reconciliadas, y el total por moneda sin conversión.
 Trace: FR-REPORTING-003, FR-LEDGER-012 · Priority: Must
 
 #### Scenario: Tres cuentas en dos monedas
@@ -19,8 +19,13 @@ Trace: FR-REPORTING-003, FR-LEDGER-012 · Priority: Must
 - **CUANDO** existe un gasto pendiente de 30.00 BOB en "Banco BOB"
 - **ENTONCES** el saldo mostrado de "Banco BOB" sigue siendo 685.00 BOB
 
+#### Scenario: Cuenta cerrada incluida y archivada excluida
+- **CUANDO** además existen "Banco Viejo" cerrada con saldo 0.00 BOB y "Caja Antigua" archivada con saldo 0.00 BOB
+- **ENTONCES** el resumen lista "Banco Viejo" con 0.00 BOB y su estado cerrada
+- **Y** no lista "Caja Antigua" y los totales por moneda siguen siendo 805.50 BOB y 50.000000 USDT
+
 ### Requirement: Dinero disponible consolidado en la moneda de reporte
-El resumen DEBE (MUST) mostrar el dinero disponible como la suma de los saldos de las cuentas de activo marcadas como líquidas, convertida a la moneda de reporte con la tasa vigente a la fecha del tipo preferido del par; para USD/BOB y USDT/BOB el tipo por defecto es `PARALLEL` y DEBE (MUST) usarse la última tasa no obsoleta del provider de mercado; para cada moneda DEBE (MUST) indicarse la tasa, su tipo, su fuente con la atribución del provider, su instante de vigencia y su antigüedad.
+El resumen DEBE (MUST) mostrar el dinero disponible como la suma de los saldos de las cuentas no archivadas de naturaleza activo con liquidez `LIQUID`, convertida a la moneda de reporte con la tasa vigente a la fecha del tipo preferido del par; para USD/BOB y USDT/BOB el tipo por defecto es `PARALLEL` y DEBE (MUST) usarse la última tasa no obsoleta del provider de mercado; para cada moneda DEBE (MUST) indicarse la tasa, su tipo, su fuente con la atribución del provider, su instante de vigencia y su antigüedad.
 Trace: FR-REPORTING-003, FR-REPORTING-002, FR-FX-006, FR-FX-010, FR-FX-014, FR-ACCOUNTS-011 · Priority: Must
 
 #### Scenario: BOB y USDT consolidados
@@ -33,7 +38,7 @@ Trace: FR-REPORTING-003, FR-REPORTING-002, FR-FX-006, FR-FX-010, FR-FX-014, FR-A
 - **ENTONCES** el dinero disponible sigue siendo 1406.50 BOB
 
 ### Requirement: Valoración de USD y USDT con fallback a la última tasa conocida o manual
-Si no hay tasa `PARALLEL` no obsoleta de ningún provider para USD/BOB o USDT/BOB, el resumen DEBE (MUST) valorar con la tasa más reciente dentro de la ventana de vigencia entre la última de provider, marcada como obsoleta con su antigüedad, y la última tasa manual del par, indicando su origen; NO DEBE (MUST NOT) dejar de mostrar el consolidado por la caída de un provider.
+Si no hay tasa `PARALLEL` no obsoleta de ningún provider para USD/BOB o USDT/BOB, el resumen DEBE (MUST) valorar con la tasa más reciente dentro de la ventana de vigencia entre la última de provider, marcada como obsoleta con su antigüedad, y la última tasa manual del par, indicando su origen y su tipo; una tasa manual de un tipo distinto del preferido solo DEBE (MUST) competir si es fresca (no más antigua que el máximo de frescura de manuales) y confiable (no reemplazada, no anómala y con desvío de hasta 5 % frente a la última tasa de provider aceptada del tipo preferido); NO DEBE (MUST NOT) dejar de mostrar el consolidado por la caída de un provider.
 Trace: FR-REPORTING-003, FR-FX-010, FR-FX-006 · Priority: Must
 
 #### Scenario: Providers caídos con última tasa obsoleta
@@ -46,6 +51,18 @@ Trace: FR-REPORTING-003, FR-FX-010, FR-FX-006 · Priority: Must
 - **Y** se consulta el 2026-09-30T18:00:00-04:00
 - **ENTONCES** el dinero disponible consolidado es 1404.50 BOB (805.50 + 50.000000 × 11.98)
 - **Y** se informa la tasa manual 11.98 `P2P` con fuente "Casa de cambio centro" y origen manual
+
+#### Scenario: Tasa manual de otro tipo no fresca descartada
+- **CUANDO** los providers fallan desde el 2026-09-29T14:00:00Z, la última tasa `PARALLEL` USDT/BOB es 12.02 de paralelo.bo con vigencia 2026-09-29T13:53:07Z, el máximo de frescura de manuales es 24 horas y la única tasa manual es USDT/BOB `P2P` 11.98 registrada el 2026-09-29T15:00:00Z (más reciente que la de provider, pero con 31 horas de antigüedad)
+- **Y** se consulta el 2026-09-30T18:00:00-04:00
+- **ENTONCES** el dinero disponible consolidado es 1406.50 BOB con la tasa 12.02 de paralelo.bo marcada como obsoleta
+- **Y** la tasa manual `P2P` 11.98 no se usa
+
+#### Scenario: Tasa manual de otro tipo con desvío excesivo descartada
+- **CUANDO** los providers fallan desde el 2026-09-30T14:00:00Z, la última tasa `PARALLEL` USDT/BOB es 12.02 de paralelo.bo con vigencia 2026-09-30T13:53:07Z y el usuario registró a las 2026-09-30T20:00:00Z la tasa manual USDT/BOB `P2P` 11.00 (desvío de 8.49 %)
+- **Y** se consulta el 2026-09-30T18:00:00-04:00
+- **ENTONCES** el dinero disponible consolidado es 1406.50 BOB con la tasa 12.02 de paralelo.bo marcada como obsoleta
+- **Y** la tasa manual `P2P` 11.00 no se usa
 
 ### Requirement: Montos sin tasa vigente se muestran sin convertir
 Si una moneda no tiene tasa hacia la moneda de reporte dentro de la ventana de vigencia, el resumen DEBE (MUST) mostrar esos saldos en su moneda original, excluirlos del consolidado, marcar el consolidado como incompleto y advertirlo con la acción de registrar la tasa; NO DEBE (MUST NOT) convertir con 1:1 ni con una tasa fuera de la ventana.
