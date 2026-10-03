@@ -12,9 +12,10 @@ invariants: [INV-005]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, structure]
@@ -43,7 +44,7 @@ expected_result:
 - El caso 3 se rechaza con LEDGER_ZERO_AMOUNT_POSTING aunque la suma en BOB sea 0.00
 - No se emite ningún evento ni se persiste nada
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-STRUCTURE-001 — El dominio rechaza asientos con menos de dos postings o con un posting en cero

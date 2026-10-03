@@ -12,9 +12,11 @@ invariants: [INV-015]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [period-closing]
@@ -43,7 +45,7 @@ expected_result:
 - La reversa fechada 2026-08-10 se rechaza con PERIOD_CLOSED
 - Los saldos al 2026-08-31 no cambian
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-PERIOD-001 — Se rechazan los asientos con fecha en un periodo bloqueado

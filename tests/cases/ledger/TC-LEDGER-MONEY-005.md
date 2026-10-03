@@ -12,9 +12,10 @@ invariants: [INV-020, INV-001]
 priority: critical
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.ledger.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [allocation, tdd]
@@ -71,7 +72,7 @@ expected_result:
 - Los resultados son exactamente iguales a las partes esperadas
 - Las partes siempre suman el total
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-005 — La distribución por mayor residuo reparte las unidades menores de forma determinista

@@ -12,9 +12,12 @@ invariants: [INV-008]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/src/domain/reversal-factory.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [reversal, concurrency]
@@ -39,7 +42,7 @@ expected_result:
 - Revertir R1 se rechaza con LEDGER_ENTRY_NOT_REVERSIBLE
 - Saldo final de Bank A = 1000.00 BOB
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-REVERSAL-002 — Un asiento solo puede revertirse una vez y una reversa no puede revertirse

@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [ledger, traceability]
@@ -43,7 +44,7 @@ expected_result:
 - reverses_entry_id es nulo
 - El evento ledger.JournalEntryPosted lleva los mismos metadatos
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-METADATA-001 — El asiento registra fecha, tipo, origen, actor, correlación, instante y secuencia

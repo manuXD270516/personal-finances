@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/balance-calculator.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [balances, sign-convention]
@@ -35,7 +37,7 @@ expected_result:
 - 'INCOME:BOB: contable -8012.34 BOB, presentado 8012.34 BOB'
 - 'Bank A: contable y presentado 595.50 BOB'
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCES-004 — El saldo presentado invierte el signo en pasivos, ingresos y patrimonio

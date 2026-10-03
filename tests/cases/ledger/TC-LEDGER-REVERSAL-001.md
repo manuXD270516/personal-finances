@@ -12,9 +12,11 @@ invariants: [INV-008, INV-004, INV-007]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/src/domain/reversal-factory.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [reversal, immutability]
@@ -36,7 +38,7 @@ expected_result:
 - Saldo de Bank A = 1000.00 BOB
 - La suma por (cuenta, split, moneda) de E1 + R1 es 0.00 BOB
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-REVERSAL-001 — El asiento de reversa niega cada posting del original y se vincula a él

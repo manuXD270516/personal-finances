@@ -12,9 +12,10 @@ invariants: [INV-021]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, splits]
@@ -42,7 +43,7 @@ expected_result:
 - La base de datos rechaza el posting nominal sin split por el CHECK correspondiente
 - El ledger no almacena ninguna categoría
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-SPLITREF-001 — Los postings a INCOME y EXPENSE deben referenciar su split

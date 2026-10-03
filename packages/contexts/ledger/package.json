@@ -1,0 +1,43 @@
+{
+  "name": "@pf/ledger",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context LEDGER: núcleo contable de doble entrada multi-moneda, append-only (openspec add-ledger-core).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./interface/ledger.module": {
+      "@pf/source": "./src/interface/ledger.module.ts",
+      "types": "./dist/interface/ledger.module.d.ts",
+      "default": "./dist/interface/ledger.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@pf/audit": "workspace:*",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "fast-check": "4.10.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

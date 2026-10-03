@@ -12,9 +12,10 @@ invariants: [INV-005]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, database, defense-in-depth]
@@ -37,7 +38,7 @@ expected_result:
 - La inserción del posting de 0.00 BOB falla por el CHECK amount <> 0
 - No quedan filas en ledger.journal_entry ni en ledger.posting para esos asientos
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-STRUCTURE-002 — La base de datos rechaza asientos con menos de dos postings o con montos en cero

@@ -12,9 +12,10 @@ invariants: [INV-004]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, database, defense-in-depth]
@@ -38,7 +39,7 @@ expected_result:
 - 'El segundo COMMIT tiene éxito: el trigger diferido solo se evalúa al momento del commit'
 - Un SELECT muestra exactamente el asiento balanceado
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCE-002 — La restricción diferida de la base de datos rechaza un asiento desbalanceado al hacer commit

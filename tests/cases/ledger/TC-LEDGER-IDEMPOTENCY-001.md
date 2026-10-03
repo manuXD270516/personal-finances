@@ -12,9 +12,11 @@ invariants: [INV-023]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, idempotency]
@@ -35,7 +37,7 @@ expected_result:
 - Existe un único asiento para T1 revisión 1 y un único evento en el outbox
 - Saldo de Bank A = 880.00 BOB
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-IDEMPOTENCY-001 — Registrar dos veces el mismo origen y revisión produce un único asiento

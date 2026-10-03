@@ -12,9 +12,10 @@ invariants: [INV-003, INV-001]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.ledger.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [money, scale]
@@ -41,7 +42,7 @@ expected_result:
 - Los montos dentro de la escala se aceptan sin cambios
 - El redondeo ocurre solo en operaciones explícitas de materialización (ver TC-LEDGER-MONEY-003)
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-SCALE-001 — Se rechaza un monto de posting con más decimales que la escala de la moneda

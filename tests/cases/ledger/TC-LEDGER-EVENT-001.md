@@ -12,9 +12,11 @@ invariants: [INV-001, INV-004]
 priority: critical
 type: integration
 level: event-contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [events, outbox, contract]
@@ -42,7 +44,7 @@ expected_result:
 - El asiento rechazado no deja evento en el outbox (rollback conjunto)
 - La reversa publica su propio evento con entryType REVERSAL y reversesEntryId de la conversión
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-EVENT-001 — Cada asiento registrado publica JournalEntryPosted válido en la misma transacción

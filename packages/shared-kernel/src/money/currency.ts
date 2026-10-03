@@ -22,3 +22,10 @@ export function currency(code: string, scale: number): Currency {
 }
 
 export const sameCurrency = (a: Currency, b: Currency): boolean => a.code === b.code;
+
+/** Exige misma moneda (código y escala) para operar; si no, `CURRENCY_MISMATCH` (INV-002, TC-LEDGER-MONEY-007). */
+export function assertSameCurrency(a: Currency, b: Currency): void {
+  if (a.code !== b.code || a.scale !== b.scale) {
+    throw new DomainError('CURRENCY_MISMATCH', `${a.code}(${a.scale}) vs ${b.code}(${b.scale})`);
+  }
+}

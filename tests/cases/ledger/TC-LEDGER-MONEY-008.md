@@ -12,9 +12,10 @@ invariants: [INV-001]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [fast-check, money]
@@ -33,7 +34,7 @@ expected_result:
 - a + 0 = a
 - a - a = 0
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-008 — Propiedad: la suma de Money es exacta, conmutativa y asociativa

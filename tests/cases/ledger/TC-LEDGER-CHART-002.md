@@ -12,9 +12,11 @@ invariants: [INV-006]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, chart-of-accounts, concurrency]
@@ -35,7 +37,7 @@ expected_result:
 - Existe exactamente una cuenta contable ASSET en USDT para Binance USDT
 - La cuenta contable de Visa BOB es LIABILITY en BOB
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-CHART-002 — Cada cuenta del usuario obtiene una única cuenta contable en su moneda, incluso en concurrencia
