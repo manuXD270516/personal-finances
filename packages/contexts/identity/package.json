@@ -29,6 +29,7 @@
   "dependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@pf/audit": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/shared-kernel": "workspace:*",
     "kysely": "catalog:",

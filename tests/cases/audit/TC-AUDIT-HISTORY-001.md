@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/application/audit-queries.test.ts
+  - apps/api/test/api/audit.api.test.ts
+  - apps/web/src/ui/AuditHistory.test.tsx
+  - tests/e2e/specs/audit.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["audit", "history"]
@@ -38,7 +42,7 @@ expected_result:
   - "Una entidad sin registros devuelve lista vacía"
   - "Con limit=2 la respuesta trae dos registros y un cursor que devuelve el tercero"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-HISTORY-001 — El historial de auditoría de una cuenta muestra apertura, renombre y archivo en orden cronológico
@@ -54,3 +58,7 @@ Dado que "Bank C" se abrió con 500.00 BOB, se renombró y se archivó
 Cuando el usuario consulta su historial
 Entonces ve los tres cambios en orden cronológico con sus diferencias
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): Historial de "Bank C" con registros de fixture (aplicación); por HTTP y E2E, el historial real del workspace (crear, renombrar) en la pestaña "Historial" de Configuración.

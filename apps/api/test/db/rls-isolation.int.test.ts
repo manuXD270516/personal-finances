@@ -11,7 +11,9 @@ const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 /**
  * Suite de aislamiento por workspace (security/access-control, ADR-0023). Las tablas de negocio de changes
- * posteriores (accounts, ledger, txn, classification, audit) se agregan a `WS_TABLES` cuando existan.
+ * posteriores (accounts, ledger, txn, classification) se agregan a `WS_TABLES` cuando existan. `audit.audit_log` es
+ * append-only (sin UPDATE para pf_app): su aislamiento lo cubre TC-AUDIT-ISOLATION-001 y el chequeo de catálogo de
+ * TC-SECURITY-RLS-004 incluye la tabla y sus particiones.
  */
 const WS_TABLES = ['platform.idempotency_key', 'iam.workspace', 'iam.workspace_membership'] as const;
 

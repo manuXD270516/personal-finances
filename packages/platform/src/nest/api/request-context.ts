@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
-import type { ContractOperation, HttpResponseSnapshot, ValidatedRequest } from '../../api/index.js';
+import {
+  updateRequestContext,
+  type ContractOperation,
+  type HttpResponseSnapshot,
+  type ValidatedRequest,
+} from '../../api/index.js';
 
 /** Usuario autenticado del request. Lo fija el guard de autenticación (`add-workspace-identity`). */
 export interface Principal {
@@ -35,6 +40,8 @@ export const principalOf = (req: ApiRequest): Principal | undefined => req.pfPri
 /** Punto único para fijar el usuario autenticado (lo usará el guard de identidad; en tests, el harness). */
 export const setPrincipal = (req: ApiRequest, principal: Principal): void => {
   req.pfPrincipal = principal;
+  // Atribución ambiental (auditoría, outbox): el actor de todo lo que ejecute esta petición es el usuario.
+  updateRequestContext({ actor: { type: 'USER', userId: principal.userId } });
 };
 
 export const headerValue = (req: ApiRequest, name: string): string | undefined => {

@@ -20,6 +20,7 @@
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/platform-express": "catalog:",
+    "@pf/audit": "workspace:*",
     "@pf/identity": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/shared-kernel": "workspace:*",

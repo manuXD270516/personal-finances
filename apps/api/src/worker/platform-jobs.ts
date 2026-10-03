@@ -6,7 +6,8 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { purgeExpiredIdempotencyKeys } from '@pf/platform/api';
+import { ensureAuditPartitions } from '@pf/audit/interface/audit.module';
+import { purgeExpiredIdempotencyKeys, runWithRequestContext } from '@pf/platform/api';
 import { purgeDeliveredEvents } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { JOB_QUEUE, LOGGER } from '@pf/platform/nest';
@@ -40,11 +41,17 @@ export const IDEMPOTENCY_PURGE_INTERVAL_MS = 15 * 60_000;
 /** Purga de eventos publicados (7 días) e inbox (30 días) cada hora (openspec add-event-outbox, design §7). */
 export const EVENT_PURGE_INTERVAL_MS = 60 * 60_000;
 
+/** Particiones de `audit.audit_log` (openspec add-audit-trail, design §5): una vez al día y al arrancar. */
+export const AUDIT_PARTITIONS_INTERVAL_MS = 24 * 60 * 60_000;
+/** Meses de anticipación con que se crean las particiones mensuales de auditoría. */
+export const AUDIT_PARTITIONS_MONTHS_AHEAD = 2;
+
 /** Registra los handlers de jobs de plataforma al arrancar el contexto del worker. */
 @Injectable()
 export class PlatformJobsRegistrar implements OnApplicationBootstrap, OnApplicationShutdown {
   private purgeTimer: NodeJS.Timeout | undefined;
   private eventPurgeTimer: NodeJS.Timeout | undefined;
+  private auditPartitionsTimer: NodeJS.Timeout | undefined;
 
   constructor(
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
@@ -89,11 +96,48 @@ export class PlatformJobsRegistrar implements OnApplicationBootstrap, OnApplicat
     this.eventPurgeTimer = setInterval(() => void this.purgeEvents(), EVENT_PURGE_INTERVAL_MS);
     this.eventPurgeTimer.unref();
     void this.purgeEvents();
+    this.auditPartitionsTimer = setInterval(
+      () => void this.ensureAuditPartitions(),
+      AUDIT_PARTITIONS_INTERVAL_MS,
+    );
+    this.auditPartitionsTimer.unref();
+    void this.ensureAuditPartitions();
   }
 
   onApplicationShutdown(): void {
     if (this.purgeTimer) clearInterval(this.purgeTimer);
     if (this.eventPurgeTimer) clearInterval(this.eventPurgeTimer);
+    if (this.auditPartitionsTimer) clearInterval(this.auditPartitionsTimer);
+  }
+
+  /**
+   * Job `audit.ensure-partitions` (rol pf_worker, función SECURITY DEFINER acotada): crea las particiones del mes
+   * actual y los 2 siguientes. Si la partición DEFAULT tiene filas, ALERTA (log `error`, alarma de logs): alguna
+   * escritura llegó sin su partición mensual.
+   */
+  async ensureAuditPartitions(): Promise<{ created: number; defaultRows: number } | undefined> {
+    return runWithRequestContext(
+      { actor: { type: 'WORKER', process: 'audit.ensure-partitions' }, origin: 'system' },
+      async () => {
+        try {
+          const result = await ensureAuditPartitions(this.pool, AUDIT_PARTITIONS_MONTHS_AHEAD);
+          this.logger.info({ created: result.created }, 'audit partitions ensured');
+          if (result.defaultRows > 0) {
+            this.logger.error(
+              { alert: 'audit.default_partition_rows', rows: result.defaultRows },
+              'audit rows landed in the DEFAULT partition',
+            );
+          }
+          return result;
+        } catch (err) {
+          this.logger.warn(
+            { err: { type: err instanceof Error ? err.name : typeof err } },
+            'audit partition maintenance failed',
+          );
+          return undefined;
+        }
+      },
+    );
   }
 
   /** Borra (rol pf_maintenance) eventos publicados e inbox vencidos; nunca pendientes ni dead-letters. */

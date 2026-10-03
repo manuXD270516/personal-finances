@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/audit.api.test.ts
+  - tests/e2e/specs/audit.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["audit", "rbac"]
@@ -30,7 +32,7 @@ expected_result:
   - "VIEWER recibe 403 problem+json con code INSUFFICIENT_ROLE y sin registros"
   - "La operación declara x-required-role EDITOR en el contrato"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-ACCESS-001 — Solo OWNER y EDITOR pueden leer la auditoría; VIEWER recibe INSUFFICIENT_ROLE
@@ -46,3 +48,7 @@ Dado un usuario VIEWER de "W1"
 Cuando consulta el historial de auditoría de "Bank A"
 Entonces recibe INSUFFICIENT_ROLE
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): Por HTTP se consulta el historial del agregado `Workspace` de W1.

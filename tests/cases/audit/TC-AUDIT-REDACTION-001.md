@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: security
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/domain/redaction-policy.test.ts
+  - packages/contexts/audit/test/integration/pg-audit-log.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["audit", "privacy", "redaction"]
@@ -35,7 +37,7 @@ expected_result:
   - "La apertura registra el monto {amount: \"100.000000\", currency: \"USDT\"}"
   - "Un campo no incluido en la allow-list del agregado no aparece en changes"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-REDACTION-001 — La auditoría enmascara identificadores de cuenta y nunca guarda tokens, pero conserva los montos
@@ -52,3 +54,7 @@ Cuando el usuario cambia el identificador de "Bank A" y abre "USDT Wallet" con 1
 Entonces la auditoría muestra "6789" y 100.000000 USDT
   Y no contiene ningún valor canario ni el identificador completo
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): Cuentas (`Account`) con una allow-list de fixture hasta `add-accounts-management`, que aportará la suya.

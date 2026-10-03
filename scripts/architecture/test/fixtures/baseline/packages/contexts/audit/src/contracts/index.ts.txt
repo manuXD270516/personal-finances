@@ -1,0 +1,4 @@
+/** Puerto síncrono de auditoría (fixture de add-audit-trail). */
+export interface AuditPort {
+  append(entry: { readonly workspaceId: string; readonly action: string }): Promise<void>;
+}

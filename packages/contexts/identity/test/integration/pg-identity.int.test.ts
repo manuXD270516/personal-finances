@@ -3,7 +3,8 @@ import { FixedClock, Instant } from '@pf/shared-kernel';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { IdentityService } from '../../src/application/identity.service.js';
-import type { AuditEntry, OutboxEvent, VerifiedIdentity } from '../../src/application/ports/index.js';
+import type { AuditEntry } from '@pf/audit/contracts';
+import type { OutboxEvent, VerifiedIdentity } from '../../src/application/ports/index.js';
 import { pgIdentityDeps } from '../../src/infrastructure/pg-identity.js';
 
 declare module 'vitest' {
@@ -38,7 +39,7 @@ describe('Repositorios PostgreSQL de IDENTITY (tareas 6.1 y 6.2)', () => {
       pgIdentityDeps({
         pool,
         outbox: { append: async (e) => void events.push(e) },
-        audit: { record: async (a) => void audits.push(a) },
+        audit: { append: async (a) => void audits.push(a) },
         clock: new FixedClock(Instant.parse('2026-10-02T12:00:00Z')),
         defaults: {
           baseCurrency: 'BOB',

@@ -64,5 +64,41 @@
       "expired": "For your security we signed you out after a period of inactivity. Please sign in again.",
       "unknown": "Something went wrong while signing in. Please try again."
     }
+  },
+  "AuditHistory": {
+    "title": "Change history",
+    "empty": "No changes recorded yet.",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "none": "—",
+    "reason": "Reason: {reason}",
+    "changesCaption": "Changes in this record",
+    "actor": {
+      "you": "by you",
+      "user": "by user …{id}",
+      "system": "by process {process}"
+    },
+    "actions": {
+      "identity_workspace_created": "Workspace created",
+      "identity_workspace_member_added": "Member added",
+      "identity_workspace_settings_changed": "Settings changed",
+      "identity_user_provisioned": "User provisioned",
+      "identity_user_preferences_changed": "Preferences changed",
+      "identity_session_started": "Signed in",
+      "identity_session_ended": "Signed out"
+    },
+    "fields": {
+      "name": "Name",
+      "baseCurrency": "Base currency",
+      "timeZone": "Time zone",
+      "locale": "Language and format",
+      "fiscalMonthStartDay": "Financial month start day",
+      "minimumLiquidityReserve": "Minimum liquidity reserve",
+      "origin": "Origin",
+      "memberUserId": "Member",
+      "memberRole": "Role",
+      "displayName": "Display name"
+    }
   }
 }

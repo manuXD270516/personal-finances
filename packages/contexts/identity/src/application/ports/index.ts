@@ -1,3 +1,4 @@
+import type { AuditPort } from '@pf/audit/contracts';
 import type { Clock, Currency } from '@pf/shared-kernel';
 import type { Role } from '../../domain/role.js';
 import type { User } from '../../domain/user.js';
@@ -91,20 +92,6 @@ export interface OutboxPort {
   append(event: OutboxEvent): Promise<void>;
 }
 
-export interface AuditEntry {
-  readonly action:
-    'identity.user.provisioned' | 'identity.workspace.created' | 'identity.workspace.settings_changed';
-  readonly actorUserId: string;
-  readonly workspaceId: string | null;
-  readonly targetId: string;
-  readonly details: Readonly<Record<string, unknown>>;
-}
-
-/** Auditoría (definida por `add-audit-trail`); se invoca en la misma transacción que el comando. */
-export interface AuditPort {
-  record(entry: AuditEntry): Promise<void>;
-}
-
 export interface IdGenerator {
   /** UUIDv7. */
   next(): string;
@@ -125,8 +112,11 @@ export interface IdentityDeps {
   readonly memberships: MembershipReader;
   readonly currencies: CurrencyCatalogPort;
   readonly outbox: OutboxPort;
+  /** Auditoría síncrona de AUDIT (`@pf/audit/contracts`): misma transacción que el comando (INV-029). */
   readonly audit: AuditPort;
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly defaults: WorkspaceDefaults;
 }
+
+export type { AuditPort };

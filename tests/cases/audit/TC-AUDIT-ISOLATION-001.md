@@ -12,9 +12,12 @@ invariants: [INV-025]
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/application/audit-queries.test.ts
+  - packages/contexts/audit/test/integration/pg-audit-log.int.test.ts
+  - apps/api/test/api/audit.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["audit", "rls", "multi-tenant"]
@@ -33,7 +36,7 @@ expected_result:
   - "La consulta SQL no devuelve filas de W1"
   - "Sin app.workspace_id la consulta SQL falla (fail-closed) en vez de devolver filas"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-ISOLATION-001 — La auditoría de un workspace no es visible desde otro workspace
@@ -49,3 +52,7 @@ Dado que "Bank A" pertenece a "W1"
 Cuando un usuario de "W2" consulta el historial de "Bank A"
 Entonces obtiene una lista vacía, igual que para una entidad inexistente
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): En la API se usa el agregado `Workspace` (Bank A llega con `add-accounts-management`).

@@ -88,16 +88,39 @@ interface ApiCall {
   method: string;
   url: string;
   authorization: string | null;
+  headers: Headers;
+  body: string | undefined;
 }
 
-/** finance-api falso: `/api/v1/me` devuelve el usuario provisionado; el resto 200. */
+/**
+ * finance-api falso: `/api/v1/me` devuelve el usuario provisionado; `/api/v1/me/session-events` 204 (o el estado de
+ * `sessionEventsStatus`); el resto 200.
+ */
 function fakeApi(userId: () => string) {
   const calls: ApiCall[] = [];
+  const state = { sessionEventsStatus: 204 };
   const impl = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     const headers = new Headers(init?.headers);
-    calls.push({ method: init?.method ?? 'GET', url, authorization: headers.get('authorization') });
+    const body =
+      init?.body instanceof ArrayBuffer || ArrayBuffer.isView(init?.body)
+        ? new TextDecoder().decode(init.body as ArrayBuffer)
+        : typeof init?.body === 'string'
+          ? init.body
+          : undefined;
+    calls.push({
+      method: init?.method ?? 'GET',
+      url,
+      authorization: headers.get('authorization'),
+      headers,
+      body,
+    });
     if (url.endsWith('/api/v1/me')) return Response.json({ id: userId(), displayName: 'Owner Demo' });
+    if (url.endsWith('/api/v1/me/session-events')) {
+      return state.sessionEventsStatus === 204
+        ? new Response(null, { status: 204 })
+        : Response.json({ code: 'INTERNAL_ERROR' }, { status: state.sessionEventsStatus });
+    }
     if (init?.method === 'POST') {
       return Response.json(
         { id: randomUUID() },
@@ -106,7 +129,7 @@ function fakeApi(userId: () => string) {
     }
     return Response.json({ ok: true }, { headers: { etag: '"7"' } });
   };
-  return { calls, fetch: impl as typeof fetch };
+  return { calls, state, fetch: impl as typeof fetch };
 }
 
 let pool: Pool;
@@ -436,6 +459,79 @@ describe('[TC-IDENTITY-SESSION-002] el BFF rechaza mutaciones sin token anti-CSR
     expect(ok.status).toBe(201);
     expect(ok.headers.get('location')).toBe('/api/bff/v1/workspaces/abc');
     expect(api.calls.at(-1)).toMatchObject({ method: 'POST', url: `${API}/api/v1/${path.join('/')}` });
+  });
+});
+
+describe('[TC-AUDIT-SESSION-001] el BFF audita el inicio y el cierre de sesión sin tokens ni cookies', () => {
+  const browser = {
+    'user-agent': 'Mozilla/5.0 (PFOS BFF test)',
+    'x-forwarded-for': '198.51.100.23, 10.0.0.2',
+  };
+  const sessionEvents = (calls: ApiCall[]) =>
+    calls.filter((c) => c.url === `${API}/api/v1/me/session-events`);
+
+  it('un único STARTED tras el login (no en los requests siguientes) y ENDED al logout con el workspace activo', async () => {
+    const { bff, api, idp } = setup();
+    const start = await bff.login(new Request(`${APP}/api/bff/auth/login`));
+    const state = new URL(start.headers.get('location')!).searchParams.get('state');
+    const cb = await bff.callback(
+      new Request(`${APP}/api/bff/auth/callback?code=good-code&state=${state}`, {
+        headers: { cookie: `${LOGIN_COOKIE}=${cookieOf(start, LOGIN_COOKIE)}`, ...browser },
+      }),
+    );
+    const sid = cookieOf(cb, SESSION_COOKIE)!;
+    for (let i = 0; i < 2; i += 1) {
+      const r = await bff.proxy(
+        new Request(`${APP}/api/bff/v1/workspaces`, { headers: withSid(sid, browser) }),
+        ['workspaces'],
+      );
+      expect(r.status).toBe(200);
+    }
+    const proxied = api.calls.filter((c) => c.url === `${API}/api/v1/workspaces`);
+    expect(proxied.every((c) => c.headers.get('x-pfos-origin') === 'ui')).toBe(true);
+    expect(proxied.every((c) => c.headers.get('user-agent') === browser['user-agent'])).toBe(true);
+    expect(proxied.every((c) => c.headers.get('x-forwarded-for') === '198.51.100.23')).toBe(true);
+
+    const activeWorkspace = randomUUID();
+    await admin.query('UPDATE iam.bff_session SET active_workspace_id = $1', [activeWorkspace]);
+    const csrf = await csrfOf(bff, sid);
+    const out = await bff.logout(
+      new Request(`${APP}/api/bff/auth/logout`, {
+        method: 'POST',
+        headers: withSid(sid, {
+          origin: APP,
+          'x-csrf-token': csrf,
+          'content-type': 'application/json',
+          ...browser,
+        }),
+        body: '{}',
+      }),
+    );
+    expect(out.status).toBe(200);
+
+    const events = sessionEvents(api.calls);
+    expect(events.map((c) => JSON.parse(c.body ?? '{}'))).toEqual([
+      { event: 'STARTED', workspaceId: null },
+      { event: 'ENDED', workspaceId: activeWorkspace },
+    ]);
+    for (const c of events) {
+      expect(c.method).toBe('POST');
+      expect(c.authorization).toBe(`Bearer ${idp.issued[0]!.accessToken}`);
+      expect(c.headers.get('user-agent')).toBe(browser['user-agent']);
+      expect(c.headers.get('x-forwarded-for')).toBe('198.51.100.23');
+      expect(c.headers.get('cookie')).toBeNull();
+      expect(c.body).not.toMatch(JWT);
+      expect(c.body).not.toContain(sid);
+    }
+  });
+
+  it('si finance-api no puede auditar, el login igual se completa (best effort con log técnico)', async () => {
+    const { bff, api } = setup();
+    api.state.sessionEventsStatus = 500;
+    const { sid } = await login(bff);
+    expect(sid).toBeTruthy();
+    expect(sessionEvents(api.calls)).toHaveLength(1);
+    expect(await sessionRows()).toBe(1);
   });
 });
 

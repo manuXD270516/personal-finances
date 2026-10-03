@@ -1404,6 +1404,8 @@ erDiagram
 
 Se escribe **en la misma transacción** que el comando (ARCHITECTURE §7). `changes` nunca contiene secretos ni tokens; sí montos (es el propósito del audit financiero). Hash chain (`prev_hash`/`row_hash` por workspace) es opcional — ver Preguntas abiertas.
 
+Implementación (add-audit-trail, migración `20261003160000_audit_audit_log.sql`): particiones mensuales `audit.audit_log_yYYYYmMM` creadas por `audit.ensure_partitions(n)` (SECURITY DEFINER; job `audit.ensure-partitions` del worker, 2 meses de anticipación) y partición `audit.audit_log_default` como red de seguridad (`audit.default_partition_rows()` alimenta la alerta del job). Políticas `ws_isolation_read` (SELECT) y `ws_isolation_write` (INSERT) para `pf_app` (y `pf_worker`, que lo hereda); las particiones repiten RLS forzada y política y no tienen grants (se accede solo por el padre). `platform.forbid_mutation()` (SQLSTATE PF003) en `BEFORE UPDATE OR DELETE` (fila, clonado a las particiones) y `BEFORE TRUNCATE` (sentencia, en el padre y cada partición). Las columnas `actor_process` y `origin` son las exigidas por FR-AUDIT-002.
+
 ### 5.17 `forecasting` (Phase 8)
 
 ```mermaid

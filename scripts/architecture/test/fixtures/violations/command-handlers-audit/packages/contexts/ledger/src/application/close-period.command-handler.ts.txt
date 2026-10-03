@@ -1,0 +1,8 @@
+import type { PostEntryCommand } from '../contracts/index.js';
+
+// Violación: un command handler mutante sin AuditPort (NFR-DATA-007).
+export class ClosePeriodCommandHandler {
+  async execute(cmd: PostEntryCommand): Promise<string> {
+    return cmd.currency;
+  }
+}

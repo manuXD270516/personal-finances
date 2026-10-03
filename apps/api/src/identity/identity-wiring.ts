@@ -1,10 +1,16 @@
 import type { ModuleMetadata } from '@nestjs/common';
+import { AuditModule, createAuditRuntime, type AuditPort } from '@pf/audit/interface/audit.module';
+import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
+import {
+  IdentityModule,
+  identityWorkspaceTimeZones,
+  type OutboxPort,
+} from '@pf/identity/interface/identity.module';
 import type { JwtVerifierOptions } from '@pf/platform/api';
 import type { ApiConfig } from '@pf/platform/config';
 import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
-import { IdentityModule, type AuditPort, type OutboxPort } from '@pf/identity/interface/identity.module';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 
@@ -24,7 +30,7 @@ export function jwtOptionsFromConfig(config: ApiConfig): JwtVerifierOptions | un
 /**
  * `OutboxPort` de IDENTITY sobre el outbox transaccional real (openspec add-event-outbox, cierra la tarea 6.3 de
  * add-workspace-identity): el evento se escribe en la transacción de la Unit of Work del caso de uso y se valida
- * contra contracts/events. La auditoría sigue registrándose en el log hasta add-audit-trail (design § Decisiones 12).
+ * contra contracts/events.
  */
 export function outboxPort(writer: OutboxWriter = new PgOutboxWriter(eventSchemaRegistry())): OutboxPort {
   return {
@@ -34,33 +40,49 @@ export function outboxPort(writer: OutboxWriter = new PgOutboxWriter(eventSchema
   };
 }
 
-function loggingAudit(logger: Logger): { audit: AuditPort } {
-  return {
-    audit: {
-      record: async (a) => {
-        logger.info(
-          { action: a.action, workspaceId: a.workspaceId },
-          'audit sin persistencia (add-audit-trail)',
-        );
-      },
-    },
-  };
+/**
+ * Composición de AUDIT (openspec add-audit-trail): `AuditPort` sobre `audit.audit_log` en la misma transacción que
+ * cada comando, con las allow-lists de redacción de cada contexto y la zona horaria del workspace de IDENTITY.
+ */
+export function auditRuntime(input: {
+  readonly config: Pick<ApiConfig, 'AUDIT_IP_HMAC_KEY'>;
+  readonly pool: Pool;
+  readonly conventions: ApiConventionsOptions;
+  readonly logger: Logger;
+}) {
+  if (!input.config.AUDIT_IP_HMAC_KEY) {
+    input.logger.warn('AUDIT_IP_HMAC_KEY ausente: clave HMAC de IP efímera (solo local/ci)');
+  }
+  return createAuditRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
+    policies: [IDENTITY_AUDIT_POLICY],
+    timeZones: identityWorkspaceTimeZones(input.pool),
+  });
 }
 
+/**
+ * Contextos de negocio montados en `/api/v1`: IDENTITY (guard global de autenticación/autorización) y AUDIT
+ * (`/audit-log`). Sin emisor OIDC (solo local/ci) no hay autenticación posible y no se monta ninguno.
+ */
 export function identityImports(input: {
   readonly config: ApiConfig;
   readonly pool: Pool;
   readonly conventions: ApiConventionsOptions;
   readonly logger: Logger;
   readonly jwt?: JwtVerifierOptions;
+  /** Sustituye el `AuditPort` (tests de atomicidad con fallos inyectados). */
+  readonly audit?: (port: AuditPort) => AuditPort;
 }): NonNullable<ModuleMetadata['imports']> {
   const jwt = input.jwt ?? jwtOptionsFromConfig(input.config);
   if (!jwt) {
     input.logger.warn(
-      'OIDC_ISSUER_URL ausente: rutas /api/v1/me y /api/v1/workspaces no montadas (solo local/ci)',
+      'OIDC_ISSUER_URL ausente: rutas /api/v1/me, /api/v1/workspaces y /audit-log no montadas (solo local/ci)',
     );
     return [];
   }
+  const audit = auditRuntime(input);
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -74,7 +96,8 @@ export function identityImports(input: {
         personalWorkspaceName: 'Personal',
       },
       outbox: outboxPort(),
-      ...loggingAudit(input.logger),
+      audit: input.audit ? input.audit(audit.port) : audit.port,
     }),
+    AuditModule.register({ runtime: audit, conventions: input.conventions }),
   ];
 }

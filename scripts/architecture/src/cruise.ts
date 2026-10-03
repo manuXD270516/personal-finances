@@ -58,10 +58,11 @@ export function cruise(cwd: string, targets: readonly string[]): Promise<CruiseR
         }
         // Reporter `err` (mismo código de salida que `arch:check`): `  error <regla>: <from> → <to>`;
         // en no-circular el ciclo continúa en las líneas siguientes.
-        const violations = [...text.matchAll(/^\s*error (\S+): (\S+) →\s+(\S+)/gm)].map((m) => ({
+        // Las reglas de módulo (`required`) no tienen destino: `  error <regla>: <módulo>`.
+        const violations = [...text.matchAll(/^\s*error (\S+): (\S+)(?: →\s+(\S+))?/gm)].map((m) => ({
           rule: m[1] as string,
           from: m[2] as string,
-          to: m[3] as string,
+          to: (m[3] ?? m[2]) as string,
         }));
         done({ exitCode, violations });
       },

@@ -8,6 +8,7 @@ import {
   httpContextMiddleware,
   PinoNestLogger,
   problemFallbackHandlers,
+  requestContextMiddleware,
   type ApiConventionsOptions,
 } from '@pf/platform/nest';
 import { shutdownTelemetry } from '@pf/platform/otel';
@@ -16,6 +17,7 @@ import { ApiModule } from './api.module.js';
 import { createApiConventions, type ApiConventionsOverrides } from './api-conventions.js';
 import { identityImports } from '../identity/identity-wiring.js';
 import type { JwtVerifierOptions } from '@pf/platform/api';
+import type { AuditPort } from '@pf/audit/interface/audit.module';
 
 /** Rutas operativas fuera de la API versionada (proposal: los probes no dependen de auth ni de versionado). */
 const UNVERSIONED_ROUTES = [
@@ -42,8 +44,12 @@ export interface ApiRuntimeOptions extends ApiConventionsOverrides {
   ) => NonNullable<ModuleMetadata['imports']>;
   /** Middleware previo a las rutas (tests: fija el usuario autenticado hasta que exista add-workspace-identity). */
   readonly middleware?: Parameters<NestExpressApplication['use']>[0];
-  /** Monta IDENTITY (`/me`, `/workspaces*`): por defecto según `OIDC_ISSUER_URL`; `false` lo omite (harness). */
-  readonly identity?: false | { readonly jwt?: JwtVerifierOptions };
+  /**
+   * Monta IDENTITY (`/me`, `/workspaces*`) y AUDIT (`/audit-log`): por defecto según `OIDC_ISSUER_URL`; `false` los
+   * omite (harness). `audit` envuelve el `AuditPort` (tests de atomicidad con fallos inyectados).
+   */
+  readonly identity?:
+    false | { readonly jwt?: JwtVerifierOptions; readonly audit?: (port: AuditPort) => AuditPort };
 }
 
 export async function createApiRuntime(
@@ -72,6 +78,7 @@ export async function createApiRuntime(
               conventions,
               logger,
               ...(options.identity?.jwt ? { jwt: options.identity.jwt } : {}),
+              ...(options.identity?.audit ? { audit: options.identity.audit } : {}),
             })),
         ...(options.imports?.(resources, conventions) ?? []),
       ],
@@ -79,6 +86,8 @@ export async function createApiRuntime(
     { logger: new PinoNestLogger(logger), abortOnError: false, bodyParser: false },
   );
   app.use(httpContextMiddleware(logger));
+  // Contexto ambiental (origen, user agent, IP para su HMAC, Idempotency-Key) que usa la auditoría (add-audit-trail).
+  app.use(requestContextMiddleware());
   // JSON y `application/*+json` (merge-patch de PATCH, docs/10 §2); errores de parseo → 400 VALIDATION_FAILED.
   app.useBodyParser('json', { type: ['application/json', 'application/*+json'], limit: '1mb' });
   if (options.middleware) app.use(options.middleware);

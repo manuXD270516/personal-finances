@@ -68,6 +68,11 @@ const CASES: readonly { overlay: string; rule: string; offender: string }[] = [
   },
   { overlay: 'shared-kernel-pure', rule: 'shared-kernel-pure', offender: 'shared-kernel/src/__violation.ts' },
   { overlay: 'no-circular', rule: 'no-circular', offender: 'contracts/__cycle_' },
+  {
+    overlay: 'command-handlers-audit',
+    rule: 'command-handlers-audit',
+    offender: 'ledger/src/application/close-period.command-handler.ts',
+  },
 ];
 
 describe('[TC-PLATFORM-ARCH-001] reglas de dependency-cruiser', () => {
@@ -109,6 +114,25 @@ describe('[TC-PLATFORM-ARCH-001] reglas de dependency-cruiser', () => {
         repo.dispose();
       }
     });
+  });
+});
+
+describe('[TC-AUDIT-ATOMIC-001] todo command handler mutante depende de AuditPort (NFR-DATA-007)', () => {
+  it('un command handler sin @pf/audit/contracts hace fallar el chequeo; con AuditPort pasa', async () => {
+    const bad = createMiniRepo(FIXTURES, 'command-handlers-audit');
+    try {
+      const result = await cruise(bad.root, MINI_TARGETS);
+      expect(result.violations).toEqual([
+        {
+          rule: 'command-handlers-audit',
+          from: 'packages/contexts/ledger/src/application/close-period.command-handler.ts',
+          to: 'packages/contexts/ledger/src/application/close-period.command-handler.ts',
+        },
+      ]);
+      expect(result.exitCode).toBeGreaterThan(0);
+    } finally {
+      bad.dispose();
+    }
   });
 });
 

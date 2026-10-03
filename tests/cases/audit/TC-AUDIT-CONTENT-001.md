@@ -12,9 +12,14 @@ invariants: [INV-001]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/domain/audit-record.test.ts
+  - packages/contexts/audit/src/application/audit-recorder.test.ts
+  - packages/contexts/audit/test/integration/pg-audit-log.int.test.ts
+  - apps/api/test/api/audit.api.test.ts
+  - packages/platform/src/nest/request-context.middleware.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["audit"]
@@ -36,7 +41,7 @@ expected_result:
   - "Los montos se almacenan como cadenas decimales con su moneda, nunca como números"
   - "La entrada de la anulación contiene reason \"Duplicada\""
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-CONTENT-001 — La entrada de auditoría registra actor, workspace, diferencias, origen y correlación con montos exactos
@@ -52,3 +57,7 @@ Dado que el usuario "U1" edita la transacción "T1" de 120.00 a 102.00 BOB desde
 Cuando se lee la pista de auditoría de "T1"
 Entonces muestra "U1", los montos "120.00" y "102.00" en BOB, el origen "ui" y la correlación "C1"
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): La edición de monto y la anulación con motivo se ejercen con registros de agregado `Transaction` escritos por `AuditPort` (fixture) hasta `add-transaction-recording`; el origen `ui`, la correlación y el instante, además, con `PATCH /workspaces/{id}` real.
