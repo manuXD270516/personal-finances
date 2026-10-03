@@ -14,9 +14,10 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
-  - packages/contexts/transactions/src/domain/transfer.test.ts
   - packages/contexts/transactions/src/application/transfers.service.test.ts
+  - packages/contexts/transactions/src/domain/transfer.test.ts
   - packages/contexts/transactions/test/integration/pg-transfers.int.test.ts
+  - tests/e2e/specs/transfers.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -32,7 +33,7 @@ expected_result:
   - "422 problem+json con code TRANSFER_CURRENCY_MISMATCH; el detail sugiere registrar una conversión"
   - "Saldos sin cambios: 1000.00 BOB y 500.00 USD; nada persistido"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-TRANSFER-001 — Una transferencia entre cuentas de distinta moneda se rechaza en favor de una conversión

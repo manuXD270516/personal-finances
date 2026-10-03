@@ -37,14 +37,18 @@
 
 > Pendiente: este pase priorizó dominio → persistencia → casos de uso → API. La API completa (`/fx-rates*`, `/fx-rate-preferences`, `/currencies`, `/conversions*`) ya está disponible para la UI.
 
-- [ ] 6.1 Pantalla `/fx` → Tasas: lista por par con tipo/fuente/fecha, alta manual, corrección con motivo y vista de versiones reemplazadas; preferencias de tipo por par; verificar con test de componentes
-- [ ] 6.2 Formulario de conversión (docs/28 §4.3): dos de tres valores, fees por tipo y moneda (incluida tercera cuenta), resumen con efectiva, referencia, spread y costo total antes de confirmar, advertencia de discrepancia; textos en español vía i18n; verificar con test de componentes y montos formateados `es-BO`
-- [ ] 6.3 Detalle de conversión con historial de revisiones y vista "Detalle contable" plegada
+- [x] 6.1 Pantalla `/fx` → Tasas: lista por par con tipo/fuente/fecha, alta manual, corrección con motivo y vista de versiones reemplazadas; preferencias de tipo por par; verificar con test de componentes
+  - Nota (2026-10-03): `apps/web/src/ui/fx/FxRatesPage.tsx` (`/fx`): tasas por par con tipo, fuente y vigencia, alta manual, corrección con motivo, versiones reemplazadas y preferencia de tipo por par (`PUT fx-rate-preferences` con `If-Match`); tests en `fx.test.tsx`.
+- [x] 6.2 Formulario de conversión (docs/28 §4.3): dos de tres valores, fees por tipo y moneda (incluida tercera cuenta), resumen con efectiva, referencia, spread y costo total antes de confirmar, advertencia de discrepancia; textos en español vía i18n; verificar con test de componentes y montos formateados `es-BO`
+  - Nota (2026-10-03): `apps/web/src/ui/fx/ConversionForm.tsx` (`/fx/conversiones/nueva`): dos de tres valores con `POST conversions/preview`, comisiones por tipo descontadas de lo entregado/recibido o pagadas desde otra cuenta (tercera moneda), referencia explícita opcional y resumen (efectiva, referencia, spread, costo total, advertencia de discrepancia) obligatorio antes de registrar.
+- [x] 6.3 Detalle de conversión con historial de revisiones y vista "Detalle contable" plegada
+  - Nota (2026-10-03): `ConversionDetailView.tsx` en el detalle de la transacción: revisión vigente, tabla de revisiones (`GET conversions/{id}/revisions`) y "Detalle contable" plegado. La enmienda (`PUT conversions/{id}`) sigue sin pantalla.
 
 ## 7. TESTS automatizados y E2E
 
 - [x] 7.1 Agregar los TC críticos (canónico USDT→BOB, cripto→cripto con TRX, inmutabilidad, no-recálculo) a la Financial Regression Suite; verificar que corren en el gate de PR — los TC críticos tienen `regression_suite: true` y corren en `pnpm test`/`pnpm test:integration`
-- [ ] 7.2 (Pendiente: depende de la UI del grupo 6; el flujo está cubierto por la prueba de API) E2E Playwright: registrar tasa P2P 6.95, convertir 100.000000 USDT → 685.00 BOB con fee 5.00 BOB, ver saldos, efectiva 6.85 y spread 0.72 %; corregir la tasa y comprobar que la conversión no cambia
+- [x] 7.2 (Pendiente: depende de la UI del grupo 6; el flujo está cubierto por la prueba de API) E2E Playwright: registrar tasa P2P 6.95, convertir 100.000000 USDT → 685.00 BOB con fee 5.00 BOB, ver saldos, efectiva 6.85 y spread 0.72 %; corregir la tasa y comprobar que la conversión no cambia
+  - Nota (2026-10-03): `tests/e2e/specs/fx.spec.ts` (tasa P2P 6.95, 100.000000 USDT → 685.00 BOB con fee 5.00 BOB, efectiva 6.85, spread 0.72 %, saldos, corrección de la tasa sin recalcular la conversión); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 
 ## 8. DOCUMENTACIÓN y cierre
 

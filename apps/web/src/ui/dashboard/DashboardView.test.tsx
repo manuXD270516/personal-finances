@@ -95,6 +95,22 @@ describe('Home: dinero disponible y tasa usada (add-basic-dashboard, tarea 6.1)'
     expect(text(q1)).toContain('Total incompleto');
     expect(q1).toMatch(/data-testid="unconverted-amount">0,01000000 BTC</);
     expect(q1).toContain('Registrar tasa BTC/BOB');
+    // Con la pantalla de tasas disponible, la acción es un enlace con el par prellenado.
+    const linked = renderToStaticMarkup(
+      <DashboardView
+        summary={{
+          ...SUMMARY,
+          consolidated: {
+            ...SUMMARY.consolidated,
+            complete: false,
+            unconverted: [{ amount: '0.01000000', currency: 'BTC' }],
+          },
+        }}
+        {...ctx}
+        registerRateHref="/fx"
+      />,
+    );
+    expect(linked).toContain('<a href="/fx?base=BTC&amp;quote=BOB">Registrar tasa BTC/BOB</a>');
     expect(q1).toMatch(/data-testid="liquid-balance-amount"[^>]*>1\.406,50 BOB</);
   });
 

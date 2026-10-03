@@ -17,6 +17,7 @@ automated_tests:
   - packages/contexts/transactions/src/application/transactions.service.test.ts
   - packages/contexts/transactions/src/domain/transaction.test.ts
   - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+  - tests/e2e/specs/transactions.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -42,7 +43,7 @@ expected_result:
   - "Se publica TransactionPosted con revision 2 y supersedesJournalEntryId = E1"
   - "T4 queda en posted con un asiento activo de 65.00 BOB"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-EDIT-001 — Editar el monto de una transacción registrada produce una reversa más un nuevo asiento

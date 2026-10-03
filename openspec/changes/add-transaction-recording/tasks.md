@@ -41,13 +41,17 @@
 ## 6. UI
 
 - [ ] 6.1 Formulario de transacción (ingreso/gasto/reembolso/ajuste) con entrada de montos tolerante al locale (NFR-USAB-003), splits con reparto por porcentaje/partes iguales usando la regla compartida, advertencia de duplicados no bloqueante; verificar con tests de componente y axe sin violaciones serious/critical
-- [ ] 6.2 Registro de transacciones con filtros, búsqueda, marcado `cleared` individual y en lote, y detalle con historial, anular, des-reconciliar y "duplicar"; verificar en viewport móvil 360 px (NFR-USAB-006)
-- [ ] 6.3 Copys en español mapeados por `code` de error (sin mostrar `title` técnico); verificar que todos los códigos de este change tienen copy
+  - Nota (2026-10-03): formulario hecho (`apps/web/src/ui/transactions/TransactionForm.tsx`, `SplitsEditor.tsx`, `CounterpartyPicker.tsx`; ruta `/transacciones/nueva`): montos tolerantes al locale (`common/money.ts`), splits con "Restante por asignar", partes iguales y porcentajes con `Money.allocate` del shared-kernel, aviso de duplicados no bloqueante (`duplicate-check`), medio de pago (incluido QR), reembolso vinculado y ajuste con motivo; tests de componente en `transactions.test.tsx` y `common/money.test.ts`. Pendiente: verificación con axe (sin `@axe-core/playwright` en el repo).
+- [x] 6.2 Registro de transacciones con filtros, búsqueda, marcado `cleared` individual y en lote, y detalle con historial, anular, des-reconciliar y "duplicar"; verificar en viewport móvil 360 px (NFR-USAB-006)
+  - Nota (2026-10-03): `TransactionsPage.tsx` (`/transacciones`: filtros, búsqueda, marcado cleared en lote) y `TransactionDetail.tsx` (`/transacciones/{id}`: confirmar, reconciliar, des-reconciliar con motivo, anular con motivo, contabilizar pendiente, editar y "Duplicar"). El historial se presenta como línea de tiempo del ciclo de vida (estado → estado, quién, cuándo, por qué y revisión contable) sobre `GET …/transactions/{id}/history`, visible para VIEWER. Viewport 360 px verificado en E2E.
+- [x] 6.3 Copys en español mapeados por `code` de error (sin mostrar `title` técnico); verificar que todos los códigos de este change tienen copy
+  - Nota (2026-10-03): los errores se muestran por `code` con `ProblemMessage` y el catálogo `messages/errors.{es,en,pt}.json` (ya cubría todos los códigos del change; lo verifica TC-PLATFORM-API-005).
 
 ## 7. AUTOMATED TESTS y E2E
 
 - [x] 7.1 Asegurar que cada TC del change tiene al menos un test con `[TC-…]` al inicio del nombre y actualizar `automation_status`/`automated_tests`; verificar con la matriz de trazabilidad
-- [ ] 7.2 E2E Playwright: registrar un gasto dividido, editar su monto, marcarlo cleared y anular otro, comprobando saldos en pantalla; verificar en CI con el stack `core`
+- [x] 7.2 E2E Playwright: registrar un gasto dividido, editar su monto, marcarlo cleared y anular otro, comprobando saldos en pantalla; verificar en CI con el stack `core`
+  - Nota (2026-10-03): `tests/e2e/specs/transactions.spec.ts` (gasto dividido, edición del monto con reversa ⇒ revisión 2, confirmación individual y en lote, anulación de otro, saldos en pantalla; QR, contrapartes en línea, reembolso, ajuste, duplicar como pendiente; historial visible para VIEWER); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 - [ ] 7.3 Benchmark de NFR-PERF-001 (listado 50k) y NFR-PERF-003 (comando de escritura); verificar p95 dentro de umbral en el job nightly
 
 ## 8. DOCUMENTACIÓN y cierre

@@ -22,6 +22,8 @@ export interface AuditLogEntry {
   readonly changes: readonly { readonly field: string; readonly before: unknown; readonly after: unknown }[];
   readonly reason: string | null;
   readonly origin: string;
+  /** Correlación de la operación: agrupa las entradas de un mismo comando (p. ej. transacción + asiento). */
+  readonly correlationId?: string;
 }
 
 interface Money {

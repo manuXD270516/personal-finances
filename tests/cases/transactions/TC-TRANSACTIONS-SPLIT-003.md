@@ -14,6 +14,7 @@ type: property
 level: property
 automation_status: automated
 automated_tests:
+  - apps/web/src/ui/transactions/transactions.test.tsx
   - packages/contexts/transactions/src/domain/transaction.properties.test.ts
 status: automated
 regression_suite: true
@@ -40,7 +41,7 @@ expected_result:
   - "Repetir el pedido produce el mismo resultado"
   - "PBT: para todo monto y pesos > 0, la suma es exacta y cada parte difiere de su cuota ideal en menos de una unidad de escala"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-SPLIT-003 — El reparto en partes iguales o por porcentaje es exacto y reproducible

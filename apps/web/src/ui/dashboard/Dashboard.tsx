@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
-import { useSession } from '../session-context';
+import { localized, useSession } from '../session-context';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import type { ReportSummary } from './types';
 
@@ -66,6 +66,8 @@ export function Dashboard() {
       timeZone={loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE}
       t={(key, values) => t(key, values)}
       has={(key) => t.has(key)}
+      createAccountHref={localized(uiLocale, '/cuentas/nueva')}
+      registerRateHref={localized(uiLocale, '/fx')}
     />
   );
 }

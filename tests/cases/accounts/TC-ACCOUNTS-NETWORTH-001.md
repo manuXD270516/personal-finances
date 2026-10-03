@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/accounts.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "net-worth"]
@@ -29,7 +30,7 @@ expected_result:
   - "Patrimonio neto en BOB = 1000.00 BOB"
   - "El saldo de Préstamo a familiar sigue siendo 500.00 BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-NETWORTH-001 — Una cuenta excluida del patrimonio neto conserva su saldo pero no suma al patrimonio

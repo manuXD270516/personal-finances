@@ -17,6 +17,7 @@ level: domain
 automation_status: automated
 automated_tests:
   - packages/contexts/transactions/src/domain/transfer.test.ts
+  - tests/e2e/specs/transfers.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -41,7 +42,7 @@ expected_result:
 - Patrimonio sin cambio
 - paymentMethod QR
 created: '2026-10-02'
-updated: '2026-10-02'
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-TRANSFER-008 — Transferencia por QR entre cuentas propias preserva el patrimonio

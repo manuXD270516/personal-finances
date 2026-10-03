@@ -198,6 +198,25 @@ describe('API de categorías (tareas 6.1-6.3)', () => {
     expect(dup.body['existingId']).toBe(r.body['id']);
   });
 
+  it('crear una categoría con Idempotency-Key (opcional) responde 201 y el reintento reproduce la misma respuesta', async () => {
+    // Regresión: el nombre localizado se leía DESPUÉS del comando con una unidad de trabajo sin workspace, que
+    // dejaba la transacción de idempotencia sin contexto RLS ⇒ 500 "workspace context not set".
+    const key = randomUUID();
+    const send = () =>
+      call('POST', `/api/v1/workspaces/${ws}/categories`, {
+        token: u.token,
+        body: { groupId, name: 'Farmacia idempotente' },
+        headers: { 'idempotency-key': key },
+      });
+    const first = await send();
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+    expect(contract.validateResponse('createCategory', 201, first.body)).toEqual([]);
+    const replay = await send();
+    expect(replay.status).toBe(201);
+    expect(replay.headers.get('idempotent-replayed')).toBe('true');
+    expect(replay.body['id']).toBe(first.body['id']);
+  });
+
   it('[TC-CLASSIFICATION-SYSTEM-002] FEES: archivar y renombrar ⇒ 409 SYSTEM_CATEGORY_IMMUTABLE; color ⇒ 200', async () => {
     const fees = (await categories(u.token, ws)).find((c) => c.systemCode === 'FEES')!;
     const path = `/api/v1/workspaces/${ws}/categories/${fees.id}`;

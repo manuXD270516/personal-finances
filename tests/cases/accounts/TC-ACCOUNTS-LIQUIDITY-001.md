@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/accounts/AccountsListView.test.tsx
+  - tests/e2e/specs/accounts.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "liquidity"]
@@ -34,7 +36,7 @@ expected_result:
   - "Dinero disponible en BOB = 1000.00 BOB"
   - "Tras el cambio, dinero disponible en BOB = 6000.00 BOB y no se crea ningún asiento"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-LIQUIDITY-001 — La liquidez de la cuenta tiene un valor por defecto según tipo y solo lo líquido cuenta como dinero disponible

@@ -15,6 +15,7 @@ level: property
 automation_status: automated
 automated_tests:
   - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - tests/e2e/specs/fx.spec.ts
 status: automated
 regression_suite: true
 phase: 1

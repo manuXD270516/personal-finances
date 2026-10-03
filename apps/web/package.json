@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
     "next": "catalog:",
     "next-intl": "catalog:",
     "openid-client": "catalog:",

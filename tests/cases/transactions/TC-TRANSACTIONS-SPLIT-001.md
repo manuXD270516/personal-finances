@@ -17,6 +17,7 @@ automated_tests:
   - packages/contexts/transactions/src/domain/transaction.properties.test.ts
   - packages/contexts/transactions/src/domain/transaction.test.ts
   - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+  - tests/e2e/specs/transactions.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -43,7 +44,7 @@ expected_result:
   - "Inválido (suma 149.99): se rechaza con SPLITS_DO_NOT_SUM y no se persiste nada"
   - "Saldo de Bank A = 850.00 BOB"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-SPLIT-001 — Los montos de la división (split) deben sumar exactamente el total de la transacción

@@ -14,6 +14,7 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
+  - apps/web/src/ui/transactions/transactions.test.tsx
   - packages/contexts/transactions/src/application/transactions.service.test.ts
 status: automated
 regression_suite: false
@@ -29,7 +30,7 @@ expected_result:
   - "Cada entrada tiene actor, occurredAt UTC, versión y correlationId"
   - "Un VIEWER puede consultar el historial; los datos de otro workspace nunca aparecen"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-HISTORY-001 — El detalle de una transacción muestra su historial de cambios en orden

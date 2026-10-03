@@ -12,9 +12,10 @@ invariants: [INV-009, INV-004, INV-030]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/transfers.spec.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["credit-card", "liability", "net-worth"]
@@ -43,7 +44,7 @@ expected_result:
   - "Tras el pago: Bank A 650.00, Credit Card 0.00, patrimonio neto sigue en 650.00 BOB"
   - "Gasto de Household en marzo = 350.00 (contado una sola vez, no de nuevo en el pago)"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-CREDITCARD-001 — La compra con tarjeta de crédito aumenta el pasivo y el pago es una transferencia que conserva el patrimonio neto
