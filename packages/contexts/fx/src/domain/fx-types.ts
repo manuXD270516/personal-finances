@@ -1,6 +1,33 @@
-/** Tipos de tasa de FR-FX-002 (docs/31 D13; design.md pregunta abierta resuelta a favor de FR-FX-002). */
-export const FX_RATE_TYPES = ['OFFICIAL', 'PARALLEL', 'P2P', 'BANK', 'CUSTOM'] as const;
+/**
+ * Tipos de tasa de FR-FX-002 (docs/31 D13; design.md pregunta abierta resuelta a favor de FR-FX-002) más la compra
+ * y la venta publicadas del mercado paralelo (`PARALLEL_BUY` / `PARALLEL_SELL`; decisión del owner 2026-10-03,
+ * add-market-rate-providers decisión 29).
+ */
+export const FX_RATE_TYPES = [
+  'OFFICIAL',
+  'PARALLEL',
+  'P2P',
+  'BANK',
+  'CUSTOM',
+  'PARALLEL_BUY',
+  'PARALLEL_SELL',
+] as const;
 export type FxRateType = (typeof FX_RATE_TYPES)[number];
+
+/**
+ * Cotizaciones de un solo lado (compra/venta publicadas por la fuente, tal como la fuente las nombra). Se registran
+ * además de la mediana/punto medio `PARALLEL` y SOLO se usan cuando se piden explícitamente (tipo pedido o
+ * preferencia del par): sin tipo resuelto y en el nivel de manuales de otro tipo nunca entran, así la valoración
+ * por defecto no cambia (design.md decisión 29).
+ */
+export const QUOTE_SIDE_RATE_TYPES = ['PARALLEL_BUY', 'PARALLEL_SELL'] as const;
+export type QuoteSideRateType = (typeof QUOTE_SIDE_RATE_TYPES)[number];
+
+export const isQuoteSideRateType = (t: FxRateType): t is QuoteSideRateType =>
+  (QUOTE_SIDE_RATE_TYPES as readonly string[]).includes(t);
+
+/** Mercado de un tipo: compra/venta paralela comparten roles de providers y obsolescencia con `PARALLEL`. */
+export const marketOf = (t: FxRateType): FxRateType => (isQuoteSideRateType(t) ? 'PARALLEL' : t);
 
 /** Origen de una tasa: manual (este change), provider (add-market-rate-providers) u observación de conversión. */
 export const FX_RATE_SOURCES = ['MANUAL', 'PROVIDER', 'USER_CONVERSION'] as const;

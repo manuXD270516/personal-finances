@@ -248,6 +248,9 @@ services:
       resources:
         limits: { cpus: '1', memory: 512m }
 
+  # El worker consulta los providers de tasas (paralelo.bo y bo.dolarapi.com, HTTPS 443; add-market-rate-providers):
+  # necesita salida a internet. La red `default` del proyecto es un bridge NO interno (no declarar `internal: true`)
+  # y la configuración FX_* llega solo del `.env` (contrato único; aquí no se fija ninguna). TC-FX-PROVIDER-019.
   finance-worker:
     <<: *app
     profiles: [core]

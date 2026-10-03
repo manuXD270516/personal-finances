@@ -112,6 +112,7 @@ export class InMemoryReporting {
       derivation: r.base === req.base ? 'DIRECT' : 'INVERSE',
       components: [],
       rateType: r.rateType ?? 'PARALLEL',
+      requestedRateType: r.rateType ?? 'PARALLEL',
       source: r.source ?? (provider ? 'PROVIDER' : 'MANUAL'),
       sourceLabel: r.sourceLabel ?? null,
       asOf: r.asOf,

@@ -3,6 +3,7 @@ import {
   PROVIDER_DESCRIPTORS,
   ProviderError,
   ProviderSample,
+  type FxRateType,
   type MarketRateProvider,
   type ProviderDescriptor,
 } from '../../domain/index.js';
@@ -15,6 +16,11 @@ const LA_PAZ = 'America/La_Paz';
 const LA_PAZ_OFFSET_MS = 4 * 3_600_000;
 const DAY_MS = 86_400_000;
 const LABEL = 'paralelo.bo (mediana P2P USDT/BOB)';
+/** Compra/venta publicadas, perspectiva de quien opera: `buy` = lo que paga quien compra; `sell` = lo que recibe. */
+const SIDES = [
+  { field: 'buy', rateType: 'PARALLEL_BUY', label: 'paralelo.bo (compra P2P USDT/BOB)' },
+  { field: 'sell', rateType: 'PARALLEL_SELL', label: 'paralelo.bo (venta P2P USDT/BOB)' },
+] as const;
 const PAIRS = [
   { base: 'USD', quote: 'BOB' },
   { base: 'USDT', quote: 'BOB' },
@@ -77,8 +83,9 @@ function instantText(v: JsonValue | undefined, field: string): string {
 
 /**
  * Adapter ACL de paralelo.bo (fuente principal; ADR-0025). `fetchLatest` → 2 muestras `PARALLEL` (USD/BOB y USDT/BOB)
- * con `value = median` y `asOf = timestamp`; `buy`, `sell`, `spreadPct`, `sourceCount` y `methodologyVersion` solo
- * quedan en la respuesta cruda. `fetchHistory` → por cada punto de un día COMPLETO D (D < hoy en America/La_Paz), 2
+ * con `value = median` y `asOf = timestamp`, más `PARALLEL_BUY` = `buy` y `PARALLEL_SELL` = `sell` por par (decisión
+ * del owner 2026-10-03; omitidas si vienen nulas o ausentes, `PROVIDER_PAYLOAD_INVALID` si son inválidas);
+ * `spreadPct`, `sourceCount` y `methodologyVersion` solo quedan en la respuesta cruda. `fetchHistory` → por cada punto de un día COMPLETO D (D < hoy en America/La_Paz), 2
  * muestras vigentes al cierre de D (`D 23:59:59 -04:00`).
  */
 export class ParaleloBoProvider implements MarketRateProvider {
@@ -104,18 +111,25 @@ export class ParaleloBoProvider implements MarketRateProvider {
       throw schemaChanged('rate response lacks timestamp/median');
     const asOf = instantText(doc['timestamp'], 'timestamp');
     const value = numberText(doc['median'], 'median');
-    return PAIRS.map((p) =>
+    const sample = (p: (typeof PAIRS)[number], rateType: FxRateType, v: string, sourceLabel: string) =>
       ProviderSample.of({
         provider: 'PARALELO_BO',
         ...p,
-        rateType: 'PARALLEL',
-        value,
+        rateType,
+        value: v,
         asOf,
         fetchedAt: res.fetchedAt,
         rawPayload: res.body,
-        sourceLabel: LABEL,
-      }),
-    );
+        sourceLabel,
+      });
+    const samples = PAIRS.map((p) => sample(p, 'PARALLEL', value, LABEL));
+    for (const side of SIDES) {
+      const raw = doc[side.field];
+      if (raw === undefined || raw === null) continue;
+      const v = numberText(raw, side.field);
+      for (const p of PAIRS) samples.push(sample(p, side.rateType, v, side.label));
+    }
+    return samples;
   }
 
   async fetchHistory(): Promise<ProviderSample[]> {

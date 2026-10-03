@@ -42,7 +42,7 @@ Bounded contexts, agregados y puertos:
 - Más providers, precios cripto/commodities (Phase 5).
 - Alertas por email/in-app (Phase 2, Notifications); aquí solo estado consultable y marca en la tasa.
 - Configuración de providers por workspace desde la UI (Phase 1: variables de entorno de la instalación).
-- Tipos de tasa `BUY`/`SELL` (compra/venta quedan en la respuesta cruda).
+- ~~Tipos de tasa `BUY`/`SELL`~~: revertido por el owner el 2026-10-03 (decisión 29).
 
 ## Decisiones
 
@@ -62,6 +62,8 @@ Bounded contexts, agregados y puertos:
    | `FX_PROVIDER_OFFICIAL` | `dolarapi_bo` | `dolarapi_bo`, `none` |
    | `FX_POLL_INTERVAL` | `15m` | duración en minutos enteros, mínimo `1m` (60 s) |
    | `FX_STALE_AFTER_PARALLEL` / `FX_STALE_AFTER_OFFICIAL` | `60m` / `48h` | duración |
+   | `FX_STALE_AFTER_FALLBACK` | `180m` | duración (umbral propio del respaldo de `PARALLEL`; decisión 30) |
+   | `FX_MANUAL_FALLBACK_MAX_AGE` | `24h` | duración (manual de otro tipo como último recurso; decisión 31) |
    | `FX_ANOMALY_THRESHOLD_PCT` | `5` | decimal > 0 |
    | `FX_PROVIDER_TIMEOUT` | `10s` | duración ≤ 30 s |
    | `FX_BACKFILL_ENABLED` | `true` | bool |
@@ -91,6 +93,13 @@ Decisiones de implementación (2026-10-03):
 26. **Selección.** `RateResolver` aplica `ValuationRateSelector` dentro de cada orientación (directa antes que inversa, decisión 14 de add-manual-conversions) solo para valorar (`resolve`/`tryResolve`); la referencia de una conversión (`resolveForConversion`, también el costo total) sigue siendo la tasa más reciente SIN niveles (decisión 7), y ambas excluyen anomalías pendientes/rechazadas (la referencia explícita sigue ganando, decisión 24 de add-manual-conversions). Una tasa de provider sin rol configurado (p. ej. con `none`) solo entra por el nivel 3 (`LAST_KNOWN_STALE`, `stale` según su antigüedad). Cruzada: `provider`/`selection` de la componente más antigua, `stale` si alguna lo está. Línea base de anomalías: última tasa aceptada del feed con `asOf` anterior a la muestra. `FxRate.anomaly.thresholdPct` informa el umbral configurado vigente (no se persiste por fila).
 27. **Escrituras del sistema sin auditoría de usuario.** La ingesta vive en `market-rate-ingestion.ts` (no `*.service.ts`): sus efectos se trazan con `fx.RateRecorded.v1` (actor `SYSTEM fx-provider:<id>`, `correlationId` = id del ciclo) y `fx.provider_run`. Solo `ReviewRateAnomaly` (en `FxService`) audita (`fx.exchange_rate.anomaly_reviewed`, `anomalyStatus` PENDING → CONFIRMED/REJECTED, motivo en `reason`; `FX_AUDIT_POLICY.ExchangeRate.anomalyStatus = plain`).
 28. **Migraciones.** `20261003230000_fx_market_rate_providers.sql` (columnas, CHECKs, FK compuesta de la línea base, índices, `fx.rate_anomaly_review` con trigger "solo tasas marcadas", `fx.provider_run`) y `20261003230100_iam_workspace_directory_role.sql`. El índice único no usa `CONCURRENTLY` (dbmate corre cada migración en una transacción; tabla pequeña). `raw_payload` ≤ 1 MiB por CHECK.
+
+Decisiones del owner (2026-10-03), aplicadas en la rama `feat/fx-owner-decisions`:
+
+29. **Compra y venta como tipos propios.** Umbrales confirmados (obsolescencia 60 min principal / 48 h oficial, anomalía 5 %, polling 15 min). Nuevos `FxRateType` `PARALLEL_BUY` y `PARALLEL_SELL` (aditivos: en OpenAPI `FxRateType` pasa a `x-extensible-enum` en respuestas, como `ErrorCode`, y las requests usan el conjunto cerrado `FxRateTypeInput` / `FxRatePreferenceListInput`; `oasdiff breaking` sin cambios incompatibles; `ResolvedRate.requestedRateType` nuevo y opcional; también en `fx.RateRecorded.v1` / `transactions.ConversionRecorded.v1`; CHECKs ampliados por `20261004130000_fx_quote_side_rate_types.sql` en `fx.exchange_rate`, `fx.rate_preference` y `txn.conversion_detail`). Perspectiva de quien opera: `PARALLEL_BUY` = lo que paga quien compra la divisa (`buy` de paralelo.bo, `venta` de la casa `binance` de bo.dolarapi.com), `PARALLEL_SELL` = lo que recibe quien la vende (`sell` / `compra`); en ambas fuentes BUY ≥ SELL. Se registran con la misma vigencia, provider y crudo que la mediana (feeds `quoteSideFeeds` del descriptor; el estado del provider sigue informando solo los feeds de valoración). `buy`/`sell` nulos o ausentes ⇒ solo la mediana; presentes e inválidos ⇒ `PROVIDER_PAYLOAD_INVALID`. Comparten roles y obsolescencia con `PARALLEL` (`marketOf`) y la detección de anomalías (línea base por tipo). **Solo se usan si se piden** (tipo explícito o preferencia): sin tipo resuelto `RateResolver` los excluye, así la valoración y la referencia de conversión por defecto no cambian. La casa `oficial` no aporta compra/venta (hoy 12/12; ampliable con `OFFICIAL_BUY/SELL` de forma aditiva).
+30. **Umbral propio del respaldo.** `FX_STALE_AFTER_FALLBACK` (180 min) aplica a las tasas del provider que cumple el rol de RESPALDO de `PARALLEL` (y su compra/venta) según la configuración (`StalenessPolicy.thresholdFor`), nunca al principal ni a `OFFICIAL`; resuelve la pregunta de calibración del respaldo (bo.dolarapi.com publica `fechaActualizacion` con ~2 h de retraso). Lo usan la selección y `GetProviderStatus`.
+31. **Manual de otro tipo como último recurso** (docs/31 D34; pregunta abierta de add-basic-dashboard). En el nivel 3 de `ValuationRateSelector`, si el tipo pedido lo alimentan providers (tiene umbral de obsolescencia), compite también la manual MÁS RECIENTE de otro tipo del par que cumpla: no reemplazada, sin anomalía pendiente/rechazada, `asOf ≤ t`, `t − asOf ≤ FX_MANUAL_FALLBACK_MAX_AGE` (24 h, propuesta pendiente de confirmación del owner) y desvío `|m − p| / p × 100 ≤ FX_ANOMALY_THRESHOLD_PCT` (5 %, Decimal, en la orientación de la manual) respecto de la última tasa de provider usable del par y tipo pedido, si existe; nunca compra/venta. Entre manuales gana la más reciente (a igual vigencia, la del tipo pedido); la manual del tipo pedido conserva el comportamiento de `fx/market-rates` (sin límite de antigüedad salvo la ventana). La sustitución se marca con `ResolvedRate.requestedRateType` (aditivo, nullable) ≠ `rateType`, `selection = MANUAL`. No aplica a la referencia de una conversión (decisión 26). PBT de 500 corridas (TC-FX-PROVIDER-018).
+32. **Providers en el entorno en contenedores.** `.env.example` mantiene ambos providers habilitados. El `finance-worker` del modo B sale por la red Compose por defecto (bridge no interno) a `paralelo.bo` y `bo.dolarapi.com` (HTTPS 443, CA propio de Node, sin proxy) y recibe `FX_*` solo del `.env` (contrato único). `pnpm test:stack` lo verifica sin red con los providers en `none` (TC-FX-PROVIDER-019); verificación manual y egress corporativo en docs/19.
 
 Modelo de datos (schema.tabla, expand-only):
 
@@ -162,8 +171,9 @@ Dependencias (aplicadas antes): `add-api-conventions`, `add-workspace-identity` 
 ## Preguntas abiertas
 
 - **Uso comercial**: la licencia CC BY 4.0 permite uso comercial con atribución; paralelo.bo pide contacto para "uso comercial/límites mayores". Mientras PFOS sea personal no aplica; reevaluar antes de abrir el producto a terceros (ADR-0025 §Validación).
-- **Umbral de anomalía** (5 %) y obsolescencia (60 min) calibrados a ojo; revisar con 30 días de datos de `fx.provider_run`.
+- ~~**Umbral de anomalía** (5 %) y obsolescencia (60 min)~~: confirmados por el owner el 2026-10-03 (decisión 29); revisar igualmente con 30 días de datos de `fx.provider_run`.
 - **FR nuevas** (FR-FX-013..017) y cambio de fase/prioridad de FR-FX-009/010 (Phase 5 → 1; FR-FX-010 Should → Must) pendientes de incorporar a docs/01 por el lead.
-- ¿Registrar también `BUY`/`SELL` como tipos para el análisis de spread (FR-FX-011, Phase 5)?
-- **Calibración del respaldo (hallazgo 2026-10-03):** la `fechaActualizacion` de la casa `binance` de bo.dolarapi.com iba ~2 h por detrás al leerla (12:01Z a las 13:54Z). Con `FX_STALE_AFTER_PARALLEL = 60m` el respaldo a menudo estará obsoleto y la valoración caerá a `LAST_KNOWN_STALE` (la de provider más reciente) en vez de `FALLBACK`. ¿Subir el umbral solo para el respaldo, usar `fetchedAt` del respaldo como vigencia, o aceptarlo?
+- ~~¿Registrar también `BUY`/`SELL` como tipos?~~: sí, como `PARALLEL_BUY`/`PARALLEL_SELL` (decisión 29).
+- ~~**Calibración del respaldo**~~: resuelta con `FX_STALE_AFTER_FALLBACK` = 180 min (decisión 30). Hallazgo original (2026-10-03): la `fechaActualizacion` de la casa `binance` de bo.dolarapi.com iba ~2 h por detrás al leerla (12:01Z a las 13:54Z). Con `FX_STALE_AFTER_PARALLEL = 60m` el respaldo a menudo estará obsoleto y la valoración caerá a `LAST_KNOWN_STALE` (la de provider más reciente) en vez de `FALLBACK`. ¿Subir el umbral solo para el respaldo, usar `fetchedAt` del respaldo como vigencia, o aceptarlo?
+- **`FX_MANUAL_FALLBACK_MAX_AGE` = 24 h** (docs/31 D34) es una propuesta pendiente de confirmación del owner (decisión 31).
 - **Smoke en vivo (7.3) y UI (6.x)** quedan pendientes; `ReportSummary.meta.attributions` lo implementa `add-basic-dashboard`.
