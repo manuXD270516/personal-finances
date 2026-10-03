@@ -146,7 +146,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `documents.AttachmentUploaded.v1` | DOCUMENTS | IMPORTS, REPORTING | Escaneo OK | `documentId, contentType, sizeBytes, sha256, purpose` (sin filename) | `documentId` | N |
 | `imports.ImportCompleted.v1` | IMPORTS | NOTIFY, REPORTING | Commit terminado | `importJobId, accountId, sourceType, stats: {total, imported, duplicates, ignored, errors}, dateRange` | `importJobId` | N |
 | `forecast.ForecastGenerated.v1` | FORECAST | NOTIFY, REPORTING | Corrida exitosa | `forecastRunId, scope, horizonMonths, modelName, modelVersion, summary` | `forecastRunId` | N |
-| `fx.RateRecorded.v1` | FX | REPORTING | Tasa manual/proveedor/observación | `rateId, base, quote, value, asOf, rateType, source` | `rateId` | N |
+| `fx.RateRecorded.v1` | FX | REPORTING | Tasa manual/proveedor/observación (provider: actor `SYSTEM` `fx-provider:<id>`, un evento por workspace; la carga histórica emite uno por workspace y ejecución) | `rateId, base, quote, value, asOf, rateType, source` (+ opcionales aditivos `provider`, `anomalyFlagged`, add-market-rate-providers) | `rateId` | N |
+| `identity.WorkspaceCreated.v1` | IDENTITY | CLASSIFICATION, REPORTING, FX (consumidor `fx.market-rate-provisioning`, inbox: siembra preferencias `PARALLEL` USD/BOB y USDT/BOB y encola `fx.backfill-historical-rates` en la misma transacción; add-market-rate-providers) | Alta de workspace | `workspaceId, name, baseCurrency, timeZone, locale, fiscalMonthStartDay, ownerUserId, origin` | `workspaceId` | B (nombre) |
 | `classification.CategoriesMerged.v1` | CLASSIFICATION | TRANSACTIONS, PLANNING, RULES, REPORTING | `MergeCategories` | `sourceCategoryIds[], targetCategoryId` | `(targetCategoryId, aggregateVersion)` | N |
 
 ## 4. Versionado y evolución

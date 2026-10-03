@@ -1,5 +1,6 @@
 import { DomainError, Instant, Rate, type Currency } from '@pf/shared-kernel';
-import type { FxRateSource, FxRateType } from './fx-types.js';
+import type { FxRateProvider, FxRateSource, FxRateType } from './fx-types.js';
+import type { ProviderSample } from './market-rate-provider.js';
 
 /** NUMERIC(38,18): como máximo 20 dígitos enteros y 18 decimales; las tasas NO se redondean a la escala de la moneda. */
 const RATE_VALUE = /^(?:0|[1-9]\d{0,19})(?:\.\d{1,18})?$/;
@@ -22,6 +23,32 @@ export interface ExchangeRateState {
   readonly supersedeReason: string | null;
   readonly createdAt: string;
   readonly createdBy: string | null;
+  /** Provider que la originó (`source = PROVIDER`); `null` en tasas manuales (add-market-rate-providers). */
+  readonly provider: FxRateProvider | null;
+  /** Instante en que el worker obtuvo la muestra (`asOf` es el publicado por el provider). */
+  readonly fetchedAt: string | null;
+  /** Respuesta cruda exacta del provider (evidencia; nunca se expone en la API). */
+  readonly rawPayload: string | null;
+  /** Marca de anomalía inmutable de la fila (la decisión vive en `fx.rate_anomaly_review`). */
+  readonly anomaly: AnomalyMark | null;
+}
+
+/** Variación de una muestra de provider que superó el umbral respecto de la tasa aceptada anterior (design.md 8). */
+export interface AnomalyMark {
+  readonly baselineRateId: string;
+  /** Porcentaje con signo, HALF_EVEN a 4 decimales (`"12.3128"`). */
+  readonly variationPct: string;
+}
+
+/** Datos de una tasa de provider que no vienen de la muestra (copia por workspace; design.md decisión 3). */
+export interface ProviderRateInput {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly base: Currency;
+  readonly quote: Currency;
+  readonly effectiveDate: string;
+  readonly createdAt: string;
+  readonly anomaly: AnomalyMark | null;
 }
 
 export interface RecordRateInput {
@@ -104,6 +131,38 @@ export class ExchangeRate {
       supersedeReason: null,
       createdAt: input.createdAt,
       createdBy: input.createdBy,
+      provider: null,
+      fetchedAt: null,
+      rawPayload: null,
+      anomaly: null,
+    });
+  }
+
+  /**
+   * Tasa de provider (`source = PROVIDER`; FR-FX-009): copia por workspace de una muestra, con provider, vigencia
+   * publicada, instante de obtención y respuesta cruda. Nunca reemplaza (`supersedes_id`) ni toca tasas manuales.
+   */
+  static fromProviderSample(sample: ProviderSample, input: ProviderRateInput): ExchangeRate {
+    if (input.base.code !== sample.base || input.quote.code !== sample.quote) {
+      throw new DomainError('VALIDATION_FAILED', 'currencies do not match the provider sample');
+    }
+    return new ExchangeRate({
+      id: input.id,
+      workspaceId: input.workspaceId,
+      rate: parseRateValue(input.base, input.quote, sample.value),
+      rateType: sample.rateType,
+      source: 'PROVIDER',
+      sourceLabel: label(sample.sourceLabel),
+      asOf: sample.asOf,
+      effectiveDate: input.effectiveDate,
+      supersedesId: null,
+      supersedeReason: null,
+      createdAt: input.createdAt,
+      createdBy: null,
+      provider: sample.provider,
+      fetchedAt: sample.fetchedAt,
+      rawPayload: sample.rawPayload,
+      anomaly: input.anomaly,
     });
   }
 
@@ -150,6 +209,10 @@ export class ExchangeRate {
       supersedeReason: reason,
       createdAt: input.createdAt,
       createdBy: input.createdBy,
+      provider: null,
+      fetchedAt: null,
+      rawPayload: null,
+      anomaly: null,
     });
   }
 }

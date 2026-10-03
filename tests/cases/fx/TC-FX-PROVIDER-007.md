@@ -12,9 +12,11 @@ invariants: ["INV-020","INV-012"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
+  - apps/api/test/api/fx-providers.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","provider","fallback","staleness","valuation"]
@@ -31,7 +33,7 @@ expected_result:
   - "Caso 3 (principal responde pero repite timestamp 07:40Z, 80 min): resultado 1205.50 BOB con selection FALLBACK"
   - "Nunca se usa una tasa con asOf posterior al instante consultado"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-007 — La valoración usa el principal y conmuta al respaldo cuando el principal falla o queda obsoleto

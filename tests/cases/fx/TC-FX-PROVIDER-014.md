@@ -12,8 +12,12 @@ invariants: ["INV-020"]
 priority: critical
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - packages/contexts/fx/src/application/provider-settings.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/provider-http-client.test.ts
+  - apps/api/src/worker/fx-jobs.test.ts
 status: ready
 regression_suite: true
 phase: 1
@@ -35,7 +39,7 @@ expected_result:
   - "Cero solicitudes externas"
   - "Variante: el resumen responde sin esperar al provider; el ciclo termina en timeout (FX_PROVIDER_TIMEOUT) y queda como PROVIDER_TIMEOUT"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-014 — Con providers deshabilitados o lentos el core sigue funcionando con tasas manuales
@@ -58,3 +62,4 @@ Entonces veo 599.00 BOB valorados con la tasa manual
 
 - 50.000000 × 11.98 = 599.00 BOB; la conversión posterior 10.000000 × 11.98 = 119.80 BOB.
 - Fechas fijas con `FixedClock`; instantes en UTC (America/La_Paz = UTC−4). Sin red en CI: providers simulados con fixtures grabados.
+- Automatización parcial (2026-10-03): Pendiente: la parte de dashboard/resumen (add-basic-dashboard) y la conversión vía API con providers deshabilitados; automatizado a nivel de aplicación, worker y cliente HTTP.

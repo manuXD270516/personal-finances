@@ -6,6 +6,7 @@ import {
   EventDeliveryMetrics,
   EventSubscriptions,
   OutboxRelay,
+  PgOutboxWriter,
   type EventConsumerDefinition,
   type OutboxRelayOptions,
 } from '@pf/platform/events';
@@ -17,6 +18,12 @@ import {
   type HealthServer,
 } from '@pf/platform/health';
 import type { Logger } from '@pf/platform/logging';
+import {
+  createFxMarketRateJobs,
+  parseFxProviderSettings,
+  type FxMarketRateJobsOptions,
+} from '@pf/fx/interface/fx.module';
+import { identityActiveWorkspaces } from '@pf/identity/interface/identity.module';
 import { createLedgerMaintenance } from '@pf/ledger/interface/ledger.module';
 import { PinoNestLogger } from '@pf/platform/nest';
 import { otelCounters, shutdownTelemetry } from '@pf/platform/otel';
@@ -24,7 +31,9 @@ import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
 import { systemClock, type Clock } from '@pf/shared-kernel';
 import { Pool } from 'pg';
+import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { createJobQueue } from '../runtime/platform-resources.js';
+import { registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { WorkerModule } from './platform-jobs.js';
 
@@ -54,6 +63,10 @@ export interface WorkerRuntimeOptions {
   readonly clock?: Clock;
   /** Encola el mantenimiento diario del ledger al arrancar (por defecto sí; los tests lo desactivan). */
   readonly ledgerMaintenanceOnStart?: boolean;
+  /** Providers de tasas de mercado (tests: servidor HTTP local en lugar de los providers reales). */
+  readonly fxEndpoints?: FxMarketRateJobsOptions['endpoints'];
+  /** Encola un relleno de días faltantes de tasas al arrancar (por defecto sí). */
+  readonly fxGapFillOnStart?: boolean;
 }
 
 export async function createWorkerRuntime(
@@ -114,8 +127,30 @@ export async function createWorkerRuntime(
     },
   );
 
+  // Providers de tasas de mercado (add-market-rate-providers): polling, carga histórica y relleno; la configuración
+  // inválida o `none` no impide arrancar el worker (degradación).
+  const fxClock = options.clock ?? systemClock;
+  const fxOutbox = new PgOutboxWriter(eventSchemaRegistry());
+  const fxConsumers = await registerFxMarketRateJobs(
+    queue,
+    createFxMarketRateJobs({
+      pool,
+      clock: fxClock,
+      outbox: {
+        append: async (event) => {
+          await fxOutbox.append(event);
+        },
+      },
+      workspaces: identityActiveWorkspaces(pool),
+      settings: parseFxProviderSettings(config),
+      ...(options.fxEndpoints ? { endpoints: options.fxEndpoints } : {}),
+    }),
+    logger,
+    { gapFillOnStart: options.fxGapFillOnStart ?? true },
+  );
+
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
-  const subscriptions = new EventSubscriptions(options.eventConsumers ?? []);
+  const subscriptions = new EventSubscriptions([...(options.eventConsumers ?? []), ...fxConsumers]);
   const consumers = new EventConsumerRuntime({ pool, queue, subscriptions, logger, metrics });
   const relay = new OutboxRelay({
     pool,

@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest';
+import {
+  DEFAULT_FX_PROVIDER_SETTINGS,
+  enabledProviders,
+  parseFxProviderSettings,
+  pollCronFor,
+  valuationPolicyOf,
+} from './provider-settings.js';
+
+describe('Configuración FX_* de providers (design.md decisión 5)', () => {
+  it('[TC-FX-PROVIDER-005] defaults: paralelo.bo principal, bo.dolarapi.com respaldo y oficial, cada 15 min', () => {
+    const s = DEFAULT_FX_PROVIDER_SETTINGS;
+    expect([s.primary, s.fallback, s.official, s.pollCron, s.configError]).toEqual([
+      'PARALELO_BO',
+      'DOLARAPI_BO',
+      'DOLARAPI_BO',
+      '*/15 * * * *',
+      null,
+    ]);
+    expect([s.staleAfterParallelMs, s.staleAfterOfficialMs, s.anomalyThresholdPct, s.timeoutMs]).toEqual([
+      3_600_000,
+      172_800_000,
+      '5',
+      10_000,
+    ]);
+    expect(enabledProviders(s)).toEqual(['PARALELO_BO', 'DOLARAPI_BO']);
+    expect(valuationPolicyOf(s).roles.PARALLEL).toEqual({ primary: 'PARALELO_BO', fallback: 'DOLARAPI_BO' });
+  });
+
+  it('[TC-FX-PROVIDER-005] FX_POLL_INTERVAL=30m registra el cron */30 * * * *', () => {
+    expect(parseFxProviderSettings({ FX_POLL_INTERVAL: '30m' }).pollCron).toBe('*/30 * * * *');
+    expect(pollCronFor(60_000)).toBe('* * * * *');
+    expect(pollCronFor(3_600_000)).toBe('0 * * * *');
+    expect(pollCronFor(6 * 3_600_000)).toBe('0 */6 * * *');
+    expect(pollCronFor(45 * 60_000)).toBeNull();
+  });
+
+  it('[TC-FX-PROVIDER-011] FX_POLL_INTERVAL=30s: los providers no se inician y se informa FX_PROVIDER_CONFIG_INVALID', () => {
+    const s = parseFxProviderSettings({ FX_POLL_INTERVAL: '30s' });
+    expect(s.configError).toMatch(/at least 60 seconds/);
+    expect(enabledProviders(s)).toEqual([]);
+    expect(parseFxProviderSettings({ FX_POLL_INTERVAL: '60s' }).configError).toBeNull();
+  });
+
+  it('[TC-FX-PROVIDER-014] none en todos los roles deshabilita los providers sin error de configuración', () => {
+    const s = parseFxProviderSettings({
+      FX_PROVIDER_PRIMARY: 'none',
+      FX_PROVIDER_FALLBACK: 'none',
+      FX_PROVIDER_OFFICIAL: 'none',
+    });
+    expect([enabledProviders(s), s.configError]).toEqual([[], null]);
+  });
+
+  it('valores inválidos: respaldo igual al principal, timeout > 30 s, umbral ≤ 0, provider desconocido', () => {
+    for (const env of [
+      { FX_PROVIDER_FALLBACK: 'paralelo_bo' },
+      { FX_PROVIDER_TIMEOUT: '31s' },
+      { FX_ANOMALY_THRESHOLD_PCT: '0' },
+      { FX_PROVIDER_PRIMARY: 'binance' },
+      { FX_PROVIDER_OFFICIAL: 'paralelo_bo' },
+      { FX_STALE_AFTER_PARALLEL: 'una hora' },
+      { FX_BACKFILL_ENABLED: 'yes' },
+    ]) {
+      expect(parseFxProviderSettings(env).configError, JSON.stringify(env)).not.toBeNull();
+    }
+    expect(parseFxProviderSettings({ FX_ANOMALY_THRESHOLD_PCT: '2.50' }).anomalyThresholdPct).toBe('2.5');
+  });
+});

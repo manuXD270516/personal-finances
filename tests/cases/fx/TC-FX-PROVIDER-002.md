@@ -12,9 +12,11 @@ invariants: ["INV-001","INV-011"]
 priority: high
 type: integration
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/providers.contract.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","dolarapi","contract-test"]
@@ -30,7 +32,7 @@ expected_result:
   - "USD/BOB PARALLEL = \"12.055\" y USDT/BOB PARALLEL = \"12.055\" ((12.04 + 12.07) / 2 exacto), provider DOLARAPI_BO, asOf 2026-10-02T08:50:00.000Z"
   - "Ninguna casa distinta de oficial y binance genera tasas"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-002 — El provider de respaldo registra la tasa oficial y la paralela de Binance con punto medio exacto

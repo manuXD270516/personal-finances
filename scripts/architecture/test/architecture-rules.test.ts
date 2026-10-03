@@ -156,3 +156,27 @@ describe('[TC-PLATFORM-ARCH-001] process.env solo dentro de @pf/platform (ESLint
     expect(await lint('packages/platform/src/config/__fixture.ts')).not.toContain('no-restricted-properties');
   });
 });
+
+describe('[TC-FX-PROVIDER-003] adapters de providers: sin JSON.parse ni response.json() (ESLint, INV-001)', () => {
+  const eslint = new ESLint({ cwd: REPO_ROOT });
+  const lint = async (relativePath: string, code: string) => {
+    const [result] = await eslint.lintText(code, { filePath: join(REPO_ROOT, relativePath) });
+    return (result?.messages ?? []).map((m) => m.message);
+  };
+  const ADAPTER = 'packages/contexts/fx/src/infrastructure/providers/__fixture.ts';
+
+  it('rechaza JSON.parse y response.json() en infrastructure/providers', async () => {
+    const parse = await lint(ADAPTER, 'export const v = (t: string): unknown => JSON.parse(t);\n');
+    expect(parse.some((m) => m.includes('LosslessJsonReader'))).toBe(true);
+    const json = await lint(ADAPTER, 'export const v = async (r: Response): Promise<unknown> => r.json();\n');
+    expect(json.some((m) => m.includes('LosslessJsonReader'))).toBe(true);
+  });
+
+  it('lo permite fuera de los adapters y en sus tests (contraejemplo documentado)', async () => {
+    const code = 'export const v = (t: string): unknown => JSON.parse(t);\n';
+    expect(await lint('packages/contexts/fx/src/infrastructure/__fixture.ts', code)).toEqual([]);
+    expect(await lint('packages/contexts/fx/src/infrastructure/providers/__fixture.test.ts', code)).toEqual(
+      [],
+    );
+  });
+});

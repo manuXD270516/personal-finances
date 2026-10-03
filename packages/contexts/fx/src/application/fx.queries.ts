@@ -49,6 +49,11 @@ export class FxQueries implements FxConversionPricingPort {
     return this.deps.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
   }
 
+  /** Umbral de anomalía vigente (`FX_ANOMALY_THRESHOLD_PCT`), para `FxRate.anomaly.thresholdPct`. */
+  get anomalyThresholdPct(): string {
+    return this.deps.anomalyThresholdPct ?? '5';
+  }
+
   listCurrencies(
     workspaceId: string,
     filter: { readonly kind?: CurrencyKind; readonly enabled?: boolean; readonly q?: string },
@@ -262,6 +267,6 @@ export class FxQueries implements FxConversionPricingPort {
     const { preferences } = await this.deps.preferences.get(workspaceId);
     const preferenceOf = (a: string, b: string) =>
       preferences.find((p) => sameUnorderedPair(p.base, p.quote, a, b))?.rateType ?? null;
-    return { resolver: new RateResolver(candidates), preferenceOf };
+    return { resolver: new RateResolver(candidates, this.deps.policy), preferenceOf };
   }
 }

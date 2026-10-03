@@ -12,9 +12,13 @@ invariants: ["INV-025"]
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/provider-http-client.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/providers.architecture.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/providers.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","privacy","security"]
@@ -33,7 +37,7 @@ expected_result:
   - "Ningún byte de la solicitud contiene ids de workspace o usuario, montos, saldos, cuentas, monedas habilitadas ni zona horaria"
   - "Ambos workspaces reciben las tasas en filas propias (RLS)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-013 — Las solicitudes a providers son anónimas e idénticas para cualquier workspace

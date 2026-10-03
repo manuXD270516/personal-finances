@@ -31,7 +31,13 @@ export function createTestEnv(): {
   for (const line of parseEnvLines(example)) {
     if (line.key && /^PF_[A-Z0-9_]+_PORT$/.test(line.key)) ports.set(line.key, `3${line.value!.slice(1)}`);
   }
-  writeFileSync(envFile, renderEnv(example, new Map(), ports).text);
+  // Sin red en tests: los providers de tasas de mercado quedan deshabilitados (add-market-rate-providers).
+  const noNetworkFx = new Map([
+    ['FX_PROVIDER_PRIMARY', 'none'],
+    ['FX_PROVIDER_FALLBACK', 'none'],
+    ['FX_PROVIDER_OFFICIAL', 'none'],
+  ]);
+  writeFileSync(envFile, renderEnv(example, noNetworkFx, ports).text);
   const processEnv: NodeJS.ProcessEnv = { ...process.env };
   // Los valores del `.env` temporal mandan: no heredar variables de la sesión que los pisen.
   for (const k of Object.keys(processEnv))

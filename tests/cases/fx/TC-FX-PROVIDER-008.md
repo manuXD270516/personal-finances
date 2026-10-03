@@ -12,9 +12,10 @@ invariants: ["INV-020"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","provider","staleness","fallback","missing-rate"]
@@ -30,7 +31,7 @@ expected_result:
   - "Caso 2: 1210.00 BOB con la tasa manual 12.10, selection MANUAL, source MANUAL, sin atribución de provider"
   - "Caso 3: FX_RATE_NOT_FOUND; ningún valor aproximado ni 1:1"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-008 — Sin providers vigentes se usa la última tasa conocida marcada obsoleta o una manual más reciente

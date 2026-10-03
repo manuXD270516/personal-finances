@@ -3,3 +3,6 @@ export * from './currency-definition.js';
 export * from './exchange-rate.js';
 export * from './rate-resolver.js';
 export * from './conversion-pricing.js';
+export * from './market-rate-provider.js';
+export * from './valuation-rate-selector.js';
+export * from './anomaly-detector.js';

@@ -7,7 +7,7 @@ import {
   createClassificationRuntime,
 } from '@pf/classification/interface/classification.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
-import { createFxRuntime, FxModule } from '@pf/fx/interface/fx.module';
+import { createFxRuntime, FxModule, parseFxProviderSettings } from '@pf/fx/interface/fx.module';
 import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
 import {
   IdentityModule,
@@ -140,6 +140,8 @@ export function identityImports(input: {
     audit: auditPort,
     outbox: classificationOutbox(),
     workspaces: identityWorkspaceSettings(input.pool),
+    // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
+    providers: parseFxProviderSettings(input.config),
   });
   // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({

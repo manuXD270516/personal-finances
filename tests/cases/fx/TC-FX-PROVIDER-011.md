@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/provider-http-client.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - packages/contexts/fx/src/application/provider-settings.test.ts
+  - apps/api/src/worker/fx-jobs.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","rate-limit","cache","tos"]
@@ -34,7 +38,7 @@ expected_result:
   - "Intervalo 30s: los providers no se inician; el estado muestra FX_PROVIDER_CONFIG_INVALID; la API y el resto del worker siguen funcionando"
   - "Ráfaga: como máximo 60 solicitudes por minuto a paralelo.bo"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-011 — El cliente de providers respeta el límite de solicitudes, la caché declarada y el intervalo mínimo

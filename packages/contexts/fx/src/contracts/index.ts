@@ -102,6 +102,7 @@ export const FX_AUDIT_POLICY = {
     asOf: 'plain',
     effectiveDate: 'plain',
     supersedesRateId: 'plain',
+    anomalyStatus: 'plain',
   },
   RatePreferences: {
     preferences: 'plain',

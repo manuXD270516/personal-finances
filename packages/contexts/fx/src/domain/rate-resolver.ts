@@ -1,6 +1,18 @@
 import { DomainError, type Instant, Rate, type Currency } from '@pf/shared-kernel';
 import type { ExchangeRateState } from './exchange-rate.js';
-import { DEFAULT_RATE_WINDOW_DAYS, type FxRateSource, type FxRateType } from './fx-types.js';
+import {
+  DEFAULT_RATE_WINDOW_DAYS,
+  type FxRateProvider,
+  type FxRateSource,
+  type FxRateType,
+  type RateSelection,
+} from './fx-types.js';
+import {
+  DEFAULT_VALUATION_POLICY,
+  ValuationRateSelector,
+  type ValuationChoice,
+  type ValuationPolicy,
+} from './valuation-rate-selector.js';
 
 const DAY_MS = 86_400_000;
 
@@ -8,7 +20,16 @@ const DAY_MS = 86_400_000;
 export interface RateCandidate {
   readonly state: ExchangeRateState;
   readonly supersededById: string | null;
+  /** Decisión sobre una tasa marcada como anómala (`null`/ausente = sin revisar). */
+  readonly anomalyDecision?: 'CONFIRMED' | 'REJECTED' | null;
 }
+
+/**
+ * ¿Puede usarse para valorar o como referencia? No reemplazada y, si es anómala, confirmada (una anomalía pendiente
+ * o rechazada nunca se usa; fx/market-rate-providers).
+ */
+export const isUsableCandidate = (c: RateCandidate): boolean =>
+  c.supersededById === null && (c.state.anomaly === null || c.anomalyDecision === 'CONFIRMED');
 
 export type RateDerivation = 'DIRECT' | 'INVERSE' | 'CROSS';
 
@@ -29,6 +50,12 @@ export interface ResolvedRate {
   readonly ageSeconds: number;
   /** `true` para tasas cruzadas (FR-FX-005). */
   readonly approx: boolean;
+  /** Provider de la tasa usada (de la más antigua en una cruzada); `null` si es manual. */
+  readonly provider: FxRateProvider | null;
+  /** Nivel de fallback (fx/market-rate-providers). */
+  readonly selection: RateSelection;
+  /** `true` si se usa una tasa de provider obsoleta como última conocida (en una cruzada: alguna componente). */
+  readonly stale: boolean;
 }
 
 export interface ResolveQuery {
@@ -45,18 +72,9 @@ export interface ResolveQuery {
   readonly pivot?: Currency | null;
 }
 
-interface Pick {
-  readonly state: ExchangeRateState;
+interface Pick extends ValuationChoice {
   readonly inverse: boolean;
 }
-
-const newest = (a: ExchangeRateState, b: ExchangeRateState): ExchangeRateState => {
-  const ta = Date.parse(a.asOf);
-  const tb = Date.parse(b.asOf);
-  if (ta !== tb) return ta > tb ? a : b;
-  if (a.createdAt !== b.createdAt) return a.createdAt > b.createdAt ? a : b;
-  return a.id > b.id ? a : b;
-};
 
 /**
  * DS `RateResolver` (FR-FX-004/005/006; design.md decisión 4), puro: la tasa vigente de un par a un instante es la
@@ -65,7 +83,18 @@ const newest = (a: ExchangeRateState, b: ExchangeRateState): ExchangeRateState =
  * la original a precisión 40, INV-032) → cruzada por pivote solo si `allowCross`. Nunca inventa un valor ni usa 1:1.
  */
 export class RateResolver {
-  constructor(private readonly candidates: readonly RateCandidate[]) {}
+  private readonly selector: ValuationRateSelector;
+
+  /**
+   * `policy`: roles de providers y obsolescencia (fx/market-rate-providers). Dentro de cada orientación la tasa se
+   * elige con `ValuationRateSelector` (principal → respaldo → última conocida obsoleta o manual más reciente).
+   */
+  constructor(
+    private readonly candidates: readonly RateCandidate[],
+    policy: ValuationPolicy = DEFAULT_VALUATION_POLICY,
+  ) {
+    this.selector = new ValuationRateSelector(policy);
+  }
 
   /** Resolución para valoración/consulta: lanza `FX_RATE_NOT_FOUND` si no hay tasa. */
   resolve(query: ResolveQuery): ResolvedRate {
@@ -83,23 +112,28 @@ export class RateResolver {
 
   /** Referencia de una conversión real: solo directa o inversa, nunca cruzada (INV-032, docs/04 §3.10). */
   resolveForConversion(query: Omit<ResolveQuery, 'allowCross' | 'pivot'>): ResolvedRate | null {
-    return this.tryResolve({ ...query, allowCross: false });
+    return this.resolveWith({ ...query, allowCross: false }, 'newest');
   }
 
   tryResolve(query: ResolveQuery): ResolvedRate | null {
+    return this.resolveWith(query, 'valuation');
+  }
+
+  /** `valuation`: niveles de fallback (fx/market-rate-providers); `newest`: la más reciente (referencias). */
+  private resolveWith(query: ResolveQuery, mode: 'valuation' | 'newest'): ResolvedRate | null {
     const { base, quote, at } = query;
     if (base.code === quote.code) {
       throw new DomainError('VALIDATION_FAILED', 'base and quote must differ').at('/quote');
     }
     const windowDays = query.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
     const typeFor = (a: string, b: string) => query.rateType ?? query.preferenceOf?.(a, b) ?? null;
-    const direct = this.pick(base.code, quote.code, at, windowDays, typeFor(base.code, quote.code));
+    const direct = this.pick(base.code, quote.code, at, windowDays, typeFor(base.code, quote.code), mode);
     if (direct) return this.single(direct, base, at);
     if (!query.allowCross) return null;
     const pivot = query.pivot;
     if (!pivot || pivot.code === base.code || pivot.code === quote.code) return null;
-    const first = this.pick(base.code, pivot.code, at, windowDays, typeFor(base.code, pivot.code));
-    const second = this.pick(pivot.code, quote.code, at, windowDays, typeFor(pivot.code, quote.code));
+    const first = this.pick(base.code, pivot.code, at, windowDays, typeFor(base.code, pivot.code), mode);
+    const second = this.pick(pivot.code, quote.code, at, windowDays, typeFor(pivot.code, quote.code), mode);
     if (!first || !second) return null;
     const r1 = orient(first, base);
     const r2 = orient(second, pivot);
@@ -116,6 +150,10 @@ export class RateResolver {
       effectiveDate: older.effectiveDate,
       ...age(at, older.asOf),
       approx: true,
+      provider: older.provider,
+      selection:
+        Date.parse(first.state.asOf) <= Date.parse(second.state.asOf) ? first.selection : second.selection,
+      stale: first.stale || second.stale,
     };
   }
 
@@ -133,27 +171,37 @@ export class RateResolver {
       effectiveDate: s.effectiveDate,
       ...age(at, s.asOf),
       approx: false,
+      provider: s.provider,
+      selection: p.selection,
+      stale: p.stale,
     };
   }
 
-  private pick(a: string, b: string, at: Instant, windowDays: number, type: FxRateType | null): Pick | null {
+  private pick(
+    a: string,
+    b: string,
+    at: Instant,
+    windowDays: number,
+    type: FxRateType | null,
+    mode: 'valuation' | 'newest',
+  ): Pick | null {
     const to = at.epochMillis;
     const from = to - windowDays * DAY_MS;
     const eligible = this.candidates
-      .filter((c) => c.supersededById === null)
+      .filter(isUsableCandidate)
       .map((c) => c.state)
       .filter((s) => {
         const t = Date.parse(s.asOf);
         return t <= to && t >= from && (type === null || s.rateType === type);
       });
-    const latest = (base: string, quote: string) =>
-      eligible
-        .filter((s) => s.rate.base.code === base && s.rate.quote.code === quote)
-        .reduce<ExchangeRateState | null>((acc, s) => (acc ? newest(acc, s) : s), null);
-    const direct = latest(a, b);
-    if (direct) return { state: direct, inverse: false };
-    const inverse = latest(b, a);
-    return inverse ? { state: inverse, inverse: true } : null;
+    const choose = (base: string, quote: string) => {
+      const pair = eligible.filter((s) => s.rate.base.code === base && s.rate.quote.code === quote);
+      return mode === 'newest' ? this.selector.newest(pair, at) : this.selector.select(pair, at);
+    };
+    const direct = choose(a, b);
+    if (direct) return { ...direct, inverse: false };
+    const inverse = choose(b, a);
+    return inverse ? { ...inverse, inverse: true } : null;
   }
 }
 

@@ -26,7 +26,13 @@ export function createEnvFile(): string {
     if (line.key && /^PF_[A-Z0-9_]+_PORT$/.test(line.key)) ports.set(line.key, `4${line.value!.slice(1)}`);
   }
   // CI reutiliza las imágenes del job `image` (FINANCE_*_IMAGE en el entorno del proceso).
-  writeFileSync(file, renderEnv(example, new Map(), ports).text);
+  // Sin red en E2E: providers de tasas de mercado deshabilitados (add-market-rate-providers).
+  const noNetworkFx = new Map([
+    ['FX_PROVIDER_PRIMARY', 'none'],
+    ['FX_PROVIDER_FALLBACK', 'none'],
+    ['FX_PROVIDER_OFFICIAL', 'none'],
+  ]);
+  writeFileSync(file, renderEnv(example, noNetworkFx, ports).text);
   return file;
 }
 

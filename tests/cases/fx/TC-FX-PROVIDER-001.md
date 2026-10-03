@@ -12,9 +12,11 @@ invariants: ["INV-001","INV-011"]
 priority: critical
 type: integration
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/providers.contract.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","paralelo-bo","contract-test"]
@@ -33,7 +35,7 @@ expected_result:
   - "rawPayload conserva el texto exacto del fixture (incluye buy 12.12, sell 11.92, spreadPct -1.6972, sourceCount 4)"
   - "buy y sell no se usan como valor de ninguna tasa"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-001 — El provider principal registra la mediana de paralelo.bo como tasa PARALLEL USD/BOB y USDT/BOB

@@ -325,7 +325,8 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | custom-fields | `GET/POST W/custom-fields`, `PATCH …/{id}`, `POST …/archive` | `classification/custom-fields` | 2 |
 | counterparties | `GET/POST W/counterparties`, `GET/PATCH …/{id}`, `POST …/archive`, `POST …/merge` (P2) | `classification/counterparties` | 1 |
 | currencies | `GET W/currencies`, `PUT W/currencies/{code}/enabled` (P1.x), `POST W/currencies` (custom, P5) | `fx/market-rates` (ver Preguntas abiertas) | 1 |
-| fx-rates | `GET/POST W/fx-rates`, `GET W/fx-rates/latest?base=&quote=&asOf=` | `fx/market-rates` | 1 (manual) / 5 |
+| fx-rates | `GET/POST W/fx-rates` (filtros `source`, `provider`), `GET W/fx-rates/latest?base=&quote=&asOf=` (con `provider`, `selection`, `stale`, `ageSeconds`, `attribution`), `POST W/fx-rates/{fxRateId}/supersede`, `POST W/fx-rates/{fxRateId}/anomaly-review` (EDITOR; `Idempotency-Key`; 409 `FX_RATE_ANOMALY_ALREADY_REVIEWED`, 422 `FX_RATE_NOT_ANOMALOUS`) | `fx/market-rates`, `fx/market-rate-providers` | 1 (manual y providers paralelo.bo / bo.dolarapi.com, D29) |
+| fx-providers | `GET W/fx-providers/status` (VIEWER; salud, feeds, fallas, próximo intento, carga histórica, atribución; nunca llama a un provider) | `fx/market-rate-providers` | 1 |
 | periods | `GET/POST W/periods`, `POST …/{id}/close`, `POST …/{id}/reopen` | `planning/financial-periods`, `planning/month-closing` | 2 |
 | budgets | `GET/POST W/budgets`, `GET/PATCH …/{id}`, `PATCH …/{id}/lines/{lineId}` | `planning/budgets` | 2 |
 | templates | `GET/POST W/templates`, `GET …/{id}`, `POST …/{id}/versions`, `POST …/{id}/apply` | `planning/budget-templates` | 2 |

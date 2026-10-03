@@ -36,6 +36,23 @@ const noSessionRlsContext = {
   ],
 };
 
+/**
+ * INV-001 / add-market-rate-providers (tarea 4.5, design.md decisión 2): los adapters de providers leen los números
+ * JSON como texto exacto (`LosslessJsonReader`); `JSON.parse` y `response.json()` los convertirían a `number`.
+ */
+const LOSSLESS_JSON_MESSAGE =
+  'Prohibido JSON.parse/response.json() en los adapters de providers (INV-001): usa LosslessJsonReader.';
+const providersLosslessJson = {
+  'no-restricted-syntax': [
+    ...noSessionRlsContext['no-restricted-syntax'],
+    {
+      selector: "CallExpression[callee.object.name='JSON'][callee.property.name='parse']",
+      message: LOSSLESS_JSON_MESSAGE,
+    },
+    { selector: "CallExpression[callee.property.name='json']", message: LOSSLESS_JSON_MESSAGE },
+  ],
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -78,6 +95,11 @@ export default tseslint.config(
   // ADR-0006 / INV-001 (add-ledger-core 2.4): dinero nunca como `number` y sin el Decimal global de decimal.js
   // (SPIKE-03 H7); el único dueño de decimal.js es el clon MoneyDecimal del shared-kernel.
   ...moneyConfig({ decimalAllowed: ['packages/shared-kernel/src/money/**'] }),
+  {
+    files: ['packages/contexts/fx/src/infrastructure/providers/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.test-support.ts'],
+    rules: providersLosslessJson,
+  },
   {
     // Nest usa clases inyectables y decoradores: las clases sin miembros son legítimas.
     files: ['apps/api/**/*.ts', 'packages/platform/src/nest/**/*.ts'],
