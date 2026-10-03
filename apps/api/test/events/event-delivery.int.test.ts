@@ -490,6 +490,12 @@ describe('platform/event-delivery: relay y consumidores', () => {
       await sleep(1_500);
       expect(metrics.dead).toBe(1);
       expect(attempts).toHaveLength(3);
+      // El dead-letter abierto congela su agregado en este consumidor: v2 se publica pero no se procesa.
+      const [poison2] = await command(ws, [settingsChanged(ws, poisonAgg, 2)]);
+      await until(async () => ((await outboxRows([poison2!.eventId]))[0]?.published_at ? true : undefined));
+      await sleep(2_000);
+      expect(attempts).toHaveLength(3);
+      expect((await effects(ws, def.consumer)).map((e) => e.aggregate_id)).toEqual([healthyAgg]);
       expect(deadLetterQueueName(def.consumer)).toBe(`events.${def.consumer}.dlq`);
     } finally {
       await worker.stop();
@@ -555,6 +561,71 @@ describe('platform/event-delivery: relay y consumidores', () => {
       await until(async () => ((await effects(ws, def.consumer)).length >= 2 ? true : undefined));
       expect((await effects(ws, def.consumer)).map((e) => e.event_id)[0]).toBe(event!.eventId);
       expect((await outboxRows([event!.eventId]))[0]?.published_at).not.toBeNull();
+    } finally {
+      await worker.stop();
+    }
+  });
+
+  it('[TC-PLATFORM-EVENTS-013] tras una caída de la cola el relay publica la cabeza pendiente de cada agregado antes que sus sucesores', async () => {
+    // Determinista: v1 y v2 del MISMO agregado se confirman juntos y el eventId de v2 ordena antes que el de v1.
+    // pg-boss desempata la cabeza de una clave por (created_on, id): si ambos se encolan en la misma transacción
+    // del relay (mismo created_on), v2 adelantaría a v1. El relay solo debe publicar la cabeza por agregado.
+    const ws = randomUUID();
+    const agg = randomUUID();
+    const tail = () => uuidv7().slice(1);
+    const v1 = { ...settingsChanged(ws, agg, 1), eventId: `f${tail()}` };
+    const v2 = { ...settingsChanged(ws, agg, 2), eventId: `0${tail()}` };
+    const other = settingsChanged(ws, randomUUID(), 1);
+    expect(v2.eventId < v1.eventId).toBe(true);
+    const def = recordingConsumer(ws);
+    let down = true;
+    const worker = await startWorker([def], {
+      startRelay: false,
+      wrap: (q) =>
+        new Proxy(q, {
+          get(target, prop, receiver) {
+            if (prop === 'enqueueInTransaction' && down) {
+              return async () => {
+                throw new Error('cola no disponible');
+              };
+            }
+            const value = Reflect.get(target, prop, receiver) as unknown;
+            return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+          },
+        }),
+    });
+    try {
+      await command(ws, [v1, v2, other]);
+      // La cola cae: varios intentos fallidos dejan los tres eventos pendientes con last_error.
+      for (let i = 0; i < 3; i++) await expect(worker.relay.runOnce()).rejects.toThrow('cola no disponible');
+      expect((await outboxRows([v1.eventId, v2.eventId])).every((r) => r.published_at === null)).toBe(true);
+
+      // La cola vuelve: el primer lote publica v1 (cabeza) y el otro agregado, nunca v2 todavía.
+      down = false;
+      await worker.relay.runOnce();
+      const published = async () =>
+        new Map(
+          (await outboxRows([v1.eventId, v2.eventId, other.eventId])).map((r) => [r.id, r.published_at]),
+        );
+      let state = await published();
+      expect(state.get(v1.eventId)).not.toBeNull();
+      expect(state.get(other.eventId)).not.toBeNull();
+      expect(state.get(v2.eventId)).toBeNull();
+      // Lotes siguientes: v2 sale en una transacción posterior.
+      while ((await worker.relay.runOnce()) > 0) {
+        /* drenar */
+      }
+      state = await published();
+      expect(state.get(v2.eventId)).not.toBeNull();
+
+      await until(async () =>
+        (await effects(ws, def.consumer)).filter((e) => e.aggregate_id === agg).length >= 2
+          ? true
+          : undefined,
+      );
+      expect(
+        (await effects(ws, def.consumer)).filter((e) => e.aggregate_id === agg).map((e) => e.event_id),
+      ).toEqual([v1.eventId, v2.eventId]);
     } finally {
       await worker.stop();
     }
