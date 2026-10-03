@@ -73,6 +73,16 @@ Trace: NFR-REL-008 · Priority: Must
 - **ENTONCES** el evento con versión 2 del mismo agregado no se procesa hasta que el de versión 1 se complete
 - **Y** los eventos de otros agregados siguen procesándose
 
+#### Scenario: Un evento pendiente de publicar retiene a los siguientes del mismo agregado
+- **CUANDO** las versiones 1 y 2 de un agregado se confirman juntas mientras la cola no acepta trabajos y luego la cola vuelve
+- **ENTONCES** la versión 1 se publica antes que la versión 2
+- **Y** cada consumidor aplica la versión 1 antes que la versión 2
+
+#### Scenario: Un evento en dead-letter congela su agregado en ese consumidor
+- **CUANDO** el evento con versión 1 de un agregado queda en dead-letter abierto para un consumidor
+- **ENTONCES** ese consumidor no procesa la versión 2 del agregado hasta que el dead-letter se resuelva
+- **Y** el dead-letter abierto queda visible en la métrica de dead-letters
+
 ### Requirement: Reintentos con backoff y dead-letter observable
 Un evento cuyo procesamiento falla DEBE (MUST) reintentarse con backoff exponencial hasta un máximo configurable (por defecto 5 reintentos); al agotarse DEBE (MUST) quedar en dead-letter con el consumidor, el evento, el error y el número de intentos, contarse en una métrica de dead-letters y NO DEBE (MUST NOT) bloquear a otros agregados.
 Trace: NFR-REL-012, NFR-OBS-004 · Priority: Must

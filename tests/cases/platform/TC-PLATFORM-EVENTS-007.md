@@ -37,6 +37,7 @@ expected_result:
 - platform.dead_letter tiene la fila OPEN con el error y 3 intentos
 - La métrica de dead-letters suma 1
 - El evento de B se aplica
+- La versión 2 del agregado A se publica pero el consumidor no la procesa mientras el dead-letter siga abierto
 created: 2026-10-03
 updated: 2026-10-03
 ---

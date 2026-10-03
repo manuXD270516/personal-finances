@@ -54,7 +54,7 @@ const MAX_ERROR_LENGTH = 1000;
 
 /**
  * Relay del outbox (openspec add-event-outbox, design §5). Cada lote es UNA transacción: advisory lock de relay
- * único, filas pendientes por `sequence` con `FOR UPDATE SKIP LOCKED`, encolado en pg-boss sobre la misma conexión
+ * único, la cabeza pendiente de cada agregado por `sequence` con `FOR UPDATE SKIP LOCKED`, encolado en pg-boss sobre la misma conexión
  * (`JobQueue.enqueueInTransaction`, job `id = eventId`, `key = aggregateId`) y `published_at`. Encolar y marcar son
  * atómicos: una caída antes del COMMIT no pierde ni duplica eventos.
  */
@@ -82,14 +82,24 @@ export class OutboxRelay {
         await client.query('COMMIT');
         return 0;
       }
+      // Solo la CABEZA pendiente de cada agregado: pg-boss desempata la cabeza de una clave `key_strict_fifo` por
+      // (created_on, id), y todos los jobs de esta transacción comparten created_on; si dos eventos del mismo
+      // agregado se encolaran juntos, el desempate por eventId podría invertirlos. Los sucesores salen en lotes
+      // posteriores (created_on mayor), así que la cola los ve en orden de confirmación (TC-PLATFORM-EVENTS-013).
       rows = (
         await client.query<PendingRow>(
-          `SELECT id, event_type, event_version, aggregate_id, correlation_id, envelope, trace_context
-             FROM platform.outbox
-            WHERE published_at IS NULL
-            ORDER BY sequence
+          `SELECT o.id, o.event_type, o.event_version, o.aggregate_id, o.correlation_id, o.envelope, o.trace_context
+             FROM platform.outbox o
+            WHERE o.published_at IS NULL
+              AND NOT EXISTS (
+                    SELECT 1 FROM platform.outbox p
+                     WHERE p.published_at IS NULL
+                       AND p.workspace_id = o.workspace_id
+                       AND p.aggregate_id = o.aggregate_id
+                       AND p.sequence < o.sequence)
+            ORDER BY o.sequence
             LIMIT $1
-            FOR UPDATE SKIP LOCKED`,
+            FOR UPDATE OF o SKIP LOCKED`,
           [batchSize],
         )
       ).rows;
@@ -178,7 +188,6 @@ export class OutboxRelay {
       await listener.query(`LISTEN ${OUTBOX_NOTIFY_CHANNEL}`);
       this.listener = listener;
     }
-    const batchSize = this.options.batchSize ?? 200;
     const pollMs = this.options.pollIntervalMs ?? 500;
     this.loop = (async () => {
       let backoff = 100;
@@ -186,7 +195,8 @@ export class OutboxRelay {
         try {
           const published = await this.runOnce();
           backoff = 100;
-          if (published >= batchSize) continue;
+          // Con publicación por cabeza, un lote puede dejar sucesores listos aunque no se haya llenado.
+          if (published > 0) continue;
           await this.sleep(pollMs);
         } catch (err) {
           this.options.logger.warn(

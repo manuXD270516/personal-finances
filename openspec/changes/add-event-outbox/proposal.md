@@ -41,7 +41,7 @@ Los changes de Phase 1 (`add-workspace-identity`, `add-classification`, `add-led
 
 **Migraciones requeridas:** expand únicamente (tablas nuevas, índices, políticas RLS, trigger, grants). No destructiva. Sin datos previos que migrar.
 
-**Test cases:** AÑADIDOS — TC-PLATFORM-EVENTS-001, TC-PLATFORM-EVENTS-002, TC-PLATFORM-EVENTS-003, TC-PLATFORM-EVENTS-004, TC-PLATFORM-EVENTS-005, TC-PLATFORM-EVENTS-006, TC-PLATFORM-EVENTS-007, TC-PLATFORM-EVENTS-008, TC-PLATFORM-EVENTS-009, TC-PLATFORM-EVENTS-010, TC-PLATFORM-EVENTS-011, TC-PLATFORM-EVENTS-012. MODIFICADOS — TC-IDENTITY-WORKSPACE-003 (verifica `identity.WorkspaceSettingsChanged.v1` en el outbox real). DEPRECADOS — ninguno.
+**Test cases:** AÑADIDOS — TC-PLATFORM-EVENTS-001, TC-PLATFORM-EVENTS-002, TC-PLATFORM-EVENTS-003, TC-PLATFORM-EVENTS-004, TC-PLATFORM-EVENTS-005, TC-PLATFORM-EVENTS-006, TC-PLATFORM-EVENTS-007, TC-PLATFORM-EVENTS-008, TC-PLATFORM-EVENTS-009, TC-PLATFORM-EVENTS-010, TC-PLATFORM-EVENTS-011, TC-PLATFORM-EVENTS-012, TC-PLATFORM-EVENTS-013. MODIFICADOS — TC-IDENTITY-WORKSPACE-003 (verifica `identity.WorkspaceSettingsChanged.v1` en el outbox real). DEPRECADOS — ninguno.
 
 **Invariantes afectadas:** INV-028 (consumidores idempotentes: reprocesar un evento no cambia el resultado). El change no toca dinero, ledger, FX, periodos ni redondeo.
 

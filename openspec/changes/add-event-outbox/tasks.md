@@ -6,7 +6,7 @@
 
 - [x] 1.1 Redactar `platform/event-delivery` (11 requirements Must) y validar con `openspec validate add-event-outbox --strict` y `openspec show add-event-outbox --json`
 - [x] 1.2 Agregar `platform/event-delivery` a docs/ARCHITECTURE.md §14, el change a docs/03 §7 (antes de `add-audit-trail`) y la decisión D30 a docs/31
-- [x] 1.3 Escribir TC-PLATFORM-EVENTS-001..012 (`requirement_status: confirmed`) y actualizar TC-IDENTITY-WORKSPACE-003; verificar con `pnpm traceability:check` que ningún requirement Must queda sin TC
+- [x] 1.3 Escribir TC-PLATFORM-EVENTS-001..013 (`requirement_status: confirmed`) y actualizar TC-IDENTITY-WORKSPACE-003; verificar con `pnpm traceability:check` que ningún requirement Must queda sin TC
 
 ## 2. Base de datos
 
@@ -36,6 +36,7 @@
 - [x] 5.4 TC-PLATFORM-EVENTS-006: orden por agregado con eventos intercalados y concurrencia; retención detrás de un evento en reintento
 - [x] 5.5 TC-PLATFORM-EVENTS-007: dead-letter tras agotar reintentos sin bloquear otros agregados
 - [x] 5.6 TC-PLATFORM-EVENTS-008: cola caída ⇒ el comando se confirma y el evento se publica al volver
+- [x] 5.9 Corrección (CI del PR #8): el relay publica solo la cabeza pendiente por agregado; TC-PLATFORM-EVENTS-013 determinista y TC-PLATFORM-EVENTS-007 verifica que un dead-letter congela su agregado; `event-delivery.int.test.ts` 20 corridas seguidas en verde (design, Decisiones de implementación 12–13)
 - [x] 5.7 TC-PLATFORM-EVENTS-009/010/011/012: purga, métricas, apagado ordenado, contexto RLS y correlación en el consumidor
 - [x] 5.8 TC-IDENTITY-WORKSPACE-003 y productores de IDENTITY: `identity.WorkspaceSettingsChanged.v1`/`WorkspaceCreated.v1` en el outbox real vía API
 
