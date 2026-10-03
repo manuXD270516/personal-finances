@@ -12,9 +12,10 @@ invariants: [INV-007]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [immutability, database, defense-in-depth]
@@ -35,9 +36,9 @@ steps:
 expected_result:
 - Cada sentencia falla (privilegio no otorgado o trigger de inmutabilidad)
 - P1, P2 y E1 quedan sin cambios después
-- La falla se mapea a LEDGER_IMMUTABLE si se expone a través de la aplicación
+- Si la falla llega a la aplicación se mapea a INTERNAL_ERROR + métrica (PF003/42501 son siempre bugs; design.md §Decisiones 3, docs/31 D19)
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-IMMUTABILITY-001 — Los postings y asientos no pueden actualizarse ni eliminarse a nivel de base de datos

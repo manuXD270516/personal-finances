@@ -12,9 +12,10 @@ invariants: [INV-002, INV-004, INV-006]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [opening-balance]
@@ -42,7 +43,7 @@ expected_result:
 - Patrimonio neto = 2500.00 - 800.00 = 1700.00 BOB
 - No se crea ningún posting de INCOME
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-OPENING-001 — El saldo inicial se registra contra EQUITY:OPENING_BALANCE en la moneda de la cuenta

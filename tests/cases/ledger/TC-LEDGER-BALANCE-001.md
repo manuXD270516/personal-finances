@@ -12,9 +12,11 @@ invariants: [INV-004, INV-002]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, multi-currency]
@@ -38,7 +40,7 @@ expected_result:
 - El error lista cada moneda desbalanceada y su residuo (USD +100.00, BOB -690.00; BOB +0.01)
 - No se emite ningún evento de dominio
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCE-001 — El dominio rechaza un asiento desbalanceado en cualquier moneda

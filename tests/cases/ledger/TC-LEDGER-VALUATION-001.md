@@ -12,9 +12,10 @@ invariants: [INV-031, INV-004]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/ledger.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [fast-check, valuation, trial-balance]
@@ -40,7 +41,7 @@ expected_result:
 - Σ saldos valorizados = 0 a precisión 40
 - Patrimonio neto valorizado = −valor(EQUITY + INCOME + EXPENSE); en el ejemplo 10685.00 BOB
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-VALUATION-001 — Propiedad: el balance de comprobación es cero por moneda y valorizado con cualquier tasa

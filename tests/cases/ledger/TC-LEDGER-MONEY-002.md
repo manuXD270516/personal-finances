@@ -12,9 +12,12 @@ invariants: [INV-001, INV-002]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+  - packages/shared-kernel/src/money/money.ledger.test.ts
+  - packages/shared-kernel/src/money/money.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [money, numeric, precision]
@@ -45,7 +48,7 @@ expected_result:
 - 'La API serializa los montos como strings decimales completados a la escala de la moneda: "685.00"'
 - La moneda siempre está presente junto al monto (INV-002)
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-002 — Los montos decimales hacen round-trip exacto entre Decimal, NUMERIC(38,18) y strings de la API

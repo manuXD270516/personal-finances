@@ -12,9 +12,10 @@ invariants: [INV-006]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, chart-of-accounts, concurrency]
@@ -35,7 +36,7 @@ expected_result:
 - Existe una sola cuenta EQUITY:FX_TRADING:BOB y ambos asientos concurrentes se registran contra ella
 - Ningún asiento falla por violación de unicidad
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-CHART-003 — Las cuentas de sistema por moneda se crean una sola vez bajo demanda

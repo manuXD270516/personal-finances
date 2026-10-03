@@ -12,9 +12,10 @@ invariants: [INV-015]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [period-closing, database, defense-in-depth]
@@ -47,7 +48,7 @@ expected_result:
 - El asiento de W1 del 2026-09-01 y el de W2 del 2026-08-15 se aceptan
 - Tras desbloquear, el asiento del 2026-08-31 se acepta
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-PERIOD-002 — La base de datos rechaza asientos con fecha dentro de un periodo bloqueado

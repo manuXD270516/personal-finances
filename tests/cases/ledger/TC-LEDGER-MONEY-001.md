@@ -12,9 +12,10 @@ invariants: [INV-001]
 priority: critical
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.ledger.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [money, shared-kernel, tdd]
@@ -41,7 +42,7 @@ expected_result:
 - Pasar un number no compila en el chequeo de tipos (verificado con @ts-expect-error)
 - Cada valor inválido lanza MONEY_INVALID_AMOUNT en tiempo de ejecución
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-001 — No se puede crear Money a partir de un number de JavaScript

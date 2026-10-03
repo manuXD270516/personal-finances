@@ -12,9 +12,10 @@ invariants: [INV-004]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, sign-convention]
@@ -37,7 +38,7 @@ expected_result:
 - 'Compra: EXPENSE:BOB +350.00 BOB, Visa BOB -350.00 BOB; saldo contable de Visa BOB = -350.00 BOB'
 - Cada asiento suma 0.00 BOB
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-SIGN-001 — Los débitos se registran positivos y los créditos negativos

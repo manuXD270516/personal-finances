@@ -4,59 +4,70 @@
 
 ## 1. Spec y test cases (SPEC → TEST CASE)
 
-- [ ] 1.1 Revisar `specs/ledger/journal-posting/spec.md` y `specs/ledger/balances/spec.md` contra docs/09 §16; verificar que todo requirement Must tiene ≥ 1 TC no deprecado en `tests/cases/ledger/`
-- [ ] 1.2 Confirmar los TC modificados (requirement exacto, `requirement_status: confirmed`, `status: ready`) y los TC añadidos listados en proposal.md; verificar que el chequeo de catálogo de `scripts/traceability` los acepta y que todos los ejemplos numéricos suman cero por moneda
+- [x] 1.1 Revisar `specs/ledger/journal-posting/spec.md` y `specs/ledger/balances/spec.md` contra docs/09 §16; verificar que todo requirement Must tiene ≥ 1 TC no deprecado en `tests/cases/ledger/`
+- [x] 1.2 Confirmar los TC modificados (requirement exacto, `requirement_status: confirmed`, `status: ready`) y los TC añadidos listados en proposal.md; verificar que el chequeo de catálogo de `scripts/traceability` los acepta y que todos los ejemplos numéricos suman cero por moneda
 - [ ] 1.3 Consolidar en `contracts/` los cambios listados en design.md → Contratos (vía el proceso de consolidación); verificar con Spectral que los nuevos `ErrorCode` y la operación `getLedgerTrialBalance` pasan el ruleset
+  > Pendiente (2026-10-03): según design.md los cambios de contrato se consolidaron el 2026-10-02 (los `ErrorCode` del ledger ya están en `finance-api.v1.yaml`); falta verificar con Spectral `getLedgerTrialBalance`, ligado a 6.3.
 
 ## 2. Dinero en el shared-kernel (DOMAIN, TDD)
 
-- [ ] 2.1 TDD: promover `Money`, `MoneyDecimal`, `Currency`, `Rate` y `rounding` desde `spikes/SPIKE-03-money/src` a `packages/shared-kernel/src/money`, migrando primero sus tests `[TC-LEDGER-MONEY-001]`, `[TC-LEDGER-MONEY-007]`, `[TC-LEDGER-MONEY-008]`; verificar que pasan y que `pnpm typecheck` valida los `@ts-expect-error` de TC-001
-- [ ] 2.2 TDD: rechazo de escala excedida con `AMOUNT_SCALE_EXCEEDED` (unificado; reemplaza `MONEY_SCALE_EXCEEDED` del spike) y rango con `AMOUNT_OUT_OF_RANGE`; tests `[TC-LEDGER-SCALE-001]`
-- [ ] 2.3 TDD: redondeo HALF_EVEN con cuantización racional exacta (H3) y reparto por mayor residuo truncando hacia cero (H5); tests `[TC-LEDGER-MONEY-003]`, `[TC-LEDGER-MONEY-005]` y propiedades `[TC-LEDGER-MONEY-004]`, `[TC-LEDGER-MONEY-006]` (100 runs en PR, 10 000 nightly)
+- [x] 2.1 TDD: promover `Money`, `MoneyDecimal`, `Currency`, `Rate` y `rounding` desde `spikes/SPIKE-03-money/src` a `packages/shared-kernel/src/money`, migrando primero sus tests `[TC-LEDGER-MONEY-001]`, `[TC-LEDGER-MONEY-007]`, `[TC-LEDGER-MONEY-008]`; verificar que pasan y que `pnpm typecheck` valida los `@ts-expect-error` de TC-001
+- [x] 2.2 TDD: rechazo de escala excedida con `AMOUNT_SCALE_EXCEEDED` (unificado; reemplaza `MONEY_SCALE_EXCEEDED` del spike) y rango con `AMOUNT_OUT_OF_RANGE`; tests `[TC-LEDGER-SCALE-001]`
+- [x] 2.3 TDD: redondeo HALF_EVEN con cuantización racional exacta (H3) y reparto por mayor residuo truncando hacia cero (H5); tests `[TC-LEDGER-MONEY-003]`, `[TC-LEDGER-MONEY-005]` y propiedades `[TC-LEDGER-MONEY-004]`, `[TC-LEDGER-MONEY-006]` (100 runs en PR, 10 000 nightly)
 - [ ] 2.4 Mover la regla `pf/no-number-money` y `no-restricted-imports` del `Decimal` global a `packages/eslint-config`; verificar que el fixture malo falla y el bueno pasa (TC-PLATFORM-ARCH-002)
+  > Pendiente: `pf/no-number-money` sigue solo en `spikes/SPIKE-03-money/lint` (no existe `packages/eslint-config`). Mientras tanto `Money` rechaza `number` al compilar (`@ts-expect-error` de TC-LEDGER-MONEY-001, validado por `pnpm typecheck`) y en ejecución (`MONEY_INVALID_AMOUNT`).
 - [ ] 2.5 Verificar cobertura del shared-kernel ≥ 95 % líneas / 90 % ramas y mutation score ≥ 80 % (Stryker) en Money/rounding/allocation (NFR-MAINT-002)
+  > Pendiente: no se ejecutó Stryker ni cobertura en esta sesión (`stryker.config.json` ya incluye `src/money/**`).
 
 ## 3. Dominio del ledger (DOMAIN, TDD)
 
-- [ ] 3.1 TDD: AR `LedgerAccount` (naturaleza y moneda inmutables) y VO `LedgerAccountCode`; tests `[TC-LEDGER-CHART-001]`
-- [ ] 3.2 TDD: AR `JournalEntry` + `EntryValidator` con el orden de validación de design.md §Decisiones 2; tests `[TC-LEDGER-BALANCE-001]`, `[TC-LEDGER-STRUCTURE-001]`, `[TC-LEDGER-CURRENCY-001]`, `[TC-LEDGER-SPLITREF-001]`, `[TC-LEDGER-SIGN-001]`
-- [ ] 3.3 TDD: `ReversalFactory` (negación exacta, rechazo de revertir un `REVERSAL`); tests `[TC-LEDGER-REVERSAL-001]`, `[TC-LEDGER-REVERSAL-002]` (parte de dominio) y propiedad `[TC-LEDGER-REVERSAL-003]`
-- [ ] 3.4 TDD: chequeo de periodo bloqueado en dominio y `BalanceCalculator` (saldo contable y presentado por naturaleza); tests `[TC-LEDGER-PERIOD-001]` (dominio), `[TC-LEDGER-BALANCES-004]`
-- [ ] 3.5 Propiedades de ledger en memoria: `[TC-LEDGER-BALANCE-003]` (balance de comprobación en cero tras cada paso) y `[TC-LEDGER-VALUATION-001]` (identidad de valoración con tasas aleatorias, precisión 40)
+- [x] 3.1 TDD: AR `LedgerAccount` (naturaleza y moneda inmutables) y VO `LedgerAccountCode`; tests `[TC-LEDGER-CHART-001]`
+- [x] 3.2 TDD: AR `JournalEntry` + `EntryValidator` con el orden de validación de design.md §Decisiones 2; tests `[TC-LEDGER-BALANCE-001]`, `[TC-LEDGER-STRUCTURE-001]`, `[TC-LEDGER-CURRENCY-001]`, `[TC-LEDGER-SPLITREF-001]`, `[TC-LEDGER-SIGN-001]`
+- [x] 3.3 TDD: `ReversalFactory` (negación exacta, rechazo de revertir un `REVERSAL`); tests `[TC-LEDGER-REVERSAL-001]`, `[TC-LEDGER-REVERSAL-002]` (parte de dominio) y propiedad `[TC-LEDGER-REVERSAL-003]`
+- [x] 3.4 TDD: chequeo de periodo bloqueado en dominio y `BalanceCalculator` (saldo contable y presentado por naturaleza); tests `[TC-LEDGER-PERIOD-001]` (dominio), `[TC-LEDGER-BALANCES-004]`
+- [x] 3.5 Propiedades de ledger en memoria: `[TC-LEDGER-BALANCE-003]` (balance de comprobación en cero tras cada paso) y `[TC-LEDGER-VALUATION-001]` (identidad de valoración con tasas aleatorias, precisión 40)
 
 ## 4. Casos de uso (APPLICATION)
 
-- [ ] 4.1 `PostJournalEntry` con `LedgerAccountResolver` (get-or-create de cuentas de usuario y de sistema), idempotencia por `sourceRef` y escritura de `ledger.JournalEntryPosted.v1` en el outbox; tests de aplicación con fakes `[TC-LEDGER-METADATA-001]`, `[TC-LEDGER-OPENING-001]`, `[TC-LEDGER-TRANSFER-001]`
-- [ ] 4.2 `ReverseJournalEntry(entryId, reverseDate, reason)` validando periodo abierto y reversa única
-- [ ] 4.3 `LedgerPeriodLockPort` (`lockPeriod`, `unlockPeriod`, idempotentes) para uso de Planning en Phase 2; verificar con `[TC-LEDGER-PERIOD-001]` usando el puerto directamente
+- [x] 4.1 `PostJournalEntry` con `LedgerAccountResolver` (get-or-create de cuentas de usuario y de sistema), idempotencia por `sourceRef` y escritura de `ledger.JournalEntryPosted.v1` en el outbox; tests de aplicación con fakes `[TC-LEDGER-METADATA-001]`, `[TC-LEDGER-OPENING-001]`, `[TC-LEDGER-TRANSFER-001]`
+- [x] 4.2 `ReverseJournalEntry(entryId, reverseDate, reason)` validando periodo abierto y reversa única
+- [x] 4.3 `LedgerPeriodLockPort` (`lockPeriod`, `unlockPeriod`, idempotentes) para uso de Planning en Phase 2; verificar con `[TC-LEDGER-PERIOD-001]` usando el puerto directamente
 - [ ] 4.4 `BalanceQuery` (`GetBalance`, `GetBalances` agrupado por moneda, `GetTrialBalance`, `GetEntriesBySource`); tests `[TC-LEDGER-BALANCES-005]` (el saldo contable ignora pendientes)
+  > Parcial: `PgBalanceQuery` implementa GetBalance/GetBalances/GetTrialBalance/GetEntriesBySource (TC-LEDGER-BALANCES-003/004 en integración). Falta el saldo "actual" por defecto en la zona horaria del workspace (tercer punto de TC-LEDGER-BALANCES-002) y TC-LEDGER-BALANCES-005.
 - [ ] 4.5 Comandos internos `RebuildBalanceSnapshots` y `VerifyLedgerIntegrity` con `MetricsPort` y log estructurado
+  > Pendiente: `RebuildBalanceSnapshots` y `VerifyLedgerIntegrity` sin implementar (tabla `balance_snapshot` y grants DRV ya existen).
 
 ## 5. Persistencia (INFRASTRUCTURE)
 
-- [ ] 5.1 Migraciones dbmate en `db/migrations/ledger/` según design.md → Plan de migración (tablas, FKs compuestas, triggers PF001/PF003/PF004/PF005, RLS ENABLE+FORCE, grants); verificar con el test de migraciones sobre PG vacío
-- [ ] 5.2 Repositorios Kysely append-only sobre la Unit of Work (`Transaction<DB>` con `SET LOCAL app.workspace_id`) y type parser de `NUMERIC` → string; tests `[TC-LEDGER-MONEY-002]`, `[TC-LEDGER-IDEMPOTENCY-001]`, `[TC-LEDGER-CHART-002]`, `[TC-LEDGER-CHART-003]` (incluye concurrencia)
-- [ ] 5.3 Tests de base de datos con rol `pf_app`: `[TC-LEDGER-BALANCE-002]`, `[TC-LEDGER-STRUCTURE-002]`, `[TC-LEDGER-IMMUTABILITY-001]`, `[TC-LEDGER-PERIOD-002]`, `[TC-LEDGER-REVERSAL-002]` (PK de `entry_reversal` bajo concurrencia), `[TC-LEDGER-ISOLATION-001]`
-- [ ] 5.4 Mapeo de SQLSTATE (`PF001/PF004/PF005` → `DomainError`; `PF002/PF003/42501` → `INTERNAL_ERROR` + métrica); verificar con tests de integración que el código llega íntegro
+- [x] 5.1 Migraciones dbmate en `db/migrations/ledger/` según design.md → Plan de migración (tablas, FKs compuestas, triggers PF001/PF003/PF004/PF005, RLS ENABLE+FORCE, grants); verificar con el test de migraciones sobre PG vacío
+- [x] 5.2 Repositorios Kysely append-only sobre la Unit of Work (`Transaction<DB>` con `SET LOCAL app.workspace_id`) y type parser de `NUMERIC` → string; tests `[TC-LEDGER-MONEY-002]`, `[TC-LEDGER-IDEMPOTENCY-001]`, `[TC-LEDGER-CHART-002]`, `[TC-LEDGER-CHART-003]` (incluye concurrencia)
+- [x] 5.3 Tests de base de datos con rol `pf_app`: `[TC-LEDGER-BALANCE-002]`, `[TC-LEDGER-STRUCTURE-002]`, `[TC-LEDGER-IMMUTABILITY-001]`, `[TC-LEDGER-PERIOD-002]`, `[TC-LEDGER-REVERSAL-002]` (PK de `entry_reversal` bajo concurrencia), `[TC-LEDGER-ISOLATION-001]`
+- [x] 5.4 Mapeo de SQLSTATE (`PF001/PF004/PF005` → `DomainError`; `PF002/PF003/42501` → `INTERNAL_ERROR` + métrica); verificar con tests de integración que el código llega íntegro
 - [ ] 5.5 Consultas de saldo con el índice `INCLUDE (amount)` y snapshots (`balance_snapshot`, worker); tests `[TC-LEDGER-BALANCES-001]`, `[TC-LEDGER-BALANCES-002]`, `[TC-LEDGER-BALANCES-003]`, `[TC-LEDGER-SNAPSHOT-001]`; medir p95 ≤ 50 ms por cuenta (NFR-PERF-005) y overhead de RLS < 10 % con `EXPLAIN ANALYZE`
+  > Parcial: saldos por `SUM` sobre `posting_balance_ix`; sin snapshots ni medición p95/overhead de RLS (TC-LEDGER-BALANCES-001 y TC-LEDGER-SNAPSHOT-001 sin automatizar).
 - [ ] 5.6 Job diario del verificador de invariantes en el worker y enganche en `restore:local`; test `[TC-LEDGER-INTEGRITY-001]`
+  > Pendiente: job diario del verificador y enganche en `restore:local` (TC-LEDGER-INTEGRITY-001).
 
 ## 6. Contratos de API y eventos (API)
 
-- [ ] 6.1 Test de contrato de `ledger.JournalEntryPosted.v1` contra `contracts/events/ledger/JournalEntryPosted.v1.schema.json` + Σ por moneda = 0 + escala canónica; test `[TC-LEDGER-EVENT-001]`
-- [ ] 6.2 Mapeo de los nuevos códigos de error a problem+json (status según design.md → Contratos); verificar con tests de API
+- [x] 6.1 Test de contrato de `ledger.JournalEntryPosted.v1` contra `contracts/events/ledger/JournalEntryPosted.v1.schema.json` + Σ por moneda = 0 + escala canónica; test `[TC-LEDGER-EVENT-001]`
+- [x] 6.2 Mapeo de los nuevos códigos de error a problem+json (status según design.md → Contratos); verificar con tests de API
 - [ ] 6.3 (Could) Endpoint `GET /api/v1/workspaces/{workspaceId}/ledger/trial-balance` solo `OWNER`; test `[TC-LEDGER-TRIAL-001]`
+  > Pendiente (Could): endpoint técnico trial-balance (TC-LEDGER-TRIAL-001).
 
 ## 7. UI
 
-- [ ] 7.1 Sin UI de usuario (el ledger es invisible). Verificar que ningún componente de `apps/web` muestra débitos/créditos ni códigos de cuentas contables
+- [x] 7.1 Sin UI de usuario (el ledger es invisible). Verificar que ningún componente de `apps/web` muestra débitos/créditos ni códigos de cuentas contables
 
 ## 8. Tests automatizados, regresión y E2E
 
 - [ ] 8.1 Marcar los TC críticos en la Financial Regression Suite y verificar que corren en cada PR (unit/PBT/integración) y nightly (10 000 runs)
-- [ ] 8.2 E2E: cubierto por los slices consumidores (`add-accounts-management`, `add-transaction-recording`); aquí solo un smoke de integración que postea y revierte un asiento de 120.00 BOB y verifica saldo 1000.00 BOB y evento publicado
+  > Parcial: los TC del ledger con `regression_suite: true` corren en cada PR (unit/PBT con 100 corridas y semilla fija; integración en `pnpm test:integration`); `NIGHTLY=1` sube a 10 000 corridas (verificado localmente). Falta el job nightly en CI.
+- [x] 8.2 E2E: cubierto por los slices consumidores (`add-accounts-management`, `add-transaction-recording`); aquí solo un smoke de integración que postea y revierte un asiento de 120.00 BOB y verifica saldo 1000.00 BOB y evento publicado
 
 ## 9. Documentación y cierre
 
 - [ ] 9.1 Reportar al owner las correcciones de docs detectadas (PF002 duplicado en docs/08, FR-ACCOUNTS-003 vs get-or-create de docs/09 §2.2, prioridades FR-LEDGER-014/015 vs NFR-DATA-008/009, FR erróneos en TC previos) y actualizar docs/09/docs/08 cuando el owner lo apruebe
+  > Pendiente de aprobación del owner: ver design.md → "Registro de implementación (2026-10-03)".
 - [ ] 9.2 Actualizar `automation_status`/`status` de los TC, regenerar `tests/traceability/matrix.{md,json}` y ejecutar `openspec validate add-ledger-core --strict --no-interactive`
+  > Parcial: TC automatizados actualizados (35) y matriz regenerada; quedan sin automatizar TC-LEDGER-BALANCES-001/002/005, SNAPSHOT-001, INTEGRITY-001 y TRIAL-001.

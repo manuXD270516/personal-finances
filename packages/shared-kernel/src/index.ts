@@ -14,8 +14,17 @@ export {
   pointerSegment,
   type FieldViolation,
 } from './errors/domain-error.js';
-export { currency, sameCurrency, CURRENCY_CODE, MAX_SCALE, type Currency } from './money/currency.js';
+export {
+  currency,
+  sameCurrency,
+  assertSameCurrency,
+  CURRENCY_CODE,
+  MAX_SCALE,
+  type Currency,
+} from './money/currency.js';
 export { MoneyDecimal, dec, type Decimal } from './money/decimal.js';
-export { Money, MAX_INTEGER_DIGITS, type MoneyJson } from './money/money.js';
+export { Money, MAX_INTEGER_DIGITS, type MoneyJson, type Weight } from './money/money.js';
+export { Rate, RATE_PERSIST_SCALE } from './money/rate.js';
+export { type RoundingMode } from './money/rounding.js';
 export { Instant, FixedClock, systemClock, type Clock } from './time/instant.js';
 export { LocalDate } from './time/local-date.js';

@@ -12,9 +12,10 @@ invariants: [INV-004, INV-009]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/ledger.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [fast-check, ledger]
@@ -34,7 +35,7 @@ expected_result:
 - Para cada moneda, la suma de los saldos de todas las cuentas contables es 0 después de cada paso
 - La suma de los saldos ASSET + LIABILITY solo cambia por asientos que tocan INCOME/EXPENSE/EQUITY
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCE-003 — Propiedad: todo asiento aceptado balancea por moneda y el balance de comprobación siempre es cero
