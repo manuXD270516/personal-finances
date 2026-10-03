@@ -12,9 +12,10 @@ invariants: [INV-023]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/ledger-maintenance.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [balances, pending]
@@ -33,7 +34,7 @@ expected_result:
 - No existe ningún asiento para la transacción pendiente
 - El saldo proyectado 800.00 BOB se expone como un valor separado del saldo contable
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCES-005 — El saldo contable ignora transacciones pendientes

@@ -23,11 +23,14 @@ function fakeLedger() {
   let balance = 100_000n; // 1000.00 BOB en centavos
   return {
     effects,
+    // Saldo simulado del test en centavos `bigint`: el formateo es solo de presentación del fake.
+    // eslint-disable-next-line pf/no-number-money -- fake de test, no es dinero del dominio
     balance: () => (Number(balance) / 100).toFixed(2),
     command: (amount: string, fail?: () => never) => async (): Promise<HttpResponseSnapshot> => {
       if (fail) fail();
       const id = `tx-${effects.length + 1}`;
       effects.push(id);
+      // eslint-disable-next-line pf/no-number-money -- fake de test (centavos), no es dinero del dominio
       balance -= BigInt(Math.round(Number(amount) * 100));
       return {
         status: 201,

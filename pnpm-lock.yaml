@@ -286,6 +286,9 @@ importers:
       '@next/eslint-plugin-next':
         specifier: 16.3.8
         version: 16.3.8(eslint@10.11.0(supports-color@7.2.0))
+      '@pf/eslint-config':
+        specifier: workspace:*
+        version: link:packages/eslint-config
       cross-env:
         specifier: 10.1.0
         version: 10.1.0
@@ -662,6 +665,18 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/eslint-config:
+    devDependencies:
+      eslint:
+        specifier: 10.11.0
+        version: 10.11.0(supports-color@7.2.0)
+      typescript-eslint:
+        specifier: 8.71.0
+        version: 8.71.0(eslint@10.11.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@26.6.3)(vite@8.3.2(@types/node@26.6.3)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/platform:
     dependencies:

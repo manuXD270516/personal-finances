@@ -12,9 +12,10 @@ invariants: [INV-022]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/ledger-maintenance.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [balances, snapshot]
@@ -38,7 +39,7 @@ expected_result:
 - El snapshot reconstruido vale 830.00 BOB y coincide con Σ postings
 - Reconstruir dos veces produce filas idénticas
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-SNAPSHOT-001 — Los snapshots de saldo se invalidan con asientos retroactivos y se reconstruyen idénticos

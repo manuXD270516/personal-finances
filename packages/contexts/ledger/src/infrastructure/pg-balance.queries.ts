@@ -1,5 +1,5 @@
 import { unitOfWorkKysely } from '@pf/platform/api';
-import { DomainError, LocalDate, Money } from '@pf/shared-kernel';
+import { DomainError, LocalDate, Money, type Clock } from '@pf/shared-kernel';
 import { sql } from 'kysely';
 import type { CurrencyCatalog, LedgerUnitOfWork } from '../application/ports/index.js';
 import type {
@@ -21,19 +21,31 @@ interface BalanceRow {
   balance: string;
 }
 
-const asOfDate = (asOf: string | undefined): string | null =>
-  asOf === undefined ? null : LocalDate.parse(asOf).toString();
-
 /**
- * `BalanceQuery` sobre PostgreSQL (design.md §Decisiones 8): `SUM(amount)` sobre `NUMERIC` agrupado por cuenta y
- * moneda (nunca suma monedas distintas), con `entry_date ≤ asOf` usando `posting_balance_ix … INCLUDE (amount)`.
- * El ledger no conoce estados de transacción: los pendientes los aporta Transactions (FR-LEDGER-013).
+ * `BalanceQuery` sobre PostgreSQL (design.md §Decisiones 8 y 9): saldo = snapshot vigente más reciente con
+ * `as_of_date ≤ asOf` + `SUM(amount)` de los postings posteriores (`posting_balance_ix … INCLUDE (amount)`), sobre
+ * `NUMERIC` y agrupado por cuenta y moneda (nunca suma monedas distintas). Un snapshot invalidado por un asiento
+ * retroactivo registrado después (`sequence > last_sequence` con `entry_date ≤ as_of_date`) se descarta en la misma
+ * consulta, así que la lectura nunca depende del job de reconstrucción (INV-022). Sin `asOf`, el saldo es al día de hoy
+ * en la zona horaria del workspace (FR-LEDGER-012). El ledger no conoce estados de transacción: los pendientes los
+ * aporta Transactions (FR-LEDGER-013).
  */
 export class PgBalanceQuery implements BalanceQuery {
   constructor(
     private readonly uow: LedgerUnitOfWork,
     private readonly currencies: CurrencyCatalog,
+    private readonly clock?: Clock,
   ) {}
+
+  /** `asOf` explícito o, si falta, la fecha de hoy en la zona del workspace (sin reloj: sin límite de fecha). */
+  private async asOfDate(workspaceId: string, asOf: string | undefined): Promise<string | null> {
+    if (asOf !== undefined) return LocalDate.parse(asOf).toString();
+    if (!this.clock) return null;
+    const { rows } = await sql<{ time_zone: string }>`
+      SELECT time_zone FROM iam.workspace WHERE id = ${workspaceId}`.execute(unitOfWorkKysely());
+    const tz = rows[0]?.time_zone;
+    return tz === undefined ? null : LocalDate.ofInstant(this.clock.now(), tz).toString();
+  }
 
   getBalance(input: {
     workspaceId: string;
@@ -41,7 +53,8 @@ export class PgBalanceQuery implements BalanceQuery {
     asOf?: string;
   }): Promise<AccountBalanceDto> {
     return this.uow.run(input.workspaceId, async () => {
-      const rows = await this.balances(input.workspaceId, asOfDate(input.asOf), [input.ledgerAccountId]);
+      const asOf = await this.asOfDate(input.workspaceId, input.asOf);
+      const rows = await this.balances(input.workspaceId, asOf, [input.ledgerAccountId]);
       const row = rows[0];
       if (!row)
         throw new DomainError('REFERENCE_NOT_FOUND', `ledger account ${input.ledgerAccountId} not found`);
@@ -57,7 +70,7 @@ export class PgBalanceQuery implements BalanceQuery {
     return this.uow.run(input.workspaceId, async () => {
       const rows = await this.balances(
         input.workspaceId,
-        asOfDate(input.asOf),
+        await this.asOfDate(input.workspaceId, input.asOf),
         input.ledgerAccountIds ?? null,
       );
       const totals = new Map<string, Money>();
@@ -74,7 +87,7 @@ export class PgBalanceQuery implements BalanceQuery {
 
   getTrialBalance(input: { workspaceId: string; asOf?: string }): Promise<TrialBalanceDto> {
     return this.uow.run(input.workspaceId, async () => {
-      const asOf = asOfDate(input.asOf);
+      const asOf = await this.asOfDate(input.workspaceId, input.asOf);
       const rows = await this.balances(input.workspaceId, asOf, null);
       const byCurrency = new Map<string, { lines: AccountBalanceDto[]; total: Money }>();
       for (const row of rows) {
@@ -131,14 +144,23 @@ export class PgBalanceQuery implements BalanceQuery {
   ): Promise<BalanceRow[]> {
     const { rows } = await sql<BalanceRow>`
       SELECT a.id AS ledger_account_id, a.code, a.type, a.source_account_id, a.currency,
-             COALESCE(SUM(p.amount), 0)::text AS balance
+             (COALESCE(s.balance, 0) + COALESCE((
+               SELECT SUM(p.amount) FROM ledger.posting p
+                WHERE p.workspace_id = a.workspace_id AND p.ledger_account_id = a.id
+                  AND (s.as_of_date IS NULL OR p.entry_date > s.as_of_date)
+                  AND (${asOf}::date IS NULL OR p.entry_date <= ${asOf}::date)), 0))::text AS balance
         FROM ledger.ledger_account a
-        LEFT JOIN ledger.posting p
-          ON p.workspace_id = a.workspace_id AND p.ledger_account_id = a.id
-         AND (${asOf}::date IS NULL OR p.entry_date <= ${asOf}::date)
+        LEFT JOIN LATERAL (
+          SELECT bs.as_of_date, bs.balance FROM ledger.balance_snapshot bs
+           WHERE bs.workspace_id = a.workspace_id AND bs.ledger_account_id = a.id
+             AND (${asOf}::date IS NULL OR bs.as_of_date <= ${asOf}::date)
+             AND NOT EXISTS (
+               SELECT 1 FROM ledger.journal_entry e JOIN ledger.posting p2 ON p2.journal_entry_id = e.id
+                WHERE e.workspace_id = bs.workspace_id AND e.sequence > bs.last_sequence
+                  AND e.entry_date <= bs.as_of_date AND p2.ledger_account_id = bs.ledger_account_id)
+           ORDER BY bs.as_of_date DESC LIMIT 1) s ON true
        WHERE a.workspace_id = ${workspaceId}
          AND (${ids === null}::boolean OR a.id = ANY(${ids ?? []}::uuid[]))
-       GROUP BY a.id, a.code, a.type, a.source_account_id, a.currency
        ORDER BY a.currency, a.code`.execute(unitOfWorkKysely());
     return rows;
   }

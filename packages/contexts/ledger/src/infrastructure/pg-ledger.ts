@@ -288,6 +288,11 @@ export class PgJournalEntryRepository implements JournalEntryRepository {
   }
 
   private async insert(entry: JournalEntry): Promise<JournalEntry> {
+    // Candado compartido por workspace: espera a un `RebuildBalanceSnapshots` en curso (exclusivo) para que el
+    // checkpoint `last_sequence` de los snapshots sea exacto (pg-ledger-maintenance.ts).
+    await sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${'ledger.balance_snapshot:' + entry.workspaceId}, 0))`.execute(
+      db(),
+    );
     const inserted = await db()
       .insertInto('ledger.journal_entry')
       .values({

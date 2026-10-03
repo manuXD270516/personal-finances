@@ -161,7 +161,9 @@ let ledgerExpense: string;
 beforeAll(async () => {
   app = new Pool({ connectionString: deps.databaseUrl, max: 6 });
   migrator = new Pool({ connectionString: deps.migratorUrl, max: 2 });
-  const clock = new FixedClock(Instant.parse('2026-03-15T14:00:00Z'));
+  // Posterior a todas las fechas de negocio del archivo: el saldo "actual" por defecto (hoy en la zona del workspace)
+  // incluye todos los asientos (TC-LEDGER-BALANCES-002 cubre el borde de día en ledger-maintenance.int.test.ts).
+  const clock = new FixedClock(Instant.parse('2026-12-31T14:00:00Z'));
   // AuditPort que escribe en audit.audit_log con la conexión de la unidad de trabajo en curso: verifica la
   // atomicidad ledger + auditoría sin depender de las capas internas de @pf/audit (regla no-cross-context-internals).
   const audit: AuditPort = {
