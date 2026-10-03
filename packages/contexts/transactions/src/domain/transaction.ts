@@ -1,8 +1,24 @@
-import { DomainError, Money } from '@pf/shared-kernel';
+import { DomainError, Money, type Rate } from '@pf/shared-kernel';
+import {
+  assertInstant,
+  freezeDetail,
+  priceConversion,
+  type ConversionDetail,
+  type ConversionFeeType,
+  type PairOrientation,
+  type ReferenceRateInfo,
+} from './conversion.js';
 import { assertTransition, hasActiveEntry, type TransactionStatus } from './transaction-status.js';
 
 /** Kinds de este change (transfers/conversions/opening los agregan otros changes sobre el mismo agregado). */
-export const TRANSACTION_KINDS = ['INCOME', 'EXPENSE', 'REFUND', 'ADJUSTMENT', 'TRANSFER'] as const;
+export const TRANSACTION_KINDS = [
+  'INCOME',
+  'EXPENSE',
+  'REFUND',
+  'ADJUSTMENT',
+  'TRANSFER',
+  'CONVERSION',
+] as const;
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 export type AdjustmentDirection = 'INCREASE' | 'DECREASE';
 export type AccountNature = 'ASSET' | 'LIABILITY';
@@ -51,8 +67,11 @@ export interface Leg {
   readonly role: LegRole;
 }
 
-/** `MAIN` (una cuenta); `SOURCE`/`TARGET` en transferencias (add-transfers, docs/09 §6.4). */
-export type LegRole = 'MAIN' | 'SOURCE' | 'TARGET';
+/**
+ * `MAIN` (una cuenta); `SOURCE`/`TARGET` en transferencias y conversiones (docs/09 §6.4, §6.12); `FEE` = fee de una
+ * conversión pagado desde una tercera cuenta (add-manual-conversions, docs/09 §6.15).
+ */
+export type LegRole = 'MAIN' | 'SOURCE' | 'TARGET' | 'FEE';
 
 export interface TransactionState {
   readonly id: string;
@@ -82,6 +101,8 @@ export interface TransactionState {
   readonly voidReason: string | null;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
+  /** Solo `CONVERSION`: detalle de precio inmutable de la revisión vigente (docs/09 §7). */
+  readonly conversion?: ConversionDetail | null;
 }
 
 export interface RecordTransactionInput {
@@ -186,7 +207,8 @@ export function legAmount(
       return amount;
     case 'EXPENSE':
     case 'TRANSFER':
-      // TRANSFER: leg de origen sin comisión (los legs completos los arma `transferLegs`).
+    case 'CONVERSION':
+      // TRANSFER/CONVERSION: leg de origen (los legs completos los arman `transferLegs`/`conversionLegs`).
       return amount.negate();
     case 'ADJUSTMENT': {
       // INCREASE = aumenta el saldo PRESENTADO: débito en ASSET, crédito en LIABILITY.
@@ -341,6 +363,153 @@ export function transferFee(s: Pick<TransactionState, 'splits' | 'amount'>): Mon
     s.splits.map((x) => x.amount),
     s.amount.currency,
   );
+}
+
+/** Cuenta de una conversión con la moneda y naturaleza que informa Accounts. */
+export type ConversionAccount = TransferAccount;
+
+export interface ConversionFeeSpec {
+  readonly type: ConversionFeeType;
+  readonly amount: Money;
+  /** Tercera cuenta que paga el fee (su moneda debe ser la del fee); `null` = descontado del origen o destino. */
+  readonly paidFrom: ConversionAccount | null;
+  /** Categoría del split de gasto (por defecto la de sistema *Fees*). */
+  readonly categoryId: string;
+  readonly splitId: string;
+}
+
+/** Datos financieros de una conversión (registro y `amendConversion`, que los reemplaza completos). */
+export interface ConversionData {
+  readonly businessDate: string;
+  readonly postingDate?: string | null;
+  readonly sourceAccount: ConversionAccount;
+  readonly targetAccount: ConversionAccount;
+  /** Bruto entregado, en la moneda de la cuenta origen. */
+  readonly sourceAmount: Money;
+  /** Neto recibido, en la moneda de la cuenta destino. */
+  readonly targetAmount: Money;
+  readonly fees: readonly ConversionFeeSpec[];
+  readonly quotedRate: Rate | null;
+  readonly referenceRate: ReferenceRateInfo | null;
+  readonly display: PairOrientation;
+  readonly provider: { readonly counterpartyId: string | null; readonly name: string | null };
+  readonly executedAt: string;
+  readonly externalRef: string | null;
+  readonly description?: string | null;
+  readonly notes?: string | null;
+}
+
+export interface RecordConversionInput extends ConversionData {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly status?: 'PENDING' | 'POSTED' | 'CLEARED';
+  readonly origin?: TransactionSource;
+}
+
+/**
+ * Valida una conversión y arma legs, splits de fees y el `ConversionDetail` de la revisión (transactions/conversions;
+ * docs/09 §6.12–§6.15, §7.2): cuentas de monedas distintas (`CONVERSION_SAME_CURRENCY`), montos en la moneda de su
+ * cuenta (`CURRENCY_MISMATCH`), escala (ya validada al construir `Money`), fees por moneda y cuenta pagadora
+ * (`CONVERSION_AMOUNTS_INCONSISTENT`) e INV-010 (convertido + fees en origen = bruto; neto + fees en destino = bruto
+ * destino), todo ANTES de tocar el ledger.
+ */
+export function buildConversion(
+  data: ConversionData,
+  revision: number,
+): Pick<TransactionState, 'accountId' | 'amount' | 'legs' | 'splits' | 'conversion'> {
+  const { sourceAccount: from, targetAccount: to } = data;
+  if (from.currency === to.currency) {
+    throw new DomainError(
+      'CONVERSION_SAME_CURRENCY',
+      `both accounts are in ${from.currency}; record a transfer instead`,
+    ).at('/targetAccountId');
+  }
+  if (data.sourceAmount.currency.code !== from.currency) {
+    throw new DomainError(
+      'CURRENCY_MISMATCH',
+      `the source account is in ${from.currency}, not ${data.sourceAmount.currency.code}`,
+    ).at('/sourceAmount/currency');
+  }
+  if (data.targetAmount.currency.code !== to.currency) {
+    throw new DomainError(
+      'CURRENCY_MISMATCH',
+      `the target account is in ${to.currency}, not ${data.targetAmount.currency.code}`,
+    ).at('/targetAmount/currency');
+  }
+  for (const [i, f] of data.fees.entries()) {
+    if (f.paidFrom && f.paidFrom.currency !== f.amount.currency.code) {
+      throw new DomainError(
+        'CURRENCY_MISMATCH',
+        `the fee is in ${f.amount.currency.code} but account ${f.paidFrom.accountId} is in ${f.paidFrom.currency}`,
+      ).at(`/fees/${i}/paidFromAccountId`);
+    }
+  }
+  assertText(data.description, 500, '/description');
+  assertText(data.notes, 4000, '/notes');
+  assertText(data.provider.name, 100, '/provider/name');
+  assertText(data.externalRef, 200, '/externalRef');
+  const executedAt = assertInstant(data.executedAt, '/executedAt');
+  const pricing = priceConversion({
+    sourceAmount: data.sourceAmount,
+    targetAmount: data.targetAmount,
+    fees: data.fees.map((f) => ({
+      type: f.type,
+      amount: f.amount,
+      paidFromAccountId: f.paidFrom?.accountId ?? null,
+    })),
+    quotedRate: data.quotedRate,
+    referenceRate: data.referenceRate?.rate ?? null,
+    display: data.display,
+  });
+  const legs: Leg[] = [
+    { accountId: from.accountId, nature: from.nature, amount: data.sourceAmount.negate(), role: 'SOURCE' },
+    { accountId: to.accountId, nature: to.nature, amount: data.targetAmount, role: 'TARGET' },
+    ...data.fees.flatMap((f): Leg[] =>
+      f.paidFrom
+        ? [
+            {
+              accountId: f.paidFrom.accountId,
+              nature: f.paidFrom.nature,
+              amount: f.amount.negate(),
+              role: 'FEE',
+            },
+          ]
+        : [],
+    ),
+  ];
+  const splits: Split[] = data.fees.map((f) => ({
+    id: f.splitId,
+    amount: f.amount,
+    categoryId: f.categoryId,
+    counterpartyId: null,
+    tagIds: [],
+    memo: null,
+  }));
+  const conversion = freezeDetail({
+    revision,
+    sourceAccountId: from.accountId,
+    targetAccountId: to.accountId,
+    sourceAmount: data.sourceAmount,
+    convertedSourceAmount: pricing.convertedSource,
+    grossTargetAmount: pricing.grossTarget,
+    targetAmount: data.targetAmount,
+    quotedRate: data.quotedRate,
+    effectiveRate: pricing.effectiveRate,
+    referenceRate: data.referenceRate,
+    spread: pricing.spread,
+    quotedRateDeviation: pricing.quotedRateDeviation,
+    fees: data.fees.map((f, i) => ({
+      feeNo: i + 1,
+      type: f.type,
+      amount: f.amount,
+      paidFromAccountId: f.paidFrom?.accountId ?? null,
+      splitId: f.splitId,
+    })),
+    provider: { counterpartyId: data.provider.counterpartyId, name: data.provider.name },
+    executedAt,
+    externalRef: data.externalRef,
+  });
+  return { accountId: from.accountId, amount: data.sourceAmount, legs, splits, conversion };
 }
 
 /**
@@ -511,6 +680,94 @@ export class Transaction {
     );
   }
 
+  /**
+   * Conversión entre monedas (transactions/conversions; ARCHITECTURE §4.2): UNA transacción `CONVERSION` con legs
+   * `SOURCE` (−bruto), `TARGET` (+neto) y `FEE` (fees desde una tercera cuenta), un split de gasto por fee y el
+   * `ConversionDetail` inmutable de la revisión 1. El asiento lo arma el traductor (patas `EQUITY:FX_TRADING:<CCY>`).
+   */
+  static recordConversion(input: RecordConversionInput): Transaction {
+    const built = buildConversion(input, 1);
+    return new Transaction(
+      {
+        id: input.id,
+        workspaceId: input.workspaceId,
+        kind: 'CONVERSION',
+        status: input.status ?? 'POSTED',
+        businessDate: input.businessDate,
+        postingDate: input.postingDate ?? null,
+        ...built,
+        direction: null,
+        description: input.description ?? null,
+        notes: input.notes ?? null,
+        counterpartyId: input.provider.counterpartyId,
+        paymentMethod: null,
+        source: input.origin ?? 'MANUAL',
+        externalRef: null,
+        refundOfTransactionId: null,
+        adjustmentReason: null,
+        confirmedRefundExcess: false,
+        revision: 1,
+        version: 1,
+        activeEntryId: null,
+        voidedAt: null,
+        voidReason: null,
+        createdAt: null,
+        updatedAt: null,
+      },
+      null,
+    );
+  }
+
+  /**
+   * `AmendConversion` (FR-TRANSACTIONS-024, docs/31 D11): reemplazo completo de los datos financieros ⇒ revisión + 1
+   * con un `ConversionDetail` NUEVO (el anterior se conserva) y, si hay asiento activo, `ledgerImpact` (la aplicación
+   * revierte el asiento y postea el nuevo en la misma transacción BD). VOIDED ⇒ `INVALID_STATUS_TRANSITION`;
+   * RECONCILED ⇒ `TRANSACTION_RECONCILED`; un CLEARED vuelve a POSTED.
+   */
+  amendConversion(data: ConversionData): AmendResult {
+    const s = this.state;
+    if (s.kind !== 'CONVERSION') {
+      throw new DomainError('RESOURCE_NOT_FOUND', `transaction ${s.id} is not a conversion`);
+    }
+    if (s.status === 'VOIDED') {
+      throw new DomainError('INVALID_STATUS_TRANSITION', 'a voided conversion cannot be amended');
+    }
+    if (s.status === 'RECONCILED') {
+      throw new DomainError(
+        'TRANSACTION_RECONCILED',
+        'a reconciled conversion must be un-reconciled before it is amended',
+      );
+    }
+    const revision = s.revision + 1;
+    const built = buildConversion(data, revision);
+    const ledgerImpact = hasActiveEntry(s.status);
+    const previousEntryId = s.activeEntryId;
+    const previousStatus = s.status;
+    this.state = {
+      ...s,
+      ...built,
+      businessDate: data.businessDate,
+      postingDate: data.postingDate === undefined ? s.postingDate : data.postingDate,
+      description: data.description === undefined ? s.description : data.description,
+      notes: data.notes === undefined ? s.notes : data.notes,
+      counterpartyId: data.provider.counterpartyId,
+      revision,
+      status: s.status === 'CLEARED' ? 'POSTED' : s.status,
+      activeEntryId: null,
+      version: s.version + 1,
+    };
+    this.replacedSplits = true;
+    const changed: ChangedField[] = ['amount', 'businessDate', 'accountId', 'splits'];
+    if (this.state.status !== previousStatus) changed.push('status');
+    return {
+      changedFields: changed,
+      ledgerImpact,
+      classificationChanges: [],
+      previousStatus,
+      previousEntryId,
+    };
+  }
+
   get id(): string {
     return this.state.id;
   }
@@ -651,6 +908,10 @@ export class Transaction {
       changed.push('amount');
       financial = true;
     }
+    if (s.kind === 'CONVERSION' && financial) {
+      // Montos, cuentas y fecha de una conversión cambian solo con `amendConversion` (reversa + detalle nuevo, D11).
+      throw validation('use amendConversion (PUT /conversions/{id}) to change a conversion', '');
+    }
     if (isTransfer && target) {
       assertTransferAccounts(
         { accountId: next.accountId, nature, currency: accountCurrency },
@@ -708,9 +969,9 @@ export class Transaction {
         );
         if (classificationChanges.length > 0 || memoOrCounterparty) changed.push('splits');
         next = { ...next, splits: reclassified };
-      } else if (isTransfer) {
+      } else if (isTransfer || s.kind === 'CONVERSION') {
         throw validation(
-          'the fee split of a TRANSFER cannot be restructured; void and re-record it',
+          `the fee split of a ${s.kind} cannot be restructured here; use its own amend operation`,
           '/splits',
         );
       } else {

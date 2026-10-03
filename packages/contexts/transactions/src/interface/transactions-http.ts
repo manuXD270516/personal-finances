@@ -11,6 +11,7 @@ import {
   type ApiResponse,
 } from '@pf/platform/nest';
 import type { AuditLogEntryDto } from '@pf/audit/contracts';
+import type { ConversionCostDto } from '@pf/fx/contracts';
 import type { TransactionSort } from '../application/ports/index.js';
 import type {
   MoneyDto,
@@ -27,6 +28,7 @@ import type {
   TransactionState,
   TransactionStatus,
 } from '../domain/index.js';
+import { conversionDetailDto } from './conversion-dto.js';
 
 export const TRANSACTIONS_SERVICE = Symbol('TRANSACTIONS_SERVICE');
 
@@ -51,7 +53,7 @@ function userIdOf(req: ApiRequest): string {
 }
 
 /** `Transaction` del contrato OpenAPI (dinero como string decimal). */
-export function toTransactionDto(s: TransactionState) {
+export function toTransactionDto(s: TransactionState, totalCost?: ConversionCostDto | null) {
   return {
     id: s.id,
     kind: s.kind,
@@ -76,7 +78,7 @@ export function toTransactionDto(s: TransactionState) {
       tagIds: [...x.tagIds],
       memo: x.memo,
     })),
-    conversion: null,
+    conversion: s.conversion ? conversionDetailDto(s.conversion, totalCost) : null,
     source: s.source,
     externalRef: s.externalRef,
     revision: s.revision,
@@ -257,7 +259,7 @@ export class TransactionsController {
   async markTransactionsCleared(@Param('workspaceId') workspaceId: string, @Body() body: Json) {
     const items = (body['items'] as { id: string; version: number }[] | undefined) ?? [];
     const result = await this.service.markCleared(workspaceId, items, body['cleared'] === true);
-    return { data: result.data.map(toTransactionDto), bulkOperationId: result.bulkOperationId };
+    return { data: result.data.map((s) => toTransactionDto(s)), bulkOperationId: result.bulkOperationId };
   }
 
   @Post('workspaces/:workspaceId/transactions/duplicate-check')

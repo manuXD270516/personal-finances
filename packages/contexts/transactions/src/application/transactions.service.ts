@@ -1,5 +1,4 @@
 import type { AuditChangeInput, AuditLogEntryDto, AuditPort } from '@pf/audit/contracts';
-import type { PostingLineDto } from '@pf/ledger/contracts';
 import { currency as makeCurrency, DomainError, Money, type FieldViolation } from '@pf/shared-kernel';
 import { TRANSACTION_EVENTS } from '../contracts/index.js';
 import {
@@ -7,7 +6,6 @@ import {
   DUPLICATE_WINDOW_DAYS,
   findDuplicates,
   normalizeText,
-  toJournalEntryDraft,
   Transaction,
   transferFee,
   type AdjustmentDirection,
@@ -22,6 +20,15 @@ import {
   type TransactionState,
   type TransactionStatus,
 } from '../domain/index.js';
+import {
+  legsPayload,
+  linkEntry,
+  postEntry,
+  publishEvent,
+  publishPosted,
+  splitsAudit,
+  splitsPayload,
+} from './posting-support.js';
 import type { TransactionListFilter, TransactionsDeps, TransactionSort } from './ports/index.js';
 
 export interface MoneyDto {
@@ -847,35 +854,12 @@ export class TransactionsService {
     });
   }
 
-  private async postEntry(tx: Transaction): Promise<string> {
-    const draft = toJournalEntryDraft(tx.snapshot);
-    const postings: PostingLineDto[] = draft.postings.map((p) => ({
-      target:
-        p.target.kind === 'USER_ACCOUNT'
-          ? { kind: 'USER_ACCOUNT', accountId: p.target.accountId, nature: p.target.nature }
-          : { kind: 'SYSTEM', systemKind: p.target.systemKind },
-      amount: p.amount.toJSON(),
-      splitId: p.splitId,
-    }));
-    const posted = await this.deps.ledger.postJournalEntry({
-      workspaceId: tx.workspaceId,
-      entryDate: draft.entryDate,
-      entryType: 'STANDARD',
-      sourceRef: draft.sourceRef,
-      memo: draft.memo,
-      postings,
-    });
-    return posted.journalEntryId;
+  private postEntry(tx: Transaction): Promise<string> {
+    return postEntry(this.deps, tx);
   }
 
   private link(tx: Transaction, journalEntryId: string, linkType: 'POSTED' | 'REVERSAL'): Promise<void> {
-    return this.deps.transactions.linkEntry({
-      workspaceId: tx.workspaceId,
-      transactionId: tx.id,
-      revision: tx.revision,
-      journalEntryId,
-      linkType,
-    });
+    return linkEntry(this.deps, tx, journalEntryId, linkType);
   }
 
   private async duplicates(
@@ -915,71 +899,22 @@ export class TransactionsService {
     ];
   }
 
-  private async publish(
+  private publish(
     tx: Transaction,
     event: { readonly eventType: string; readonly eventVersion: number },
     payload: object,
   ): Promise<void> {
-    await this.deps.outbox.append({
-      eventId: this.deps.ids.next(),
-      eventType: event.eventType,
-      eventVersion: event.eventVersion,
-      occurredAt: this.deps.clock.now().toString(),
-      workspaceId: tx.workspaceId,
-      aggregateType: 'Transaction',
-      aggregateId: tx.id,
-      aggregateVersion: tx.version,
-      payload,
-    });
+    return publishEvent(this.deps, tx, event, payload);
   }
 
-  /**
-   * `TransactionPosted` y, si `kind=TRANSFER`, `TransferCompleted` (add-transfers decisiones 5–6): en todos los
-   * caminos de posteo (creación, `pending→posted`, amend con nuevo asiento) y nunca en `pending`.
-   */
-  private async publishPosted(
+  /** `TransactionPosted` + `TransferCompleted`/`ConversionRecorded` según el kind (ver `publishPosted`). */
+  private publishPosted(
     tx: Transaction,
     journalEntryId: string,
     previousStatus: TransactionStatus | null,
     supersedes: string | null,
   ): Promise<void> {
-    await this.publishTransactionPosted(tx, journalEntryId, previousStatus, supersedes);
-    const s = tx.snapshot;
-    if (s.kind !== 'TRANSFER') return;
-    const source = s.legs.find((l) => l.role === 'SOURCE');
-    const target = s.legs.find((l) => l.role === 'TARGET');
-    if (!source || !target) throw new DomainError('INTERNAL_ERROR', 'transfer without SOURCE/TARGET legs');
-    await this.publish(tx, TRANSACTION_EVENTS.transferCompleted, {
-      transactionId: s.id,
-      journalEntryId,
-      businessDate: s.businessDate,
-      fromAccountId: source.accountId,
-      toAccountId: target.accountId,
-      amount: s.amount.toJSON(),
-      fee: transferFee(s)?.toJSON() ?? null,
-      matchedTransactionIds: [],
-    });
-  }
-
-  private publishTransactionPosted(
-    tx: Transaction,
-    journalEntryId: string,
-    previousStatus: TransactionStatus | null,
-    supersedes: string | null,
-  ): Promise<void> {
-    const s = tx.snapshot;
-    return this.publish(tx, TRANSACTION_EVENTS.posted, {
-      transactionId: s.id,
-      revision: s.revision,
-      kind: s.kind,
-      businessDate: s.businessDate,
-      journalEntryId,
-      previousStatus,
-      counterpartyId: s.counterpartyId,
-      legs: legsPayload(s),
-      splits: splitsPayload(s),
-      supersedesJournalEntryId: supersedes,
-    });
+    return publishPosted(this.deps, tx, journalEntryId, previousStatus, supersedes);
   }
 
   private publishCategorized(tx: Transaction, changes: readonly SplitClassificationChange[]): Promise<void> {
@@ -994,23 +929,6 @@ export class TransactionsService {
     });
   }
 }
-
-const legsPayload = (s: TransactionState) =>
-  s.legs.map((l) => ({ accountId: l.accountId, amount: l.amount.toJSON() }));
-const splitsPayload = (s: TransactionState) =>
-  s.splits.map((x) => ({
-    splitId: x.id,
-    amount: x.amount.toJSON(),
-    categoryId: x.categoryId,
-    tagIds: [...x.tagIds],
-  }));
-const splitsAudit = (s: TransactionState) =>
-  s.splits.map((x) => ({
-    id: x.id,
-    amount: x.amount.toJSON(),
-    categoryId: x.categoryId,
-    tagIds: [...x.tagIds],
-  }));
 
 function auditActionForStatus(
   requested: string | undefined,

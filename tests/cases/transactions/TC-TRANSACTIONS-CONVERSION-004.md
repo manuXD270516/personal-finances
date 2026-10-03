@@ -12,9 +12,11 @@ invariants: ["INV-004","INV-005","INV-010","INV-024"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/domain/conversion.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["conversion","fast-check","multi-currency"]
@@ -31,7 +33,7 @@ expected_result:
   - "Legs de cuentas de usuario = postings de cuentas de usuario (INV-024)"
   - "convertedSource + fees en origen = source; target + fees en destino = grossTarget (INV-010)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-004 — Propiedad: conversiones en las cuatro direcciones producen un asiento que cuadra por moneda

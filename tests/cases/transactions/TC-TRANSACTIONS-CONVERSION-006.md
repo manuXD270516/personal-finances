@@ -12,9 +12,11 @@ invariants: ["INV-010"]
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["conversion","validation","fees"]
@@ -29,7 +31,7 @@ expected_result:
   - "Ambos casos se rechazan con CONVERSION_AMOUNTS_INCONSISTENT"
   - "No se crea transacción ni asiento"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-006 — Fees mayores al monto entregado o en tercera moneda sin cuenta pagadora se rechazan

@@ -12,9 +12,11 @@ invariants: ["INV-020","INV-001","INV-032"]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-resolver.test.ts
+  - packages/contexts/fx/src/domain/fx.properties.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fast-check","fx","inverse"]
@@ -31,7 +33,7 @@ expected_result:
   - "|1/(1/r) − r| / r < 10^-38 (error relativo, INV-032)"
   - "La conversión de cero es cero y los resultados son deterministas"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-CONVERSION-001 — Propiedad: convertir y revertir con la tasa inversa devuelve el original con un margen de una unidad menor

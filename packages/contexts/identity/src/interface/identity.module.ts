@@ -2,8 +2,8 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtVerifier, type JwtVerifierOptions } from '@pf/platform/api';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
-import type { Clock } from '@pf/shared-kernel';
-import { PgUnitOfWork } from '@pf/platform/api';
+import { DomainError, type Clock } from '@pf/shared-kernel';
+import { currentRequestContext, PgUnitOfWork } from '@pf/platform/api';
 import type { Pool } from 'pg';
 import { IdentityService } from '../application/identity.service.js';
 import type {
@@ -84,6 +84,29 @@ export function identityWorkspaceTimeZones(pool: Pool): {
         if (!ws) throw new Error('workspace not visible for time zone lookup');
         return ws.settings.timeZone.value;
       }),
+  };
+}
+
+/**
+ * Moneda de reporte (`baseCurrency`) y zona horaria del workspace para otros contextos (FX valora el costo de una
+ * conversión en la moneda de reporte y fecha las tasas en la zona del workspace; add-manual-conversions). Se invoca
+ * dentro de la unidad de trabajo del llamador, con el usuario de la petición (RLS de membresía).
+ */
+export function identityWorkspaceSettings(pool: Pool): {
+  settingsOf(workspaceId: string): Promise<{ readonly baseCurrency: string; readonly timeZone: string }>;
+} {
+  const uow = new PgUnitOfWork(pool);
+  const workspaces = new PgWorkspaceRepository();
+  return {
+    settingsOf: (workspaceId) => {
+      const actor = currentRequestContext()?.actor;
+      const userId = actor && actor.type === 'USER' ? actor.userId : null;
+      return uow.run({ userId, workspaceId }, async () => {
+        const ws = await workspaces.findById(workspaceId);
+        if (!ws) throw new DomainError('RESOURCE_NOT_FOUND', `workspace ${workspaceId} not found`);
+        return { baseCurrency: ws.settings.baseCurrency.code, timeZone: ws.settings.timeZone.value };
+      });
+    },
   };
 }
 

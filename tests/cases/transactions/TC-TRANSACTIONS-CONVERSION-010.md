@@ -12,9 +12,13 @@ invariants: ["INV-007","INV-008","INV-012","INV-023","INV-029"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - packages/contexts/transactions/test/integration/pg-conversions.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["conversion","amend","reversal"]
@@ -35,7 +39,7 @@ expected_result:
   - "Saldo Banco BOB = 686.00 BOB"
   - "Un registro de auditoría con el motivo en la misma transacción"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-010 — Corregir una conversión genera reversa, asiento nuevo y detalle nuevo conservando el anterior

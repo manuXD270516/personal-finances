@@ -12,9 +12,12 @@ invariants: ["INV-011","INV-012"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","reference-rate","history"]
@@ -31,7 +34,7 @@ expected_result:
   - "La conversión queda vinculada a R2 (id, valor 6.95, tipo P2P, fuente)"
   - "Tras el reemplazo sigue mostrando R2 = 6.95 y spread 0.719424460431654676 %"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PRICING-006 — La conversión guarda la versión exacta de la tasa de referencia y no cambia si luego se reemplaza

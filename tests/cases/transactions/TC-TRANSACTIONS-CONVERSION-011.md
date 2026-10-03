@@ -12,9 +12,11 @@ invariants: ["INV-028","INV-027"]
 priority: high
 type: integration
 level: event-contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["conversion","outbox","events"]
@@ -33,7 +35,7 @@ expected_result:
   - "Payload válido: source 100.000000 USDT, target 685.00 BOB, quotedRate 6.90, effectiveRate 6.85, referenceRate 6.95, fee PROVIDER 5.00 BOB, spread 0.719424460431654676"
   - "El consumidor aplica su efecto una sola vez"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-011 — Postear una conversión publica un único ConversionRecorded válido y su reentrega es idempotente

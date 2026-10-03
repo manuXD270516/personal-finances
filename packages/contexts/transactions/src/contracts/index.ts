@@ -14,6 +14,7 @@ export const TRANSACTION_EVENTS = {
   categorized: { eventType: 'transactions.TransactionCategorized', eventVersion: 1 },
   updated: { eventType: 'transactions.TransactionUpdated', eventVersion: 1 },
   transferCompleted: { eventType: 'transactions.TransferCompleted', eventVersion: 1 },
+  conversionRecorded: { eventType: 'transactions.ConversionRecorded', eventVersion: 1 },
 } as const;
 
 /**
@@ -42,5 +43,18 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     revision: 'plain',
     journalEntryId: 'plain',
     bulkOperationId: 'plain',
+    // Conversiones (add-manual-conversions): montos exactos y detalle de precio de la revisión.
+    targetAmount: 'money',
+    convertedSourceAmount: 'money',
+    grossTargetAmount: 'money',
+    quotedRate: 'plain',
+    effectiveRate: 'plain',
+    referenceFxRateId: 'plain',
+    spread: 'plain',
+    quotedRateDeviation: 'money',
+    conversionFees: 'plain',
+    provider: 'plain',
+    executedAt: 'plain',
+    externalRef: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;

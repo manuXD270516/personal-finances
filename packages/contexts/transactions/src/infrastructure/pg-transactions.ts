@@ -16,6 +16,7 @@ import {
   normalizeText,
   Transaction,
   type AccountNature,
+  type ConversionDetail,
   type AdjustmentDirection,
   type LegRole,
   type PaymentMethod,
@@ -24,9 +25,14 @@ import {
   type TransactionState,
   type TransactionStatus,
 } from '../domain/index.js';
+import { insertConversionDetail, loadConversionDetails } from './pg-conversion-details.js';
 
-/** Orden estable de legs al rehidratar (`SOURCE` antes que `TARGET`). */
-const LEG_ORDER: readonly LegRole[] = ['MAIN', 'SOURCE', 'TARGET'];
+/** Orden estable de legs al rehidratar (`SOURCE` antes que `TARGET`, `FEE` al final). */
+const LEG_ORDER: readonly LegRole[] = ['MAIN', 'SOURCE', 'TARGET', 'FEE'];
+
+/** Clave de comparación de un leg (rol, cuenta, monto exacto, moneda). */
+const legKey = (role: string, accountId: string, amount: Money) =>
+  `${role}|${accountId}|${amount.toFixed()}|${amount.currency.code}`;
 
 /** Tablas del schema `txn` (fechas como texto, montos NUMERIC como string). */
 interface TxnDb {
@@ -181,6 +187,13 @@ export class PgTransactionRepository implements TransactionRepository {
   async insert(tx: Transaction): Promise<void> {
     await db().insertInto('txn.transaction').values(txRow(tx.snapshot)).execute();
     await this.writeChildren(tx);
+    await this.writeConversion(tx);
+  }
+
+  /** `ConversionDetail` de la revisión vigente (inmutable; una revisión nueva inserta una fila nueva). */
+  private async writeConversion(tx: Transaction): Promise<void> {
+    const s = tx.snapshot;
+    if (s.conversion) await insertConversionDetail(s.workspaceId, s.id, s.conversion);
   }
 
   async update(tx: Transaction): Promise<boolean> {
@@ -194,6 +207,7 @@ export class PgTransactionRepository implements TransactionRepository {
       .executeTakeFirst();
     if (Number(result.numUpdatedRows) !== 1) return false;
     await this.writeChildren(tx);
+    await this.writeConversion(tx);
     return true;
   }
 
@@ -252,23 +266,32 @@ export class PgTransactionRepository implements TransactionRepository {
     // tiene dos legs (`SOURCE`/`TARGET`, add-transfers); se emparejan por `role`.
     const existing = await k
       .selectFrom('txn.transaction_leg')
-      .select(['id', 'revision', 'role', 'account_id', 'amount', 'transaction_date'])
+      .select([
+        'id',
+        'revision',
+        'role',
+        'account_id',
+        'currency',
+        sql<string>`amount::text`.as('amount'),
+        sql<string>`transaction_date::text`.as('transaction_date'),
+      ])
       .where('workspace_id', '=', s.workspaceId)
       .where('transaction_id', '=', s.id)
       .where('superseded_in_revision', 'is', null)
       .execute();
     if (s.legs.length === 0) return;
+    // Multiconjunto de legs (una conversión puede tener varios `FEE`): mismos rol, cuenta, monto, moneda y fecha.
+    const wanted = s.legs.map((l) => legKey(l.role, l.accountId, l.amount)).sort();
+    const current = existing
+      .map((e) => {
+        const leg = s.legs.find((l) => l.amount.currency.code === e.currency);
+        return leg ? legKey(e.role, e.account_id, Money.parse(e.amount, leg.amount.currency)) : `?${e.id}`;
+      })
+      .sort();
     const same =
       existing.length === s.legs.length &&
-      s.legs.every((leg) => {
-        const e = existing.find((x) => x.role === leg.role);
-        return (
-          e !== undefined &&
-          e.account_id === leg.accountId &&
-          Money.parse(e.amount, leg.amount.currency).equals(leg.amount) &&
-          String(e.transaction_date) === s.businessDate
-        );
-      });
+      existing.every((e) => e.transaction_date === s.businessDate) &&
+      wanted.every((w, i) => w === current[i]);
     if (same) return;
     if (existing.length > 0) {
       await k
@@ -279,8 +302,9 @@ export class PgTransactionRepository implements TransactionRepository {
         .where('superseded_in_revision', 'is', null)
         .where('revision', '<', s.revision)
         .execute();
-      // Edición de un PENDING (sin repostear): misma revisión ⇒ se actualiza en su lugar.
-      for (const leg of s.legs) {
+      // Edición de un PENDING (sin repostear): misma revisión ⇒ se actualiza en su lugar (una conversión siempre
+      // incrementa la revisión: sus legs nunca se actualizan in situ).
+      for (const leg of s.kind === 'CONVERSION' ? [] : s.legs) {
         await k
           .updateTable('txn.transaction_leg')
           .set({
@@ -368,6 +392,21 @@ export class PgTransactionRepository implements TransactionRepository {
     if (filter.sources?.length) q = q.where('t.source', 'in', [...filter.sources]);
     if (filter.paymentMethods?.length) q = q.where('t.payment_method', 'in', [...filter.paymentMethods]);
     if (filter.currency) q = q.where('t.currency', '=', filter.currency);
+    if (filter.targetCurrency) {
+      const target = filter.targetCurrency;
+      q = q.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('txn.transaction_leg as tl')
+            .select('tl.id')
+            .whereRef('tl.workspace_id', '=', 't.workspace_id')
+            .whereRef('tl.transaction_id', '=', 't.id')
+            .where('tl.superseded_in_revision', 'is', null)
+            .where('tl.role', '=', 'TARGET')
+            .where('tl.currency', '=', target),
+        ),
+      );
+    }
     if (filter.dateFrom) q = q.where(sql`t.transaction_date`, '>=', sql`${filter.dateFrom}::date`);
     if (filter.dateTo) q = q.where(sql`t.transaction_date`, '<=', sql`${filter.dateTo}::date`);
     if (filter.amountMin) q = q.where(sql`t.amount`, '>=', sql`${filter.amountMin}::numeric`);
@@ -487,6 +526,24 @@ export class PgTransactionRepository implements TransactionRepository {
       .execute();
   }
 
+  async postedEntriesByRevision(workspaceId: string, transactionId: string): Promise<Map<number, string>> {
+    const rows = await db()
+      .selectFrom('txn.transaction_journal_link')
+      .select(['revision', 'journal_entry_id'])
+      .where('workspace_id', '=', workspaceId)
+      .where('transaction_id', '=', transactionId)
+      .where('link_type', '=', 'POSTED')
+      .execute();
+    return new Map(rows.map((r) => [Number(r.revision), r.journal_entry_id]));
+  }
+
+  async conversionRevisions(
+    workspaceId: string,
+    transactionId: string,
+  ): Promise<{ readonly detail: ConversionDetail; readonly createdAt: string | null }[]> {
+    return (await loadConversionDetails(workspaceId, [transactionId])).get(transactionId) ?? [];
+  }
+
   async linkedEntries(workspaceId: string, transactionId: string): Promise<string[]> {
     const rows = await db()
       .selectFrom('txn.transaction_journal_link')
@@ -511,6 +568,8 @@ export class PgTransactionRepository implements TransactionRepository {
         's.category_id',
         's.counterparty_id',
         's.memo',
+        's.currency',
+        sql<number>`(SELECT c.scale FROM fx.currency c WHERE c.code = s.currency)`.as('scale'),
         sql<string>`s.amount::text`.as('amount'),
         sql<string[]>`COALESCE((SELECT array_agg(st.tag_id::text ORDER BY st.tag_id) FROM txn.split_tag st
            WHERE st.workspace_id = s.workspace_id AND st.split_id = s.id), '{}')`.as('tag_ids'),
@@ -527,12 +586,21 @@ export class PgTransactionRepository implements TransactionRepository {
         'l.account_id',
         'l.account_nature',
         'l.role',
+        'l.currency',
+        sql<number>`(SELECT c.scale FROM fx.currency c WHERE c.code = l.currency)`.as('scale'),
         sql<string>`l.amount::text`.as('amount'),
       ])
       .where('l.workspace_id', '=', workspaceId)
       .where('l.transaction_id', 'in', ids)
       .where('l.superseded_in_revision', 'is', null)
       .execute();
+    const conversions = await loadConversionDetails(
+      workspaceId,
+      rows.filter((r) => r.kind === 'CONVERSION').map((r) => r.id),
+      new Map(rows.map((r) => [r.id, r.revision])),
+    );
+    const parseIn = (v: string, code: string, scale: number) =>
+      Money.parse(v, makeCurrency(code, Number(scale)));
     return rows.map((r) => {
       const ccy: Currency = makeCurrency(r.currency, Number(r.scale));
       const money = (v: string) => Money.parse(v, ccy);
@@ -563,7 +631,7 @@ export class PgTransactionRepository implements TransactionRepository {
           .map((l) => ({
             accountId: l.account_id,
             nature: l.account_nature,
-            amount: money(l.amount),
+            amount: parseIn(l.amount, l.currency, l.scale),
             role: l.role,
           }))
           .sort((a, b) => LEG_ORDER.indexOf(a.role) - LEG_ORDER.indexOf(b.role)),
@@ -571,7 +639,7 @@ export class PgTransactionRepository implements TransactionRepository {
           .filter((s) => s.transaction_id === r.id)
           .map((s) => ({
             id: s.id,
-            amount: money(s.amount),
+            amount: parseIn(s.amount, s.currency, s.scale),
             categoryId: s.category_id,
             counterpartyId: s.counterparty_id,
             tagIds: s.tag_ids,
@@ -584,6 +652,7 @@ export class PgTransactionRepository implements TransactionRepository {
         voidReason: r.void_reason,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
+        conversion: conversions.get(r.id)?.at(-1)?.detail ?? null,
       });
     });
   }

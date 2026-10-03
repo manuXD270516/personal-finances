@@ -12,9 +12,10 @@ invariants: ["INV-020"]
 priority: critical
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","spread"]
@@ -30,7 +31,7 @@ expected_result:
   - "Compra: spreadPct = (7.00 − 6.95) / 6.95 × 100 = 0.719424460431654676; spreadAmount = 5.00 BOB"
   - "Signo positivo = desfavorable al usuario en ambos casos"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PRICING-002 — El spread se calcula en porcentaje y monto para venta y compra de USDT

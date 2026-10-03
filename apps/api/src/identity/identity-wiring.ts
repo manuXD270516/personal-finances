@@ -6,10 +6,13 @@ import {
   ClassificationModule,
   createClassificationRuntime,
 } from '@pf/classification/interface/classification.module';
+import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
+import { createFxRuntime, FxModule } from '@pf/fx/interface/fx.module';
 import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
 import {
   IdentityModule,
   identityUserLocales,
+  identityWorkspaceSettings,
   identityWorkspaceTimeZones,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
@@ -86,6 +89,7 @@ export function auditRuntime(input: {
       CLASSIFICATION_AUDIT_POLICY,
       ACCOUNTS_AUDIT_POLICY,
       TRANSACTIONS_AUDIT_POLICY,
+      FX_AUDIT_POLICY,
     ],
     timeZones: identityWorkspaceTimeZones(input.pool),
   });
@@ -129,7 +133,15 @@ export function identityImports(input: {
     logger: input.logger,
     defaultTimeZone: input.config.APP_TIMEZONE,
   });
-  // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification vía sus puertos públicos.
+  // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
+  const fx = createFxRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    audit: auditPort,
+    outbox: classificationOutbox(),
+    workspaces: identityWorkspaceSettings(input.pool),
+  });
+  // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -140,6 +152,7 @@ export function identityImports(input: {
     accounts: accounts.query,
     classification: classification.validator,
     lookup: classification.lookup,
+    fx: fx.pricing,
   });
   return [
     IdentityModule.register({
@@ -155,12 +168,19 @@ export function identityImports(input: {
       },
       outbox: outboxPort(),
       audit: auditPort,
-      onWorkspaceCreated: classification.provisioner,
+      // Provisión síncrona en la transacción de CreateWorkspace: categorías (classification) y monedas (fx).
+      onWorkspaceCreated: {
+        onWorkspaceCreated: async (created) => {
+          await classification.provisioner.onWorkspaceCreated(created);
+          await fx.provisioner.onWorkspaceCreated(created);
+        },
+      },
     }),
     AuditModule.register({ runtime: audit, conventions: input.conventions }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
     // ACCOUNTS (+ LEDGER sin HTTP) — openspec add-accounts-management.
     ...accountsImports({ runtime: accounts, conventions: input.conventions }),
     TransactionsModule.register({ runtime: transactions, conventions: input.conventions }),
+    FxModule.register({ runtime: fx, conventions: input.conventions }),
   ];
 }

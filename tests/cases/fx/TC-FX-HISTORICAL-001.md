@@ -12,9 +12,12 @@ invariants: ["INV-011","INV-012"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/fx.properties.test.ts
+  - packages/contexts/fx/test/integration/pg-fx.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","history","immutability"]
@@ -34,7 +37,7 @@ expected_result:
   - "ConversionDetail sigue mostrando cotizada 6.90, efectiva 6.85 y referencia R1 = 6.95"
   - "Los postings de la conversión no cambian (sin recálculo)"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-HISTORICAL-001 — Una conversión histórica conserva su tasa original tras agregar o corregir tasas

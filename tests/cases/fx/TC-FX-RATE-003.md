@@ -12,9 +12,12 @@ invariants: ["INV-011"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-resolver.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","as-of","rate-resolver"]
@@ -30,7 +33,7 @@ expected_result:
   - "Al 2026-09-30 se obtiene R2 = 6.95 con id, fecha 2026-09-29 y fuente (R1 reemplazada no se usa)"
   - "Al 2026-10-10 se obtiene FX_RATE_NOT_FOUND, sin valor aproximado ni 1:1"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-RATE-003 — La tasa vigente a una fecha es la última no reemplazada dentro de la ventana de 7 días

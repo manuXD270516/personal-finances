@@ -12,9 +12,12 @@ invariants: ["INV-003","INV-001"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["conversion","scale"]
@@ -30,7 +33,7 @@ expected_result:
   - "Los dos primeros: 422 AMOUNT_SCALE_EXCEEDED, sin redondeo silencioso"
   - "El tercero se acepta con 0.01600000 BTC exactos"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-007 — Montos de conversión con más decimales que la escala se rechazan sin redondear

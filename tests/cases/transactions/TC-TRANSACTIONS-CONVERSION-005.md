@@ -12,9 +12,13 @@ invariants: ["INV-004","INV-010","INV-021"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - packages/contexts/transactions/test/integration/pg-conversions.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["conversion","crypto","network-fee","third-currency"]
@@ -34,7 +38,7 @@ expected_result:
   - "Detalle: fees [PROVIDER 2.000000 USDT, NETWORK 15.000000 TRX desde Wallet TRX]; efectiva BTC/USDT 62500; cotizada 62375"
   - "Saldos: Wallet TRX 35.000000 TRX"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-005 — El fee de red pagado en TRX desde otra wallet se registra como gasto en TRX en el mismo asiento

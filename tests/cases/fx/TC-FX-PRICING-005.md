@@ -12,9 +12,10 @@ invariants: ["INV-010","INV-012"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","quoted-rate","tolerance"]
@@ -30,7 +31,7 @@ expected_result:
   - "685.01: se registra sin advertencia (diferencia 0.01 BOB ≤ tolerancia)"
   - "En ambos casos el asiento usa los montos reales"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PRICING-005 — Una tasa cotizada que no cuadra con los montos se marca discrepante y prevalecen los montos
