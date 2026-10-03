@@ -238,6 +238,7 @@ export class IdentityService {
           aggregateVersion: workspace.version,
           workspaceId: workspace.id,
           occurredAt: this.deps.clock.now().toString(),
+          actor: { type: 'USER', id: userId },
           payload: { workspaceId: workspace.id, changes },
         });
         await this.deps.audit.record({
@@ -280,6 +281,7 @@ export class IdentityService {
       aggregateVersion: 1,
       workspaceId: workspace.id,
       occurredAt: this.deps.clock.now().toString(),
+      actor: { type: 'USER', id: userId },
       payload: {
         workspaceId: workspace.id,
         name: s.name,

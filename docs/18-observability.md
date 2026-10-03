@@ -125,16 +125,17 @@ Rate = conteo del histograma; Errors = status ≥ 500 (4xx contabilizados aparte
 
 | Métrica | Tipo | Descripción |
 |---|---|---|
-| `pf.outbox.pending` | Gauge | Filas no publicadas |
-| `pf.outbox.lag` (s) | Gauge | `now − min(occurred_at)` de filas pendientes — **métrica clave** |
-| `pf.outbox.published.total` | Counter | `event_type` |
-| `pf.outbox.publish_failures.total` | Counter | |
-| `pf.inbox.duplicates.total` | Counter | `consumer` — eventos duplicados descartados (sano si > 0, alarmante si se dispara) |
+| `pf.outbox.pending` | Gauge | Filas no publicadas (NFR-OBS-004 `outbox_pending`); leídas de PostgreSQL, no de las estadísticas cacheadas de pg-boss |
+| `pf.outbox.lag` (s) | Gauge | `now − min(created_at)` de filas pendientes — **métrica clave** (Prometheus: `pf_outbox_lag_seconds`; NFR-OBS-004 `outbox_lag_seconds`) |
+| `pf.outbox.published` | Counter | `event_type` (Prometheus: `pf_outbox_published_total`) |
+| `pf.outbox.publish_failures` | Counter | lotes del relay fallidos |
+| `pf.inbox.duplicates` | Counter | `consumer` — eventos duplicados descartados (sano si > 0, alarmante si se dispara) |
+| `pf.events.dead_lettered` | Counter | `consumer` — eventos que agotaron sus reintentos |
 | `pf.queue.depth` | Gauge | `queue`, `state` (waiting/active/delayed/failed) |
 | `pf.queue.job.wait_time` (s) | Histogram | `queue` — de encolado a inicio |
 | `pf.queue.job.duration` (s) | Histogram | `queue`, `outcome` (completed/failed/retried) |
 | `pf.queue.job.failures.total` | Counter | `queue`, `error_class` (transient/domain/unexpected) |
-| `pf.queue.dead_letter` | Gauge | Jobs en estado failed definitivo |
+| `pf.queue.dead_letter` | Gauge | Dead-letters abiertos (`platform.dead_letter` con `status = OPEN`) |
 | `pf.worker.heartbeat` | Gauge (timestamp) | Último latido por proceso worker |
 | `pf.scheduler.last_run` | Gauge (timestamp) | `job` (month-close reminders, recurrence expansion, consistency check) |
 

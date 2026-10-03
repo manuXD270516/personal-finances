@@ -1,10 +1,12 @@
 import type { ModuleMetadata } from '@nestjs/common';
 import type { JwtVerifierOptions } from '@pf/platform/api';
 import type { ApiConfig } from '@pf/platform/config';
+import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
 import { IdentityModule, type AuditPort, type OutboxPort } from '@pf/identity/interface/identity.module';
 import type { Pool } from 'pg';
+import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 
 /** Opciones JWT desde el contrato de configuración (`OIDC_*`); `undefined` si no hay emisor configurado. */
 export function jwtOptionsFromConfig(config: ApiConfig): JwtVerifierOptions | undefined {
@@ -20,19 +22,20 @@ export function jwtOptionsFromConfig(config: ApiConfig): JwtVerifierOptions | un
 }
 
 /**
- * Outbox y auditoría todavía sin tabla (`platform.outbox` llega con el relay; `AuditPort` con add-audit-trail):
- * se registran en el log para no perder la traza. Ver openspec add-workspace-identity, design § Decisiones 12.
+ * `OutboxPort` de IDENTITY sobre el outbox transaccional real (openspec add-event-outbox, cierra la tarea 6.3 de
+ * add-workspace-identity): el evento se escribe en la transacción de la Unit of Work del caso de uso y se valida
+ * contra contracts/events. La auditoría sigue registrándose en el log hasta add-audit-trail (design § Decisiones 12).
  */
-function loggingPorts(logger: Logger): { outbox: OutboxPort; audit: AuditPort } {
+export function outboxPort(writer: OutboxWriter = new PgOutboxWriter(eventSchemaRegistry())): OutboxPort {
   return {
-    outbox: {
-      append: async (e) => {
-        logger.warn(
-          { eventType: e.eventType, aggregateId: e.aggregateId },
-          'outbox sin persistencia (tarea 6.3)',
-        );
-      },
+    append: async (event) => {
+      await writer.append(event);
     },
+  };
+}
+
+function loggingAudit(logger: Logger): { audit: AuditPort } {
+  return {
     audit: {
       record: async (a) => {
         logger.info(
@@ -70,7 +73,8 @@ export function identityImports(input: {
         locale: input.config.APP_DEFAULT_LOCALE,
         personalWorkspaceName: 'Personal',
       },
-      ...loggingPorts(input.logger),
+      outbox: outboxPort(),
+      ...loggingAudit(input.logger),
     }),
   ];
 }

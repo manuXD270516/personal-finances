@@ -27,6 +27,7 @@ export function baseEnv(deps: Dependencies, overrides: Record<string, string> = 
     PFOS_ENV: 'ci',
     LOG_LEVEL: 'info',
     DATABASE_URL: deps.databaseUrl,
+    WORKER_DATABASE_URL: deps.workerDatabaseUrl,
     OBJECT_STORAGE_ENDPOINT: deps.s3Endpoint,
     OBJECT_STORAGE_BUCKET: deps.bucket,
     OBJECT_STORAGE_ACCESS_KEY: deps.s3AccessKey,

@@ -13,9 +13,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- packages/contexts/identity/src/application/identity.service.test.ts
+- apps/api/test/api/identity.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -50,7 +52,7 @@ expected_result:
 - 'Moneda XYZ: 422 REFERENCE_NOT_FOUND'
 - El workspace final mantiene la versión 2 y los valores del primer PATCH
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-IDENTITY-WORKSPACE-003 — El OWNER configura el workspace y los valores inválidos se rechazan sin cambios
@@ -68,3 +70,7 @@ Entonces el workspace devuelve el valor nuevo con una versión nueva
 Cuando envía la zona horaria "GMT-4 Bolivia"
 Entonces la respuesta es 422 con código "INVALID_TIMEZONE"
 ```
+
+## Notas
+
+- Desde `add-event-outbox` (2026-10-03) el test de API verifica además el outbox real: `identity.WorkspaceCreated` (versión de agregado 1) y un único `identity.WorkspaceSettingsChanged.v1` (versión 2, actor = el OWNER) leídos como `pf_worker` y validados contra `contracts/events`; los PATCH rechazados no escriben eventos.

@@ -16,9 +16,11 @@ import { Pool } from 'pg';
 /**
  * Elige el adapter de la cola según el toggle (docs/19 §0.3 punto 6). El dominio nunca se entera.
  * BullMQ/Valkey es un adapter opcional aún no implementado (ADR-0008): fallar al arrancar es explícito.
+ * `connectionString`: DATABASE_URL (pf_app) en la API, WORKER_DATABASE_URL (pf_worker) en el worker.
  */
 export function createJobQueue(
-  config: Pick<ApiConfig, 'JOB_QUEUE_DRIVER' | 'DATABASE_URL' | 'JOB_QUEUE_POLLING_INTERVAL_SECONDS'>,
+  config: Pick<ApiConfig, 'JOB_QUEUE_DRIVER' | 'JOB_QUEUE_POLLING_INTERVAL_SECONDS'>,
+  connectionString: string,
   logger: Logger,
   role: 'producer' | 'consumer',
 ): JobQueue {
@@ -26,7 +28,7 @@ export function createJobQueue(
     throw new Error(`JOB_QUEUE_DRIVER=${config.JOB_QUEUE_DRIVER} todavía no tiene adapter (solo pgboss)`);
   }
   return new PgBossJobQueue({
-    connectionString: config.DATABASE_URL,
+    connectionString,
     pollingIntervalSeconds: config.JOB_QUEUE_POLLING_INTERVAL_SECONDS,
     logger,
     role,
@@ -66,7 +68,7 @@ export function createApiResources(config: ApiConfig, logger: Logger): ApiResour
       'readiness check failed',
     ),
   );
-  const queue = createJobQueue(config, logger, 'producer');
+  const queue = createJobQueue(config, config.DATABASE_URL, logger, 'producer');
 
   return {
     pool,

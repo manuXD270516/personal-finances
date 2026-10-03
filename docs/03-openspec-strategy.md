@@ -98,6 +98,7 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 | 0 | `bootstrap-platform-foundation` ✅ implementado y **archivado** (2026-10-02, PRs #1–#4) | `platform/local-environment`, `platform/observability`, `platform/delivery-pipeline`, `quality/test-traceability` | Implementation Gate |
 | 1 | `add-api-conventions` | `platform/api-conventions` (idempotency, problem+json, paginación) | 1 |
 | 2 | `add-workspace-identity` | `identity/authentication`, `identity/workspace-membership`, `security/access-control`; incluye como **primer grupo de tareas** la migración del catálogo `fx.currency` + datos de referencia, porque `iam.workspace.base_currency` lo referencia (el comportamiento del catálogo sigue especificado en `fx/market-rates`) | 1 |
+| 2b | `add-event-outbox` | `platform/event-delivery` (outbox transaccional, relay a pg-boss, inbox idempotente, orden por agregado, dead-letter y métricas; cierra la tarea 6.3 de `add-workspace-identity`; docs/31 D30) | 1 |
 | 3 | `add-audit-trail` | `audit/audit-trail` | 1 |
 | 4 | `add-ledger-core` | `ledger/journal-posting`, `ledger/balances` | 1 |
 | 5 | `add-classification` | `classification/categories`, `classification/tags`, `classification/counterparties` | 1 |
@@ -108,7 +109,7 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 | 9b | `add-market-rate-providers` | `fx/market-rate-providers` (paralelo.bo principal, bo.dolarapi.com respaldo/oficial; docs/31 D29, ADR-0025) | 1 |
 | 10 | `add-basic-dashboard` | `reporting/dashboard`, `reporting/net-worth` (valoración USD/USDT con la tasa paralela del provider) | 1 |
 
-Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
+Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29, y el 2b `add-event-outbox`, agregado el 2026-10-03, docs/31 D30) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
 
 ## 8. Integración con CI y herramientas
 

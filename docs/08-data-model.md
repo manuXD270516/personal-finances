@@ -1525,8 +1525,9 @@ erDiagram
 
 | Tabla | Unique | Índices | RLS / grants | Retención |
 |-------|--------|---------|--------------|-----------|
-| `outbox` | PK | `(created_at) WHERE published_at IS NULL` (relay); `(aggregate_id, aggregate_version)` | **PLT**: `pf_app` INSERT con `WITH CHECK workspace_id = current_workspace_id()`; `pf_worker` policy `TO pf_worker USING (true)` para SELECT/UPDATE de `published_at`, `publish_attempts`, `last_error` (grants a nivel de columna) | Publicados: 7 días |
-| `inbox` | PK `(consumer, event_id)` | `(processed_at)` | Sin datos de negocio; solo `pf_worker` | 30 días |
+| `outbox` | PK; único `(aggregate_id, aggregate_version, event_type, event_version)` (publicación dual vN/vN+1) | `(sequence) WHERE published_at IS NULL` (relay, métricas); `(published_at) WHERE published_at IS NOT NULL` (purga) | **PLT** (RLS forzada): `pf_app` solo INSERT con `WITH CHECK workspace_id = current_workspace_id()`; `pf_worker` SELECT + UPDATE de `published_at`, `publish_attempts`, `last_error` (grants de columna, política `USING (true)`); `pf_maintenance` SELECT/DELETE solo de filas publicadas. Sin FK a `iam.workspace` (tabla técnica; ver add-event-outbox design §3) | Publicados: 7 días |
+| `inbox` | PK `(consumer, event_id)` | `(processed_at)` | Sin datos de negocio (allowlist del chequeo RLS); `pf_worker` SELECT/INSERT, `pf_maintenance` SELECT/DELETE; `pf_app` sin grants | 30 días |
+| `dead_letter` | PK `(consumer, event_id)` | `(first_failed_at) WHERE status = 'OPEN'` | RLS forzada, solo `pf_worker` (SELECT/INSERT/UPDATE); `status OPEN\|REPLAYED\|DISCARDED` | Sin purga (se resuelve a mano) |
 | `idempotency_key` | PK `(scope_id, key)` | `(expires_at)` | **WS** (cuando `workspace_id` no es NULL) / USR (endpoints de usuario); contiene respuestas ⇒ datos financieros | 24 h (configurable hasta 7 días) |
 | `operation` | PK | `(workspace_id, created_at DESC)` | WS | 30 días tras terminar |
 | `workspace_tombstone` | PK | — | Solo `pf_migrator`/rol de purge | Permanente (sin datos personales) |

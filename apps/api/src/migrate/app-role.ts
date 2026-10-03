@@ -61,3 +61,23 @@ export async function ensureBffRolePassword(migrator: Client, bffDatabaseUrl: st
     `ALTER ROLE ${BFF_ROLE} PASSWORD ${migrator.escapeLiteral(scramSha256Verifier(password))}`,
   );
 }
+
+/** Rol del worker (relay del outbox, consumidores): miembro de `pf_app`, sin BYPASSRLS ni DDL. */
+export const WORKER_ROLE = 'pf_worker';
+
+/**
+ * Alinea la contraseña de `pf_worker` con WORKER_DATABASE_URL (openspec add-event-outbox, design §4). Mismo
+ * mecanismo que `pf_app`/`pf_bff`: `pf_migrator` creó el rol y envía el verificador SCRAM, nunca el texto plano.
+ */
+export async function ensureWorkerRolePassword(migrator: Client, workerDatabaseUrl: string): Promise<void> {
+  const url = new URL(workerDatabaseUrl);
+  const user = decodeURIComponent(url.username);
+  const password = decodeURIComponent(url.password);
+  if (user !== WORKER_ROLE) throw new Error(`WORKER_DATABASE_URL debe usar el rol ${WORKER_ROLE}`);
+  if (password.length < 12) {
+    throw new Error('WORKER_DATABASE_URL: la contraseña del rol del worker es demasiado corta (mínimo 12)');
+  }
+  await migrator.query(
+    `ALTER ROLE ${WORKER_ROLE} PASSWORD ${migrator.escapeLiteral(scramSha256Verifier(password))}`,
+  );
+}

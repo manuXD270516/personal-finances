@@ -105,6 +105,16 @@ export const VARIABLES = {
     // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
     example: 'postgres://pf_migrator:<PF_DEV_DB_PASSWORD>@127.0.0.1:25432/pfos',
   }),
+  WORKER_DATABASE_URL: variable(postgresUrl, {
+    group: 'PostgreSQL',
+    description:
+      'Conexión del worker (rol `pf_worker`: grants de `pf_app` + relay del outbox, inbox y dead-letter; sin BYPASSRLS ni DDL). `migrate` alinea la contraseña del rol con esta URL.',
+    optional: true,
+    requiredWhen: 'finance-worker (`worker`)',
+    secret: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: 'postgres://pf_worker:<PF_DEV_DB_WORKER_PASSWORD>@127.0.0.1:25432/pfos',
+  }),
   DATABASE_POOL_MAX: variable(positiveInt, {
     group: 'PostgreSQL',
     description: 'Tamaño máximo del pool de conexiones por proceso.',
@@ -472,11 +482,13 @@ export const APP_VARIABLES = {
     'OIDC_REQUIRED_SCOPE',
     'OIDC_CLOCK_SKEW_SECONDS',
   ],
+  // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
   worker: [
     ...GENERAL,
     ...PRODUCT,
     ...OTEL,
-    ...DATABASE,
+    'WORKER_DATABASE_URL',
+    'DATABASE_POOL_MAX',
     ...OBJECT_STORAGE,
     ...QUEUE,
     'WORKER_CONCURRENCY',
@@ -485,12 +497,14 @@ export const APP_VARIABLES = {
     'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
   ],
-  // `migrate` también lee DATABASE_URL (y BFF_DATABASE_URL si existe): alinea las contraseñas de `pf_app`/`pf_bff`.
+  // `migrate` también lee DATABASE_URL (y BFF_DATABASE_URL/WORKER_DATABASE_URL si existen): alinea las contraseñas
+  // de `pf_app`/`pf_bff`/`pf_worker`.
   migrate: [
     ...GENERAL,
     'DATABASE_MIGRATOR_URL',
     'DATABASE_URL',
     'BFF_DATABASE_URL',
+    'WORKER_DATABASE_URL',
     ...OBJECT_STORAGE,
     'OBJECT_STORAGE_ENSURE_BUCKET',
     'OBJECT_STORAGE_CORS_ORIGINS',

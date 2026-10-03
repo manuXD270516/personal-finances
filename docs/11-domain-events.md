@@ -28,7 +28,7 @@ Convenciones de payload: camelCase; dinero `{amount: string, currency: string}` 
 ## 2. Garantías de entrega
 
 - **Producción**: el evento se inserta en `platform.outbox` en la **misma transacción** que el cambio de estado. Si no hay commit, no hay evento.
-- **Relay**: proceso en `worker` lee outbox (orden por `sequence`), publica a BullMQ, marca `published_at`. At-least-once.
+- **Relay**: proceso en `worker` (rol `pf_worker`, una sola réplica activa por advisory lock) lee outbox (orden por `sequence`, `FOR UPDATE SKIP LOCKED`), encola en **pg-boss** dentro de la misma transacción (una cola `events.<consumer>` por consumidor, `key_strict_fifo` por `aggregateId`, job `id = eventId`) y marca `published_at`. At-least-once (ADR-0008 con enmienda; as-built en `openspec/changes/add-event-outbox`).
 - **Consumo**: handler idempotente; `platform.inbox(consumer, event_id)` insertado en la misma transacción que el efecto del handler; duplicado ⇒ no-op.
 - **Orden**: garantizado **sólo por agregado** (`aggregateId` + `aggregateVersion`). Los consumidores que necesiten orden detectan huecos (`aggregateVersion` esperado) y reintentan/aplazan; no se asume orden entre agregados.
 - **Reintentos**: backoff exponencial (p. ej. 5 intentos: 1 s, 10 s, 1 min, 10 min, 1 h); luego **dead-letter** (§6).
@@ -169,13 +169,13 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 | Tabla (`platform`) | Columnas conceptuales | Notas |
 |---|---|---|
-| `outbox` | `id (=eventId)`, `sequence bigserial`, `workspace_id`, `event_type`, `event_version`, `aggregate_type`, `aggregate_id`, `aggregate_version`, `envelope jsonb`, `created_at`, `published_at null`, `attempts` | Insert en la misma tx del comando. Relay por `sequence`. Retención de publicados N días (replay). |
+| `outbox` | `id (=eventId)`, `sequence` (identity), `workspace_id`, `event_type`, `event_version`, `aggregate_type`, `aggregate_id`, `aggregate_version`, `occurred_at`, `correlation_id`, `envelope jsonb`, `trace_context jsonb`, `created_at`, `published_at null`, `publish_attempts`, `last_error` | Insert en la misma tx del comando. Relay por `sequence`. Retención de publicados 7 días (purga horaria). |
 | `inbox` | `consumer`, `event_id`, `processed_at` · PK `(consumer, event_id)` | Insert en la tx del handler. |
 | `dead_letter` | `consumer`, `event_id`, `envelope`, `error`, `attempts`, `first_failed_at`, `last_failed_at`, `status (OPEN\|REPLAYED\|DISCARDED)` | Tras agotar reintentos. Alerta (métrica `events_dead_lettered_total`). |
 
 - **Dead-letter**: el evento problemático no bloquea otros agregados; para el mismo agregado, el consumidor que exige orden **pausa** ese agregado hasta resolución. Operación: comando admin `ReplayDeadLetter(id)` / `DiscardDeadLetter(id, reason)` (auditados).
 - **Replay**: proyecciones (Reporting, actuals de Planning) se reconstruyen (a) desde `outbox` retenido, o (b) — preferido — desde las tablas fuente vía `RebuildProjection` (las proyecciones son funciones de los datos). Replay = reprocesar con un `consumer` nuevo/limpiado; la idempotencia del inbox garantiza seguridad.
-- **Observabilidad**: `traceparent` se propaga en metadatos del job BullMQ (no en el envelope); `correlationId` en logs.
+- **Observabilidad**: el `traceparent` se guarda en `outbox.trace_context` y viaja en los datos del job de pg-boss (no en el envelope); `correlationId` en logs. Métricas `pf.outbox.pending`, `pf.outbox.lag`, `pf.inbox.duplicates`, `pf.events.dead_lettered`, `pf.queue.dead_letter` (docs/18 §5.3).
 
 ## 7. PII
 

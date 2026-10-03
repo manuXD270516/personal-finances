@@ -104,6 +104,21 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
       });
     }
   }
+  // finance-worker: relay del outbox y consumidores corren como pf_worker (add-event-outbox design §4).
+  if (app === 'worker' && values['WORKER_DATABASE_URL'] === undefined) {
+    if (!problems.some((p) => p.variable === 'WORKER_DATABASE_URL')) {
+      problems.push({ variable: 'WORKER_DATABASE_URL', reason: 'falta (obligatoria en finance-worker)' });
+    }
+  }
+  if (names.includes('WORKER_DATABASE_URL') && values['WORKER_DATABASE_URL'] !== undefined) {
+    const user = decodeURIComponent(new URL(String(values['WORKER_DATABASE_URL'])).username);
+    if (user !== 'pf_worker') {
+      problems.push({
+        variable: 'WORKER_DATABASE_URL',
+        reason: 'debe usar el rol pf_worker (relay del outbox sin BYPASSRLS)',
+      });
+    }
+  }
   if (names.includes('OIDC_ISSUER_URL') && cloud && values['OIDC_ISSUER_URL'] === undefined) {
     if (!problems.some((p) => p.variable === 'OIDC_ISSUER_URL')) {
       problems.push({
