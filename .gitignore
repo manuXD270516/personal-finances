@@ -19,3 +19,10 @@ next-env.d.ts
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
 tests/traceability/matrix.md
+
+# Mutation testing (Stryker)
+.stryker-tmp/
+reports/mutation/
+
+# Copia del contrato generada por `pnpm --filter @pf/api build`
+apps/api/contract/

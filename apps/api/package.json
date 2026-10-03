@@ -5,7 +5,7 @@
   "type": "module",
   "description": "finance-api: composition root NestJS (comandos api | worker | migrate | seed).",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-contract.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
@@ -40,6 +40,7 @@
   },
   "files": [
     "dist",
-    "db"
+    "db",
+    "contract"
   ]
 }

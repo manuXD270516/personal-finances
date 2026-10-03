@@ -14,9 +14,11 @@ invariants: []
 priority: high
 type: unit
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- packages/platform/src/api/errors/error-catalog.test.ts
+- apps/web/src/errors/error-messages.test.tsx
+status: automated
 regression_suite: false
 phase: 1
 tags:

@@ -15,9 +15,11 @@ invariants:
 priority: critical
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/api/test/api/api-conventions.api.test.ts
+- packages/platform/src/api/idempotency/policy.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:

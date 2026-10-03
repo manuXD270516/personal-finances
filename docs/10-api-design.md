@@ -1,6 +1,6 @@
 # 10 — Diseño de la API (REST `/api/v1`, contract-first)
 
-> **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §8, §12, §14 · [`contracts/openapi/finance-api.v1.yaml`](../contracts/openapi/finance-api.v1.yaml) · [03-openspec-strategy.md](03-openspec-strategy.md) · [07-c4-architecture.md](07-c4-architecture.md) · [08-data-model.md](08-data-model.md) · [09-ledger-design.md](09-ledger-design.md) · [11-domain-events.md](11-domain-events.md) · [12-security.md](12-security.md) · [13-import-architecture.md](13-import-architecture.md) · [14-reporting.md](14-reporting.md) · [16-testing-strategy.md](16-testing-strategy.md) · ADR-0010, ADR-0019, ADR-0022, ADR-0024
+> **Estado:** Aceptado — convenciones implementadas en `add-api-conventions` (§19, as-built 2026-10-02) · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §8, §12, §14 · [`contracts/openapi/finance-api.v1.yaml`](../contracts/openapi/finance-api.v1.yaml) · [03-openspec-strategy.md](03-openspec-strategy.md) · [07-c4-architecture.md](07-c4-architecture.md) · [08-data-model.md](08-data-model.md) · [09-ledger-design.md](09-ledger-design.md) · [11-domain-events.md](11-domain-events.md) · [12-security.md](12-security.md) · [13-import-architecture.md](13-import-architecture.md) · [14-reporting.md](14-reporting.md) · [16-testing-strategy.md](16-testing-strategy.md) · ADR-0010, ADR-0019, ADR-0022, ADR-0024
 
 La API de `finance-api` es **REST sobre JSON**, versionada en la ruta (`/api/v1`), descrita **contract-first** en OpenAPI 3.1. Su único cliente en Phase 1–9 es el BFF de `finance-web` (ADR-0019), pero se diseña como API pública estable (otro cliente — CLI, móvil, asistente — debe poder usarla sin cambios).
 
@@ -435,3 +435,26 @@ RateLimit: "default";r=118;t=60
 6. **Signo en comandos**: magnitudes positivas + `kind`. ¿Se necesita algún comando con monto con signo (ajustes)? Propuesta: `ADJUSTMENT` usa `direction: INCREASE|DECREASE`.
 7. **Bulk edit en Phase 2**: ARCHITECTURE no fija la fase de `transactions/bulk-edit`; se propone Phase 2.
 8. **Reapertura de periodo por EDITOR**: hoy solo OWNER. Confirmar con el owner (impacta la integridad del cierre).
+
+---
+
+## 19. Estado de implementación — as-built (2026-10-02, change `add-api-conventions`)
+
+Las convenciones de §2–§7 y §9–§11 son comportamiento verificable en `@pf/platform` y `@pf/shared-kernel` (spec `platform/api-conventions`, TC-PLATFORM-API-001..020 y TC-TRANSACTIONS-IDEMPOTENCY-001 automatizados). Todo controller nuevo las hereda sin código propio: basta con que su operación exista en el contrato.
+
+| Convención | Implementación | Notas as-built |
+|---|---|---|
+| Versionado `/api/v1` (§11) | Prefijo global en `apps/api`; 404 `RESOURCE_NOT_FOUND` problem+json para rutas desconocidas **y** para versiones no publicadas (`/api/v2/...`) | Nest solo instala su 404 bajo el prefijo: `problemFallbackHandlers` cubre el resto |
+| Problem Details (§9) | `ErrorCatalog` (`@pf/platform/errors`), `renderProblem`, `ProblemDetailsFilter` global | 500 sin stack/SQL (detalle solo en el log `error` con el mismo `requestId`); dependencia caída (errores de conexión, SQLSTATE 08xxx/57P0x) ⇒ 503 con `Retry-After` |
+| Catálogo de códigos (§9.1) | Test de igualdad contrato ↔ `ErrorCatalog` ↔ `apps/web/messages/errors.{es,en,pt}.json` | Los estados se verifican contra los comentarios `# <status>` del enum `ErrorCode` del contrato |
+| Validación contra el contrato (§1.3, §4) | `ContractValidationInterceptor` con Ajv 2020-12 compilado al arranque desde el YAML | Interceptor y no pipe (un pipe no ve ruta ni cabeceras). Parámetros de query desconocidos también ⇒ 400. `errors[].in` (`body`/`query`/`header`/`path`) agregado a `FieldError` (cambio compatible) |
+| Idempotencia (§7) | `IdempotencyPolicy` + `PgIdempotencyStore` (`platform.idempotency_key`, RLS forzada) + `IdempotencyInterceptor` + `PgCommandTransaction` | Efectos y respuesta se confirman en la misma transacción; purga cada 15 min en el worker con `SET LOCAL ROLE pf_maintenance` (solo filas vencidas). 422 `IDEMPOTENCY_KEY_REUSED` (D1, INV-027) |
+| ETag / If-Match (§6) | `ConditionalRequestInterceptor` (`@ExpectedVersion()`), `preconditionFailed()` / `concurrencyConflict()` | `If-Match` débil o mal formado ⇒ 400; `If-None-Match` con comparación débil |
+| Cursor (§5.1) | `CursorCodec` (HMAC-SHA256, `kid`, ámbito recurso/workspace/filtros) + `buildPage` | `CURSOR_SIGNING_KEY` obligatoria en staging/production |
+| Montos y fechas (§4) | `Money.parse`/`toFixed`, `LocalDate`, `Instant` en `@pf/shared-kernel` | Ceros finales no significativos (`"685.000"` BOB = 685.00); mutation score 84 % (`pnpm --filter @pf/shared-kernel test:mutation`) |
+| Rate limiting (§10) | `RateLimitGuard` + `InMemoryRateLimiter` | **Ventana deslizante exacta** en vez de token bucket (garantiza 429 en la escritura 121 dentro de un minuto); en memoria (una réplica); `RATE_LIMIT_STORE=valkey` aún sin adapter |
+| Deprecación (§11) | `DeprecationInterceptor` (`Deprecation: @<epoch>`, `Sunset`, `Link; rel="deprecation"`) | El contrato declara `deprecated: true` + `x-deprecated-at` + `x-sunset` (YYYY-MM-DD); regla Spectral `pfos-sunset-on-deprecated` exige ≥ 90 días |
+| Gobernanza (§1.2) | Job `contract` de la PR: Redocly, Spectral (`contracts/openapi/.spectral.yaml` + `functions/`) y `oasdiff breaking` contra `main` (imagen fijada por digest) | Fixtures que fallan a propósito en `scripts/contract` (job `integration`). Excepción solo con label `api-breaking` + ADR |
+| BFF (§1.3) | `apps/web/src/bff/finance-api-client.ts` | `Idempotency-Key` UUIDv7 por intento del usuario, reutilizada en reintentos técnicos; `If-Match`/`If-None-Match` |
+
+Pendiente: generación de tipos con `openapi-typescript` (`@pf/api-contracts`, §1.3), mocks MSW y el informe de cobertura de operaciones del contrato (§1.4) llegan con el primer contexto de negocio; el E2E Playwright de doble clic / dos pestañas llega con el primer formulario que crea registros (ver `openspec/changes/add-api-conventions/tasks.md` 7.1).

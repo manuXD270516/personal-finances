@@ -71,6 +71,30 @@ jobs:
       - uses: ./.github/actions/setup-workspace
       - run: pnpm config:docs:check
 
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # oasdiff compara contra origin/main
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      # add-api-conventions (design §Contratos #12, docs/10 §1.2): validez OpenAPI 3.1 y reglas PFOS.
+      - name: Redocly lint
+        run: npx --yes @redocly/cli@2.57.0 lint contracts/openapi/finance-api.v1.yaml
+      - name: Spectral (contracts/openapi/.spectral.yaml)
+        run: >-
+          npx --yes @stoplight/spectral-cli@6.17.0 lint contracts/openapi/finance-api.v1.yaml
+          --ruleset contracts/openapi/.spectral.yaml --fail-severity error
+      # Cambios incompatibles en /api/v1 (NFR-MAINT-009): la excepción exige el label api-breaking + ADR.
+      # Las pruebas con fixtures que fallan a propósito (TC-PLATFORM-API-002) corren en el job `integration`.
+      - name: oasdiff breaking contra main
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'api-breaking') }}
+        run: |
+          git show origin/main:contracts/openapi/finance-api.v1.yaml > "$RUNNER_TEMP/finance-api.main.yaml"
+          pnpm contract:breaking "$RUNNER_TEMP/finance-api.main.yaml" "$GITHUB_WORKSPACE/contracts/openapi/finance-api.v1.yaml"
+
   architecture:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -240,4 +264,4 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: gitleaks git --log-opts="${BASE_SHA}..${HEAD_SHA}" --redact --no-banner --exit-code 1 .
+        run: gitleaks git --config .gitleaks.toml --log-opts="${BASE_SHA}..${HEAD_SHA}" --redact --no-banner --exit-code 1 .

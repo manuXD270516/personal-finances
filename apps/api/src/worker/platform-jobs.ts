@@ -1,4 +1,12 @@
-import { Inject, Injectable, Module, type DynamicModule, type OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Module,
+  type DynamicModule,
+  type OnApplicationBootstrap,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
+import { purgeExpiredIdempotencyKeys } from '@pf/platform/api';
 import type { Logger } from '@pf/platform/logging';
 import { JOB_QUEUE, LOGGER } from '@pf/platform/nest';
 import {
@@ -25,9 +33,14 @@ export interface WorkerModuleDeps {
 /** Duración máxima aceptada para el job de diagnóstico (no debe superar el período de gracia). */
 const MAX_PROBE_DURATION_MS = 20_000;
 
+/** Purga de claves de idempotencia vencidas (design §3): cada 15 min; el DELETE es idempotente entre réplicas. */
+export const IDEMPOTENCY_PURGE_INTERVAL_MS = 15 * 60_000;
+
 /** Registra los handlers de jobs de plataforma al arrancar el contexto del worker. */
 @Injectable()
-export class PlatformJobsRegistrar implements OnApplicationBootstrap {
+export class PlatformJobsRegistrar implements OnApplicationBootstrap, OnApplicationShutdown {
+  private purgeTimer: NodeJS.Timeout | undefined;
+
   constructor(
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     @Inject(LOGGER) private readonly logger: Logger,
@@ -65,6 +78,28 @@ export class PlatformJobsRegistrar implements OnApplicationBootstrap {
       queues.push(PLATFORM_PROBE_QUEUE);
     }
     this.logger.info({ queues }, 'worker consuming');
+    this.purgeTimer = setInterval(() => void this.purgeIdempotencyKeys(), IDEMPOTENCY_PURGE_INTERVAL_MS);
+    this.purgeTimer.unref();
+    void this.purgeIdempotencyKeys();
+  }
+
+  onApplicationShutdown(): void {
+    if (this.purgeTimer) clearInterval(this.purgeTimer);
+  }
+
+  /** Borra (rol pf_maintenance) las claves con `expires_at` vencido. Nunca registra respuestas almacenadas. */
+  async purgeIdempotencyKeys(): Promise<number> {
+    try {
+      const purged = await purgeExpiredIdempotencyKeys(this.pool);
+      this.logger.info({ purged }, 'idempotency keys purged');
+      return purged;
+    } catch (err) {
+      this.logger.warn(
+        { err: { type: err instanceof Error ? err.name : typeof err } },
+        'idempotency purge failed',
+      );
+      return 0;
+    }
   }
 }
 

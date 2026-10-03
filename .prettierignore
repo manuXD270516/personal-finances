@@ -16,3 +16,4 @@ spikes
 README.md
 # Matriz de trazabilidad generada por @pf/traceability
 tests/traceability
+.stryker-tmp/

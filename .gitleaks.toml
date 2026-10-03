@@ -1,0 +1,12 @@
+# Configuración de gitleaks: reglas por defecto + allowlist mínima.
+title = "pfos gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Los UUID (claves de idempotencia e IDs de prueba) no son secretos"
+regexTarget = "match"
+regexes = [
+  '''(?i)['"=:\s][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['"]?$''',
+]

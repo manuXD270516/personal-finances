@@ -27,6 +27,7 @@ export default tseslint.config(
       '**/.next/**',
       '**/.turbo/**',
       '**/coverage/**',
+      '**/.stryker-tmp/**',
       '**/next-env.d.ts',
       'spikes/**',
       'docs/**',

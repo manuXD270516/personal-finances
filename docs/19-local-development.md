@@ -316,6 +316,7 @@ SPIKE-07 valida: presigned PUT/GET con el SDK v3 de AWS, `forcePathStyle`, check
 - Secretos: sufijo `_PASSWORD`, `_SECRET`, `_KEY`, `_TOKEN`; el logger los redacta.
 - Ficheros: `.env.example` (versionado, sin secretos) y `.env` (generado por `pnpm setup:env`, ignorado por git, leído por Compose **y** por los procesos del host). `PF_ENV_FILE` permite usar otro fichero (lo usa `test:stack`). No existen `.env.host` ni `.env.test`.
 - `PFOS_ENV` ∈ `local | ci | staging | production`. Comportamientos dev-only (`seed`, `stack:reset`, creación de buckets) se rechazan fuera de `local | ci`.
+- Convenciones de API (`add-api-conventions`, as-built 2026-10-02; detalle en [config-reference.md](config-reference.md)): `CURSOR_SIGNING_KEY` (secreto `kid:secreto[,kid:secreto…]` de los cursores de paginación; **obligatorio en staging/production**, en `local | ci` se genera uno efímero si falta), `IDEMPOTENCY_RETENTION` (`24h` por defecto, rango `24h`–`7d`), `RATE_LIMIT_STORE=memory|valkey` (toggle; `valkey` aún sin adapter y falla al arrancar), `RATE_LIMIT_READS_PER_MIN=600`, `RATE_LIMIT_WRITES_PER_MIN=120` y `API_PROBLEM_TYPE_BASE` (base del `type` RFC 9457).
 
 ### 6.2 `.env.example`
 

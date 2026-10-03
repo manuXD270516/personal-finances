@@ -13,7 +13,7 @@
 
 | Proceso | Variables |
 |---|---|
-| `api` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_NODE_RESOURCE_DETECTORS`, `DATABASE_URL`, `DATABASE_POOL_MAX`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `JOB_QUEUE_DRIVER`, `JOB_QUEUE_POLLING_INTERVAL_SECONDS`, `SESSION_STORE`, `VALKEY_URL`, `API_PORT`, `API_BIND_ADDRESS`, `HEALTH_CHECK_TIMEOUT_MS`, `SHUTDOWN_TIMEOUT_MS` |
+| `api` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_NODE_RESOURCE_DETECTORS`, `DATABASE_URL`, `DATABASE_POOL_MAX`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `JOB_QUEUE_DRIVER`, `JOB_QUEUE_POLLING_INTERVAL_SECONDS`, `SESSION_STORE`, `VALKEY_URL`, `API_PORT`, `API_BIND_ADDRESS`, `HEALTH_CHECK_TIMEOUT_MS`, `SHUTDOWN_TIMEOUT_MS`, `API_PROBLEM_TYPE_BASE`, `IDEMPOTENCY_RETENTION`, `CURSOR_SIGNING_KEY`, `RATE_LIMIT_STORE`, `RATE_LIMIT_READS_PER_MIN`, `RATE_LIMIT_WRITES_PER_MIN` |
 | `worker` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_NODE_RESOURCE_DETECTORS`, `DATABASE_URL`, `DATABASE_POOL_MAX`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `JOB_QUEUE_DRIVER`, `JOB_QUEUE_POLLING_INTERVAL_SECONDS`, `SESSION_STORE`, `VALKEY_URL`, `WORKER_CONCURRENCY`, `WORKER_HEALTH_PORT`, `WORKER_HEALTH_BIND_ADDRESS`, `HEALTH_CHECK_TIMEOUT_MS`, `SHUTDOWN_TIMEOUT_MS` |
 | `migrate` | `PFOS_ENV`, `LOG_LEVEL`, `DATABASE_MIGRATOR_URL`, `DATABASE_URL`, `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_REGION`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_FORCE_PATH_STYLE`, `OBJECT_STORAGE_ENSURE_BUCKET`, `OBJECT_STORAGE_CORS_ORIGINS` |
 | `seed` | `PFOS_ENV`, `LOG_LEVEL`, `APP_DEFAULT_LOCALE`, `APP_REPORTING_CURRENCY`, `APP_TIMEZONE`, `DATABASE_URL`, `DATABASE_POOL_MAX` |
@@ -72,6 +72,17 @@
 | `API_BIND_ADDRESS` | no | `0.0.0.0` | no | `api` | Dirección de escucha de finance-api. | — |
 | `HEALTH_CHECK_TIMEOUT_MS` | no | `2000` | no | `api`, `worker` | Tiempo máximo por chequeo de dependencia en `/health/ready`. | — |
 | `SHUTDOWN_TIMEOUT_MS` | no | `25000` | no | `api`, `worker` | Tiempo máximo de apagado ordenado tras SIGTERM antes de forzar la salida (menor que `stop_grace_period`). | — |
+
+## Convenciones de API
+
+| Variable | Obligatoria | Default | Secreto | Procesos | Descripción | Ejemplo (modo A) |
+|---|---|---|---|---|---|---|
+| `API_PROBLEM_TYPE_BASE` | no | `https://pfos.dev/problems/` | no | `api` | Base del `type` de los errores RFC 9457 (`<base><code-en-kebab>`). Dominio placeholder hasta confirmarlo (docs/10 §18.3). | — |
+| `IDEMPOTENCY_RETENTION` | no | `24h` | no | `api` | Retención de las claves `Idempotency-Key` y sus respuestas (mínimo 24h, máximo 7d). Pasada, la clave se trata como nueva. | — |
+| `CURSOR_SIGNING_KEY` | si `PFOS_ENV=staging|production` | — | sí | `api` | Claves HMAC de los cursores de paginación (`kid:secreto`, separadas por coma; la primera firma, todas verifican: rotación por `kid`). Obligatoria en staging/production; en local/ci, si falta, se genera una efímera. | — |
+| `RATE_LIMIT_STORE` | no | `memory` | no | `api` | Almacén del límite de tasa. `memory` es válido con una réplica de API (Phase 1); `valkey` aún no tiene adapter (falla al arrancar). | — |
+| `RATE_LIMIT_READS_PER_MIN` | no | `600` | no | `api` | Lecturas (GET) por minuto por usuario y por workspace (docs/10 §10). | — |
+| `RATE_LIMIT_WRITES_PER_MIN` | no | `120` | no | `api` | Escrituras por minuto por usuario y por workspace (docs/10 §10). | — |
 
 ## Worker
 

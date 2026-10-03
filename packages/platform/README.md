@@ -11,7 +11,9 @@ Capacidades técnicas transversales, sin lógica de negocio. Es el **único** pa
 | `@pf/platform/queue` | Puerto `JobQueue` + adapter pg-boss (polling explícito) con envelope que propaga `correlationId` y `traceparent` |
 | `@pf/platform/storage` | Cliente S3 (path-style, checksums `WHEN_REQUIRED`) |
 | `@pf/platform/lifecycle` | Apagado ordenado ante SIGTERM/SIGINT con plazo máximo |
-| `@pf/platform/nest` | `HealthController`, middleware de correlación/log de peticiones, interceptor `http.route` para OTel, adaptador de logger para Nest |
+| `@pf/platform/nest` | `HealthController`, middleware de correlación/log de peticiones, interceptor `http.route` para OTel, adaptador de logger para Nest; `apiConventionsProviders()` registra `RateLimitGuard` → `ContractValidationInterceptor` → `DeprecationInterceptor` → `IdempotencyInterceptor` → `ConditionalRequestInterceptor` y el `ProblemDetailsFilter` global; decoradores `@ExpectedVersion()`/`@ValidatedQuery()` |
+| `@pf/platform/api` | Convenciones de API sin Nest (`platform/api-conventions`): contrato OpenAPI cargado con Ajv 2020-12 (`ApiContract`), `ApiProblem`/`renderProblem` (RFC 9457), `IdempotencyPolicy` + `PgIdempotencyStore`/`InMemoryIdempotencyStore`, purga `purgeExpiredIdempotencyKeys`, `PgCommandTransaction` (transacción con contexto RLS), `CursorCodec`/`buildPage`, `InMemoryRateLimiter` |
+| `@pf/platform/errors` | `ErrorCatalog` (código → estado HTTP, `title`, `type`); sin dependencias, lo usa también finance-web |
 | `@pf/platform/otel/register` | Bootstrap OpenTelemetry para `node --import` (ESM, Nest 12), activo solo con `OTEL_ENABLED=true` |
 
 Carpetas: `src/<capacidad>/` (no hay capas de dominio: es infraestructura compartida). Tests unitarios colocados

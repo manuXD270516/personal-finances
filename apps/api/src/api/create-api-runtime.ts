@@ -1,12 +1,19 @@
 import type { AddressInfo } from 'node:net';
-import type { INestApplication } from '@nestjs/common';
+import type { ModuleMetadata } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { ApiConfig } from '@pf/platform/config';
 import type { Logger } from '@pf/platform/logging';
-import { httpContextMiddleware, PinoNestLogger } from '@pf/platform/nest';
+import {
+  httpContextMiddleware,
+  PinoNestLogger,
+  problemFallbackHandlers,
+  type ApiConventionsOptions,
+} from '@pf/platform/nest';
 import { shutdownTelemetry } from '@pf/platform/otel';
 import { createApiResources, type ApiResources } from '../runtime/platform-resources.js';
 import { ApiModule } from './api.module.js';
+import { createApiConventions, type ApiConventionsOverrides } from './api-conventions.js';
 
 /** Rutas operativas fuera de la API versionada (proposal: los probes no dependen de auth ni de versionado). */
 const UNVERSIONED_ROUTES = [
@@ -17,7 +24,7 @@ const UNVERSIONED_ROUTES = [
 ];
 
 export interface ApiRuntime {
-  readonly app: INestApplication;
+  readonly app: NestExpressApplication;
   readonly resources: ApiResources;
   /** Escucha en `port`/`host` (por defecto los de la configuración). Devuelve la URL base. */
   listen(port?: number, host?: string): Promise<string>;
@@ -25,22 +32,47 @@ export interface ApiRuntime {
   close(): Promise<void>;
 }
 
-export async function createApiRuntime(config: ApiConfig, logger: Logger): Promise<ApiRuntime> {
+export interface ApiRuntimeOptions extends ApiConventionsOverrides {
+  /** Módulos extra (tests: controllers de prueba del harness con acceso a los recursos). */
+  readonly imports?: (
+    resources: ApiResources,
+    conventions: ApiConventionsOptions,
+  ) => NonNullable<ModuleMetadata['imports']>;
+  /** Middleware previo a las rutas (tests: fija el usuario autenticado hasta que exista add-workspace-identity). */
+  readonly middleware?: Parameters<NestExpressApplication['use']>[0];
+}
+
+export async function createApiRuntime(
+  config: ApiConfig,
+  logger: Logger,
+  options: ApiRuntimeOptions = {},
+): Promise<ApiRuntime> {
   const resources = createApiResources(config, logger);
   await resources.queue.start();
 
-  const app = await NestFactory.create(
+  const conventions = createApiConventions(config, resources.pool, logger, options);
+
+  const app = await NestFactory.create<NestExpressApplication>(
     ApiModule.register({
       probe: resources.probe,
       queue: resources.queue,
       logger,
       diagnostics: config.PFOS_ENV === 'local' || config.PFOS_ENV === 'ci',
+      conventions,
+      imports: options.imports?.(resources, conventions) ?? [],
     }),
-    { logger: new PinoNestLogger(logger), abortOnError: false },
+    { logger: new PinoNestLogger(logger), abortOnError: false, bodyParser: false },
   );
   app.use(httpContextMiddleware(logger));
+  // JSON y `application/*+json` (merge-patch de PATCH, docs/10 §2); errores de parseo → 400 VALIDATION_FAILED.
+  app.useBodyParser('json', { type: ['application/json', 'application/*+json'], limit: '1mb' });
+  if (options.middleware) app.use(options.middleware);
   app.setGlobalPrefix('api/v1', { exclude: UNVERSIONED_ROUTES });
   await app.init();
+  // 404/errores problem+json también fuera de /api/v1 (p. ej. /api/v2/me: versión no publicada).
+  const fallback = problemFallbackHandlers(conventions);
+  app.use(fallback.notFound);
+  app.use(fallback.onError);
 
   let closed = false;
   return {

@@ -17,9 +17,11 @@
         "*.ts",
         "*.mjs",
         "tsconfig*.json",
-        "package.json"
+        "package.json",
+        "scripts/**",
+        "$TURBO_ROOT$/contracts/openapi/*.yaml"
       ],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "contract/**"]
     },
     "typecheck": {
       "dependsOn": ["^transit"]
