@@ -12,9 +12,10 @@ invariants: [INV-006, INV-002]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [ledger, multi-currency]
@@ -34,7 +35,7 @@ expected_result:
 - La base de datos rechaza la inserción por la FK compuesta (ledger_account_id, currency, account_type)
 - No se persiste ningún posting
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-CURRENCY-001 — Se rechaza un posting cuya moneda difiere de la de su cuenta contable

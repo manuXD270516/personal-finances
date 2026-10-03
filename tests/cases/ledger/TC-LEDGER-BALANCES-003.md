@@ -12,9 +12,10 @@ invariants: [INV-002]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [balances, multi-currency]
@@ -33,7 +34,7 @@ expected_result:
 - 'Totales: 795.50 BOB y 99.900000 USDT, por separado'
 - No existe ningún total que combine BOB y USDT
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCES-003 — Los saldos de varias cuentas se agregan por moneda sin mezclar monedas

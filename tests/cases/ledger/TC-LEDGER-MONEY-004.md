@@ -12,9 +12,10 @@ invariants: [INV-020, INV-001]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [fast-check, rounding]
@@ -33,7 +34,7 @@ expected_result:
 - round(-x, c) = -round(x, c)
 - La misma entrada siempre produce la misma salida (sin dependencia del entorno ni del locale)
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-004 — Propiedad: el redondeo es determinista, idempotente, simétrico y acotado

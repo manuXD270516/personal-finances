@@ -12,9 +12,11 @@ invariants: [INV-002]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.ledger.test.ts
+  - packages/shared-kernel/src/money/money.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [money, multi-currency]
@@ -37,7 +39,7 @@ expected_result:
 - equals devuelve false (nunca lanza, nunca compara solo los montos)
 - Las operaciones en la misma moneda tienen éxito
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-007 — Se rechazan la aritmética y la comparación entre monedas distintas

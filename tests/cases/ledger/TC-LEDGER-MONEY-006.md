@@ -12,9 +12,10 @@ invariants: [INV-020]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [fast-check, allocation]
@@ -33,7 +34,7 @@ expected_result:
 - Distribuir dos veces produce resultados idénticos
 - Un peso cero produce una parte cero
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-006 — Propiedad: la distribución siempre suma el total con un error acotado por parte

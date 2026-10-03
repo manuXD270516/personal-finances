@@ -12,9 +12,11 @@ invariants: [INV-025]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/journal-entry.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [rls, multi-tenant, security]
@@ -38,7 +40,7 @@ expected_result:
 - La conexión reutilizada no hereda el workspace anterior
 - Desde W1 solo se ven postings de W1
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-ISOLATION-001 — El ledger no lee ni escribe datos de otro workspace y falla sin contexto

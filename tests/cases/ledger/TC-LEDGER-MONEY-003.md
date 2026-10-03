@@ -12,9 +12,10 @@ invariants: [INV-020]
 priority: critical
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/money/money.ledger.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [money, rounding, tdd]
@@ -60,7 +61,7 @@ steps:
 expected_result:
 - Cada resultado es exactamente igual al valor esperado
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-MONEY-003 — El redondeo a la escala de la moneda usa HALF_EVEN

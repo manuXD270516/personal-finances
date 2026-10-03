@@ -12,9 +12,11 @@ invariants: [INV-006]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/ledger-account.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [ledger, chart-of-accounts]
@@ -34,7 +36,7 @@ expected_result:
 - Cada sentencia falla por privilegio no otorgado (solo archived_at es actualizable)
 - La cuenta contable sigue en BOB con naturaleza ASSET
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-CHART-001 — La naturaleza y la moneda de una cuenta contable no pueden cambiar

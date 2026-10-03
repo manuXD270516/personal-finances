@@ -12,9 +12,10 @@ invariants: [INV-008, INV-004]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/domain/ledger.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [fast-check, reversal]
@@ -38,7 +39,7 @@ expected_result:
 - r tiene el mismo número de postings y las mismas cuentas que e
 - reverse(r) está prohibido
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-REVERSAL-003 — Propiedad: original más reversa suma cero por cuenta, split y moneda

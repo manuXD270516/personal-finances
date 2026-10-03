@@ -12,9 +12,10 @@ invariants: [INV-001, INV-009, INV-004]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [transfer, net-worth, ledger]
@@ -42,7 +43,7 @@ expected_result:
 - Patrimonio neto antes = patrimonio neto después = 1000.00 BOB
 - No se crea ningún posting de INCOME ni de EXPENSE
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-TRANSFER-001 — La transferencia entre cuentas propias preserva el patrimonio neto y mantiene el ledger balanceado
