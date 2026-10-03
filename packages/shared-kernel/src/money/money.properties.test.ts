@@ -100,7 +100,8 @@ describe('Money — propiedades (fast-check)', () => {
     }
     expect(even.toFixed()).toBe('0');
     expect(up.toFixed()).toBe('50');
-  });
+    // 100 000 redondeos exactos: en runners de CI supera el timeout por defecto de 5 s.
+  }, 30_000);
 
   it('[TC-LEDGER-MONEY-006] allocate: Σ partes = total, error < 1 unidad, determinista, peso 0 → 0 (INV-021)', () => {
     const arbWeights = fc
