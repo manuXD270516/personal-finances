@@ -12,9 +12,12 @@ invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+  - apps/api/test/api/classification.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [system-categories, workspace]
@@ -34,7 +37,7 @@ expected_result:
 - No existe ninguna categoría de usuario
 - Reprovisionar el mismo workspace no crea duplicados
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-SYSTEM-001 — Un workspace nuevo sin catálogo contiene exactamente las categorías de sistema

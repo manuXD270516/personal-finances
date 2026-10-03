@@ -3323,6 +3323,7 @@ components:
             - INVALID_SORT                      # 400
             - INVALID_FILTER                    # 400
             - RESOURCE_NOT_FOUND                # 404
+            - METHOD_NOT_ALLOWED                # 405 (DELETE sobre catálogos: archivar, docs/31 D7)
             - CONCURRENCY_CONFLICT              # 409
             - IDEMPOTENCY_REQUEST_IN_PROGRESS   # 409 + Retry-After
             - PRECONDITION_FAILED               # 412

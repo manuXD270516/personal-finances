@@ -17,6 +17,7 @@ import type {
   WorkspacePageRequest,
   WorkspaceRepository,
   WorkspaceSummary,
+  WorkspaceCreatedHook,
 } from '../application/ports/index.js';
 import { LocaleTag } from '../domain/locale-tag.js';
 import { isRole, type Role } from '../domain/role.js';
@@ -332,6 +333,7 @@ export function pgIdentityDeps(input: {
   readonly audit: AuditPort;
   readonly clock: Clock;
   readonly defaults: WorkspaceDefaults;
+  readonly onWorkspaceCreated?: WorkspaceCreatedHook;
 }): IdentityDeps {
   const uow: UnitOfWork = new PgUnitOfWork(input.pool);
   return {
@@ -345,5 +347,6 @@ export function pgIdentityDeps(input: {
     ids: uuidV7,
     clock: input.clock,
     defaults: input.defaults,
+    ...(input.onWorkspaceCreated ? { onWorkspaceCreated: input.onWorkspaceCreated } : {}),
   };
 }

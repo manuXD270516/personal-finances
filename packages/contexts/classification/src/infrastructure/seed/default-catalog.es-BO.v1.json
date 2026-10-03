@@ -1,0 +1,162 @@
+{
+  "version": "es-BO.v1",
+  "description": "Catálogo inicial sugerido para un usuario en Bolivia (openspec add-classification, design §7). Datos editables y versionados: nunca hardcodeados en código. Las categorías de sistema no figuran aquí (las provisiona ProvisionSystemCategories).",
+  "groups": [
+    {
+      "name": "Vivienda",
+      "kind": "EXPENSE",
+      "categories": [
+        { "name": "Alquiler", "icon": "home", "color": "#5D4037" },
+        { "name": "Expensas y condominio", "icon": "building", "color": "#5D4037" },
+        {
+          "name": "Servicios básicos",
+          "icon": "bolt",
+          "color": "#F9A825",
+          "children": ["Luz", "Agua", "Gas domiciliario", "Internet", "Telefonía móvil", "TV cable"]
+        },
+        { "name": "Mantenimiento y reparaciones", "icon": "wrench", "color": "#5D4037" }
+      ]
+    },
+    {
+      "name": "Alimentación",
+      "kind": "EXPENSE",
+      "categories": [
+        {
+          "name": "Supermercado",
+          "icon": "cart",
+          "color": "#2E7D32",
+          "children": ["Mercado", "Supermercado y minimarket"]
+        },
+        { "name": "Restaurantes", "icon": "utensils", "color": "#E65100" },
+        { "name": "Delivery", "icon": "bike", "color": "#E65100" },
+        { "name": "Cafés y snacks", "icon": "coffee", "color": "#6D4C41" }
+      ]
+    },
+    {
+      "name": "Transporte",
+      "kind": "EXPENSE",
+      "categories": [
+        { "name": "Combustible", "icon": "fuel", "color": "#1565C0" },
+        {
+          "name": "Transporte público",
+          "icon": "bus",
+          "color": "#1565C0",
+          "children": ["Minibús y micro", "Teleférico"]
+        },
+        { "name": "Taxi y apps de transporte", "icon": "taxi", "color": "#1565C0" },
+        {
+          "name": "Vehículo",
+          "icon": "car",
+          "color": "#1565C0",
+          "children": [
+            "Mantenimiento",
+            "SOAT y seguro vehicular",
+            "Impuesto vehicular",
+            "Estacionamiento y peajes"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Salud",
+      "kind": "EXPENSE",
+      "categories": [
+        { "name": "Consultas médicas", "icon": "stethoscope", "color": "#C62828" },
+        { "name": "Farmacia", "icon": "pill", "color": "#C62828" },
+        { "name": "Seguro de salud", "icon": "shield", "color": "#C62828" },
+        { "name": "Dental y óptica", "icon": "tooth", "color": "#C62828" }
+      ]
+    },
+    {
+      "name": "Educación",
+      "kind": "EXPENSE",
+      "categories": [
+        { "name": "Colegio y pensiones", "icon": "school", "color": "#283593" },
+        { "name": "Universidad", "icon": "graduation", "color": "#283593" },
+        { "name": "Cursos e idiomas", "icon": "book", "color": "#283593" },
+        { "name": "Útiles y libros", "icon": "pencil", "color": "#283593" }
+      ]
+    },
+    {
+      "name": "Hogar y personal",
+      "kind": "EXPENSE",
+      "categories": [
+        {
+          "name": "Hogar",
+          "icon": "sofa",
+          "color": "#00838F",
+          "children": ["Artículos de limpieza", "Muebles y equipamiento", "Trabajadora del hogar"]
+        },
+        { "name": "Ropa y calzado", "icon": "shirt", "color": "#00838F" },
+        {
+          "name": "Cuidado personal",
+          "icon": "sparkles",
+          "color": "#00838F",
+          "children": ["Peluquería", "Cosméticos"]
+        }
+      ]
+    },
+    {
+      "name": "Ocio",
+      "kind": "EXPENSE",
+      "categories": [
+        { "name": "Entretenimiento", "icon": "ticket", "color": "#6A1B9A" },
+        { "name": "Viajes", "icon": "plane", "color": "#6A1B9A" },
+        { "name": "Suscripciones digitales", "icon": "play", "color": "#6A1B9A" },
+        { "name": "Deporte y gimnasio", "icon": "dumbbell", "color": "#6A1B9A" },
+        { "name": "Salidas y fiestas", "icon": "glass", "color": "#6A1B9A" }
+      ]
+    },
+    {
+      "name": "Familia",
+      "kind": "EXPENSE",
+      "categories": [
+        { "name": "Hijos", "icon": "baby", "color": "#AD1457" },
+        { "name": "Mascotas", "icon": "paw", "color": "#AD1457" },
+        { "name": "Regalos y celebraciones", "icon": "gift", "color": "#AD1457" },
+        { "name": "Apoyo familiar", "icon": "users", "color": "#AD1457" },
+        { "name": "Donaciones y diezmo", "icon": "heart", "color": "#AD1457" }
+      ]
+    },
+    { "name": "Finanzas", "kind": "EXPENSE", "categories": [] },
+    {
+      "name": "Otros gastos",
+      "kind": "EXPENSE",
+      "categories": [{ "name": "Varios", "icon": "dots", "color": "#546E7A" }]
+    },
+    {
+      "name": "Ingresos laborales",
+      "kind": "INCOME",
+      "categories": [
+        { "name": "Sueldo", "icon": "briefcase", "color": "#2E7D32" },
+        { "name": "Aguinaldo", "icon": "gift", "color": "#2E7D32" },
+        { "name": "Bonos y horas extra", "icon": "clock", "color": "#2E7D32" },
+        { "name": "Honorarios y freelance", "icon": "laptop", "color": "#2E7D32" }
+      ]
+    },
+    {
+      "name": "Inversiones",
+      "kind": "INCOME",
+      "categories": [
+        {
+          "name": "Rendimientos de inversiones",
+          "icon": "trending-up",
+          "color": "#00695C",
+          "children": ["DPF", "Fondos de inversión", "Staking y rendimientos cripto"]
+        },
+        { "name": "Dividendos", "icon": "pie", "color": "#00695C" }
+      ]
+    },
+    {
+      "name": "Otros ingresos",
+      "kind": "INCOME",
+      "categories": [
+        { "name": "Alquileres cobrados", "icon": "key", "color": "#558B2F" },
+        { "name": "Ventas", "icon": "tag", "color": "#558B2F" },
+        { "name": "Regalos recibidos", "icon": "gift", "color": "#558B2F" },
+        { "name": "Reembolsos de terceros", "icon": "undo", "color": "#558B2F" },
+        { "name": "Varios", "icon": "dots", "color": "#558B2F" }
+      ]
+    }
+  ]
+}

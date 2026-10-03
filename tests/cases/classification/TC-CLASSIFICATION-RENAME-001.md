@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [categories, reporting]
@@ -34,7 +35,7 @@ expected_result:
 - Ninguna porción cambia de categoryId ni de monto
 - La auditoría registra el nombre anterior y el nuevo
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-RENAME-001 — Renombrar una categoría se refleja en el historial sin cambiar transacciones

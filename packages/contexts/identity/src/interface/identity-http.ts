@@ -208,6 +208,9 @@ export class IdentityController {
       timezone: str(body, 'timezone') ?? this.defaults.timeZone,
       locale: str(body, 'locale') ?? this.defaults.locale,
       ...(typeof fiscal === 'number' ? { fiscalMonthStartDay: fiscal } : {}),
+      ...(typeof body['seedDefaultCategories'] === 'boolean'
+        ? { seedDefaultCategories: body['seedDefaultCategories'] }
+        : {}),
     });
     res.setHeader('location', `/api/v1/workspaces/${view.workspace.id}`);
     return this.workspace(view);

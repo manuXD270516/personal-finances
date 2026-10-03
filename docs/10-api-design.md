@@ -219,6 +219,7 @@ Content-Type: application/json
 | platform | `WORKSPACE_ACCESS_DENIED` | 403 | No es miembro activo del workspace |
 | platform | `INSUFFICIENT_ROLE` | 403 | Rol insuficiente para la operación |
 | platform | `RESOURCE_NOT_FOUND` | 404 | No existe en el workspace |
+| platform | `METHOD_NOT_ALLOWED` | 405 | `DELETE` sobre un recurso que solo se archiva (categorías, grupos, tags, counterparties; docs/31 D7) |
 | platform | `CONCURRENCY_CONFLICT` | 409 | Versión cambió durante la operación |
 | platform | `IDEMPOTENCY_REQUEST_IN_PROGRESS` | 409 | Misma clave en ejecución |
 | platform | `PRECONDITION_FAILED` | 412 | `If-Match` no coincide |

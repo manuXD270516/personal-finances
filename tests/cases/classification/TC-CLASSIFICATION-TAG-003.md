@@ -12,9 +12,11 @@ invariants: [INV-019]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+  - packages/contexts/classification/test/integration/pg-classification.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [tags, archive]
@@ -33,7 +35,7 @@ expected_result:
 - Los 4 gastos conservan el tag
 - El reporte por tag muestra "Viaje Santa Cruz 2026" = 1,180.00 BOB como archivado
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-TAG-003 — Archivar un tag conserva las transacciones que lo tienen

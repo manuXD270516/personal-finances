@@ -1,8 +1,14 @@
 import type { ModuleMetadata } from '@nestjs/common';
 import { AuditModule, createAuditRuntime, type AuditPort } from '@pf/audit/interface/audit.module';
+import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
+import {
+  ClassificationModule,
+  createClassificationRuntime,
+} from '@pf/classification/interface/classification.module';
 import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
 import {
   IdentityModule,
+  identityUserLocales,
   identityWorkspaceTimeZones,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
@@ -40,6 +46,17 @@ export function outboxPort(writer: OutboxWriter = new PgOutboxWriter(eventSchema
   };
 }
 
+/** `OutboxPort` de CLASSIFICATION (`classification.CategoryArchived.v1`) sobre el outbox transaccional real. */
+export function classificationOutbox(writer: OutboxWriter = new PgOutboxWriter(eventSchemaRegistry())): {
+  append(event: Parameters<OutboxWriter['append']>[0]): Promise<void>;
+} {
+  return {
+    append: async (event) => {
+      await writer.append(event);
+    },
+  };
+}
+
 /**
  * Composición de AUDIT (openspec add-audit-trail): `AuditPort` sobre `audit.audit_log` en la misma transacción que
  * cada comando, con las allow-lists de redacción de cada contexto y la zona horaria del workspace de IDENTITY.
@@ -57,7 +74,7 @@ export function auditRuntime(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
-    policies: [IDENTITY_AUDIT_POLICY],
+    policies: [IDENTITY_AUDIT_POLICY, CLASSIFICATION_AUDIT_POLICY],
     timeZones: identityWorkspaceTimeZones(input.pool),
   });
 }
@@ -83,6 +100,15 @@ export function identityImports(input: {
     return [];
   }
   const audit = auditRuntime(input);
+  const auditPort = input.audit ? input.audit(audit.port) : audit.port;
+  // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
+  const classification = createClassificationRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    outbox: classificationOutbox(),
+    audit: auditPort,
+    locales: identityUserLocales(input.pool),
+  });
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -96,8 +122,10 @@ export function identityImports(input: {
         personalWorkspaceName: 'Personal',
       },
       outbox: outboxPort(),
-      audit: input.audit ? input.audit(audit.port) : audit.port,
+      audit: auditPort,
+      onWorkspaceCreated: classification.provisioner,
     }),
     AuditModule.register({ runtime: audit, conventions: input.conventions }),
+    ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
   ];
 }

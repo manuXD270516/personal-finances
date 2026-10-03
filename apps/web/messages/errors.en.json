@@ -4,6 +4,7 @@
   "INVALID_SORT": "The list cannot be sorted that way.",
   "INVALID_FILTER": "One of the filters is not valid. Check it and try again.",
   "RESOURCE_NOT_FOUND": "We could not find what you are looking for. It may have been removed or you may not have access.",
+  "METHOD_NOT_ALLOWED": "This action is not available. Catalog items are never deleted: you can archive them.",
   "CONCURRENCY_CONFLICT": "Someone else or another tab changed this record at the same time. Reload and try again.",
   "IDEMPOTENCY_REQUEST_IN_PROGRESS": "Your previous request is still being processed. Please wait a moment.",
   "PRECONDITION_FAILED": "This record changed since you opened it. Reload to see the current version before saving.",

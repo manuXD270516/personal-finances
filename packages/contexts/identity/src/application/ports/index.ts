@@ -105,6 +105,19 @@ export interface WorkspaceDefaults {
   readonly personalWorkspaceName: string;
 }
 
+/**
+ * Gancho síncrono al crear un workspace (openspec add-classification, design §6): otros contextos provisionan sus
+ * datos iniciales (categorías de sistema y catálogo sugerido) DENTRO de la misma unidad de trabajo. Lo cablea el
+ * composition root; IDENTITY no conoce a sus implementadores.
+ */
+export interface WorkspaceCreatedHook {
+  onWorkspaceCreated(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly seedDefaultCategories: boolean;
+  }): Promise<void>;
+}
+
 export interface IdentityDeps {
   readonly uow: UnitOfWork;
   readonly users: UserRepository;
@@ -117,6 +130,8 @@ export interface IdentityDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly defaults: WorkspaceDefaults;
+  /** Provisión síncrona de otros contextos al crear un workspace (opcional). */
+  readonly onWorkspaceCreated?: WorkspaceCreatedHook;
 }
 
 export type { AuditPort };

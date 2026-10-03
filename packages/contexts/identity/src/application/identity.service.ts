@@ -41,6 +41,8 @@ export interface CreateWorkspaceCommand {
   readonly timezone: string;
   readonly locale: string;
   readonly fiscalMonthStartDay?: number;
+  /** Aplicar también el catálogo inicial de categorías (por defecto `true`; add-classification). */
+  readonly seedDefaultCategories?: boolean;
 }
 
 const accessDenied = () =>
@@ -193,7 +195,7 @@ export class IdentityService {
         ownerUserId: userId,
         personal: false,
       });
-      await this.persistNewWorkspace(workspace, userId, 'USER_CREATED');
+      await this.persistNewWorkspace(workspace, userId, 'USER_CREATED', cmd.seedDefaultCategories ?? true);
       return { workspace, role: 'OWNER' as const };
     });
   }
@@ -308,9 +310,17 @@ export class IdentityService {
     workspace: Workspace,
     userId: string,
     origin: 'PERSONAL_DEFAULT' | 'USER_CREATED',
+    seedDefaultCategories = true,
   ): Promise<void> {
     await this.deps.uow.bind({ userId, workspaceId: workspace.id });
     await this.deps.workspaces.insert(workspace);
+    // add-classification (design §6): categorías de sistema (y catálogo inicial) en la MISMA transacción.
+    await this.deps.onWorkspaceCreated?.onWorkspaceCreated({
+      workspaceId: workspace.id,
+      userId,
+      seedDefaultCategories,
+    });
+    await this.deps.uow.bind({ userId, workspaceId: workspace.id });
     const s = workspace.settings;
     await this.deps.outbox.append({
       eventId: this.deps.ids.next(),

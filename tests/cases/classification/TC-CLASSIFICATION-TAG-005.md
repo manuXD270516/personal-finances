@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [tags]
@@ -32,7 +33,7 @@ expected_result:
 - El reporte muestra "Viaje Santa Cruz 2026" = 600.00 BOB
 - Las asignaciones de tag no cambian
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-TAG-005 — Renombrar un tag se refleja en el reporte por tag sin tocar transacciones

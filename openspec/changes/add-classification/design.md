@@ -167,3 +167,19 @@ Solo *expand*: `db/migrations/classification/<ts>_create_classification_schema.s
 - **Provisión síncrona vs evento `identity.WorkspaceCreated`** (docs/05 §2.5). Decisión provisional: síncrona; actualizar docs/05.
 - **Cashback** aparece como categoría de sistema en el glosario de docs/04 pero no en FR-CLASSIFICATION-003; no se provisiona.
 - **Recategorizar en periodo cerrado** (TC-CLASSIFICATION-RECATEGORIZE-001, INV-015): no aplica en Phase 1 (sin cierre de mes); se decide en Phase 2 (`planning/month-closing`).
+
+## Decisiones de implementación
+
+Registradas durante la aplicación del change (2026-10-03, owner ausente; revisables):
+
+1. **Provisión síncrona** (pregunta abierta resuelta como la decisión provisional): `IdentityService` expone el puerto opcional `WorkspaceCreatedHook` (`IdentityDeps.onWorkspaceCreated`); el composition root (`apps/api/src/identity/identity-wiring.ts`) lo cablea a `ClassificationService.onWorkspaceCreated`, que corre en la MISMA transacción (la `PgUnitOfWork` reutiliza la transacción en curso). IDENTITY no importa CLASSIFICATION. No se consume `identity.WorkspaceCreated` por el inbox. Aplica también al workspace personal JIT (con catálogo, `seedDefaultCategories` por defecto `true`). `POST /workspaces` acepta `seedDefaultCategories`. docs/05 §2.5 queda pendiente de actualizar (tarea 10.1).
+2. **Auditoría de la provisión**: la provisión dentro de `CreateWorkspace` no escribe filas de auditoría propias (el alta queda auditada por `identity.workspace.created`; evita ~90 filas por workspace y mantiene estable el historial del workspace). `POST …/apply-default-catalog` sí audita un registro `classification.catalog.applied` (agregado `CategoryCatalog`, id = workspace) con versión y conteos. El resto de comandos audita un registro por agregado modificado (diff campo a campo; alias como texto separado por comas porque AUDIT solo admite escalares).
+3. **`OPENING_BALANCE` y `CASHBACK`** no se provisionan (decisión provisional del design).
+4. **405 para `DELETE`**: se añade el código `METHOD_NOT_ALLOWED` (405) al `ErrorCatalog`, al enum `ErrorCode` del contrato, a docs/10 §9.1 y a `errors.{es,en,pt}.json`. Los controllers declaran `DELETE` en categorías, grupos, tags y counterparties solo para responder 405 problem+json con `Allow: GET, PATCH`, sin tocar datos (no son operaciones del contrato).
+5. **Unicidad de nombres** de grupos, categorías, tags y counterparties por `normalized_name` (minúsculas, sin acentos, espacios colapsados) entre activos; la aplicación lo valida (con `existingId` en `NAME_TAKEN`) y los índices únicos parciales son la defensa. Grupos: único por `(workspace, kind)`.
+6. **Alias**: tabla `counterparty_alias` con columna `active` (copia del estado de la counterparty) para que el índice único parcial solo aplique entre counterparties activas; se reescriben al actualizar (DELETE permitido solo en esa tabla).
+7. **Nombres i18n**: la API resuelve el nombre de las categorías de sistema desde `SystemCategoryCatalog` (dominio) según `Me.locale` (`identityUserLocales`); la tabla `classification.category_name_i18n` se carga con los mismos datos para consultas SQL (reporting). Locale sin traducción ⇒ `es`.
+8. **Paginación**: los catálogos son pequeños; los listados se ordenan en memoria (árbol grupo → categoría → subcategorías) y el cursor firmado guarda el último id. `reorder` devuelve la página completa de hermanas.
+9. **`LastCategoryUsedQueryPort`**: stub sin historial (`noTransactionsYet`) hasta `add-transaction-recording` (tarea 5.3).
+10. **`archived_by`** existe en las tablas pero queda `NULL` (el actor del archivado está en la auditoría).
+11. **TC**: quedan sin automatizar los que requieren Transactions/Ledger o UI (TC-CLASSIFICATION-KIND-002 —la parte de catálogo sí tiene test—, -TAG-002, -TAG-006, -COUNTERPARTY-002, -COUNTERPARTY-005, -RECATEGORIZE-001); grupos 7-10 y la tarea 1.1/1.3 (revisión del owner, TCs de requirements Should) siguen pendientes.

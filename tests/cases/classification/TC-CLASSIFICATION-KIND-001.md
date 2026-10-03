@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [categories, kind]
@@ -34,7 +36,7 @@ expected_result:
 - El segundo se acepta; la categoría sigue siendo EXPENSE
 - El total de "Restaurantes" en marzo de 2026 sigue siendo 420.00 BOB
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-KIND-001 — El tipo de una categoría no cambia al moverla y sus totales se conservan

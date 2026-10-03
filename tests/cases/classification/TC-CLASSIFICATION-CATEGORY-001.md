@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+  - apps/api/test/api/classification.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [categories]
@@ -37,7 +39,7 @@ expected_result:
 - La primera responde 201 con tipo EXPENSE, icono "cart", color "#2E7D32" y estado activo
 - La segunda responde 409 NAME_TAKEN y no se crea categoría
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-CATEGORY-001 — Crear una categoría de gasto con icono y color y rechazar nombre duplicado entre hermanas

@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [counterparties, alias]
@@ -33,7 +34,7 @@ expected_result:
 - La segunda no reconoce ninguna counterparty
 - La tercera no reconoce "Entel" porque está archivada
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-ALIAS-001 — Una descripción bancaria se reconoce por el alias de la counterparty

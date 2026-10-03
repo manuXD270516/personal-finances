@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/infrastructure/default-catalog.test.ts
+  - packages/contexts/classification/test/integration/pg-classification.int.test.ts
+  - apps/api/test/api/classification.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [seed, workspace]
@@ -39,7 +42,7 @@ expected_result:
 - Reaplicar no crea duplicados de las categorías activas existentes y reporta las omitidas
 - Las categorías del catálogo tienen systemCode null
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-SEED-001 — El catálogo inicial se carga opcionalmente, es editable y aplicarlo dos veces no duplica

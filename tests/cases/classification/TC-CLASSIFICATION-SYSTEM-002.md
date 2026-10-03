@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+  - apps/api/test/api/classification.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [system-categories]
@@ -36,7 +39,7 @@ expected_result:
 - Renombrar responde 409 SYSTEM_CATEGORY_IMMUTABLE
 - Cambiar el color responde 200 y systemCode sigue siendo FEES
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-SYSTEM-002 — Las categorías de sistema no se archivan ni renombran pero sí cambian de color

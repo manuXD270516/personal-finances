@@ -12,9 +12,10 @@ invariants: [INV-019]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [counterparties, archive]
@@ -34,7 +35,7 @@ expected_result:
 - El gasto se rechaza con COUNTERPARTY_ARCHIVED
 - '"Entel" no aparece en el listado por defecto'
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-COUNTERPARTY-004 — Una counterparty archivada no puede asignarse a transacciones nuevas

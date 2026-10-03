@@ -6,8 +6,13 @@ import type { Clock } from '@pf/shared-kernel';
 import { PgUnitOfWork } from '@pf/platform/api';
 import type { Pool } from 'pg';
 import { IdentityService } from '../application/identity.service.js';
-import type { AuditPort, OutboxPort, WorkspaceDefaults } from '../application/ports/index.js';
-import { PgWorkspaceRepository, pgIdentityDeps } from '../infrastructure/pg-identity.js';
+import type {
+  AuditPort,
+  OutboxPort,
+  WorkspaceCreatedHook,
+  WorkspaceDefaults,
+} from '../application/ports/index.js';
+import { PgUserRepository, PgWorkspaceRepository, pgIdentityDeps } from '../infrastructure/pg-identity.js';
 import {
   IDENTITY_DEFAULTS,
   IDENTITY_DEPS,
@@ -28,6 +33,8 @@ export interface IdentityModuleOptions {
   /** Outbox transaccional (add-event-outbox) y auditoría síncrona (`@pf/audit`, add-audit-trail). */
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  /** Provisión síncrona de otros contextos al crear un workspace (add-classification). */
+  readonly onWorkspaceCreated?: WorkspaceCreatedHook;
 }
 
 /**
@@ -44,6 +51,7 @@ export class IdentityModule {
       audit: options.audit,
       clock: options.clock,
       defaults: options.defaults,
+      ...(options.onWorkspaceCreated ? { onWorkspaceCreated: options.onWorkspaceCreated } : {}),
     });
     return {
       module: IdentityModule,
@@ -79,5 +87,21 @@ export function identityWorkspaceTimeZones(pool: Pool): {
   };
 }
 
+/**
+ * Locale del usuario (`Me.locale`) para otros contextos (CLASSIFICATION nombra las categorías de sistema en él).
+ * Lee con el contexto RLS del propio usuario (solo ve su fila).
+ */
+export function identityUserLocales(pool: Pool): { localeOf(userId: string): Promise<string> } {
+  const uow = new PgUnitOfWork(pool);
+  const users = new PgUserRepository();
+  return {
+    localeOf: (userId) =>
+      uow.run(
+        { userId, workspaceId: null },
+        async () => (await users.findById(userId))?.locale.value ?? 'es',
+      ),
+  };
+}
+
 export { JwtVerifier };
-export type { AuditPort, OutboxPort, WorkspaceDefaults };
+export type { AuditPort, OutboxPort, WorkspaceCreatedHook, WorkspaceDefaults };
