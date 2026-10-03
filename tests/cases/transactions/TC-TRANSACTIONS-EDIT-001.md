@@ -12,9 +12,12 @@ invariants: [INV-004, INV-007, INV-008, INV-023, INV-024]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+  - packages/contexts/transactions/src/domain/transaction.test.ts
+  - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["edit", "reversal"]

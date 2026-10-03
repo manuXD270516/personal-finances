@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+  - packages/contexts/transactions/src/domain/duplicate-detector.test.ts
+  - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["duplicates"]

@@ -18,6 +18,11 @@ import type { ApiConfig } from '@pf/platform/config';
 import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
+import {
+  createTransactionsRuntime,
+  TransactionsModule,
+} from '@pf/transactions/interface/transactions.module';
+import { TRANSACTIONS_AUDIT_POLICY } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
@@ -76,7 +81,12 @@ export function auditRuntime(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
-    policies: [IDENTITY_AUDIT_POLICY, CLASSIFICATION_AUDIT_POLICY, ACCOUNTS_AUDIT_POLICY],
+    policies: [
+      IDENTITY_AUDIT_POLICY,
+      CLASSIFICATION_AUDIT_POLICY,
+      ACCOUNTS_AUDIT_POLICY,
+      TRANSACTIONS_AUDIT_POLICY,
+    ],
     timeZones: identityWorkspaceTimeZones(input.pool),
   });
 }
@@ -112,12 +122,24 @@ export function identityImports(input: {
     locales: identityUserLocales(input.pool),
   });
   // ACCOUNTS (add-accounts-management).
-  const { accounts } = accountsRuntime({
+  const { accounts, ledger } = accountsRuntime({
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
     logger: input.logger,
     defaultTimeZone: input.config.APP_TIMEZONE,
+  });
+  // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification vía sus puertos públicos.
+  const transactions = createTransactionsRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    audit: auditPort,
+    history: audit.history,
+    outbox: classificationOutbox(),
+    ledger: ledger.posting,
+    accounts: accounts.query,
+    classification: classification.validator,
+    lookup: classification.lookup,
   });
   return [
     IdentityModule.register({
@@ -139,5 +161,6 @@ export function identityImports(input: {
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
     // ACCOUNTS (+ LEDGER sin HTTP) — openspec add-accounts-management.
     ...accountsImports({ runtime: accounts, conventions: input.conventions }),
+    TransactionsModule.register({ runtime: transactions, conventions: input.conventions }),
   ];
 }

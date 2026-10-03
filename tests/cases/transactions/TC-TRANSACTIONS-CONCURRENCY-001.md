@@ -12,9 +12,11 @@ invariants: [INV-023]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+  - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["optimistic-locking", "etag", "api"]

@@ -12,9 +12,10 @@ invariants: [INV-004, INV-029, INV-023]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["atomicity", "outbox", "audit"]

@@ -10,27 +10,27 @@
 
 ## 2. DOMAIN (TDD obligatorio: lógica financieramente crítica)
 
-- [ ] 2.1 Escribir primero los tests de `TransactionStatus` (transiciones de FR-TRANSACTIONS-006, TC-TRANSACTIONS-STATUS-001) y luego implementar la máquina de estados; verificar con PBT de secuencias aleatorias de comandos (INV-023)
-- [ ] 2.2 TDD del agregado `Transaction`: creación income/expense/refund/adjustment, moneda = moneda de cuenta, monto positivo y escala (TC-TRANSACTIONS-CURRENCY-001, AMOUNT-001, AMOUNT-002); verificar que los errores de dominio usan los códigos del catálogo
-- [ ] 2.3 TDD de splits: ≥ 1 split, default *Uncategorized*, Σ splits exacta, splits supersedidos por revisión (TC-TRANSACTIONS-SPLIT-001, SPLIT-002, SPLIT-004); verificar PBT de INV-021
-- [ ] 2.4 TDD de `TransactionPostingTranslator` para INCOME, EXPENSE, REFUND, ADJUSTMENT (docs/09 §6.1–§6.6); verificar con PBT que todo asiento cuadra por moneda (INV-004) y que legs = postings de cuentas de usuario (INV-024)
-- [ ] 2.5 TDD de amend (financiero vs descriptivo), void, cleared/reconciled/unreconcile y protección de reconciliadas (TC-TRANSACTIONS-EDIT-001, EDIT-002, VOID-001, RECONCILED-001..003); verificar que una edición descriptiva nunca produce drafts de asiento (INV-033)
-- [ ] 2.6 TDD de reglas de reembolso (vínculo, exceso con confirmación) y ajuste (motivo, dirección) (TC-TRANSACTIONS-REFUND-001, REFUND-002, ADJUSTMENT-001)
-- [ ] 2.7 Implementar `DuplicateDetector` puro con tests de ventana ±3 días, cuenta, monto y similitud (TC-TRANSACTIONS-DUPLICATE-001); verificar casos borde de acentos y mayúsculas
+- [x] 2.1 Escribir primero los tests de `TransactionStatus` (transiciones de FR-TRANSACTIONS-006, TC-TRANSACTIONS-STATUS-001) y luego implementar la máquina de estados; verificar con PBT de secuencias aleatorias de comandos (INV-023)
+- [x] 2.2 TDD del agregado `Transaction`: creación income/expense/refund/adjustment, moneda = moneda de cuenta, monto positivo y escala (TC-TRANSACTIONS-CURRENCY-001, AMOUNT-001, AMOUNT-002); verificar que los errores de dominio usan los códigos del catálogo
+- [x] 2.3 TDD de splits: ≥ 1 split, default *Uncategorized*, Σ splits exacta, splits supersedidos por revisión (TC-TRANSACTIONS-SPLIT-001, SPLIT-002, SPLIT-004); verificar PBT de INV-021
+- [x] 2.4 TDD de `TransactionPostingTranslator` para INCOME, EXPENSE, REFUND, ADJUSTMENT (docs/09 §6.1–§6.6); verificar con PBT que todo asiento cuadra por moneda (INV-004) y que legs = postings de cuentas de usuario (INV-024)
+- [x] 2.5 TDD de amend (financiero vs descriptivo), void, cleared/reconciled/unreconcile y protección de reconciliadas (TC-TRANSACTIONS-EDIT-001, EDIT-002, VOID-001, RECONCILED-001..003); verificar que una edición descriptiva nunca produce drafts de asiento (INV-033)
+- [x] 2.6 TDD de reglas de reembolso (vínculo, exceso con confirmación) y ajuste (motivo, dirección) (TC-TRANSACTIONS-REFUND-001, REFUND-002, ADJUSTMENT-001)
+- [x] 2.7 Implementar `DuplicateDetector` puro con tests de ventana ±3 días, cuenta, monto y similitud (TC-TRANSACTIONS-DUPLICATE-001); verificar casos borde de acentos y mayúsculas
 
 ## 3. APPLICATION
 
-- [ ] 3.1 Implementar comandos `RecordTransaction`, `RecordRefund`, `RecordAdjustment`, `PostTransaction` con Unit of Work (agregado + `LedgerPostingPort` + `AuditPort` + outbox en una transacción); verificar con TC-TRANSACTIONS-POSTING-001 (falla inyectada ⇒ rollback total) y TC-TRANSACTIONS-PENDING-001
-- [ ] 3.2 Implementar `AmendTransaction`, `ApplyClassification`, `VoidTransaction` con `reverseEntry` y validación de cuentas no activas (INV-026); verificar TC-TRANSACTIONS-ARCHIVED-001 y SPLIT-005
-- [ ] 3.3 Implementar `SetClearedStatus` (individual y lote all-or-nothing con `bulkOperationId`), `MarkReconciled`, `UnreconcileTransaction`; verificar TC-TRANSACTIONS-CLEARED-001, CLEARED-002
-- [ ] 3.4 Implementar queries `GetTransaction`, `ListTransactions` (filtros, subcategorías, cursor) y `CheckDuplicates`; verificar TC-TRANSACTIONS-LIST-001
+- [x] 3.1 Implementar comandos `RecordTransaction`, `RecordRefund`, `RecordAdjustment`, `PostTransaction` con Unit of Work (agregado + `LedgerPostingPort` + `AuditPort` + outbox en una transacción); verificar con TC-TRANSACTIONS-POSTING-001 (falla inyectada ⇒ rollback total) y TC-TRANSACTIONS-PENDING-001
+- [x] 3.2 Implementar `AmendTransaction`, `ApplyClassification`, `VoidTransaction` con `reverseEntry` y validación de cuentas no activas (INV-026); verificar TC-TRANSACTIONS-ARCHIVED-001 y SPLIT-005
+- [x] 3.3 Implementar `SetClearedStatus` (individual y lote all-or-nothing con `bulkOperationId`), `MarkReconciled`, `UnreconcileTransaction`; verificar TC-TRANSACTIONS-CLEARED-001, CLEARED-002
+- [x] 3.4 Implementar queries `GetTransaction`, `ListTransactions` (filtros, subcategorías, cursor) y `CheckDuplicates`; verificar TC-TRANSACTIONS-LIST-001
 - [ ] 3.5 Emitir `TransactionCreated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransactionUpdated` según design.md § Eventos; verificar con tests de contrato del productor (Ajv strict) contra `contracts/events/transactions/*`
 
 ## 4. INFRASTRUCTURE
 
-- [ ] 4.1 Escribir la migración `txn_0001_transactions_core` (schema `txn`, tablas, CHECKs de INV-023, constraint trigger diferido de Σ splits, índices, `unaccent`/`pg_trgm`, grants sin DELETE, RLS por `workspace_id`); verificar con test de migración y test de catálogo PG (sin FKs cross-schema, sin `timestamp without time zone`)
-- [ ] 4.2 Implementar `TransactionRepository` (Kysely, montos como string, optimistic locking por `version`); verificar con tests de integración Testcontainers incluido el test concurrente de dos escritores (NFR-DATA-014)
-- [ ] 4.3 Verificar aislamiento: tests RLS con dos workspaces (INV-025) y que `pf_app` no puede borrar filas de `txn.*` ni modificar `txn.transaction_journal_link`
+- [x] 4.1 Escribir la migración `txn_0001_transactions_core` (schema `txn`, tablas, CHECKs de INV-023, constraint trigger diferido de Σ splits, índices, `unaccent`/`pg_trgm`, grants sin DELETE, RLS por `workspace_id`); verificar con test de migración y test de catálogo PG (sin FKs cross-schema, sin `timestamp without time zone`)
+- [x] 4.2 Implementar `TransactionRepository` (Kysely, montos como string, optimistic locking por `version`); verificar con tests de integración Testcontainers incluido el test concurrente de dos escritores (NFR-DATA-014)
+- [x] 4.3 Verificar aislamiento: tests RLS con dos workspaces (INV-025) y que `pf_app` no puede borrar filas de `txn.*` ni modificar `txn.transaction_journal_link`
 
 ## 5. API
 
@@ -46,7 +46,7 @@
 
 ## 7. AUTOMATED TESTS y E2E
 
-- [ ] 7.1 Asegurar que cada TC del change tiene al menos un test con `[TC-…]` al inicio del nombre y actualizar `automation_status`/`automated_tests`; verificar con la matriz de trazabilidad
+- [x] 7.1 Asegurar que cada TC del change tiene al menos un test con `[TC-…]` al inicio del nombre y actualizar `automation_status`/`automated_tests`; verificar con la matriz de trazabilidad
 - [ ] 7.2 E2E Playwright: registrar un gasto dividido, editar su monto, marcarlo cleared y anular otro, comprobando saldos en pantalla; verificar en CI con el stack `core`
 - [ ] 7.3 Benchmark de NFR-PERF-001 (listado 50k) y NFR-PERF-003 (comando de escritura); verificar p95 dentro de umbral en el job nightly
 

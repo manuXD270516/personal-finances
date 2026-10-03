@@ -189,6 +189,28 @@ export class ClassificationQueries {
     });
   }
 
+  /** Id de la categoría de sistema (`UNCATEGORIZED`/`UNCATEGORIZED_INCOME`) del workspace (Transactions). */
+  systemCategoryId(userId: string, workspaceId: string, systemCode: string): Promise<string | null> {
+    return this.run(userId, workspaceId, async () => {
+      const all = await this.deps.categories.listAll(workspaceId);
+      return all.find((c) => c.systemCode === systemCode)?.id ?? null;
+    });
+  }
+
+  /** Las categorías dadas más todas sus subcategorías (filtro `categoryId` de listTransactions). */
+  categoryIdsWithDescendants(
+    userId: string,
+    workspaceId: string,
+    categoryIds: readonly string[],
+  ): Promise<string[]> {
+    return this.run(userId, workspaceId, async () => {
+      const all = await this.deps.categories.listAll(workspaceId);
+      const wanted = new Set(categoryIds);
+      for (const c of all) if (c.parentId !== null && wanted.has(c.parentId)) wanted.add(c.id);
+      return [...wanted];
+    });
+  }
+
   /**
    * `ValidateClassification` (INV-019): Transactions la invoca con los IDs NUEVOS o MODIFICADOS de cada porción.
    * Inexistente ⇒ `REFERENCE_NOT_FOUND`; archivado ⇒ `CATEGORY_ARCHIVED` / `TAG_ARCHIVED` /
