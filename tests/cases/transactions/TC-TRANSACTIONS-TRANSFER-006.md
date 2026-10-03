@@ -38,7 +38,7 @@ expected_result:
   - "Posteada: exactamente un transactions.TransferCompleted.v1 con fromAccountId Bank A, toAccountId Bank B, amount 300.00 BOB, fee null, journalEntryId del asiento, válido contra el schema"
   - "Saldos: Bank A 700.00 BOB, Bank B 300.00 BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-TRANSFER-006 — TransferCompleted se publica una sola vez al postear la transferencia y nunca estando pendiente
@@ -55,3 +55,7 @@ Cuando se postea
 Entonces se publica exactamente un evento de transferencia completada
   Y antes de postearla no existía ninguno
 ```
+
+## Notas
+
+- 2026-10-03 (docs/31 D37, change `add-lifecycle-timeline`): `TransferCompleted` se publica **una sola vez** por transferencia; una edición financiera ya no lo re-emite, publica `TransferRevised.v1` (ver TC-TRANSACTIONS-TRANSFER-009). Este TC no cambia de expectativa.
