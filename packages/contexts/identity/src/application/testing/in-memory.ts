@@ -158,9 +158,12 @@ export class InMemoryIdentity {
           self.workspaces.set(ws.id, Workspace.restore(ws.snapshot()));
           return true;
         },
-        async listForUser(userId) {
+        async listForUser(userId, page) {
           return [...self.workspaces.values()]
             .filter((w) => w.roleOf(userId) !== null)
+            .filter((w) => page?.afterId === undefined || w.id > page.afterId)
+            .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+            .slice(0, page?.limit ?? Number.MAX_SAFE_INTEGER)
             .map((w): WorkspaceSummary => ({
               id: w.id,
               name: w.settings.name,

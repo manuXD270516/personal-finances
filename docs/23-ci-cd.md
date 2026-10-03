@@ -424,6 +424,7 @@ Implementados en `.github/workflows/pr.yml` y `.github/workflows/main.yml` (setu
 | `typecheck` | `pnpm typecheck` |
 | `openspec` | `pnpm spec:validate` (`--all --strict --no-interactive`, telemetría off) |
 | `config-docs` | `pnpm config:docs:check` |
+| `contract` | Redocly lint + Spectral (reglas PFOS) del contrato OpenAPI y `oasdiff` breaking contra `main` (salvo label `api-breaking`), add-api-conventions |
 | `architecture` | `pnpm arch:check` (dependency-cruiser) |
 | `traceability` | `pnpm traceability:check -- --base origin/main` + matriz como artefacto |
 | `unit` | `pnpm test` (incluye las pruebas de fixtures de arquitectura, TC-PLATFORM-ARCH-001) |
@@ -434,6 +435,8 @@ Implementados en `.github/workflows/pr.yml` y `.github/workflows/main.yml` (setu
 | `dependency-scan` | `trivy fs` CRITICAL con fix |
 | `secrets` | gitleaks sobre los commits de la PR |
 
+Son **15 checks requeridos** (`contract` se agregó con add-api-conventions). El job **`e2e`** (Playwright/Chromium contra el stack desechable `pfos-e2e` con Keycloak real y las imágenes del job `image`, add-workspace-identity) corre en cada PR pero está **pendiente de agregar a la protección de rama**: se agregará cuando acumule corridas estables en GitHub.
+
 Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branches up to date*, historial lineal, sin force-push ni borrado. `main.yml` (jobs `build-push (finance-api)`, `build-push (finance-web)`, `verify-by-digest`) corre tras el merge y **no** es un check requerido.
 
 ### 16.1 Estado real — as-built (2026-10-02)
@@ -441,4 +444,5 @@ Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branche
 - **Gate verificado en GitHub:** run [`37045925393`](https://github.com/manuXD270516/personal-finances/actions/runs/37045925393) del workflow `pr` sobre el PR #1 (`feat/bootstrap-platform-foundation`, commit `a3a7bed`): **14/14 jobs en verde** (los 14 checks de la tabla anterior).
 - **Branch protection aplicada en `main`** (verificada con `gh api repos/manuXD270516/personal-finances/branches/main/protection`): **14 checks requeridos** (los de la tabla), *require branches up to date* (`strict`), **PR obligatorio** con 0 aprobaciones, resolución de conversaciones obligatoria, **historial lineal**, **sin force push** y sin borrado de la rama. `enforce_admins` está desactivado (el owner puede saltarse la protección en una emergencia).
 - **Tras el merge:** el PR #1 se fusionó en `main` (commit `ff6b8e0`) y el run `37046732572` de `main.yml` terminó en verde (`build-push` ×2 y `verify-by-digest`).
-- Reproducción local de los checks que no necesitan GitHub (verificado en Windows 11, PowerShell y Git Bash): `pnpm format:check`, `pnpm turbo run typecheck lint test`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm test:integration`. `pnpm test:stack` requiere Docker y tarda varios minutos.
+- Reproducción local de los checks que no necesitan GitHub (verificado en Windows 11, PowerShell y Git Bash): `pnpm format:check`, `pnpm turbo run typecheck lint test`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm test:integration`. `pnpm test:stack` y `pnpm test:e2e` requieren Docker y tardan varios minutos.
+- **Actualización (add-api-conventions / add-workspace-identity):** la protección de `main` pasa a **15 checks requeridos** (se agregó `contract`). `e2e` existe en `pr.yml` pero aún **no** es requerido (pendiente de agregar a la protección).

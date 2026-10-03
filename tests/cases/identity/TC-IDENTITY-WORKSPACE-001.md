@@ -13,9 +13,11 @@ invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- packages/contexts/identity/src/application/identity.service.test.ts
+- tests/e2e/specs/authorization.spec.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:

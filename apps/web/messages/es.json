@@ -5,7 +5,64 @@
   },
   "Home": {
     "title": "Finanzas personales",
-    "subtitle": "La plataforma está en construcción.",
-    "language": "Idioma"
+    "subtitle": "Tu espacio de trabajo activo y tu cuenta.",
+    "language": "Idioma",
+    "greeting": "Hola, {name}"
+  },
+  "App": {
+    "nav": "Navegación principal",
+    "home": "Inicio",
+    "settings": "Configuración del espacio",
+    "preferences": "Mis preferencias",
+    "newWorkspace": "Nuevo espacio de trabajo",
+    "logout": "Cerrar sesión",
+    "loading": "Cargando…",
+    "ready": "Listo",
+    "activeWorkspace": "Espacio de trabajo activo",
+    "role": "Tu rol: {role}",
+    "roles": {
+      "OWNER": "Propietario",
+      "EDITOR": "Editor",
+      "VIEWER": "Lector"
+    }
+  },
+  "Workspace": {
+    "settingsTitle": "Configuración del espacio de trabajo",
+    "createTitle": "Nuevo espacio de trabajo",
+    "name": "Nombre",
+    "baseCurrency": "Moneda base",
+    "timezone": "Zona horaria",
+    "locale": "Idioma y formato",
+    "fiscalMonthStartDay": "Día de inicio del mes financiero",
+    "minimumReserve": "Reserva mínima de liquidez",
+    "minimumReserveHint": "Monto en la moneda base; déjalo vacío si no quieres una reserva.",
+    "save": "Guardar cambios",
+    "saving": "Guardando…",
+    "saved": "Cambios guardados.",
+    "create": "Crear espacio",
+    "creating": "Creando…",
+    "created": "Espacio de trabajo creado: {name}.",
+    "readOnly": "Solo el propietario puede modificar esta configuración."
+  },
+  "Preferences": {
+    "title": "Mis preferencias",
+    "displayName": "Nombre visible",
+    "locale": "Idioma",
+    "timezone": "Zona horaria",
+    "save": "Guardar preferencias",
+    "saved": "Preferencias guardadas."
+  },
+  "Auth": {
+    "errorTitle": "No pudimos iniciar tu sesión",
+    "expiredTitle": "Tu sesión terminó",
+    "login": "Iniciar sesión",
+    "reasons": {
+      "state": "El enlace de inicio de sesión ya se usó o venció. Vuelve a iniciar sesión.",
+      "idp": "El proveedor de identidad canceló el inicio de sesión.",
+      "callback": "No pudimos validar la respuesta del proveedor de identidad. Inténtalo de nuevo.",
+      "provision": "No pudimos preparar tu cuenta. Verifica tu correo electrónico en el proveedor de identidad e inténtalo de nuevo.",
+      "expired": "Por seguridad cerramos tu sesión tras un tiempo de inactividad. Inicia sesión de nuevo.",
+      "unknown": "Ocurrió un error al iniciar sesión. Inténtalo de nuevo."
+    }
   }
 }

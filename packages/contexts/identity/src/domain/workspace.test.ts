@@ -159,6 +159,33 @@ describe('TimeZoneId, LocaleTag y User', () => {
       'VALIDATION_FAILED',
     );
   });
+
+  it('User.updatePreferences cambia el nombre visible y fusiona preferencias (null borra la clave)', () => {
+    const user = User.restore({
+      id: OWNER,
+      idpIssuer: 'http://keycloak/realms/pfos',
+      idpSubject: 'kc-0001',
+      email: 'owner@demo.pfos.test',
+      displayName: 'Owner',
+      locale: LocaleTag.of('es-BO'),
+      timeZone: null,
+      status: 'ACTIVE',
+      version: 1,
+      preferences: { theme: 'light' },
+    });
+    expect(user.updatePreferences({ displayName: '  Ana  ', preferences: { density: 'compact' } })).toBe(
+      true,
+    );
+    expect(user.displayName).toBe('Ana');
+    expect(user.preferences).toEqual({ theme: 'light', density: 'compact' });
+    expect(user.updatePreferences({ preferences: { theme: null } })).toBe(true);
+    expect(user.preferences).toEqual({ density: 'compact' });
+    expect(user.updatePreferences({ displayName: 'Ana', preferences: { density: 'compact' } })).toBe(false);
+    expect(user.version).toBe(3);
+    expect(codeOf(() => user.updatePreferences({ displayName: ' ' }))).toBe('VALIDATION_FAILED');
+    expect(codeOf(() => user.updatePreferences({ displayName: 'x'.repeat(101) }))).toBe('VALIDATION_FAILED');
+    expect(user.displayName).toBe('Ana');
+  });
 });
 
 describe('roleGrants (docs/12 §4)', () => {

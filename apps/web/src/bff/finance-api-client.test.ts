@@ -63,6 +63,21 @@ describe('cliente BFF → finance-api (Idempotency-Key, ETag/If-Match)', () => {
     expect(secondAttempt).not.toBe(first);
   });
 
+  it('[TC-PLATFORM-API-009] dos envíos del mismo formulario (doble clic) comparten la clave que conserva la UI', async () => {
+    const { calls, fetch } = fakeFetch([
+      json(201, { id: 'ws-1' }),
+      json(201, { id: 'ws-1' }, { 'idempotent-replayed': 'true' }),
+    ]);
+    const client = createFinanceApiClient({ baseUrl: 'http://api', fetch, delay: noDelay });
+    const key = uuidv7();
+    const [a, b] = await Promise.all([
+      client.command('POST', '/api/v1/workspaces', { name: 'Hogar' }, { idempotencyKey: key }),
+      client.command('POST', '/api/v1/workspaces', { name: 'Hogar' }, { idempotencyKey: key }),
+    ]);
+    expect(calls.map((c) => c.headers['idempotency-key'])).toEqual([key, key]);
+    expect([a.data, b.data]).toEqual([{ id: 'ws-1' }, { id: 'ws-1' }]);
+  });
+
   it('[TC-PLATFORM-API-008] los errores definitivos no se reintentan y exponen el problem con su code', async () => {
     const { calls, fetch } = fakeFetch([json(422, { code: 'IDEMPOTENCY_KEY_REUSED', requestId: 'r-1' })]);
     const client = createFinanceApiClient({ baseUrl: 'http://api', fetch, delay: noDelay });

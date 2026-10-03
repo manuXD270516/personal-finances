@@ -5,7 +5,64 @@
   },
   "Home": {
     "title": "Finanças pessoais",
-    "subtitle": "A plataforma está em construção.",
-    "language": "Idioma"
+    "subtitle": "Seu espaço de trabalho ativo e sua conta.",
+    "language": "Idioma",
+    "greeting": "Olá, {name}"
+  },
+  "App": {
+    "nav": "Navegação principal",
+    "home": "Início",
+    "settings": "Configuração do espaço",
+    "preferences": "Minhas preferências",
+    "newWorkspace": "Novo espaço de trabalho",
+    "logout": "Sair",
+    "loading": "Carregando…",
+    "ready": "Pronto",
+    "activeWorkspace": "Espaço de trabalho ativo",
+    "role": "Seu papel: {role}",
+    "roles": {
+      "OWNER": "Proprietário",
+      "EDITOR": "Editor",
+      "VIEWER": "Leitor"
+    }
+  },
+  "Workspace": {
+    "settingsTitle": "Configuração do espaço de trabalho",
+    "createTitle": "Novo espaço de trabalho",
+    "name": "Nome",
+    "baseCurrency": "Moeda base",
+    "timezone": "Fuso horário",
+    "locale": "Idioma e formato",
+    "fiscalMonthStartDay": "Dia de início do mês financeiro",
+    "minimumReserve": "Reserva mínima de liquidez",
+    "minimumReserveHint": "Valor na moeda base; deixe vazio se não quiser uma reserva.",
+    "save": "Salvar alterações",
+    "saving": "Salvando…",
+    "saved": "Alterações salvas.",
+    "create": "Criar espaço",
+    "creating": "Criando…",
+    "created": "Espaço de trabalho criado: {name}.",
+    "readOnly": "Somente o proprietário pode alterar esta configuração."
+  },
+  "Preferences": {
+    "title": "Minhas preferências",
+    "displayName": "Nome de exibição",
+    "locale": "Idioma",
+    "timezone": "Fuso horário",
+    "save": "Salvar preferências",
+    "saved": "Preferências salvas."
+  },
+  "Auth": {
+    "errorTitle": "Não conseguimos iniciar sua sessão",
+    "expiredTitle": "Sua sessão terminou",
+    "login": "Entrar",
+    "reasons": {
+      "state": "O link de login já foi usado ou expirou. Entre novamente.",
+      "idp": "O provedor de identidade cancelou o login.",
+      "callback": "Não conseguimos validar a resposta do provedor de identidade. Tente novamente.",
+      "provision": "Não conseguimos preparar sua conta. Verifique seu e-mail no provedor de identidade e tente novamente.",
+      "expired": "Por segurança encerramos sua sessão após um período de inatividade. Entre novamente.",
+      "unknown": "Ocorreu um erro ao entrar. Tente novamente."
+    }
   }
 }

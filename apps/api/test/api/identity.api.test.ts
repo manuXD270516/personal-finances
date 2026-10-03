@@ -307,3 +307,103 @@ describe('autorización por workspace (docs/31 D2)', () => {
     expect(list.body['page']).toMatchObject({ hasMore: false, nextCursor: null });
   });
 });
+
+describe('[TC-IDENTITY-AUTH-008] el nombre visible y las preferencias se actualizan y la provisión no los pisa', () => {
+  it('PATCH /me con displayName y preferences (merge-patch) persiste tras nuevos requests; nombre vacío 400', async () => {
+    const u = await user(`kc-name-${randomUUID()}`);
+    const v = Number((await call('GET', '/api/v1/me', { token: u.token })).body['version']);
+    const ok = await call('PATCH', '/api/v1/me', {
+      token: u.token,
+      body: { displayName: 'Ana Demo', preferences: { theme: 'dark', density: 'compact' } },
+      contentType: 'application/merge-patch+json',
+      headers: { 'if-match': `"${v}"` },
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ displayName: 'Ana Demo', version: v + 1 });
+    const merged = await call('PATCH', '/api/v1/me', {
+      token: u.token,
+      body: { preferences: { density: null } },
+      contentType: 'application/merge-patch+json',
+      headers: { 'if-match': `"${v + 1}"` },
+    });
+    expect(merged.status).toBe(200);
+    // Cada request vuelve a ejecutar la provisión con el nombre del IdP: no debe pisar el elegido por el usuario.
+    const again = await call('GET', '/api/v1/me', { token: u.token });
+    expect(again.body).toMatchObject({ displayName: 'Ana Demo', version: v + 2 });
+    const app = await connect(deps.databaseUrl);
+    try {
+      const prefs = await inTx(app, { userId: u.id, workspaceId: null }, () =>
+        app.query<{ preferences: Record<string, unknown> }>(
+          'SELECT preferences FROM iam."user" WHERE id = $1',
+          [u.id],
+        ),
+      );
+      expect(prefs.rows[0]?.preferences).toEqual({ theme: 'dark' });
+    } finally {
+      await app.end();
+    }
+    const empty = await call('PATCH', '/api/v1/me', {
+      token: u.token,
+      body: { displayName: '   ' },
+      contentType: 'application/merge-patch+json',
+      headers: { 'if-match': `"${v + 2}"` },
+    });
+    expectProblem(empty, 400, 'VALIDATION_FAILED');
+  });
+
+  it('si el nombre cambia en el IdP, la provisión lo actualiza', async () => {
+    const sub = `kc-rename-${randomUUID()}`;
+    await user(sub);
+    const renamed = await call('GET', '/api/v1/me', {
+      token: await tokenFor(sub, { name: 'Nombre Nuevo IdP' }),
+    });
+    expect(renamed.body['displayName']).toBe('Nombre Nuevo IdP');
+  });
+});
+
+describe('[TC-IDENTITY-WORKSPACE-006] el listado de workspaces se pagina por cursor', () => {
+  it('limit=1 recorre todas las membresías sin repetir; un cursor manipulado o de otro usuario da 400 INVALID_CURSOR', async () => {
+    const u = await user(`kc-page-${randomUUID()}`);
+    for (const name of ['Hogar', 'Negocio']) {
+      const r = await call('POST', '/api/v1/workspaces', {
+        token: u.token,
+        body: { name, baseCurrency: 'BOB' },
+        headers: { 'idempotency-key': randomUUID() },
+      });
+      expect(r.status).toBe(201);
+    }
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const q: string = cursor ? `?limit=1&cursor=${encodeURIComponent(cursor)}` : '?limit=1';
+      const r = await call('GET', `/api/v1/workspaces${q}`, { token: u.token });
+      expect(r.status).toBe(200);
+      const data = r.body['data'] as { id: string }[];
+      const page = r.body['page'] as { limit: number; hasMore: boolean; nextCursor: string | null };
+      expect(data).toHaveLength(1);
+      expect(page.limit).toBe(1);
+      seen.push(data[0]!.id);
+      cursor = page.nextCursor;
+      expect(page.hasMore).toBe(cursor !== null);
+      pages += 1;
+    } while (cursor && pages < 10);
+    expect(seen).toHaveLength(3);
+    expect(new Set(seen).size).toBe(3);
+    expect([...seen].sort()).toEqual(seen);
+
+    const first = await call('GET', '/api/v1/workspaces?limit=1', { token: u.token });
+    const next = (first.body['page'] as { nextCursor: string }).nextCursor;
+    const other = await user(`kc-page-other-${randomUUID()}`);
+    expectProblem(
+      await call('GET', `/api/v1/workspaces?cursor=${encodeURIComponent(next)}`, { token: other.token }),
+      400,
+      'INVALID_CURSOR',
+    );
+    expectProblem(
+      await call('GET', `/api/v1/workspaces?cursor=${encodeURIComponent(`${next}x`)}`, { token: u.token }),
+      400,
+      'INVALID_CURSOR',
+    );
+  });
+});

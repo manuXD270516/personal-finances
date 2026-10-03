@@ -14,6 +14,7 @@ import type {
   UserRepository,
   VerifiedIdentity,
   WorkspaceDefaults,
+  WorkspacePageRequest,
   WorkspaceRepository,
   WorkspaceSummary,
 } from '../application/ports/index.js';
@@ -40,6 +41,7 @@ interface IamUserTable {
   time_zone: string | null;
   status: UserStatus;
   version: number;
+  preferences: Record<string, unknown>;
   updated_at: Generated<Date>;
 }
 
@@ -109,6 +111,7 @@ export class PgUserRepository implements UserRepository {
         'time_zone',
         'status',
         'version',
+        'preferences',
       ])
       .where('id', '=', id)
       .executeTakeFirst();
@@ -123,6 +126,7 @@ export class PgUserRepository implements UserRepository {
       timeZone: r.time_zone === null ? null : TimeZoneId.of(r.time_zone),
       status: r.status,
       version: r.version,
+      preferences: r.preferences ?? {},
     });
   }
 
@@ -130,8 +134,10 @@ export class PgUserRepository implements UserRepository {
     const res = await db()
       .updateTable('iam.user')
       .set({
+        display_name: user.displayName,
         locale: user.locale.value,
         time_zone: user.timeZone?.value ?? null,
+        preferences: sql<Record<string, unknown>>`${JSON.stringify(user.preferences)}::jsonb`,
         version: user.version,
         updated_at: now,
       })
@@ -263,16 +269,17 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
     return res.numUpdatedRows === 1n;
   }
 
-  async listForUser(userId: string): Promise<readonly WorkspaceSummary[]> {
-    const rows = await db()
+  async listForUser(userId: string, page?: WorkspacePageRequest): Promise<readonly WorkspaceSummary[]> {
+    let q = db()
       .selectFrom('iam.workspace_membership as m')
       .innerJoin('iam.workspace as w', 'w.id', 'm.workspace_id')
       .select(['w.id', 'w.name', 'm.role', 'w.base_currency'])
       .where('m.user_id', '=', userId)
       .where('m.status', '=', 'ACTIVE')
-      .orderBy('m.joined_at')
-      .orderBy('w.id')
-      .execute();
+      .orderBy('w.id');
+    if (page?.afterId !== undefined) q = q.where('w.id', '>', page.afterId);
+    if (page?.limit !== undefined) q = q.limit(page.limit);
+    const rows = await q.execute();
     return rows.map((r) => ({ id: r.id, name: r.name, role: toRole(r.role), baseCurrency: r.base_currency }));
   }
 }

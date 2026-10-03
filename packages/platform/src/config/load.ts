@@ -87,6 +87,23 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
   }
 
   const cloud = values['PFOS_ENV'] === 'staging' || values['PFOS_ENV'] === 'production';
+  // finance-web: el BFF no funciona sin emisor OIDC ni almacén de sesiones (ADR-0010 enmienda).
+  if (app === 'web') {
+    for (const name of ['OIDC_ISSUER_URL', 'BFF_DATABASE_URL'] as const) {
+      if (values[name] === undefined && !problems.some((p) => p.variable === name)) {
+        problems.push({ variable: name, reason: 'falta (obligatoria en finance-web)' });
+      }
+    }
+  }
+  if (app === 'web' && values['BFF_DATABASE_URL'] !== undefined) {
+    const user = decodeURIComponent(new URL(String(values['BFF_DATABASE_URL'])).username);
+    if (user !== 'pf_bff') {
+      problems.push({
+        variable: 'BFF_DATABASE_URL',
+        reason: 'debe usar el rol pf_bff (grants solo sobre iam.bff_session)',
+      });
+    }
+  }
   if (names.includes('OIDC_ISSUER_URL') && cloud && values['OIDC_ISSUER_URL'] === undefined) {
     if (!problems.some((p) => p.variable === 'OIDC_ISSUER_URL')) {
       problems.push({

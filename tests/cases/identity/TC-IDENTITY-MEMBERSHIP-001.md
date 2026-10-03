@@ -19,6 +19,7 @@ level: api
 automation_status: automated
 automated_tests:
 - apps/api/test/api/identity.api.test.ts
+- tests/e2e/specs/authorization.spec.ts
 status: automated
 regression_suite: true
 phase: 1

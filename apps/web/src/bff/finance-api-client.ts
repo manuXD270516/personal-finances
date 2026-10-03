@@ -53,6 +53,11 @@ export interface CommandOptions {
   readonly ifMatch?: number | string;
   /** Envía `Idempotency-Key` (POST financieros). Por defecto `true` en POST. */
   readonly idempotent?: boolean;
+  /**
+   * Clave del intento del usuario cuando la UI la conserva entre llamadas (p. ej. un formulario que se envía dos
+   * veces por doble clic antes de deshabilitarse): ambas llamadas comparten la clave y la API ejecuta una sola vez.
+   */
+  readonly idempotencyKey?: string;
   readonly contentType?: string;
 }
 
@@ -132,7 +137,8 @@ export function createFinanceApiClient(options: FinanceApiClientOptions) {
       if (body !== undefined)
         headers['content-type'] =
           opts.contentType ?? (method === 'PATCH' ? 'application/merge-patch+json' : 'application/json');
-      if (opts.idempotent ?? method === 'POST') headers['idempotency-key'] = newKey();
+      if (opts.idempotencyKey !== undefined) headers['idempotency-key'] = opts.idempotencyKey;
+      else if (opts.idempotent ?? method === 'POST') headers['idempotency-key'] = newKey();
       if (opts.ifMatch !== undefined) headers['if-match'] = etagOf(opts.ifMatch);
 
       for (let attempt = 0; ; attempt += 1) {

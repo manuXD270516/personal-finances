@@ -46,6 +46,8 @@ x-app-addresses: &app-addresses
   OBJECT_STORAGE_ENDPOINT: http://object-storage:8333
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
   VALKEY_URL: redis://valkey:6379/0
+  # finance-api valida `iss` contra la URL pública (OIDC_ISSUER_URL del .env) pero lee el JWKS por la red interna.
+  OIDC_JWKS_URI: http://keycloak:8080/realms/pfos/protocol/openid-connect/certs
 
 services:
   # ───────────────────────────── deps ─────────────────────────────
@@ -149,6 +151,7 @@ services:
       PF_DEV_KC_OWNER_PASSWORD: ${PF_DEV_KC_OWNER_PASSWORD:?run pnpm setup:env}
       PF_DEV_KC_EDITOR_PASSWORD: ${PF_DEV_KC_EDITOR_PASSWORD:?run pnpm setup:env}
       PF_DEV_KC_VIEWER_PASSWORD: ${PF_DEV_KC_VIEWER_PASSWORD:?run pnpm setup:env}
+      PF_DEV_KC_OUTSIDER_PASSWORD: ${PF_DEV_KC_OUTSIDER_PASSWORD:?run pnpm setup:env}
       PF_WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:?run pnpm setup:env}
     volumes:
       - ./keycloak/realm-pfos-dev.json:/opt/keycloak/data/import/realm-pfos-dev.json:ro
@@ -205,6 +208,7 @@ services:
     environment:
       <<: *app-addresses
       DATABASE_MIGRATOR_URL: postgres://pf_migrator:${PF_DEV_DB_MIGRATOR_PASSWORD:?run pnpm setup:env}@postgres:5432/pfos?sslmode=disable
+      BFF_DATABASE_URL: &bff-db postgres://pf_bff:${PF_DEV_DB_BFF_PASSWORD:?run pnpm setup:env}@postgres:5432/pfos?sslmode=disable
     healthcheck:
       disable: true
     depends_on:
@@ -278,6 +282,10 @@ services:
     environment:
       PORT: '3000'
       HOSTNAME: 0.0.0.0
+      # Direcciones de back-channel del BFF en la red Compose (el navegador sigue usando las URL públicas).
+      FINANCE_API_URL: http://finance-api:8080
+      OIDC_DISCOVERY_URL: http://keycloak:8080/realms/pfos
+      BFF_DATABASE_URL: *bff-db
     init: true
     read_only: true
     tmpfs:

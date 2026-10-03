@@ -320,7 +320,7 @@ SPIKE-07 valida: presigned PUT/GET con el SDK v3 de AWS, `forcePathStyle`, check
 
 ### 6.2 `.env.example`
 
-Fichero real: [`.env.example`](../.env.example). Bloques: plataforma local (`PF_BIND_ADDR=127.0.0.1` y puertos `PF_*_PORT` con defaults "2 + puerto canónico"), secretos de desarrollo `PF_DEV_*=__generate__` (superusuario y roles de PostgreSQL, Keycloak, cliente OIDC, usuarios `owner|editor|viewer@pfos.test`, credenciales S3), runtime de la app (valores del modo A interpolados desde los `PF_*`, p. ej. `DATABASE_URL=postgres://pf_app:${PF_DEV_DB_APP_PASSWORD}@${PF_BIND_ADDR}:${PF_POSTGRES_PORT}/pfos?sslmode=disable`), identidad (`OIDC_PUBLIC_BASE_URL`, `WEB_PUBLIC_URL`), OpenTelemetry (`OTEL_ENABLED=false`) e imágenes (`FINANCE_API_IMAGE`/`FINANCE_WEB_IMAGE` vacías = build local). La referencia completa de variables de runtime, generada desde el esquema, es [config-reference.md](config-reference.md) (`pnpm config:docs`; CI falla si está desactualizada).
+Fichero real: [`.env.example`](../.env.example). Bloques: plataforma local (`PF_BIND_ADDR=127.0.0.1` y puertos `PF_*_PORT` con defaults "2 + puerto canónico"), secretos de desarrollo `PF_DEV_*=__generate__` (superusuario y roles de PostgreSQL, Keycloak, cliente OIDC, usuarios `owner|editor|viewer|outsider@demo.pfos.test`, rol `pf_bff`, secreto de sesiones del BFF, credenciales S3), runtime de la app (valores del modo A interpolados desde los `PF_*`, p. ej. `DATABASE_URL=postgres://pf_app:${PF_DEV_DB_APP_PASSWORD}@${PF_BIND_ADDR}:${PF_POSTGRES_PORT}/pfos?sslmode=disable`), identidad (`OIDC_PUBLIC_BASE_URL`, `WEB_PUBLIC_URL`, `OIDC_ISSUER_URL`), BFF (`FINANCE_API_URL`, `OIDC_CLIENT_*`, `OIDC_SCOPES`, `BFF_DATABASE_URL`, `BFF_SESSION_ENC_KEY`, `SESSION_IDLE_TIMEOUT`, `SESSION_ABSOLUTE_TIMEOUT`), OpenTelemetry (`OTEL_ENABLED=false`) e imágenes (`FINANCE_API_IMAGE`/`FINANCE_WEB_IMAGE` vacías = build local). La referencia completa de variables de runtime, generada desde el esquema, es [config-reference.md](config-reference.md) (`pnpm config:docs`; CI falla si está desactualizada).
 
 > El dominio `pfos.test` es un TLD reservado (RFC 2606), sin riesgo de envío real.
 
@@ -342,8 +342,10 @@ Otros comandos del repo (fuera del stack):
 | `pnpm arch:check` | dependency-cruiser con [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs) sobre `apps`, `packages` y `scripts`. |
 | `pnpm traceability:check` / `pnpm traceability:matrix` | Reglas de [17-test-traceability.md](17-test-traceability.md) y matriz en `tests/traceability/`. |
 | `pnpm config:docs` / `pnpm config:docs:check` | Genera / verifica [config-reference.md](config-reference.md). |
+| `pnpm test:integration` | Integración con Testcontainers (PostgreSQL real): API, repositorios, RLS y BFF (`iam.bff_session`). |
+| `pnpm test:e2e` | Playwright (Chromium) contra el stack desechable `pfos-e2e` con Keycloak real (§10.2). |
 
-Propuestos en Phase 0 y **no implementados** (pendientes, sin fecha): `pnpm doctor`, `db:migrate:new`, `db:psql`, `test:e2e`, `stack:nuke`, `keycloak:export`, `dev:users`. `env:init` pasó a llamarse `setup:env` y `test:platform` es `test:stack`.
+Propuestos en Phase 0 y **no implementados** (pendientes, sin fecha): `pnpm doctor`, `db:migrate:new`, `db:psql`, `stack:nuke`, `keycloak:export`, `dev:users`. `env:init` pasó a llamarse `setup:env` y `test:platform` es `test:stack`.
 
 ## 8. Reset y seeds
 
@@ -379,7 +381,7 @@ Definición detallada de datasets en [29-seed-datasets.md](29-seed-datasets.md);
 
 Reglas: seeds **deterministas** (PRNG sembrado, `Clock` fijo — regla `pf/no-nondeterminism`), escritos **a través de los casos de uso** de la capa `application` (respetan invariantes del ledger y Audit) y no por SQL crudo; idempotentes por `seed_run` (re-ejecutar no duplica). El seed resuelve el `sub` de cada usuario Keycloak dev para crear `iam.user` + membership.
 
-> **As-built (2026-10-02):** solo existe `minimal` (`dataset_version` 1), que por ahora solo registra su ejecución en `platform.seed_run` porque aún no hay bounded contexts; `demo` y `large` se rechazan con un error explícito hasta que lleguen los datasets de [29-seed-datasets.md](29-seed-datasets.md).
+> **As-built (2026-10-02):** solo existe `minimal` (`dataset_version` 2): registra su ejecución en `platform.seed_run` y siembra las identidades de IDENTITY (`add-workspace-identity`, tarea 8.5): los usuarios `owner`, `editor`, `viewer` y `outsider` (`<usuario>@demo.pfos.test`, con el `sub` fijo que tienen en el realm de desarrollo y el emisor `OIDC_ISSUER_URL`), `W1 Personal Demo` (owner OWNER, editor EDITOR, viewer VIEWER) y `W2 Other Demo` (owner y outsider OWNER). Es idempotente y corre con el rol de la app bajo RLS. Sin `OIDC_ISSUER_URL` omite las identidades con un aviso. Cuentas, categorías y transacciones llegan con sus contextos. `demo` y `large` se rechazan con un error explícito hasta que lleguen los datasets de [29-seed-datasets.md](29-seed-datasets.md).
 
 ## 9. Backup / restore local (resumen) — as-built (2026-10-02)
 
@@ -387,10 +389,30 @@ Reglas: seeds **deterministas** (PRNG sembrado, `Clock` fijo — regla `pf/no-no
 
 ## 10. Keycloak: realm de desarrollo — as-built (2026-10-02)
 
-- Fichero: [`deploy/compose/keycloak/realm-pfos-dev.json`](../deploy/compose/keycloak/realm-pfos-dev.json) (versionado, **sin secretos**). Usa placeholders `${PF_DEV_OIDC_CLIENT_SECRET}`, `${PF_DEV_KC_OWNER_PASSWORD}`, `${PF_DEV_KC_EDITOR_PASSWORD}`, `${PF_DEV_KC_VIEWER_PASSWORD}` y `${PF_WEB_PUBLIC_URL}`, que Keycloak sustituye al importar (`--import-realm`) con las variables que le pasa `compose.yaml` — confirmado, no hace falta render previo.
-- Contenido: realm `pfos`; client confidencial del BFF con redirect `${PF_WEB_PUBLIC_URL}/api/auth/callback` y post-logout redirect; usuarios `owner@pfos.test`, `editor@pfos.test`, `viewer@pfos.test`. **Los roles de workspace (`OWNER/EDITOR/VIEWER`) NO viven en Keycloak**: los asigna la aplicación en `iam.membership` (ARCHITECTURE §5, ADR-0010). Keycloak solo autentica.
+- Fichero: [`deploy/compose/keycloak/realm-pfos-dev.json`](../deploy/compose/keycloak/realm-pfos-dev.json) (versionado, **sin secretos**). Usa placeholders `${PF_DEV_OIDC_CLIENT_SECRET}`, `${PF_DEV_KC_OWNER_PASSWORD}`, `${PF_DEV_KC_EDITOR_PASSWORD}`, `${PF_DEV_KC_VIEWER_PASSWORD}`, `${PF_DEV_KC_OUTSIDER_PASSWORD}` y `${PF_WEB_PUBLIC_URL}`, que Keycloak sustituye al importar (`--import-realm`) con las variables que le pasa `compose.yaml` — confirmado, no hace falta render previo.
+- Contenido (as-built `add-workspace-identity`): realm `pfos` con access token de 5 min, refresh rotativo (`revokeRefreshToken`, `refreshTokenMaxReuse=0`); client scopes explícitos `basic`, `profile`, `email` y `pfos.api` (este último agrega el scope `pfos.api` y la audiencia `finance-api` al access token); client confidencial `pfos-web` (BFF, Authorization Code + PKCE S256) con redirect `${PF_WEB_PUBLIC_URL}/api/bff/auth/callback` y post-logout redirect `${PF_WEB_PUBLIC_URL}/`; usuarios de la Minimal Seed `owner`, `editor`, `viewer` y `outsider` (`<usuario>@demo.pfos.test`, email verificado, id fijo). **Los roles de workspace (`OWNER/EDITOR/VIEWER`) NO viven en Keycloak**: los asigna la aplicación en `iam.workspace_membership` (ARCHITECTURE §5, ADR-0010); la Minimal Seed los siembra. Keycloak solo autentica.
+- **Cambios del realm:** Keycloak solo importa el realm si no existe. Tras actualizar `realm-pfos-dev.json` (o al pasar a esta versión desde una anterior) hay que recrear la base de Keycloak: `pnpm stack:reset -- --seed=minimal` (borra los volúmenes locales del proyecto `pfos`).
 - Credenciales: generadas por `pnpm setup:env` en `.env` (`PF_DEV_KC_*`, dev-only). Consola admin en `${OIDC_PUBLIC_BASE_URL}/admin` (`http://localhost:28081/admin`) con el usuario `pfos-admin` y `PF_DEV_KEYCLOAK_ADMIN_PASSWORD`.
 - Pendiente (no implementado): `pnpm keycloak:export` para exportar cambios al realm y `pnpm dev:users`.
+
+### 10.1 Login local y usuarios de prueba — as-built (2026-10-02)
+
+1. `pnpm setup:env` (genera en `.env` las contraseñas `PF_DEV_KC_OWNER_PASSWORD`, `PF_DEV_KC_EDITOR_PASSWORD`, `PF_DEV_KC_VIEWER_PASSWORD`, `PF_DEV_KC_OUTSIDER_PASSWORD`, el secreto del client `PF_DEV_OIDC_CLIENT_SECRET`, la contraseña del rol `pf_bff` `PF_DEV_DB_BFF_PASSWORD` y el secreto de cifrado de sesiones `PF_DEV_BFF_SESSION_SECRET`; un `.env` existente conserva sus valores y solo recibe los nuevos).
+2. Modo B: `pnpm stack:up -- --profile core` y `pnpm db:seed -- --profile=minimal`. Modo A: `pnpm stack:up`, `pnpm db:migrate`, `pnpm db:seed -- --profile=minimal` y `pnpm dev`.
+3. Abrir `WEB_PUBLIC_URL` (`http://localhost:23000`): sin sesión, el BFF redirige al login de Keycloak. Usuario `owner` (o `editor`, `viewer`, `outsider`) con la contraseña `<PF_DEV_KC_OWNER_PASSWORD del .env>`; las contraseñas nunca se escriben en el repo ni en la documentación.
+
+| Usuario | Email | Membresías (Minimal Seed) | Para probar |
+|---|---|---|---|
+| `owner` | owner@demo.pfos.test | OWNER de W1 y W2 | Configuración del workspace, selector W1/W2 |
+| `editor` | editor@demo.pfos.test | EDITOR de W1 | 403 `INSUFFICIENT_ROLE` al cambiar la configuración |
+| `viewer` | viewer@demo.pfos.test | VIEWER de W1 | Solo lectura |
+| `outsider` | outsider@demo.pfos.test | OWNER de W2 | 403 `WORKSPACE_ACCESS_DENIED` sobre W1 |
+
+Un usuario creado a mano en la consola de Keycloak (email verificado) obtiene en su primer login un workspace personal (moneda base `APP_REPORTING_CURRENCY`, zona `APP_TIMEZONE`, locale `APP_DEFAULT_LOCALE`). El navegador solo recibe la cookie opaca `__Host-pfos_sid` (HttpOnly; Chromium/Firefox la aceptan con `Secure` en `http://localhost`); los tokens viven cifrados en `iam.bff_session`.
+
+### 10.2 E2E (Playwright) — as-built (2026-10-02)
+
+`pnpm test:e2e` (paquete `tests/e2e`, `@pf/e2e`) levanta un stack **desechable** `pfos-e2e` en modo B con un `.env` temporal (secretos propios, puertos `4xxxx`), reconstruye las imágenes (`pnpm images:build`), aplica la Minimal Seed, ejecuta los specs en Chromium contra Keycloak real y baja el stack con sus volúmenes. Nunca toca el proyecto `pfos` de desarrollo. Requiere el navegador de Playwright una vez: `pnpm --filter @pf/e2e run browsers`. Variables: `PF_E2E_KEEP_STACK=1` deja el stack arriba (imprime la ruta del `.env`); `PF_E2E_ENV_FILE=<ruta>` reutiliza ese stack sin levantar ni bajar nada; `PF_STACK_PREBUILT_IMAGES=1` no reconstruye (CI usa las imágenes del job `image`). Bajar a mano: `PF_COMPOSE_PROJECT=pfos-e2e PF_ENV_FILE=<ruta> pnpm stack:down -- --volumes --yes`.
 
 ## 11. Troubleshooting en Windows
 

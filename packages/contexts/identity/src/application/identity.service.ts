@@ -1,8 +1,13 @@
 import { DomainError, type Currency } from '@pf/shared-kernel';
 import { roleGrants, type Permission, type Role } from '../domain/role.js';
-import type { User } from '../domain/user.js';
+import type { User, UserPreferenceChanges } from '../domain/user.js';
 import { Workspace, type SettingsChange, type SettingsPatch } from '../domain/workspace.js';
-import type { IdentityDeps, VerifiedIdentity, WorkspaceSummary } from './ports/index.js';
+import type {
+  IdentityDeps,
+  VerifiedIdentity,
+  WorkspacePageRequest,
+  WorkspaceSummary,
+} from './ports/index.js';
 
 export interface ProvisionResult {
   readonly userId: string;
@@ -120,15 +125,23 @@ export class IdentityService {
   async updateMyPreferences(
     userId: string,
     expectedVersion: number,
-    changes: { readonly locale?: string; readonly timezone?: string | null },
+    changes: {
+      readonly displayName?: string;
+      readonly locale?: string;
+      readonly timezone?: string | null;
+      readonly preferences?: Readonly<Record<string, unknown>>;
+    },
   ): Promise<User> {
     return this.deps.uow.run({ userId, workspaceId: null }, async () => {
       const user = await this.deps.users.findById(userId);
       if (!user) throw notFound('user');
       if (user.version !== expectedVersion) throw preconditionFailed();
-      const prefs: { locale?: string; timeZone?: string | null } = {};
-      if (changes.locale !== undefined) prefs.locale = changes.locale;
-      if (changes.timezone !== undefined) prefs.timeZone = changes.timezone;
+      const prefs: UserPreferenceChanges = {
+        ...(changes.displayName === undefined ? {} : { displayName: changes.displayName }),
+        ...(changes.locale === undefined ? {} : { locale: changes.locale }),
+        ...(changes.timezone === undefined ? {} : { timeZone: changes.timezone }),
+        ...(changes.preferences === undefined ? {} : { preferences: changes.preferences }),
+      };
       if (user.updatePreferences(prefs) && !(await this.deps.users.savePreferences(user, expectedVersion))) {
         throw preconditionFailed();
       }
@@ -138,8 +151,14 @@ export class IdentityService {
 
   // ------------------------------------------------------------------ workspaces
 
-  async listMyWorkspaces(userId: string): Promise<readonly WorkspaceSummary[]> {
-    return this.deps.uow.run({ userId, workspaceId: null }, () => this.deps.workspaces.listForUser(userId));
+  /**
+   * `ListMyWorkspaces`: membresías activas en orden estable por id de workspace (UUIDv7). Con `page`, keyset
+   * `id > afterId` y como máximo `limit` filas (el llamador pide `limit + 1` para saber si hay más).
+   */
+  async listMyWorkspaces(userId: string, page?: WorkspacePageRequest): Promise<readonly WorkspaceSummary[]> {
+    return this.deps.uow.run({ userId, workspaceId: null }, () =>
+      this.deps.workspaces.listForUser(userId, page),
+    );
   }
 
   /** `CreateWorkspace`: el creador queda como OWNER; `identity.WorkspaceCreated.v1` con origin `USER_CREATED`. */

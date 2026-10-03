@@ -200,7 +200,8 @@ erDiagram
     text idp_subject "sub del IdP"
     text email
     boolean email_verified
-    text display_name
+    text display_name "editable por el usuario (PATCH /me)"
+    text idp_display_name "último nombre visto en el IdP (nullable)"
     text locale "es-BO"
     text time_zone "IANA, preferencia personal (nullable)"
     text status "ACTIVE DISABLED"
@@ -267,7 +268,7 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `user` | `(idp_issuer, idp_subject)`; `lower(email)` parcial `WHERE status='ACTIVE'` | `status IN (...)` | — | **USR**: `id = app.user_id` (lectura propia); alta vía JIT provisioning con rol `pf_app` y policy `WITH CHECK` sobre `idp_subject` del token (función `SECURITY DEFINER` acotada) | `version` |
+| `user` | `(idp_issuer, idp_subject)`; `lower(email)` parcial `WHERE status='ACTIVE'` | `status IN (...)` | — | **USR**: `id = app.user_id` (lectura propia); alta vía JIT provisioning con rol `pf_app` y policy `WITH CHECK` sobre `idp_subject` del token (función `SECURITY DEFINER` acotada `iam.provision_user`: sincroniza `email` siempre y `display_name` solo si cambió el nombre en el IdP —`idp_display_name`—, para no pisar el elegido por el usuario) | `version` |
 | `workspace` | — | `fiscal_month_start_day BETWEEN 1 AND 28`; reserva mínima: `min_liquidity_reserve_amount` y `min_liquidity_reserve_currency` ambos nulos o ambos presentes, monto `>= 0` | — | **USR/WS**: `SELECT` si existe membership activa de `app.user_id`; `UPDATE` si `id = current_workspace_id()` | `version`, `archived_at` |
 | `workspace_membership` | PK compuesta. **Al menos un OWNER activo** por workspace: invariante de dominio (`LAST_OWNER_CANNOT_LEAVE`) + constraint trigger diferido | `role IN ('OWNER','EDITOR','VIEWER')` | `(user_id) WHERE status='ACTIVE'` (resolver workspaces del usuario) | **USR**: `user_id = app.user_id OR workspace_id = current_workspace_id()` | `version` |
 | `workspace_invitation` | `(workspace_id, email_normalized) WHERE accepted_at IS NULL AND revoked_at IS NULL` | `expires_at > created_at` | `(token_hash)` | WS | — (Phase 9) |

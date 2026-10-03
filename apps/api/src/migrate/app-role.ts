@@ -41,3 +41,23 @@ export async function ensureAppRolePassword(migrator: Client, databaseUrl: strin
   const verifier = scramSha256Verifier(password);
   await migrator.query(`ALTER ROLE ${APP_ROLE} PASSWORD ${migrator.escapeLiteral(verifier)}`);
 }
+
+/** Rol del BFF (`finance-web`): grants solo sobre `iam.bff_session`. Lo crea la migración de roles (sin contraseña). */
+export const BFF_ROLE = 'pf_bff';
+
+/**
+ * Alinea la contraseña de `pf_bff` con BFF_DATABASE_URL (credencial separada del BFF, design §6). Mismo
+ * mecanismo que `pf_app`: `pf_migrator` creó el rol y tiene ADMIN OPTION; se envía el verificador SCRAM.
+ */
+export async function ensureBffRolePassword(migrator: Client, bffDatabaseUrl: string): Promise<void> {
+  const url = new URL(bffDatabaseUrl);
+  const user = decodeURIComponent(url.username);
+  const password = decodeURIComponent(url.password);
+  if (user !== BFF_ROLE) throw new Error(`BFF_DATABASE_URL debe usar el rol ${BFF_ROLE}`);
+  if (password.length < 12) {
+    throw new Error('BFF_DATABASE_URL: la contraseña del rol del BFF es demasiado corta (mínimo 12)');
+  }
+  await migrator.query(
+    `ALTER ROLE ${BFF_ROLE} PASSWORD ${migrator.escapeLiteral(scramSha256Verifier(password))}`,
+  );
+}

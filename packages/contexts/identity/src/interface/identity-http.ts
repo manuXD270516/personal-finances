@@ -13,7 +13,14 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
-import { ApiProblem, JwtVerifier, type VerifiedAccessToken } from '@pf/platform/api';
+import {
+  ApiProblem,
+  DEFAULT_PAGE_LIMIT,
+  JwtVerifier,
+  MAX_PAGE_LIMIT,
+  buildPage,
+  type VerifiedAccessToken,
+} from '@pf/platform/api';
 import {
   API_CONVENTIONS,
   ExpectedVersion,
@@ -123,23 +130,55 @@ export class IdentityController {
   @Patch('me')
   async updateMe(@Req() req: ApiRequest, @ExpectedVersion() expected: number, @Body() body: Json) {
     const id = userId(req);
-    const changes: { locale?: string; timezone?: string } = {};
+    const changes: {
+      displayName?: string;
+      locale?: string;
+      timezone?: string;
+      preferences?: Record<string, unknown>;
+    } = {};
+    const displayName = str(body, 'displayName');
     const locale = str(body, 'locale');
     const timezone = str(body, 'timezone');
+    const preferences = body['preferences'];
+    if (displayName !== undefined) changes.displayName = displayName;
     if (locale !== undefined) changes.locale = locale;
     if (timezone !== undefined) changes.timezone = timezone;
+    if (preferences !== null && typeof preferences === 'object' && !Array.isArray(preferences)) {
+      changes.preferences = preferences as Record<string, unknown>;
+    }
     await this.service.updateMyPreferences(id, expected, changes);
     const { user, workspaces } = await this.service.getMe(id);
     return this.me(user, workspaces);
   }
 
+  /**
+   * Paginación por cursor (docs/10 §5.1): keyset por id de workspace (UUIDv7), `limit` 1..200 (50 por defecto);
+   * el cursor firmado vale solo para este recurso y este usuario.
+   */
   @Get('workspaces')
   async listWorkspaces(@Req() req: ApiRequest) {
     const id = userId(req);
-    const summaries = await this.service.listMyWorkspaces(id);
+    const query = (req.query ?? {}) as Record<string, unknown>;
+    const rawLimit = Number(query['limit'] ?? DEFAULT_PAGE_LIMIT);
+    const limit = Number.isInteger(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), MAX_PAGE_LIMIT)
+      : DEFAULT_PAGE_LIMIT;
+    const scope = { resource: 'workspaces', workspaceId: id, filters: {} };
+    const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : undefined;
+    const afterId = cursor === undefined ? undefined : String(this.options.cursors.decode(cursor, scope)[0]);
+    const rows = await this.service.listMyWorkspaces(id, {
+      ...(afterId === undefined ? {} : { afterId }),
+      limit: limit + 1,
+    });
+    const page = buildPage(
+      rows,
+      limit,
+      (s) => [s.id],
+      (position) => this.options.cursors.encode(scope, position),
+    );
     const data = [];
-    for (const s of summaries) data.push(this.workspace(await this.service.getWorkspace(id, s.id)));
-    return { data, page: { limit: data.length, hasMore: false, nextCursor: null } };
+    for (const s of page.data) data.push(this.workspace(await this.service.getWorkspace(id, s.id)));
+    return { data, page: page.page };
   }
 
   @Post('workspaces')

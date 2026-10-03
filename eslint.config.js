@@ -44,6 +44,8 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/coverage/**',
       '**/.stryker-tmp/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
       '**/next-env.d.ts',
       'spikes/**',
       'docs/**',
@@ -84,6 +86,12 @@ export default tseslint.config(
     // Tooling y tests: pueden leer el entorno (Testcontainers, CI) y escribir en consola.
     files: ['**/*.config.{ts,js,mjs}', 'scripts/**', '**/test/**', '**/*.test.ts'],
     rules: { 'no-restricted-properties': 'off', 'no-console': 'off', 'no-restricted-syntax': 'off' },
+  },
+  {
+    // E2E (Playwright): leen el `.env` desechable del stack `pfos-e2e` y ejecutan código en el navegador.
+    files: ['tests/e2e/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    rules: { 'no-restricted-properties': 'off', 'no-console': 'off' },
   },
   {
     files: ['apps/web/**/*.{ts,tsx}'],

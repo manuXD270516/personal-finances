@@ -41,6 +41,15 @@ const redisUrl = z.string().regex(/^rediss?:\/\/[^\s]+$/, 'debe ser una URL redi
 const port = z.coerce.number().int().min(1).max(65535);
 const positiveInt = z.coerce.number().int().positive();
 const bool = z.stringbool();
+const httpOrigin = z
+  .string()
+  .regex(/^https?:\/\/[^\s/]+$/, 'debe ser un origen http(s)://host[:puerto] sin ruta');
+/** Duración en minutos (`30m`) u horas (`12h`), en milisegundos. */
+const duration = z
+  .string()
+  .regex(/^\d+[mh]$/, 'duración en minutos (`30m`) u horas (`12h`)')
+  .transform((v) => Number(v.slice(0, -1)) * (v.endsWith('h') ? 3_600_000 : 60_000))
+  .refine((ms) => ms > 0, 'debe ser mayor que cero');
 
 /** Detectores de recurso OTel que filtran PII (usuario de SO, hostname, argumentos) — SPIKE-10 hallazgo 5. */
 const FORBIDDEN_RESOURCE_DETECTORS = ['all', 'host', 'process'];
@@ -255,9 +264,9 @@ export const VARIABLES = {
   OIDC_ISSUER_URL: variable(httpUrl, {
     group: 'Identidad (OIDC)',
     description:
-      'Emisor (`iss`) exacto de los access tokens (realm de Keycloak). Sin ella, en local/ci las rutas de identidad no se montan; obligatoria en staging/production.',
+      'Emisor (`iss`) exacto de los access tokens (realm de Keycloak, URL que ve el navegador). En finance-api, sin ella en local/ci las rutas de identidad no se montan; obligatoria en staging/production y siempre en finance-web (discovery del BFF).',
     optional: true,
-    requiredWhen: '`PFOS_ENV=staging|production`',
+    requiredWhen: '`PFOS_ENV=staging|production` (api) y siempre en finance-web',
     example: 'https://auth.example.test/realms/pfos',
   }),
   OIDC_JWKS_URI: variable(httpUrl, {
@@ -280,6 +289,77 @@ export const VARIABLES = {
     group: 'Identidad (OIDC)',
     description: 'Tolerancia de reloj en segundos para `exp`/`nbf`.',
     default: '30',
+  }),
+  // ── BFF (finance-web): login OIDC, sesiones y proxy hacia finance-api (ADR-0010 enmienda, ADR-0019) ──
+  WEB_PUBLIC_URL: variable(httpOrigin, {
+    group: 'BFF (finance-web)',
+    description:
+      'Origen público de finance-web tal como lo ve el navegador (sin ruta). Se usa para el chequeo `Origin` anti-CSRF, el `redirect_uri` (`<origen>/api/bff/auth/callback`) y el retorno tras el logout.',
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: 'http://localhost:23000',
+  }),
+  FINANCE_API_URL: variable(httpOrigin, {
+    group: 'BFF (finance-web)',
+    description:
+      'URL interna de finance-api (back-channel del BFF; `http://finance-api:8080` en Compose). El navegador nunca la usa.',
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: 'http://127.0.0.1:28080',
+  }),
+  OIDC_DISCOVERY_URL: variable(httpUrl, {
+    group: 'BFF (finance-web)',
+    description:
+      'URL base alternativa (back-channel) para el discovery OIDC del BFF cuando el emisor público no es alcanzable desde el contenedor (`http://keycloak:8080/realms/pfos` en Compose). El `issuer` del documento debe coincidir con `OIDC_ISSUER_URL`. Si falta se usa `OIDC_ISSUER_URL`.',
+    optional: true,
+  }),
+  OIDC_CLIENT_ID: variable(z.string().min(1), {
+    group: 'BFF (finance-web)',
+    description: 'Client id confidencial del BFF en el IdP (Authorization Code + PKCE S256).',
+    default: 'pfos-web',
+  }),
+  OIDC_CLIENT_SECRET: variable(z.string().min(16), {
+    group: 'BFF (finance-web)',
+    description: 'Secreto del client confidencial del BFF.',
+    secret: true,
+  }),
+  OIDC_SCOPES: variable(z.string().regex(/(^|\s)openid(\s|$)/, 'debe incluir el scope openid'), {
+    group: 'BFF (finance-web)',
+    description: 'Scopes pedidos en el login (deben incluir `openid` y el scope de la API).',
+    default: 'openid profile email pfos.api',
+  }),
+  BFF_DATABASE_URL: variable(postgresUrl, {
+    group: 'BFF (finance-web)',
+    description:
+      'Conexión del BFF al almacén de sesiones `iam.bff_session` (rol `pf_bff`, grants solo sobre esa tabla). `migrate` alinea la contraseña del rol con esta URL.',
+    optional: true,
+    requiredWhen: 'finance-web (`web`)',
+    secret: true,
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: 'postgres://pf_bff:<PF_DEV_DB_BFF_PASSWORD>@127.0.0.1:25432/pfos',
+  }),
+  BFF_SESSION_ENC_KEY: variable(
+    z
+      .string()
+      .regex(
+        /^([A-Za-z0-9_-]{1,32}:)?[^,:\s]{32,}(,[A-Za-z0-9_-]{1,32}:[^,:\s]{32,})*$/,
+        'formato [kid:]secreto[,kid:secreto…] con secretos de ≥ 32 caracteres',
+      ),
+    {
+      group: 'BFF (finance-web)',
+      description:
+        'Claves de cifrado de las sesiones del BFF (`kid:secreto`, separadas por coma; la primera cifra, todas descifran: rotación por `kid`; un secreto sin `kid` usa el kid `k0`). De cada secreto se deriva una clave AES-256-GCM con HKDF-SHA256. En cloud viene del secrets manager.',
+      secret: true,
+    },
+  ),
+  SESSION_IDLE_TIMEOUT: variable(duration, {
+    group: 'BFF (finance-web)',
+    description:
+      'Expiración de la sesión por inactividad (`30m`, `1h`…). Se desliza como máximo una vez por minuto.',
+    default: '30m',
+  }),
+  SESSION_ABSOLUTE_TIMEOUT: variable(duration, {
+    group: 'BFF (finance-web)',
+    description: 'Duración máxima de la sesión desde el login, haya o no actividad (`12h`…).',
+    default: '12h',
   }),
   RATE_LIMIT_STORE: variable(z.enum(['memory', 'valkey']), {
     group: 'Convenciones de API',
@@ -405,15 +485,30 @@ export const APP_VARIABLES = {
     'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
   ],
-  // `migrate` también lee DATABASE_URL: asegura que el rol de la app (`pf_app`) tenga esa credencial.
+  // `migrate` también lee DATABASE_URL (y BFF_DATABASE_URL si existe): alinea las contraseñas de `pf_app`/`pf_bff`.
   migrate: [
     ...GENERAL,
     'DATABASE_MIGRATOR_URL',
     'DATABASE_URL',
+    'BFF_DATABASE_URL',
     ...OBJECT_STORAGE,
     'OBJECT_STORAGE_ENSURE_BUCKET',
     'OBJECT_STORAGE_CORS_ORIGINS',
   ],
-  seed: [...GENERAL, ...PRODUCT, ...DATABASE],
-  web: [...GENERAL],
+  // `seed` lee OIDC_ISSUER_URL para sembrar las identidades de la Minimal Seed (usuarios del realm de desarrollo).
+  seed: [...GENERAL, ...PRODUCT, ...DATABASE, 'OIDC_ISSUER_URL'],
+  web: [
+    ...GENERAL,
+    'WEB_PUBLIC_URL',
+    'FINANCE_API_URL',
+    'OIDC_ISSUER_URL',
+    'OIDC_DISCOVERY_URL',
+    'OIDC_CLIENT_ID',
+    'OIDC_CLIENT_SECRET',
+    'OIDC_SCOPES',
+    'BFF_DATABASE_URL',
+    'BFF_SESSION_ENC_KEY',
+    'SESSION_IDLE_TIMEOUT',
+    'SESSION_ABSOLUTE_TIMEOUT',
+  ],
 } as const satisfies Record<AppName, readonly VariableName[]>;

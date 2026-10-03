@@ -10,6 +10,21 @@ export type ErrorMessages = Readonly<Record<string, string>>;
  */
 export const ERROR_MESSAGES: Readonly<Record<'es' | 'en' | 'pt', ErrorMessages>> = { es, en, pt };
 
+/**
+ * Códigos propios del BFF (no forman parte del contrato de finance-api ni de su `ErrorCatalog`; design § Contratos).
+ */
+export const BFF_ERROR_MESSAGES: Readonly<Record<'es' | 'en' | 'pt', ErrorMessages>> = {
+  es: {
+    CSRF_REJECTED:
+      'No pudimos verificar que la solicitud venga de esta página. Recarga la página e inténtalo de nuevo.',
+  },
+  en: { CSRF_REJECTED: "We couldn't verify that the request came from this page. Reload and try again." },
+  pt: {
+    CSRF_REJECTED:
+      'Não conseguimos verificar que a solicitação veio desta página. Recarregue e tente novamente.',
+  },
+};
+
 /** Forma mínima de un Problem Details (RFC 9457) que la UI necesita. */
 export interface ProblemLike {
   readonly code?: unknown;
@@ -25,7 +40,14 @@ export const missingMessages = (codes: readonly string[], messages: ErrorMessage
  * genérico de `INTERNAL_ERROR`. Nunca devuelve `title` ni `detail` (inglés técnico).
  */
 export function problemMessage(problem: ProblemLike, locale: string): string {
-  const catalog = ERROR_MESSAGES[locale as keyof typeof ERROR_MESSAGES] ?? ERROR_MESSAGES.es;
+  const key = (locale in ERROR_MESSAGES ? locale : 'es') as keyof typeof ERROR_MESSAGES;
+  const catalog = ERROR_MESSAGES[key];
   const code = typeof problem.code === 'string' ? problem.code : 'INTERNAL_ERROR';
-  return catalog[code] ?? catalog['INTERNAL_ERROR'] ?? ERROR_MESSAGES.es['INTERNAL_ERROR'] ?? '';
+  return (
+    catalog[code] ??
+    BFF_ERROR_MESSAGES[key][code] ??
+    catalog['INTERNAL_ERROR'] ??
+    ERROR_MESSAGES.es['INTERNAL_ERROR'] ??
+    ''
+  );
 }

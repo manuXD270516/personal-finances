@@ -35,6 +35,11 @@ export interface UserRepository {
   savePreferences(user: User, expectedVersion: number): Promise<boolean>;
 }
 
+export interface WorkspacePageRequest {
+  readonly afterId?: string;
+  readonly limit?: number;
+}
+
 export interface WorkspaceSummary {
   readonly id: string;
   readonly name: string;
@@ -50,7 +55,8 @@ export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   /** Guarda configuración y membresías con control optimista; `false` si la versión cambió. */
   update(workspace: Workspace, expectedVersion: number): Promise<boolean>;
-  listForUser(userId: string): Promise<readonly WorkspaceSummary[]>;
+  /** Membresías activas del usuario ordenadas por id de workspace (keyset `id > afterId`, máx. `limit`). */
+  listForUser(userId: string, page?: WorkspacePageRequest): Promise<readonly WorkspaceSummary[]>;
 }
 
 /** Membresía activa por request (sin caché: una revocación tiene efecto inmediato). */

@@ -119,4 +119,38 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     );
     expect(err.problems.map((p) => p.variable)).toEqual(['OBJECT_STORAGE_CORS_ORIGINS']);
   });
+
+  it('finance-web exige emisor OIDC, almacén de sesiones con rol pf_bff y clave de cifrado; duraciones en ms', () => {
+    const missing = captureError(() => loadConfig('web', { PFOS_ENV: 'ci' }));
+    expect(missing.problems.map((p) => p.variable).sort()).toEqual(
+      [
+        'BFF_DATABASE_URL',
+        'BFF_SESSION_ENC_KEY',
+        'FINANCE_API_URL',
+        'OIDC_CLIENT_SECRET',
+        'OIDC_ISSUER_URL',
+        'WEB_PUBLIC_URL',
+      ].sort(),
+    );
+    const env = {
+      PFOS_ENV: 'ci',
+      WEB_PUBLIC_URL: 'https://app.example',
+      FINANCE_API_URL: 'http://finance-api:8080',
+      OIDC_ISSUER_URL: 'https://auth.example/realms/pfos',
+      OIDC_CLIENT_SECRET: 'client-secret-0123456789',
+      BFF_DATABASE_URL: 'postgres://pf_bff:s3cr3t-bff@db.internal:5432/pfos',
+      BFF_SESSION_ENC_KEY: `k1:${'a'.repeat(32)}`,
+    };
+    const config = loadConfig('web', env);
+    expect(config.SESSION_IDLE_TIMEOUT).toBe(30 * 60_000);
+    expect(config.SESSION_ABSOLUTE_TIMEOUT).toBe(12 * 3_600_000);
+    expect(config.OIDC_CLIENT_ID).toBe('pfos-web');
+    const wrongRole = captureError(() =>
+      loadConfig('web', { ...env, BFF_DATABASE_URL: 'postgres://pf_app:x@db.internal:5432/pfos' }),
+    );
+    expect(wrongRole.problems.map((p) => p.variable)).toEqual(['BFF_DATABASE_URL']);
+    const badKey = captureError(() => loadConfig('web', { ...env, BFF_SESSION_ENC_KEY: 'k1:corta' }));
+    expect(badKey.problems.map((p) => p.variable)).toEqual(['BFF_SESSION_ENC_KEY']);
+    expect(JSON.stringify(badKey.problems)).not.toContain('corta');
+  });
 });

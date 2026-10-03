@@ -14,9 +14,10 @@ invariants: []
 priority: high
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/web/test/integration/bff.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:
