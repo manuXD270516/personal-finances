@@ -12,9 +12,10 @@ invariants: [INV-019]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/test/integration/pg-classification.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [counterparties, archive]
@@ -33,7 +34,7 @@ expected_result:
 - Los 12 pagos siguen referenciando "Entel"
 - El historial de "Entel" sigue sumando 1,440.00 BOB
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-COUNTERPARTY-003 — Archivar una counterparty conserva sus transacciones

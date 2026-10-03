@@ -3314,81 +3314,82 @@ components:
         detail: { type: string }
     ErrorCode:
       description: Stable domain error code. Open set — clients must handle unknown values. Catalog in docs/10-api-design.md §9.1.
-      anyOf:
-        - type: string
-          enum:
-            # platform / api-conventions
-            - VALIDATION_FAILED                 # 400
-            - INVALID_CURSOR                    # 400
-            - INVALID_SORT                      # 400
-            - INVALID_FILTER                    # 400
-            - RESOURCE_NOT_FOUND                # 404
-            - CONCURRENCY_CONFLICT              # 409
-            - IDEMPOTENCY_REQUEST_IN_PROGRESS   # 409 + Retry-After
-            - PRECONDITION_FAILED               # 412
-            - PRECONDITION_REQUIRED             # 428
-            - IDEMPOTENCY_KEY_REQUIRED          # 428
-            - IDEMPOTENCY_KEY_REUSED            # 422
-            - REFERENCE_NOT_FOUND               # 422
-            - RATE_LIMITED                      # 429
-            - INTERNAL_ERROR                    # 500
-            - SERVICE_UNAVAILABLE               # 503
-            # identity / security
-            - UNAUTHENTICATED                   # 401
-            - WORKSPACE_ACCESS_DENIED           # 403 (not an active member)
-            - INSUFFICIENT_ROLE                 # 403 (role too low)
-            - INVALID_TIMEZONE                  # 422
-            - WORKSPACE_PENDING_DELETION        # 409 (later phase)
-            - LAST_OWNER_CANNOT_LEAVE           # 409 (later phase)
-            # money / ledger
-            - MONEY_INVALID_AMOUNT              # 422
-            - AMOUNT_OUT_OF_RANGE               # 422
-            - AMOUNT_SCALE_EXCEEDED             # 422
-            - AMOUNT_NOT_POSITIVE               # 422
-            - CURRENCY_MISMATCH                 # 422
-            - LEDGER_UNBALANCED_ENTRY           # 422
-            - LEDGER_ENTRY_TOO_FEW_POSTINGS     # 422
-            - LEDGER_ZERO_AMOUNT_POSTING        # 422
-            - LEDGER_SPLIT_REQUIRED             # 422
-            - LEDGER_ENTRY_ALREADY_REVERSED     # 409
-            - LEDGER_ENTRY_NOT_REVERSIBLE       # 409
-            - LEDGER_IMMUTABLE                  # 409 (DB immutability guard PF003, if surfaced)
-            - PERIOD_CLOSED                     # 409
-            # accounts
-            - ACCOUNT_ARCHIVED                  # 409
-            - ACCOUNT_CLOSED                    # 409
-            - ACCOUNT_BALANCE_NOT_ZERO          # 409
-            - ACCOUNT_CURRENCY_IMMUTABLE        # 409
-            - ACCOUNT_CURRENCY_KIND_MISMATCH    # 422
-            - ACCOUNT_NAME_TAKEN                # 409
-            - INSTITUTION_ARCHIVED              # 409
-            # transactions
-            - SPLITS_DO_NOT_SUM                 # 422
-            - INVALID_STATUS_TRANSITION         # 409
-            - TRANSACTION_RECONCILED            # 409
-            - REFUND_EXCEEDS_ORIGINAL           # 422
-            - TRANSFER_SAME_ACCOUNT             # 422
-            - TRANSFER_CURRENCY_MISMATCH        # 422 (+ suggestedOperationId)
-            - CONVERSION_SAME_CURRENCY          # 422
-            - CONVERSION_AMOUNTS_INCONSISTENT   # 422
-            # classification
-            - CATEGORY_ARCHIVED                 # 409
-            - TAG_ARCHIVED                      # 409
-            - COUNTERPARTY_ARCHIVED             # 409
-            - CATEGORY_KIND_MISMATCH            # 422
-            - CATEGORY_DEPTH_EXCEEDED           # 422
-            - CATEGORY_GROUP_NOT_EMPTY          # 409
-            - SYSTEM_CATEGORY_IMMUTABLE         # 409
-            - COUNTERPARTY_ALIAS_TAKEN          # 409
-            - NAME_TAKEN                        # 409 (+ existingId for counterparties)
-            # fx
-            - FX_RATE_NOT_FOUND                 # 422
-            - FX_RATE_ALREADY_SUPERSEDED        # 409
-            - FX_RATE_ANOMALY_ALREADY_REVIEWED  # 409
-            - FX_RATE_NOT_ANOMALOUS             # 422
-            - CURRENCY_NOT_ENABLED              # 422
-        - type: string
-          pattern: '^[A-Z][A-Z0-9_]*$'
+      type: string
+      pattern: '^[A-Z][A-Z0-9_]*$'
+      # x-extensible-enum (convención reconocida por oasdiff): el catálogo crece sin que agregar un código sea
+      # un cambio incompatible; los clientes DEBEN tolerar códigos desconocidos (docs/10 §9.1).
+      x-extensible-enum:
+        # platform / api-conventions
+        - VALIDATION_FAILED                 # 400
+        - INVALID_CURSOR                    # 400
+        - INVALID_SORT                      # 400
+        - INVALID_FILTER                    # 400
+        - RESOURCE_NOT_FOUND                # 404
+        - METHOD_NOT_ALLOWED                # 405 (DELETE sobre catálogos: archivar, docs/31 D7)
+        - CONCURRENCY_CONFLICT              # 409
+        - IDEMPOTENCY_REQUEST_IN_PROGRESS   # 409 + Retry-After
+        - PRECONDITION_FAILED               # 412
+        - PRECONDITION_REQUIRED             # 428
+        - IDEMPOTENCY_KEY_REQUIRED          # 428
+        - IDEMPOTENCY_KEY_REUSED            # 422
+        - REFERENCE_NOT_FOUND               # 422
+        - RATE_LIMITED                      # 429
+        - INTERNAL_ERROR                    # 500
+        - SERVICE_UNAVAILABLE               # 503
+        # identity / security
+        - UNAUTHENTICATED                   # 401
+        - WORKSPACE_ACCESS_DENIED           # 403 (not an active member)
+        - INSUFFICIENT_ROLE                 # 403 (role too low)
+        - INVALID_TIMEZONE                  # 422
+        - WORKSPACE_PENDING_DELETION        # 409 (later phase)
+        - LAST_OWNER_CANNOT_LEAVE           # 409 (later phase)
+        # money / ledger
+        - MONEY_INVALID_AMOUNT              # 422
+        - AMOUNT_OUT_OF_RANGE               # 422
+        - AMOUNT_SCALE_EXCEEDED             # 422
+        - AMOUNT_NOT_POSITIVE               # 422
+        - CURRENCY_MISMATCH                 # 422
+        - LEDGER_UNBALANCED_ENTRY           # 422
+        - LEDGER_ENTRY_TOO_FEW_POSTINGS     # 422
+        - LEDGER_ZERO_AMOUNT_POSTING        # 422
+        - LEDGER_SPLIT_REQUIRED             # 422
+        - LEDGER_ENTRY_ALREADY_REVERSED     # 409
+        - LEDGER_ENTRY_NOT_REVERSIBLE       # 409
+        - LEDGER_IMMUTABLE                  # 409 (DB immutability guard PF003, if surfaced)
+        - PERIOD_CLOSED                     # 409
+        # accounts
+        - ACCOUNT_ARCHIVED                  # 409
+        - ACCOUNT_CLOSED                    # 409
+        - ACCOUNT_BALANCE_NOT_ZERO          # 409
+        - ACCOUNT_CURRENCY_IMMUTABLE        # 409
+        - ACCOUNT_CURRENCY_KIND_MISMATCH    # 422
+        - ACCOUNT_NAME_TAKEN                # 409
+        - INSTITUTION_ARCHIVED              # 409
+        # transactions
+        - SPLITS_DO_NOT_SUM                 # 422
+        - INVALID_STATUS_TRANSITION         # 409
+        - TRANSACTION_RECONCILED            # 409
+        - REFUND_EXCEEDS_ORIGINAL           # 422
+        - TRANSFER_SAME_ACCOUNT             # 422
+        - TRANSFER_CURRENCY_MISMATCH        # 422 (+ suggestedOperationId)
+        - CONVERSION_SAME_CURRENCY          # 422
+        - CONVERSION_AMOUNTS_INCONSISTENT   # 422
+        # classification
+        - CATEGORY_ARCHIVED                 # 409
+        - TAG_ARCHIVED                      # 409
+        - COUNTERPARTY_ARCHIVED             # 409
+        - CATEGORY_KIND_MISMATCH            # 422
+        - CATEGORY_DEPTH_EXCEEDED           # 422
+        - CATEGORY_GROUP_NOT_EMPTY          # 409
+        - SYSTEM_CATEGORY_IMMUTABLE         # 409
+        - COUNTERPARTY_ALIAS_TAKEN          # 409
+        - NAME_TAKEN                        # 409 (+ existingId for counterparties)
+        # fx
+        - FX_RATE_NOT_FOUND                 # 422
+        - FX_RATE_ALREADY_SUPERSEDED        # 409
+        - FX_RATE_ANOMALY_ALREADY_REVIEWED  # 409
+        - FX_RATE_NOT_ANOMALOUS             # 422
+        - CURRENCY_NOT_ENABLED              # 422
 
     # ── Identity ──
     WorkspaceRole:

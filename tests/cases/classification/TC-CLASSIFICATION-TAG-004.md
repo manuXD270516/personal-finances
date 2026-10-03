@@ -12,9 +12,10 @@ invariants: [INV-019]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [tags, archive]
@@ -35,7 +36,7 @@ expected_result:
 - El gasto se rechaza con TAG_ARCHIVED
 - El tag no aparece en el listado por defecto
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-TAG-004 — Un tag archivado no puede añadirse a transacciones nuevas

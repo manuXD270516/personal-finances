@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [categories, hierarchy]
@@ -35,7 +36,7 @@ expected_result:
 - '"Luz" queda activa con tipo EXPENSE y grupo "Vivienda"'
 - '"Luz departamento" se rechaza con CATEGORY_DEPTH_EXCEEDED'
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-HIERARCHY-001 — Las subcategorías heredan grupo y tipo y no se permite un tercer nivel

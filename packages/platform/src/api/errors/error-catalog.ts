@@ -13,6 +13,7 @@ export const ERROR_CATALOG = {
   INVALID_SORT: { status: 400, title: 'Sort key not allowed' },
   INVALID_FILTER: { status: 400, title: 'Invalid filter' },
   RESOURCE_NOT_FOUND: { status: 404, title: 'Resource not found' },
+  METHOD_NOT_ALLOWED: { status: 405, title: 'Method not allowed on this resource' },
   CONCURRENCY_CONFLICT: { status: 409, title: 'Concurrent modification detected' },
   IDEMPOTENCY_REQUEST_IN_PROGRESS: {
     status: 409,

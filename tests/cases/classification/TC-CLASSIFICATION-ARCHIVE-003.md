@@ -12,9 +12,11 @@ invariants: [INV-019]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [archive, hierarchy]
@@ -33,7 +35,7 @@ expected_result:
 - Las transacciones de "Luz" (180.00 BOB) siguen referenciando "Luz"
 - Se emite un classification.CategoryArchived.v1 por cada categoría archivada
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-ARCHIVE-003 — Archivar una categoría archiva sus subcategorías sin tocar sus transacciones

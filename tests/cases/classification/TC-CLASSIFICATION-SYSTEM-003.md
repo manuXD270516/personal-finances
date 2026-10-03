@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/domain/domain.test.ts
+  - apps/api/test/api/classification.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [system-categories, i18n]
@@ -32,7 +34,7 @@ expected_result:
 - Ambos reciben el mismo id y systemCode FEES
 - El gasto de 12.00 BOB aparece bajo la misma categoría para ambos
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-SYSTEM-003 — El nombre de una categoría de sistema se muestra en el idioma del usuario

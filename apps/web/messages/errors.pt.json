@@ -4,6 +4,7 @@
   "INVALID_SORT": "A lista não pode ser ordenada dessa forma.",
   "INVALID_FILTER": "Um dos filtros não é válido. Revise-o e tente novamente.",
   "RESOURCE_NOT_FOUND": "Não encontramos o que você procura. Pode ter sido removido ou você não tem acesso.",
+  "METHOD_NOT_ALLOWED": "Esta ação não está disponível. Itens do catálogo não são excluídos: você pode arquivá-los.",
   "CONCURRENCY_CONFLICT": "Outra pessoa ou aba alterou este registro ao mesmo tempo. Recarregue e tente novamente.",
   "IDEMPOTENCY_REQUEST_IN_PROGRESS": "Sua solicitação anterior ainda está sendo processada. Aguarde um momento.",
   "PRECONDITION_FAILED": "Este registro mudou desde que você o abriu. Recarregue para ver a versão atual antes de salvar.",

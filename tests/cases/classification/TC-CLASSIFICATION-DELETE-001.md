@@ -12,9 +12,11 @@ invariants: [INV-019]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+  - apps/api/test/api/classification.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [archive, cross-context]
@@ -34,7 +36,7 @@ expected_result:
 - Ninguna porción referencia una categoría inexistente
 - La operación disponible para retirar una categoría es POST …/archive
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-DELETE-001 — No existe eliminación de categorías: la solicitud se rechaza y nada cambia

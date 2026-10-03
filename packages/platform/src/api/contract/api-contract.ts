@@ -180,11 +180,14 @@ export class ApiContract {
     return [...this.byRoute.values()];
   }
 
-  /** Códigos de `components.schemas.ErrorCode` (enum abierto del contrato). */
+  /** Códigos de `components.schemas.ErrorCode` (catálogo abierto: `x-extensible-enum`, o `enum` por compatibilidad). */
   errorCodes(): string[] {
     const errorCode = this.resolvePointer('/components/schemas/ErrorCode') as Json | undefined;
     const branches = (errorCode?.['anyOf'] as Json[] | undefined) ?? [errorCode ?? {}];
-    return branches.flatMap((b) => (Array.isArray(b['enum']) ? (b['enum'] as string[]) : []));
+    return branches.flatMap((b) => {
+      const values = b['x-extensible-enum'] ?? b['enum'];
+      return Array.isArray(values) ? (values as string[]) : [];
+    });
   }
 
   /** Valida una respuesta contra el schema declarado (contract testing del lado proveedor, docs/10 §1.4). */

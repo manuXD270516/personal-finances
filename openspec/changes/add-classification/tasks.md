@@ -5,41 +5,41 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar las specs `classification/categories`, `classification/tags` y `classification/counterparties` con el owner y resolver las preguntas abiertas de design.md (OPENING_BALANCE, provisión síncrona); verificar con `openspec validate add-classification --strict`
-- [ ] 1.2 Confirmar los TC MODIFICADOS (TC-CLASSIFICATION-ARCHIVE-001, -DELETE-001, -RECATEGORIZE-001) y los 24 AÑADIDOS en `tests/cases/classification/`; verificar que el chequeo del catálogo de trazabilidad los acepta y que todo requirement Must tiene ≥ 1 TC
+- [x] 1.2 Confirmar los TC MODIFICADOS (TC-CLASSIFICATION-ARCHIVE-001, -DELETE-001, -RECATEGORIZE-001) y los 24 AÑADIDOS en `tests/cases/classification/`; verificar que el chequeo del catálogo de trazabilidad los acepta y que todo requirement Must tiene ≥ 1 TC
 - [ ] 1.3 Redactar los TC de los requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia de categoría); verificar con el chequeo del catálogo
 
 ## 2. DOMAIN — categorías y grupos (TDD)
 
-- [ ] 2.1 Test-first: `NormalizedText` (mayúsculas, acentos, espacios) con tests unitarios y de propiedades; verificar que pasan
-- [ ] 2.2 Test-first: AR `CategoryGroup` y `Category` — tipo inmutable, profundidad ≤ 2 (`CATEGORY_DEPTH_EXCEEDED`), herencia de grupo/tipo, `CATEGORY_KIND_MISMATCH`, archivado en cascada, desarchivado con padre archivado; tests de dominio nombrados con TC-CLASSIFICATION-HIERARCHY-001, -KIND-001, -ARCHIVE-003
-- [ ] 2.3 Test-first: `SystemCategoryPolicy` y `SystemCategoryCatalog` (11 códigos, tipos, prohibiciones `SYSTEM_CATEGORY_IMMUTABLE`); tests nombrados con TC-CLASSIFICATION-SYSTEM-001, -SYSTEM-002
-- [ ] 2.4 Test-first: invariante INV-019 como test de propiedades (∀ secuencia crear/asignar/archivar/desarchivar: toda referencia resuelve a una categoría existente); verificar con TC-CLASSIFICATION-DELETE-001
+- [x] 2.1 Test-first: `NormalizedText` (mayúsculas, acentos, espacios) con tests unitarios y de propiedades; verificar que pasan
+- [x] 2.2 Test-first: AR `CategoryGroup` y `Category` — tipo inmutable, profundidad ≤ 2 (`CATEGORY_DEPTH_EXCEEDED`), herencia de grupo/tipo, `CATEGORY_KIND_MISMATCH`, archivado en cascada, desarchivado con padre archivado; tests de dominio nombrados con TC-CLASSIFICATION-HIERARCHY-001, -KIND-001, -ARCHIVE-003
+- [x] 2.3 Test-first: `SystemCategoryPolicy` y `SystemCategoryCatalog` (11 códigos, tipos, prohibiciones `SYSTEM_CATEGORY_IMMUTABLE`); tests nombrados con TC-CLASSIFICATION-SYSTEM-001, -SYSTEM-002
+- [x] 2.4 Test-first: invariante INV-019 como test de propiedades (∀ secuencia crear/asignar/archivar/desarchivar: toda referencia resuelve a una categoría existente); verificar con TC-CLASSIFICATION-DELETE-001
 
 ## 3. DOMAIN — tags y counterparties (TDD)
 
-- [ ] 3.1 Test-first: AR `Tag` (nombre normalizado único, archivado, desarchivado); tests nombrados con TC-CLASSIFICATION-TAG-001, -TAG-003
-- [ ] 3.2 Test-first: AR `Counterparty` y VO `Alias` (mínimo 3 caracteres, únicos), `CounterpartyMatcher` (subcadena normalizada, desempate por alias más largo, ignora archivadas); tests nombrados con TC-CLASSIFICATION-COUNTERPARTY-001, -ALIAS-001, -ALIAS-002
+- [x] 3.1 Test-first: AR `Tag` (nombre normalizado único, archivado, desarchivado); tests nombrados con TC-CLASSIFICATION-TAG-001, -TAG-003
+- [x] 3.2 Test-first: AR `Counterparty` y VO `Alias` (mínimo 3 caracteres, únicos), `CounterpartyMatcher` (subcadena normalizada, desempate por alias más largo, ignora archivadas); tests nombrados con TC-CLASSIFICATION-COUNTERPARTY-001, -ALIAS-001, -ALIAS-002
 
 ## 4. APPLICATION
 
-- [ ] 4.1 Casos de uso de categorías/grupos (crear, actualizar, mover, archivar, desarchivar, reordenar) con `AuditPort` y outbox de `classification.CategoryArchived.v1`; tests de aplicación con fakes nombrados con TC-CLASSIFICATION-CATEGORY-001, -RENAME-001, -ARCHIVE-001
-- [ ] 4.2 `ProvisionSystemCategories` (idempotente) cableado en la composición de `CreateWorkspace`; verificar que un workspace nuevo tiene exactamente las 11 categorías de sistema (TC-CLASSIFICATION-SYSTEM-001)
-- [ ] 4.3 `ApplyDefaultCategoryCatalog` + archivo de datos `default-catalog.es-BO.v1.json` con el catálogo de design.md §7; verificar idempotencia y conteos con TC-CLASSIFICATION-SEED-001
-- [ ] 4.4 Casos de uso de tags y counterparties (incl. creación inline con `existingId` en `NAME_TAKEN`) y queries `ResolveCounterparty`, `GetCategorySuggestion` (puerto `LastCategoryUsedQueryPort`); tests nombrados con TC-CLASSIFICATION-COUNTERPARTY-002, -TAG-005
-- [ ] 4.5 Query pública `ValidateClassification` (archivados, tipo, existencia) expuesta en `contracts` del paquete; tests nombrados con TC-CLASSIFICATION-ARCHIVE-002, -KIND-002, -TAG-004, -COUNTERPARTY-004
+- [x] 4.1 Casos de uso de categorías/grupos (crear, actualizar, mover, archivar, desarchivar, reordenar) con `AuditPort` y outbox de `classification.CategoryArchived.v1`; tests de aplicación con fakes nombrados con TC-CLASSIFICATION-CATEGORY-001, -RENAME-001, -ARCHIVE-001
+- [x] 4.2 `ProvisionSystemCategories` (idempotente) cableado en la composición de `CreateWorkspace`; verificar que un workspace nuevo tiene exactamente las 11 categorías de sistema (TC-CLASSIFICATION-SYSTEM-001)
+- [x] 4.3 `ApplyDefaultCategoryCatalog` + archivo de datos `default-catalog.es-BO.v1.json` con el catálogo de design.md §7; verificar idempotencia y conteos con TC-CLASSIFICATION-SEED-001
+- [x] 4.4 Casos de uso de tags y counterparties (incl. creación inline con `existingId` en `NAME_TAKEN`) y queries `ResolveCounterparty`, `GetCategorySuggestion` (puerto `LastCategoryUsedQueryPort`); tests nombrados con TC-CLASSIFICATION-COUNTERPARTY-002, -TAG-005
+- [x] 4.5 Query pública `ValidateClassification` (archivados, tipo, existencia) expuesta en `contracts` del paquete; tests nombrados con TC-CLASSIFICATION-ARCHIVE-002, -KIND-002, -TAG-004, -COUNTERPARTY-004
 
 ## 5. INFRASTRUCTURE
 
-- [ ] 5.1 Migración *expand* del schema `classification` (tablas, índices parciales, CHECKs, triggers de tipo/profundidad/sistema, RLS `ENABLE/FORCE`, grants sin `DELETE`) y migración de nombres i18n; verificar con test de migración sobre PG vacío y test de RLS/grants (Testcontainers)
-- [ ] 5.2 Repositorios PostgreSQL con optimistic locking y adaptador de outbox; tests de integración de repositorio nombrados con TC-CLASSIFICATION-ARCHIVE-001, -TAG-003, -COUNTERPARTY-003
-- [ ] 5.3 Adaptador `LastCategoryUsedQueryPort` contra el `contracts` de Transactions (stub hasta `add-transaction-recording`); verificar con test de integración
-- [ ] 5.4 Schema de evento `classification.CategoryArchived.v1` y test de contrato del productor; verificar que el payload valida contra el schema
+- [x] 5.1 Migración *expand* del schema `classification` (tablas, índices parciales, CHECKs, triggers de tipo/profundidad/sistema, RLS `ENABLE/FORCE`, grants sin `DELETE`) y migración de nombres i18n; verificar con test de migración sobre PG vacío y test de RLS/grants (Testcontainers)
+- [x] 5.2 Repositorios PostgreSQL con optimistic locking y adaptador de outbox; tests de integración de repositorio nombrados con TC-CLASSIFICATION-ARCHIVE-001, -TAG-003, -COUNTERPARTY-003
+- [x] 5.3 Adaptador `LastCategoryUsedQueryPort` contra el `contracts` de Transactions (stub hasta `add-transaction-recording`); verificar con test de integración
+- [x] 5.4 Schema de evento `classification.CategoryArchived.v1` y test de contrato del productor; verificar que el payload valida contra el schema
 
 ## 6. API
 
-- [ ] 6.1 Controladores REST de categorías, grupos, tags y counterparties según el contrato consolidado (incl. unarchive, reorder, apply-default-catalog, resolve, category-suggestion; 405 para `DELETE`); tests de API nombrados con TC-CLASSIFICATION-DELETE-001, -SYSTEM-002, -SYSTEM-003
-- [ ] 6.2 Resolución de nombres de categorías de sistema por locale del usuario; verificar con TC-CLASSIFICATION-SYSTEM-003
-- [ ] 6.3 Tests de contrato OpenAPI (respuestas validan contra el schema; códigos de error del catálogo) y autorización por rol (`VIEWER` no escribe)
+- [x] 6.1 Controladores REST de categorías, grupos, tags y counterparties según el contrato consolidado (incl. unarchive, reorder, apply-default-catalog, resolve, category-suggestion; 405 para `DELETE`); tests de API nombrados con TC-CLASSIFICATION-DELETE-001, -SYSTEM-002, -SYSTEM-003
+- [x] 6.2 Resolución de nombres de categorías de sistema por locale del usuario; verificar con TC-CLASSIFICATION-SYSTEM-003
+- [x] 6.3 Tests de contrato OpenAPI (respuestas validan contra el schema; códigos de error del catálogo) y autorización por rol (`VIEWER` no escribe)
 
 ## 7. Integración con Transactions (cuando exista `add-transaction-recording`)
 

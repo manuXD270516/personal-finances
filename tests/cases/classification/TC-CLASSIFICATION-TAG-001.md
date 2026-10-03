@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [tags]
@@ -33,7 +34,7 @@ expected_result:
 - '"Viaje Santa Cruz 2026" responde 201 activo con color "#1565C0"'
 - '"trabajo" responde 409 NAME_TAKEN'
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-TAG-001 — Crear un tag con color y rechazar un nombre equivalente ya activo

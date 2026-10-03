@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/classification/src/application/classification.service.test.ts
+  - packages/contexts/classification/test/integration/pg-classification.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [counterparties, alias]
@@ -33,7 +35,7 @@ expected_result:
 - La operación se rechaza con COUNTERPARTY_ALIAS_TAKEN
 - '"Yaigo" queda sin alias'
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-ALIAS-002 — Un alias no puede pertenecer a dos counterparties del workspace
