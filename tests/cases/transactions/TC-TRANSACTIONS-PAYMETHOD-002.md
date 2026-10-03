@@ -13,9 +13,10 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/transactions.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -36,7 +37,7 @@ expected_result:
 - paymentMethod es null
 - Cash queda en 80.00 BOB
 created: '2026-10-02'
-updated: '2026-10-02'
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-PAYMETHOD-002 — Una transacción sin medio de pago se registra normalmente

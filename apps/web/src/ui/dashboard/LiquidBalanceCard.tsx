@@ -21,6 +21,10 @@ export function rateForCurrency(summary: ReportSummary, currency: string): Resol
   );
 }
 
+/** Destino de "Registrar tasa X/Y": la pantalla de tasas con el par prellenado. */
+export const rateHref = (href: string, base: string, quote: string): string =>
+  `${href}${href.includes('?') ? '&' : '?'}${new URLSearchParams({ base, quote }).toString()}`;
+
 /**
  * Q1 "¿Cuánto dinero tengo?": dinero disponible consolidado en la moneda de reporte, totales líquidos por moneda
  * con la tasa usada y su fuente, y advertencia de montos no convertidos (sin 1:1 ni números inventados).
@@ -91,7 +95,7 @@ export function LiquidBalanceCard({
                       <span data-testid="unconverted-amount">{formatMoney(m, locale)}</span> ·{' '}
                       <span data-testid="register-rate-action">
                         {registerRateHref ? (
-                          <a href={registerRateHref}>
+                          <a href={rateHref(registerRateHref, m.currency, consolidated.currency)}>
                             {t('liquid.registerRate', { pair: `${m.currency}/${consolidated.currency}` })}
                           </a>
                         ) : (

@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: security
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/accounts/AccountsListView.test.tsx
+  - tests/e2e/specs/accounts.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "privacy"]
@@ -32,7 +34,7 @@ expected_result:
   - "Ni la base de datos, ni la auditoría, ni los eventos, ni los logs contienen \"DEMO-000123456789\""
   - "El valor de 9 caracteres por API se rechaza con VALIDATION_FAILED"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-MASK-001 — El identificador de la cuenta se conserva y muestra solo con sus últimos 4 caracteres

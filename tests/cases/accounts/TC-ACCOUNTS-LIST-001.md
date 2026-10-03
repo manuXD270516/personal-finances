@@ -12,9 +12,11 @@ invariants: [INV-012, INV-020]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/accounts/AccountsListView.test.tsx
+  - tests/e2e/specs/accounts.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "multi-currency", "fx"]
@@ -33,7 +35,7 @@ expected_result:
   - "Credit Card: balance 350.00 BOB presentado como adeudado; baseCurrencyBalance 350.00 BOB"
   - "Ningún equivalente se persiste; registrar luego una tasa USD→BOB 6.97 cambia el equivalente mostrado sin alterar transacciones históricas"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-LIST-001 — El listado de cuentas muestra el saldo en su moneda y el equivalente en BOB con fecha y fuente de la tasa

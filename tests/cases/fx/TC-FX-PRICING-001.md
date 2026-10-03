@@ -14,6 +14,7 @@ type: unit
 level: domain
 automation_status: automated
 automated_tests:
+  - apps/web/src/ui/fx/fx.test.tsx
   - packages/contexts/transactions/src/domain/conversion.test.ts
 status: automated
 regression_suite: true

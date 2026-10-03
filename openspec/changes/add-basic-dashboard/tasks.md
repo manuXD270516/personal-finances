@@ -45,6 +45,7 @@
 
 - [x] 6.1 Home: `LiquidBalanceCard` (por moneda + consolidado con tasa, `RateSourceBadge` "Fuente: paralelo.bo" con enlace y CC BY 4.0, vigencia, antigüedad e indicador de tasa obsoleta; advertencia de no convertibles), tarjetas de ingresos/gastos/ahorro con variación MoM (semántica `expense-up`, no solo color), `TopCategoriesWidget`, `NetWorthCard` con desglose; textos en español vía i18n y formato `es-BO`
   - Nota: `apps/web/src/ui/dashboard/*`; acciones "crear cuenta"/"registrar tasa" como texto (aún no hay páginas de cuentas ni tasas en la web).
+  - Nota (2026-10-03): las acciones "Crea tu primera cuenta" y "Registrar tasa X/BOB" ya son enlaces reales (`/cuentas/nueva` y `/fx?base=X&quote=BOB`).
 - [x] 6.2 Widgets de Q4, Q5, Q8 y Q9 en estado "no disponible aún" con acción sugerida; estados vacíos sin cuentas; skeletons < 1 s; verificar con tests de componentes
 
 ## 7. TESTS automatizados y E2E

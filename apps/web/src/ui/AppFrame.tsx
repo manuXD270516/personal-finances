@@ -51,6 +51,10 @@ export function AppFrame({ children }: { children: ReactNode }) {
         ) : null}
         <nav aria-label={t('nav')}>
           <a href={localized(locale, '/')}>{t('home')}</a> ·{' '}
+          <a href={localized(locale, '/transacciones')}>{t('transactions')}</a> ·{' '}
+          <a href={localized(locale, '/cuentas')}>{t('accounts')}</a> ·{' '}
+          <a href={localized(locale, '/fx')}>{t('fx')}</a> ·{' '}
+          <a href={localized(locale, '/clasificacion')}>{t('classification')}</a> ·{' '}
           <a href={localized(locale, '/configuracion')}>{t('settings')}</a> ·{' '}
           <a href={localized(locale, '/preferencias')}>{t('preferences')}</a> ·{' '}
           <a href={localized(locale, '/workspaces/nuevo')}>{t('newWorkspace')}</a>

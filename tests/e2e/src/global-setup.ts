@@ -7,6 +7,9 @@ import { ENV_FILE_VAR, createEnvFile, pnpm, processEnvFor, removeEnvFile } from 
  * - `PF_E2E_ENV_FILE=<ruta>`: reutiliza un stack ya levantado con ese `.env` (iteración local); no lo baja al final.
  * - `PF_STACK_PREBUILT_IMAGES=1`: no reconstruye imágenes (CI carga las del job `image` con FINANCE_*_IMAGE).
  * - `PF_E2E_KEEP_STACK=1`: deja el stack arriba al terminar (depuración); bajarlo con `pnpm stack:down`.
+ * - `PF_E2E_PROJECT=pfos-e2e-<x>` y `PF_E2E_PORT_PREFIX=3|5`: otro proyecto Compose y otros puertos (3xxxx/5xxxx) para
+ *   correr la suite en paralelo desde otro worktree; con `FINANCE_API_IMAGE`/`FINANCE_WEB_IMAGE` propios, las imágenes
+ *   tampoco se pisan.
  */
 export default async function globalSetup(): Promise<() => Promise<void>> {
   const reuse = process.env[ENV_FILE_VAR];

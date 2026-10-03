@@ -14,8 +14,9 @@ type: domain
 level: application
 automation_status: automated
 automated_tests:
-  - packages/contexts/transactions/src/domain/transfer.test.ts
   - packages/contexts/transactions/src/application/transfers.service.test.ts
+  - packages/contexts/transactions/src/domain/transfer.test.ts
+  - tests/e2e/specs/transfers.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -38,7 +39,7 @@ expected_result:
   - "Bank A 650.00 BOB; deuda de Credit Card 0.00 BOB; patrimonio sigue en 650.00 BOB"
   - "Gasto de marzo en Household sigue en 350.00 BOB (contado una sola vez)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CARDPAYMENT-001 — El pago de la tarjeta es una transferencia de activo a pasivo y no cuenta como gasto

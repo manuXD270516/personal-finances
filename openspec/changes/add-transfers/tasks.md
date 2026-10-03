@@ -31,11 +31,14 @@
 ## 6. UI
 
 - [ ] 6.1 Formulario de transferencia con comisión opcional y atajo "Pagar tarjeta"; ante `TRANSFER_CURRENCY_MISMATCH` ofrecer abrir el formulario de conversión prellenado; verificar axe sin violaciones serious/critical y viewport 360 px
+  - Nota (2026-10-03): formulario hecho (`apps/web/src/ui/transactions/TransferForm.tsx`, `/transferencias/nueva` y atajo "Pagar tarjeta" `?pagoTarjeta=1` con la deuda de la tarjeta y "Pagar el total"); con monedas distintas no permite registrar y ofrece la conversión prellenada (también ante `TRANSFER_CURRENCY_MISMATCH`). Viewport 360 px verificado en E2E; pendiente la verificación con axe.
 
 ## 7. AUTOMATED TESTS y E2E
 
-- [ ] 7.1 Asegurar un test con `[TC-…]` por cada TC del change y actualizar `automation_status`/`automated_tests`; verificar en la matriz de trazabilidad
-- [ ] 7.2 E2E Playwright del ejemplo canónico (A 1000.00 BOB → B 300.00 BOB) y del pago de tarjeta, comprobando saldos y patrimonio en el dashboard; verificar en CI con el stack `core`
+- [x] 7.1 Asegurar un test con `[TC-…]` por cada TC del change y actualizar `automation_status`/`automated_tests`; verificar en la matriz de trazabilidad
+  - Nota (2026-10-03): todos los TC del change (TC-TRANSACTIONS-TRANSFER-001..008, TC-TRANSACTIONS-CARDPAYMENT-001, TC-LEDGER-TRANSFER-001) están `automated`; la UI agregó cobertura E2E a TRANSFER-001, -007, -008 y CARDPAYMENT-001.
+- [x] 7.2 E2E Playwright del ejemplo canónico (A 1000.00 BOB → B 300.00 BOB) y del pago de tarjeta, comprobando saldos y patrimonio en el dashboard; verificar en CI con el stack `core`
+  - Nota (2026-10-03): `tests/e2e/specs/transfers.spec.ts` (A 1000.00 → B 300.00 por QR, pago de tarjeta con QR, saldos y patrimonio en el Home; orientación a conversión); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 
 ## 8. DOCUMENTACIÓN y cierre
 

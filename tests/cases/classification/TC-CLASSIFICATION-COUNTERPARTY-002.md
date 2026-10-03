@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/transactions.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [counterparties, ui]
@@ -38,7 +39,7 @@ expected_result:
 - '"Panadería Don Pepe" queda activa con kind OTHER y el gasto de 35.00 BOB la referencia'
 - La segunda creación responde 409 NAME_TAKEN con existingId de "Hipermaxi" y la UI la selecciona
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-CLASSIFICATION-COUNTERPARTY-002 — Crear una counterparty inline desde el formulario y usarla en el mismo gasto

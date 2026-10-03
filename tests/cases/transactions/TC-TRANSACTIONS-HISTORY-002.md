@@ -15,9 +15,10 @@ invariants:
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - tests/e2e/specs/transactions.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -41,7 +42,7 @@ expected_result:
 - El VIEWER obtiene el historial con actor, fecha y cambio 120.00 BOB -> 102.00 BOB
 - No aparecen registros de otras entidades ni de otros workspaces
 created: '2026-10-02'
-updated: '2026-10-02'
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-HISTORY-002 — Un VIEWER ve el historial de una transacción que puede ver

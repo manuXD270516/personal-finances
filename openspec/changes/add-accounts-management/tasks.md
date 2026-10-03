@@ -40,18 +40,23 @@
 - [x] 6.1 TDD en `apps/api`: `OpenAccountWithOpeningBalance` (unidad de trabajo, idempotencia, `RecordOpeningBalance`, signo de pasivos); tests `[TC-ACCOUNTS-OPENING-001]` con montos de docs/09 §6.7 y 100.000000 USDT
 - [x] 6.2 Atomicidad e idempotencia con Testcontainers: `[TC-ACCOUNTS-OPENING-002]` (escala inválida ⇒ nada persistido), `[TC-ACCOUNTS-OPENING-003]` (reintento ⇒ una cuenta, un asiento)
 - [ ] 6.3 Integración real con Ledger: `[TC-ACCOUNTS-LEDGERLINK-001]`, `[TC-ACCOUNTS-BALANCE-001]`, `[TC-ACCOUNTS-CURRENCY-001]`, `[TC-ACCOUNTS-ARCHIVE-002]` contra Transactions real (incluye anulación ⇒ `ACCOUNT_ARCHIVED`)
-- [ ] 6.4 Con `add-transfers` y `add-basic-dashboard`: `[TC-ACCOUNTS-CREDITCARD-001]`, `[TC-ACCOUNTS-NETWORTH-001]` y liquidez en el resumen
+- [x] 6.4 Con `add-transfers` y `add-basic-dashboard`: `[TC-ACCOUNTS-CREDITCARD-001]`, `[TC-ACCOUNTS-NETWORTH-001]` y liquidez en el resumen
+  - Nota (2026-10-03): cubierto por E2E: `tests/e2e/specs/transfers.spec.ts` (tarjeta: compra, pago y patrimonio, TC-ACCOUNTS-CREDITCARD-001) y `tests/e2e/specs/accounts.spec.ts` (cuenta excluida del patrimonio, TC-ACCOUNTS-NETWORTH-001; liquidez en "¿Cuánto dinero tengo?", TC-ACCOUNTS-LIQUIDITY-001); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 
 ## 7. UI
 
-- [ ] 7.1 Pantalla Cuentas: listado agrupable/filtrable con saldo, equivalente BOB (fecha/fuente de tasa o "sin tasa"), pasivos como "adeuda", archivadas ocultas por defecto; textos vía i18n `es` (preparado `en`, `pt`); verificar con tests de componente
-- [ ] 7.2 Formularios crear/editar cuenta (tipo inmutable al editar, recorte del identificador a 4 caracteres en el cliente, saldo inicial con validación de escala por moneda, liquidez con default por tipo); acciones archivar/cerrar/reactivar con confirmación; pestaña "Historial" de add-audit-trail
+- [x] 7.1 Pantalla Cuentas: listado agrupable/filtrable con saldo, equivalente BOB (fecha/fuente de tasa o "sin tasa"), pasivos como "adeuda", archivadas ocultas por defecto; textos vía i18n `es` (preparado `en`, `pt`); verificar con tests de componente
+  - Nota (2026-10-03): `apps/web/src/ui/accounts/AccountsPage.tsx` + `AccountsListView.tsx` (ruta `/cuentas`): filtros por tipo, moneda, estado e institución, agrupación por tipo/institución, "mostrar archivadas"; tests de componente en `AccountsListView.test.tsx`. Textos en `messages/{es,en,pt}.json` (namespace `Accounts`).
+- [x] 7.2 Formularios crear/editar cuenta (tipo inmutable al editar, recorte del identificador a 4 caracteres en el cliente, saldo inicial con validación de escala por moneda, liquidez con default por tipo); acciones archivar/cerrar/reactivar con confirmación; pestaña "Historial" de add-audit-trail
+  - Nota (2026-10-03): `AccountForm.tsx` (alta `/cuentas/nueva` y edición con `If-Match`; el identificador se recorta a 4 caracteres al salir del campo y solo se envía `accountNumberLast4`), `AccountDetail.tsx` (`/cuentas/{id}`: archivar/cerrar/reactivar con confirmación `alertdialog` y pestaña Historial reutilizando `AuditHistory`).
 - [ ] 7.3 Pantalla Instituciones (crear/editar/archivar, icono/color); verificar con axe sin violaciones serias
+  - Nota (2026-10-03): pantalla mínima hecha (`InstitutionsPage.tsx`, `/instituciones`: crear con icono/color, renombrar, archivar); falta la verificación con axe (el repo aún no tiene `@axe-core/playwright`).
 
 ## 8. Tests automatizados y E2E
 
 - [ ] 8.1 Ejecutar en CI todos los tests nombrados con TC-ids de `tests/cases/accounts/` (unit, aplicación, integración Testcontainers, API, contrato); agregar los críticos a la Financial Regression Suite
-- [ ] 8.2 E2E Playwright: crear "Banco BOB" con 10000.00 BOB y "Visa BOB" adeudando 2000.00 BOB, ver patrimonio 8000.00 BOB, archivar y reactivar una cuenta; verificar contra Compose `core` con la Minimal Seed
+- [x] 8.2 E2E Playwright: crear "Banco BOB" con 10000.00 BOB y "Visa BOB" adeudando 2000.00 BOB, ver patrimonio 8000.00 BOB, archivar y reactivar una cuenta; verificar contra Compose `core` con la Minimal Seed
+  - Nota (2026-10-03): `tests/e2e/specs/accounts.spec.ts` (Banco BOB 10.000,00 + Visa BOB adeudando 2.000,00 ⇒ patrimonio 8.000,00 BOB en el Home; archivar y reactivar la Visa; identificador enmascarado; móvil 360 px); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 
 ## 9. Documentación y cierre
 

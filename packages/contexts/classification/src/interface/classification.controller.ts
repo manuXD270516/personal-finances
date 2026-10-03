@@ -287,6 +287,9 @@ export class ClassificationController {
     @Res({ passthrough: true }) res: ApiResponse,
   ) {
     const user = userId(req);
+    // El locale se lee ANTES del comando: su unidad de trabajo (sin workspace) dentro de la transacción de
+    // idempotencia dejaba esa transacción sin contexto RLS y `complete` fallaba con 500.
+    const locale = await this.locales.localeOf(user);
     const c = await mapped(() =>
       this.service.createCategory(user, ws, {
         ...pick(body, ['id', 'parentId', 'icon', 'color', 'sortOrder']),
@@ -295,7 +298,7 @@ export class ClassificationController {
       }),
     );
     res.setHeader('location', `/api/v1/workspaces/${ws}/categories/${c.id}`);
-    return categoryDto(c, await this.locales.localeOf(user));
+    return categoryDto(c, locale);
   }
 
   @Post(`${WS}/categories/reorder`)

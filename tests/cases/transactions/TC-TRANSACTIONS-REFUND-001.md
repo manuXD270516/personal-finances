@@ -16,6 +16,7 @@ automation_status: automated
 automated_tests:
   - packages/contexts/transactions/src/application/transactions.service.test.ts
   - packages/contexts/transactions/src/domain/transaction.test.ts
+  - tests/e2e/specs/transactions.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -39,7 +40,7 @@ expected_result:
   - "Ingresos de marzo sin cambios"
   - "Saldo de Bank A = 850.00 BOB"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-REFUND-001 — El reembolso reduce el gasto de la categoría original y no es un ingreso

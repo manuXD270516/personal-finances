@@ -50,7 +50,9 @@
 ## 8. UI
 
 - [ ] 8.1 Pantalla de categorías (árbol grupo → categoría → subcategoría, icono, color, arrastrar para reordenar, archivar/desarchivar, filtro de archivadas, categorías de sistema marcadas como protegidas); verificar con tests de componentes
+  - Nota (2026-10-03): solo lo mínimo para los selectores (`apps/web/src/ui/classification/ClassificationPage.tsx`, `/clasificacion`): árbol grupo → categoría → subcategoría, crear, archivar/desarchivar, filtro de archivadas, sistema protegidas y "aplicar catálogo sugerido". Falta: icono/color, arrastrar para reordenar y tests de componentes.
 - [ ] 8.2 Pantallas de tags y counterparties (alias, categoría por defecto) y selectores que excluyen archivados; creación inline de counterparty en el formulario de transacción con manejo de `NAME_TAKEN` → seleccionar la existente; verificar con tests de componentes
+  - Nota (2026-10-03): hecho: tags y contrapartes (crear, archivar, desarchivar), selectores sin archivados y creación en línea de contraparte con `NAME_TAKEN` → selecciona la existente (E2E en `tests/e2e/specs/transactions.spec.ts`, TC-CLASSIFICATION-COUNTERPARTY-002). Falta: alias y categoría por defecto en la pantalla, tests de componentes.
 - [ ] 8.3 Paso opcional "cargar catálogo sugerido" en la creación del workspace y acción "aplicar catálogo sugerido"; textos en catálogos i18n `es` (y claves para `en`/`pt`)
 
 ## 9. AUTOMATED TESTS y E2E

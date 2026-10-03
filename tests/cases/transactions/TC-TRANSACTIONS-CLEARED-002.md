@@ -15,6 +15,7 @@ level: api
 automation_status: automated
 automated_tests:
   - packages/contexts/transactions/src/application/transactions.service.test.ts
+  - tests/e2e/specs/transactions.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -34,7 +35,7 @@ expected_result:
   - "Segundo lote: 409 INVALID_STATUS_TRANSITION con errors[] apuntando a V; A y B siguen posted"
   - "Una versión obsoleta en cualquier ítem rechaza el lote completo con PRECONDITION_FAILED"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CLEARED-002 — El marcado de cleared en lote es atómico y se audita con un identificador común

@@ -14,8 +14,9 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
-  - packages/contexts/accounts/src/domain/account.test.ts
   - apps/api/test/api/accounts.api.test.ts
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - tests/e2e/specs/accounts.spec.ts
 status: automated
 regression_suite: false
 phase: 1
