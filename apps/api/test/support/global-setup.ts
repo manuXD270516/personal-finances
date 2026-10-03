@@ -34,6 +34,8 @@ function withCredentials(url: string, user: string, password: string): string {
 export interface Dependencies {
   /** Rol de la app (`pf_app`, sin BYPASSRLS ni DDL), igual que en Compose y cloud. */
   readonly databaseUrl: string;
+  /** Rol del BFF (`pf_bff`, grants solo sobre `iam.bff_session`), igual que en Compose. */
+  readonly bffDatabaseUrl: string;
   /** Rol propietario de migraciones (`pf_migrator`). */
   readonly migratorUrl: string;
   readonly postgresHost: string;
@@ -95,6 +97,7 @@ export default async function setup(project: TestProject) {
   const s3Endpoint = `http://${s3.getHost()}:${s3.getMappedPort(8333)}`;
   const migratorUrl = withCredentials(pg.getConnectionUri(), 'pf_migrator', randomBytes(18).toString('hex'));
   const databaseUrl = withCredentials(pg.getConnectionUri(), 'pf_app', randomBytes(18).toString('hex'));
+  const bffDatabaseUrl = withCredentials(pg.getConnectionUri(), 'pf_bff', randomBytes(18).toString('hex'));
   await bootstrapMigratorRole(pg.getConnectionUri(), new URL(migratorUrl).password);
   // El comando `migrate` real: dbmate (binario del host) + rol pf_app + pg-boss + bucket.
   await runMigrate(
@@ -103,6 +106,7 @@ export default async function setup(project: TestProject) {
       LOG_LEVEL: 'warn',
       DATABASE_MIGRATOR_URL: migratorUrl,
       DATABASE_URL: databaseUrl,
+      BFF_DATABASE_URL: bffDatabaseUrl,
       OBJECT_STORAGE_ENDPOINT: s3Endpoint,
       OBJECT_STORAGE_BUCKET: bucket,
       OBJECT_STORAGE_ACCESS_KEY: s3AccessKey,
@@ -114,6 +118,7 @@ export default async function setup(project: TestProject) {
 
   project.provide('deps', {
     databaseUrl,
+    bffDatabaseUrl,
     migratorUrl,
     postgresHost: pg.getHost(),
     postgresPort: pg.getPort(),

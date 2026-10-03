@@ -227,6 +227,7 @@ Content-Type: application/json
 | platform | `REFERENCE_NOT_FOUND` | 422 | Un ID del body no existe en el workspace |
 | platform | `RATE_LIMITED` | 429 | Límite excedido |
 | platform | `INTERNAL_ERROR` / `SERVICE_UNAVAILABLE` | 500 / 503 | Error inesperado / dependencia caída |
+| identity | `INVALID_TIMEZONE` | 422 | Zona horaria que no es un identificador IANA válido (`PATCH /me`, workspaces) |
 | identity | `WORKSPACE_PENDING_DELETION` | 409 | Workspace en borrado; solo lectura |
 | identity | `LAST_OWNER_CANNOT_LEAVE` | 409 | Debe existir un OWNER |
 | accounts | `ACCOUNT_ARCHIVED` | 409 | La cuenta archivada no admite movimientos |

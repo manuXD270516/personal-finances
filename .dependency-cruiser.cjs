@@ -38,7 +38,14 @@ module.exports = {
       severity: 'error',
       comment: 'domain solo puede importar su propio domain y @pf/shared-kernel.',
       from: { path: `${CTX}domain/` },
-      to: { pathNot: ['^packages/contexts/$1/src/domain/', '^packages/shared-kernel/src/'] },
+      // vitest: los tests de dominio (`*.test.ts`) importan el runner; no es una dependencia del modelo.
+      to: {
+        pathNot: [
+          '^packages/contexts/$1/src/domain/',
+          '^packages/shared-kernel/src/',
+          '(^|/node_modules/)vitest(/|$)',
+        ],
+      },
     },
     {
       name: 'application-no-infra',
@@ -115,7 +122,9 @@ module.exports = {
     // OJO (SPIKE-04, R4): NO excluir node_modules aquí. `exclude` elimina también las aristas y
     // `domain-no-framework` dejaría de dispararse en silencio. `doNotFollow` basta.
     exclude: {
-      path: '(^|/)(dist|\\.next|\\.turbo|coverage|fixtures)/|(^|/)next-env\\.d\\.ts$',
+      // Sin tocar node_modules: paquetes cuyo entry point vive en `dist/` (p. ej. kysely) deben seguir siendo
+      // aristas visibles para `domain-no-framework`.
+      path: '^(apps|packages|packages/contexts|scripts|spikes)/[^/]+/(dist|\\.next|\\.turbo|coverage)/|^(\\.turbo|coverage)/|(^|/)fixtures/|(^|/)next-env\\.d\\.ts$',
     },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.base.json' },

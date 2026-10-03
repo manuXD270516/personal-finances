@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration --concurrency=1",
+    "test:e2e": "pnpm --filter @pf/e2e run test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "spec:validate": "cross-env OPENSPEC_TELEMETRY=0 DO_NOT_TRACK=1 OPENSPEC_NO_UPDATE_CHECK=1 openspec validate --all --strict --no-interactive",

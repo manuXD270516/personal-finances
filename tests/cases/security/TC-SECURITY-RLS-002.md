@@ -14,9 +14,10 @@ invariants:
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:

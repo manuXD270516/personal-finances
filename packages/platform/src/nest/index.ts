@@ -31,5 +31,6 @@ export {
   setPrincipal,
   type ApiRequest,
   type ApiRequestState,
+  type ApiResponse,
   type Principal,
 } from './api/request-context.js';

@@ -19,6 +19,22 @@ const noProcessEnv = {
   ],
 };
 
+/**
+ * ADR-0023 / NFR-SEC-004 (TC-SECURITY-RLS-003): el contexto RLS solo se fija con alcance de transacción
+ * (`SET LOCAL` / `set_config(..., true)`, vía `PgUnitOfWork`). Un `SET app.*` de sesión o `set_config(..., false)`
+ * filtra el workspace entre requests de un pool.
+ */
+const SESSION_SET = String.raw`/\bSET\s+(SESSION\s+)?app\.|set_config\(\s*'app\.[a-z_]+'\s*,[^)]*,\s*false\s*\)/i`;
+const SESSION_SET_MESSAGE =
+  'Contexto RLS de sesión prohibido: usa SET LOCAL / set_config(..., true) vía PgUnitOfWork (ADR-0023, NFR-SEC-004).';
+const noSessionRlsContext = {
+  'no-restricted-syntax': [
+    'error',
+    { selector: `Literal[value=${SESSION_SET}]`, message: SESSION_SET_MESSAGE },
+    { selector: `TemplateElement[value.raw=${SESSION_SET}]`, message: SESSION_SET_MESSAGE },
+  ],
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -28,6 +44,8 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/coverage/**',
       '**/.stryker-tmp/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
       '**/next-env.d.ts',
       'spikes/**',
       'docs/**',
@@ -51,6 +69,7 @@ export default tseslint.config(
       'no-console': 'error',
       eqeqeq: ['error', 'always'],
       ...noProcessEnv,
+      ...noSessionRlsContext,
     },
   },
   {
@@ -66,6 +85,12 @@ export default tseslint.config(
   {
     // Tooling y tests: pueden leer el entorno (Testcontainers, CI) y escribir en consola.
     files: ['**/*.config.{ts,js,mjs}', 'scripts/**', '**/test/**', '**/*.test.ts'],
+    rules: { 'no-restricted-properties': 'off', 'no-console': 'off', 'no-restricted-syntax': 'off' },
+  },
+  {
+    // E2E (Playwright): leen el `.env` desechable del stack `pfos-e2e` y ejecutan código en el navegador.
+    files: ['tests/e2e/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: { 'no-restricted-properties': 'off', 'no-console': 'off' },
   },
   {

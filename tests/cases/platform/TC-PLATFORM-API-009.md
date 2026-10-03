@@ -21,6 +21,7 @@ automated_tests:
 - apps/api/test/db/idempotency-key.int.test.ts
 - packages/platform/src/api/idempotency/policy.test.ts
 - apps/web/src/bff/finance-api-client.test.ts
+- tests/e2e/specs/api-conventions.spec.ts
 status: automated
 regression_suite: true
 phase: 1

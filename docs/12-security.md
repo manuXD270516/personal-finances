@@ -111,8 +111,39 @@ sequenceDiagram
 - **Cookie**: prefijo `__Host-`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, sin `Domain`. Rotación del `sid` en login y elevación de privilegio.
 - **CSRF**: SameSite=Lax bloquea la mayoría; además *synchronizer token* (`X-CSRF-Token` derivado de `csrfSecret` de la sesión) obligatorio en métodos no seguros y verificación de `Origin`/`Sec-Fetch-Site`. Las rutas BFF solo aceptan `application/json` (no forms simples).
 - **Logout**: borra sesión server-side, revoca refresh token en el IdP, RP-initiated logout (`end_session_endpoint`).
+- **Implementación (as-built, `add-workspace-identity`)** — `apps/web/src/bff/` (`Bff`, sin dependencias de Next; las
+  route handlers solo delegan):
+  - Rutas: `GET /api/bff/auth/login?returnTo=…`, `GET /api/bff/auth/callback`, `POST /api/bff/auth/logout`,
+    `GET|PUT /api/bff/session` (token CSRF y workspace activo; nunca tokens OAuth) y el proxy
+    `/api/bff/v1/*` → `finance-api /api/v1/*` con `Authorization: Bearer`. Rutas internas de `finance-web`: no
+    forman parte del contrato de `finance-api`.
+  - El registro pre-sesión (`kind = 'PENDING_LOGIN'`, TTL 10 min, de un solo uso: se borra al consumirlo) se liga
+    al navegador con una segunda cookie opaca `__Host-pfos_login` (mismos atributos, `Max-Age=600`): un `state`
+    reutilizado o nunca emitido, o un callback sin esa cookie, terminan en la página de error en español
+    (`/auth/error?reason=state`) sin crear sesión (CSRF de login).
+  - Tras el canje del código, el BFF llama a `GET /api/v1/me` con el access token (provisión JIT del usuario y su
+    workspace personal) y guarda el `userId`; un fallo (p. ej. email no verificado) termina en
+    `/auth/error?reason=provision` y revoca el refresh token.
+  - Cifrado: `BFF_SESSION_ENC_KEY` = `[kid:]secreto[,kid:secreto…]` (sin `kid` ⇒ `k0`); de cada secreto se deriva la clave AES-256-GCM
+    con HKDF-SHA256 (rotación por `kid`: la primera cifra, todas descifran). El AAD liga cada blob a su fila y
+    columna (`<id>:tokens|csrf|login`).
+  - Expiración con el reloj del BFF: `SESSION_IDLE_TIMEOUT` (30 min, se desliza como máximo una vez por minuto) y
+    `SESSION_ABSOLUTE_TIMEOUT` (12 h). Sesión expirada, cerrada o con refresh rechazado (`invalid_grant`) ⇒ se borra
+    la fila y la respuesta es `401 application/problem+json` con `code: UNAUTHENTICATED` (la página muestra "sesión
+    expirada" y pide un nuevo login).
+  - Refresh de un solo vuelo: promesa compartida por sesión en el proceso + `pg_advisory_xact_lock(
+    hashtextextended(id::text, 0))` con relectura de los tokens bajo el bloqueo (dos réplicas del BFF hacen un solo
+    refresh; TC-IDENTITY-SESSION-001). Ante un 401 de la API se fuerza un único refresh y se reintenta una vez (la
+    API rechaza la autenticación antes de ejecutar nada).
+  - CSRF: `Origin` (o `Sec-Fetch-Site: same-origin`) igual a `WEB_PUBLIC_URL` y tipo de cuerpo
+    `application/json`/`application/merge-patch+json` se verifican **antes** de cargar la sesión; luego
+    `X-CSRF-Token = HMAC-SHA256(csrfSecret, sid)`. Fallo ⇒ `403` con `code: CSRF_REJECTED` (código propio del BFF,
+    con mensaje en el catálogo de la UI) y nada se reenvía a la API. El logout también exige Origin + token.
+  - En Compose (modo B) el BFF hace el discovery por el back-channel (`OIDC_DISCOVERY_URL=http://keycloak:8080/…`)
+    y exige que el documento declare el emisor público `OIDC_ISSUER_URL`; finance-api lee el JWKS por
+    `OIDC_JWKS_URI` interno y valida `iss` contra la URL pública.
 - **Re-autenticación reciente** (`auth_time` ≤ 10 min, o `max_age` en nueva autorización) para acciones sensibles: exportar workspace, solicitar borrado, cambiar roles, crear conexiones bancarias.
-- Local: Keycloak con realm `pfos` importado; usuarios de prueba con contraseñas **solo** en el realm de dev (nunca reutilizadas).
+- Local: Keycloak con realm `pfos` importado (`deploy/compose/keycloak/realm-pfos-dev.json`: client `pfos-web`, scope `pfos.api` con audiencia `finance-api`, access token 5 min, `refreshTokenMaxReuse=0`); usuarios de prueba de la Minimal Seed (`owner`, `editor`, `viewer`, `outsider` @demo.pfos.test) con contraseñas aleatorias generadas por `pnpm setup:env` en el `.env` local (nunca reutilizadas ni versionadas). Ver [19-local-development.md](19-local-development.md).
 
 ### 3.1 Validación de JWT en `finance-api`
 
@@ -161,7 +192,7 @@ sequenceDiagram
 | `pf_migrator` | Migraciones (contenedor `migrate`, pipeline) | Owner de schemas/tablas; no `SUPERUSER`; credencial distinta, solo disponible en el job de migración |
 | `pf_app` | Proceso `api` | `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`; grants DML mínimos por tabla; sin DDL |
 | `pf_worker` | Proceso `worker` | Igual a `pf_app` + políticas del relay de outbox y escritura de read models |
-| `pf_bff` | BFF (`finance-web`): store de sesiones | `LOGIN NOSUPERUSER NOBYPASSRLS`; `SELECT/INSERT/UPDATE/DELETE` **solo** sobre `iam.bff_session`; sin acceso a tablas de negocio; credencial separada |
+| `pf_bff` | BFF (`finance-web`): store de sesiones | `LOGIN NOSUPERUSER NOBYPASSRLS`; `SELECT/INSERT/UPDATE/DELETE` **solo** sobre `iam.bff_session`; sin acceso a tablas de negocio; credencial separada (`BFF_DATABASE_URL`; `migrate` alinea su contraseña) |
 | `pf_maintenance` | Purgas por retención (incl. sesiones expiradas de `iam.bff_session`) | DELETE solo en tablas técnicas/purgables |
 | `pf_purge` | Borrado de workspace a pedido del usuario (función `SECURITY DEFINER`) | Único que desactiva triggers de inmutabilidad dentro de la función; auditado |
 | `pf_backup` | Dumps lógicos | `BYPASSRLS`, solo lectura, usado únicamente por el job de backup |

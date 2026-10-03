@@ -1,4 +1,4 @@
-# PR gate (platform/delivery-pipeline, docs/23 §5.1 y §6). Todos los jobs son checks requeridos en `main`
+# PR gate (platform/delivery-pipeline, docs/23 §5.1 y §6). Todos los jobs salvo `e2e` son checks requeridos en `main`
 # (lista en docs/23 §16). Acciones de terceros fijadas por SHA de commit completo; binarios (Trivy, gitleaks)
 # por versión + SHA-256 verificado. El comentario junto a cada SHA es el tag de origen verificado.
 name: pr
@@ -225,6 +225,42 @@ jobs:
         run: for f in "$RUNNER_TEMP"/images/*.tar; do docker load -i "$f"; done
       # TC-PLATFORM-STACK-*: perfil core healthy, migrate, reset+seed, backup/restore… (tarea 4.3 en Linux).
       - run: pnpm test:stack
+
+  # E2E con Playwright (Chromium) contra el stack Compose desechable `pfos-e2e` con Keycloak real (add-workspace-
+  # identity, grupo 9). Prueba las imágenes construidas UNA vez por el job `image` (sin reconstruir). Aún NO es un
+  # check requerido de `main` (docs/23 §16: pendiente de agregar a la protección de rama).
+  e2e:
+    needs: [image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PF_STACK_PREBUILT_IMAGES: '1'
+      FINANCE_API_IMAGE: pfos/finance-api:ci
+      FINANCE_WEB_IMAGE: pfos/finance-web:ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: image-*
+          path: ${{ runner.temp }}/images
+          merge-multiple: true
+      - name: Cargar las imágenes del job `image` (sin reconstruir)
+        run: for f in "$RUNNER_TEMP"/images/*.tar; do docker load -i "$f"; done
+      # Navegador de la versión de @playwright/test fijada en el lockfile (con sus dependencias de sistema).
+      - name: Instalar Chromium de Playwright
+        run: pnpm --filter @pf/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() }}
+        with:
+          name: e2e-report
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   dependency-scan:
     runs-on: ubuntu-latest

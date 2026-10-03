@@ -20,6 +20,7 @@ automated_tests:
 - apps/api/test/api/api-conventions.api.test.ts
 - packages/platform/src/api/errors/error-catalog.test.ts
 - apps/web/src/bff/finance-api-client.test.ts
+- tests/e2e/specs/api-conventions.spec.ts
 status: automated
 regression_suite: true
 phase: 1

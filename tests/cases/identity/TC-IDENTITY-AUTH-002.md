@@ -14,9 +14,11 @@ invariants: []
 priority: critical
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- tests/e2e/specs/auth.spec.ts
+- apps/web/test/integration/bff.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:

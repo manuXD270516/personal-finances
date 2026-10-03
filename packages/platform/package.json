@@ -88,6 +88,8 @@
     "@pf/shared-kernel": "workspace:*",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "jose": "catalog:",
+    "kysely": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "pino": "catalog:",

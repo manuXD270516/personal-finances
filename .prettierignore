@@ -17,3 +17,5 @@ README.md
 # Matriz de trazabilidad generada por @pf/traceability
 tests/traceability
 .stryker-tmp/
+tests/e2e/playwright-report
+tests/e2e/test-results

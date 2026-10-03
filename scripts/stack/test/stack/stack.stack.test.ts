@@ -3,7 +3,7 @@
 import { rmSync } from 'node:fs';
 import { DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { backupDir, digest, getObjectBytes, listAllObjects } from '../../src/lib/backup.js';
 import { run, serviceStates } from '../../src/lib/compose.js';
@@ -292,8 +292,12 @@ describe('stack local en contenedores (pfos-test)', () => {
       .map((f) => f.split('_')[0]!)
       .sort();
     expect(await sql(ctx, 'SELECT version FROM public.schema_migrations ORDER BY version')).toEqual(files);
+    // La versión esperada se lee de la definición del seed para no desincronizarse al evolucionarlo.
+    const seedSource = readFileSync(resolve(ROOT, 'apps/api/src/seed/run-seed.ts'), 'utf8');
+    const minimalVersion = /minimal:\s*\{\s*datasetVersion:\s*(\d+)/.exec(seedSource)?.[1];
+    expect(minimalVersion, 'datasetVersion de la Minimal Seed en run-seed.ts').toBeDefined();
     expect(await sql(ctx, `SELECT profile || ':' || dataset_version FROM platform.seed_run`)).toEqual([
-      'minimal:1',
+      `minimal:${minimalVersion}`,
     ]);
     expect(await sql(ctx, 'SELECT count(*) FROM platform.diagnostic_probe')).toEqual(['0']);
   });

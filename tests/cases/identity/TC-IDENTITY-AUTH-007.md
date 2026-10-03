@@ -15,9 +15,11 @@ invariants: []
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- packages/contexts/identity/test/integration/pg-identity.int.test.ts
+- packages/contexts/identity/src/application/identity.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:

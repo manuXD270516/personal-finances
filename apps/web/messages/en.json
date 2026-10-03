@@ -5,7 +5,64 @@
   },
   "Home": {
     "title": "Personal finances",
-    "subtitle": "The platform is under construction.",
-    "language": "Language"
+    "subtitle": "Your active workspace and your account.",
+    "language": "Language",
+    "greeting": "Hi, {name}"
+  },
+  "App": {
+    "nav": "Main navigation",
+    "home": "Home",
+    "settings": "Workspace settings",
+    "preferences": "My preferences",
+    "newWorkspace": "New workspace",
+    "logout": "Sign out",
+    "loading": "Loading…",
+    "ready": "Ready",
+    "activeWorkspace": "Active workspace",
+    "role": "Your role: {role}",
+    "roles": {
+      "OWNER": "Owner",
+      "EDITOR": "Editor",
+      "VIEWER": "Viewer"
+    }
+  },
+  "Workspace": {
+    "settingsTitle": "Workspace settings",
+    "createTitle": "New workspace",
+    "name": "Name",
+    "baseCurrency": "Base currency",
+    "timezone": "Time zone",
+    "locale": "Language and format",
+    "fiscalMonthStartDay": "Financial month start day",
+    "minimumReserve": "Minimum liquidity reserve",
+    "minimumReserveHint": "Amount in the base currency; leave it empty for no reserve.",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saved": "Changes saved.",
+    "create": "Create workspace",
+    "creating": "Creating…",
+    "created": "Workspace created: {name}.",
+    "readOnly": "Only the owner can change these settings."
+  },
+  "Preferences": {
+    "title": "My preferences",
+    "displayName": "Display name",
+    "locale": "Language",
+    "timezone": "Time zone",
+    "save": "Save preferences",
+    "saved": "Preferences saved."
+  },
+  "Auth": {
+    "errorTitle": "We couldn't sign you in",
+    "expiredTitle": "Your session ended",
+    "login": "Sign in",
+    "reasons": {
+      "state": "The sign-in link was already used or expired. Please sign in again.",
+      "idp": "The identity provider cancelled the sign-in.",
+      "callback": "We couldn't validate the identity provider response. Please try again.",
+      "provision": "We couldn't set up your account. Verify your email with the identity provider and try again.",
+      "expired": "For your security we signed you out after a period of inactivity. Please sign in again.",
+      "unknown": "Something went wrong while signing in. Please try again."
+    }
   }
 }
