@@ -229,7 +229,9 @@
             "PARALLEL",
             "P2P",
             "BANK",
-            "CUSTOM"
+            "CUSTOM",
+            "PARALLEL_BUY",
+            "PARALLEL_SELL"
           ],
           "description": "FxRateType (opcional, cambio aditivo)."
         }

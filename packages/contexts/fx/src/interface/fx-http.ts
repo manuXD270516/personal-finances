@@ -111,6 +111,7 @@ export function toResolvedRateDto(r: ResolvedRate) {
     derivation: r.derivation,
     components: r.components.map(component),
     rateType: r.rateType,
+    requestedRateType: r.requestedRateType,
     source: r.source,
     sourceLabel: r.sourceLabel,
     asOf: r.asOf,

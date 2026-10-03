@@ -13,6 +13,8 @@ export interface FxProviderEnv {
   readonly FX_POLL_INTERVAL?: string;
   readonly FX_STALE_AFTER_PARALLEL?: string;
   readonly FX_STALE_AFTER_OFFICIAL?: string;
+  readonly FX_STALE_AFTER_FALLBACK?: string;
+  readonly FX_MANUAL_FALLBACK_MAX_AGE?: string;
   readonly FX_ANOMALY_THRESHOLD_PCT?: string;
   readonly FX_PROVIDER_TIMEOUT?: string;
   readonly FX_BACKFILL_ENABLED?: string;
@@ -28,6 +30,10 @@ export interface FxProviderSettings {
   readonly pollCron: string;
   readonly staleAfterParallelMs: number;
   readonly staleAfterOfficialMs: number;
+  /** Umbral propio del provider de respaldo de `PARALLEL` (bo.dolarapi.com publica con ~2 h de retraso). */
+  readonly staleAfterFallbackMs: number;
+  /** Antigüedad máxima de una manual de OTRO tipo en el último recurso de la valoración (docs/31 D34). */
+  readonly manualFallbackMaxAgeMs: number;
   readonly anomalyThresholdPct: string;
   readonly timeoutMs: number;
   readonly backfillEnabled: boolean;
@@ -42,6 +48,8 @@ export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
   FX_POLL_INTERVAL: '15m',
   FX_STALE_AFTER_PARALLEL: '60m',
   FX_STALE_AFTER_OFFICIAL: '48h',
+  FX_STALE_AFTER_FALLBACK: '180m',
+  FX_MANUAL_FALLBACK_MAX_AGE: '24h',
   FX_ANOMALY_THRESHOLD_PCT: '5',
   FX_PROVIDER_TIMEOUT: '10s',
   FX_BACKFILL_ENABLED: 'true',
@@ -126,6 +134,8 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
   }
   const staleAfterParallelMs = duration('FX_STALE_AFTER_PARALLEL');
   const staleAfterOfficialMs = duration('FX_STALE_AFTER_OFFICIAL');
+  const staleAfterFallbackMs = duration('FX_STALE_AFTER_FALLBACK');
+  const manualFallbackMaxAgeMs = duration('FX_MANUAL_FALLBACK_MAX_AGE');
   const timeoutMs = duration('FX_PROVIDER_TIMEOUT');
   if (timeoutMs > MAX_TIMEOUT_MS) errors.push('FX_PROVIDER_TIMEOUT must be at most 30s');
   const threshold = raw.FX_ANOMALY_THRESHOLD_PCT.trim();
@@ -140,6 +150,8 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
     pollCron,
     staleAfterParallelMs: staleAfterParallelMs || 60 * MINUTE_MS,
     staleAfterOfficialMs: staleAfterOfficialMs || 48 * HOUR_MS,
+    staleAfterFallbackMs: staleAfterFallbackMs || 180 * MINUTE_MS,
+    manualFallbackMaxAgeMs: manualFallbackMaxAgeMs || 24 * HOUR_MS,
     anomalyThresholdPct: errors.length === 0 ? dec(threshold).toFixed() : '5',
     timeoutMs: timeoutMs || 10_000,
     backfillEnabled: backfill === 'true',
@@ -162,7 +174,7 @@ export function enabledProviders(s: FxProviderSettings): FxRateProvider[] {
   return [...new Set([s.primary, s.fallback, s.official].filter((p): p is FxRateProvider => p !== null))];
 }
 
-/** Política de valoración derivada de la configuración (roles y obsolescencia por tipo). */
+/** Política de valoración derivada de la configuración (roles, obsolescencia por tipo y umbral del respaldo). */
 export function valuationPolicyOf(s: FxProviderSettings): ValuationPolicy {
   return {
     roles: {
@@ -170,6 +182,11 @@ export function valuationPolicyOf(s: FxProviderSettings): ValuationPolicy {
       OFFICIAL: { primary: s.official, fallback: null },
     },
     staleAfterMs: { PARALLEL: s.staleAfterParallelMs, OFFICIAL: s.staleAfterOfficialMs },
+    // Solo el provider con rol de respaldo de PARALLEL (StalenessPolicy.thresholdFor).
+    fallbackStaleAfterMs: { PARALLEL: s.staleAfterFallbackMs },
+    // Último recurso con manuales de otro tipo (docs/31 D34): antigüedad máxima y desvío = umbral de anomalía.
+    manualFallbackMaxAgeMs: s.manualFallbackMaxAgeMs,
+    manualFallbackMaxDeviationPct: s.anomalyThresholdPct,
   };
 }
 

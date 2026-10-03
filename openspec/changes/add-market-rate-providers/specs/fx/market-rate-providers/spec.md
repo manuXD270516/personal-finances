@@ -13,12 +13,32 @@ Trace: FR-FX-009 · Priority: Must
 #### Scenario: Muestra del provider principal
 - **CUANDO** paralelo.bo responde `timestamp` 2026-10-02T08:53:07.532Z, `buy` 12.12, `sell` 11.92, `median` 12.02 y `sourceCount` 4
 - **ENTONCES** se registran USD/BOB = 12.02 y USDT/BOB = 12.02, tipo `PARALLEL`, origen proveedor, provider paralelo.bo y vigencia 2026-10-02T08:53:07.532Z
-- **Y** la compra 12.12 y la venta 11.92 quedan en la respuesta cruda conservada, no como valor de la tasa
+- **Y** la compra 12.12 y la venta 11.92 quedan en la respuesta cruda conservada y no alteran el valor 12.02 de la tasa `PARALLEL`
 
 #### Scenario: Muestra del provider de respaldo
 - **CUANDO** bo.dolarapi.com responde la casa `oficial` con compra 12 y venta 12 actualizada el 2026-10-01T00:00:00.000Z y la casa `binance` con compra 12.04 y venta 12.07
 - **ENTONCES** se registra USD/BOB = 12 tipo `OFFICIAL` con provider bo.dolarapi.com y vigencia 2026-10-01T00:00:00.000Z
 - **Y** se registran USD/BOB = 12.055 y USDT/BOB = 12.055 tipo `PARALLEL` con provider bo.dolarapi.com
+
+### Requirement: Compra y venta publicadas como tipos de tasa propios
+Además de la mediana o el punto medio `PARALLEL`, el sistema DEBE (MUST) registrar la compra y la venta publicadas por cada provider de tasa paralela como tipos de tasa propios, desde la perspectiva de quien opera: `PARALLEL_BUY` (lo que paga quien compra la divisa) y `PARALLEL_SELL` (lo que recibe quien la vende), con el mismo provider, par, vigencia y respuesta cruda que la mediana. Estas tasas NO DEBEN (MUST NOT) usarse para valorar salvo que se pidan explícitamente (tipo pedido o preferencia del par), y una compra o venta ausente NO DEBE (MUST NOT) impedir el registro de la mediana.
+Trace: FR-FX-009, FR-FX-011 · Priority: Must
+
+#### Scenario: Compra y venta del provider principal
+- **CUANDO** paralelo.bo responde `timestamp` 2026-10-02T08:53:07.532Z, `buy` 12.12, `sell` 11.92 y `median` 12.02
+- **ENTONCES** se registran USD/BOB y USDT/BOB tipo `PARALLEL_BUY` = 12.12 y tipo `PARALLEL_SELL` = 11.92 con provider paralelo.bo y vigencia 2026-10-02T08:53:07.532Z
+- **Y** USD/BOB y USDT/BOB tipo `PARALLEL` siguen valiendo 12.02
+
+#### Scenario: Compra y venta del provider de respaldo
+- **CUANDO** bo.dolarapi.com responde la casa `binance` con compra 12.04 y venta 12.07 actualizada el 2026-10-02T08:50:00.000Z
+- **ENTONCES** se registran USD/BOB y USDT/BOB tipo `PARALLEL_BUY` = 12.07 y tipo `PARALLEL_SELL` = 12.04 con provider bo.dolarapi.com
+- **Y** la tasa `PARALLEL` sigue siendo el punto medio 12.055
+
+#### Scenario: La valoración por defecto no cambia
+- **CUANDO** existen USD/BOB `PARALLEL` 12.02, `PARALLEL_BUY` 12.12 y `PARALLEL_SELL` 11.92 de paralelo.bo con vigencia 2026-10-02T08:53:07.532Z
+- **Y** se valoran 100.00 USD a las 2026-10-02T09:00:00Z con la preferencia `PARALLEL` o sin preferencia
+- **ENTONCES** el resultado es 1202.00 BOB con la tasa `PARALLEL` 12.02
+- **Y** con la preferencia `PARALLEL_SELL` el resultado es 1192.00 BOB
 
 ### Requirement: Lectura exacta de los valores publicados por los providers
 El sistema DEBE (MUST) leer cada valor numérico de la respuesta de un provider como decimal exacto a partir de su representación textual, sin pasar por punto flotante binario; una muestra con un valor ausente, no numérico, menor o igual a cero o con más de 18 decimales NO DEBE (MUST NOT) registrarse y DEBE (MUST) contarse como falla del provider.
@@ -72,7 +92,7 @@ Trace: FR-FX-013 · Priority: Must
 - **Y** no altera las tasas de los días que ya tenían muestras
 
 ### Requirement: Selección de la tasa de valoración con fallback entre providers
-Para valorar un par con tipo `PARALLEL` a un instante, el sistema DEBE (MUST) usar la tasa vigente no obsoleta del provider principal; si el principal falló o su última tasa está obsoleta (por defecto más de 60 minutos de antigüedad para `PARALLEL` y más de 48 horas para `OFFICIAL`, configurable), DEBE (MUST) usar la tasa vigente no obsoleta del provider de respaldo; la valoración DEBE (MUST) informar el provider, la vigencia, la antigüedad y el nivel de fallback usados.
+Para valorar un par con tipo `PARALLEL` a un instante, el sistema DEBE (MUST) usar la tasa vigente no obsoleta del provider principal; si el principal falló o su última tasa está obsoleta (por defecto más de 60 minutos de antigüedad para `PARALLEL` y más de 48 horas para `OFFICIAL`, configurable), DEBE (MUST) usar la tasa vigente no obsoleta del provider de respaldo, que tiene su propio umbral de obsolescencia configurable (por defecto 180 minutos, porque bo.dolarapi.com publica su vigencia con unas 2 horas de retraso); la valoración DEBE (MUST) informar el provider, la vigencia, la antigüedad y el nivel de fallback usados.
 Trace: FR-FX-010, FR-FX-006 · Priority: Must
 
 #### Scenario: Principal disponible
@@ -90,8 +110,14 @@ Trace: FR-FX-010, FR-FX-006 · Priority: Must
 - **ENTONCES** su tasa se considera obsoleta (80 minutos)
 - **Y** la valoración usa la tasa no obsoleta de bo.dolarapi.com
 
+#### Scenario: Respaldo con retraso de publicación
+- **CUANDO** paralelo.bo falla desde las 09:00Z con última tasa de vigencia 2026-10-02T08:53:07.532Z y la última tasa de bo.dolarapi.com es 12.055 con vigencia 2026-10-02T09:01:00Z
+- **Y** se valoran 100.00 USD a las 2026-10-02T11:00:00Z
+- **ENTONCES** el resultado es 1205.50 BOB con la tasa de bo.dolarapi.com, nivel respaldo, no obsoleta y con antigüedad de 119 minutos
+- **Y** a las 2026-10-02T12:30:00Z (209 minutos) la misma tasa se informa como última conocida obsoleta
+
 ### Requirement: Última tasa conocida marcada como obsoleta
-Si ningún provider tiene una tasa no obsoleta del par, el sistema DEBE (MUST) usar la tasa más reciente dentro de la ventana de vigencia (por defecto 7 días) entre la última de provider y la última manual del par; si se usa la de provider, DEBE (MUST) marcarse como obsoleta con su antigüedad; si no hay ninguna tasa en la ventana, DEBE (MUST) responder `FX_RATE_NOT_FOUND` y NO DEBE (MUST NOT) inventar un valor.
+Si ningún provider tiene una tasa no obsoleta del par, el sistema DEBE (MUST) usar la tasa más reciente dentro de la ventana de vigencia (por defecto 7 días) entre la última de provider y la última manual del par; si se usa la de provider, DEBE (MUST) marcarse como obsoleta con su antigüedad; si no hay ninguna tasa en la ventana, DEBE (MUST) responder `FX_RATE_NOT_FOUND` y NO DEBE (MUST NOT) inventar un valor. En este nivel, si el tipo pedido es uno alimentado por providers, la tasa manual PUEDE (MAY) ser de otro tipo del par (por ejemplo `P2P`) solo si no fue reemplazada, no es una anomalía pendiente ni rechazada, su vigencia no es posterior al instante valorado, su antigüedad no supera la máxima configurada (por defecto 24 horas) y su desvío respecto de la última tasa de provider del par y tipo pedido, cuando existe, no supera el umbral de anomalía (por defecto 5 %); NO DEBE (MUST NOT) ser de compra o venta, y la valoración DEBE (MUST) informar el tipo usado junto al tipo pedido.
 Trace: FR-FX-010, FR-FX-004 · Priority: Must
 
 #### Scenario: Ambos providers caídos
@@ -107,6 +133,22 @@ Trace: FR-FX-010, FR-FX-004 · Priority: Must
 #### Scenario: Sin tasa dentro de la ventana
 - **CUANDO** la última tasa USD/BOB de cualquier origen es del 2026-09-20 y se valora al 2026-10-02
 - **ENTONCES** la consulta responde `FX_RATE_NOT_FOUND`
+
+#### Scenario: Tasa manual fresca de otro tipo
+- **CUANDO** la preferencia de USD/BOB es `PARALLEL`, ambos providers fallan desde las 09:00Z y la última tasa de provider es 12.02 de paralelo.bo con vigencia 2026-10-02T08:53:07.532Z
+- **Y** el usuario registra la tasa manual USD/BOB `P2P` 11.98 con vigencia 2026-10-02T13:30:00Z
+- **Y** se valoran 100.00 USD a las 2026-10-02T14:00:00Z
+- **ENTONCES** el resultado es 1198.00 BOB con la tasa manual 11.98, origen manual, tipo usado `P2P` y tipo pedido `PARALLEL`
+
+#### Scenario: Tasa manual de otro tipo no vigente
+- **CUANDO** en el mismo caso la tasa manual `P2P` 11.98 tiene vigencia 2026-10-01T13:00:00Z (25 horas, más que la antigüedad máxima de 24 horas)
+- **ENTONCES** el resultado es 1202.00 BOB con la tasa 12.02 de paralelo.bo marcada como obsoleta
+- **Y** tampoco se usa una tasa manual de otro tipo reemplazada, anómala pendiente o rechazada, posterior al instante valorado o de compra o venta
+
+#### Scenario: Tasa manual de otro tipo con desvío excesivo
+- **CUANDO** en el mismo caso la tasa manual `P2P` es 12.70 con vigencia 2026-10-02T13:30:00Z (desvío de +5.66 % respecto de 12.02)
+- **ENTONCES** el resultado es 1202.00 BOB con la tasa 12.02 de paralelo.bo marcada como obsoleta
+- **Y** con la tasa manual `BANK` 12.62 (+4.99 %) el resultado es 1262.00 BOB con esa tasa manual
 
 ### Requirement: Las tasas manuales prevalecen para operaciones concretas
 Los providers NO DEBEN (MUST NOT) modificar, reemplazar ni ocultar tasas manuales; el usuario DEBE (MUST) poder registrar tasas manuales en todo momento, y la tasa manual que el usuario indica como referencia de una operación concreta DEBE (MUST) quedar registrada como referencia de esa operación aunque exista una tasa de provider más reciente.
@@ -196,6 +238,18 @@ Trace: FR-FX-015 · Priority: Must
 #### Scenario: Provider lento durante una consulta del usuario
 - **CUANDO** paralelo.bo tarda más de 30 segundos en responder mientras el usuario consulta el resumen
 - **ENTONCES** el resumen responde con las tasas ya registradas sin esperar al provider
+
+### Requirement: Salida de red del worker en el entorno en contenedores
+En el entorno local en contenedores (producto completo), el proceso que consulta a los providers DEBE (MUST) poder abrir conexiones HTTPS salientes hacia paralelo.bo y bo.dolarapi.com y DEBE (MUST) recibir la configuración de providers del contrato único de configuración, sin valores fijados en la definición de contenedores; las suites de prueba DEBEN (MUST) seguir sin red con los providers deshabilitados.
+Trace: FR-FX-009, FR-FX-015 · Priority: Should
+
+#### Scenario: Stack en contenedores
+- **CUANDO** el producto completo se levanta en contenedores con la configuración de `.env`
+- **ENTONCES** el contenedor del worker está conectado solo a redes con salida (no internas) y sus variables `FX_*` son las del `.env`
+
+#### Scenario: Suite de contenedores sin red
+- **CUANDO** se ejecuta la suite de contenedores del stack
+- **ENTONCES** los providers figuran deshabilitados y no se envía ninguna solicitud externa
 
 ### Requirement: Estado de los providers consultable
 Un miembro del workspace DEBE (MUST) poder consultar el estado de cada provider: rol, pares y tipos, si está habilitado, último intento, último éxito, último error, fallas consecutivas, vigencia y antigüedad de su última tasa, si está obsoleta, próximo intento, estado de la carga histórica y su atribución.

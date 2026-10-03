@@ -157,7 +157,13 @@ export interface ProviderFeed {
 
 export interface ProviderDescriptor {
   readonly id: FxRateProvider;
+  /** Feeds de valoración (mediana/punto medio y oficial): los que informa el estado del provider. */
   readonly feeds: readonly ProviderFeed[];
+  /**
+   * Compra/venta publicadas (`PARALLEL_BUY`/`PARALLEL_SELL`, perspectiva de quien opera; design.md decisión 29):
+   * se registran además de la mediana y no participan del estado ni de la valoración por defecto.
+   */
+  readonly quoteSideFeeds: readonly ProviderFeed[];
   readonly attribution: RateAttribution;
   /** Límite de solicitudes por minuto que el cliente respeta (paralelo.bo publica 60; dolarapi 30 conservador). */
   readonly limitPerMinute: number;
@@ -178,6 +184,13 @@ export interface MarketRateProvider {
   fetchHistory(): Promise<ProviderSample[]>;
 }
 
+const QUOTE_SIDE_FEEDS: readonly ProviderFeed[] = Object.freeze([
+  { base: 'USD', quote: 'BOB', rateType: 'PARALLEL_BUY' as const },
+  { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL_BUY' as const },
+  { base: 'USD', quote: 'BOB', rateType: 'PARALLEL_SELL' as const },
+  { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL_SELL' as const },
+]);
+
 /** Catálogo de providers (ADR-0025): feeds, atribución, límite de uso e histórico. Lo exponen los adapters. */
 export const PROVIDER_DESCRIPTORS: Readonly<Record<FxRateProvider, ProviderDescriptor>> = Object.freeze({
   PARALELO_BO: Object.freeze({
@@ -186,6 +199,7 @@ export const PROVIDER_DESCRIPTORS: Readonly<Record<FxRateProvider, ProviderDescr
       { base: 'USD', quote: 'BOB', rateType: 'PARALLEL' as const },
       { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL' as const },
     ],
+    quoteSideFeeds: QUOTE_SIDE_FEEDS,
     attribution: attributionOf('PARALELO_BO'),
     limitPerMinute: 60,
     history: true,
@@ -197,6 +211,7 @@ export const PROVIDER_DESCRIPTORS: Readonly<Record<FxRateProvider, ProviderDescr
       { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL' as const },
       { base: 'USD', quote: 'BOB', rateType: 'OFFICIAL' as const },
     ],
+    quoteSideFeeds: QUOTE_SIDE_FEEDS,
     attribution: attributionOf('DOLARAPI_BO'),
     // No publica límite: 30/min conservador (design.md decisión 9).
     limitPerMinute: 30,

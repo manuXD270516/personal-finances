@@ -4,8 +4,8 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner el spec `fx/market-rate-providers` (umbrales: obsolescencia 60 min / 48 h, anomalía 5 %, intervalo 15 min) y las preguntas abiertas de design.md; verificar con `openspec validate add-market-rate-providers --strict`
-  - Nota (2026-10-03): pendiente del owner (umbrales y preguntas abiertas; nueva pregunta sobre la calibración del respaldo en design.md). `openspec validate --all --strict` pasa.
+- [x] 1.1 Revisar con el owner el spec `fx/market-rate-providers` (umbrales: obsolescencia 60 min / 48 h, anomalía 5 %, intervalo 15 min) y las preguntas abiertas de design.md; verificar con `openspec validate add-market-rate-providers --strict`
+  - Nota (2026-10-03): umbrales confirmados por el owner; decisiones aplicadas (design.md 29–32): compra/venta como `PARALLEL_BUY`/`PARALLEL_SELL`, `FX_STALE_AFTER_FALLBACK` (180 min), manual de otro tipo como último recurso con los criterios de docs/31 D34 (`FX_MANUAL_FALLBACK_MAX_AGE` 24 h pendiente de confirmación, desvío ≤ 5 %) y salida de red del worker en modo B. Nuevos TC-FX-PROVIDER-016..019. `openspec validate --all --strict` pasa.
 - [x] 1.2 Revisar TC-FX-PROVIDER-001..015 contra los scenarios (cifras: mediana 12.02, compra 12.12, venta 11.92, oficial 12.00, Binance 12.04/12.07 → 12.055; fechas fijas con `FixedClock`); verificar que el chequeo del catálogo los acepta y que todo requirement Must tiene ≥ 1 TC
   - Nota (2026-10-03): cifras verificadas contra los scenarios y los tests (12.02, 12.12/11.92, oficial 12, 12.04/12.07 → 12.055, 412 s, 600 s, 21600 s, 3142 s, +12.3128 %, +0.6656 %); `pnpm traceability:check` acepta los 15 TC y todo requirement Must tiene ≥ 1 TC. TC-012 y TC-014 quedan `ready` con automatización parcial (UI y dashboard pendientes).
 - [x] 1.3 Grabar los fixtures de contrato en `packages/fx/test/fixtures/providers/` con el texto exacto de las respuestas verificadas el 2026-10-02 (`paralelo-bo/rate.ok.json`, `rate.median-null.json`, `rate.18-decimals.json`, `rate.schema-changed.json`, `historical.sample.json`, `dolarapi-bo/dolares.ok.json`) más respuestas HTTP 429/503/timeout; verificar que ningún fixture contiene datos de usuario
@@ -61,6 +61,8 @@
   - Nota (2026-10-03): pendiente (E2E con providers simulados).
 - [ ] 7.3 Smoke **opcional en vivo, no bloqueante** (`pnpm fx:smoke-live`, nightly, `continue-on-error`): una solicitud a cada endpoint real, validación contra el JSON Schema del adapter y hash de `https://paralelo.bo/openapi.json`; su falla abre un aviso para revisar el adapter, nunca rompe el pipeline
   - Nota (2026-10-03): pendiente (smoke en vivo no bloqueante `pnpm fx:smoke-live`); los contratos del adapter ya están como constantes reutilizables.
+
+- [x] 7.4 Decisiones del owner 2026-10-03 (TDD + PBT): TC-FX-PROVIDER-016 (compra/venta, contract + aplicación + PostgreSQL), -017 (umbral del respaldo), -018 (manual de otro tipo, PBT 500 corridas), -019 (`test:stack`: worker en redes no internas y `FX_*` del `.env`)
 
 ## 8. DOCUMENTACIÓN y cierre
 

@@ -55,7 +55,9 @@ export function midpoint(buy: string, sell: string): string {
 /**
  * Adapter ACL de bo.dolarapi.com (respaldo `PARALLEL` y única fuente `OFFICIAL`; ADR-0025): casa `oficial` →
  * `OFFICIAL` USD/BOB; casa `binance` → `PARALLEL` USD/BOB y USDT/BOB, ambas con el punto medio compra/venta y
- * `asOf = fechaActualizacion`. Las demás casas se ignoran. Sin histórico.
+ * `asOf = fechaActualizacion`. La casa `binance` aporta además `PARALLEL_BUY` = `venta` (lo que paga quien compra
+ * USD) y `PARALLEL_SELL` = `compra` (lo que recibe quien vende), misma perspectiva que paralelo.bo (decisión del
+ * owner 2026-10-03). Las demás casas se ignoran. Sin histórico.
  */
 export class DolarApiBoProvider implements MarketRateProvider {
   constructor(
@@ -89,11 +91,14 @@ export class DolarApiBoProvider implements MarketRateProvider {
       casa: string,
       pairs: readonly { base: string; rateType: 'OFFICIAL' | 'PARALLEL' }[],
       label: string,
+      quoteSides = false,
     ) => {
       for (const field of ['compra', 'venta', 'fechaActualizacion']) {
         if (!(field in entry)) throw schemaChanged(`casa ${casa} lacks ${field}`);
       }
-      const value = midpoint(numberText(entry['compra'], 'compra'), numberText(entry['venta'], 'venta'));
+      const compra = numberText(entry['compra'], 'compra');
+      const venta = numberText(entry['venta'], 'venta');
+      const value = midpoint(compra, venta);
       const at = entry['fechaActualizacion'];
       if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) {
         throw payloadInvalid(`casa ${casa} fechaActualizacion is not an instant`);
@@ -114,6 +119,28 @@ export class DolarApiBoProvider implements MarketRateProvider {
           }),
         );
       }
+      if (!quoteSides) return;
+      const sides = [
+        { rateType: 'PARALLEL_BUY' as const, value: venta, label: 'bo.dolarapi.com (Binance P2P, venta)' },
+        { rateType: 'PARALLEL_SELL' as const, value: compra, label: 'bo.dolarapi.com (Binance P2P, compra)' },
+      ];
+      for (const side of sides) {
+        for (const p of pairs) {
+          samples.push(
+            ProviderSample.of({
+              provider: 'DOLARAPI_BO',
+              base: p.base,
+              quote: 'BOB',
+              rateType: side.rateType,
+              value: side.value,
+              asOf,
+              fetchedAt: res.fetchedAt,
+              rawPayload: res.body,
+              sourceLabel: side.label,
+            }),
+          );
+        }
+      }
     };
     if (oficial)
       make(oficial, 'oficial', [{ base: 'USD', rateType: 'OFFICIAL' }], 'bo.dolarapi.com (oficial)');
@@ -126,6 +153,7 @@ export class DolarApiBoProvider implements MarketRateProvider {
           { base: 'USDT', rateType: 'PARALLEL' },
         ],
         'bo.dolarapi.com (Binance P2P, punto medio compra/venta)',
+        true,
       );
     }
     return samples;

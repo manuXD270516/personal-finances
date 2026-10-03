@@ -117,7 +117,7 @@ function ingestion(workspaces: () => string[] = () => [...active]) {
   });
 }
 
-const rowsOf = (ws: string, user: string | null = null) =>
+const rowsOf = (ws: string, user: string | null = null, rateType = 'PARALLEL') =>
   inTx(
     app,
     ws,
@@ -140,8 +140,9 @@ const rowsOf = (ws: string, user: string | null = null) =>
                 to_char(as_of AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS as_of,
                 to_char(fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS fetched_at,
                 raw_payload, anomaly_flagged, anomaly_variation_pct::text
-           FROM fx.exchange_rate WHERE workspace_id = $1 AND source = 'PROVIDER' ORDER BY as_of, base_currency`,
-          [ws],
+           FROM fx.exchange_rate WHERE workspace_id = $1 AND source = 'PROVIDER' AND rate_type = $2
+          ORDER BY as_of, base_currency`,
+          [ws, rateType],
         )
       ).rows,
   );
@@ -170,8 +171,9 @@ describe('PollMarketRates sobre PostgreSQL (fx/market-rate-providers)', () => {
     active.add(w1);
     server.route('/api/v1/rate', { body: fixture('paralelo-bo/rate.ok.json') });
     clock.set(Instant.parse('2026-10-02T09:00:00Z'));
+    // Mediana + compra + venta por par (decisión del owner 2026-10-03).
     expect((await ingestion().poll()).map((r) => [r.provider, r.outcome, r.newSamples])).toEqual([
-      ['PARALELO_BO', 'OK', 2],
+      ['PARALELO_BO', 'OK', 6],
     ]);
     const rows = await rowsOf(w1);
     expect(rows.map((r) => [r.base, r.rate, r.provider, r.as_of, r.fetched_at])).toEqual([
@@ -189,7 +191,7 @@ describe('PollMarketRates sobre PostgreSQL (fx/market-rate-providers)', () => {
         typeof r.envelope === 'string' ? (JSON.parse(r.envelope) as EventEnvelope) : r.envelope,
       ),
     );
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(6);
     for (const e of events) {
       expect(() => registry.validate(e)).not.toThrow();
       expect(e.actor).toEqual({ type: 'SYSTEM', id: 'fx-provider:PARALELO_BO' });
@@ -219,6 +221,35 @@ describe('PollMarketRates sobre PostgreSQL (fx/market-rate-providers)', () => {
       ).toBe('42501');
     }
     expect((await rowsOf(w1))[0]?.rate).toBe('12.02');
+  });
+
+  it('[TC-FX-PROVIDER-016] compra 12.12 y venta 11.92 quedan como PARALLEL_BUY/PARALLEL_SELL inmutables (CHECK ampliado por la migración)', async () => {
+    const buy = await rowsOf(w1, null, 'PARALLEL_BUY');
+    const sell = await rowsOf(w1, null, 'PARALLEL_SELL');
+    expect(buy.map((r) => [r.base, r.rate, r.provider, r.as_of])).toEqual([
+      ['USD', '12.12', 'PARALELO_BO', '2026-10-02T08:53:07.532Z'],
+      ['USDT', '12.12', 'PARALELO_BO', '2026-10-02T08:53:07.532Z'],
+    ]);
+    expect(sell.map((r) => [r.base, r.rate])).toEqual([
+      ['USD', '11.92'],
+      ['USDT', '11.92'],
+    ]);
+    // Migración 20261004130000: los tres CHECK de tipo de tasa admiten compra/venta y siguen cerrados al resto.
+    const { rows } = await migrator.query<{ conname: string; def: string }>(
+      `SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint
+        WHERE conname IN ('exchange_rate_rate_type_check', 'rate_preference_rate_type_check',
+                          'conversion_detail_reference_rate_type_check') ORDER BY conname`,
+    );
+    expect(rows.map((r) => r.conname)).toEqual([
+      'conversion_detail_reference_rate_type_check',
+      'exchange_rate_rate_type_check',
+      'rate_preference_rate_type_check',
+    ]);
+    for (const r of rows) {
+      expect(r.def).toContain("'PARALLEL_BUY'");
+      expect(r.def).toContain("'PARALLEL_SELL'");
+      expect(r.def).not.toContain('MID');
+    }
   });
 
   it('[TC-FX-PROVIDER-013] dos workspaces: una sola solicitud por ciclo y filas propias aisladas por RLS', async () => {
