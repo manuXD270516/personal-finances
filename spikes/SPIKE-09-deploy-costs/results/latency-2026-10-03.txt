@@ -1,0 +1,14 @@
+# SPIKE-09 latency — 2026-10-03T20:54:44Z — TCP handshake RTT (ms), IPv4, 7 intentos
+region                         host                                                min    med
+aws-sa-east-1                  ec2.sa-east-1.amazonaws.com                         112    114
+aws-us-east-1                  ec2.us-east-1.amazonaws.com                         138    143
+oci-sa-saopaulo-1              objectstorage.sa-saopaulo-1.oraclecloud.com         105    108
+oci-sa-santiago-1              objectstorage.sa-santiago-1.oraclecloud.com          63     67
+oci-us-ashburn-1               objectstorage.us-ashburn-1.oraclecloud.com          136    140
+vultr-sao-paulo                sao-br-ping.vultr.com                                79     83
+vultr-santiago                 scl-cl-ping.vultr.com                                85     93
+vultr-new-jersey               nj-us-ping.vultr.com                                143    145
+hetzner-ashburn                ash-speed.hetzner.com                               131    140
+hetzner-falkenstein            fsn1-speed.hetzner.com                              235    247
+hetzner-helsinki               hel1-speed.hetzner.com                              258    263
+gcp-edge(southamerica-east1)   southamerica-east1-run.googleapis.com                54     57
