@@ -100,5 +100,121 @@
       "memberRole": "Role",
       "displayName": "Display name"
     }
+  },
+  "Dashboard": {
+    "loading": "Loading your summary…",
+    "noWorkspace": "Select or create a workspace to see your summary.",
+    "period": "Period: {from} to {to}",
+    "comparisonMode": {
+      "PREVIOUS_PERIOD_TO_DATE": "compared with the same days of the previous month ({from} – {to})",
+      "PREVIOUS_PERIOD": "compared with the previous period ({from} – {to})"
+    },
+    "questions": {
+      "Q1": "How much money do I have?",
+      "Q2": "How much came in?",
+      "Q3": "How much did I spend?",
+      "Q4": "How much is committed?",
+      "Q5": "How much can I spend?",
+      "Q6": "How much did I save?",
+      "Q7": "How am I doing compared with last month?",
+      "Q8": "Which payments are coming?",
+      "Q9": "Will I meet my goals?"
+    },
+    "notAvailable": "Not available yet",
+    "noData": "There is no data to answer this question yet.",
+    "noAccounts": "You have no accounts yet.",
+    "none": "—",
+    "incomplete": "incomplete",
+    "actionHints": {
+      "CREATE_ACCOUNT": "Create your first account to get started.",
+      "AVAILABLE_IN_PHASE_2": "Will be enabled with budgets (phase 2).",
+      "AVAILABLE_IN_PHASE_3": "Will be enabled with recurring payments and commitments (phase 3).",
+      "AVAILABLE_IN_PHASE_4": "Will be enabled with savings goals (phase 4).",
+      "UNKNOWN": "This question will be enabled later."
+    },
+    "liquid": {
+      "caption": "Money available in liquid accounts, consolidated in {currency}",
+      "incomplete": "Incomplete total: these amounts could not be converted because there is no current rate.",
+      "registerRate": "Record {pair} rate"
+    },
+    "rate": {
+      "approx": "approx.",
+      "origin": {
+        "MANUAL": "manual origin",
+        "PROVIDER": "market provider",
+        "USER_CONVERSION": "rate from your own conversion"
+      },
+      "sourceLabel": "Source: {label}",
+      "fallback": "fallback",
+      "asOf": "valid as of: {date}",
+      "stale": "stale"
+    },
+    "age": {
+      "now": "less than 1 min ago",
+      "minutes": "{n} min ago",
+      "hours": "{n} h ago",
+      "days": "{n} d ago"
+    },
+    "savingsRate": "Savings rate:",
+    "variation": {
+      "new": "new",
+      "vsPrevious": "compared with last month",
+      "income": {
+        "up": "income increase",
+        "down": "income decrease",
+        "flat": "income unchanged"
+      },
+      "expense": {
+        "up": "spending increase",
+        "down": "spending decrease",
+        "flat": "spending unchanged"
+      },
+      "savings": {
+        "up": "savings increase",
+        "down": "savings decrease",
+        "flat": "savings unchanged"
+      }
+    },
+    "topCategories": {
+      "title": "Top spending categories",
+      "empty": "No expenses recorded this month."
+    },
+    "netWorth": {
+      "title": "Net worth",
+      "assets": "Assets:",
+      "liabilities": "Liabilities:",
+      "incomplete": "Incomplete net worth: some amounts could not be valued for lack of a rate.",
+      "byCurrency": "By currency",
+      "currency": "Currency",
+      "net": "Net",
+      "converted": "In {currency}",
+      "noRate": "no rate",
+      "byAccountType": "By account type"
+    },
+    "accounts": {
+      "title": "Balances by account",
+      "liability": "liability",
+      "converted": "≈ {amount}",
+      "noRate": "no current rate"
+    },
+    "accountTypes": {
+      "BANK": "Bank",
+      "CASH": "Cash",
+      "DIGITAL_WALLET": "Digital wallet",
+      "CREDIT_CARD": "Credit card",
+      "LOAN": "Loan",
+      "CRYPTO_WALLET": "Crypto wallet",
+      "INVESTMENT": "Investment",
+      "SAVINGS": "Savings",
+      "VIRTUAL": "Virtual",
+      "MANUAL_ASSET": "Manual asset",
+      "MANUAL_LIABILITY": "Manual liability"
+    },
+    "meta": {
+      "generatedAt": "Generated: {date}",
+      "freshness": "Data as of: {date}",
+      "reportingCurrency": "Reporting currency: {currency}",
+      "approx": "Some figures use approximate rates."
+    }
   }
 }

@@ -141,9 +141,33 @@ export interface BalanceQuery {
   }): Promise<readonly EntrySummaryDto[]>;
 }
 
+/** Saldos por lote de cuentas del usuario (`GetBalances` por lote; openspec add-basic-dashboard). */
+export interface AccountBalancesDto {
+  /** Fecha de corte aplicada (`null` = sin límite de fecha). */
+  readonly asOf: string | null;
+  /** Instante de registro del último asiento del workspace (frescura de los datos), `null` si no hay asientos. */
+  readonly latestEntryAt: string | null;
+  /** Una línea por cuenta del usuario con ledger account (las demás tienen saldo cero). */
+  readonly balances: readonly AccountBalanceDto[];
+}
+
+/**
+ * Consulta de saldos por lote para lecturas (Reporting): saldo contable y presentado de cada cuenta del usuario a la
+ * fecha `asOf` (por defecto, hoy en la zona horaria del workspace), acelerada por `balance_snapshot`. Sin efectos.
+ */
+export interface AccountBalancesQuery {
+  getAccountBalances(input: {
+    readonly workspaceId: string;
+    /** Ids de cuentas del usuario (Accounts); sin filtro = todas. */
+    readonly accountIds?: readonly string[];
+    readonly asOf?: string;
+  }): Promise<AccountBalancesDto>;
+}
+
 export const LEDGER_POSTING_PORT = Symbol.for('pf.ledger.LedgerPostingPort');
 export const LEDGER_PERIOD_LOCK_PORT = Symbol.for('pf.ledger.LedgerPeriodLockPort');
 export const BALANCE_QUERY = Symbol.for('pf.ledger.BalanceQuery');
+export const ACCOUNT_BALANCES_QUERY = Symbol.for('pf.ledger.AccountBalancesQuery');
 
 /** Nombre del evento publicado por el outbox (contracts/events/ledger/JournalEntryPosted.v1.schema.json). */
 export const JOURNAL_ENTRY_POSTED = { eventType: 'ledger.JournalEntryPosted', eventVersion: 1 } as const;

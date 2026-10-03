@@ -12,9 +12,10 @@ invariants: ["INV-009","INV-031","INV-010"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/net-worth.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["net-worth","fast-check","invariant"]
@@ -31,7 +32,7 @@ expected_result:
   - "Conversión canónica: ΔNW = −10.00 BOB (5.00 fee + 5.00 spread a 6.95)"
   - "∀ conversión: ΔNW = −(fees + spread) valorados a la tasa de valoración"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-NETWORTH-005 — Propiedad: transferencias no cambian el patrimonio y una conversión lo reduce en fee más spread

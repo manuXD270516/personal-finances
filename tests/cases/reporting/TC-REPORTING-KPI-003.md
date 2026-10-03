@@ -12,9 +12,12 @@ invariants: ["INV-012","INV-020"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.golden.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/consolidation-service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["kpi","multi-currency","conv_t"]
@@ -32,7 +35,7 @@ expected_result:
   - "Consolidado: 20.00 × 11.96 + 100.00 = 339.20 BOB"
   - "Tras la tasa nueva, septiembre sigue en 339.20 BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-003 — Los flujos en USD se consolidan con la tasa de su fecha y no cambian con tasas posteriores

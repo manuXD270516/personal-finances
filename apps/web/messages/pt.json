@@ -100,5 +100,121 @@
       "memberRole": "Função",
       "displayName": "Nome de exibição"
     }
+  },
+  "Dashboard": {
+    "loading": "Carregando o resumo…",
+    "noWorkspace": "Selecione ou crie um espaço de trabalho para ver seu resumo.",
+    "period": "Período: de {from} a {to}",
+    "comparisonMode": {
+      "PREVIOUS_PERIOD_TO_DATE": "comparado com os mesmos dias do mês anterior ({from} – {to})",
+      "PREVIOUS_PERIOD": "comparado com o período anterior ({from} – {to})"
+    },
+    "questions": {
+      "Q1": "Quanto dinheiro eu tenho?",
+      "Q2": "Quanto entrou?",
+      "Q3": "Quanto gastei?",
+      "Q4": "Quanto está comprometido?",
+      "Q5": "Quanto posso gastar?",
+      "Q6": "Quanto economizei?",
+      "Q7": "Como estou em relação ao mês passado?",
+      "Q8": "Quais pagamentos vêm aí?",
+      "Q9": "Vou cumprir minhas metas?"
+    },
+    "notAvailable": "Ainda não disponível",
+    "noData": "Ainda não há dados para responder esta pergunta.",
+    "noAccounts": "Você ainda não tem contas.",
+    "none": "—",
+    "incomplete": "incompleto",
+    "actionHints": {
+      "CREATE_ACCOUNT": "Crie sua primeira conta para começar.",
+      "AVAILABLE_IN_PHASE_2": "Será habilitado com os orçamentos (fase 2).",
+      "AVAILABLE_IN_PHASE_3": "Será habilitado com os pagamentos recorrentes e compromissos (fase 3).",
+      "AVAILABLE_IN_PHASE_4": "Será habilitado com as metas de economia (fase 4).",
+      "UNKNOWN": "Esta pergunta será habilitada mais adiante."
+    },
+    "liquid": {
+      "caption": "Dinheiro disponível em contas líquidas, consolidado em {currency}",
+      "incomplete": "Total incompleto: estes valores não puderam ser convertidos por falta de uma taxa vigente.",
+      "registerRate": "Registrar taxa {pair}"
+    },
+    "rate": {
+      "approx": "aprox.",
+      "origin": {
+        "MANUAL": "origem manual",
+        "PROVIDER": "provedor de mercado",
+        "USER_CONVERSION": "taxa de uma conversão própria"
+      },
+      "sourceLabel": "Fonte: {label}",
+      "fallback": "reserva",
+      "asOf": "vigência: {date}",
+      "stale": "desatualizada"
+    },
+    "age": {
+      "now": "há menos de 1 min",
+      "minutes": "há {n} min",
+      "hours": "há {n} h",
+      "days": "há {n} d"
+    },
+    "savingsRate": "Taxa de economia:",
+    "variation": {
+      "new": "novo",
+      "vsPrevious": "em relação ao mês anterior",
+      "income": {
+        "up": "aumento de receitas",
+        "down": "queda de receitas",
+        "flat": "receitas sem mudança"
+      },
+      "expense": {
+        "up": "aumento de gastos",
+        "down": "queda de gastos",
+        "flat": "gastos sem mudança"
+      },
+      "savings": {
+        "up": "aumento da economia",
+        "down": "queda da economia",
+        "flat": "economia sem mudança"
+      }
+    },
+    "topCategories": {
+      "title": "Principais categorias de gasto",
+      "empty": "Sem gastos registrados neste mês."
+    },
+    "netWorth": {
+      "title": "Patrimônio líquido",
+      "assets": "Ativos:",
+      "liabilities": "Passivos:",
+      "incomplete": "Patrimônio incompleto: há valores sem avaliação por falta de taxa.",
+      "byCurrency": "Por moeda",
+      "currency": "Moeda",
+      "net": "Líquido",
+      "converted": "Em {currency}",
+      "noRate": "sem taxa",
+      "byAccountType": "Por tipo de conta"
+    },
+    "accounts": {
+      "title": "Saldos por conta",
+      "liability": "passivo",
+      "converted": "≈ {amount}",
+      "noRate": "sem taxa vigente"
+    },
+    "accountTypes": {
+      "BANK": "Banco",
+      "CASH": "Dinheiro",
+      "DIGITAL_WALLET": "Carteira digital",
+      "CREDIT_CARD": "Cartão de crédito",
+      "LOAN": "Empréstimo",
+      "CRYPTO_WALLET": "Carteira cripto",
+      "INVESTMENT": "Investimento",
+      "SAVINGS": "Poupança",
+      "VIRTUAL": "Virtual",
+      "MANUAL_ASSET": "Ativo manual",
+      "MANUAL_LIABILITY": "Passivo manual"
+    },
+    "meta": {
+      "generatedAt": "Gerado: {date}",
+      "freshness": "Dados até: {date}",
+      "reportingCurrency": "Moeda de relatório: {currency}",
+      "approx": "Alguns valores usam taxas aproximadas."
+    }
   }
 }

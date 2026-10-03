@@ -17,6 +17,38 @@ export const TRANSACTION_EVENTS = {
   conversionRecorded: { eventType: 'transactions.ConversionRecorded', eventVersion: 1 },
 } as const;
 
+export interface FlowMoneyDto {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/**
+ * Fila de `SummarizeNominalFlows` (openspec add-basic-dashboard): agregado por fecha de negocio, moneda, naturaleza y
+ * categoría de las porciones (splits) vigentes de transacciones con asiento activo (`POSTED | CLEARED | RECONCILED`).
+ * `amount` va con el signo del usuario: `INCOME` positivo; `EXPENSE` neto de reembolsos (un reembolso resta, así que
+ * el neto puede ser negativo). Incluye las comisiones de transferencias y conversiones como `EXPENSE` (su split
+ * *Fees*); nunca el principal de transferencias o conversiones, saldos iniciales ni ajustes (docs/14 §4.3).
+ */
+export interface NominalFlowRowDto {
+  readonly businessDate: string;
+  readonly nature: 'INCOME' | 'EXPENSE';
+  readonly categoryId: string;
+  /** En la escala canónica de la moneda. */
+  readonly amount: FlowMoneyDto;
+}
+
+/** Query pública `SummarizeNominalFlows` (sin efectos; en la unidad de trabajo del llamador si existe). */
+export interface NominalFlowQuery {
+  summarizeNominalFlows(input: {
+    readonly workspaceId: string;
+    /** Rango inclusivo de fechas de negocio `YYYY-MM-DD`. */
+    readonly dateFrom: string;
+    readonly dateTo: string;
+  }): Promise<readonly NominalFlowRowDto[]>;
+}
+
+export const NOMINAL_FLOW_QUERY = Symbol.for('pf.transactions.NominalFlowQuery');
+
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.

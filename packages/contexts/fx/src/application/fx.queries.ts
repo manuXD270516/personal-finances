@@ -45,7 +45,8 @@ export function toReferenceDto(stored: StoredRate): ReferenceRateDto {
 export class FxQueries implements FxConversionPricingPort {
   constructor(private readonly deps: FxDeps) {}
 
-  private get windowDays(): number {
+  /** Ventana de vigencia (días) de la resolución *as-of*. */
+  get windowDays(): number {
     return this.deps.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
   }
 
@@ -147,6 +148,53 @@ export class FxQueries implements FxConversionPricingPort {
         allowCross: true,
       });
       return { amount: resolved.rate.convert(amount), resolved };
+    });
+  }
+
+  /**
+   * Valoración por lote (add-basic-dashboard): resuelve cada `(base, quote, at)` con UNA sola lectura de candidatas
+   * (ventana desde el instante más antiguo hasta el más reciente) y la misma política que `latest`/`convertForValuation`
+   * (tipo preferido del par, niveles de fallback, cruzada por pivote marcada `approx`). `null` = sin tasa.
+   */
+  resolveValuationRates(
+    workspaceId: string,
+    requests: readonly { readonly base: string; readonly quote: string; readonly at: Instant }[],
+  ): Promise<(ResolvedRate | null)[]> {
+    return this.deps.uow.run(workspaceId, async () => {
+      if (requests.length === 0) return [];
+      const defs = new Map<string, Currency | null>();
+      const currencyOf = async (code: string) => {
+        if (!defs.has(code)) defs.set(code, (await this.deps.currencies.find(code))?.toCurrency() ?? null);
+        return defs.get(code) ?? null;
+      };
+      const pivot = await currencyOf(DEFAULT_PIVOT_CURRENCY);
+      for (const r of requests) {
+        await currencyOf(r.base);
+        await currencyOf(r.quote);
+      }
+      const codes = [...defs.entries()].filter(([, c]) => c !== null).map(([code]) => code);
+      const times = requests.map((r) => r.at.epochMillis);
+      const from = Instant.ofEpochMillis(Math.min(...times) - this.windowDays * DAY_MS);
+      const to = Instant.ofEpochMillis(Math.max(...times));
+      const candidates = await this.deps.rates.candidates(workspaceId, codes, from, to);
+      const { preferences } = await this.deps.preferences.get(workspaceId);
+      const preferenceOf = (a: string, b: string) =>
+        preferences.find((p) => sameUnorderedPair(p.base, p.quote, a, b))?.rateType ?? null;
+      const resolver = new RateResolver(candidates, this.deps.policy);
+      return requests.map((r) => {
+        const base = defs.get(r.base) ?? null;
+        const quote = defs.get(r.quote) ?? null;
+        if (!base || !quote || base.code === quote.code) return null;
+        return resolver.tryResolve({
+          base,
+          quote,
+          at: r.at,
+          preferenceOf,
+          windowDays: this.windowDays,
+          allowCross: true,
+          pivot,
+        });
+      });
     });
   }
 

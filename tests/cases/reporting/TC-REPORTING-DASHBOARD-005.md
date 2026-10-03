@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - apps/web/src/ui/dashboard/DashboardView.test.tsx
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - tests/e2e/specs/dashboard.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["dashboard","home","empty-state"]
@@ -30,7 +34,7 @@ expected_result:
   - "A: los widgets de Q4, Q5, Q8 y Q9 dicen que aún no están disponibles, sin cifras; la API devuelve status NOT_AVAILABLE_IN_PHASE"
   - "B: \"¿Cuánto dinero tengo?\" indica que no hay cuentas y ofrece crear una; no se muestra 0.00 BOB (status NO_DATA)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-005 — Las preguntas del Home no habilitadas en Phase 1 se declaran no disponibles sin montos

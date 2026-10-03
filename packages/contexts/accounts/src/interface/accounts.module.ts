@@ -4,6 +4,7 @@ import type { BalanceQuery } from '@pf/ledger/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
+import { AccountCatalogQueries } from '../application/account-catalog.queries.js';
 import { AccountsService } from '../application/accounts.service.js';
 import { InstitutionsService } from '../application/institutions.service.js';
 import type {
@@ -14,6 +15,7 @@ import type {
 } from '../application/ports/index.js';
 import {
   ACCOUNTS_QUERY_PORT,
+  type AccountCatalogQuery,
   type AccountOpeningBalancePort,
   type AccountsQueryPort,
 } from '../contracts/index.js';
@@ -52,6 +54,8 @@ export interface AccountsRuntime {
   readonly institutions: InstitutionsService;
   /** Puerto público para Transactions (INV-026). */
   readonly query: AccountsQueryPort;
+  /** Catálogo de cuentas para Reporting (openspec add-basic-dashboard). */
+  readonly catalog: AccountCatalogQuery;
 }
 
 /** Composición de ACCOUNTS sobre PostgreSQL (misma transacción que la `PgUnitOfWork` de cada comando). */
@@ -78,6 +82,7 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
       getPostingEligibility: (input) => accounts.getPostingEligibility(input.workspaceId, input.accountIds),
       assertCanPost: (input) => accounts.assertCanPost(input.workspaceId, input.accounts),
     },
+    catalog: new AccountCatalogQueries(deps),
   };
 }
 

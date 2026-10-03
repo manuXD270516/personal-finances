@@ -197,6 +197,14 @@ export class ClassificationQueries {
     });
   }
 
+  /** `CategoryCatalogQuery.categoriesByIds` (Reporting): incluye archivadas; ids inexistentes se omiten. */
+  categoriesByIds(userId: string, workspaceId: string, categoryIds: readonly string[]): Promise<Category[]> {
+    return this.run(userId, workspaceId, async () => {
+      const wanted = new Set(categoryIds);
+      return (await this.deps.categories.listAll(workspaceId)).filter((c) => wanted.has(c.id));
+    });
+  }
+
   /** Las categorías dadas más todas sus subcategorías (filtro `categoryId` de listTransactions). */
   categoryIdsWithDescendants(
     userId: string,

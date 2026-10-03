@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-valuator.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["net-worth","include-in-net-worth"]
@@ -33,7 +36,7 @@ expected_result:
   - "Patrimonio neto = 1006.50 BOB"
   - "\"Caja oficina\" aparece con 1000.00 BOB en accounts"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-NETWORTH-003 — Una cuenta excluida del patrimonio no suma aunque aparezca en saldos

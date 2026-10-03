@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/consolidation-service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["dashboard","missing-rate"]
@@ -35,7 +37,7 @@ expected_result:
   - "Variante: consolidado 805.50 BOB, complete = false, unconverted = [0.01000000 BTC, 50.000000 USDT]"
   - "Nunca se usa 1:1 ni una tasa fuera de la ventana"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-003 — Saldos sin tasa vigente se muestran sin convertir y el consolidado queda incompleto

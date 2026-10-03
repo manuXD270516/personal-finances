@@ -12,9 +12,12 @@ invariants: ["INV-031","INV-020"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-valuator.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["net-worth","valuation"]
@@ -34,7 +37,7 @@ expected_result:
   - "Patrimonio neto = 1006.50 BOB"
   - "Tasa USDT/BOB 12.02 PARALLEL informada con \"Fuente: paralelo.bo\", vigencia 2026-09-30T21:53:07Z y antigüedad 6 min"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-NETWORTH-001 — El patrimonio neto actual es activos menos pasivos valorados en BOB con la tasa informada

@@ -1,9 +1,9 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort } from '@pf/audit/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
-import type { Clock } from '@pf/shared-kernel';
+import { Instant, type Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
-import type { FxConversionPricingPort } from '../contracts/index.js';
+import type { FxConversionPricingPort, FxValuationPort, ValuationRateDto } from '../contracts/index.js';
 import { FxQueries } from '../application/fx.queries.js';
 import { FxService } from '../application/fx.service.js';
 import { MarketRateIngestion } from '../application/market-rate-ingestion.js';
@@ -22,7 +22,7 @@ import {
   type FxProviderSettings,
 } from '../application/provider-settings.js';
 import { ProviderStatusQueries } from '../application/provider-status.queries.js';
-import type { FxRateProvider, MarketRateProvider } from '../domain/index.js';
+import type { FxRateProvider, MarketRateProvider, ResolvedRate } from '../domain/index.js';
 import {
   PgCurrencyRepository,
   PgExchangeRateRepository,
@@ -35,7 +35,7 @@ import { PgProviderRunRepository } from '../infrastructure/pg-provider-runs.js';
 import { DolarApiBoProvider } from '../infrastructure/providers/dolarapi-bo.provider.js';
 import { ParaleloBoProvider } from '../infrastructure/providers/paralelo-bo.provider.js';
 import { ProviderHttpClient, type HttpTransport } from '../infrastructure/providers/provider-http-client.js';
-import { FX_PROVIDER_STATUS, FX_QUERIES, FX_SERVICE, FxController } from './fx-http.js';
+import { FX_PROVIDER_STATUS, FX_QUERIES, FX_SERVICE, FxController, toResolvedRateDto } from './fx-http.js';
 
 export interface FxRuntimeOptions {
   readonly pool: Pool;
@@ -57,9 +57,41 @@ export interface FxRuntime {
   readonly providerStatus: ProviderStatusQueries;
   /** Puerto in-process para TRANSACTIONS (`@pf/fx/contracts`): referencia y costo de conversiones. */
   readonly pricing: FxConversionPricingPort;
+  /** Valoración por lote para REPORTING (`@pf/fx/contracts`, add-basic-dashboard). */
+  readonly valuation: FxValuationPort;
   /** Gancho síncrono de `CreateWorkspace`: habilita las monedas por defecto. */
   readonly provisioner: {
     onWorkspaceCreated(input: { readonly workspaceId: string; readonly userId: string }): Promise<void>;
+  };
+}
+
+/** Tasa a precisión completa en la orientación almacenada (la original de una inversa; la cruzada tal cual). */
+function exactRate(r: ResolvedRate): ValuationRateDto['exact'] {
+  const stored = r.derivation === 'INVERSE' ? r.rate.inverse() : r.rate;
+  return { base: stored.base.code, quote: stored.quote.code, value: stored.value.toFixed() };
+}
+
+/** `FxValuationPort` sobre las consultas de FX (misma unidad de trabajo del llamador si existe). */
+function valuationPort(queries: FxQueries): FxValuationPort {
+  return {
+    get windowDays() {
+      return queries.windowDays;
+    },
+    async resolveValuationRates({ workspaceId, requests }) {
+      const found = await queries.resolveValuationRates(
+        workspaceId,
+        requests.map((r) => ({ base: r.base, quote: r.quote, at: Instant.parse(r.at) })),
+      );
+      return found.map((r) => (r ? { resolved: toResolvedRateDto(r), exact: exactRate(r) } : null));
+    },
+    async enabledCurrencies(workspaceId) {
+      const rows = await queries.listCurrencies(workspaceId, { enabled: true });
+      return rows.map((r) => ({
+        code: r.definition.code,
+        kind: r.definition.kind,
+        scale: r.definition.scale,
+      }));
+    },
   };
 }
 
@@ -96,6 +128,7 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
       settings,
     }),
     pricing: queries,
+    valuation: valuationPort(queries),
     provisioner: {
       // Sin consultar IDENTITY: el workspace aún se está creando en la misma transacción (BOB, USD, USDT).
       onWorkspaceCreated: ({ workspaceId }) => service.onWorkspaceCreated({ workspaceId }),

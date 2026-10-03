@@ -6,7 +6,12 @@ import type { Pool } from 'pg';
 import { LedgerMaintenance } from '../application/ledger-maintenance.js';
 import { LedgerService } from '../application/ledger.service.js';
 import type { LedgerInvariantViolation, MetricsPort } from '../application/ports/index.js';
-import type { BalanceQuery, LedgerPeriodLockPort, LedgerPostingPort } from '../contracts/index.js';
+import type {
+  AccountBalancesQuery,
+  BalanceQuery,
+  LedgerPeriodLockPort,
+  LedgerPostingPort,
+} from '../contracts/index.js';
 import { PgBalanceQuery } from '../infrastructure/pg-balance.queries.js';
 import { PgLedgerMaintenanceRepository } from '../infrastructure/pg-ledger-maintenance.js';
 import {
@@ -34,6 +39,8 @@ export interface LedgerRuntime {
   readonly posting: LedgerPostingPort;
   readonly periodLock: LedgerPeriodLockPort;
   readonly balances: BalanceQuery;
+  /** Saldos por cuenta en lote (Reporting, add-basic-dashboard). */
+  readonly accountBalances: AccountBalancesQuery;
 }
 
 /**
@@ -57,11 +64,8 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     },
     options.audit,
   );
-  return {
-    posting: service,
-    periodLock: service,
-    balances: new PgBalanceQuery(uow, pgCurrencyCatalog, options.clock),
-  };
+  const balances = new PgBalanceQuery(uow, pgCurrencyCatalog, options.clock);
+  return { posting: service, periodLock: service, balances, accountBalances: balances };
 }
 
 export interface LedgerMaintenanceOptions {

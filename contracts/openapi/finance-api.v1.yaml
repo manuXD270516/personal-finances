@@ -4746,6 +4746,9 @@ components:
           items: { $ref: '#/components/schemas/FxRate' }
         rateType: { $ref: '#/components/schemas/FxRateType' }
         source: { $ref: '#/components/schemas/FxRateSource' }
+        sourceLabel:
+          type: [string, 'null']
+          description: Free-text source of the rate used (e.g. the exchange house of a manual rate); null for cross rates
         asOf: { $ref: '#/components/schemas/Instant' }
         ageDays: { type: integer, minimum: 0 }
         approx: { type: boolean, description: True for cross rates or rates older than the freshness window }

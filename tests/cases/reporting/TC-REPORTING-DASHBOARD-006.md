@@ -12,9 +12,11 @@ invariants: ["INV-022"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["dashboard","read-your-writes","freshness"]
@@ -33,7 +35,7 @@ expected_result:
   - "meta incluye period 2026-09-01..2026-09-30, reportingCurrency BOB, generatedAt y dataFreshness"
   - "La respuesta lleva ETag; un If-None-Match con el ETag previo no devuelve 304"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-006 — El resumen refleja de inmediato un gasto recién posteado y declara su frescura

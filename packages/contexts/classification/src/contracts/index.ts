@@ -48,6 +48,28 @@ export interface ClassificationLookup {
   }): Promise<string[]>;
 }
 
+/** Categoría resumida para lecturas de otros contextos (Reporting, openspec add-basic-dashboard). */
+export interface CategorySummaryDto {
+  readonly categoryId: string;
+  readonly name: string;
+  readonly kind: CategoryKindDto;
+  readonly parentId: string | null;
+  /** Código de sistema (`FEES`, `UNCATEGORIZED`, …) o `null`. */
+  readonly systemCode: string | null;
+  readonly archived: boolean;
+}
+
+/** Nombres de categorías por id (incluye archivadas: los históricos las siguen mostrando). Sin efectos. */
+export interface CategoryCatalogQuery {
+  categoriesByIds(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly categoryIds: readonly string[];
+  }): Promise<readonly CategorySummaryDto[]>;
+}
+
+export const CATEGORY_CATALOG_QUERY = Symbol.for('pf.classification.CategoryCatalogQuery');
+
 /**
  * Provisión síncrona al crear un workspace (design §6-§7): categorías de sistema siempre y catálogo inicial si
  * `seedDefaultCategories`. Se invoca dentro de la unidad de trabajo de `CreateWorkspace` (misma transacción).

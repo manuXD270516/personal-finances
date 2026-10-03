@@ -12,9 +12,10 @@ invariants: ["INV-020","INV-001"]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/consolidation-service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["dashboard","rounding","fast-check"]
@@ -31,7 +32,7 @@ expected_result:
   - "No 801.34 BOB (suma de 400.67 redondeados por cuenta)"
   - "El resultado es determinista"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-004 — Los consolidados se redondean HALF_EVEN solo al presentar, agregando por moneda antes de convertir

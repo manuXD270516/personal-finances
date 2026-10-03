@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-valuator.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["net-worth","breakdown"]
@@ -33,7 +35,7 @@ expected_result:
   - "Por tipo: banco 685.00; efectivo 120.50; wallet cripto 601.00; tarjeta de crédito −400.00 (BOB)"
   - "Σ desglose por tipo = 1006.50 BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-NETWORTH-002 — El patrimonio se desglosa por moneda y por tipo de cuenta

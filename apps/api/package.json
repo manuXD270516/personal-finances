@@ -27,6 +27,7 @@
     "@pf/identity": "workspace:*",
     "@pf/ledger": "workspace:*",
     "@pf/platform": "workspace:*",
+    "@pf/reporting": "workspace:*",
     "@pf/shared-kernel": "workspace:*",
     "@pf/transactions": "workspace:*",
     "dbmate": "2.36.0",
