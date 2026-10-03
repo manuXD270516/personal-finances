@@ -12,15 +12,16 @@ invariants: [INV-001]
 priority: critical
 type: platform
 level: architecture
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/eslint-config/src/no-number-money.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["eslint", "money"]
 error_code: null
 preconditions:
-  - "tools/eslint-plugin-pf con las reglas pf/no-number-money y pf/no-float-parse"
+  - "packages/eslint-config (@pf/eslint-config) con la regla pf/no-number-money, que también cubre el parseo de flotantes (parseFloat/Number/+x) sobre montos"
 input:
   invalid:
     - "interface Expense { amount: number }"
@@ -36,7 +37,7 @@ expected_result:
   - "Cada muestra inválida reporta la regla correspondiente"
   - "Las muestras válidas no reportan nada (sin falsos positivos en números no monetarios)"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-PLATFORM-ARCH-002 — Una regla de ESLint prohíbe tipos number y el parseo de flotantes para valores monetarios

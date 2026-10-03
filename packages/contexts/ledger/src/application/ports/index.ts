@@ -100,3 +100,44 @@ export interface LedgerDeps {
   readonly clock: Clock;
   readonly context: LedgerRequestContext;
 }
+
+/** Métricas del ledger (Prometheus/OTel en la plataforma). */
+export interface MetricsPort {
+  increment(name: string, labels: Readonly<Record<string, string>>, value?: number): void;
+}
+
+/** Log estructurado (pino en la plataforma); los campos van en `fields`, nunca interpolados en el mensaje. */
+export interface LedgerLogPort {
+  info(fields: Readonly<Record<string, unknown>>, message: string): void;
+  error(fields: Readonly<Record<string, unknown>>, message: string): void;
+}
+
+/** Invariantes que revisa el verificador (design.md §Decisiones 10). */
+export type LedgerInvariant = 'INV-004' | 'INV-005' | 'INV-008' | 'INV-022' | 'STRUCTURE';
+
+export interface LedgerInvariantViolation {
+  readonly invariant: LedgerInvariant;
+  readonly workspaceId: string;
+  /** Asiento o cuenta contable afectada. */
+  readonly journalEntryId?: string;
+  readonly ledgerAccountId?: string;
+  readonly currency?: string;
+  readonly asOfDate?: string;
+  /** Diferencia o suma observada (decimal como string, nunca `number`). */
+  readonly difference?: string;
+  readonly detail: string;
+}
+
+/**
+ * Acceso de mantenimiento al ledger (worker, rol `pf_ledger_maintenance` asumido solo en la transacción del job):
+ * lectura entre workspaces y escritura de la caché `ledger.balance_snapshot` (DRV).
+ */
+export interface LedgerMaintenanceRepository {
+  /** Recalcula desde cero los snapshots al `asOfDate` (de un workspace/cuenta o de todo el ledger). */
+  rebuildSnapshots(input: {
+    readonly asOfDate: string;
+    readonly workspaceId?: string;
+    readonly ledgerAccountId?: string;
+  }): Promise<{ readonly workspaces: number; readonly snapshots: number }>;
+  findViolations(): Promise<readonly LedgerInvariantViolation[]>;
+}

@@ -82,6 +82,18 @@ export interface JobQueue {
   /** Encola con el `correlationId` del contexto actual (o uno nuevo si no hay). Devuelve el id del job. */
   send<P extends object>(queue: string, payload: P): Promise<string>;
   work<P extends object>(queue: string, options: WorkOptions, handler: JobHandler<P>): Promise<void>;
+  /**
+   * Programa envíos periódicos (cron de 5 campos, evaluado en `tz`) a `queue` con el reloj de la cola (pg-boss
+   * timekeeper, solo en procesos `consumer`). Idempotente entre réplicas y reinicios: reemplaza la programación previa.
+   */
+  schedule<P extends object>(
+    queue: string,
+    cron: string,
+    payload: P,
+    options?: { readonly tz?: string },
+  ): Promise<void>;
+  /** Elimina la programación de `queue` (idempotente). */
+  unschedule(queue: string): Promise<void>;
   /** Deja de tomar jobs nuevos y espera a que terminen los activos. */
   drain(): Promise<void>;
   stop(): Promise<void>;

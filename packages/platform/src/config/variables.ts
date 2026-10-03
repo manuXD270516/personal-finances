@@ -422,6 +422,25 @@ export const VARIABLES = {
     description: 'Dirección de escucha de los probes del worker.',
     default: '0.0.0.0',
   }),
+  LEDGER_INTEGRITY_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `0 4 * * *`) u `off`',
+      ),
+    {
+      group: 'Worker',
+      description:
+        'Cron (5 campos) del job diario del ledger: verificador de invariantes (`VerifyLedgerIntegrity`) y reconstrucción de snapshots de saldo al día anterior (`RebuildBalanceSnapshots`). `off` lo desactiva.',
+      default: '0 4 * * *',
+    },
+  ),
+  LEDGER_INTEGRITY_CRON_TZ: variable(z.string().min(1).max(64), {
+    group: 'Worker',
+    description: 'Zona horaria IANA en la que se evalúa `LEDGER_INTEGRITY_CRON`.',
+    default: 'UTC',
+  }),
 
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
@@ -512,6 +531,8 @@ export const APP_VARIABLES = {
     'WORKER_CONCURRENCY',
     'WORKER_HEALTH_PORT',
     'WORKER_HEALTH_BIND_ADDRESS',
+    'LEDGER_INTEGRITY_CRON',
+    'LEDGER_INTEGRITY_CRON_TZ',
     'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
   ],

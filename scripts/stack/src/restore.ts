@@ -68,6 +68,11 @@ runMain(async () => {
     if (restart.length > 0) {
       log(`levantando ${restart.join(', ')}`);
       await composeOrThrow(['*'], ['up', '-d', '--wait', '--no-deps', ...restart], {}, ctx);
+      // add-ledger-core 5.6: al arrancar, finance-worker encola `ledger.daily-maintenance`
+      // (VerifyLedgerIntegrity + RebuildBalanceSnapshots) sobre la base restaurada; las violaciones salen como log
+      // `error` (alert=ledger.invariant_violation) del worker.
+      if (restart.includes('finance-worker'))
+        log('finance-worker verificará las invariantes del ledger restaurado (job ledger.daily-maintenance)');
     }
   }
   log(`restore de ${id} completo en ${formatDuration(Date.now() - started)}`);

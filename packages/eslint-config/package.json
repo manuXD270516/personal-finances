@@ -1,0 +1,19 @@
+{
+  "name": "@pf/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plugin ESLint `pf` del monorepo: regla pf/no-number-money y restricción del Decimal global (openspec add-ledger-core 2.4, ADR-0006).",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "eslint": "10.11.0",
+    "typescript-eslint": "8.71.0",
+    "vitest": "catalog:"
+  }
+}

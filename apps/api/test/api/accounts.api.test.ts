@@ -11,6 +11,12 @@ import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { connect, inTx, sqlState } from '../support/db.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
+/** Recorta un NUMERIC (string decimal) a la escala de la moneda sin pasar por `number` (INV-001). */
+const atScale = (value: string, scale: number): string => {
+  const [integer = '0', fraction = ''] = value.split('.');
+  return scale === 0 ? integer : `${integer}.${fraction.padEnd(scale, '0').slice(0, scale)}`;
+};
+
 // ACCOUNTS por HTTP contra PostgreSQL real (Testcontainers postgres:18): contrato, roles, ETag/If-Match,
 // idempotencia, auditoría y outbox en la misma transacción, y la apertura con saldo inicial atómica con el ledger
 // (openspec add-accounts-management, tareas 2.5, 5.4, 6.1–6.3).
@@ -358,7 +364,7 @@ describe('apertura con saldo inicial', () => {
       bankPostings.map((p) => [
         p.entry_type,
         p.entry_date,
-        Number(p.amount).toFixed(2),
+        atScale(p.amount, 2),
         p.code.startsWith('EQUITY'),
       ]),
     ).toEqual([
@@ -367,9 +373,9 @@ describe('apertura con saldo inicial', () => {
     ]);
     expect(bankPostings[1]!.code).toContain('OPENING_BALANCE');
     const visaPostings = await postingsOf(editor, visa.body['id'] as string);
-    expect(visaPostings.map((p) => Number(p.amount).toFixed(2))).toEqual(['-2000.00', '2000.00']);
+    expect(visaPostings.map((p) => atScale(p.amount, 2))).toEqual(['-2000.00', '2000.00']);
     const usdtPostings = await postingsOf(editor, usdt.body['id'] as string);
-    expect(usdtPostings.map((p) => Number(p.amount).toFixed(6))).toEqual(['100.000000', '-100.000000']);
+    expect(usdtPostings.map((p) => atScale(p.amount, 6))).toEqual(['100.000000', '-100.000000']);
     expect(await postingsOf(editor, empty.body['id'] as string)).toEqual([]);
 
     // Un único ledger account por cuenta, con su naturaleza y moneda (sin ledger account si no hubo posting).

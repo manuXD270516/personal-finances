@@ -2,6 +2,7 @@
 // Las reglas de fronteras de arquitectura viven en dependency-cruiser (grupo 5), no aquí.
 import js from '@eslint/js';
 import nextPlugin from '@next/eslint-plugin-next';
+import { moneyConfig } from '@pf/eslint-config';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -53,6 +54,8 @@ export default tseslint.config(
       'contracts/**',
       'tests/cases/**',
       '.claude/**',
+      // Fixture que falla a propósito (TC-PLATFORM-ARCH-002): lo verifica el test de @pf/eslint-config.
+      'packages/eslint-config/fixtures/**',
     ],
   },
   js.configs.recommended,
@@ -72,6 +75,9 @@ export default tseslint.config(
       ...noSessionRlsContext,
     },
   },
+  // ADR-0006 / INV-001 (add-ledger-core 2.4): dinero nunca como `number` y sin el Decimal global de decimal.js
+  // (SPIKE-03 H7); el único dueño de decimal.js es el clon MoneyDecimal del shared-kernel.
+  ...moneyConfig({ decimalAllowed: ['packages/shared-kernel/src/money/**'] }),
   {
     // Nest usa clases inyectables y decoradores: las clases sin miembros son legítimas.
     files: ['apps/api/**/*.ts', 'packages/platform/src/nest/**/*.ts'],

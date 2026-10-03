@@ -3,9 +3,12 @@ import type { OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
+import { LedgerMaintenance } from '../application/ledger-maintenance.js';
 import { LedgerService } from '../application/ledger.service.js';
+import type { LedgerInvariantViolation, MetricsPort } from '../application/ports/index.js';
 import type { BalanceQuery, LedgerPeriodLockPort, LedgerPostingPort } from '../contracts/index.js';
 import { PgBalanceQuery } from '../infrastructure/pg-balance.queries.js';
+import { PgLedgerMaintenanceRepository } from '../infrastructure/pg-ledger-maintenance.js';
 import {
   PgJournalEntryRepository,
   PgLedgerAccountRepository,
@@ -54,7 +57,47 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     },
     options.audit,
   );
-  return { posting: service, periodLock: service, balances: new PgBalanceQuery(uow, pgCurrencyCatalog) };
+  return {
+    posting: service,
+    periodLock: service,
+    balances: new PgBalanceQuery(uow, pgCurrencyCatalog, options.clock),
+  };
 }
 
-export type { BalanceQuery, LedgerMetrics, LedgerPeriodLockPort, LedgerPostingPort };
+export interface LedgerMaintenanceOptions {
+  /** Pool del worker (rol `pf_worker`, que puede asumir `pf_ledger_maintenance`). */
+  readonly pool: Pool;
+  readonly clock: Clock;
+  readonly logger: Logger;
+  readonly metrics: MetricsPort;
+}
+
+/**
+ * Comandos internos `RebuildBalanceSnapshots` y `VerifyLedgerIntegrity` (tarea 4.5) para el job diario del worker y
+ * `restore:local` (tarea 5.6).
+ */
+export function createLedgerMaintenance(options: LedgerMaintenanceOptions): LedgerMaintenance {
+  return new LedgerMaintenance({
+    repository: new PgLedgerMaintenanceRepository(options.pool),
+    metrics: options.metrics,
+    logger: options.logger,
+    clock: options.clock,
+  });
+}
+
+/** Cola del job diario del ledger (verificador de invariantes + reconstrucción de snapshots). */
+export const LEDGER_DAILY_MAINTENANCE_QUEUE = 'ledger.daily-maintenance';
+
+export {
+  LEDGER_INVARIANT_VIOLATIONS_METRIC,
+  LEDGER_SNAPSHOTS_REBUILT_METRIC,
+} from '../application/ledger-maintenance.js';
+export type {
+  BalanceQuery,
+  LedgerInvariantViolation,
+  LedgerMaintenance,
+  LedgerMetrics,
+  LedgerPeriodLockPort,
+  LedgerPostingPort,
+  MetricsPort,
+};

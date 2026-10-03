@@ -181,3 +181,12 @@ Registradas durante la implementación autónoma del 2026-10-02 (owner ausente; 
 27. **Minimal Seed (8.5):** `dataset_version` 2; siembra usuarios (vía `iam.provision_user`), W1/W2 y membresías con el rol `pf_app` bajo RLS (una transacción por workspace con contexto LOCAL; sin `ON CONFLICT` en `iam.workspace` porque el upsert exigiría la política SELECT de membresía). No pasa por casos de uso: no existe todavía un caso de uso de "agregar miembro" (invitaciones son Phase 11).
 28. **UI mínima (8.4, parcial):** páginas autenticadas bajo `app/[locale]/(app)` (layout que valida la sesión en el servidor), selector de workspace activo, configuración del workspace (`If-Match`), preferencias personales y alta de workspace (clave de idempotencia por intento + guarda contra doble envío), página pública `/auth/error` (motivos `state|idp|callback|provision|expired`). `CSRF_REJECTED` tiene mensaje propio en la UI (fuera del `ErrorCatalog` de la API). Sin estilos ni tests de componentes todavía.
 29. **E2E (grupo 9):** paquete `tests/e2e` (`@pf/e2e`, Playwright 1.63 + Chromium) que levanta un stack Compose desechable `pfos-e2e` (modo B, puertos 4xxxx, `.env` temporal) con Keycloak real. El job `e2e` de `pr.yml` reutiliza las imágenes del job `image`; no es check requerido todavía.
+
+### Registro 2026-10-03 — matriz de autorización (tarea 7.4)
+
+Implementación autónoma (owner ausente), pendiente de revisión:
+
+- La matriz se **deriva del contrato** (`x-required-role` de cada operación) en lugar de un archivo declarativo aparte: un solo origen de verdad; el test falla si una operación de workspace no declara `x-required-role`.
+- Solo entran las operaciones **con ruta implementada** (sin credenciales responden 401; las no implementadas responden 404). Cuando un change implementa una operación, entra sola en la matriz.
+- Con ids aleatorios y cuerpo vacío, "permitido" significa que la autorización deja pasar (cualquier estado distinto de 401/403: 2xx, 400, 404, 412, 422). Verificar 2xx exige datos válidos por operación y queda en los tests de cada contexto.
+- Anónimo → 401; no miembro → 403 `WORKSPACE_ACCESS_DENIED`; rol insuficiente → 403 `INSUFFICIENT_ROLE` (jerarquía VIEWER < EDITOR < OWNER).

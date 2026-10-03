@@ -14,8 +14,8 @@
 - [x] 2.1 TDD: promover `Money`, `MoneyDecimal`, `Currency`, `Rate` y `rounding` desde `spikes/SPIKE-03-money/src` a `packages/shared-kernel/src/money`, migrando primero sus tests `[TC-LEDGER-MONEY-001]`, `[TC-LEDGER-MONEY-007]`, `[TC-LEDGER-MONEY-008]`; verificar que pasan y que `pnpm typecheck` valida los `@ts-expect-error` de TC-001
 - [x] 2.2 TDD: rechazo de escala excedida con `AMOUNT_SCALE_EXCEEDED` (unificado; reemplaza `MONEY_SCALE_EXCEEDED` del spike) y rango con `AMOUNT_OUT_OF_RANGE`; tests `[TC-LEDGER-SCALE-001]`
 - [x] 2.3 TDD: redondeo HALF_EVEN con cuantización racional exacta (H3) y reparto por mayor residuo truncando hacia cero (H5); tests `[TC-LEDGER-MONEY-003]`, `[TC-LEDGER-MONEY-005]` y propiedades `[TC-LEDGER-MONEY-004]`, `[TC-LEDGER-MONEY-006]` (100 runs en PR, 10 000 nightly)
-- [ ] 2.4 Mover la regla `pf/no-number-money` y `no-restricted-imports` del `Decimal` global a `packages/eslint-config`; verificar que el fixture malo falla y el bueno pasa (TC-PLATFORM-ARCH-002)
-  > Pendiente: `pf/no-number-money` sigue solo en `spikes/SPIKE-03-money/lint` (no existe `packages/eslint-config`). Mientras tanto `Money` rechaza `number` al compilar (`@ts-expect-error` de TC-LEDGER-MONEY-001, validado por `pnpm typecheck`) y en ejecución (`MONEY_INVALID_AMOUNT`).
+- [x] 2.4 Mover la regla `pf/no-number-money` y `no-restricted-imports` del `Decimal` global a `packages/eslint-config`; verificar que el fixture malo falla y el bueno pasa (TC-PLATFORM-ARCH-002)
+  > Hecho (2026-10-03): `@pf/eslint-config` (`packages/eslint-config`) con `pf/no-number-money` (capa sintáctica: `number` en nombres monetarios, `parseFloat`/`Number`/`+x` sobre montos, literales en `Money.of`, `toFixed(n)`/`toNumber()`) y `no-restricted-imports` de `decimal.js`, aplicado a todo el monorepo desde `eslint.config.js` (excepción: `packages/shared-kernel/src/money/**`, dueño de `MoneyDecimal`). `fixtures/bad.ts` falla y `fixtures/good.ts` pasa en `src/no-number-money.test.ts` (RuleTester + ESLint). Ver design.md → Registro 2026-10-03 (hardening).
 - [ ] 2.5 Verificar cobertura del shared-kernel ≥ 95 % líneas / 90 % ramas y mutation score ≥ 80 % (Stryker) en Money/rounding/allocation (NFR-MAINT-002)
   > Pendiente: no se ejecutó Stryker ni cobertura en esta sesión (`stryker.config.json` ya incluye `src/money/**`).
 
@@ -32,10 +32,10 @@
 - [x] 4.1 `PostJournalEntry` con `LedgerAccountResolver` (get-or-create de cuentas de usuario y de sistema), idempotencia por `sourceRef` y escritura de `ledger.JournalEntryPosted.v1` en el outbox; tests de aplicación con fakes `[TC-LEDGER-METADATA-001]`, `[TC-LEDGER-OPENING-001]`, `[TC-LEDGER-TRANSFER-001]`
 - [x] 4.2 `ReverseJournalEntry(entryId, reverseDate, reason)` validando periodo abierto y reversa única
 - [x] 4.3 `LedgerPeriodLockPort` (`lockPeriod`, `unlockPeriod`, idempotentes) para uso de Planning en Phase 2; verificar con `[TC-LEDGER-PERIOD-001]` usando el puerto directamente
-- [ ] 4.4 `BalanceQuery` (`GetBalance`, `GetBalances` agrupado por moneda, `GetTrialBalance`, `GetEntriesBySource`); tests `[TC-LEDGER-BALANCES-005]` (el saldo contable ignora pendientes)
-  > Parcial: `PgBalanceQuery` implementa GetBalance/GetBalances/GetTrialBalance/GetEntriesBySource (TC-LEDGER-BALANCES-003/004 en integración). Falta el saldo "actual" por defecto en la zona horaria del workspace (tercer punto de TC-LEDGER-BALANCES-002) y TC-LEDGER-BALANCES-005.
-- [ ] 4.5 Comandos internos `RebuildBalanceSnapshots` y `VerifyLedgerIntegrity` con `MetricsPort` y log estructurado
-  > Pendiente: `RebuildBalanceSnapshots` y `VerifyLedgerIntegrity` sin implementar (tabla `balance_snapshot` y grants DRV ya existen).
+- [x] 4.4 `BalanceQuery` (`GetBalance`, `GetBalances` agrupado por moneda, `GetTrialBalance`, `GetEntriesBySource`); tests `[TC-LEDGER-BALANCES-005]` (el saldo contable ignora pendientes)
+  > Hecho (2026-10-03): saldo "actual" por defecto = hoy en la zona horaria del workspace (`Clock`), TC-LEDGER-BALANCES-002 completo y TC-LEDGER-BALANCES-005 en `test/integration/ledger-maintenance.int.test.ts`.
+- [x] 4.5 Comandos internos `RebuildBalanceSnapshots` y `VerifyLedgerIntegrity` con `MetricsPort` y log estructurado
+  > Hecho (2026-10-03): `application/ledger-maintenance.ts` (puertos `LedgerMaintenanceRepository`, `MetricsPort`, `LedgerLogPort`), `infrastructure/pg-ledger-maintenance.ts` y `createLedgerMaintenance`; métricas `ledger_invariant_violations_total{invariant}` y `ledger_balance_snapshots_rebuilt_total`; tests unitarios en `ledger-maintenance.test.ts`.
 
 ## 5. Persistencia (INFRASTRUCTURE)
 
@@ -44,9 +44,9 @@
 - [x] 5.3 Tests de base de datos con rol `pf_app`: `[TC-LEDGER-BALANCE-002]`, `[TC-LEDGER-STRUCTURE-002]`, `[TC-LEDGER-IMMUTABILITY-001]`, `[TC-LEDGER-PERIOD-002]`, `[TC-LEDGER-REVERSAL-002]` (PK de `entry_reversal` bajo concurrencia), `[TC-LEDGER-ISOLATION-001]`
 - [x] 5.4 Mapeo de SQLSTATE (`PF001/PF004/PF005` → `DomainError`; `PF002/PF003/42501` → `INTERNAL_ERROR` + métrica); verificar con tests de integración que el código llega íntegro
 - [ ] 5.5 Consultas de saldo con el índice `INCLUDE (amount)` y snapshots (`balance_snapshot`, worker); tests `[TC-LEDGER-BALANCES-001]`, `[TC-LEDGER-BALANCES-002]`, `[TC-LEDGER-BALANCES-003]`, `[TC-LEDGER-SNAPSHOT-001]`; medir p95 ≤ 50 ms por cuenta (NFR-PERF-005) y overhead de RLS < 10 % con `EXPLAIN ANALYZE`
-  > Parcial: saldos por `SUM` sobre `posting_balance_ix`; sin snapshots ni medición p95/overhead de RLS (TC-LEDGER-BALANCES-001 y TC-LEDGER-SNAPSHOT-001 sin automatizar).
-- [ ] 5.6 Job diario del verificador de invariantes en el worker y enganche en `restore:local`; test `[TC-LEDGER-INTEGRITY-001]`
-  > Pendiente: job diario del verificador y enganche en `restore:local` (TC-LEDGER-INTEGRITY-001).
+  > Parcial (2026-10-03): lectura = snapshot vigente + Σ postings posteriores (descarta en la misma consulta los snapshots invalidados por asientos retroactivos); TC-LEDGER-BALANCES-001/002 y SNAPSHOT-001 automatizados. Falta medir p95 y el overhead de RLS (sin dataset `large` en esta sesión).
+- [x] 5.6 Job diario del verificador de invariantes en el worker y enganche en `restore:local`; test `[TC-LEDGER-INTEGRITY-001]`
+  > Hecho (2026-10-03): cola `ledger.daily-maintenance` (pg-boss cron `LEDGER_INTEGRITY_CRON`/`LEDGER_INTEGRITY_CRON_TZ`, default `0 4 * * *` UTC; `off` lo desactiva) que ejecuta `VerifyLedgerIntegrity` y luego `RebuildBalanceSnapshots`; también se encola al arrancar el worker, de modo que `restore:local` (que reinicia finance-worker) verifica el ledger restaurado. TC-LEDGER-INTEGRITY-001 automatizado.
 
 ## 6. Contratos de API y eventos (API)
 
@@ -70,4 +70,4 @@
 - [ ] 9.1 Reportar al owner las correcciones de docs detectadas (PF002 duplicado en docs/08, FR-ACCOUNTS-003 vs get-or-create de docs/09 §2.2, prioridades FR-LEDGER-014/015 vs NFR-DATA-008/009, FR erróneos en TC previos) y actualizar docs/09/docs/08 cuando el owner lo apruebe
   > Pendiente de aprobación del owner: ver design.md → "Registro de implementación (2026-10-03)".
 - [ ] 9.2 Actualizar `automation_status`/`status` de los TC, regenerar `tests/traceability/matrix.{md,json}` y ejecutar `openspec validate add-ledger-core --strict --no-interactive`
-  > Parcial: TC automatizados actualizados (35) y matriz regenerada; quedan sin automatizar TC-LEDGER-BALANCES-001/002/005, SNAPSHOT-001, INTEGRITY-001 y TRIAL-001.
+  > Parcial (2026-10-03): TC-LEDGER-BALANCES-001/002/005, SNAPSHOT-001 e INTEGRITY-001 y TC-PLATFORM-ARCH-002 marcados automatizados; queda TC-LEDGER-TRIAL-001 (6.3, Could).

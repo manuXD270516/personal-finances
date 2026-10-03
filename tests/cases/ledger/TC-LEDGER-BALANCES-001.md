@@ -12,9 +12,10 @@ invariants: [INV-022]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/ledger-maintenance.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [balances, snapshot]
@@ -34,7 +35,7 @@ expected_result:
 - El snapshot reconstruido es igual al snapshot previo a la eliminación
 - El saldo obtenido del snapshot es igual al saldo obtenido de SUM(postings)
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCES-001 — El saldo de una cuenta es igual a la suma de sus postings y los snapshots se reconstruyen idénticos

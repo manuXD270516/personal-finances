@@ -17,12 +17,15 @@ import {
   type HealthServer,
 } from '@pf/platform/health';
 import type { Logger } from '@pf/platform/logging';
+import { createLedgerMaintenance } from '@pf/ledger/interface/ledger.module';
 import { PinoNestLogger } from '@pf/platform/nest';
-import { shutdownTelemetry } from '@pf/platform/otel';
+import { otelCounters, shutdownTelemetry } from '@pf/platform/otel';
 import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
+import { systemClock, type Clock } from '@pf/shared-kernel';
 import { Pool } from 'pg';
 import { createJobQueue } from '../runtime/platform-resources.js';
+import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { WorkerModule } from './platform-jobs.js';
 
 export interface WorkerRuntime {
@@ -47,6 +50,10 @@ export interface WorkerRuntimeOptions {
   /** Ajustes del relay (tests: lote, polling, inyección de fallos). */
   readonly relay?: Partial<Pick<OutboxRelayOptions, 'batchSize' | 'pollIntervalMs' | 'afterEnqueue'>>;
   readonly metrics?: EventDeliveryMetrics;
+  /** Reloj de los comandos del ledger (tests: FixedClock). */
+  readonly clock?: Clock;
+  /** Encola el mantenimiento diario del ledger al arrancar (por defecto sí; los tests lo desactivan). */
+  readonly ledgerMaintenanceOnStart?: boolean;
 }
 
 export async function createWorkerRuntime(
@@ -87,6 +94,24 @@ export async function createWorkerRuntime(
       diagnostics: config.PFOS_ENV === 'local' || config.PFOS_ENV === 'ci',
     }),
     { logger: new PinoNestLogger(logger), abortOnError: false },
+  );
+
+  // Job diario del ledger: verificador de invariantes + snapshots (add-ledger-core 5.6). Corre también al arrancar,
+  // así `restore:local` (que reinicia el worker) verifica el ledger restaurado.
+  await registerLedgerDailyJob(
+    queue,
+    createLedgerMaintenance({
+      pool,
+      clock: options.clock ?? systemClock,
+      logger,
+      metrics: otelCounters('@pf/ledger'),
+    }),
+    logger,
+    {
+      cron: config.LEDGER_INTEGRITY_CRON,
+      tz: config.LEDGER_INTEGRITY_CRON_TZ,
+      runOnStart: options.ledgerMaintenanceOnStart ?? true,
+    },
   );
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);

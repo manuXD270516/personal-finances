@@ -12,9 +12,10 @@ invariants: [INV-022]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/ledger-maintenance.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [balances, as-of]
@@ -40,7 +41,7 @@ expected_result:
 - Tras el retroactivo, el saldo al 2026-01-31 es 830.00 BOB
 - Con FixedClock en 2026-02-01T02:30:00Z (2026-01-31 22:30 en La Paz) y antes del retroactivo, el saldo actual por defecto se calcula al 2026-01-31 y es 850.00 BOB
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-BALANCES-002 — El saldo a una fecha incluye solo asientos hasta esa fecha, también los retroactivos

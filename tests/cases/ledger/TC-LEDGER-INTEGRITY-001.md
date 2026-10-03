@@ -12,9 +12,10 @@ invariants: [INV-004, INV-005, INV-008, INV-022]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/ledger/test/integration/ledger-maintenance.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [invariants, observability]
@@ -33,7 +34,7 @@ expected_result:
 - 'Segunda ejecución: reporta INV-022 con la cuenta, la fecha y la diferencia 4.50 BOB'
 - Se emite un log de nivel error con workspaceId, se incrementa la métrica y se dispara la alerta crítica
 created: &id001 2026-10-02
-updated: *id001
+updated: 2026-10-03
 ---
 
 # TC-LEDGER-INTEGRITY-001 — El verificador de invariantes detecta un snapshot divergente y emite alerta

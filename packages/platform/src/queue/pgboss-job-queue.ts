@@ -48,7 +48,8 @@ export class PgBossJobQueue implements JobQueue {
       // (installPgBossSchema). Si falta o está desactualizado, start() falla en vez de intentar DDL.
       migrate: false,
       supervise: consumer,
-      schedule: false,
+      // Timekeeper (cron) solo en el worker: los jobs periódicos del ledger (add-ledger-core 5.6).
+      schedule: consumer,
       useListenNotify: consumer,
     });
     this.boss.on('error', (err: unknown) =>
@@ -173,6 +174,24 @@ export class PgBossJobQueue implements JobQueue {
       },
     );
     this.working.add(queue);
+  }
+
+  async schedule<P extends object>(
+    queue: string,
+    cron: string,
+    payload: P,
+    options: { readonly tz?: string } = {},
+  ): Promise<void> {
+    await this.ensureQueue(queue);
+    // Los envíos del cron no pasan por `send`: el envelope se fija al programar (correlación propia de la
+    // programación; cada ejecución tiene además su `job.id`).
+    const envelope: JobEnvelope<P> = { v: 1, correlationId: uuidv7(), traceContext: {}, payload };
+    await this.boss.schedule(queue, cron, envelope, { tz: options.tz ?? 'UTC' });
+    this.options.logger.info({ 'job.queue': queue, cron, tz: options.tz ?? 'UTC' }, 'job scheduled');
+  }
+
+  async unschedule(queue: string): Promise<void> {
+    await this.boss.unschedule(queue);
   }
 
   async drain(): Promise<void> {
