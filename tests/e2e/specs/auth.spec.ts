@@ -89,7 +89,14 @@ test.describe('autenticación vía BFF con Keycloak real (identity/authenticatio
     expect(accessToken).toMatch(JWT);
     // En el almacén de sesiones los tokens están cifrados (AES-256-GCM), no son JWT legibles.
     expect(stored.raw).not.toContain(accessToken);
-    expect(stored.raw).not.toMatch(/eyJ/);
+    // El texto cifrado es base64url aleatorio: puede contener "eyJ" por azar. Lo que importa es que
+    // no aparezca ningún segmento real de los tokens ni nada con forma de JWT (cabecera.payload.).
+    for (const token of [accessToken, refreshToken, idToken].filter(Boolean) as string[]) {
+      for (const segment of token.split('.').filter((part) => part.length >= 16)) {
+        expect(stored.raw).not.toContain(segment);
+      }
+    }
+    expect(stored.raw).not.toMatch(/eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\./);
 
     const browserSide = await page.evaluate(() => ({
       documentCookie: document.cookie,
