@@ -1,3 +1,4 @@
+import type { AuditEntry } from '@pf/audit/contracts';
 import { DomainError, type Currency } from '@pf/shared-kernel';
 import { roleGrants, type Permission, type Role } from '../domain/role.js';
 import type { User, UserPreferenceChanges } from '../domain/user.js';
@@ -100,12 +101,13 @@ export class IdentityService {
         personal: true,
       });
       await this.persistNewWorkspace(workspace, userId, 'PERSONAL_DEFAULT');
-      await this.deps.audit.record({
-        action: 'identity.user.provisioned',
-        actorUserId: userId,
+      await this.deps.audit.append({
         workspaceId: workspace.id,
-        targetId: userId,
-        details: { issuer: identity.issuer },
+        action: 'identity.user.provisioned',
+        aggregateType: 'User',
+        aggregateId: userId,
+        changes: [{ field: 'displayName', before: null, after: identity.displayName }],
+        actor: { type: 'USER', userId },
       });
       return { userId, createdWorkspaceId: workspace.id };
     });
@@ -136,15 +138,30 @@ export class IdentityService {
       const user = await this.deps.users.findById(userId);
       if (!user) throw notFound('user');
       if (user.version !== expectedVersion) throw preconditionFailed();
+      const before = profileOf(user);
       const prefs: UserPreferenceChanges = {
         ...(changes.displayName === undefined ? {} : { displayName: changes.displayName }),
         ...(changes.locale === undefined ? {} : { locale: changes.locale }),
         ...(changes.timezone === undefined ? {} : { timeZone: changes.timezone }),
         ...(changes.preferences === undefined ? {} : { preferences: changes.preferences }),
       };
-      if (user.updatePreferences(prefs) && !(await this.deps.users.savePreferences(user, expectedVersion))) {
-        throw preconditionFailed();
-      }
+      if (!user.updatePreferences(prefs)) return user;
+      if (!(await this.deps.users.savePreferences(user, expectedVersion))) throw preconditionFailed();
+      const after = profileOf(user);
+      const diff = PROFILE_FIELDS.filter((f) => before[f] !== after[f]).map((field) => ({
+        field,
+        before: before[field],
+        after: after[field],
+      }));
+      // `preferences` (JSON libre) no se copia: la allow-list de `User` no lo incluye. El perfil no pertenece a un
+      // workspace: se audita en el workspace hogar del usuario (design.md, decisiones de implementación).
+      await this.auditInHomeWorkspace(userId, null, {
+        action: 'identity.user.preferences_changed',
+        aggregateType: 'User',
+        aggregateId: userId,
+        aggregateVersion: user.version,
+        changes: diff,
+      });
       return user;
     });
   }
@@ -241,16 +258,39 @@ export class IdentityService {
           actor: { type: 'USER', id: userId },
           payload: { workspaceId: workspace.id, changes },
         });
-        await this.deps.audit.record({
-          action: 'identity.workspace.settings_changed',
-          actorUserId: userId,
+        await this.deps.audit.append({
           workspaceId: workspace.id,
-          targetId: workspace.id,
-          details: { changes },
+          action: 'identity.workspace.settings_changed',
+          aggregateType: 'Workspace',
+          aggregateId: workspace.id,
+          aggregateVersion: workspace.version,
+          changes: changes.map((c) => ({ field: c.field, before: c.before, after: c.after })),
+          actor: { type: 'USER', userId },
         });
       }
       return { view: { workspace, role }, changes };
     });
+  }
+
+  // ------------------------------------------------------------------ sesión (FR-AUDIT-005)
+
+  /**
+   * `RecordSessionEvent`: audita el inicio (`STARTED`) o el cierre (`ENDED`) de una sesión del BFF en el workspace
+   * activo de la sesión (o el hogar del usuario). User agent y HMAC de la IP los completa AUDIT desde el contexto de
+   * la petición; nunca tokens ni cookies. Devuelve el workspace donde quedó (o `null` si se omitió).
+   */
+  async recordSessionEvent(
+    userId: string,
+    event: 'STARTED' | 'ENDED',
+    activeWorkspaceId: string | null,
+  ): Promise<string | null> {
+    return this.deps.uow.run({ userId, workspaceId: null }, () =>
+      this.auditInHomeWorkspace(userId, activeWorkspaceId, {
+        action: event === 'STARTED' ? 'identity.session.started' : 'identity.session.ended',
+        aggregateType: 'User',
+        aggregateId: userId,
+      }),
+    );
   }
 
   // ------------------------------------------------------------------ helpers
@@ -293,14 +333,65 @@ export class IdentityService {
         origin,
       },
     });
-    await this.deps.audit.record({
-      action: 'identity.workspace.created',
-      actorUserId: userId,
+    await this.deps.audit.append({
       workspaceId: workspace.id,
-      targetId: workspace.id,
-      details: { origin },
+      action: 'identity.workspace.created',
+      aggregateType: 'Workspace',
+      aggregateId: workspace.id,
+      aggregateVersion: 1,
+      changes: [
+        { field: 'name', before: null, after: s.name },
+        { field: 'baseCurrency', before: null, after: s.baseCurrency.code },
+        { field: 'timeZone', before: null, after: s.timeZone.value },
+        { field: 'locale', before: null, after: s.locale.value },
+        { field: 'fiscalMonthStartDay', before: null, after: s.fiscalMonthStartDay },
+        { field: 'origin', before: null, after: origin },
+      ],
+      actor: { type: 'USER', userId },
     });
+    for (const m of workspace.memberships) {
+      await this.deps.audit.append({
+        workspaceId: workspace.id,
+        action: 'identity.workspace.member_added',
+        aggregateType: 'Workspace',
+        aggregateId: workspace.id,
+        aggregateVersion: 1,
+        changes: [
+          { field: 'memberUserId', before: null, after: m.userId },
+          { field: 'memberRole', before: null, after: m.role },
+        ],
+        actor: { type: 'USER', userId },
+      });
+    }
   }
+
+  /**
+   * Audita un evento del usuario que no pertenece a un workspace (perfil, sesión): en `preferred` si el usuario es
+   * miembro activo; si no, en su workspace hogar (la membresía activa más antigua, UUIDv7). Sin workspaces no hay
+   * dónde registrarlo (`audit_log.workspace_id` es obligatorio): se omite (design §6). Devuelve el workspace usado.
+   */
+  private async auditInHomeWorkspace(
+    userId: string,
+    preferred: string | null,
+    entry: Omit<AuditEntry, 'workspaceId' | 'actor'>,
+  ): Promise<string | null> {
+    let target: string | null = null;
+    if (preferred !== null && (await this.deps.memberships.activeRole(userId, preferred)) !== null) {
+      target = preferred;
+    }
+    target ??= (await this.deps.workspaces.listForUser(userId, { limit: 1 }))[0]?.id ?? null;
+    if (target === null) return null;
+    await this.deps.uow.bind({ userId, workspaceId: target });
+    await this.deps.audit.append({ ...entry, workspaceId: target, actor: { type: 'USER', userId } });
+    return target;
+  }
+}
+
+const PROFILE_FIELDS = ['displayName', 'locale', 'timeZone'] as const;
+
+/** Campos del perfil que se auditan (allow-list `User` de IDENTITY_AUDIT_POLICY). */
+function profileOf(user: User): Record<(typeof PROFILE_FIELDS)[number], string | null> {
+  return { displayName: user.displayName, locale: user.locale.value, timeZone: user.timeZone?.value ?? null };
 }
 
 function preconditionFailed(): DomainError {

@@ -1,5 +1,9 @@
 import { Transaction } from '../domain/transaction.js';
 // Consumo cruzado permitido: solo vía contracts del otro contexto.
 import type { PostEntryCommand } from '../../../ledger/src/contracts/index.js';
+import type { AuditPort } from '../../../audit/src/contracts/index.js';
 
-export const recordTransaction = (cmd: PostEntryCommand): Transaction => new Transaction(cmd);
+export const recordTransaction = async (cmd: PostEntryCommand, audit: AuditPort): Promise<Transaction> => {
+  await audit.append({ workspaceId: 'w', action: 'transactions.transaction.recorded' });
+  return new Transaction(cmd);
+};

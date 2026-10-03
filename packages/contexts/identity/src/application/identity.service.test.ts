@@ -72,8 +72,10 @@ describe('ProvisionUserFromIdentity', () => {
     });
     expect(mem.auditEntries.map((a) => a.action)).toEqual([
       'identity.workspace.created',
+      'identity.workspace.member_added',
       'identity.user.provisioned',
     ]);
+    expect(mem.auditEntries.every((a) => a.workspaceId === createdWorkspaceId)).toBe(true);
     // La transacción fija el workspace nuevo como contexto RLS antes de insertarlo.
     expect(mem.contexts).toContainEqual({ userId, workspaceId: createdWorkspaceId });
   });

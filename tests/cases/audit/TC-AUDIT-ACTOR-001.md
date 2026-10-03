@@ -12,9 +12,13 @@ invariants: [INV-029]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/domain/audit-record.test.ts
+  - packages/contexts/audit/src/application/audit-recorder.test.ts
+  - packages/contexts/audit/test/integration/pg-audit-log.int.test.ts
+  - packages/platform/src/nest/request-context.middleware.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["audit", "worker"]
@@ -33,7 +37,7 @@ expected_result:
   - "El registro conserva correlationId C7"
   - "Un registro de actor USER sin userId o de actor SYSTEM sin proceso es rechazado por el dominio y por la base de datos"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-ACTOR-001 — Una mutación hecha por un proceso del sistema se audita con actor de sistema y conserva la correlación
@@ -50,3 +54,7 @@ Cuando el proceso crea la cuenta contable de sistema para USDT
 Entonces el registro de auditoría identifica un actor de sistema con su proceso
   Y conserva la correlación "C7"
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): La creación de la cuenta contable de sistema USDT se simula con un proceso `ledger.system-accounts` (contexto ambiental SYSTEM y consumidor real del worker) hasta `add-ledger-core`.

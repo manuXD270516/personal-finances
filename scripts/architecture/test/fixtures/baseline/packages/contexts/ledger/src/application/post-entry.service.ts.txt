@@ -1,5 +1,9 @@
 import { JournalEntry } from '../domain/journal-entry.js';
 import type { PostEntryCommand } from '../contracts/index.js';
+import type { AuditPort } from '../../../audit/src/contracts/index.js';
 
-export const postEntry = (cmd: PostEntryCommand): JournalEntry =>
-  new JournalEntry({ amount: cmd.amount, currency: cmd.currency }, { amount: cmd.amount, currency: cmd.currency });
+export const postEntry = async (cmd: PostEntryCommand, audit: AuditPort): Promise<JournalEntry> => {
+  const entry = new JournalEntry({ amount: cmd.amount, currency: cmd.currency }, { amount: cmd.amount, currency: cmd.currency });
+  await audit.append({ workspaceId: 'w', action: 'ledger.journal_entry.posted' });
+  return entry;
+};

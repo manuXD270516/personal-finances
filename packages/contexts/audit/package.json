@@ -1,0 +1,45 @@
+{
+  "name": "@pf/audit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context AUDIT: pista de auditoría atómica, inmutable y aislada por workspace (openspec add-audit-trail).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./interface/audit.module": {
+      "@pf/source": "./src/interface/audit.module.ts",
+      "types": "./dist/interface/audit.module.d.ts",
+      "default": "./dist/interface/audit.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "fast-check": "4.10.2",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

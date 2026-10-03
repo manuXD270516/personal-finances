@@ -339,7 +339,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | reports | `GET W/reports/summary` (P1: calculado leyendo el ledger y las transacciones directamente, sin read models; consolidado en moneda de reporte siempre presente con `complete` y `unconverted[]`), `GET W/reports/{kpis,income-expenses,budget-vs-actual,expenses/by-category,…}` ([14-reporting.md](14-reporting.md)) | `reporting/*` | 1 / 7 |
 | forecasts | `POST W/forecasts` (202), `GET …/{id}`, `GET W/forecasts/latest?kind=` | `forecast/expense-forecasting` | 8 |
 | notifications | `GET W/notifications`, `POST …/{id}/read`, `GET/PUT W/notification-preferences` | `notifications/alerts` | 2 |
-| audit-log | `GET W/audit-log?aggregateType=&aggregateId=&actor=&from=&to=` | `audit/audit-trail` | 1 |
+| audit-log | `GET W/audit-log?aggregateType=&aggregateId=&from=&to=&sort=` (`listAuditLog`, EDITOR+; filtro `actor` en Phase 2) y `POST /me/session-events` (`recordSessionEvent`, auditoría de login/logout que invoca el BFF) | `audit/audit-trail` | 1 |
 | operations | `GET W/operations/{id}`, `POST …/{id}/cancel` | `platform/api-conventions` | 1 (contrato) / 6 (uso) |
 | exports | `POST W/exports` (202), `GET W/exports/{id}` | `reporting/financial-reports` + privacidad | 7 |
 | assistant | `POST W/assistant/conversations`, `POST …/{id}/messages` | `assistant/read-only-assistant` | 10 |

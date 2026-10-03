@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../bff/finance-api-client';
 import { ProblemMessage } from '../errors/ProblemMessage';
+import { AuditHistory } from './AuditHistory';
 import { useSession, type Me } from './session-context';
 
 const CURRENCIES = ['BOB', 'USD', 'USDT', 'BTC', 'ETH'];
@@ -117,63 +118,74 @@ export function WorkspaceSettingsForm() {
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} aria-labelledby="ws-settings-title">
-      <h1 id="ws-settings-title">{t('settingsTitle')}</h1>
-      {ws.role !== 'OWNER' ? <p>{t('readOnly')}</p> : null}
-      <label>
-        {t('name')}
-        <input name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      </label>
-      <label>
-        {t('baseCurrency')}
-        <select
-          name="baseCurrency"
-          value={form.baseCurrency}
-          onChange={(e) => setForm({ ...form, baseCurrency: e.target.value })}
-        >
-          {CURRENCIES.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {t('timezone')}
-        <input
-          name="timezone"
-          list="ws-timezones"
-          value={form.timezone}
-          onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-        />
-        <TimezoneOptions id="ws-timezones" />
-      </label>
-      <label>
-        {t('fiscalMonthStartDay')}
-        <input
-          name="fiscalMonthStartDay"
-          type="number"
-          min={1}
-          max={28}
-          value={form.fiscal}
-          onChange={(e) => setForm({ ...form, fiscal: e.target.value })}
-        />
-      </label>
-      <label>
-        {t('minimumReserve')}
-        <input
-          name="minimumReserve"
-          inputMode="decimal"
-          value={form.reserve}
-          aria-describedby="reserve-hint"
-          onChange={(e) => setForm({ ...form, reserve: e.target.value })}
-        />
-      </label>
-      <small id="reserve-hint">{t('minimumReserveHint')}</small>
-      <button type="submit" disabled={busy}>
-        {busy ? t('saving') : t('save')}
-      </button>
-      {saved ? <p role="status">{t('saved')}</p> : null}
-      {problem ? <ProblemMessage problem={problem} locale={locale} /> : null}
-    </form>
+    <>
+      <form onSubmit={(e) => void submit(e)} aria-labelledby="ws-settings-title">
+        <h1 id="ws-settings-title">{t('settingsTitle')}</h1>
+        {ws.role !== 'OWNER' ? <p>{t('readOnly')}</p> : null}
+        <label>
+          {t('name')}
+          <input name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </label>
+        <label>
+          {t('baseCurrency')}
+          <select
+            name="baseCurrency"
+            value={form.baseCurrency}
+            onChange={(e) => setForm({ ...form, baseCurrency: e.target.value })}
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t('timezone')}
+          <input
+            name="timezone"
+            list="ws-timezones"
+            value={form.timezone}
+            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+          />
+          <TimezoneOptions id="ws-timezones" />
+        </label>
+        <label>
+          {t('fiscalMonthStartDay')}
+          <input
+            name="fiscalMonthStartDay"
+            type="number"
+            min={1}
+            max={28}
+            value={form.fiscal}
+            onChange={(e) => setForm({ ...form, fiscal: e.target.value })}
+          />
+        </label>
+        <label>
+          {t('minimumReserve')}
+          <input
+            name="minimumReserve"
+            inputMode="decimal"
+            value={form.reserve}
+            aria-describedby="reserve-hint"
+            onChange={(e) => setForm({ ...form, reserve: e.target.value })}
+          />
+        </label>
+        <small id="reserve-hint">{t('minimumReserveHint')}</small>
+        <button type="submit" disabled={busy}>
+          {busy ? t('saving') : t('save')}
+        </button>
+        {saved ? <p role="status">{t('saved')}</p> : null}
+        {problem ? <ProblemMessage problem={problem} locale={locale} /> : null}
+      </form>
+      <AuditHistory
+        workspaceId={ws.id}
+        aggregateType="Workspace"
+        aggregateId={ws.id}
+        role={ws.role}
+        locale={ws.locale}
+        timeZone={ws.timezone}
+        refreshKey={ws.version}
+      />
+    </>
   );
 }
 

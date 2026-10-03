@@ -127,6 +127,14 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
       });
     }
   }
+  if (names.includes('AUDIT_IP_HMAC_KEY') && cloud && values['AUDIT_IP_HMAC_KEY'] === undefined) {
+    if (!problems.some((p) => p.variable === 'AUDIT_IP_HMAC_KEY')) {
+      problems.push({
+        variable: 'AUDIT_IP_HMAC_KEY',
+        reason: 'falta (obligatoria con PFOS_ENV=staging|production)',
+      });
+    }
+  }
   if (names.includes('CURSOR_SIGNING_KEY') && cloud && values['CURSOR_SIGNING_KEY'] === undefined) {
     if (!problems.some((p) => p.variable === 'CURSOR_SIGNING_KEY')) {
       problems.push({

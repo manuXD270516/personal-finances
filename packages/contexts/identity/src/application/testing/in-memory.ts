@@ -3,8 +3,8 @@ import { LocaleTag } from '../../domain/locale-tag.js';
 import type { Role } from '../../domain/role.js';
 import { User } from '../../domain/user.js';
 import { Workspace } from '../../domain/workspace.js';
+import type { AuditEntry } from '@pf/audit/contracts';
 import type {
-  AuditEntry,
   IdentityDeps,
   OutboxEvent,
   RlsContext,
@@ -32,6 +32,9 @@ export class InMemoryIdentity {
     ].map((c) => [c.code, c]),
   );
   private seq = 0;
+  /** Unidades de trabajo abiertas y contexto RLS vigente (la auditoría exige ambos, como el adapter real). */
+  private depth = 0;
+  private current: RlsContext | null = null;
   readonly clock = new FixedClock(Instant.parse('2026-10-02T12:00:00Z'));
 
   nextId(): string {
@@ -92,6 +95,9 @@ export class InMemoryIdentity {
             audit: self.auditEntries.length,
           };
           self.contexts.push(ctx);
+          const previous = self.current;
+          self.depth += 1;
+          self.current = ctx;
           try {
             return await fn();
           } catch (err) {
@@ -102,10 +108,14 @@ export class InMemoryIdentity {
             self.outboxEvents.length = snapshot.outbox;
             self.auditEntries.length = snapshot.audit;
             throw err;
+          } finally {
+            self.depth -= 1;
+            self.current = previous;
           }
         },
         async bind(ctx) {
           self.contexts.push(ctx);
+          self.current = ctx;
         },
       },
       users: {
@@ -188,7 +198,10 @@ export class InMemoryIdentity {
         },
       },
       audit: {
-        async record(entry) {
+        async append(entry) {
+          if (self.depth === 0) throw new Error('AUDIT_OUTSIDE_UNIT_OF_WORK');
+          if (self.current?.workspaceId !== entry.workspaceId)
+            throw new Error('RLS: audit workspace mismatch');
           self.auditEntries.push(entry);
         },
       },

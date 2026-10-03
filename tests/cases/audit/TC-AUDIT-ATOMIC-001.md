@@ -12,9 +12,14 @@ invariants: [INV-029]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/application/audit-recorder.test.ts
+  - packages/contexts/audit/test/integration/pg-audit-log.int.test.ts
+  - packages/contexts/identity/src/application/identity.audit.test.ts
+  - apps/api/test/api/audit.api.test.ts
+  - scripts/architecture/test/architecture-rules.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["audit", "atomicity", "outbox"]
@@ -36,7 +41,7 @@ expected_result:
   - "Comando inválido: no se escribe fila de auditoría"
   - "El saldo de Bank A refleja solo el comando exitoso (925.00 BOB)"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-ATOMIC-001 — La bitácora de auditoría se escribe en la misma transacción de base de datos que la mutación financiera
@@ -59,3 +64,4 @@ Entonces el gasto no se registra
 ## Notas
 
 - Hasta que exista `add-transaction-recording`, el test usa un comando de prueba con el mismo flujo de unidad de trabajo (design.md de add-audit-trail).
+- Automatización (add-audit-trail): Hasta `add-transaction-recording`, el gasto se ejerce con un comando de prueba (`FakeMutatingCommand` sobre tablas de fixture con el mismo flujo de unidad de trabajo, outbox real y auditoría real) en `pg-audit-log.int.test.ts`; el escenario de configuración, con `UpdateWorkspaceSettings` real (unitario e integración HTTP, 500 `INTERNAL_ERROR`). La regla `command-handlers-audit` de dependency-cruiser exige `AuditPort` en todo command handler/servicio de casos de uso.

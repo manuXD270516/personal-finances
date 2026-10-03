@@ -38,12 +38,14 @@ module.exports = {
       severity: 'error',
       comment: 'domain solo puede importar su propio domain y @pf/shared-kernel.',
       from: { path: `${CTX}domain/` },
-      // vitest: los tests de dominio (`*.test.ts`) importan el runner; no es una dependencia del modelo.
+      // vitest y fast-check: los tests de dominio (`*.test.ts`) importan el runner y la librería de PBT; no son
+      // dependencias del modelo.
       to: {
         pathNot: [
           '^packages/contexts/$1/src/domain/',
           '^packages/shared-kernel/src/',
           '(^|/node_modules/)vitest(/|$)',
+          '(^|/node_modules/)fast-check(/|$)',
         ],
       },
     },
@@ -115,6 +117,19 @@ module.exports = {
       comment: 'Import que no resuelve (p. ej. deep import bloqueado por package.json#exports).',
       from: {},
       to: { couldNotResolve: true },
+    },
+  ],
+  required: [
+    {
+      name: 'command-handlers-audit',
+      severity: 'error',
+      comment:
+        'NFR-DATA-007 / INV-029 (add-audit-trail): todo command handler (*.command-handler.ts) o servicio de casos de uso (*.service.ts) de un contexto depende de AuditPort (@pf/audit/contracts) y audita dentro de su unidad de trabajo. Las consultas puras van en *.queries.ts.',
+      module: {
+        path: '^packages/contexts/([^/]+)/src/application/(.+/)?[^/]+([.-]command-handler|[.]service)[.]ts$',
+        pathNot: ['^packages/contexts/audit/', '[.]test[.]ts$', '/testing/'],
+      },
+      to: { path: '^packages/contexts/audit/src/contracts/' },
     },
   ],
   options: {

@@ -64,5 +64,41 @@
       "expired": "Por segurança encerramos sua sessão após um período de inatividade. Entre novamente.",
       "unknown": "Ocorreu um erro ao entrar. Tente novamente."
     }
+  },
+  "AuditHistory": {
+    "title": "Histórico de alterações",
+    "empty": "Ainda não há alterações registradas.",
+    "field": "Campo",
+    "before": "Antes",
+    "after": "Depois",
+    "none": "—",
+    "reason": "Motivo: {reason}",
+    "changesCaption": "Alterações deste registro",
+    "actor": {
+      "you": "por você",
+      "user": "pelo usuário …{id}",
+      "system": "pelo processo {process}"
+    },
+    "actions": {
+      "identity_workspace_created": "Espaço de trabalho criado",
+      "identity_workspace_member_added": "Membro adicionado",
+      "identity_workspace_settings_changed": "Configuração alterada",
+      "identity_user_provisioned": "Usuário cadastrado",
+      "identity_user_preferences_changed": "Preferências alteradas",
+      "identity_session_started": "Início de sessão",
+      "identity_session_ended": "Fim de sessão"
+    },
+    "fields": {
+      "name": "Nome",
+      "baseCurrency": "Moeda base",
+      "timeZone": "Fuso horário",
+      "locale": "Idioma e formato",
+      "fiscalMonthStartDay": "Dia de início do mês financeiro",
+      "minimumLiquidityReserve": "Reserva mínima de liquidez",
+      "origin": "Origem",
+      "memberUserId": "Membro",
+      "memberRole": "Função",
+      "displayName": "Nome de exibição"
+    }
   }
 }

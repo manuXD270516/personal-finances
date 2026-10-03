@@ -270,6 +270,23 @@ export const VARIABLES = {
       secret: true,
     },
   ),
+  // ── Auditoría (openspec add-audit-trail) ──
+  AUDIT_IP_HMAC_KEY: variable(
+    z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_-]{1,32}:[^,\s]{32,}(,[A-Za-z0-9_-]{1,32}:[^,\s]{32,})*$/,
+        'formato kid:secreto[,kid:secreto…] con secretos de ≥ 32 caracteres',
+      ),
+    {
+      group: 'Auditoría',
+      description:
+        'Claves HMAC-SHA256 con las que se guarda la IP del cliente en `audit.audit_log` (`kid:secreto`, separadas por coma; la primera es la vigente: rotación por `kid`). La IP nunca se persiste en claro. Obligatoria en staging/production; en local/ci, si falta, se genera una efímera.',
+      optional: true,
+      requiredWhen: '`PFOS_ENV=staging|production`',
+      secret: true,
+    },
+  ),
   // ── Identidad (OIDC, finance-api como resource server) ──
   OIDC_ISSUER_URL: variable(httpUrl, {
     group: 'Identidad (OIDC)',
@@ -473,6 +490,7 @@ export const APP_VARIABLES = {
     'API_PROBLEM_TYPE_BASE',
     'IDEMPOTENCY_RETENTION',
     'CURSOR_SIGNING_KEY',
+    'AUDIT_IP_HMAC_KEY',
     'RATE_LIMIT_STORE',
     'RATE_LIMIT_READS_PER_MIN',
     'RATE_LIMIT_WRITES_PER_MIN',

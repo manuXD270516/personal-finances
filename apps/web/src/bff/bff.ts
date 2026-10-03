@@ -59,6 +59,8 @@ const FORWARD_REQUEST_HEADERS = [
   'if-match',
   'if-none-match',
   'traceparent',
+  // Atribución en la auditoría (add-audit-trail): el user agent del navegador; la IP va en X-Forwarded-For.
+  'user-agent',
 ];
 const FORWARD_RESPONSE_HEADERS = [
   'content-type',
@@ -71,6 +73,16 @@ const FORWARD_RESPONSE_HEADERS = [
   'ratelimit-reset',
 ];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const IP = /^[0-9a-fA-F.:]{2,45}$/;
+/** Cabecera con la que finance-api reconoce el origen `ui` de la auditoría (`@pf/platform/nest` CLIENT_ORIGIN_HEADER). */
+export const CLIENT_ORIGIN_HEADER = 'x-pfos-origin';
+export const SESSION_EVENTS_PATH = '/api/v1/me/session-events';
+
+/** IP del navegador según el proxy de entrada de finance-web (primer salto de `X-Forwarded-For` o `X-Real-IP`). */
+export function clientIpOf(headers: Headers): string | undefined {
+  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || headers.get('x-real-ip')?.trim();
+  return forwarded && IP.test(forwarded) ? forwarded : undefined;
+}
 
 export function problem(status: number, code: string, title: string, headers: HeadersInit = {}): Response {
   const h = new Headers(headers);
@@ -215,6 +227,8 @@ export class Bff {
       now: this.clock.now(),
       timeouts: this.settings.timeouts,
     });
+    // Auditoría del inicio de sesión (FR-AUDIT-005): una vez por sesión, nunca en los requests siguientes.
+    await this.recordSessionEvent(tokenSet.accessToken, req, 'STARTED', null);
     const headers = new Headers({
       location: `${this.settings.appOrigin}${pending.returnTo}`,
       'cache-control': 'no-store',
@@ -299,6 +313,9 @@ export class Bff {
       return res;
     }
     if (!csrfTokenValid(req, sid, s.csrfSecret)) return csrfRejected();
+    // Auditoría del cierre (FR-AUDIT-005) mientras el access token sigue vigente; luego se revoca.
+    const tokens = await this.freshTokens(s).catch(() => null);
+    if (tokens) await this.recordSessionEvent(tokens.accessToken, req, 'ENDED', s.activeWorkspaceId);
     await this.revokeQuietly(s.tokens.refreshToken);
     await this.deps.store.delete(s.id);
     let redirectTo = home;
@@ -389,6 +406,9 @@ export class Bff {
       }
     }
     headers.set('authorization', `Bearer ${accessToken}`);
+    headers.set(CLIENT_ORIGIN_HEADER, 'ui');
+    const ip = incoming ? clientIpOf(incoming) : undefined;
+    if (ip) headers.set('x-forwarded-for', ip);
     return this.fetchApi(`${this.settings.apiBaseUrl}${path}`, {
       method,
       headers,
@@ -397,6 +417,36 @@ export class Bff {
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),
     });
+  }
+
+  /**
+   * `POST /api/v1/me/session-events` (FR-AUDIT-005): best effort, nunca impide el login ni el logout; un fallo queda
+   * en el log técnico sin PII. User agent e IP viajan como cabeceras del navegador; tokens y cookies nunca.
+   */
+  private async recordSessionEvent(
+    accessToken: string,
+    req: Request,
+    event: 'STARTED' | 'ENDED',
+    workspaceId: string | null,
+  ): Promise<void> {
+    try {
+      const incoming = new Headers();
+      const ua = req.headers.get('user-agent');
+      if (ua) incoming.set('user-agent', ua);
+      const ip = clientIpOf(req.headers);
+      if (ip) incoming.set('x-forwarded-for', ip);
+      const traceparent = req.headers.get('traceparent');
+      if (traceparent) incoming.set('traceparent', traceparent);
+      incoming.set('content-type', 'application/json');
+      const body = new TextEncoder().encode(JSON.stringify({ event, workspaceId })).buffer as ArrayBuffer;
+      const res = await this.callApi('POST', SESSION_EVENTS_PATH, accessToken, incoming, body);
+      await res.body?.cancel();
+      if (res.status !== 204) {
+        this.deps.logger?.warn({ status: res.status, event }, 'session event not audited');
+      }
+    } catch (err) {
+      this.deps.logger?.warn({ err: errorName(err), event }, 'session event not audited');
+    }
   }
 
   // ───────────────────────────── refresh ─────────────────────────────

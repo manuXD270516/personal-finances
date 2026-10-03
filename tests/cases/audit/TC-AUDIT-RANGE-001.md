@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/application/audit-queries.test.ts
+  - apps/api/test/api/audit.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["audit", "timezone"]
@@ -33,7 +35,7 @@ expected_result:
   - "Sin filtro de entidad, el orden por defecto es del más reciente al más antiguo"
   - "El rango invertido se rechaza con INVALID_FILTER"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-RANGE-001 — La consulta de auditoría por rango de fechas usa la zona horaria del workspace

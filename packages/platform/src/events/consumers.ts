@@ -1,7 +1,8 @@
 import type { Pool } from 'pg';
 import type { SqlExecutor } from '../api/idempotency/store.js';
+import { runWithRequestContext } from '../api/context/request-context.js';
 import { PgUnitOfWork, requireSqlExecutor } from '../api/db/command-transaction.js';
-import type { Logger } from '../logging/index.js';
+import { currentCorrelation, runWithCorrelation, type Logger } from '../logging/index.js';
 import type { JobContext, JobQueue, QueueOptions } from '../queue/job-queue.js';
 import { fullEventName, isEventEnvelope, type EventEnvelope } from './envelope.js';
 import type { EventDeliveryMetrics } from './metrics.js';
@@ -151,7 +152,38 @@ export class EventConsumerRuntime {
     meta: { attempt?: number; signal?: AbortSignal } = {},
   ): Promise<DeliveryOutcome> {
     if (!isEventEnvelope(event)) throw new Error(`entrega sin envelope válido para ${def.consumer}`);
-    const outcome = await this.uow.run({ userId: null, workspaceId: event.workspaceId }, async () => {
+    // Atribución (openspec add-audit-trail, design §4): lo que el consumidor audite o publique lo hace el proceso
+    // `<consumer>` (actor WORKER, origen system), con la correlación del evento y el evento como causa.
+    const correlationId = typeof event.correlationId === 'string' ? event.correlationId : undefined;
+    const attribution = {
+      actor: { type: 'WORKER' as const, process: def.consumer },
+      origin: 'system' as const,
+    };
+    const run = () =>
+      runWithRequestContext({ ...attribution, causationId: event.eventId }, () =>
+        this.apply(def, event, meta),
+      );
+    const ambient = currentCorrelation();
+    const outcome =
+      correlationId && ambient?.correlationId !== correlationId
+        ? await runWithCorrelation({ correlationId }, run)
+        : await run();
+    if (outcome === 'duplicate') {
+      this.options.metrics?.duplicate(def.consumer);
+      this.options.logger.info(
+        { consumer: def.consumer, event: fullEventName(event), event_id: event.eventId },
+        'duplicate event skipped',
+      );
+    }
+    return outcome;
+  }
+
+  private apply(
+    def: EventConsumerDefinition,
+    event: EventEnvelope,
+    meta: { attempt?: number; signal?: AbortSignal },
+  ): Promise<DeliveryOutcome> {
+    return this.uow.run({ userId: null, workspaceId: event.workspaceId }, async () => {
       const tx = requireSqlExecutor();
       const inserted = await tx.query(
         `INSERT INTO platform.inbox (consumer, event_id, workspace_id) VALUES ($1, $2, $3)
@@ -167,14 +199,6 @@ export class EventConsumerRuntime {
       });
       return 'applied' as const;
     });
-    if (outcome === 'duplicate') {
-      this.options.metrics?.duplicate(def.consumer);
-      this.options.logger.info(
-        { consumer: def.consumer, event: fullEventName(event), event_id: event.eventId },
-        'duplicate event skipped',
-      );
-    }
-    return outcome;
   }
 
   /** pg-boss copió el job a la DLQ (incluye la caída del proceso en el último intento). */

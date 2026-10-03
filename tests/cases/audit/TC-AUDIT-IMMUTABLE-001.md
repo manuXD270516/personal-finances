@@ -12,9 +12,10 @@ invariants: [INV-029]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/test/integration/pg-audit-log.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["audit", "append-only"]
@@ -33,7 +34,7 @@ expected_result:
   - "El registro original conserva before 120.00 BOB y after 102.00 BOB"
   - "Tras la corrección existen dos registros de T1 en orden cronológico y el primero no cambió"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-IMMUTABLE-001 — Los registros de auditoría no se pueden modificar ni borrar y las correcciones agregan registros nuevos

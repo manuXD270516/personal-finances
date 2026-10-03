@@ -155,6 +155,18 @@ export class IdentityController {
    * Paginación por cursor (docs/10 §5.1): keyset por id de workspace (UUIDv7), `limit` 1..200 (50 por defecto);
    * el cursor firmado vale solo para este recurso y este usuario.
    */
+  /**
+   * `POST /me/session-events` (`recordSessionEvent`, FR-AUDIT-005): el BFF informa el inicio y el cierre de su
+   * sesión; se audita en el workspace activo de la sesión (o el hogar del usuario). 204 sin cuerpo.
+   */
+  @Post('me/session-events')
+  @HttpCode(204)
+  async recordSessionEvent(@Req() req: ApiRequest, @Body() body: Json): Promise<void> {
+    const event = body['event'] === 'ENDED' ? 'ENDED' : 'STARTED';
+    const workspaceId = typeof body['workspaceId'] === 'string' ? body['workspaceId'] : null;
+    await this.service.recordSessionEvent(userId(req), event, workspaceId);
+  }
+
   @Get('workspaces')
   async listWorkspaces(@Req() req: ApiRequest) {
     const id = userId(req);

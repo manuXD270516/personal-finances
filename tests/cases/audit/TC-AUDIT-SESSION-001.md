@@ -12,9 +12,13 @@ invariants: []
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/identity/src/application/identity.audit.test.ts
+  - apps/api/test/api/audit.api.test.ts
+  - apps/web/test/integration/bff.int.test.ts
+  - tests/e2e/specs/audit.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["audit", "session", "security"]
@@ -34,7 +38,7 @@ expected_result:
   - "Existe un registro de cierre de sesión de U1"
   - "Ningún registro contiene el access token, el refresh token ni la cookie de sesión"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-AUDIT-SESSION-001 — El inicio y el cierre de sesión quedan auditados sin tokens ni cookies
@@ -51,3 +55,7 @@ Cuando inicia sesión el 2026-03-15T12:00:00Z y luego cierra sesión
 Entonces existen registros de inicio y cierre de sesión de "U1"
   Y ninguno contiene tokens ni cookies
 ```
+
+## Notas
+
+- Automatización (add-audit-trail): El BFF llama a `POST /api/v1/me/session-events` tras el callback (STARTED) y en el logout (ENDED); ver design.md, decisiones de implementación.

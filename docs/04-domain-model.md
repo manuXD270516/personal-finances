@@ -364,9 +364,9 @@ Sin agregados transaccionales: **read models** reconstruibles desde eventos + qu
 
 ### 3.17 AUDIT (`audit`)
 
-- **AR `AuditLog`** (registro append-only): `id, workspaceId, occurredAt, actor (userId|system|service), action (nombre del comando), aggregateType, aggregateId, aggregateVersion, changes (diff before/after con PII redactada), correlationId, requestMeta (ipHash, userAgent), prevHash?` (cadena de hash opcional para evidencia de manipulación).
-- **Port público**: `AuditPort.append(record)` — **síncrono en la misma transacción** (ARCHITECTURE §7, INV-029).
-- **Queries**: `SearchAuditLog(filters)`, `GetHistory(aggregateType, aggregateId)`.
+- **AR `AuditRecord`** (registro append-only, inmutable): `id, workspaceId, occurredAt, actor (USER{userId} | SYSTEM{process} | WORKER{process}), action (<context>.<aggregate>.<verbo-pasado>), aggregateType, aggregateId, aggregateVersion, changes (diff campo a campo filtrado por la allow-list del agregado; montos como {amount: string, currency}), reason, origin (ui|api|import|rule|recurring|system), correlationId, requestId, idempotencyKey, clientIpHash (HMAC), userAgent, prevHash?` (cadena de hash reservada, FR-AUDIT-008).
+- **Port público**: `AuditPort.append(entry)` (`@pf/audit/contracts`) — **síncrono en la misma transacción** (ARCHITECTURE §7, INV-029); fuera de una unidad de trabajo falla con `AUDIT_OUTSIDE_UNIT_OF_WORK`. Cada contexto declara la allow-list de redacción de sus agregados (`RedactionPolicy`).
+- **Queries**: `SearchAuditLog({from, to, aggregateType?})`, `GetHistory(aggregateType, aggregateId)` y `AuditHistoryQuery.historyOf(entities)` (vistas de historial por entidad, p. ej. `getTransactionHistory`, D28). Implementado por `add-audit-trail` (`packages/contexts/audit`).
 - **Invariantes**: append-only (sin UPDATE/DELETE grants); retención configurable.
 
 ### 3.18 ASSISTANT — AI Assistant (Phase 10)

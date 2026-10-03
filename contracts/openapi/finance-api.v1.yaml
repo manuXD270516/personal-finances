@@ -47,7 +47,7 @@ tags:
   - name: Ledger
     description: Read-only views of the internal double-entry ledger (Phase 1, trial balance).
   - name: Audit
-    description: "Phase 1: read-only audit log (history by entity and by date range)."
+    description: "Phase 1: read-only audit log (history by entity and by date range) and session login/logout auditing."
   - name: Reporting
     description: Basic dashboard KPIs (Phase 1). Advanced reports in Phase 7 (see docs/14-reporting.md).
   - name: Platform
@@ -133,6 +133,32 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'INVALID_TIMEZONE (timezone is not a valid IANA zone).'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /me/session-events:
+    post:
+      tags: [Audit]
+      operationId: recordSessionEvent
+      summary: Audit a login or logout of the caller's BFF session (FR-AUDIT-005)
+      description: |
+        Called by the finance-web BFF right after a successful login (`STARTED`) and on logout (`ENDED`). The record is
+        written in `workspaceId` when the caller is an active member of it, otherwise in the caller's oldest active
+        workspace; without any workspace nothing is recorded. User agent and client IP (stored only as an HMAC) come
+        from the forwarded request; tokens and cookies are never recorded.
+      x-openspec-capability: audit/audit-trail
+      x-required-role: AUTHENTICATED
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionEvent' }
+      responses:
+        '204':
+          description: Session event audited (or skipped when the user has no workspace)
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
@@ -3391,6 +3417,17 @@ components:
               workspaceName: { type: string }
               role: { $ref: '#/components/schemas/WorkspaceRole' }
         version: { $ref: '#/components/schemas/Version' }
+    SessionEvent:
+      type: object
+      additionalProperties: false
+      required: [event]
+      properties:
+        event: { type: string, enum: [STARTED, ENDED] }
+        workspaceId:
+          description: Active workspace of the BFF session, if any
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
     MeUpdate:
       type: object
       additionalProperties: false

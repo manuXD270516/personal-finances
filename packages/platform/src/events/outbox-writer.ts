@@ -1,5 +1,6 @@
 import { context, propagation } from '@opentelemetry/api';
 import type { Generated } from 'kysely';
+import { currentRequestContext } from '../api/context/request-context.js';
 import { requireSqlExecutor } from '../api/db/command-transaction.js';
 import { unitOfWorkKysely } from '../api/db/uow-kysely.js';
 import { currentCorrelation, uuidv7 } from '../logging/index.js';
@@ -39,6 +40,11 @@ function toUtcInstant(value: string): string {
   return date.toISOString();
 }
 
+function ambientCausation(): string | null {
+  const causation = currentRequestContext()?.causationId;
+  return isUuid(causation) ? causation : null;
+}
+
 /** Construye el envelope v1 completo (sin validar). */
 export function buildEnvelope<P extends object>(draft: DomainEventDraft<P>): EventEnvelope<P> {
   const ambient = currentCorrelation()?.correlationId;
@@ -53,7 +59,8 @@ export function buildEnvelope<P extends object>(draft: DomainEventDraft<P>): Eve
     aggregateId: draft.aggregateId,
     aggregateVersion: draft.aggregateVersion,
     correlationId,
-    causationId: draft.causationId ?? null,
+    // Sin causa explícita, la del contexto ambiental (evento/job que originó el trabajo, add-audit-trail design §4).
+    causationId: draft.causationId ?? ambientCausation(),
     actor: draft.actor ?? { type: 'SYSTEM', id: null },
     // Round-trip JSON: valida exactamente lo que se publicará (p. ej. objetos de valor con toJSON).
     payload: JSON.parse(JSON.stringify(draft.payload)) as P,

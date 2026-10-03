@@ -98,3 +98,12 @@ export {
   type JwtVerifierOptions,
   type VerifiedAccessToken,
 } from './auth/jwt-verifier.js';
+export {
+  currentRequestContext,
+  runWithRequestContext,
+  updateRequestContext,
+  uuidFromOpaqueId,
+  type RequestActor,
+  type RequestContext,
+  type RequestOrigin,
+} from './context/request-context.js';
