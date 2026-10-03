@@ -12,9 +12,11 @@ invariants: ["INV-003"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/test/integration/pg-fx.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","currency"]
@@ -31,7 +33,7 @@ expected_result:
   - "El filtro CRYPTO devuelve USDT, BTC y ETH y no devuelve BOB ni USD"
   - "La respuesta lleva ETag"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-CURRENCY-001 — El catálogo de monedas expone tipo y escala de BOB, USD, USDT, BTC y ETH

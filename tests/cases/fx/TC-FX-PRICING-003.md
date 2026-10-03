@@ -12,9 +12,11 @@ invariants: ["INV-012"]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","spread","missing-rate"]
@@ -29,7 +31,7 @@ expected_result:
   - "Primera: referenceRate = null, spread = null, effectiveRate = 6.85"
   - "Segunda: referenceRate = 6.95 registrada, spread = null"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PRICING-003 — Sin tasa de referencia o sin tasa cotizada el spread queda no determinable

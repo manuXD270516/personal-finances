@@ -12,9 +12,12 @@ invariants: ["INV-020"]
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-resolver.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","cost"]
@@ -33,7 +36,7 @@ expected_result:
   - "Compra: 0.695 + 5.00 = 5.695 → 5.70 BOB (HALF_EVEN una sola vez)"
   - "Swap: costo marcado complete = false con missingValuations = [15.000000 TRX]"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PRICING-004 — El costo total suma fees y spread valorados a la referencia con un solo redondeo

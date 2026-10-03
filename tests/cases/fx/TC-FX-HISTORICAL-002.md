@@ -12,9 +12,13 @@ invariants: ["INV-011","INV-029"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/exchange-rate.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - packages/contexts/fx/test/integration/pg-fx.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","supersede","audit"]
@@ -33,7 +37,7 @@ expected_result:
   - "La auditoría registra actor, instante y motivo en la misma transacción"
   - "El segundo intento responde 409 FX_RATE_ALREADY_SUPERSEDED"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-HISTORICAL-002 — Corregir una tasa crea una versión que la reemplaza, con motivo auditado y sin doble reemplazo

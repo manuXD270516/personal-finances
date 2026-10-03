@@ -12,9 +12,12 @@ invariants: ["INV-001","INV-002","INV-004","INV-010","INV-011"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["conversion","multi-currency","crypto","fees"]
@@ -34,7 +37,7 @@ expected_result:
   - "ConversionDetail inmutable: cotizada 6.90, efectiva 6.85, referencia 6.95, spread 0.719424460431654676 %, fee 5.00 BOB, proveedor y marca de tiempo"
   - "Saldos: Wallet USDT 0.000000 USDT, Banco BOB 685.00 BOB"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-001 — La conversión de USDT a BOB con comisión registra patas balanceadas por moneda

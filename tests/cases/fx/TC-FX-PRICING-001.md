@@ -12,9 +12,10 @@ invariants: ["INV-010","INV-001","INV-020"]
 priority: critical
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","pricing"]
@@ -32,7 +33,7 @@ expected_result:
   - "Spread frente a la referencia = 0.719424460431654676 % (5.00 BOB)"
   - "Compra: efectiva USDT/BOB = 7.007007007007007007"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PRICING-001 — La valorización de conversiones calcula la tasa efectiva y las comisiones totales a partir de la tasa cotizada y los montos

@@ -12,9 +12,12 @@ invariants: ["INV-002","INV-006"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["conversion","validation"]
@@ -30,7 +33,7 @@ expected_result:
   - "Primero: 422 CONVERSION_SAME_CURRENCY; sin transacción ni asiento"
   - "Segundo: 422 CURRENCY_MISMATCH"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-003 — Convertir entre cuentas de la misma moneda se rechaza con CONVERSION_SAME_CURRENCY

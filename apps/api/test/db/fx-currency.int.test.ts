@@ -9,11 +9,15 @@ import { connect, inTx, sqlState } from '../support/db.js';
 const deps = inject('deps');
 const FX_MIGRATION = '20261002140000_fx_currency.sql';
 
+// add-workspace-identity siembra BOB/USD/USDT/BTC/ETH; add-manual-conversions agrega EUR, USDC y TRX.
 const REFERENCE = [
   { code: 'BOB', kind: 'FIAT', scale: 2 },
   { code: 'BTC', kind: 'CRYPTO', scale: 8 },
   { code: 'ETH', kind: 'CRYPTO', scale: 18 },
+  { code: 'EUR', kind: 'FIAT', scale: 2 },
+  { code: 'TRX', kind: 'CRYPTO', scale: 6 },
   { code: 'USD', kind: 'FIAT', scale: 2 },
+  { code: 'USDC', kind: 'CRYPTO', scale: 6 },
   { code: 'USDT', kind: 'CRYPTO', scale: 6 },
 ];
 
@@ -33,7 +37,7 @@ describe('fx.currency: catálogo de monedas y FK de iam.workspace (add-workspace
   const catalog = async (c: Client) =>
     (await c.query('SELECT code, kind, scale FROM fx.currency ORDER BY code')).rows as typeof REFERENCE;
 
-  it('tras migrate contiene exactamente BOB 2, USD 2, USDT 6, BTC 8 y ETH 18; pf_app solo lee', async () => {
+  it('tras migrate contiene exactamente BOB 2, USD 2, EUR 2, USDT 6, USDC 6, TRX 6, BTC 8 y ETH 18; pf_app solo lee', async () => {
     expect(await catalog(migrator)).toEqual(REFERENCE);
     expect(await catalog(app)).toEqual(REFERENCE);
     expect(
@@ -45,6 +49,10 @@ describe('fx.currency: catálogo de monedas y FK de iam.workspace (add-workspace
       '42501',
     );
     expect(await sqlState(() => app.query(`DELETE FROM fx.currency WHERE code = 'BOB'`))).toBe('42501');
+    // FR-FX-001 (add-manual-conversions): la escala es inmutable también para el propietario (trigger).
+    expect(await sqlState(() => migrator.query(`UPDATE fx.currency SET scale = 3 WHERE code = 'BOB'`))).toBe(
+      '23514',
+    );
   });
 
   it('la migración es idempotente: re-ejecutar su bloque up no cambia el catálogo', async () => {

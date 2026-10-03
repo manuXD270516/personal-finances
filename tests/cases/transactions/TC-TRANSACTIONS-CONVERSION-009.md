@@ -12,9 +12,10 @@ invariants: ["INV-012","INV-011"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["conversion","history","fast-check"]
@@ -29,7 +30,7 @@ expected_result:
   - "targetAmount 685.00 BOB, effectiveRate 6.85, referencia 6.95 (R2) y spread sin cambios"
   - "Los postings del asiento son idénticos"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-009 — Registrar una tasa nueva no recalcula conversiones históricas

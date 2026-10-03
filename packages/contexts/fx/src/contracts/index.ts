@@ -1,0 +1,109 @@
+/**
+ * API pública de `@pf/fx` (openspec add-manual-conversions; ADR-0003). Hoja: no importa capas internas.
+ * Montos como `{amount: "<decimal>", currency: "<código>"}` y tasas como `{base, quote, value: "<decimal>"}` (nunca
+ * `number`, ADR-0006).
+ */
+import type { AuditFieldPoliciesDto } from '@pf/audit/contracts';
+
+export const FX_CONTEXT = 'fx' as const;
+
+/** Eventos publicados por el outbox (contracts/events/fx/*.v1.schema.json). */
+export const FX_EVENTS = {
+  rateRecorded: { eventType: 'fx.RateRecorded', eventVersion: 1 },
+} as const;
+
+export type FxRateTypeDto = 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM';
+export type FxRateSourceDto = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
+export type CurrencyKindDto = 'FIAT' | 'CRYPTO' | 'COMMODITY' | 'CUSTOM';
+
+export interface MoneyDto {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/** 1 `base` = `value` `quote`. */
+export interface RateDto {
+  readonly base: string;
+  readonly quote: string;
+  readonly value: string;
+}
+
+/** Versión EXACTA de la tasa de referencia que una conversión registra (fx/conversion-pricing, FR-FX-008). */
+export interface ReferenceRateDto {
+  readonly fxRateId: string;
+  /** En la orientación almacenada de la versión (la original; nunca una inversa redondeada). */
+  readonly rate: RateDto;
+  readonly rateType: FxRateTypeDto;
+  readonly source: FxRateSourceDto;
+  readonly sourceLabel: string | null;
+  readonly asOf: string;
+}
+
+export interface ConversionCostDto {
+  /** Fees + spread valorados en la moneda de reporte del workspace, con una sola cuantización HALF_EVEN. */
+  readonly amount: MoneyDto;
+  readonly complete: boolean;
+  readonly missingValuations: readonly MoneyDto[];
+}
+
+/** Moneda del catálogo (tipo y escala canónica, FR-FX-001). */
+export interface CurrencyInfoDto {
+  readonly code: string;
+  readonly kind: CurrencyKindDto;
+  readonly scale: number;
+}
+
+/**
+ * Puerto que TRANSACTIONS consume (in-process, dentro de SU unidad de trabajo) para el pricing de conversiones.
+ * Errores (`DomainError.code`): `REFERENCE_NOT_FOUND` (id explícito inexistente), `CURRENCY_MISMATCH` (la tasa
+ * explícita no es del par).
+ */
+export interface FxConversionPricingPort {
+  /**
+   * Referencia de una conversión: la versión explícita (`fxRateId`) o la resuelta al `executedAt` con el tipo
+   * preferido del par (directa o inversa, NUNCA cruzada; ventana de 7 días). `null` si no hay ninguna.
+   */
+  referenceForConversion(input: {
+    readonly workspaceId: string;
+    readonly base: string;
+    readonly quote: string;
+    readonly executedAt: string;
+    readonly fxRateId?: string | null;
+  }): Promise<ReferenceRateDto | null>;
+  /**
+   * Costo total (fees + spread) en la moneda de reporte, valorando cada componente con la referencia del instante de
+   * ejecución (la de la conversión para su par; para otras monedas, la misma política de resolución). Derivado: nunca
+   * se persiste y se recalcula siempre con las tasas vigentes AL `executedAt`, no con tasas nuevas.
+   */
+  conversionCost(input: {
+    readonly workspaceId: string;
+    readonly executedAt: string;
+    readonly components: readonly MoneyDto[];
+    readonly reference: ReferenceRateDto | null;
+  }): Promise<ConversionCostDto>;
+  /** Tipo y escala de una moneda activa del catálogo (`null` si no existe o está inactiva). */
+  currency(code: string): Promise<CurrencyInfoDto | null>;
+}
+
+export const FX_CONVERSION_PRICING_PORT = Symbol.for('pf.fx.FxConversionPricingPort');
+
+/**
+ * Allow-list de auditoría de FX (add-audit-trail, NFR-SEC-015): las tasas son datos de mercado (valor como texto
+ * decimal exacto); lo no listado nunca se copia a `audit.audit_log`.
+ */
+export const FX_AUDIT_POLICY = {
+  ExchangeRate: {
+    base: 'plain',
+    quote: 'plain',
+    value: 'plain',
+    rateType: 'plain',
+    source: 'plain',
+    sourceLabel: 'plain',
+    asOf: 'plain',
+    effectiveDate: 'plain',
+    supersedesRateId: 'plain',
+  },
+  RatePreferences: {
+    preferences: 'plain',
+  },
+} as const satisfies AuditFieldPoliciesDto;

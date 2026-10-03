@@ -12,9 +12,11 @@ invariants: ["INV-001","INV-002","INV-004","INV-010"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/conversion.test.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["conversion","crypto","network-fee"]
@@ -32,7 +34,7 @@ expected_result:
   - "ConversionDetail: cotizada 50000, efectiva 48000 USDT por BTC (600.000000 / 0.01250000), comisiones por tipo: NETWORK 0.00050000 BTC"
   - "Saldos: BTC Wallet 0.00000000 BTC, USDT Wallet 700.000000 USDT"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-TRANSACTIONS-CONVERSION-002 — Conversión de cripto a cripto con comisión de red pagada en el activo de origen

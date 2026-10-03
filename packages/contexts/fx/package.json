@@ -1,0 +1,46 @@
+{
+  "name": "@pf/fx",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context FX: catálogo de monedas, tasas de referencia manuales inmutables y pricing de conversiones (openspec add-manual-conversions).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./interface/fx.module": {
+      "@pf/source": "./src/interface/fx.module.ts",
+      "types": "./dist/interface/fx.module.d.ts",
+      "default": "./dist/interface/fx.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@pf/audit": "workspace:*",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "fast-check": "4.10.2",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

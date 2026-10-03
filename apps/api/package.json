@@ -23,6 +23,7 @@
     "@pf/accounts": "workspace:*",
     "@pf/audit": "workspace:*",
     "@pf/classification": "workspace:*",
+    "@pf/fx": "workspace:*",
     "@pf/identity": "workspace:*",
     "@pf/ledger": "workspace:*",
     "@pf/platform": "workspace:*",

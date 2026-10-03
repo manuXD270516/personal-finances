@@ -12,9 +12,13 @@ invariants: ["INV-001","INV-011"]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/exchange-rate.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - packages/contexts/fx/test/integration/pg-fx.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","rates","manual"]
@@ -33,7 +37,7 @@ expected_result:
   - "El valor de 18 decimales se lee sin pérdida"
   - "Se emite fx.RateRecorded.v1 en el outbox"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-RATE-001 — Registrar manualmente una tasa P2P de USDT/BOB conserva valor, tipo, fuente e instante exactos

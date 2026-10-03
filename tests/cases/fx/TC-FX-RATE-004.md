@@ -12,9 +12,13 @@ invariants: ["INV-020"]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-resolver.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - packages/contexts/fx/test/integration/pg-fx.int.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","valuation","preferences"]
@@ -32,7 +36,7 @@ expected_result:
   - "Segunda valoración: 980.00 BOB con tasa PARALLEL 9.80"
   - "Ninguna tasa ni transacción cambió"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-RATE-004 — La valoración usa el tipo de tasa preferido del par e informa tasa, tipo, fuente y fecha

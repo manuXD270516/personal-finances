@@ -12,9 +12,12 @@ invariants: ["INV-032"]
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/exchange-rate.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","validation"]
@@ -29,7 +32,7 @@ expected_result:
   - "Cada intento se rechaza con VALIDATION_FAILED"
   - "No se persiste ninguna tasa ni se emite evento"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-RATE-002 — Se rechazan tasas con valor cero o con la misma moneda como base y quote

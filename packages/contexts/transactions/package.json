@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Bounded context TRANSACTIONS: ingresos, gastos, reembolsos y ajustes con splits (openspec add-transaction-recording).",
+  "description": "Bounded context TRANSACTIONS: ingresos, gastos, reembolsos, ajustes, transferencias y conversiones (openspec add-transaction-recording, add-transfers, add-manual-conversions).",
   "exports": {
     "./contracts": {
       "@pf/source": "./src/contracts/index.ts",
@@ -31,6 +31,7 @@
     "@pf/accounts": "workspace:*",
     "@pf/audit": "workspace:*",
     "@pf/classification": "workspace:*",
+    "@pf/fx": "workspace:*",
     "@pf/ledger": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/shared-kernel": "workspace:*",

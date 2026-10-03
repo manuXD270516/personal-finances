@@ -1,9 +1,11 @@
 import type { AuditHistoryQuery, AuditPort } from '@pf/audit/contracts';
 import type { AccountsQueryPort } from '@pf/accounts/contracts';
 import type { ClassificationValidator } from '@pf/classification/contracts';
+import type { FxConversionPricingPort } from '@pf/fx/contracts';
 import type { LedgerPostingPort } from '@pf/ledger/contracts';
 import type { Clock, Money } from '@pf/shared-kernel';
 import type {
+  ConversionDetail,
   PaymentMethod,
   Transaction,
   TransactionKind,
@@ -30,6 +32,8 @@ export interface TransactionListFilter {
   readonly sources?: readonly TransactionSource[];
   readonly paymentMethods?: readonly PaymentMethod[];
   readonly currency?: string;
+  /** Solo conversiones: moneda del leg `TARGET` vigente. */
+  readonly targetCurrency?: string;
   readonly dateFrom?: string;
   readonly dateTo?: string;
   readonly amountMin?: string;
@@ -70,6 +74,13 @@ export interface TransactionRepository {
     readonly linkType: 'POSTED' | 'REVERSAL';
   }): Promise<void>;
   linkedEntries(workspaceId: string, transactionId: string): Promise<string[]>;
+  /** Asientos POSTED por revisión (para el historial de revisiones de una conversión). */
+  postedEntriesByRevision(workspaceId: string, transactionId: string): Promise<Map<number, string>>;
+  /** Todas las revisiones del `ConversionDetail` (inmutables), de la más antigua a la vigente. */
+  conversionRevisions(
+    workspaceId: string,
+    transactionId: string,
+  ): Promise<{ readonly detail: ConversionDetail; readonly createdAt: string | null }[]>;
 }
 
 export interface CurrencyCatalog {
@@ -114,6 +125,8 @@ export interface TransactionsDeps {
   readonly ledger: LedgerPostingPort;
   readonly classification: ClassificationValidator;
   readonly categories: CategoryLookupPort;
+  /** Referencia y costo de conversiones (FX vía `@pf/fx/contracts`, misma unidad de trabajo). */
+  readonly fx: FxConversionPricingPort;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
   readonly history: AuditHistoryQuery;
