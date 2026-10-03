@@ -422,11 +422,14 @@ describe('auditoría de las mutaciones de IDENTITY por HTTP', () => {
     expect(created.status).toBe(201);
     const id = String(created.body['id']);
     const rows = await rawAudit(u.id, id);
-    expect(rows.map((x) => x['action'])).toEqual([
+    // Ambas filas comparten occurred_at (reloj fijo): el orden entre ellas no está definido.
+    expect(rows.map((x) => x['action']).sort()).toEqual([
       'identity.workspace.created',
       'identity.workspace.member_added',
     ]);
-    expect(rows[0]?.['idempotency_key']).toEqual(expect.any(String));
+    expect(rows.find((x) => x['action'] === 'identity.workspace.created')?.['idempotency_key']).toEqual(
+      expect.any(String),
+    );
 
     const me = await call('PATCH', '/api/v1/me', {
       token: u.token,
