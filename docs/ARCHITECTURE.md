@@ -94,7 +94,7 @@ Fusiones respecto a la lista original (justificadas en `docs/05-bounded-contexts
 | AuthN/AuthZ | OIDC/OAuth2 (Authorization Code + PKCE vía BFF). Local: Keycloak. Cloud: Cognito vs Keycloak gestionado vs otros → depende de ADR-0013. RBAC por workspace (`OWNER`, `EDITOR`, `VIEWER`). PostgreSQL **RLS** como defense-in-depth. Validado en SPIKE-06 (Keycloak 26.8 + Next.js 16 BFF con `openid-client` 6 + Nest 12 con `jose` 6): token nunca expuesto al navegador, CSRF con SameSite + Origin + HMAC, refresh rotado con **lock distribuido** (reusar un refresh rotado mata la sesión en Keycloak). Session store del BFF: Valkey en el spike; **sesiones en PostgreSQL** (Redis opcional, Q5 aceptada). Keycloak local necesita ≥ 1 GiB | ADR-0010 | Aceptado |
 | Contenedores | Docker multi-stage, imágenes non-root, healthchecks, una imagen por deployable (`finance-web`, `finance-api`, `finance-ml`) | ADR-0011 | Aceptado |
 | Local | Docker Compose con **profiles**; scripts cross-platform (Node/tsx vía `pnpm`) — el entorno principal del owner es Windows; nada de scripts solo-bash | ADR-0012 | Aceptado |
-| Cloud | Recomendación: **AWS ECS/Fargate** (paridad, Terraform maduro, learning value) con perfil de costo mínimo; **Cloud Run** como plan B documentado; **Kubernetes/EKS rechazado** por ahora | ADR-0013 | Propuesto (decisión del owner sobre presupuesto) |
+| Cloud | Recomendación: **AWS ECS/Fargate** (paridad, Terraform maduro, learning value) con perfil de costo mínimo; **Cloud Run** como plan B documentado; **Kubernetes/EKS rechazado** por ahora. **SPIKE-09 (2026-10-03)** propone en su lugar un despliegue por niveles: default **VPS único con Docker Compose en AWS Lightsail 4 GB São Paulo (≈ USD 27–30/mes)**, N1 Hetzner (≈ 10–15), N3 con Neon (≈ 50–60) y ECS/Fargate + RDS como N4 (≥ 110) | ADR-0013, ADR-0027 | Propuesto (decisión del owner sobre presupuesto, Q3) |
 | IaC | Terraform (compatible OpenTofu), módulos por capa, state remoto | ADR-0014 | Propuesto |
 | CI/CD | GitHub Actions; trunk-based con PRs cortos; Conventional Commits; release-please; imágenes tag `sha-<git-sha>` + semver | ADR-0015 | Propuesto |
 | Testing | **Vitest** (unit/domain/app), Testcontainers (PG/Redis/S3), Playwright (E2E), fast-check (PBT), Spectral/Redocly (OpenAPI lint), JSON Schema (event contracts), dependency-cruiser (arquitectura) | ADR-0016 | Aceptado |
@@ -106,7 +106,7 @@ Fusiones respecto a la lista original (justificadas en `docs/05-bounded-contexts
 
 ### Lista canónica de ADRs (`docs/adr/NNNN-titulo.md`, formato MADR)
 
-0001 Record architecture decisions · 0002 Architecture style (Modular Monolith + DDD + Hexagonal) · 0003 Module boundaries & extraction criteria · 0004 Ledger model · 0005 Database · 0006 Money representation · 0007 Data access & migrations (ORM) · 0008 Async jobs & domain events (outbox) · 0009 Object storage · 0010 Authentication & authorization · 0011 Container strategy · 0012 Local development environment · 0013 Cloud deployment strategy · 0014 Infrastructure as Code · 0015 CI/CD & release strategy · 0016 Testing strategy · 0017 ML separation · 0018 Monorepo & build tooling · 0019 Frontend architecture (Next.js + BFF) · 0020 Observability · 0021 AI assistant integration · 0022 API style & versioning · 0023 Multi-tenancy & Row-Level Security · 0024 Spec Driven Development with OpenSpec & test traceability · 0025 Fuentes de tipo de cambio para Bolivia (paralelo.bo + bo.dolarapi.com).
+0001 Record architecture decisions · 0002 Architecture style (Modular Monolith + DDD + Hexagonal) · 0003 Module boundaries & extraction criteria · 0004 Ledger model · 0005 Database · 0006 Money representation · 0007 Data access & migrations (ORM) · 0008 Async jobs & domain events (outbox) · 0009 Object storage · 0010 Authentication & authorization · 0011 Container strategy · 0012 Local development environment · 0013 Cloud deployment strategy · 0014 Infrastructure as Code · 0015 CI/CD & release strategy · 0016 Testing strategy · 0017 ML separation · 0018 Monorepo & build tooling · 0019 Frontend architecture (Next.js + BFF) · 0020 Observability · 0021 AI assistant integration · 0022 API style & versioning · 0023 Multi-tenancy & Row-Level Security · 0024 Spec Driven Development with OpenSpec & test traceability · 0025 Fuentes de tipo de cambio para Bolivia (paralelo.bo + bo.dolarapi.com) · 0027 Destino de despliegue inicial (VPS + Compose por niveles, propuesto).
 
 ## 6. Estructura del repositorio (objetivo; en Phase 0 solo existen `docs/`, `openspec/`, `contracts/` borrador y `tests/cases/`)
 
@@ -260,18 +260,20 @@ Las specs principales (`openspec/specs/`) describen **comportamiento vigente**; 
 
 ## 15. Spikes tecnológicos de Phase 0 / inicio de Phase 1
 
-| ID | Spike | Pregunta que responde | Time-box |
-|----|-------|-----------------------|----------|
-| SPIKE-01 | OpenSpec workflow + validación en CI | ¿`openspec validate --strict` integrado en CI y flujo propose→apply→archive funciona para el equipo? | 0.5 d |
-| SPIKE-02 | Data access: Kysely vs Prisma vs Drizzle | RLS con `SET LOCAL`, NUMERIC sin pérdida, constraint triggers, mapping de agregados, DX de migraciones | 2 d |
-| SPIKE-03 | Money & rounding | decimal.js + HALF_EVEN + largest remainder + fast-check; round-trip NUMERIC ↔ string ↔ Decimal | 1 d |
-| SPIKE-04 | Modular monolith en NestJS | Módulos por contexto, dependency-cruiser, composición sin filtrar Nest al dominio | 1.5 d |
-| SPIKE-05 | Outbox + cola de jobs | Outbox relay, at-least-once, inbox idempotente, graceful shutdown; comparar BullMQ/Valkey vs BullMQ v6 backend PostgreSQL vs pg-boss (¿Redis opcional?) | 1.5 d |
-| SPIKE-06 | Auth: Keycloak + Next.js BFF + API JWT | Flujo PKCE, cookie httpOnly, validación JWT en Nest, mapping a workspace roles | 2 d |
-| SPIKE-07 | Object storage local | SeaweedFS vs Garage; presigned URLs compatibles con S3 (MinIO archivado) | 0.5 d |
-| SPIKE-08 | Compose en Windows/WSL2 | Profiles, healthchecks, bind mounts + hot reload, rendimiento de FS | 1 d |
-| SPIKE-09 | Cloud cost PoC | Costo mensual real mínimo ECS/Fargate vs Cloud Run para staging+prod | 1 d |
-| SPIKE-10 | Observabilidad local | OTel SDK Nest/Next + `otel-lgtm`; correlación trace-log | 1 d |
+| ID | Spike | Pregunta que responde | Time-box | Estado |
+|----|-------|-----------------------|----------|--------|
+| SPIKE-01 | OpenSpec workflow + validación en CI | ¿`openspec validate --strict` integrado en CI y flujo propose→apply→archive funciona para el equipo? | 0.5 d | Completado (CI real pendiente de remoto) |
+| SPIKE-02 | Data access: Kysely vs Prisma vs Drizzle | RLS con `SET LOCAL`, NUMERIC sin pérdida, constraint triggers, mapping de agregados, DX de migraciones | 2 d | Completado — Kysely + dbmate |
+| SPIKE-03 | Money & rounding | decimal.js + HALF_EVEN + largest remainder + fast-check; round-trip NUMERIC ↔ string ↔ Decimal | 1 d | Completado |
+| SPIKE-04 | Modular monolith en NestJS | Módulos por contexto, dependency-cruiser, composición sin filtrar Nest al dominio | 1.5 d | Completado |
+| SPIKE-05 | Outbox + cola de jobs | Outbox relay, at-least-once, inbox idempotente, graceful shutdown; comparar BullMQ/Valkey vs BullMQ v6 backend PostgreSQL vs pg-boss (¿Redis opcional?) | 1.5 d | Completado — pg-boss, Redis opcional |
+| SPIKE-06 | Auth: Keycloak + Next.js BFF + API JWT | Flujo PKCE, cookie httpOnly, validación JWT en Nest, mapping a workspace roles | 2 d | Completado |
+| SPIKE-07 | Object storage local | SeaweedFS vs Garage; presigned URLs compatibles con S3 (MinIO archivado) | 0.5 d | Completado — SeaweedFS |
+| SPIKE-08 | Compose en Windows/WSL2 | Profiles, healthchecks, bind mounts + hot reload, rendimiento de FS | 1 d | Completado |
+| SPIKE-09 | Cloud cost PoC | Costo mensual real mínimo ECS/Fargate vs Cloud Run para staging+prod (ampliado a VPS + Compose, PaaS, Postgres gestionado, object storage, IdP y observabilidad de bajo costo) | 1 d | Completado (investigación, 2026-10-03) — [informe](../spikes/SPIKE-09-deploy-costs/README.md), ADR-0027 Propuesto; **presupuesto del owner pendiente (Q3)** y PoC de costo facturado al abrir el change de despliegue |
+| SPIKE-10 | Observabilidad local | OTel SDK Nest/Next + `otel-lgtm`; correlación trace-log | 1 d | Completado |
+
+Informes, evidencia y ADRs afectados de cada spike: [spikes/README.md](../spikes/README.md).
 
 ## 16. Fuera de alcance de Phase 0 (DESIGN GATE)
 

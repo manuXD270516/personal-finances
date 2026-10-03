@@ -1,0 +1,6 @@
+# docker stats --no-stream (solo lectura) de los contenedores pfos-* del stack local (perfil deps, 15 h de uptime, uso de desarrollo) — 2026-10-03T20:56:48Z
+NAME                    CPU %     MEM USAGE / LIMIT
+pfos-keycloak-1         0.12%     545.1MiB / 1.25GiB
+pfos-postgres-1         0.00%     75.36MiB / 1GiB
+pfos-object-storage-1   7.44%     63.15MiB / 256MiB
+pfos-mailpit-1          0.00%     7.875MiB / 128MiB

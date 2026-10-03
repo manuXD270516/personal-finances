@@ -2,6 +2,8 @@
 
 > **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §2, §5 (ADR-0013), §11, §15 · [07-c4-architecture.md](07-c4-architecture.md) · [12-security.md](12-security.md) · [18-observability.md](18-observability.md) · [20-container-strategy.md](20-container-strategy.md) · [22-infrastructure.md](22-infrastructure.md) · [23-ci-cd.md](23-ci-cd.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · ADR-0009, ADR-0010, ADR-0013, ADR-0014, ADR-0020 · SPIKE-09
 
+> **Actualización 2026-10-03:** [SPIKE-09](../spikes/SPIKE-09-deploy-costs/README.md) re-verificó precios, midió latencia desde Bolivia y amplió el análisis a VPS único + Compose, PostgreSQL gestionado barato, object storage, IdP y observabilidad; propone [ADR-0027](adr/0027-destino-de-despliegue-inicial-vps-compose.md) (default ≈ USD 27–30/mes). Este documento se conserva como análisis de las opciones de plataforma (nivel N4 y alternativas).
+
 > **Precios:** todas las cifras son **aproximadas**, en USD, región `us-east-1` (o equivalente más barata del proveedor) salvo indicación, consultadas en fuentes públicas a **2026-10-01**, sin impuestos ni free tier salvo que se diga. **Verificar en SPIKE-09** con la calculadora oficial y un PoC real antes de decidir.
 
 ---

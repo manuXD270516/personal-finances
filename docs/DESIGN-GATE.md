@@ -45,7 +45,7 @@ Este documento cierra el bloque de diseño de Phase 0. **No se escribe código p
 | 11 | Test case catalog Phase 0/1 | **PARTIAL** | 50 TCs en `draft`; se completan al redactar los changes de Phase 1 (Implementation Gate) |
 | 12 | Local container architecture / stack local | **PARTIAL** | Object storage (SeaweedFS vs Garage, MinIO descartado) → SPIKE-07; Compose en Windows/WSL2 → SPIKE-08; ¿Redis opcional? → SPIKE-05 |
 | 13 | Technology ADRs | **PARTIAL** | 23 en *Propuesto*; cada uno se acepta al cerrar su spike (SPIKE-01..10) |
-| 14 | Deployment architecture (cloud) | **PARTIAL** | Presupuesto mensual del owner → ECS/Fargate (~120–195 USD/mes) vs Cloud Run (~60–110 USD/mes), SPIKE-09. No bloquea Phase 1 (local-first) |
+| 14 | Deployment architecture (cloud) | **PARTIAL** | Presupuesto mensual del owner → ECS/Fargate (~120–195 USD/mes) vs Cloud Run (~60–110 USD/mes), SPIKE-09. No bloquea Phase 1 (local-first). **2026-10-03:** SPIKE-09 completado (investigación) → ADR-0027 propone VPS + Compose por niveles (default ≈ USD 27–30/mes); falta Q3 |
 | 15 | IaC / CI-CD | **READY** | Terraform vs OpenTofu como binario por defecto (menor) |
 | 16 | Observability | **READY** | — |
 | 17 | Backup / restore / DR | **READY** | — |
@@ -70,6 +70,7 @@ Este documento cierra el bloque de diseño de Phase 0. **No se escribe código p
 ### Decisiones que cambian el diseño (antes de los spikes correspondientes)
 
 - **Q3. Presupuesto cloud** mensual máximo y si se acepta operar **local-only** hasta el Hito H (o un despliegue mínimo al final de Phase 2). Decide ECS/Fargate vs Cloud Run (ADR-0013).
+  - **Nota 2026-10-03 — [SPIKE-09](../spikes/SPIKE-09-deploy-costs/README.md):** propone [ADR-0027](adr/0027-destino-de-despliegue-inicial-vps-compose.md) con niveles **N1 ≈ USD 10–15/mes** (Hetzner + Compose), **N2 ≈ USD 27–30/mes** (AWS Lightsail 4 GB São Paulo + Compose, **default recomendado**), **N3 ≈ USD 50–60/mes** (N2 + Neon PG gestionado) y **N4 ≥ USD 110/mes** (ECS/Fargate + RDS, ADR-0013). **Pendiente: confirmación del presupuesto por el owner**; sin respuesta se planifica N2.
 - **Q4. Object storage local:** ¿aceptas reemplazar MinIO (archivado, sin imágenes desde oct-2025) por SeaweedFS o Garage?
 - **Q5. Redis:** ¿preferís minimizar dependencias usando la cola sobre PostgreSQL (BullMQ v6 backend PG o pg-boss) si SPIKE-05 lo valida?
 - **Q6. Frontend:** ¿confirmas Next.js como UI + BFF (tokens fuera del navegador) frente a una SPA Vite + BFF separado?
