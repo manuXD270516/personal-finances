@@ -5,6 +5,7 @@ import {
   ProviderError,
   ProviderSample,
   type FxRateProvider,
+  type FxRateType,
   type MarketRateProvider,
 } from '../domain/index.js';
 import { FxQueries } from './fx.queries.js';
@@ -59,7 +60,7 @@ class FakeProvider implements MarketRateProvider {
 const sample = (
   provider: FxRateProvider,
   base: string,
-  rateType: 'PARALLEL' | 'OFFICIAL',
+  rateType: FxRateType,
   value: string,
   asOf: string,
   fetchedAt: string,
@@ -196,6 +197,52 @@ describe('PollMarketRates (fx/market-rate-providers)', () => {
       ['USD', 'OFFICIAL', '12', 'DOLARAPI_BO'],
       ['USD', 'PARALLEL', '12.055', 'DOLARAPI_BO'],
       ['USDT', 'PARALLEL', '12.055', 'DOLARAPI_BO'],
+    ]);
+  });
+
+  it('[TC-FX-PROVIDER-016] compra/venta se registran como PARALLEL_BUY/PARALLEL_SELL junto a la mediana; la valoración por defecto sigue en 12.02', async () => {
+    const { mem, paralelo, ingestion, service, queries } = setup(
+      parseFxProviderSettings({ FX_PROVIDER_FALLBACK: 'none', FX_PROVIDER_OFFICIAL: 'none' }),
+    );
+    const asOf = '2026-10-02T08:53:07.532Z';
+    paralelo.latest = (f) => [
+      ...paraleloSamples('12.02', asOf)(f),
+      sample('PARALELO_BO', 'USD', 'PARALLEL_BUY', '12.12', asOf, f),
+      sample('PARALELO_BO', 'USDT', 'PARALLEL_BUY', '12.12', asOf, f),
+      sample('PARALELO_BO', 'USD', 'PARALLEL_SELL', '11.92', asOf, f),
+      sample('PARALELO_BO', 'USDT', 'PARALLEL_SELL', '11.92', asOf, f),
+    ];
+    expect((await ingestion.poll()).map((r) => [r.outcome, r.newSamples])).toEqual([['OK', 6]]);
+    expect(
+      providerRates(mem)
+        .filter((r) => r.rate.base.code === 'USD')
+        .map((r) => [r.snapshot.rateType, r.valueText, r.snapshot.asOf]),
+    ).toEqual([
+      ['PARALLEL', '12.02', asOf],
+      ['PARALLEL_BUY', '12.12', asOf],
+      ['PARALLEL_SELL', '11.92', asOf],
+    ]);
+    expect(mem.state.outbox.map((e) => (e.payload as { rateType: string }).rateType)).toContain(
+      'PARALLEL_BUY',
+    );
+    // Sin preferencia y con la preferencia PARALLEL: la mediana.
+    const amount = { amount: '100.00', currency: 'USD' };
+    const byDefault = await queries.convertForValuation({ workspaceId: WS, amount, to: 'BOB' });
+    expect([byDefault.amount.toString(), byDefault.resolved?.rateType]).toEqual(['1202.00 BOB', 'PARALLEL']);
+    await ingestion.seedPreferences(WS);
+    const preferred = await queries.convertForValuation({ workspaceId: WS, amount, to: 'BOB' });
+    expect(preferred.amount.toString()).toBe('1202.00 BOB');
+    // El usuario puede preferir explícitamente la venta (lo que recibe al vender USD).
+    await service.replacePreferences({
+      workspaceId: WS,
+      expectedVersion: (await queries.listPreferences(WS)).version,
+      preferences: [{ base: 'USD', quote: 'BOB', rateType: 'PARALLEL_SELL' }],
+    });
+    const sell = await queries.convertForValuation({ workspaceId: WS, amount, to: 'BOB' });
+    expect([sell.amount.toString(), sell.resolved?.rateType, sell.resolved?.selection]).toEqual([
+      '1192.00 BOB',
+      'PARALLEL_SELL',
+      'PRIMARY',
     ]);
   });
 
@@ -618,5 +665,85 @@ describe('GetProviderStatus (fx/market-rate-providers)', () => {
     const invalid = setup(parseFxProviderSettings({ FX_POLL_INTERVAL: '30s' }));
     const [s] = await invalid.status.status(WS);
     expect([s?.health, s?.lastError?.code]).toEqual(['DISABLED', 'FX_PROVIDER_CONFIG_INVALID']);
+  });
+});
+
+describe('Decisiones del owner 2026-10-03 (casos de uso)', () => {
+  it('[TC-FX-PROVIDER-017] respaldo con 2 h de retraso: el estado lo informa no obsoleto y la valoración usa FALLBACK', async () => {
+    const { mem, paralelo, dolarapi, ingestion, status, queries } = setup();
+    await ingestion.seedPreferences(WS);
+    paralelo.failure = new ProviderError('PROVIDER_UNAVAILABLE', 'unexpected HTTP 503', 503);
+    mem.clock.set(at('2026-10-02T11:00:00Z'));
+    dolarapi.latest = (f) => [
+      sample('DOLARAPI_BO', 'USD', 'PARALLEL', '12.055', '2026-10-02T09:01:00.000Z', f),
+      sample('DOLARAPI_BO', 'USDT', 'PARALLEL', '12.055', '2026-10-02T09:01:00.000Z', f),
+    ];
+    await ingestion.poll();
+    const d = (await status.status(WS)).find((x) => x.provider === 'DOLARAPI_BO');
+    expect(
+      d?.feeds.filter((f) => f.rateType === 'PARALLEL').map((f) => [f.role, f.ageSeconds, f.stale]),
+    ).toEqual([
+      ['FALLBACK', 7140, false],
+      ['FALLBACK', 7140, false],
+    ]);
+    const valued = await queries.convertForValuation({
+      workspaceId: WS,
+      amount: { amount: '100.00', currency: 'USD' },
+      to: 'BOB',
+    });
+    expect([valued.amount.toString(), valued.resolved?.selection, valued.resolved?.stale]).toEqual([
+      '1205.50 BOB',
+      'FALLBACK',
+      false,
+    ]);
+  });
+
+  it('[TC-FX-PROVIDER-018] preferencia PARALLEL sin providers vigentes: la manual P2P fresca valora y se informa el tipo usado', async () => {
+    const { mem, paralelo, ingestion, service, queries } = setup(
+      parseFxProviderSettings({ FX_PROVIDER_FALLBACK: 'none', FX_PROVIDER_OFFICIAL: 'none' }),
+    );
+    await ingestion.seedPreferences(WS);
+    paralelo.latest = paraleloSamples('12.02', '2026-10-02T08:53:07.532Z');
+    await ingestion.poll();
+    mem.clock.set(at('2026-10-02T14:00:00Z'));
+    const value = () =>
+      queries.convertForValuation({
+        workspaceId: WS,
+        amount: { amount: '50.000000', currency: 'USDT' },
+        to: 'BOB',
+      });
+    // Manual P2P con desvío de +5.66 % (12.70 vs 12.02 > 5 %) ⇒ descartada: última conocida obsoleta.
+    await service.recordManualRate({
+      workspaceId: WS,
+      userId: EDITOR,
+      base: 'USDT',
+      quote: 'BOB',
+      value: '12.70',
+      rateType: 'P2P',
+      asOf: '2026-10-02T12:30:00Z',
+    });
+    const stale = await value();
+    expect([stale.amount.toString(), stale.resolved?.selection, stale.resolved?.stale]).toEqual([
+      '601.00 BOB',
+      'LAST_KNOWN_STALE',
+      true,
+    ]);
+    await service.recordManualRate({
+      workspaceId: WS,
+      userId: EDITOR,
+      base: 'USDT',
+      quote: 'BOB',
+      value: '11.98',
+      rateType: 'P2P',
+      asOf: '2026-10-02T13:30:00Z',
+    });
+    const fresh = await value();
+    expect([
+      fresh.amount.toString(),
+      fresh.resolved?.selection,
+      fresh.resolved?.rateType,
+      fresh.resolved?.requestedRateType,
+      fresh.resolved?.source,
+    ]).toEqual(['599.00 BOB', 'MANUAL', 'P2P', 'PARALLEL', 'MANUAL']);
   });
 });

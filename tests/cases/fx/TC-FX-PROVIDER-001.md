@@ -33,7 +33,7 @@ expected_result:
   - "Muestras: USD/BOB = \"12.02\" y USDT/BOB = \"12.02\", rateType PARALLEL, provider PARALELO_BO, asOf 2026-10-02T08:53:07.532Z, fetchedAt 2026-10-02T09:00:00Z"
   - "source = PROVIDER en ambas tasas registradas"
   - "rawPayload conserva el texto exacto del fixture (incluye buy 12.12, sell 11.92, spreadPct -1.6972, sourceCount 4)"
-  - "buy y sell no se usan como valor de ninguna tasa"
+  - "buy y sell no alteran el valor de la tasa PARALLEL (se registran aparte como PARALLEL_BUY/PARALLEL_SELL, TC-FX-PROVIDER-016)"
 created: 2026-10-02
 updated: 2026-10-03
 ---
@@ -42,7 +42,7 @@ updated: 2026-10-03
 
 ## Intención
 
-Fija el mapeo del ACL de paralelo.bo: qué campo es la tasa (mediana), qué pares se derivan y qué se conserva solo como evidencia cruda.
+Fija el mapeo del ACL de paralelo.bo: qué campo es la tasa `PARALLEL` (mediana), qué pares se derivan y qué se conserva como evidencia cruda. Desde la decisión del owner del 2026-10-03 la compra y la venta se registran además como tipos propios (TC-FX-PROVIDER-016).
 
 ## Escenario
 
@@ -50,7 +50,7 @@ Fija el mapeo del ACL de paralelo.bo: qué campo es la tasa (mediana), qué pare
 Dado el fixture grabado de paralelo.bo con median 12.02 y timestamp 2026-10-02T08:53:07.532Z
 Cuando el job consulta el provider principal
 Entonces se registran USD/BOB y USDT/BOB PARALLEL 12.02 con provider paralelo.bo
-  Y compra 12.12 y venta 11.92 quedan solo en la respuesta cruda
+  Y compra 12.12 y venta 11.92 quedan en la respuesta cruda sin alterar la mediana
 ```
 
 ## Notas

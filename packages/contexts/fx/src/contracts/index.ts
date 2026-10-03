@@ -12,7 +12,14 @@ export const FX_EVENTS = {
   rateRecorded: { eventType: 'fx.RateRecorded', eventVersion: 1 },
 } as const;
 
-export type FxRateTypeDto = 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM';
+export type FxRateTypeDto =
+  | 'OFFICIAL'
+  | 'PARALLEL'
+  | 'P2P'
+  | 'BANK'
+  | 'CUSTOM'
+  | 'PARALLEL_BUY'
+  | 'PARALLEL_SELL';
 export type FxRateSourceDto = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
 export type CurrencyKindDto = 'FIAT' | 'CRYPTO' | 'COMMODITY' | 'CUSTOM';
 
@@ -108,6 +115,8 @@ export interface ResolvedRateDto {
   /** Tasas almacenadas usadas por una inversa/cruzada (`FxRate` del contrato HTTP). */
   readonly components: readonly object[];
   readonly rateType: FxRateTypeDto;
+  /** Tipo pedido (explícito o preferido); si difiere de `rateType` se usó una manual fresca de otro tipo. */
+  readonly requestedRateType: FxRateTypeDto | null;
   readonly source: FxRateSourceDto;
   readonly sourceLabel: string | null;
   readonly asOf: string;

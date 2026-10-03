@@ -52,14 +52,14 @@ afterAll(async () => {
 });
 
 describe('ParaleloBoProvider (contrato contra respuestas grabadas)', () => {
-  it('[TC-FX-PROVIDER-001] rate.ok.json → USD/BOB y USDT/BOB PARALLEL = mediana 12.02 con vigencia publicada; buy/sell solo en el crudo', async () => {
+  it('[TC-FX-PROVIDER-001] rate.ok.json → USD/BOB y USDT/BOB PARALLEL = mediana 12.02 con vigencia publicada; buy/sell no alteran la mediana', async () => {
     fresh();
     const body = fixture('paralelo-bo/rate.ok.json');
     server.route('/api/v1/rate', {
       body,
       headers: { 'cache-control': 'public, max-age=60', 'ratelimit-limit': '60' },
     });
-    const samples = await paralelo.fetchLatest();
+    const samples = (await paralelo.fetchLatest()).filter((s) => s.rateType === 'PARALLEL');
     expect(samples.map(plain)).toEqual([
       {
         pair: 'USD/BOB',
@@ -92,6 +92,36 @@ describe('ParaleloBoProvider (contrato contra respuestas grabadas)', () => {
       license: 'CC BY 4.0',
       licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
     });
+  });
+
+  it('[TC-FX-PROVIDER-016] rate.ok.json → además PARALLEL_BUY = buy 12.12 y PARALLEL_SELL = sell 11.92 por par, misma vigencia y crudo', async () => {
+    fresh();
+    const body = fixture('paralelo-bo/rate.ok.json');
+    server.route('/api/v1/rate', { body });
+    const samples = await paralelo.fetchLatest();
+    expect(samples.map((s) => `${s.base}/${s.quote} ${s.rateType}=${s.value}`)).toEqual([
+      'USD/BOB PARALLEL=12.02',
+      'USDT/BOB PARALLEL=12.02',
+      'USD/BOB PARALLEL_BUY=12.12',
+      'USDT/BOB PARALLEL_BUY=12.12',
+      'USD/BOB PARALLEL_SELL=11.92',
+      'USDT/BOB PARALLEL_SELL=11.92',
+    ]);
+    for (const s of samples) {
+      expect([s.asOf, s.provider, s.rawPayload]).toEqual(['2026-10-02T08:53:07.532Z', 'PARALELO_BO', body]);
+    }
+    expect(paralelo.descriptor().feeds.map((f) => f.rateType)).toEqual(['PARALLEL', 'PARALLEL']);
+    // buy/sell nulos o ausentes: solo la mediana (campos opcionales del contrato); inválidos ⇒ PAYLOAD_INVALID.
+    fresh();
+    server.route('/api/v1/rate', {
+      body: '{"timestamp":"2026-10-02T09:10:00.000Z","buy":null,"median":12.02,"sourceCount":4}',
+    });
+    expect((await paralelo.fetchLatest()).map((s) => s.rateType)).toEqual(['PARALLEL', 'PARALLEL']);
+    fresh();
+    server.route('/api/v1/rate', {
+      body: '{"timestamp":"2026-10-02T09:10:00.000Z","buy":0,"sell":11.92,"median":12.02}',
+    });
+    expect((await errorOf(paralelo.fetchLatest())).code).toBe('PROVIDER_PAYLOAD_INVALID');
   });
 
   it('[TC-FX-PROVIDER-003] rate.18-decimals.json se registra como "12.020000000000000001"', async () => {
@@ -145,7 +175,7 @@ describe('ParaleloBoProvider (contrato contra respuestas grabadas)', () => {
     fresh();
     server.route('/api/v1/rate', { body: fixture('paralelo-bo/rate.recorded-2026-10-03.json') });
     const samples = await paralelo.fetchLatest();
-    expect(samples).toHaveLength(2);
+    expect(samples).toHaveLength(6);
     expect(samples[0]?.value).toMatch(/^\d+(\.\d{1,18})?$/);
   });
 });
@@ -154,7 +184,9 @@ describe('DolarApiBoProvider (contrato contra respuestas grabadas)', () => {
   it('[TC-FX-PROVIDER-002] oficial 12/12 → OFFICIAL USD/BOB 12; binance 12.04/12.07 → PARALLEL USD/BOB y USDT/BOB 12.055 exacto', async () => {
     fresh();
     server.route('/v1/dolares', { body: fixture('dolarapi-bo/dolares.ok.json') });
-    const samples = await dolarapi.fetchLatest();
+    const samples = (await dolarapi.fetchLatest()).filter(
+      (s) => s.rateType === 'PARALLEL' || s.rateType === 'OFFICIAL',
+    );
     expect(samples.map(plain)).toEqual([
       {
         pair: 'USD/BOB',
@@ -186,12 +218,33 @@ describe('DolarApiBoProvider (contrato contra respuestas grabadas)', () => {
     expect(await dolarapi.fetchHistory()).toEqual([]);
   });
 
+  it('[TC-FX-PROVIDER-016] binance compra 12.04 / venta 12.07 → PARALLEL_SELL 12.04 y PARALLEL_BUY 12.07 (quien compra USD paga la venta); oficial sin compra/venta propias', async () => {
+    fresh();
+    server.route('/v1/dolares', { body: fixture('dolarapi-bo/dolares.ok.json') });
+    const samples = await dolarapi.fetchLatest();
+    expect(
+      samples
+        .filter((s) => s.rateType === 'PARALLEL_BUY' || s.rateType === 'PARALLEL_SELL')
+        .map((s) => `${s.base}/${s.quote} ${s.rateType}=${s.value} @${s.asOf}`),
+    ).toEqual([
+      'USD/BOB PARALLEL_BUY=12.07 @2026-10-02T08:50:00.000Z',
+      'USDT/BOB PARALLEL_BUY=12.07 @2026-10-02T08:50:00.000Z',
+      'USD/BOB PARALLEL_SELL=12.04 @2026-10-02T08:50:00.000Z',
+      'USDT/BOB PARALLEL_SELL=12.04 @2026-10-02T08:50:00.000Z',
+    ]);
+    expect(dolarapi.descriptor().quoteSideFeeds).toHaveLength(4);
+  });
+
   it('[TC-FX-PROVIDER-002] casas distintas de oficial y binance no generan tasas; sin ninguna de ellas ⇒ PROVIDER_SCHEMA_CHANGED', async () => {
     fresh();
     server.route('/v1/dolares', {
       body: '[{"moneda":"USD","casa":"blue","compra":13,"venta":13.2,"fechaActualizacion":"2026-10-02T08:50:00.000Z"},{"moneda":"USD","casa":"binance","compra":12.04,"venta":12.07,"fechaActualizacion":"2026-10-02T08:50:00.000Z"}]',
     });
-    expect((await dolarapi.fetchLatest()).every((s) => s.value === '12.055')).toBe(true);
+    expect(
+      (await dolarapi.fetchLatest())
+        .filter((s) => s.rateType === 'PARALLEL')
+        .every((s) => s.value === '12.055'),
+    ).toBe(true);
     fresh();
     server.route('/v1/dolares', { body: '[{"moneda":"USD","casa":"blue","compra":13,"venta":13.2}]' });
     expect((await errorOf(dolarapi.fetchLatest())).code).toBe('PROVIDER_SCHEMA_CHANGED');
@@ -205,6 +258,10 @@ describe('DolarApiBoProvider (contrato contra respuestas grabadas)', () => {
       'USD/OFFICIAL=12',
       'USD/PARALLEL=11.98',
       'USDT/PARALLEL=11.98',
+      'USD/PARALLEL_BUY=12',
+      'USDT/PARALLEL_BUY=12',
+      'USD/PARALLEL_SELL=11.96',
+      'USDT/PARALLEL_SELL=11.96',
     ]);
     expect(midpoint('12.04', '12.07')).toBe('12.055');
     expect(midpoint('0.000000000000000001', '0.000000000000000002')).toBe('0.000000000000000002');

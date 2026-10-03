@@ -480,6 +480,18 @@ export const VARIABLES = {
       'Antigüedad a partir de la cual una tasa `OFFICIAL` de provider se considera obsoleta (`48h`).',
     default: '48h',
   }),
+  FX_STALE_AFTER_FALLBACK: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Umbral de obsolescencia propio del provider de respaldo de la tasa `PARALLEL` (`180m`): bo.dolarapi.com publica su `fechaActualizacion` con ~2 h de retraso. El principal sigue usando `FX_STALE_AFTER_PARALLEL`.',
+    default: '180m',
+  }),
+  FX_MANUAL_FALLBACK_MAX_AGE: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Antigüedad máxima (`24h`) de una tasa manual de OTRO tipo (p. ej. `P2P`) que la valoración acepta como último recurso cuando no hay tasa vigente de provider (docs/31 D34); además su desvío respecto de la última tasa de provider del par no puede superar `FX_ANOMALY_THRESHOLD_PCT`.',
+    default: '24h',
+  }),
   FX_ANOMALY_THRESHOLD_PCT: variable(z.string().min(1).max(16), {
     group: 'FX (tasas de mercado)',
     description:
@@ -549,6 +561,8 @@ const FX_PROVIDERS = [
   'FX_POLL_INTERVAL',
   'FX_STALE_AFTER_PARALLEL',
   'FX_STALE_AFTER_OFFICIAL',
+  'FX_STALE_AFTER_FALLBACK',
+  'FX_MANUAL_FALLBACK_MAX_AGE',
   'FX_ANOMALY_THRESHOLD_PCT',
   'FX_PROVIDER_TIMEOUT',
   'FX_BACKFILL_ENABLED',

@@ -2433,7 +2433,7 @@ paths:
           schema: { $ref: '#/components/schemas/CurrencyCode' }
         - name: rateType
           in: query
-          schema: { $ref: '#/components/schemas/FxRateType' }
+          schema: { $ref: '#/components/schemas/FxRateTypeInput' }
         - name: asOfFrom
           in: query
           description: Inclusive lower bound on `asOf`
@@ -2525,9 +2525,14 @@ paths:
         For types fed by market rate providers (`PARALLEL` USD/BOB and USDT/BOB, `OFFICIAL` USD/BOB) the selection is
         (fx/market-rate-providers): non-stale rate of the primary provider (`selection=PRIMARY`) → non-stale rate of the
         fallback provider (`FALLBACK`) → the most recent of the last provider rate (`LAST_KNOWN_STALE`, `stale=true`)
-        and the last manual rate of the pair (`MANUAL`) within the window → `FX_RATE_NOT_FOUND`. Provider rates flagged
-        as anomalous and not confirmed are never used. Provider rates carry `attribution` (e.g. "Fuente: paralelo.bo",
-        CC BY 4.0) that clients must display next to the rate.
+        and the last manual rate of the pair (`MANUAL`) within the window → `FX_RATE_NOT_FOUND`. The fallback provider
+        has its own staleness threshold (default 180 min; primary 60 min). At the manual level a manual rate of ANOTHER
+        type of the pair (e.g. `P2P`) is accepted only if it is recent (age ≤ 24 h by default), deviates at most the
+        anomaly threshold (default 5 %) from the latest provider rate of the pair, is not superseded and is not a
+        pending/rejected anomaly; then `rateType` ≠ `requestedRateType`. `PARALLEL_BUY` /
+        `PARALLEL_SELL` are only used when requested. Provider rates flagged as anomalous and not confirmed are never
+        used. Provider rates carry `attribution` (e.g. "Fuente: paralelo.bo", CC BY 4.0) that clients must display next
+        to the rate.
       x-openspec-capability: [fx/market-rates, fx/market-rate-providers]
       x-required-role: VIEWER
       parameters:
@@ -2545,7 +2550,7 @@ paths:
           schema: { $ref: '#/components/schemas/Instant' }
         - name: rateType
           in: query
-          schema: { $ref: '#/components/schemas/FxRateType' }
+          schema: { $ref: '#/components/schemas/FxRateTypeInput' }
         - name: allowCross
           in: query
           schema: { type: boolean, default: false }
@@ -2789,7 +2794,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/FxRatePreferenceList' }
+            schema: { $ref: '#/components/schemas/FxRatePreferenceListInput' }
       responses:
         '200':
           description: Saved preferences
@@ -4536,8 +4541,21 @@ components:
           items: { $ref: '#/components/schemas/Currency' }
     FxRateType:
       type: string
-      description: Rate types of FR-FX-002 (docs/31 D13)
-      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM]
+      description: >-
+        Rate types of FR-FX-002 (docs/31 D13). PARALLEL_BUY / PARALLEL_SELL are the published parallel-market buy and
+        sell quotes from the trader's perspective (BUY = price paid to buy the base currency, SELL = price received
+        when selling it), recorded by market rate providers in addition to the PARALLEL median/midpoint; they are only
+        used for valuation when explicitly requested (rateType or pair preference). Open set — clients must handle
+        unknown values; the server rejects unknown values in requests with VALIDATION_FAILED.
+      # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de tipos crece de forma
+      # aditiva (PARALLEL_BUY / PARALLEL_SELL, decisión del owner 2026-10-03; docs/10 §9.1).
+      x-extensible-enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL]
+    FxRateTypeInput:
+      type: string
+      description: >-
+        FxRateType accepted in requests (closed set; responses use the open set `FxRateType`). PARALLEL_BUY /
+        PARALLEL_SELL added by the owner decision of 2026-10-03.
+      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL]
     FxRateSource:
       type: string
       enum: [MANUAL, PROVIDER, USER_CONVERSION]
@@ -4709,7 +4727,7 @@ components:
         base: { $ref: '#/components/schemas/CurrencyCode' }
         quote: { $ref: '#/components/schemas/CurrencyCode' }
         value: { $ref: '#/components/schemas/PositiveDecimalString' }
-        rateType: { $ref: '#/components/schemas/FxRateType' }
+        rateType: { $ref: '#/components/schemas/FxRateTypeInput' }
         asOf: { $ref: '#/components/schemas/Instant' }
         sourceLabel: { type: string, maxLength: 200 }
     FxRateSupersede:
@@ -4745,6 +4763,15 @@ components:
           description: Stored rates used for INVERSE / CROSS derivations
           items: { $ref: '#/components/schemas/FxRate' }
         rateType: { $ref: '#/components/schemas/FxRateType' }
+        requestedRateType:
+          description: >-
+            Rate type requested explicitly or by the pair preference (null = any type). When it differs from `rateType`
+            the valuation fell back to a recent manual rate of another type (age ≤ 24 h by default, deviation ≤ the
+            anomaly threshold vs the latest provider rate, never superseded nor a pending/rejected anomaly, never after
+            the requested instant).
+          oneOf:
+            - $ref: '#/components/schemas/FxRateType'
+            - type: 'null'
         source: { $ref: '#/components/schemas/FxRateSource' }
         sourceLabel:
           type: [string, 'null']
@@ -4760,7 +4787,7 @@ components:
         selection: { $ref: '#/components/schemas/RateSelection' }
         stale:
           type: boolean
-          description: True when a provider rate older than the staleness threshold (default 60 min PARALLEL, 48 h OFFICIAL) is used as last known rate
+          description: True when a provider rate older than the staleness threshold (default 60 min PARALLEL primary, 180 min PARALLEL fallback, 48 h OFFICIAL) is used as last known rate
         attribution:
           description: Must be displayed next to the rate when present
           oneOf:
@@ -4782,6 +4809,23 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/FxRatePreference' }
+    FxRatePreferenceInput:
+      type: object
+      additionalProperties: false
+      required: [base, quote, rateType]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        rateType: { $ref: '#/components/schemas/FxRateTypeInput' }
+    FxRatePreferenceListInput:
+      type: object
+      additionalProperties: false
+      required: [data]
+      description: Request body of replaceFxRatePreferences (closed rate type set).
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FxRatePreferenceInput' }
 
     # ── Ledger ──
     LedgerAccountNature:

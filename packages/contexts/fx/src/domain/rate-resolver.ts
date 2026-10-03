@@ -2,6 +2,7 @@ import { DomainError, type Instant, Rate, type Currency } from '@pf/shared-kerne
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
   DEFAULT_RATE_WINDOW_DAYS,
+  isQuoteSideRateType,
   type FxRateProvider,
   type FxRateSource,
   type FxRateType,
@@ -9,6 +10,7 @@ import {
 } from './fx-types.js';
 import {
   DEFAULT_VALUATION_POLICY,
+  newestState,
   ValuationRateSelector,
   type ValuationChoice,
   type ValuationPolicy,
@@ -42,6 +44,11 @@ export interface ResolvedRate {
   /** Tasas almacenadas usadas (la original de una inversa; las dos componentes de una cruzada). */
   readonly components: readonly ExchangeRateState[];
   readonly rateType: FxRateType;
+  /**
+   * Tipo pedido (explícito o preferido del par); `null` = sin tipo. Si difiere de `rateType`, la valoración usó una
+   * tasa manual fresca de otro tipo en el nivel de manuales (decisión del owner 2026-10-03).
+   */
+  readonly requestedRateType: FxRateType | null;
   readonly source: FxRateSource;
   readonly sourceLabel: string | null;
   readonly asOf: string;
@@ -127,8 +134,9 @@ export class RateResolver {
     }
     const windowDays = query.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
     const typeFor = (a: string, b: string) => query.rateType ?? query.preferenceOf?.(a, b) ?? null;
-    const direct = this.pick(base.code, quote.code, at, windowDays, typeFor(base.code, quote.code), mode);
-    if (direct) return this.single(direct, base, at);
+    const requested = typeFor(base.code, quote.code);
+    const direct = this.pick(base.code, quote.code, at, windowDays, requested, mode);
+    if (direct) return this.single(direct, base, at, requested);
     if (!query.allowCross) return null;
     const pivot = query.pivot;
     if (!pivot || pivot.code === base.code || pivot.code === quote.code) return null;
@@ -144,6 +152,7 @@ export class RateResolver {
       fxRateId: null,
       components: [first.state, second.state],
       rateType: older.rateType,
+      requestedRateType: requested,
       source: older.source,
       sourceLabel: null,
       asOf: older.asOf,
@@ -157,7 +166,7 @@ export class RateResolver {
     };
   }
 
-  private single(p: Pick, base: Currency, at: Instant): ResolvedRate {
+  private single(p: Pick, base: Currency, at: Instant, requested: FxRateType | null): ResolvedRate {
     const s = p.state;
     return {
       rate: orient(p, base),
@@ -165,6 +174,7 @@ export class RateResolver {
       fxRateId: s.id,
       components: p.inverse ? [s] : [],
       rateType: s.rateType,
+      requestedRateType: requested,
       source: s.source,
       sourceLabel: s.sourceLabel,
       asOf: s.asOf,
@@ -187,16 +197,35 @@ export class RateResolver {
   ): Pick | null {
     const to = at.epochMillis;
     const from = to - windowDays * DAY_MS;
-    const eligible = this.candidates
+    const usable = this.candidates
       .filter(isUsableCandidate)
       .map((c) => c.state)
       .filter((s) => {
         const t = Date.parse(s.asOf);
-        return t <= to && t >= from && (type === null || s.rateType === type);
+        return t <= to && t >= from;
       });
+    // Compra/venta solo si se piden explícitamente (sin tipo nunca entran; design.md decisión 29).
+    const ofType = (s: ExchangeRateState) =>
+      type === null ? !isQuoteSideRateType(s.rateType) : s.rateType === type;
+    const eligible = usable.filter(ofType);
+    const others = type === null ? [] : usable.filter((s) => s.rateType !== type);
+    const samePair = (s: ExchangeRateState) =>
+      (s.rate.base.code === a && s.rate.quote.code === b) ||
+      (s.rate.base.code === b && s.rate.quote.code === a);
+    // Referencia del desvío de una manual de otro tipo: la última tasa de provider usable del par y tipo pedido.
+    const providerReference = eligible
+      .filter((s) => s.source === 'PROVIDER' && samePair(s))
+      .reduce<ExchangeRateState | null>((acc, s) => (acc ? newestState(acc, s) : s), null);
     const choose = (base: string, quote: string) => {
-      const pair = eligible.filter((s) => s.rate.base.code === base && s.rate.quote.code === quote);
-      return mode === 'newest' ? this.selector.newest(pair, at) : this.selector.select(pair, at);
+      const inPair = (s: ExchangeRateState) => s.rate.base.code === base && s.rate.quote.code === quote;
+      const pair = eligible.filter(inPair);
+      return mode === 'newest'
+        ? this.selector.newest(pair, at)
+        : this.selector.select(pair, at, {
+            requestedType: type,
+            otherTypes: others.filter(inPair),
+            providerReference,
+          });
     };
     const direct = choose(a, b);
     if (direct) return { ...direct, inverse: false };

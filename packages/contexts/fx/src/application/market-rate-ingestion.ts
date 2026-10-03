@@ -3,6 +3,7 @@ import { FX_EVENTS } from '../contracts/index.js';
 import {
   AnomalyDetector,
   ExchangeRate,
+  marketOf,
   ProviderError,
   type FxRateProvider,
   type MarketRateProvider,
@@ -160,10 +161,13 @@ export class MarketRateIngestion {
     return this.finish(provider, 'POLL', startedAt, outcome, inserted, null);
   }
 
-  /** Muestras de los feeds para los que el provider tiene rol (PARALLEL: principal/respaldo; OFFICIAL: oficial). */
+  /**
+   * Muestras de los feeds para los que el provider tiene rol (PARALLEL y su compra/venta: principal/respaldo;
+   * OFFICIAL: oficial).
+   */
   private servesRole(provider: FxRateProvider, sample: ProviderSample): boolean {
     const s = this.deps.settings;
-    if (sample.rateType === 'PARALLEL') return provider === s.primary || provider === s.fallback;
+    if (marketOf(sample.rateType) === 'PARALLEL') return provider === s.primary || provider === s.fallback;
     if (sample.rateType === 'OFFICIAL') return provider === s.official;
     return false;
   }

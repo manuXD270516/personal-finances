@@ -59,10 +59,32 @@ describe('Configuración FX_* de providers (design.md decisión 5)', () => {
       { FX_PROVIDER_PRIMARY: 'binance' },
       { FX_PROVIDER_OFFICIAL: 'paralelo_bo' },
       { FX_STALE_AFTER_PARALLEL: 'una hora' },
+      { FX_STALE_AFTER_FALLBACK: '3 horas' },
+      { FX_MANUAL_FALLBACK_MAX_AGE: 'un día' },
       { FX_BACKFILL_ENABLED: 'yes' },
     ]) {
       expect(parseFxProviderSettings(env).configError, JSON.stringify(env)).not.toBeNull();
     }
     expect(parseFxProviderSettings({ FX_ANOMALY_THRESHOLD_PCT: '2.50' }).anomalyThresholdPct).toBe('2.5');
+  });
+
+  it('[TC-FX-PROVIDER-017] FX_STALE_AFTER_FALLBACK (por defecto 180m) es el umbral propio del respaldo de PARALLEL', () => {
+    expect(DEFAULT_FX_PROVIDER_SETTINGS.staleAfterFallbackMs).toBe(10_800_000);
+    expect(valuationPolicyOf(DEFAULT_FX_PROVIDER_SETTINGS).fallbackStaleAfterMs).toEqual({
+      PARALLEL: 10_800_000,
+    });
+    const s = parseFxProviderSettings({ FX_STALE_AFTER_FALLBACK: '4h' });
+    expect([s.staleAfterFallbackMs, s.configError]).toEqual([14_400_000, null]);
+    // Sin respaldo configurado no hay umbral propio que aplicar.
+    const none = parseFxProviderSettings({ FX_PROVIDER_FALLBACK: 'none' });
+    expect(valuationPolicyOf(none).roles.PARALLEL).toEqual({ primary: 'PARALELO_BO', fallback: null });
+  });
+
+  it('[TC-FX-PROVIDER-018] FX_MANUAL_FALLBACK_MAX_AGE (por defecto 24h) y desvío máximo = FX_ANOMALY_THRESHOLD_PCT', () => {
+    const p = valuationPolicyOf(DEFAULT_FX_PROVIDER_SETTINGS);
+    expect([p.manualFallbackMaxAgeMs, p.manualFallbackMaxDeviationPct]).toEqual([86_400_000, '5']);
+    const s = parseFxProviderSettings({ FX_MANUAL_FALLBACK_MAX_AGE: '6h', FX_ANOMALY_THRESHOLD_PCT: '3' });
+    expect([s.configError, valuationPolicyOf(s).manualFallbackMaxAgeMs]).toEqual([null, 21_600_000]);
+    expect(valuationPolicyOf(s).manualFallbackMaxDeviationPct).toBe('3');
   });
 });

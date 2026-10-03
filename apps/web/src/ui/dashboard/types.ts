@@ -8,7 +8,8 @@ export interface Money {
   readonly currency: string;
 }
 
-export type FxRateType = 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM';
+export type FxRateType =
+  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL';
 export type FxRateSource = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
 export type FxRateProvider = 'PARALELO_BO' | 'DOLARAPI_BO';
 export type RateSelection = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
@@ -38,6 +39,8 @@ export interface ResolvedRate {
   readonly fxRateId?: string | null;
   readonly derivation: 'DIRECT' | 'INVERSE' | 'CROSS';
   readonly rateType: FxRateType;
+  /** Tipo pedido; si difiere de `rateType`, se usó una tasa manual fresca de otro tipo. */
+  readonly requestedRateType?: FxRateType | null;
   readonly source: FxRateSource;
   readonly asOf: string;
   readonly ageDays: number;

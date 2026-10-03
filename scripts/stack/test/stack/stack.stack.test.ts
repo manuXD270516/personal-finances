@@ -137,6 +137,35 @@ describe('stack local en contenedores (pfos-test)', () => {
     expect((await serviceStates(ctx)).map((s) => s.Service)).not.toContain('otel-lgtm');
   });
 
+  it('[TC-FX-PROVIDER-019] finance-worker: solo redes con salida (no internas) y FX_* del .env (contrato único); providers en none sin red', async () => {
+    const name = (await stateOf(ctx, 'finance-worker'))!.Name;
+    const networks = Object.keys(
+      JSON.parse(await containerInspect(name, '{{json .NetworkSettings.Networks}}')) as Record<
+        string,
+        unknown
+      >,
+    );
+    expect(networks.length).toBeGreaterThan(0);
+    for (const net of networks) {
+      const internal = await run('docker', ['network', 'inspect', net, '--format', '{{.Internal}}'], {
+        mode: 'capture',
+      });
+      expect(internal.stdout.trim(), net).toBe('false');
+    }
+    const containerEnv = new Map(
+      (JSON.parse(await containerInspect(name, '{{json .Config.Env}}')) as string[]).map((kv) => {
+        const i = kv.indexOf('=');
+        return [kv.slice(0, i), kv.slice(i + 1)] as const;
+      }),
+    );
+    const fxKeys = Object.keys(env).filter((k) => k.startsWith('FX_'));
+    expect(fxKeys).toEqual(expect.arrayContaining(['FX_STALE_AFTER_FALLBACK', 'FX_MANUAL_FALLBACK_MAX_AGE']));
+    for (const k of fxKeys) expect(containerEnv.get(k), k).toBe(env[k]);
+    expect(containerEnv.get('FX_PROVIDER_PRIMARY')).toBe('none');
+    const logs = await run('docker', ['logs', name], { mode: 'capture' });
+    expect(logs.stdout + logs.stderr).toContain('fx market rate providers disabled');
+  });
+
   it('[TC-PLATFORM-STACK-002] con postgres u object-storage caídos /health/ready = 503 (live 200) y se recupera sin reiniciar finance-api', async () => {
     const apiName = (await stateOf(ctx, 'finance-api'))!.Name;
     const startedAt = await containerInspect(apiName, '{{.State.StartedAt}}');

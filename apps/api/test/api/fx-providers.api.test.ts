@@ -291,8 +291,16 @@ describe('FX providers por HTTP (fx/market-rate-providers)', () => {
     });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(contract.validateResponse('listFxRates', 200, r.body)).toEqual([]);
-    const data = r.body['data'] as { provider: string; source: string; base: string }[];
-    expect(data.map((x) => x.base).sort()).toEqual(['USD', 'USDT']);
+    const data = r.body['data'] as { provider: string; source: string; base: string; rateType: string }[];
+    // Mediana + compra + venta por par (TC-FX-PROVIDER-016).
+    expect(data.map((x) => `${x.base} ${x.rateType}`).sort()).toEqual([
+      'USD PARALLEL',
+      'USD PARALLEL_BUY',
+      'USD PARALLEL_SELL',
+      'USDT PARALLEL',
+      'USDT PARALLEL_BUY',
+      'USDT PARALLEL_SELL',
+    ]);
     expect(data.every((x) => x.provider === 'PARALELO_BO' && x.source === 'PROVIDER')).toBe(true);
   });
 
