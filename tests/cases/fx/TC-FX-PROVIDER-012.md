@@ -12,8 +12,9 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-providers.api.test.ts
 status: ready
 regression_suite: false
 phase: 1
@@ -37,7 +38,7 @@ expected_result:
   - "Para bo.dolarapi.com el texto es \"Fuente: bo.dolarapi.com\" con enlace https://bo.dolarapi.com"
   - "La tasa manual muestra \"Casa de cambio centro\" y attribution null"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-012 — Toda tasa de provider y todo monto valorado con ella muestran la atribución de la fuente
@@ -58,3 +59,4 @@ Entonces junto a la tasa veo "Fuente: paralelo.bo" con enlace y licencia CC BY 4
 
 - Texto de atribución pedido por paralelo.bo (verificado el 2026-10-02): "paralelo.bo (https://paralelo.bo)".
 - Fechas fijas con `FixedClock`; instantes en UTC (America/La_Paz = UTC−4). Sin red en CI: providers simulados con fixtures grabados.
+- Automatización parcial (2026-10-03): Pendiente: RateSourceBadge en la UI (tarea 6.1) y ReportSummary.meta.attributions (add-basic-dashboard).

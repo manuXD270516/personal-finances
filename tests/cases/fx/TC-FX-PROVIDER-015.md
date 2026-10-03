@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - apps/api/test/api/fx-providers.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","status","observability"]
@@ -35,7 +37,7 @@ expected_result:
   - "attribution presente en cada provider"
   - "Variante: ambos providers con health DISABLED y nextAttemptAt null"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-015 — El estado de los providers informa salud, última tasa, fallas y carga histórica

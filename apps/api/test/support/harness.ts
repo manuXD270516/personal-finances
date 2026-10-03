@@ -33,6 +33,10 @@ export function baseEnv(deps: Dependencies, overrides: Record<string, string> = 
     OBJECT_STORAGE_ACCESS_KEY: deps.s3AccessKey,
     OBJECT_STORAGE_SECRET_KEY: deps.s3SecretKey,
     HEALTH_CHECK_TIMEOUT_MS: '1500',
+    // Sin red en tests: providers de tasas de mercado deshabilitados salvo que el test los simule localmente.
+    FX_PROVIDER_PRIMARY: 'none',
+    FX_PROVIDER_FALLBACK: 'none',
+    FX_PROVIDER_OFFICIAL: 'none',
     ...overrides,
   };
 }

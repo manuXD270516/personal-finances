@@ -7,3 +7,5 @@
 *.sql text eol=lf
 *.Dockerfile text eol=lf
 Dockerfile text eol=lf
+# Respuestas grabadas de providers de tasas: bytes exactos (add-market-rate-providers 1.3)
+packages/contexts/fx/test/fixtures/providers/** -text

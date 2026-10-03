@@ -12,9 +12,13 @@ invariants: ["INV-001"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/lossless-json-reader.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/providers.contract.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/providers.architecture.test.ts
+  - scripts/architecture/test/architecture-rules.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","provider","lossless","money","fast-check"]
@@ -30,7 +34,7 @@ expected_result:
   - "Leer el mismo texto con JSON.parse daría 12.02 (el test lo documenta como contraejemplo)"
   - "La propiedad se cumple en todas las corridas"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-003 — Los valores numéricos del provider se leen como decimal exacto sin pasar por punto flotante

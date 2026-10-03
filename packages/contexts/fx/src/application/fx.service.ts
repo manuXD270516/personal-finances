@@ -30,6 +30,14 @@ export interface SupersedeRateCommand {
   readonly sourceLabel?: string | null;
 }
 
+export interface ReviewRateAnomalyCommand {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly rateId: string;
+  readonly decision: 'CONFIRM' | 'REJECT';
+  readonly reason: string;
+}
+
 export interface ReplacePreferencesCommand {
   readonly workspaceId: string;
   readonly expectedVersion: number;
@@ -119,6 +127,56 @@ export class FxService {
         ],
       });
       return { rate: next, supersededById: null };
+    });
+  }
+
+  /**
+   * `ReviewRateAnomaly` (fx/market-rate-providers; design.md decisión 8): un EDITOR/OWNER confirma o rechaza una tasa
+   * de provider marcada como anómala, con motivo obligatorio. La tasa sigue inmutable: la decisión es una fila
+   * append-only de `fx.rate_anomaly_review` y se audita en la misma transacción (INV-029). Una tasa no marcada ⇒
+   * `FX_RATE_NOT_ANOMALOUS` (422); una segunda revisión ⇒ `FX_RATE_ANOMALY_ALREADY_REVIEWED` (409).
+   */
+  reviewAnomaly(cmd: ReviewRateAnomalyCommand): Promise<StoredRate> {
+    return this.deps.uow.run(cmd.workspaceId, async () => {
+      if (cmd.decision !== 'CONFIRM' && cmd.decision !== 'REJECT') {
+        throw new DomainError('VALIDATION_FAILED', 'decision must be CONFIRM or REJECT').at('/decision');
+      }
+      const reason = typeof cmd.reason === 'string' ? cmd.reason.trim() : '';
+      if (reason.length < 3 || reason.length > 500) {
+        throw new DomainError('VALIDATION_FAILED', 'reason must have between 3 and 500 characters').at(
+          '/reason',
+        );
+      }
+      const stored = await this.deps.rates.findById(cmd.workspaceId, cmd.rateId);
+      if (!stored) throw notFound(cmd.rateId);
+      if (stored.rate.snapshot.anomaly === null) {
+        throw new DomainError('FX_RATE_NOT_ANOMALOUS', `fx rate ${cmd.rateId} is not flagged as anomalous`);
+      }
+      if (stored.anomalyReview) {
+        throw new DomainError(
+          'FX_RATE_ANOMALY_ALREADY_REVIEWED',
+          `the anomaly of fx rate ${cmd.rateId} was already ${stored.anomalyReview.decision.toLowerCase()}`,
+        );
+      }
+      const review = {
+        rateId: stored.rate.id,
+        workspaceId: cmd.workspaceId,
+        decision: cmd.decision === 'CONFIRM' ? ('CONFIRMED' as const) : ('REJECTED' as const),
+        reason,
+        decidedBy: cmd.userId,
+        decidedAt: this.deps.clock.now().toString(),
+      };
+      await this.deps.reviews.insert(review);
+      await this.audit.append({
+        workspaceId: cmd.workspaceId,
+        action: 'fx.exchange_rate.anomaly_reviewed',
+        aggregateType: 'ExchangeRate',
+        aggregateId: stored.rate.id,
+        aggregateVersion: 2,
+        reason,
+        changes: [{ field: 'anomalyStatus', before: 'PENDING', after: review.decision }],
+      });
+      return { ...stored, anomalyReview: review };
     });
   }
 
@@ -215,7 +273,7 @@ export class FxService {
         asOf: s.asOf,
         effectiveDate: s.effectiveDate,
         supersedesRateId: s.supersedesId,
-        provider: null,
+        provider: s.provider,
       },
     });
   }

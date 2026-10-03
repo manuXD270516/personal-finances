@@ -12,9 +12,12 @@ invariants: ["INV-032"]
 priority: high
 type: integration
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/lossless-json-reader.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/providers.contract.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","validation"]
@@ -32,7 +35,7 @@ expected_result:
   - "El estado muestra lastError.code = PROVIDER_PAYLOAD_INVALID y consecutiveFailures incrementado"
   - "La última tasa válida 12.02 sigue siendo la del provider"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-004 — Una muestra con valor ausente o inválido no registra tasas y cuenta como falla del provider

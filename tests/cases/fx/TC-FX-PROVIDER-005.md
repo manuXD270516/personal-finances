@@ -12,9 +12,14 @@ invariants: ["INV-011","INV-028"]
 priority: critical
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - packages/contexts/fx/src/application/provider-settings.test.ts
+  - packages/contexts/fx/test/integration/providers.int.test.ts
+  - apps/api/src/worker/fx-jobs.test.ts
+  - apps/api/test/api/fx-providers.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","provider","job","pg-boss","idempotency"]
@@ -36,7 +41,7 @@ expected_result:
   - "UPDATE y DELETE fallan por permisos; leer la tasa por id devuelve siempre 12.02"
   - "Variante: el cron registrado es */30 * * * *"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-005 — El job programado registra cada muestra nueva una sola vez como tasa inmutable con su procedencia

@@ -111,6 +111,36 @@ export function identityWorkspaceSettings(pool: Pool): {
 }
 
 /**
+ * Directorio de workspaces ACTIVOS (id y zona horaria) para jobs de instalación del worker (add-market-rate-providers:
+ * FX copia cada tasa de provider a cada workspace). Requiere el pool del worker (`pf_worker`): asume
+ * `pf_workspace_directory` solo dentro de la transacción de la consulta (migración 20261003230100).
+ */
+export function identityActiveWorkspaces(pool: Pool): {
+  list(): Promise<readonly { readonly workspaceId: string; readonly timeZone: string }[]>;
+} {
+  return {
+    async list() {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN READ ONLY');
+        await client.query('SET LOCAL ROLE pf_workspace_directory');
+        const { rows } = await client.query<{ id: string; time_zone: string }>(
+          `SELECT id::text AS id, time_zone FROM iam.workspace
+            WHERE status = 'ACTIVE' AND archived_at IS NULL ORDER BY id`,
+        );
+        await client.query('COMMIT');
+        return rows.map((r) => ({ workspaceId: r.id, timeZone: r.time_zone }));
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+/**
  * Locale del usuario (`Me.locale`) para otros contextos (CLASSIFICATION nombra las categorías de sistema en él).
  * Lee con el contexto RLS del propio usuario (solo ve su fila).
  */

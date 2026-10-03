@@ -12,9 +12,14 @@ invariants: ["INV-011","INV-029"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/anomaly-detector.test.ts
+  - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/providers.int.test.ts
+  - apps/api/test/api/fx-providers.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","anomaly","audit"]
@@ -40,7 +45,7 @@ expected_result:
   - "La segunda revisión responde 409 FX_RATE_ANOMALY_ALREADY_REVIEWED"
   - "Variante: 12.10 (+0.6656 %) se usa sin confirmación"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-010 — Una muestra con variación mayor al umbral queda retenida hasta que un editor la confirma

@@ -442,6 +442,62 @@ export const VARIABLES = {
     default: 'UTC',
   }),
 
+  // ── FX: providers de tasas de mercado (openspec add-market-rate-providers, design.md decisión 5; ADR-0025) ──
+  // Sintaxis laxa a propósito: la semántica (mínimos, combinaciones) la valida FX al arrancar y un error NO detiene el
+  // proceso: los providers no se inician, el estado informa `FX_PROVIDER_CONFIG_INVALID` y el resto sigue (degradación).
+  FX_PROVIDER_PRIMARY: variable(z.string().min(1).max(32), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Provider principal de la tasa `PARALLEL` USD/BOB y USDT/BOB: `paralelo_bo`, `dolarapi_bo` o `none` (deshabilitado).',
+    default: 'paralelo_bo',
+  }),
+  FX_PROVIDER_FALLBACK: variable(z.string().min(1).max(32), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Provider de respaldo de la tasa `PARALLEL` (distinto del principal): `dolarapi_bo`, `paralelo_bo` o `none`.',
+    default: 'dolarapi_bo',
+  }),
+  FX_PROVIDER_OFFICIAL: variable(z.string().min(1).max(32), {
+    group: 'FX (tasas de mercado)',
+    description: 'Provider de la tasa `OFFICIAL` USD/BOB: `dolarapi_bo` o `none`.',
+    default: 'dolarapi_bo',
+  }),
+  FX_POLL_INTERVAL: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Intervalo de consulta de los providers (cron pg-boss del worker): minutos u horas que dividan la hora o el día (`15m`, `30m`, `1h`); mínimo `1m` (60 s).',
+    default: '15m',
+  }),
+  FX_STALE_AFTER_PARALLEL: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Antigüedad a partir de la cual una tasa `PARALLEL` de provider se considera obsoleta (`60m`).',
+    default: '60m',
+  }),
+  FX_STALE_AFTER_OFFICIAL: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Antigüedad a partir de la cual una tasa `OFFICIAL` de provider se considera obsoleta (`48h`).',
+    default: '48h',
+  }),
+  FX_ANOMALY_THRESHOLD_PCT: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Variación porcentual (decimal > 0) respecto de la tasa aceptada anterior a partir de la cual una muestra queda retenida como anómala hasta que un editor la confirme.',
+    default: '5',
+  }),
+  FX_PROVIDER_TIMEOUT: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description: 'Timeout de cada solicitud a un provider (`10s`; máximo `30s`).',
+    default: '10s',
+  }),
+  FX_BACKFILL_ENABLED: variable(z.string().min(1).max(8), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Carga inicial del histórico diario de la tasa paralela al crear un workspace y relleno diario de días faltantes (`true`/`false`).',
+    default: 'true',
+  }),
+
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
     group: 'OpenTelemetry',
@@ -486,6 +542,17 @@ const OBJECT_STORAGE = [
   'OBJECT_STORAGE_SECRET_KEY',
   'OBJECT_STORAGE_FORCE_PATH_STYLE',
 ] as const;
+const FX_PROVIDERS = [
+  'FX_PROVIDER_PRIMARY',
+  'FX_PROVIDER_FALLBACK',
+  'FX_PROVIDER_OFFICIAL',
+  'FX_POLL_INTERVAL',
+  'FX_STALE_AFTER_PARALLEL',
+  'FX_STALE_AFTER_OFFICIAL',
+  'FX_ANOMALY_THRESHOLD_PCT',
+  'FX_PROVIDER_TIMEOUT',
+  'FX_BACKFILL_ENABLED',
+] as const;
 const QUEUE = [
   'JOB_QUEUE_DRIVER',
   'JOB_QUEUE_POLLING_INTERVAL_SECONDS',
@@ -518,6 +585,7 @@ export const APP_VARIABLES = {
     'OIDC_API_AUDIENCE',
     'OIDC_REQUIRED_SCOPE',
     'OIDC_CLOCK_SKEW_SECONDS',
+    ...FX_PROVIDERS,
   ],
   // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
   worker: [
@@ -533,6 +601,7 @@ export const APP_VARIABLES = {
     'WORKER_HEALTH_BIND_ADDRESS',
     'LEDGER_INTEGRITY_CRON',
     'LEDGER_INTEGRITY_CRON_TZ',
+    ...FX_PROVIDERS,
     'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
   ],

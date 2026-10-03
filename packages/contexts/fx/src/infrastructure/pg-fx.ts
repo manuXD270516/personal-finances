@@ -4,10 +4,13 @@ import { currency, DomainError, Rate, type Instant } from '@pf/shared-kernel';
 import { sql, type Generated, type Kysely } from 'kysely';
 import type { Pool } from 'pg';
 import type {
+  AnomalyReview,
   CurrencyRepository,
   CurrencyRow,
   ExchangeRateRepository,
   IdGenerator,
+  ProviderFeedKey,
+  RateAnomalyReviewRepository,
   RateListFilter,
   RatePreference,
   RatePreferenceRepository,
@@ -20,6 +23,7 @@ import {
   DEFAULT_WORKSPACE_CURRENCIES,
   ExchangeRate,
   type CurrencyKind,
+  type FxRateProvider,
   type FxRateSource,
   type FxRateType,
   type RateCandidate,
@@ -52,11 +56,24 @@ interface FxDb {
     as_of_date: string;
     source: FxRateSource;
     source_label: string | null;
-    provider: string | null;
+    provider: FxRateProvider | null;
     supersedes_id: string | null;
     supersede_reason: string | null;
     created_at: string;
     created_by: string | null;
+    fetched_at: string | null;
+    raw_payload: string | null;
+    anomaly_flagged: Generated<boolean>;
+    anomaly_baseline_rate_id: string | null;
+    anomaly_variation_pct: string | null;
+  };
+  'fx.rate_anomaly_review': {
+    exchange_rate_id: string;
+    workspace_id: string;
+    decision: 'CONFIRMED' | 'REJECTED';
+    reason: string;
+    decided_by: string;
+    decided_at: string;
   };
   'fx.rate_preference': {
     workspace_id: string;
@@ -90,6 +107,16 @@ interface RateRow {
   base_scale: number;
   quote_scale: number;
   superseded_by: string | null;
+  provider: FxRateProvider | null;
+  fetched_at: string | null;
+  raw_payload: string | null;
+  anomaly_flagged: boolean;
+  anomaly_baseline_rate_id: string | null;
+  anomaly_variation_pct: string | null;
+  review_decision: 'CONFIRMED' | 'REJECTED' | null;
+  review_reason: string | null;
+  review_decided_by: string | null;
+  review_decided_at: string | null;
 }
 
 /** Selección común: tasa con escalas de sus monedas y la versión que la reemplazó (si existe). */
@@ -98,6 +125,7 @@ function selectRates() {
     .selectFrom('fx.exchange_rate as r')
     .innerJoin('fx.currency as b', 'b.code', 'r.base_currency')
     .innerJoin('fx.currency as q', 'q.code', 'r.quote_currency')
+    .leftJoin('fx.rate_anomaly_review as rv', 'rv.exchange_rate_id', 'r.id')
     .select([
       'r.id',
       'r.workspace_id',
@@ -119,6 +147,16 @@ function selectRates() {
       sql<string | null>`(SELECT s.id::text FROM fx.exchange_rate s WHERE s.supersedes_id = r.id LIMIT 1)`.as(
         'superseded_by',
       ),
+      'r.provider',
+      iso('r.fetched_at').as('fetched_at'),
+      'r.raw_payload',
+      'r.anomaly_flagged',
+      'r.anomaly_baseline_rate_id',
+      sql<string | null>`r.anomaly_variation_pct::text`.as('anomaly_variation_pct'),
+      'rv.decision as review_decision',
+      'rv.reason as review_reason',
+      'rv.decided_by as review_decided_by',
+      iso('rv.decided_at').as('review_decided_at'),
     ]);
 }
 
@@ -139,10 +177,54 @@ function toStored(row: RateRow): StoredRate {
       supersedeReason: row.supersede_reason,
       createdAt: row.created_at,
       createdBy: row.created_by,
+      provider: row.provider,
+      fetchedAt: row.fetched_at,
+      rawPayload: row.raw_payload,
+      anomaly:
+        row.anomaly_flagged && row.anomaly_baseline_rate_id && row.anomaly_variation_pct
+          ? { baselineRateId: row.anomaly_baseline_rate_id, variationPct: row.anomaly_variation_pct }
+          : null,
     }),
     supersededById: row.superseded_by,
+    anomalyReview:
+      row.review_decision && row.review_decided_by && row.review_decided_at && row.workspace_id
+        ? {
+            rateId: row.id,
+            workspaceId: row.workspace_id,
+            decision: row.review_decision,
+            reason: row.review_reason ?? '',
+            decidedBy: row.review_decided_by,
+            decidedAt: row.review_decided_at,
+          }
+        : null,
   };
 }
+
+const rateValues = (rate: ExchangeRate) => {
+  const s = rate.snapshot;
+  return {
+    id: s.id,
+    workspace_id: s.workspaceId,
+    base_currency: s.rate.base.code,
+    quote_currency: s.rate.quote.code,
+    rate: rate.valueText,
+    rate_type: s.rateType,
+    as_of: s.asOf,
+    as_of_date: s.effectiveDate,
+    source: s.source,
+    source_label: s.sourceLabel,
+    provider: s.provider,
+    supersedes_id: s.supersedesId,
+    supersede_reason: s.supersedeReason,
+    created_at: s.createdAt,
+    created_by: s.createdBy,
+    fetched_at: s.fetchedAt,
+    raw_payload: s.rawPayload,
+    anomaly_flagged: s.anomaly !== null,
+    anomaly_baseline_rate_id: s.anomaly?.baselineRateId ?? null,
+    anomaly_variation_pct: s.anomaly?.variationPct ?? null,
+  };
+};
 
 const isUniqueViolation = (err: unknown, constraint: string) =>
   (err as { code?: string; constraint?: string }).code === '23505' &&
@@ -156,26 +238,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
   async insert(rate: ExchangeRate): Promise<void> {
     const s = rate.snapshot;
     try {
-      await db()
-        .insertInto('fx.exchange_rate')
-        .values({
-          id: s.id,
-          workspace_id: s.workspaceId,
-          base_currency: s.rate.base.code,
-          quote_currency: s.rate.quote.code,
-          rate: rate.valueText,
-          rate_type: s.rateType,
-          as_of: s.asOf,
-          as_of_date: s.effectiveDate,
-          source: s.source,
-          source_label: s.sourceLabel,
-          provider: null,
-          supersedes_id: s.supersedesId,
-          supersede_reason: s.supersedeReason,
-          created_at: s.createdAt,
-          created_by: s.createdBy,
-        })
-        .execute();
+      await db().insertInto('fx.exchange_rate').values(rateValues(rate)).execute();
     } catch (err) {
       if (isUniqueViolation(err, 'exchange_rate_supersedes_uk')) {
         throw new DomainError(
@@ -211,8 +274,62 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .execute();
     return rows.map((r) => {
       const stored = toStored(r as RateRow);
-      return { state: stored.rate.snapshot, supersededById: stored.supersededById };
+      return {
+        state: stored.rate.snapshot,
+        supersededById: stored.supersededById,
+        anomalyDecision: stored.anomalyReview?.decision ?? null,
+      };
     });
+  }
+
+  async insertProviderRate(rate: ExchangeRate): Promise<boolean> {
+    const result = await db()
+      .insertInto('fx.exchange_rate')
+      .values(rateValues(rate))
+      .onConflict((oc) =>
+        oc
+          .columns(['workspace_id', 'provider', 'base_currency', 'quote_currency', 'rate_type', 'as_of'])
+          .where('provider', 'is not', null)
+          .doNothing(),
+      )
+      .executeTakeFirst();
+    return Number(result.numInsertedOrUpdatedRows ?? 0n) === 1;
+  }
+
+  async latestAccepted(workspaceId: string, feed: ProviderFeedKey): Promise<StoredRate | null> {
+    const row = await selectRates()
+      .where('r.workspace_id', '=', workspaceId)
+      .where('r.provider', '=', feed.provider)
+      .where('r.base_currency', '=', feed.base)
+      .where('r.quote_currency', '=', feed.quote)
+      .where('r.rate_type', '=', feed.rateType)
+      .where((eb) => eb.or([eb('r.anomaly_flagged', '=', false), eb('rv.decision', '=', 'CONFIRMED')]))
+      .orderBy('r.as_of', 'desc')
+      .orderBy('r.id', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return row ? toStored(row as RateRow) : null;
+  }
+
+  async providerDays(
+    workspaceId: string,
+    feed: ProviderFeedKey,
+    from: string,
+    to: string,
+  ): Promise<Set<string>> {
+    const rows = await db()
+      .selectFrom('fx.exchange_rate')
+      .select(sql<string>`as_of_date::text`.as('day'))
+      .distinct()
+      .where('workspace_id', '=', workspaceId)
+      .where('provider', '=', feed.provider)
+      .where('base_currency', '=', feed.base)
+      .where('quote_currency', '=', feed.quote)
+      .where('rate_type', '=', feed.rateType)
+      .where('as_of_date', '>=', from)
+      .where('as_of_date', '<=', to)
+      .execute();
+    return new Set(rows.map((r) => r.day));
   }
 
   async list(
@@ -225,6 +342,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
     if (filter.quote) q = q.where('r.quote_currency', '=', filter.quote);
     if (filter.rateType) q = q.where('r.rate_type', '=', filter.rateType);
     if (filter.source) q = q.where('r.source', '=', filter.source);
+    if (filter.provider) q = q.where('r.provider', '=', filter.provider);
     if (filter.asOfFrom) q = q.where('r.as_of', '>=', filter.asOfFrom);
     if (filter.asOfTo) q = q.where('r.as_of', '<=', filter.asOfTo);
     if (!filter.includeSuperseded) {
@@ -241,6 +359,32 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .limit(page.limit)
       .execute();
     return rows.map((r) => toStored(r as RateRow));
+  }
+}
+
+/** Revisiones de anomalías (`fx.rate_anomaly_review`, WS append-only; PK = tasa). */
+export class PgRateAnomalyReviewRepository implements RateAnomalyReviewRepository {
+  async insert(review: AnomalyReview): Promise<void> {
+    try {
+      await db()
+        .insertInto('fx.rate_anomaly_review')
+        .values({
+          exchange_rate_id: review.rateId,
+          workspace_id: review.workspaceId,
+          decision: review.decision,
+          reason: review.reason,
+          decided_by: review.decidedBy,
+          decided_at: review.decidedAt,
+        })
+        .execute();
+    } catch (err) {
+      if (isUniqueViolation(err, 'rate_anomaly_review_pkey')) {
+        throw new DomainError('FX_RATE_ANOMALY_ALREADY_REVIEWED', `rate ${review.rateId} already reviewed`, {
+          cause: err,
+        });
+      }
+      throw err;
+    }
   }
 }
 
@@ -338,6 +482,18 @@ export class PgRatePreferenceRepository implements RatePreferenceRepository {
       })),
       version: set ? Number(set.version) : 1,
     };
+  }
+
+  async seedDefaults(workspaceId: string, preferences: readonly RatePreference[]): Promise<void> {
+    for (const p of preferences) {
+      // Solo si el usuario nunca fijó la lista (sin fila de versión) y el par no tiene preferencia: ON CONFLICT cubre
+      // también el índice único del par no ordenado.
+      await sql`
+        INSERT INTO fx.rate_preference (workspace_id, base_currency, quote_currency, rate_type, version)
+        SELECT ${workspaceId}::uuid, ${p.base}, ${p.quote}, ${p.rateType}, 1
+         WHERE NOT EXISTS (SELECT 1 FROM fx.rate_preference_set s WHERE s.workspace_id = ${workspaceId}::uuid)
+        ON CONFLICT DO NOTHING`.execute(db());
+    }
   }
 
   async replace(

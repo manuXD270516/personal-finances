@@ -12,9 +12,13 @@ invariants: ["INV-011","INV-028"]
 priority: high
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/infrastructure/providers/providers.contract.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/providers.int.test.ts
+  - apps/api/test/events/fx-providers-worker.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","backfill","historical"]
@@ -37,7 +41,7 @@ expected_result:
   - "El punto del día en curso (2026-10-02) no se registra: día incompleto"
   - "La carga emite un único fx.RateRecorded.v1 por workspace y ejecución"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-006 — La carga del histórico diario de paralelo.bo es completa, idempotente y rellena días faltantes

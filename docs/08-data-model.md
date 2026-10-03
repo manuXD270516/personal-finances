@@ -25,7 +25,7 @@ Este documento define el **modelo físico** en PostgreSQL 18: un schema por boun
 
 | Grupo | Columnas | Aplica a |
 |-------|----------|----------|
-| Tenancy | `workspace_id uuid NOT NULL REFERENCES iam.workspace(id)` | Toda tabla de negocio (excepciones explícitas: `iam.user`, `fx.currency` global, `platform.inbox`). |
+| Tenancy | `workspace_id uuid NOT NULL REFERENCES iam.workspace(id)` | Toda tabla de negocio (excepciones explícitas: `iam.user`, `fx.currency` global, `platform.inbox`, `fx.provider_run` — bitácora de instalación de los providers de tasas, sin datos de usuario; add-market-rate-providers). |
 | Auditoría técnica | `created_at timestamptz NOT NULL DEFAULT now()`, `created_by uuid`, `updated_at timestamptz`, `updated_by uuid` | Agregados mutables. Las tablas inmutables solo tienen `created_*`. |
 | Optimistic locking | `version int NOT NULL DEFAULT 1` | Raíces de agregado mutables (ARCHITECTURE §9). Se incrementa en cada UPDATE (`WHERE id=$1 AND version=$2`). Expuesto como `ETag`. |
 | Soft-archive | `archived_at timestamptz`, `archived_by uuid` | Catálogos referenciados: accounts, institutions, categories, category groups, tags, counterparties, custom fields, templates, rules, goals, recurring definitions. Hard delete prohibido en datos financieros. |
@@ -1033,7 +1033,9 @@ erDiagram
 |-------|--------|-------|---------|-----|-------------------|
 | `currency` | PK `code`; `(owner_workspace_id, lower(name)) WHERE kind='CUSTOM'` | `scale BETWEEN 0 AND 18`; `kind='CUSTOM'` ⇔ `owner_workspace_id IS NOT NULL`; `code ~ '^[A-Z0-9][A-Z0-9_.-]{1,15}$'` | — | **WS+G** (`owner_workspace_id`) | `is_active` (no se borra; `scale` inmutable una vez usada) |
 | `workspace_currency` | PK | — | — | WS | — |
-| `exchange_rate` | `(COALESCE(workspace_id, '00000000-0000-0000-0000-000000000000'), provider, base_currency, quote_currency, rate_type, as_of)` | `base_currency <> quote_currency`; `rate > 0` | `(base_currency, quote_currency, as_of DESC)` + `(workspace_id, base_currency, quote_currency, as_of_date DESC)` (búsqueda "tasa vigente a fecha X") | **WS+G**, append-only (sin UPDATE/DELETE; corrección = nueva fila con `supersedes_id`) | Inmutable |
+| `exchange_rate` | **As-built (add-market-rate-providers, 2026-10-03):** `exchange_rate_provider_uk (workspace_id, provider, base_currency, quote_currency, rate_type, as_of) WHERE provider IS NOT NULL` (idempotencia de muestras: una copia por workspace, design decisión 3); `UNIQUE (supersedes_id)` | `base_currency <> quote_currency`; `rate > 0`; `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `(source = 'PROVIDER') = (provider IS NOT NULL)`; provider ⇔ `fetched_at`; marca de anomalía completa (`anomaly_flagged`, `anomaly_baseline_rate_id` → FK compuesta al mismo workspace, `anomaly_variation_pct numeric(12,4)`); `raw_payload text` (respuesta cruda exacta, ≤ 1 MiB, nunca expuesta en la API) | `(base_currency, quote_currency, as_of DESC)` + `(workspace_id, base_currency, quote_currency, as_of DESC)` + `exchange_rate_provider_day_idx (workspace_id, provider, base, quote, rate_type, as_of_date)` (relleno de días) | **WS+G**, append-only (sin UPDATE/DELETE para nadie; corrección = nueva fila con `supersedes_id`); el worker (`pf_worker`, miembro de `pf_app`) inserta las de provider con `SET LOCAL app.workspace_id` | Inmutable |
+| `rate_anomaly_review` | PK `exchange_rate_id`; FK `(workspace_id, exchange_rate_id)` | `decision IN ('CONFIRMED','REJECTED')`; `reason` 3–500; trigger: solo tasas con `anomaly_flagged` | — | **WS**, append-only (`SELECT, INSERT`) | Inmutable (una decisión por tasa; add-market-rate-providers) |
+| `provider_run` | PK `id` | `kind IN ('POLL','BACKFILL','GAP_FILL')`; `outcome IN ('OK','NO_NEW_SAMPLE','FAILED','SKIPPED_RATE_LIMIT','SKIPPED_CACHE')`; `FAILED` ⇔ `error_code`; `history_points/from/to` (carga histórica) | `(provider, started_at DESC)`, `(started_at)` | **Instalación sin `workspace_id`** (excepción explícita de §1): RLS FORZADA con políticas por rol — `pf_app` SELECT (estado), `pf_worker` INSERT/DELETE (bitácora y purga > 90 días) | Bitácora (purga) |
 | `provider_config` | `(workspace_id, provider)` | — | — | WS | `version` (Phase 5) |
 
 Catálogo inicial de monedas globales (`BOB`, `USD`, `USDT`, `USDC`, `EUR`, `BTC`, `ETH`, …) se carga como **migración de datos de referencia**, no como seed (§12). Pregunta abierta: códigos de monedas `CUSTOM` globalmente únicos.
@@ -1544,7 +1546,8 @@ erDiagram
 | `ledger.period_lock` | SELECT, INSERT, DELETE | SELECT | No (DELETE = reapertura, auditada) |
 | `ledger.balance_snapshot` | SELECT | SELECT, INSERT, UPDATE, DELETE | No (derivado) |
 | `txn.conversion_detail`, `txn.conversion_fee`, `txn.transaction_journal_link` | SELECT, INSERT | SELECT, INSERT | Sí |
-| `fx.exchange_rate` | SELECT, INSERT | SELECT, INSERT | Sí |
+| `fx.exchange_rate`, `fx.rate_anomaly_review` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; sin UPDATE/DELETE) |
+| `fx.provider_run` (instalación) | SELECT | SELECT, INSERT, DELETE (purga) | No |
 | `planning.budget_template_version`, `budget_template_line` | SELECT, INSERT | SELECT | Sí |
 | `audit.audit_log` | SELECT, INSERT | SELECT, INSERT | Sí |
 | `goals.goal_contribution`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |

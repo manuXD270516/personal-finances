@@ -1,12 +1,16 @@
 import type { AuditPort } from '@pf/audit/contracts';
 import type { Clock, Instant } from '@pf/shared-kernel';
 import type {
+  AnomalyStatus,
   CurrencyDefinition,
   CurrencyKind,
   ExchangeRate,
+  FxProviderErrorCode,
+  FxRateProvider,
   FxRateSource,
   FxRateType,
   RateCandidate,
+  ValuationPolicy,
 } from '../../domain/index.js';
 
 /** Transacción PG + `SET LOCAL app.workspace_id`; reutiliza la del llamador si existe (Transactions, idempotencia). */
@@ -14,10 +18,35 @@ export interface UnitOfWork {
   run<T>(workspaceId: string, fn: () => Promise<T>): Promise<T>;
 }
 
-/** Tasa con su estado de reemplazo (la versión que la reemplazó, si existe). */
+/** Decisión de un miembro sobre una tasa anómala (`fx.rate_anomaly_review`, append-only). */
+export interface AnomalyReview {
+  readonly rateId: string;
+  readonly workspaceId: string;
+  readonly decision: 'CONFIRMED' | 'REJECTED';
+  readonly reason: string;
+  readonly decidedBy: string;
+  readonly decidedAt: string;
+}
+
+/** Tasa con su estado de reemplazo (la versión que la reemplazó, si existe) y la revisión de su anomalía. */
 export interface StoredRate {
   readonly rate: ExchangeRate;
   readonly supersededById: string | null;
+  readonly anomalyReview?: AnomalyReview | null;
+}
+
+/** Estado de la anomalía de una tasa almacenada (`null` si no está marcada). */
+export function anomalyStatusOf(stored: StoredRate): AnomalyStatus | null {
+  if (stored.rate.snapshot.anomaly === null) return null;
+  return stored.anomalyReview?.decision ?? 'PENDING';
+}
+
+/** Feed de un provider en un workspace (par y tipo). */
+export interface ProviderFeedKey {
+  readonly provider: FxRateProvider;
+  readonly base: string;
+  readonly quote: string;
+  readonly rateType: FxRateType;
 }
 
 export interface RateListFilter {
@@ -25,6 +54,7 @@ export interface RateListFilter {
   readonly quote?: string;
   readonly rateType?: FxRateType;
   readonly source?: FxRateSource;
+  readonly provider?: FxRateProvider;
   readonly asOfFrom?: string;
   readonly asOfTo?: string;
   readonly includeSuperseded: boolean;
@@ -51,6 +81,60 @@ export interface ExchangeRateRepository {
     filter: RateListFilter,
     page: { readonly offset: number; readonly limit: number },
   ): Promise<StoredRate[]>;
+  /**
+   * Inserta una tasa de provider si no existe otra con el mismo (workspace, provider, par, tipo, vigencia) — índice
+   * único `exchange_rate_provider_uk`, `ON CONFLICT DO NOTHING`. `true` si se insertó.
+   */
+  insertProviderRate(rate: ExchangeRate): Promise<boolean>;
+  /**
+   * Última tasa ACEPTADA de un feed (no marcada, o marcada y confirmada; nunca pendiente ni rechazada): línea base de
+   * la detección de anomalías y "última tasa" del estado de providers.
+   */
+  latestAccepted(workspaceId: string, feed: ProviderFeedKey): Promise<StoredRate | null>;
+  /** Fechas efectivas (YYYY-MM-DD) con alguna tasa del feed en [from, to] (relleno de días faltantes). */
+  providerDays(workspaceId: string, feed: ProviderFeedKey, from: string, to: string): Promise<Set<string>>;
+}
+
+/** Revisiones de anomalías (append-only; PK = tasa). */
+export interface RateAnomalyReviewRepository {
+  /** `FX_RATE_ANOMALY_ALREADY_REVIEWED` si la tasa ya tiene una decisión (carrera resuelta por la PK). */
+  insert(review: AnomalyReview): Promise<void>;
+}
+
+export type ProviderRunKind = 'POLL' | 'BACKFILL' | 'GAP_FILL';
+export type ProviderRunOutcome = 'OK' | 'NO_NEW_SAMPLE' | 'FAILED' | 'SKIPPED_RATE_LIMIT' | 'SKIPPED_CACHE';
+
+/** Intento de un provider (`fx.provider_run`, tabla de instalación sin datos de usuario). */
+export interface ProviderRun {
+  readonly id: string;
+  readonly provider: FxRateProvider;
+  readonly kind: ProviderRunKind;
+  readonly startedAt: string;
+  readonly finishedAt: string;
+  readonly outcome: ProviderRunOutcome;
+  readonly errorCode: FxProviderErrorCode | null;
+  readonly httpStatus: number | null;
+  readonly latencyMs: number;
+  /** Tasas nuevas registradas (suma de todos los workspaces). */
+  readonly newSamples: number;
+  readonly retryAfterUntil: string | null;
+  /** Solo BACKFILL/GAP_FILL: días completos publicados por el histórico y su rango. */
+  readonly historyPoints: number | null;
+  readonly historyFrom: string | null;
+  readonly historyTo: string | null;
+}
+
+export interface ProviderRunRepository {
+  record(run: ProviderRun): Promise<void>;
+  /** Últimas `limit` corridas del provider (más recientes primero), opcionalmente de ciertos tipos. */
+  recent(provider: FxRateProvider, limit: number, kinds?: readonly ProviderRunKind[]): Promise<ProviderRun[]>;
+  /** Borra corridas anteriores a `before` (retención de 90 días). */
+  purgeBefore(before: string): Promise<number>;
+}
+
+/** Workspaces activos (IDENTITY vía composition root) a los que el worker copia las tasas de provider. */
+export interface ActiveWorkspacesPort {
+  list(): Promise<readonly { readonly workspaceId: string; readonly timeZone: string }[]>;
 }
 
 export interface CurrencyRow {
@@ -87,6 +171,11 @@ export interface RatePreferenceRepository {
     preferences: readonly RatePreference[],
     expectedVersion: number,
   ): Promise<boolean>;
+  /**
+   * Siembra preferencias por defecto SOLO si el usuario nunca fijó la lista (sin versión guardada) y el par no tiene
+   * preferencia (`ON CONFLICT DO NOTHING`); no cambia la versión.
+   */
+  seedDefaults(workspaceId: string, preferences: readonly RatePreference[]): Promise<void>;
 }
 
 /** Ajustes del workspace (IDENTITY vía composition root): moneda de reporte y zona horaria. */
@@ -96,6 +185,9 @@ export interface WorkspaceSettingsPort {
 
 export interface OutboxPort {
   append(event: {
+    /** Productor del evento (providers: `{type: SYSTEM, id: "fx-provider:<id>"}`); por defecto el del contexto. */
+    readonly actor?: { readonly type: 'USER' | 'SYSTEM' | 'SERVICE'; readonly id: string | null };
+    readonly correlationId?: string;
     readonly eventId: string;
     readonly eventType: string;
     readonly eventVersion: number;
@@ -125,4 +217,10 @@ export interface FxDeps {
   readonly clock: Clock;
   /** Ventana de vigencia de la resolución *as-of* (días; 7 por defecto). */
   readonly windowDays?: number;
+  /** Revisiones de anomalías (fx/market-rate-providers). */
+  readonly reviews: RateAnomalyReviewRepository;
+  /** Roles de providers y obsolescencia de la valoración (por defecto, los de design.md decisión 5). */
+  readonly policy?: ValuationPolicy;
+  /** Umbral de anomalía vigente (`FX_ANOMALY_THRESHOLD_PCT`), informado en `FxRate.anomaly.thresholdPct`. */
+  readonly anomalyThresholdPct?: string;
 }

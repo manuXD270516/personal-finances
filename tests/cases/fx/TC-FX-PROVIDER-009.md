@@ -12,9 +12,11 @@ invariants: ["INV-011","INV-012"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
+  - packages/contexts/fx/src/application/market-rate-providers.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["fx","provider","manual-rate","conversion"]
@@ -35,7 +37,7 @@ expected_result:
   - "La tasa manual USD/BOB 12.10 sigue con valor 12.10, sin supersededByRateId"
   - "Registrar tasas manuales funciona con providers activos"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-FX-PROVIDER-009 — La tasa manual indicada para una conversión es su referencia y los providers no tocan tasas manuales
