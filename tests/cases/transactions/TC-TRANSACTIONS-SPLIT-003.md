@@ -12,9 +12,10 @@ invariants: [INV-020, INV-021]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/transaction.properties.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["splits", "rounding", "largest-remainder"]

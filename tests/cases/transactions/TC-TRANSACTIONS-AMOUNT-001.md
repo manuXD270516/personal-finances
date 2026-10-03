@@ -12,9 +12,10 @@ invariants: [INV-001, INV-003]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/transaction.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["money", "scale", "validation"]

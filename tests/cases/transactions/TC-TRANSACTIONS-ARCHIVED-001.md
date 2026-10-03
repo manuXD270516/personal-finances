@@ -12,9 +12,10 @@ invariants: [INV-026]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["archived-account", "validation"]

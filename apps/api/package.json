@@ -27,6 +27,7 @@
     "@pf/ledger": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/shared-kernel": "workspace:*",
+    "@pf/transactions": "workspace:*",
     "dbmate": "2.36.0",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",

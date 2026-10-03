@@ -12,9 +12,11 @@ invariants: [INV-033, INV-007]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+  - packages/contexts/transactions/src/domain/transaction.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["edit", "classification"]

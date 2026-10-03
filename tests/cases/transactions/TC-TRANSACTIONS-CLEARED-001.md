@@ -12,9 +12,10 @@ invariants: [INV-023]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["cleared", "reconciliation"]

@@ -34,6 +34,20 @@ export interface ClassificationValidator {
   }): Promise<void>;
 }
 
+/** Consultas de catálogo para Transactions: categoría de sistema por código y jerarquía (subcategorías). */
+export interface ClassificationLookup {
+  systemCategoryId(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly systemCode: 'UNCATEGORIZED' | 'UNCATEGORIZED_INCOME';
+  }): Promise<string | null>;
+  categoryIdsWithDescendants(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly categoryIds: readonly string[];
+  }): Promise<string[]>;
+}
+
 /**
  * Provisión síncrona al crear un workspace (design §6-§7): categorías de sistema siempre y catálogo inicial si
  * `seedDefaultCategories`. Se invoca dentro de la unidad de trabajo de `CreateWorkspace` (misma transacción).

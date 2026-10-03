@@ -10,7 +10,11 @@ import type {
   LocaleResolver,
   OutboxPort,
 } from '../application/ports/index.js';
-import type { ClassificationValidator, WorkspaceCatalogProvisioner } from '../contracts/index.js';
+import type {
+  ClassificationLookup,
+  ClassificationValidator,
+  WorkspaceCatalogProvisioner,
+} from '../contracts/index.js';
 import { pgClassificationDeps } from '../infrastructure/pg-classification.js';
 import {
   CLASSIFICATION_LOCALES,
@@ -38,6 +42,8 @@ export interface ClassificationRuntime {
   readonly provisioner: WorkspaceCatalogProvisioner;
   /** `ValidateClassification` para Transactions (in-process, `@pf/classification/contracts`). */
   readonly validator: ClassificationValidator;
+  /** Categorías de sistema y jerarquía para Transactions (`@pf/classification/contracts`). */
+  readonly lookup: ClassificationLookup;
 }
 
 export function createClassificationRuntime(options: ClassificationRuntimeOptions): ClassificationRuntime {
@@ -58,6 +64,12 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
     validator: {
       validate: ({ userId, workspaceId, ...rest }) =>
         queries.validateClassification(userId, workspaceId, rest),
+    },
+    lookup: {
+      systemCategoryId: ({ userId, workspaceId, systemCode }) =>
+        queries.systemCategoryId(userId, workspaceId, systemCode),
+      categoryIdsWithDescendants: ({ userId, workspaceId, categoryIds }) =>
+        queries.categoryIdsWithDescendants(userId, workspaceId, categoryIds),
     },
   };
 }
