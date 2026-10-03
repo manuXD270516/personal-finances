@@ -77,4 +77,13 @@ describe('logger estructurado (docs/18 §3)', () => {
     expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(a < b).toBe(true);
   });
+
+  it('UUIDv7 del mismo milisegundo son estrictamente crecientes en el orden de generación', () => {
+    const ids = Array.from({ length: 5000 }, () => uuidv7(1_800_000_000_000));
+    expect([...ids].sort()).toEqual(ids);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+  });
 });

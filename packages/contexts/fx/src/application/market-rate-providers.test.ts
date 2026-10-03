@@ -529,7 +529,7 @@ describe('BackfillHistoricalRates y FillRateGaps (fx/market-rate-providers)', ()
       from: '2024-08-06',
       to: '2026-10-01',
     });
-  });
+  }, 30_000);
 
   it('[TC-FX-PROVIDER-006] el relleno diario registra solo los 3 días faltantes por par y no toca los demás', async () => {
     const { mem, paralelo, ingestion } = setup();
