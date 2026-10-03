@@ -107,3 +107,45 @@ Cambios **exactos** requeridos (no se editan aquí; los consolida el proceso de 
 - FR-ACCOUNTS-003 exige crear el `LedgerAccount` en la misma transacción que la cuenta; ARCHITECTURE §7, docs/06 y docs/11 definen get-or-create al postear. Este diseño sigue ARCHITECTURE (canónico); ¿se ajusta el texto de FR-ACCOUNTS-003?
 - ¿Las cuentas archivadas con saldo ≠ 0 cuentan en el patrimonio neto del dashboard? Propuesta: sí, si `includeInNetWorth` (el saldo existe); la UI advierte al archivar con saldo.
 - ¿Liquidez por defecto de los pasivos (`ILLIQUID`) es adecuada para *safe to spend*, o los pasivos deben quedar fuera del eje de liquidez? Revisar en el change de reporting.
+
+## Implementación (2026-10-03, owner ausente — decisiones registradas)
+
+Implementados los grupos 2 (salvo 2.4), 3, 4, 5 y 6.1–6.2 sobre `add-ledger-core` (PR #11). Decisiones tomadas de forma
+autónoma, a revisar por el owner:
+
+1. **Orquestación de la apertura con saldo inicial.** `apps/api/src/accounts/open-account-with-opening-balance.ts`
+   implementa `AccountOpeningBalancePort` (`@pf/accounts/contracts`) sobre `LedgerPostingPort`. `AccountsService.openAccount`
+   abre la `UnitOfWork` (o reutiliza la del `IdempotencyInterceptor`, que corre en `PgCommandTransaction`), inserta la
+   cuenta, escribe `AccountOpened` en el outbox, invoca el puerto y audita; el ledger reutiliza la misma conexión
+   (`currentSqlExecutor()`), así que cuenta + asiento + ledger accounts (get-or-create) + auditoría + outbox +
+   respuesta idempotente se confirman o revierten juntos (TC-ACCOUNTS-OPENING-002/003, con escala inválida y con periodo
+   bloqueado). Accounts no depende de Transactions ni del ledger para escribir (sin ciclo); la composición vive en
+   `apps/api` como pide ARCHITECTURE §7.
+2. **Sin Transactions todavía.** El asiento `OPENING` se postea directo al ledger con origen `Transaction/<accountId>/1`
+   (determinista ⇒ un reintento no duplica el asiento, FR-LEDGER-010). Cuando llegue `add-transaction-recording`, el
+   adaptador delegará en `RecordOpeningBalance` (transacción `OPENING_BALANCE`) sin cambiar Accounts. Pasivos: el monto
+   presentado positivo (adeudado) se postea negativo en la cuenta y positivo en `EQUITY:OPENING_BALANCE:<CCY>`.
+3. **Saldos.** `LedgerBalancesAdapter` usa `BalanceQuery.getTrialBalance` (API pública del ledger) y toma la línea cuyo
+   `accountId` es la cuenta: saldo presentado = `presented`. Sin ledger account ⇒ saldo cero y "sin movimientos" (el
+   ledger account nace con el primer posting), que es también el criterio de `ACCOUNT_CURRENCY_IMMUTABLE` y de cierre.
+4. **Equivalente en moneda base**: `baseCurrencyBalance = null` siempre hasta `add-manual-conversions` (sin
+   `FxRateQueryPort`); TC-ACCOUNTS-LIST-001 queda pendiente.
+5. **Moneda habilitada** = existe en `fx.currency` con `is_active` (no hay aún catálogo de monedas por workspace).
+6. **Etiquetas**: `TagCatalogPort` por defecto permisivo hasta `add-classification`; `account_tag.tag_id` sin FK.
+7. **Fechas de negocio** (`openedOn` por defecto, `archivedOn`, `reactivatedOn`): "hoy" en la zona del workspace (vía
+   `identityWorkspaceTimeZones`), con `APP_TIMEZONE` como respaldo. `openedOn` por defecto = fecha del saldo inicial o
+   hoy (el evento `AccountOpened.v1` la exige).
+8. **Archivar institución** es idempotente (el contrato no documenta 409); archivar cuenta dos veces ⇒
+   `INVALID_STATUS_TRANSITION`. Se permite archivar una cuenta CLOSED. Editar una cuenta ARCHIVED ⇒ `ACCOUNT_ARCHIVED`.
+9. **Reordenar** emite `AccountUpdated` (`changedFields: [displayOrder]`) y audita `accounts.account.reordered` por cada
+   cuenta que cambia de posición.
+10. **Paginación** de `listAccounts`/`listInstitutions`: cursor firmado con la posición (offset) dentro del resultado
+    filtrado y ordenado (pocas cuentas por workspace; los saldos se calculan en lote).
+11. **INV-026**: `AccountsQueryPort.getPostingEligibility` / `assertCanPost` con `SELECT … FOR SHARE`; archivar/cerrar/
+    reactivar toman `FOR UPDATE`. Probado con un poster de prueba; TC-ACCOUNTS-ARCHIVE-002 completo espera Transactions.
+
+Pendiente: 2.4 (seed de instituciones), 6.3–6.4, 7 (UI), 8.2 (E2E), 9 (docs). TC no automatizados aún:
+LIQUIDITY-001, NETWORTH-001, CREDITCARD-001 (Reporting/Transfers), LIST-001 (FX), CURRENCY-001, ARCHIVE-002,
+LEDGERLINK-001, BALANCE-001 (Transactions), OPENING-001 (todo salvo el patrimonio neto, que calcula Reporting),
+LIST-002 (el filtro inválido responde `VALIDATION_FAILED` por contrato, no `INVALID_FILTER`), INSTITUTION-002 (seed),
+MASK-001 (E2E).

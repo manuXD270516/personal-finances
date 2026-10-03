@@ -12,9 +12,12 @@ invariants: [INV-026, INV-029]
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "archive"]
@@ -31,7 +34,7 @@ expected_result:
   - "Existe un registro de auditoría de la reactivación y se emite accounts.AccountReactivated.v1 con previousStatus ARCHIVED"
   - "Old Card se rechaza con ACCOUNT_NAME_TAKEN y sigue archivada"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-ARCHIVE-003 — Reactivar una cuenta archivada permite volver a registrar movimientos y queda auditado

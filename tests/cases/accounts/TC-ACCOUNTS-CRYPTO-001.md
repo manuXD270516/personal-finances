@@ -12,9 +12,11 @@ invariants: [INV-003]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "crypto"]
@@ -30,7 +32,7 @@ expected_result:
   - "USDT Wallet 2 se rechaza con AMOUNT_SCALE_EXCEEDED y no se crea"
   - "BTC Cold se crea con saldo 0.01250000 BTC y red BTC"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-CRYPTO-001 — Una billetera cripto exige moneda cripto y respeta su escala

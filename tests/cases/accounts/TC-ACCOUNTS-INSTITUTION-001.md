@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["institutions"]
@@ -32,7 +34,7 @@ expected_result:
   - "Fintech Y se crea sin país"
   - "VIEWER recibe 403 INSUFFICIENT_ROLE"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-INSTITUTION-001 — El usuario crea instituciones configurables con tipo, país y datos de presentación

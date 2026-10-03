@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "naming"]
@@ -30,7 +33,7 @@ expected_result:
   - "\"Old Bank\" se crea porque la homónima está archivada"
   - "\"W2 Bank\" se crea en W1 porque la unicidad es por workspace"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-NAME-001 — El nombre de cuenta es único entre cuentas activas sin distinguir mayúsculas

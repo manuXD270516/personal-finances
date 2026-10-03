@@ -1,0 +1,48 @@
+{
+  "name": "@pf/accounts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context ACCOUNTS: cuentas del usuario e instituciones (openspec add-accounts-management).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./interface/accounts.module": {
+      "@pf/source": "./src/interface/accounts.module.ts",
+      "types": "./dist/interface/accounts.module.d.ts",
+      "default": "./dist/interface/accounts.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@pf/audit": "workspace:*",
+    "@pf/ledger": "workspace:*",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

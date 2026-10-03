@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "no-hard-delete"]
@@ -29,7 +31,7 @@ expected_result:
   - "El DELETE SQL falla por falta de privilegio"
   - "Las transacciones, el saldo de 300.00 BOB y el historial de auditoría de Old Bank siguen consultables"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-NODELETE-001 — Las cuentas no se pueden eliminar y una cuenta archivada conserva toda su historia

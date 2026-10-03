@@ -12,9 +12,11 @@ invariants: [INV-029]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["institutions", "audit"]
@@ -28,7 +30,7 @@ expected_result:
   - "Bank A sigue asociada a la institución con saldo 1000.00 BOB y sin asientos nuevos"
   - "Existe un registro de auditoría con el sitio web anterior y el nuevo"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-INSTITUTION-003 — Editar una institución no altera sus cuentas ni sus saldos y queda auditado

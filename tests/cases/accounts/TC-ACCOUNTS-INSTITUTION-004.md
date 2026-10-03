@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["institutions", "archive", "no-hard-delete"]
@@ -36,7 +38,7 @@ expected_result:
   - "El DELETE por API no existe (405) y el DELETE SQL falla por privilegios"
   - "Bank H se rechaza con INSTITUTION_ARCHIVED (409)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-INSTITUTION-004 — Una institución con cuentas se archiva, nunca se elimina, y sus cuentas conservan la asociación

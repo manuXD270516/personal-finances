@@ -12,9 +12,11 @@ invariants: [INV-029]
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "metadata", "audit"]
@@ -33,7 +35,7 @@ expected_result:
   - "Existe un registro de auditoría con before \"Bank A\" y after \"Banco principal\" y se emite accounts.AccountUpdated.v1 con changedFields name, color, notes"
   - "La segunda edición se rechaza con PRECONDITION_FAILED (412)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-METADATA-001 — Editar metadatos de una cuenta no toca el ledger, se audita y respeta la concurrencia optimista
