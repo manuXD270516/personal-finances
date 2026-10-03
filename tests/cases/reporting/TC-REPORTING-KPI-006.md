@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/kpi-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["kpi","categories"]
@@ -32,7 +35,7 @@ expected_result:
   - "Empate: Agua antes que Cine"
   - "topCategories = 21 se rechaza con 400 VALIDATION_FAILED (máximo 20)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-006 — El top-N de categorías ordena por gasto neto descendente con desempate por nombre

@@ -4,6 +4,8 @@ import { sql } from 'kysely';
 import type { CurrencyCatalog, LedgerUnitOfWork } from '../application/ports/index.js';
 import type {
   AccountBalanceDto,
+  AccountBalancesDto,
+  AccountBalancesQuery,
   BalanceQuery,
   EntrySummaryDto,
   LedgerAccountNatureDto,
@@ -30,7 +32,7 @@ interface BalanceRow {
  * en la zona horaria del workspace (FR-LEDGER-012). El ledger no conoce estados de transacción: los pendientes los
  * aporta Transactions (FR-LEDGER-013).
  */
-export class PgBalanceQuery implements BalanceQuery {
+export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
   constructor(
     private readonly uow: LedgerUnitOfWork,
     private readonly currencies: CurrencyCatalog,
@@ -82,6 +84,35 @@ export class PgBalanceQuery implements BalanceQuery {
         totals.set(row.currency, (totals.get(row.currency) ?? Money.zero(cur)).add(amount));
       }
       return [...totals.values()].map((m) => m.toJSON());
+    });
+  }
+
+  /**
+   * `GetBalances` por lote (add-basic-dashboard): una línea por cuenta del usuario y el instante del último asiento
+   * del workspace, en la misma transacción (lectura consistente con los saldos).
+   */
+  getAccountBalances(input: {
+    workspaceId: string;
+    accountIds?: readonly string[];
+    asOf?: string;
+  }): Promise<AccountBalancesDto> {
+    return this.uow.run(input.workspaceId, async () => {
+      const asOf = await this.asOfDate(input.workspaceId, input.asOf);
+      const wanted = input.accountIds === undefined ? null : new Set(input.accountIds);
+      const rows = (await this.balances(input.workspaceId, asOf, null)).filter(
+        (r) => r.source_account_id !== null && (wanted === null || wanted.has(r.source_account_id)),
+      );
+      const balances: AccountBalanceDto[] = [];
+      for (const row of rows) balances.push(await this.toDto(row));
+      const { rows: latest } = await sql<{ created_at: Date | string }>`
+        SELECT created_at FROM ledger.journal_entry WHERE workspace_id = ${input.workspaceId}
+         ORDER BY sequence DESC LIMIT 1`.execute(unitOfWorkKysely());
+      const at = latest[0]?.created_at;
+      return {
+        asOf,
+        latestEntryAt: at === undefined ? null : new Date(at).toISOString(),
+        balances,
+      };
     });
   }
 

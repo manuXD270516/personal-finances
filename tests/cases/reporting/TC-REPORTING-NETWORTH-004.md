@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-valuator.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["net-worth","missing-rate"]
@@ -34,7 +36,7 @@ expected_result:
   - "unvalued = [0.01000000 BTC] con advertencia"
   - "Nunca 1:1 ni tasa fuera de la ventana"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-NETWORTH-004 — Sin tasa vigente para BTC el patrimonio se marca incompleto y lista el BTC no valorado

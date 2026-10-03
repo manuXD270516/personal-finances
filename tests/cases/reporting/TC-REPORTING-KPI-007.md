@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/period-comparator.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["kpi","mom"]
@@ -32,7 +34,7 @@ expected_result:
   - "Ingresos: +8000.00 BOB, deltaPct null, isNew = true"
   - "Borde: el 31 de octubre se compara contra 1..30 de septiembre"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-007 — La comparación con el mes anterior es a la misma fecha y marca "nuevo" si el anterior es cero

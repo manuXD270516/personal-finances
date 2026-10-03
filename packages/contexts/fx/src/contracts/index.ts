@@ -87,6 +87,68 @@ export interface FxConversionPricingPort {
 
 export const FX_CONVERSION_PRICING_PORT = Symbol.for('pf.fx.FxConversionPricingPort');
 
+export type FxRateProviderDto = 'PARALELO_BO' | 'DOLARAPI_BO';
+export type RateSelectionDto = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
+export type RateDerivationDto = 'DIRECT' | 'INVERSE' | 'CROSS';
+
+/** Atribución que debe mostrarse junto a una tasa de provider (`RateAttribution` del contrato HTTP). */
+export interface RateAttributionDto {
+  readonly provider: FxRateProviderDto;
+  readonly text: string;
+  readonly url: string;
+  readonly license: string | null;
+  readonly licenseUrl: string | null;
+}
+
+/** `ResolvedRate` del contrato HTTP (fx/market-rates + fx/market-rate-providers), listo para serializar. */
+export interface ResolvedRateDto {
+  readonly rate: RateDto;
+  readonly fxRateId: string | null;
+  readonly derivation: RateDerivationDto;
+  /** Tasas almacenadas usadas por una inversa/cruzada (`FxRate` del contrato HTTP). */
+  readonly components: readonly object[];
+  readonly rateType: FxRateTypeDto;
+  readonly source: FxRateSourceDto;
+  readonly sourceLabel: string | null;
+  readonly asOf: string;
+  readonly ageDays: number;
+  readonly ageSeconds: number;
+  readonly approx: boolean;
+  readonly provider: FxRateProviderDto | null;
+  readonly selection: RateSelectionDto;
+  readonly stale: boolean;
+  readonly attribution: RateAttributionDto | null;
+}
+
+/** Tasa de valoración resuelta: la de presentación y la EXACTA para convertir (nunca una inversa redondeada). */
+export interface ValuationRateDto {
+  readonly resolved: ResolvedRateDto;
+  /**
+   * Tasa a precisión completa en la orientación ALMACENADA (directa/inversa: la original; cruzada: el producto a
+   * precisión 40). Para convertir `m` de `exact.base` se multiplica; de `exact.quote`, se divide (INV-032).
+   */
+  readonly exact: RateDto;
+}
+
+/**
+ * Puerto de valoración (`ConvertForValuation` por lote; openspec add-basic-dashboard, FR-FX-006/010) que consume
+ * REPORTING: para cada pedido `(base, quote, at)` la tasa de valoración del tipo preferido del par con la selección de
+ * fx/market-rate-providers (principal → respaldo → última conocida obsoleta o manual más reciente), directa → inversa →
+ * cruzada por pivote (`approx`), dentro de la ventana; `null` si no hay ninguna (nunca 1:1). Sin efectos.
+ */
+export interface FxValuationPort {
+  resolveValuationRates(input: {
+    readonly workspaceId: string;
+    readonly requests: readonly { readonly base: string; readonly quote: string; readonly at: string }[];
+  }): Promise<readonly (ValuationRateDto | null)[]>;
+  /** Monedas habilitadas del workspace con su escala canónica. */
+  enabledCurrencies(workspaceId: string): Promise<readonly CurrencyInfoDto[]>;
+  /** Ventana de vigencia en días de la resolución *as-of* (7 por defecto). */
+  readonly windowDays: number;
+}
+
+export const FX_VALUATION_PORT = Symbol.for('pf.fx.FxValuationPort');
+
 /**
  * Allow-list de auditoría de FX (add-audit-trail, NFR-SEC-015): las tasas son datos de mercado (valor como texto
  * decimal exacto); lo no listado nunca se copia a `audit.audit_log`.

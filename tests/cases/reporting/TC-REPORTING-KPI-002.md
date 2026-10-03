@@ -12,9 +12,12 @@ invariants: ["INV-009"]
 priority: critical
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.golden.test.ts
+  - packages/contexts/reporting/src/domain/kpi-calculator.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["kpi","expenses","refund"]
@@ -31,7 +34,7 @@ expected_result:
   - "El pago de tarjeta de 400.00 BOB no suma"
   - "Variante: Restaurantes = −30.00 BOB mostrado como neto negativo"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-002 — Los gastos del mes incluyen fees de conversión, restan reembolsos y excluyen pagos de tarjeta

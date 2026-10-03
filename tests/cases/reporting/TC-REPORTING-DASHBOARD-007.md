@@ -12,9 +12,11 @@ invariants: ["INV-020"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["dashboard","liquid-balance","fx","provider","staleness"]
@@ -35,7 +37,7 @@ expected_result:
   - "Variante: consolidado 1404.50 BOB (805.50 + 50.000000 × 11.98) con selection MANUAL, fuente \"Casa de cambio centro\" y sin atribución de provider"
   - "En ningún caso el consolidado desaparece ni se usa 1:1"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-007 — Con providers caídos el dinero disponible usa la última tasa conocida marcada obsoleta o una manual más reciente
@@ -58,3 +60,4 @@ Entonces veo 1406.50 BOB
 - Cubre también el scenario "Tasa manual más reciente que la de provider".
 - ageSeconds = 22:00:00 − 13:53:07 = 29 213 s (8 h 6 min).
 - Datos ficticios salvo el valor 12.02 (observado en paralelo.bo el 2026-10-02); fechas fijas con `FixedClock` (TZ America/La_Paz).
+- Automatización (2026-10-03): con la preferencia `PARALLEL` sembrada al crear el workspace, el resolver de FX solo considera tasas del tipo preferido; la variante manual se automatizó como tasa manual `PARALLEL` 11.98 (no `P2P`). Pendiente de decisión del owner (design.md § Preguntas abiertas) si una manual de otro tipo debe competir en el fallback.

@@ -71,7 +71,33 @@ export interface AccountOpeningBalancePort {
   }): Promise<{ readonly journalEntryId: string }>;
 }
 
+/** Cuenta del catálogo para lecturas de otros contextos (Reporting, openspec add-basic-dashboard). Sin saldo. */
+export interface AccountSummaryDto {
+  readonly accountId: string;
+  readonly name: string;
+  readonly type: AccountTypeDto;
+  readonly nature: AccountNatureDto;
+  readonly currency: string;
+  readonly status: AccountStatusDto;
+  /** Solo `LIQUID` cuenta como dinero disponible (docs/31 D5, FR-ACCOUNTS-011). */
+  readonly liquidity: AccountLiquidityDto;
+  readonly includeInNetWorth: boolean;
+  readonly displayOrder: number;
+}
+
+/**
+ * Consulta pública del catálogo de cuentas (sin efectos, sin bloqueo). Se ejecuta en la unidad de trabajo del
+ * llamador si existe. Por defecto devuelve las cuentas no archivadas (ACTIVE y CLOSED) en orden de visualización.
+ */
+export interface AccountCatalogQuery {
+  listAccounts(input: {
+    readonly workspaceId: string;
+    readonly includeArchived?: boolean;
+  }): Promise<readonly AccountSummaryDto[]>;
+}
+
 export const ACCOUNTS_QUERY_PORT = Symbol.for('pf.accounts.AccountsQueryPort');
+export const ACCOUNT_CATALOG_QUERY = Symbol.for('pf.accounts.AccountCatalogQuery');
 export const ACCOUNT_OPENING_BALANCE_PORT = Symbol.for('pf.accounts.AccountOpeningBalancePort');
 
 /** Eventos publicados por el outbox (contracts/events/accounts/*.v1.schema.json). */

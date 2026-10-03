@@ -12,9 +12,10 @@ invariants: ["INV-023"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["kpi","status"]
@@ -30,7 +31,7 @@ expected_result:
   - "Gastos = 1300.00 BOB"
   - "Ni el pendiente ni el anulado aparecen en saldos ni categorías"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-005 — Gastos pendientes y anulados no suman en las cifras del mes

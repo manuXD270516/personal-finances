@@ -21,6 +21,7 @@ import type { ApiConfig } from '@pf/platform/config';
 import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
+import { createReportingRuntime, ReportingModule } from '@pf/reporting/interface/reporting.module';
 import {
   createTransactionsRuntime,
   TransactionsModule,
@@ -156,6 +157,17 @@ export function identityImports(input: {
     lookup: classification.lookup,
     fx: fx.pricing,
   });
+  // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
+  const reporting = createReportingRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    workspaces: identityWorkspaceSettings(input.pool),
+    accounts: accounts.catalog,
+    balances: ledger.accountBalances,
+    flows: transactions.flows,
+    categories: classification.categories,
+    rates: fx.valuation,
+  });
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -184,5 +196,6 @@ export function identityImports(input: {
     ...accountsImports({ runtime: accounts, conventions: input.conventions }),
     TransactionsModule.register({ runtime: transactions, conventions: input.conventions }),
     FxModule.register({ runtime: fx, conventions: input.conventions }),
+    ReportingModule.register({ runtime: reporting, conventions: input.conventions }),
   ];
 }

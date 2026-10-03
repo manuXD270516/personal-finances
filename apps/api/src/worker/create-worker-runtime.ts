@@ -26,6 +26,7 @@ import {
 import { identityActiveWorkspaces } from '@pf/identity/interface/identity.module';
 import { createLedgerMaintenance } from '@pf/ledger/interface/ledger.module';
 import { PinoNestLogger } from '@pf/platform/nest';
+import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
 import { otelCounters, shutdownTelemetry } from '@pf/platform/otel';
 import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
@@ -150,7 +151,12 @@ export async function createWorkerRuntime(
   );
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
-  const subscriptions = new EventSubscriptions([...(options.eventConsumers ?? []), ...fxConsumers]);
+  // REPORTING (add-basic-dashboard): versión derivada de los datos por workspace (ETag del resumen del Home).
+  const subscriptions = new EventSubscriptions([
+    ...(options.eventConsumers ?? []),
+    ...fxConsumers,
+    reportingDataVersionConsumer(),
+  ]);
   const consumers = new EventConsumerRuntime({ pool, queue, subscriptions, logger, metrics });
   const relay = new OutboxRelay({
     pool,

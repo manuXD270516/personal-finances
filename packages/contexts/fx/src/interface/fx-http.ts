@@ -112,6 +112,7 @@ export function toResolvedRateDto(r: ResolvedRate) {
     components: r.components.map(component),
     rateType: r.rateType,
     source: r.source,
+    sourceLabel: r.sourceLabel,
     asOf: r.asOf,
     ageDays: r.ageDays,
     ageSeconds: r.ageSeconds,

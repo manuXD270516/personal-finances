@@ -12,9 +12,12 @@ invariants: ["INV-009","INV-031"]
 priority: critical
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.golden.test.ts
+  - packages/contexts/reporting/src/domain/kpi-calculator.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["kpi","income"]
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - "Ingresos = 8000.00 BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-001 — Los ingresos del mes excluyen transferencias, conversiones y saldos iniciales

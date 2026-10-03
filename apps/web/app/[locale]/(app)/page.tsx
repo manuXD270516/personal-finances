@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { use } from 'react';
 import { routing } from '../../../i18n/routing';
+import { Dashboard } from '../../../src/ui/dashboard/Dashboard';
 
 export default function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params);
@@ -18,6 +19,7 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
           </a>
         ))}
       </nav>
+      <Dashboard />
     </section>
   );
 }

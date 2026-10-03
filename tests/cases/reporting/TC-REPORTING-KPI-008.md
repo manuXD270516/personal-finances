@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/domain/period-comparator.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["kpi","timezone","period-boundary"]
@@ -29,7 +31,7 @@ expected_result:
   - "Septiembre incluye 150.00 BOB"
   - "Octubre no lo incluye"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-008 — Un gasto con fecha de negocio 30 de septiembre registrado de madrugada en UTC cuenta en septiembre

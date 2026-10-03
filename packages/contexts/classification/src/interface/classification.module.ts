@@ -11,6 +11,7 @@ import type {
   OutboxPort,
 } from '../application/ports/index.js';
 import type {
+  CategoryCatalogQuery,
   ClassificationLookup,
   ClassificationValidator,
   WorkspaceCatalogProvisioner,
@@ -44,6 +45,8 @@ export interface ClassificationRuntime {
   readonly validator: ClassificationValidator;
   /** Categorías de sistema y jerarquía para Transactions (`@pf/classification/contracts`). */
   readonly lookup: ClassificationLookup;
+  /** Nombres de categorías para Reporting (add-basic-dashboard). */
+  readonly categories: CategoryCatalogQuery;
 }
 
 export function createClassificationRuntime(options: ClassificationRuntimeOptions): ClassificationRuntime {
@@ -70,6 +73,17 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
         queries.systemCategoryId(userId, workspaceId, systemCode),
       categoryIdsWithDescendants: ({ userId, workspaceId, categoryIds }) =>
         queries.categoryIdsWithDescendants(userId, workspaceId, categoryIds),
+    },
+    categories: {
+      categoriesByIds: async ({ userId, workspaceId, categoryIds }) =>
+        (await queries.categoriesByIds(userId, workspaceId, categoryIds)).map((c) => ({
+          categoryId: c.id,
+          name: c.name,
+          kind: c.kind,
+          parentId: c.parentId,
+          systemCode: c.systemCode,
+          archived: c.isArchived,
+        })),
     },
   };
 }

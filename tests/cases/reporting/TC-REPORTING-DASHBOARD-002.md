@@ -12,9 +12,12 @@ invariants: ["INV-020"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/consolidation-service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["dashboard","liquid-balance","fx"]
@@ -34,7 +37,7 @@ expected_result:
   - "meta.attributions incluye \"Fuente: paralelo.bo\" (https://paralelo.bo, CC BY 4.0) y la UI la muestra junto a la tasa"
   - "La cuenta de inversión no suma"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-002 — El dinero disponible consolida cuentas líquidas en BOB con la tasa paralela del provider, su fuente y antigüedad

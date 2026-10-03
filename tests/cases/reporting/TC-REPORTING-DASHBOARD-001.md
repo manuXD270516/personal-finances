@@ -12,9 +12,11 @@ invariants: ["INV-022","INV-023"]
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["dashboard","balances","multi-currency"]
@@ -32,7 +34,7 @@ expected_result:
   - "byCurrency: BOB 805.50; USDT 50.000000"
   - "El pendiente de 30.00 BOB no altera el saldo de Banco BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-DASHBOARD-001 — El resumen muestra saldos por cuenta y totales por moneda solo con transacciones posteadas

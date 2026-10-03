@@ -12,9 +12,11 @@ invariants: ["INV-031"]
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - packages/contexts/reporting/src/domain/kpi-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["kpi","savings"]
@@ -29,7 +31,7 @@ expected_result:
   - "Caso 1: ahorro 6695.00 BOB; tasa 83.7 % (6695 / 8000 = 0.836875)"
   - "Caso 2: ahorro −300.00 BOB; tasa no definida (savingsRate null, UI \"—\")"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-REPORTING-KPI-004 — El ahorro es ingresos menos gastos y la tasa de ahorro no se define sin ingresos
