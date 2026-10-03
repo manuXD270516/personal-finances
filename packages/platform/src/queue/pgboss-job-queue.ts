@@ -6,6 +6,9 @@ import {
   type JobEnvelope,
   type JobHandler,
   type JobQueue,
+  type QueueOptions,
+  type QueueSqlExecutor,
+  type TransactionalJob,
   type WorkOptions,
 } from './job-queue.js';
 
@@ -62,15 +65,40 @@ export class PgBossJobQueue implements JobQueue {
     this.started = true;
   }
 
-  async ensureQueue(name: string): Promise<void> {
+  async ensureQueue(name: string, options: QueueOptions = {}): Promise<void> {
     if (this.queues.has(name)) return;
     await this.boss.createQueue(name, {
       notify: true,
-      retryLimit: 3,
+      policy: options.orderedByKey ? 'key_strict_fifo' : 'standard',
+      retryLimit: options.retryLimit ?? 3,
+      retryDelay: options.retryDelaySeconds ?? 1,
       retryBackoff: true,
-      expireInSeconds: 300,
+      ...(options.retryDelayMaxSeconds !== undefined ? { retryDelayMax: options.retryDelayMaxSeconds } : {}),
+      ...(options.deadLetter ? { deadLetter: options.deadLetter } : {}),
+      expireInSeconds: options.expireInSeconds ?? 300,
     });
     this.queues.add(name);
+  }
+
+  async enqueueInTransaction<P extends object>(
+    queue: string,
+    jobs: readonly TransactionalJob<P>[],
+    tx: QueueSqlExecutor,
+  ): Promise<void> {
+    if (jobs.length === 0) return;
+    await this.boss.insert(
+      queue,
+      jobs.map((job) => {
+        const data: JobEnvelope<P> = {
+          v: 1,
+          correlationId: job.correlationId,
+          traceContext: job.traceContext,
+          payload: job.payload,
+        };
+        return { id: job.id, data, ...(job.key ? { singletonKey: job.key } : {}) };
+      }),
+      { db: { executeSql: (text: string, values?: unknown[]) => tx.query(text, values) } },
+    );
   }
 
   async send<P extends object>(queue: string, payload: P): Promise<string> {

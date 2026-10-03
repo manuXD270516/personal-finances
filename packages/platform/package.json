@@ -29,6 +29,11 @@
       "types": "./dist/queue/index.d.ts",
       "default": "./dist/queue/index.js"
     },
+    "./events": {
+      "@pf/source": "./src/events/index.ts",
+      "types": "./dist/events/index.d.ts",
+      "default": "./dist/events/index.js"
+    },
     "./storage": {
       "@pf/source": "./src/storage/index.ts",
       "types": "./dist/storage/index.d.ts",

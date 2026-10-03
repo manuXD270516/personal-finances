@@ -252,7 +252,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | notify | `notifications/alerts` |
 | audit | `audit/audit-trail` |
 | assistant | `assistant/read-only-assistant` |
-| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions` |
+| platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery` |
 | security | `security/access-control`, `security/file-upload-security` |
 | quality | `quality/test-traceability` |
 

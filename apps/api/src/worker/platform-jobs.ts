@@ -7,6 +7,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { purgeExpiredIdempotencyKeys } from '@pf/platform/api';
+import { purgeDeliveredEvents } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { JOB_QUEUE, LOGGER } from '@pf/platform/nest';
 import {
@@ -36,10 +37,14 @@ const MAX_PROBE_DURATION_MS = 20_000;
 /** Purga de claves de idempotencia vencidas (design §3): cada 15 min; el DELETE es idempotente entre réplicas. */
 export const IDEMPOTENCY_PURGE_INTERVAL_MS = 15 * 60_000;
 
+/** Purga de eventos publicados (7 días) e inbox (30 días) cada hora (openspec add-event-outbox, design §7). */
+export const EVENT_PURGE_INTERVAL_MS = 60 * 60_000;
+
 /** Registra los handlers de jobs de plataforma al arrancar el contexto del worker. */
 @Injectable()
 export class PlatformJobsRegistrar implements OnApplicationBootstrap, OnApplicationShutdown {
   private purgeTimer: NodeJS.Timeout | undefined;
+  private eventPurgeTimer: NodeJS.Timeout | undefined;
 
   constructor(
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
@@ -81,10 +86,24 @@ export class PlatformJobsRegistrar implements OnApplicationBootstrap, OnApplicat
     this.purgeTimer = setInterval(() => void this.purgeIdempotencyKeys(), IDEMPOTENCY_PURGE_INTERVAL_MS);
     this.purgeTimer.unref();
     void this.purgeIdempotencyKeys();
+    this.eventPurgeTimer = setInterval(() => void this.purgeEvents(), EVENT_PURGE_INTERVAL_MS);
+    this.eventPurgeTimer.unref();
+    void this.purgeEvents();
   }
 
   onApplicationShutdown(): void {
     if (this.purgeTimer) clearInterval(this.purgeTimer);
+    if (this.eventPurgeTimer) clearInterval(this.eventPurgeTimer);
+  }
+
+  /** Borra (rol pf_maintenance) eventos publicados e inbox vencidos; nunca pendientes ni dead-letters. */
+  async purgeEvents(): Promise<void> {
+    try {
+      const purged = await purgeDeliveredEvents(this.pool);
+      this.logger.info({ purged }, 'delivered events purged');
+    } catch (err) {
+      this.logger.warn({ err: { type: err instanceof Error ? err.name : typeof err } }, 'event purge failed');
+    }
   }
 
   /** Borra (rol pf_maintenance) las claves con `expires_at` vencido. Nunca registra respuestas almacenadas. */

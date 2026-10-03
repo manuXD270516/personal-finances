@@ -97,6 +97,21 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(config.DATABASE_URL).toBe(API_ENV.DATABASE_URL);
   });
 
+  it('finance-worker se conecta como pf_worker (WORKER_DATABASE_URL obligatoria, sin DATABASE_URL)', () => {
+    const { DATABASE_URL: _app, ...storage } = API_ENV;
+    const missing = captureError(() => loadConfig('worker', storage));
+    expect(missing.problems.map((p) => p.variable)).toEqual(['WORKER_DATABASE_URL']);
+    const env = { ...storage, WORKER_DATABASE_URL: 'postgres://pf_worker:s3cr3t-wk@db.internal:5432/pfos' };
+    const config = loadConfig('worker', env);
+    expect(config.WORKER_DATABASE_URL).toBe(env.WORKER_DATABASE_URL);
+    expect(Object.keys(config)).not.toContain('DATABASE_URL');
+    const wrongRole = captureError(() =>
+      loadConfig('worker', { ...env, WORKER_DATABASE_URL: API_ENV.DATABASE_URL }),
+    );
+    expect(wrongRole.problems.map((p) => p.variable)).toEqual(['WORKER_DATABASE_URL']);
+    expect(JSON.stringify(wrongRole.problems)).not.toContain('s3cr3t');
+  });
+
   it('rechaza OBJECT_STORAGE_ENSURE_BUCKET=true fuera de local/ci', () => {
     const env = {
       ...API_ENV,

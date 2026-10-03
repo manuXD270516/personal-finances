@@ -8,6 +8,9 @@ export {
   type JobQueue,
   type PlatformPingPayload,
   type PlatformProbePayload,
+  type QueueOptions,
+  type QueueSqlExecutor,
+  type TransactionalJob,
   type WorkOptions,
 } from './job-queue.js';
 export {

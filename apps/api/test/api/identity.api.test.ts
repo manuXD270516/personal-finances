@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
+import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { connect, inTx } from '../support/db.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
@@ -405,5 +406,55 @@ describe('[TC-IDENTITY-WORKSPACE-006] el listado de workspaces se pagina por cur
       400,
       'INVALID_CURSOR',
     );
+  });
+});
+
+describe('[TC-IDENTITY-WORKSPACE-003] el OWNER configura el workspace y los valores inválidos se rechazan sin cambios', () => {
+  it('PATCH válido: 200, ETag "2" e identity.WorkspaceSettingsChanged.v1 en platform.outbox; inválidos sin cambios ni eventos', async () => {
+    const u = await user(`kc-settings-${randomUUID()}`);
+    const path = `/api/v1/workspaces/${u.personal}`;
+    const patch = (body: unknown, version: number) =>
+      call('PATCH', path, {
+        token: u.token,
+        body,
+        contentType: 'application/merge-patch+json',
+        headers: { 'if-match': `"${version}"` },
+      });
+    const ok = await patch({ name: 'Finanzas personales', locale: 'es-BO', fiscalMonthStartDay: 5 }, 1);
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('etag')).toBe('"2"');
+    expect(ok.body).toMatchObject({ name: 'Finanzas personales', locale: 'es-BO', fiscalMonthStartDay: 5 });
+    expectProblem(await patch({ timezone: 'GMT-4 Bolivia' }, 2), 422, 'INVALID_TIMEZONE');
+    expectProblem(await patch({ fiscalMonthStartDay: 29 }, 2), 400, 'VALIDATION_FAILED');
+    expectProblem(await patch({ baseCurrency: 'XYZ' }, 2), 422, 'REFERENCE_NOT_FOUND');
+    const current = await call('GET', path, { token: u.token });
+    expect(current.body).toMatchObject({ version: 2, fiscalMonthStartDay: 5, baseCurrency: 'BOB' });
+
+    // Outbox real (add-event-outbox): WorkspaceCreated (v1 del agregado) y un único WorkspaceSettingsChanged (v2).
+    const worker = await connect(deps.workerDatabaseUrl);
+    try {
+      const { rows } = await worker.query<{
+        event_type: string;
+        aggregate_version: number;
+        envelope: Record<string, unknown>;
+      }>(
+        'SELECT event_type, aggregate_version, envelope FROM platform.outbox WHERE workspace_id = $1 ORDER BY sequence',
+        [u.personal],
+      );
+      expect(rows.map((r) => [r.event_type, r.aggregate_version])).toEqual([
+        ['identity.WorkspaceCreated', 1],
+        ['identity.WorkspaceSettingsChanged', 2],
+      ]);
+      const changed = rows[1]!.envelope as unknown as Parameters<
+        ReturnType<typeof eventSchemaRegistry>['validate']
+      >[0];
+      expect(() => eventSchemaRegistry().validate(changed)).not.toThrow();
+      expect(changed).toMatchObject({ workspaceId: u.personal, actor: { type: 'USER', id: u.id } });
+      expect(
+        (changed.payload as { changes: { field: string }[] }).changes.map((c) => c.field).sort(),
+      ).toEqual(['fiscalMonthStartDay', 'name']);
+    } finally {
+      await worker.end();
+    }
   });
 });

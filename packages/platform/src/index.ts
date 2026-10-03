@@ -7,6 +7,7 @@
  * | `@pf/platform/logging`        | Logger pino JSON con redacción, correlación (AsyncLocalStorage)      |
  * | `@pf/platform/health`         | Liveness/readiness y chequeos de PostgreSQL, S3 y Valkey             |
  * | `@pf/platform/queue`          | Puerto `JobQueue` + adapter pg-boss con envelope de correlación      |
+ * | `@pf/platform/events`         | Outbox transaccional, relay, consumidores con inbox, DLQ, métricas   |
  * | `@pf/platform/storage`        | Cliente S3 configurado (ADR-0009)                                    |
  * | `@pf/platform/lifecycle`      | Apagado ordenado (SIGTERM)                                           |
  * | `@pf/platform/nest`           | Adaptadores NestJS (health controller, middleware, interceptor OTel) |

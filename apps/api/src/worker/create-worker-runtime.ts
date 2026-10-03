@@ -2,6 +2,14 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { WorkerConfig } from '@pf/platform/config';
 import {
+  EventConsumerRuntime,
+  EventDeliveryMetrics,
+  EventSubscriptions,
+  OutboxRelay,
+  type EventConsumerDefinition,
+  type OutboxRelayOptions,
+} from '@pf/platform/events';
+import {
   objectStorageCheck,
   postgresCheck,
   ReadinessProbe,
@@ -21,20 +29,38 @@ export interface WorkerRuntime {
   readonly context: INestApplicationContext;
   readonly queue: JobQueue;
   readonly pool: Pool;
+  readonly relay: OutboxRelay;
+  readonly consumers: EventConsumerRuntime;
+  readonly subscriptions: EventSubscriptions;
   /** Publica `/health/live` y `/health/ready` (por defecto en WORKER_HEALTH_PORT). Devuelve el puerto. */
   listenHealth(port?: number, host?: string): Promise<number>;
   /**
-   * Apagado ordenado (NFR-REL-009): readiness pasa a 503, deja de tomar jobs, espera a que terminen los activos
-   * (pg-boss `offWork({ wait: true })`), cierra la cola, el pool y vacía la telemetría.
+   * Apagado ordenado (NFR-REL-009): readiness pasa a 503, el relay deja de publicar, la cola deja de tomar jobs y
+   * espera a que terminen los activos (pg-boss `offWork({ wait: true })`), y se cierran cola, pool y telemetría.
    */
   close(): Promise<void>;
 }
 
-export async function createWorkerRuntime(config: WorkerConfig, logger: Logger): Promise<WorkerRuntime> {
-  const queue = createJobQueue(config, logger, 'consumer');
+export interface WorkerRuntimeOptions {
+  /** Consumidores de eventos registrados por los contextos (y por los tests). */
+  readonly eventConsumers?: readonly EventConsumerDefinition[];
+  /** Ajustes del relay (tests: lote, polling, inyección de fallos). */
+  readonly relay?: Partial<Pick<OutboxRelayOptions, 'batchSize' | 'pollIntervalMs' | 'afterEnqueue'>>;
+  readonly metrics?: EventDeliveryMetrics;
+}
+
+export async function createWorkerRuntime(
+  config: WorkerConfig,
+  logger: Logger,
+  options: WorkerRuntimeOptions = {},
+): Promise<WorkerRuntime> {
+  // pf_worker: relay del outbox entre workspaces, inbox y dead-letter (openspec add-event-outbox, design §4).
+  const databaseUrl = config.WORKER_DATABASE_URL;
+  if (!databaseUrl) throw new Error('WORKER_DATABASE_URL es obligatoria en el worker');
+  const queue = createJobQueue(config, databaseUrl, logger, 'consumer');
   const pool = new Pool({
-    connectionString: config.DATABASE_URL,
-    max: Math.min(config.DATABASE_POOL_MAX, 4),
+    connectionString: databaseUrl,
+    max: Math.min(config.DATABASE_POOL_MAX, 6),
     connectionTimeoutMillis: config.HEALTH_CHECK_TIMEOUT_MS,
     application_name: 'finance-worker',
   });
@@ -63,6 +89,22 @@ export async function createWorkerRuntime(config: WorkerConfig, logger: Logger):
     { logger: new PinoNestLogger(logger), abortOnError: false },
   );
 
+  const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
+  const subscriptions = new EventSubscriptions(options.eventConsumers ?? []);
+  const consumers = new EventConsumerRuntime({ pool, queue, subscriptions, logger, metrics });
+  const relay = new OutboxRelay({
+    pool,
+    queue,
+    routes: subscriptions,
+    logger,
+    metrics,
+    listenConnectionString: databaseUrl,
+    pollIntervalMs: Math.round(config.JOB_QUEUE_POLLING_INTERVAL_SECONDS * 1000),
+    ...options.relay,
+  });
+  await consumers.start();
+  await relay.start();
+
   let draining = false;
   let health: HealthServer | undefined;
   let closed = false;
@@ -70,6 +112,9 @@ export async function createWorkerRuntime(config: WorkerConfig, logger: Logger):
     context,
     queue,
     pool,
+    relay,
+    consumers,
+    subscriptions,
     async listenHealth(port = config.WORKER_HEALTH_PORT, host = config.WORKER_HEALTH_BIND_ADDRESS) {
       health = await startHealthServer({ port, host, probe, isDraining: () => draining });
       logger.info({ port: health.port }, 'worker health listening');
@@ -79,6 +124,7 @@ export async function createWorkerRuntime(config: WorkerConfig, logger: Logger):
       if (closed) return;
       closed = true;
       draining = true;
+      await relay.stop();
       await queue.drain();
       await context.close();
       await queue.stop();

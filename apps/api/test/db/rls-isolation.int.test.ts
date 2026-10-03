@@ -228,13 +228,18 @@ describe('RLS por workspace (security/access-control)', () => {
     );
     expect(owners).toEqual([{ owner: 'pf_migrator' }]);
 
-    // Credenciales efímeras para iniciar sesión con pf_worker/pf_bff (pf_migrator tiene ADMIN sobre ellos).
+    // pf_worker usa la credencial que `migrate` alineó con WORKER_DATABASE_URL (la comparten los tests del outbox);
+    // pf_bff, una efímera (pf_migrator tiene ADMIN sobre el rol).
     const clients: Client[] = [];
     try {
       for (const role of ['pf_worker', 'pf_bff']) {
-        const password = randomBytes(18).toString('hex');
-        await migrator.query(`ALTER ROLE ${role} PASSWORD ${migrator.escapeLiteral(password)}`);
-        const c = await connect(withRole(deps.databaseUrl, role, password));
+        let url = deps.workerDatabaseUrl;
+        if (role === 'pf_bff') {
+          const password = randomBytes(18).toString('hex');
+          await migrator.query(`ALTER ROLE ${role} PASSWORD ${migrator.escapeLiteral(password)}`);
+          url = withRole(deps.databaseUrl, role, password);
+        }
+        const c = await connect(url);
         clients.push(c);
         expect(await sqlState(() => c.query(`CREATE TABLE platform.ddl_${role} (id int)`)), role).toBe(
           '42501',
@@ -265,7 +270,6 @@ describe('RLS por workspace (security/access-control)', () => {
       expect(await sqlState(() => app.query('SELECT * FROM iam.bff_session'))).toBe('42501');
     } finally {
       await Promise.all(clients.map((c) => c.end()));
-      await migrator.query('ALTER ROLE pf_worker PASSWORD NULL');
       await migrator.query('ALTER ROLE pf_bff PASSWORD NULL');
     }
   });

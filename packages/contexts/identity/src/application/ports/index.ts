@@ -78,10 +78,15 @@ export interface OutboxEvent {
   readonly aggregateVersion: number;
   readonly workspaceId: string;
   readonly occurredAt: string;
+  /** Quién originó el cambio (envelope v1 `actor`). */
+  readonly actor: { readonly type: 'USER'; readonly id: string };
   readonly payload: Readonly<Record<string, unknown>>;
 }
 
-/** Outbox transaccional (`platform.outbox`): se escribe en la misma transacción que el cambio. */
+/**
+ * Outbox transaccional (`platform.outbox`, openspec add-event-outbox): se escribe en la misma transacción que el
+ * cambio; el adapter completa el envelope (`correlationId`, `causationId`) y lo valida contra contracts/events.
+ */
 export interface OutboxPort {
   append(event: OutboxEvent): Promise<void>;
 }

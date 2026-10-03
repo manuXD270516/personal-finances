@@ -19,7 +19,8 @@
         "tsconfig*.json",
         "package.json",
         "scripts/**",
-        "$TURBO_ROOT$/contracts/openapi/*.yaml"
+        "$TURBO_ROOT$/contracts/openapi/*.yaml",
+        "$TURBO_ROOT$/contracts/events/**"
       ],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "contract/**"]
     },
