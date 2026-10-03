@@ -43,4 +43,4 @@ Mover dinero entre cuentas propias (banco → efectivo, ahorro → corriente, pa
 
 **Impacto de regresión:** TC-LEDGER-TRANSFER-001, TRANSFER-002, TRANSFER-004 y CARDPAYMENT-001 entran en la Financial Regression Suite (patrimonio neto). Cambios futuros en el traductor de postings o en Debt (Phase 4, pagos de tarjeta) deben mantenerlos verdes.
 
-**Riesgos introducidos:** doble conteo del pago de tarjeta como gasto en reportes si Reporting no distingue `TRANSFER` (mitigado: el pago no tiene postings EXPENSE); semántica de `TransferCompleted` tras un amend (ver design.md, pregunta abierta).
+**Riesgos introducidos:** doble conteo del pago de tarjeta como gasto en reportes si Reporting no distingue `TRANSFER` (mitigado: el pago no tiene postings EXPENSE); semántica de `TransferCompleted` tras un amend (resuelta por docs/31 D37: emisión única + `TransferRevised.v1`, implementada en `add-lifecycle-timeline`).

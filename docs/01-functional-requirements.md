@@ -28,10 +28,10 @@ flowchart LR
 
 | Contexto | Código | Capabilities | # FR | Must | Should | Could | Won't | Fase de inicio |
 |----------|--------|--------------|-----:|-----:|-------:|------:|------:|----------------|
-| Identity & Workspace | IDENTITY | identity/authentication, identity/workspace-membership | 12 | 7 | 3 | 1 | 1 | 1 |
+| Identity & Workspace | IDENTITY | identity/authentication, identity/workspace-membership, identity/demo-data | 16 | 10 | 4 | 1 | 1 | 1 |
 | Accounts | ACCOUNTS | accounts/account-management, accounts/institutions | 16 | 13 | 2 | 1 | 0 | 1 |
 | Ledger | LEDGER | ledger/journal-posting, ledger/balances (+ reporting/cash-flow-calendar para FR-LEDGER-013) | 16 | 15 | 0 | 1 | 0 | 1 |
-| Transactions | TRANSACTIONS | transactions/* (7) | 35 | 29 | 5 | 1 | 0 | 1 |
+| Transactions | TRANSACTIONS | transactions/* (7) | 36 | 30 | 5 | 1 | 0 | 1 |
 | Classification | CLASSIFICATION | classification/* (4) | 13 | 7 | 4 | 2 | 0 | 1 |
 | Planning & Budgeting | PLANNING | planning/* (4) | 24 | 16 | 6 | 2 | 0 | 2 |
 | Commitments | COMMITMENTS | commitments/recurrence-engine, commitments/subscriptions | 17 | 12 | 5 | 0 | 0 | 3 |
@@ -44,9 +44,9 @@ flowchart LR
 | Reporting | REPORTING | reporting/* (4) | 19 | 14 | 4 | 1 | 0 | 1 |
 | Forecasting | FORECAST | forecast/expense-forecasting | 10 | 6 | 3 | 1 | 0 | 8 |
 | Notifications | NOTIFY | notifications/alerts | 9 | 4 | 3 | 1 | 1 | 2 |
-| Audit | AUDIT | audit/audit-trail | 8 | 5 | 2 | 1 | 0 | 1 |
+| Audit | AUDIT | audit/audit-trail, audit/lifecycle-timeline | 12 | 7 | 4 | 1 | 0 | 1 |
 | AI Assistant | ASSISTANT | assistant/read-only-assistant | 11 | 8 | 1 | 0 | 2 | 10 |
-| **Total** | | | **272** | **186** | **60** | **21** | **4** | |
+| **Total** | | | **281** | **192** | **63** | **21** | **4** | |
 
 > FRs con prioridad mixta (p.ej. FR-REPORTING-008) se cuentan por su prioridad más alta. Los conteos son orientativos y se recalculan al cerrar el DESIGN GATE.
 
@@ -54,7 +54,7 @@ flowchart LR
 
 ## 3. IDENTITY — Identity & Workspace
 
-Capabilities: `identity/authentication`, `identity/workspace-membership`. Ver también `security/access-control` y el documento 12 (seguridad, `docs/12-*`).
+Capabilities: `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` (docs/31 D36). Ver también `security/access-control` y el documento 12 (seguridad, `docs/12-*`).
 
 | ID | Requerimiento | Prioridad | Fase | Capability |
 |----|---------------|-----------|------|------------|
@@ -70,6 +70,10 @@ Capabilities: `identity/authentication`, `identity/workspace-membership`. Ver ta
 | FR-IDENTITY-010 | El `OWNER` DEBE poder exportar todos los datos del workspace (cuentas, transacciones con splits, ledger, catálogos, planes, metas, deudas, tasas, audit) en formato JSON versionado y CSV, como job asíncrono con descarga temporal. | Must | 2 | identity/workspace-membership |
 | FR-IDENTITY-011 | El sistema DEBE permitir transferir la propiedad (`OWNER`) del workspace a otro miembro. | Could | 11 | identity/workspace-membership |
 | FR-IDENTITY-012 | Borrado definitivo de workspace y de cuenta de usuario (derecho al olvido) con periodo de gracia. | Won't (now) | — | identity/workspace-membership |
+| FR-IDENTITY-013 | Los datos de demostración DEBEN cargarse **solo por una acción explícita del `OWNER` en la app** ("Cargar datos de demostración"), nunca automáticamente (arranque, migración, login); la carga crea un **workspace de demostración dedicado**, marcado como demo de forma inmutable desde su creación, y nunca escribe datos demo en un workspace real. (docs/31 D36, 2026-10-03) | Must | 1 | identity/demo-data |
+| FR-IDENTITY-014 | Todo dato de demostración DEBE identificarse como tal en la UI (indicador persistente) y en la API (`isDemo` del workspace), usar solo entidades ficticias con apariencia real (bancos, comercios, personas) y generarse de forma determinista desde el dataset versionado (docs/29). (docs/31 D36) | Must | 1 | identity/demo-data |
+| FR-IDENTITY-015 | El `OWNER` del workspace demo DEBE poder **limpiar** los datos de demostración ("Limpiar datos de demostración"): el workspace demo se archiva al instante y luego se **purga por completo** de forma asíncrona y auditada, sin afectar ningún workspace real (ADR-0026). (docs/31 D36) | Must | 1 | identity/demo-data |
+| FR-IDENTITY-016 | La acción de carga de datos demo DEBE poder deshabilitarse por entorno (habilitada por defecto en local/dev; deshabilitada por defecto en producción hasta decisión del owner) y DEBE limitarse a un workspace demo activo por usuario. (docs/31 D36) | Should | 1 | identity/demo-data |
 
 ## 4. ACCOUNTS — Accounts & Institutions
 
@@ -150,6 +154,7 @@ Capabilities: `transactions/transaction-recording`, `transactions/transfers`, `t
 | FR-TRANSACTIONS-018 | (INV-009) Una `transfer` entre dos cuentas del workspace en la misma moneda DEBE generar una única entry (débito destino, crédito origen) y NO DEBE contarse como ingreso ni gasto. Origen y destino deben ser distintos. | Must | 1 | transactions/transfers |
 | FR-TRANSACTIONS-019 | Una transferencia PUEDE incluir un fee (gasto en la cuenta origen, categoría de sistema *Fees*) en la misma entry. | Should | 1 | transactions/transfers |
 | FR-TRANSACTIONS-020 | Un movimiento entre cuentas de monedas distintas DEBE registrarse como `conversion`; el sistema DEBE guiar al usuario si intenta una transferencia cross-currency. | Must | 1 | transactions/transfers |
+| FR-TRANSACTIONS-036 | Editar financieramente una transferencia posteada DEBE ser una transición explícita **revisada** (reversa + nueva revisión) que publica `transactions.TransferRevised.v1` con los asientos revertido, de reversa y nuevo; `transactions.TransferCompleted.v1` DEBE publicarse **una sola vez** por transferencia (primer posteo). (docs/31 D37, 2026-10-03) | Must | 1 | transactions/transfers |
 | FR-TRANSACTIONS-021 | Una `conversion` DEBE soportar las 4 direcciones: fiat→fiat, fiat→crypto, crypto→fiat, crypto→crypto, generando una sola entry con patas por moneda balanceadas vía `EQUITY:FX_TRADING:<CCY>` (ARCHITECTURE §4.2). | Must | 1 | transactions/conversions |
 | FR-TRANSACTIONS-022 | Una conversión DEBE capturar: monto enviado (moneda origen), monto recibido (moneda destino), tasa cotizada (quoted), tasa efectiva (calculada), fees por tipo (`PROVIDER`, `NETWORK`, `BANK`, `TAX`, `OTHER`) con su moneda, spread vs tasa de referencia, provider/canal (p.ej. Binance P2P, casa de cambio, banco), timestamp y monto final acreditado. Se persisten como `ConversionDetail` inmutable, versionado por revisión (FR-TRANSACTIONS-024). (rev. 2026-10-02, D12) | Must | 1 | transactions/conversions |
 | FR-TRANSACTIONS-023 | Los fees de conversión DEBEN registrarse como postings a `EXPENSE:<CCY>` con split de categoría de sistema *Fees*, en la moneda en que se pagaron. | Must | 1 | transactions/conversions |
@@ -436,6 +441,10 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-AUDIT-006 | Consulta global del audit log con filtros (actor, acción, entidad, rango de fechas) y export CSV (solo `OWNER`). | Should | 2 | audit/audit-trail |
 | FR-AUDIT-007 | Política de retención configurable (default: indefinida para eventos financieros, 2 años para eventos de acceso). | Should | 9 | audit/audit-trail |
 | FR-AUDIT-008 | Hash encadenado (tamper-evidence) por workspace verificable por job. | Could | 9 | audit/audit-trail |
+| FR-AUDIT-009 | Cada agregado con ciclo de vida (`Transaction` —incluidas transferencias y conversiones—, `Account`, `ExchangeRate`) DEBE declarar una **máquina de estados explícita** (estados, transiciones permitidas con su guarda y **un evento por transición**); toda transición, incluida la edición financiera (reversa + nueva revisión), DEBE registrarse como un **registro de transición append-only** en la misma transacción de BD que el cambio. (docs/31 D37, 2026-10-03) | Must | 1 | audit/lifecycle-timeline |
+| FR-AUDIT-010 | El sistema DEBE exponer el **recorrido** de un elemento (`GET …/{id}/lifecycle`): transiciones en orden con actor, instante, origen, motivo, revisión/versión, asientos del ledger (revertido, de reversa, nuevo) y evento emitido, junto con la definición de su máquina de estados; visible para todo miembro que pueda ver el elemento, incluido `VIEWER` (D28). (docs/31 D37) | Must | 1 | audit/lifecycle-timeline |
+| FR-AUDIT-011 | La UI DEBE ofrecer un **reporte de recorrido tipo máquina de estados**: diagrama de estados con el camino recorrido resaltado y el estado actual destacado, más una línea de tiempo de transiciones con enlace a cada revisión y a sus asientos. (docs/31 D37) | Should | 1 | audit/lifecycle-timeline |
+| FR-AUDIT-012 | Las transiciones ocurridas antes de existir el registro de transiciones DEBEN reconstruirse desde el audit log y marcarse como **derivadas**; el recorrido nunca inventa transiciones sin evidencia. (docs/31 D37) | Should | 1 | audit/lifecycle-timeline |
 
 ## 20. ASSISTANT — AI Assistant (solo lectura)
 

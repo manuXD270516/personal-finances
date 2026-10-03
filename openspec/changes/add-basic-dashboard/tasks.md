@@ -4,9 +4,14 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner los specs `reporting/dashboard` y `reporting/net-worth` y resolver las preguntas abiertas de design.md (definición de cuenta líquida; la tasa USD/USDT↔BOB ya quedó resuelta: `PARALLEL` del provider, docs/31 D29); verificar con `openspec validate add-basic-dashboard --strict`
+- [ ] 1.1 Revisar con el owner los specs `reporting/dashboard` y `reporting/net-worth` y resolver las preguntas abiertas de design.md (la definición de cuenta líquida quedó resuelta: `ASSET` + `LIQUID`, cuentas no archivadas incluidas, docs/31 D35; la tasa USD/USDT↔BOB ya quedó resuelta: `PARALLEL` del provider, docs/31 D29; el último recurso con manuales de cualquier tipo, docs/31 D34); verificar con `openspec validate add-basic-dashboard --strict`
 - [x] 1.2 Revisar TC-REPORTING-DASHBOARD-001..007, TC-REPORTING-KPI-001..008 y TC-REPORTING-NETWORTH-001..005 contra los scenarios (cifras a mano, fechas fijas, `FixedClock`); verificar que el chequeo del catálogo los acepta y que todo requirement Must tiene ≥ 1 TC
   - Nota (2026-10-03): cifras verificadas a mano contra los scenarios; el chequeo de catálogo los acepta y todo Must tiene ≥ 1 TC. TC-REPORTING-DASHBOARD-007: la variante manual se automatizó como `PARALLEL` (ver design.md § Preguntas abiertas). La revisión con el owner sigue en 1.1.
+
+- [ ] 1.3 Decisiones del owner 2026-10-03 (docs/31 D34, D35): spec ampliada (scenarios "Cuenta cerrada incluida y archivada excluida", "Tasa manual de otro tipo no fresca descartada" y "Tasa manual de otro tipo con desvío excesivo descartada") y TC-REPORTING-DASHBOARD-008/-009 redactados (draft)
+  - [ ] 1.3.1 Verificar (test de API) que el resumen lista cuentas `CLOSED` no archivadas (TC-REPORTING-DASHBOARD-008); la regla ya está implementada (decisión 12), falta el test con el TC-id
+  - [ ] 1.3.2 Cuando FX implemente D34 en `ValuationRateSelector` (coordinado con `add-market-rate-providers`; este change no toca `packages/contexts/fx`), automatizar TC-REPORTING-DASHBOARD-009 y re-automatizar la variante manual de TC-REPORTING-DASHBOARD-007 con `P2P`
+  - [ ] 1.3.3 Confirmar con el owner el máximo de frescura de manuales en el último recurso (propuesta 24 h, `FX_MANUAL_FALLBACK_MAX_AGE`)
 
 ## 2. DOMAIN (TDD, lógica financiera crítica)
 

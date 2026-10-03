@@ -108,8 +108,10 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 | 9 | `add-manual-conversions` | `transactions/conversions`, `fx/conversion-pricing`, `fx/market-rates` (manual) | 1 |
 | 9b | `add-market-rate-providers` | `fx/market-rate-providers` (paralelo.bo principal, bo.dolarapi.com respaldo/oficial; docs/31 D29, ADR-0025) | 1 |
 | 10 | `add-basic-dashboard` | `reporting/dashboard`, `reporting/net-worth` (valoración USD/USDT con la tasa paralela del provider) | 1 |
+| 11 | `add-lifecycle-timeline` | `audit/lifecycle-timeline` (máquinas de estado explícitas por agregado, `GET …/{id}/lifecycle`, reporte de recorrido en la UI) + `transactions/transfers` (`TransferRevised.v1`; docs/31 D37) | 1 |
+| 12 | `add-demo-data` | `identity/demo-data` (carga y limpieza de datos de demostración por acción explícita del OWNER, en un workspace demo dedicado y purgable; docs/31 D36, ADR-0026) | 1 |
 
-Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29, y el 2b `add-event-outbox`, agregado el 2026-10-03, docs/31 D30) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
+Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29, y el 2b `add-event-outbox`, agregado el 2026-10-03, docs/31 D30; los 11 `add-lifecycle-timeline` y 12 `add-demo-data` se agregaron el 2026-10-03 por decisión del owner, docs/31 D37 y D36) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
 
 ## 8. Integración con CI y herramientas
 

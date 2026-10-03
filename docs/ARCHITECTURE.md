@@ -234,7 +234,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 
 | Contexto | Capabilities |
 |----------|--------------|
-| identity | `identity/authentication`, `identity/workspace-membership` |
+| identity | `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` |
 | accounts | `accounts/account-management`, `accounts/institutions` |
 | ledger | `ledger/journal-posting`, `ledger/balances` |
 | transactions | `transactions/transaction-recording`, `transactions/transfers`, `transactions/conversions`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection`, `transactions/bulk-edit` |
@@ -250,7 +250,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` |
 | forecast | `forecast/expense-forecasting` |
 | notify | `notifications/alerts` |
-| audit | `audit/audit-trail` |
+| audit | `audit/audit-trail`, `audit/lifecycle-timeline` |
 | assistant | `assistant/read-only-assistant` |
 | platform | `platform/local-environment`, `platform/delivery-pipeline`, `platform/observability`, `platform/api-conventions`, `platform/event-delivery` |
 | security | `security/access-control`, `security/file-upload-security` |
