@@ -1,5 +1,6 @@
 import type { ModuleMetadata } from '@nestjs/common';
 import { AuditModule, createAuditRuntime, type AuditPort } from '@pf/audit/interface/audit.module';
+import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
 import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
 import {
   ClassificationModule,
@@ -19,6 +20,7 @@ import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
+import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
 
 /** Opciones JWT desde el contrato de configuración (`OIDC_*`); `undefined` si no hay emisor configurado. */
 export function jwtOptionsFromConfig(config: ApiConfig): JwtVerifierOptions | undefined {
@@ -74,7 +76,7 @@ export function auditRuntime(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
-    policies: [IDENTITY_AUDIT_POLICY, CLASSIFICATION_AUDIT_POLICY],
+    policies: [IDENTITY_AUDIT_POLICY, CLASSIFICATION_AUDIT_POLICY, ACCOUNTS_AUDIT_POLICY],
     timeZones: identityWorkspaceTimeZones(input.pool),
   });
 }
@@ -109,6 +111,14 @@ export function identityImports(input: {
     audit: auditPort,
     locales: identityUserLocales(input.pool),
   });
+  // ACCOUNTS (add-accounts-management).
+  const { accounts } = accountsRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    audit: auditPort,
+    logger: input.logger,
+    defaultTimeZone: input.config.APP_TIMEZONE,
+  });
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -127,5 +137,7 @@ export function identityImports(input: {
     }),
     AuditModule.register({ runtime: audit, conventions: input.conventions }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
+    // ACCOUNTS (+ LEDGER sin HTTP) — openspec add-accounts-management.
+    ...accountsImports({ runtime: accounts, conventions: input.conventions }),
   ];
 }

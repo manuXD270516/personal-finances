@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "account-type"]
@@ -28,7 +30,7 @@ expected_result:
   - "Bank A sigue con tipo bank, naturaleza ASSET y saldo 1000.00 BOB"
   - "No se escribe auditoría ni evento"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-TYPES-002 — El tipo de una cuenta no puede cambiarse después de crearla

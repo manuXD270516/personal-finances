@@ -12,9 +12,11 @@ invariants: [INV-025]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "institutions", "multi-tenant"]
@@ -30,7 +32,7 @@ expected_result:
   - "Bank G se rechaza con REFERENCE_NOT_FOUND (422) sin revelar que la institución existe en W2"
   - "Cash se crea sin institución"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-INSTLINK-001 — Una cuenta puede asociarse a una institución de su workspace y nunca a una ajena

@@ -12,9 +12,10 @@ invariants: [INV-027]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "idempotency"]
@@ -33,7 +34,7 @@ expected_result:
   - "Existe una sola cuenta Bank F con saldo 500.00 BOB y un solo asiento de apertura"
   - "El tercer POST responde 422 IDEMPOTENCY_KEY_REUSED"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-OPENING-003 — Reintentar la creación de una cuenta con la misma clave de idempotencia no duplica cuenta ni asiento

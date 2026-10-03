@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "archive"]
@@ -32,7 +34,7 @@ expected_result:
   - "Se emite accounts.AccountArchived.v1 con reason \"Cuenta cerrada en el banco\" y se escribe auditoría"
   - "El segundo archivo se rechaza con INVALID_STATUS_TRANSITION"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-ARCHIVE-001 — Una cuenta archivada desaparece del listado por defecto pero sigue consultable con su saldo

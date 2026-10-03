@@ -12,9 +12,10 @@ invariants: [INV-030]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "account-type"]
@@ -32,7 +33,7 @@ expected_result:
   - "Las 3 cuentas de liability_types quedan activas con naturaleza LIABILITY"
   - "El tipo checking se rechaza con VALIDATION_FAILED y no se crea cuenta"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-TYPES-001 — Cada tipo de cuenta soportado se crea con la naturaleza activo o pasivo que le corresponde

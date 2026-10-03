@@ -12,9 +12,12 @@ invariants: [INV-022]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "close"]
@@ -30,7 +33,7 @@ expected_result:
   - "Bank B queda CLOSED con closedOn 2026-03-31; se emite accounts.AccountClosed.v1 y se audita"
   - "USDT Wallet se rechaza con ACCOUNT_BALANCE_NOT_ZERO (409) y sigue ACTIVE con 0.000001 USDT"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-CLOSE-001 — Una cuenta solo se cierra con saldo exactamente cero en su moneda

@@ -9,36 +9,36 @@
 
 ## 2. Instituciones (`accounts/institutions`)
 
-- [ ] 2.1 Dominio TDD: `Institution`, `InstitutionKind`, validación de país ISO; tests `[TC-ACCOUNTS-INSTITUTION-001]`
-- [ ] 2.2 Aplicación: `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`, `ListInstitutions` con `AuditPort`; tests `[TC-ACCOUNTS-INSTITUTION-003]`, `[TC-ACCOUNTS-INSTITUTION-004]`
-- [ ] 2.3 Infraestructura: migración `accounts.institution` (RLS WS, único parcial por nombre, sin DELETE) y repositorio Kysely; test de integración de aislamiento y `NAME_TAKEN`
+- [x] 2.1 Dominio TDD: `Institution`, `InstitutionKind`, validación de país ISO; tests `[TC-ACCOUNTS-INSTITUTION-001]`
+- [x] 2.2 Aplicación: `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`, `ListInstitutions` con `AuditPort`; tests `[TC-ACCOUNTS-INSTITUTION-003]`, `[TC-ACCOUNTS-INSTITUTION-004]`
+- [x] 2.3 Infraestructura: migración `accounts.institution` (RLS WS, único parcial por nombre, sin DELETE) y repositorio Kysely; test de integración de aislamiento y `NAME_TAKEN`
 - [ ] 2.4 Seed de catálogo inicial ficticio por workspace (nunca en migraciones ni en código); verificar con `[TC-ACCOUNTS-INSTITUTION-002]`
-- [ ] 2.5 API `institutions` según design.md §Contratos; tests de API y de contrato
+- [x] 2.5 API `institutions` según design.md §Contratos; tests de API y de contrato
 
 ## 3. Dominio de cuentas (`@pf/accounts/domain`)
 
-- [ ] 3.1 TDD: `AccountType` → `AccountNature` y `Liquidity.defaultFor(type)`; tests `[TC-ACCOUNTS-TYPES-001]`, `[TC-ACCOUNTS-LIQUIDITY-001]`
-- [ ] 3.2 TDD: inmutabilidad de tipo, cambio de moneda solo sin movimientos; tests `[TC-ACCOUNTS-TYPES-002]`, `[TC-ACCOUNTS-CURRENCY-002]`
-- [ ] 3.3 TDD: transiciones ACTIVE/CLOSED/ARCHIVED (cerrar exige saldo cero, reactivar, transiciones inválidas); tests `[TC-ACCOUNTS-CLOSE-001]`, `[TC-ACCOUNTS-ARCHIVE-001]`, `[TC-ACCOUNTS-ARCHIVE-003]`
-- [ ] 3.4 TDD: `MaskedAccountNumber` y regla cripto (moneda `CRYPTO`, escala); tests `[TC-ACCOUNTS-MASK-001]`, `[TC-ACCOUNTS-CRYPTO-001]`
+- [x] 3.1 TDD: `AccountType` → `AccountNature` y `Liquidity.defaultFor(type)`; tests `[TC-ACCOUNTS-TYPES-001]`, `[TC-ACCOUNTS-LIQUIDITY-001]`
+- [x] 3.2 TDD: inmutabilidad de tipo, cambio de moneda solo sin movimientos; tests `[TC-ACCOUNTS-TYPES-002]`, `[TC-ACCOUNTS-CURRENCY-002]`
+- [x] 3.3 TDD: transiciones ACTIVE/CLOSED/ARCHIVED (cerrar exige saldo cero, reactivar, transiciones inválidas); tests `[TC-ACCOUNTS-CLOSE-001]`, `[TC-ACCOUNTS-ARCHIVE-001]`, `[TC-ACCOUNTS-ARCHIVE-003]`
+- [x] 3.4 TDD: `MaskedAccountNumber` y regla cripto (moneda `CRYPTO`, escala); tests `[TC-ACCOUNTS-MASK-001]`, `[TC-ACCOUNTS-CRYPTO-001]`
 
 ## 4. Aplicación de cuentas
 
-- [ ] 4.1 `OpenAccount` (sin saldo inicial), `UpdateAccount`, `ArchiveAccount`, `CloseAccount`, `ReactivateAccount`, `ReorderAccounts` con `AuditPort` + outbox en la `UnitOfWork`; tests `[TC-ACCOUNTS-NAME-001]`, `[TC-ACCOUNTS-INSTLINK-001]`, `[TC-ACCOUNTS-METADATA-001]`
-- [ ] 4.2 `AccountsQueryPort.getPostingEligibility` (estado, moneda, naturaleza) con bloqueo `FOR SHARE`; tests de aplicación para INV-026 `[TC-ACCOUNTS-ARCHIVE-002]` (con un poster de prueba hasta que exista Transactions)
-- [ ] 4.3 Queries `GetAccount`, `ListAccounts` (filtros, `groupBy`, orden manual) con `LedgerBalancesPort` y `FxRateQueryPort` simulados; tests `[TC-ACCOUNTS-LIST-001]`, `[TC-ACCOUNTS-LIST-002]`
+- [x] 4.1 `OpenAccount` (sin saldo inicial), `UpdateAccount`, `ArchiveAccount`, `CloseAccount`, `ReactivateAccount`, `ReorderAccounts` con `AuditPort` + outbox en la `UnitOfWork`; tests `[TC-ACCOUNTS-NAME-001]`, `[TC-ACCOUNTS-INSTLINK-001]`, `[TC-ACCOUNTS-METADATA-001]`
+- [x] 4.2 `AccountsQueryPort.getPostingEligibility` (estado, moneda, naturaleza) con bloqueo `FOR SHARE`; tests de aplicación para INV-026 `[TC-ACCOUNTS-ARCHIVE-002]` (con un poster de prueba hasta que exista Transactions)
+- [x] 4.3 Queries `GetAccount`, `ListAccounts` (filtros, `groupBy`, orden manual) con `LedgerBalancesPort` y `FxRateQueryPort` simulados; tests `[TC-ACCOUNTS-LIST-001]`, `[TC-ACCOUNTS-LIST-002]`
 
 ## 5. Infraestructura y API de cuentas
 
-- [ ] 5.1 Migración `accounts.account` y `accounts.account_tag` (checks de tipo/naturaleza/liquidez, únicos parciales, FKs compuestas, RLS WS, grants sin DELETE en `account`); verificar con test de migración y `[TC-ACCOUNTS-NODELETE-001]`
-- [ ] 5.2 Repositorios Kysely con optimistic locking (`version`) y mapeo de violaciones únicas a `ACCOUNT_NAME_TAKEN`
-- [ ] 5.3 Esquemas de eventos `AccountOpened.v1` (corregido), `AccountClosed.v1`, `AccountReactivated.v1`, `AccountUpdated.v1` consolidados en `contracts/events/` (proceso de contratos); tests de contrato de eventos con los payloads emitidos
-- [ ] 5.4 Controllers `accounts` (`list/get/create/update/archive/close/reactivate/order`) con `x-required-role`, ETag/If-Match e `Idempotency-Key`; tests de API y test de contrato contra el OpenAPI consolidado
+- [x] 5.1 Migración `accounts.account` y `accounts.account_tag` (checks de tipo/naturaleza/liquidez, únicos parciales, FKs compuestas, RLS WS, grants sin DELETE en `account`); verificar con test de migración y `[TC-ACCOUNTS-NODELETE-001]`
+- [x] 5.2 Repositorios Kysely con optimistic locking (`version`) y mapeo de violaciones únicas a `ACCOUNT_NAME_TAKEN`
+- [x] 5.3 Esquemas de eventos `AccountOpened.v1` (corregido), `AccountClosed.v1`, `AccountReactivated.v1`, `AccountUpdated.v1` consolidados en `contracts/events/` (proceso de contratos); tests de contrato de eventos con los payloads emitidos
+- [x] 5.4 Controllers `accounts` (`list/get/create/update/archive/close/reactivate/order`) con `x-required-role`, ETag/If-Match e `Idempotency-Key`; tests de API y test de contrato contra el OpenAPI consolidado
 
 ## 6. Apertura con saldo inicial y saldos (tras add-ledger-core y add-transaction-recording)
 
-- [ ] 6.1 TDD en `apps/api`: `OpenAccountWithOpeningBalance` (unidad de trabajo, idempotencia, `RecordOpeningBalance`, signo de pasivos); tests `[TC-ACCOUNTS-OPENING-001]` con montos de docs/09 §6.7 y 100.000000 USDT
-- [ ] 6.2 Atomicidad e idempotencia con Testcontainers: `[TC-ACCOUNTS-OPENING-002]` (escala inválida ⇒ nada persistido), `[TC-ACCOUNTS-OPENING-003]` (reintento ⇒ una cuenta, un asiento)
+- [x] 6.1 TDD en `apps/api`: `OpenAccountWithOpeningBalance` (unidad de trabajo, idempotencia, `RecordOpeningBalance`, signo de pasivos); tests `[TC-ACCOUNTS-OPENING-001]` con montos de docs/09 §6.7 y 100.000000 USDT
+- [x] 6.2 Atomicidad e idempotencia con Testcontainers: `[TC-ACCOUNTS-OPENING-002]` (escala inválida ⇒ nada persistido), `[TC-ACCOUNTS-OPENING-003]` (reintento ⇒ una cuenta, un asiento)
 - [ ] 6.3 Integración real con Ledger: `[TC-ACCOUNTS-LEDGERLINK-001]`, `[TC-ACCOUNTS-BALANCE-001]`, `[TC-ACCOUNTS-CURRENCY-001]`, `[TC-ACCOUNTS-ARCHIVE-002]` contra Transactions real (incluye anulación ⇒ `ACCOUNT_ARCHIVED`)
 - [ ] 6.4 Con `add-transfers` y `add-basic-dashboard`: `[TC-ACCOUNTS-CREDITCARD-001]`, `[TC-ACCOUNTS-NETWORTH-001]` y liquidez en el resumen
 

@@ -12,9 +12,11 @@ invariants: [INV-003, INV-029]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "opening-balance", "atomicity"]
@@ -27,7 +29,7 @@ expected_result:
   - "No existe la cuenta Bank E, ni transacción OPENING_BALANCE, ni asiento, ni ledger account, ni registro de auditoría, ni evento AccountOpened"
   - "El nombre Bank E queda libre para un nuevo intento"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-OPENING-002 — Si el saldo inicial no puede contabilizarse, la cuenta no se crea

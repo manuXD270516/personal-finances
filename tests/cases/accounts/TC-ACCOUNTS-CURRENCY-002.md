@@ -12,9 +12,13 @@ invariants: [INV-006]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "multi-currency"]
@@ -30,7 +34,7 @@ expected_result:
   - "Bank C: se rechaza con ACCOUNT_CURRENCY_IMMUTABLE; sigue en BOB con saldo 200.00 BOB"
   - "Bank D: queda en USD con saldo 0.00 USD y el cambio se audita"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # TC-ACCOUNTS-CURRENCY-002 — La moneda de una cuenta solo puede cambiarse mientras no tenga movimientos
