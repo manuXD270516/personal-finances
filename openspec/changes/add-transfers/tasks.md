@@ -10,22 +10,22 @@
 
 ## 2. DOMAIN (TDD obligatorio)
 
-- [ ] 2.1 Escribir primero los tests de `Transaction.recordTransfer` (misma moneda, cuentas distintas, montos positivos, legs SOURCE/TARGET, split de comisión) con TC-TRANSACTIONS-TRANSFER-001, TRANSFER-003 y luego implementar
-- [ ] 2.2 TDD de la traducción `TRANSFER` (docs/09 §6.4 y §6.8) con y sin comisión (TC-TRANSACTIONS-TRANSFER-004, CARDPAYMENT-001); verificar con PBT que ∀ (monto, comisión): asiento balanceado y ΔPatrimonio = −comisión (INV-009, TC-TRANSACTIONS-TRANSFER-002)
-- [ ] 2.3 TDD de amend/void de transferencias reutilizando la máquina de estados; verificar que cambiar una cuenta a otra moneda produce `TRANSFER_CURRENCY_MISMATCH`
+- [x] 2.1 Escribir primero los tests de `Transaction.recordTransfer` (misma moneda, cuentas distintas, montos positivos, legs SOURCE/TARGET, split de comisión) con TC-TRANSACTIONS-TRANSFER-001, TRANSFER-003 y luego implementar
+- [x] 2.2 TDD de la traducción `TRANSFER` (docs/09 §6.4 y §6.8) con y sin comisión (TC-TRANSACTIONS-TRANSFER-004, CARDPAYMENT-001); verificar con PBT que ∀ (monto, comisión): asiento balanceado y ΔPatrimonio = −comisión (INV-009, TC-TRANSACTIONS-TRANSFER-002)
+- [x] 2.3 TDD de amend/void de transferencias reutilizando la máquina de estados; verificar que cambiar una cuenta a otra moneda produce `TRANSFER_CURRENCY_MISMATCH`
 
 ## 3. APPLICATION
 
-- [ ] 3.1 Implementar `RecordTransfer` con Unit of Work (Ledger + Audit + outbox) y validación de cuentas no activas; verificar TC-TRANSACTIONS-TRANSFER-005 y TC-LEDGER-TRANSFER-001
-- [ ] 3.2 Emitir `TransferCompleted` en todos los caminos de posteo de `kind=TRANSFER` y nunca en `pending`; verificar TC-TRANSACTIONS-TRANSFER-006 con test de contrato del productor (Ajv strict)
+- [x] 3.1 Implementar `RecordTransfer` con Unit of Work (Ledger + Audit + outbox) y validación de cuentas no activas; verificar TC-TRANSACTIONS-TRANSFER-005 y TC-LEDGER-TRANSFER-001
+- [x] 3.2 Emitir `TransferCompleted` en todos los caminos de posteo de `kind=TRANSFER` y nunca en `pending`; verificar TC-TRANSACTIONS-TRANSFER-006 con test de contrato del productor (Ajv strict)
 
 ## 4. INFRASTRUCTURE
 
-- [ ] 4.1 Migración `txn_0002_transfers` con `txn.assert_transfer_consistency()`; verificar con test de integración que un insert inconsistente (misma cuenta o monedas distintas) falla al COMMIT
+- [x] 4.1 Migración `txn_0002_transfers` con `txn.assert_transfer_consistency()`; verificar con test de integración que un insert inconsistente (misma cuenta o monedas distintas) falla al COMMIT
 
 ## 5. API
 
-- [ ] 5.1 Implementar `POST W/transfers` (Idempotency-Key, rol EDITOR, problem con `suggestedOperationId`); verificar contract tests y los ejemplos del OpenAPI
+- [x] 5.1 Implementar `POST W/transfers` (Idempotency-Key, rol EDITOR, problem con `suggestedOperationId`); verificar contract tests y los ejemplos del OpenAPI
 
 ## 6. UI
 

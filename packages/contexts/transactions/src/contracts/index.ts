@@ -13,6 +13,7 @@ export const TRANSACTION_EVENTS = {
   voided: { eventType: 'transactions.TransactionVoided', eventVersion: 1 },
   categorized: { eventType: 'transactions.TransactionCategorized', eventVersion: 1 },
   updated: { eventType: 'transactions.TransactionUpdated', eventVersion: 1 },
+  transferCompleted: { eventType: 'transactions.TransferCompleted', eventVersion: 1 },
 } as const;
 
 /**
@@ -26,6 +27,8 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     transactionDate: 'plain',
     postingDate: 'plain',
     accountId: 'plain',
+    toAccountId: 'plain',
+    fee: 'money',
     amount: 'money',
     description: 'plain',
     notes: 'plain',

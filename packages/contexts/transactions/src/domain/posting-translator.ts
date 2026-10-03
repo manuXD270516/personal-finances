@@ -26,6 +26,8 @@ export interface JournalEntryDraft {
  *   EXPENSE    +EXPENSE:<CCY> por split, −cuenta
  *   REFUND     +cuenta, −EXPENSE:<CCY> por split (misma categoría del gasto, vía el split)
  *   ADJUSTMENT ±cuenta, ∓EQUITY:ADJUSTMENTS:<CCY>
+ *   TRANSFER   +destino, −origen (monto + comisión), +EXPENSE:<CCY> por el split de comisión (sin INCOME/EXPENSE si
+ *              no hay comisión: el pago de tarjeta no es gasto, INV-030)
  * Los legs son exactamente los postings sobre cuentas del usuario (INV-024) y el asiento cuadra por moneda (INV-004).
  * Fecha contable = fecha de negocio (decisión 1).
  */
@@ -44,6 +46,13 @@ export function toJournalEntryDraft(tx: TransactionState): JournalEntryDraft {
       target: { kind: 'SYSTEM', systemKind: 'ADJUSTMENTS' },
       amount: leg.amount.negate(),
       splitId: null,
+    }));
+  } else if (tx.kind === 'TRANSFER') {
+    // +destino, −origen (incluye la comisión) y +EXPENSE:<CCY> por el split de comisión (docs/09 §6.4, §6.8).
+    nominal = tx.splits.map((s) => ({
+      target: { kind: 'SYSTEM', systemKind: 'EXPENSE' },
+      amount: s.amount,
+      splitId: s.id,
     }));
   } else {
     const systemKind = tx.kind === 'INCOME' ? 'INCOME' : 'EXPENSE';

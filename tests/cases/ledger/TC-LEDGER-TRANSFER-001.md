@@ -15,6 +15,7 @@ level: application
 automation_status: automated
 automated_tests:
   - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
 status: automated
 regression_suite: true
 phase: 1

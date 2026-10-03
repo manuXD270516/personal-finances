@@ -12,9 +12,11 @@ invariants: [INV-030, INV-009, INV-004]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/transfer.test.ts
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["transfer", "credit-card", "net-worth"]

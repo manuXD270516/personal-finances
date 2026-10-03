@@ -12,9 +12,12 @@ invariants: [INV-002, INV-004]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/transfer.test.ts
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
+  - packages/contexts/transactions/test/integration/pg-transfers.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["transfer", "multi-currency"]

@@ -17,12 +17,16 @@ import {
   Transaction,
   type AccountNature,
   type AdjustmentDirection,
+  type LegRole,
   type PaymentMethod,
   type TransactionKind,
   type TransactionSource,
   type TransactionState,
   type TransactionStatus,
 } from '../domain/index.js';
+
+/** Orden estable de legs al rehidratar (`SOURCE` antes que `TARGET`). */
+const LEG_ORDER: readonly LegRole[] = ['MAIN', 'SOURCE', 'TARGET'];
 
 /** Tablas del schema `txn` (fechas como texto, montos NUMERIC como string). */
 interface TxnDb {
@@ -62,7 +66,7 @@ interface TxnDb {
     transaction_id: string;
     account_id: string;
     account_nature: AccountNature;
-    role: 'MAIN';
+    role: LegRole;
     amount: string;
     currency: string;
     transaction_date: string;
@@ -244,21 +248,27 @@ export class PgTransactionRepository implements TransactionRepository {
           .execute();
       }
     }
-    // Legs: si cambió la revisión (o es nueva), se supersede la anterior y se inserta la vigente.
+    // Legs: si cambió la revisión (o es nueva), se supersede la anterior y se inserta la vigente. Una transferencia
+    // tiene dos legs (`SOURCE`/`TARGET`, add-transfers); se emparejan por `role`.
     const existing = await k
       .selectFrom('txn.transaction_leg')
-      .select(['id', 'revision', 'account_id', 'amount', 'transaction_date'])
+      .select(['id', 'revision', 'role', 'account_id', 'amount', 'transaction_date'])
       .where('workspace_id', '=', s.workspaceId)
       .where('transaction_id', '=', s.id)
       .where('superseded_in_revision', 'is', null)
       .execute();
-    const leg = s.legs[0];
-    if (!leg) return;
+    if (s.legs.length === 0) return;
     const same =
-      existing.length === 1 &&
-      existing[0]?.account_id === leg.accountId &&
-      Money.parse(existing[0].amount, leg.amount.currency).equals(leg.amount) &&
-      String(existing[0].transaction_date) === s.businessDate;
+      existing.length === s.legs.length &&
+      s.legs.every((leg) => {
+        const e = existing.find((x) => x.role === leg.role);
+        return (
+          e !== undefined &&
+          e.account_id === leg.accountId &&
+          Money.parse(e.amount, leg.amount.currency).equals(leg.amount) &&
+          String(e.transaction_date) === s.businessDate
+        );
+      });
     if (same) return;
     if (existing.length > 0) {
       await k
@@ -270,36 +280,41 @@ export class PgTransactionRepository implements TransactionRepository {
         .where('revision', '<', s.revision)
         .execute();
       // Edición de un PENDING (sin repostear): misma revisión ⇒ se actualiza en su lugar.
-      await k
-        .updateTable('txn.transaction_leg')
-        .set({
-          account_id: leg.accountId,
-          account_nature: leg.nature,
-          amount: leg.amount.toFixed(),
-          transaction_date: s.businessDate,
-        })
-        .where('workspace_id', '=', s.workspaceId)
-        .where('transaction_id', '=', s.id)
-        .where('superseded_in_revision', 'is', null)
-        .where('revision', '=', s.revision)
-        .execute();
+      for (const leg of s.legs) {
+        await k
+          .updateTable('txn.transaction_leg')
+          .set({
+            account_id: leg.accountId,
+            account_nature: leg.nature,
+            amount: leg.amount.toFixed(),
+            transaction_date: s.businessDate,
+          })
+          .where('workspace_id', '=', s.workspaceId)
+          .where('transaction_id', '=', s.id)
+          .where('role', '=', leg.role)
+          .where('superseded_in_revision', 'is', null)
+          .where('revision', '=', s.revision)
+          .execute();
+      }
       if (existing.some((e) => e.revision === s.revision)) return;
     }
     await k
       .insertInto('txn.transaction_leg')
-      .values({
-        id: uuidv7(),
-        workspace_id: s.workspaceId,
-        transaction_id: s.id,
-        account_id: leg.accountId,
-        account_nature: leg.nature,
-        role: 'MAIN',
-        amount: leg.amount.toFixed(),
-        currency: leg.amount.currency.code,
-        transaction_date: s.businessDate,
-        revision: s.revision,
-        superseded_in_revision: null,
-      })
+      .values(
+        s.legs.map((leg) => ({
+          id: uuidv7(),
+          workspace_id: s.workspaceId,
+          transaction_id: s.id,
+          account_id: leg.accountId,
+          account_nature: leg.nature,
+          role: leg.role,
+          amount: leg.amount.toFixed(),
+          currency: leg.amount.currency.code,
+          transaction_date: s.businessDate,
+          revision: s.revision,
+          superseded_in_revision: null,
+        })),
+      )
       .execute();
   }
 
@@ -330,7 +345,24 @@ export class PgTransactionRepository implements TransactionRepository {
       .innerJoin('fx.currency as c', 'c.code', 't.currency')
       .select(txColumns)
       .where('t.workspace_id', '=', workspaceId);
-    if (filter.accountIds?.length) q = q.where('t.account_id', 'in', [...filter.accountIds]);
+    if (filter.accountIds?.length) {
+      // Una transferencia aparece en ambas cuentas (add-transfers decisión 8): se busca también por legs vigentes.
+      const accountIds = [...filter.accountIds];
+      q = q.where((eb) =>
+        eb.or([
+          eb('t.account_id', 'in', accountIds),
+          eb.exists(
+            eb
+              .selectFrom('txn.transaction_leg as fl')
+              .select('fl.id')
+              .whereRef('fl.workspace_id', '=', 't.workspace_id')
+              .whereRef('fl.transaction_id', '=', 't.id')
+              .where('fl.superseded_in_revision', 'is', null)
+              .where('fl.account_id', 'in', accountIds),
+          ),
+        ]),
+      );
+    }
     if (filter.kinds?.length) q = q.where('t.kind', 'in', [...filter.kinds]);
     if (filter.statuses?.length) q = q.where('t.status', 'in', [...filter.statuses]);
     if (filter.sources?.length) q = q.where('t.source', 'in', [...filter.sources]);
@@ -494,6 +526,7 @@ export class PgTransactionRepository implements TransactionRepository {
         'l.transaction_id',
         'l.account_id',
         'l.account_nature',
+        'l.role',
         sql<string>`l.amount::text`.as('amount'),
       ])
       .where('l.workspace_id', '=', workspaceId)
@@ -531,8 +564,9 @@ export class PgTransactionRepository implements TransactionRepository {
             accountId: l.account_id,
             nature: l.account_nature,
             amount: money(l.amount),
-            role: 'MAIN' as const,
-          })),
+            role: l.role,
+          }))
+          .sort((a, b) => LEG_ORDER.indexOf(a.role) - LEG_ORDER.indexOf(b.role)),
         splits: splits
           .filter((s) => s.transaction_id === r.id)
           .map((s) => ({
@@ -581,6 +615,10 @@ export class ClassificationCategoryLookup implements CategoryLookupPort {
       workspaceId,
       systemCode: kind === 'INCOME' ? 'UNCATEGORIZED_INCOME' : 'UNCATEGORIZED',
     });
+  }
+
+  fees(workspaceId: string): Promise<string | null> {
+    return this.lookup.systemCategoryId({ userId: actorUserId(), workspaceId, systemCode: 'FEES' });
   }
 
   withDescendants(workspaceId: string, categoryIds: readonly string[]): Promise<string[]> {

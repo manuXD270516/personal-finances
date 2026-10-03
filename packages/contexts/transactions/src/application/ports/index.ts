@@ -81,6 +81,8 @@ export interface CurrencyCatalog {
 export interface CategoryLookupPort {
   /** *Uncategorized* (`EXPENSE`) o *Uncategorized income* (`INCOME`) del workspace. */
   uncategorized(workspaceId: string, kind: 'EXPENSE' | 'INCOME'): Promise<string | null>;
+  /** Categoría de sistema *Fees* (comisión por defecto de una transferencia, add-transfers decisión 2). */
+  fees(workspaceId: string): Promise<string | null>;
   /** Las categorías dadas y todas sus subcategorías (filtro `categoryId` del listado). */
   withDescendants(workspaceId: string, categoryIds: readonly string[]): Promise<string[]>;
 }
