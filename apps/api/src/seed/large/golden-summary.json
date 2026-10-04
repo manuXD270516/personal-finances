@@ -1,7 +1,7 @@
 {
-  "datasetVersion": "1",
+  "datasetVersion": "2",
   "main": {
-    "datasetVersion": "1",
+    "datasetVersion": "2",
     "balances": {
       "bob1": "20000.00",
       "bob2": "20000.00",
@@ -20,7 +20,7 @@
       "usdt2": "450.000000",
       "usdt3": "0.000000",
       "btc1": "0.04423087",
-      "btc2": "0.00500000",
+      "btc2": "0.00000000",
       "card1": "8601.99",
       "card2": "7786.10",
       "card3": "10261.27",

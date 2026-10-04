@@ -102,7 +102,8 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
   - **Anomalías inyectadas con etiquetas** (para detección de anomalías futura): gastos atípicos (×5–×20 del percentil 95 de la categoría), cargos duplicados, suscripción olvidada que sube de precio, fraude simulado con counterparty nuevo, saltos de tasa P2P. Las etiquetas viven **fuera de la BD del producto** en `seeds/large/labels/anomalies.v<N>.jsonl` (`transactionId`, `kind`, `injectedAt`, `severity`), para no contaminar el dominio.
 - **Uso en performance:** k6 sobre listados filtrados, net worth histórico, reportes por categoría y cash-flow calendar ([16-testing-strategy.md §5.15](./16-testing-strategy.md)).
 
-> **As-built (ci/nightly-perf, 2026-10-04).** Large Seed v1 en `apps/api/src/seed/large/`: plan determinista `buildLargePlan`
+> **As-built (ci/nightly-perf, 2026-10-04; v2 desde perf/balance-query: la cuenta `P2P Exchange Demo — BTC` ya no
+> tiene saldo de apertura — queda sin postings, regresión del 422 `CURRENCY_MISMATCH` del resumen).** Large Seed v2 en `apps/api/src/seed/large/`: plan determinista `buildLargePlan`
 > (`large-plan.ts`, mismo PRNG mulberry32 y aritmética de unidades mínimas `bigint` que el dataset Demo, regla ESLint de
 > determinismo, `golden-summary.json` verificado por test) ejecutado por `loadLargeWorkspace` con los **casos de uso
 > públicos** (`applyPlanOp`, compartido con el `DemoDataLoader`), un lote por mes, reloj simulado, actor `system:seed` y

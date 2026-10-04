@@ -1,6 +1,11 @@
 import type { AccountSummaryDto } from '@pf/accounts/contracts';
 import type { CategorySummaryDto } from '@pf/classification/contracts';
-import type { CurrencyInfoDto, FxValuationPort, ResolvedRateDto, ValuationRateDto } from '@pf/fx/contracts';
+import type {
+  FxValuationPort,
+  WorkspaceCurrencyDto,
+  ResolvedRateDto,
+  ValuationRateDto,
+} from '@pf/fx/contracts';
 import type { AccountBalanceDto } from '@pf/ledger/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import type { NominalFlowRowDto } from '@pf/transactions/contracts';
@@ -45,11 +50,12 @@ const ATTRIBUTION = {
 export class InMemoryReporting {
   readonly clock = new FixedClock(Instant.parse('2026-09-30T22:00:00Z'));
   settings = { baseCurrency: 'BOB', timeZone: 'America/La_Paz' };
-  readonly currencies: CurrencyInfoDto[] = [
-    { code: 'BOB', kind: 'FIAT', scale: 2 },
-    { code: 'USD', kind: 'FIAT', scale: 2 },
-    { code: 'USDT', kind: 'CRYPTO', scale: 6 },
-    { code: 'BTC', kind: 'CRYPTO', scale: 8 },
+  /** Catálogo con el estado de habilitación en el workspace (`enabled: false` = moneda no habilitada). */
+  readonly currencies: WorkspaceCurrencyDto[] = [
+    { code: 'BOB', kind: 'FIAT', scale: 2, enabled: true },
+    { code: 'USD', kind: 'FIAT', scale: 2, enabled: true },
+    { code: 'USDT', kind: 'CRYPTO', scale: 6, enabled: true },
+    { code: 'BTC', kind: 'CRYPTO', scale: 8, enabled: true },
   ];
   readonly accounts: AccountSummaryDto[] = [];
   /** Saldo PRESENTADO por cuenta. */
@@ -64,7 +70,8 @@ export class InMemoryReporting {
 
   addAccount(
     over: Partial<AccountSummaryDto> & Pick<AccountSummaryDto, 'name' | 'type' | 'currency'>,
-    balance: string,
+    /** Saldo presentado; `null` = cuenta sin postings (todavía sin cuenta contable ni línea de saldo). */
+    balance: string | null,
   ) {
     const liability = ['CREDIT_CARD', 'LOAN', 'MANUAL_LIABILITY'].includes(over.type);
     const account: AccountSummaryDto = {
@@ -77,7 +84,8 @@ export class InMemoryReporting {
       ...over,
     };
     this.accounts.push(account);
-    this.balances.set(account.accountId, { amount: balance, currency: account.currency });
+    if (balance !== null)
+      this.balances.set(account.accountId, { amount: balance, currency: account.currency });
     return account;
   }
 
@@ -134,7 +142,8 @@ export class InMemoryReporting {
         this.rateRequests.push(...requests);
         return requests.map((r) => this.resolve(r));
       },
-      enabledCurrencies: async () => this.currencies,
+      enabledCurrencies: async () => this.currencies.filter((c) => c.enabled),
+      workspaceCurrencies: async () => this.currencies,
     };
     return {
       uow: { run: (_ctx, fn) => fn() },

@@ -333,6 +333,35 @@ describe('GetReportSummary — patrimonio neto (reporting/net-worth)', () => {
     expect(s.netWorth.unvalued.map(amount)).toEqual(['0.01000000 BTC']);
     expect(s.consolidated.complete).toBe(false);
   });
+  it('[TC-REPORTING-NETWORTH-004] (regresión) cuenta BTC sin postings con BTC no habilitada: saldo cero a la escala del catálogo (8), sin CURRENCY_MISMATCH', async () => {
+    mem.currencies.splice(
+      mem.currencies.findIndex((c) => c.code === 'BTC'),
+      1,
+      {
+        code: 'BTC',
+        kind: 'CRYPTO',
+        scale: 8,
+        enabled: false,
+      },
+    );
+    mem.addAccount(
+      { accountId: 'btc', name: 'Wallet BTC', type: 'CRYPTO_WALLET', currency: 'BTC' },
+      '0.01000000',
+    );
+    mem.addAccount({ accountId: 'btc2', name: 'Exchange BTC', type: 'CRYPTO_WALLET', currency: 'BTC' }, null);
+    const s = await summary();
+    const btc = s.accounts.filter((a) => a.balance.currency === 'BTC');
+    expect(btc.map((a) => [a.accountId, amount(a.balance)])).toEqual([
+      ['btc', '0.01000000 BTC'],
+      ['btc2', '0.00000000 BTC'],
+    ]);
+    const btcTotals = s.byCurrency.find((c) => c.currency === 'BTC');
+    expect([amount(btcTotals?.liquidBalance), amount(btcTotals?.netWorth)]).toEqual([
+      '0.01000000 BTC',
+      '0.01000000 BTC',
+    ]);
+    expect(s.netWorth.unvalued.map(amount)).toEqual(['0.01000000 BTC']);
+  });
 });
 
 describe('GetReportSummary — preguntas del Home y frescura', () => {
