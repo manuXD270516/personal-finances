@@ -49,8 +49,9 @@
   - Nota (2026-10-03): `apps/web/src/ui/accounts/AccountsPage.tsx` + `AccountsListView.tsx` (ruta `/cuentas`): filtros por tipo, moneda, estado e institución, agrupación por tipo/institución, "mostrar archivadas"; tests de componente en `AccountsListView.test.tsx`. Textos en `messages/{es,en,pt}.json` (namespace `Accounts`).
 - [x] 7.2 Formularios crear/editar cuenta (tipo inmutable al editar, recorte del identificador a 4 caracteres en el cliente, saldo inicial con validación de escala por moneda, liquidez con default por tipo); acciones archivar/cerrar/reactivar con confirmación; pestaña "Historial" de add-audit-trail
   - Nota (2026-10-03): `AccountForm.tsx` (alta `/cuentas/nueva` y edición con `If-Match`; el identificador se recorta a 4 caracteres al salir del campo y solo se envía `accountNumberLast4`), `AccountDetail.tsx` (`/cuentas/{id}`: archivar/cerrar/reactivar con confirmación `alertdialog` y pestaña Historial reutilizando `AuditHistory`).
-- [ ] 7.3 Pantalla Instituciones (crear/editar/archivar, icono/color); verificar con axe sin violaciones serias
+- [x] 7.3 Pantalla Instituciones (crear/editar/archivar, icono/color); verificar con axe sin violaciones serias
   - Nota (2026-10-03): pantalla mínima hecha (`InstitutionsPage.tsx`, `/instituciones`: crear con icono/color, renombrar, archivar); falta la verificación con axe (el repo aún no tiene `@axe-core/playwright`).
+  - Nota (2026-10-04): /instituciones (y /cuentas, /cuentas/nueva, detalle de cuenta) verificado con axe-core (`@axe-core/playwright`, WCAG 2.1 A/AA) en `tests/e2e/specs/a11y.spec.ts`: sin violaciones serious/critical (2026-10-04).
 
 ## 8. Tests automatizados y E2E
 

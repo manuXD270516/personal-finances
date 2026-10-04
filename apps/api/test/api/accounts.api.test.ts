@@ -646,6 +646,73 @@ describe('comandos de cuenta', () => {
     expect((await call('GET', `${accountsPath(editor)}/${id}`, { token: editor.token })).status).toBe(200);
   });
 
+  it('[TC-ACCOUNTS-LIST-001] equivalente en BOB con fecha, fuente y versión de la tasa; sin tasa null; nunca persistido', async () => {
+    const u = await user(`kc-acc-eq-${randomUUID()}`);
+    const opening = (amount: string, currency: string) => ({
+      openingBalance: { amount: { amount, currency }, date: '2026-03-01' },
+    });
+    const usd = await create(u, {
+      name: 'USD Savings',
+      type: 'SAVINGS',
+      currency: 'USD',
+      ...opening('500.00', 'USD'),
+    });
+    const btc = await create(u, {
+      name: 'BTC Wallet',
+      type: 'CRYPTO_WALLET',
+      currency: 'BTC',
+      ...opening('0.01250000', 'BTC'),
+    });
+    const card = await create(u, {
+      name: 'Credit Card',
+      type: 'CREDIT_CARD',
+      currency: 'BOB',
+      ...opening('350.00', 'BOB'),
+    });
+    for (const r of [usd, btc, card]) expect(r.status, JSON.stringify(r.body)).toBe(201);
+    // Sin tasas: ningún equivalente inventado.
+    expect(usd.body['baseCurrencyBalance']).toBeNull();
+    const rate = (value: string, asOf: string) =>
+      call('POST', `/api/v1/workspaces/${u.ws}/fx-rates`, {
+        token: u.token,
+        body: { base: 'USD', quote: 'BOB', value, rateType: 'PARALLEL', asOf },
+        headers: { 'idempotency-key': randomUUID() },
+      });
+    const first = await rate('6.96', '2026-03-14T16:00:00Z');
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+
+    const list = await call('GET', accountsPath(u), { token: u.token });
+    expect(contract().validateResponse('listAccounts', 200, list.body)).toEqual([]);
+    const byName = new Map(
+      (list.body['data'] as Record<string, unknown>[]).map((a) => [a['name'] as string, a]),
+    );
+    expect(byName.get('USD Savings')?.['balance']).toEqual({ amount: '500.00', currency: 'USD' });
+    expect(byName.get('USD Savings')?.['baseCurrencyBalance']).toMatchObject({
+      amount: { amount: '3480.00', currency: 'BOB' },
+      rateDate: '2026-03-14',
+      rateSource: 'MANUAL',
+      fxRateId: first.body['id'],
+      rate: { rateType: 'PARALLEL', derivation: 'DIRECT', asOf: '2026-03-14T16:00:00.000Z', stale: false },
+    });
+    expect(byName.get('BTC Wallet')?.['balance']).toEqual({ amount: '0.01250000', currency: 'BTC' });
+    expect(byName.get('BTC Wallet')?.['baseCurrencyBalance']).toBeNull();
+    expect(byName.get('Credit Card')?.['balance']).toEqual({ amount: '350.00', currency: 'BOB' });
+    expect(byName.get('Credit Card')?.['baseCurrencyBalance']).toBeNull();
+
+    // Una tasa nueva cambia el equivalente mostrado (derivado) sin alterar el ledger.
+    const before = await postingsOf(u, usd.body['id'] as string);
+    const second = await rate('6.97', '2026-03-15T12:00:00Z');
+    expect(second.status, JSON.stringify(second.body)).toBe(201);
+    const one = await call('GET', `${accountsPath(u)}/${String(usd.body['id'])}`, { token: u.token });
+    expect(contract().validateResponse('getAccount', 200, one.body)).toEqual([]);
+    expect(one.body['baseCurrencyBalance']).toMatchObject({
+      amount: { amount: '3485.00', currency: 'BOB' },
+      rateDate: '2026-03-15',
+      fxRateId: second.body['id'],
+    });
+    expect(await postingsOf(u, usd.body['id'] as string)).toEqual(before);
+  });
+
   it('[TC-ACCOUNTS-LIST-002] filtros, agrupación y orden manual', async () => {
     const u = await user(`kc-acc-list-${randomUUID()}`);
     const inst = await call('POST', `/api/v1/workspaces/${u.ws}/institutions`, {

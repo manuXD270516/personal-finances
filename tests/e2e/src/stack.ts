@@ -48,10 +48,6 @@ export function createEnvFile(): string {
     ['FX_PROVIDER_PRIMARY', 'none'],
     ['FX_PROVIDER_FALLBACK', 'none'],
     ['FX_PROVIDER_OFFICIAL', 'none'],
-    // Todas las peticiones llegan desde el contenedor del BFF: el límite por usuario se cuenta hoy por IP (el guard
-    // de límite corre antes que el de identidad), así que la suite completa comparte una sola cuota de lecturas.
-    ['RATE_LIMIT_READS_PER_MIN', '6000'],
-    ['RATE_LIMIT_WRITES_PER_MIN', '1200'],
   ]);
   writeFileSync(file, renderEnv(example, e2eOverrides, ports).text);
   return file;

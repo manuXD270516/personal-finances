@@ -10,6 +10,9 @@ export {
   DeprecationInterceptor,
   IdempotencyInterceptor,
   RateLimitGuard,
+  RateLimitInterceptor,
+  chargeFailedAuthentication,
+  rateLimitSubject,
 } from './api/interceptors.js';
 export {
   API_CONVENTIONS,

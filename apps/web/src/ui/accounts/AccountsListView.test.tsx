@@ -104,38 +104,41 @@ describe('pantalla Cuentas (add-accounts-management 7.1)', () => {
     expect(row(html, 'Bank A')).not.toContain('account-no-rate');
   });
 
-  it('sin baseCurrencyBalance usa la valoración del resumen (misma tasa del Home) con su fecha y fuente', () => {
-    const html = renderToStaticMarkup(
-      <AccountsListView
-        accounts={ACCOUNTS}
-        institutions={INSTITUTIONS}
-        groupBy="none"
-        baseCurrency="BOB"
-        ctx={f}
-        href={(p) => p}
-        valuations={
-          new Map([
-            [
-              id(3),
-              {
-                converted: { amount: '601.00', currency: 'BOB' },
-                rate: {
-                  rate: { base: 'USDT', quote: 'BOB', value: '12.02' },
-                  derivation: 'DIRECT',
-                  rateType: 'PARALLEL',
-                  source: 'MANUAL',
-                  asOf: '2026-10-01T02:30:00Z',
-                  ageDays: 0,
-                  approx: false,
-                },
-              },
-            ],
-          ])
-        }
-      />,
+  it('con tasa de provider muestra su atribución como fuente (la misma valoración del Home)', () => {
+    const html = render('none', [
+      account({
+        id: id(3),
+        name: 'Wallet USDT',
+        type: 'CRYPTO_WALLET',
+        currency: 'USDT',
+        balance: { amount: '50.000000', currency: 'USDT' },
+        baseCurrencyBalance: {
+          amount: { amount: '601.00', currency: 'BOB' },
+          rateDate: '2026-09-30',
+          rateSource: 'PROVIDER',
+          fxRateId: id(81),
+          rate: {
+            rate: { base: 'USDT', quote: 'BOB', value: '12.02' },
+            derivation: 'DIRECT',
+            rateType: 'PARALLEL',
+            source: 'PROVIDER',
+            asOf: '2026-10-01T02:30:00Z',
+            ageDays: 0,
+            approx: false,
+            attribution: {
+              provider: 'PARALELO_BO',
+              text: 'Datos de Proveedor Demo',
+              url: 'https://example.org',
+              license: null,
+              licenseUrl: null,
+            },
+          },
+        },
+      }),
+    ]);
+    expect(textOf(row(html, 'Wallet USDT'))).toMatch(
+      /≈ 601,00 BOB · tasa del 30[^·]*sept[^·]*2026 · Datos de Proveedor Demo/,
     );
-    // 2026-10-01T02:30Z es el 30/09 en La Paz.
-    expect(textOf(row(html, 'Wallet USDT'))).toMatch(/≈ 601,00 BOB · tasa del 30[^·]*sept[^·]*2026 · manual/);
   });
 
   it('los pasivos se muestran como "Adeuda" (positivo) y un saldo a favor no se muestra negativo', () => {

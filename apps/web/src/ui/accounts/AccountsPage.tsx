@@ -14,7 +14,6 @@ import {
 import { Field, inputStyle, pageStyle, rowStyle } from '../common/ui';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { AccountsListView } from './AccountsListView';
-import { useValuations } from './valuations';
 import { accountsQuery, EMPTY_ACCOUNT_FILTERS, type AccountFilters, type AccountGroupBy } from './logic';
 
 export function AccountsPage() {
@@ -52,7 +51,6 @@ function AccountsScreen({ ctx }: { ctx: WorkspaceContext }) {
     };
   }, [api, base, filters]);
 
-  const valuations = useValuations(ctx, accounts);
   const institutionMap = useMemo(() => new Map(institutions.map((i) => [i.id, i])), [institutions]);
   const enabledCurrencies = ctx.currencies.filter((c) => c.enabled).map((c) => c.code);
 
@@ -177,7 +175,6 @@ function AccountsScreen({ ctx }: { ctx: WorkspaceContext }) {
           baseCurrency={ctx.ws.baseCurrency}
           ctx={f}
           href={ctx.href}
-          valuations={valuations}
         />
       ) : (
         <p aria-busy="true">{t('loading')}</p>

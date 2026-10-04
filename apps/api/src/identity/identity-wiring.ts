@@ -30,6 +30,7 @@ import { TRANSACTIONS_AUDIT_POLICY } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
+import { workspaceCreatedHook } from './workspace-provisioning.js';
 
 /** Opciones JWT desde el contrato de configuración (`OIDC_*`); `undefined` si no hay emisor configurado. */
 export function jwtOptionsFromConfig(config: ApiConfig): JwtVerifierOptions | undefined {
@@ -126,14 +127,6 @@ export function identityImports(input: {
     audit: auditPort,
     locales: identityUserLocales(input.pool),
   });
-  // ACCOUNTS (add-accounts-management).
-  const { accounts, ledger } = accountsRuntime({
-    pool: input.pool,
-    clock: input.conventions.clock,
-    audit: auditPort,
-    logger: input.logger,
-    defaultTimeZone: input.config.APP_TIMEZONE,
-  });
   // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
   const fx = createFxRuntime({
     pool: input.pool,
@@ -143,6 +136,16 @@ export function identityImports(input: {
     workspaces: identityWorkspaceSettings(input.pool),
     // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
     providers: parseFxProviderSettings(input.config),
+  });
+  // ACCOUNTS (add-accounts-management).
+  const { accounts, ledger } = accountsRuntime({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    audit: auditPort,
+    logger: input.logger,
+    defaultTimeZone: input.config.APP_TIMEZONE,
+    // Equivalente en moneda base con el puerto público de valoración de FX (misma semántica que Reporting).
+    valuation: { rates: fx.valuation, workspaces: identityWorkspaceSettings(input.pool) },
   });
   // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({
@@ -183,12 +186,7 @@ export function identityImports(input: {
       outbox: outboxPort(),
       audit: auditPort,
       // Provisión síncrona en la transacción de CreateWorkspace: categorías (classification) y monedas (fx).
-      onWorkspaceCreated: {
-        onWorkspaceCreated: async (created) => {
-          await classification.provisioner.onWorkspaceCreated(created);
-          await fx.provisioner.onWorkspaceCreated(created);
-        },
-      },
+      onWorkspaceCreated: workspaceCreatedHook({ classification, fx }),
     }),
     AuditModule.register({ runtime: audit, conventions: input.conventions }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),

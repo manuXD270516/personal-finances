@@ -1,3 +1,4 @@
+import type { FxValuationPort, ValuationRateDto } from '@pf/fx/contracts';
 import { DomainError } from '@pf/shared-kernel';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AccountsService } from './accounts.service.js';
@@ -292,6 +293,102 @@ describe('Queries', () => {
       { key: andino.id, label: 'Banco Andino Demo', accountIds: [grouped.data[0]?.account.id] },
       { key: null, label: null, accountIds: [grouped.data[1]?.account.id, grouped.data[2]?.account.id] },
     ]);
+  });
+});
+
+describe('Equivalente en moneda base', () => {
+  it('[TC-ACCOUNTS-LIST-001] USD con tasa manual 6.96 ⇒ 3480.00 BOB; BTC sin tasa y BOB ⇒ null; tasas resueltas en UN lote a "ahora"', async () => {
+    const calls: Parameters<FxValuationPort['resolveValuationRates']>[0][] = [];
+    const usdBob: ValuationRateDto = {
+      exact: { base: 'USD', quote: 'BOB', value: '6.96' },
+      resolved: {
+        rate: { base: 'USD', quote: 'BOB', value: '6.96' },
+        fxRateId: '0190a000-0000-7000-8000-000000000696',
+        derivation: 'DIRECT',
+        components: [],
+        rateType: 'PARALLEL',
+        requestedRateType: 'PARALLEL',
+        source: 'MANUAL',
+        sourceLabel: null,
+        asOf: '2026-03-14T16:00:00.000Z',
+        ageDays: 0,
+        ageSeconds: 79200,
+        approx: false,
+        provider: null,
+        selection: 'MANUAL',
+        stale: false,
+        attribution: null,
+      },
+    };
+    const rates: FxValuationPort = {
+      windowDays: 7,
+      enabledCurrencies: async () => [],
+      resolveValuationRates: async (input) => {
+        calls.push(input);
+        return input.requests.map((r) => (r.base === 'USD' && r.quote === 'BOB' ? usdBob : null));
+      },
+    };
+    const deps = mem.deps();
+    const valued = new AccountsService({
+      ...deps,
+      valuation: {
+        rates,
+        workspaces: { settingsOf: async () => ({ baseCurrency: 'BOB', timeZone: 'America/La_Paz' }) },
+      },
+    });
+    const opening = (amount: string, currency: string) => ({
+      openingBalance: { amount: { amount, currency }, date: '2026-03-01' },
+    });
+    await valued.openAccount({
+      workspaceId: W1,
+      name: 'USD Savings',
+      type: 'SAVINGS',
+      currency: 'USD',
+      ...opening('500.00', 'USD'),
+    });
+    await valued.openAccount({
+      workspaceId: W1,
+      name: 'BTC Wallet',
+      type: 'CRYPTO_WALLET',
+      currency: 'BTC',
+      ...opening('0.01250000', 'BTC'),
+    });
+    await valued.openAccount({
+      workspaceId: W1,
+      name: 'Credit Card',
+      type: 'CREDIT_CARD',
+      currency: 'BOB',
+      ...opening('350.00', 'BOB'),
+    });
+    calls.length = 0;
+
+    const list = await valued.listAccounts({ workspaceId: W1 });
+    const byName = new Map(list.data.map((v) => [v.account.name, v]));
+    expect(byName.get('USD Savings')?.balance).toEqual({ amount: '500.00', currency: 'USD' });
+    expect(byName.get('USD Savings')?.baseCurrencyBalance).toMatchObject({
+      amount: { amount: '3480.00', currency: 'BOB' },
+      rateDate: '2026-03-14',
+      rateSource: 'MANUAL',
+      fxRateId: usdBob.resolved.fxRateId,
+    });
+    expect(byName.get('BTC Wallet')?.balance).toEqual({ amount: '0.01250000', currency: 'BTC' });
+    expect(byName.get('BTC Wallet')?.baseCurrencyBalance).toBeNull();
+    expect(byName.get('Credit Card')?.balance).toEqual({ amount: '350.00', currency: 'BOB' });
+    expect(byName.get('Credit Card')?.baseCurrencyBalance).toBeNull();
+    expect(calls).toEqual([
+      {
+        workspaceId: W1,
+        requests: [
+          { base: 'BTC', quote: 'BOB', at: '2026-03-15T14:00:00.000Z' },
+          { base: 'USD', quote: 'BOB', at: '2026-03-15T14:00:00.000Z' },
+        ],
+      },
+    ]);
+  });
+
+  it('sin valoración compuesta el equivalente es null (nunca 1:1)', async () => {
+    const usd = await svc.openAccount({ workspaceId: W1, name: 'USD', type: 'SAVINGS', currency: 'USD' });
+    expect(usd.baseCurrencyBalance).toBeNull();
   });
 });
 

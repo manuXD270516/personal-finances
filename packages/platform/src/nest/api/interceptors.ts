@@ -13,6 +13,7 @@ import {
   type CommandContext,
   type HttpResponseSnapshot,
   type RateLimitDecision,
+  type RateLimitPolicy,
 } from '../../api/index.js';
 import { API_CONVENTIONS, renderException, snapshotResponse, type ApiConventionsOptions } from './options.js';
 import {
@@ -36,45 +37,119 @@ const routeOf = (req: ApiRequest): string | undefined =>
 const hasBody = (req: ApiRequest): boolean =>
   req.headers['transfer-encoding'] !== undefined || Number(req.headers['content-length'] ?? 0) > 0;
 
+const ipKey = (req: ApiRequest) => `ip:${req.ip ?? req.socket?.remoteAddress ?? 'unknown'}`;
+
+/**
+ * Sujeto del límite "por usuario": el usuario autenticado (`Principal`, fijado por el guard de identidad tras verificar
+ * el token) o, si no hay identidad, la IP del cliente según Express (`req.ip`: la dirección del socket salvo que
+ * `trust proxy` declare un proxy de confianza). Nunca se lee `X-Forwarded-For` directamente (falsificable): todo el
+ * tráfico anónimo que llega por el BFF comparte la cuota de su IP.
+ */
+export function rateLimitSubject(req: ApiRequest): string {
+  const principal = principalOf(req);
+  if (principal) return `user:${principal.userId}`;
+  return ipKey(req);
+}
+
+/** Consume la cuota (lectura/escritura) del sujeto y del workspace; 429 `RATE_LIMITED` si alguna se agotó. */
+async function enforceRateLimit(
+  options: ApiConventionsOptions,
+  req: ApiRequest,
+  res: ApiResponse,
+): Promise<void> {
+  const rate = options.rateLimit;
+  const state = apiState(req);
+  if (!rate || state.rateLimited) return;
+  const route = routeOf(req);
+  const op = route ? options.contract.find(req.method ?? 'GET', route) : undefined;
+  if (!op) return;
+  state.rateLimited = true;
+  const policy = op.method === 'GET' ? rate.reads : rate.writes;
+  const now = options.clock.now().toDate();
+  const keys = [rateLimitSubject(req)];
+  const workspaceId = op.hasWorkspaceScope ? req.params?.['workspaceId'] : undefined;
+  if (workspaceId) keys.push(`workspace:${workspaceId}`);
+
+  let tightest: RateLimitDecision | undefined;
+  for (const key of keys) {
+    const decision = await rate.limiter.consume(key, policy, now);
+    if (!decision.allowed) {
+      throw new ApiProblem('RATE_LIMITED', `quota "${policy.name}" exceeded`, {
+        headers: {
+          ...rateLimitHeaders(policy, decision),
+          'retry-after': String(decision.retryAfterSeconds),
+        },
+      });
+    }
+    if (!tightest || decision.remaining < tightest.remaining) tightest = decision;
+  }
+  if (tightest) for (const [k, v] of Object.entries(rateLimitHeaders(policy, tightest))) res.setHeader(k, v);
+}
+
+/** Política (lecturas/escrituras) de la operación del contrato; `undefined` fuera de la API o sin límite. */
+function policyOf(options: ApiConventionsOptions, req: ApiRequest): RateLimitPolicy | undefined {
+  const rate = options.rateLimit;
+  if (!rate) return undefined;
+  const route = routeOf(req);
+  const op = route ? options.contract.find(req.method ?? 'GET', route) : undefined;
+  if (!op) return undefined;
+  return op.method === 'GET' ? rate.reads : rate.writes;
+}
+
+const rateLimited = (policy: RateLimitPolicy, decision: RateLimitDecision) =>
+  new ApiProblem('RATE_LIMITED', `quota "${policy.name}" exceeded`, {
+    headers: { ...rateLimitHeaders(policy, decision), 'retry-after': String(decision.retryAfterSeconds) },
+  });
+
+/**
+ * Para el guard de identidad, cuando la autenticación FALLA (token ausente, inválido, vencido o malformado ⇒ 401):
+ * carga la petición al bucket de la IP (el mismo de las anónimas) y, agotado, responde 429 en lugar del 401.
+ * Idempotente por petición (no cobra dos veces si el guard anónimo ya la contó). No hay rechazo previo a la
+ * verificación: no se puede distinguir un token válido sin verificarlo, y bloquear por IP antes castigaría a todos
+ * los usuarios válidos detrás del BFF; verificar un token basura es barato (parseo/firma, JWKS con cooldown).
+ */
+export async function chargeFailedAuthentication(
+  options: ApiConventionsOptions,
+  req: ApiRequest,
+): Promise<void> {
+  const policy = policyOf(options, req);
+  const state = apiState(req);
+  if (!policy || state.rateLimited) return;
+  state.rateLimited = true;
+  const decision = await options.rateLimit!.limiter.consume(ipKey(req), policy, options.clock.now().toDate());
+  if (!decision.allowed) throw rateLimited(policy, decision);
+}
+
 /**
  * Límite de tasa por usuario y por workspace (token bucket, design §8): lecturas y escrituras con cuotas propias,
  * cabeceras `RateLimit`/`RateLimit-Policy` en cada respuesta de la API y 429 `RATE_LIMITED` + `Retry-After` sin
- * ejecutar la operación. Guard ⇒ corre antes de validación, idempotencia y el handler.
+ * ejecutar la operación. Dos etapas, porque el orden entre guards globales de distintos módulos no está garantizado:
+ * - este guard (antes de la identidad) cuenta YA las peticiones anónimas (sin `Authorization`) por IP;
+ * - las que traen credenciales se cuentan en `RateLimitInterceptor`, que corre después de TODOS los guards: con el
+ *   `Principal` verificado la cuota es por usuario (`sub` provisionado), no por la IP del BFF.
  */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(@Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const rate = this.options.rateLimit;
-    if (!rate || ctx.getType() !== 'http') return true;
+    if (!this.options.rateLimit || ctx.getType() !== 'http') return true;
     const { req, res } = http(ctx);
-    const route = routeOf(req);
-    const op = route ? this.options.contract.find(req.method ?? 'GET', route) : undefined;
-    if (!op) return true;
-    const policy = op.method === 'GET' ? rate.reads : rate.writes;
-    const now = this.options.clock.now().toDate();
-    const userKey = principalOf(req)?.userId ?? `ip:${req.ip ?? req.socket.remoteAddress ?? 'unknown'}`;
-    const keys = [`user:${userKey}`];
-    const workspaceId = op.hasWorkspaceScope ? req.params?.['workspaceId'] : undefined;
-    if (workspaceId) keys.push(`workspace:${workspaceId}`);
-
-    let tightest: RateLimitDecision | undefined;
-    for (const key of keys) {
-      const decision = await rate.limiter.consume(key, policy, now);
-      if (!decision.allowed) {
-        throw new ApiProblem('RATE_LIMITED', `quota "${policy.name}" exceeded`, {
-          headers: {
-            ...rateLimitHeaders(policy, decision),
-            'retry-after': String(decision.retryAfterSeconds),
-          },
-        });
-      }
-      if (!tightest || decision.remaining < tightest.remaining) tightest = decision;
-    }
-    if (tightest)
-      for (const [k, v] of Object.entries(rateLimitHeaders(policy, tightest))) res.setHeader(k, v);
+    const anonymous = !principalOf(req) && headerValue(req, 'authorization') === undefined;
+    if (anonymous || principalOf(req)) await enforceRateLimit(this.options, req, res);
     return true;
+  }
+}
+
+/** Segunda etapa del límite de tasa (ver `RateLimitGuard`): primer interceptor, antes de validar el contrato. */
+@Injectable()
+export class RateLimitInterceptor implements NestInterceptor {
+  constructor(@Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions) {}
+
+  intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
+    if (!this.options.rateLimit || ctx.getType() !== 'http') return next.handle();
+    const { req, res } = http(ctx);
+    return from(enforceRateLimit(this.options, req, res)).pipe(mergeMap(() => next.handle()));
   }
 }
 

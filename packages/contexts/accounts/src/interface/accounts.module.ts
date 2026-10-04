@@ -9,6 +9,7 @@ import { AccountsService } from '../application/accounts.service.js';
 import { InstitutionsService } from '../application/institutions.service.js';
 import type {
   AccountsDeps,
+  BaseCurrencyValuationDeps,
   OutboxPort,
   TagCatalogPort,
   WorkspaceCalendar,
@@ -47,6 +48,11 @@ export interface AccountsRuntimeOptions {
   readonly calendar: WorkspaceCalendar;
   /** Catálogo de etiquetas (Classification); por defecto acepta cualquier id (design.md §Implementación). */
   readonly tags?: TagCatalogPort;
+  /**
+   * Equivalente en moneda base (`FxValuationPort` de `@pf/fx/contracts` + moneda base/zona de IDENTITY). Ausente ⇒
+   * `baseCurrencyBalance: null`.
+   */
+  readonly valuation?: BaseCurrencyValuationDeps;
 }
 
 export interface AccountsRuntime {
@@ -73,6 +79,7 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
     ids: uuidV7Ids,
     clock: options.clock,
     calendar: options.calendar,
+    ...(options.valuation ? { valuation: options.valuation } : {}),
   };
   const accounts = new AccountsService(deps);
   return {
@@ -109,4 +116,11 @@ export class AccountsModule {
   }
 }
 
-export type { AccountOpeningBalancePort, AccountsQueryPort, OutboxPort, TagCatalogPort, WorkspaceCalendar };
+export type {
+  AccountOpeningBalancePort,
+  AccountsQueryPort,
+  BaseCurrencyValuationDeps,
+  OutboxPort,
+  TagCatalogPort,
+  WorkspaceCalendar,
+};

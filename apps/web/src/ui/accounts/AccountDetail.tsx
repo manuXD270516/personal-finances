@@ -12,7 +12,6 @@ import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } f
 import { AccountForm } from './AccountForm';
 import { AccountStatusBadge, BalanceText, BaseEquivalent } from './AccountsListView';
 import { maskedIdentifier } from './logic';
-import { useValuations } from './valuations';
 
 export function NewAccountPage() {
   return <WithWorkspace>{(ctx) => <NewAccount ctx={ctx} />}</WithWorkspace>;
@@ -79,7 +78,6 @@ function AccountDetail({
   const [closedOn, setClosedOn] = useState(todayIn(ctx.timeZone));
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | undefined>(created ? t('created') : undefined);
-  const valuations = useValuations(ctx, account?.version);
 
   const load = useCallback(() => {
     ctx.api
@@ -151,12 +149,7 @@ function AccountDetail({
         <strong data-testid="account-balance" style={{ fontSize: '1.5rem' }}>
           <BalanceText account={account} ctx={f} />
         </strong>{' '}
-        <BaseEquivalent
-          account={account}
-          baseCurrency={ctx.ws.baseCurrency}
-          ctx={f}
-          valuation={valuations.get(account.id)}
-        />
+        <BaseEquivalent account={account} baseCurrency={ctx.ws.baseCurrency} ctx={f} />
       </p>
       {account.pendingAmount && !/^-?0*(\.0*)?$/.test(account.pendingAmount.amount) ? (
         <p style={mutedStyle}>{t('pending', { amount: formatMoney(account.pendingAmount, locale) })}</p>

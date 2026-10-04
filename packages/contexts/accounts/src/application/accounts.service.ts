@@ -15,6 +15,7 @@ import {
   type AccountType,
   type Liquidity,
 } from '../domain/index.js';
+import { baseCurrencyBalanceOf, type BaseCurrencyBalanceDto } from './base-currency-valuation.js';
 import type { AccountListFilter, AccountsDeps, CurrencyInfo } from './ports/index.js';
 
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `account ${id} not found`);
@@ -48,6 +49,8 @@ export interface AccountView {
   readonly status: AccountStatus;
   /** Saldo presentado (pasivo positivo = adeudado), en la moneda y escala de la cuenta. */
   readonly balance: MoneyDto;
+  /** Equivalente en la moneda base (derivado, nunca persistido); `null` en moneda base o sin tasa. */
+  readonly baseCurrencyBalance: BaseCurrencyBalanceDto | null;
 }
 
 export type AccountSort =
@@ -492,25 +495,59 @@ export class AccountsService {
       accounts.map((a) => a.id),
     );
     const scales = new Map<string, number>();
-    const out: AccountView[] = [];
+    const scaleOf = async (code: string) => {
+      let scale = scales.get(code);
+      if (scale === undefined) {
+        scale = (await this.deps.currencies.find(code))?.scale ?? 2;
+        scales.set(code, scale);
+      }
+      return scale;
+    };
+    const presentedOf = new Map<string, MoneyDto>();
     for (const account of accounts) {
       let presented = balances.get(account.id)?.presented;
       if (!presented || presented.currency !== account.currency) {
-        let scale = scales.get(account.currency);
-        if (scale === undefined) {
-          scale = (await this.deps.currencies.find(account.currency))?.scale ?? 2;
-          scales.set(account.currency, scale);
-        }
-        presented = Money.zero(makeCurrency(account.currency, scale)).toJSON();
+        presented = Money.zero(makeCurrency(account.currency, await scaleOf(account.currency))).toJSON();
       }
-      out.push({
+      presentedOf.set(account.id, presented);
+    }
+    const valueOf = await this.baseCurrencyValuer(workspaceId, accounts, scaleOf);
+    return accounts.map((account) => {
+      const balance = presentedOf.get(account.id) as MoneyDto;
+      return {
         account: account.snapshot,
         nature: natureOf(account.type),
         status: account.status,
-        balance: presented,
-      });
-    }
-    return out;
+        balance,
+        baseCurrencyBalance: valueOf(balance),
+      };
+    });
+  }
+
+  /**
+   * Equivalente en moneda base (FR-ACCOUNTS-010, TC-ACCOUNTS-LIST-001): UNA resolución por lote de las tasas de
+   * valoración "ahora" (puerto público de FX, misma semántica que Reporting) para las monedas distintas de la base.
+   */
+  private async baseCurrencyValuer(
+    workspaceId: string,
+    accounts: readonly Account[],
+    scaleOf: (code: string) => Promise<number>,
+  ): Promise<(balance: MoneyDto) => BaseCurrencyBalanceDto | null> {
+    const valuation = this.deps.valuation;
+    if (!valuation || accounts.length === 0) return () => null;
+    const { baseCurrency, timeZone } = await valuation.workspaces.settingsOf(workspaceId);
+    const codes = [...new Set(accounts.map((a) => a.currency))].filter((c) => c !== baseCurrency).sort();
+    const at = this.deps.clock.now().toString();
+    const resolved = codes.length
+      ? await valuation.rates.resolveValuationRates({
+          workspaceId,
+          requests: codes.map((code) => ({ base: code, quote: baseCurrency, at })),
+        })
+      : [];
+    const rates = new Map(codes.map((code, i) => [code, resolved[i] ?? null]));
+    const base = { code: baseCurrency, scale: await scaleOf(baseCurrency) };
+    return (balance) =>
+      baseCurrencyBalanceOf({ balance, base, valuation: rates.get(balance.currency) ?? null, timeZone });
   }
 
   private async groups(
