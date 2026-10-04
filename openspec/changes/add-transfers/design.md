@@ -24,7 +24,7 @@ Puertos: `AccountDirectory` (moneda, naturaleza, estado), `ClassificationValidat
 ## Decisiones
 
 1. **Una transacción, un asiento.** Una transferencia es `kind='TRANSFER'` con dos legs (`SOURCE`, `TARGET`) y un solo asiento (docs/09 §6.4). Alternativa — dos transacciones espejo (gasto + ingreso) — descartada: infla ingresos/gastos y rompe INV-009 ante una edición parcial.
-2. **Comisión en el mismo asiento.** La comisión sale del origen: leg `SOURCE` = −(monto + comisión); posting `EXPENSE:<CCY>` +comisión con `splitId` de un split en *Fees* (o en la categoría de gasto indicada; categoría de ingreso ⇒ `CATEGORY_KIND_MISMATCH`). Σ por moneda = 0 (p. ej. 1000.00 + 10.00 − 1010.00). ΔPatrimonio = −comisión (INV-009). Comisiones en otra moneda u otra cuenta quedan fuera (se registran como gasto aparte o como conversión; docs/31 D37, **propuesta pendiente de confirmación del owner**).
+2. **Comisión en el mismo asiento.** La comisión sale del origen: leg `SOURCE` = −(monto + comisión); posting `EXPENSE:<CCY>` +comisión con `splitId` de un split en *Fees* (o en la categoría de gasto indicada; categoría de ingreso ⇒ `CATEGORY_KIND_MISMATCH`). Σ por moneda = 0 (p. ej. 1000.00 + 10.00 − 1010.00). ΔPatrimonio = −comisión (INV-009). Comisiones en otra moneda u otra cuenta **no se soportan como comisión de transferencia** (confirmado por el owner el 2026-10-04, docs/31 D40): una comisión en otra moneda se rechaza con `TRANSFER_CURRENCY_MISMATCH` (puntero `/fee/amount/currency`, nada persistido) y se registra como **conversión** (con su fee) o como **gasto aparte**.
 3. **Validaciones y códigos.** `from = to` ⇒ `TRANSFER_SAME_ACCOUNT` (422); moneda distinta ⇒ `TRANSFER_CURRENCY_MISMATCH` (422) con extensión `suggestedOperationId: createConversion` en el problem detail (la UI ofrece abrir el formulario de conversión prellenado); cuenta archivada/cerrada ⇒ `ACCOUNT_ARCHIVED`/`ACCOUNT_CLOSED` (409); `AMOUNT_NOT_POSITIVE`/`AMOUNT_SCALE_EXCEEDED` (422). Se prefiere un código específico a `CURRENCY_MISMATCH` porque el cliente necesita distinguir "usa una conversión" de "moneda distinta a la de la cuenta".
 4. **Pago de tarjeta.** Es una transferencia normal con destino de naturaleza `LIABILITY` (docs/09 §6.8, INV-030): `LIABILITY:<card>` +monto, `ASSET:<bank>` −monto, sin EXPENSE. En Phase 1 el kind se mantiene `TRANSFER`; `CARD_PAYMENT` (enumerado en el OpenAPI) se reserva para `debt/credit-cards` (Phase 4), que podrá enriquecerlo sin cambiar el asiento.
 5. **Estados.** Mismo ciclo que cualquier transacción (`add-transaction-recording`): `pending` sin asiento ni `TransferCompleted`; al quedar posteada se postea el asiento y se emite `TransferCompleted`. Void ⇒ reversa + `TransactionVoided` (los consumidores revierten el efecto). Amend de monto/comisión/cuentas ⇒ reversa + nuevo asiento; cambiar una cuenta a otra moneda ⇒ `TRANSFER_CURRENCY_MISMATCH`.
@@ -79,7 +79,7 @@ Cambios **exactos** requeridos (no se editan aquí):
 ## Riesgos / Trade-offs
 
 - [Reportes que sumen legs en vez de splits contarían el pago de tarjeta como salida de gasto] → Reporting deriva gastos de postings `EXPENSE` (INV-034); TC-TRANSACTIONS-CARDPAYMENT-001 lo protege.
-- [Comisión en moneda distinta a la transferida no soportada] → aceptado: se registra como gasto aparte; documentado en la UI.
+- [Comisión en moneda distinta a la transferida no soportada] → aceptado por el owner (docs/31 D40): se registra como conversión o gasto aparte; documentado en la UI y cubierto por el scenario "Comisión en otra moneda rechazada" (TC-TRANSACTIONS-TRANSFERFEE-001).
 - [Re-emisión de `TransferCompleted` tras amend] → resuelto por docs/31 D37: emisión única + `TransferRevised.v1` por edición (change `add-lifecycle-timeline`).
 
 ## Plan de migración
@@ -89,5 +89,5 @@ Expand-only: `txn_0002_transfers` crea el constraint trigger de consistencia. Si
 ## Preguntas abiertas
 
 1. ~~¿`TransferCompleted` debe re-emitirse tras un amend?~~ — resuelta por el owner el 2026-10-03 (docs/31 D37): editar = reversa + nueva revisión como transición trazable; `TransferCompleted` una sola vez y `TransferRevised.v1` por edición (change `add-lifecycle-timeline`).
-2. ¿Se necesitan comisiones de transferencia pagadas desde una tercera cuenta o en otra moneda en Phase 1? — **Propuesta (docs/31 D37), pendiente de confirmación del owner:** no en Phase 1; la comisión en otra moneda se registra como conversión o gasto aparte.
+2. ~~¿Se necesitan comisiones de transferencia pagadas desde una tercera cuenta o en otra moneda en Phase 1?~~ — resuelta por el owner el 2026-10-04 (docs/31 D40): **no se soportan** como comisión de transferencia; la comisión en otra moneda se registra como conversión o gasto aparte y el intento se rechaza con `TRANSFER_CURRENCY_MISMATCH`.
 3. ~~Código para transferencia entre monedas~~ — resuelta por el owner el 2026-10-03 (docs/31 D37): se mantiene `TRANSFER_CURRENCY_MISMATCH`.

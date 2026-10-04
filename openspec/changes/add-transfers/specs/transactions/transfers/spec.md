@@ -34,7 +34,7 @@ Trace: FR-TRANSACTIONS-020, FR-TRANSACTIONS-004, INV-002 · Priority: Must
 - **Y** los saldos siguen en 1000.00 BOB y 500.00 USD
 
 ### Requirement: Transferencia con comisión
-Una transferencia PUEDE incluir una comisión pagada desde la cuenta origen; cuando la incluye, el sistema DEBE (MUST) registrarla en el mismo asiento como gasto en la categoría de sistema "Fees" (u otra categoría de gasto indicada), de modo que el patrimonio neto baje exactamente el monto de la comisión.
+Una transferencia PUEDE incluir una comisión pagada desde la cuenta origen; cuando la incluye, el sistema DEBE (MUST) registrarla en el mismo asiento como gasto en la categoría de sistema "Fees" (u otra categoría de gasto indicada), de modo que el patrimonio neto baje exactamente el monto de la comisión. La comisión DEBE (MUST) estar en la moneda de la transferencia; una comisión en otra moneda NO DEBE (MUST NOT) aceptarse como comisión de transferencia: se rechaza con `TRANSFER_CURRENCY_MISMATCH` sin persistir nada y se registra como conversión o como gasto aparte (docs/31 D40).
 Trace: FR-TRANSACTIONS-019, INV-009, INV-004 · Priority: Should
 
 #### Scenario: Transferencia interbancaria con comisión
@@ -42,6 +42,11 @@ Trace: FR-TRANSACTIONS-019, INV-009, INV-004 · Priority: Should
 - **ENTONCES** el saldo de "Bank A" es 990.00 BOB y el de "Bank B" es 1000.00 BOB
 - **Y** el gasto en "Fees" aumenta 10.00 BOB y el patrimonio neto baja exactamente 10.00 BOB
 - **Y** el asiento suma 0.00 BOB (1000.00 + 10.00 - 1010.00)
+
+#### Scenario: Comisión en otra moneda rechazada
+- **CUANDO** el usuario transfiere 1000.00 BOB de "Bank A" (saldo 2000.00 BOB) a "Bank B" (saldo 0.00 BOB) con una comisión de 1.50 USD
+- **ENTONCES** se rechaza con el código `TRANSFER_CURRENCY_MISMATCH` señalando la moneda de la comisión, y no se crea asiento ni evento de transferencia
+- **Y** los saldos siguen en 2000.00 BOB y 0.00 BOB, y la comisión en USD debe registrarse como conversión o como gasto aparte
 
 ### Requirement: Pago de tarjeta de crédito como transferencia
 El pago de una tarjeta de crédito desde una cuenta de activo DEBE (MUST) registrarse como transferencia de la cuenta de activo a la cuenta de pasivo de la tarjeta, reduciendo la deuda y el saldo del activo por el mismo monto, y NO DEBE (MUST NOT) contarse como gasto.

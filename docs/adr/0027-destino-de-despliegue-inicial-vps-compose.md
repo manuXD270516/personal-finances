@@ -63,10 +63,11 @@ Para N1/N2 se decide además:
 - **Contras:** el polling de pg-boss impide el scale-to-zero (≈ USD 21–25/mes en Neon); en Neon los roles creados por consola heredan `BYPASSRLS` (los roles de app deben crearse por SQL); sin IP allowlist en el plan Launch.
 - **Costo:** ≈ USD 50–60. **Complejidad:** baja-media.
 
-### 3. PaaS (Fly.io, Railway, Render)
+### 3. PaaS (Fly.io, Railway, Render, Vercel)
 - **Pros:** operación mínima, deploy simple.
 - **Contras:** Keycloak (≥ 1 GiB) encarece cada plataforma; PITR débil o caro (Render 3 días en Hobby, Railway sin PITR gestionado); sin región sudamericana en Render/Railway; IaC limitada; lock-in medio.
 - **Costo:** ≈ USD 25–80 según plataforma. **Complejidad:** muy baja.
+- **Re-evaluación 2026-10-04 ([SPIKE-09 Anexo A](../../spikes/SPIKE-09-deploy-costs/anexo-a-paas.md), docs/31 D42):** ninguna PaaS supera a N2/N1 con todas las restricciones. Fly.io Managed Postgres no sirve (solo PG 16/17, sin `CREATEROLE` para los roles de ADR-0023); Vercel para `web` no ahorra costo, expone `api` y la BD de sesiones a Internet y rompe el deploy por digest. Variantes registradas si el owner prefiere no administrar un host: **P1 Railway** (≈ USD 25–30, `us-east4`, PG 18 en contenedor, PITR propio) y **P2 Fly.io `gru`** (≈ USD 38–48, PG 18 propio en Machine + volumen, auto-stop solo en `web`/`api`).
 
 ### 4. Cloud Run + Cloud SQL
 - **Pros:** gestionado, buen PITR, IaC madura, región São Paulo.
