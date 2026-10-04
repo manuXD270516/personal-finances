@@ -12,9 +12,10 @@ invariants: [INV-033]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/classification-ledger.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [tags, ledger, regression]
@@ -34,7 +35,7 @@ expected_result:
 - El saldo de "Wallet USDT" sigue siendo 500.000000 USDT
 - Se emite transactions.TransactionCategorized.v1 con addedTagIds = [Trabajo]
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-TAG-006 — Añadir un tag a un gasto contabilizado no crea asientos ni cambia saldos
@@ -55,3 +56,4 @@ Entonces no se crean asientos
 ## Notas
 
 - Se automatiza cuando exista add-transaction-recording (tasks 7.2).
+- Automatizado 2026-10-04 (add-classification 7.2).

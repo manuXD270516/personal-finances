@@ -132,6 +132,18 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
       });
     }
   }
+  // Perfil Cognito (add-workspace-identity design §3): sin `aud`, el cliente se valida por `client_id`.
+  if (
+    names.includes('OIDC_PROFILE') &&
+    values['OIDC_PROFILE'] === 'cognito' &&
+    values['OIDC_AUTHORIZED_PARTIES'] === undefined &&
+    !problems.some((p) => p.variable === 'OIDC_AUTHORIZED_PARTIES')
+  ) {
+    problems.push({
+      variable: 'OIDC_AUTHORIZED_PARTIES',
+      reason: 'falta (obligatoria con OIDC_PROFILE=cognito: client_id autorizados)',
+    });
+  }
   if (names.includes('AUDIT_IP_HMAC_KEY') && cloud && values['AUDIT_IP_HMAC_KEY'] === undefined) {
     if (!problems.some((p) => p.variable === 'AUDIT_IP_HMAC_KEY')) {
       problems.push({

@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/classification-ledger.api.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [categories, kind, cross-context]
@@ -40,7 +42,7 @@ expected_result:
 - El reembolso se acepta
 - El gasto del mes en "Supermercado" pasa de 500.00 BOB a 450.00 BOB
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-KIND-002 — Se rechaza una categoría de gasto en un ingreso y se acepta en un reembolso
@@ -63,3 +65,4 @@ Entonces se acepta y reduce el gasto del mes en 50.00 BOB
 
 - Requiere add-transaction-recording para el flujo completo; la validación unitaria vive en ValidateClassification.
 - Revisado 2026-10-04: se mantiene `not_automated` (advertencia R3 intencional). El test con su id valida `ValidateClassification`; falta el flujo de API (ingreso rechazado sin transacción ni asiento y el gasto del mes 500.00 → 450.00 BOB tras el reembolso).
+- Automatizado 2026-10-04: flujo de API (ingreso rechazado sin transacción ni asiento; reembolso aceptado; gasto del mes en "Supermercado" 500.00 → 450.00 BOB en `reports/summary`).

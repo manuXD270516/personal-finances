@@ -58,6 +58,7 @@
 - [ ] 6.3 (Could) Endpoint `GET /api/v1/workspaces/{workspaceId}/ledger/trial-balance` solo `OWNER`; test `[TC-LEDGER-TRIAL-001]`
   > Pendiente (Could): endpoint técnico trial-balance (TC-LEDGER-TRIAL-001).
   > Verificado 2026-10-04 (pendiente, código): solo existen la consulta `getTrialBalance` (`pg-balance.queries.ts`) y la operación del contrato; no hay ruta HTTP `/ledger/trial-balance` ni test `[TC-LEDGER-TRIAL-001]`.
+  > Nota 2026-10-04: no se implementa — pendiente de decisión del owner (rol). El contrato declara `getLedgerTrialBalance` con `x-required-role: VIEWER`, mientras la tarea, design.md (decisión 13) y TC-LEDGER-TRIAL-001 dicen solo `OWNER`; cambiar el rol del contrato no sería aditivo y no hay decisión en docs/31.
 
 ## 7. UI
 

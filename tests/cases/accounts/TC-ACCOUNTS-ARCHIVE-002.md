@@ -17,6 +17,7 @@ automated_tests:
   - packages/contexts/accounts/src/application/accounts.service.test.ts
   - packages/contexts/accounts/src/domain/account.test.ts
   - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+  - apps/api/test/api/accounts-ledger.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -59,3 +60,4 @@ Entonces se rechaza con ACCOUNT_ARCHIVED
 ## Notas
 
 - Verificado 2026-10-04: rechazo por estado/moneda en dominio y aplicación, carrera con FOR SHARE en integración; la anulación contra Transactions real la cubre [TC-TRANSACTIONS-ARCHIVED-001].
+- Ampliado 2026-10-04 (add-accounts-management 6.3): gasto, anulación de T9, ingreso en cuenta cerrada y transferencia hacia la archivada contra Transactions real (sin póster de prueba), con conteo de transacciones/asientos/auditoría/outbox, y la carrera archivo ↔ gasto por HTTP.

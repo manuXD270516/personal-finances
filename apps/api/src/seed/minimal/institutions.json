@@ -1,0 +1,14 @@
+{
+  "catalogVersion": "minimal.v1",
+  "institutions": [
+    {
+      "name": "Banco Andino Demo",
+      "kind": "BANK",
+      "countryCode": "BO",
+      "website": "https://andino.demo.pfos.test"
+    },
+    { "name": "Cooperativa Illimani Demo", "kind": "BANK", "countryCode": "BO" },
+    { "name": "Billetera Altiplano Demo", "kind": "FINTECH", "countryCode": "BO" },
+    { "name": "P2P Exchange Demo", "kind": "EXCHANGE", "countryCode": null }
+  ]
+}

@@ -12,6 +12,7 @@ import { DemoDataLoader } from '../demo/demo-data-loader.js';
 import { AUDIT_POLICIES, outboxPort } from '../identity/identity-wiring.js';
 import { Client, Pool } from 'pg';
 import { seedWorkspaceProvisioning } from '../identity/workspace-provisioning.js';
+import { seedInstitutionCatalog } from './institution-catalog.js';
 
 export const SEED_PROFILES = ['minimal', 'demo', 'large'] as const;
 export type SeedProfile = (typeof SEED_PROFILES)[number];
@@ -20,10 +21,12 @@ export type SeedProfile = (typeof SEED_PROFILES)[number];
  * Datasets disponibles (docs/29). La Minimal Seed registra su ejecución en `platform.seed_run` y, desde la versión
  * 2, siembra las identidades de IDENTITY (usuarios del realm de desarrollo, W1/W2 y sus membresías); desde la 3,
  * provisiona W1/W2 por el MISMO gancho que `CreateWorkspace` (categorías de sistema + catálogo sugerido es-BO y
- * monedas por defecto). Cada contexto añadirá sus datos. `demo`/`large` llegan con los datasets de docs/29.
+ * monedas por defecto); desde la 4, carga en W1/W2 el catálogo inicial de instituciones ficticias
+ * (`seed/minimal/institutions.json`, add-accounts-management 2.4). Cada contexto añadirá sus datos. `demo`/`large`
+ * llegan con los datasets de docs/29.
  */
 export const SEED_DATASETS: Partial<Record<SeedProfile, { readonly datasetVersion: number }>> = {
-  minimal: { datasetVersion: 3 },
+  minimal: { datasetVersion: 4 },
   // add-demo-data: crea el workspace DEMO dedicado de owner@demo.pfos.test (origen W1) con el MISMO cargador que la
   // acción "Cargar datos de demostración" de la app. Nunca escribe datos financieros en W1/W2.
   demo: { datasetVersion: Number(DEMO_MANIFEST.datasetVersion) },
@@ -159,7 +162,19 @@ export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedP
   await client.connect();
   try {
     if (profile === 'minimal' && config.OIDC_ISSUER_URL) {
-      await provisionWorkspaces(config, await seedIdentity(client, config));
+      const previous = await client.query<{ dataset_version: number }>(
+        `SELECT dataset_version FROM platform.seed_run WHERE profile = 'minimal'`,
+      );
+      const owners = await seedIdentity(client, config);
+      await provisionWorkspaces(config, owners);
+      // Catálogo inicial de instituciones (v4): se carga UNA vez; re-ejecutar la seed no restaura lo que el usuario
+      // renombró o archivó después (TC-ACCOUNTS-INSTITUTION-002).
+      if ((previous.rows[0]?.dataset_version ?? 0) < 4) {
+        for (const ws of MINIMAL_WORKSPACES) {
+          const owner = owners.get(ws.members.find((m) => m.role === 'OWNER')!.user)!;
+          await seedInstitutionCatalog(client, { userId: owner, workspaceId: ws.id });
+        }
+      }
     } else if (profile === 'minimal') {
       logger.warn('OIDC_ISSUER_URL ausente: la Minimal Seed no siembra identidades');
     } else if (profile === 'demo') {

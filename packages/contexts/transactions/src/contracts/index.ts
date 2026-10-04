@@ -52,6 +52,20 @@ export interface NominalFlowQuery {
 export const NOMINAL_FLOW_QUERY = Symbol.for('pf.transactions.NominalFlowQuery');
 
 /**
+ * Query pública para la sugerencia de categoría por counterparty de CLASSIFICATION (add-classification design §8,
+ * FR-CLASSIFICATION-011): categoría de la porción vigente más reciente, de una transacción no anulada del tipo pedido
+ * (`EXPENSE` incluye reembolsos), con esa counterparty (en la porción o en la transacción). CLASSIFICATION decide si
+ * es usable (activa y del tipo pedido). Sin efectos; en la unidad de trabajo del llamador si existe.
+ */
+export interface CounterpartyCategoryUsageQuery {
+  lastCategoryUsed(input: {
+    readonly workspaceId: string;
+    readonly counterpartyId: string;
+    readonly kind: 'EXPENSE' | 'INCOME';
+  }): Promise<string | null>;
+}
+
+/**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.
  */

@@ -96,8 +96,10 @@ export {
   DEFAULT_JWT_ALGORITHMS,
   JwtVerifier,
   type JwtVerifierOptions,
+  type OidcProfile,
   type VerifiedAccessToken,
 } from './auth/jwt-verifier.js';
+export { JWKS_METRICS, JwksCache, type JwksCacheOptions, type JwksObserver } from './auth/jwks-cache.js';
 export {
   currentRequestContext,
   runWithRequestContext,

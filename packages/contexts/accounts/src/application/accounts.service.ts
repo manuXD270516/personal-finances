@@ -180,7 +180,9 @@ export class AccountsService {
         [opened],
         openingEntryId,
       );
-      return this.view(account);
+      // Releer la fila: `created_at` lo fija la base al insertar; sin esto la respuesta 201 llevaba `createdAt` nulo,
+      // presentado como 1970-01-01 (regresión en accounts-ledger.api.test.ts).
+      return this.view((await accounts.findById(s.workspaceId, s.id)) ?? account);
     });
   }
 

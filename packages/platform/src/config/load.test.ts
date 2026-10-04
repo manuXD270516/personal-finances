@@ -190,6 +190,16 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(JSON.stringify(badKey.problems)).not.toContain('corta');
   });
 
+  it('[TC-IDENTITY-AUTH-001] perfil OIDC: keycloak por defecto, fallback JWKS 24 h y cognito exige client ids', () => {
+    const api = loadConfig('api', API_ENV);
+    expect(api.OIDC_PROFILE).toBe('keycloak');
+    expect(api.OIDC_JWKS_FALLBACK_MAX_AGE).toBe(24 * 3_600_000);
+    const cognito = captureError(() => loadConfig('api', { ...API_ENV, OIDC_PROFILE: 'cognito' }));
+    expect(cognito.problems.map((p) => p.variable)).toEqual(['OIDC_AUTHORIZED_PARTIES']);
+    const ok = loadConfig('api', { ...API_ENV, OIDC_PROFILE: 'cognito', OIDC_AUTHORIZED_PARTIES: 'abc123' });
+    expect(ok.OIDC_AUTHORIZED_PARTIES).toBe('abc123');
+  });
+
   it('[TC-IDENTITY-DEMO-012] DEMO_DATA_ENABLED: por defecto habilitada en local/ci y deshabilitada en staging/production', () => {
     expect(loadConfig('api', API_ENV).DEMO_DATA_ENABLED).toBe(true);
     expect(loadConfig('api', { ...API_ENV, PFOS_ENV: 'local' }).DEMO_DATA_ENABLED).toBe(true);
