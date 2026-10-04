@@ -140,7 +140,7 @@ export class IdentityService {
     return this.deps.uow.run({ userId, workspaceId: null }, async () => {
       const user = await this.deps.users.findById(userId);
       if (!user) throw notFound('user');
-      if (user.version !== expectedVersion) throw preconditionFailed();
+      if (user.version !== expectedVersion) throw preconditionFailed(user.version);
       const before = profileOf(user);
       const prefs: UserPreferenceChanges = {
         ...(changes.displayName === undefined ? {} : { displayName: changes.displayName }),
@@ -224,7 +224,7 @@ export class IdentityService {
     return this.deps.uow.run({ userId, workspaceId }, async () => {
       const workspace = await this.deps.workspaces.findById(workspaceId);
       if (!workspace) throw accessDenied();
-      if (workspace.version !== expectedVersion) throw preconditionFailed();
+      if (workspace.version !== expectedVersion) throw preconditionFailed(workspace.version);
       const patch: {
         -readonly [K in keyof SettingsPatch]: SettingsPatch[K];
       } = {};
@@ -345,6 +345,9 @@ function profileOf(user: User): Record<(typeof PROFILE_FIELDS)[number], string |
   return { displayName: user.displayName, locale: user.locale.value, timeZone: user.timeZone?.value ?? null };
 }
 
-function preconditionFailed(): DomainError {
-  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
+function preconditionFailed(currentVersion?: number): DomainError {
+  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
+  });
 }

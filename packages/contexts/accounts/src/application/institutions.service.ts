@@ -118,11 +118,14 @@ export class InstitutionsService {
   private async load(workspaceId: string, id: string, expectedVersion: number): Promise<Institution> {
     const institution = await this.deps.institutions.findById(workspaceId, id);
     if (!institution) throw notFound(id);
-    if (institution.version !== expectedVersion) throw preconditionFailed();
+    if (institution.version !== expectedVersion) throw preconditionFailed(institution.version);
     return institution;
   }
 }
 
-function preconditionFailed(): DomainError {
-  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
+function preconditionFailed(currentVersion?: number): DomainError {
+  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
+  });
 }

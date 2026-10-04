@@ -198,6 +198,25 @@ describe('API de categorías (tareas 6.1-6.3)', () => {
     expect(dup.body['existingId']).toBe(r.body['id']);
   });
 
+  it('[TC-PLATFORM-API-014] PATCH de categoría con versión obsoleta ⇒ 412 con currentVersion y sin cambios', async () => {
+    const c = await call('POST', `/api/v1/workspaces/${ws}/categories`, {
+      token: u.token,
+      body: { groupId, name: `Versión ${randomUUID().slice(0, 8)}` },
+    });
+    expect(c.status).toBe(201);
+    const path = `/api/v1/workspaces/${ws}/categories/${String(c.body['id'])}`;
+    const ok = await patch(u.token, path, { color: '#1144AA' }, 1);
+    expect([ok.status, ok.headers.get('etag')]).toEqual([200, '"2"']);
+    const stale = await patch(u.token, path, { color: '#C62828' }, 1);
+    expectProblem(stale, 412, 'PRECONDITION_FAILED');
+    expect(stale.body['currentVersion']).toBe(2);
+    expect(contract.validateResponse('updateCategory', 412, stale.body, 'application/problem+json')).toEqual(
+      [],
+    );
+    const after = await call('GET', path, { token: u.token });
+    expect(after.body).toMatchObject({ color: '#1144AA', version: 2 });
+  });
+
   it('crear una categoría con Idempotency-Key (opcional) responde 201 y el reintento reproduce la misma respuesta', async () => {
     // Regresión: el nombre localizado se leía DESPUÉS del comando con una unidad de trabajo sin workspace, que
     // dejaba la transacción de idempotencia sin contexto RLS ⇒ 500 "workspace context not set".

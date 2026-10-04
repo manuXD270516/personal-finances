@@ -48,8 +48,11 @@ export interface CatalogResult {
   readonly skipped: number;
 }
 
-const preconditionFailed = () =>
-  new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
+const preconditionFailed = (currentVersion?: number) =>
+  new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
+  });
 
 type Snap = Readonly<Record<string, unknown>>;
 
@@ -689,28 +692,28 @@ export class ClassificationService {
   private async loadGroup(workspaceId: string, id: string, expected: number): Promise<CategoryGroup> {
     const g = await this.deps.groups.findById(workspaceId, id);
     if (!g) throw notFound('category group');
-    if (g.version !== expected) throw preconditionFailed();
+    if (g.version !== expected) throw preconditionFailed(g.version);
     return g;
   }
 
   private async loadCategory(workspaceId: string, id: string, expected: number): Promise<Category> {
     const c = await this.deps.categories.findById(workspaceId, id);
     if (!c) throw notFound('category');
-    if (c.version !== expected) throw preconditionFailed();
+    if (c.version !== expected) throw preconditionFailed(c.version);
     return c;
   }
 
   private async loadTag(workspaceId: string, id: string, expected: number): Promise<Tag> {
     const t = await this.deps.tags.findById(workspaceId, id);
     if (!t) throw notFound('tag');
-    if (t.version !== expected) throw preconditionFailed();
+    if (t.version !== expected) throw preconditionFailed(t.version);
     return t;
   }
 
   private async loadCounterparty(workspaceId: string, id: string, expected: number): Promise<Counterparty> {
     const c = await this.deps.counterparties.findById(workspaceId, id);
     if (!c) throw notFound('counterparty');
-    if (c.version !== expected) throw preconditionFailed();
+    if (c.version !== expected) throw preconditionFailed(c.version);
     return c;
   }
 
