@@ -159,6 +159,9 @@ export function renderProblem(err: unknown, ctx: RenderContext): RenderedProblem
     code = err.code;
     detail = err.message;
     fields = violationsToFields(err.violations);
+    // Única extensión que el dominio publica (docs/10 §6): la versión vigente en 412/409.
+    const currentVersion = err.details['currentVersion'];
+    if (Number.isInteger(currentVersion)) extensions = { currentVersion };
   } else if (isDependencyUnavailable(err)) {
     code = 'SERVICE_UNAVAILABLE';
     detail = 'a dependency is temporarily unavailable; retry later';

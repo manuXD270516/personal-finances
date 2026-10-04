@@ -15,7 +15,8 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
-- apps/api/test/api/api-conventions.api.test.ts
+  - apps/api/test/api/api-conventions.api.test.ts
+  - apps/api/test/api/contract-routes.api.test.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -34,7 +35,7 @@ expected_result:
 - '/api/v1/me: 200'
 - '/api/v2/me y /api/v1/no-existe: 404 application/problem+json con código RESOURCE_NOT_FOUND'
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-PLATFORM-API-001 — Las operaciones viven bajo /api/v1 y una versión no publicada responde 404

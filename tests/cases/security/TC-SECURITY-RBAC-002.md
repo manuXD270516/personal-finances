@@ -19,6 +19,7 @@ level: security
 automation_status: automated
 automated_tests:
   - apps/api/test/api/authorization-matrix.api.test.ts
+  - apps/api/test/api/contract-routes.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -48,7 +49,7 @@ expected_result:
 - Los pares permitidos devuelven 2xx; los denegados devuelven 401 (anónimo), 403 WORKSPACE_ACCESS_DENIED (no miembro) o 403 INSUFFICIENT_ROLE (rol insuficiente)
 - updateWorkspace solo es permitida al OWNER
 created: 2026-10-01
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-SECURITY-RBAC-002 — La matriz de autorización cubre todas las operaciones de la API para cada rol

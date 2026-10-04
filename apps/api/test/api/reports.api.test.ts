@@ -159,6 +159,7 @@ async function poll(at: string, workspaces: readonly User[]) {
 let canonical: User;
 let flows: User;
 let empty: User;
+let lifecycle: User;
 const ids: Record<string, string> = {};
 
 beforeAll(async () => {
@@ -193,9 +194,10 @@ beforeAll(async () => {
   canonical = await user(`kc-rep-a-${randomUUID()}`);
   flows = await user(`kc-rep-b-${randomUUID()}`);
   empty = await user(`kc-rep-c-${randomUUID()}`);
+  lifecycle = await user(`kc-rep-d-${randomUUID()}`);
   routes.set('/api/v1/rate', fixture('paralelo-bo/rate.ok.json'));
   routes.set('/v1/dolares', fixture('dolarapi-bo/dolares.ok.json'));
-  await poll('2026-10-02T09:00:00Z', [canonical, flows, empty]);
+  await poll('2026-10-02T09:00:00Z', [canonical, flows, empty, lifecycle]);
 
   // Workspace A (ejemplo canónico de los TC): saldos y patrimonio.
   ids['banco'] = await account(canonical, 'Banco BOB', 'BANK', 'BOB', '685.00');
@@ -301,7 +303,9 @@ describe('GET /reports/summary — saldos, dinero disponible y patrimonio (PG re
         base: 'USDT',
         quote: 'BOB',
         value: '11.98',
-        rateType: 'PARALLEL',
+        // Manual de OTRO tipo (P2P) que compite en el último recurso por fresca (1 h <= 24 h) y confiable (desvío
+        // 0.33 % <= 5 %) (docs/31 D34/D38; antes se automatizaba como PARALLEL).
+        rateType: 'P2P',
         asOf: '2026-10-02T16:00:00Z',
         sourceLabel: 'Casa de cambio centro',
       });
@@ -309,12 +313,121 @@ describe('GET /reports/summary — saldos, dinero disponible y patrimonio (PG re
       expect(m((r.body['consolidated'] as { liquidBalance: Money }).liquidBalance)).toBe('1404.50 BOB');
       rate = (r.body['meta'] as { ratesUsed: Record<string, unknown>[] }).ratesUsed[0];
       expect(rate).toMatchObject({
+        rate: { base: 'USDT', quote: 'BOB', value: '11.98' },
+        rateType: 'P2P',
         source: 'MANUAL',
         selection: 'MANUAL',
         sourceLabel: 'Casa de cambio centro',
         attribution: null,
       });
       expect((r.body['meta'] as { attributions: unknown[] }).attributions).toEqual([]);
+    } finally {
+      clock.set(Instant.parse(NOW));
+    }
+  });
+});
+
+describe('GET /reports/summary — cuentas cerradas/archivadas y último recurso con manuales de otro tipo (D34, D35)', () => {
+  const acc: Record<string, string> = {};
+  const action = async (accountId: string, name: 'close' | 'archive', body: unknown) => {
+    const current = await call('GET', `${W(lifecycle)}/accounts/${accountId}`, { token: lifecycle.token });
+    const r = await call('POST', `${W(lifecycle)}/accounts/${accountId}/${name}`, {
+      token: lifecycle.token,
+      body,
+      headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(current.body['version'])}"` },
+    });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    return r.body;
+  };
+  const bare = async (name: string, type: string) =>
+    (await post(lifecycle, '/accounts', { name, type, currency: 'BOB', openedOn: '2026-01-02' }))[
+      'id'
+    ] as string;
+
+  beforeAll(async () => {
+    acc['banco'] = await account(lifecycle, 'Banco BOB', 'BANK', 'BOB', '685.00');
+    acc['caja'] = await account(lifecycle, 'Caja BOB', 'CASH', 'BOB', '120.50');
+    acc['wallet'] = await account(lifecycle, 'Wallet USDT', 'CRYPTO_WALLET', 'USDT', '50.000000');
+    acc['viejo'] = await bare('Banco Viejo', 'BANK');
+    acc['antigua'] = await bare('Caja Antigua', 'CASH');
+    expect((await action(acc['viejo'], 'close', { closedOn: '2026-08-31' }))['status']).toBe('CLOSED');
+    expect((await action(acc['antigua'], 'archive', { reason: 'ya no se usa' }))['status']).toBe('ARCHIVED');
+  }, 60_000);
+
+  it('[TC-REPORTING-DASHBOARD-008] el resumen lista la cuenta CLOSED no archivada con 0.00 BOB y excluye la archivada; totales 805.50 BOB y 50.000000 USDT', async () => {
+    const r = await summary(lifecycle);
+    expect(r.status, `${JSON.stringify(r.body)} ${apiErrors()}`).toBe(200);
+    const accounts = r.body['accounts'] as { accountId: string; name: string; balance: Money }[];
+    expect(accounts.map((a) => [a.name, m(a.balance)])).toEqual([
+      ['Banco BOB', '685.00 BOB'],
+      ['Caja BOB', '120.50 BOB'],
+      ['Wallet USDT', '50.000000 USDT'],
+      ['Banco Viejo', '0.00 BOB'],
+    ]);
+    expect(accounts.find((a) => a.name === 'Banco Viejo')?.accountId).toBe(acc['viejo']);
+    const closed = await call('GET', `${W(lifecycle)}/accounts/${acc['viejo']}`, { token: lifecycle.token });
+    expect(closed.body['status']).toBe('CLOSED');
+    const byCurrency = r.body['byCurrency'] as { currency: string; liquidBalance: Money }[];
+    expect(byCurrency.map((c) => m(c.liquidBalance))).toEqual(['805.50 BOB', '50.000000 USDT']);
+  });
+
+  it('[TC-REPORTING-DASHBOARD-009] con providers caídos una manual P2P vieja (31 h) o anómala (8.49 %) se descarta y se usa la última del provider marcada obsoleta', async () => {
+    // Última tasa del provider: USDT/BOB PARALLEL 12.02 de 2026-10-02T08:53:07.532Z; ahora 2026-10-03T17:00Z (32 h).
+    clock.set(Instant.parse('2026-10-03T17:00:00Z'));
+    try {
+      const expectLastKnown = async () => {
+        const r = await summary(lifecycle);
+        expect(r.status, `${JSON.stringify(r.body)} ${apiErrors()}`).toBe(200);
+        expect(m((r.body['consolidated'] as { liquidBalance: Money }).liquidBalance)).toBe('1406.50 BOB');
+        const rates = (r.body['meta'] as { ratesUsed: Record<string, unknown>[] }).ratesUsed;
+        expect(rates).toHaveLength(1);
+        expect(rates[0]).toMatchObject({
+          rate: { base: 'USDT', quote: 'BOB', value: '12.02' },
+          rateType: 'PARALLEL',
+          source: 'PROVIDER',
+          provider: 'PARALELO_BO',
+          selection: 'LAST_KNOWN_STALE',
+          stale: true,
+        });
+      };
+      await expectLastKnown();
+      // Caso A: manual P2P más reciente que la del provider pero con 31 h (> 24 h, FX_MANUAL_FALLBACK_MAX_AGE).
+      await post(lifecycle, '/fx-rates', {
+        base: 'USDT',
+        quote: 'BOB',
+        value: '11.98',
+        rateType: 'P2P',
+        asOf: '2026-10-02T10:00:00Z',
+        sourceLabel: 'Casa de cambio centro',
+      });
+      await expectLastKnown();
+      // Caso B: manual P2P fresca (1 h) pero con desvío |11.00 - 12.02| / 12.02 = 8.49 % (> 5 %).
+      await post(lifecycle, '/fx-rates', {
+        base: 'USDT',
+        quote: 'BOB',
+        value: '11.00',
+        rateType: 'P2P',
+        asOf: '2026-10-03T16:00:00Z',
+        sourceLabel: 'Casa de cambio centro',
+      });
+      await expectLastKnown();
+      // Contraste: manual P2P fresca (30 min) y confiable (0.33 %) => se usa (variante de TC-REPORTING-DASHBOARD-007).
+      await post(lifecycle, '/fx-rates', {
+        base: 'USDT',
+        quote: 'BOB',
+        value: '11.98',
+        rateType: 'P2P',
+        asOf: '2026-10-03T16:30:00Z',
+        sourceLabel: 'Casa de cambio centro',
+      });
+      const r = await summary(lifecycle);
+      expect(m((r.body['consolidated'] as { liquidBalance: Money }).liquidBalance)).toBe('1404.50 BOB');
+      expect((r.body['meta'] as { ratesUsed: Record<string, unknown>[] }).ratesUsed[0]).toMatchObject({
+        rate: { base: 'USDT', quote: 'BOB', value: '11.98' },
+        rateType: 'P2P',
+        source: 'MANUAL',
+        selection: 'MANUAL',
+      });
     } finally {
       clock.set(Instant.parse(NOW));
     }

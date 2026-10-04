@@ -61,3 +61,4 @@ Entonces veo 1406.50 BOB
 - ageSeconds = 22:00:00 − 13:53:07 = 29 213 s (8 h 6 min).
 - Datos ficticios salvo el valor 12.02 (observado en paralelo.bo el 2026-10-02); fechas fijas con `FixedClock` (TZ America/La_Paz).
 - Automatización (2026-10-03): con la preferencia `PARALLEL` sembrada al crear el workspace, el resolver de FX solo considera tasas del tipo preferido; la variante manual se automatizó como tasa manual `PARALLEL` 11.98 (no `P2P`). Resuelto por el owner el 2026-10-03 (docs/31 D34): una manual de otro tipo SÍ compite si es fresca y confiable; la variante debe re-automatizarse con `P2P` cuando FX implemente D34 (ver TC-REPORTING-DASHBOARD-009 para los casos descartados).
+- Re-automatizado (2026-10-04): FX implementa D34/D38 en `ValuationRateSelector`; la variante manual usa ahora `P2P` 11.98 (1 h, desvío 0.33 %) y verifica `rateType: P2P`, `selection: MANUAL` y 1404.50 BOB.

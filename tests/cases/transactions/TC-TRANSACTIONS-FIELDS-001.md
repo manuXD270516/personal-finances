@@ -12,9 +12,10 @@ invariants: [INV-001]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/transactions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fields", "api"]
@@ -41,7 +42,7 @@ expected_result:
   - "source = MANUAL y status = POSTED"
   - "El listado filtrado por la contraparte la incluye"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-TRANSACTIONS-FIELDS-001 — Todos los campos de una transacción se persisten y se devuelven sin cambios

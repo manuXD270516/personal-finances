@@ -22,16 +22,26 @@ export class DomainError extends Error {
   override readonly name: string = 'DomainError';
   readonly code: string;
   readonly violations: readonly FieldViolation[];
+  /**
+   * Datos estructurados del error que el cliente necesita para recuperarse (p. ej. `currentVersion` en
+   * `PRECONDITION_FAILED`, docs/10 §6). La plataforma decide cuáles publica como extensión del problem.
+   */
+  readonly details: Readonly<Record<string, unknown>>;
 
   constructor(
     code: string,
     message: string,
-    options: { readonly violations?: readonly FieldViolation[]; readonly cause?: unknown } = {},
+    options: {
+      readonly violations?: readonly FieldViolation[];
+      readonly details?: Readonly<Record<string, unknown>>;
+      readonly cause?: unknown;
+    } = {},
   ) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
     if (!CODE.test(code)) throw new TypeError(`DomainError: code inválido '${code}' (UPPER_SNAKE_CASE)`);
     this.code = code;
     this.violations = Object.freeze([...(options.violations ?? [])]);
+    this.details = Object.freeze({ ...(options.details ?? {}) });
   }
 
   /**
@@ -44,6 +54,7 @@ export class DomainError extends Error {
     }
     return new DomainError(this.code, this.message, {
       violations: [...this.violations, { pointer, code: this.code, detail: this.message }],
+      details: this.details,
       cause: this.cause,
     });
   }

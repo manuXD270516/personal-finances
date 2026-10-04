@@ -12,9 +12,10 @@ invariants: [INV-022]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/transactions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["dates", "timezone", "balances"]
@@ -33,7 +34,7 @@ expected_result:
   - "Saldo de Bank A al 2026-03-31 = 800.00 BOB"
   - "El gasto cuenta en marzo de 2026 (200.00 BOB) y no en abril de 2026"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-TRANSACTIONS-DATES-001 — El asiento usa la fecha de negocio y la fecha de posteo bancaria es solo informativa
