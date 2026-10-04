@@ -16,6 +16,7 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
+- apps/api/test/api/workspace-base-currency.api.test.ts
 - apps/api/test/api/identity.api.test.ts
 status: automated
 regression_suite: false
@@ -35,7 +36,7 @@ expected_result:
 - 'owner: W1 Personal Demo y W2 Other Demo, ambos con role OWNER; page.hasMore false'
 - 'outsider: solo W2 Other Demo'
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-WORKSPACE-006 — El listado de workspaces muestra solo las membresías activas del usuario

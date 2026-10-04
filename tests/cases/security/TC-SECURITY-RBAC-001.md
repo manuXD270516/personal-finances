@@ -17,6 +17,7 @@ level: api
 automation_status: automated
 automated_tests:
   - packages/contexts/identity/src/application/identity.service.test.ts
+  - apps/api/test/api/rbac-viewer.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -64,3 +65,4 @@ Entonces el estado de la respuesta es 403
 
 - Código actualizado de FORBIDDEN a INSUFFICIENT_ROLE (docs/10 §9.1).
 - Verificado 2026-10-04: a nivel API, la matriz [TC-SECURITY-RBAC-002] (apps/api/test/api/authorization-matrix.api.test.ts) comprueba 200 en lecturas y 403 INSUFFICIENT_ROLE en mutaciones de VIEWER para toda operación implementada.
+- Ampliado 2026-10-04 (add-workspace-identity 7.2): test de API con su id (`rbac-viewer.api.test.ts`): GETs 200 y gasto, transferencia, edición y categoría de VIEWER ⇒ 403 INSUFFICIENT_ROLE sin transacciones, asientos, categorías ni auditoría nuevas.

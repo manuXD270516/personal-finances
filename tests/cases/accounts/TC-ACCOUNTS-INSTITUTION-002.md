@@ -15,6 +15,7 @@ level: repository-integration
 automation_status: automated
 automated_tests:
   - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+  - apps/api/test/db/institution-catalog.int.test.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -50,3 +51,7 @@ Dado un workspace creado con el catálogo inicial que incluye "Banco Andino Demo
 Cuando el usuario la renombra a "Banco Andino"
 Entonces cambia solo en ese workspace
 ```
+
+## Notas
+
+- Ampliado 2026-10-04 (add-accounts-management 2.4): catálogo inicial ficticio por workspace en `apps/api/src/seed/minimal/institutions.json`, cargado una vez por la Minimal Seed v4 (W1/W2); `institution-catalog.int.test.ts` verifica W3 sin catálogo, filas propias por workspace, renombrado que la seed no restaura y ausencia de nombres literales fuera de archivos de seed.

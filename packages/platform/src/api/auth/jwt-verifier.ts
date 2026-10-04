@@ -1,6 +1,5 @@
 import {
   createLocalJWKSet,
-  createRemoteJWKSet,
   errors as joseErrors,
   jwtVerify,
   type JSONWebKeySet,
@@ -8,19 +7,27 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 import { ApiProblem } from '../errors/problem.js';
+import { JwksCache, type JwksObserver } from './jwks-cache.js';
 
 /**
  * Validación de access tokens JWT (docs/12 §3.1, ADR-0010, SPIKE-06) como adapter de infraestructura sin framework.
  * Allowlist de algoritmos asimétricos (nunca `none`/HS*), `iss`, `aud`, `exp`/`nbf` con tolerancia de reloj,
  * `typ` de access token, `azp` opcional y scope requerido. JWKS remoto con caché (10 min), refetch limitado
- * (cooldown) por `kid` desconocido. Cualquier fallo ⇒ 401 `UNAUTHENTICATED` sin revelar qué validación falló.
+ * (cooldown) por `kid` desconocido y fallback al último JWKS conocido hasta 24 h (`JwksCache`). Perfil por IdP
+ * (design §3): `keycloak` valida `aud`/`azp`; `cognito` (sin `aud`) valida `token_use=access` y `client_id`.
+ * Cualquier fallo ⇒ 401 `UNAUTHENTICATED` sin revelar qué validación falló.
  */
+export type OidcProfile = 'keycloak' | 'cognito';
+
 export interface JwtVerifierOptions {
   readonly issuer: string;
+  /** Audiencia exigida (`aud`); el perfil `cognito` no la valida (sus access tokens no llevan `aud`). */
   readonly audience: string;
+  /** Perfil del IdP (por defecto `keycloak`). */
+  readonly profile?: OidcProfile;
   /** Scope que el token debe incluir (claim `scope`, separado por espacios). Vacío ⇒ no se exige. */
   readonly requiredScope?: string;
-  /** Clientes autorizados (`azp`); vacío ⇒ no se restringe. */
+  /** Clientes autorizados (`azp` en keycloak, `client_id` en cognito); vacío ⇒ no se restringe. */
   readonly authorizedParties?: readonly string[];
   /** Tolerancia de reloj para `exp`/`nbf` en segundos (por defecto 30). */
   readonly clockSkewSeconds?: number;
@@ -33,6 +40,12 @@ export interface JwtVerifierOptions {
   readonly jwksCacheMaxAgeMs?: number;
   /** Intervalo mínimo entre refetch del JWKS por `kid` desconocido en ms (por defecto 30 s). */
   readonly jwksCooldownMs?: number;
+  /** Antigüedad máxima del último JWKS conocido usable si el IdP no responde, en ms (por defecto 24 h). */
+  readonly jwksFallbackMaxAgeMs?: number;
+  /** Obtención del JWKS remoto (por defecto `fetch`); inyectable en tests. */
+  readonly fetchJwks?: (url: URL, timeoutMs: number) => Promise<unknown>;
+  /** Logs/métricas del JWKS remoto (refetch fallido, uso del fallback). */
+  readonly jwksObserver?: JwksObserver;
   /** Reloj inyectable (tests). */
   readonly now?: () => Date;
 }
@@ -55,10 +68,17 @@ export class JwtVerifier {
   constructor(private readonly options: JwtVerifierOptions) {
     this.keys =
       options.jwks instanceof URL
-        ? createRemoteJWKSet(options.jwks, {
-            cacheMaxAge: options.jwksCacheMaxAgeMs ?? 10 * 60_000,
-            cooldownDuration: options.jwksCooldownMs ?? 30_000,
-          })
+        ? new JwksCache({
+            url: options.jwks,
+            ...(options.jwksCacheMaxAgeMs !== undefined ? { cacheMaxAgeMs: options.jwksCacheMaxAgeMs } : {}),
+            ...(options.jwksCooldownMs !== undefined ? { cooldownMs: options.jwksCooldownMs } : {}),
+            ...(options.jwksFallbackMaxAgeMs !== undefined
+              ? { fallbackMaxAgeMs: options.jwksFallbackMaxAgeMs }
+              : {}),
+            ...(options.fetchJwks ? { fetchJwks: options.fetchJwks } : {}),
+            ...(options.now ? { now: () => options.now!().getTime() } : {}),
+            ...(options.jwksObserver ? { observer: options.jwksObserver } : {}),
+          }).getKey
         : createLocalJWKSet(options.jwks);
   }
 
@@ -71,11 +91,12 @@ export class JwtVerifier {
   async verify(token: string | undefined): Promise<VerifiedAccessToken> {
     if (!token) throw unauthenticated();
     const o = this.options;
+    const cognito = o.profile === 'cognito';
     let payload: JWTPayload;
     try {
       ({ payload } = await jwtVerify(token, this.keys, {
         issuer: o.issuer,
-        audience: o.audience,
+        ...(cognito ? {} : { audience: o.audience }),
         algorithms: [...(o.algorithms ?? DEFAULT_JWT_ALGORITHMS)],
         clockTolerance: o.clockSkewSeconds ?? 30,
         requiredClaims: ['sub', 'exp', 'iat'],
@@ -89,9 +110,12 @@ export class JwtVerifier {
     const typ = payload['typ'];
     const accepted = o.acceptedTypes ?? ['Bearer', 'at+jwt'];
     if (typ !== undefined && (typeof typ !== 'string' || !accepted.includes(typ))) throw unauthenticated();
+    if (cognito && payload['token_use'] !== 'access') throw unauthenticated();
     if (o.authorizedParties && o.authorizedParties.length > 0) {
-      const azp = payload['azp'];
-      if (typeof azp !== 'string' || !o.authorizedParties.includes(azp)) throw unauthenticated();
+      const client = payload[cognito ? 'client_id' : 'azp'];
+      if (typeof client !== 'string' || !o.authorizedParties.includes(client)) throw unauthenticated();
+    } else if (cognito) {
+      throw unauthenticated();
     }
     if (o.requiredScope) {
       const scope = payload['scope'];
@@ -103,7 +127,7 @@ export class JwtVerifier {
       issuer: o.issuer,
       subject: payload.sub as string,
       email: str(payload['email']),
-      displayName: str(payload['name']) ?? str(payload['preferred_username']),
+      displayName: str(payload['name']) ?? str(payload['preferred_username']) ?? str(payload['username']),
       claims: payload,
     };
   }
