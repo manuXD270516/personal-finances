@@ -3,7 +3,7 @@
  * conversiones, tasas y clasificación. Montos y tasas: `DecimalString` (INV-001), nunca `number`.
  */
 import type { AuditLogEntry } from '../AuditHistory';
-import type { AccountType, Money, RateAttribution } from '../dashboard/types';
+import type { AccountType, Money, RateAttribution, ResolvedRate } from '../dashboard/types';
 
 export type { AccountType, Money } from '../dashboard/types';
 export type { AuditLogEntry } from '../AuditHistory';
@@ -48,6 +48,8 @@ export interface Account {
     readonly rateDate: string;
     readonly rateSource: string;
     readonly fxRateId: string;
+    /** Tasa resuelta completa (tipo, `stale`, atribución del provider). */
+    readonly rate?: ResolvedRate;
   } | null;
   readonly clearedBalance?: Money;
   readonly pendingAmount?: Money;

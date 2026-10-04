@@ -1,17 +1,20 @@
 import type { SeedConfig } from '@pf/platform/config';
 import type { Logger } from '@pf/platform/logging';
-import { Client } from 'pg';
+import { systemClock } from '@pf/shared-kernel';
+import { Client, Pool } from 'pg';
+import { seedWorkspaceProvisioning } from '../identity/workspace-provisioning.js';
 
 export const SEED_PROFILES = ['minimal', 'demo', 'large'] as const;
 export type SeedProfile = (typeof SEED_PROFILES)[number];
 
 /**
  * Datasets disponibles (docs/29). La Minimal Seed registra su ejecución en `platform.seed_run` y, desde la versión
- * 2, siembra las identidades de IDENTITY (usuarios del realm de desarrollo, W1/W2 y sus membresías). Cada contexto
- * añadirá sus datos. `demo`/`large` llegan con los datasets de docs/29.
+ * 2, siembra las identidades de IDENTITY (usuarios del realm de desarrollo, W1/W2 y sus membresías); desde la 3,
+ * provisiona W1/W2 por el MISMO gancho que `CreateWorkspace` (categorías de sistema + catálogo sugerido es-BO y
+ * monedas por defecto). Cada contexto añadirá sus datos. `demo`/`large` llegan con los datasets de docs/29.
  */
 export const SEED_DATASETS: Partial<Record<SeedProfile, { readonly datasetVersion: number }>> = {
-  minimal: { datasetVersion: 2 },
+  minimal: { datasetVersion: 3 },
 };
 
 /**
@@ -55,7 +58,7 @@ export const MINIMAL_WORKSPACES: readonly {
  * Usuarios + W1/W2 + membresías, idempotente, con el rol de la app bajo RLS: cada
  * workspace en su propia transacción con `app.user_id`/`app.workspace_id` LOCAL (como la UnitOfWork).
  */
-async function seedIdentity(client: Client, config: SeedConfig): Promise<void> {
+async function seedIdentity(client: Client, config: SeedConfig): Promise<Map<SeedUser, string>> {
   const issuer = config.OIDC_ISSUER_URL!.replace(/\/+$/, '');
   const ids = new Map<SeedUser, string>();
   for (const u of MINIMAL_USERS) {
@@ -97,6 +100,25 @@ async function seedIdentity(client: Client, config: SeedConfig): Promise<void> {
       throw err;
     }
   }
+  return ids;
+}
+
+/**
+ * Provisión de W1/W2 por el gancho de `CreateWorkspace` (idempotente: las categorías de sistema y del catálogo ya
+ * presentes y las monedas ya habilitadas se omiten). Sin ella, registrar un gasto sin categoría falla con
+ * `REFERENCE_NOT_FOUND` (no existe `UNCATEGORIZED`).
+ */
+async function provisionWorkspaces(config: SeedConfig, owners: ReadonlyMap<SeedUser, string>): Promise<void> {
+  const pool = new Pool({ connectionString: config.DATABASE_URL, application_name: 'pfos-seed', max: 2 });
+  try {
+    const hook = seedWorkspaceProvisioning(pool, systemClock);
+    for (const ws of MINIMAL_WORKSPACES) {
+      const owner = owners.get(ws.members.find((m) => m.role === 'OWNER')!.user)!;
+      await hook.onWorkspaceCreated({ workspaceId: ws.id, userId: owner, seedDefaultCategories: true });
+    }
+  } finally {
+    await pool.end();
+  }
 }
 
 export class SeedRejectedError extends Error {
@@ -124,8 +146,9 @@ export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedP
   const client = new Client({ connectionString: config.DATABASE_URL, application_name: 'pfos-seed' });
   await client.connect();
   try {
-    if (profile === 'minimal' && config.OIDC_ISSUER_URL) await seedIdentity(client, config);
-    else if (profile === 'minimal')
+    if (profile === 'minimal' && config.OIDC_ISSUER_URL) {
+      await provisionWorkspaces(config, await seedIdentity(client, config));
+    } else if (profile === 'minimal')
       logger.warn('OIDC_ISSUER_URL ausente: la Minimal Seed no siembra identidades');
     await client.query('BEGIN');
     await client.query(

@@ -1,10 +1,8 @@
 import { formatMoney, formatLocalDate, isNegative } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
-import { todayIn } from '../common/dates';
 import type { Account, AccountType, Institution, Money } from '../common/types';
 import { badgeStyle, cardStyle, mutedStyle } from '../common/ui';
 import { groupAccounts, maskedIdentifier, type AccountGroupBy } from './logic';
-import type { AccountValuation } from './valuations';
 
 /** Saldo presentado: los pasivos se muestran como "Adeuda …" (positivo), nunca como negativo (docs/28 §8.3). */
 export function BalanceText({ account, ctx }: { account: Account; ctx: FormatContext }) {
@@ -27,31 +25,22 @@ export function BaseEquivalent({
   account,
   baseCurrency,
   ctx,
-  valuation,
 }: {
   account: Account;
   baseCurrency: string;
   ctx: FormatContext;
-  valuation?: AccountValuation | undefined;
 }) {
-  const { t, locale, has, timeZone } = ctx;
+  const { t, locale, has } = ctx;
   if (account.currency === baseCurrency) return null;
-  const eq: { amount: Money; date: string; source: string } | null = account.baseCurrencyBalance
+  const b = account.baseCurrencyBalance;
+  const eq: { amount: Money; date: string; source: string } | null = b
     ? {
-        amount: account.baseCurrencyBalance.amount,
-        date: account.baseCurrencyBalance.rateDate,
-        source: account.baseCurrencyBalance.rateSource,
+        amount: b.amount,
+        date: b.rateDate,
+        // Tasa de provider: se muestra su atribución (docs/31 D31).
+        source: b.rate?.source === 'PROVIDER' && b.rate.attribution ? b.rate.attribution.text : b.rateSource,
       }
-    : valuation
-      ? {
-          amount: valuation.converted,
-          date: todayIn(timeZone, new Date(valuation.rate.asOf)),
-          source:
-            valuation.rate.source === 'PROVIDER' && valuation.rate.attribution
-              ? valuation.rate.attribution.text
-              : valuation.rate.source,
-        }
-      : null;
+    : null;
   if (!eq)
     return (
       <span data-testid="account-no-rate" style={mutedStyle}>
@@ -86,8 +75,6 @@ export interface AccountsListViewProps {
   readonly baseCurrency: string;
   readonly ctx: FormatContext;
   readonly href: (path: string) => string;
-  /** Equivalentes en moneda base por cuenta (valoración del resumen) cuando la cuenta no trae el suyo. */
-  readonly valuations?: ReadonlyMap<string, AccountValuation>;
 }
 
 /**
@@ -101,7 +88,6 @@ export function AccountsListView({
   baseCurrency,
   ctx,
   href,
-  valuations,
 }: AccountsListViewProps) {
   const { t } = ctx;
   if (accounts.length === 0) return <p data-testid="accounts-empty">{t('empty')}</p>;
@@ -157,12 +143,7 @@ export function AccountsListView({
                     <strong data-testid="account-balance">
                       <BalanceText account={a} ctx={ctx} />
                     </strong>
-                    <BaseEquivalent
-                      account={a}
-                      baseCurrency={baseCurrency}
-                      ctx={ctx}
-                      valuation={valuations?.get(a.id)}
-                    />
+                    <BaseEquivalent account={a} baseCurrency={baseCurrency} ctx={ctx} />
                   </div>
                   <small style={mutedStyle} data-testid="account-liquidity" data-liquidity={a.liquidity}>
                     {t(`liquidity.${a.liquidity}`)}

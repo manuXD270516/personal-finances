@@ -32,8 +32,9 @@
 
 ## 6. UI
 
-- [ ] 6.1 Formulario de transferencia con comisión opcional y atajo "Pagar tarjeta"; ante `TRANSFER_CURRENCY_MISMATCH` ofrecer abrir el formulario de conversión prellenado; verificar axe sin violaciones serious/critical y viewport 360 px
+- [x] 6.1 Formulario de transferencia con comisión opcional y atajo "Pagar tarjeta"; ante `TRANSFER_CURRENCY_MISMATCH` ofrecer abrir el formulario de conversión prellenado; verificar axe sin violaciones serious/critical y viewport 360 px
   - Nota (2026-10-03): formulario hecho (`apps/web/src/ui/transactions/TransferForm.tsx`, `/transferencias/nueva` y atajo "Pagar tarjeta" `?pagoTarjeta=1` con la deuda de la tarjeta y "Pagar el total"); con monedas distintas no permite registrar y ofrece la conversión prellenada (también ante `TRANSFER_CURRENCY_MISMATCH`). Viewport 360 px verificado en E2E; pendiente la verificación con axe.
+  - Nota (2026-10-04): /transferencias/nueva (y /fx/conversiones/nueva) verificado con axe-core (`@axe-core/playwright`, WCAG 2.1 A/AA) en `tests/e2e/specs/a11y.spec.ts`: sin violaciones serious/critical (2026-10-04).
 
 ## 7. AUTOMATED TESTS y E2E
 

@@ -18,6 +18,8 @@ export interface ApiRequestState {
   validated?: ValidatedRequest;
   /** Versión esperada según `If-Match` (`"7"` → 7). */
   expectedVersion?: number;
+  /** La cuota de esta petición ya se consumió (guard anónimo o interceptor autenticado). */
+  rateLimited?: boolean;
 }
 
 export type ApiRequest = IncomingMessage & {

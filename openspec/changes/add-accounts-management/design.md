@@ -128,8 +128,13 @@ autónoma, a revisar por el owner:
 3. **Saldos.** `LedgerBalancesAdapter` usa `BalanceQuery.getTrialBalance` (API pública del ledger) y toma la línea cuyo
    `accountId` es la cuenta: saldo presentado = `presented`. Sin ledger account ⇒ saldo cero y "sin movimientos" (el
    ledger account nace con el primer posting), que es también el criterio de `ACCOUNT_CURRENCY_IMMUTABLE` y de cierre.
-4. **Equivalente en moneda base**: `baseCurrencyBalance = null` siempre hasta `add-manual-conversions` (sin
-   `FxRateQueryPort`); TC-ACCOUNTS-LIST-001 queda pendiente.
+4. **Equivalente en moneda base** (actualizado 2026-10-04): `baseCurrencyBalance` se valora con el puerto público
+   `FxValuationPort` de `@pf/fx/contracts` (una resolución por lote a "ahora", misma semántica que Reporting: tipo
+   preferido del par, principal → respaldo → última conocida obsoleta o manual, directa → inversa → cruzada) y la
+   moneda base/zona del workspace de IDENTITY (composición en `apps/api`). Conversión con la tasa exacta y HALF_EVEN una
+   sola vez a la escala de la base; `rateDate` = fecha del `asOf` en la zona del workspace; `rate` (aditivo) lleva la
+   `ResolvedRate` completa (`stale`, selección, atribución). `null` si la cuenta está en la moneda base o sin tasa
+   (contrato). TC-ACCOUNTS-LIST-001 automatizado.
 5. **Moneda habilitada** = existe en `fx.currency` con `is_active` (no hay aún catálogo de monedas por workspace).
 6. **Etiquetas**: `TagCatalogPort` por defecto permisivo hasta `add-classification`; `account_tag.tag_id` sin FK.
 7. **Fechas de negocio** (`openedOn` por defecto, `archivedOn`, `reactivatedOn`): "hoy" en la zona del workspace (vía

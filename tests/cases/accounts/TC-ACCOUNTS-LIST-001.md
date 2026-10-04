@@ -14,6 +14,9 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
+  - packages/contexts/accounts/src/application/base-currency-valuation.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - apps/api/test/api/accounts.api.test.ts
   - apps/web/src/ui/accounts/AccountsListView.test.tsx
   - tests/e2e/specs/accounts.spec.ts
 status: automated
@@ -32,10 +35,10 @@ steps: ["Listar cuentas"]
 expected_result:
   - "USD Savings: balance 500.00 USD; baseCurrencyBalance 3480.00 BOB con rateDate 2026-03-14 y rateSource manual"
   - "BTC Wallet: balance 0.01250000 BTC; baseCurrencyBalance null con indicación de equivalente no disponible"
-  - "Credit Card: balance 350.00 BOB presentado como adeudado; baseCurrencyBalance 350.00 BOB"
+  - "Credit Card: balance 350.00 BOB presentado como adeudado; baseCurrencyBalance null (ya está en la moneda base, contrato `Account.baseCurrencyBalance`)"
   - "Ningún equivalente se persiste; registrar luego una tasa USD→BOB 6.97 cambia el equivalente mostrado sin alterar transacciones históricas"
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-LIST-001 — El listado de cuentas muestra el saldo en su moneda y el equivalente en BOB con fecha y fuente de la tasa

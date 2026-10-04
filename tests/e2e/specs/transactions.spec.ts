@@ -296,22 +296,13 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     const W = `/workspaces/${W1}`;
     const suffix = randomUUID().slice(0, 8);
     const bank = await openAccount(editor.page, W, `Banco historial ${suffix}`, 'BANK', 'BOB', '1000.00');
-    // La Minimal Seed no provisiona categorías en W1: se crea una propia para el split.
-    const group = await api(editor.page, 'POST', `${W}/category-groups`, {
-      name: `Grupo ${suffix}`,
-      kind: 'EXPENSE',
-    });
-    const category = await api(editor.page, 'POST', `${W}/categories`, {
-      groupId: String(group['id']),
-      name: `Varios ${suffix}`,
-    });
+    // Sin categoría: la Minimal Seed provisiona W1 como cualquier workspace ("Sin categoría" de sistema).
     const created = await api(editor.page, 'POST', `${W}/transactions`, {
       kind: 'EXPENSE',
       transactionDate: todayLaPaz(),
       accountId: bank,
       amount: bob('120.00'),
       description: `Historial ${suffix}`,
-      splits: [{ amount: bob('120.00'), categoryId: String(category['id']) }],
     });
     const id = String(created['id']);
     await go(editor.page, `/transacciones/${id}`);

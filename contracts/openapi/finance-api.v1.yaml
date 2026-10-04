@@ -3530,14 +3530,25 @@ components:
       enum: [ACTIVE, CLOSED, ARCHIVED]
     BaseCurrencyBalance:
       type: object
-      description: Balance valued in the workspace base currency with the rate used (never invented when no rate exists)
+      description: |
+        Balance valued in the workspace base currency with the rate used (never invented when no rate exists). Same
+        valuation semantics as the report summary: preferred rate type of the pair, provider selection (primary →
+        fallback → last known stale or recent manual), direct → inverse → cross by pivot; converted with the exact
+        stored rate and rounded HALF_EVEN once to the base currency scale. Derived, never persisted.
       additionalProperties: false
       required: [amount, rateDate, rateSource, fxRateId]
       properties:
         amount: { $ref: '#/components/schemas/Money' }
-        rateDate: { $ref: '#/components/schemas/LocalDate' }
+        rateDate:
+          $ref: '#/components/schemas/LocalDate'
+          description: Business date of the rate `asOf` in the workspace time zone
         rateSource: { type: string, examples: [MANUAL] }
-        fxRateId: { $ref: '#/components/schemas/Uuid' }
+        fxRateId:
+          $ref: '#/components/schemas/Uuid'
+          description: Stored rate version used (for a CROSS derivation, the first stored rate of the computation)
+        rate:
+          $ref: '#/components/schemas/ResolvedRate'
+          description: Full resolved rate (type, derivation, asOf, stale, selection and attribution to display)
     Account:
       type: object
       required: [id, name, type, classification, status, liquidity, currency, balance, includeInNetWorth, version, createdAt]

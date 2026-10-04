@@ -44,7 +44,7 @@ function pick<T>(body: Json, keys: readonly string[]): T {
   return out as T;
 }
 
-/** `Account` del contrato OpenAPI (dinero como string decimal; equivalente en moneda base pendiente de FX). */
+/** `Account` del contrato OpenAPI (dinero como string decimal; equivalente en moneda base valorado con FX). */
 export function toAccountDto(v: AccountView) {
   const a = v.account;
   return {
@@ -59,7 +59,7 @@ export function toAccountDto(v: AccountView) {
     openedOn: a.openedOn,
     closedOn: a.closedOn,
     balance: v.balance,
-    baseCurrencyBalance: null,
+    baseCurrencyBalance: v.baseCurrencyBalance,
     includeInNetWorth: a.includeInNetWorth,
     includeInBudget: a.includeInBudget,
     displayOrder: a.displayOrder,

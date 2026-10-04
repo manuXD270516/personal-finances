@@ -1,0 +1,60 @@
+import { AxeBuilder } from '@axe-core/playwright';
+import { expect, test, type Page } from '@playwright/test';
+import { go, newFinanceUser, openAccount } from '../src/finance.js';
+
+/**
+ * Accesibilidad de las pantallas principales (NFR-USAB-001, WCAG 2.1 AA): axe-core sin violaciones `serious` ni
+ * `critical` (add-accounts-management 7.3, add-transaction-recording 6.1, add-transfers 6.1, add-audit-trail 7.1).
+ * Las páginas se analizan con datos (cuentas en BOB/USD) para que listados y formularios rendericen completos.
+ */
+const PAGES: readonly { readonly path: string; readonly name: string }[] = [
+  { path: '/', name: 'Inicio' },
+  { path: '/cuentas', name: 'Cuentas' },
+  { path: '/cuentas/nueva', name: 'Nueva cuenta' },
+  { path: '/transacciones', name: 'Transacciones' },
+  { path: '/transacciones/nueva', name: 'Nueva transacción' },
+  { path: '/transferencias/nueva', name: 'Nueva transferencia' },
+  { path: '/fx', name: 'Tasas de cambio' },
+  { path: '/fx/conversiones/nueva', name: 'Nueva conversión' },
+  { path: '/instituciones', name: 'Instituciones' },
+  { path: '/clasificacion', name: 'Clasificación' },
+];
+
+async function seriousViolations(page: Page) {
+  const result = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  return result.violations
+    .filter((v) => v.impact === 'serious' || v.impact === 'critical')
+    .map((v) => ({
+      id: v.id,
+      impact: v.impact,
+      help: v.help,
+      targets: v.nodes.slice(0, 5).map((n) => n.target.join(' ')),
+    }));
+}
+
+test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
+  test('sin violaciones serias ni críticas en Home, cuentas, transacciones, transferencias, FX, instituciones y clasificación', async ({
+    browser,
+  }) => {
+    const { context, page, W } = await newFinanceUser(browser, 'a11y');
+    const bank = await openAccount(page, W, 'Banco a11y', 'BANK', 'BOB', '1000.00');
+    await openAccount(page, W, 'Ahorro USD a11y', 'SAVINGS', 'USD', '100.00');
+
+    const found: Record<string, Awaited<ReturnType<typeof seriousViolations>>> = {};
+    for (const p of PAGES) {
+      await go(page, p.path);
+      await expect(page.locator('main, [role="main"]').first()).toBeVisible();
+      const violations = await seriousViolations(page);
+      if (violations.length > 0) found[`${p.name} (${p.path})`] = violations;
+    }
+    // Detalle de cuenta con la pestaña Historial de auditoría (componente `AuditHistory`, add-audit-trail 7.1).
+    await go(page, `/cuentas/${bank}`);
+    await expect(page.getByTestId('audit-history')).toBeVisible();
+    const detail = await seriousViolations(page);
+    if (detail.length > 0) found['Detalle de cuenta con historial (/cuentas/{id})'] = detail;
+    expect(found).toEqual({});
+    await context.close();
+  });
+});

@@ -1,4 +1,5 @@
 import type { AuditPort } from '@pf/audit/contracts';
+import type { FxValuationPort } from '@pf/fx/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { AccountOpeningBalancePort, MoneyDto } from '../../contracts/index.js';
 import type {
@@ -115,6 +116,17 @@ export interface WorkspaceCalendar {
   today(workspaceId: string): Promise<string>;
 }
 
+/** Moneda base y zona horaria del workspace (IDENTITY, vía composition root). */
+export interface WorkspaceSettingsPort {
+  settingsOf(workspaceId: string): Promise<{ readonly baseCurrency: string; readonly timeZone: string }>;
+}
+
+/** Valoración del equivalente en moneda base (FR-ACCOUNTS-010): puerto público de FX + ajustes del workspace. */
+export interface BaseCurrencyValuationDeps {
+  readonly rates: FxValuationPort;
+  readonly workspaces: WorkspaceSettingsPort;
+}
+
 export interface AccountsDeps {
   readonly uow: UnitOfWork;
   readonly accounts: AccountRepository;
@@ -128,4 +140,6 @@ export interface AccountsDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly calendar: WorkspaceCalendar;
+  /** Sin valoración (p. ej. sin FX compuesto) `baseCurrencyBalance` es siempre `null`. */
+  readonly valuation?: BaseCurrencyValuationDeps;
 }

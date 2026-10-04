@@ -56,6 +56,7 @@
 
 - [x] 7.1 Componente "Historial" reutilizable (lista cronológica con actor, acción, instante en zona del workspace, diff antes/después con montos formateados por locale `es-BO`), visible solo para OWNER/EDITOR; textos vía catálogo i18n; verificar con test de componente y axe sin violaciones serias
   > Hecho parcialmente: `AuditHistory` en Configuración (OWNER/EDITOR), i18n es/en/pt, test de componente con estructura accesible. **Pendiente:** verificación con axe (no hay axe-core/jsdom en el repo; no se agregaron dependencias).
+  > Nota (2026-10-04): `AuditHistory` en el detalle de cuenta (`/cuentas/{id}`, rol OWNER) verificado con axe-core (`@axe-core/playwright`, WCAG 2.1 A/AA) en `tests/e2e/specs/a11y.spec.ts`: sin violaciones serious/critical (2026-10-04).
 
 ## 8. Tests automatizados y E2E
 

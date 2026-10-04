@@ -23,6 +23,7 @@ import {
 } from '@pf/platform/api';
 import {
   API_CONVENTIONS,
+  chargeFailedAuthentication,
   ExpectedVersion,
   principalOf,
   setPrincipal,
@@ -71,7 +72,17 @@ export class IdentityAccessGuard implements CanActivate {
     const op = route ? this.options.contract.find(req.method ?? 'GET', route) : undefined;
     if (!op) return true; // fuera de la API versionada (health, diagnósticos)
 
-    const token = await this.verifier.verify(JwtVerifier.bearer(req.headers.authorization));
+    // Cada 401 consume la cuota por IP del tráfico anónimo y, agotada, se responde 429. El tráfico válido no paga
+    // aquí (se cuenta por usuario en `RateLimitInterceptor`), así que los usuarios detrás del BFF no se penalizan.
+    let token: VerifiedAccessToken;
+    try {
+      token = await this.verifier.verify(JwtVerifier.bearer(req.headers.authorization));
+    } catch (err) {
+      if (err instanceof ApiProblem && err.code === 'UNAUTHENTICATED') {
+        await chargeFailedAuthentication(this.options, req);
+      }
+      throw err;
+    }
     const { userId } = await this.service.provision(toIdentity(token));
     setPrincipal(req, { userId });
 
