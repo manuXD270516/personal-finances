@@ -290,6 +290,73 @@ describe('Snapshots de saldo y verificador de invariantes (PostgreSQL 18, pf_wor
     expect(await balance(ws, bank, '2026-01-31')).toBe('830.00');
   });
 
+  it('[TC-LEDGER-SNAPSHOT-001] (lote) saldos de todas las cuentas: snapshots de distinto checkpoint, el más reciente invalidado cae al anterior válido; solo cuentas del usuario', async () => {
+    const ws = randomUUID();
+    await createWorkspace(ws);
+    const bankA = randomUUID();
+    const bankB = randomUUID();
+    await seedBankA(ws, bankA);
+    await post(ws, '2026-01-01', [userLine(bankB, '500.00'), sysLine('OPENING_BALANCE', '-500.00')], {
+      entryType: 'OPENING',
+    });
+    const ledgerA = await ledgerAccount(ws, bankA);
+    const ledgerB = await ledgerAccount(ws, bankB);
+    await maintenance.rebuildBalanceSnapshots({ workspaceId: ws, asOfDate: '2026-01-31' });
+    // Snapshot anterior de A (2026-01-15, 1000.00) con el mismo checkpoint que el del 2026-01-31.
+    await asMaintenance(async (c) => {
+      const { rows } = await c.query<{ m: string }>(
+        `SELECT last_sequence::text AS m FROM ledger.balance_snapshot
+          WHERE workspace_id = $1 AND ledger_account_id = $2`,
+        [ws, ledgerA],
+      );
+      await c.query(
+        `INSERT INTO ledger.balance_snapshot (workspace_id, ledger_account_id, as_of_date, currency, balance, last_sequence)
+         VALUES ($1, $2, '2026-01-15', 'BOB', 1000.00, $3)`,
+        [ws, ledgerA, rows[0]!.m],
+      );
+    });
+    // Retroactivo en A (2026-01-20): invalida su snapshot del 01-31 pero no el del 01-15.
+    await post(ws, '2026-01-20', [sysLine('EXPENSE', '20.00'), userLine(bankA, '-20.00')]);
+    // B se reconstruye después (checkpoint mayor que el de A) y luego recibe un retroactivo (2026-01-10).
+    await maintenance.rebuildBalanceSnapshots({
+      workspaceId: ws,
+      ledgerAccountId: ledgerB,
+      asOfDate: '2026-01-31',
+    });
+    await post(ws, '2026-01-10', [sysLine('EXPENSE', '75.25'), userLine(bankB, '-75.25')]);
+
+    const all = await asUser(() =>
+      ledger.accountBalances.getAccountBalances({ workspaceId: ws, asOf: '2026-01-31' }),
+    );
+    expect(
+      all.balances.map((b) => [b.accountId, b.ledgerAccountId, b.nature, b.balance.amount]).sort(),
+    ).toEqual(
+      [
+        [bankA, ledgerA, 'ASSET', '830.00'],
+        [bankB, ledgerB, 'ASSET', '424.75'],
+      ].sort(),
+    );
+    expect(await sumPostings(ws, ledgerA, '2026-01-31')).toBe('830.00');
+    expect(await sumPostings(ws, ledgerB, '2026-01-31')).toBe('424.75');
+    expect(await balance(ws, bankA, '2026-01-31')).toBe('830.00');
+    expect(await balance(ws, bankA, '2026-01-16')).toBe('1000.00');
+    expect(await balance(ws, bankA, '2026-02-01')).toBe('530.00');
+
+    // Filtro por cuentas del usuario y saldo actual por defecto (2026-01-31 en La Paz).
+    const onlyA = await asUser(() =>
+      ledger.accountBalances.getAccountBalances({ workspaceId: ws, accountIds: [bankA] }),
+    );
+    expect(onlyA.balances.map((b) => [b.accountId, b.balance.amount])).toEqual([[bankA, '830.00']]);
+    expect(onlyA.asOf).toBe('2026-01-31');
+    // El balance de comprobación sigue viendo las cuentas de sistema (Σ por moneda = 0).
+    const trial = await asUser(() =>
+      ledger.balances.getTrialBalance({ workspaceId: ws, asOf: '2026-01-31' }),
+    );
+    expect(trial.currencies.map((c) => [c.currency, c.total.amount, c.lines.length])).toEqual([
+      ['BOB', '0.00', 4],
+    ]);
+  });
+
   it('[TC-LEDGER-INTEGRITY-001] el verificador detecta un snapshot divergente: log error con workspaceId y métrica', async () => {
     const ws = randomUUID();
     await createWorkspace(ws);

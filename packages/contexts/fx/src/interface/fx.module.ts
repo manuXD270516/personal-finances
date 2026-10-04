@@ -100,6 +100,15 @@ function valuationPort(queries: FxQueries): FxValuationPort {
         scale: r.definition.scale,
       }));
     },
+    async workspaceCurrencies(workspaceId) {
+      const rows = await queries.listCurrencies(workspaceId, {});
+      return rows.map((r) => ({
+        code: r.definition.code,
+        kind: r.definition.kind,
+        scale: r.definition.scale,
+        enabled: r.enabled,
+      }));
+    },
   };
 }
 

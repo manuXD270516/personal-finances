@@ -64,7 +64,7 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     },
     options.audit,
   );
-  const balances = new PgBalanceQuery(uow, pgCurrencyCatalog, options.clock);
+  const balances = new PgBalanceQuery(uow, options.clock);
   return { posting: service, periodLock: service, balances, accountBalances: balances };
 }
 

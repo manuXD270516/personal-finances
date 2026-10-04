@@ -35,7 +35,7 @@ import { SeededRandom } from '../../demo/dataset/prng.js';
  */
 export const LARGE_MANIFEST = {
   profile: 'large',
-  datasetVersion: '1',
+  datasetVersion: '2',
   generatorVersion: '1.0.0',
   prngSeed: 20210930,
   startYear: 2021,
@@ -145,9 +145,9 @@ const MAIN_ACCOUNTS: readonly [string, string, AccountType, DemoCurrency, string
   ['usdt2', 'P2P Exchange Demo — Ahorro USDT', 'CRYPTO_WALLET', 'USDT', 'p2p', 200_000_000n],
   ['usdt3', 'Cold Wallet Demo — USDT', 'CRYPTO_WALLET', 'USDT', 'cold', 0n],
   ['btc1', 'Cold Wallet BTC', 'CRYPTO_WALLET', 'BTC', 'cold', 1_000_000n],
-  // Con saldo de apertura: una cuenta BTC sin postings (BTC no habilitada en el workspace) rompe hoy GET /reports/summary
-  // (CURRENCY_MISMATCH BTC(8) vs BTC(18), escala de respaldo de reporting); ver el reporte del change.
-  ['btc2', 'P2P Exchange Demo — BTC', 'CRYPTO_WALLET', 'BTC', 'p2p', 500_000n],
+  // Sin postings y con BTC no habilitada en el workspace: GET /reports/summary la presenta en cero a la escala del
+  // catálogo (TC-REPORTING-NETWORTH-001, regresión del CURRENCY_MISMATCH BTC(8) vs BTC(18)).
+  ['btc2', 'P2P Exchange Demo — BTC', 'CRYPTO_WALLET', 'BTC', 'p2p', 0n],
   ['card1', 'Tarjeta Andina Demo', 'CREDIT_CARD', 'BOB', 'andino', 0n],
   ['card2', 'Tarjeta Sol Demo', 'CREDIT_CARD', 'BOB', 'sol', 0n],
   ['card3', 'Tarjeta Illimani Demo', 'CREDIT_CARD', 'BOB', 'illimani', 0n],
