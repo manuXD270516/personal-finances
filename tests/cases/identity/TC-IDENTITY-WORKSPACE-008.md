@@ -13,9 +13,10 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+- tests/e2e/specs/workspace-identity.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -34,7 +35,7 @@ expected_result:
 - La vista de cuentas muestra W2 Bank con 5000.00 BOB y ninguna cuenta de W1
 - Todas las peticiones de negocio llevan el id de W2 en la ruta
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-WORKSPACE-008 — Cambiar el workspace activo muestra solo datos del workspace elegido
@@ -55,3 +56,4 @@ Entonces ve la cuenta "W2 Bank" con 5000.00 BOB
 ## Notas
 
 - Requirement Should.
+- Automatizado (2026-10-04, add-workspace-identity 9.2) en `tests/e2e/specs/workspace-identity.spec.ts`: owner elige W1 y luego W2 en el selector de la vista de cuentas; se verifica "W2 Bank" con 5.000,00 BOB, ninguna cuenta de W1 y que toda petición de negocio interceptada lleva el id de W2 en la ruta. "W2 Bank" no es parte de la Minimal Seed: la prueba la crea una vez (idempotente) en W2.

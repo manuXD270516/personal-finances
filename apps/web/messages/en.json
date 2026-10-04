@@ -30,7 +30,9 @@
     "fx": "Crypto & FX",
     "classification": "Classification",
     "demoIndicator": "Demo data — this workspace contains fictitious data and can be fully cleaned up.",
-    "demoOption": "{name} (demo)"
+    "demoOption": "{name} (demo)",
+    "workspaceSwitched": "Active workspace: {name}.",
+    "switching": "Switching workspace…"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -49,7 +51,29 @@
     "creating": "Creating…",
     "created": "Workspace created: {name}.",
     "readOnly": "Only the owner can change these settings.",
-    "seedCatalog": "Load the suggested category catalog (you can edit it later)"
+    "seedCatalog": "Load the suggested category catalog (you can edit it later)",
+    "minimumReserveIn": "Minimum liquidity reserve ({currency})",
+    "timezoneHint": "IANA identifier, for example America/La_Paz.",
+    "localeHint": "Number, amount and date format of the workspace.",
+    "fiscalHint": "A day between 1 and 28.",
+    "baseCurrencyWarning": "Changing the base currency does not modify recorded amounts, entries or rates; totals are recalculated in the new currency.",
+    "noChanges": "There are no changes to save.",
+    "reloadLatest": "Load the current version",
+    "reloaded": "The current version was loaded. Review the values and save again.",
+    "membersNote": "Member and invitation management will arrive in a future release.",
+    "errors": {
+      "nameRequired": "Enter a name.",
+      "nameTooLong": "The name allows up to 100 characters.",
+      "timezoneInvalid": "This is not a valid IANA time zone (for example America/La_Paz).",
+      "fiscalRange": "Choose a day between 1 and 28.",
+      "localeRequired": "Choose a language and format.",
+      "amount": {
+        "EMPTY": "Enter an amount.",
+        "INVALID": "This is not a valid amount.",
+        "SCALE": "{currency} allows up to {scale} decimals.",
+        "NOT_POSITIVE": "The reserve cannot be negative."
+      }
+    }
   },
   "Preferences": {
     "title": "My preferences",
@@ -57,7 +81,18 @@
     "locale": "Language",
     "timezone": "Time zone",
     "save": "Save preferences",
-    "saved": "Preferences saved."
+    "saved": "Preferences saved.",
+    "saving": "Saving…",
+    "localeHint": "Interface language and format of your preferences. The screen switches language when you save.",
+    "timezoneHint": "IANA identifier, for example America/La_Paz.",
+    "noChanges": "There are no changes to save.",
+    "reloadLatest": "Load the current version",
+    "reloaded": "The current version was loaded. Review the values and save again.",
+    "errors": {
+      "displayNameRequired": "Enter a display name.",
+      "displayNameTooLong": "The name allows up to 100 characters.",
+      "timezoneInvalid": "This is not a valid IANA time zone (for example America/La_Paz)."
+    }
   },
   "Auth": {
     "errorTitle": "We couldn't sign you in",
@@ -1142,5 +1177,10 @@
     "cleanupConfirm": "Yes, clean up",
     "cancel": "Cancel",
     "disabled": "Loading demo data is disabled in this environment."
+  },
+  "Locales": {
+    "es-BO": "Español (Bolivia)",
+    "en-US": "English (United States)",
+    "pt-BR": "Português (Brasil)"
   }
 }
