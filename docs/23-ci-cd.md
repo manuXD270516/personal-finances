@@ -2,7 +2,7 @@
 
 > **Estado:** Aceptado — PR gate y build once implementados en Phase 0 (`bootstrap-platform-foundation`); secciones marcadas **as-built (2026-10-02)** · **Fecha:** 2026-10-01 (diseño) / 2026-10-02 (as-built) · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §5 (ADR-0015), §9, §11, §12, §15 · [03-openspec-strategy.md](03-openspec-strategy.md) · [16-testing-strategy.md](16-testing-strategy.md) §10 · [17-test-traceability.md](17-test-traceability.md) · [19-local-development.md](19-local-development.md) · [20-container-strategy.md](20-container-strategy.md) · [21-cloud-deployment-options.md](21-cloud-deployment-options.md) · [22-infrastructure.md](22-infrastructure.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · ADR-0015, ADR-0016, ADR-0024 · Spec: `openspec/changes/bootstrap-platform-foundation/specs/platform/delivery-pipeline/spec.md` · SPIKE-01
 
-> **As-built (2026-10-02).** Existen y son la fuente de verdad [`.github/workflows/pr.yml`](../.github/workflows/pr.yml), [`.github/workflows/main.yml`](../.github/workflows/main.yml) y la acción compuesta [`.github/actions/setup-workspace`](../.github/actions/setup-workspace/action.yml); la política de excepciones de vulnerabilidades está en [`.trivyignore.yaml`](../.trivyignore.yaml) y las reglas de arquitectura en [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs). §5.1 y §5.2 se reemplazaron por un resumen de esos ficheros; el estado real del gate está en §16. `release.yml`, `deploy.yml`, `nightly.yml` e `infra.yml` (§5.3–§5.6) siguen siendo **ilustrativos** (no hay despliegue en cloud todavía). Todas las actions de terceros se fijan por **commit SHA** completo (en los ejemplos ilustrativos, abreviado como `@<sha>`).
+> **As-built (2026-10-02).** Existen y son la fuente de verdad [`.github/workflows/pr.yml`](../.github/workflows/pr.yml), [`.github/workflows/main.yml`](../.github/workflows/main.yml) y la acción compuesta [`.github/actions/setup-workspace`](../.github/actions/setup-workspace/action.yml); la política de excepciones de vulnerabilidades está en [`.trivyignore.yaml`](../.trivyignore.yaml) y las reglas de arquitectura en [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs). §5.1 y §5.2 se reemplazaron por un resumen de esos ficheros; el estado real del gate está en §16. `release.yml`, `deploy.yml` e `infra.yml` (§5.3, §5.4, §5.6) siguen siendo **ilustrativos** (no hay despliegue en cloud todavía); [`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml) existe desde 2026-10-04 (§5.5, as-built). Todas las actions de terceros se fijan por **commit SHA** completo (en los ejemplos ilustrativos, abreviado como `@<sha>`).
 
 ---
 
@@ -214,26 +214,18 @@ jobs:
 
 Los comandos `pnpm deploy:*` son scripts TypeScript (`tools/deploy/`) sobre AWS SDK v3 — testeables, cross-platform y reutilizables desde el portátil del owner en break-glass.
 
-### 5.5 `nightly.yml` (ilustrativo — no implementado)
+### 5.5 `nightly.yml` — as-built (2026-10-04)
 
-```yaml
-name: nightly
-on:
-  schedule: [{ cron: "0 7 * * *" }]   # 03:00 America/La_Paz
-  workflow_dispatch:
-permissions: { contents: read, id-token: write, issues: write }
-concurrency: { group: nightly, cancel-in-progress: true }
-jobs:
-  full-tests:        # suite completa sin --affected, PBT numRuns=10000 (seed aleatoria, se imprime)
-  e2e-full:          # Playwright Chromium + Firefox + WebKit sobre compose core + seed demo
-  mutation:          # Stryker (informativo → gate en módulos críticos, doc 16)
-  multi-arch-smoke:  # compose smoke con imágenes arm64 (runner arm)
-  rescan-deployed:   # Trivy sobre digests desplegados en staging/prod (CVE nuevos) → issue
-  infra-drift:       # terraform plan -detailed-exitcode por entorno → issue infra-drift
-  traceability:      # genera matriz FR→Spec→TC→test y la publica como artefacto
-  restore-drill:     # semanal/mensual (if: github.event.schedule…): ver doc 30 §8
-  perf:              # k6 con seed large (Phase 2+)
-```
+Fichero real: [`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml). Disparo `schedule` `0 6 * * *` (06:00 UTC = 02:00 America/La_Paz) + `workflow_dispatch`; `permissions: contents: read` a nivel de workflow (solo `fx-smoke-live` agrega `issues: write`); `concurrency: nightly` con `cancel-in-progress: true`; mismas actions fijadas por SHA que `pr.yml`. **No es un check requerido** y no altera los de `pr.yml` (§16). Cuatro jobs independientes:
+
+| Job | Qué ejecuta | Falla si | Artefacto |
+|---|---|---|---|
+| `regression (Financial Regression Suite)` | `pnpm turbo run build` + `NIGHTLY=1 pnpm traceability:regression --run`: TC con `regression_suite: true` derivados de `tests/cases` (`@pf/traceability`), grupos unit + integración (Testcontainers) filtrados por TC-ID; `NIGHTLY=1` sube los PBT a 10 000 corridas con semilla aleatoria | algún grupo falla | `regression-suite` (JSON + MD, 30 días) |
+| `mutation (shared-kernel)` | `test:coverage` (Vitest + v8) y `test:mutation` (Stryker 10, command runner) | líneas < 95 % o ramas < 90 % (`vitest.config.ts`); mutation score < 80 % (`stryker.config.json`, `break: 80`) | `shared-kernel-quality` (coverage + reporte Stryker HTML/JSON) |
+| `perf (Large Seed + NFR-PERF)` | `pnpm perf:bench` (`apps/api/test/perf/nightly.perf.ts`): PostgreSQL 18 por Testcontainers, Large Seed (docs/29 §2.3) por los casos de uso, API en proceso con JWT locales; mide NFR-PERF-001/003/004/005 y el overhead de RLS | algún p95 supera su umbral de docs/02 o el overhead de RLS ≥ 10 % (sobre el piso de ruido de 0.5 ms) | `perf-report` (`perf-results.json` + `perf-summary.md`, 90 días) |
+| `fx-smoke-live (no bloqueante)` | `pnpm fx:smoke-live`: una solicitud a cada endpoint real de paralelo.bo y bo.dolarapi.com con el cliente/adapters del worker, validación contra el consumer contract del adapter y SHA-256 de `https://paralelo.bo/openapi.json` contra el valor grabado. **Único job con red hacia terceros** | nunca rompe el pipeline (`continue-on-error: true`); ante falla abre o comenta el issue «fx:smoke-live: revisar los adapters de providers de tasas» con `GITHUB_TOKEN` (`issues: write`) | `fx-smoke-live` (JSON + MD) |
+
+Diferencias con el ejemplo ilustrativo: sin `e2e-full` multi-navegador, `multi-arch-smoke`, `rescan-deployed`, `infra-drift` ni `restore-drill` (no hay cloud ni imágenes multi-arch todavía); performance con un harness Node (no k6) que mide ida y vuelta HTTP en el mismo host (cota superior del server time) y EXPLAIN ANALYZE para RLS; la seed `large` se genera en cada corrida (sin snapshot `pg_dump` restaurable aún, docs/29 §7 pregunta 1). Los mismos comandos corren en local: `pnpm traceability:regression --run`, `pnpm --filter @pf/shared-kernel run test:coverage` / `test:mutation`, `pnpm perf:bench` (variables `PF_PERF_SCALE`, `PF_PERF_MONTHS`, `PF_PERF_SATELLITES`, `PF_PERF_ITERATIONS` para corridas rápidas) y `pnpm fx:smoke-live`.
 
 ### 5.6 `infra.yml` (ilustrativo — no implementado; reutilizable; detalle conceptual en [22-infrastructure.md](22-infrastructure.md) §8)
 
@@ -286,6 +278,8 @@ jobs:
 | Mutation / performance / ZAP | n/a | Nightly informativo | Según doc 16 |
 
 Fuente de verdad de la progresión: [16-testing-strategy.md](16-testing-strategy.md) §10.
+
+> **As-built (2026-10-04):** mutation (shared-kernel, `break: 80`), coverage del shared-kernel (95/90) y performance (NFR-PERF-001/003/004/005 + RLS) corren en `nightly.yml` (§5.5) y fallan ese workflow ante una brecha, pero no son checks del PR. La Financial Regression Suite se **lista** en cada PR (job `traceability`, artefacto `regression-suite.{json,md}`; sus tests ya corren completos en `unit` e `integration`) y se **ejecuta agrupada** con `NIGHTLY=1` en el nightly.
 
 > **As-built (2026-10-02):** el bootstrap adelantó a Phase 0 los gates de la columna Phase 1 que ya tienen contenido: format, lint, typecheck, OpenSpec, `config-docs`, architecture, traceability, unit, integration, build de imágenes (sin size budget), Trivy imagen + `trivy fs` (**CRITICAL** con fix), secretos y el compose smoke (`stack-smoke` = `pnpm test:stack`, en todo PR). Aún no existen: markdownlint, OpenAPI lint, migration validation, E2E, coverage ni mutation.
 
@@ -446,3 +440,10 @@ Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branche
 - **Tras el merge:** el PR #1 se fusionó en `main` (commit `ff6b8e0`) y el run `37046732572` de `main.yml` terminó en verde (`build-push` ×2 y `verify-by-digest`).
 - Reproducción local de los checks que no necesitan GitHub (verificado en Windows 11, PowerShell y Git Bash): `pnpm format:check`, `pnpm turbo run typecheck lint test`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm test:integration`. `pnpm test:stack` y `pnpm test:e2e` requieren Docker y tardan varios minutos.
 - **Actualización (add-api-conventions / add-workspace-identity):** la protección de `main` pasa a **15 checks requeridos** (se agregó `contract`). `e2e` existe en `pr.yml` pero aún **no** es requerido (pendiente de agregar a la protección).
+
+### 16.2 Nightly — as-built (2026-10-04)
+
+- `.github/workflows/nightly.yml` (§5.5) **no** agrega checks requeridos ni cambia los de esta sección; se valida con `actionlint` 1.7.12 (`docker run rhysd/actionlint`, incluye shellcheck). Mientras no se fusione en `main`, ni `schedule` ni `workflow_dispatch` pueden ejecutarlo en GitHub: lo verificado es la corrida local de cada job.
+- Corrida local (Windows 11 + Docker Desktop): `regression` 23/23 grupos en verde con `NIGHTLY=1` (~3.5 min); `mutation` líneas 98.05 % / ramas 91.49 %, mutation score 83.26 % (~7 min); `perf` carga del Large Seed ≈ 32 min y **3 brechas** (NFR-PERF-004 p95 311 ms, NFR-PERF-005 todas las cuentas p95 259 ms, overhead de RLS 19.7 % en el agregado de todo el workspace; detalle en [16-testing-strategy.md §5.15](16-testing-strategy.md)) — el job queda en rojo hasta corregirlas; `fx-smoke-live` 3/3 endpoints conformes y `https://paralelo.bo/openapi.json` → **404** (hoy responde `/api/v1/openapi.json`): el smoke lo marca y, en GitHub, abriría el issue de revisión.
+- Corrección en `@pf/traceability`: el CLI ignoraba en silencio las opciones tras el separador `--` que reenvía pnpm (`pnpm traceability:check -- --base origin/main` corría **sin** `--base`, es decir sin la regla R11 de TC borrados). Ahora filtra `--` y el job `traceability` aplica R11 de verdad.
+

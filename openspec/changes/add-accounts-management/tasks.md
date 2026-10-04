@@ -61,9 +61,11 @@
 
 ## 8. Tests automatizados y E2E
 
-- [ ] 8.1 Ejecutar en CI todos los tests nombrados con TC-ids de `tests/cases/accounts/` (unit, aplicación, integración Testcontainers, API, contrato); agregar los críticos a la Financial Regression Suite
+- [x] 8.1 Ejecutar en CI todos los tests nombrados con TC-ids de `tests/cases/accounts/` (unit, aplicación, integración Testcontainers, API, contrato); agregar los críticos a la Financial Regression Suite
   > Verificado 2026-10-04 (parcial): unit, integración (Testcontainers), API y E2E corren en `.github/workflows/pr.yml`. Falta: tests de TC-ACCOUNTS-BALANCE-001 y CURRENCY-001 (no automatizados) y un mecanismo que ejecute la Financial Regression Suite como grupo (hoy solo existe el flag `regression_suite`; no hay job nightly).
   > Nota 2026-10-04: BALANCE-001 y CURRENCY-001 ya tienen tests (6.3). Sigue pendiente el job que ejecute la Financial Regression Suite como grupo (lo lleva el agente de nightly/CI).
+  > Actualización 2026-10-04 (ci/nightly-perf): el mecanismo existe (`pnpm traceability:regression --run`, job nightly `regression`; los TC de accounts de la suite corren: 6 unit + 2 integración en verde localmente). Sigue pendiente la automatización de TC-ACCOUNTS-BALANCE-001 y CURRENCY-001.
+  > Cerrada 2026-10-04 (integración de ramas): BALANCE-001 y CURRENCY-001 automatizados (PR #37) y la suite corre como grupo en el job nightly `regression`.
 - [x] 8.2 E2E Playwright: crear "Banco BOB" con 10000.00 BOB y "Visa BOB" adeudando 2000.00 BOB, ver patrimonio 8000.00 BOB, archivar y reactivar una cuenta; verificar contra Compose `core` con la Minimal Seed
   - Nota (2026-10-03): `tests/e2e/specs/accounts.spec.ts` (Banco BOB 10.000,00 + Visa BOB adeudando 2.000,00 ⇒ patrimonio 8.000,00 BOB en el Home; archivar y reactivar la Visa; identificador enmascarado; móvil 360 px); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 

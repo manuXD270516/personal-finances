@@ -1,0 +1,151 @@
+# Nightly (docs/23 §5.5, docs/16 §5.15/§8/§11.3): pruebas que NO caben en el PR gate. No es un check requerido de
+# `main` ni cambia los de `pr.yml`. Jobs independientes (uno que falla no cancela a los demás):
+#   regression     Financial Regression Suite derivada de tests/cases (`regression_suite: true`), unit + integración,
+#                  con NIGHTLY=1 (property-based tests a 10 000 corridas, semilla aleatoria impresa en cada falla).
+#   mutation       shared-kernel: cobertura (≥ 95 % líneas / ≥ 90 % ramas) y Stryker (mutation score ≥ 80 %).
+#   perf           Large Seed (docs/29 §2.3) + benchmarks NFR-PERF-001/003/004/005 y overhead de RLS (Testcontainers);
+#                  falla si un p95 supera su umbral de docs/02. Reporte JSON + Markdown como artefacto.
+#   fx-smoke-live  ÚNICO job con red hacia terceros: smoke de los providers de tasas reales. `continue-on-error`:
+#                  nunca rompe el pipeline; si falla abre o actualiza un issue para revisar el adapter.
+# Acciones fijadas por SHA de commit completo (comentario = tag verificado), igual que pr.yml/main.yml.
+name: nightly
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # 06:00 UTC = 02:00 America/La_Paz (UTC−4, sin horario de verano)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+  OPENSPEC_TELEMETRY: '0'
+  OPENSPEC_NO_UPDATE_CHECK: '1'
+
+jobs:
+  regression:
+    name: regression (Financial Regression Suite)
+    runs-on: ubuntu-latest # Docker para Testcontainers
+    timeout-minutes: 60
+    env:
+      NIGHTLY: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      # Los tests de integración importan los paquetes del workspace compilados (como `pnpm test:integration`).
+      - run: pnpm turbo run build
+      - run: pnpm traceability:regression --run
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        run: cat tests/traceability/regression-suite.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: regression-suite
+          path: |
+            tests/traceability/regression-suite.json
+            tests/traceability/regression-suite.md
+          if-no-files-found: error
+          retention-days: 30
+
+  mutation:
+    name: mutation (shared-kernel)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      # NFR-MAINT-002 / add-ledger-core 2.5: umbrales en packages/shared-kernel/vitest.config.ts y stryker.config.json.
+      - name: Cobertura (≥ 95 % líneas, ≥ 90 % ramas)
+        run: pnpm --filter @pf/shared-kernel run test:coverage
+      - name: Stryker (mutation score ≥ 80 %)
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @pf/shared-kernel run test:mutation
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo '### shared-kernel'
+            node -e "const s=require('./packages/shared-kernel/coverage/coverage-summary.json').total;console.log('| métrica | % |\n|---|---|\n| líneas | '+s.lines.pct+' |\n| ramas | '+s.branches.pct+' |')" || true
+            node -e "const r=require('./packages/shared-kernel/reports/mutation/mutation.json');let k=0,t=0;for(const f of Object.values(r.files))for(const m of f.mutants){if(['Killed','Timeout'].includes(m.status))k++;if(!['CompileError','RuntimeError','Ignored'].includes(m.status))t++;}console.log('\nMutation score: '+(100*k/t).toFixed(2)+' % ('+k+'/'+t+')')" || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: shared-kernel-quality
+          path: |
+            packages/shared-kernel/coverage
+            packages/shared-kernel/reports/mutation
+          if-no-files-found: warn
+          retention-days: 30
+
+  perf:
+    name: perf (Large Seed + NFR-PERF)
+    runs-on: ubuntu-latest # Docker para Testcontainers (PostgreSQL 18)
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm turbo run build --filter=@pf/api...
+      # Carga ~97 000 transacciones (principal) + 20 satélites por los casos de uso y mide los p95 (docs/02 §PERF).
+      - run: pnpm perf:bench
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: perf-report
+          path: reports/perf
+          if-no-files-found: warn
+          retention-days: 90
+
+  fx-smoke-live:
+    name: fx-smoke-live (no bloqueante)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true # add-market-rate-providers 7.3: nunca rompe el pipeline
+    permissions:
+      contents: read
+      issues: write # solo para abrir/actualizar el aviso de revisión del adapter
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-workspace
+      - id: smoke
+        run: pnpm fx:smoke-live
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        run: cat reports/fx-smoke/fx-smoke.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: fx-smoke-live
+          path: reports/fx-smoke
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Abrir o actualizar el aviso de revisión del adapter
+        if: ${{ failure() && steps.smoke.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title='fx:smoke-live: revisar los adapters de providers de tasas'
+          body="$(printf 'El smoke en vivo de los providers falló en %s.\n\n%s\n' "$RUN_URL" "$(cat reports/fx-smoke/fx-smoke.md 2>/dev/null || echo 'sin reporte')")"
+          number="$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

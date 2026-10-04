@@ -102,6 +102,22 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
   - **Anomalías inyectadas con etiquetas** (para detección de anomalías futura): gastos atípicos (×5–×20 del percentil 95 de la categoría), cargos duplicados, suscripción olvidada que sube de precio, fraude simulado con counterparty nuevo, saltos de tasa P2P. Las etiquetas viven **fuera de la BD del producto** en `seeds/large/labels/anomalies.v<N>.jsonl` (`transactionId`, `kind`, `injectedAt`, `severity`), para no contaminar el dominio.
 - **Uso en performance:** k6 sobre listados filtrados, net worth histórico, reportes por categoría y cash-flow calendar ([16-testing-strategy.md §5.15](./16-testing-strategy.md)).
 
+> **As-built (ci/nightly-perf, 2026-10-04).** Large Seed v1 en `apps/api/src/seed/large/`: plan determinista `buildLargePlan`
+> (`large-plan.ts`, mismo PRNG mulberry32 y aritmética de unidades mínimas `bigint` que el dataset Demo, regla ESLint de
+> determinismo, `golden-summary.json` verificado por test) ejecutado por `loadLargeWorkspace` con los **casos de uso
+> públicos** (`applyPlanOp`, compartido con el `DemoDataLoader`), un lote por mes, reloj simulado, actor `system:seed` y
+> verificación final de saldos contra el plan + balance de comprobación en cero. Contenido: workspace principal
+> `Large — Principal` (owner = `owner@demo.pfos.test`) 2021-10 → 2026-09 con **97 374 transacciones**, 25 cuentas,
+> ~120 categorías (catálogo + 42 extra), 600 contrapartes, 40 suscripciones (5 con alza de precio), 600 tasas manuales,
+> estacionalidad (diciembre +40 %, febrero +15 %, invierno), inflación de alimentos +0.4 %/mes, montos log-normales y
+> 172 anomalías etiquetadas (OUTLIER, DUPLICATE_CHARGE, NEW_COUNTERPARTY_FRAUD, SUBSCRIPTION_PRICE_HIKE, P2P_RATE_JUMP)
+> exportables con `--labels-out` (JSONL fuera de la BD); 20 satélites con 1 079–4 775 transacciones (56 116 en total).
+> `pnpm db:seed -- --profile=large [--scale=0.1] [--concurrency=4] [--months=N]` (contenedor o `--host`); rechazada con
+> `PFOS_ENV=staging|production`, idempotente por `platform.seed_run` y rechaza una carga parcial previa. Carga completa
+> medida en local (Windows 11 + Docker Desktop, 4 workspaces en paralelo): **≈ 32 min** (~20 ms por operación, dominado por
+> la latencia de ida y vuelta a PostgreSQL); aún sin snapshot `pg_dump` restaurable (§7 pregunta 1). Los IDs de las
+> filas no son deterministas (los casos de uso generan UUIDv7); sí lo son fechas, montos, claves del plan y saldos.
+
 ## 3. Generación determinista
 
 ```mermaid

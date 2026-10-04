@@ -46,6 +46,7 @@
   - Nota: el contrato ya estaba consolidado; solo se agregó `ResolvedRate.sourceLabel` (aditivo, oasdiff sin cambios incompatibles). Respuestas validadas contra el OpenAPI en el test de API.
 - [ ] 5.2 Benchmark nightly con seed `large`: p95 ≤ 300 ms (NFR-PERF-004)
   > Verificado 2026-10-04 (pendiente, benchmark): no hay workflow nightly ni benchmark, y el perfil de seed `large` aún no tiene datos (`apps/api/src/seed/run-seed.ts`).
+  > Medido 2026-10-04 (ci/nightly-perf): la seed `large` y el benchmark existen (job nightly `perf`). Medido en local 2026-10-04 (`pnpm perf:bench`, Large Seed completo: 97 374 transacciones / 200 617 postings en el principal + 20 satélites; Windows 11 + Docker Desktop, PostgreSQL 18 por Testcontainers; tiempos de ida y vuelta HTTP en el mismo host): `GET /reports/summary` p50 285 ms, **p95 311 ms > 300 ms** ✘ (200 muestras, mes actual y 2026-09, sin `If-None-Match`). El costo dominante es `getAccountBalances` del ledger (p95 259 ms aislado; ver add-ledger-core 5.5). Abierta hasta optimizar esa consulta. Hallazgo aparte: una cuenta BTC sin postings en un workspace sin BTC habilitada hace que el resumen responda 422 `CURRENCY_MISMATCH` ("BTC(8) vs BTC(18)": `scaleOf` usa escala 18 de respaldo); la seed `large` lo evita dando saldo de apertura a esa cuenta.
   - Pendiente (2026-10-03): la seed `large` aún no existe (docs/29); sin benchmark.
 
 ## 6. UI

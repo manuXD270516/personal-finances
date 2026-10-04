@@ -231,6 +231,7 @@ Propiedades concretas (cada una es un TC con `type: property`):
 | Transfers | Cualquier transferencia entre cuentas propias de la misma moneda deja el net worth invariante | INV-009 | TC-LEDGER-TRANSFER-001 (ejemplo) + propiedad asociada |
 
 - **Configuración:** `numRuns` 100 en PR; 10 000 nightly (`pbt-nightly`). Semilla fija por defecto en PR (reproducible) y aleatoria nightly; toda falla imprime `seed` y `path` y se convierte en un **test de regresión de ejemplo** con el contraejemplo minimizado.
+- **As-built (2026-10-04):** los PBT leen `NIGHTLY=1` (10 000 corridas, semilla aleatoria; sin la variable, 100 con semilla fija). El job nightly `regression` ([23-ci-cd.md §5.5](./23-ci-cd.md)) los ejecuta con `NIGHTLY=1` dentro de la Financial Regression Suite (§11.3).
 - **Arbitraries compartidos:** `@pf/shared-kernel/testing` exporta `arbMoney(currency)`, `arbCurrency()`, `arbDecimalString(scale)`, `arbBalancedEntry()`.
 
 ### 5.14 Security
@@ -246,6 +247,10 @@ Propiedades concretas (cada una es un TC con `type: property`):
 - **Herramientas:** k6 contra compose o staging con el **Large Dataset Seed** ([29-seed-datasets.md](./29-seed-datasets.md)).
 - **Métricas:** p95/p99 por endpoint, contra los NFR-PERF de [02-non-functional-requirements.md](./02-non-functional-requirements.md).
 - **CI:** manual/nightly; nunca bloquea PRs en Phase 1.
+
+> **As-built (2026-10-04).** En lugar de k6, un harness Node (`pnpm perf:bench` → `apps/api/test/perf/nightly.perf.ts`, config `vitest.perf.config.ts`): PostgreSQL 18 real por Testcontainers (mismo `global-setup` que integración), **Large Seed** cargado por los casos de uso (docs/29 §2.3), la API en proceso (`createApiRuntime`) con JWT firmados localmente y límites de tasa altos. Mide p50/p95/p99 de NFR-PERF-001 (listado, 6 escenarios de filtros y cursor), NFR-PERF-003 (`POST /transactions`, `/transfers`, `/conversions`), NFR-PERF-004 (`GET /reports/summary` sin `If-None-Match`), NFR-PERF-005 (saldo por cuenta as-of sin y con snapshots de fin de mes; todas las cuentas) y el overhead de RLS (EXPLAIN ANALYZE como `pf_app` vs superusuario). Los umbrales viven en `apps/api/test/perf/perf-report.ts` y un test unitario verifica que coinciden con docs/02. Escribe `reports/perf/perf-results.json` + `perf-summary.md` y falla ante un p95 sobre el umbral. Corre en el job nightly `perf` (no bloquea PRs).
+
+> **Primera medición (local, 2026-10-04,** Large Seed completo: 97 374 transacciones / 200 617 postings en el principal + 20 satélites; Windows 11 + Docker Desktop**):** NFR-PERF-001 p95 82 ms (≤ 300) ✔ · NFR-PERF-003 p95 64 / 48 / 56 ms (transacción / transferencia / conversión, ≤ 150) ✔ · NFR-PERF-005 por cuenta p95 4.4 ms (≤ 50) ✔ y **todas las cuentas p95 259 ms (> 150)** ✘ · **NFR-PERF-004 p95 311 ms (> 300)** ✘ · **RLS** +0.48 ms por cuenta (bajo el piso de ruido) y **+19.7 % en el agregado de todo el workspace** ✘. Las dos brechas de latencia comparten causa (la invalidación de snapshots en `PgBalanceQuery` recorre los asientos por fecha una vez por ledger account); el job `perf` queda en rojo hasta corregirlas (add-ledger-core 5.5, add-basic-dashboard 5.2).
 
 ### 5.16 Smoke post-deployment
 
@@ -314,6 +319,7 @@ Cada regla tiene su propio test de "fixture prohibido" que demuestra que la regl
   - `contexts/*/domain` críticos (ledger, transactions, fx, debt, commitments, planning): 90 % / 85 %.
   - Resto: 70 % (informativo en Phase 1).
 - **Mutation testing (Stryker)** sobre `shared-kernel` (Money/rounding/allocation), `ledger/domain`, `transactions/domain` (conversiones) y luego `debt/domain` (amortización): primero informativo (nightly), **gate posterior** con mutation score ≥ 80 % en esos módulos.
+- **As-built (2026-10-04):** `shared-kernel` tiene umbrales de cobertura (`vitest.config.ts`: líneas 95 / ramas 90, solo con `--coverage`) y Stryker (`stryker.config.json`: command runner, `break: 80`, mutantes en `src/money`, `src/time`, `src/errors`); ambos corren en el job nightly `mutation` y fallan ese workflow (gate nightly, aún no del PR). Medición local 2026-10-04: líneas **98.05 %**, ramas **91.49 %**; mutation score **83.26 %** (591 killed + 1 timeout / 711; `money/` 83.81 %, con `rate.ts` 72.13 % como el más débil). `ledger/domain` y `transactions/domain` quedan pendientes.
 - **Cobertura de trazabilidad** (más importante que la de líneas): todo Requirement `Must` con al menos un TC y todo TC `automated` con test existente ([17-test-traceability.md](./17-test-traceability.md)).
 
 ## 9. Consideraciones Windows (Docker Desktop / WSL2)
@@ -394,6 +400,7 @@ Un change sin esta sección falla la revisión (y, cuando exista el generador, e
 - Conjunto de TCs marcados `regression_suite: true`: todos los que cubren `INV-001..INV-020`, conversiones, transferencias, reversas, periodos cerrados, RLS y autorización, más cada bug financiero corregido.
 - Se ejecuta completa en cada PR (es rápida porque la mayoría es domain/property/integration) y, en cada release, se publica su lista versionada (`tests/traceability/regression-suite.<version>.json`) generada por el script de trazabilidad.
 - Crece release a release; **su tamaño nunca disminuye sin un change aprobado**.
+- **As-built (2026-10-04):** `pnpm traceability:regression` (`scripts/traceability/src/regression.ts`) deriva la suite del front matter (`regression_suite: true`, no deprecados) y de los tests que nombran cada TC-ID, la escribe en `tests/traceability/regression-suite.{json,md}` y la agrupa por paquete y tipo (unit, integration, stack, e2e). Con `--run` ejecuta los grupos unit + integration con `vitest -t` filtrado por TC-ID. En cada PR el job `traceability` publica la lista (los tests ya corren completos en `unit` e `integration`); el job nightly `regression` la ejecuta con `NIGHTLY=1`. Estado 2026-10-04: 168 TC, 158 con tests y 10 sin tests (no automatizados), 100 archivos (63 unit, 28 integración, 9 E2E — estos últimos corren en `pnpm test:e2e`, no en el runner de la suite).
 
 ## 12. Preguntas abiertas
 
