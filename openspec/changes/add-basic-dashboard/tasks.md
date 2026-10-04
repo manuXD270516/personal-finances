@@ -62,6 +62,7 @@
 
 ## 8. DOCUMENTACIÓN y cierre
 
-- [ ] 8.1 Actualizar docs/14 (§9.1 alineado con docs/00 §6; Phase 1 sin proyecciones), docs/10 (`/reports/summary`) y docs/01 (ubicación de FR-REPORTING-004 en el Home); verificar enlaces
+- [x] 8.1 Actualizar docs/14 (§9.1 alineado con docs/00 §6; Phase 1 sin proyecciones), docs/10 (`/reports/summary`) y docs/01 (ubicación de FR-REPORTING-004 en el Home); verificar enlaces
+  > Hecho 2026-10-04: docs/14 §4, §5 y §9.1 (Phase 1 sin proyecciones; D14, D15, D34/D38, D35), docs/10 §13.1 (`/reports/summary`) y nota en FR-REPORTING-004 de docs/01 (sin mover la FR; la ubicación queda como pregunta abierta 10 de docs/01); enlaces verificados.
 - [x] 8.2 Actualizar estados de automatización de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict`; verificar 0 requirements Must sin cobertura
   - Nota: TC de reporting marcados `automated`, matriz regenerada, `openspec validate --all --strict` y `traceability:check` en verde. 8.1 (docs/14, docs/10, docs/01) queda pendiente.

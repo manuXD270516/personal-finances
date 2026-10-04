@@ -48,5 +48,6 @@
 
 ## 8. DOCUMENTACIÓN y cierre
 
-- [ ] 8.1 Actualizar docs/10 §9.1 (`TRANSFER_CURRENCY_MISMATCH`), docs/09 §6.4 (consistencia en BD) y docs/11 (semántica de re-emisión decidida); verificar enlaces
+- [x] 8.1 Actualizar docs/10 §9.1 (`TRANSFER_CURRENCY_MISMATCH`), docs/09 §6.4 (consistencia en BD) y docs/11 (semántica de re-emisión decidida); verificar enlaces
+  > Hecho 2026-10-04: docs/10 §9.1 (`TRANSFER_CURRENCY_MISMATCH`, D37/D40), docs/09 §6.4 (comisión en la misma moneda, edición y eventos, `txn.assert_transfer_consistency` diferido) y docs/11 (D37: `TransferCompleted` una vez, `TransferRevised.v1` por edición); enlaces verificados.
 - [ ] 8.2 Regenerar la matriz, actualizar estados de TC y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar

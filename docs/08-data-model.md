@@ -635,9 +635,10 @@ As-built Phase 1 (rev. 2026-10-04; migraciones `20261003200000_txn_transactions_
 
 Reglas adicionales:
 - **Σ splits vigentes = monto nominal** (INV-021) para kinds con parte nominal (`INCOME`, `EXPENSE`, `REFUND`, categorizados de `ADJUSTMENT`, componentes no-principal de `LOAN_PAYMENT`): validado en dominio y por el constraint trigger diferido `txn.assert_splits_sum()` sobre `transaction` y `transaction_split` (as-built: para `INCOME`, `EXPENSE` y `REFUND`; `23514`, `transaction_splits_sum_ck`). `TRANSFER`/`CONVERSION` solo tienen splits para fees (09 §6.17).
-- **Transferencias**: no hay tabla `transfer`; una transferencia es `kind='TRANSFER'` con legs `SOURCE`/`TARGET` en la misma moneda (cross-currency ⇒ `CONVERSION`). El recurso API `/transfers` es una fachada sobre este modelo ([10-api-design.md](10-api-design.md)). El pago de tarjeta de crédito es una transferencia (`kind='TRANSFER'`, destino `LIABILITY`); `CARD_PAYMENT` queda reservado para `debt/credit-cards` (Phase 4).
+- **Transferencias**: no hay tabla `transfer`; una transferencia es `kind='TRANSFER'` con legs `SOURCE`/`TARGET` en la misma moneda (cross-currency ⇒ `CONVERSION`). El recurso API `/transfers` es una fachada sobre este modelo ([10-api-design.md](10-api-design.md)). El pago de tarjeta de crédito es una transferencia (`kind='TRANSFER'`, destino `LIABILITY`; D27); `CARD_PAYMENT` queda reservado para `debt/credit-cards` (Phase 4). Refuerzo en BD (add-transfers, migración `20261003210000_txn_transfers.sql`; rev. 2026-10-04): constraint trigger `DEFERRABLE INITIALLY DEFERRED` `txn.assert_transfer_consistency()` sobre `transaction` y `transaction_leg` — entre los legs vigentes de una `TRANSFER` hay exactamente un `SOURCE` negativo y un `TARGET` positivo, ningún otro rol, dos cuentas distintas y una sola moneda igual a la de la cabecera; si no, `23514` con constraint `transaction_transfer_consistency_ck`.
+- **Conversiones en BD** (add-manual-conversions, migración `20261003220100_txn_conversions.sql`; rev. 2026-10-04): constraint trigger diferido `txn.assert_conversion_consistency()` sobre `transaction`, `transaction_leg`, `conversion_detail` y `conversion_fee` — un `SOURCE` negativo, un `TARGET` positivo y legs `FEE` negativos; monedas distintas; cuentas, montos y monedas de los legs iguales a los del detalle vigente (`transaction_conversion_consistency_ck`); y los fees no pagados desde otra cuenta concilian bruto y neto (INV-010: `converted_source_amount` + fees en origen = `source_amount`; `target_amount` + fees en destino = `gross_target_amount`; `conversion_detail_inv010_ck`).
 - **Edición de una transacción posteada** que afecta montos/cuentas/fecha/moneda: `revision+1`, entry `REVERSAL` + nueva entry `STANDARD` con `source_revision = revision`; `active_entry_id` apunta a la nueva y `transaction_journal_link` conserva la historia. Los legs/splits anteriores se marcan `superseded_in_revision` (los postings históricos siguen apuntando a splits existentes). Recategorizar **no** toca el ledger (INV-033): se actualiza `category_id` del split vigente in situ.
-- **Edición de una conversión** (FR-TRANSACTIONS-024): mismo patrón — `revision+1`, entry `REVERSAL` + nueva entry `STANDARD` y **nueva fila** `conversion_detail`/`conversion_fee` con esa `revision`, todo en la misma transacción de BD; las revisiones anteriores del detalle nunca se modifican.
+- **Edición de una conversión** (FR-TRANSACTIONS-024): mismo patrón — `revision+1`, entry `REVERSAL` + nueva entry `STANDARD` y **nueva fila** `conversion_detail`/`conversion_fee` con esa `revision`, todo en la misma transacción de BD; las revisiones anteriores del detalle nunca se modifican (D11: `revision` forma parte de la PK de `conversion_detail`).
 
 ### 5.5 `classification` — Categories, Tags, Custom fields, Counterparties (Phase 1)
 
@@ -646,10 +647,16 @@ erDiagram
   CATEGORY_GROUP ||--o{ CATEGORY : "agrupa"
   CATEGORY |o--o{ CATEGORY : "parent_id"
   COUNTERPARTY ||--o{ COUNTERPARTY_ALIAS : "alias"
+  CATEGORY_NAME_I18N {
+    text system_code PK "uno de los 11 codigos"
+    text locale PK "es en pt"
+    text name
+  }
   CATEGORY_GROUP {
     uuid id PK
     uuid workspace_id FK
     text name
+    text normalized_name "minusculas, sin acentos, espacios colapsados"
     text kind "EXPENSE INCOME"
     int sort_order
     timestamptz archived_at
@@ -661,6 +668,7 @@ erDiagram
     uuid group_id FK
     uuid parent_id FK "subcategoria: un solo nivel bajo categoria"
     text name
+    text normalized_name
     text kind "EXPENSE INCOME"
     text system_code "FEES FX_FEES INTEREST LOAN_FEES INSURANCE TAXES ADJUSTMENTS UNCATEGORIZED INTEREST_EARNED ADJUSTMENTS_INCOME UNCATEGORIZED_INCOME"
     text color
@@ -673,6 +681,7 @@ erDiagram
     uuid id PK
     uuid workspace_id FK
     text name
+    text normalized_name
     text color
     timestamptz archived_at
     int version
@@ -693,7 +702,8 @@ erDiagram
     uuid workspace_id FK
     text name
     text normalized_name
-    text kind "MERCHANT PERSON EMPLOYER SERVICE_PROVIDER LENDER EXCHANGE P2P_TRADER GOVERNMENT OTHER"
+    text kind "MERCHANT PERSON EMPLOYER SERVICE_PROVIDER FINANCIAL_INSTITUTION LENDER EXCHANGE P2P_TRADER GOVERNMENT OTHER"
+    text icon
     uuid default_category_id FK
     text website
     text notes
@@ -701,22 +711,25 @@ erDiagram
     int version
   }
   COUNTERPARTY_ALIAS {
-    uuid id PK
-    uuid workspace_id FK
-    uuid counterparty_id FK
-    text alias_normalized
-    text source "MANUAL IMPORT"
+    uuid workspace_id PK, FK
+    uuid counterparty_id PK, FK
+    text alias_normalized PK "min 3 caracteres"
+    text alias
+    boolean active
   }
 ```
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `category_group` | `(workspace_id, kind, lower(name)) WHERE archived_at IS NULL` | `kind IN ('EXPENSE','INCOME')` | — | WS | `version`, `archived_at` |
-| `category` | `(workspace_id, group_id, coalesce(parent_id, '00000000-0000-0000-0000-000000000000'), lower(name)) WHERE archived_at IS NULL` (único por padre); `(workspace_id, system_code) WHERE system_code IS NOT NULL` | `system_code IN (...)` (11 códigos); `kind` = `kind` del grupo y del padre (trigger); `parent_id <> id`; jerarquía grupo → categoría → subcategoría: una subcategoría no tiene hijas (trigger, `CATEGORY_DEPTH_EXCEEDED`) | `(workspace_id, group_id, sort_order)` | WS | `version`, `archived_at`. Categorías de sistema no archivables (trigger) |
-| `tag` | `(workspace_id, lower(name)) WHERE archived_at IS NULL` | — | — | WS | `version`, `archived_at` |
-| `custom_field_definition` | `(workspace_id, key) WHERE archived_at IS NULL` | `key ~ '^[a-z][a-z0-9_]{0,39}$'`; `data_type='ENUM'` ⇒ `jsonb_typeof(options)='array'` | — | WS | `version`, `archived_at` |
-| `counterparty` | `(workspace_id, normalized_name) WHERE archived_at IS NULL` | — | `gin (normalized_name gin_trgm_ops)` (fuzzy match, `pg_trgm`) | WS | `version`, `archived_at` |
-| `counterparty_alias` | `(workspace_id, alias_normalized)` | — | — | WS | — |
+| `category_group` | `(id, workspace_id)`; `(workspace_id, kind, normalized_name) WHERE archived_at IS NULL` | `kind IN ('EXPENSE','INCOME')` | — | WS | `version`, `archived_at` |
+| `category` | `(id, workspace_id)`; `(workspace_id, group_id, coalesce(parent_id, '00000000-0000-0000-0000-000000000000'), normalized_name) WHERE archived_at IS NULL` (**único por padre**, D8); `(workspace_id, system_code) WHERE system_code IS NOT NULL` | `system_code IN (...)` (11 códigos, D9); una categoría de sistema no tiene padre (`category_system_no_parent`) ni puede estar archivada (`category_system_active`); `parent_id <> id`; trigger `classification.category_guard()`: `kind` = `kind` del grupo, el padre comparte `kind` y grupo (`CATEGORY_KIND_MISMATCH`), jerarquía de **3 niveles** grupo → categoría → subcategoría — una subcategoría no tiene hijas (`CATEGORY_DEPTH_EXCEEDED`) —, una categoría de sistema no tiene subcategorías ni se renombra ni archiva (`SYSTEM_CATEGORY_IMMUTABLE`), `kind` inmutable | `(workspace_id, parent_id)` | WS | `version`, `archived_at` |
+| `category_name_i18n` | PK `(system_code, locale)` | `locale IN ('es','en','pt')` | — | **Global sin `workspace_id`** (excepción de §1.2): RLS forzada con política `global_read` (`SELECT` para `pf_app`); escritura solo por migración | Datos de referencia (33 filas: 11 códigos × 3 locales). La API resuelve el nombre de las categorías de sistema por el locale del usuario (fallback `es`) |
+| `tag` | `(workspace_id, normalized_name) WHERE archived_at IS NULL` | — | — | WS | `version`, `archived_at` |
+| `custom_field_definition` | `(workspace_id, key) WHERE archived_at IS NULL` | `key ~ '^[a-z][a-z0-9_]{0,39}$'`; `data_type='ENUM'` ⇒ `jsonb_typeof(options)='array'` | — | WS | `version`, `archived_at` (Phase 2, aún no creada) |
+| `counterparty` | `(id, workspace_id)`; `(workspace_id, normalized_name) WHERE archived_at IS NULL` | `kind IN (...)` (default `OTHER`); FK compuesta `(default_category_id, workspace_id) → category` | *Planificado (Phase 6):* `gin (normalized_name gin_trgm_ops)` (fuzzy match, `pg_trgm`) — en Phase 1 la resolución es por subcadena sobre texto normalizado | WS | `version`, `archived_at` |
+| `counterparty_alias` | PK `(workspace_id, counterparty_id, alias_normalized)`; `(workspace_id, alias_normalized) WHERE active` (`COUNTERPARTY_ALIAS_TAKEN`) | `length(alias_normalized) >= 3` | — | WS (`pf_app`: además `DELETE`, tabla de enlace) | — |
+
+As-built `add-classification` (migración `20261003173000_classification_schema.sql`; rev. 2026-10-04, D7–D9): la unicidad de nombres usa `normalized_name` (minúsculas, sin acentos, espacios colapsados; la llena la aplicación) en lugar de `lower(name)`. **Nunca hay hard delete** de categorías, grupos, tags ni counterparties (D7, INV-019): `pf_app` solo tiene `SELECT, INSERT, UPDATE` y el borrado es archivar (`archived_at`, `archived_by`); `DELETE` sobre el recurso API ⇒ 405. Las categorías de sistema (11 `system_code`, D9) se provisionan por workspace, de forma síncrona al crearlo; su nombre visible sale de `category_name_i18n`.
 
 ### 5.6 `planning` — Periods, Budgets, Templates, Month closing (Phase 2)
 
@@ -1016,6 +1029,7 @@ erDiagram
   CURRENCY ||--o{ EXCHANGE_RATE : "base"
   CURRENCY ||--o{ EXCHANGE_RATE : "quote"
   EXCHANGE_RATE |o--o| EXCHANGE_RATE : "supersedes_id"
+  EXCHANGE_RATE ||--o| RATE_ANOMALY_REVIEW : "decision del usuario"
   CURRENCY {
     varchar code PK "BOB USD USDT BTC"
     text kind "FIAT CRYPTO COMMODITY CUSTOM"
@@ -1042,23 +1056,56 @@ erDiagram
     int version
     timestamptz updated_at
   }
+  RATE_PREFERENCE_SET {
+    uuid workspace_id PK, FK
+    int version "ETag del conjunto de preferencias"
+    timestamptz updated_at
+  }
   EXCHANGE_RATE {
     uuid id PK
-    uuid workspace_id FK "NULL = global provider"
+    uuid workspace_id FK "NULL solo para source PROVIDER"
     ccy base_currency FK
     ccy quote_currency FK
     rate rate "quote por 1 base"
-    text rate_type "OFFICIAL PARALLEL P2P BANK CUSTOM"
+    text rate_type "OFFICIAL PARALLEL PARALLEL_BUY PARALLEL_SELL P2P BANK CUSTOM"
     timestamptz as_of
     date as_of_date "fecha de negocio"
     text source "MANUAL PROVIDER USER_CONVERSION"
-    text provider "manual, coingecko, ..."
-    text provider_ref
+    text source_label "etiqueta libre de la fuente (nullable)"
+    text provider "PARALELO_BO DOLARAPI_BO (solo PROVIDER)"
     uuid supersedes_id FK
-    uuid derived_from_transaction_id "ref txn"
-    timestamptz fetched_at
+    text supersede_reason "obligatoria si supersedes_id"
+    timestamptz fetched_at "solo PROVIDER"
+    text raw_payload "respuesta cruda, max 1 MiB, nunca en la API"
+    boolean anomaly_flagged
+    uuid anomaly_baseline_rate_id FK
+    numeric anomaly_variation_pct "numeric(12,4)"
     timestamptz created_at
     uuid created_by
+  }
+  RATE_ANOMALY_REVIEW {
+    uuid exchange_rate_id PK, FK
+    uuid workspace_id FK
+    text decision "CONFIRMED REJECTED"
+    text reason "3..500"
+    uuid decided_by
+    timestamptz decided_at
+  }
+  PROVIDER_RUN {
+    uuid id PK
+    text provider "PARALELO_BO DOLARAPI_BO"
+    text kind "POLL BACKFILL GAP_FILL"
+    timestamptz started_at
+    timestamptz finished_at
+    text outcome "OK NO_NEW_SAMPLE FAILED SKIPPED_RATE_LIMIT SKIPPED_CACHE"
+    text error_code "solo FAILED"
+    int http_status
+    int latency_ms
+    int new_samples
+    timestamptz retry_after_until
+    int history_points
+    date history_from
+    date history_to
   }
   PROVIDER_CONFIG {
     uuid id PK
@@ -1074,12 +1121,14 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `currency` | PK `code`; `(owner_workspace_id, lower(name)) WHERE kind='CUSTOM'` | `scale BETWEEN 0 AND 18`; `kind='CUSTOM'` ⇔ `owner_workspace_id IS NOT NULL`; `code ~ '^[A-Z0-9][A-Z0-9_.-]{1,15}$'` | — | **WS+G** (`owner_workspace_id`) | `is_active` (no se borra; `scale` inmutable una vez usada) |
+| `currency` | PK `code`; `(owner_workspace_id, lower(name)) WHERE kind='CUSTOM'` | `scale BETWEEN 0 AND 18`; `kind='CUSTOM'` ⇔ `owner_workspace_id IS NOT NULL`; `code ~ '^[A-Z0-9][A-Z0-9_.-]{1,15}$'` | — | **WS+G** (`owner_workspace_id`). As-built Phase 1: tabla global sin RLS, solo `SELECT` para `pf_app` (aún no hay monedas `CUSTOM`) | `is_active` (no se borra; `scale` inmutable: trigger `currency_scale_immutable`) |
 | `workspace_currency` | PK | — | — | WS | — |
-| `exchange_rate` | **As-built (add-market-rate-providers, 2026-10-03):** `exchange_rate_provider_uk (workspace_id, provider, base_currency, quote_currency, rate_type, as_of) WHERE provider IS NOT NULL` (idempotencia de muestras: una copia por workspace, design decisión 3); `UNIQUE (supersedes_id)` | `base_currency <> quote_currency`; `rate > 0`; `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `(source = 'PROVIDER') = (provider IS NOT NULL)`; provider ⇔ `fetched_at`; marca de anomalía completa (`anomaly_flagged`, `anomaly_baseline_rate_id` → FK compuesta al mismo workspace, `anomaly_variation_pct numeric(12,4)`); `raw_payload text` (respuesta cruda exacta, ≤ 1 MiB, nunca expuesta en la API) | `(base_currency, quote_currency, as_of DESC)` + `(workspace_id, base_currency, quote_currency, as_of DESC)` + `exchange_rate_provider_day_idx (workspace_id, provider, base, quote, rate_type, as_of_date)` (relleno de días) | **WS+G**, append-only (sin UPDATE/DELETE para nadie; corrección = nueva fila con `supersedes_id`); el worker (`pf_worker`, miembro de `pf_app`) inserta las de provider con `SET LOCAL app.workspace_id` | Inmutable |
+| `rate_preference` | PK `(workspace_id, base_currency, quote_currency)`; `(workspace_id, least(base, quote), greatest(base, quote))` (una preferencia por par sin importar la orientación) | `base_currency <> quote_currency`; `rate_type IN (...)` (los 7 tipos) | — | WS (`pf_app`: `SELECT, INSERT, UPDATE, DELETE`) | `version` |
+| `rate_preference_set` | PK `workspace_id` | — | — | WS | `version`: concurrencia optimista del reemplazo completo de las preferencias del workspace |
+| `exchange_rate` | **As-built (add-manual-conversions y add-market-rate-providers; rev. 2026-10-04):** `exchange_rate_provider_uk (workspace_id, provider, base_currency, quote_currency, rate_type, as_of) WHERE provider IS NOT NULL` (idempotencia de muestras: una copia por workspace, design decisión 3); `UNIQUE (supersedes_id)` | `base_currency <> quote_currency`; `rate > 0`; `rate_type IN ('OFFICIAL','PARALLEL','PARALLEL_BUY','PARALLEL_SELL','P2P','BANK','CUSTOM')` (D13 + D39; `PARALLEL_BUY` = BOB pagados por 1 USD, `PARALLEL_SELL` = BOB recibidos, ambos junto con la mediana `PARALLEL`); `source IN ('MANUAL','PROVIDER','USER_CONVERSION')`; `workspace_id IS NOT NULL OR source='PROVIDER'`; `supersedes_id` ⇔ `supersede_reason` (3–500) y la corrección conserva par, tipo y `as_of` (trigger `exchange_rate_supersede_consistency`); `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `(source = 'PROVIDER') = (provider IS NOT NULL)`; provider ⇔ `fetched_at`; marca de anomalía completa (`anomaly_flagged`, `anomaly_baseline_rate_id` → FK compuesta al mismo workspace, `anomaly_variation_pct numeric(12,4)`); `raw_payload text` (respuesta cruda exacta, ≤ 1 MiB, nunca expuesta en la API) | `(base_currency, quote_currency, as_of DESC)` + `(workspace_id, base_currency, quote_currency, as_of DESC)` + `exchange_rate_provider_day_idx (workspace_id, provider, base, quote, rate_type, as_of_date)` (relleno de días) | **WS+G**, append-only (sin UPDATE/DELETE para nadie; corrección = nueva fila con `supersedes_id`); el worker (`pf_worker`, miembro de `pf_app`) inserta las de provider con `SET LOCAL app.workspace_id` | Inmutable |
 | `rate_anomaly_review` | PK `exchange_rate_id`; FK `(workspace_id, exchange_rate_id)` | `decision IN ('CONFIRMED','REJECTED')`; `reason` 3–500; trigger: solo tasas con `anomaly_flagged` | — | **WS**, append-only (`SELECT, INSERT`) | Inmutable (una decisión por tasa; add-market-rate-providers) |
-| `provider_run` | PK `id` | `kind IN ('POLL','BACKFILL','GAP_FILL')`; `outcome IN ('OK','NO_NEW_SAMPLE','FAILED','SKIPPED_RATE_LIMIT','SKIPPED_CACHE')`; `FAILED` ⇔ `error_code`; `history_points/from/to` (carga histórica) | `(provider, started_at DESC)`, `(started_at)` | **Instalación sin `workspace_id`** (excepción explícita de §1): RLS FORZADA con políticas por rol — `pf_app` SELECT (estado), `pf_worker` INSERT/DELETE (bitácora y purga > 90 días) | Bitácora (purga) |
-| `provider_config` | `(workspace_id, provider)` | — | — | WS | `version` (Phase 5) |
+| `provider_run` | PK `id` | `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `kind IN ('POLL','BACKFILL','GAP_FILL')`; `outcome IN ('OK','NO_NEW_SAMPLE','FAILED','SKIPPED_RATE_LIMIT','SKIPPED_CACHE')`; `FAILED` ⇔ `error_code`; `history_points/from/to` (carga histórica) | `(provider, started_at DESC)`, `(started_at)` | **Instalación sin `workspace_id`** (excepción explícita de §1): RLS FORZADA con políticas por rol — `pf_app` SELECT (estado), `pf_worker` INSERT/DELETE (bitácora y purga > 90 días) | Bitácora (purga) |
+| `provider_config` | `(workspace_id, provider)` | — | — | WS | `version` (Phase 5, aún no creada) |
 
 Catálogo inicial de monedas globales (`BOB`, `USD`, `USDT`, `USDC`, `EUR`, `BTC`, `ETH`, …) se carga como **migración de datos de referencia**, no como seed (§12). Pregunta abierta: códigos de monedas `CUSTOM` globalmente únicos.
 
@@ -1589,14 +1638,14 @@ erDiagram
 | `ledger.journal_entry`, `ledger.posting`, `ledger.entry_reversal` | SELECT, INSERT | SELECT, INSERT | Sí (UPDATE, DELETE, TRUNCATE) |
 | `ledger.period_lock` | SELECT, INSERT, DELETE | SELECT | No (DELETE = reapertura, auditada) |
 | `ledger.balance_snapshot` | SELECT | SELECT, INSERT, UPDATE, DELETE | No (derivado) |
-| `txn.conversion_detail`, `txn.conversion_fee`, `txn.transaction_journal_link` | SELECT, INSERT | SELECT, INSERT | Sí |
+| `txn.conversion_detail`, `txn.conversion_fee`, `txn.transaction_journal_link` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; as-built, rev. 2026-10-04) |
 | `fx.exchange_rate`, `fx.rate_anomaly_review` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; sin UPDATE/DELETE) |
 | `fx.provider_run` (instalación) | SELECT | SELECT, INSERT, DELETE (purga) | No |
 | `planning.budget_template_version`, `budget_template_line` | SELECT, INSERT | SELECT | Sí |
 | `audit.audit_log`, `audit.lifecycle_transition` | SELECT, INSERT | SELECT, INSERT | Sí |
 | `goals.goal_contribution`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |
 | `reporting.*` | SELECT | SELECT, INSERT, UPDATE, DELETE, TRUNCATE | No |
-| Resto de tablas de negocio | SELECT, INSERT, UPDATE | SELECT, INSERT, UPDATE | No (DELETE no concedido salvo tablas de enlace/técnicas: `split_tag`, `split_custom_field_value`, `attachment_link`, `reconciliation_item`; purgas de `imports.staged_transaction` solo `pf_maintenance`) |
+| Resto de tablas de negocio | SELECT, INSERT, UPDATE | SELECT, INSERT, UPDATE | No (DELETE no concedido salvo tablas de enlace/técnicas: `accounts.account_tag`, `txn.split_tag`, `classification.counterparty_alias`, `fx.rate_preference`, `split_custom_field_value`, `attachment_link`, `reconciliation_item`; purgas de `imports.staged_transaction` solo `pf_maintenance`) |
 
 ---
 
@@ -1615,7 +1664,7 @@ erDiagram
   TRANSACTION ||--o{ TRANSACTION_SPLIT : ""
   TRANSACTION_SPLIT ||..o{ POSTING : "split_id logico"
   JOURNAL_ENTRY ||--o| ENTRY_REVERSAL : ""
-  TRANSACTION ||--o| CONVERSION_DETAIL : ""
+  TRANSACTION ||--o{ CONVERSION_DETAIL : "por revision"
   CATEGORY_GROUP ||--o{ CATEGORY : ""
   CATEGORY ||..o{ TRANSACTION_SPLIT : "category_id logico"
   TAG ||..o{ SPLIT_TAG : ""
