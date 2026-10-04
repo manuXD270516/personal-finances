@@ -25,6 +25,9 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/clasificacion?vista=etiquetas', name: 'Clasificación: etiquetas' },
   { path: '/clasificacion?vista=contrapartes', name: 'Clasificación: contrapartes' },
   { path: '/fx?vista=proveedores', name: 'FX: proveedores' },
+  // add-workspace-identity 8.4: preferencias personales y alta de workspace.
+  { path: '/preferencias', name: 'Mis preferencias' },
+  { path: '/workspaces/nuevo', name: 'Nuevo espacio de trabajo' },
 ];
 
 async function seriousViolations(page: Page) {

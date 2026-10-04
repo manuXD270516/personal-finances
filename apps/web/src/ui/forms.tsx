@@ -1,24 +1,27 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { FinanceApiError, uuidv7, type ApiProblemBody } from '../bff/finance-api-client';
 import { ProblemMessage } from '../errors/ProblemMessage';
 import { AuditHistory } from './AuditHistory';
-import { useSession, type Me } from './session-context';
-
-const CURRENCIES = ['BOB', 'USD', 'USDT', 'BTC', 'ETH'];
-const TIMEZONES = [
-  'America/La_Paz',
-  'America/Sao_Paulo',
-  'America/Lima',
-  'America/Bogota',
-  'America/Mexico_City',
-  'America/New_York',
-  'Europe/Madrid',
-  'UTC',
-];
-const LOCALES = ['es-BO', 'en-US', 'pt-BR'];
+import { pageStyle } from './common/ui';
+import { PreferencesView, WorkspaceSettingsView, type FormNotice } from './identity/IdentityViews';
+import {
+  BASE_CURRENCIES,
+  buildPreferencesPatch,
+  buildSettingsPatch,
+  settingsFormOf,
+  switchLocalePath,
+  uiLocaleFor,
+  type PreferencesError,
+  type PreferencesField,
+  type PreferencesValues,
+  type SettingsError,
+  type SettingsField,
+  type SettingsForm,
+} from './identity/logic';
+import { useSession } from './session-context';
 
 interface Workspace {
   readonly id: string;
@@ -35,80 +38,83 @@ interface Workspace {
 const problemOf = (err: unknown): ApiProblemBody =>
   err instanceof FinanceApiError ? err.problem : { code: 'SERVICE_UNAVAILABLE' };
 
-function TimezoneOptions({ id }: { id: string }) {
-  return (
-    <datalist id={id}>
-      {TIMEZONES.map((tz) => (
-        <option key={tz} value={tz} />
-      ))}
-    </datalist>
-  );
-}
+/** Query con la que la página de preferencias, ya en el idioma nuevo, confirma que se guardó. */
+const SAVED_FLAG = 'guardado';
 
 /**
  * Configuración del workspace activo (FR-IDENTITY-005). Se edita con `If-Match`: si otra pestaña guardó antes, la
- * API responde 412 y se muestra el mensaje en español del catálogo. La autorización la decide la API (403).
+ * API responde 412 y se muestra el mensaje del catálogo con la opción de cargar la versión vigente. Solo se envían
+ * los campos que cambiaron (merge-patch). La autorización la decide la API (403 `INSUFFICIENT_ROLE`).
  */
 export function WorkspaceSettingsForm() {
   const t = useTranslations('Workspace');
+  const tLocales = useTranslations('Locales');
   const locale = useLocale();
   const { state, reload } = useSession();
   const [ws, setWs] = useState<Workspace | undefined>();
   const [etag, setEtag] = useState<string | undefined>();
-  const [form, setForm] = useState({ name: '', baseCurrency: 'BOB', timezone: '', fiscal: '1', reserve: '' });
+  const [form, setForm] = useState<SettingsForm | undefined>();
+  const [errors, setErrors] = useState<Partial<Record<SettingsField, SettingsError>>>({});
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
-  const [saved, setSaved] = useState(false);
+  const [notice, setNotice] = useState<FormNotice>();
   const [busy, setBusy] = useState(false);
 
   const ready = state.status === 'ready' ? state : undefined;
   const workspaceId = ready?.active?.workspaceId;
   const api = ready?.api;
 
+  const show = useCallback((w: Workspace, tag: string | undefined) => {
+    setWs(w);
+    setEtag(tag);
+    setForm(settingsFormOf(w, w.locale));
+    setErrors({});
+  }, []);
+
+  const load = useCallback(
+    async (after?: FormNotice) => {
+      if (!api || !workspaceId) return;
+      try {
+        const r = await api.get<Workspace>(`/workspaces/${workspaceId}`);
+        show(r.data!, r.etag);
+        setProblem(undefined);
+        setNotice(after);
+      } catch (err) {
+        setProblem(problemOf(err));
+      }
+    },
+    [api, workspaceId, show],
+  );
+
   useEffect(() => {
-    if (!api || !workspaceId) return;
-    api
-      .get<Workspace>(`/workspaces/${workspaceId}`)
-      .then((r) => {
-        const w = r.data!;
-        setWs(w);
-        setEtag(r.etag);
-        setForm({
-          name: w.name,
-          baseCurrency: w.baseCurrency,
-          timezone: w.timezone,
-          fiscal: String(w.fiscalMonthStartDay),
-          reserve: w.minimumLiquidityReserve?.amount ?? '',
-        });
-      })
-      .catch((err: unknown) => setProblem(problemOf(err)));
-  }, [api, workspaceId]);
+    void load();
+  }, [load]);
 
-  if (!ready || !ws) return problem ? <ProblemMessage problem={problem} locale={locale} /> : null;
+  // Mientras llega el workspace recién elegido en el selector no se muestra el formulario del anterior.
+  if (!ready || !ws || !form || ws.id !== workspaceId)
+    return problem ? <ProblemMessage problem={problem} locale={locale} /> : null;
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!ready || !ws || busy) return;
-    setBusy(true);
+  async function submit() {
+    if (!ready || !ws || !form || busy) return;
     setProblem(undefined);
-    setSaved(false);
+    setNotice(undefined);
+    const built = buildSettingsPatch(ws, form, { locale: ws.locale });
+    if (!built.ok) {
+      setErrors(built.errors);
+      return;
+    }
+    setErrors({});
+    if (Object.keys(built.patch).length === 0) {
+      setNotice('noChanges');
+      return;
+    }
+    setBusy(true);
     try {
-      const r = await ready.api.command<Workspace>(
-        'PATCH',
-        `/workspaces/${ws.id}`,
-        {
-          name: form.name,
-          baseCurrency: form.baseCurrency,
-          timezone: form.timezone,
-          fiscalMonthStartDay: Number(form.fiscal),
-          minimumLiquidityReserve: form.reserve.trim()
-            ? { amount: form.reserve.trim(), currency: form.baseCurrency }
-            : null,
-        },
-        { ifMatch: etag ?? ws.version },
-      );
-      setWs(r.data);
-      setEtag(r.etag);
-      setSaved(true);
+      const r = await ready.api.command<Workspace>('PATCH', `/workspaces/${ws.id}`, built.patch, {
+        ifMatch: etag ?? ws.version,
+      });
+      show(r.data!, r.etag);
+      setNotice('saved');
+      // El nombre aparece en el selector de workspace (sesión).
       if (r.data && r.data.name !== ws.name) await reload();
     } catch (err) {
       setProblem(problemOf(err));
@@ -118,64 +124,25 @@ export function WorkspaceSettingsForm() {
   }
 
   return (
-    <>
-      <form onSubmit={(e) => void submit(e)} aria-labelledby="ws-settings-title">
-        <h1 id="ws-settings-title">{t('settingsTitle')}</h1>
-        {ws.role !== 'OWNER' ? <p>{t('readOnly')}</p> : null}
-        <label>
-          {t('name')}
-          <input name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </label>
-        <label>
-          {t('baseCurrency')}
-          <select
-            name="baseCurrency"
-            value={form.baseCurrency}
-            onChange={(e) => setForm({ ...form, baseCurrency: e.target.value })}
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t('timezone')}
-          <input
-            name="timezone"
-            list="ws-timezones"
-            value={form.timezone}
-            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-          />
-          <TimezoneOptions id="ws-timezones" />
-        </label>
-        <label>
-          {t('fiscalMonthStartDay')}
-          <input
-            name="fiscalMonthStartDay"
-            type="number"
-            min={1}
-            max={28}
-            value={form.fiscal}
-            onChange={(e) => setForm({ ...form, fiscal: e.target.value })}
-          />
-        </label>
-        <label>
-          {t('minimumReserve')}
-          <input
-            name="minimumReserve"
-            inputMode="decimal"
-            value={form.reserve}
-            aria-describedby="reserve-hint"
-            onChange={(e) => setForm({ ...form, reserve: e.target.value })}
-          />
-        </label>
-        <small id="reserve-hint">{t('minimumReserveHint')}</small>
-        <button type="submit" disabled={busy}>
-          {busy ? t('saving') : t('save')}
-        </button>
-        {saved ? <p role="status">{t('saved')}</p> : null}
-        {problem ? <ProblemMessage problem={problem} locale={locale} /> : null}
-      </form>
+    <section style={pageStyle}>
+      <WorkspaceSettingsView
+        t={(key, values) => t(key as never, values as never)}
+        localeName={(tag) => (tLocales.has(tag as never) ? tLocales(tag as never) : tag)}
+        uiLocale={locale}
+        form={form}
+        original={ws}
+        errors={errors}
+        isOwner={ws.role === 'OWNER'}
+        busy={busy}
+        notice={notice}
+        problem={problem}
+        onChange={(patch) => {
+          setForm((prev) => (prev ? { ...prev, ...patch } : prev));
+          setNotice(undefined);
+        }}
+        onSubmit={() => void submit()}
+        onReloadLatest={() => void load('reloaded')}
+      />
       <AuditHistory
         workspaceId={ws.id}
         aggregateType="Workspace"
@@ -185,7 +152,7 @@ export function WorkspaceSettingsForm() {
         timeZone={ws.timezone}
         refreshKey={ws.version}
       />
-    </>
+    </section>
   );
 }
 
@@ -246,7 +213,7 @@ export function CreateWorkspaceForm() {
       <label>
         {t('baseCurrency')}
         <select name="baseCurrency" value={baseCurrency} onChange={(e) => setBaseCurrency(e.target.value)}>
-          {CURRENCIES.map((c) => (
+          {BASE_CURRENCIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </select>
@@ -269,33 +236,86 @@ export function CreateWorkspaceForm() {
   );
 }
 
-/** Preferencias personales (FR-IDENTITY-003): nombre visible, locale y zona horaria con `If-Match`. */
+/**
+ * Preferencias personales (FR-IDENTITY-003): nombre visible, locale y zona horaria con `If-Match`. El locale
+ * elegido es también el idioma de la UI: al guardarlo se navega a la misma pantalla en ese idioma (`/`, `/en`,
+ * `/pt`) y se fija la cookie de locale de next-intl para que las rutas sin prefijo no vuelvan al idioma anterior.
+ */
 export function PreferencesForm() {
   const t = useTranslations('Preferences');
+  const tLocales = useTranslations('Locales');
   const locale = useLocale();
   const { state, reload } = useSession();
-  const me: Me | undefined = state.status === 'ready' ? state.me : undefined;
-  const [form, setForm] = useState({
+  const me = state.status === 'ready' ? state.me : undefined;
+  const [form, setForm] = useState<PreferencesValues>(() => ({
     displayName: me?.displayName ?? '',
     locale: me?.locale ?? 'es-BO',
     timezone: me?.timezone ?? '',
-  });
+  }));
+  const [errors, setErrors] = useState<Partial<Record<PreferencesField, PreferencesError>>>({});
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
-  const [saved, setSaved] = useState(false);
+  const [notice, setNotice] = useState<FormNotice>();
   const [busy, setBusy] = useState(false);
+  const pendingNotice = useRef<FormNotice>(undefined);
+  const shownVersion = useRef<string | undefined>(me ? `${me.id}:${me.version}` : undefined);
+
+  // Cada versión nueva del perfil (guardado, recarga tras 412) reemplaza lo editado.
+  useEffect(() => {
+    if (!me) return;
+    const key = `${me.id}:${me.version}`;
+    if (shownVersion.current !== key) {
+      shownVersion.current = key;
+      setForm({ displayName: me.displayName, locale: me.locale, timezone: me.timezone });
+      setErrors({});
+    }
+    if (pendingNotice.current) {
+      setNotice(pendingNotice.current);
+      pendingNotice.current = undefined;
+    }
+  }, [me]);
+
+  // Tras cambiar de idioma, la página nueva confirma el guardado (`?guardado=1`) y limpia la URL.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(SAVED_FLAG)) return;
+    setNotice('saved');
+    url.searchParams.delete(SAVED_FLAG);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   if (state.status !== 'ready' || !me) return null;
   const { api } = state;
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  async function submit() {
     if (busy || !me) return;
-    setBusy(true);
     setProblem(undefined);
-    setSaved(false);
+    setNotice(undefined);
+    const built = buildPreferencesPatch(
+      { displayName: me.displayName, locale: me.locale, timezone: me.timezone },
+      form,
+    );
+    if (!built.ok) {
+      setErrors(built.errors);
+      return;
+    }
+    setErrors({});
+    if (Object.keys(built.patch).length === 0) {
+      setNotice('noChanges');
+      return;
+    }
+    setBusy(true);
     try {
-      await api.command('PATCH', '/me', form, { ifMatch: me.version });
-      setSaved(true);
+      await api.command('PATCH', '/me', built.patch, { ifMatch: me.version });
+      const target = uiLocaleFor(form.locale);
+      if (built.patch.locale !== undefined && target !== locale) {
+        // Cookie de next-intl: sin ella, una ruta sin prefijo volvería a negociar el idioma anterior.
+        document.cookie = `NEXT_LOCALE=${target}; path=/; SameSite=Lax`;
+        const here = new URL(window.location.href);
+        here.searchParams.set(SAVED_FLAG, '1');
+        window.location.assign(switchLocalePath(`${here.pathname}${here.search}`, target));
+        return;
+      }
+      pendingNotice.current = 'saved';
       await reload();
     } catch (err) {
       setProblem(problemOf(err));
@@ -305,44 +325,27 @@ export function PreferencesForm() {
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} aria-labelledby="prefs-title">
-      <h1 id="prefs-title">{t('title')}</h1>
-      <label>
-        {t('displayName')}
-        <input
-          name="displayName"
-          maxLength={100}
-          value={form.displayName}
-          onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-        />
-      </label>
-      <label>
-        {t('locale')}
-        <select
-          name="locale"
-          value={form.locale}
-          onChange={(e) => setForm({ ...form, locale: e.target.value })}
-        >
-          {LOCALES.map((l) => (
-            <option key={l}>{l}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {t('timezone')}
-        <input
-          name="timezone"
-          list="me-timezones"
-          value={form.timezone}
-          onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-        />
-        <TimezoneOptions id="me-timezones" />
-      </label>
-      <button type="submit" disabled={busy}>
-        {t('save')}
-      </button>
-      {saved ? <p role="status">{t('saved')}</p> : null}
-      {problem ? <ProblemMessage problem={problem} locale={locale} /> : null}
-    </form>
+    <section style={pageStyle}>
+      <PreferencesView
+        t={(key, values) => t(key as never, values as never)}
+        localeName={(tag) => (tLocales.has(tag as never) ? tLocales(tag as never) : tag)}
+        uiLocale={locale}
+        form={form}
+        errors={errors}
+        busy={busy}
+        notice={notice}
+        problem={problem}
+        onChange={(patch) => {
+          setForm((prev) => ({ ...prev, ...patch }));
+          setNotice(undefined);
+        }}
+        onSubmit={() => void submit()}
+        onReloadLatest={() => {
+          pendingNotice.current = 'reloaded';
+          setProblem(undefined);
+          void reload();
+        }}
+      />
+    </section>
   );
 }
