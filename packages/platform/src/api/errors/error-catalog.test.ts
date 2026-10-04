@@ -140,4 +140,17 @@ describe('catálogo de códigos de error (platform/api-conventions)', () => {
     expect(r409.body).toMatchObject({ status: 409, code: 'CONCURRENCY_CONFLICT' });
     expect(new ApiProblem('RATE_LIMITED').message).toBe('Rate limit exceeded');
   });
+
+  it('[TC-PLATFORM-API-014] un DomainError PRECONDITION_FAILED del dominio publica currentVersion (regresión: faltaba en /transactions)', () => {
+    const domain = new DomainError('PRECONDITION_FAILED', 'stale', { details: { currentVersion: 2 } });
+    const r412 = renderProblem(domain.at('/version'), { requestId: 'r' }).response;
+    expect(r412.body).toMatchObject({ status: 412, code: 'PRECONDITION_FAILED', currentVersion: 2 });
+    // Solo `currentVersion` entero: ningún otro detalle del dominio se filtra al cliente.
+    const other = new DomainError('PRECONDITION_FAILED', 'stale', {
+      details: { currentVersion: 'x', secret: 'no' },
+    });
+    const body = renderProblem(other, { requestId: 'r' }).response.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty('currentVersion');
+    expect(body).not.toHaveProperty('secret');
+  });
 });

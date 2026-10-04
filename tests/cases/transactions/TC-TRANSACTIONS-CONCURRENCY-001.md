@@ -16,6 +16,7 @@ automation_status: automated
 automated_tests:
   - packages/contexts/transactions/src/application/transactions.service.test.ts
   - packages/contexts/transactions/test/integration/pg-transactions.int.test.ts
+  - apps/api/test/api/transactions.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -40,7 +41,7 @@ expected_result:
   - "Segunda: 412 problem+json con code PRECONDITION_FAILED y currentVersion 2; monto vigente 102.00 BOB; sin asientos adicionales"
   - "Anulación sin If-Match: 428 con code PRECONDITION_REQUIRED; T1 sigue posted"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-TRANSACTIONS-CONCURRENCY-001 — Una edición con versión obsoleta o sin versión se rechaza sin aplicar cambios

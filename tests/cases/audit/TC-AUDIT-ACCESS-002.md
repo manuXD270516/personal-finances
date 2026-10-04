@@ -15,9 +15,10 @@ invariants:
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/transactions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags:
@@ -39,7 +40,7 @@ expected_result:
 - El historial del gasto se devuelve
 - /audit-log responde 403 INSUFFICIENT_ROLE
 created: '2026-10-02'
-updated: '2026-10-02'
+updated: '2026-10-04'
 ---
 
 # TC-AUDIT-ACCESS-002 — VIEWER ve el historial de una transacción pero no el log de auditoría

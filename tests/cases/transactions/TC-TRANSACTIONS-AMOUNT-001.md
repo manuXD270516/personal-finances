@@ -15,6 +15,7 @@ level: api
 automation_status: automated
 automated_tests:
   - packages/contexts/transactions/src/domain/transaction.test.ts
+  - apps/api/test/api/transactions.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -37,7 +38,7 @@ expected_result:
   - "BOB: 422 problem+json con code AMOUNT_SCALE_EXCEEDED y errors[0].pointer = \"/amount/amount\"; nada persistido"
   - "USDT: 201; saldo de USDT Wallet = 98.765433 USDT"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-TRANSACTIONS-AMOUNT-001 — Se rechazan montos con más decimales que la escala de la moneda sin redondear

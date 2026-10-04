@@ -21,7 +21,7 @@ dependency-cruiser falla si un `*.command-handler.ts` o `*.service.ts` de `appli
 Esquema de BD: `apps/api/db/migrations/20261003160000_audit_audit_log.sql` y
 `20261004150000_audit_lifecycle_transition.sql`. Las máquinas de estado NO viven aquí: cada contexto las declara en su
 dominio (sobre `LifecycleMachine` del shared-kernel) y `apps/api` las pasa a `createAuditRuntime({ machines })`. Decisiones en
-`openspec/changes/add-audit-trail/design.md` § Decisiones de implementación.
+`openspec/changes/archive/2026-10-04-add-audit-trail/design.md` § Decisiones de implementación.
 
 | Script | Efecto |
 |---|---|
