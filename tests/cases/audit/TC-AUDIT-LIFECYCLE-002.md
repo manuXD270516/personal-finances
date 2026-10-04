@@ -12,9 +12,13 @@ invariants: ["INV-029","INV-023"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle.test.ts
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+  - packages/contexts/transactions/src/infrastructure/lifecycle.architecture.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["lifecycle","atomicity"]
@@ -30,7 +34,7 @@ expected_result:
   - "Primera corrida: existen el asiento, la auditoría, el evento TransactionPosted y una transición POST pending → posted que referencia el asiento y el auditLogId"
   - "Segunda corrida: el comando falla, la transacción sigue pending, sin asiento ni evento, y el saldo no cambia"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-002 — El registro de transición se escribe atómicamente con el posteo
@@ -49,4 +53,4 @@ Entonces existen juntos el asiento, la auditoría, el evento y la transición pe
 ```
 
 ## Notas
-
+- Implementación (2026-10-04): la falla se inyecta envolviendo `LifecyclePort` (opción `identity.lifecycle` del runtime de la API) y en los dobles en memoria (`faults.lifecycle`). El chequeo de consistencia estado ↔ última transición (`audit.lifecycle_state_divergences()`) se verifica en el mismo archivo de API.

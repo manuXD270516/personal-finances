@@ -1,4 +1,10 @@
-import type { AuditChangeInput, AuditPort } from '@pf/audit/contracts';
+import type {
+  AuditChangeInput,
+  AuditEntry,
+  AuditPort,
+  LifecycleDto,
+  LifecycleEventRefDto,
+} from '@pf/audit/contracts';
 import { currency as makeCurrency, DomainError, Money } from '@pf/shared-kernel';
 import {
   ACCOUNT_EVENTS,
@@ -7,6 +13,7 @@ import {
   type PostingEligibilityDto,
 } from '../contracts/index.js';
 import {
+  ACCOUNT_LIFECYCLE,
   Account,
   natureOf,
   type AccountChanges,
@@ -127,7 +134,7 @@ export class AccountsService {
       });
       await accounts.insert(account);
       const s = account.snapshot;
-      await this.publish(account, ACCOUNT_EVENTS.opened, {
+      const opened = await this.publish(account, ACCOUNT_EVENTS.opened, {
         accountId: s.id,
         name: s.name,
         type: s.type,
@@ -137,15 +144,17 @@ export class AccountsService {
         openedOn: s.openedOn ?? openedOn,
         includeInNetWorth: s.includeInNetWorth,
         liquidity: s.liquidity,
+        transition: 'OPEN',
       });
+      let openingEntryId: string | null = null;
       if (opening && !opening.isZero() && cmd.openingBalance) {
-        await this.deps.openingBalance.recordOpeningBalance({
+        ({ journalEntryId: openingEntryId } = await this.deps.openingBalance.recordOpeningBalance({
           workspaceId: cmd.workspaceId,
           accountId: s.id,
           nature: account.nature,
           amount: opening.toJSON(),
           date: cmd.openingBalance.date,
-        });
+        }));
       }
       const changes: AuditChangeInput[] = [
         { field: 'name', before: null, after: s.name },
@@ -158,14 +167,19 @@ export class AccountsService {
       if (s.accountNumberLast4)
         changes.push({ field: 'accountNumberLast4', before: null, after: s.accountNumberLast4 });
       if (opening) changes.push({ field: 'openingBalance', before: null, after: opening.toJSON() });
-      await this.audit.append({
-        workspaceId: s.workspaceId,
-        action: 'accounts.account.opened',
-        aggregateType: 'Account',
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        changes,
-      });
+      await this.record(
+        account,
+        {
+          workspaceId: s.workspaceId,
+          action: 'accounts.account.opened',
+          aggregateType: 'Account',
+          aggregateId: s.id,
+          aggregateVersion: s.version,
+          changes,
+        },
+        [opened],
+        openingEntryId,
+      );
       return this.view(account);
     });
   }
@@ -203,15 +217,21 @@ export class AccountsService {
       for (const f of ['name', 'institutionId', 'liquidity', 'includeInNetWorth', 'currency'] as const) {
         if (changed.includes(f)) payload[f] = after[f];
       }
-      await this.publish(account, ACCOUNT_EVENTS.updated, payload);
-      await this.audit.append({
-        workspaceId,
-        action: 'accounts.account.updated',
-        aggregateType: 'Account',
-        aggregateId: accountId,
-        aggregateVersion: after.version,
-        changes: changed.map((field) => ({ field, before: before[field], after: after[field] })),
-      });
+      const updated = await this.publish(account, ACCOUNT_EVENTS.updated, payload);
+      await this.record(
+        account,
+        {
+          workspaceId,
+          action: 'accounts.account.updated',
+          aggregateType: 'Account',
+          aggregateId: accountId,
+          aggregateVersion: after.version,
+          changes: changed.map((field) => ({ field, before: before[field], after: after[field] })),
+        },
+        [updated],
+        null,
+        changed,
+      );
       return this.view(account);
     });
   }
@@ -227,20 +247,25 @@ export class AccountsService {
       const previous = account.status;
       account.archive(this.deps.clock.now().toString(), reason);
       await this.save(account);
-      await this.publish(account, ACCOUNT_EVENTS.archived, {
+      const archived = await this.publish(account, ACCOUNT_EVENTS.archived, {
         accountId,
         archivedOn: await this.deps.calendar.today(workspaceId),
         reason: account.snapshot.archiveReason,
+        transition: 'ARCHIVE',
       });
-      await this.audit.append({
-        workspaceId,
-        action: 'accounts.account.archived',
-        aggregateType: 'Account',
-        aggregateId: accountId,
-        aggregateVersion: account.version,
-        reason: account.snapshot.archiveReason,
-        changes: [{ field: 'status', before: previous, after: 'ARCHIVED' }],
-      });
+      await this.record(
+        account,
+        {
+          workspaceId,
+          action: 'accounts.account.archived',
+          aggregateType: 'Account',
+          aggregateId: accountId,
+          aggregateVersion: account.version,
+          reason: account.snapshot.archiveReason,
+          changes: [{ field: 'status', before: previous, after: 'ARCHIVED' }],
+        },
+        [archived],
+      );
       return this.view(account);
     });
   }
@@ -258,23 +283,28 @@ export class AccountsService {
       account.close(input.closedOn, input.reason ?? null, { balanceIsZero });
       await this.save(account);
       const s = account.snapshot;
-      await this.publish(account, ACCOUNT_EVENTS.closed, {
+      const closed = await this.publish(account, ACCOUNT_EVENTS.closed, {
         accountId,
         closedOn: s.closedOn,
         reason: s.closeReason,
+        transition: 'CLOSE',
       });
-      await this.audit.append({
-        workspaceId,
-        action: 'accounts.account.closed',
-        aggregateType: 'Account',
-        aggregateId: accountId,
-        aggregateVersion: s.version,
-        reason: s.closeReason,
-        changes: [
-          { field: 'status', before: 'ACTIVE', after: 'CLOSED' },
-          { field: 'closedOn', before: null, after: s.closedOn },
-        ],
-      });
+      await this.record(
+        account,
+        {
+          workspaceId,
+          action: 'accounts.account.closed',
+          aggregateType: 'Account',
+          aggregateId: accountId,
+          aggregateVersion: s.version,
+          reason: s.closeReason,
+          changes: [
+            { field: 'status', before: 'ACTIVE', after: 'CLOSED' },
+            { field: 'closedOn', before: null, after: s.closedOn },
+          ],
+        },
+        [closed],
+      );
       return this.view(account);
     });
   }
@@ -284,19 +314,24 @@ export class AccountsService {
       const account = await this.load(workspaceId, accountId, expectedVersion, true);
       const previousStatus = account.reactivate();
       await this.save(account);
-      await this.publish(account, ACCOUNT_EVENTS.reactivated, {
+      const reactivated = await this.publish(account, ACCOUNT_EVENTS.reactivated, {
         accountId,
         previousStatus,
         reactivatedOn: await this.deps.calendar.today(workspaceId),
+        transition: 'REACTIVATE',
       });
-      await this.audit.append({
-        workspaceId,
-        action: 'accounts.account.reactivated',
-        aggregateType: 'Account',
-        aggregateId: accountId,
-        aggregateVersion: account.version,
-        changes: [{ field: 'status', before: previousStatus, after: 'ACTIVE' }],
-      });
+      await this.record(
+        account,
+        {
+          workspaceId,
+          action: 'accounts.account.reactivated',
+          aggregateType: 'Account',
+          aggregateId: accountId,
+          aggregateVersion: account.version,
+          changes: [{ field: 'status', before: previousStatus, after: 'ACTIVE' }],
+        },
+        [reactivated],
+      );
       return this.view(account);
     });
   }
@@ -323,19 +358,47 @@ export class AccountsService {
         const before = account.snapshot.displayOrder;
         if (!account.moveTo(order)) continue;
         await this.save(account);
-        await this.publish(account, ACCOUNT_EVENTS.updated, {
+        const updated = await this.publish(account, ACCOUNT_EVENTS.updated, {
           accountId: account.id,
           changedFields: ['displayOrder'],
         });
-        await this.audit.append({
-          workspaceId,
-          action: 'accounts.account.reordered',
-          aggregateType: 'Account',
-          aggregateId: account.id,
-          aggregateVersion: account.version,
-          changes: [{ field: 'displayOrder', before, after: order }],
-        });
+        await this.record(
+          account,
+          {
+            workspaceId,
+            action: 'accounts.account.reordered',
+            aggregateType: 'Account',
+            aggregateId: account.id,
+            aggregateVersion: account.version,
+            changes: [{ field: 'displayOrder', before, after: order }],
+          },
+          [updated],
+          null,
+          ['displayOrder'],
+        );
       }
+    });
+  }
+
+  /**
+   * `GET W/accounts/{id}/lifecycle` (add-lifecycle-timeline decisión 7; VIEWER, D28): verifica que la cuenta existe en
+   * el workspace (otro workspace ⇒ 404 idéntico a inexistente, RLS) y pide su recorrido a AUDIT con el estado actual.
+   */
+  accountLifecycle(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly accountId: string;
+  }): Promise<LifecycleDto> {
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const account = await this.deps.accounts.findById(input.workspaceId, input.accountId);
+      if (!account) throw notFound(input.accountId);
+      return this.deps.lifecycleQuery.lifecycleOf({
+        userId: input.userId,
+        workspaceId: input.workspaceId,
+        aggregateType: 'Account',
+        aggregateId: account.id,
+        currentState: account.status,
+      });
     });
   }
 
@@ -467,13 +530,41 @@ export class AccountsService {
     }
   }
 
+  /**
+   * Auditoría + paso del recorrido en la unidad de trabajo del comando (add-lifecycle-timeline decisión 5): la
+   * transición validada por `ACCOUNT_LIFECYCLE` o, si el comando no cambió el estado, una anotación de metadatos.
+   */
+  private record(
+    account: Account,
+    entry: AuditEntry,
+    events: readonly LifecycleEventRefDto[],
+    openingEntryId: string | null = null,
+    changedFields: readonly string[] = [],
+  ): Promise<void> {
+    const t = account.lastTransition;
+    return this.deps.lifecycle.record(entry, [
+      t
+        ? {
+            kind: 'TRANSITION',
+            transition: t.transition,
+            fromState: t.from,
+            toState: t.to,
+            machineVersion: ACCOUNT_LIFECYCLE.version,
+            events,
+            ...(openingEntryId ? { journalEntries: { posted: openingEntryId } } : {}),
+          }
+        : { kind: 'ANNOTATION', changedFields, events },
+    ]);
+  }
+
   private async publish(
     account: Account,
     event: { readonly eventType: string; readonly eventVersion: number },
     payload: object,
-  ): Promise<void> {
+  ): Promise<LifecycleEventRefDto> {
+    const eventId = this.deps.ids.next();
     await this.deps.outbox.append({
-      eventId: this.deps.ids.next(),
+      eventId,
       eventType: event.eventType,
       eventVersion: event.eventVersion,
       occurredAt: this.deps.clock.now().toString(),
@@ -483,6 +574,7 @@ export class AccountsService {
       aggregateVersion: account.version,
       payload,
     });
+    return { eventId, eventType: `${event.eventType}.v${event.eventVersion}` };
   }
 
   private async view(account: Account): Promise<AccountView> {

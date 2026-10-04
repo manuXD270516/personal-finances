@@ -9,6 +9,11 @@ export interface LedgerDailyJobOptions {
   readonly tz: string;
   /** Encola además una ejecución al arrancar (p. ej. tras `restore:local`, que reinicia el worker). */
   readonly runOnStart: boolean;
+  /**
+   * Chequeos adicionales tras `VerifyLedgerIntegrity` (add-lifecycle-timeline decisión 6: estado del agregado ↔
+   * última transición del recorrido).
+   */
+  readonly afterIntegrity?: () => Promise<unknown>;
 }
 
 export interface LedgerDailyPayload {
@@ -27,7 +32,7 @@ export async function registerLedgerDailyJob(
   options: LedgerDailyJobOptions,
 ): Promise<void> {
   await queue.work<LedgerDailyPayload>(LEDGER_DAILY_MAINTENANCE_QUEUE, { concurrency: 1 }, (job) =>
-    runLedgerDailyMaintenance(maintenance, job.payload.trigger),
+    runLedgerDailyMaintenance(maintenance, job.payload.trigger, options.afterIntegrity),
   );
   if (options.cron === 'off') {
     await queue.unschedule(LEDGER_DAILY_MAINTENANCE_QUEUE);
@@ -47,11 +52,13 @@ export async function registerLedgerDailyJob(
 export function runLedgerDailyMaintenance(
   maintenance: LedgerMaintenance,
   trigger: LedgerDailyPayload['trigger'],
+  afterIntegrity?: () => Promise<unknown>,
 ): Promise<void> {
   return runWithRequestContext(
     { actor: { type: 'WORKER', process: `ledger.daily-maintenance:${trigger}` }, origin: 'system' },
     async () => {
       await maintenance.verifyLedgerIntegrity();
+      if (afterIntegrity) await afterIntegrity();
       await maintenance.rebuildBalanceSnapshots();
     },
   );

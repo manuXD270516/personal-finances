@@ -1,6 +1,7 @@
 import type { AuditActorInput } from '../../domain/audit-actor.js';
 import type { AuditOrigin } from '../../domain/audit-origin.js';
 import type { AuditRecord } from '../../domain/audit-record.js';
+import type { LifecycleEntry } from '../../domain/lifecycle-entry.js';
 
 /** Contexto ambiental de la petición/job (lo aporta la plataforma: middleware HTTP, jobs, consumidores). */
 export interface AuditAmbient {
@@ -60,4 +61,33 @@ export interface WorkspaceTimeZones {
 /** Unidad de trabajo de lectura con contexto RLS (usuario + workspace). */
 export interface ReadUnitOfWork {
   run<T>(ctx: { userId: string; workspaceId: string }, fn: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * Almacén append-only de `audit.lifecycle_transition` (add-lifecycle-timeline decisión 5): escribe y lee SIEMPRE en la
+ * transacción de la unidad de trabajo (RLS del workspace). Nunca actualiza ni borra.
+ */
+export interface LifecycleStore {
+  /** Siguiente `sequence` del agregado (1 si no tiene filas); la serializa el bloqueo del agregado del comando. */
+  nextSequence(workspaceId: string, aggregateType: string, aggregateId: string): Promise<number>;
+  insert(entry: LifecycleEntry): Promise<void>;
+  /** Filas del agregado ordenadas por `sequence`. */
+  entriesOf(
+    workspaceId: string,
+    aggregateType: string,
+    aggregateId: string,
+  ): Promise<readonly LifecycleEntry[]>;
+}
+
+/** Lectura de la auditoría y escritura de filas derivadas para el job `audit.lifecycle-backfill` (rol pf_worker). */
+export interface LifecycleBackfillSource {
+  /** Agregados del workspace con auditoría de los tipos dados y SIN filas de recorrido (id ascendente, paginado). */
+  aggregatesWithoutLifecycle(input: {
+    readonly workspaceId: string;
+    readonly aggregateTypes: readonly string[];
+    readonly afterAggregateId: string | null;
+    readonly limit: number;
+  }): Promise<readonly { readonly aggregateType: string; readonly aggregateId: string }[]>;
+  /** Registros de auditoría del agregado en orden cronológico. */
+  auditOf(workspaceId: string, aggregateType: string, aggregateId: string): Promise<readonly AuditRecord[]>;
 }

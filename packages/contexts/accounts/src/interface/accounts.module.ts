@@ -1,5 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { BalanceQuery } from '@pf/ledger/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
@@ -7,6 +7,7 @@ import type { Pool } from 'pg';
 import { AccountCatalogQueries } from '../application/account-catalog.queries.js';
 import { AccountsService } from '../application/accounts.service.js';
 import { InstitutionsService } from '../application/institutions.service.js';
+import { ACCOUNT_LIFECYCLE } from '../domain/index.js';
 import type {
   AccountsDeps,
   BaseCurrencyValuationDeps,
@@ -39,6 +40,9 @@ export interface AccountsRuntimeOptions {
   readonly pool: Pool;
   readonly clock: Clock;
   readonly audit: AuditPort;
+  /** Auditoría + recorrido (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: LifecycleQuery;
   readonly outbox: OutboxPort;
   /** Saldos (API pública de LEDGER). */
   readonly balances: BalanceQuery;
@@ -76,6 +80,8 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
     openingBalance: options.openingBalance,
     outbox: options.outbox,
     audit: options.audit,
+    lifecycle: options.lifecycle,
+    lifecycleQuery: options.lifecycleQuery,
     ids: uuidV7Ids,
     clock: options.clock,
     calendar: options.calendar,
@@ -115,6 +121,9 @@ export class AccountsModule {
     };
   }
 }
+
+/** Máquina de estados `Account` declarada por el dominio (add-lifecycle-timeline), para AUDIT en el composition root. */
+export const ACCOUNT_LIFECYCLE_MACHINE: LifecycleMachineDto = ACCOUNT_LIFECYCLE.definition;
 
 export type {
   AccountOpeningBalancePort,

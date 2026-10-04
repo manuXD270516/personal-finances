@@ -12,9 +12,11 @@ invariants: ["INV-009","INV-008"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["transfer","events","revision"]
@@ -32,7 +34,7 @@ expected_result:
   - "\"A\" 750.00 BOB, \"B\" 250.00 BOB, patrimonio 1000.00 BOB"
   - "El consumidor aplica TransferRevised una sola vez"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-TRANSACTIONS-TRANSFER-009 — Corregir una transferencia publica TransferRevised y no re-emite TransferCompleted

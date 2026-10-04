@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/accounts/AccountClosed.v1.schema.json",
   "title": "accounts.AccountClosed.v1",
-  "description": "Una cuenta fue cerrada (saldo cero); sigue visible pero no acepta nuevos movimientos (INV-026). Productor: ACCOUNTS. Consumidores: REPORTING, COMMITMENTS (Phase 3). Idempotencia natural: (accountId, aggregateVersion). PII baja: reason.",
+  "description": "Una cuenta fue cerrada (saldo cero); sigue visible pero no acepta nuevos movimientos (INV-026). Productor: ACCOUNTS. Consumidores: REPORTING, COMMITMENTS (Phase 3). Idempotencia natural: (accountId, aggregateVersion). PII baja: reason. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
   "type": "object",
   "allOf": [
     {
@@ -45,6 +45,16 @@
             "null"
           ],
           "maxLength": 500
+        },
+        "transition": {
+          "description": "Transición de la máquina `Account` que originó el evento (opcional, aditivo).",
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "CLOSE",
+            "ARCHIVE",
+            "REACTIVATE"
+          ]
         }
       }
     }
@@ -68,7 +78,8 @@
       "payload": {
         "accountId": "01928c4e-0000-7000-8000-000000acc003",
         "closedOn": "2026-10-02",
-        "reason": "Cuenta cerrada en el banco"
+        "reason": "Cuenta cerrada en el banco",
+        "transition": "CLOSE"
       }
     }
   ]

@@ -19,3 +19,13 @@ export {
   type AuditFieldPolicies,
   type AuditFieldRule,
 } from './redaction-policy.js';
+export {
+  compareLifecycleEntries,
+  historyComplete,
+  lifecycleEntry,
+  lifecyclePath,
+  type LifecycleEntry,
+  type LifecycleEntryKind,
+  type LifecycleJournalEntries,
+} from './lifecycle-entry.js';
+export { DERIVABLE_AGGREGATE_TYPES, deriveLifecycleSteps, type DerivedStep } from './lifecycle-derivation.js';

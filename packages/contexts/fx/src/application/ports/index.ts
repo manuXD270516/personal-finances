@@ -1,4 +1,4 @@
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { Clock, Instant } from '@pf/shared-kernel';
 import type {
   AnomalyStatus,
@@ -213,6 +213,10 @@ export interface FxDeps {
   readonly workspaces: WorkspaceSettingsPort;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  /** Auditoría + recorrido de tasas manuales (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
+  /** `GetLifecycle` de AUDIT para `GET W/fx-rates/{id}/lifecycle`. */
+  readonly lifecycleQuery: LifecycleQuery;
   readonly ids: IdGenerator;
   readonly clock: Clock;
   /** Ventana de vigencia de la resolución *as-of* (días; 7 por defecto). */

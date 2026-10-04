@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - packages/contexts/accounts/src/domain/account-lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","accounts"]
@@ -32,7 +35,7 @@ expected_result:
   - "CLOSE (ACTIVE → CLOSED)"
   - "currentState CLOSED; la transferencia no es transición de la cuenta"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-009 — El recorrido de una cuenta muestra apertura, archivo, reactivación y cierre

@@ -23,6 +23,7 @@ import {
   parseFxProviderSettings,
   type FxMarketRateJobsOptions,
 } from '@pf/fx/interface/fx.module';
+import { createLifecycleBackfill } from '@pf/audit/interface/audit.module';
 import { identityActiveWorkspaces } from '@pf/identity/interface/identity.module';
 import { createLedgerMaintenance } from '@pf/ledger/interface/ledger.module';
 import { PinoNestLogger } from '@pf/platform/nest';
@@ -34,6 +35,7 @@ import { systemClock, type Clock } from '@pf/shared-kernel';
 import { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { createJobQueue } from '../runtime/platform-resources.js';
+import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import { registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { WorkerModule } from './platform-jobs.js';
@@ -68,6 +70,8 @@ export interface WorkerRuntimeOptions {
   readonly fxEndpoints?: FxMarketRateJobsOptions['endpoints'];
   /** Encola un relleno de días faltantes de tasas al arrancar (por defecto sí). */
   readonly fxGapFillOnStart?: boolean;
+  /** Encola la reconstrucción del recorrido desde la auditoría al arrancar (por defecto sí; add-lifecycle-timeline). */
+  readonly lifecycleBackfillOnStart?: boolean;
 }
 
 export async function createWorkerRuntime(
@@ -112,6 +116,8 @@ export async function createWorkerRuntime(
 
   // Job diario del ledger: verificador de invariantes + snapshots (add-ledger-core 5.6). Corre también al arrancar,
   // así `restore:local` (que reinicia el worker) verifica el ledger restaurado.
+  const activeWorkspaces = identityActiveWorkspaces(pool);
+  const auditMetrics = otelCounters('@pf/audit');
   await registerLedgerDailyJob(
     queue,
     createLedgerMaintenance({
@@ -125,8 +131,12 @@ export async function createWorkerRuntime(
       cron: config.LEDGER_INTEGRITY_CRON,
       tz: config.LEDGER_INTEGRITY_CRON_TZ,
       runOnStart: options.ledgerMaintenanceOnStart ?? true,
+      afterIntegrity: () => verifyLifecycleConsistency(pool, activeWorkspaces, logger, auditMetrics),
     },
   );
+  await registerLifecycleBackfillJob(queue, createLifecycleBackfill(pool), activeWorkspaces, logger, {
+    runOnStart: options.lifecycleBackfillOnStart ?? true,
+  });
 
   // Providers de tasas de mercado (add-market-rate-providers): polling, carga histórica y relleno; la configuración
   // inválida o `none` no impide arrancar el worker (degradación).
@@ -142,7 +152,7 @@ export async function createWorkerRuntime(
           await fxOutbox.append(event);
         },
       },
-      workspaces: identityActiveWorkspaces(pool),
+      workspaces: activeWorkspaces,
       settings: parseFxProviderSettings(config),
       ...(options.fxEndpoints ? { endpoints: options.fxEndpoints } : {}),
     }),

@@ -1,7 +1,9 @@
+import type { LifecycleEventRefDto, LifecycleStepInput } from '@pf/audit/contracts';
 import type { PostingLineDto } from '@pf/ledger/contracts';
 import { DomainError } from '@pf/shared-kernel';
 import { TRANSACTION_EVENTS } from '../contracts/index.js';
 import {
+  TRANSACTION_LIFECYCLE,
   toJournalEntryDraft,
   transferFee,
   type ConversionDetail,
@@ -55,14 +57,16 @@ export function linkEntry(
   });
 }
 
+/** Publica en el outbox y devuelve la referencia del evento para el registro de transición (add-lifecycle-timeline). */
 export async function publishEvent(
   deps: Deps,
   tx: Transaction,
   event: { readonly eventType: string; readonly eventVersion: number },
   payload: object,
-): Promise<void> {
+): Promise<LifecycleEventRefDto> {
+  const eventId = deps.ids.next();
   await deps.outbox.append({
-    eventId: deps.ids.next(),
+    eventId,
     eventType: event.eventType,
     eventVersion: event.eventVersion,
     occurredAt: deps.clock.now().toString(),
@@ -72,6 +76,7 @@ export async function publishEvent(
     aggregateVersion: tx.version,
     payload,
   });
+  return { eventId, eventType: `${event.eventType}.v${event.eventVersion}` };
 }
 
 export const legsPayload = (s: TransactionState) =>
@@ -141,10 +146,21 @@ export function conversionRecordedPayload(s: TransactionState, d: ConversionDeta
   };
 }
 
+/** Revisión que reemplaza el asiento activo (transición `REVISE`): asientos revertido y de reversa. */
+export interface RevisionPosting {
+  readonly revisionFrom: number;
+  readonly reversedJournalEntryId: string;
+  readonly reversalJournalEntryId: string;
+}
+
 /**
- * `TransactionPosted` y, según el kind, `TransferCompleted` (add-transfers) o `ConversionRecorded` (exactamente uno por
- * revisión posteada; idempotencia natural `(transactionId, journalEntryId)`), en todos los caminos de posteo
- * (creación, `pending→posted`, edición con asiento nuevo) y nunca en `pending`.
+ * `TransactionPosted` y, según el kind (en todos los caminos de posteo y nunca en `pending`):
+ * - `TRANSFER`: `TransferCompleted` UNA SOLA VEZ, en su primer asiento (`RECORD`/`POST`; idempotencia natural
+ *   `transactionId`); cada edición financiera (`REVISE`, `revision` presente) publica `TransferRevised` con los tres
+ *   asientos (docs/31 D37, add-lifecycle-timeline decisión 9; reemplaza la re-emisión de add-transfers decisión 6).
+ *   Idempotencia natural de `TransferRevised`: `(transactionId, revisionTo)`.
+ * - `CONVERSION`: `ConversionRecorded` por revisión posteada (comportamiento vigente de add-manual-conversions).
+ * `TransactionPosted` lleva el campo aditivo `transition` (decisión 10). Devuelve las referencias de los eventos.
  */
 export async function publishPosted(
   deps: Deps,
@@ -152,42 +168,115 @@ export async function publishPosted(
   journalEntryId: string,
   previousStatus: TransactionStatus | null,
   supersedes: string | null,
-): Promise<void> {
+  revision: RevisionPosting | null = null,
+): Promise<LifecycleEventRefDto[]> {
   const s = tx.snapshot;
-  await publishEvent(deps, tx, TRANSACTION_EVENTS.posted, {
-    transactionId: s.id,
-    revision: s.revision,
-    kind: s.kind,
-    businessDate: s.businessDate,
-    journalEntryId,
-    previousStatus,
-    counterpartyId: s.counterpartyId,
-    legs: legsPayload(s),
-    splits: splitsPayload(s),
-    supersedesJournalEntryId: supersedes,
-  });
+  const transition = tx.lastTransition?.transition;
+  const refs: LifecycleEventRefDto[] = [
+    await publishEvent(deps, tx, TRANSACTION_EVENTS.posted, {
+      transactionId: s.id,
+      revision: s.revision,
+      kind: s.kind,
+      businessDate: s.businessDate,
+      journalEntryId,
+      previousStatus,
+      counterpartyId: s.counterpartyId,
+      legs: legsPayload(s),
+      splits: splitsPayload(s),
+      supersedesJournalEntryId: supersedes,
+      ...(transition ? { transition } : {}),
+    }),
+  ];
   if (s.kind === 'TRANSFER') {
     const source = s.legs.find((l) => l.role === 'SOURCE');
     const target = s.legs.find((l) => l.role === 'TARGET');
     if (!source || !target) throw new DomainError('INTERNAL_ERROR', 'transfer without SOURCE/TARGET legs');
-    await publishEvent(deps, tx, TRANSACTION_EVENTS.transferCompleted, {
-      transactionId: s.id,
-      journalEntryId,
-      businessDate: s.businessDate,
-      fromAccountId: source.accountId,
-      toAccountId: target.accountId,
-      amount: s.amount.toJSON(),
-      fee: transferFee(s)?.toJSON() ?? null,
-      matchedTransactionIds: [],
-    });
+    refs.push(
+      revision
+        ? await publishEvent(deps, tx, TRANSACTION_EVENTS.transferRevised, {
+            transactionId: s.id,
+            revisionFrom: revision.revisionFrom,
+            revisionTo: s.revision,
+            businessDate: s.businessDate,
+            fromAccountId: source.accountId,
+            toAccountId: target.accountId,
+            amount: s.amount.toJSON(),
+            fee: transferFee(s)?.toJSON() ?? null,
+            reversedJournalEntryId: revision.reversedJournalEntryId,
+            reversalJournalEntryId: revision.reversalJournalEntryId,
+            journalEntryId,
+          })
+        : await publishEvent(deps, tx, TRANSACTION_EVENTS.transferCompleted, {
+            transactionId: s.id,
+            journalEntryId,
+            businessDate: s.businessDate,
+            fromAccountId: source.accountId,
+            toAccountId: target.accountId,
+            amount: s.amount.toJSON(),
+            fee: transferFee(s)?.toJSON() ?? null,
+            matchedTransactionIds: [],
+          }),
+    );
   }
   if (s.kind === 'CONVERSION') {
     if (!s.conversion) throw new DomainError('INTERNAL_ERROR', 'conversion without ConversionDetail');
-    await publishEvent(
-      deps,
-      tx,
-      TRANSACTION_EVENTS.conversionRecorded,
-      conversionRecordedPayload(s, s.conversion, journalEntryId),
+    refs.push(
+      await publishEvent(
+        deps,
+        tx,
+        TRANSACTION_EVENTS.conversionRecorded,
+        conversionRecordedPayload(s, s.conversion, journalEntryId),
+      ),
     );
   }
+  return refs;
+}
+
+/**
+ * Pasos del recorrido de una transacción para `LifecyclePort` (add-lifecycle-timeline decisiones 2 y 5): la transición
+ * que dejó el agregado (validada por `TRANSACTION_LIFECYCLE`) o, si el comando no cambió el estado ni el ledger, una
+ * anotación con los campos cambiados. Las conversiones enlazan el `ConversionDetail` de la revisión
+ * (`detailRefs.conversionRevision`, D11).
+ */
+export function transactionSteps(
+  tx: Transaction,
+  input: {
+    readonly events: readonly LifecycleEventRefDto[];
+    readonly journalEntries?: {
+      readonly reversed?: string | null;
+      readonly reversal?: string | null;
+      readonly posted?: string | null;
+    };
+    readonly changedFields?: readonly string[];
+    readonly revisionBefore?: number;
+  },
+): LifecycleStepInput[] {
+  const t = tx.lastTransition;
+  const s = tx.snapshot;
+  if (t) {
+    const linksDetail = s.kind === 'CONVERSION' && (t.transition === 'RECORD' || t.transition === 'REVISE');
+    return [
+      {
+        kind: 'TRANSITION',
+        transition: t.transition,
+        fromState: t.from,
+        toState: t.to,
+        machineVersion: TRANSACTION_LIFECYCLE.version,
+        revisionFrom: t.revisionFrom,
+        revisionTo: t.revisionTo,
+        events: input.events,
+        ...(input.journalEntries ? { journalEntries: input.journalEntries } : {}),
+        ...(linksDetail ? { detailRefs: { conversionRevision: s.revision } } : {}),
+      },
+    ];
+  }
+  const revised = input.revisionBefore !== undefined && input.revisionBefore !== s.revision;
+  return [
+    {
+      kind: 'ANNOTATION',
+      changedFields: input.changedFields ?? [],
+      events: input.events,
+      ...(revised ? { revisionFrom: input.revisionBefore ?? null, revisionTo: s.revision } : {}),
+    },
+  ];
 }

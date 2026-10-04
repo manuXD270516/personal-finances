@@ -1,5 +1,5 @@
 import type { ModuleMetadata } from '@nestjs/common';
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import {
   AccountsModule,
   createAccountsRuntime,
@@ -46,6 +46,9 @@ export function accountsRuntime(input: {
   readonly pool: Pool;
   readonly clock: Clock;
   readonly audit: AuditPort;
+  /** Auditoría + recorrido y su consulta (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: LifecycleQuery;
   readonly logger: Logger;
   readonly defaultTimeZone: string;
   readonly outbox?: OutboxWriter;
@@ -64,6 +67,8 @@ export function accountsRuntime(input: {
     pool: input.pool,
     clock: input.clock,
     audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
     outbox: { append: async (event) => void (await writer.append(event)) },
     balances: ledger.balances,
     openingBalance: new OpenAccountWithOpeningBalance(ledger.posting),

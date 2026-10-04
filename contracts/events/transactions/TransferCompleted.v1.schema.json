@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/transactions/TransferCompleted.v1.schema.json",
   "title": "transactions.TransferCompleted.v1",
-  "description": "Transferencia entre cuentas del usuario en la misma moneda quedó posteada (creación, pending→posted o emparejamiento de dos transacciones importadas). Productor: TRANSACTIONS. Consumidores: GOALS, DEBT, REPORTING. Idempotencia natural: (transactionId, journalEntryId). Sin PII.",
+  "description": "Transferencia entre cuentas del usuario en la misma moneda quedó posteada por PRIMERA vez (creación posteada, pending→posted o emparejamiento de dos transacciones importadas). Se publica UNA SOLA VEZ por transferencia: las ediciones financieras publican transactions.TransferRevised.v1 y la anulación TransactionVoided.v1 (docs/31 D37, openspec add-lifecycle-timeline). Productor: TRANSACTIONS. Consumidores: GOALS, DEBT, REPORTING. Idempotencia natural: transactionId. Sin PII.",
   "type": "object",
   "allOf": [
     {

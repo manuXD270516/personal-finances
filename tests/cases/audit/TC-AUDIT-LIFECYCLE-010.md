@@ -12,9 +12,12 @@ invariants: ["INV-011"]
 priority: medium
 type: api
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - packages/contexts/fx/src/domain/exchange-rate-lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","fx"]
@@ -31,7 +34,7 @@ expected_result:
   - "SUPERSEDE (RECORDED → SUPERSEDED) con detailRefs.supersededByRateId = id de la tasa 6.96"
   - "La tasa 6.95 conserva su valor original"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-010 — El recorrido de una tasa corregida muestra su reemplazo sin modificarla
@@ -49,4 +52,4 @@ Entonces su recorrido muestra registrar y reemplazar enlazado a 6.96
 ```
 
 ## Notas
-
+- Implementación (2026-10-04): la ruta sigue la del contrato vigente, `GET W/fx-rates/{fxRateId}/lifecycle`; la tasa nueva lleva `RECORD` con `detailRefs.supersedesRateId`.

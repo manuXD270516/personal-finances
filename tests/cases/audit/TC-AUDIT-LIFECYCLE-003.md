@@ -12,9 +12,11 @@ invariants: ["INV-007","INV-008"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+  - packages/contexts/transactions/src/domain/transaction-lifecycle.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["lifecycle","revision","reversal"]
@@ -31,7 +33,7 @@ expected_result:
   - "journalEntries: reversed = E1, reversal = reversa de E1, posted = asiento nuevo de 102.00 BOB"
   - "Saldo de \"Bank A\" 898.00 BOB"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-003 — Corregir el monto de un gasto registra la transición de revisión con sus asientos

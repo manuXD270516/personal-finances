@@ -861,5 +861,83 @@
     "unarchived": "“{name}” unarchived.",
     "categoryCreated": "Category “{name}” created.",
     "system": "system (protected)"
+  },
+  "Lifecycle": {
+    "tabs": {
+      "label": "Detail sections",
+      "detail": "Detail",
+      "lifecycle": "Lifecycle",
+      "history": "Change history"
+    },
+    "title": "Lifecycle",
+    "subtitle": "This item's path through its state machine: each transition, who made it and when.",
+    "loading": "Loading the lifecycle…",
+    "empty": "No transitions recorded yet.",
+    "incomplete": "Incomplete earlier history: part of the lifecycle was rebuilt from the audit log and there is no evidence of earlier steps.",
+    "diagram": {
+      "label": "State diagram: current state {current}. Path: {path}.",
+      "noState": "no state",
+      "current": "(current)",
+      "legend": "Highlighted: states and transitions taken, numbered in the order they happened (record is the entry point). Dimmed: not taken. The timeline describes the same path."
+    },
+    "timeline": {
+      "title": "Timeline",
+      "none": "—",
+      "derived": "derived",
+      "derivedHint": "Rebuilt from the audit log (before transitions were recorded).",
+      "annotation": "Descriptive change: {fields}",
+      "revision": "Revision {revision}",
+      "revisionChange": "Revision {from} → {to}",
+      "amountWithFee": "{amount} + fee {fee}",
+      "viewRevision": "view revision {revision}",
+      "reason": "Reason: {reason}",
+      "journal": "view journal entries",
+      "journalEntries": {
+        "reversed": "Reversed entry: {id}",
+        "reversal": "Reversal entry: {id}",
+        "posted": "New entry: {id}"
+      },
+      "events": "Events: {events}",
+      "actor": {
+        "you": "You",
+        "named": "{id}",
+        "user": "User …{id}",
+        "process": "Process {id}"
+      }
+    },
+    "revisions": {
+      "title": "Revisions",
+      "item": "Revision {revision}",
+      "conversion": "Converts {source} → {target} · rate {rate}",
+      "fees": "fees: {fees}"
+    },
+    "legRoles": {
+      "MAIN": "main",
+      "SOURCE": "source",
+      "TARGET": "target",
+      "FEE": "fee"
+    },
+    "transitions": {
+      "Transaction": {
+        "RECORD": "Record",
+        "POST": "Post",
+        "CLEAR": "Clear",
+        "UNCLEAR": "Unclear",
+        "RECONCILE": "Reconcile",
+        "UNRECONCILE": "Unreconcile",
+        "REVISE": "Revise",
+        "VOID": "Void"
+      },
+      "Account": {
+        "OPEN": "Open",
+        "CLOSE": "Close",
+        "ARCHIVE": "Archive",
+        "REACTIVATE": "Reactivate"
+      },
+      "ExchangeRate": {
+        "RECORD": "Record",
+        "SUPERSEDE": "Supersede"
+      }
+    }
   }
 }

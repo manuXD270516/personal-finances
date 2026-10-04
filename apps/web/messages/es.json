@@ -861,5 +861,83 @@
     "unarchived": "«{name}» desarchivada.",
     "categoryCreated": "Categoría «{name}» creada.",
     "system": "de sistema (protegida)"
+  },
+  "Lifecycle": {
+    "tabs": {
+      "label": "Secciones del detalle",
+      "detail": "Detalle",
+      "lifecycle": "Recorrido",
+      "history": "Historial de cambios"
+    },
+    "title": "Recorrido",
+    "subtitle": "El camino de este elemento por su máquina de estados: cada transición, quién la hizo y cuándo.",
+    "loading": "Cargando el recorrido…",
+    "empty": "Todavía no hay transiciones registradas.",
+    "incomplete": "Historia previa incompleta: parte del recorrido se reconstruyó desde la auditoría y no hay evidencia de los pasos anteriores.",
+    "diagram": {
+      "label": "Diagrama de estados: estado actual {current}. Camino: {path}.",
+      "noState": "sin estado",
+      "current": "(actual)",
+      "legend": "Resaltado: estados y transiciones recorridos, numerados en el orden en que ocurrieron (registrar es el punto de entrada). Atenuado: no recorridos. La línea de tiempo describe el mismo recorrido."
+    },
+    "timeline": {
+      "title": "Línea de tiempo",
+      "none": "—",
+      "derived": "derivada",
+      "derivedHint": "Reconstruida desde la auditoría (anterior al registro de transiciones).",
+      "annotation": "Cambio descriptivo: {fields}",
+      "revision": "Revisión {revision}",
+      "revisionChange": "Revisión {from} → {to}",
+      "amountWithFee": "{amount} + comisión {fee}",
+      "viewRevision": "ver revisión {revision}",
+      "reason": "Motivo: {reason}",
+      "journal": "ver asientos",
+      "journalEntries": {
+        "reversed": "Asiento revertido: {id}",
+        "reversal": "Asiento de reversa: {id}",
+        "posted": "Asiento nuevo: {id}"
+      },
+      "events": "Eventos: {events}",
+      "actor": {
+        "you": "Tú",
+        "named": "{id}",
+        "user": "Usuario …{id}",
+        "process": "Proceso {id}"
+      }
+    },
+    "revisions": {
+      "title": "Revisiones",
+      "item": "Revisión {revision}",
+      "conversion": "Convierte {source} → {target} · tasa {rate}",
+      "fees": "comisiones: {fees}"
+    },
+    "legRoles": {
+      "MAIN": "principal",
+      "SOURCE": "origen",
+      "TARGET": "destino",
+      "FEE": "comisión"
+    },
+    "transitions": {
+      "Transaction": {
+        "RECORD": "Registrar",
+        "POST": "Contabilizar",
+        "CLEAR": "Confirmar",
+        "UNCLEAR": "Quitar confirmación",
+        "RECONCILE": "Reconciliar",
+        "UNRECONCILE": "Des-reconciliar",
+        "REVISE": "Revisar",
+        "VOID": "Anular"
+      },
+      "Account": {
+        "OPEN": "Abrir",
+        "CLOSE": "Cerrar",
+        "ARCHIVE": "Archivar",
+        "REACTIVATE": "Reactivar"
+      },
+      "ExchangeRate": {
+        "RECORD": "Registrar",
+        "SUPERSEDE": "Reemplazar"
+      }
+    }
   }
 }

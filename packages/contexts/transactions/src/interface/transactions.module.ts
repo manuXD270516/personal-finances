@@ -1,6 +1,12 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountsQueryPort } from '@pf/accounts/contracts';
-import type { AuditHistoryQuery, AuditPort } from '@pf/audit/contracts';
+import type {
+  AuditHistoryQuery,
+  AuditPort,
+  LifecycleMachineDto,
+  LifecyclePort,
+  LifecycleQuery,
+} from '@pf/audit/contracts';
 import type { ClassificationLookup, ClassificationValidator } from '@pf/classification/contracts';
 import type { FxConversionPricingPort } from '@pf/fx/contracts';
 import type { LedgerPostingPort } from '@pf/ledger/contracts';
@@ -10,6 +16,7 @@ import type { Pool } from 'pg';
 import type { OutboxPort, TransactionsDeps } from '../application/ports/index.js';
 import { ConversionsService } from '../application/conversions.service.js';
 import { TransactionsService } from '../application/transactions.service.js';
+import { TRANSACTION_LIFECYCLE } from '../domain/index.js';
 import {
   ClassificationCategoryLookup,
   PgTransactionRepository,
@@ -27,6 +34,9 @@ export interface TransactionsRuntimeOptions {
   readonly clock: Clock;
   readonly audit: AuditPort;
   readonly history: AuditHistoryQuery;
+  /** Auditoría + recorrido (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: LifecycleQuery;
   readonly outbox: OutboxPort;
   /** Puertos públicos de otros contextos (misma transacción BD, ARCHITECTURE §7). */
   readonly ledger: LedgerPostingPort;
@@ -58,6 +68,8 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     outbox: options.outbox,
     audit: options.audit,
     history: options.history,
+    lifecycle: options.lifecycle,
+    lifecycleQuery: options.lifecycleQuery,
     ids: uuidV7Ids,
     clock: options.clock,
   };
@@ -91,4 +103,7 @@ export class TransactionsModule {
 }
 
 export { TRANSACTIONS_AUDIT_POLICY } from '../contracts/index.js';
+
+/** Máquina de estados `Transaction` declarada por el dominio (add-lifecycle-timeline), para AUDIT en el composition root. */
+export const TRANSACTION_LIFECYCLE_MACHINE: LifecycleMachineDto = TRANSACTION_LIFECYCLE.definition;
 export type { OutboxPort };

@@ -298,3 +298,39 @@ describe('Preferencias y valoración (fx/market-rates)', () => {
     expect(enabled.map((c) => c.definition.code).sort()).toEqual(['BOB', 'USD', 'USDT']);
   });
 });
+
+describe('Recorrido de una tasa manual (add-lifecycle-timeline)', () => {
+  it('[TC-AUDIT-LIFECYCLE-010] USDT/BOB P2P 6.95 del 2026-03-15 corregida a 6.96: RECORD y SUPERSEDE enlazada a la 6.96; la 6.95 conserva su valor', async () => {
+    const { service, queries } = setup();
+    const { rate: r1 } = await service.recordManualRate(p2p({ asOf: '2026-03-15T16:00:00Z' }));
+    const { rate: r2 } = await service.supersedeRate({
+      workspaceId: WS,
+      userId: 'u1',
+      rateId: r1.id,
+      value: '6.96',
+      reason: 'error de tipeo',
+    });
+    const view = await service.rateLifecycle({ userId: 'u1', workspaceId: WS, rateId: r1.id });
+    expect(
+      view.items.map((i) => (i.kind === 'TRANSITION' ? [i.transition, i.fromState, i.toState] : [])),
+    ).toEqual([
+      ['RECORD', null, 'RECORDED'],
+      ['SUPERSEDE', 'RECORDED', 'SUPERSEDED'],
+    ]);
+    expect(view.items[1]).toMatchObject({
+      detailRefs: { supersededByRateId: r2.id },
+      reason: 'error de tipeo',
+    });
+    expect(view.currentState).toBe('SUPERSEDED');
+    const next = await service.rateLifecycle({ userId: 'u1', workspaceId: WS, rateId: r2.id });
+    expect(next.items).toEqual([
+      expect.objectContaining({
+        transition: 'RECORD',
+        toState: 'RECORDED',
+        detailRefs: { supersedesRateId: r1.id },
+        events: ['fx.RateRecorded.v1'],
+      }),
+    ]);
+    expect((await queries.getRate(WS, r1.id)).rate.valueText).toBe('6.95');
+  });
+});

@@ -28,3 +28,10 @@ export { Rate, RATE_PERSIST_SCALE } from './money/rate.js';
 export { type RoundingMode } from './money/rounding.js';
 export { Instant, FixedClock, systemClock, type Clock } from './time/instant.js';
 export { LocalDate } from './time/local-date.js';
+export {
+  LifecycleMachine,
+  type LifecycleMachineDefinition,
+  type LifecycleStateDefinition,
+  type LifecycleTransitionDefinition,
+  type StateTransition,
+} from './lifecycle/lifecycle-machine.js';

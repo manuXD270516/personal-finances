@@ -19,8 +19,10 @@ import {
   tableWrapStyle,
   warningStyle,
 } from '../common/ui';
+import { Tabs } from '../common/Tabs';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
+import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { useCatalogs } from './catalogs';
 import { availableActions } from './logic';
 import { TransactionForm, type RecordKind } from './TransactionForm';
@@ -110,7 +112,8 @@ type Pending = 'void' | 'unreconcile' | null;
 /**
  * Detalle de transacción (6.2): datos, patas por cuenta, splits con categoría y tags, detalle de conversión,
  * acciones de estado (confirmar, reconciliar, contabilizar pendiente, des-reconciliar con motivo, anular con
- * motivo), edición, "Duplicar" y el historial como línea de tiempo del ciclo de vida (visible también para VIEWER).
+ * motivo), edición y "Duplicar"; pestañas "Detalle" | "Recorrido" (diagrama de estados + línea de tiempo de transiciones,
+ * add-lifecycle-timeline) | "Historial de cambios" (diff de auditoría por entrada). Todo visible también para VIEWER.
  */
 function Detail({
   ctx,
@@ -123,6 +126,7 @@ function Detail({
 }) {
   const f = useFormat('Transactions', ctx);
   const fx = useFormat('Fx', ctx);
+  const lf = useFormat('Lifecycle', ctx);
   const { t, locale } = f;
   const catalogs = useCatalogs(ctx);
   const [tx, setTx] = useState<Transaction | undefined>();
@@ -235,263 +239,308 @@ function Detail({
           {t('detail.duplicateNotice')}
         </p>
       ) : null}
-      <dl
-        style={{
-          ...cardStyle,
-          display: 'grid',
-          gridTemplateColumns: 'minmax(8rem, max-content) 1fr',
-          gap: '0.25rem 1rem',
-          margin: 0,
-        }}
-      >
-        <dt>{t('detail.kind')}</dt>
-        <dd style={{ margin: 0 }}>{t(`kinds.${tx.kind}`)}</dd>
-        <dt>{t('detail.date')}</dt>
-        <dd style={{ margin: 0 }}>{formatLocalDate(tx.transactionDate, locale)}</dd>
-        {tx.postingDate ? (
-          <>
-            <dt>{t('detail.postingDate')}</dt>
-            <dd style={{ margin: 0 }}>{formatLocalDate(tx.postingDate, locale)}</dd>
-          </>
-        ) : null}
-        <dt>{t('detail.paymentMethod')}</dt>
-        <dd style={{ margin: 0 }} data-testid="detail-payment-method">
-          {tx.paymentMethod ? t(`paymentMethods.${tx.paymentMethod}`) : t('detail.none')}
-        </dd>
-        <dt>{t('detail.counterparty')}</dt>
-        <dd style={{ margin: 0 }} data-testid="detail-counterparty">
-          {tx.counterpartyId ? (catalogs.names.counterparty(tx.counterpartyId) ?? '…') : t('detail.none')}
-        </dd>
-        {tx.adjustmentReason ? (
-          <>
-            <dt>{t('detail.adjustment')}</dt>
-            <dd style={{ margin: 0 }}>
-              {tx.adjustmentDirection ? t(`direction.${tx.adjustmentDirection}`) : ''} · {tx.adjustmentReason}
-            </dd>
-          </>
-        ) : null}
-        {tx.refundOfTransactionId ? (
-          <>
-            <dt>{t('detail.refundOf')}</dt>
-            <dd style={{ margin: 0 }}>
-              <a href={ctx.href(`/transacciones/${tx.refundOfTransactionId}`)}>{t('detail.viewOriginal')}</a>
-            </dd>
-          </>
-        ) : null}
-        {tx.notes ? (
-          <>
-            <dt>{t('detail.notes')}</dt>
-            <dd style={{ margin: 0 }}>{tx.notes}</dd>
-          </>
-        ) : null}
-        <dt>{t('detail.revision')}</dt>
-        <dd style={{ margin: 0 }} data-testid="detail-revision">
-          {tx.revision}
-        </dd>
-        {tx.voidReason ? (
-          <>
-            <dt>{t('detail.voidReason')}</dt>
-            <dd style={{ margin: 0 }}>{tx.voidReason}</dd>
-          </>
-        ) : null}
-      </dl>
-      <section aria-labelledby="tx-legs-title" style={cardStyle}>
-        <h2 id="tx-legs-title" style={{ fontSize: '1rem', marginTop: 0 }}>
-          {t('detail.legs')}
-        </h2>
-        <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-          {tx.legs.map((l, i) => (
-            <li key={`${l.accountId}-${l.role}-${i}`} data-testid="tx-leg" data-role={l.role}>
-              <a href={ctx.href(`/cuentas/${l.accountId}`)}>{accountName(l.accountId)}</a>:{' '}
-              {formatMoney(l.amount, locale)} ({t(`legRoles.${l.role}`)})
-            </li>
-          ))}
-        </ul>
-      </section>
-      {tx.splits.length > 0 ? (
-        <section aria-labelledby="tx-splits-title" style={cardStyle}>
-          <h2 id="tx-splits-title" style={{ fontSize: '1rem', marginTop: 0 }}>
-            {t('splits.title')}
-          </h2>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th scope="col" style={cellStyle}>
-                    {t('detail.category')}
-                  </th>
-                  <th scope="col" style={cellStyle}>
-                    {t('detail.tags')}
-                  </th>
-                  <th scope="col" style={numCellStyle}>
-                    {t('detail.amount')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {tx.splits.map((s) => (
-                  <tr key={s.id} data-testid="tx-split">
-                    <td style={cellStyle}>{catalogs.names.category(s.categoryId) ?? '…'}</td>
-                    <td style={cellStyle}>
-                      {(s.tagIds ?? []).map((id) => catalogs.names.tag(id) ?? '…').join(', ')}
-                    </td>
-                    <td style={numCellStyle} data-testid="tx-split-amount">
-                      {formatMoney(s.amount, locale)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-      {tx.conversion ? (
-        <ConversionDetailView
-          detail={conversion ?? tx.conversion}
-          revisions={revisions}
-          legs={tx.legs}
-          f={fx}
-          accountName={accountName}
-        />
-      ) : null}
-      {status ? <p role="status">{status}</p> : null}
-      {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-      {ctx.canEdit ? (
-        <div style={rowStyle} role="group" aria-label={t('detail.actions')}>
-          {actions.edit && RECORD.includes(tx.kind) ? (
-            <button type="button" onClick={() => setEditing(true)} disabled={editing || busy}>
-              {t('detail.edit')}
-            </button>
-          ) : null}
-          {actions.post ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void act(
-                  () =>
-                    ctx.api.command<Transaction>(
-                      'POST',
-                      `${ctx.base}/transactions/${current.id}/post`,
-                      undefined,
-                      { ifMatch: current.version },
-                    ),
-                  t('detail.done.post'),
-                )
-              }
-            >
-              {t('detail.post')}
-            </button>
-          ) : null}
-          {actions.clear ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void patchStatus('CLEARED', t('detail.done.clear'))}
-            >
-              {t('detail.clear')}
-            </button>
-          ) : null}
-          {actions.unclear ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void patchStatus('POSTED', t('detail.done.unclear'))}
-            >
-              {t('detail.unclear')}
-            </button>
-          ) : null}
-          {actions.reconcile ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void patchStatus('RECONCILED', t('detail.done.reconcile'))}
-            >
-              {t('detail.reconcile')}
-            </button>
-          ) : null}
-          {actions.unreconcile ? (
-            <button type="button" disabled={busy} onClick={() => setPending('unreconcile')}>
-              {t('detail.unreconcile')}
-            </button>
-          ) : null}
-          {actions.void ? (
-            <button type="button" disabled={busy} onClick={() => setPending('void')}>
-              {t('detail.void')}
-            </button>
-          ) : null}
-          {actions.duplicate ? (
-            <a href={ctx.href(`/transacciones/nueva?duplicar=${tx.id}`)}>{t('detail.duplicate')}</a>
-          ) : null}
-        </div>
-      ) : null}
-      {pending ? (
-        <ConfirmPanel
-          title={t(`detail.confirm.${pending}.title`)}
-          description={t(`detail.confirm.${pending}.description`)}
-          confirmLabel={t(`detail.confirm.${pending}.confirm`)}
-          cancelLabel={t('form.cancel')}
-          busy={busy}
-          confirmDisabled={!reason.trim()}
-          onCancel={() => setPending(null)}
-          onConfirm={() =>
-            void act(
-              () =>
-                pending === 'void'
-                  ? ctx.api.command<Transaction>(
-                      'POST',
-                      `${ctx.base}/transactions/${current.id}/void`,
-                      { reason: reason.trim() },
-                      { ifMatch: current.version },
-                    )
-                  : ctx.api.command<Transaction>(
-                      'POST',
-                      `${ctx.base}/transactions/${current.id}/unreconcile`,
-                      { reason: reason.trim() },
-                      { ifMatch: current.version, idempotent: false },
-                    ),
-              t(`detail.done.${pending}`),
-            )
-          }
-        >
-          <Field label={t('detail.confirm.reason')}>
-            {(p) => (
-              <input
-                {...p}
-                name="reason"
-                required
-                maxLength={500}
-                style={inputStyle}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+      <Tabs
+        idPrefix="tx"
+        label={lf.t('tabs.label')}
+        tabs={[
+          {
+            id: 'detail',
+            label: lf.t('tabs.detail'),
+            content: (
+              <>
+                <dl
+                  style={{
+                    ...cardStyle,
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(8rem, max-content) 1fr',
+                    gap: '0.25rem 1rem',
+                    margin: 0,
+                  }}
+                >
+                  <dt>{t('detail.kind')}</dt>
+                  <dd style={{ margin: 0 }}>{t(`kinds.${tx.kind}`)}</dd>
+                  <dt>{t('detail.date')}</dt>
+                  <dd style={{ margin: 0 }}>{formatLocalDate(tx.transactionDate, locale)}</dd>
+                  {tx.postingDate ? (
+                    <>
+                      <dt>{t('detail.postingDate')}</dt>
+                      <dd style={{ margin: 0 }}>{formatLocalDate(tx.postingDate, locale)}</dd>
+                    </>
+                  ) : null}
+                  <dt>{t('detail.paymentMethod')}</dt>
+                  <dd style={{ margin: 0 }} data-testid="detail-payment-method">
+                    {tx.paymentMethod ? t(`paymentMethods.${tx.paymentMethod}`) : t('detail.none')}
+                  </dd>
+                  <dt>{t('detail.counterparty')}</dt>
+                  <dd style={{ margin: 0 }} data-testid="detail-counterparty">
+                    {tx.counterpartyId
+                      ? (catalogs.names.counterparty(tx.counterpartyId) ?? '…')
+                      : t('detail.none')}
+                  </dd>
+                  {tx.adjustmentReason ? (
+                    <>
+                      <dt>{t('detail.adjustment')}</dt>
+                      <dd style={{ margin: 0 }}>
+                        {tx.adjustmentDirection ? t(`direction.${tx.adjustmentDirection}`) : ''} ·{' '}
+                        {tx.adjustmentReason}
+                      </dd>
+                    </>
+                  ) : null}
+                  {tx.refundOfTransactionId ? (
+                    <>
+                      <dt>{t('detail.refundOf')}</dt>
+                      <dd style={{ margin: 0 }}>
+                        <a href={ctx.href(`/transacciones/${tx.refundOfTransactionId}`)}>
+                          {t('detail.viewOriginal')}
+                        </a>
+                      </dd>
+                    </>
+                  ) : null}
+                  {tx.notes ? (
+                    <>
+                      <dt>{t('detail.notes')}</dt>
+                      <dd style={{ margin: 0 }}>{tx.notes}</dd>
+                    </>
+                  ) : null}
+                  <dt>{t('detail.revision')}</dt>
+                  <dd style={{ margin: 0 }} data-testid="detail-revision">
+                    {tx.revision}
+                  </dd>
+                  {tx.voidReason ? (
+                    <>
+                      <dt>{t('detail.voidReason')}</dt>
+                      <dd style={{ margin: 0 }}>{tx.voidReason}</dd>
+                    </>
+                  ) : null}
+                </dl>
+                <section aria-labelledby="tx-legs-title" style={cardStyle}>
+                  <h2 id="tx-legs-title" style={{ fontSize: '1rem', marginTop: 0 }}>
+                    {t('detail.legs')}
+                  </h2>
+                  <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                    {tx.legs.map((l, i) => (
+                      <li key={`${l.accountId}-${l.role}-${i}`} data-testid="tx-leg" data-role={l.role}>
+                        <a href={ctx.href(`/cuentas/${l.accountId}`)}>{accountName(l.accountId)}</a>:{' '}
+                        {formatMoney(l.amount, locale)} ({t(`legRoles.${l.role}`)})
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+                {tx.splits.length > 0 ? (
+                  <section aria-labelledby="tx-splits-title" style={cardStyle}>
+                    <h2 id="tx-splits-title" style={{ fontSize: '1rem', marginTop: 0 }}>
+                      {t('splits.title')}
+                    </h2>
+                    <div style={tableWrapStyle}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th scope="col" style={cellStyle}>
+                              {t('detail.category')}
+                            </th>
+                            <th scope="col" style={cellStyle}>
+                              {t('detail.tags')}
+                            </th>
+                            <th scope="col" style={numCellStyle}>
+                              {t('detail.amount')}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tx.splits.map((s) => (
+                            <tr key={s.id} data-testid="tx-split">
+                              <td style={cellStyle}>{catalogs.names.category(s.categoryId) ?? '…'}</td>
+                              <td style={cellStyle}>
+                                {(s.tagIds ?? []).map((id) => catalogs.names.tag(id) ?? '…').join(', ')}
+                              </td>
+                              <td style={numCellStyle} data-testid="tx-split-amount">
+                                {formatMoney(s.amount, locale)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ) : null}
+                {tx.conversion ? (
+                  <ConversionDetailView
+                    detail={conversion ?? tx.conversion}
+                    revisions={revisions}
+                    legs={tx.legs}
+                    f={fx}
+                    accountName={accountName}
+                  />
+                ) : null}
+                {status ? <p role="status">{status}</p> : null}
+                {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
+                {ctx.canEdit ? (
+                  <div style={rowStyle} role="group" aria-label={t('detail.actions')}>
+                    {actions.edit && RECORD.includes(tx.kind) ? (
+                      <button type="button" onClick={() => setEditing(true)} disabled={editing || busy}>
+                        {t('detail.edit')}
+                      </button>
+                    ) : null}
+                    {actions.post ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void act(
+                            () =>
+                              ctx.api.command<Transaction>(
+                                'POST',
+                                `${ctx.base}/transactions/${current.id}/post`,
+                                undefined,
+                                { ifMatch: current.version },
+                              ),
+                            t('detail.done.post'),
+                          )
+                        }
+                      >
+                        {t('detail.post')}
+                      </button>
+                    ) : null}
+                    {actions.clear ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void patchStatus('CLEARED', t('detail.done.clear'))}
+                      >
+                        {t('detail.clear')}
+                      </button>
+                    ) : null}
+                    {actions.unclear ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void patchStatus('POSTED', t('detail.done.unclear'))}
+                      >
+                        {t('detail.unclear')}
+                      </button>
+                    ) : null}
+                    {actions.reconcile ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void patchStatus('RECONCILED', t('detail.done.reconcile'))}
+                      >
+                        {t('detail.reconcile')}
+                      </button>
+                    ) : null}
+                    {actions.unreconcile ? (
+                      <button type="button" disabled={busy} onClick={() => setPending('unreconcile')}>
+                        {t('detail.unreconcile')}
+                      </button>
+                    ) : null}
+                    {actions.void ? (
+                      <button type="button" disabled={busy} onClick={() => setPending('void')}>
+                        {t('detail.void')}
+                      </button>
+                    ) : null}
+                    {actions.duplicate ? (
+                      <a href={ctx.href(`/transacciones/nueva?duplicar=${tx.id}`)}>{t('detail.duplicate')}</a>
+                    ) : null}
+                  </div>
+                ) : null}
+                {pending ? (
+                  <ConfirmPanel
+                    title={t(`detail.confirm.${pending}.title`)}
+                    description={t(`detail.confirm.${pending}.description`)}
+                    confirmLabel={t(`detail.confirm.${pending}.confirm`)}
+                    cancelLabel={t('form.cancel')}
+                    busy={busy}
+                    confirmDisabled={!reason.trim()}
+                    onCancel={() => setPending(null)}
+                    onConfirm={() =>
+                      void act(
+                        () =>
+                          pending === 'void'
+                            ? ctx.api.command<Transaction>(
+                                'POST',
+                                `${ctx.base}/transactions/${current.id}/void`,
+                                { reason: reason.trim() },
+                                { ifMatch: current.version },
+                              )
+                            : ctx.api.command<Transaction>(
+                                'POST',
+                                `${ctx.base}/transactions/${current.id}/unreconcile`,
+                                { reason: reason.trim() },
+                                { ifMatch: current.version, idempotent: false },
+                              ),
+                        t(`detail.done.${pending}`),
+                      )
+                    }
+                  >
+                    <Field label={t('detail.confirm.reason')}>
+                      {(p) => (
+                        <input
+                          {...p}
+                          name="reason"
+                          required
+                          maxLength={500}
+                          style={inputStyle}
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                        />
+                      )}
+                    </Field>
+                  </ConfirmPanel>
+                ) : null}
+                {editing && catalogs.loaded ? (
+                  <TransactionForm
+                    ctx={ctx}
+                    catalogs={catalogs}
+                    original={tx}
+                    onCancel={() => setEditing(false)}
+                    onSaved={(next) => {
+                      setTx(next);
+                      setEditing(false);
+                      setStatus(
+                        next.revision !== tx.revision
+                          ? t('detail.done.amended', { revision: next.revision })
+                          : t('detail.done.edited'),
+                      );
+                      load();
+                    }}
+                  />
+                ) : null}
+              </>
+            ),
+          },
+          {
+            id: 'lifecycle',
+            label: lf.t('tabs.lifecycle'),
+            content: (
+              <LifecycleTab
+                ctx={ctx}
+                path={`transactions/${tx.id}`}
+                refreshKey={tx.version}
+                stateLabel={(code) => (f.has(`status.${code}`) ? t(`status.${code}`) : code)}
+                fieldLabel={(name) => (f.has(`history.fields.${name}`) ? t(`history.fields.${name}`) : name)}
+                accountName={(id) => catalogs.names.account(id)}
+                idPrefix="tx-lifecycle"
               />
-            )}
-          </Field>
-        </ConfirmPanel>
-      ) : null}
-      {editing && catalogs.loaded ? (
-        <TransactionForm
-          ctx={ctx}
-          catalogs={catalogs}
-          original={tx}
-          onCancel={() => setEditing(false)}
-          onSaved={(next) => {
-            setTx(next);
-            setEditing(false);
-            setStatus(
-              next.revision !== tx.revision
-                ? t('detail.done.amended', { revision: next.revision })
-                : t('detail.done.edited'),
-            );
-            load();
-          }}
-        />
-      ) : null}
-      {historyProblem ? (
-        <ProblemMessage problem={historyProblem} locale={ctx.uiLocale} />
-      ) : history ? (
-        <TransactionTimeline entries={history} ctx={f} names={catalogs.names} currentUserId={ctx.me.id} />
-      ) : null}
+            ),
+          },
+          {
+            id: 'history',
+            label: lf.t('tabs.history'),
+            content: historyProblem ? (
+              <ProblemMessage problem={historyProblem} locale={ctx.uiLocale} />
+            ) : history ? (
+              <TransactionTimeline
+                entries={history}
+                ctx={f}
+                names={catalogs.names}
+                currentUserId={ctx.me.id}
+              />
+            ) : (
+              <p aria-busy="true">{t('list.loading')}</p>
+            ),
+          },
+        ]}
+      />
     </section>
   );
 }

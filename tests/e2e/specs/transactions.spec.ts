@@ -95,6 +95,8 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     // Confirmar (cleared): no toca el ledger, solo el estado.
     await page.getByRole('button', { name: 'Marcar como confirmada' }).click();
     await expect(page.getByText('Transacción confirmada.')).toBeVisible();
+    // El historial (diff de auditoría) vive en su pestaña; "Recorrido" lo cubre lifecycle.spec.ts.
+    await page.getByRole('tab', { name: 'Historial de cambios' }).click();
     const entries = page.getByTestId('timeline-entry');
     await expect(entries).toHaveCount(3);
     await expect(entries.nth(0)).toHaveAttribute('data-to', 'POSTED');
@@ -120,6 +122,7 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     await dialog.getByRole('button', { name: 'Sí, anular' }).click();
     await expect(page.getByText('Transacción anulada.')).toBeVisible();
     await expect(page.getByTestId('tx-status').first()).toHaveText('Anulada');
+    await page.getByRole('tab', { name: 'Historial de cambios' }).click();
     const last = page.getByTestId('timeline-entry').last();
     await expect(last).toHaveAttribute('data-from', 'POSTED');
     await expect(last).toHaveAttribute('data-to', 'VOIDED');
@@ -318,6 +321,7 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     const viewer = await newUserPage(browser, 'viewer', `/transacciones/${id}`);
     const page = viewer.page;
     await expect(page.getByTestId('transaction-detail')).toBeVisible();
+    await page.getByRole('tab', { name: 'Historial de cambios' }).click();
     const entries = page.getByTestId('timeline-entry');
     await expect(entries).toHaveCount(2);
     const edited = entries.nth(1);

@@ -4,3 +4,4 @@ export * from './posting-translator.js';
 export * from './duplicate-detector.js';
 export * from './refund-policy.js';
 export * from './conversion.js';
+export * from './transaction-lifecycle.js';

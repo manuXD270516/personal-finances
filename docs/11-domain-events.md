@@ -91,9 +91,17 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `transactions.TransferCompleted.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** GOALS, DEBT, REPORTING.
-- **Trigger:** transferencia posteada (creación o pending→posted) o emparejamiento `LinkAsTransfer`. Incluye el pago de tarjeta de crédito, que es una transferencia (`kind = TRANSFER`, destino `LIABILITY`); no existe un kind propio en Phase 1 (`CARD_PAYMENT` queda reservado para `debt/credit-cards`, Phase 4).
+- **Trigger:** **primer** posteo de la transferencia (creación posteada o pending→posted) o emparejamiento `LinkAsTransfer`; se publica **una sola vez** por transferencia: una edición financiera publica `TransferRevised.v1` y la anulación `TransactionVoided.v1` (docs/31 D37, `add-lifecycle-timeline`). Incluye el pago de tarjeta de crédito, que es una transferencia (`kind = TRANSFER`, destino `LIABILITY`); no existe un kind propio en Phase 1 (`CARD_PAYMENT` queda reservado para `debt/credit-cards`, Phase 4).
 - **Payload:** `transactionId`, `journalEntryId`, `businessDate`, `fromAccountId`, `toAccountId`, `amount: Money (positivo)`, `fee: Money|null`, `matchedTransactionIds: uuid[]` (vacío si no hubo emparejamiento).
-- **Idem.:** natural `(transactionId, journalEntryId)`. **Ord.:** por `Transaction`. **PII:** N.
+- **Idem.:** natural `(transactionId, journalEntryId)` (equivale a `transactionId`: hay uno solo). **Ord.:** por `Transaction`. **PII:** N.
+
+#### `transactions.TransferRevised.v1`
+- **Productor:** TRANSACTIONS. **Consumidores:** REPORTING (Phase 1, invalida el resumen); GOALS, DEBT (Phase 4).
+- **Trigger:** transición `REVISE` de una transferencia posteada o cleared (monto, comisión, cuentas o fecha): reversa exacta del asiento activo + asiento nuevo con la revisión siguiente (docs/31 D37).
+- **Payload:** `transactionId`, `revisionFrom`, `revisionTo`, `businessDate`, `fromAccountId`, `toAccountId`, `amount: Money (positivo)`, `fee: Money|null`, `reversedJournalEntryId`, `reversalJournalEntryId`, `journalEntryId`.
+- **Idem.:** natural `(transactionId, revisionTo)`. **Ord.:** por `Transaction`. **PII:** N.
+
+**Campo `transition` (aditivo, `add-lifecycle-timeline`).** `TransactionCreated`, `TransactionPosted`, `TransactionUpdated`, `TransactionVoided`, `AccountOpened`, `AccountClosed`, `AccountArchived` y `AccountReactivated` (v1) llevan el campo opcional `transition` con la transición de la máquina de estados que los originó (`RECORD`, `POST`, `CLEAR`, `UNCLEAR`, `RECONCILE`, `UNRECONCILE`, `REVISE`, `VOID`; `OPEN`, `CLOSE`, `ARCHIVE`, `REACTIVATE`). Es compatible (sin `v2`): los consumidores lo ignoran; `TransactionUpdated` no lo lleva cuando la edición es descriptiva (anotación del recorrido).
 
 #### `transactions.ConversionRecorded.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** FX (observación de tasa), REPORTING.

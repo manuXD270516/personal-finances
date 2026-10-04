@@ -1,7 +1,13 @@
-import type { AuditEntry, AuditPort } from '@pf/audit/contracts';
+import type {
+  AuditEntry,
+  AuditPort,
+  LifecyclePort,
+  LifecycleQuery,
+  LifecycleStepInput,
+} from '@pf/audit/contracts';
 import { DomainError, FixedClock, Instant } from '@pf/shared-kernel';
 import type { AccountOpeningBalancePort, MoneyDto } from '../../contracts/index.js';
-import { Account, Institution } from '../../domain/index.js';
+import { ACCOUNT_LIFECYCLE, Account, Institution } from '../../domain/index.js';
 import type {
   AccountListFilter,
   AccountRepository,
@@ -24,6 +30,12 @@ export class InMemoryAccounts {
   readonly institutions = new Map<string, Institution>();
   readonly events: Event[] = [];
   readonly audits: AuditEntry[] = [];
+  /** Pasos del recorrido registrados por `LifecyclePort` (en orden; con su acción de auditoría). */
+  readonly lifecycleSteps: (LifecycleStepInput & {
+    aggregateId: string;
+    action: string;
+    reason: string | null;
+  })[] = [];
   /** Saldo contable (Σ postings) por cuenta; presencia = la cuenta tiene ledger account / movimientos. */
   readonly ledger = new Map<string, MoneyDto & { nature: 'ASSET' | 'LIABILITY' }>();
   readonly openingEntries: { accountId: string; amount: MoneyDto; nature: string; date: string }[] = [];
@@ -39,6 +51,78 @@ export class InMemoryAccounts {
   ]);
 
   readonly audit: AuditPort = { append: async (e) => void this.audits.push(e) };
+
+  /** Doble de `LifecyclePort`: auditoría + pasos (comparten el rollback de la unidad de trabajo). */
+  readonly lifecycle: LifecyclePort = {
+    record: async (entry, steps) => {
+      await this.audit.append(entry);
+      for (const step of steps) {
+        this.lifecycleSteps.push({
+          ...step,
+          aggregateId: step.aggregateId ?? entry.aggregateId,
+          action: entry.action,
+          reason: step.kind === 'TRANSITION' ? (step.reason ?? entry.reason ?? null) : null,
+        });
+      }
+    },
+  };
+
+  /** Doble de `LifecycleQuery` sobre los pasos registrados. */
+  readonly lifecycleQuery: LifecycleQuery = {
+    machineOf: () => ACCOUNT_LIFECYCLE.definition,
+    lifecycleOf: async (input) => {
+      const own = this.lifecycleSteps.filter((s) => s.aggregateId === input.aggregateId);
+      return {
+        aggregateType: input.aggregateType,
+        aggregateId: input.aggregateId,
+        currentState: input.currentState,
+        path: own.flatMap((s) => (s.kind === 'TRANSITION' ? [s.toState] : [])),
+        historyComplete: own.find((s) => s.kind === 'TRANSITION')?.fromState === null,
+        machine: ACCOUNT_LIFECYCLE.definition,
+        items: own.map((s, i) =>
+          s.kind === 'TRANSITION'
+            ? {
+                sequence: i + 1,
+                kind: 'TRANSITION' as const,
+                transition: s.transition,
+                fromState: s.fromState,
+                toState: s.toState,
+                machineVersion: s.machineVersion,
+                occurredAt: '2026-03-15T14:00:00.000Z',
+                actor: { type: 'USER' as const, id: input.userId, displayName: null },
+                origin: 'api' as const,
+                reason: s.reason,
+                revisionFrom: null,
+                revisionTo: null,
+                aggregateVersion: null,
+                journalEntries: {
+                  reversed: null,
+                  reversal: null,
+                  posted: s.journalEntries?.posted ?? null,
+                },
+                detailRefs: {},
+                events: (s.events ?? []).map((e) => e.eventType),
+                auditLogId: null,
+                derived: false,
+              }
+            : {
+                sequence: i + 1,
+                kind: 'ANNOTATION' as const,
+                occurredAt: '2026-03-15T14:00:00.000Z',
+                actor: { type: 'USER' as const, id: input.userId, displayName: null },
+                origin: 'api' as const,
+                changedFields: [...s.changedFields],
+                revisionFrom: null,
+                revisionTo: null,
+                aggregateVersion: null,
+                events: (s.events ?? []).map((e) => e.eventType),
+                auditLogId: null,
+                derived: false,
+              },
+        ),
+      };
+    },
+  };
 
   deps(): AccountsDeps {
     const accounts = this.accountRepo();
@@ -89,6 +173,8 @@ export class InMemoryAccounts {
       openingBalance: opening,
       outbox: { append: async (e) => void this.events.push(e) },
       audit: this.audit,
+      lifecycle: this.lifecycle,
+      lifecycleQuery: this.lifecycleQuery,
       ids: { next: () => `00000000-0000-7000-8000-${String(++this.seq).padStart(12, '0')}` },
       clock: this.clock,
       calendar: { today: async () => '2026-03-15' },

@@ -1,4 +1,11 @@
-import type { AuditChangeInput, AuditLogEntryDto, AuditPort } from '@pf/audit/contracts';
+import type {
+  AuditChangeInput,
+  AuditEntry,
+  AuditLogEntryDto,
+  AuditPort,
+  LifecycleDto,
+  LifecycleEventRefDto,
+} from '@pf/audit/contracts';
 import { currency as makeCurrency, DomainError, Money, type FieldViolation } from '@pf/shared-kernel';
 import { TRANSACTION_EVENTS } from '../contracts/index.js';
 import {
@@ -10,6 +17,8 @@ import {
   transferFee,
   type AdjustmentDirection,
   type ChangedField,
+  type ConversionDetail,
+  type LegRole,
   type ExternalRef,
   type PaymentMethod,
   type SplitClassificationChange,
@@ -28,6 +37,8 @@ import {
   publishPosted,
   splitsAudit,
   splitsPayload,
+  transactionSteps,
+  type RevisionPosting,
 } from './posting-support.js';
 import type { TransactionListFilter, TransactionsDeps, TransactionSort } from './ports/index.js';
 
@@ -103,6 +114,23 @@ export interface UpdateTransactionCommand {
   readonly paymentMethod?: PaymentMethod | null;
   readonly status?: 'POSTED' | 'CLEARED' | 'RECONCILED';
   readonly splits?: readonly SplitDto[];
+}
+
+/** Montos de una revisión para el recorrido (add-lifecycle-timeline decisión 7; transfers y conversions). */
+export interface TransactionRevisionView {
+  readonly revision: number;
+  /** Monto de la revisión (en una transferencia, lo transferido sin la comisión). */
+  readonly amount: Money;
+  /** Comisión de una transferencia (Σ split de comisión); `null` si no hay. */
+  readonly fee: Money | null;
+  readonly legs: readonly { readonly accountId: string; readonly role: LegRole; readonly amount: Money }[];
+  /** Detalle de conversión de la revisión (D11), `null` si no es conversión. */
+  readonly conversion: ConversionDetail | null;
+}
+
+export interface TransactionLifecycleView {
+  readonly lifecycle: LifecycleDto;
+  readonly revisions: readonly TransactionRevisionView[];
 }
 
 export interface TransactionWarning {
@@ -243,21 +271,24 @@ export class TransactionsService {
       await transactions.insert(tx);
       if (entryId) await this.link(tx, entryId, 'POSTED');
       const s = tx.snapshot;
-      await this.publish(tx, TRANSACTION_EVENTS.created, {
-        transactionId: s.id,
-        kind: s.kind,
-        status: s.status,
-        businessDate: s.businessDate,
-        description: s.description,
-        counterpartyId: s.counterpartyId,
-        origin: { type: s.source, refId: null },
-        legs: legsPayload(s),
-        splits: splitsPayload(s),
-        postingDate: s.postingDate,
-        refundOfTransactionId: s.refundOfTransactionId,
-        paymentMethod: s.paymentMethod,
-      });
-      if (entryId) await this.publishPosted(tx, entryId, null, null);
+      const events: LifecycleEventRefDto[] = [
+        await this.publish(tx, TRANSACTION_EVENTS.created, {
+          transactionId: s.id,
+          kind: s.kind,
+          status: s.status,
+          businessDate: s.businessDate,
+          description: s.description,
+          counterpartyId: s.counterpartyId,
+          origin: { type: s.source, refId: null },
+          legs: legsPayload(s),
+          splits: splitsPayload(s),
+          postingDate: s.postingDate,
+          refundOfTransactionId: s.refundOfTransactionId,
+          paymentMethod: s.paymentMethod,
+          transition: 'RECORD',
+        }),
+      ];
+      if (entryId) events.push(...(await this.publishPosted(tx, entryId, null, null)));
       const changes: AuditChangeInput[] = [
         { field: 'kind', before: null, after: s.kind },
         { field: 'status', before: null, after: s.status },
@@ -279,15 +310,19 @@ export class TransactionsService {
         changes.push({ field: 'adjustmentReason', before: null, after: s.adjustmentReason });
       }
       if (entryId) changes.push({ field: 'journalEntryId', before: null, after: entryId });
-      await this.audit.append({
-        workspaceId: s.workspaceId,
-        action: 'transactions.transaction.created',
-        aggregateType: 'Transaction',
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        changes,
-        reason: s.adjustmentReason,
-      });
+      await this.record(
+        tx,
+        {
+          workspaceId: s.workspaceId,
+          action: 'transactions.transaction.created',
+          aggregateType: 'Transaction',
+          aggregateId: s.id,
+          aggregateVersion: s.version,
+          changes,
+          reason: s.adjustmentReason,
+        },
+        { events, journalEntries: { posted: entryId } },
+      );
       return { transaction: tx.snapshot, warnings };
     });
   }
@@ -356,21 +391,24 @@ export class TransactionsService {
       await this.deps.transactions.insert(tx);
       if (entryId) await this.link(tx, entryId, 'POSTED');
       const s = tx.snapshot;
-      await this.publish(tx, TRANSACTION_EVENTS.created, {
-        transactionId: s.id,
-        kind: s.kind,
-        status: s.status,
-        businessDate: s.businessDate,
-        description: s.description,
-        counterpartyId: s.counterpartyId,
-        origin: { type: s.source, refId: null },
-        legs: legsPayload(s),
-        splits: splitsPayload(s),
-        postingDate: s.postingDate,
-        refundOfTransactionId: null,
-        paymentMethod: s.paymentMethod,
-      });
-      if (entryId) await this.publishPosted(tx, entryId, null, null);
+      const events: LifecycleEventRefDto[] = [
+        await this.publish(tx, TRANSACTION_EVENTS.created, {
+          transactionId: s.id,
+          kind: s.kind,
+          status: s.status,
+          businessDate: s.businessDate,
+          description: s.description,
+          counterpartyId: s.counterpartyId,
+          origin: { type: s.source, refId: null },
+          legs: legsPayload(s),
+          splits: splitsPayload(s),
+          postingDate: s.postingDate,
+          refundOfTransactionId: null,
+          paymentMethod: s.paymentMethod,
+          transition: 'RECORD',
+        }),
+      ];
+      if (entryId) events.push(...(await this.publishPosted(tx, entryId, null, null)));
       const changes: AuditChangeInput[] = [
         { field: 'kind', before: null, after: s.kind },
         { field: 'status', before: null, after: s.status },
@@ -386,14 +424,18 @@ export class TransactionsService {
         if (s[f] !== null) changes.push({ field: f, before: null, after: s[f] });
       }
       if (entryId) changes.push({ field: 'journalEntryId', before: null, after: entryId });
-      await this.audit.append({
-        workspaceId: s.workspaceId,
-        action: 'transactions.transfer.created',
-        aggregateType: 'Transaction',
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        changes,
-      });
+      await this.record(
+        tx,
+        {
+          workspaceId: s.workspaceId,
+          action: 'transactions.transfer.created',
+          aggregateType: 'Transaction',
+          aggregateId: s.id,
+          aggregateVersion: s.version,
+          changes,
+        },
+        { events, journalEntries: { posted: entryId } },
+      );
       return tx.snapshot;
     });
   }
@@ -416,18 +458,22 @@ export class TransactionsService {
       tx.attachEntry(entryId);
       await this.save(tx);
       await this.link(tx, entryId, 'POSTED');
-      await this.publishPosted(tx, entryId, previous, null);
-      await this.audit.append({
-        workspaceId,
-        action: 'transactions.transaction.posted',
-        aggregateType: 'Transaction',
-        aggregateId: transactionId,
-        aggregateVersion: tx.version,
-        changes: [
-          { field: 'status', before: previous, after: 'POSTED' },
-          { field: 'journalEntryId', before: null, after: entryId },
-        ],
-      });
+      const events = await this.publishPosted(tx, entryId, previous, null);
+      await this.record(
+        tx,
+        {
+          workspaceId,
+          action: 'transactions.transaction.posted',
+          aggregateType: 'Transaction',
+          aggregateId: transactionId,
+          aggregateVersion: tx.version,
+          changes: [
+            { field: 'status', before: previous, after: 'POSTED' },
+            { field: 'journalEntryId', before: null, after: entryId },
+          ],
+        },
+        { events, journalEntries: { posted: entryId } },
+      );
       return tx.snapshot;
     });
   }
@@ -495,6 +541,7 @@ export class TransactionsService {
       }
       if (changedFields.length === 0) return tx.snapshot;
       let newEntryId: string | null = null;
+      let revision: RevisionPosting | null = null;
       if (result.ledgerImpact && result.previousEntryId) {
         const reversal = await this.deps.ledger.reverseJournalEntry({
           workspaceId,
@@ -509,36 +556,69 @@ export class TransactionsService {
           journalEntryId: reversal.journalEntryId,
           linkType: 'REVERSAL',
         });
+        revision = {
+          revisionFrom: before.revision,
+          reversedJournalEntryId: result.previousEntryId,
+          reversalJournalEntryId: reversal.journalEntryId,
+        };
         newEntryId = await this.postEntry(tx);
         tx.attachEntry(newEntryId);
       }
       await this.save(tx);
       if (newEntryId) await this.link(tx, newEntryId, 'POSTED');
       const after = tx.snapshot;
+      const transition = tx.lastTransition?.transition;
+      const events: LifecycleEventRefDto[] = [];
       const eventFields = changedFields.filter((f) => UPDATED_EVENT_FIELDS.has(f));
       if (eventFields.length > 0) {
-        await this.publish(tx, TRANSACTION_EVENTS.updated, {
-          transactionId: after.id,
-          revision: after.revision,
-          status: after.status,
-          previousStatus,
-          changedFields: [...new Set(eventFields)],
-          ledgerImpact: result.ledgerImpact,
-          reason: null,
-          paymentMethod: after.paymentMethod,
-        });
+        events.push(
+          await this.publish(tx, TRANSACTION_EVENTS.updated, {
+            transactionId: after.id,
+            revision: after.revision,
+            status: after.status,
+            previousStatus,
+            changedFields: [...new Set(eventFields)],
+            ledgerImpact: result.ledgerImpact,
+            reason: null,
+            paymentMethod: after.paymentMethod,
+            ...(transition ? { transition } : {}),
+          }),
+        );
       }
-      if (newEntryId) await this.publishPosted(tx, newEntryId, result.previousStatus, result.previousEntryId);
+      if (newEntryId) {
+        events.push(
+          ...(await this.publishPosted(
+            tx,
+            newEntryId,
+            result.previousStatus,
+            result.previousEntryId,
+            revision,
+          )),
+        );
+      }
       if (result.classificationChanges.length > 0)
-        await this.publishCategorized(tx, result.classificationChanges);
-      await this.audit.append({
-        workspaceId,
-        action: auditActionForStatus(cmd.status, previousStatus) ?? 'transactions.transaction.updated',
-        aggregateType: 'Transaction',
-        aggregateId: after.id,
-        aggregateVersion: after.version,
-        changes: diff(before, after, changedFields, newEntryId),
-      });
+        events.push(await this.publishCategorized(tx, result.classificationChanges));
+      await this.record(
+        tx,
+        {
+          workspaceId,
+          action: auditActionForStatus(cmd.status, previousStatus) ?? 'transactions.transaction.updated',
+          aggregateType: 'Transaction',
+          aggregateId: after.id,
+          aggregateVersion: after.version,
+          changes: diff(before, after, changedFields, newEntryId),
+        },
+        {
+          events,
+          journalEntries: {
+            reversed: revision?.reversedJournalEntryId ?? null,
+            reversal: revision?.reversalJournalEntryId ?? null,
+            posted: newEntryId,
+          },
+          changedFields: changedFields.map(changedFieldName),
+          revisionBefore: before.revision,
+        },
+      );
       return after;
     });
   }
@@ -570,7 +650,7 @@ export class TransactionsService {
       await this.save(tx);
       if (reversalId) await this.link(tx, reversalId, 'REVERSAL');
       const s = tx.snapshot;
-      await this.publish(tx, TRANSACTION_EVENTS.voided, {
+      const voided = await this.publish(tx, TRANSACTION_EVENTS.voided, {
         transactionId: s.id,
         kind: s.kind,
         businessDate: s.businessDate,
@@ -579,19 +659,27 @@ export class TransactionsService {
         reason: s.voidReason,
         legs: legsPayload(s),
         splits: splitsPayload(s),
+        transition: 'VOID',
       });
-      await this.audit.append({
-        workspaceId,
-        action: 'transactions.transaction.voided',
-        aggregateType: 'Transaction',
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        reason: s.voidReason,
-        changes: [
-          { field: 'status', before: previousStatus, after: 'VOIDED' },
-          ...(reversalId ? [{ field: 'journalEntryId', before: entryToReverse, after: reversalId }] : []),
-        ],
-      });
+      await this.record(
+        tx,
+        {
+          workspaceId,
+          action: 'transactions.transaction.voided',
+          aggregateType: 'Transaction',
+          aggregateId: s.id,
+          aggregateVersion: s.version,
+          reason: s.voidReason,
+          changes: [
+            { field: 'status', before: previousStatus, after: 'VOIDED' },
+            ...(reversalId ? [{ field: 'journalEntryId', before: entryToReverse, after: reversalId }] : []),
+          ],
+        },
+        {
+          events: [voided],
+          journalEntries: { reversed: reversalId ? entryToReverse : null, reversal: reversalId },
+        },
+      );
       return s;
     });
   }
@@ -608,7 +696,7 @@ export class TransactionsService {
       tx.unreconcile(reason);
       await this.save(tx);
       const s = tx.snapshot;
-      await this.publish(tx, TRANSACTION_EVENTS.updated, {
+      const updated = await this.publish(tx, TRANSACTION_EVENTS.updated, {
         transactionId: s.id,
         revision: s.revision,
         status: s.status,
@@ -617,16 +705,21 @@ export class TransactionsService {
         ledgerImpact: false,
         reason: reason.trim(),
         paymentMethod: s.paymentMethod,
+        transition: 'UNRECONCILE',
       });
-      await this.audit.append({
-        workspaceId,
-        action: 'transactions.transaction.unreconciled',
-        aggregateType: 'Transaction',
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        reason: reason.trim(),
-        changes: [{ field: 'status', before: 'RECONCILED', after: 'CLEARED' }],
-      });
+      await this.record(
+        tx,
+        {
+          workspaceId,
+          action: 'transactions.transaction.unreconciled',
+          aggregateType: 'Transaction',
+          aggregateId: s.id,
+          aggregateVersion: s.version,
+          reason: reason.trim(),
+          changes: [{ field: 'status', before: 'RECONCILED', after: 'CLEARED' }],
+        },
+        { events: [updated] },
+      );
       return s;
     });
   }
@@ -676,7 +769,7 @@ export class TransactionsService {
         const previous = tx.changeStatus(target);
         await this.save(tx);
         const s = tx.snapshot;
-        await this.publish(tx, TRANSACTION_EVENTS.updated, {
+        const updated = await this.publish(tx, TRANSACTION_EVENTS.updated, {
           transactionId: s.id,
           revision: s.revision,
           status: s.status,
@@ -685,18 +778,23 @@ export class TransactionsService {
           ledgerImpact: false,
           reason: null,
           paymentMethod: s.paymentMethod,
+          transition: cleared ? 'CLEAR' : 'UNCLEAR',
         });
-        await this.audit.append({
-          workspaceId,
-          action: cleared ? 'transactions.transaction.cleared' : 'transactions.transaction.uncleared',
-          aggregateType: 'Transaction',
-          aggregateId: s.id,
-          aggregateVersion: s.version,
-          changes: [
-            { field: 'status', before: previous, after: target },
-            { field: 'bulkOperationId', before: null, after: bulkOperationId },
-          ],
-        });
+        await this.record(
+          tx,
+          {
+            workspaceId,
+            action: cleared ? 'transactions.transaction.cleared' : 'transactions.transaction.uncleared',
+            aggregateType: 'Transaction',
+            aggregateId: s.id,
+            aggregateVersion: s.version,
+            changes: [
+              { field: 'status', before: previous, after: target },
+              { field: 'bulkOperationId', before: null, after: bulkOperationId },
+            ],
+          },
+          { events: [updated] },
+        );
       }
       return { data: loaded.map((t) => t.snapshot), bulkOperationId };
     });
@@ -781,6 +879,48 @@ export class TransactionsService {
         ...(input.after ? { after: input.after } : {}),
         limit: input.limit,
       });
+    });
+  }
+
+  /**
+   * `GetLifecycle` de una transacción (add-lifecycle-timeline decisión 7; VIEWER, D28): verifica que la transacción
+   * existe en el workspace (404 idéntico a inexistente si es de otro, RLS), pide el recorrido a AUDIT con el estado
+   * actual como fuente de verdad y lo compone con los montos de cada revisión (legs vigentes y reemplazadas y
+   * `ConversionDetail` de cada revisión). AUDIT no hace joins cross-schema.
+   */
+  transactionLifecycle(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly transactionId: string;
+  }): Promise<TransactionLifecycleView> {
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const tx = await this.deps.transactions.findById(input.workspaceId, input.transactionId);
+      if (!tx) throw notFound(input.transactionId);
+      const s = tx.snapshot;
+      const lifecycle = await this.deps.lifecycleQuery.lifecycleOf({
+        userId: input.userId,
+        workspaceId: input.workspaceId,
+        aggregateType: 'Transaction',
+        aggregateId: s.id,
+        currentState: s.status,
+      });
+      const legs = await this.deps.transactions.revisionLegs(input.workspaceId, s.id);
+      const details =
+        s.kind === 'CONVERSION'
+          ? await this.deps.transactions.conversionRevisions(input.workspaceId, s.id)
+          : [];
+      const revisions: TransactionRevisionView[] = [...legs.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([revision, revisionLegs]) => {
+          const detail = details.find((d) => d.detail.revision === revision)?.detail ?? null;
+          return {
+            revision,
+            ...revisionAmounts(s.kind, revisionLegs, detail),
+            legs: revisionLegs,
+            conversion: detail,
+          };
+        });
+      return { lifecycle, revisions };
     });
   }
 
@@ -903,8 +1043,20 @@ export class TransactionsService {
     tx: Transaction,
     event: { readonly eventType: string; readonly eventVersion: number },
     payload: object,
-  ): Promise<void> {
+  ): Promise<LifecycleEventRefDto> {
     return publishEvent(this.deps, tx, event, payload);
+  }
+
+  /**
+   * Auditoría + paso del recorrido (transición validada por la máquina o anotación) en la unidad de trabajo del
+   * comando (add-lifecycle-timeline decisión 5, INV-029).
+   */
+  private record(
+    tx: Transaction,
+    entry: AuditEntry,
+    input: Parameters<typeof transactionSteps>[1],
+  ): Promise<void> {
+    return this.deps.lifecycle.record(entry, transactionSteps(tx, input));
   }
 
   /** `TransactionPosted` + `TransferCompleted`/`ConversionRecorded` según el kind (ver `publishPosted`). */
@@ -913,11 +1065,15 @@ export class TransactionsService {
     journalEntryId: string,
     previousStatus: TransactionStatus | null,
     supersedes: string | null,
-  ): Promise<void> {
-    return publishPosted(this.deps, tx, journalEntryId, previousStatus, supersedes);
+    revision: RevisionPosting | null = null,
+  ): Promise<LifecycleEventRefDto[]> {
+    return publishPosted(this.deps, tx, journalEntryId, previousStatus, supersedes, revision);
   }
 
-  private publishCategorized(tx: Transaction, changes: readonly SplitClassificationChange[]): Promise<void> {
+  private publishCategorized(
+    tx: Transaction,
+    changes: readonly SplitClassificationChange[],
+  ): Promise<LifecycleEventRefDto> {
     const s = tx.snapshot;
     return this.publish(tx, TRANSACTION_EVENTS.categorized, {
       transactionId: s.id,
@@ -929,6 +1085,30 @@ export class TransactionsService {
     });
   }
 }
+
+/**
+ * Monto (y comisión) de una revisión a partir de sus legs: transferencia ⇒ lo que recibe el destino y la diferencia con
+ * lo que sale del origen; conversión ⇒ lo entregado; resto ⇒ la magnitud del leg principal.
+ */
+function revisionAmounts(
+  kind: TransactionKind,
+  legs: TransactionRevisionView['legs'],
+  detail: ConversionDetail | null,
+): { readonly amount: Money; readonly fee: Money | null } {
+  if (kind === 'CONVERSION' && detail) return { amount: detail.sourceAmount, fee: null };
+  const target = legs.find((l) => l.role === 'TARGET');
+  const source = legs.find((l) => l.role === 'SOURCE');
+  if (kind === 'TRANSFER' && target && source) {
+    const fee = source.amount.abs().subtract(target.amount.abs());
+    return { amount: target.amount.abs(), fee: fee.isZero() ? null : fee };
+  }
+  const main = legs.find((l) => l.role === 'MAIN') ?? legs[0];
+  if (!main) throw new DomainError('INTERNAL_ERROR', 'revision without legs');
+  return { amount: main.amount.abs(), fee: null };
+}
+
+/** Nombre de campo del contrato en las anotaciones (`businessDate` se expone como `transactionDate`). */
+const changedFieldName = (f: ChangedField): string => (f === 'businessDate' ? 'transactionDate' : f);
 
 function auditActionForStatus(
   requested: string | undefined,

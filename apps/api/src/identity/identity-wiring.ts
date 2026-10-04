@@ -1,13 +1,24 @@
 import type { ModuleMetadata } from '@nestjs/common';
-import { AuditModule, createAuditRuntime, type AuditPort } from '@pf/audit/interface/audit.module';
+import {
+  AuditModule,
+  createAuditRuntime,
+  type AuditPort,
+  type LifecyclePort,
+} from '@pf/audit/interface/audit.module';
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
+import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
 import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
 import {
   ClassificationModule,
   createClassificationRuntime,
 } from '@pf/classification/interface/classification.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
-import { createFxRuntime, FxModule, parseFxProviderSettings } from '@pf/fx/interface/fx.module';
+import {
+  createFxRuntime,
+  EXCHANGE_RATE_LIFECYCLE_MACHINE,
+  FxModule,
+  parseFxProviderSettings,
+} from '@pf/fx/interface/fx.module';
 import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
 import {
   IdentityModule,
@@ -24,6 +35,7 @@ import type { ApiConventionsOptions } from '@pf/platform/nest';
 import { createReportingRuntime, ReportingModule } from '@pf/reporting/interface/reporting.module';
 import {
   createTransactionsRuntime,
+  TRANSACTION_LIFECYCLE_MACHINE,
   TransactionsModule,
 } from '@pf/transactions/interface/transactions.module';
 import { TRANSACTIONS_AUDIT_POLICY } from '@pf/transactions/contracts';
@@ -94,6 +106,8 @@ export function auditRuntime(input: {
       FX_AUDIT_POLICY,
     ],
     timeZones: identityWorkspaceTimeZones(input.pool),
+    // add-lifecycle-timeline: máquinas de estado declaradas por cada contexto dueño (dato puro, una sola fuente).
+    machines: [TRANSACTION_LIFECYCLE_MACHINE, ACCOUNT_LIFECYCLE_MACHINE, EXCHANGE_RATE_LIFECYCLE_MACHINE],
   });
 }
 
@@ -109,6 +123,8 @@ export function identityImports(input: {
   readonly jwt?: JwtVerifierOptions;
   /** Sustituye el `AuditPort` (tests de atomicidad con fallos inyectados). */
   readonly audit?: (port: AuditPort) => AuditPort;
+  /** Sustituye el `LifecyclePort` (tests de atomicidad del registro de transición, TC-AUDIT-LIFECYCLE-002). */
+  readonly lifecycle?: (port: LifecyclePort) => LifecyclePort;
 }): NonNullable<ModuleMetadata['imports']> {
   const jwt = input.jwt ?? jwtOptionsFromConfig(input.config);
   if (!jwt) {
@@ -119,6 +135,10 @@ export function identityImports(input: {
   }
   const audit = auditRuntime(input);
   const auditPort = input.audit ? input.audit(audit.port) : audit.port;
+  // Recorrido (add-lifecycle-timeline): auditoría (posiblemente envuelta) + transición en la misma unidad de trabajo.
+  const lifecyclePort = input.lifecycle
+    ? input.lifecycle(audit.lifecycleFor(auditPort))
+    : audit.lifecycleFor(auditPort);
   // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
   const classification = createClassificationRuntime({
     pool: input.pool,
@@ -132,6 +152,8 @@ export function identityImports(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
+    lifecycle: lifecyclePort,
+    lifecycleQuery: audit.lifecycleQuery,
     outbox: classificationOutbox(),
     workspaces: identityWorkspaceSettings(input.pool),
     // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
@@ -142,6 +164,8 @@ export function identityImports(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
+    lifecycle: lifecyclePort,
+    lifecycleQuery: audit.lifecycleQuery,
     logger: input.logger,
     defaultTimeZone: input.config.APP_TIMEZONE,
     // Equivalente en moneda base con el puerto público de valoración de FX (misma semántica que Reporting).
@@ -152,6 +176,8 @@ export function identityImports(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
+    lifecycle: lifecyclePort,
+    lifecycleQuery: audit.lifecycleQuery,
     history: audit.history,
     outbox: classificationOutbox(),
     ledger: ledger.posting,

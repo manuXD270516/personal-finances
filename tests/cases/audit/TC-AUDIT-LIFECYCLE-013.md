@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/lifecycle/lifecycle.test.tsx
+  - tests/e2e/specs/lifecycle.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","ui"]
@@ -30,7 +32,7 @@ expected_result:
   - "La línea de tiempo lista registrar, postear, revisar y anular con actor, fecha en hora de La Paz y enlace a la revisión 2"
   - "El diagrama tiene alternativa accesible (aria-describedby a la línea de tiempo)"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-013 — La pestaña Recorrido destaca el camino recorrido y lista la línea de tiempo
@@ -51,3 +53,4 @@ Entonces veo el camino recorrido destacado en el diagrama
 ## Notas
 
 - Numeración del diagrama: solo transiciones (registrar es el punto de entrada).
+- Implementación (2026-10-04): en la UI "postear" se rotula "Contabilizar" y "cleared", "Confirmar" (mismos textos que los botones y estados vigentes; una clave de `es.json`). La numeración muestra "1. Contabilizar", "2. Revisar", "3. Anular" en el diagrama y en la línea de tiempo; una arista recorrida varias veces lleva todos sus números ("1, 3"). El E2E también verifica el diagrama vertical a 375 px sin scroll horizontal y el Recorrido de la cuenta.

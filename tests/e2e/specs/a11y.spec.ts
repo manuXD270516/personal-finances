@@ -51,9 +51,16 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     }
     // Detalle de cuenta con la pestaña Historial de auditoría (componente `AuditHistory`, add-audit-trail 7.1).
     await go(page, `/cuentas/${bank}`);
+    await page.getByRole('tab', { name: 'Historial de cambios' }).click();
     await expect(page.getByTestId('audit-history')).toBeVisible();
     const detail = await seriousViolations(page);
     if (detail.length > 0) found['Detalle de cuenta con historial (/cuentas/{id})'] = detail;
+    // Pestaña Recorrido (diagrama de la máquina de estados + línea de tiempo, add-lifecycle-timeline).
+    await page.getByRole('tab', { name: 'Recorrido' }).click();
+    // Hay dos diagramas (horizontal y vertical); CSS muestra uno según el ancho.
+    await expect(page.locator('[data-testid="lifecycle-diagram"]:visible')).toHaveCount(1);
+    const lifecycle = await seriousViolations(page);
+    if (lifecycle.length > 0) found['Detalle de cuenta con recorrido (/cuentas/{id})'] = lifecycle;
     expect(found).toEqual({});
     await context.close();
   });

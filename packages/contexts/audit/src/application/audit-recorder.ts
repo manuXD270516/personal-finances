@@ -40,7 +40,7 @@ export class AuditRecorder implements AuditPort {
       entry.origin ??
       (isAuditOrigin(ambient.origin) ? ambient.origin : actor.type === 'USER' ? 'api' : 'system');
     const record = AuditRecord.create({
-      id: ids.next(),
+      id: entry.id ?? ids.next(),
       workspaceId: entry.workspaceId,
       occurredAt: clock.now(),
       actor,

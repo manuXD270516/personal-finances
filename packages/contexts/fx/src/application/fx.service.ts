@@ -1,8 +1,15 @@
-import type { AuditChangeInput, AuditPort } from '@pf/audit/contracts';
+import type {
+  AuditChangeInput,
+  AuditPort,
+  LifecycleDto,
+  LifecycleEventRefDto,
+  LifecycleTransitionInput,
+} from '@pf/audit/contracts';
 import { DomainError, Instant, LocalDate, type Currency } from '@pf/shared-kernel';
 import { FX_EVENTS } from '../contracts/index.js';
 import {
   DEFAULT_WORKSPACE_CURRENCIES,
+  EXCHANGE_RATE_LIFECYCLE,
   ExchangeRate,
   isFxRateType,
   type FxRateType,
@@ -80,15 +87,18 @@ export class FxService {
         createdBy: cmd.userId,
       });
       await this.deps.rates.insert(rate);
-      await this.publish(rate);
-      await this.audit.append({
-        workspaceId: cmd.workspaceId,
-        action: 'fx.exchange_rate.recorded',
-        aggregateType: 'ExchangeRate',
-        aggregateId: rate.id,
-        aggregateVersion: 1,
-        changes: rateChanges(rate),
-      });
+      const recorded = await this.publish(rate);
+      await this.deps.lifecycle.record(
+        {
+          workspaceId: cmd.workspaceId,
+          action: 'fx.exchange_rate.recorded',
+          aggregateType: 'ExchangeRate',
+          aggregateId: rate.id,
+          aggregateVersion: 1,
+          changes: rateChanges(rate),
+        },
+        [rateStep('RECORD', null, [recorded])],
+      );
       return { rate, supersededById: null };
     });
   }
@@ -113,19 +123,32 @@ export class FxService {
         original.supersededById,
       );
       await this.deps.rates.insert(next);
-      await this.publish(next);
-      await this.audit.append({
-        workspaceId: cmd.workspaceId,
-        action: 'fx.exchange_rate.superseded',
-        aggregateType: 'ExchangeRate',
-        aggregateId: next.id,
-        aggregateVersion: 1,
-        reason: next.snapshot.supersedeReason,
-        changes: [
-          ...rateChanges(next),
-          { field: 'value', before: original.rate.valueText, after: next.valueText },
+      const recorded = await this.publish(next);
+      // Una corrección registra la versión nueva (RECORD) y reemplaza la original (SUPERSEDE, enlazada a la nueva),
+      // ambas respaldadas por el mismo registro de auditoría (add-lifecycle-timeline decisión 4; INV-011).
+      await this.deps.lifecycle.record(
+        {
+          workspaceId: cmd.workspaceId,
+          action: 'fx.exchange_rate.superseded',
+          aggregateType: 'ExchangeRate',
+          aggregateId: next.id,
+          aggregateVersion: 1,
+          reason: next.snapshot.supersedeReason,
+          changes: [
+            ...rateChanges(next),
+            { field: 'value', before: original.rate.valueText, after: next.valueText },
+          ],
+        },
+        [
+          { ...rateStep('RECORD', null, [recorded]), detailRefs: { supersedesRateId: original.rate.id } },
+          {
+            ...rateStep('SUPERSEDE', 'RECORDED', []),
+            aggregateId: original.rate.id,
+            aggregateVersion: 2,
+            detailRefs: { supersededByRateId: next.id },
+          },
         ],
-      });
+      );
       return { rate: next, supersededById: null };
     });
   }
@@ -167,15 +190,19 @@ export class FxService {
         decidedAt: this.deps.clock.now().toString(),
       };
       await this.deps.reviews.insert(review);
-      await this.audit.append({
-        workspaceId: cmd.workspaceId,
-        action: 'fx.exchange_rate.anomaly_reviewed',
-        aggregateType: 'ExchangeRate',
-        aggregateId: stored.rate.id,
-        aggregateVersion: 2,
-        reason,
-        changes: [{ field: 'anomalyStatus', before: 'PENDING', after: review.decision }],
-      });
+      // Los estados de revisión de anomalías los declarará su change con el mismo mecanismo: hoy, anotación.
+      await this.deps.lifecycle.record(
+        {
+          workspaceId: cmd.workspaceId,
+          action: 'fx.exchange_rate.anomaly_reviewed',
+          aggregateType: 'ExchangeRate',
+          aggregateId: stored.rate.id,
+          aggregateVersion: 2,
+          reason,
+          changes: [{ field: 'anomalyStatus', before: 'PENDING', after: review.decision }],
+        },
+        [{ kind: 'ANNOTATION', changedFields: ['anomalyStatus'] }],
+      );
       return { ...stored, anomalyReview: review };
     });
   }
@@ -251,10 +278,11 @@ export class FxService {
   }
 
   /** `fx.RateRecorded.v1` en la misma unidad de trabajo (idempotencia natural `rateId`). */
-  private publish(rate: ExchangeRate): Promise<void> {
+  private async publish(rate: ExchangeRate): Promise<LifecycleEventRefDto> {
     const s = rate.snapshot;
-    return this.deps.outbox.append({
-      eventId: this.deps.ids.next(),
+    const eventId = this.deps.ids.next();
+    await this.deps.outbox.append({
+      eventId,
       eventType: FX_EVENTS.rateRecorded.eventType,
       eventVersion: FX_EVENTS.rateRecorded.eventVersion,
       occurredAt: this.deps.clock.now().toString(),
@@ -276,7 +304,50 @@ export class FxService {
         provider: s.provider,
       },
     });
+    return {
+      eventId,
+      eventType: `${FX_EVENTS.rateRecorded.eventType}.v${FX_EVENTS.rateRecorded.eventVersion}`,
+    };
   }
+
+  /**
+   * `GET W/fx-rates/{id}/lifecycle` (add-lifecycle-timeline decisión 7; VIEWER+): verifica que la tasa existe en el
+   * workspace (otro workspace ⇒ 404, RLS) y pide su recorrido a AUDIT con su estado (RECORDED/SUPERSEDED).
+   */
+  rateLifecycle(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly rateId: string;
+  }): Promise<LifecycleDto> {
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const stored = await this.deps.rates.findById(input.workspaceId, input.rateId);
+      if (!stored) throw notFound(input.rateId);
+      return this.deps.lifecycleQuery.lifecycleOf({
+        userId: input.userId,
+        workspaceId: input.workspaceId,
+        aggregateType: 'ExchangeRate',
+        aggregateId: stored.rate.id,
+        currentState: stored.supersededById ? 'SUPERSEDED' : 'RECORDED',
+      });
+    });
+  }
+}
+
+/** Paso de la máquina `ExchangeRate` validado contra `EXCHANGE_RATE_LIFECYCLE` (única fuente de las reglas). */
+function rateStep(
+  code: 'RECORD' | 'SUPERSEDE',
+  from: 'RECORDED' | null,
+  events: readonly LifecycleEventRefDto[],
+): LifecycleTransitionInput {
+  const t = EXCHANGE_RATE_LIFECYCLE.transition(code, from);
+  return {
+    kind: 'TRANSITION',
+    transition: t.transition,
+    fromState: t.from,
+    toState: t.to,
+    machineVersion: EXCHANGE_RATE_LIFECYCLE.version,
+    events,
+  };
 }
 
 function rateChanges(rate: ExchangeRate): AuditChangeInput[] {

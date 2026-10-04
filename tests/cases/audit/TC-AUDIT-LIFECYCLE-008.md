@@ -12,9 +12,10 @@ invariants: ["INV-011","INV-008"]
 priority: high
 type: api
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","conversion","multi-currency"]
@@ -31,7 +32,7 @@ expected_result:
   - "REVISE 1 → 2 enlazada al ConversionDetail con 686.00 BOB y efectiva 6.86"
   - "La transición REVISE trae reversed (asiento de la revisión 1), reversal y posted"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-008 — El recorrido de una conversión corregida enlaza cada revisión con su detalle
@@ -51,3 +52,4 @@ Entonces el recorrido enlaza la revisión 1 con efectiva 6.85 y la 2 con efectiv
 ## Notas
 
 - Cifras del scenario canónico de transactions/conversions.
+- Implementación (2026-10-04): cada transición `RECORD`/`REVISE` de una conversión lleva `detailRefs.conversionRevision`; `revisions[n].conversion` trae montos, tasa efectiva y fees del `ConversionDetail` de esa revisión.

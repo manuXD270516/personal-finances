@@ -14,6 +14,8 @@ export const TRANSACTION_EVENTS = {
   categorized: { eventType: 'transactions.TransactionCategorized', eventVersion: 1 },
   updated: { eventType: 'transactions.TransactionUpdated', eventVersion: 1 },
   transferCompleted: { eventType: 'transactions.TransferCompleted', eventVersion: 1 },
+  /** Edición financiera de una transferencia (add-lifecycle-timeline decisión 9; docs/31 D37). */
+  transferRevised: { eventType: 'transactions.TransferRevised', eventVersion: 1 },
   conversionRecorded: { eventType: 'transactions.ConversionRecorded', eventVersion: 1 },
 } as const;
 

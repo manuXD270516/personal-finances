@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/accounts/AccountOpened.v1.schema.json",
   "title": "accounts.AccountOpened.v1",
-  "description": "Se abrió una cuenta del usuario. El saldo inicial NO viaja aquí (es una transacción OPENING_BALANCE). Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: accountId. PII baja: name (nunca número de cuenta).",
+  "description": "Se abrió una cuenta del usuario. El saldo inicial NO viaja aquí (es una transacción OPENING_BALANCE). Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: accountId. PII baja: name (nunca número de cuenta). Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
   "type": "object",
   "allOf": [
     {
@@ -95,6 +95,16 @@
             "ILLIQUID"
           ],
           "description": "AccountLiquidity del OpenAPI (docs/31 D5)."
+        },
+        "transition": {
+          "description": "Transición de la máquina `Account` que originó el evento (opcional, aditivo).",
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "CLOSE",
+            "ARCHIVE",
+            "REACTIVATE"
+          ]
         }
       }
     }
@@ -124,7 +134,8 @@
         "institutionId": "01928c4e-0000-7000-8000-0000000a1001",
         "openedOn": "2026-10-01",
         "includeInNetWorth": true,
-        "liquidity": "LIQUID"
+        "liquidity": "LIQUID",
+        "transition": "OPEN"
       }
     }
   ]

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/transactions/TransactionCreated.v1.schema.json",
   "title": "transactions.TransactionCreated.v1",
-  "description": "Se aceptó una nueva transacción (pending o posted). Productor: TRANSACTIONS. Consumidores: RULES, COMMITMENTS, REPORTING. PII baja: description. Define $defs compartidos por los eventos del contexto transactions (v1).",
+  "description": "Se aceptó una nueva transacción (pending o posted). Productor: TRANSACTIONS. Consumidores: RULES, COMMITMENTS, REPORTING. PII baja: description. Define $defs compartidos por los eventos del contexto transactions (v1). Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
   "type": "object",
   "allOf": [
     {
@@ -121,6 +121,20 @@
             "DIGITAL_WALLET",
             "OTHER",
             null
+          ]
+        },
+        "transition": {
+          "description": "Transición de la máquina `Transaction` que originó el evento (opcional, aditivo).",
+          "type": "string",
+          "enum": [
+            "RECORD",
+            "POST",
+            "CLEAR",
+            "UNCLEAR",
+            "RECONCILE",
+            "UNRECONCILE",
+            "REVISE",
+            "VOID"
           ]
         }
       }
@@ -280,7 +294,8 @@
           }
         ],
         "postingDate": null,
-        "refundOfTransactionId": null
+        "refundOfTransactionId": null,
+        "transition": "RECORD"
       }
     },
     {

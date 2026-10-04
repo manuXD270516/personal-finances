@@ -12,9 +12,15 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/accounts/src/domain/account-lifecycle.test.ts
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+  - packages/contexts/transactions/src/domain/transaction-lifecycle.test.ts
+  - packages/contexts/transactions/src/infrastructure/lifecycle.architecture.test.ts
+  - packages/shared-kernel/src/lifecycle/lifecycle-machine.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","state-machine"]
@@ -30,7 +36,7 @@ expected_result:
   - "La reconciliación se rechaza con INVALID_STATUS_TRANSITION"
   - "No se registra ninguna transición y el gasto sigue pending"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-001 — La máquina de estados declarada rechaza transiciones no declaradas
@@ -52,3 +58,4 @@ Entonces se rechaza con INVALID_STATUS_TRANSITION
 
 - Cubre también el scenario "Definición de la máquina de una transacción".
 - Variante de cuentas: archivar una cuenta ya archivada ⇒ INVALID_STATUS_TRANSITION.
+- Implementación (2026-10-04): los estados usan los códigos del contrato (`PENDING`, `POSTED`, `CLEARED`, `RECONCILED`, `VOIDED`); `RECORD` declara varios destinos (`to: [PENDING, POSTED, CLEARED]`). La máquina vive en el dominio de cada contexto (`TRANSACTION_LIFECYCLE`, `ACCOUNT_LIFECYCLE`, `EXCHANGE_RATE_LIFECYCLE`) sobre `LifecycleMachine` del shared-kernel; PBT con fast-check (transacciones) y enumeración exhaustiva (cuentas) verifican que todo estado persistido se alcanza por transiciones declaradas.

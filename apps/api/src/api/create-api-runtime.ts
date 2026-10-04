@@ -17,7 +17,7 @@ import { ApiModule } from './api.module.js';
 import { createApiConventions, type ApiConventionsOverrides } from './api-conventions.js';
 import { identityImports } from '../identity/identity-wiring.js';
 import type { JwtVerifierOptions } from '@pf/platform/api';
-import type { AuditPort } from '@pf/audit/interface/audit.module';
+import type { AuditPort, LifecyclePort } from '@pf/audit/interface/audit.module';
 
 /** Rutas operativas fuera de la API versionada (proposal: los probes no dependen de auth ni de versionado). */
 const UNVERSIONED_ROUTES = [
@@ -49,7 +49,13 @@ export interface ApiRuntimeOptions extends ApiConventionsOverrides {
    * omite (harness). `audit` envuelve el `AuditPort` (tests de atomicidad con fallos inyectados).
    */
   readonly identity?:
-    false | { readonly jwt?: JwtVerifierOptions; readonly audit?: (port: AuditPort) => AuditPort };
+    | false
+    | {
+        readonly jwt?: JwtVerifierOptions;
+        readonly audit?: (port: AuditPort) => AuditPort;
+        /** Envuelve el `LifecyclePort` (TC-AUDIT-LIFECYCLE-002: fallo inyectado al escribir la transición). */
+        readonly lifecycle?: (port: LifecyclePort) => LifecyclePort;
+      };
 }
 
 export async function createApiRuntime(
@@ -79,6 +85,7 @@ export async function createApiRuntime(
               logger,
               ...(options.identity?.jwt ? { jwt: options.identity.jwt } : {}),
               ...(options.identity?.audit ? { audit: options.identity.audit } : {}),
+              ...(options.identity?.lifecycle ? { lifecycle: options.identity.lifecycle } : {}),
             })),
         ...(options.imports?.(resources, conventions) ?? []),
       ],

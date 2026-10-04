@@ -1,5 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import { Instant, type Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
@@ -22,6 +22,7 @@ import {
   type FxProviderSettings,
 } from '../application/provider-settings.js';
 import { ProviderStatusQueries } from '../application/provider-status.queries.js';
+import { EXCHANGE_RATE_LIFECYCLE } from '../domain/index.js';
 import type { FxRateProvider, MarketRateProvider, ResolvedRate } from '../domain/index.js';
 import {
   PgCurrencyRepository,
@@ -41,6 +42,9 @@ export interface FxRuntimeOptions {
   readonly pool: Pool;
   readonly clock: Clock;
   readonly audit: AuditPort;
+  /** Auditoría + recorrido de tasas manuales (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: LifecycleQuery;
   readonly outbox: OutboxPort;
   /** Moneda de reporte y zona horaria del workspace (IDENTITY, vía composition root). */
   readonly workspaces: WorkspaceSettingsPort;
@@ -109,6 +113,8 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
     workspaces: options.workspaces,
     outbox: options.outbox,
     audit: options.audit,
+    lifecycle: options.lifecycle,
+    lifecycleQuery: options.lifecycleQuery,
     ids: uuidV7Ids,
     clock: options.clock,
     policy: valuationPolicyOf(settings),
@@ -157,6 +163,9 @@ export class FxModule {
     };
   }
 }
+
+/** Máquina de estados `ExchangeRate` (tasas manuales; add-lifecycle-timeline), para AUDIT en el composition root. */
+export const EXCHANGE_RATE_LIFECYCLE_MACHINE: LifecycleMachineDto = EXCHANGE_RATE_LIFECYCLE.definition;
 
 // ------------------------------------------------------------------ worker: providers de tasas de mercado
 
