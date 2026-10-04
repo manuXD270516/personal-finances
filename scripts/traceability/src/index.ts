@@ -3,6 +3,8 @@ export type { CheckOptions, CheckResult, LoadOptions } from './check.js';
 export { loadCatalog, parseCaseFile } from './catalog.js';
 export { main } from './cli.js';
 export { buildMatrix, renderMatrixMarkdown, writeMatrix } from './matrix.js';
+export { buildRegressionSuite, kindOf, renderRegressionMarkdown, testNamePattern } from './regression.js';
+export type { RegressionSuite } from './regression.js';
 export type { MatrixJson } from './matrix.js';
 export { loadRequirements, parseSpecMarkdown, parseTrace } from './openspec.js';
 export { scanTests } from './tests-scan.js';

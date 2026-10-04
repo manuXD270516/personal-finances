@@ -18,11 +18,13 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "test:mutation": "stryker run"
+    "test:mutation": "stryker run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
+    "@vitest/coverage-v8": "5.0.3",
     "fast-check": "4.10.2",
     "typescript": "catalog:",
     "vitest": "catalog:"

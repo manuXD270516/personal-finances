@@ -53,18 +53,33 @@ export interface DemoMoney {
   readonly currency: DemoCurrency;
 }
 
-export interface DemoInstitution {
-  readonly key: InstitutionKey;
+/**
+ * Claves de un plan: el dataset Demo usa uniones cerradas; otros datasets deterministas (`large`, docs/29 §2.3)
+ * reutilizan los mismos tipos de operación con claves `string`.
+ */
+export interface PlanKeys {
+  readonly account: string;
+  readonly counterparty: string;
+  readonly institution: string;
+}
+export interface DemoKeys extends PlanKeys {
+  readonly account: AccountKey;
+  readonly counterparty: CounterpartyKey;
+  readonly institution: InstitutionKey;
+}
+
+export interface DemoInstitution<K extends PlanKeys = DemoKeys> {
+  readonly key: K['institution'];
   readonly name: string;
   readonly kind: 'BANK' | 'EXCHANGE' | 'WALLET_PROVIDER';
 }
 
-export interface DemoAccount {
-  readonly key: AccountKey;
+export interface DemoAccount<K extends PlanKeys = DemoKeys> {
+  readonly key: K['account'];
   readonly name: string;
   readonly type: 'BANK' | 'SAVINGS' | 'CASH' | 'CRYPTO_WALLET' | 'CREDIT_CARD' | 'LOAN';
   readonly currency: DemoCurrency;
-  readonly institution: InstitutionKey | null;
+  readonly institution: K['institution'] | null;
   readonly openedOn: string;
   readonly opening: DemoMoney | null;
   /** Identificador ficticio (`DEMO-…`), en las notas de la cuenta. */
@@ -72,8 +87,8 @@ export interface DemoAccount {
   readonly last4: string | null;
 }
 
-export interface DemoCounterparty {
-  readonly key: CounterpartyKey;
+export interface DemoCounterparty<K extends PlanKeys = DemoKeys> {
+  readonly key: K['counterparty'];
   readonly name: string;
   readonly kind: 'MERCHANT' | 'PERSON' | 'SERVICE_PROVIDER' | 'FINANCIAL_INSTITUTION' | 'EMPLOYER';
 }
@@ -84,9 +99,9 @@ export interface DemoSplit {
   readonly tag?: 'reembolsable' | 'hogar';
 }
 
-type PaymentMethod = 'CASH' | 'QR' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'BANK_TRANSFER';
+export type PaymentMethod = 'CASH' | 'QR' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'BANK_TRANSFER';
 
-export type DemoOp =
+export type PlanOp<K extends PlanKeys = DemoKeys> =
   | {
       readonly op: 'rate';
       readonly date: string;
@@ -99,10 +114,10 @@ export type DemoOp =
       readonly op: 'income' | 'expense';
       readonly key: string;
       readonly date: string;
-      readonly account: AccountKey;
+      readonly account: K['account'];
       readonly amount: DemoMoney;
       readonly splits: readonly DemoSplit[];
-      readonly counterparty: CounterpartyKey | null;
+      readonly counterparty: K['counterparty'] | null;
       readonly paymentMethod: PaymentMethod;
       readonly description: string;
       readonly pending?: boolean;
@@ -112,14 +127,14 @@ export type DemoOp =
       readonly key: string;
       readonly date: string;
       readonly of: string;
-      readonly account: AccountKey;
+      readonly account: K['account'];
       readonly amount: DemoMoney;
       readonly description: string;
     }
   | {
       readonly op: 'adjustment';
       readonly date: string;
-      readonly account: AccountKey;
+      readonly account: K['account'];
       readonly amount: DemoMoney;
       readonly direction: 'INCREASE' | 'DECREASE';
       readonly reason: string;
@@ -127,8 +142,8 @@ export type DemoOp =
   | {
       readonly op: 'transfer';
       readonly date: string;
-      readonly from: AccountKey;
-      readonly to: AccountKey;
+      readonly from: K['account'];
+      readonly to: K['account'];
       readonly amount: DemoMoney;
       readonly paymentMethod: PaymentMethod;
       readonly description: string;
@@ -136,8 +151,8 @@ export type DemoOp =
   | {
       readonly op: 'conversion';
       readonly date: string;
-      readonly from: AccountKey;
-      readonly to: AccountKey;
+      readonly from: K['account'];
+      readonly to: K['account'];
       readonly source: DemoMoney;
       readonly target: DemoMoney;
       /** 1 base = value quote (orientación de la cotización P2P). */
@@ -155,23 +170,24 @@ export type DemoOp =
     }
   | { readonly op: 'void'; readonly date: string; readonly of: string; readonly reason: string };
 
+export type DemoOp = PlanOp;
 export type IncomeExpenseOp = Extract<DemoOp, { op: 'income' | 'expense' }>;
 
-export interface DemoMonth {
+export interface DemoMonth<K extends PlanKeys = DemoKeys> {
   /** `YYYY-MM` del mes (ya desplazado a la ancla pedida). */
   readonly month: string;
-  readonly ops: readonly DemoOp[];
+  readonly ops: readonly PlanOp<K>[];
 }
 
-export interface DemoPlan {
+export interface DemoPlan<K extends PlanKeys = DemoKeys> {
   readonly datasetVersion: string;
   readonly anchorDate: string;
   readonly startDate: string;
-  readonly institutions: readonly DemoInstitution[];
-  readonly accounts: readonly DemoAccount[];
-  readonly counterparties: readonly DemoCounterparty[];
+  readonly institutions: readonly DemoInstitution<K>[];
+  readonly accounts: readonly DemoAccount<K>[];
+  readonly counterparties: readonly DemoCounterparty<K>[];
   readonly tags: readonly { readonly key: 'reembolsable' | 'hogar'; readonly name: string }[];
-  readonly months: readonly DemoMonth[];
+  readonly months: readonly DemoMonth<K>[];
 }
 
 // ------------------------------------------------------------------ helpers de dinero (enteros, nunca `number`)
@@ -876,10 +892,10 @@ function acc(
 
 const LIABILITY: ReadonlySet<AccountKey> = new Set(['card', 'loan']);
 
-export interface DemoSummary {
+export interface PlanSummary<A extends string = string> {
   readonly datasetVersion: string;
   /** Saldo PRESENTADO por cuenta (pasivo positivo = adeudado), string decimal en la escala de su moneda. */
-  readonly balances: Readonly<Record<AccountKey, string>>;
+  readonly balances: Readonly<Record<A, string>>;
   readonly counts: {
     readonly accounts: number;
     readonly transactions: number;
@@ -892,16 +908,27 @@ export interface DemoSummary {
   };
 }
 
+export type DemoSummary = PlanSummary<AccountKey>;
+
 /**
  * Resumen esperado del plan (oráculo del golden summary): aplica cada operación a los saldos presentados con aritmética
  * entera. Las pendientes no afectan saldos; una edición reemplaza el monto; una anulación lo revierte.
  */
 export function summarizeDemoPlan(plan: DemoPlan): DemoSummary {
-  const balance = new Map<AccountKey, bigint>(plan.accounts.map((a) => [a.key, a.opening?.minor ?? 0n]));
-  const sign = (key: AccountKey, assetDelta: bigint) => (LIABILITY.has(key) ? -assetDelta : assetDelta);
-  const add = (key: AccountKey, assetDelta: bigint) =>
+  return summarizePlan(plan, (key) => LIABILITY.has(key));
+}
+
+/** Igual que `summarizeDemoPlan` para cualquier plan; `isLiability` decide el signo del saldo presentado. */
+export function summarizePlan<K extends PlanKeys>(
+  plan: DemoPlan<K>,
+  isLiability: (key: K['account']) => boolean,
+): PlanSummary<K['account']> {
+  type A = K['account'];
+  const balance = new Map<A, bigint>(plan.accounts.map((a) => [a.key, a.opening?.minor ?? 0n]));
+  const sign = (key: A, assetDelta: bigint) => (isLiability(key) ? -assetDelta : assetDelta);
+  const add = (key: A, assetDelta: bigint) =>
     balance.set(key, (balance.get(key) ?? 0n) + sign(key, assetDelta));
-  const recorded = new Map<string, { account: AccountKey; delta: bigint }>();
+  const recorded = new Map<string, { account: A; delta: bigint }>();
   const counts = {
     accounts: plan.accounts.length,
     transactions: 0,
@@ -982,6 +1009,6 @@ export function summarizeDemoPlan(plan: DemoPlan): DemoSummary {
       a.key,
       toDecimal(money(balance.get(a.key) ?? 0n, currencyOf.get(a.key) ?? 'BOB')),
     ]),
-  ) as Record<AccountKey, string>;
+  ) as Record<A, string>;
   return { datasetVersion: plan.datasetVersion, balances, counts };
 }

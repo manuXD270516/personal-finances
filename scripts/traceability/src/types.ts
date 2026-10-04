@@ -48,6 +48,8 @@ export interface TestCase {
   automationStatus: AutomationStatus;
   automatedTests: string[];
   status: CaseStatus;
+  /** `regression_suite: true` (Financial Regression Suite, docs/16 §11.3). */
+  regressionSuite: boolean;
 }
 
 export interface TestFile {

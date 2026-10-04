@@ -101,8 +101,8 @@ export default tseslint.config(
     rules: providersLosslessJson,
   },
   {
-    // docs/29 §3 (add-demo-data): el dataset Demo es determinista (PRNG sembrado, sin reloj).
-    files: ['apps/api/src/demo/dataset/**/*.ts'],
+    // docs/29 §3 (add-demo-data): los datasets Demo y Large son deterministas (PRNG sembrado, sin reloj).
+    files: ['apps/api/src/demo/dataset/**/*.ts', 'apps/api/src/seed/large/large-plan.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
       'no-restricted-syntax': [
