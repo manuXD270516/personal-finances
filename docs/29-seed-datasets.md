@@ -34,16 +34,17 @@ Diseñado para que los test cases del catálogo se puedan ejecutar sobre él sin
 - **Monedas:** BOB (2), USD (2), USDT (6), BTC (8).
 - **Cuentas W1:**
 
-| Cuenta | Tipo | Moneda | Saldo de apertura |
-|---|---|---|---|
-| Bank A | ASSET (checking) | BOB | 1 000.00 |
-| Bank B | ASSET (savings) | BOB | 0.00 |
-| USD Savings | ASSET | USD | 500.00 |
-| USDT Wallet | ASSET | USDT | 100.000000 |
-| BTC Wallet | ASSET | BTC | 0.01250000 |
-| Credit Card | LIABILITY | BOB | 0.00 |
+| Cuenta | Tipo (`AccountType`) | Naturaleza | Liquidez (default) | Moneda | Saldo de apertura |
+|---|---|---|---|---|---|
+| Bank A | `BANK` | ASSET | `LIQUID` | BOB | 1 000.00 |
+| Bank B | `SAVINGS` | ASSET | `LIQUID` | BOB | 0.00 |
+| USD Savings | `SAVINGS` | ASSET | `LIQUID` | USD | 500.00 |
+| USDT Wallet | `CRYPTO_WALLET` | ASSET | `LIQUID` | USDT | 100.000000 |
+| BTC Wallet | `CRYPTO_WALLET` | ASSET | `LIQUID` | BTC | 0.01250000 |
+| Credit Card | `CREDIT_CARD` | LIABILITY | `ILLIQUID` | BOB | 0.00 |
 
-- **Categorías base:** Groceries, Household, Personal care, Rent, Utilities, Salary, Fees (sistema), Subscriptions, Transport; una categoría archivada con transacciones (`Old Gym`) para TC-CLASSIFICATION-ARCHIVE-001.
+  Tipos según la lista canónica de FR-ACCOUNTS-001 (docs/31 D3: el antiguo "checking" es `BANK`); naturaleza derivada del tipo y liquidez por defecto según FR-ACCOUNTS-011 (D5). Las cuentas con saldo de apertura 0 no generan asiento; su `LedgerAccount` nace con el primer posting (get-or-create, D6).
+- **Categorías:** cada workspace se provisiona por el mismo gancho que `CreateWorkspace` (dataset `minimal` v3, `apps/api/src/seed/run-seed.ts`): las 11 categorías de sistema (FR-CLASSIFICATION-003) y el catálogo sugerido es-BO de [§2.4](#24-catálogo-inicial-de-categorías-sugerido) (incluye, p. ej., *Supermercado*, *Alquiler*, *Servicios básicos*, *Sueldo*, *Suscripciones digitales*, *Transporte público*). Pendiente para TC-CLASSIFICATION-ARCHIVE-001: una categoría archivada con transacciones (`Old Gym`).
 - **Transacciones:** pocas y con propósito (un gasto con split, un pending, un refund, una transacción voided). Los saldos de apertura coinciden con los ejemplos de los TCs (p. ej. TC-LEDGER-TRANSFER-001 parte de Bank A = 1 000.00 BOB, Bank B = 0.00 BOB) **antes** de aplicar esas transacciones; los tests que necesitan el estado "virgen" usan el snapshot `minimal@opening`.
 - **W2:** una cuenta `W2 Bank` BOB 5 000.00 y 3 transacciones, usadas solo para verificar que nunca aparecen desde W1.
 

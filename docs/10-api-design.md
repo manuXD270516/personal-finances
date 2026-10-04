@@ -232,25 +232,45 @@ Content-Type: application/json
 | identity | `WORKSPACE_PENDING_DELETION` | 409 | Workspace en borrado; solo lectura |
 | identity | `LAST_OWNER_CANNOT_LEAVE` | 409 | Debe existir un OWNER |
 | accounts | `ACCOUNT_ARCHIVED` | 409 | La cuenta archivada no admite movimientos |
+| accounts | `ACCOUNT_CLOSED` | 409 | La cuenta cerrada no admite movimientos (crear, editar, anular o registrar `pending`; INV-026) |
+| accounts | `ACCOUNT_BALANCE_NOT_ZERO` | 409 | Solo se cierra una cuenta con saldo cero (`POST …/close`) |
 | accounts | `ACCOUNT_CURRENCY_IMMUTABLE` | 409 | No se cambia la moneda de una cuenta con movimientos |
+| accounts | `ACCOUNT_CURRENCY_KIND_MISMATCH` | 422 | La moneda no es compatible con el tipo de cuenta (p. ej. moneda fiat en `CRYPTO_WALLET`) |
 | accounts | `ACCOUNT_NAME_TAKEN` | 409 | Nombre duplicado entre cuentas activas |
+| accounts | `INSTITUTION_ARCHIVED` | 409 | Institución archivada: no asignable a cuentas (las existentes la conservan) |
 | ledger | `LEDGER_UNBALANCED_ENTRY` | 422 | Σ por moneda ≠ 0 (no debería llegar al cliente: indica bug) |
+| ledger | `LEDGER_ENTRY_TOO_FEW_POSTINGS` | 422 | Asiento con menos de 2 postings (SQLSTATE `PF005`, docs/31 D19) |
+| ledger | `LEDGER_ZERO_AMOUNT_POSTING` | 422 | Posting con monto cero |
+| ledger | `LEDGER_SPLIT_REQUIRED` | 422 | Posting nominal (`INCOME`/`EXPENSE`) sin split de origen |
+| ledger | `LEDGER_ENTRY_ALREADY_REVERSED` | 409 | El asiento ya fue revertido (reversa única, también bajo concurrencia) |
+| ledger | `LEDGER_ENTRY_NOT_REVERSIBLE` | 409 | No se revierte un asiento de tipo `REVERSAL` |
+| ledger | `LEDGER_IMMUTABLE` | 409 | Reservado ("if surfaced"): la mutación prohibida (SQLSTATE `PF003`) siempre es un bug y hoy se responde `500 INTERNAL_ERROR` + métrica (docs/31 D19) |
 | ledger | `PERIOD_CLOSED` | 409 | Fecha en periodo cerrado |
 | ledger | `CURRENCY_MISMATCH` | 422 | Moneda distinta a la de la cuenta |
 | transactions | `SPLITS_DO_NOT_SUM` | 422 | Σ splits ≠ monto |
 | transactions | `INVALID_STATUS_TRANSITION` | 409 | p. ej. anular una anulada |
 | transactions | `TRANSACTION_RECONCILED` | 409 | Requiere des-reconciliar antes de editar montos |
+| transactions | `REFUND_EXCEEDS_ORIGINAL` | 422 | Σ reembolsos vigentes + nuevo > monto del gasto original (salvo `confirmRefundExceedsOriginal: true`, auditado) |
 | transactions | `TRANSFER_SAME_ACCOUNT` | 422 | Origen = destino |
+| transactions | `TRANSFER_CURRENCY_MISMATCH` | 422 | Cuentas (o comisión) en otra moneda: la transferencia es de una sola moneda; el problem incluye `suggestedOperationId` (`createConversion`). Una comisión en otra moneda o desde otra cuenta se registra como conversión o gasto aparte (docs/31 D37, D40) |
 | transactions | `CONVERSION_SAME_CURRENCY` | 422 | Conversión entre la misma moneda (usar transferencia) |
 | transactions | `CONVERSION_AMOUNTS_INCONSISTENT` | 422 | Montos/fees no cuadran (09 §7.2) |
+| shared | `MONEY_INVALID_AMOUNT` | 422 | El monto no es un decimal válido |
+| shared | `AMOUNT_OUT_OF_RANGE` | 422 | Magnitud fuera de rango (\|x\| ≥ 10²⁰) |
 | shared | `AMOUNT_SCALE_EXCEEDED` | 422 | Más decimales que `currency.scale` |
 | shared | `AMOUNT_NOT_POSITIVE` | 422 | Magnitud ≤ 0 en comando |
 | classification | `CATEGORY_ARCHIVED`, `TAG_ARCHIVED`, `COUNTERPARTY_ARCHIVED` | 409 | No asignable a splits nuevos |
 | classification | `CATEGORY_KIND_MISMATCH` | 422 | Categoría de ingreso en gasto, etc. |
+| classification | `CATEGORY_DEPTH_EXCEEDED` | 422 | Jerarquía de categorías con más de 2 niveles |
+| classification | `CATEGORY_GROUP_NOT_EMPTY` | 409 | Un grupo solo se archiva si todas sus categorías están archivadas |
 | classification | `SYSTEM_CATEGORY_IMMUTABLE` | 409 | Categorías de sistema no se archivan |
-| classification | `NAME_TAKEN` | 409 | Nombre duplicado |
+| classification | `COUNTERPARTY_ALIAS_TAKEN` | 409 | Alias (normalizado) ya usado por otra counterparty del workspace |
+| classification | `NAME_TAKEN` | 409 | Nombre duplicado (en counterparties el problem incluye `existingId`) |
 | fx | `FX_RATE_NOT_FOUND` | 422 | Sin tasa para el par/fecha requerida |
-| fx | `CURRENCY_NOT_ENABLED` | 422 | Moneda no habilitada en el workspace |
+| fx | `FX_RATE_ALREADY_SUPERSEDED` | 409 | La versión de la tasa ya fue reemplazada (`POST …/supersede`) |
+| fx | `FX_RATE_ANOMALY_ALREADY_REVIEWED` | 409 | La anomalía de la tasa de provider ya fue revisada (`POST …/anomaly-review`) |
+| fx | `FX_RATE_NOT_ANOMALOUS` | 422 | Se pidió revisar una tasa que no está marcada como anómala |
+| fx | `CURRENCY_NOT_ENABLED` | 422 | Moneda no habilitada en el workspace (también `reportingCurrency` de `/reports/summary`) |
 | planning (P2) | `BUDGET_ALREADY_EXISTS`, `PERIOD_OVERLAP`, `MONTH_CLOSING_IN_PROGRESS` | 409 | — |
 | commitments (P3) | `INVALID_RRULE`, `OCCURRENCE_ALREADY_MATERIALIZED` | 422 / 409 | — |
 | debt (P4) | `INSTALLMENT_ALREADY_PAID`, `PAYMENT_BREAKDOWN_MISMATCH` | 409 / 422 | — |
@@ -259,7 +279,7 @@ Content-Type: application/json
 | imports (P6) | `IMPORT_UNSUPPORTED_FORMAT`, `IMPORT_FILE_TOO_LARGE`, `IMPORT_REVIEW_INCOMPLETE`, `IMPORT_INVALID_STATE_TRANSITION`, `IMPORT_REVERT_BLOCKED`, `IMPORT_AMBIGUOUS_NUMBER`, `IMPORT_AMBIGUOUS_DATE`, `IMPORT_CONNECTION_EXPIRED` | 4xx | Definidos en [13-import-architecture.md](13-import-architecture.md) §15 |
 | rules (P6) | `RULE_INVALID_DEFINITION` | 422 | JSON Schema de condiciones/acciones |
 
-El catálogo vive en `components.schemas.ErrorCode` del contrato (enum abierto) y en `@pf/shared-kernel` (errores de dominio). Spectral verifica que todo `code` usado en ejemplos exista en el catálogo.
+El catálogo vive en `components.schemas.ErrorCode` del contrato (enum abierto) y en `@pf/shared-kernel` (errores de dominio). Spectral verifica que todo `code` usado en ejemplos exista en el catálogo. Las filas de contextos sin fase indicada coinciden 1:1 con el enum `ErrorCode` del contrato (Phase 1, alineado el 2026-10-04); las filas marcadas `(P2)`…`(P6)` son códigos previstos que se agregan al contrato al implementar su fase.
 
 ---
 
@@ -311,22 +331,24 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | me | `GET/PATCH /api/v1/me` | `identity/authentication` | 1 |
 | workspaces | `GET/POST /api/v1/workspaces`, `GET/PATCH /api/v1/workspaces/{id}` | `identity/workspace-membership` | 1 |
 | members, invitations | `GET W/members`, `PATCH W/members/{userId}`, `POST W/invitations`, `POST /api/v1/invitations/{token}/accept` | `identity/workspace-membership` | 9 |
-| accounts | `GET/POST W/accounts`, `GET/PATCH W/accounts/{id}`, `POST …/archive`, `POST …/close`, `POST …/reactivate` (estados `ACTIVE`/`CLOSED`/`ARCHIVED`), `GET …/balance-history` (P7) | `accounts/account-management` | 1 |
+| accounts | `GET/POST W/accounts`, `PUT W/accounts/order` (`reorderAccounts`), `GET/PATCH W/accounts/{id}`, `POST …/archive`, `POST …/close` (saldo cero, si no `409 ACCOUNT_BALANCE_NOT_ZERO`), `POST …/reactivate` (estados `ACTIVE`/`CLOSED`/`ARCHIVED`), `GET …/balance-history` (P7) | `accounts/account-management` | 1 |
 | institutions | `GET/POST W/institutions`, `GET/PATCH …/{id}`, `POST …/archive` | `accounts/institutions` | 1 |
-| transactions | `GET/POST W/transactions`, `GET/PATCH …/{id}`, `POST …/{id}/void`, `POST …/{id}/post` | `transactions/transaction-recording`, `transactions/splits` | 1 |
+| transactions | `GET/POST W/transactions`, `GET/PATCH …/{id}`, `POST …/{id}/post` (pending → posted), `POST …/{id}/void`, `GET …/{id}/history` (`getTransactionHistory`, revisiones), `POST W/transactions/duplicate-check` (`checkTransactionDuplicates`, EDITOR, sin efectos), `POST W/transactions/mark-cleared` (`markTransactionsCleared`, en lote), `POST …/{id}/unreconcile` (`unreconcileTransaction`) | `transactions/transaction-recording`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection` | 1 |
 | transactions bulk | `POST W/transactions/bulk-edit` | `transactions/bulk-edit` | 2 |
 | transfers | `POST W/transfers` (fachada: crea transacción `TRANSFER`) | `transactions/transfers` | 1 |
-| conversions | `GET/POST W/conversions`, `GET …/{transactionId}` | `transactions/conversions`, `fx/conversion-pricing` | 1 |
+| conversions | `GET/POST W/conversions`, `POST W/conversions/preview` (`previewConversion`, VIEWER, sin efectos), `GET …/{transactionId}`, `PUT …/{transactionId}` (`amendConversion`, nueva revisión de `ConversionDetail`), `GET …/{transactionId}/revisions` (`listConversionRevisions`) | `transactions/conversions`, `fx/conversion-pricing` | 1 |
 | reconciliations | `GET/POST W/reconciliations`, `PATCH …/{id}`, `POST …/{id}/complete` | `transactions/reconciliation` | 2 |
 | duplicates | `GET W/duplicate-candidates`, `POST …/{id}/resolve` | `transactions/duplicate-detection` | 6 |
-| categories | `GET/POST W/categories`, `GET/PATCH …/{id}`, `POST …/archive` | `classification/categories` | 1 |
-| category-groups | `GET/POST W/category-groups`, `GET/PATCH …/{id}`, `POST …/archive` | `classification/categories` | 1 |
-| tags | `GET/POST W/tags`, `GET/PATCH …/{id}`, `POST …/archive` | `classification/tags` | 1 |
+| categories | `GET/POST W/categories`, `POST W/categories/reorder`, `POST W/categories/apply-default-catalog`, `GET/PATCH …/{id}`, `POST …/archive` (en cascada a subcategorías), `POST …/unarchive` | `classification/categories` | 1 |
+| category-groups | `GET/POST W/category-groups`, `GET/PATCH …/{id}`, `POST …/archive`, `POST …/unarchive` | `classification/categories` | 1 |
+| tags | `GET/POST W/tags`, `GET/PATCH …/{id}`, `POST …/archive`, `POST …/unarchive` | `classification/tags` | 1 |
 | custom-fields | `GET/POST W/custom-fields`, `PATCH …/{id}`, `POST …/archive` | `classification/custom-fields` | 2 |
-| counterparties | `GET/POST W/counterparties`, `GET/PATCH …/{id}`, `POST …/archive`, `POST …/merge` (P2) | `classification/counterparties` | 1 |
+| counterparties | `GET/POST W/counterparties`, `GET W/counterparties/resolve` (por alias), `GET/PATCH …/{id}`, `POST …/archive`, `POST …/unarchive`, `GET …/{id}/category-suggestion`, `POST …/merge` (P2) | `classification/counterparties` | 1 |
 | currencies | `GET W/currencies`, `PUT W/currencies/{code}/enabled` (P1.x), `POST W/currencies` (custom, P5) | `fx/market-rates` (ver Preguntas abiertas) | 1 |
-| fx-rates | `GET/POST W/fx-rates` (filtros `source`, `provider`), `GET W/fx-rates/latest?base=&quote=&asOf=` (con `provider`, `selection`, `stale`, `ageSeconds`, `attribution`), `POST W/fx-rates/{fxRateId}/supersede`, `POST W/fx-rates/{fxRateId}/anomaly-review` (EDITOR; `Idempotency-Key`; 409 `FX_RATE_ANOMALY_ALREADY_REVIEWED`, 422 `FX_RATE_NOT_ANOMALOUS`) | `fx/market-rates`, `fx/market-rate-providers` | 1 (manual y providers paralelo.bo / bo.dolarapi.com, D29) |
+| fx-rates | `GET/POST W/fx-rates` (filtros `source`, `provider`), `GET W/fx-rates/{fxRateId}`, `GET W/fx-rates/latest?base=&quote=&asOf=` (con `provider`, `selection`, `stale`, `ageSeconds`, `attribution`), `POST W/fx-rates/{fxRateId}/supersede`, `POST W/fx-rates/{fxRateId}/anomaly-review` (EDITOR; `Idempotency-Key`; 409 `FX_RATE_ANOMALY_ALREADY_REVIEWED`, 422 `FX_RATE_NOT_ANOMALOUS`) | `fx/market-rates`, `fx/market-rate-providers` | 1 (manual y providers paralelo.bo / bo.dolarapi.com, D29) |
 | fx-providers | `GET W/fx-providers/status` (VIEWER; salud, feeds, fallas, próximo intento, carga histórica, atribución; nunca llama a un provider) | `fx/market-rate-providers` | 1 |
+| fx-rate-preferences | `GET/PUT W/fx-rate-preferences` (`listFxRatePreferences` VIEWER, `replaceFxRatePreferences` EDITOR; tipo de tasa preferido por par, sembrado `PARALLEL` para USD/BOB y USDT/BOB al crear el workspace) | `fx/market-rates` | 1 |
+| ledger | `GET W/ledger/trial-balance` (`getLedgerTrialBalance`, solo lectura) | `ledger/balances` | 1 |
 | periods | `GET/POST W/periods`, `POST …/{id}/close`, `POST …/{id}/reopen` | `planning/financial-periods`, `planning/month-closing` | 2 |
 | budgets | `GET/POST W/budgets`, `GET/PATCH …/{id}`, `PATCH …/{id}/lines/{lineId}` | `planning/budgets` | 2 |
 | templates | `GET/POST W/templates`, `GET …/{id}`, `POST …/{id}/versions`, `POST …/{id}/apply` | `planning/budget-templates` | 2 |
@@ -338,15 +360,27 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | documents | `POST W/documents/uploads`, `POST …/{id}/complete`, `GET …/{id}`, `GET …/{id}/download`, `POST/DELETE W/documents/{id}/links` | `documents/attachments` | 6 |
 | imports | `POST W/imports`, `POST …/{id}/upload-complete`, `GET …/{id}`, `GET …/{id}/preview`, `PATCH …/{id}/rows/{rowId}`, `POST …/{id}/approve|cancel|revert|retry`, `…/mapping-profiles`, `…/connections` | `imports/import-pipeline`, `imports/banking-providers` | 6 (CSV P3) |
 | rules | `GET/POST W/rules`, `GET/PATCH …/{id}`, `POST …/{id}/test`, `POST …/reorder`, `POST …/{id}/archive` | `rules/rule-engine` | 6 |
-| reports | `GET W/reports/summary` (P1: calculado leyendo el ledger y las transacciones directamente, sin read models; consolidado en moneda de reporte siempre presente con `complete` y `unconverted[]`), `GET W/reports/{kpis,income-expenses,budget-vs-actual,expenses/by-category,…}` ([14-reporting.md](14-reporting.md)) | `reporting/*` | 1 / 7 |
+| reports | `GET W/reports/summary` (`getReportSummary`, VIEWER; ver §13.1), `GET W/reports/{kpis,income-expenses,budget-vs-actual,expenses/by-category,…}` ([14-reporting.md](14-reporting.md)) | `reporting/dashboard`, `reporting/net-worth` (P1); `reporting/*` | 1 / 7 |
 | forecasts | `POST W/forecasts` (202), `GET …/{id}`, `GET W/forecasts/latest?kind=` | `forecast/expense-forecasting` | 8 |
 | notifications | `GET W/notifications`, `POST …/{id}/read`, `GET/PUT W/notification-preferences` | `notifications/alerts` | 2 |
 | audit-log | `GET W/audit-log?aggregateType=&aggregateId=&from=&to=&sort=` (`listAuditLog`, EDITOR+; filtro `actor` en Phase 2) y `POST /me/session-events` (`recordSessionEvent`, auditoría de login/logout que invoca el BFF) | `audit/audit-trail` | 1 |
 | lifecycle | `GET W/transactions/{id}/lifecycle` (`getTransactionLifecycle`, con `revisions[]`), `GET W/accounts/{id}/lifecycle` (`getAccountLifecycle`), `GET W/fx-rates/{id}/lifecycle` (`getRateLifecycle`), `GET W/lifecycle-machines/{Transaction\|Account\|ExchangeRate}` (`getLifecycleMachine`); VIEWER+ (D28), otro workspace ⇒ 404; sin códigos de error nuevos (`INVALID_STATUS_TRANSITION` ya existía) | `audit/lifecycle-timeline` | 1 |
-| operations | `GET W/operations/{id}`, `POST …/{id}/cancel` | `platform/api-conventions` | 1 (contrato) / 6 (uso) |
+| operations | `GET W/operations/{id}`, `POST …/{id}/cancel` (P6, aún no en el contrato) | `platform/api-conventions` | 1 (contrato) / 6 (uso) |
 | exports | `POST W/exports` (202), `GET W/exports/{id}` | `reporting/financial-reports` + privacidad | 7 |
 | assistant | `POST W/assistant/conversations`, `POST …/{id}/messages` | `assistant/read-only-assistant` | 10 |
 | health | `GET /health/live`, `GET /health/ready` (fuera de `/api/v1`, sin auth, red interna) | `platform/observability` | 1 |
+
+
+### 13.1 `GET W/reports/summary` (Phase 1)
+
+Contrato: `getReportSummary` → `ReportSummary` (capabilities `reporting/dashboard`, `reporting/net-worth`; change `add-basic-dashboard`).
+
+- **Fuente**: se calcula leyendo el ledger y las transacciones posteadas directamente, **sin read models** (docs/31 D15). `meta.dataFreshness` = instante del último dato incluido; ETag/`If-None-Match` ⇒ `304`.
+- **Parámetros**: `month=YYYY-MM` (excluyente con `dateFrom`/`dateTo`; por defecto el mes en curso en la zona del workspace), `reportingCurrency` (por defecto la moneda base, BOB; una moneda no habilitada ⇒ `422 CURRENCY_NOT_ENABLED`), `topCategories` (0–20, por defecto 5) y `compare` (`PREVIOUS_PERIOD_TO_DATE` por defecto, `PREVIOUS_PERIOD`, `NONE`).
+- **Por moneda y consolidado**: `byCurrency[]` con las cifras nativas; `consolidated` en la moneda de reporte está **siempre presente** con `complete: boolean` y `unconverted[]` (montos nativos excluidos por falta de tasa; nunca se inventa una tasa). `meta.complete` resume la completitud y `meta.approx` es `true` si alguna cifra consolidada usa tasas de referencia o cruzadas (`CROSS`); `meta.rateWindowDays` es la ventana de frescura aplicada.
+- **Valoración**: los stocks (saldos, patrimonio) se valoran a la fecha de consulta y los flujos (ingresos, gastos) a la tasa de su propia fecha. La tasa sale del selector de valoración de FX (`fx/market-rate-providers`): tipo preferido del par (`PARALLEL` sembrado para USD/BOB y USDT/BOB, D29), niveles `PRIMARY` → `FALLBACK` → `LAST_KNOWN_STALE`/`MANUAL`; en el último nivel compiten también manuales de **otro tipo del mismo par** solo si son frescas (≤ `FX_MANUAL_FALLBACK_MAX_AGE` = 24 h, D34/D38) y confiables (no reemplazadas, no anómalas pendientes/rechazadas, desvío ≤ 5 % frente a la última de provider aceptada, D31). Cada tasa usada viaja en `meta.ratesUsed[]` (`ResolvedRate`: `selection`, `stale`, `requestedRateType` vs `rateType`, `derivation` `DIRECT`/`INVERSE`/`CROSS`, `ageSeconds`).
+- **Atribución**: `meta.attributions[]` lista las atribuciones distintas de las tasas de provider usadas (p. ej. "Fuente: paralelo.bo", CC BY 4.0); el cliente **debe** mostrarlas junto a las cifras valorizadas ([ADR-0025](adr/0025-fuentes-de-tipo-de-cambio-bolivia.md)).
+- **Resto del payload**: `comparison` (null con `compare=NONE`), `accounts[]` (saldo por cuenta), `topExpenseCategories[]` (gasto neto de reembolsos, puede ser negativo, con `complete` propio), `netWorth` (activos, pasivos, patrimonio) y `questions[]` (estado de las preguntas del home).
 
 ---
 
@@ -361,7 +395,7 @@ Roles por workspace (ARCHITECTURE §5, ADR-0010). `✔` permitido, `—` denegad
 | Bulk edit de clasificación | ✔ | ✔ | — |
 | Crear/editar/archivar cuentas, instituciones | ✔ | ✔ | — |
 | Gestionar categorías, tags, counterparties, custom fields | ✔ | ✔ | — |
-| Registrar tasas FX manuales | ✔ | ✔ | — |
+| Registrar/reemplazar tasas FX manuales, revisar anomalías de provider, fijar preferencias de tipo de tasa | ✔ | ✔ | — |
 | Presupuestos, templates, recurrentes, metas, préstamos | ✔ | ✔ | — |
 | **Cerrar** periodo / mes | ✔ | ✔ | — |
 | **Reabrir** periodo cerrado | ✔ | — | — |

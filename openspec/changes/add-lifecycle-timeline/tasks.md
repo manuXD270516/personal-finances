@@ -5,6 +5,7 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar con el owner la spec `audit/lifecycle-timeline`, el requirement añadido a `transactions/transfers` y las preguntas abiertas de design.md (comisión en otra moneda —propuesta: no en Phase 1—, `ConversionRevised`); verificar con `openspec validate add-lifecycle-timeline --strict`
+  > Revisado 2026-10-04 (sigue pendiente del owner): la pregunta 1 (comisión en otra moneda) quedó resuelta por docs/31 D40. Siguen abiertas sin decisión: 2 `ConversionRevised.v1` vs re-emisión de `ConversionRecorded`, 3 recorrido de categorías/contrapartes en Phase 1 y 4 exportación del recorrido.
 - [x] 1.2 Revisar TC-AUDIT-LIFECYCLE-001..013 y TC-TRANSACTIONS-TRANSFER-009 contra los scenarios (cifras a mano, fechas fijas, `FixedClock`); actualizar la nota de TC-TRANSACTIONS-TRANSFER-006; verificar con `pnpm traceability:check` que todo Must tiene ≥ 1 TC
   - 2026-10-04: cifras verificadas a mano (1000.00 − 102.00 = 898.00; 1000.00 − 300.00 + 50.00 = 750.00; 685.00/100 = 6.85, 686.00/100 = 6.86); la nota de TRANSFER-006 ya estaba. Los TC automatizados llevan `automated_tests` y una nota de implementación (códigos de estado del contrato, ruta `fx-rates`, orden por instante). `traceability:check` OK (solo advertencias R3 previas, ajenas a este change).
 

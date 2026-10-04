@@ -14,9 +14,10 @@ invariants:
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:
@@ -42,7 +43,7 @@ expected_result:
 - La consulta sin contexto no ve filas de W1
 - El lint de CI no encuentra 'SET app.' sin LOCAL en el código
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-SECURITY-RLS-003 — Peticiones intercaladas de dos workspaces en el mismo pool nunca mezclan datos
@@ -58,3 +59,7 @@ Dadas peticiones intercaladas de "W1" y "W2" sobre un pool de 2 conexiones
 Cuando se ejecutan concurrentemente
 Entonces ninguna respuesta mezcla workspaces
 ```
+
+## Notas
+
+- Verificado 2026-10-04: el lint de 'SET app.' sin LOCAL vive en eslint.config.js (corre en CI con pnpm lint).

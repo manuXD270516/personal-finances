@@ -4,8 +4,10 @@
 
 ## 1. Spec y test cases (SPEC → TEST CASE)
 
-- [ ] 1.1 Revisar con el owner `specs/accounts/account-management/spec.md` y `specs/accounts/institutions/spec.md` (en especial tipos de docs/01 y defaults de liquidez); verificar con `openspec validate add-accounts-management --strict --no-interactive`
-- [ ] 1.2 Confirmar los TC de `tests/cases/accounts/` listados en proposal.md con `status: ready` y cobertura ≥ 1 TC por requirement Must; verificar con el chequeo del catálogo
+- [x] 1.1 Revisar con el owner `specs/accounts/account-management/spec.md` y `specs/accounts/institutions/spec.md` (en especial tipos de docs/01 y defaults de liquidez); verificar con `openspec validate add-accounts-management --strict --no-interactive`
+  > Verificado 2026-10-04: las preguntas abiertas de design.md quedan resueltas por decisiones de docs/31 — tipos de cuenta D3, estados D4, liquidez (enum y defaults) D5, get-or-create del ledger account (FR-ACCOUNTS-003) D6, cuentas archivadas fuera del resumen del dashboard y liquidez = solo `ASSET` + `LIQUID` (los pasivos quedan fuera del eje de liquidez) D35; `openspec validate add-accounts-management --strict` en verde.
+- [x] 1.2 Confirmar los TC de `tests/cases/accounts/` listados en proposal.md con `status: ready` y cobertura ≥ 1 TC por requirement Must; verificar con el chequeo del catálogo
+  > Verificado 2026-10-04: los 28 TC de proposal.md existen en `tests/cases/accounts/` con `status` `ready` o `automated` (ninguno `draft`); los 27 requirements Must tienen ≥ 1 TC (los 5 sin TC son Should/Could); `pnpm traceability:check` (R2) en verde.
 
 ## 2. Instituciones (`accounts/institutions`)
 
@@ -13,6 +15,7 @@
 - [x] 2.2 Aplicación: `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`, `ListInstitutions` con `AuditPort`; tests `[TC-ACCOUNTS-INSTITUTION-003]`, `[TC-ACCOUNTS-INSTITUTION-004]`
 - [x] 2.3 Infraestructura: migración `accounts.institution` (RLS WS, único parcial por nombre, sin DELETE) y repositorio Kysely; test de integración de aislamiento y `NAME_TAKEN`
 - [ ] 2.4 Seed de catálogo inicial ficticio por workspace (nunca en migraciones ni en código); verificar con `[TC-ACCOUNTS-INSTITUTION-002]`
+  > Verificado 2026-10-04 (pendiente, código): no existe seed de instituciones ficticias por workspace (`apps/api/src/seed/run-seed.ts` y la provisión del workspace solo siembran Classification y FX). `[TC-ACCOUNTS-INSTITUTION-002]` (`pg-accounts.int.test.ts`) cubre aislamiento y ausencia de filas globales insertando la institución a mano; el TC pasó a `automated`.
 - [x] 2.5 API `institutions` según design.md §Contratos; tests de API y de contrato
 
 ## 3. Dominio de cuentas (`@pf/accounts/domain`)
@@ -40,6 +43,7 @@
 - [x] 6.1 TDD en `apps/api`: `OpenAccountWithOpeningBalance` (unidad de trabajo, idempotencia, `RecordOpeningBalance`, signo de pasivos); tests `[TC-ACCOUNTS-OPENING-001]` con montos de docs/09 §6.7 y 100.000000 USDT
 - [x] 6.2 Atomicidad e idempotencia con Testcontainers: `[TC-ACCOUNTS-OPENING-002]` (escala inválida ⇒ nada persistido), `[TC-ACCOUNTS-OPENING-003]` (reintento ⇒ una cuenta, un asiento)
 - [ ] 6.3 Integración real con Ledger: `[TC-ACCOUNTS-LEDGERLINK-001]`, `[TC-ACCOUNTS-BALANCE-001]`, `[TC-ACCOUNTS-CURRENCY-001]`, `[TC-ACCOUNTS-ARCHIVE-002]` contra Transactions real (incluye anulación ⇒ `ACCOUNT_ARCHIVED`)
+  > Verificado 2026-10-04 (parcial): LEDGERLINK-001 con API real (`accounts.api.test.ts`) + get-or-create concurrente en `[TC-LEDGER-CHART-002]`; anulación ⇒ `ACCOUNT_ARCHIVED` cubierta en Transactions (`[TC-TRANSACTIONS-ARCHIVED-001]`, en memoria). Falta: `[TC-ACCOUNTS-BALANCE-001]` (sin test) y `[TC-ACCOUNTS-CURRENCY-001]`/`[TC-ACCOUNTS-ARCHIVE-002]` contra Transactions real (hoy con poster de prueba).
 - [x] 6.4 Con `add-transfers` y `add-basic-dashboard`: `[TC-ACCOUNTS-CREDITCARD-001]`, `[TC-ACCOUNTS-NETWORTH-001]` y liquidez en el resumen
   - Nota (2026-10-03): cubierto por E2E: `tests/e2e/specs/transfers.spec.ts` (tarjeta: compra, pago y patrimonio, TC-ACCOUNTS-CREDITCARD-001) y `tests/e2e/specs/accounts.spec.ts` (cuenta excluida del patrimonio, TC-ACCOUNTS-NETWORTH-001; liquidez en "¿Cuánto dinero tengo?", TC-ACCOUNTS-LIQUIDITY-001); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 
@@ -56,6 +60,7 @@
 ## 8. Tests automatizados y E2E
 
 - [ ] 8.1 Ejecutar en CI todos los tests nombrados con TC-ids de `tests/cases/accounts/` (unit, aplicación, integración Testcontainers, API, contrato); agregar los críticos a la Financial Regression Suite
+  > Verificado 2026-10-04 (parcial): unit, integración (Testcontainers), API y E2E corren en `.github/workflows/pr.yml`. Falta: tests de TC-ACCOUNTS-BALANCE-001 y CURRENCY-001 (no automatizados) y un mecanismo que ejecute la Financial Regression Suite como grupo (hoy solo existe el flag `regression_suite`; no hay job nightly).
 - [x] 8.2 E2E Playwright: crear "Banco BOB" con 10000.00 BOB y "Visa BOB" adeudando 2000.00 BOB, ver patrimonio 8000.00 BOB, archivar y reactivar una cuenta; verificar contra Compose `core` con la Minimal Seed
   - Nota (2026-10-03): `tests/e2e/specs/accounts.spec.ts` (Banco BOB 10.000,00 + Visa BOB adeudando 2.000,00 ⇒ patrimonio 8.000,00 BOB en el Home; archivar y reactivar la Visa; identificador enmascarado; móvil 360 px); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 

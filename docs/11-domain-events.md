@@ -50,6 +50,10 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `transactions.ConversionRecorded` | **Mantener** (Phase 1) | Lleva `ConversionDetail` (tasas, fees, spread) para FX (observación de tasa) y Reporting (historial de conversiones). |
 | `ledger.JournalEntryPosted` | **Mantener** (Phase 1) | Fuente de proyecciones de saldo en Reporting; incluye reversas. |
 | `accounts.AccountOpened` / `AccountArchived` | **Mantener** (Phase 1) | Proyecciones (lista de cuentas en dashboard, net worth), réplicas locales futuras. Ledger **no** los necesita (get-or-create). |
+| `accounts.AccountUpdated` / `AccountClosed` / `AccountReactivated` | **Agregar** (Phase 1, docs/31) | Ciclo de vida completo de la cuenta (`ACTIVE`/`CLOSED`/`ARCHIVED`) para proyecciones del dashboard. |
+| `classification.CategoryArchived` | **Agregar** (Phase 1, `add-classification`) | Reporting marca categorías archivadas; Planning y Rules lo consumen desde sus fases. |
+| `fx.RateRecorded` | **Adelantar** a Phase 1 (`add-manual-conversions`, `add-market-rate-providers`) | Tasas manuales y de providers (D29) invalidan el resumen valorizado. |
+| `identity.WorkspaceCreated` / `WorkspaceSettingsChanged` | **Mantener** (Phase 1) | Siembra de categorías (Classification) y de preferencias/histórico de tasas (FX); Reporting reacciona a moneda base, zona horaria y mes fiscal. |
 | `commitments.RecurringOccurrenceGenerated` | **Reemplazar** por `commitments.OccurrencesGenerated` (batch por definición y ventana) | Un evento por ocurrencia genera ruido (cientos por ventana). El calendario de flujo de caja sólo necesita el lote. `RecurringOccurrenceDue` (uno por ocurrencia) sí es útil para recordatorios. |
 | `planning.BudgetThresholdReached` | **Mantener** (Phase 2) | Hecho de negocio para Notify; dedup por (item, umbral, mes). |
 | `goals.SavingsContributionRecorded` | **Mantener** (Phase 4) | Reporting/Notify. |
@@ -69,7 +73,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 #### `transactions.TransactionCreated.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** RULES, COMMITMENTS (auto-match), REPORTING (pendientes).
 - **Trigger:** cualquier `Record*` o `ImportTransactions` acepta una transacción (pending o posted).
-- **Payload:** `transactionId: uuid`, `kind: TransactionKind`, `status: PENDING|POSTED`, `businessDate: date`, `description: string|null`, `counterpartyId: uuid|null`, `origin: {type: MANUAL|IMPORT|RECURRING|DEBT|GOAL|SYSTEM, refId: uuid|null}` (mismo enum que el OpenAPI), `legs: [{accountId: uuid, amount: Money(firmado)}]`, `splits: [{splitId, amount: Money, categoryId|null, tagIds: uuid[]}]`.
+- **Payload:** `transactionId: uuid`, `kind: TransactionKind`, `status: PENDING|POSTED|CLEARED`, `businessDate: date`, `postingDate: date|null`, `description: string|null`, `counterpartyId: uuid|null`, `origin: {type: MANUAL|IMPORT|RECURRING|DEBT|GOAL|SYSTEM, refId: uuid|null}` (mismo enum que el OpenAPI), `legs: [{accountId: uuid, amount: Money(firmado)}]`, `splits: [{splitId, amount: Money, categoryId|null, tagIds: uuid[]}]`, `refundOfTransactionId: uuid|null`; opcionales aditivos `paymentMethod` (D27) y `transition`.
 - **Idem.:** `eventId`; natural `transactionId`. **Ord.:** por `Transaction`. **PII:** B (`description`).
 
 #### `transactions.TransactionPosted.v1`
@@ -105,7 +109,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `transactions.ConversionRecorded.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** FX (observación de tasa), REPORTING.
-- **Payload:** `transactionId`, `journalEntryId`, `businessDate`, `executedAt`, `source: {accountId, amount: Money}` (bruto), `target: {accountId, amount: Money}` (neto), `quotedRate: Rate|null`, `effectiveRate: Rate`, `referenceRate: {rate: Rate, fxRateId, source}|null`, `fees: [{type: PROVIDER|NETWORK|BANK|TAX|OTHER, amount: Money, paidFromAccountId|null}]`, `spread: {percentage: string, amount: Money}|null`, `provider: {counterpartyId|null, name|null}`. `Rate = {base, quote, value: string}`.
+- **Payload:** `transactionId`, `journalEntryId`, `businessDate`, `executedAt`, `source: {accountId, amount: Money}` (bruto), `target: {accountId, amount: Money}` (neto), `quotedRate: Rate|null`, `effectiveRate: Rate`, `referenceRate: {rate: Rate, fxRateId, source}|null`, `fees: [{type: PROVIDER|NETWORK|BANK|TAX|OTHER, amount: Money, paidFromAccountId|null}]`, `spread: {percentage: string, amount: Money}|null`, `provider: {counterpartyId|null, name|null}`. `Rate = {base, quote, value: string}`. Opcionales aditivos (`add-manual-conversions`): `revision` (1 al registrar, +1 por amend), `convertedSource`, `grossTarget`, `quotedRateDeviation|null`.
+- **Re-emisión:** un amend (`PUT …/conversions/{transactionId}`) vuelve a publicar el evento con `revision + 1` y el `journalEntryId` activo.
 - **Idem.:** natural `(transactionId, journalEntryId)`. **Ord.:** por `Transaction`. **PII:** B (nombre de proveedor/persona P2P).
 
 #### `ledger.JournalEntryPosted.v1`
@@ -125,16 +130,53 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `transactions.TransactionUpdated.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** REPORTING (Phase 1); PLANNING y COMMITMENTS desde sus fases.
-- **Trigger:** edición de una transacción no cubierta por otros eventos (amend).
-- **Payload:** `transactionId`, `revision: int`, `changedFields: string[]`, `ledgerImpact: boolean`, valores `before/after` de los campos cambiados.
-- **Idem.:** natural `(transactionId, revision)`. **Ord.:** por `Transaction`. **PII:** B.
+- **Trigger:** edición descriptiva, cambio `cleared`/`reconciled` (`POST …/mark-cleared`, `PATCH` de reconciliación), des-reconciliación (`POST …/{id}/unreconcile`) o amend financiero; en el amend se emite **junto** a `TransactionPosted.v1` con `ledgerImpact = true` (`add-transaction-recording`).
+- **Payload:** `transactionId`, `revision: int`, `status: PENDING|POSTED|CLEARED|RECONCILED`, `previousStatus|null`, `changedFields: string[]`, `ledgerImpact: boolean`, `reason: string|null`; opcionales aditivos `paymentMethod` y `transition`. **Sin** montos ni valores `before/after` (los consumidores que los necesitan leen `TransactionPosted`).
+- **Idem.:** natural `(transactionId, aggregateVersion)`. **Ord.:** por `Transaction`. **PII:** B (`reason`).
 
-#### `accounts.AccountClosed.v1` / `accounts.AccountReactivated.v1` / `accounts.AccountUpdated.v1`
+#### `accounts.AccountUpdated.v1`
 - **Productor:** ACCOUNTS. **Consumidores:** REPORTING.
-- **Payload:** `accountId` + `closedAt` (Closed) o `changedFields` (Updated/Reactivated).
+- **Trigger:** cambian metadatos, liquidez, inclusión en patrimonio o la moneda (solo sin movimientos) de la cuenta.
+- **Payload:** `accountId`, `changedFields: string[]` y, opcionales, los valores nuevos **no sensibles** (`name`, `institutionId|null`, `liquidity`, `includeInNetWorth`, `currency`); nunca `notes` ni identificadores de cuenta.
 - **Idem.:** `(accountId, aggregateVersion)`. **Ord.:** por `Account`. **PII:** B (`name`).
 
-> Movidos a Phase 1 el 2026-10-02 al consolidar las specs ([31](31-phase-1-consolidation-decisions.md)); sus JSON Schemas viven en `contracts/events/`.
+#### `accounts.AccountClosed.v1`
+- **Productor:** ACCOUNTS. **Consumidores:** REPORTING; COMMITMENTS (Phase 3).
+- **Trigger:** `POST …/accounts/{id}/close` con saldo cero (si no, `409 ACCOUNT_BALANCE_NOT_ZERO`); la cuenta sigue visible pero no admite movimientos (INV-026).
+- **Payload:** `accountId`, `closedOn: date`, `reason: string|null`; opcional `transition`.
+- **Idem.:** `(accountId, aggregateVersion)`. **Ord.:** por `Account`. **PII:** B (`reason`).
+
+#### `accounts.AccountReactivated.v1`
+- **Productor:** ACCOUNTS. **Consumidores:** REPORTING.
+- **Trigger:** `POST …/accounts/{id}/reactivate` de una cuenta `CLOSED` o `ARCHIVED`.
+- **Payload:** `accountId`, `previousStatus: ARCHIVED|CLOSED`, `reactivatedOn: date`; opcional `transition`.
+- **Idem.:** `(accountId, aggregateVersion)`. **Ord.:** por `Account`. **PII:** N.
+
+> `AccountUpdated`, `AccountClosed`, `AccountReactivated` y `TransactionUpdated` se movieron a Phase 1 el 2026-10-02 al consolidar las specs ([31](31-phase-1-consolidation-decisions.md)); sus JSON Schemas viven en `contracts/events/`.
+
+#### `classification.CategoryArchived.v1`
+- **Productor:** CLASSIFICATION. **Consumidores:** REPORTING (Phase 1, marca "archivada" en el dashboard); PLANNING y RULES desde sus fases.
+- **Trigger:** `POST …/categories/{id}/archive`. Archivar una categoría padre archiva sus subcategorías activas en la misma transacción y emite **un evento por categoría** archivada (`add-classification`).
+- **Payload:** `categoryId`, `parentId|null`, `groupId`, `kind: EXPENSE|INCOME`, `archivedAt: instant`, `cascadedFromCategoryId|null` (la categoría padre cuando se archivó en cascada).
+- **Idem.:** natural `(categoryId, aggregateVersion)`. **Ord.:** por `Category`. **PII:** N.
+
+#### `fx.RateRecorded.v1`
+- **Productor:** FX. **Consumidores:** REPORTING (invalida el resumen).
+- **Trigger:** se registra una tasa histórica inmutable: manual (`POST …/fx-rates`, actor `USER`), corrección (`POST …/fx-rates/{id}/supersede`) o muestra de un provider de mercado (paralelo.bo / bo.dolarapi.com, ADR-0025, D29; actor `SYSTEM` `fx-provider:<id>`, `causationId = null`, `correlationId` = id del ciclo; un evento por workspace en cuyo historial se registró). La carga histórica emite **un único** evento por workspace y ejecución (`rateId` = última tasa insertada). Movido a Phase 1 con `add-manual-conversions`.
+- **Payload:** `rateId`, `base`, `quote`, `value: string` (1 base = value quote), `rateType: OFFICIAL|PARALLEL|P2P|BANK|CUSTOM|PARALLEL_BUY|PARALLEL_SELL`, `source: MANUAL|PROVIDER|USER_CONVERSION`, `sourceLabel|null`, `asOf: instant`, `effectiveDate: date`, `supersedesRateId|null`; opcionales aditivos (`add-market-rate-providers`) `provider: PARALELO_BO|DOLARAPI_BO|null` y `anomalyFlagged: boolean`.
+- **Idem.:** natural `rateId`. **Ord.:** por `ExchangeRate`. **PII:** N.
+
+#### `identity.WorkspaceCreated.v1`
+- **Productor:** IDENTITY. **Consumidores:** CLASSIFICATION (siembra categorías de sistema y, si aplica, el catálogo por defecto), REPORTING, FX (consumidor `fx.market-rate-provisioning` con inbox: siembra las preferencias `PARALLEL` de USD/BOB y USDT/BOB si el workspace no fijó su lista y encola `fx.backfill-historical-rates` con id de job = `eventId`, en la misma transacción; `add-market-rate-providers`).
+- **Trigger:** alta de workspace (personal por provisión JIT o adicional del usuario).
+- **Payload:** `workspaceId`, `name`, `baseCurrency`, `timeZone`, `locale`, `fiscalMonthStartDay`, `ownerUserId`, `origin: PERSONAL_DEFAULT|USER_CREATED`.
+- **Idem.:** natural `workspaceId` (`aggregateVersion = 1`). **Ord.:** por `Workspace`. **PII:** B (`name`).
+
+#### `identity.WorkspaceSettingsChanged.v1`
+- **Productor:** IDENTITY. **Consumidores:** REPORTING (moneda base, zona horaria, mes fiscal).
+- **Trigger:** `PATCH /workspaces/{id}` con cambios efectivos; un evento por versión del agregado.
+- **Payload:** `workspaceId`, `changes: [{field: name|baseCurrency|timeZone|locale|fiscalMonthStartDay|minimumLiquidityReserve, before, after}]` (`minimumLiquidityReserve` como `Money`).
+- **Idem.:** natural `(workspaceId, aggregateVersion)`. **Ord.:** por `Workspace`. **PII:** B (`name`).
 
 ### 3.3 Fases posteriores (schemas se crean al implementar)
 
@@ -154,8 +196,6 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `documents.AttachmentUploaded.v1` | DOCUMENTS | IMPORTS, REPORTING | Escaneo OK | `documentId, contentType, sizeBytes, sha256, purpose` (sin filename) | `documentId` | N |
 | `imports.ImportCompleted.v1` | IMPORTS | NOTIFY, REPORTING | Commit terminado | `importJobId, accountId, sourceType, stats: {total, imported, duplicates, ignored, errors}, dateRange` | `importJobId` | N |
 | `forecast.ForecastGenerated.v1` | FORECAST | NOTIFY, REPORTING | Corrida exitosa | `forecastRunId, scope, horizonMonths, modelName, modelVersion, summary` | `forecastRunId` | N |
-| `fx.RateRecorded.v1` | FX | REPORTING | Tasa manual/proveedor/observación (provider: actor `SYSTEM` `fx-provider:<id>`, un evento por workspace; la carga histórica emite uno por workspace y ejecución) | `rateId, base, quote, value, asOf, rateType, source` (+ opcionales aditivos `provider`, `anomalyFlagged`, add-market-rate-providers) | `rateId` | N |
-| `identity.WorkspaceCreated.v1` | IDENTITY | CLASSIFICATION, REPORTING, FX (consumidor `fx.market-rate-provisioning`, inbox: siembra preferencias `PARALLEL` USD/BOB y USDT/BOB y encola `fx.backfill-historical-rates` en la misma transacción; add-market-rate-providers) | Alta de workspace | `workspaceId, name, baseCurrency, timeZone, locale, fiscalMonthStartDay, ownerUserId, origin` | `workspaceId` | B (nombre) |
 | `classification.CategoriesMerged.v1` | CLASSIFICATION | TRANSACTIONS, PLANNING, RULES, REPORTING | `MergeCategories` | `sourceCategoryIds[], targetCategoryId` | `(targetCategoryId, aggregateVersion)` | N |
 
 ## 4. Versionado y evolución

@@ -5,8 +5,11 @@
 ## 1. SPEC y test cases
 
 - [ ] 1.1 Revisar con el owner las preguntas abiertas de design.md (ajuste informativo en cero, `reconciled→void`, sobre-reembolso, evento `TransactionCleared`); verificar que las respuestas quedan reflejadas en las specs y que `openspec validate add-transaction-recording --strict` pasa
-- [ ] 1.2 Confirmar los TC listados en proposal.md (estado `ready`, `requirement` exacto); verificar con el chequeo del catálogo de `scripts/traceability` que no hay requirement Must sin TC
+  > Revisado 2026-10-04 (sigue pendiente del owner): 1 ajuste en cero (D17) y 2 `reconciled → void` (D16) resueltos en docs/31. Siguen abiertas sin decisión: 3 sobre-reembolso con confirmación explícita (implementado con `confirmRefundExceedsOriginal`) y 4 evento propio `TransactionCleared` vs `TransactionUpdated` (implementado con `TransactionUpdated`).
+- [x] 1.2 Confirmar los TC listados en proposal.md (estado `ready`, `requirement` exacto); verificar con el chequeo del catálogo de `scripts/traceability` que no hay requirement Must sin TC
+  > Verificado 2026-10-04: todos los TC de proposal.md existen en `tests/cases/transactions/` con `requirement` exacto (comparado con los `### Requirement:`), en `ready` o `automated`; `pnpm traceability:check` sin requirement Must sin TC.
 - [ ] 1.3 Aplicar en `contracts/openapi/finance-api.v1.yaml` y `contracts/events/` los cambios de design.md § Contratos (o confirmar que el proceso de consolidación los aplicó); verificar Redocly lint 0/0 y la meta-validación de los JSON Schema con sus `examples`
+  > Verificado 2026-10-04 (parcial): el contenido de § Contratos está en el OpenAPI (`ACCOUNT_CLOSED`, `REFUND_EXCEEDS_ORIGINAL`, `TransactionCreateResult.warnings`, `mark-cleared`, `duplicate-check`, `unreconcile`, `history`, `paymentMethod`) y en `contracts/events/transactions/` (`TransactionUpdated.v1` con ejemplos); Redocly y Spectral corren en `pr.yml`. Falta: ningún test ni paso de CI valida los `examples` de los JSON Schema de eventos contra su schema.
 
 ## 2. DOMAIN (TDD obligatorio: lógica financieramente crítica)
 
@@ -25,6 +28,7 @@
 - [x] 3.3 Implementar `SetClearedStatus` (individual y lote all-or-nothing con `bulkOperationId`), `MarkReconciled`, `UnreconcileTransaction`; verificar TC-TRANSACTIONS-CLEARED-001, CLEARED-002
 - [x] 3.4 Implementar queries `GetTransaction`, `ListTransactions` (filtros, subcategorías, cursor) y `CheckDuplicates`; verificar TC-TRANSACTIONS-LIST-001
 - [ ] 3.5 Emitir `TransactionCreated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransactionUpdated` según design.md § Eventos; verificar con tests de contrato del productor (Ajv strict) contra `contracts/events/transactions/*`
+  > Verificado 2026-10-04 (parcial): los cinco eventos se emiten (`transaction-lifecycle.ts`) y `PgOutboxWriter` valida cada sobre con Ajv strict en tiempo de ejecución (ejercitado por los tests de API). Falta: un test de contrato del productor dedicado (como `identity/src/application/events.contract.test.ts`).
 
 ## 4. INFRASTRUCTURE
 
@@ -35,8 +39,11 @@
 ## 5. API
 
 - [ ] 5.1 Implementar controllers `createTransaction` (con `warnings[]`), `getTransaction`, `listTransactions`, `updateTransaction`, `voidTransaction`, `postTransaction`, `markTransactionsCleared`, `unreconcileTransaction`, `checkTransactionDuplicates` con `x-required-role`; verificar contract tests contra el OpenAPI
+  > Verificado 2026-10-04 (parcial): las rutas existen en `packages/contexts/transactions/src/interface/transactions-http.ts` y la matriz `[TC-SECURITY-RBAC-002]` comprueba `x-required-role` de las operaciones implementadas. Falta: test contrato↔rutas (la matriz omite las operaciones sin ruta) y test de API de `warnings[]`.
 - [ ] 5.2 Verificar `If-Match`/`ETag` (412/428/409) y `Idempotency-Key` con TC-TRANSACTIONS-CONCURRENCY-001 y TC-TRANSACTIONS-IDEMPOTENCY-001; verificar problem+json con `errors[].pointer` en TC-TRANSACTIONS-AMOUNT-001
+  > Verificado 2026-10-04 (pendiente, código): `If-Match`/`ETag` e `Idempotency-Key` solo se prueban sobre el harness de convenciones (`api-conventions.api.test.ts`), no contra `/transactions`; no hay test de API `[TC-TRANSACTIONS-CONCURRENCY-001]` ni `[TC-TRANSACTIONS-AMOUNT-001]`.
 - [ ] 5.3 Verificar TC-TRANSACTIONS-FIELDS-001, DATES-001 y HISTORY-001 a nivel API (historial vía `GET W/audit-log`)
+  > Verificado 2026-10-04 (pendiente, código): no hay tests `[TC-TRANSACTIONS-FIELDS-001]` ni `[TC-TRANSACTIONS-DATES-001]` (ambos `ready` sin test), ni `[TC-TRANSACTIONS-HISTORY-001]` a nivel API (solo servicio).
 
 ## 6. UI
 
@@ -54,6 +61,7 @@
 - [x] 7.2 E2E Playwright: registrar un gasto dividido, editar su monto, marcarlo cleared y anular otro, comprobando saldos en pantalla; verificar en CI con el stack `core`
   - Nota (2026-10-03): `tests/e2e/specs/transactions.spec.ts` (gasto dividido, edición del monto con reversa ⇒ revisión 2, confirmación individual y en lote, anulación de otro, saldos en pantalla; QR, contrapartes en línea, reembolso, ajuste, duplicar como pendiente; historial visible para VIEWER); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
 - [ ] 7.3 Benchmark de NFR-PERF-001 (listado 50k) y NFR-PERF-003 (comando de escritura); verificar p95 dentro de umbral en el job nightly
+  > Verificado 2026-10-04 (pendiente, benchmark): no existe tooling de benchmark ni workflow nightly (`.github/workflows` solo tiene `pr.yml` y `main.yml`, sin `schedule`).
 
 ## 8. DOCUMENTACIÓN y cierre
 

@@ -5,8 +5,10 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar las specs `classification/categories`, `classification/tags` y `classification/counterparties` con el owner y resolver las preguntas abiertas de design.md (OPENING_BALANCE, provisión síncrona); verificar con `openspec validate add-classification --strict`
+  > Revisado 2026-10-04 (sigue pendiente del owner): `OPENING_BALANCE` y `Cashback` quedan resueltos por docs/31 D9 (la lista canónica de 11 códigos del design no los incluye), además de D7/D8. Siguen abiertas sin decisión en docs/31: provisión síncrona vs `identity.WorkspaceCreated` (implementada síncrona y documentada en docs/05 §2.5 como decisión provisional) y recategorizar en periodo cerrado (diferida a Phase 2).
 - [x] 1.2 Confirmar los TC MODIFICADOS (TC-CLASSIFICATION-ARCHIVE-001, -DELETE-001, -RECATEGORIZE-001) y los 24 AÑADIDOS en `tests/cases/classification/`; verificar que el chequeo del catálogo de trazabilidad los acepta y que todo requirement Must tiene ≥ 1 TC
 - [ ] 1.3 Redactar los TC de los requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia de categoría); verificar con el chequeo del catálogo
+  > Verificado 2026-10-04 (pendiente): ningún TC de `tests/cases/classification/` cubre los 7 requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia por counterparty).
 
 ## 2. DOMAIN — categorías y grupos (TDD)
 
@@ -44,8 +46,11 @@
 ## 7. Integración con Transactions (cuando exista `add-transaction-recording`)
 
 - [ ] 7.1 Test de integración INV-033: recategorizar un gasto de 150.00 BOB no cambia asientos ni saldos; nombrado con TC-CLASSIFICATION-RECATEGORIZE-001
+  > Verificado 2026-10-04 (pendiente, código): no hay test `[TC-CLASSIFICATION-RECATEGORIZE-001]`; el comportamiento se cubre parcialmente con otros ids (`[TC-AUDIT-LIFECYCLE-004]`, `[TC-TRANSACTIONS-SPLIT-004]`), no en integración.
 - [ ] 7.2 Tests de integración de etiquetado y cambio de counterparty sin efecto en el ledger; nombrados con TC-CLASSIFICATION-TAG-006 y TC-CLASSIFICATION-COUNTERPARTY-005
+  > Verificado 2026-10-04 (pendiente, código): no hay tests `[TC-CLASSIFICATION-TAG-006]` ni `[TC-CLASSIFICATION-COUNTERPARTY-005]`.
 - [ ] 7.3 Test de totales por tag sin doble conteo; nombrado con TC-CLASSIFICATION-TAG-002
+  > Verificado 2026-10-04 (pendiente, código): no hay test `[TC-CLASSIFICATION-TAG-002]`.
 
 ## 8. UI
 

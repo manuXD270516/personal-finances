@@ -58,3 +58,4 @@ Entonces se rechaza con el código "CURRENCY_MISMATCH"
 ## Notas
 
 - El código se alinea con el catálogo docs/10 §9.1 (`CURRENCY_MISMATCH`); antes figuraba `ACCOUNT_CURRENCY_MISMATCH`, que no existe en el catálogo.
+- Revisado 2026-10-04: se mantiene `not_automated` (advertencia R3 intencional). El test con su id solo cubre `CURRENCY_NOT_ENABLED`; falta el gasto en otra moneda rechazado con `CURRENCY_MISMATCH` contra Transactions real sin persistir nada (add-accounts-management 6.3).

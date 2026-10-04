@@ -62,3 +62,4 @@ Entonces se acepta y reduce el gasto del mes en 50.00 BOB
 ## Notas
 
 - Requiere add-transaction-recording para el flujo completo; la validación unitaria vive en ValidateClassification.
+- Revisado 2026-10-04: se mantiene `not_automated` (advertencia R3 intencional). El test con su id valida `ValidateClassification`; falta el flujo de API (ingreso rechazado sin transacción ni asiento y el gasto del mes 500.00 → 450.00 BOB tras el reembolso).

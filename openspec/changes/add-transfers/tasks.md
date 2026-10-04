@@ -7,8 +7,10 @@
 - [x] 1.1 Revisar con el owner las preguntas abiertas de design.md (re-emisión de `TransferCompleted`, comisiones en otra moneda, código `TRANSFER_CURRENCY_MISMATCH`); verificar que `openspec validate add-transfers --strict` pasa
   - Nota (2026-10-03): resueltas por el owner en docs/31 D37 — `TransferCompleted` una sola vez + `TransferRevised.v1` por edición (se implementa en `add-lifecycle-timeline`), se mantiene `TRANSFER_CURRENCY_MISMATCH`; comisión en otra moneda: propuesta "no en Phase 1", pendiente de confirmación.
   - Nota (2026-10-04): el owner confirmó que la comisión en otra moneda **no se soporta** como comisión de transferencia (docs/31 D40); se registra como conversión o gasto aparte. Spec ampliada con el scenario "Comisión en otra moneda rechazada" y TC-TRANSACTIONS-TRANSFERFEE-001 (`ready`, sin automatizar: el rechazo ya está implementado en `Transaction.recordTransfer`, falta el test con el TC-id, tarea 2.4).
-- [ ] 1.2 Confirmar TC-TRANSACTIONS-TRANSFER-001..006, TC-TRANSACTIONS-CARDPAYMENT-001 y TC-LEDGER-TRANSFER-001 en estado `ready`; verificar con el chequeo del catálogo que ningún requirement Must queda sin TC
+- [x] 1.2 Confirmar TC-TRANSACTIONS-TRANSFER-001..006, TC-TRANSACTIONS-CARDPAYMENT-001 y TC-LEDGER-TRANSFER-001 en estado `ready`; verificar con el chequeo del catálogo que ningún requirement Must queda sin TC
+  > Verificado 2026-10-04: TC-TRANSACTIONS-TRANSFER-001..006, TC-TRANSACTIONS-CARDPAYMENT-001 y TC-LEDGER-TRANSFER-001 están `automated` con su requirement exacto; `pnpm traceability:check` (R2) en verde.
 - [ ] 1.3 Aplicar (o confirmar aplicados) los cambios de design.md § Contratos; verificar Redocly lint 0/0 y validación de `examples` de `TransferCompleted.v1`
+  > Verificado 2026-10-04 (parcial): OpenAPI con `TRANSFER_CURRENCY_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `suggestedOperationId` y ejemplos de `createTransfer`; `TransferCompleted.v1` (con ejemplo de comisión) y `TransferRevised.v1` con `examples`; Redocly en `pr.yml`. Falta: validación automática de los `examples` de los eventos contra su schema.
 
 ## 2. DOMAIN (TDD obligatorio)
 
@@ -16,6 +18,7 @@
 - [x] 2.2 TDD de la traducción `TRANSFER` (docs/09 §6.4 y §6.8) con y sin comisión (TC-TRANSACTIONS-TRANSFER-004, CARDPAYMENT-001); verificar con PBT que ∀ (monto, comisión): asiento balanceado y ΔPatrimonio = −comisión (INV-009, TC-TRANSACTIONS-TRANSFER-002)
 - [x] 2.3 TDD de amend/void de transferencias reutilizando la máquina de estados; verificar que cambiar una cuenta a otra moneda produce `TRANSFER_CURRENCY_MISMATCH`
 - [ ] 2.4 (docs/31 D40) Test con el TC-id de la comisión en otra moneda: `Transaction.recordTransfer` con comisión en USD sobre una transferencia en BOB ⇒ `TRANSFER_CURRENCY_MISMATCH` en `/fee/amount/currency`, sin asiento ni evento (TC-TRANSACTIONS-TRANSFERFEE-001; el comportamiento ya está implementado)
+  > Verificado 2026-10-04 (pendiente, código): `TC-TRANSACTIONS-TRANSFERFEE-001` existe (`ready`, `not_automated`) pero ningún test lleva su id ni prueba la comisión en USD con el puntero `/fee/amount/currency`.
 
 ## 3. APPLICATION
 

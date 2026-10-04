@@ -61,6 +61,7 @@
 - [ ] 7.2 E2E Playwright con providers simulados por servidor local: principal OK (12.02 con atribución), principal caído (12.055 de respaldo), ambos caídos (12.02 obsoleta con antigüedad), anomalía 13.50 confirmada
   - Nota (2026-10-03): pendiente (E2E con providers simulados).
 - [ ] 7.3 Smoke **opcional en vivo, no bloqueante** (`pnpm fx:smoke-live`, nightly, `continue-on-error`): una solicitud a cada endpoint real, validación contra el JSON Schema del adapter y hash de `https://paralelo.bo/openapi.json`; su falla abre un aviso para revisar el adapter, nunca rompe el pipeline
+  > Verificado 2026-10-04 (pendiente, CI): no existe el script `fx:smoke-live` ni workflow nightly.
   - Nota (2026-10-03): pendiente (smoke en vivo no bloqueante `pnpm fx:smoke-live`); los contratos del adapter ya están como constantes reutilizables.
 
 - [x] 7.4 Decisiones del owner 2026-10-03 (TDD + PBT): TC-FX-PROVIDER-016 (compra/venta, contract + aplicación + PostgreSQL), -017 (umbral del respaldo), -018 (manual de otro tipo, PBT 500 corridas), -019 (`test:stack`: worker en redes no internas y `FX_*` del `.env`)
