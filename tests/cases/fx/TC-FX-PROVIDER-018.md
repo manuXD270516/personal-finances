@@ -16,6 +16,7 @@ automation_status: automated
 automated_tests:
   - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
   - packages/contexts/fx/src/application/market-rate-providers.test.ts
+  - apps/web/src/ui/fx/providers.test.tsx
 status: automated
 regression_suite: true
 phase: 1
@@ -38,7 +39,7 @@ expected_result:
   - "Si el tipo pedido no tiene umbral (P2P, BANK, CUSTOM) no hay sustitución; la referencia de una conversión no cambia"
   - "PBT: si rateType ≠ requestedRateType entonces la tasa es manual, selection MANUAL, no es de compra/venta, 0 ≤ t − asOf ≤ antigüedad máxima, desvío ≤ 5 % respecto de la última tasa de provider usable del tipo pedido, no reemplazada y sin anomalía sin confirmar"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-018 — El nivel de manuales acepta una tasa manual de otro tipo solo si es reciente y confiable, informando el tipo usado

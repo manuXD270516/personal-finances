@@ -17,6 +17,7 @@ automated_tests:
   - packages/contexts/classification/src/infrastructure/default-catalog.test.ts
   - packages/contexts/classification/test/integration/pg-classification.int.test.ts
   - apps/api/test/api/classification.api.test.ts
+  - tests/e2e/specs/classification.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -42,7 +43,7 @@ expected_result:
 - Reaplicar no crea duplicados de las categorías activas existentes y reporta las omitidas
 - Las categorías del catálogo tienen systemCode null
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-SEED-001 — El catálogo inicial se carga opcionalmente, es editable y aplicarlo dos veces no duplica

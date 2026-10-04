@@ -1,6 +1,7 @@
 import {
   createFxMarketRateJobs,
   parseFxProviderSettings,
+  providerHostsFor,
   type FxProviderEnv,
 } from '@pf/fx/interface/fx.module';
 import { createLogger } from '@pf/platform/logging';
@@ -9,7 +10,7 @@ import { FixedClock, Instant } from '@pf/shared-kernel';
 import { Writable } from 'node:stream';
 import { Pool } from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
-import { registerFxMarketRateJobs } from './fx-jobs.js';
+import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 
 // Registro de los jobs de providers (tarea 4.4) con una cola falsa: sin Docker ni red.
 const pool = new Pool({ connectionString: 'postgres://nobody@127.0.0.1:1/none', max: 1 });
@@ -86,5 +87,20 @@ describe('registerFxMarketRateJobs (fx/market-rate-providers)', () => {
     expect(jobs.settings.configError).not.toBeNull();
     await expect(registerFxMarketRateJobs(queue, jobs, logger)).resolves.toEqual([]);
     expect(calls.work).toEqual([]);
+  });
+});
+
+describe('fxEndpointsFromConfig (providers simulados en E2E, solo local/ci)', () => {
+  it('sin URL alternativas usa los providers reales; con URL, la allowlist suma su host', () => {
+    expect(fxEndpointsFromConfig({})).toBeUndefined();
+    const endpoints = fxEndpointsFromConfig({
+      FX_PROVIDER_PARALELO_BO_URL: 'http://host.docker.internal:39090',
+    });
+    expect(endpoints).toEqual({ baseUrls: { PARALELO_BO: 'http://host.docker.internal:39090' } });
+    expect(providerHostsFor(endpoints!.baseUrls!)).toEqual([
+      'paralelo.bo',
+      'bo.dolarapi.com',
+      'host.docker.internal',
+    ]);
   });
 });

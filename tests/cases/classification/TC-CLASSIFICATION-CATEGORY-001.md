@@ -16,6 +16,8 @@ automation_status: automated
 automated_tests:
   - packages/contexts/classification/src/application/classification.service.test.ts
   - apps/api/test/api/classification.api.test.ts
+  - apps/web/src/ui/classification/classification.test.tsx
+  - tests/e2e/specs/classification.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -39,7 +41,7 @@ expected_result:
 - La primera responde 201 con tipo EXPENSE, icono "cart", color "#2E7D32" y estado activo
 - La segunda responde 409 NAME_TAKEN y no se crea categoría
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-CATEGORY-001 — Crear una categoría de gasto con icono y color y rechazar nombre duplicado entre hermanas

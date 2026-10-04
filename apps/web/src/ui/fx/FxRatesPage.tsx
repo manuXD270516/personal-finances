@@ -24,13 +24,56 @@ import {
   tableWrapStyle,
 } from '../common/ui';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { Tabs } from '../common/Tabs';
+import { RateAttributionLink } from '../dashboard/RateSourceBadge';
 import { groupRatesByPair, withPreference, type RatePairGroup } from './logic';
+import { ProvidersPanel, rateTypeLabel } from './ProvidersPanel';
 
-export function FxRatesPage({ base, quote }: { base?: string; quote?: string }) {
+export function FxRatesPage({ base, quote, view }: { base?: string; quote?: string; view?: string }) {
   return (
     <WithWorkspace>
-      {(ctx) => <FxRates ctx={ctx} {...(base ? { base } : {})} {...(quote ? { quote } : {})} />}
+      {(ctx) => (
+        <FxScreen
+          ctx={ctx}
+          {...(base ? { base } : {})}
+          {...(quote ? { quote } : {})}
+          {...(view ? { view } : {})}
+        />
+      )}
     </WithWorkspace>
+  );
+}
+
+/** `/fx`: pestañas Tasas (manuales y de provider) y Proveedores (estado, carga histórica y anomalías). */
+function FxScreen({
+  ctx,
+  base,
+  quote,
+  view,
+}: {
+  ctx: WorkspaceContext;
+  base?: string;
+  quote?: string;
+  view?: string;
+}) {
+  const { t } = useFormat('Fx', ctx);
+  return (
+    <section aria-labelledby="fx-title" style={pageStyle}>
+      <h1 id="fx-title">{t('screen.title')}</h1>
+      <Tabs
+        label={t('screen.tabs')}
+        idPrefix="fx"
+        initial={view === 'proveedores' ? 'providers' : 'rates'}
+        tabs={[
+          {
+            id: 'rates',
+            label: t('screen.rates'),
+            content: <FxRates ctx={ctx} {...(base ? { base } : {})} {...(quote ? { quote } : {})} />,
+          },
+          { id: 'providers', label: t('screen.providers'), content: <ProvidersPanel ctx={ctx} /> },
+        ]}
+      />
+    </section>
   );
 }
 
@@ -151,8 +194,8 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
   const groups = groupRatesByPair(rates ?? [], prefs.data);
 
   return (
-    <section aria-labelledby="fx-title" style={pageStyle}>
-      <h1 id="fx-title">{t('rates.title')}</h1>
+    <div style={{ display: 'grid', gap: '1rem', minWidth: 0 }} data-testid="fx-rates">
+      <h2 style={{ fontSize: '1.1rem', margin: 0 }}>{t('rates.title')}</h2>
       <nav aria-label={t('rates.actions')} style={rowStyle}>
         {ctx.canEdit ? <a href={ctx.href('/fx/conversiones/nueva')}>{t('rates.newConversion')}</a> : null}
         <a href={ctx.href('/transacciones?tipo=CONVERSION')}>{t('rates.conversions')}</a>
@@ -285,7 +328,7 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
           onPreference={(rt) => void setPreference(g, rt)}
         />
       ))}
-    </section>
+    </div>
   );
 }
 
@@ -366,12 +409,18 @@ function RatePairSection({
                 <td style={numCellStyle} data-testid="rate-value">
                   {rateSentence(r, locale)}
                 </td>
-                <td style={cellStyle}>{t(`rateTypes.${r.rateType}`)}</td>
+                <td style={cellStyle}>
+                  {rateTypeLabel(f, r.rateType)}
+                  {r.anomaly ? (
+                    <span style={badgeStyle} data-testid="rate-anomaly">
+                      {' '}
+                      {t(`providers.anomalies.status.${r.anomaly.status}`)}
+                    </span>
+                  ) : null}
+                </td>
                 <td style={cellStyle}>
                   {r.attribution ? (
-                    <a href={r.attribution.url} target="_blank" rel="noopener noreferrer">
-                      {r.attribution.text}
-                    </a>
+                    <RateAttributionLink attribution={r.attribution} />
                   ) : (
                     <>
                       {t(`sources.${r.source}`)}

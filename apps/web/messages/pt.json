@@ -48,7 +48,8 @@
     "create": "Criar espaço",
     "creating": "Criando…",
     "created": "Espaço de trabalho criado: {name}.",
-    "readOnly": "Somente o proprietário pode alterar esta configuração."
+    "readOnly": "Somente o proprietário pode alterar esta configuração.",
+    "seedCatalog": "Carregar o catálogo sugerido de categorias (você pode editá-lo depois)"
   },
   "Preferences": {
     "title": "Minhas preferências",
@@ -177,7 +178,9 @@
       "sourceLabel": "Fonte: {label}",
       "fallback": "reserva",
       "asOf": "vigência: {date}",
-      "stale": "desatualizada"
+      "stale": "desatualizada",
+      "lastKnown": "última conhecida",
+      "requested": "tipo pedido: {type}"
     },
     "age": {
       "now": "há menos de 1 min",
@@ -719,7 +722,9 @@
       "PARALLEL": "Paralelo",
       "P2P": "P2P",
       "BANK": "Bancária",
-      "CUSTOM": "Personalizada"
+      "CUSTOM": "Personalizada",
+      "PARALLEL_BUY": "Compra",
+      "PARALLEL_SELL": "Venda"
     },
     "detail": {
       "title": "Detalhe da conversão (revisão {revision})",
@@ -787,7 +792,7 @@
       "reasonMin": "O motivo precisa de pelo menos 3 caracteres."
     },
     "rates": {
-      "title": "Cripto e câmbio: taxas",
+      "title": "Taxas de câmbio",
       "actions": "Ações de câmbio",
       "newConversion": "Nova conversão",
       "conversions": "Ver conversões",
@@ -819,6 +824,99 @@
       "newValue": "Valor corrigido",
       "correctReason": "Motivo da correção",
       "saveCorrection": "Salvar correção"
+    },
+    "screen": {
+      "title": "Cripto e câmbio",
+      "tabs": "Seções de câmbio",
+      "rates": "Taxas",
+      "providers": "Provedores"
+    },
+    "providers": {
+      "title": "Provedores de taxas de mercado",
+      "intro": "O sistema consulta paralelo.bo (principal) e bo.dolarapi.com (reserva e oficial) em segundo plano, sem enviar seus dados. Se falharem, usa-se a última taxa conhecida marcada como desatualizada ou suas taxas manuais.",
+      "loading": "Carregando o estado dos provedores…",
+      "never": "nunca",
+      "health": {
+        "HEALTHY": "Saudável",
+        "DEGRADED": "Degradado",
+        "DOWN": "Fora do ar",
+        "DISABLED": "Desabilitado"
+      },
+      "lastAttempt": "Última tentativa",
+      "lastSuccess": "Último sucesso",
+      "failures": "Falhas seguidas",
+      "lastError": "Último erro",
+      "nextAttempt": "Próxima tentativa",
+      "retryAfter": "Aguardando o limite de uso até",
+      "disabled": "Desabilitado por configuração: não é consultado e o resto do sistema segue com taxas manuais.",
+      "errors": {
+        "PROVIDER_UNAVAILABLE": "Indisponível",
+        "PROVIDER_TIMEOUT": "Tempo esgotado",
+        "PROVIDER_RATE_LIMITED": "Limite de uso atingido",
+        "PROVIDER_PAYLOAD_INVALID": "Resposta inválida",
+        "PROVIDER_SCHEMA_CHANGED": "O formato da resposta mudou",
+        "FX_PROVIDER_CONFIG_INVALID": "Configuração inválida"
+      },
+      "feeds": "Taxas publicadas",
+      "feed": "Par e tipo",
+      "role": "Papel",
+      "lastRate": "Última taxa",
+      "age": "Idade",
+      "roles": {
+        "PRIMARY": "Principal",
+        "FALLBACK": "Reserva"
+      },
+      "noRate": "sem taxa",
+      "stale": "desatualizada",
+      "quoteSidesHint": "Compra: o que você paga para comprar 1 {base}. Venda: o que recebe ao vendê-lo. Só são usadas se pedidas.",
+      "backfill": {
+        "title": "Carga histórica",
+        "status": {
+          "PENDING": "pendente",
+          "RUNNING": "em andamento",
+          "COMPLETED": "concluída",
+          "FAILED": "falhou",
+          "NOT_APPLICABLE": "não se aplica"
+        },
+        "points": "{n} pontos",
+        "range": "de {from} a {to}",
+        "lastRun": "última execução {date}"
+      },
+      "selection": {
+        "PRIMARY": "principal",
+        "FALLBACK": "reserva",
+        "LAST_KNOWN_STALE": "última conhecida, desatualizada",
+        "MANUAL": "manual"
+      },
+      "valuation": {
+        "title": "Taxa de valoração vigente",
+        "hint": "Usada para valorar saldos e como referência de conversões: principal → reserva → última conhecida (desatualizada) ou manual.",
+        "none": "sem taxa disponível (registre uma manual)"
+      },
+      "anomalies": {
+        "title": "Anomalias pendentes de revisão ({n})",
+        "hint": "Amostras que variaram mais que o limite em relação à anterior: não são usadas até você confirmá-las. Rejeitada, nunca é usada.",
+        "readOnly": "Somente leitura: um editor ou proprietário do espaço pode confirmá-las ou rejeitá-las.",
+        "empty": "Não há anomalias pendentes.",
+        "variation": "variação {pct} % (limite {threshold} %)",
+        "reviewLabel": "Revisar a anomalia {rate}",
+        "reasonLabel": "Motivo",
+        "confirm": "Confirmar",
+        "reject": "Rejeitar",
+        "confirmed": "Anomalia confirmada: {rate} já é usada para valorar.",
+        "rejected": "Anomalia rejeitada: {rate} não será usada.",
+        "reviewed": "Revisadas recentemente",
+        "reason": "motivo: {reason}",
+        "status": {
+          "PENDING": "anomalia pendente",
+          "CONFIRMED": "anomalia confirmada",
+          "REJECTED": "anomalia rejeitada"
+        },
+        "errors": {
+          "REASON_MIN": "O motivo deve ter pelo menos 3 caracteres.",
+          "REASON_MAX": "O motivo admite até 500 caracteres."
+        }
+      }
     }
   },
   "Classification": {
@@ -862,7 +960,89 @@
     "archived": "“{name}” arquivada.",
     "unarchived": "“{name}” desarquivada.",
     "categoryCreated": "Categoria “{name}” criada.",
-    "system": "do sistema (protegida)"
+    "system": "do sistema (protegida)",
+    "sections": "Seções de classificação",
+    "catalogHint": "O catálogo sugerido adiciona grupos e categorias comuns na Bolívia; só cria o que falta (por nome) e você pode editá-las ou arquivá-las depois.",
+    "newGroup": "Novo grupo",
+    "groupCreated": "Grupo «{name}» criado.",
+    "kind": "Tipo",
+    "reorderHint": "Para reordenar, use os botões ↑ e ↓ de cada categoria (teclado) ou arraste-a sobre outra do mesmo nível.",
+    "emptyGroup": "Sem categorias.",
+    "reordered": "Ordem salva: «{name}» movida.",
+    "categoryUpdated": "Categoria «{name}» atualizada.",
+    "moveUp": "Subir «{name}»",
+    "moveDown": "Descer «{name}»",
+    "edit": "Editar",
+    "editNamed": "Editar «{name}»",
+    "archiveNamed": "Arquivar «{name}»",
+    "unarchiveNamed": "Desarquivar «{name}»",
+    "systemNameHint": "As categorias de sistema não são renomeadas; você pode mudar o ícone, a cor e a ordem.",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "icon": "Ícone",
+    "noIcon": "Sem ícone",
+    "color": "Cor",
+    "noColor": "Sem cor",
+    "tagUpdated": "Etiqueta «{name}» atualizada.",
+    "emptyTags": "Ainda não há etiquetas.",
+    "emptyCounterparties": "Ainda não há contrapartes.",
+    "unknownCategory": "categoria não disponível",
+    "defaultCategory": "Categoria padrão",
+    "defaultCategoryHint": "Sugerida ao registrar um movimento com esta contraparte.",
+    "noDefaultCategory": "Nenhuma",
+    "aliases": "Apelidos",
+    "aliasesHint": "Textos com que aparece nas descrições bancárias, separados por vírgulas (mínimo 3 caracteres cada).",
+    "aliasesList": "Apelidos: {aliases}",
+    "defaultCategoryIs": "Categoria padrão: {name}",
+    "counterpartyUpdated": "Contraparte «{name}» atualizada.",
+    "errors": {
+      "ALIAS_MIN": "Cada apelido deve ter entre 3 e 120 caracteres.",
+      "ALIAS_MAX_COUNT": "São permitidos até 20 apelidos."
+    },
+    "icons": {
+      "baby": "Bebê",
+      "bike": "Bicicleta",
+      "bolt": "Eletricidade",
+      "book": "Livro",
+      "briefcase": "Pasta",
+      "building": "Prédio",
+      "bus": "Ônibus",
+      "car": "Carro",
+      "cart": "Carrinho",
+      "clock": "Relógio",
+      "coffee": "Café",
+      "dots": "Outros",
+      "dumbbell": "Academia",
+      "fuel": "Combustível",
+      "gift": "Presente",
+      "glass": "Taça",
+      "graduation": "Formatura",
+      "heart": "Coração",
+      "home": "Casa",
+      "key": "Chave",
+      "laptop": "Notebook",
+      "paw": "Animal de estimação",
+      "pencil": "Lápis",
+      "pie": "Torta",
+      "pill": "Remédio",
+      "plane": "Avião",
+      "play": "Entretenimento",
+      "school": "Escola",
+      "shield": "Seguro",
+      "shirt": "Roupa",
+      "sofa": "Móveis",
+      "sparkles": "Cuidados pessoais",
+      "stethoscope": "Médico",
+      "tag": "Etiqueta",
+      "taxi": "Táxi",
+      "ticket": "Ingresso",
+      "tooth": "Dentista",
+      "trending-up": "Investimento",
+      "undo": "Reembolso",
+      "users": "Pessoas",
+      "utensils": "Comida",
+      "wrench": "Manutenção"
+    }
   },
   "Lifecycle": {
     "tabs": {

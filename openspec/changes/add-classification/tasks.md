@@ -54,16 +54,20 @@
 
 ## 8. UI
 
-- [ ] 8.1 Pantalla de categorías (árbol grupo → categoría → subcategoría, icono, color, arrastrar para reordenar, archivar/desarchivar, filtro de archivadas, categorías de sistema marcadas como protegidas); verificar con tests de componentes
+- [x] 8.1 Pantalla de categorías (árbol grupo → categoría → subcategoría, icono, color, arrastrar para reordenar, archivar/desarchivar, filtro de archivadas, categorías de sistema marcadas como protegidas); verificar con tests de componentes
   - Nota (2026-10-03): solo lo mínimo para los selectores (`apps/web/src/ui/classification/ClassificationPage.tsx`, `/clasificacion`): árbol grupo → categoría → subcategoría, crear, archivar/desarchivar, filtro de archivadas, sistema protegidas y "aplicar catálogo sugerido". Falta: icono/color, arrastrar para reordenar y tests de componentes.
-- [ ] 8.2 Pantallas de tags y counterparties (alias, categoría por defecto) y selectores que excluyen archivados; creación inline de counterparty en el formulario de transacción con manejo de `NAME_TAKEN` → seleccionar la existente; verificar con tests de componentes
+  - Nota (2026-10-04): `/clasificacion` con pestañas Categorías | Etiquetas | Contrapartes (`?vista=`). Categorías: árbol en el orden persistente (`sortOrder`), alta de grupo y de categoría/subcategoría con icono (iconos del catálogo con etiquetas i18n) y color (`<input type="color">` + "Sin color"), edición en línea (las de sistema solo icono/color/orden), reordenar con botones ↑/↓ accesibles por teclado (alternativa a arrastrar) y arrastrar entre hermanas (HTML5) vía `POST categories/reorder` con exactamente las hermanas activas; los selectores de categoría siguen el orden persistente de los grupos. Tests de componentes en `apps/web/src/ui/classification/classification.test.tsx`.
+- [x] 8.2 Pantallas de tags y counterparties (alias, categoría por defecto) y selectores que excluyen archivados; creación inline de counterparty en el formulario de transacción con manejo de `NAME_TAKEN` → seleccionar la existente; verificar con tests de componentes
   - Nota (2026-10-03): hecho: tags y contrapartes (crear, archivar, desarchivar), selectores sin archivados y creación en línea de contraparte con `NAME_TAKEN` → selecciona la existente (E2E en `tests/e2e/specs/transactions.spec.ts`, TC-CLASSIFICATION-COUNTERPARTY-002). Falta: alias y categoría por defecto en la pantalla, tests de componentes.
-- [ ] 8.3 Paso opcional "cargar catálogo sugerido" en la creación del workspace y acción "aplicar catálogo sugerido"; textos en catálogos i18n `es` (y claves para `en`/`pt`)
+  - Nota (2026-10-04): etiquetas con color y edición (renombrar/color); contrapartes con alias (separados por coma o línea, ≥ 3 caracteres, ≤ 20, sin repetidos) y categoría por defecto (selector sin archivadas), edición con `If-Match`; tests de componentes (alias, resumen, selector sin archivadas) y E2E.
+- [x] 8.3 Paso opcional "cargar catálogo sugerido" en la creación del workspace y acción "aplicar catálogo sugerido"; textos en catálogos i18n `es` (y claves para `en`/`pt`)
+  - Nota (2026-10-04): casilla "Cargar el catálogo sugerido de categorías" (marcada por defecto) en `/workspaces/nuevo` → `seedDefaultCategories`; acción "Aplicar catálogo sugerido" en Categorías con su explicación. i18n es/en/pt.
 
 ## 9. AUTOMATED TESTS y E2E
 
 - [ ] 9.1 Completar los tests automatizados de todos los TC de este change y marcar `automation_status: automated`; verificar que el chequeo de trazabilidad no reporta TC sin test
-- [ ] 9.2 E2E (Playwright): crear workspace con catálogo, crear subcategoría, archivarla y comprobar que desaparece del selector pero sigue en el historial; crear counterparty inline; verificar en CI
+- [x] 9.2 E2E (Playwright): crear workspace con catálogo, crear subcategoría, archivarla y comprobar que desaparece del selector pero sigue en el historial; crear counterparty inline; verificar en CI
+  - Nota (2026-10-04): `tests/e2e/specs/classification.spec.ts`: workspace nuevo con catálogo por la UI, subcategoría "Fibra óptica" con icono y color, reordenada con el teclado (persiste tras recargar), gasto clasificado en ella, archivada → fuera del árbol y del selector de `/transacciones/nueva`, visible con "Mostrar archivadas" y en el detalle del gasto; contraparte con alias y categoría por defecto (resuelta por alias) y etiqueta. La creación inline de contraparte ya la cubre `transactions.spec.ts` (TC-CLASSIFICATION-COUNTERPARTY-002). Páginas nuevas en `a11y.spec.ts`.
 
 ## 10. DOCUMENTACIÓN y cierre
 

@@ -5,7 +5,9 @@ import { go, newFinanceUser, openAccount } from '../src/finance.js';
 /**
  * Accesibilidad de las pantallas principales (NFR-USAB-001, WCAG 2.1 AA): axe-core sin violaciones `serious` ni
  * `critical` (add-accounts-management 7.3, add-transaction-recording 6.1, add-transfers 6.1, add-audit-trail 7.1).
- * Las páginas se analizan con datos (cuentas en BOB/USD) para que listados y formularios rendericen completos.
+ * Las páginas se analizan con datos (cuentas en BOB/USD) para que listados y formularios rendericen completos. Las
+ * pestañas Proveedores de `/fx` y Etiquetas/Contrapartes de `/clasificacion` se abren por `?vista=` (add-market-rate-
+ * providers 6.2, add-classification 8.1–8.2); en clasificación también se analiza el formulario de edición abierto.
  */
 const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/', name: 'Inicio' },
@@ -20,6 +22,9 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/clasificacion', name: 'Clasificación' },
   // add-demo-data 6.1: configuración del workspace con el panel "Datos de demostración" (OWNER).
   { path: '/configuracion', name: 'Configuración y datos de demostración' },
+  { path: '/clasificacion?vista=etiquetas', name: 'Clasificación: etiquetas' },
+  { path: '/clasificacion?vista=contrapartes', name: 'Clasificación: contrapartes' },
+  { path: '/fx?vista=proveedores', name: 'FX: proveedores' },
 ];
 
 async function seriousViolations(page: Page) {
@@ -63,6 +68,16 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     await expect(page.locator('[data-testid="lifecycle-diagram"]:visible')).toHaveCount(1);
     const lifecycle = await seriousViolations(page);
     if (lifecycle.length > 0) found['Detalle de cuenta con recorrido (/cuentas/{id})'] = lifecycle;
+    // Clasificación con un formulario de edición abierto (icono, color y alias) y la contraparte en edición.
+    await go(page, '/clasificacion');
+    await page
+      .locator('[data-testid="category"]:visible')
+      .first()
+      .getByRole('button', { name: /^Editar/ })
+      .click();
+    await expect(page.locator('[data-testid="category-edit-form"]:visible')).toHaveCount(1);
+    const editing = await seriousViolations(page);
+    if (editing.length > 0) found['Clasificación con edición abierta (/clasificacion)'] = editing;
     expect(found).toEqual({});
     await context.close();
   });

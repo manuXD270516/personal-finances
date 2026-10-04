@@ -49,17 +49,20 @@
 
 ## 6. UI
 
-- [ ] 6.1 `RateSourceBadge` junto a toda tasa de provider ("Fuente: paralelo.bo" con enlace y CC BY 4.0; "Fuente: bo.dolarapi.com"), indicador de obsolescencia con antigüedad relativa (`es-BO`) y nivel de fallback; verificar con tests de componentes (TC-FX-PROVIDER-012)
+- [x] 6.1 `RateSourceBadge` junto a toda tasa de provider ("Fuente: paralelo.bo" con enlace y CC BY 4.0; "Fuente: bo.dolarapi.com"), indicador de obsolescencia con antigüedad relativa (`es-BO`) y nivel de fallback; verificar con tests de componentes (TC-FX-PROVIDER-012)
   - Nota (2026-10-03): pendiente (fuera del alcance de esta implementación).
-- [ ] 6.2 Pantalla `/fx` → Providers: estado por provider y feed, carga histórica, bandeja de anomalías pendientes con confirmar/rechazar y motivo; textos en español vía i18n
+  - Nota (2026-10-04): se reutiliza el `RateSourceBadge` del Home (`apps/web/src/ui/dashboard`), sin duplicarlo: la atribución pasa a `RateAttributionLink` (texto enlazado + licencia enlazada), que usan el Home, la pestaña Tasas de `/fx` y Proveedores; el badge suma el nivel ("respaldo", "última conocida") y el tipo pedido cuando difiere. Antigüedad relativa con `formatAge` (es-BO). Tests de componentes en `apps/web/src/ui/fx/providers.test.tsx` (TC-FX-PROVIDER-012, -008, -018).
+- [x] 6.2 Pantalla `/fx` → Providers: estado por provider y feed, carga histórica, bandeja de anomalías pendientes con confirmar/rechazar y motivo; textos en español vía i18n
   - Nota (2026-10-03): pendiente (fuera del alcance de esta implementación).
+  - Nota (2026-10-04): `/fx` pasa a pestañas Tasas | Proveedores (`?vista=proveedores`; `ProvidersPanel`): tasa de valoración vigente por par (USD/BOB y USDT/BOB `PARALLEL`, USD/BOB `OFFICIAL`) con su badge; tarjeta por provider (salud, último intento/éxito, fallas seguidas, último error con HTTP, próximo intento, `Retry-After`, feeds con rol, última tasa, antigüedad y obsolescencia, carga histórica); compra/venta `PARALLEL_BUY`/`PARALLEL_SELL` como "Compra"/"Venta" desde el lado del owner (D39); bandeja de anomalías (tasas `PROVIDER` de los últimos 7 días) con confirmar/rechazar y motivo de 3–500 caracteres (EDITOR/OWNER; VIEWER solo lectura) y revisadas recientemente. i18n es/en/pt. Tests de componentes (TC-FX-PROVIDER-010, -015, -016).
 
 ## 7. TESTS automatizados y E2E
 
 - [x] 7.1 Agregar TC-FX-PROVIDER-003, -007, -008 y -009 a la Financial Regression Suite; verificar que corren en el gate de PR sin red
   - Nota (2026-10-03): TC-003/007/008/009 ya tenían `regression_suite: true` y son tests unitarios sin red que corren en el gate de PR (`pnpm turbo test`).
-- [ ] 7.2 E2E Playwright con providers simulados por servidor local: principal OK (12.02 con atribución), principal caído (12.055 de respaldo), ambos caídos (12.02 obsoleta con antigüedad), anomalía 13.50 confirmada
+- [x] 7.2 E2E Playwright con providers simulados por servidor local: principal OK (12.02 con atribución), principal caído (12.055 de respaldo), ambos caídos (12.02 obsoleta con antigüedad), anomalía 13.50 confirmada
   - Nota (2026-10-03): pendiente (E2E con providers simulados).
+  - Nota (2026-10-04): `tests/e2e/specs/fx-providers.spec.ts` + `tests/e2e/src/fx-sim.ts`: el harness sirve paralelo.bo y bo.dolarapi.com desde un servidor HTTP local (formato de los fixtures grabados) y el worker del stack E2E los alcanza por `FX_PROVIDER_PARALELO_BO_URL`/`FX_PROVIDER_DOLARAPI_BO_URL=http://host.docker.internal:<prefijo>9090` (variables nuevas y opcionales, solo del worker, rechazadas con `PFOS_ENV=staging|production`; `extra_hosts: host-gateway` en el worker para Linux). El cron corre cada 24 h y la prueba dispara cada ciclo encolando `fx.poll-market-rates` (pg-boss). Cuatro escenarios, cada uno en un workspace creado en el momento justo (la consulta reparte a todos): 12.02 principal con atribución CC BY 4.0, compra/venta y carga histórica; 12.055 de respaldo con la falla HTTP 503 del principal; 12.02 última conocida obsoleta "hace N d"; 13.50 anómala (+12,31 %) que el VIEWER ve sin acciones y el EDITOR confirma con motivo en W1. Verifica además que las solicitudes al simulado no llevan query, cookies ni credenciales.
 - [ ] 7.3 Smoke **opcional en vivo, no bloqueante** (`pnpm fx:smoke-live`, nightly, `continue-on-error`): una solicitud a cada endpoint real, validación contra el JSON Schema del adapter y hash de `https://paralelo.bo/openapi.json`; su falla abre un aviso para revisar el adapter, nunca rompe el pipeline
   > Verificado 2026-10-04 (pendiente, CI): no existe el script `fx:smoke-live` ni workflow nightly.
   - Nota (2026-10-03): pendiente (smoke en vivo no bloqueante `pnpm fx:smoke-live`); los contratos del adapter ya están como constantes reutilizables.

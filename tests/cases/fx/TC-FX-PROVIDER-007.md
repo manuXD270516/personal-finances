@@ -16,6 +16,7 @@ automation_status: automated
 automated_tests:
   - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
   - apps/api/test/api/fx-providers.api.test.ts
+  - tests/e2e/specs/fx-providers.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -33,7 +34,7 @@ expected_result:
   - "Caso 3 (principal responde pero repite timestamp 07:40Z, 80 min): resultado 1205.50 BOB con selection FALLBACK"
   - "Nunca se usa una tasa con asOf posterior al instante consultado"
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-007 — La valoración usa el principal y conmuta al respaldo cuando el principal falla o queda obsoleto

@@ -1,7 +1,38 @@
 import { formatDecimal } from '../AuditHistory';
 import { formatAge, formatInstant } from './format';
 import { mutedStyle } from './styles';
-import type { FormatContext, ResolvedRate } from './types';
+import type { FormatContext, RateAttribution, ResolvedRate } from './types';
+
+const external = { target: '_blank', rel: 'noopener noreferrer' } as const;
+
+/**
+ * Atribución de la fuente de una tasa de provider (FR-FX-014, NFR-COMP-007): texto enlazado ("Fuente: paralelo.bo" →
+ * https://paralelo.bo) y licencia enlazada si la hay (CC BY 4.0). Única pieza de atribución de la UI: la usan el
+ * Home, la pantalla de tasas y la de proveedores.
+ */
+export function RateAttributionLink({ attribution }: { attribution: RateAttribution }) {
+  return (
+    <>
+      <a href={attribution.url} {...external}>
+        {attribution.text}
+      </a>
+      {attribution.license ? (
+        <>
+          {' '}
+          (
+          {attribution.licenseUrl ? (
+            <a href={attribution.licenseUrl} {...external}>
+              {attribution.license}
+            </a>
+          ) : (
+            attribution.license
+          )}
+          )
+        </>
+      ) : null}
+    </>
+  );
+}
 
 /**
  * Tasa usada en una valoración (FR-FX-014, FR-REPORTING-003): par, valor y tipo, fuente con atribución enlazada
@@ -13,7 +44,6 @@ export function RateSourceBadge({ rate, ctx }: { rate: ResolvedRate; ctx: Format
   const pair = `${rate.rate.base}/${rate.rate.quote}`;
   const stale = rate.stale === true;
   const attribution = rate.attribution ?? null;
-  const external = { target: '_blank', rel: 'noopener noreferrer' } as const;
   return (
     <span
       data-testid="rate-badge"
@@ -21,6 +51,7 @@ export function RateSourceBadge({ rate, ctx }: { rate: ResolvedRate; ctx: Format
       data-rate-type={rate.rateType}
       data-source={rate.source}
       data-stale={stale ? 'true' : 'false'}
+      data-selection={rate.selection ?? ''}
       style={{ ...mutedStyle, display: 'block' }}
     >
       <span data-testid="rate-value">
@@ -30,23 +61,7 @@ export function RateSourceBadge({ rate, ctx }: { rate: ResolvedRate; ctx: Format
       {' · '}
       {attribution ? (
         <span data-testid="rate-attribution">
-          <a href={attribution.url} {...external}>
-            {attribution.text}
-          </a>
-          {attribution.license ? (
-            <>
-              {' '}
-              (
-              {attribution.licenseUrl ? (
-                <a href={attribution.licenseUrl} {...external}>
-                  {attribution.license}
-                </a>
-              ) : (
-                attribution.license
-              )}
-              )
-            </>
-          ) : null}
+          <RateAttributionLink attribution={attribution} />
         </span>
       ) : (
         <span data-testid="rate-attribution">
@@ -54,7 +69,20 @@ export function RateSourceBadge({ rate, ctx }: { rate: ResolvedRate; ctx: Format
           {t(`rate.origin.${rate.source}`)}
         </span>
       )}
-      {rate.selection === 'FALLBACK' ? <> · {t('rate.fallback')}</> : null}
+      {rate.selection === 'FALLBACK' ? (
+        <>
+          {' · '}
+          <span data-testid="rate-level">{t('rate.fallback')}</span>
+        </>
+      ) : rate.selection === 'LAST_KNOWN_STALE' ? (
+        <>
+          {' · '}
+          <span data-testid="rate-level">{t('rate.lastKnown')}</span>
+        </>
+      ) : null}
+      {rate.requestedRateType && rate.requestedRateType !== rate.rateType ? (
+        <> · {t('rate.requested', { type: rate.requestedRateType })}</>
+      ) : null}
       {' · '}
       <span data-testid="rate-as-of">
         {t('rate.asOf', { date: formatInstant(rate.asOf, locale, timeZone) })}

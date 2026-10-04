@@ -16,6 +16,8 @@ automation_status: automated
 automated_tests:
   - packages/contexts/classification/src/domain/domain.test.ts
   - packages/contexts/classification/src/application/classification.service.test.ts
+  - apps/web/src/ui/classification/classification.test.tsx
+  - tests/e2e/specs/classification.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -43,7 +45,7 @@ expected_result:
 - '"TIGO bolivia" responde 409 NAME_TAKEN'
 - '"Gimnasio X" responde 409 CATEGORY_ARCHIVED'
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-COUNTERPARTY-001 — Crear una counterparty con categoría por defecto y rechazar nombres equivalentes

@@ -40,7 +40,7 @@ import { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
-import { registerFxMarketRateJobs } from './fx-jobs.js';
+import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
@@ -147,6 +147,8 @@ export async function createWorkerRuntime(
   // Providers de tasas de mercado (add-market-rate-providers): polling, carga histórica y relleno; la configuración
   // inválida o `none` no impide arrancar el worker (degradación).
   const fxClock = options.clock ?? systemClock;
+  // Tests: servidor HTTP local en proceso; E2E: providers simulados por `FX_PROVIDER_*_URL` (solo local/ci).
+  const fxEndpoints = options.fxEndpoints ?? fxEndpointsFromConfig(config);
   const fxOutbox = new PgOutboxWriter(eventSchemaRegistry());
   const fxConsumers = await registerFxMarketRateJobs(
     queue,
@@ -160,7 +162,7 @@ export async function createWorkerRuntime(
       },
       workspaces: activeWorkspaces,
       settings: parseFxProviderSettings(config),
-      ...(options.fxEndpoints ? { endpoints: options.fxEndpoints } : {}),
+      ...(fxEndpoints ? { endpoints: fxEndpoints } : {}),
     }),
     logger,
     { gapFillOnStart: options.fxGapFillOnStart ?? true },

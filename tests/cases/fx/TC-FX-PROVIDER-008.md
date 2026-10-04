@@ -15,6 +15,8 @@ level: domain
 automation_status: automated
 automated_tests:
   - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
+  - apps/web/src/ui/fx/providers.test.tsx
+  - tests/e2e/specs/fx-providers.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -31,7 +33,7 @@ expected_result:
   - "Caso 2: 1210.00 BOB con la tasa manual 12.10, selection MANUAL, source MANUAL, sin atribución de provider"
   - "Caso 3: FX_RATE_NOT_FOUND; ningún valor aproximado ni 1:1"
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-008 — Sin providers vigentes se usa la última tasa conocida marcada obsoleta o una manual más reciente

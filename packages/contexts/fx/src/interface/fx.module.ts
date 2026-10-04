@@ -35,7 +35,11 @@ import {
 import { PgProviderRunRepository } from '../infrastructure/pg-provider-runs.js';
 import { DolarApiBoProvider } from '../infrastructure/providers/dolarapi-bo.provider.js';
 import { ParaleloBoProvider } from '../infrastructure/providers/paralelo-bo.provider.js';
-import { ProviderHttpClient, type HttpTransport } from '../infrastructure/providers/provider-http-client.js';
+import {
+  PROVIDER_HOSTS,
+  ProviderHttpClient,
+  type HttpTransport,
+} from '../infrastructure/providers/provider-http-client.js';
 import { FX_PROVIDER_STATUS, FX_QUERIES, FX_SERVICE, FxController, toResolvedRateDto } from './fx-http.js';
 
 export interface FxRuntimeOptions {
@@ -208,13 +212,14 @@ export interface FxMarketRateJobs {
  */
 export function createFxMarketRateJobs(options: FxMarketRateJobsOptions): FxMarketRateJobs {
   const { settings } = options;
+  const urls = options.endpoints?.baseUrls ?? {};
+  const allowedHosts = options.endpoints?.allowedHosts ?? providerHostsFor(urls);
   const http = new ProviderHttpClient({
     clock: options.clock,
     timeoutMs: settings.timeoutMs,
     ...(options.endpoints?.transport ? { transport: options.endpoints.transport } : {}),
-    ...(options.endpoints?.allowedHosts ? { allowedHosts: options.endpoints.allowedHosts } : {}),
+    allowedHosts,
   });
-  const urls = options.endpoints?.baseUrls ?? {};
   const providers: Partial<Record<FxRateProvider, MarketRateProvider>> = {
     PARALELO_BO: new ParaleloBoProvider(http, options.clock, urls.PARALELO_BO),
     DOLARAPI_BO: new DolarApiBoProvider(http, urls.DOLARAPI_BO),
@@ -233,6 +238,17 @@ export function createFxMarketRateJobs(options: FxMarketRateJobsOptions): FxMark
     providers,
   });
   return { settings, enabled: enabledProviders(settings).length > 0, ingestion };
+}
+
+/**
+ * Allowlist de hosts: los de los providers reales más los de las URL base alternativas (solo local/CI: providers
+ * simulados por un servidor HTTP local en las pruebas E2E; `FX_PROVIDER_*_URL` se rechaza en staging/production).
+ */
+export function providerHostsFor(baseUrls: Partial<Record<FxRateProvider, string>>): string[] {
+  const extra = Object.values(baseUrls)
+    .filter((u): u is string => typeof u === 'string' && u !== '')
+    .map((u) => new URL(u).hostname);
+  return [...new Set([...PROVIDER_HOSTS, ...extra])];
 }
 
 export { FX_AUDIT_POLICY, type FxConversionPricingPort } from '../contracts/index.js';
