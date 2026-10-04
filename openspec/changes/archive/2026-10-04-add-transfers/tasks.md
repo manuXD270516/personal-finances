@@ -9,16 +9,18 @@
   - Nota (2026-10-04): el owner confirmó que la comisión en otra moneda **no se soporta** como comisión de transferencia (docs/31 D40); se registra como conversión o gasto aparte. Spec ampliada con el scenario "Comisión en otra moneda rechazada" y TC-TRANSACTIONS-TRANSFERFEE-001 (`ready`, sin automatizar: el rechazo ya está implementado en `Transaction.recordTransfer`, falta el test con el TC-id, tarea 2.4).
 - [x] 1.2 Confirmar TC-TRANSACTIONS-TRANSFER-001..006, TC-TRANSACTIONS-CARDPAYMENT-001 y TC-LEDGER-TRANSFER-001 en estado `ready`; verificar con el chequeo del catálogo que ningún requirement Must queda sin TC
   > Verificado 2026-10-04: TC-TRANSACTIONS-TRANSFER-001..006, TC-TRANSACTIONS-CARDPAYMENT-001 y TC-LEDGER-TRANSFER-001 están `automated` con su requirement exacto; `pnpm traceability:check` (R2) en verde.
-- [ ] 1.3 Aplicar (o confirmar aplicados) los cambios de design.md § Contratos; verificar Redocly lint 0/0 y validación de `examples` de `TransferCompleted.v1`
+- [x] 1.3 Aplicar (o confirmar aplicados) los cambios de design.md § Contratos; verificar Redocly lint 0/0 y validación de `examples` de `TransferCompleted.v1`
   > Verificado 2026-10-04 (parcial): OpenAPI con `TRANSFER_CURRENCY_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `suggestedOperationId` y ejemplos de `createTransfer`; `TransferCompleted.v1` (con ejemplo de comisión) y `TransferRevised.v1` con `examples`; Redocly en `pr.yml`. Falta: validación automática de los `examples` de los eventos contra su schema.
+  > Hecho 2026-10-04: `apps/api/src/runtime/event-contracts.test.ts` (unitario, sin Docker) valida con Ajv 2020-12 strict (`EventSchemaRegistry`) TODOS los `examples` de TODOS los schemas de `contracts/events` (20 eventos, incluidos `TransferCompleted.v1` con y sin comisión y `TransferRevised.v1`), exige ≥ 1 ejemplo por schema y que el `title` coincida con `eventType`/`eventVersion` del ejemplo.
 
 ## 2. DOMAIN (TDD obligatorio)
 
 - [x] 2.1 Escribir primero los tests de `Transaction.recordTransfer` (misma moneda, cuentas distintas, montos positivos, legs SOURCE/TARGET, split de comisión) con TC-TRANSACTIONS-TRANSFER-001, TRANSFER-003 y luego implementar
 - [x] 2.2 TDD de la traducción `TRANSFER` (docs/09 §6.4 y §6.8) con y sin comisión (TC-TRANSACTIONS-TRANSFER-004, CARDPAYMENT-001); verificar con PBT que ∀ (monto, comisión): asiento balanceado y ΔPatrimonio = −comisión (INV-009, TC-TRANSACTIONS-TRANSFER-002)
 - [x] 2.3 TDD de amend/void de transferencias reutilizando la máquina de estados; verificar que cambiar una cuenta a otra moneda produce `TRANSFER_CURRENCY_MISMATCH`
-- [ ] 2.4 (docs/31 D40) Test con el TC-id de la comisión en otra moneda: `Transaction.recordTransfer` con comisión en USD sobre una transferencia en BOB ⇒ `TRANSFER_CURRENCY_MISMATCH` en `/fee/amount/currency`, sin asiento ni evento (TC-TRANSACTIONS-TRANSFERFEE-001; el comportamiento ya está implementado)
+- [x] 2.4 (docs/31 D40) Test con el TC-id de la comisión en otra moneda: `Transaction.recordTransfer` con comisión en USD sobre una transferencia en BOB ⇒ `TRANSFER_CURRENCY_MISMATCH` en `/fee/amount/currency`, sin asiento ni evento (TC-TRANSACTIONS-TRANSFERFEE-001; el comportamiento ya está implementado)
   > Verificado 2026-10-04 (pendiente, código): `TC-TRANSACTIONS-TRANSFERFEE-001` existe (`ready`, `not_automated`) pero ningún test lleva su id ni prueba la comisión en USD con el puntero `/fee/amount/currency`.
+  > Hecho 2026-10-04: `[TC-TRANSACTIONS-TRANSFERFEE-001]` en `transfers.service.test.ts` (DomainError con violación en `/fee/amount/currency`, sin transacción, asiento ni outbox) y en `apps/api/test/api/transactions.api.test.ts` (422 problem+json, saldos 2000.00/0.00 BOB, sin `TransferCompleted`); TC `automated`.
 
 ## 3. APPLICATION
 
@@ -50,4 +52,5 @@
 
 - [x] 8.1 Actualizar docs/10 §9.1 (`TRANSFER_CURRENCY_MISMATCH`), docs/09 §6.4 (consistencia en BD) y docs/11 (semántica de re-emisión decidida); verificar enlaces
   > Hecho 2026-10-04: docs/10 §9.1 (`TRANSFER_CURRENCY_MISMATCH`, D37/D40), docs/09 §6.4 (comisión en la misma moneda, edición y eventos, `txn.assert_transfer_consistency` diferido) y docs/11 (D37: `TransferCompleted` una vez, `TransferRevised.v1` por edición); enlaces verificados.
-- [ ] 8.2 Regenerar la matriz, actualizar estados de TC y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar
+- [x] 8.2 Regenerar la matriz, actualizar estados de TC y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar
+  > Hecho 2026-10-04: todos los TC del change (TC-TRANSACTIONS-TRANSFER-001..009, TRANSFERFEE-001, CARDPAYMENT-001, TC-LEDGER-TRANSFER-001) `automated`; matriz regenerada (`pnpm traceability:matrix`), `pnpm traceability:check` y `pnpm spec:validate` en verde; change archivado.

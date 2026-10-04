@@ -159,8 +159,11 @@ export interface ListTransactionsQuery extends Omit<TransactionListFilter, 'q' |
 
 const MAX_BULK = 500;
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `transaction ${id} not found`);
-const preconditionFailed = () =>
-  new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6). */
+const preconditionFailed = (currentVersion: number) =>
+  new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    details: { currentVersion },
+  });
 const concurrencyConflict = () =>
   new DomainError('CONCURRENCY_CONFLICT', 'the transaction was modified concurrently');
 const UPDATED_EVENT_FIELDS: ReadonlySet<ChangedField> = new Set([
@@ -929,7 +932,7 @@ export class TransactionsService {
   private async load(workspaceId: string, id: string, expectedVersion: number): Promise<Transaction> {
     const tx = await this.deps.transactions.findById(workspaceId, id, { forUpdate: true });
     if (!tx) throw notFound(id);
-    if (tx.version !== expectedVersion) throw preconditionFailed();
+    if (tx.version !== expectedVersion) throw preconditionFailed(tx.version);
     return tx;
   }
 

@@ -12,8 +12,11 @@ invariants: [INV-002, INV-004]
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
+  - apps/api/test/api/transactions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["transfer", "fees", "multi-currency"]
@@ -51,4 +54,5 @@ Entonces se rechaza con el código "TRANSFER_CURRENCY_MISMATCH"
 
 ## Notas
 
-- El rechazo ya está implementado en `Transaction.recordTransfer` (`packages/contexts/transactions/src/domain/transaction.ts`); falta el test con este TC-id (tarea 2.4 de `add-transfers`).
+- El rechazo está implementado en `Transaction.recordTransfer` (`packages/contexts/transactions/src/domain/transaction.ts`).
+- Automatizado (2026-10-04, tarea 2.4 de `add-transfers`): servicio con dobles en memoria (sin transacción, asiento ni outbox) y API contra PostgreSQL real (422 problem+json con `errors[0].pointer = /fee/amount/currency`, saldos 2000.00/0.00 BOB, sin `TransferCompleted`).

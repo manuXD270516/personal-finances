@@ -69,6 +69,7 @@
 
 - [x] 9.1 Actualizar docs/08 §5.16 (columnas `origin`, `actor_process`), docs/04 §3.17 y docs/10 (operación `listAuditLog` ya en Phase 1); verificar enlaces
   > Hecho: docs/08 §5.16 (implementación: particiones, políticas, triggers), docs/04 §3.17 y docs/10 §13 actualizados; `docs/config-reference.md` regenerado.
-- [ ] 9.2 Actualizar `automation_status`/`status` de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict --no-interactive`; archivar el change
+- [x] 9.2 Actualizar `automation_status`/`status` de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict --no-interactive`; archivar el change
   > Parcial: `automation_status`/`status` actualizados y matriz regenerada; `openspec validate --all` en verde. **Pendiente:** archivar el change (lo hace el lead tras el merge).
   > Revisado 2026-10-04 (no archivable aún): `TC-AUDIT-ACCESS-002` (VIEWER ve el historial de una transacción pero no `/audit-log`, D28) sigue `ready`/`not_automated` sin test con su id, y docs/17 exige que los TC del change estén `automated` al archivar. El comportamiento existe (`GET …/transactions/{id}/history` para VIEWER; 403 en `/audit-log` probado en `[TC-AUDIT-ACCESS-001]`); falta un test de API `[TC-AUDIT-ACCESS-002]`.
+  > Hecho 2026-10-04: test de API `[TC-AUDIT-ACCESS-002]` en `apps/api/test/api/transactions.api.test.ts` (VIEWER obtiene `GET …/transactions/{id}/history` del gasto editado a 45.90 BOB; `GET /audit-log`, con y sin filtro por agregado, ⇒ 403 `INSUFFICIENT_ROLE`); TC `automated`. Los 11 TC del change están `automated`; matriz regenerada, `pnpm traceability:check` y `pnpm spec:validate` en verde; change archivado.

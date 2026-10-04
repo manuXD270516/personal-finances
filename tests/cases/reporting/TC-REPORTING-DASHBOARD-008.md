@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: api
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["dashboard","accounts","closed-account"]
@@ -32,7 +33,7 @@ expected_result:
   - "La lista de cuentas no incluye \"Caja Antigua\""
   - "Totales por moneda: 805.50 BOB y 50.000000 USDT"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-REPORTING-DASHBOARD-008 — El resumen incluye cuentas cerradas no archivadas y excluye las archivadas

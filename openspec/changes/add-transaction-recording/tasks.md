@@ -8,8 +8,9 @@
   > Revisado 2026-10-04 (sigue pendiente del owner): 1 ajuste en cero (D17) y 2 `reconciled → void` (D16) resueltos en docs/31. Siguen abiertas sin decisión: 3 sobre-reembolso con confirmación explícita (implementado con `confirmRefundExceedsOriginal`) y 4 evento propio `TransactionCleared` vs `TransactionUpdated` (implementado con `TransactionUpdated`).
 - [x] 1.2 Confirmar los TC listados en proposal.md (estado `ready`, `requirement` exacto); verificar con el chequeo del catálogo de `scripts/traceability` que no hay requirement Must sin TC
   > Verificado 2026-10-04: todos los TC de proposal.md existen en `tests/cases/transactions/` con `requirement` exacto (comparado con los `### Requirement:`), en `ready` o `automated`; `pnpm traceability:check` sin requirement Must sin TC.
-- [ ] 1.3 Aplicar en `contracts/openapi/finance-api.v1.yaml` y `contracts/events/` los cambios de design.md § Contratos (o confirmar que el proceso de consolidación los aplicó); verificar Redocly lint 0/0 y la meta-validación de los JSON Schema con sus `examples`
+- [x] 1.3 Aplicar en `contracts/openapi/finance-api.v1.yaml` y `contracts/events/` los cambios de design.md § Contratos (o confirmar que el proceso de consolidación los aplicó); verificar Redocly lint 0/0 y la meta-validación de los JSON Schema con sus `examples`
   > Verificado 2026-10-04 (parcial): el contenido de § Contratos está en el OpenAPI (`ACCOUNT_CLOSED`, `REFUND_EXCEEDS_ORIGINAL`, `TransactionCreateResult.warnings`, `mark-cleared`, `duplicate-check`, `unreconcile`, `history`, `paymentMethod`) y en `contracts/events/transactions/` (`TransactionUpdated.v1` con ejemplos); Redocly y Spectral corren en `pr.yml`. Falta: ningún test ni paso de CI valida los `examples` de los JSON Schema de eventos contra su schema.
+  > Hecho 2026-10-04: `apps/api/src/runtime/event-contracts.test.ts` meta-valida (Ajv strict) los 20 schemas de `contracts/events` y valida cada uno de sus `examples` (corre en `pnpm test`).
 
 ## 2. DOMAIN (TDD obligatorio: lógica financieramente crítica)
 
@@ -27,8 +28,9 @@
 - [x] 3.2 Implementar `AmendTransaction`, `ApplyClassification`, `VoidTransaction` con `reverseEntry` y validación de cuentas no activas (INV-026); verificar TC-TRANSACTIONS-ARCHIVED-001 y SPLIT-005
 - [x] 3.3 Implementar `SetClearedStatus` (individual y lote all-or-nothing con `bulkOperationId`), `MarkReconciled`, `UnreconcileTransaction`; verificar TC-TRANSACTIONS-CLEARED-001, CLEARED-002
 - [x] 3.4 Implementar queries `GetTransaction`, `ListTransactions` (filtros, subcategorías, cursor) y `CheckDuplicates`; verificar TC-TRANSACTIONS-LIST-001
-- [ ] 3.5 Emitir `TransactionCreated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransactionUpdated` según design.md § Eventos; verificar con tests de contrato del productor (Ajv strict) contra `contracts/events/transactions/*`
+- [x] 3.5 Emitir `TransactionCreated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransactionUpdated` según design.md § Eventos; verificar con tests de contrato del productor (Ajv strict) contra `contracts/events/transactions/*`
   > Verificado 2026-10-04 (parcial): los cinco eventos se emiten (`transaction-lifecycle.ts`) y `PgOutboxWriter` valida cada sobre con Ajv strict en tiempo de ejecución (ejercitado por los tests de API). Falta: un test de contrato del productor dedicado (como `identity/src/application/events.contract.test.ts`).
+  > Hecho 2026-10-04: test de contrato del productor en `apps/api/test/api/transactions.api.test.ts` ("Contrato del productor…"): recorrido real por HTTP (pendiente → posteo, edición descriptiva y financiera, recategorización, cleared, anulación, transferencia con comisión y su edición) y validación Ajv strict de CADA sobre del outbox contra `contracts/events/transactions/*`; exige los 7 tipos (Created, Posted, Updated, Categorized, Voided, TransferCompleted, TransferRevised) y montos siempre string.
 
 ## 4. INFRASTRUCTURE
 
@@ -38,12 +40,15 @@
 
 ## 5. API
 
-- [ ] 5.1 Implementar controllers `createTransaction` (con `warnings[]`), `getTransaction`, `listTransactions`, `updateTransaction`, `voidTransaction`, `postTransaction`, `markTransactionsCleared`, `unreconcileTransaction`, `checkTransactionDuplicates` con `x-required-role`; verificar contract tests contra el OpenAPI
+- [x] 5.1 Implementar controllers `createTransaction` (con `warnings[]`), `getTransaction`, `listTransactions`, `updateTransaction`, `voidTransaction`, `postTransaction`, `markTransactionsCleared`, `unreconcileTransaction`, `checkTransactionDuplicates` con `x-required-role`; verificar contract tests contra el OpenAPI
   > Verificado 2026-10-04 (parcial): las rutas existen en `packages/contexts/transactions/src/interface/transactions-http.ts` y la matriz `[TC-SECURITY-RBAC-002]` comprueba `x-required-role` de las operaciones implementadas. Falta: test contrato↔rutas (la matriz omite las operaciones sin ruta) y test de API de `warnings[]`.
-- [ ] 5.2 Verificar `If-Match`/`ETag` (412/428/409) y `Idempotency-Key` con TC-TRANSACTIONS-CONCURRENCY-001 y TC-TRANSACTIONS-IDEMPOTENCY-001; verificar problem+json con `errors[].pointer` en TC-TRANSACTIONS-AMOUNT-001
+  > Hecho 2026-10-04: `apps/api/test/api/contract-routes.api.test.ts` enumera las rutas Express montadas por Nest: toda ruta bajo `/api/v1` es una operación del contrato (los DELETE extra responden 405 con `Allow`), toda operación del contrato tiene ruta salvo la lista explícita de pendientes (`getLedgerTrialBalance`, `getOperation`), todas las de TRANSACTIONS están montadas y `x-required-role` se aplica en cada una (VIEWER ⇒ 403 `INSUFFICIENT_ROLE` en las de EDITOR). `warnings[]` `POSSIBLE_DUPLICATE` verificado por API (validado contra `TransactionCreateResult`).
+- [x] 5.2 Verificar `If-Match`/`ETag` (412/428/409) y `Idempotency-Key` con TC-TRANSACTIONS-CONCURRENCY-001 y TC-TRANSACTIONS-IDEMPOTENCY-001; verificar problem+json con `errors[].pointer` en TC-TRANSACTIONS-AMOUNT-001
   > Verificado 2026-10-04 (pendiente, código): `If-Match`/`ETag` e `Idempotency-Key` solo se prueban sobre el harness de convenciones (`api-conventions.api.test.ts`), no contra `/transactions`; no hay test de API `[TC-TRANSACTIONS-CONCURRENCY-001]` ni `[TC-TRANSACTIONS-AMOUNT-001]`.
-- [ ] 5.3 Verificar TC-TRANSACTIONS-FIELDS-001, DATES-001 y HISTORY-001 a nivel API (historial vía `GET W/audit-log`)
+  > Hecho 2026-10-04 en `apps/api/test/api/transactions.api.test.ts`: `[TC-TRANSACTIONS-CONCURRENCY-001]` (200 con ETag "2"; versión obsoleta ⇒ 412 `PRECONDITION_FAILED` con `currentVersion: 2` sin asientos extra; anular sin If-Match ⇒ 428; dos PATCH simultáneos ⇒ un ganador y 412/409), `[TC-TRANSACTIONS-IDEMPOTENCY-001]` sobre `POST /transactions` (réplica idéntica con `Idempotent-Replayed`, Location y ETag; 1 transacción, 1 asiento, 1 auditoría, 2 eventos; saldo 925.00) y `[TC-TRANSACTIONS-AMOUNT-001]` (422 `AMOUNT_SCALE_EXCEEDED` en `/amount/amount` sin persistir; 1.234567 USDT ⇒ 98.765433). **Bug corregido:** el 412 de `/transactions` (y de `amendConversion`) no incluía `currentVersion` (docs/10 §6, `Problem.currentVersion`): `DomainError` admite `details` y `renderProblem` publica solo `currentVersion` entero; regresión en `error-catalog.test.ts`.
+- [x] 5.3 Verificar TC-TRANSACTIONS-FIELDS-001, DATES-001 y HISTORY-001 a nivel API (historial vía `GET W/audit-log`)
   > Verificado 2026-10-04 (pendiente, código): no hay tests `[TC-TRANSACTIONS-FIELDS-001]` ni `[TC-TRANSACTIONS-DATES-001]` (ambos `ready` sin test), ni `[TC-TRANSACTIONS-HISTORY-001]` a nivel API (solo servicio).
+  > Hecho 2026-10-04 en `apps/api/test/api/transactions.api.test.ts`: `[TC-TRANSACTIONS-FIELDS-001]` (ida y vuelta de todos los campos, contraparte, tag, `externalRef`, montos string; listado por contraparte), `[TC-TRANSACTIONS-DATES-001]` (asiento con `entry_date` 2026-03-31, saldo al 31-mar 800.00, gasto en marzo y no en abril vía `/reports/summary`) y `[TC-TRANSACTIONS-HISTORY-001]` (`GET …/history` como VIEWER y `GET W/audit-log?aggregateType=Transaction&aggregateId=…`; otro workspace ⇒ 404); TC `automated`.
 
 ## 6. UI
 

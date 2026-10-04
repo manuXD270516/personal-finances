@@ -215,7 +215,9 @@ export class ConversionsService {
       const tx = await this.deps.transactions.findById(workspaceId, cmd.transactionId, { forUpdate: true });
       if (!tx || tx.snapshot.kind !== 'CONVERSION') throw notFound(cmd.transactionId);
       if (tx.version !== cmd.expectedVersion) {
-        throw new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+        throw new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+          details: { currentVersion: tx.version },
+        });
       }
       const reason = cmd.reason?.trim() || null;
       if (reason && reason.length > 500) {

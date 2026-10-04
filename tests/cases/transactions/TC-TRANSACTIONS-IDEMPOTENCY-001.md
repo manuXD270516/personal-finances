@@ -18,9 +18,10 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
-- apps/api/test/api/api-conventions.api.test.ts
-- packages/platform/src/api/idempotency/policy.test.ts
-- apps/web/src/bff/finance-api-client.test.ts
+  - apps/api/test/api/api-conventions.api.test.ts
+  - packages/platform/src/api/idempotency/policy.test.ts
+  - apps/web/src/bff/finance-api-client.test.ts
+  - apps/api/test/api/transactions.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -53,7 +54,7 @@ expected_result:
 - Existe una sola transacción, un solo asiento, una sola fila de auditoría y un solo evento para el gasto
 - 'Saldo de Bank A: 925.00 BOB'
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-TRANSACTIONS-IDEMPOTENCY-001 — Repetir un POST con el mismo Idempotency-Key devuelve el resultado original sin duplicar

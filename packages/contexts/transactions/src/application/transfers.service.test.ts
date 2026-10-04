@@ -111,6 +111,28 @@ describe('RecordTransfer', () => {
     expect(netWorth(balanceOf)).toBe('-10.00');
   });
 
+  it('[TC-TRANSACTIONS-TRANSFERFEE-001] comisión en USD sobre una transferencia en BOB ⇒ TRANSFER_CURRENCY_MISMATCH en /fee/amount/currency sin asiento ni evento (D40)', async () => {
+    const { service, state, balanceOf } = setup();
+    let error: unknown;
+    try {
+      await service.recordTransfer(
+        cmd({
+          amount: { amount: '1000.00', currency: 'BOB' },
+          fee: { amount: { amount: '1.50', currency: 'USD' } },
+        }),
+      );
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(DomainError);
+    expect((error as DomainError).code).toBe('TRANSFER_CURRENCY_MISMATCH');
+    expect((error as DomainError).violations.map((v) => v.pointer)).toEqual(['/fee/amount/currency']);
+    expect(state.txs.size).toBe(0);
+    expect(state.entries).toHaveLength(0);
+    expect(state.outbox).toHaveLength(0);
+    expect([balanceOf(A), balanceOf(B)]).toEqual(['0.00', '0.00']);
+  });
+
   it('[TC-TRANSACTIONS-TRANSFER-005] destino archivado ⇒ ACCOUNT_ARCHIVED sin persistir nada', async () => {
     const { service, state, balanceOf } = setup();
     expect(await codeOf(service.recordTransfer(cmd({ toAccountId: ARCHIVED })))).toBe('ACCOUNT_ARCHIVED');
