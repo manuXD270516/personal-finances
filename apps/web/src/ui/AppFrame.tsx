@@ -41,7 +41,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
           >
             {me.memberships.map((m) => (
               <option key={m.workspaceId} value={m.workspaceId}>
-                {m.workspaceName}
+                {m.isDemo ? t('demoOption', { name: m.workspaceName }) : m.workspaceName}
               </option>
             ))}
           </select>
@@ -66,6 +66,24 @@ export function AppFrame({ children }: { children: ReactNode }) {
           {t('ready')}
         </span>
       </header>
+      {active?.isDemo ? (
+        // Indicador persistente y no descartable (add-demo-data, FR-IDENTITY-014): toda pantalla del workspace demo.
+        <p
+          data-testid="demo-indicator"
+          role="note"
+          style={{
+            margin: '0.5rem 0',
+            padding: '0.5rem 0.75rem',
+            border: '2px solid #9a6700',
+            borderRadius: '0.375rem',
+            background: '#fff8c5',
+            color: '#3b2300',
+            fontWeight: 600,
+          }}
+        >
+          {t('demoIndicator')}
+        </p>
+      ) : null}
       <main>{children}</main>
     </>
   );

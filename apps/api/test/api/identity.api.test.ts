@@ -136,7 +136,7 @@ describe('[TC-IDENTITY-AUTH-006] GET /me devuelve perfil, locale, zona horaria y
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ id: u.id, locale: 'es-BO', timezone: 'America/La_Paz' });
     expect(r.body['memberships']).toEqual([
-      { workspaceId: u.personal, workspaceName: expect.any(String), role: 'OWNER' },
+      { workspaceId: u.personal, workspaceName: expect.any(String), role: 'OWNER', isDemo: false },
     ]);
     expect(r.headers.get('etag')).toBe(`"${String(r.body['version'])}"`);
   });

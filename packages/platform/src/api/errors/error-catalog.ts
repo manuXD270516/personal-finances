@@ -34,6 +34,9 @@ export const ERROR_CATALOG = {
   INVALID_TIMEZONE: { status: 422, title: 'Invalid IANA time zone' },
   WORKSPACE_PENDING_DELETION: { status: 409, title: 'Workspace is pending deletion' },
   LAST_OWNER_CANNOT_LEAVE: { status: 409, title: 'The last owner cannot leave the workspace' },
+  DEMO_WORKSPACE_ALREADY_EXISTS: { status: 409, title: 'A demo workspace already exists for this user' },
+  WORKSPACE_NOT_DEMO: { status: 409, title: 'Workspace is not a demo workspace' },
+  DEMO_DATA_DISABLED: { status: 403, title: 'Loading demo data is disabled in this environment' },
   // money / ledger
   MONEY_INVALID_AMOUNT: { status: 422, title: 'Invalid amount' },
   AMOUNT_OUT_OF_RANGE: { status: 422, title: 'Amount out of range' },

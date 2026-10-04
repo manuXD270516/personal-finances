@@ -472,3 +472,14 @@ Los puertos de host ya no son los canónicos: defaults "2 + puerto canónico" (2
 6. **Docker Desktop vs alternativas** (licencia de Docker Desktop para uso personal es gratuita; Rancher/Podman no se soportan oficialmente): ¿se exige Docker Desktop?
 7. **Ubicación del repo:** ¿mover el repo de `D:\projects` a WSL2 para habilitar Modo C y Dev Containers con buen rendimiento?
 8. ~~**Valkey vs Redis**~~ — resuelto: Valkey 9.1 en el perfil opcional `valkey`. Pregunta original: se propone Valkey 8 (licencia BSD) por paridad con ElastiCache for Valkey ([21-cloud-deployment-options.md](21-cloud-deployment-options.md)).
+
+## Guion de demo con datos de demostración (add-demo-data)
+
+1. `pnpm stack:up` + `pnpm db:migrate` + `pnpm db:seed` (Minimal) e iniciar sesión como `owner@demo.pfos.test`.
+2. Configuración del espacio → **Datos de demostración** → "Cargar datos de demostración" (confirmar). Se crea "Demo — Finanzas de
+   Valeria" (workspace separado; W1 no cambia) y la carga corre en el worker (< 2 min, progreso visible).
+3. "Ir al espacio de demostración": Home, cuentas, transacciones y Cripto/FX con 21 meses de datos ficticios; el indicador
+   "Datos de demostración" aparece en toda pantalla y el selector etiqueta el workspace.
+4. Al terminar: Configuración → "Limpiar datos de demostración" (confirmar). El demo desaparece al instante y el worker lo purga.
+   Alternativa sin UI: `pnpm db:seed -- --profile=demo`. `DEMO_DATA_ENABLED=false` oculta la carga (por defecto en staging/production).
+

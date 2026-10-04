@@ -524,6 +524,7 @@ describe('Consumidor reporting.data-version (platform.inbox)', () => {
       'accounts.AccountOpened.v1',
       'accounts.AccountArchived.v1',
       'fx.RateRecorded.v1',
+      'identity.DemoDataLoaded.v1',
     ]);
     const consumers = new EventConsumerRuntime({
       pool: worker,

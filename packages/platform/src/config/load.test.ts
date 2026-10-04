@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from './load.js';
+import { ConfigError, demoDataEnabled, loadConfig } from './load.js';
 
 const API_ENV = {
   PFOS_ENV: 'ci',
@@ -167,5 +167,17 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     const badKey = captureError(() => loadConfig('web', { ...env, BFF_SESSION_ENC_KEY: 'k1:corta' }));
     expect(badKey.problems.map((p) => p.variable)).toEqual(['BFF_SESSION_ENC_KEY']);
     expect(JSON.stringify(badKey.problems)).not.toContain('corta');
+  });
+
+  it('[TC-IDENTITY-DEMO-012] DEMO_DATA_ENABLED: por defecto habilitada en local/ci y deshabilitada en staging/production', () => {
+    expect(loadConfig('api', API_ENV).DEMO_DATA_ENABLED).toBe(true);
+    expect(loadConfig('api', { ...API_ENV, PFOS_ENV: 'local' }).DEMO_DATA_ENABLED).toBe(true);
+    expect(loadConfig('api', { ...API_ENV, DEMO_DATA_ENABLED: 'false' }).DEMO_DATA_ENABLED).toBe(false);
+    expect(demoDataEnabled({ PFOS_ENV: 'staging' })).toBe(false);
+    expect(demoDataEnabled({ PFOS_ENV: 'production' })).toBe(false);
+    expect(demoDataEnabled({ PFOS_ENV: 'production', DEMO_DATA_ENABLED: true })).toBe(true);
+    expect(
+      captureError(() => loadConfig('api', { ...API_ENV, DEMO_DATA_ENABLED: 'quizas' })).problems,
+    ).toEqual([expect.objectContaining({ variable: 'DEMO_DATA_ENABLED' })]);
   });
 });

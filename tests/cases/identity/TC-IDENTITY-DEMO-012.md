@@ -12,9 +12,9 @@ invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/demo-data.api.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts","packages/platform/src/config/load.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","config"]
@@ -31,7 +31,7 @@ expected_result:
   - "La configuración no muestra \"Cargar datos de demostración\""
   - "Si existía un demo previo, \"Limpiar datos de demostración\" sigue disponible"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-012 — Con la carga deshabilitada por entorno la API la rechaza y la UI no la ofrece

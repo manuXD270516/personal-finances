@@ -12,9 +12,9 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/demo-data.api.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","authorization"]
@@ -29,7 +29,7 @@ expected_result:
   - "Respuesta 403 con code INSUFFICIENT_ROLE"
   - "No se crea ningún workspace ni job de carga"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-002 — Un EDITOR no puede cargar datos de demostración

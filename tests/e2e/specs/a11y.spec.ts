@@ -18,6 +18,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/fx/conversiones/nueva', name: 'Nueva conversión' },
   { path: '/instituciones', name: 'Instituciones' },
   { path: '/clasificacion', name: 'Clasificación' },
+  // add-demo-data 6.1: configuración del workspace con el panel "Datos de demostración" (OWNER).
+  { path: '/configuracion', name: 'Configuración y datos de demostración' },
 ];
 
 async function seriousViolations(page: Page) {

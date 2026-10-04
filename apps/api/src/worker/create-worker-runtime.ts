@@ -23,8 +23,12 @@ import {
   parseFxProviderSettings,
   type FxMarketRateJobsOptions,
 } from '@pf/fx/interface/fx.module';
-import { createLifecycleBackfill } from '@pf/audit/interface/audit.module';
-import { identityActiveWorkspaces } from '@pf/identity/interface/identity.module';
+import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface/audit.module';
+import {
+  createDemoDataRuntime,
+  identityActiveWorkspaces,
+  identityWorkspaceTimeZones,
+} from '@pf/identity/interface/identity.module';
 import { createLedgerMaintenance } from '@pf/ledger/interface/ledger.module';
 import { PinoNestLogger } from '@pf/platform/nest';
 import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
@@ -38,6 +42,9 @@ import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import { registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
+import { registerDemoJobs } from './demo-jobs.js';
+import { DemoDataLoader } from '../demo/demo-data-loader.js';
+import { AUDIT_POLICIES, demoDataOptions, outboxPort } from '../identity/identity-wiring.js';
 import { WorkerModule } from './platform-jobs.js';
 
 export interface WorkerRuntime {
@@ -72,6 +79,8 @@ export interface WorkerRuntimeOptions {
   readonly fxGapFillOnStart?: boolean;
   /** Encola la reconstrucción del recorrido desde la auditoría al arrancar (por defecto sí; add-lifecycle-timeline). */
   readonly lifecycleBackfillOnStart?: boolean;
+  /** Tests (add-demo-data): falla inyectada del cargador demo (`<módulo>/<YYYY-MM>`). */
+  readonly demoFailAt?: string;
 }
 
 export async function createWorkerRuntime(
@@ -114,26 +123,23 @@ export async function createWorkerRuntime(
     { logger: new PinoNestLogger(logger), abortOnError: false },
   );
 
+  const ledgerMaintenance = createLedgerMaintenance({
+    pool,
+    clock: options.clock ?? systemClock,
+    logger,
+    metrics: otelCounters('@pf/ledger'),
+  });
+
   // Job diario del ledger: verificador de invariantes + snapshots (add-ledger-core 5.6). Corre también al arrancar,
   // así `restore:local` (que reinicia el worker) verifica el ledger restaurado.
   const activeWorkspaces = identityActiveWorkspaces(pool);
   const auditMetrics = otelCounters('@pf/audit');
-  await registerLedgerDailyJob(
-    queue,
-    createLedgerMaintenance({
-      pool,
-      clock: options.clock ?? systemClock,
-      logger,
-      metrics: otelCounters('@pf/ledger'),
-    }),
-    logger,
-    {
-      cron: config.LEDGER_INTEGRITY_CRON,
-      tz: config.LEDGER_INTEGRITY_CRON_TZ,
-      runOnStart: options.ledgerMaintenanceOnStart ?? true,
-      afterIntegrity: () => verifyLifecycleConsistency(pool, activeWorkspaces, logger, auditMetrics),
-    },
-  );
+  await registerLedgerDailyJob(queue, ledgerMaintenance, logger, {
+    cron: config.LEDGER_INTEGRITY_CRON,
+    tz: config.LEDGER_INTEGRITY_CRON_TZ,
+    runOnStart: options.ledgerMaintenanceOnStart ?? true,
+    afterIntegrity: () => verifyLifecycleConsistency(pool, activeWorkspaces, logger, auditMetrics),
+  });
   await registerLifecycleBackfillJob(queue, createLifecycleBackfill(pool), activeWorkspaces, logger, {
     runOnStart: options.lifecycleBackfillOnStart ?? true,
   });
@@ -159,6 +165,40 @@ export async function createWorkerRuntime(
     logger,
     { gapFillOnStart: options.fxGapFillOnStart ?? true },
   );
+
+  // Datos de demostración (add-demo-data): carga por casos de uso (`demo.load`) y purga acotada (`demo.purge`).
+  const demoAudit = createAuditRuntime({
+    pool,
+    clock: systemClock,
+    policies: AUDIT_POLICIES,
+    timeZones: identityWorkspaceTimeZones(pool),
+  });
+  const demo = createDemoDataRuntime({
+    pool,
+    clock: options.clock ?? systemClock,
+    outbox: outboxPort(fxOutbox),
+    audit: demoAudit.port,
+    defaults: {
+      baseCurrency: config.APP_REPORTING_CURRENCY,
+      timeZone: config.APP_TIMEZONE,
+      locale: config.APP_DEFAULT_LOCALE,
+      personalWorkspaceName: 'Personal',
+    },
+    // En el worker la habilitación no aplica (solo la API crea demos); la cola sí: la purga se encola desde la API.
+    demo: demoDataOptions({ PFOS_ENV: config.PFOS_ENV, DEMO_DATA_ENABLED: false }, queue),
+  });
+  await registerDemoJobs(queue, {
+    demo,
+    logger,
+    loader: new DemoDataLoader({
+      pool,
+      logger,
+      demo,
+      config,
+      ledgerMaintenance,
+      ...(options.demoFailAt ? { failAt: options.demoFailAt } : {}),
+    }),
+  });
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
   // REPORTING (add-basic-dashboard): versión derivada de los datos por workspace (ETag del resumen del Home).

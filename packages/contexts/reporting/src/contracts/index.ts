@@ -21,6 +21,8 @@ export const REPORTING_INVALIDATING_EVENTS = [
   { type: 'accounts.AccountOpened', version: 1 },
   { type: 'accounts.AccountArchived', version: 1 },
   { type: 'fx.RateRecorded', version: 1 },
+  // add-demo-data: el workspace demo terminó de cargarse (invalida la caché del resumen del Home).
+  { type: 'identity.DemoDataLoaded', version: 1 },
 ] as const;
 
 export interface MoneyDto {

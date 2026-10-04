@@ -1,0 +1,23 @@
+{
+  "datasetVersion": "1",
+  "anchorDate": "2026-09-30",
+  "balances": {
+    "bank_bob": "132486.57",
+    "bank_usd": "2181.70",
+    "cash": "9073.69",
+    "usdt": "3975.726532",
+    "btc": "0.01108761",
+    "card": "1572.65",
+    "loan": "27200.00"
+  },
+  "counts": {
+    "accounts": 7,
+    "transactions": 560,
+    "pending": 2,
+    "transfers": 61,
+    "conversions": 34,
+    "rates": 210,
+    "edits": 2,
+    "voids": 1
+  }
+}

@@ -422,6 +422,14 @@ export const VARIABLES = {
     description: 'Dirección de escucha de los probes del worker.',
     default: '0.0.0.0',
   }),
+  // ── Datos de demostración (openspec add-demo-data, ADR-0026, docs/31 D41) ──
+  DEMO_DATA_ENABLED: variable(bool, {
+    group: 'Producto',
+    description:
+      'Habilita la acción "Cargar datos de demostración" (workspace demo dedicado, purgable). Sin valor: `true` con `PFOS_ENV=local|ci` y `false` con `staging|production` (decisión del owner D41). La limpieza de workspaces demo existentes sigue disponible aunque esté deshabilitada.',
+    optional: true,
+    example: 'true',
+  }),
   LEDGER_INTEGRITY_CRON: variable(
     z
       .string()
@@ -599,6 +607,7 @@ export const APP_VARIABLES = {
     'OIDC_API_AUDIENCE',
     'OIDC_REQUIRED_SCOPE',
     'OIDC_CLOCK_SKEW_SECONDS',
+    'DEMO_DATA_ENABLED',
     ...FX_PROVIDERS,
   ],
   // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
@@ -632,7 +641,7 @@ export const APP_VARIABLES = {
     'OBJECT_STORAGE_CORS_ORIGINS',
   ],
   // `seed` lee OIDC_ISSUER_URL para sembrar las identidades de la Minimal Seed (usuarios del realm de desarrollo).
-  seed: [...GENERAL, ...PRODUCT, ...DATABASE, 'OIDC_ISSUER_URL'],
+  seed: [...GENERAL, ...PRODUCT, ...DATABASE, 'OIDC_ISSUER_URL', 'DEMO_DATA_ENABLED'],
   web: [
     ...GENERAL,
     'WEB_PUBLIC_URL',

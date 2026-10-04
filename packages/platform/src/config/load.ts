@@ -71,6 +71,11 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     }
   }
 
+  // DEMO_DATA_ENABLED sin valor: habilitada solo en local/ci (docs/31 D41; add-demo-data).
+  if (names.includes('DEMO_DATA_ENABLED') && values['DEMO_DATA_ENABLED'] === undefined) {
+    values['DEMO_DATA_ENABLED'] = values['PFOS_ENV'] === 'local' || values['PFOS_ENV'] === 'ci';
+  }
+
   // Reglas entre variables (toggles de dependencias, docs/19 §0.3 punto 6).
   if (names.includes('VALKEY_URL')) {
     const needsValkey = values['JOB_QUEUE_DRIVER'] === 'bullmq' || values['SESSION_STORE'] === 'valkey';
@@ -195,4 +200,12 @@ export function loadConfigOrExit<A extends AppName>(app: A, env: EnvSource = pro
 /** true durante `next build` (la configuración de runtime no existe en build: build once, docs/20 §7). */
 export function isNextBuildPhase(env: EnvSource = process.env): boolean {
   return env['NEXT_PHASE'] === 'phase-production-build';
+}
+
+/** `DEMO_DATA_ENABLED` efectivo (ya resuelto por `loadConfig`; el fallback cubre configuraciones armadas a mano). */
+export function demoDataEnabled(config: {
+  readonly PFOS_ENV: string;
+  readonly DEMO_DATA_ENABLED?: boolean | undefined;
+}): boolean {
+  return config.DEMO_DATA_ENABLED ?? (config.PFOS_ENV === 'local' || config.PFOS_ENV === 'ci');
 }

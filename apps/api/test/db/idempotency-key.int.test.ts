@@ -85,7 +85,10 @@ describe('platform.idempotency_key: RLS, grants y PgIdempotencyStore (tareas 4.1
       `SELECT policyname, roles::text[] AS roles, cmd FROM pg_policies
         WHERE schemaname = 'platform' AND tablename = 'idempotency_key' ORDER BY policyname`,
     );
+    // add-demo-data: políticas del dueño acotadas a la GUC de purga de workspaces demo (ADR-0026).
     expect(policies.rows).toEqual([
+      { policyname: 'demo_purge_delete', roles: ['pf_migrator'], cmd: 'DELETE' },
+      { policyname: 'demo_purge_read', roles: ['pf_migrator'], cmd: 'SELECT' },
       { policyname: 'idempotency_key_retention_purge', roles: ['pf_maintenance'], cmd: 'DELETE' },
       { policyname: 'idempotency_key_retention_read', roles: ['pf_maintenance'], cmd: 'SELECT' },
       { policyname: 'idempotency_key_scope', roles: ['pf_app'], cmd: 'ALL' },

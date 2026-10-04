@@ -1,10 +1,15 @@
-import { FixedClock, Instant, currency, type Currency } from '@pf/shared-kernel';
+import { DomainError, FixedClock, Instant, currency, type Currency } from '@pf/shared-kernel';
 import { LocaleTag } from '../../domain/locale-tag.js';
 import type { Role } from '../../domain/role.js';
 import { User } from '../../domain/user.js';
 import { Workspace } from '../../domain/workspace.js';
 import type { AuditEntry } from '@pf/audit/contracts';
 import type {
+  DemoDataDeps,
+  DemoDataSettings,
+  DemoLoadJob,
+  DemoPurgeJob,
+  DemoRun,
   IdentityDeps,
   OutboxEvent,
   RlsContext,
@@ -36,6 +41,11 @@ export class InMemoryIdentity {
   private depth = 0;
   private current: RlsContext | null = null;
   readonly clock = new FixedClock(Instant.parse('2026-10-02T12:00:00Z'));
+  /** add-demo-data: registro de cargas y jobs encolados (solo si la transacción confirma). */
+  readonly demoRuns = new Map<string, DemoRun>();
+  readonly loadJobs: DemoLoadJob[] = [];
+  readonly purgeJobs: DemoPurgeJob[] = [];
+  readonly purged = new Set<string>();
 
   nextId(): string {
     this.seq += 1;
@@ -93,6 +103,9 @@ export class InMemoryIdentity {
             workspaces: new Map(self.workspaces),
             outbox: self.outboxEvents.length,
             audit: self.auditEntries.length,
+            runs: new Map(self.demoRuns),
+            loads: self.loadJobs.length,
+            purges: self.purgeJobs.length,
           };
           self.contexts.push(ctx);
           const previous = self.current;
@@ -107,6 +120,10 @@ export class InMemoryIdentity {
             for (const [k, v] of snapshot.workspaces) self.workspaces.set(k, v);
             self.outboxEvents.length = snapshot.outbox;
             self.auditEntries.length = snapshot.audit;
+            self.demoRuns.clear();
+            for (const [k, v] of snapshot.runs) self.demoRuns.set(k, v);
+            self.loadJobs.length = snapshot.loads;
+            self.purgeJobs.length = snapshot.purges;
             throw err;
           } finally {
             self.depth -= 1;
@@ -158,6 +175,9 @@ export class InMemoryIdentity {
               if (other.personalOfUserId === ws.personalOfUserId) throw new Error('unique violation');
             }
           }
+          if (ws.demo && self.activeDemoOf(ws.demo.requestedBy)) {
+            throw new DomainError('DEMO_WORKSPACE_ALREADY_EXISTS', 'unique violation');
+          }
           self.workspaces.set(ws.id, Workspace.restore(ws.snapshot()));
         },
         async findById(id) {
@@ -168,9 +188,14 @@ export class InMemoryIdentity {
           self.workspaces.set(ws.id, Workspace.restore(ws.snapshot()));
           return true;
         },
+        async lockDemoRequests() {},
+        async findActiveDemoFor(userId) {
+          const ws = self.activeDemoOf(userId);
+          return ws ? self.load(ws.id) : null;
+        },
         async listForUser(userId, page) {
           return [...self.workspaces.values()]
-            .filter((w) => w.roleOf(userId) !== null)
+            .filter((w) => w.roleOf(userId) !== null && !w.isRetired)
             .filter((w) => page?.afterId === undefined || w.id > page.afterId)
             .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
             .slice(0, page?.limit ?? Number.MAX_SAFE_INTEGER)
@@ -179,12 +204,18 @@ export class InMemoryIdentity {
               name: w.settings.name,
               role: w.roleOf(userId) as Role,
               baseCurrency: w.settings.baseCurrency.code,
+              isDemo: w.isDemo,
             }));
         },
       },
       memberships: {
         async activeRole(userId, workspaceId) {
-          return self.workspaces.get(workspaceId)?.roleOf(userId) ?? null;
+          const ws = self.workspaces.get(workspaceId);
+          return ws && !ws.isRetired ? ws.roleOf(userId) : null;
+        },
+        async retiredRole(userId, workspaceId) {
+          const ws = self.workspaces.get(workspaceId);
+          return ws && ws.isRetired && !self.purged.has(ws.id) ? ws.roleOf(userId) : null;
         },
       },
       currencies: {
@@ -212,6 +243,70 @@ export class InMemoryIdentity {
         timeZone: 'America/La_Paz',
         locale: 'es-BO',
         personalWorkspaceName: 'Personal',
+      },
+    };
+  }
+
+  private activeDemoOf(userId: string): Workspace | undefined {
+    return [...this.workspaces.values()].find(
+      (w) => w.demo?.requestedBy === userId && w.demo.status !== 'PURGED',
+    );
+  }
+
+  /** Dependencias de `DemoDataService` (add-demo-data) sobre los mismos fakes. */
+  demoDeps(settings: Partial<DemoDataSettings> = {}): DemoDataDeps {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- los fakes cierran sobre el estado
+    const self = this;
+    return {
+      ...this.deps(),
+      demoRuns: {
+        async insert(run) {
+          self.demoRuns.set(run.workspaceId, run);
+        },
+        async find(id) {
+          return self.demoRuns.get(id) ?? null;
+        },
+        async latestForOrigin(originWorkspaceId, userId) {
+          return (
+            [...self.demoRuns.values()]
+              .filter((r) => r.originWorkspaceId === originWorkspaceId && r.requestedBy === userId)
+              .sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1))[0] ?? null
+          );
+        },
+        async update(id, patch) {
+          const run = self.demoRuns.get(id);
+          if (run) self.demoRuns.set(id, { ...run, ...patch });
+        },
+      },
+      demoJobs: {
+        async enqueueLoad(job) {
+          self.loadJobs.push(job);
+        },
+        async enqueuePurge(job) {
+          self.purgeJobs.push(job);
+        },
+      },
+      demoPurge: {
+        async purge(id) {
+          const ws = self.workspaces.get(id);
+          if (!ws?.isDemo || ws.demo?.status !== 'CLEANING') throw new Error('PF006 DEMO_PURGE_NOT_ALLOWED');
+          const copy = Workspace.restore(ws.snapshot());
+          copy.markDemoPurged();
+          self.workspaces.set(id, copy);
+          self.purged.add(id);
+          const run = self.demoRuns.get(id);
+          const rows = { 'ledger.posting': 4, 'audit.audit_log': 7 };
+          if (run)
+            self.demoRuns.set(id, { ...run, purgedAt: self.clock.now().toString(), rowsDeleted: rows });
+          return rows;
+        },
+      },
+      demo: {
+        enabled: true,
+        datasetVersion: '1',
+        workspaceName: 'Demo — Finanzas de Valeria',
+        modules: ['identity', 'accounts', 'classification', 'ledger', 'transactions', 'fx'],
+        ...settings,
       },
     };
   }

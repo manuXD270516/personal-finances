@@ -12,9 +12,9 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/demo-data.api.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","ui"]
@@ -30,7 +30,7 @@ expected_result:
   - "El Home del workspace demo muestra el indicador persistente \"Datos de demostración\""
   - "El selector de workspaces etiqueta el workspace demo"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-004 — El workspace de demostración se identifica como demo en la API y en la UI

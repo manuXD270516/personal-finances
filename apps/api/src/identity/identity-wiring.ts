@@ -25,10 +25,14 @@ import {
   identityUserLocales,
   identityWorkspaceSettings,
   identityWorkspaceTimeZones,
+  type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
 import type { JwtVerifierOptions } from '@pf/platform/api';
-import type { ApiConfig } from '@pf/platform/config';
+import { demoDataEnabled, type ApiConfig } from '@pf/platform/config';
+import type { JobQueue } from '@pf/platform/queue';
+import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
+import { demoJobsPort } from '../demo/demo-jobs-port.js';
 import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
@@ -39,6 +43,8 @@ import {
   TransactionsModule,
 } from '@pf/transactions/interface/transactions.module';
 import { TRANSACTIONS_AUDIT_POLICY } from '@pf/transactions/contracts';
+import type { AuditHistoryQuery } from '@pf/audit/contracts';
+import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
@@ -81,6 +87,22 @@ export function classificationOutbox(writer: OutboxWriter = new PgOutboxWriter(e
   };
 }
 
+/** Máquinas de estado del recorrido (add-lifecycle-timeline). */
+export const LIFECYCLE_MACHINES = [
+  TRANSACTION_LIFECYCLE_MACHINE,
+  ACCOUNT_LIFECYCLE_MACHINE,
+  EXCHANGE_RATE_LIFECYCLE_MACHINE,
+];
+
+/** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
+export const AUDIT_POLICIES = [
+  IDENTITY_AUDIT_POLICY,
+  CLASSIFICATION_AUDIT_POLICY,
+  ACCOUNTS_AUDIT_POLICY,
+  TRANSACTIONS_AUDIT_POLICY,
+  FX_AUDIT_POLICY,
+];
+
 /**
  * Composición de AUDIT (openspec add-audit-trail): `AuditPort` sobre `audit.audit_log` en la misma transacción que
  * cada comando, con las allow-lists de redacción de cada contexto y la zona horaria del workspace de IDENTITY.
@@ -98,17 +120,93 @@ export function auditRuntime(input: {
     pool: input.pool,
     clock: input.conventions.clock,
     ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
-    policies: [
-      IDENTITY_AUDIT_POLICY,
-      CLASSIFICATION_AUDIT_POLICY,
-      ACCOUNTS_AUDIT_POLICY,
-      TRANSACTIONS_AUDIT_POLICY,
-      FX_AUDIT_POLICY,
-    ],
+    policies: AUDIT_POLICIES,
     timeZones: identityWorkspaceTimeZones(input.pool),
     // add-lifecycle-timeline: máquinas de estado declaradas por cada contexto dueño (dato puro, una sola fuente).
-    machines: [TRANSACTION_LIFECYCLE_MACHINE, ACCOUNT_LIFECYCLE_MACHINE, EXCHANGE_RATE_LIFECYCLE_MACHINE],
+    machines: LIFECYCLE_MACHINES,
   });
+}
+
+/** Consulta del recorrido (add-lifecycle-timeline) que reciben FX, ACCOUNTS y TRANSACTIONS. */
+type FinanceLifecycleQuery = ReturnType<typeof createAuditRuntime>['lifecycleQuery'];
+
+/**
+ * Runtimes de los contextos financieros sobre PostgreSQL (CLASSIFICATION, FX, LEDGER + ACCOUNTS, TRANSACTIONS,
+ * REPORTING) con sus puertos públicos cableados. Lo usan la API y el cargador de datos demo del worker (add-demo-data:
+ * MISMOS casos de uso que la operación real).
+ */
+export function financeRuntimes(input: {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  readonly audit: AuditPort;
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: FinanceLifecycleQuery;
+  readonly history: AuditHistoryQuery;
+  readonly logger: Logger;
+  readonly config: Pick<ApiConfig, 'APP_TIMEZONE'> & Parameters<typeof parseFxProviderSettings>[0];
+  readonly outbox?: OutboxWriter;
+}) {
+  const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
+  // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
+  const classification = createClassificationRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    outbox: classificationOutbox(writer),
+    audit: input.audit,
+    locales: identityUserLocales(input.pool),
+  });
+  // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
+  const fx = createFxRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    outbox: classificationOutbox(writer),
+    workspaces: identityWorkspaceSettings(input.pool),
+    // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
+    providers: parseFxProviderSettings(input.config),
+  });
+  // ACCOUNTS (add-accounts-management).
+  const { accounts, ledger } = accountsRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    logger: input.logger,
+    defaultTimeZone: input.config.APP_TIMEZONE,
+    outbox: writer,
+    // Equivalente en moneda base con el puerto público de valoración de FX (misma semántica que Reporting).
+    valuation: { rates: fx.valuation, workspaces: identityWorkspaceSettings(input.pool) },
+  });
+  // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
+  const transactions = createTransactionsRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    history: input.history,
+    outbox: classificationOutbox(writer),
+    ledger: ledger.posting,
+    accounts: accounts.query,
+    classification: classification.validator,
+    lookup: classification.lookup,
+    fx: fx.pricing,
+  });
+  // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
+  const reporting = createReportingRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    workspaces: identityWorkspaceSettings(input.pool),
+    accounts: accounts.catalog,
+    balances: ledger.accountBalances,
+    flows: transactions.flows,
+    categories: classification.categories,
+    rates: fx.valuation,
+  });
+  return { classification, fx, accounts, ledger, transactions, reporting };
 }
 
 /**
@@ -125,6 +223,8 @@ export function identityImports(input: {
   readonly audit?: (port: AuditPort) => AuditPort;
   /** Sustituye el `LifecyclePort` (tests de atomicidad del registro de transición, TC-AUDIT-LIFECYCLE-002). */
   readonly lifecycle?: (port: LifecyclePort) => LifecyclePort;
+  /** Cola de jobs (add-demo-data: `demo.load`/`demo.purge` encolados en la transacción del comando). */
+  readonly queue?: JobQueue;
 }): NonNullable<ModuleMetadata['imports']> {
   const jwt = input.jwt ?? jwtOptionsFromConfig(input.config);
   if (!jwt) {
@@ -139,63 +239,15 @@ export function identityImports(input: {
   const lifecyclePort = input.lifecycle
     ? input.lifecycle(audit.lifecycleFor(auditPort))
     : audit.lifecycleFor(auditPort);
-  // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
-  const classification = createClassificationRuntime({
-    pool: input.pool,
-    clock: input.conventions.clock,
-    outbox: classificationOutbox(),
-    audit: auditPort,
-    locales: identityUserLocales(input.pool),
-  });
-  // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
-  const fx = createFxRuntime({
-    pool: input.pool,
-    clock: input.conventions.clock,
-    audit: auditPort,
-    lifecycle: lifecyclePort,
-    lifecycleQuery: audit.lifecycleQuery,
-    outbox: classificationOutbox(),
-    workspaces: identityWorkspaceSettings(input.pool),
-    // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
-    providers: parseFxProviderSettings(input.config),
-  });
-  // ACCOUNTS (add-accounts-management).
-  const { accounts, ledger } = accountsRuntime({
-    pool: input.pool,
-    clock: input.conventions.clock,
-    audit: auditPort,
-    lifecycle: lifecyclePort,
-    lifecycleQuery: audit.lifecycleQuery,
-    logger: input.logger,
-    defaultTimeZone: input.config.APP_TIMEZONE,
-    // Equivalente en moneda base con el puerto público de valoración de FX (misma semántica que Reporting).
-    valuation: { rates: fx.valuation, workspaces: identityWorkspaceSettings(input.pool) },
-  });
-  // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
-  const transactions = createTransactionsRuntime({
+  const { classification, fx, accounts, transactions, reporting } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
     lifecycle: lifecyclePort,
     lifecycleQuery: audit.lifecycleQuery,
     history: audit.history,
-    outbox: classificationOutbox(),
-    ledger: ledger.posting,
-    accounts: accounts.query,
-    classification: classification.validator,
-    lookup: classification.lookup,
-    fx: fx.pricing,
-  });
-  // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
-  const reporting = createReportingRuntime({
-    pool: input.pool,
-    clock: input.conventions.clock,
-    workspaces: identityWorkspaceSettings(input.pool),
-    accounts: accounts.catalog,
-    balances: ledger.accountBalances,
-    flows: transactions.flows,
-    categories: classification.categories,
-    rates: fx.valuation,
+    logger: input.logger,
+    config: input.config,
   });
   return [
     IdentityModule.register({
@@ -213,6 +265,8 @@ export function identityImports(input: {
       audit: auditPort,
       // Provisión síncrona en la transacción de CreateWorkspace: categorías (classification) y monedas (fx).
       onWorkspaceCreated: workspaceCreatedHook({ classification, fx }),
+      // add-demo-data: "Cargar/Limpiar datos de demostración" (DEMO_DATA_ENABLED, docs/31 D41).
+      ...(input.queue ? { demo: demoDataOptions(input.config, input.queue) } : {}),
     }),
     AuditModule.register({ runtime: audit, conventions: input.conventions }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
@@ -222,4 +276,20 @@ export function identityImports(input: {
     FxModule.register({ runtime: fx, conventions: input.conventions }),
     ReportingModule.register({ runtime: reporting, conventions: input.conventions }),
   ];
+}
+
+/** Opciones de datos de demostración de IDENTITY desde la configuración y la cola (add-demo-data). */
+export function demoDataOptions(
+  config: Pick<ApiConfig, 'PFOS_ENV'> & { readonly DEMO_DATA_ENABLED?: boolean | undefined },
+  queue: JobQueue,
+): DemoDataOptions {
+  return {
+    settings: {
+      enabled: demoDataEnabled(config),
+      datasetVersion: DEMO_MANIFEST.datasetVersion,
+      workspaceName: DEMO_MANIFEST.workspaceName,
+      modules: DEMO_MANIFEST.modules,
+    },
+    jobs: demoJobsPort(queue),
+  };
 }

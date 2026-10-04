@@ -1980,3 +1980,15 @@ Esta es la **única** excepción a "hard delete prohibido en datos financieros" 
 6. **Particionado de `ledger.posting`** si aparecen workspaces con imports masivos de exchanges (miles de trades/mes).
 7. **dbmate multi-directorio**: confirmar soporte en la versión elegida; si no, script de aplanado.
 8. **Sesión del IdP y `iam.user`**: ¿se guarda email (PII) o solo `sub`? Propuesta: email para notificaciones, sincronizado desde el token en cada login.
+
+## Datos de demostración (add-demo-data, ADR-0026) — as-built 2026-10-04
+
+Migración `20261004170000_identity_demo_data.sql` (expand):
+
+| Objeto | Cambio |
+|---|---|
+| `iam.workspace` | + `is_demo boolean NOT NULL DEFAULT false`, `demo_status` (`LOADING`/`READY`/`FAILED`/`CLEANING`/`PURGED`), `demo_origin_workspace_id`, `demo_requested_by`, `demo_dataset_version`; `status` admite `ARCHIVED` y `PURGED` (solo demo); CHECK de coherencia; índice único parcial "un demo vigente por usuario"; trigger `iam.guard_demo_workspace()` (marca inmutable y transiciones, PF003). |
+| `platform.demo_workspace_run` | Nueva (instalación, RLS forzada por solicitante): carga, progreso, error, limpieza, purga y filas borradas por tabla. Sobrevive a la purga. |
+| `platform.workspace_scoped_table` | Nueva: catálogo de tablas acotadas por `workspace_id` con `purge_order` (hijas antes que padres) y `purge_action` (`DELETE`/`RETAIN`). Toda migración que cree una tabla con `workspace_id` debe invocar `platform.register_workspace_scoped_table()`. |
+| Funciones | `platform.purge_demo_workspace(uuid)` (SECURITY DEFINER, EXECUTE solo `pf_worker`, PF006), `platform.demo_purge_target()`, `platform.workspace_is_retired(uuid)`, nueva versión de `platform.forbid_mutation()`. |
+

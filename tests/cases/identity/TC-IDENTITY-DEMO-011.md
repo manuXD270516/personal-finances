@@ -12,9 +12,9 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/db/demo-purge.int.test.ts","apps/api/test/demo/demo-data.int.test.ts"]
+status: automated
 regression_suite: true
 phase: 1
 tags: ["demo-data","purge"]
@@ -31,7 +31,7 @@ expected_result:
   - "iam.workspace conserva la lápida con status PURGED sin datos de negocio"
   - "platform.demo_workspace_run registra purged_at y las filas eliminadas por tabla"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-011 — La purga elimina todas las filas del workspace demo y deja solo la lápida
