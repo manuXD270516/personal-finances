@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/accounts.api.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "filters"]
@@ -34,7 +36,7 @@ expected_result:
   - "La agrupación por institución incluye un grupo propio para cuentas sin institución"
   - "Un valor de filtro inválido se rechaza con 400"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-LIST-002 — El listado de cuentas se filtra por tipo, moneda, estado, institución y etiqueta y se agrupa

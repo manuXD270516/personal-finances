@@ -64,3 +64,4 @@ Entonces el gasto sigue siendo 685.00 BOB
 ## Notas
 
 - Requiere los changes add-transaction-recording y add-manual-conversions para sembrar los datos; antes de ellos se ejecuta con el seed SQL.
+- Revisado 2026-10-04: se mantiene `not_automated` (advertencia R3 intencional). El test con su id es de aplicación; falta el test de API con gasto y conversión sembrados y la comparación del snapshot de asientos, postings, detalles y tasas (add-workspace-identity 7.3).

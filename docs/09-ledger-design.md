@@ -29,7 +29,7 @@ Este documento es el corazón financiero del sistema. Define cómo **todo** movi
 
 ### 2.2 Cuentas respaldadas por cuentas del usuario
 
-Cada `Account` (contexto Accounts) ↔ exactamente un `LedgerAccount` `ASSET` o `LIABILITY` en la **misma moneda**. Código lógico: `ASSET:<accountId>` / `LIABILITY:<accountId>`. Se crea con *get-or-create* idempotente la primera vez que se postea contra la cuenta (dentro de la misma transacción BD), de modo que el contexto Accounts no necesita llamar sincrónicamente a Ledger (ver [06-context-map.md](06-context-map.md)).
+Cada `Account` (contexto Accounts) ↔ exactamente un `LedgerAccount` `ASSET` o `LIABILITY` en la **misma moneda**. Código lógico: `ASSET:<accountId>` / `LIABILITY:<accountId>`. Se crea con *get-or-create* idempotente la primera vez que se postea contra la cuenta (dentro de la misma transacción BD), de modo que el contexto Accounts no necesita llamar sincrónicamente a Ledger (ver [06-context-map.md](06-context-map.md)). Crear una cuenta sin saldo inicial **no** crea su `LedgerAccount`; la unicidad `(workspace_id, source_account_id)` en `ledger.ledger_account` impide que exista más de uno por cuenta (FR-ACCOUNTS-003 reescrito en consecuencia, rev. 2026-10-02, [docs/31](31-phase-1-consolidation-decisions.md) D6).
 
 ### 2.3 Cuentas de sistema (por workspace y moneda, bajo demanda)
 
@@ -179,6 +179,12 @@ Banco BOB → Efectivo BOB, 500.00.
 | 3 | `ASSET:banco-a-bob` | −1,010.00 BOB | — |
 
 Σ BOB = 1,000 + 10 − 1,010 = **0** ✔ · El patrimonio baja exactamente el fee (10.00).
+
+**Comisión: misma moneda y desde la cuenta origen** (rev. 2026-10-04, [docs/31](31-phase-1-consolidation-decisions.md) D40). La comisión DEBE estar en la moneda de la transferencia y sale de la cuenta origen (leg `SOURCE` = −(monto + comisión)); su split va a la categoría de sistema *Fees* (o a la categoría de gasto indicada; una de ingreso ⇒ `CATEGORY_KIND_MISMATCH`). Una comisión en otra moneda o cobrada desde otra cuenta **no se soporta** como comisión de transferencia: se rechaza con `TRANSFER_CURRENCY_MISMATCH` (422, nada persistido) y se registra como **conversión** (§6.12+, con su fee) o como **gasto aparte** (§6.11).
+
+**Edición y eventos** (rev. 2026-10-04, D37). Editar una transferencia posteada (monto, comisión, cuentas o fecha) sigue la regla general (§5, §11): reversa del asiento activo + asiento nuevo de la revisión n+1. `transactions.TransferCompleted.v1` se emite **una sola vez**, en el primer posteo; cada edición financiera emite **`transactions.TransferRevised.v1`** con los asientos revertido, de reversa y nuevo; la anulación sigue con `TransactionVoided` (reversa). Cambiar una cuenta a otra de distinta moneda ⇒ `TRANSFER_CURRENCY_MISMATCH`.
+
+**Consistencia en BD** (segunda barrera del dominio, igual que el cuadre por moneda del §13; migración `20261003210000_txn_transfers.sql`): el constraint trigger **diferido** `txn.assert_transfer_consistency()` (sobre `txn.transaction` y `txn.transaction_leg`, evaluado al `COMMIT`) exige, para `kind = 'TRANSFER'` y los legs vigentes (`superseded_in_revision IS NULL`), exactamente un leg `SOURCE` con monto < 0 y un leg `TARGET` con monto > 0, ningún otro rol, **dos cuentas distintas** y **una sola moneda** igual a la de la transacción. Una violación aborta la transacción con SQLSTATE `23514` (`transaction_transfer_consistency_ck`). No hay tablas nuevas: una transferencia es una `txn.transaction` de kind `TRANSFER` cuyo único split (opcional) es el de la comisión.
 
 Transferencia entre monedas distintas **no es transferencia**: es conversión (§6.12+).
 
@@ -406,7 +412,7 @@ Ganancia realizada (200 − 180 = 20.00 USD bruto, por lote FIFO) **no** es un p
 |---|---|---|
 | `INCOME` | +ASSET/LIAB, −INCOME | ≥1 (categoría ingreso) |
 | `EXPENSE` | +EXPENSE, −ASSET/LIAB | ≥1 (categoría gasto) |
-| `TRANSFER` | +destino, −origen (misma moneda) [+EXPENSE fee] | 0 (o 1 por fee) |
+| `TRANSFER` | +destino, −origen (misma moneda) [+EXPENSE fee en la misma moneda, desde el origen] | 0 (o 1 por fee) |
 | `REFUND` | +ASSET/LIAB, −EXPENSE | ≥1 (categoría original) |
 | `ADJUSTMENT` | ±ASSET/LIAB, ∓EQUITY:ADJUSTMENTS (o ±EXPENSE/INCOME si se categoriza) | 0 (o ≥1) |
 | `OPENING_BALANCE` | ±ASSET/LIAB, ∓EQUITY:OPENING_BALANCE | 0 |
@@ -463,9 +469,9 @@ Una conversión es **una** `Transaction` de kind `CONVERSION` con **un** `Conver
 - `balance(ledgerAccount, asOf) = Σ posting.amount` de asientos con `entryDate ≤ asOf` (incluye reversas).
 - `AccountBalanceSnapshot(ledgerAccountId, asOfDate, balance, lastSequence)` en `ledger.balance_snapshot`: **derivado**. Se usa `balance = snapshot(asOf ≤ fecha) + Σ postings posteriores`.
 - Un asiento con `entryDate` anterior a snapshots existentes (backdated) **invalida** los snapshots de esa cuenta con `asOfDate ≥ entryDate` (borrado de caché permitido: no es dato financiero) y se recalculan en el worker.
-- Comando `RebuildBalanceSnapshots(ledgerAccountId?)` reconstruye desde cero; un job periódico verifica `snapshot = Σ postings` (INV-022) y alerta en discrepancia.
+- Comando `RebuildBalanceSnapshots(ledgerAccountId?)` reconstruye desde cero (FR-LEDGER-014); el job periódico `VerifyLedgerIntegrity` verifica cuadre por moneda, ≥ 2 postings, ausencia de postings en cero, reversas y `snapshot = Σ postings` (INV-022) y emite métrica/alerta ante cualquier violación (FR-LEDGER-015). Ambos son **Must en Phase 1** (rev. 2026-10-02, [docs/31](31-phase-1-consolidation-decisions.md) D20, por NFR-DATA-008/009) y corren en el job diario del worker (`LEDGER_INTEGRITY_CRON`, [config-reference.md](config-reference.md)).
 - **Saldo conciliado/cleared** (por estado de transacción) se calcula en Transactions con sus legs, no en Ledger (el ledger no conoce estados). INV-024 garantiza que legs = postings de cuentas de usuario.
-- **Saldo disponible/proyectado** (incluye `pending`, earmarks, ocurrencias recurrentes futuras): proyección de Reporting, nunca del ledger.
+- **Saldo disponible/proyectado** (incluye `pending`, earmarks, ocurrencias recurrentes futuras): proyección de Reporting, nunca del ledger. El ledger solo expone el saldo contable (FR-LEDGER-012); FR-LEDGER-013 pertenece a `reporting/cash-flow-calendar` (Phase 7; rev. 2026-10-02, D21).
 
 ## 9. Pending vs posted
 
@@ -481,6 +487,7 @@ Una conversión es **una** `Transaction` de kind `CONVERSION` con **un** `Conver
 
 ## 10. Interacción con el cierre de periodo
 
+- El bloqueo es **mensual** (rev. 2026-10-02, [docs/31](31-phase-1-consolidation-decisions.md) D10): `ledger.period_lock` tiene una fila por `(workspace_id, year_month)`; no hay bloqueos por día ni por rango arbitrario.
 - Planning (Phase 2) es dueño de `FinancialPeriod`. Al cerrar un mes (`CloseMonth`) escribe **sincrónicamente** en la misma transacción BD un registro en `ledger.period_lock(workspace_id, year_month, locked_at)` vía `LedgerPeriodLockPort` (contrato público de Ledger). Al reabrir, lo elimina (con auditoría).
 - Ledger rechaza `PostJournalEntry` con `entryDate` en un mes bloqueado → error de dominio `PERIOD_CLOSED`. La verificación ocurre en dominio y en BD (trigger `BEFORE INSERT` en `journal_entry` consulta `period_lock`), cerrando la carrera *cerrar mes ↔ postear*.
 - En Phase 1 (sin Planning) no hay locks: todos los periodos están abiertos.
@@ -582,7 +589,9 @@ CREATE TRIGGER posting_immutable BEFORE UPDATE OR DELETE ON ledger.posting
 -- 4) Periodo bloqueado
 --    BEFORE INSERT ON ledger.journal_entry: rechaza (PF004, PERIOD_CLOSED) si existe period_lock para (workspace_id, to_char(entry_date,'YYYY-MM'))
 -- SQLSTATE propios: PF001 desbalanceado, PF002 contexto de workspace ausente (RLS, la consulta falla), PF003 mutación prohibida,
---                   PF004 periodo cerrado, PF005 menos de 2 postings (docs/08 §10).
+--                   PF004 periodo cerrado, PF005 menos de 2 postings (docs/08 §10; rev. 2026-10-02, docs/31 D19).
+--   En la migración real (20261003170000_ledger_core.sql) el chequeo PF005 es un constraint trigger diferido propio
+--   sobre ledger.journal_entry (assert_entry_has_postings) y PF001 queda en el trigger de ledger.posting.
 
 -- 5) Reversa única
 --    ledger.entry_reversal(original_entry_id PRIMARY KEY, reversal_entry_id UNIQUE)
@@ -645,12 +654,14 @@ sequenceDiagram
   participant OB as outbox
   U->>TX: RecordTransfer(from, to, amount, fee?)
   TX->>ACC: getAccounts(from, to)
-  TX->>TX: validar misma moneda, cuentas activas, from≠to
+  TX->>TX: validar misma moneda (también la comisión), cuentas activas, from≠to
   Note over TX,OB: misma transacción BD
   TX->>LG: postEntry(+to, −from [, +EXPENSE fee])
   LG->>OB: JournalEntryPosted
-  TX->>OB: TransactionCreated, TransactionPosted, TransferCompleted
+  TX->>OB: TransactionCreated, TransactionPosted, TransferCompleted (una sola vez)
+  Note over TX,OB: COMMIT (txn.assert_transfer_consistency + cuadre por moneda, diferidos)
   TX-->>U: 201 (transactionId)
+  Note over TX,OB: Edición financiera posterior: reversa + nueva revisión → TransferRevised.v1 (D37)
   OB-->>OB: relay → BullMQ (async)
   Note right of OB: Goals: ¿destino vinculado a meta?<br/>Debt: ¿destino es tarjeta/préstamo?<br/>Reporting: proyecciones
 ```

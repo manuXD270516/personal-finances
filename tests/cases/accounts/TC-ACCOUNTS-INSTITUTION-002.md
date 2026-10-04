@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["institutions", "seed"]
@@ -33,7 +34,7 @@ expected_result:
   - "En W4 la institución se llama Banco Andino; en W5 sigue llamándose Banco Andino Demo"
   - "No existen filas globales de institución ni instituciones literales en el código (solo en archivos de seed)"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-INSTITUTION-002 — Ninguna institución viene fija en el producto y las del catálogo inicial son editables por workspace

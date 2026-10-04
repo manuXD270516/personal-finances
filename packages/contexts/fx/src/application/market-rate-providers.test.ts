@@ -515,7 +515,8 @@ describe('Tasas manuales frente a providers (fx/market-rate-providers)', () => {
   });
 });
 
-describe('BackfillHistoricalRates y FillRateGaps (fx/market-rate-providers)', () => {
+// Carga y relleno de 787 días por par: en CI tardan ~6 s, por encima del timeout por defecto de 5 s.
+describe('BackfillHistoricalRates y FillRateGaps (fx/market-rate-providers)', { timeout: 30_000 }, () => {
   /** 788 puntos diarios 2024-08-06..2026-10-02 (el último, del día en curso, ya excluido por el adapter). */
   const historyDays = (() => {
     const days: string[] = [];

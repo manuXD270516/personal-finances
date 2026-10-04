@@ -104,9 +104,9 @@ Cambios **exactos** requeridos (no se editan aquí; los consolida el proceso de 
 
 ## Preguntas abiertas
 
-- FR-ACCOUNTS-003 exige crear el `LedgerAccount` en la misma transacción que la cuenta; ARCHITECTURE §7, docs/06 y docs/11 definen get-or-create al postear. Este diseño sigue ARCHITECTURE (canónico); ¿se ajusta el texto de FR-ACCOUNTS-003?
-- ¿Las cuentas archivadas con saldo ≠ 0 cuentan en el patrimonio neto del dashboard? Propuesta: sí, si `includeInNetWorth` (el saldo existe); la UI advierte al archivar con saldo.
-- ¿Liquidez por defecto de los pasivos (`ILLIQUID`) es adecuada para *safe to spend*, o los pasivos deben quedar fuera del eje de liquidez? Revisar en el change de reporting.
+- ~~FR-ACCOUNTS-003 exige crear el `LedgerAccount` en la misma transacción que la cuenta~~ — resuelta (docs/31 D6): get-or-create al primer posting; FR-ACCOUNTS-003 reescrito.
+- ~~¿Las cuentas archivadas con saldo ≠ 0 cuentan en el patrimonio neto del dashboard?~~ — resuelta por el owner el 2026-10-03 (docs/31 D35): el resumen incluye solo cuentas **no archivadas** (`ACTIVE` y `CLOSED`).
+- ~~¿Liquidez por defecto de los pasivos (`ILLIQUID`)…?~~ — resuelta (docs/31 D5, D35): cuenta líquida = `ASSET` + `LIQUID`; los pasivos quedan fuera del eje de liquidez del resumen.
 
 ## Implementación (2026-10-03, owner ausente — decisiones registradas)
 

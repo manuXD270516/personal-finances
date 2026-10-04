@@ -5,12 +5,15 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar con el owner los specs `reporting/dashboard` y `reporting/net-worth` y resolver las preguntas abiertas de design.md (la definición de cuenta líquida quedó resuelta: `ASSET` + `LIQUID`, cuentas no archivadas incluidas, docs/31 D35; la tasa USD/USDT↔BOB ya quedó resuelta: `PARALLEL` del provider, docs/31 D29; el último recurso con manuales de cualquier tipo, docs/31 D34); verificar con `openspec validate add-basic-dashboard --strict`
+  > Revisado 2026-10-04 (sigue pendiente del owner): cuenta líquida (D35), tasa USD/USDT (D29), último recurso (D34/D38) y lista de preguntas del Home (D14) resueltas. Siguen abiertas: ubicación de FR-REPORTING-004 en docs/01 (se dejó una nota aclaratoria, sin mover la FR) y `/reports/summary` vs `/reports/kpis` en Phase 7.
 - [x] 1.2 Revisar TC-REPORTING-DASHBOARD-001..007, TC-REPORTING-KPI-001..008 y TC-REPORTING-NETWORTH-001..005 contra los scenarios (cifras a mano, fechas fijas, `FixedClock`); verificar que el chequeo del catálogo los acepta y que todo requirement Must tiene ≥ 1 TC
   - Nota (2026-10-03): cifras verificadas a mano contra los scenarios; el chequeo de catálogo los acepta y todo Must tiene ≥ 1 TC. TC-REPORTING-DASHBOARD-007: la variante manual se automatizó como `PARALLEL` (ver design.md § Preguntas abiertas). La revisión con el owner sigue en 1.1.
 
 - [ ] 1.3 Decisiones del owner 2026-10-03 (docs/31 D34, D35): spec ampliada (scenarios "Cuenta cerrada incluida y archivada excluida", "Tasa manual de otro tipo no fresca descartada" y "Tasa manual de otro tipo con desvío excesivo descartada") y TC-REPORTING-DASHBOARD-008/-009 redactados (draft)
   - [ ] 1.3.1 Verificar (test de API) que el resumen lista cuentas `CLOSED` no archivadas (TC-REPORTING-DASHBOARD-008); la regla ya está implementada (decisión 12), falta el test con el TC-id
+    > Verificado 2026-10-04 (pendiente, código): no hay test `[TC-REPORTING-DASHBOARD-008]` (el TC sigue `draft`).
   - [ ] 1.3.2 Cuando FX implemente D34 en `ValuationRateSelector` (coordinado con `add-market-rate-providers`; este change no toca `packages/contexts/fx`), automatizar TC-REPORTING-DASHBOARD-009 y re-automatizar la variante manual de TC-REPORTING-DASHBOARD-007 con `P2P`
+    > Verificado 2026-10-04 (desbloqueado, pendiente de código): FX ya implementa D34/D38 en `packages/contexts/fx/src/domain/valuation-rate-selector.ts` (`[TC-FX-PROVIDER-018]`, `FX_MANUAL_FALLBACK_MAX_AGE` 24 h). Falta el test `[TC-REPORTING-DASHBOARD-009]` y rehacer la variante manual de DASHBOARD-007 con `P2P` (hoy `PARALLEL` en `reports.api.test.ts`).
   - [x] 1.3.3 Confirmar con el owner el máximo de frescura de manuales en el último recurso (propuesta 24 h, `FX_MANUAL_FALLBACK_MAX_AGE`)
     - Nota (2026-10-04): confirmado 24 h por el owner (docs/31 D38); es el default vigente, sin cambios de código.
 
@@ -40,6 +43,7 @@
 - [x] 5.1 `GET /reports/summary` con los cambios de §Contratos (compare, ETag/304, `ReportSummary` ampliado); tests de API con TC-REPORTING-DASHBOARD-006 (lectura inmediata tras POST) y de contrato contra el OpenAPI consolidado
   - Nota: el contrato ya estaba consolidado; solo se agregó `ResolvedRate.sourceLabel` (aditivo, oasdiff sin cambios incompatibles). Respuestas validadas contra el OpenAPI en el test de API.
 - [ ] 5.2 Benchmark nightly con seed `large`: p95 ≤ 300 ms (NFR-PERF-004)
+  > Verificado 2026-10-04 (pendiente, benchmark): no hay workflow nightly ni benchmark, y el perfil de seed `large` aún no tiene datos (`apps/api/src/seed/run-seed.ts`).
   - Pendiente (2026-10-03): la seed `large` aún no existe (docs/29); sin benchmark.
 
 ## 6. UI
@@ -58,6 +62,7 @@
 
 ## 8. DOCUMENTACIÓN y cierre
 
-- [ ] 8.1 Actualizar docs/14 (§9.1 alineado con docs/00 §6; Phase 1 sin proyecciones), docs/10 (`/reports/summary`) y docs/01 (ubicación de FR-REPORTING-004 en el Home); verificar enlaces
+- [x] 8.1 Actualizar docs/14 (§9.1 alineado con docs/00 §6; Phase 1 sin proyecciones), docs/10 (`/reports/summary`) y docs/01 (ubicación de FR-REPORTING-004 en el Home); verificar enlaces
+  > Hecho 2026-10-04: docs/14 §4, §5 y §9.1 (Phase 1 sin proyecciones; D14, D15, D34/D38, D35), docs/10 §13.1 (`/reports/summary`) y nota en FR-REPORTING-004 de docs/01 (sin mover la FR; la ubicación queda como pregunta abierta 10 de docs/01); enlaces verificados.
 - [x] 8.2 Actualizar estados de automatización de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict`; verificar 0 requirements Must sin cobertura
   - Nota: TC de reporting marcados `automated`, matriz regenerada, `openspec validate --all --strict` y `traceability:check` en verde. 8.1 (docs/14, docs/10, docs/01) queda pendiente.

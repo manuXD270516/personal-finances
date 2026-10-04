@@ -12,9 +12,10 @@ invariants: [INV-006]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/accounts.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["accounts", "ledger"]
@@ -41,7 +42,7 @@ expected_result:
   - "Los movimientos concurrentes no crean un segundo ledger account para Bank C"
   - "Saldo de Bank C = 200.00 BOB; Card Y adeuda 100.00 BOB"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-LEDGERLINK-001 — Cada cuenta queda respaldada por exactamente una cuenta contable de su naturaleza y moneda
@@ -57,3 +58,7 @@ Cuando el usuario crea la cuenta bancaria "Bank C" en BOB y registra un ingreso 
 Entonces exactamente una cuenta contable de activo en BOB queda vinculada a "Bank C"
   Y su saldo es 200.00 BOB
 ```
+
+## Notas
+
+- Verificado 2026-10-04: el get-or-create concurrente del ledger account lo cubre además [TC-LEDGER-CHART-002] (packages/contexts/ledger/test/integration/pg-ledger.int.test.ts).

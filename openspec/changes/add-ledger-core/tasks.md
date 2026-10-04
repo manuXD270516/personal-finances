@@ -8,6 +8,7 @@
 - [x] 1.2 Confirmar los TC modificados (requirement exacto, `requirement_status: confirmed`, `status: ready`) y los TC añadidos listados en proposal.md; verificar que el chequeo de catálogo de `scripts/traceability` los acepta y que todos los ejemplos numéricos suman cero por moneda
 - [ ] 1.3 Consolidar en `contracts/` los cambios listados en design.md → Contratos (vía el proceso de consolidación); verificar con Spectral que los nuevos `ErrorCode` y la operación `getLedgerTrialBalance` pasan el ruleset
   > Pendiente (2026-10-03): según design.md los cambios de contrato se consolidaron el 2026-10-02 (los `ErrorCode` del ledger ya están en `finance-api.v1.yaml`); falta verificar con Spectral `getLedgerTrialBalance`, ligado a 6.3.
+  > Verificado 2026-10-04 (parcial): los `ErrorCode` del ledger y `getLedgerTrialBalance` (con `TrialBalance`) están en el OpenAPI y Spectral corre en `pr.yml`. Falta: el contrato declara `x-required-role: VIEWER` para `getLedgerTrialBalance`, pero la tarea 6.3 y TC-LEDGER-TRIAL-001 dicen solo `OWNER` — corregir uno de los dos.
 
 ## 2. Dinero en el shared-kernel (DOMAIN, TDD)
 
@@ -18,6 +19,7 @@
   > Hecho (2026-10-03): `@pf/eslint-config` (`packages/eslint-config`) con `pf/no-number-money` (capa sintáctica: `number` en nombres monetarios, `parseFloat`/`Number`/`+x` sobre montos, literales en `Money.of`, `toFixed(n)`/`toNumber()`) y `no-restricted-imports` de `decimal.js`, aplicado a todo el monorepo desde `eslint.config.js` (excepción: `packages/shared-kernel/src/money/**`, dueño de `MoneyDecimal`). `fixtures/bad.ts` falla y `fixtures/good.ts` pasa en `src/no-number-money.test.ts` (RuleTester + ESLint). Ver design.md → Registro 2026-10-03 (hardening).
 - [ ] 2.5 Verificar cobertura del shared-kernel ≥ 95 % líneas / 90 % ramas y mutation score ≥ 80 % (Stryker) en Money/rounding/allocation (NFR-MAINT-002)
   > Pendiente: no se ejecutó Stryker ni cobertura en esta sesión (`stryker.config.json` ya incluye `src/money/**`).
+  > Verificado 2026-10-04 (pendiente, CI): existe `packages/shared-kernel/stryker.config.json` (umbral break 80) y el script `test:mutation`, pero no hay umbrales de cobertura 95/90 ni proveedor de coverage, y ningún job de CI ejecuta Stryker ni coverage.
 
 ## 3. Dominio del ledger (DOMAIN, TDD)
 
@@ -45,6 +47,7 @@
 - [x] 5.4 Mapeo de SQLSTATE (`PF001/PF004/PF005` → `DomainError`; `PF002/PF003/42501` → `INTERNAL_ERROR` + métrica); verificar con tests de integración que el código llega íntegro
 - [ ] 5.5 Consultas de saldo con el índice `INCLUDE (amount)` y snapshots (`balance_snapshot`, worker); tests `[TC-LEDGER-BALANCES-001]`, `[TC-LEDGER-BALANCES-002]`, `[TC-LEDGER-BALANCES-003]`, `[TC-LEDGER-SNAPSHOT-001]`; medir p95 ≤ 50 ms por cuenta (NFR-PERF-005) y overhead de RLS < 10 % con `EXPLAIN ANALYZE`
   > Parcial (2026-10-03): lectura = snapshot vigente + Σ postings posteriores (descarta en la misma consulta los snapshots invalidados por asientos retroactivos); TC-LEDGER-BALANCES-001/002 y SNAPSHOT-001 automatizados. Falta medir p95 y el overhead de RLS (sin dataset `large` en esta sesión).
+  > Verificado 2026-10-04 (parcial): tests `[TC-LEDGER-BALANCES-001]`, `-002`, `[TC-LEDGER-SNAPSHOT-001]` (`ledger-maintenance.int.test.ts`) y `[TC-LEDGER-BALANCES-003]` (`pg-ledger.int.test.ts`). Falta: medir p95 ≤ 50 ms (NFR-PERF-005) y el overhead de RLS con `EXPLAIN ANALYZE` (no hay benchmark).
 - [x] 5.6 Job diario del verificador de invariantes en el worker y enganche en `restore:local`; test `[TC-LEDGER-INTEGRITY-001]`
   > Hecho (2026-10-03): cola `ledger.daily-maintenance` (pg-boss cron `LEDGER_INTEGRITY_CRON`/`LEDGER_INTEGRITY_CRON_TZ`, default `0 4 * * *` UTC; `off` lo desactiva) que ejecuta `VerifyLedgerIntegrity` y luego `RebuildBalanceSnapshots`; también se encola al arrancar el worker, de modo que `restore:local` (que reinicia finance-worker) verifica el ledger restaurado. TC-LEDGER-INTEGRITY-001 automatizado.
 
@@ -54,6 +57,7 @@
 - [x] 6.2 Mapeo de los nuevos códigos de error a problem+json (status según design.md → Contratos); verificar con tests de API
 - [ ] 6.3 (Could) Endpoint `GET /api/v1/workspaces/{workspaceId}/ledger/trial-balance` solo `OWNER`; test `[TC-LEDGER-TRIAL-001]`
   > Pendiente (Could): endpoint técnico trial-balance (TC-LEDGER-TRIAL-001).
+  > Verificado 2026-10-04 (pendiente, código): solo existen la consulta `getTrialBalance` (`pg-balance.queries.ts`) y la operación del contrato; no hay ruta HTTP `/ledger/trial-balance` ni test `[TC-LEDGER-TRIAL-001]`.
 
 ## 7. UI
 
@@ -63,6 +67,7 @@
 
 - [ ] 8.1 Marcar los TC críticos en la Financial Regression Suite y verificar que corren en cada PR (unit/PBT/integración) y nightly (10 000 runs)
   > Parcial: los TC del ledger con `regression_suite: true` corren en cada PR (unit/PBT con 100 corridas y semilla fija; integración en `pnpm test:integration`); `NIGHTLY=1` sube a 10 000 corridas (verificado localmente). Falta el job nightly en CI.
+  > Verificado 2026-10-04 (parcial): unit, PBT e integración corren en cada PR (`pr.yml`) y `NIGHTLY=1` sube los PBT a 10 000 runs. Falta: workflow nightly (no hay `schedule`) y una selección explícita de la Financial Regression Suite (hoy solo el flag `regression_suite`).
 - [x] 8.2 E2E: cubierto por los slices consumidores (`add-accounts-management`, `add-transaction-recording`); aquí solo un smoke de integración que postea y revierte un asiento de 120.00 BOB y verifica saldo 1000.00 BOB y evento publicado
 
 ## 9. Documentación y cierre

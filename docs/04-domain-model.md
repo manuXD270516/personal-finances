@@ -133,10 +133,15 @@ decimal.js configurado con `precision: 40`, `rounding: ROUND_HALF_EVEN`. Prohibi
 ```ts
 interface Rate { base: CurrencyCode; quote: CurrencyCode; value: Decimal } // 1 base = value quote; value > 0; base ≠ quote
 interface ExchangeRateSnapshot extends Rate {
-  asOf: Instant; source: RateSourceRef; rateType: 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM'; // FR-FX-002
+  asOf: Instant; source: RateSourceRef;
+  rateType: 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL'; // FR-FX-002 (D13) + D39
 }
 // operaciones: invert() (precisión 40), convert(money) (una cuantización HALF_EVEN), normalize(displayOrientation)
 ```
+
+- **Tipos de tasa** (rev. 2026-10-04, D13/D39): los cinco de FR-FX-002 (spec `fx/market-rates`) más `PARALLEL_BUY` / `PARALLEL_SELL`, que los providers de mercado registran junto con la mediana `PARALLEL` (misma vigencia, provider y respuesta cruda; spec `fx/market-rate-providers`). Convención "desde el lado del owner": `PARALLEL_BUY` = BOB que se **pagan** por 1 USD (valor mayor), `PARALLEL_SELL` = BOB que se **reciben** al vender 1 USD (valor menor). Solo se usan si se piden explícitamente (tipo pedido o preferencia del par); la valoración y la referencia de conversión por defecto no los toman. El tipo preferido para valorar se fija por par en `fx.rate_preference` (FR-FX-006).
+- **Fees de conversión** (rev. 2026-10-04, D12): VO `Fee { type: 'PROVIDER' | 'NETWORK' | 'BANK' | 'TAX' | 'OTHER'; amount: Money; paidFromAccountId? }` (FR-TRANSACTIONS-022). Un fee en una moneda distinta del origen y del destino exige `paidFromAccountId` de esa moneda.
+- **Revisión de una conversión** (rev. 2026-10-04, D11): `ConversionDetail` es inmutable y versionado por `revision` (≥ 1). Editar una conversión = reversa del asiento + nuevo asiento + nuevo `ConversionDetail` con `revision + 1` en la misma transacción de BD; las revisiones anteriores se conservan y siguen consultables (FR-TRANSACTIONS-024). La tasa de referencia queda registrada por id exacto aunque luego se reemplace (FR-FX-008).
 
 ### 2.5 Tiempo y periodos
 
@@ -189,21 +194,23 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.2 ACCOUNTS — Accounts & Institutions (`accounts`)
 
-- **AR `Account`**: `id, workspaceId, name, type, nature (derivada), currency, institutionId?, liquidity (LIQUID|SEMI_LIQUID|ILLIQUID), includeInNetWorth, status (ACTIVE|CLOSED|ARCHIVED), openedOn, closedOn?, displayOrder, maskedNumber?, notes, version`.
-  - `AccountType`: `BANK, CASH, DIGITAL_WALLET, CREDIT_CARD, LOAN, CRYPTO_WALLET, INVESTMENT, SAVINGS, VIRTUAL, MANUAL_ASSET, MANUAL_LIABILITY` (FR-ACCOUNTS-001) → `nature` LIABILITY para `CREDIT_CARD`, `LOAN`, `MANUAL_LIABILITY`; ASSET para el resto.
-  - `liquidity` por defecto según tipo (FR-ACCOUNTS-011): `LIQUID` para BANK, CASH, DIGITAL_WALLET, CRYPTO_WALLET, SAVINGS; `SEMI_LIQUID` para INVESTMENT; `ILLIQUID` para el resto. Solo `LIQUID` cuenta como dinero disponible.
+- **AR `Account`**: `id, workspaceId, name, type, nature (derivada), currency, institutionId?, liquidity (LIQUID|SEMI_LIQUID|ILLIQUID), includeInNetWorth, includeInBudget, status (ACTIVE|CLOSED|ARCHIVED, derivado de closedOn/archivedAt), openedOn, closedOn?, archivedAt?, displayOrder, accountNumberLast4? (MaskedAccountNumber), icon?, color?, notes?, tagIds[], cryptoNetwork?, version` (rev. 2026-10-04, D3/D4/D5).
+  - Estados (D4): `ACTIVE`, `CLOSED`, `ARCHIVED`; transiciones repetidas → `INVALID_STATUS_TRANSITION`; se permite archivar una cuenta `CLOSED`; editar una `ARCHIVED` → `ACCOUNT_ARCHIVED`.
+  - Etiquetas de cuenta: tabla de enlace `accounts.account_tag (workspace_id, account_id, tag_id)` con `tag_id` lógico al catálogo `classification.tag`, validado vía `TagCatalogPort`; un tag archivado no es asignable (`TAG_ARCHIVED`).
+  - `AccountType` (D3, lista canónica de FR-ACCOUNTS-001 / spec `accounts/account-management`): `BANK, CASH, DIGITAL_WALLET, CREDIT_CARD, LOAN, CRYPTO_WALLET, INVESTMENT, SAVINGS, VIRTUAL, MANUAL_ASSET, MANUAL_LIABILITY` → `nature` LIABILITY para `CREDIT_CARD`, `LOAN`, `MANUAL_LIABILITY`; ASSET para el resto.
+  - `liquidity` por defecto según tipo (FR-ACCOUNTS-011): `LIQUID` para BANK, CASH, DIGITAL_WALLET, CRYPTO_WALLET, SAVINGS; `SEMI_LIQUID` para INVESTMENT; `ILLIQUID` para el resto (D5). Solo `ASSET` + `LIQUID` cuenta como dinero disponible (D35); no existe flag `includeInLiquidity`.
 - **AR `Institution`**: `id, workspaceId, name, kind (BANK|FINTECH|EXCHANGE|BROKER|WALLET_PROVIDER|OTHER), country, website?, status`.
 - **VO**: `AccountType`, `AccountNature`, `AccountLiquidity`, `MaskedAccountNumber` (sólo últimos 4).
-- **Ports**: `AccountRepository`, `InstitutionRepository`, `CurrencyCatalog` (lectura, FX contracts), `AuditPort`.
-- **Comandos**: `OpenAccount`, `UpdateAccount` (nombre, institución, orden, liquidity, includeInNetWorth), `ArchiveAccount`, `CloseAccount` (exige saldo cero), `ReactivateAccount`, `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`.
+- **Ports**: `AccountRepository`, `InstitutionRepository`, `CurrencyCatalog` (lectura, FX contracts), `LedgerBalancesPort` (`GetBalances`, `HasPostings`), `FxRateQueryPort`, `TagCatalogPort` (Classification contracts), `AuditPort`, `OutboxPort`.
+- **Comandos**: `OpenAccount`, `UpdateAccount` (nombre, institución, orden, liquidity, includeInNetWorth, includeInBudget, tags, moneda solo sin movimientos), `ArchiveAccount`, `CloseAccount` (exige saldo cero), `ReactivateAccount`, `ReorderAccounts`, `CreateInstitution`, `UpdateInstitution`, `ArchiveInstitution`.
 - **Queries**: `GetAccount`, `ListAccounts(filters)`, `GetAccountsByIds`, `ListInstitutions`.
 - **Eventos**: `AccountOpened`, `AccountUpdated`, `AccountArchived`, `AccountClosed`, `AccountReactivated`.
-- **Invariantes**: `type` (por ende `nature`) **inmutable** tras crear; `currency` solo puede cambiar mientras la cuenta no tenga movimientos (FR-ACCOUNTS-005, rev. 2026-10-02); nombre único entre cuentas activas del workspace; cuenta archivada o cerrada no acepta movimientos nuevos (INV-026, verificado por Transactions vía query); el `LedgerAccount` de la cuenta lo crea Ledger con *get-or-create* al primer posting (FR-ACCOUNTS-003, ARCHITECTURE §7); no se borra nunca (soft-archive). El **saldo no vive aquí** (lo calcula Ledger). El saldo inicial se registra como transacción `OPENING_BALANCE` en Transactions (orquestado en la misma unidad de trabajo por la capa de composición, ver [06-context-map.md](06-context-map.md)).
+- **Invariantes**: `type` (por ende `nature`) **inmutable** tras crear; `currency` solo puede cambiar mientras la cuenta no tenga movimientos (FR-ACCOUNTS-005, rev. 2026-10-02); nombre único entre cuentas activas del workspace; cuenta archivada o cerrada no acepta movimientos nuevos (INV-026, verificado por Transactions vía query); el `LedgerAccount` de la cuenta lo crea Ledger con *get-or-create* en la misma transacción de BD que el primer posting, único por cuenta (`UNIQUE (workspace_id, source_account_id)` en `ledger.ledger_account`); Accounts no guarda `ledger_account_id` (FR-ACCOUNTS-003, ARCHITECTURE §7, rev. 2026-10-04, D6); no se borra nunca (soft-archive). El **saldo no vive aquí** (lo calcula Ledger). El saldo inicial se registra como transacción `OPENING_BALANCE` en Transactions (orquestado en la misma unidad de trabajo por la capa de composición, ver [06-context-map.md](06-context-map.md)).
 
 ### 3.3 LEDGER — Financial Ledger (`ledger`)
 
 - **AR `JournalEntry`** (E `Posting[]`): ver [09-ledger-design.md §4](09-ledger-design.md).
-- **AR `LedgerAccount`**: `id, workspaceId, nature (ASSET|LIABILITY|EQUITY|INCOME|EXPENSE), currency, code, ownerAccountId? (cuenta de usuario), systemCode? (INCOME, EXPENSE, OPENING_BALANCE, FX_TRADING, ADJUSTMENTS), status`.
+- **AR `LedgerAccount`**: `id, workspaceId, nature (ASSET|LIABILITY|EQUITY|INCOME|EXPENSE), currency, code, sourceAccountId? (cuenta de usuario; rev. 2026-10-04), systemCode? (INCOME, EXPENSE, OPENING_BALANCE, FX_TRADING, ADJUSTMENTS), status`.
 - **Read model interno**: `AccountBalanceSnapshot` (derivado), `PeriodLock` (escrito por Planning vía puerto).
 - **VO**: `EntryType`, `SourceRef`, `LedgerAccountCode`, `SignedAmount` (Money firmado).
 - **DS**: `EntryValidator` (cuadre por moneda, ≥ 2 postings, monedas de cuentas, workspace), `ReversalFactory`, `BalanceCalculator`, `LedgerAccountResolver` (get-or-create de cuentas de usuario y de sistema por moneda).
@@ -296,11 +303,11 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 ### 3.10 FX — FX & Market Data (`fx`)
 
 - **AR `CurrencyDefinition`** (catálogo `currency`): ver §2.2. Fiat ISO 4217 y cripto/commodities globales sembrados; `CUSTOM`/`COMMODITY` por workspace.
-- **AR `ExchangeRate`**: `id, base, quote, value, asOf (Instant), effectiveDate, rateType (OFFICIAL|PARALLEL|P2P|BANK|CUSTOM), source (MANUAL|PROVIDER|USER_CONVERSION), providerCode?, supersedesRateId?, workspaceId? (manuales/observaciones son del workspace; las de proveedores globales pueden ser compartidas)`. Inmutable.
+- **AR `ExchangeRate`**: `id, base, quote, value, asOf (Instant), effectiveDate, rateType (OFFICIAL|PARALLEL|P2P|BANK|CUSTOM|PARALLEL_BUY|PARALLEL_SELL, §2.4), source (MANUAL|PROVIDER|USER_CONVERSION), providerCode?, supersedesRateId?, workspaceId? (manuales/observaciones son del workspace; las de proveedores globales pueden ser compartidas)`. Inmutable.
 - **AR `RateProviderConfig`**: `providerCode, pairs[], schedule, priority, enabled`.
 - **DS**: `RateResolver` (directa → inversa → triangulación pivote, con política de fuente/staleness), `ConversionPricingService` (referencia + spread para una conversión).
 - **Repos**: `CurrencyRepository`, `ExchangeRateRepository` (append-only), `RateProviderConfigRepository`. **Ports**: `MarketRateProvider` (ACL; adapters BCB oficial, APIs fiat, Binance P2P, CoinGecko…), `Clock`.
-- **Comandos**: `RecordManualRate`, `SupersedeRate`, `FetchRates(provider, pairs, date)` (job, Phase 5), `RegisterCustomCurrency`, `RegisterCommodity`, `RecordConversionObservation` (handler de `ConversionRecorded`).
+- **Comandos**: `RecordManualRate`, `SupersedeRate`, `FetchRates(provider, pairs, date)` (job, Phase 1 desde D29, rev. 2026-10-04), `RegisterCustomCurrency`, `RegisterCommodity`, `RecordConversionObservation` (handler de `ConversionRecorded`).
 - **Queries**: `GetRate(pair, at, policy)`, `GetRateSeries(pair, range)`, `GetReferenceRate(pair, at)`, `ListCurrencies`, `ConvertForValuation(money, target, at)` (sólo lectura/reporting).
 - **Eventos**: `RateRecorded`, `RatesFetched`, `CurrencyRegistered`.
 - **Invariantes**: INV-011, INV-032; nunca se usa una tasa triangulada para registrar una operación real.

@@ -14,9 +14,10 @@ invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/identity/src/application/identity.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:
@@ -40,7 +41,7 @@ expected_result:
 - 'Mutaciones: 403 problem+json con código INSUFFICIENT_ROLE'
 - Las solicitudes denegadas no crean ninguna transacción, asiento, fila de auditoría ni evento de outbox
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-SECURITY-RBAC-001 — VIEWER puede leer pero no puede modificar datos financieros
@@ -62,3 +63,4 @@ Entonces el estado de la respuesta es 403
 ## Notas
 
 - Código actualizado de FORBIDDEN a INSUFFICIENT_ROLE (docs/10 §9.1).
+- Verificado 2026-10-04: a nivel API, la matriz [TC-SECURITY-RBAC-002] (apps/api/test/api/authorization-matrix.api.test.ts) comprueba 200 en lecturas y 403 INSUFFICIENT_ROLE en mutaciones de VIEWER para toda operación implementada.

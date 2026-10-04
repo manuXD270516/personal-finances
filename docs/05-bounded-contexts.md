@@ -44,7 +44,7 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 - **NO responsabilidades:** autenticar contraseñas (Keycloak/IdP); emitir tokens (BFF/IdP); RLS (lo aplica `@pf/platform` con el `workspaceId` resuelto).
 - **API pública:** cmd `ProvisionUserFromIdentity`, `CreateWorkspace`, `UpdateWorkspaceSettings`, `AddMember`, `ChangeMemberRole`, `RemoveMember`; qry `GetMe`, `ListMyWorkspaces`, `GetWorkspaceSettings`, `AuthorizeAction`.
 - **Eventos publicados:** `identity.WorkspaceCreated`, `identity.WorkspaceSettingsChanged`, `identity.MemberAdded`, `identity.MemberRemoved`. **Consumidos:** ninguno.
-- **Dependencias:** IdP (OIDC) vía `IdentityProviderPort`.
+- **Dependencias:** IdP (OIDC) vía `IdentityProviderPort`; puerto opcional `WorkspaceCreatedHook` (cableado en `apps/api` a la provisión síncrona del catálogo de Classification, ver §2.5).
 - **Extracción:** Media — todos consultan `AuthorizeAction` en cada request; extraíble a un IdP/servicio de autorización con caché de membresías en token.
 
 ### 2.2 ACCOUNTS (`accounts`, `@pf/accounts`)
@@ -79,7 +79,8 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 - **Responsabilidades:** categorías (incl. de sistema), grupos, tags, definiciones de custom fields, contrapartes con alias; archivado y fusión.
 - **NO responsabilidades:** asignar clasificación a transacciones (Transactions); automatización (Rules); presupuestos por categoría (Planning).
 - **API pública:** cmd de CRUD/archivo/merge (ver 04 §3.5); qry `ListCategories`, `GetCategoryTree`, `ValidateClassification`, `ResolveCounterparty`, `ListTags`, `ListCustomFields`, `ListCounterparties`.
-- **Eventos publicados:** `classification.CategoryArchived`, `CategoriesMerged`, `TagsMerged`, `CounterpartiesMerged`, `CustomFieldDefinitionChanged`. **Consumidos:** `identity.WorkspaceCreated` (sembrar categorías de sistema).
+- **Eventos publicados:** `classification.CategoryArchived`, `CategoriesMerged`, `TagsMerged`, `CounterpartiesMerged`, `CustomFieldDefinitionChanged`. **Consumidos:** ninguno en Phase 1 (la provisión del catálogo al crear el workspace es síncrona, ver abajo).
+- **Provisión del catálogo al crear el workspace (síncrona):** decisión implementada por `add-classification` (decisión provisional de su design.md, adoptada al implementar): `ProvisionSystemCategories` (11 categorías de sistema con sus grupos "Finanzas", "Otros gastos" y "Otros ingresos") y, si `seedDefaultCategories = true` (por defecto), `ApplyDefaultCategoryCatalog` (catálogo sugerido versionado, ver [29 §2.4](29-seed-datasets.md#24-catálogo-inicial-de-categorías-sugerido)) corren **en la misma unidad de trabajo que `CreateWorkspace`** —incluido el workspace personal creado por JIT—, no como consumo asíncrono de `identity.WorkspaceCreated`. Motivo: el contrato de `createWorkspace` promete que las categorías existen al responder y Transactions necesita `UNCATEGORIZED` desde la primera transacción. IDENTITY expone el puerto opcional `WorkspaceCreatedHook` y el composition root (`apps/api`) lo cablea a Classification, de modo que IDENTITY no importa CLASSIFICATION. Ambas operaciones son idempotentes; la provisión no escribe auditoría propia (queda cubierta por `identity.workspace.created`).
 - **Dependencias:** Audit (sync).
 - **Extracción:** Media — `ValidateClassification` es síncrono en la escritura de transacciones; reemplazable por réplica local de IDs válidos.
 

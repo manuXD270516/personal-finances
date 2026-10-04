@@ -12,9 +12,11 @@ invariants: [INV-004, INV-003, INV-022]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/accounts.api.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "opening-balance", "ledger"]
@@ -33,7 +35,7 @@ expected_result:
   - "Bank B: ningún asiento; saldo 0.00 BOB"
   - "Patrimonio neto en BOB = 8000.00 BOB"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-OPENING-001 — El saldo inicial genera un asiento de apertura balanceado contra el patrimonio de apertura

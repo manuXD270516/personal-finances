@@ -12,9 +12,12 @@ invariants: [INV-026]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - packages/contexts/accounts/src/domain/account.test.ts
+  - packages/contexts/accounts/test/integration/pg-accounts.int.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "archive", "ledger"]
@@ -35,7 +38,7 @@ expected_result:
   - "No se crea ninguna transacción, asiento, reversa, auditoría ni evento; Old Bank sigue en 300.00 BOB y Bank B en 0.00 BOB"
   - "En la carrera, o el gasto se confirma antes del archivo, o se rechaza con ACCOUNT_ARCHIVED; nunca queda un posting posterior al archivo"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-ARCHIVE-002 — Una cuenta archivada o cerrada rechaza movimientos nuevos, incluidas las anulaciones que la afectan
@@ -52,3 +55,7 @@ Cuando el usuario anula una transacción de 50.00 BOB registrada en "Old Bank"
 Entonces se rechaza con ACCOUNT_ARCHIVED
   Y no se crea ninguna reversa
 ```
+
+## Notas
+
+- Verificado 2026-10-04: rechazo por estado/moneda en dominio y aplicación, carrera con FOR SHARE en integración; la anulación contra Transactions real la cubre [TC-TRANSACTIONS-ARCHIVED-001].

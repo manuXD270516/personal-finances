@@ -2,7 +2,7 @@
 
 > **Estado:** Propuesto · **Fecha:** 2026-10-01 · **Relacionado:** [ARCHITECTURE.md](ARCHITECTURE.md) §3, §4, §9 · [04-domain-model.md](04-domain-model.md) · [05-bounded-contexts.md](05-bounded-contexts.md) · [09-ledger-design.md](09-ledger-design.md) · [11-domain-events.md](11-domain-events.md) · [07-c4-architecture.md](07-c4-architecture.md) · [10-api-design.md](10-api-design.md) · [12-security.md](12-security.md) · [30-backup-and-disaster-recovery.md](30-backup-and-disaster-recovery.md) · ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0023
 
-Este documento define el **modelo físico** en PostgreSQL 18: un schema por bounded context (ARCHITECTURE §3) más `platform`. Es la traducción a tablas del modelo de dominio ([04-domain-model.md](04-domain-model.md)) y del diseño del ledger ([09-ledger-design.md](09-ledger-design.md)); en caso de conflicto de semántica financiera, manda 09 y se corrige este documento. Todo el SQL es **ilustrativo** (Phase 0: no hay migraciones productivas).
+Este documento define el **modelo físico** en PostgreSQL 18: un schema por bounded context (ARCHITECTURE §3) más `platform`. Es la traducción a tablas del modelo de dominio ([04-domain-model.md](04-domain-model.md)) y del diseño del ledger ([09-ledger-design.md](09-ledger-design.md)); en caso de conflicto de semántica financiera, manda 09 y se corrige este documento. Todo el SQL de este documento es **ilustrativo**; desde Phase 1 la fuente de verdad de nombres, tipos y constraints de las tablas ya creadas son las migraciones en [`apps/api/db/migrations/`](../apps/api/db/migrations/), y las secciones marcadas *as-built* las reflejan (rev. 2026-10-04).
 
 ---
 
@@ -25,7 +25,7 @@ Este documento define el **modelo físico** en PostgreSQL 18: un schema por boun
 
 | Grupo | Columnas | Aplica a |
 |-------|----------|----------|
-| Tenancy | `workspace_id uuid NOT NULL REFERENCES iam.workspace(id)` | Toda tabla de negocio (excepciones explícitas: `iam.user`, `fx.currency` global, `platform.inbox`, `fx.provider_run` — bitácora de instalación de los providers de tasas, sin datos de usuario; add-market-rate-providers). |
+| Tenancy | `workspace_id uuid NOT NULL REFERENCES iam.workspace(id)` | Toda tabla de negocio (excepciones explícitas: `iam.user`, `iam.bff_session` (tabla técnica del BFF), `fx.currency` global, `platform.inbox`, `fx.provider_run` — bitácora de instalación de los providers de tasas, sin datos de usuario; add-market-rate-providers —, `classification.category_name_i18n` — nombres traducidos de las categorías de sistema, datos de referencia globales cargados por migración; add-classification). |
 | Auditoría técnica | `created_at timestamptz NOT NULL DEFAULT now()`, `created_by uuid`, `updated_at timestamptz`, `updated_by uuid` | Agregados mutables. Las tablas inmutables solo tienen `created_*`. |
 | Optimistic locking | `version int NOT NULL DEFAULT 1` | Raíces de agregado mutables (ARCHITECTURE §9). Se incrementa en cada UPDATE (`WHERE id=$1 AND version=$2`). Expuesto como `ETag`. |
 | Soft-archive | `archived_at timestamptz`, `archived_by uuid` | Catálogos referenciados: accounts, institutions, categories, category groups, tags, counterparties, custom fields, templates, rules, goals, recurring definitions. Hard delete prohibido en datos financieros. |
@@ -80,7 +80,7 @@ Roles: `pf_migrator` (owner de schemas y tablas, ejecuta dbmate), `pf_app` (proc
 ```mermaid
 flowchart LR
   iam[iam] --- accounts[accounts]
-  accounts -. "account.ledger_account_id (lógico)" .- ledger[ledger]
+  accounts -. "ledger_account.source_account_id (lógico)" .- ledger[ledger]
   txn[txn] -. "posting.split_id / transaction.active_entry_id (lógico)" .- ledger
   txn -. "category_id, tag_id, counterparty_id (lógico)" .- classification[classification]
   planning[planning] -. category_id .- classification
@@ -217,6 +217,7 @@ erDiagram
     ccy base_currency FK "BOB"
     text time_zone "America/La_Paz"
     text locale
+    uuid personal_of_user_id FK "workspace personal JIT (nullable, unico)"
     smallint fiscal_month_start_day "1..28"
     numeric min_liquidity_reserve_amount "reserva minima de liquidez (nullable)"
     ccy min_liquidity_reserve_currency FK "ambos nulos o ambos presentes"
@@ -269,7 +270,7 @@ erDiagram
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
 | `user` | `(idp_issuer, idp_subject)`; `lower(email)` parcial `WHERE status='ACTIVE'` | `status IN (...)` | — | **USR**: `id = app.user_id` (lectura propia); alta vía JIT provisioning con rol `pf_app` y policy `WITH CHECK` sobre `idp_subject` del token (función `SECURITY DEFINER` acotada `iam.provision_user`: sincroniza `email` siempre y `display_name` solo si cambió el nombre en el IdP —`idp_display_name`—, para no pisar el elegido por el usuario) | `version` |
-| `workspace` | — | `fiscal_month_start_day BETWEEN 1 AND 28`; reserva mínima: `min_liquidity_reserve_amount` y `min_liquidity_reserve_currency` ambos nulos o ambos presentes, monto `>= 0` | — | **USR/WS**: `SELECT` si existe membership activa de `app.user_id`; `UPDATE` si `id = current_workspace_id()` | `version`, `archived_at` |
+| `workspace` | `(personal_of_user_id) WHERE personal_of_user_id IS NOT NULL` (un workspace personal por usuario) | `fiscal_month_start_day BETWEEN 1 AND 28`; reserva mínima: `min_liquidity_reserve_amount` y `min_liquidity_reserve_currency` ambos nulos o ambos presentes, monto `>= 0` | — | **USR/WS**: `SELECT` si existe membership activa de `app.user_id`; `UPDATE` si `id = current_workspace_id()` | `version`, `archived_at` |
 | `workspace_membership` | PK compuesta. **Al menos un OWNER activo** por workspace: invariante de dominio (`LAST_OWNER_CANNOT_LEAVE`) + constraint trigger diferido | `role IN ('OWNER','EDITOR','VIEWER')` | `(user_id) WHERE status='ACTIVE'` (resolver workspaces del usuario) | **USR**: `user_id = app.user_id OR workspace_id = current_workspace_id()` | `version` |
 | `workspace_invitation` | `(workspace_id, email_normalized) WHERE accepted_at IS NULL AND revoked_at IS NULL` | `expires_at > created_at` | `(token_hash)` | WS | — (Phase 9) |
 | `bff_session` | `sid_hash` | `kind IN ('PENDING_LOGIN','ACTIVE')`; `kind='ACTIVE'` ⇒ `user_id IS NOT NULL` | `(idle_expires_at)`, `(absolute_expires_at)` (purga) | **Sin RLS por workspace** (tabla técnica por usuario, en la allowlist del chequeo de catálogo): solo el rol `pf_bff` tiene `SELECT/INSERT/UPDATE/DELETE`; `pf_app`/`pf_worker` sin grants; `pf_maintenance` purga expiradas | `version` (refresh *single-flight*) |
@@ -279,6 +280,7 @@ erDiagram
 ```mermaid
 erDiagram
   INSTITUTION ||--o{ ACCOUNT : "emite"
+  ACCOUNT ||--o{ ACCOUNT_TAG : "etiquetas"
   INSTITUTION {
     uuid id PK
     uuid workspace_id FK
@@ -286,6 +288,8 @@ erDiagram
     text kind "BANK FINTECH EXCHANGE BROKER WALLET_PROVIDER OTHER"
     char country_code "ISO 3166-1 alpha-2"
     text website
+    text icon
+    text color
     text notes
     timestamptz created_at
     timestamptz updated_at
@@ -303,25 +307,35 @@ erDiagram
     ccy currency FK
     date opened_on
     date closed_on
+    text close_reason
     boolean include_in_net_worth
     boolean include_in_budget
     int display_order
     text account_number_last4 "4 caracteres alfanumericos"
     text color
+    text icon
+    text crypto_network "solo CRYPTO_WALLET (nullable)"
     text notes
     timestamptz created_at
     timestamptz updated_at
     timestamptz archived_at
+    text archive_reason
     int version
+  }
+  ACCOUNT_TAG {
+    uuid workspace_id PK, FK
+    uuid account_id PK, FK
+    uuid tag_id PK "ref classification.tag"
   }
 ```
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `institution` | `(workspace_id, id)`; `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `kind IN (...)` | — | WS | `version`, `archived_at` |
-| `account` | `(workspace_id, id)`; `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `type IN (...)` (11 valores); `classification IN ('ASSET','LIABILITY')`; coherencia `type`↔`classification` (`CREDIT_CARD`,`LOAN`,`MANUAL_LIABILITY` ⇒ `LIABILITY`; resto ⇒ `ASSET`); `liquidity IN ('LIQUID','SEMI_LIQUID','ILLIQUID')`; `account_number_last4 ~ '^[0-9]{4}$'`; `closed_on >= opened_on` | `(workspace_id, display_order) WHERE archived_at IS NULL` | WS | `version`, `archived_at` |
+| `institution` | `(workspace_id, id)`; `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `kind IN (...)` (6 valores, D3); `country_code ~ '^[A-Z]{2}$'` | — | WS | `version`, `archived_at` |
+| `account` | `(workspace_id, id)`; `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `type IN (...)` (11 valores, D3); `classification IN ('ASSET','LIABILITY')`; coherencia `type`↔`classification` (`CREDIT_CARD`,`LOAN`,`MANUAL_LIABILITY` ⇒ `LIABILITY`; resto ⇒ `ASSET`); `liquidity IN ('LIQUID','SEMI_LIQUID','ILLIQUID')` (D5); `account_number_last4 ~ '^[A-Za-z0-9]{4}$'`; `closed_on >= opened_on`; FK compuesta `(workspace_id, institution_id) → institution(workspace_id, id)` | `(workspace_id, display_order, id)`; `(workspace_id, institution_id) WHERE institution_id IS NOT NULL` | WS | `version`, `archived_at` |
+| `account_tag` | PK `(workspace_id, account_id, tag_id)`; FK compuesta `(workspace_id, account_id) → account` | — | — | WS | Tabla de enlace: `pf_app` con `SELECT, INSERT, DELETE`. `tag_id` es referencia lógica (sin FK cross-schema), validada vía `TagCatalogPort`; un tag archivado no es asignable (`TAG_ARCHIVED`) |
 
-Notas: la moneda de una cuenta es **inmutable** una vez que existe su ledger account (cambiarla = archivar y crear otra). `account` **no** guarda `ledger_account_id`: el vínculo 1:1 vive en `ledger.ledger_account.source_account_id` (único por workspace), creado con *get-or-create* en la misma transacción del primer posting (ARCHITECTURE §7, FR-ACCOUNTS-003). Estado derivado: `ARCHIVED` si `archived_at` no es nulo, `CLOSED` si `closed_on` no es nulo, si no `ACTIVE`. `liquidity` tiene default por tipo (FR-ACCOUNTS-011); no existe `include_in_liquidity`. Nunca se guarda número de cuenta completo (minimización, [12-security.md](12-security.md) §13).
+Notas (as-built `add-accounts-management`, migración `20261003181000_accounts_institution_account.sql`; rev. 2026-10-04, D3–D6): sin DELETE en `institution` ni `account` (NFR-DATA-012). La moneda de una cuenta solo puede cambiarse mientras no tenga movimientos (`ACCOUNT_CURRENCY_IMMUTABLE`; en la práctica, mientras no exista su ledger account). `account` **no** guarda `ledger_account_id` (D6): el vínculo 1:1 vive en `ledger.ledger_account.source_account_id`, único por `(workspace_id, source_account_id)` (§5.3), creado con *get-or-create* en la misma transacción del primer posting (ARCHITECTURE §7, FR-ACCOUNTS-003); una cuenta sin movimientos no tiene ledger account y su saldo es cero. Estados (D4) `ACTIVE`, `CLOSED`, `ARCHIVED`, **derivados** (sin columna `status`): `ARCHIVED` si `archived_at` no es nulo, `CLOSED` si `closed_on` no es nulo, si no `ACTIVE`; cerrar exige saldo cero. `liquidity` tiene default por tipo (FR-ACCOUNTS-011); no existe `include_in_liquidity`. Nunca se guarda número de cuenta completo (minimización, [12-security.md](12-security.md) §13).
 
 ### 5.3 `ledger` — Financial Ledger (Phase 1)
 
@@ -378,6 +392,7 @@ erDiagram
     ccy currency FK "denormalizado via FK compuesta"
     money amount "debito + credito -"
     uuid split_id "ref txn.transaction_split"
+    text memo
     timestamptz created_at
   }
   PERIOD_LOCK {
@@ -400,12 +415,12 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `ledger_account` | `(workspace_id, id)`; `(id, currency, type)` (destino de FK compuesta de `posting`); `(workspace_id, system_kind, currency) WHERE system_kind IS NOT NULL`; `(workspace_id, source_account_id) WHERE source_account_id IS NOT NULL` | `type IN (...)`; `system_kind IS NULL OR type IN ('INCOME','EXPENSE','EQUITY')`; `source_account_id IS NOT NULL` ⇔ `type IN ('ASSET','LIABILITY')` | — | WS (sin UPDATE salvo `archived_at`) | `archived_at` (sin `version`: no se edita) |
+| `ledger_account` | `(workspace_id, id)`; `(id, currency, type)` (destino de FK compuesta de `posting`); `(workspace_id, system_kind, currency) WHERE system_kind IS NOT NULL`; `(workspace_id, source_account_id) WHERE source_account_id IS NOT NULL` | `type IN (...)`; `source_account_id IS NOT NULL` ⇔ `type IN ('ASSET','LIABILITY')`; `system_kind IS NULL` ⇔ `source_account_id IS NOT NULL`, y el `type` de una cuenta de sistema lo fija su `system_kind` (`INCOME`→`INCOME`, `EXPENSE`→`EXPENSE`, resto→`EQUITY`) | — | WS (sin UPDATE salvo `archived_at`) | `archived_at` (sin `version`: no se edita) |
 | `journal_entry` | `(workspace_id, id)`; `(id, entry_date)` (destino FK de posting); `(workspace_id, source_type, source_id, source_revision, entry_type)` | `entry_type IN ('STANDARD','REVERSAL','OPENING')`; `entry_type='REVERSAL'` ⇔ `reverses_entry_id IS NOT NULL` | `(workspace_id, source_type, source_id)`; `(workspace_id, entry_date)`; `(workspace_id, sequence)` | **WS-RO** | Inmutable |
 | `entry_reversal` | PK `original_entry_id` (**una entry se revierte a lo sumo una vez**, INV-008); `UNIQUE (reversal_entry_id)` | `original_entry_id <> reversal_entry_id` | — | **WS-RO** | Inmutable. Proyección de `reversedByEntryId` sin necesidad de UPDATE (09 §5) |
 | `posting` | `(journal_entry_id, line_no)` | `amount <> 0`; `account_type NOT IN ('INCOME','EXPENSE') OR split_id IS NOT NULL` (todo posting nominal referencia un split) | `(workspace_id, ledger_account_id, entry_date, id)` INCLUDE `(amount)` — saldos *as-of*; `(workspace_id, split_id) WHERE split_id IS NOT NULL` | **WS-RO** | Inmutable |
 | `period_lock` | PK `(workspace_id, year_month)` (bloqueo **mensual**) | `year_month ~ '^[0-9]{4}-(0[1-9]\|1[0-2])$'` | — | WS (`pf_app`: INSERT/DELETE — reabrir elimina el lock, con audit) | — |
-| `balance_snapshot` | PK | — | `(workspace_id, ledger_account_id, as_of_date DESC)` | **DRV** | **Derivado** y reconstruible (09 §8, INV-022). Borrable como caché cuando llega un asiento *backdated* |
+| `balance_snapshot` | PK | — | `(workspace_id, ledger_account_id, as_of_date DESC)` | **DRV** | **Derivado** y reconstruible (09 §8, INV-022). Borrable como caché cuando llega un asiento *backdated*. La reconstrucción y la verificación Σ postings las ejecuta el worker con `SET ROLE pf_ledger_maintenance` (rol `NOINHERIT`, sin `BYPASSRLS`, con políticas propias: lectura de `ledger_account`/`journal_entry`/`posting`/`entry_reversal` y `SELECT, INSERT, DELETE` en `balance_snapshot` de todos los workspaces; migración `20261003190000_ledger_maintenance_role.sql`) |
 
 Restricciones de BD que refuerzan el dominio:
 1. **Zero-sum por moneda y entry** (INV-004): constraint trigger `DEFERRABLE INITIALLY DEFERRED` (SQL §10.2).
@@ -415,6 +430,18 @@ Restricciones de BD que refuerzan el dominio:
 5. **Inmutabilidad** (INV-007): sin grants `UPDATE/DELETE/TRUNCATE` + trigger `forbid_mutation`.
 6. **Periodo cerrado** (INV-015): trigger `BEFORE INSERT` en `journal_entry` rechaza (`PF004`, `PERIOD_CLOSED`) la `entry_date` cuyo mes `to_char(entry_date, 'YYYY-MM')` tenga un `period_lock`. El bloqueo es **mensual** por `(workspace_id, year_month)`, igual que 09 §10. `period_lock` lo escribe Planning **sincrónicamente** vía `LedgerPeriodLockPort` (`@pf/ledger/contracts`) en la misma transacción del cierre (09 §10).
 7. `sequence` (`bigint GENERATED ALWAYS AS IDENTITY`): monotónico global ⇒ monotónico por workspace (con huecos). Suficiente para checkpoints de rebuild; **no** es orden de commit (ver Preguntas abiertas).
+
+Códigos SQLSTATE propios de la BD (docs/31 D19; as-built, migraciones `20261002130000_platform_idempotency_key.sql`, `20261003160000_audit_audit_log.sql` y `20261003170000_ledger_core.sql`; rev. 2026-10-04). Cada código tiene **un único** significado; la app los traduce a problem+json:
+
+| SQLSTATE | Significado | Origen |
+|----------|-------------|--------|
+| `PF001` | Asiento desbalanceado por moneda (`LEDGER_UNBALANCED_ENTRY`, INV-004) | `ledger.assert_entry_balanced()` (constraint trigger diferido) |
+| `PF002` | Contexto de RLS ausente (`app.workspace_id` sin fijar; también `app.user_id` en las tablas **USR**): la consulta **falla**, nunca devuelve 0 filas | `platform.current_workspace_id()` (§1.4), `platform.current_user_id()` |
+| `PF003` | Mutación prohibida sobre una tabla append-only (`IMMUTABLE_RECORD`, INV-007) | `platform.forbid_mutation()` |
+| `PF004` | Periodo cerrado (`PERIOD_CLOSED`, INV-015) | `ledger.assert_period_open()` |
+| `PF005` | Asiento con menos de 2 postings (`LEDGER_ENTRY_TOO_FEW_POSTINGS`, INV-005) | `ledger.assert_entry_has_postings()` (constraint trigger diferido) |
+
+Las violaciones de invariantes de otros contextos (p. ej. Σ splits, consistencia de transferencias y conversiones, jerarquía de categorías) usan `23514` (`check_violation`) con el nombre de constraint lógico en `CONSTRAINT`.
 
 ### 5.4 `txn` — Transactions (Phase 1)
 
@@ -435,21 +462,29 @@ erDiagram
   TRANSACTION {
     uuid id PK
     uuid workspace_id FK
-    text kind "INCOME EXPENSE TRANSFER REFUND ADJUSTMENT OPENING_BALANCE CONVERSION LOAN_DISBURSEMENT LOAN_PAYMENT CARD_PAYMENT (reservado Phase 4)"
+    text kind "Phase 1: INCOME EXPENSE REFUND ADJUSTMENT TRANSFER CONVERSION; reservados OPENING_BALANCE LOAN_DISBURSEMENT LOAN_PAYMENT CARD_PAYMENT"
     text status "PENDING POSTED CLEARED RECONCILED VOIDED"
     date transaction_date
-    uuid primary_account_id "denormalizado: cuenta del leg principal"
+    date posting_date "fecha de acreditacion (nullable)"
+    uuid account_id "ref accounts.account: cuenta principal (origen en TRANSFER y CONVERSION)"
+    money amount "monto nominal positivo"
+    ccy currency FK
+    text adjustment_direction "INCREASE DECREASE (solo ADJUSTMENT)"
+    text adjustment_reason "solo ADJUSTMENT"
     text description
-    uuid counterparty_id "ref classification.counterparty"
     text notes
+    uuid counterparty_id "ref classification.counterparty"
+    text payment_method "CASH QR DEBIT_CARD CREDIT_CARD BANK_TRANSFER DIGITAL_WALLET OTHER (nullable, D27)"
+    text source "MANUAL IMPORT RECURRING DEBT GOAL SYSTEM"
+    text external_ref_namespace
+    text external_ref_id
+    uuid refund_of_transaction_id FK "solo REFUND"
+    boolean confirmed_refund_excess
     int revision "sube con cada re-posting"
     uuid active_entry_id "ref ledger.journal_entry"
-    text source "MANUAL IMPORT RECURRING DEBT GOAL SYSTEM"
-    uuid source_ref_id "occurrence installment staged row"
-    text external_namespace
-    text external_id
     timestamptz voided_at
     text void_reason
+    text search_text "descripcion + notas normalizadas (q)"
     timestamptz created_at
     timestamptz updated_at
     int version
@@ -458,26 +493,27 @@ erDiagram
     uuid id PK
     uuid workspace_id FK
     uuid transaction_id FK
-    smallint leg_no
     uuid account_id "ref accounts.account"
+    text account_nature "ASSET LIABILITY"
+    text role "MAIN SOURCE TARGET FEE"
     money amount "signo contable desde la cuenta"
     ccy currency FK
     date transaction_date "denormalizado"
-    text role "MAIN SOURCE TARGET FEE"
+    int revision "revision que lo introdujo"
+    int superseded_in_revision "NULL si vigente"
   }
   TRANSACTION_SPLIT {
     uuid id PK
     uuid workspace_id FK
     uuid transaction_id FK
-    smallint line_no
-    money amount "monto nominal con signo"
+    int position
+    money amount "monto nominal positivo"
     ccy currency FK
     uuid category_id "ref classification.category"
     uuid counterparty_id "override opcional"
     text memo
-    int introduced_in_revision
+    int revision "revision que lo introdujo"
     int superseded_in_revision "NULL si vigente"
-    timestamptz created_at
   }
   SPLIT_TAG {
     uuid workspace_id FK
@@ -505,18 +541,23 @@ erDiagram
     money gross_target_amount "antes de fees en destino"
     money target_amount "neto recibido"
     ccy target_currency FK
-    ccy quoted_base FK
-    ccy quoted_quote FK
-    rate quoted_rate "como lo dio el proveedor"
+    ccy quoted_base FK "nullable"
+    ccy quoted_quote FK "nullable"
+    rate quoted_rate "como lo dio el proveedor (nullable)"
+    ccy effective_base FK
+    ccy effective_quote FK
     rate effective_rate "orientacion de display"
+    uuid reference_exchange_rate_id "ref fx.exchange_rate"
     ccy reference_base FK
     ccy reference_quote FK
     rate reference_rate
-    uuid reference_exchange_rate_id "ref fx.exchange_rate"
-    text reference_source
+    text reference_source "MANUAL PROVIDER USER_CONVERSION"
+    text reference_rate_type "tipos de tasa de fx (D13 D39)"
+    timestamptz reference_as_of
     numeric spread_pct
     money spread_amount
     ccy spread_currency FK
+    numeric quoted_rate_deviation
     uuid provider_counterparty_id
     text provider_name "Binance P2P casa de cambio"
     text external_ref "orden o tx hash"
@@ -536,11 +577,11 @@ erDiagram
     uuid split_id FK "split categoria Fees"
   }
   TRANSACTION_JOURNAL_LINK {
-    uuid workspace_id FK
-    uuid transaction_id PK, FK
+    uuid workspace_id PK, FK
     uuid journal_entry_id PK "ref ledger.journal_entry"
+    uuid transaction_id FK
     int revision
-    text role "POSTING REVERSAL"
+    text link_type "POSTED REVERSAL"
     timestamptz created_at
   }
   RECONCILIATION {
@@ -578,23 +619,26 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `transaction` | `(workspace_id, id)`; `(workspace_id, primary_account_id, external_namespace, external_id) WHERE external_id IS NOT NULL` (13 §7.3) | `kind IN (...)`; `status IN (...)`; `status='VOIDED'` ⇔ `voided_at IS NOT NULL`; `status IN ('PENDING','VOIDED')` ⇔ `active_entry_id IS NULL` (INV-023) | `(workspace_id, transaction_date DESC, id DESC)` (listado/cursor); `(workspace_id, counterparty_id)`; `(workspace_id, status) WHERE status='PENDING'`; `gin (to_tsvector('simple', description))` | WS | `version` (no archivo: se **anula** con `void`) |
-| `transaction_leg` | `(transaction_id, leg_no)` | `amount <> 0`; `role IN (...)` | `(workspace_id, account_id, transaction_date DESC, transaction_id DESC)` (registro de cuenta) | WS | Reemplazados en cada revisión (filas de la revisión anterior se conservan con `superseded_in_revision`, columna omitida en ERD) |
-| `transaction_split` | `(workspace_id, id)`; `(transaction_id, line_no, introduced_in_revision)` | `amount <> 0`; `superseded_in_revision IS NULL OR superseded_in_revision > introduced_in_revision` | `(workspace_id, category_id) WHERE superseded_in_revision IS NULL`; `(transaction_id)` | WS | Nunca se borra (postings históricos lo referencian) |
-| `split_tag` | PK | — | `(workspace_id, tag_id)` | WS | — |
-| `split_custom_field_value` | PK | `num_nonnulls(value_text, value_number, value_date, value_bool) = 1` | `(workspace_id, field_id)` | WS | — |
-| `conversion_detail` | PK `(transaction_id, revision)` | `source_currency <> target_currency`; montos `> 0`; tasas `> 0`; `quoted_base <> quoted_quote` | `(workspace_id, source_currency, target_currency, executed_at)` | **WS-RO** (inmutable, INV-011/012: editar = reversa + nuevo asiento + nueva revisión del detalle; las anteriores se conservan) | Inmutable; el vigente es el de la revisión activa |
-| `conversion_fee` | `(transaction_id, revision, fee_no)` | `amount > 0` | — | **WS-RO** | Inmutable |
-| `transaction_journal_link` | PK | `role IN (...)` | `(workspace_id, journal_entry_id)` | **WS-RO** | Append-only |
-| `reconciliation` | `(workspace_id, account_id) WHERE status='IN_PROGRESS'` | — | `(workspace_id, account_id, statement_date DESC)` | WS | `version` |
-| `reconciliation_item` | PK | — | `(workspace_id, transaction_id)` | WS | — |
-| `duplicate_candidate` | `(workspace_id, least(transaction_id, candidate_transaction_id), greatest(transaction_id, candidate_transaction_id))` | `transaction_id <> candidate_transaction_id`; `score BETWEEN 0 AND 1` | `(workspace_id, status) WHERE status='OPEN'` | WS | — |
+| `transaction` | `(workspace_id, id)`. *Planificado (imports, Phase 3/6):* `(workspace_id, account_id, external_ref_namespace, external_ref_id) WHERE external_ref_id IS NOT NULL` (13 §7.3) — aún no creado | `kind IN (...)` (6 valores en Phase 1, ampliado por migración en cada change: transacciones → `TRANSFER` → `CONVERSION`); `status IN (...)`; `amount > 0`; `status='VOIDED'` ⇔ `voided_at IS NOT NULL`; `status IN ('PENDING','VOIDED')` ⇔ `active_entry_id IS NULL` (INV-023); `kind='ADJUSTMENT'` ⇔ `adjustment_reason` y `adjustment_direction IN ('INCREASE','DECREASE')` presentes; `refund_of_transaction_id IS NULL OR kind='REFUND'` (FK compuesta a la misma tabla); `payment_method IN (...)` o nulo (D27); `external_ref_namespace` y `external_ref_id` ambos nulos o ambos presentes | `(workspace_id, transaction_date DESC, id DESC)` (listado/cursor); `(workspace_id, account_id, transaction_date DESC, id DESC)`; `(workspace_id, refund_of_transaction_id) WHERE refund_of_transaction_id IS NOT NULL`. Búsqueda `q` por `LIKE` sobre `search_text` (sin `pg_trgm`/`unaccent` en Phase 1) | WS | `version` (no archivo: se **anula** con `void`) |
+| `transaction_leg` | — | `amount <> 0`; `role IN (...)`; `account_nature IN ('ASSET','LIABILITY')`; `superseded_in_revision IS NULL OR superseded_in_revision > revision` | `(workspace_id, transaction_id)`; `(workspace_id, account_id, transaction_date DESC, transaction_id DESC) WHERE superseded_in_revision IS NULL` (registro de cuenta) | WS | Reemplazados en cada revisión: las filas anteriores se conservan con `superseded_in_revision` |
+| `transaction_split` | `(workspace_id, id)` | `amount > 0` (el signo lo da el `kind`); `position >= 0`; `category_id NOT NULL` | `(workspace_id, transaction_id) WHERE superseded_in_revision IS NULL`; `(workspace_id, category_id) WHERE superseded_in_revision IS NULL` | WS | Nunca se borra (postings históricos lo referencian) |
+| `split_tag` | PK `(workspace_id, split_id, tag_id)` | — | — | WS (`pf_app`: `SELECT, INSERT, DELETE`, tabla de enlace) | — |
+| `split_custom_field_value` | PK | `num_nonnulls(value_text, value_number, value_date, value_bool) = 1` | `(workspace_id, field_id)` | WS | — (Phase 2, aún no creada) |
+| `conversion_detail` | PK `(transaction_id, revision)` (D11); `(workspace_id, transaction_id, revision)` (destino de la FK de `conversion_fee`) | `source_currency <> target_currency`; montos `> 0`; `converted_source_amount <= source_amount`; `gross_target_amount >= target_amount`; tasas `> 0`; cotizada (`quoted_*`), de referencia (`reference_*`) y spread: cada grupo todo nulo o todo presente, con monedas del par de la conversión; `effective_base <> effective_quote`; `reference_source IN ('MANUAL','PROVIDER','USER_CONVERSION')`; `reference_rate_type IN (...)` (los 7 tipos de `fx.exchange_rate`) | `(workspace_id, source_currency, target_currency, executed_at)` | **WS-RO** (inmutable, INV-011/012: editar = reversa + nuevo asiento + nueva revisión del detalle; las anteriores se conservan) | Inmutable; el vigente es el de la mayor `revision` ≤ `transaction.revision` |
+| `conversion_fee` | `(transaction_id, revision, fee_no)`; FK `(workspace_id, transaction_id, revision) → conversion_detail`; FK `(workspace_id, split_id) → transaction_split` | `amount > 0`; `fee_type IN (...)`; `split_id NOT NULL` | `(workspace_id, transaction_id, revision)` | **WS-RO** | Inmutable |
+| `transaction_journal_link` | PK `(workspace_id, journal_entry_id)` | `link_type IN ('POSTED','REVERSAL')` | `(workspace_id, transaction_id, revision)` | **WS-RO** | Append-only |
+| `reconciliation` | `(workspace_id, account_id) WHERE status='IN_PROGRESS'` | — | `(workspace_id, account_id, statement_date DESC)` | WS | `version` (Phase 2, aún no creada) |
+| `reconciliation_item` | PK | — | `(workspace_id, transaction_id)` | WS | — (Phase 2, aún no creada) |
+| `duplicate_candidate` | `(workspace_id, least(transaction_id, candidate_transaction_id), greatest(transaction_id, candidate_transaction_id))` | `transaction_id <> candidate_transaction_id`; `score BETWEEN 0 AND 1` | `(workspace_id, status) WHERE status='OPEN'` | WS | — (Phase 2+, aún no creada; en Phase 1 los posibles duplicados se calculan al vuelo) |
+
+As-built Phase 1 (rev. 2026-10-04; migraciones `20261003200000_txn_transactions_core.sql`, `20261003210000_txn_transfers.sql`, `20261003220100_txn_conversions.sql` y `20261004130000_fx_quote_side_rate_types.sql`): la transacción guarda **cabecera nominal** (`account_id`, `amount > 0`, `currency`) y los legs llevan el signo contable; no existe `primary_account_id` ni `leg_no`/`line_no`/`introduced_in_revision` (el orden del split es `position` y la revisión que introduce un leg o split es `revision`). Estados `CLEARED`/`RECONCILED` se marcan sobre la misma columna `status` (mark-cleared/unreconcile, sin tabla propia en Phase 1). `payment_method` (D27) es solo descriptivo: no altera el ledger. Un ajuste lleva `adjustment_direction` (`INCREASE` = débito en ASSET, crédito en LIABILITY, según `account_nature` del leg) y `adjustment_reason`; un reembolso puede enlazar su gasto original con `refund_of_transaction_id` y `confirmed_refund_excess` registra que el usuario aceptó reembolsar más que el original. El saldo inicial de una cuenta se postea hoy directo al ledger (sin fila `OPENING_BALANCE` en `txn`, ver design de add-accounts-management). `conversion_detail`, `conversion_fee` y `transaction_journal_link` son append-only por grants (`SELECT, INSERT`), sin trigger `forbid_mutation`.
 
 Reglas adicionales:
-- **Σ splits vigentes = monto nominal** (INV-021) para kinds con parte nominal (`INCOME`, `EXPENSE`, `REFUND`, categorizados de `ADJUSTMENT`, componentes no-principal de `LOAN_PAYMENT`): validado en dominio y por constraint trigger diferido en `txn`. `TRANSFER`/`CONVERSION` solo tienen splits para fees (09 §6.17).
-- **Transferencias**: no hay tabla `transfer`; una transferencia es `kind='TRANSFER'` con legs `SOURCE`/`TARGET` en la misma moneda (cross-currency ⇒ `CONVERSION`). El recurso API `/transfers` es una fachada sobre este modelo ([10-api-design.md](10-api-design.md)). El pago de tarjeta de crédito es una transferencia (`kind='TRANSFER'`, destino `LIABILITY`); `CARD_PAYMENT` queda reservado para `debt/credit-cards` (Phase 4).
+- **Σ splits vigentes = monto nominal** (INV-021) para kinds con parte nominal (`INCOME`, `EXPENSE`, `REFUND`, categorizados de `ADJUSTMENT`, componentes no-principal de `LOAN_PAYMENT`): validado en dominio y por el constraint trigger diferido `txn.assert_splits_sum()` sobre `transaction` y `transaction_split` (as-built: para `INCOME`, `EXPENSE` y `REFUND`; `23514`, `transaction_splits_sum_ck`). `TRANSFER`/`CONVERSION` solo tienen splits para fees (09 §6.17).
+- **Transferencias**: no hay tabla `transfer`; una transferencia es `kind='TRANSFER'` con legs `SOURCE`/`TARGET` en la misma moneda (cross-currency ⇒ `CONVERSION`). El recurso API `/transfers` es una fachada sobre este modelo ([10-api-design.md](10-api-design.md)). El pago de tarjeta de crédito es una transferencia (`kind='TRANSFER'`, destino `LIABILITY`; D27); `CARD_PAYMENT` queda reservado para `debt/credit-cards` (Phase 4). Refuerzo en BD (add-transfers, migración `20261003210000_txn_transfers.sql`; rev. 2026-10-04): constraint trigger `DEFERRABLE INITIALLY DEFERRED` `txn.assert_transfer_consistency()` sobre `transaction` y `transaction_leg` — entre los legs vigentes de una `TRANSFER` hay exactamente un `SOURCE` negativo y un `TARGET` positivo, ningún otro rol, dos cuentas distintas y una sola moneda igual a la de la cabecera; si no, `23514` con constraint `transaction_transfer_consistency_ck`.
+- **Conversiones en BD** (add-manual-conversions, migración `20261003220100_txn_conversions.sql`; rev. 2026-10-04): constraint trigger diferido `txn.assert_conversion_consistency()` sobre `transaction`, `transaction_leg`, `conversion_detail` y `conversion_fee` — un `SOURCE` negativo, un `TARGET` positivo y legs `FEE` negativos; monedas distintas; cuentas, montos y monedas de los legs iguales a los del detalle vigente (`transaction_conversion_consistency_ck`); y los fees no pagados desde otra cuenta concilian bruto y neto (INV-010: `converted_source_amount` + fees en origen = `source_amount`; `target_amount` + fees en destino = `gross_target_amount`; `conversion_detail_inv010_ck`).
 - **Edición de una transacción posteada** que afecta montos/cuentas/fecha/moneda: `revision+1`, entry `REVERSAL` + nueva entry `STANDARD` con `source_revision = revision`; `active_entry_id` apunta a la nueva y `transaction_journal_link` conserva la historia. Los legs/splits anteriores se marcan `superseded_in_revision` (los postings históricos siguen apuntando a splits existentes). Recategorizar **no** toca el ledger (INV-033): se actualiza `category_id` del split vigente in situ.
-- **Edición de una conversión** (FR-TRANSACTIONS-024): mismo patrón — `revision+1`, entry `REVERSAL` + nueva entry `STANDARD` y **nueva fila** `conversion_detail`/`conversion_fee` con esa `revision`, todo en la misma transacción de BD; las revisiones anteriores del detalle nunca se modifican.
+- **Edición de una conversión** (FR-TRANSACTIONS-024): mismo patrón — `revision+1`, entry `REVERSAL` + nueva entry `STANDARD` y **nueva fila** `conversion_detail`/`conversion_fee` con esa `revision`, todo en la misma transacción de BD; las revisiones anteriores del detalle nunca se modifican (D11: `revision` forma parte de la PK de `conversion_detail`).
 
 ### 5.5 `classification` — Categories, Tags, Custom fields, Counterparties (Phase 1)
 
@@ -603,10 +647,16 @@ erDiagram
   CATEGORY_GROUP ||--o{ CATEGORY : "agrupa"
   CATEGORY |o--o{ CATEGORY : "parent_id"
   COUNTERPARTY ||--o{ COUNTERPARTY_ALIAS : "alias"
+  CATEGORY_NAME_I18N {
+    text system_code PK "uno de los 11 codigos"
+    text locale PK "es en pt"
+    text name
+  }
   CATEGORY_GROUP {
     uuid id PK
     uuid workspace_id FK
     text name
+    text normalized_name "minusculas, sin acentos, espacios colapsados"
     text kind "EXPENSE INCOME"
     int sort_order
     timestamptz archived_at
@@ -618,6 +668,7 @@ erDiagram
     uuid group_id FK
     uuid parent_id FK "subcategoria: un solo nivel bajo categoria"
     text name
+    text normalized_name
     text kind "EXPENSE INCOME"
     text system_code "FEES FX_FEES INTEREST LOAN_FEES INSURANCE TAXES ADJUSTMENTS UNCATEGORIZED INTEREST_EARNED ADJUSTMENTS_INCOME UNCATEGORIZED_INCOME"
     text color
@@ -630,6 +681,7 @@ erDiagram
     uuid id PK
     uuid workspace_id FK
     text name
+    text normalized_name
     text color
     timestamptz archived_at
     int version
@@ -650,7 +702,8 @@ erDiagram
     uuid workspace_id FK
     text name
     text normalized_name
-    text kind "MERCHANT PERSON EMPLOYER SERVICE_PROVIDER LENDER EXCHANGE P2P_TRADER GOVERNMENT OTHER"
+    text kind "MERCHANT PERSON EMPLOYER SERVICE_PROVIDER FINANCIAL_INSTITUTION LENDER EXCHANGE P2P_TRADER GOVERNMENT OTHER"
+    text icon
     uuid default_category_id FK
     text website
     text notes
@@ -658,22 +711,25 @@ erDiagram
     int version
   }
   COUNTERPARTY_ALIAS {
-    uuid id PK
-    uuid workspace_id FK
-    uuid counterparty_id FK
-    text alias_normalized
-    text source "MANUAL IMPORT"
+    uuid workspace_id PK, FK
+    uuid counterparty_id PK, FK
+    text alias_normalized PK "min 3 caracteres"
+    text alias
+    boolean active
   }
 ```
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `category_group` | `(workspace_id, kind, lower(name)) WHERE archived_at IS NULL` | `kind IN ('EXPENSE','INCOME')` | — | WS | `version`, `archived_at` |
-| `category` | `(workspace_id, group_id, coalesce(parent_id, '00000000-0000-0000-0000-000000000000'), lower(name)) WHERE archived_at IS NULL` (único por padre); `(workspace_id, system_code) WHERE system_code IS NOT NULL` | `system_code IN (...)` (11 códigos); `kind` = `kind` del grupo y del padre (trigger); `parent_id <> id`; jerarquía grupo → categoría → subcategoría: una subcategoría no tiene hijas (trigger, `CATEGORY_DEPTH_EXCEEDED`) | `(workspace_id, group_id, sort_order)` | WS | `version`, `archived_at`. Categorías de sistema no archivables (trigger) |
-| `tag` | `(workspace_id, lower(name)) WHERE archived_at IS NULL` | — | — | WS | `version`, `archived_at` |
-| `custom_field_definition` | `(workspace_id, key) WHERE archived_at IS NULL` | `key ~ '^[a-z][a-z0-9_]{0,39}$'`; `data_type='ENUM'` ⇒ `jsonb_typeof(options)='array'` | — | WS | `version`, `archived_at` |
-| `counterparty` | `(workspace_id, normalized_name) WHERE archived_at IS NULL` | — | `gin (normalized_name gin_trgm_ops)` (fuzzy match, `pg_trgm`) | WS | `version`, `archived_at` |
-| `counterparty_alias` | `(workspace_id, alias_normalized)` | — | — | WS | — |
+| `category_group` | `(id, workspace_id)`; `(workspace_id, kind, normalized_name) WHERE archived_at IS NULL` | `kind IN ('EXPENSE','INCOME')` | — | WS | `version`, `archived_at` |
+| `category` | `(id, workspace_id)`; `(workspace_id, group_id, coalesce(parent_id, '00000000-0000-0000-0000-000000000000'), normalized_name) WHERE archived_at IS NULL` (**único por padre**, D8); `(workspace_id, system_code) WHERE system_code IS NOT NULL` | `system_code IN (...)` (11 códigos, D9); una categoría de sistema no tiene padre (`category_system_no_parent`) ni puede estar archivada (`category_system_active`); `parent_id <> id`; trigger `classification.category_guard()`: `kind` = `kind` del grupo, el padre comparte `kind` y grupo (`CATEGORY_KIND_MISMATCH`), jerarquía de **3 niveles** grupo → categoría → subcategoría — una subcategoría no tiene hijas (`CATEGORY_DEPTH_EXCEEDED`) —, una categoría de sistema no tiene subcategorías ni se renombra ni archiva (`SYSTEM_CATEGORY_IMMUTABLE`), `kind` inmutable | `(workspace_id, parent_id)` | WS | `version`, `archived_at` |
+| `category_name_i18n` | PK `(system_code, locale)` | `locale IN ('es','en','pt')` | — | **Global sin `workspace_id`** (excepción de §1.2): RLS forzada con política `global_read` (`SELECT` para `pf_app`); escritura solo por migración | Datos de referencia (33 filas: 11 códigos × 3 locales). La API resuelve el nombre de las categorías de sistema por el locale del usuario (fallback `es`) |
+| `tag` | `(workspace_id, normalized_name) WHERE archived_at IS NULL` | — | — | WS | `version`, `archived_at` |
+| `custom_field_definition` | `(workspace_id, key) WHERE archived_at IS NULL` | `key ~ '^[a-z][a-z0-9_]{0,39}$'`; `data_type='ENUM'` ⇒ `jsonb_typeof(options)='array'` | — | WS | `version`, `archived_at` (Phase 2, aún no creada) |
+| `counterparty` | `(id, workspace_id)`; `(workspace_id, normalized_name) WHERE archived_at IS NULL` | `kind IN (...)` (default `OTHER`); FK compuesta `(default_category_id, workspace_id) → category` | *Planificado (Phase 6):* `gin (normalized_name gin_trgm_ops)` (fuzzy match, `pg_trgm`) — en Phase 1 la resolución es por subcadena sobre texto normalizado | WS | `version`, `archived_at` |
+| `counterparty_alias` | PK `(workspace_id, counterparty_id, alias_normalized)`; `(workspace_id, alias_normalized) WHERE active` (`COUNTERPARTY_ALIAS_TAKEN`) | `length(alias_normalized) >= 3` | — | WS (`pf_app`: además `DELETE`, tabla de enlace) | — |
+
+As-built `add-classification` (migración `20261003173000_classification_schema.sql`; rev. 2026-10-04, D7–D9): la unicidad de nombres usa `normalized_name` (minúsculas, sin acentos, espacios colapsados; la llena la aplicación) en lugar de `lower(name)`. **Nunca hay hard delete** de categorías, grupos, tags ni counterparties (D7, INV-019): `pf_app` solo tiene `SELECT, INSERT, UPDATE` y el borrado es archivar (`archived_at`, `archived_by`); `DELETE` sobre el recurso API ⇒ 405. Las categorías de sistema (11 `system_code`, D9) se provisionan por workspace, de forma síncrona al crearlo; su nombre visible sale de `category_name_i18n`.
 
 ### 5.6 `planning` — Periods, Budgets, Templates, Month closing (Phase 2)
 
@@ -973,6 +1029,7 @@ erDiagram
   CURRENCY ||--o{ EXCHANGE_RATE : "base"
   CURRENCY ||--o{ EXCHANGE_RATE : "quote"
   EXCHANGE_RATE |o--o| EXCHANGE_RATE : "supersedes_id"
+  EXCHANGE_RATE ||--o| RATE_ANOMALY_REVIEW : "decision del usuario"
   CURRENCY {
     varchar code PK "BOB USD USDT BTC"
     text kind "FIAT CRYPTO COMMODITY CUSTOM"
@@ -999,23 +1056,56 @@ erDiagram
     int version
     timestamptz updated_at
   }
+  RATE_PREFERENCE_SET {
+    uuid workspace_id PK, FK
+    int version "ETag del conjunto de preferencias"
+    timestamptz updated_at
+  }
   EXCHANGE_RATE {
     uuid id PK
-    uuid workspace_id FK "NULL = global provider"
+    uuid workspace_id FK "NULL solo para source PROVIDER"
     ccy base_currency FK
     ccy quote_currency FK
     rate rate "quote por 1 base"
-    text rate_type "OFFICIAL PARALLEL P2P BANK CUSTOM"
+    text rate_type "OFFICIAL PARALLEL PARALLEL_BUY PARALLEL_SELL P2P BANK CUSTOM"
     timestamptz as_of
     date as_of_date "fecha de negocio"
     text source "MANUAL PROVIDER USER_CONVERSION"
-    text provider "manual, coingecko, ..."
-    text provider_ref
+    text source_label "etiqueta libre de la fuente (nullable)"
+    text provider "PARALELO_BO DOLARAPI_BO (solo PROVIDER)"
     uuid supersedes_id FK
-    uuid derived_from_transaction_id "ref txn"
-    timestamptz fetched_at
+    text supersede_reason "obligatoria si supersedes_id"
+    timestamptz fetched_at "solo PROVIDER"
+    text raw_payload "respuesta cruda, max 1 MiB, nunca en la API"
+    boolean anomaly_flagged
+    uuid anomaly_baseline_rate_id FK
+    numeric anomaly_variation_pct "numeric(12,4)"
     timestamptz created_at
     uuid created_by
+  }
+  RATE_ANOMALY_REVIEW {
+    uuid exchange_rate_id PK, FK
+    uuid workspace_id FK
+    text decision "CONFIRMED REJECTED"
+    text reason "3..500"
+    uuid decided_by
+    timestamptz decided_at
+  }
+  PROVIDER_RUN {
+    uuid id PK
+    text provider "PARALELO_BO DOLARAPI_BO"
+    text kind "POLL BACKFILL GAP_FILL"
+    timestamptz started_at
+    timestamptz finished_at
+    text outcome "OK NO_NEW_SAMPLE FAILED SKIPPED_RATE_LIMIT SKIPPED_CACHE"
+    text error_code "solo FAILED"
+    int http_status
+    int latency_ms
+    int new_samples
+    timestamptz retry_after_until
+    int history_points
+    date history_from
+    date history_to
   }
   PROVIDER_CONFIG {
     uuid id PK
@@ -1031,12 +1121,14 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `currency` | PK `code`; `(owner_workspace_id, lower(name)) WHERE kind='CUSTOM'` | `scale BETWEEN 0 AND 18`; `kind='CUSTOM'` ⇔ `owner_workspace_id IS NOT NULL`; `code ~ '^[A-Z0-9][A-Z0-9_.-]{1,15}$'` | — | **WS+G** (`owner_workspace_id`) | `is_active` (no se borra; `scale` inmutable una vez usada) |
+| `currency` | PK `code`; `(owner_workspace_id, lower(name)) WHERE kind='CUSTOM'` | `scale BETWEEN 0 AND 18`; `kind='CUSTOM'` ⇔ `owner_workspace_id IS NOT NULL`; `code ~ '^[A-Z0-9][A-Z0-9_.-]{1,15}$'` | — | **WS+G** (`owner_workspace_id`). As-built Phase 1: tabla global sin RLS, solo `SELECT` para `pf_app` (aún no hay monedas `CUSTOM`) | `is_active` (no se borra; `scale` inmutable: trigger `currency_scale_immutable`) |
 | `workspace_currency` | PK | — | — | WS | — |
-| `exchange_rate` | **As-built (add-market-rate-providers, 2026-10-03):** `exchange_rate_provider_uk (workspace_id, provider, base_currency, quote_currency, rate_type, as_of) WHERE provider IS NOT NULL` (idempotencia de muestras: una copia por workspace, design decisión 3); `UNIQUE (supersedes_id)` | `base_currency <> quote_currency`; `rate > 0`; `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `(source = 'PROVIDER') = (provider IS NOT NULL)`; provider ⇔ `fetched_at`; marca de anomalía completa (`anomaly_flagged`, `anomaly_baseline_rate_id` → FK compuesta al mismo workspace, `anomaly_variation_pct numeric(12,4)`); `raw_payload text` (respuesta cruda exacta, ≤ 1 MiB, nunca expuesta en la API) | `(base_currency, quote_currency, as_of DESC)` + `(workspace_id, base_currency, quote_currency, as_of DESC)` + `exchange_rate_provider_day_idx (workspace_id, provider, base, quote, rate_type, as_of_date)` (relleno de días) | **WS+G**, append-only (sin UPDATE/DELETE para nadie; corrección = nueva fila con `supersedes_id`); el worker (`pf_worker`, miembro de `pf_app`) inserta las de provider con `SET LOCAL app.workspace_id` | Inmutable |
+| `rate_preference` | PK `(workspace_id, base_currency, quote_currency)`; `(workspace_id, least(base, quote), greatest(base, quote))` (una preferencia por par sin importar la orientación) | `base_currency <> quote_currency`; `rate_type IN (...)` (los 7 tipos) | — | WS (`pf_app`: `SELECT, INSERT, UPDATE, DELETE`) | `version` |
+| `rate_preference_set` | PK `workspace_id` | — | — | WS | `version`: concurrencia optimista del reemplazo completo de las preferencias del workspace |
+| `exchange_rate` | **As-built (add-manual-conversions y add-market-rate-providers; rev. 2026-10-04):** `exchange_rate_provider_uk (workspace_id, provider, base_currency, quote_currency, rate_type, as_of) WHERE provider IS NOT NULL` (idempotencia de muestras: una copia por workspace, design decisión 3); `UNIQUE (supersedes_id)` | `base_currency <> quote_currency`; `rate > 0`; `rate_type IN ('OFFICIAL','PARALLEL','PARALLEL_BUY','PARALLEL_SELL','P2P','BANK','CUSTOM')` (D13 + D39; `PARALLEL_BUY` = BOB pagados por 1 USD, `PARALLEL_SELL` = BOB recibidos, ambos junto con la mediana `PARALLEL`); `source IN ('MANUAL','PROVIDER','USER_CONVERSION')`; `workspace_id IS NOT NULL OR source='PROVIDER'`; `supersedes_id` ⇔ `supersede_reason` (3–500) y la corrección conserva par, tipo y `as_of` (trigger `exchange_rate_supersede_consistency`); `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `(source = 'PROVIDER') = (provider IS NOT NULL)`; provider ⇔ `fetched_at`; marca de anomalía completa (`anomaly_flagged`, `anomaly_baseline_rate_id` → FK compuesta al mismo workspace, `anomaly_variation_pct numeric(12,4)`); `raw_payload text` (respuesta cruda exacta, ≤ 1 MiB, nunca expuesta en la API) | `(base_currency, quote_currency, as_of DESC)` + `(workspace_id, base_currency, quote_currency, as_of DESC)` + `exchange_rate_provider_day_idx (workspace_id, provider, base, quote, rate_type, as_of_date)` (relleno de días) | **WS+G**, append-only (sin UPDATE/DELETE para nadie; corrección = nueva fila con `supersedes_id`); el worker (`pf_worker`, miembro de `pf_app`) inserta las de provider con `SET LOCAL app.workspace_id` | Inmutable |
 | `rate_anomaly_review` | PK `exchange_rate_id`; FK `(workspace_id, exchange_rate_id)` | `decision IN ('CONFIRMED','REJECTED')`; `reason` 3–500; trigger: solo tasas con `anomaly_flagged` | — | **WS**, append-only (`SELECT, INSERT`) | Inmutable (una decisión por tasa; add-market-rate-providers) |
-| `provider_run` | PK `id` | `kind IN ('POLL','BACKFILL','GAP_FILL')`; `outcome IN ('OK','NO_NEW_SAMPLE','FAILED','SKIPPED_RATE_LIMIT','SKIPPED_CACHE')`; `FAILED` ⇔ `error_code`; `history_points/from/to` (carga histórica) | `(provider, started_at DESC)`, `(started_at)` | **Instalación sin `workspace_id`** (excepción explícita de §1): RLS FORZADA con políticas por rol — `pf_app` SELECT (estado), `pf_worker` INSERT/DELETE (bitácora y purga > 90 días) | Bitácora (purga) |
-| `provider_config` | `(workspace_id, provider)` | — | — | WS | `version` (Phase 5) |
+| `provider_run` | PK `id` | `provider IN ('PARALELO_BO','DOLARAPI_BO')`; `kind IN ('POLL','BACKFILL','GAP_FILL')`; `outcome IN ('OK','NO_NEW_SAMPLE','FAILED','SKIPPED_RATE_LIMIT','SKIPPED_CACHE')`; `FAILED` ⇔ `error_code`; `history_points/from/to` (carga histórica) | `(provider, started_at DESC)`, `(started_at)` | **Instalación sin `workspace_id`** (excepción explícita de §1): RLS FORZADA con políticas por rol — `pf_app` SELECT (estado), `pf_worker` INSERT/DELETE (bitácora y purga > 90 días) | Bitácora (purga) |
+| `provider_config` | `(workspace_id, provider)` | — | — | WS | `version` (Phase 5, aún no creada) |
 
 Catálogo inicial de monedas globales (`BOB`, `USD`, `USDT`, `USDC`, `EUR`, `BTC`, `ETH`, …) se carga como **migración de datos de referencia**, no como seed (§12). Pregunta abierta: códigos de monedas `CUSTOM` globalmente únicos.
 
@@ -1546,14 +1638,14 @@ erDiagram
 | `ledger.journal_entry`, `ledger.posting`, `ledger.entry_reversal` | SELECT, INSERT | SELECT, INSERT | Sí (UPDATE, DELETE, TRUNCATE) |
 | `ledger.period_lock` | SELECT, INSERT, DELETE | SELECT | No (DELETE = reapertura, auditada) |
 | `ledger.balance_snapshot` | SELECT | SELECT, INSERT, UPDATE, DELETE | No (derivado) |
-| `txn.conversion_detail`, `txn.conversion_fee`, `txn.transaction_journal_link` | SELECT, INSERT | SELECT, INSERT | Sí |
+| `txn.conversion_detail`, `txn.conversion_fee`, `txn.transaction_journal_link` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; as-built, rev. 2026-10-04) |
 | `fx.exchange_rate`, `fx.rate_anomaly_review` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; sin UPDATE/DELETE) |
 | `fx.provider_run` (instalación) | SELECT | SELECT, INSERT, DELETE (purga) | No |
 | `planning.budget_template_version`, `budget_template_line` | SELECT, INSERT | SELECT | Sí |
 | `audit.audit_log`, `audit.lifecycle_transition` | SELECT, INSERT | SELECT, INSERT | Sí |
 | `goals.goal_contribution`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |
 | `reporting.*` | SELECT | SELECT, INSERT, UPDATE, DELETE, TRUNCATE | No |
-| Resto de tablas de negocio | SELECT, INSERT, UPDATE | SELECT, INSERT, UPDATE | No (DELETE no concedido salvo tablas de enlace/técnicas: `split_tag`, `split_custom_field_value`, `attachment_link`, `reconciliation_item`; purgas de `imports.staged_transaction` solo `pf_maintenance`) |
+| Resto de tablas de negocio | SELECT, INSERT, UPDATE | SELECT, INSERT, UPDATE | No (DELETE no concedido salvo tablas de enlace/técnicas: `accounts.account_tag`, `txn.split_tag`, `classification.counterparty_alias`, `fx.rate_preference`, `split_custom_field_value`, `attachment_link`, `reconciliation_item`; purgas de `imports.staged_transaction` solo `pf_maintenance`) |
 
 ---
 
@@ -1572,7 +1664,7 @@ erDiagram
   TRANSACTION ||--o{ TRANSACTION_SPLIT : ""
   TRANSACTION_SPLIT ||..o{ POSTING : "split_id logico"
   JOURNAL_ENTRY ||--o| ENTRY_REVERSAL : ""
-  TRANSACTION ||--o| CONVERSION_DETAIL : ""
+  TRANSACTION ||--o{ CONVERSION_DETAIL : "por revision"
   CATEGORY_GROUP ||--o{ CATEGORY : ""
   CATEGORY ||..o{ TRANSACTION_SPLIT : "category_id logico"
   TAG ||..o{ SPLIT_TAG : ""
