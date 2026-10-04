@@ -12,9 +12,9 @@ invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/demo/demo-data.int.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","startup"]
@@ -31,7 +31,7 @@ expected_result:
   - "Existe solo el workspace personal del usuario nuevo, sin datos financieros"
   - "No existe ningún workspace con isDemo = true ni filas en el registro de cargas demo"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-003 — Ningún dato de demostración se carga automáticamente

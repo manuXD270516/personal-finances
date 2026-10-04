@@ -12,9 +12,9 @@ invariants: ["INV-007"]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/db/demo-purge.int.test.ts","packages/contexts/identity/src/domain/demo-workspace.test.ts"]
+status: automated
 regression_suite: true
 phase: 1
 tags: ["demo-data","database","security"]
@@ -30,7 +30,7 @@ expected_result:
   - "Ambas operaciones fallan con SQLSTATE PF003"
   - "W1 sigue con is_demo = false y el demo con is_demo = true"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-005 — La marca demo de un workspace es inmutable

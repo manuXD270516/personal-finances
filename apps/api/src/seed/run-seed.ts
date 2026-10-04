@@ -1,6 +1,15 @@
-import type { SeedConfig } from '@pf/platform/config';
+import { demoDataEnabled, type SeedConfig } from '@pf/platform/config';
 import type { Logger } from '@pf/platform/logging';
-import { systemClock } from '@pf/shared-kernel';
+import { createAuditRuntime } from '@pf/audit/interface/audit.module';
+import {
+  createDemoDataRuntime,
+  identityWorkspaceTimeZones,
+  type DemoLoadJob,
+} from '@pf/identity/interface/identity.module';
+import { isDomainError, systemClock } from '@pf/shared-kernel';
+import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
+import { DemoDataLoader } from '../demo/demo-data-loader.js';
+import { AUDIT_POLICIES, outboxPort } from '../identity/identity-wiring.js';
 import { Client, Pool } from 'pg';
 import { seedWorkspaceProvisioning } from '../identity/workspace-provisioning.js';
 
@@ -15,6 +24,9 @@ export type SeedProfile = (typeof SEED_PROFILES)[number];
  */
 export const SEED_DATASETS: Partial<Record<SeedProfile, { readonly datasetVersion: number }>> = {
   minimal: { datasetVersion: 3 },
+  // add-demo-data: crea el workspace DEMO dedicado de owner@demo.pfos.test (origen W1) con el MISMO cargador que la
+  // acción "Cargar datos de demostración" de la app. Nunca escribe datos financieros en W1/W2.
+  demo: { datasetVersion: Number(DEMO_MANIFEST.datasetVersion) },
 };
 
 /**
@@ -148,8 +160,16 @@ export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedP
   try {
     if (profile === 'minimal' && config.OIDC_ISSUER_URL) {
       await provisionWorkspaces(config, await seedIdentity(client, config));
-    } else if (profile === 'minimal')
+    } else if (profile === 'minimal') {
       logger.warn('OIDC_ISSUER_URL ausente: la Minimal Seed no siembra identidades');
+    } else if (profile === 'demo') {
+      if (!config.OIDC_ISSUER_URL) throw new SeedRejectedError('el perfil demo requiere OIDC_ISSUER_URL');
+      if (!demoDataEnabled(config))
+        throw new SeedRejectedError('DEMO_DATA_ENABLED=false: perfil demo rechazado');
+      const owners = await seedIdentity(client, config);
+      await provisionWorkspaces(config, owners);
+      await seedDemo(config, logger, owners.get('owner')!, MINIMAL_WORKSPACES[0]!.id);
+    }
     await client.query('BEGIN');
     await client.query(
       `INSERT INTO platform.seed_run (profile, dataset_version) VALUES ($1, $2)
@@ -164,4 +184,69 @@ export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedP
     await client.end();
   }
   logger.info({ profile, dataset_version: dataset.datasetVersion }, 'seed applied');
+}
+
+/**
+ * Perfil `demo` (docs/29 §4; add-demo-data tarea 7.3): `RequestDemoData` del OWNER sobre W1 y el `DemoDataLoader` en
+ * proceso (rol de la app, RLS activa; sin el verificador del worker, que exige `pf_worker`: se usa el balance de
+ * comprobación). Idempotente: si el owner ya tiene un demo vigente, no hace nada.
+ */
+async function seedDemo(
+  config: SeedConfig,
+  logger: Logger,
+  ownerId: string,
+  originId: string,
+): Promise<void> {
+  const pool = new Pool({ connectionString: config.DATABASE_URL, application_name: 'pfos-seed', max: 2 });
+  try {
+    const audit = createAuditRuntime({
+      pool,
+      clock: systemClock,
+      policies: AUDIT_POLICIES,
+      timeZones: identityWorkspaceTimeZones(pool),
+    });
+    let captured: DemoLoadJob | undefined;
+    const demo = createDemoDataRuntime({
+      pool,
+      clock: systemClock,
+      outbox: outboxPort(),
+      audit: audit.port,
+      defaults: {
+        baseCurrency: config.APP_REPORTING_CURRENCY,
+        timeZone: config.APP_TIMEZONE,
+        locale: config.APP_DEFAULT_LOCALE,
+        personalWorkspaceName: 'Personal',
+      },
+      onWorkspaceCreated: seedWorkspaceProvisioning(pool, systemClock),
+      demo: {
+        settings: {
+          enabled: true,
+          datasetVersion: DEMO_MANIFEST.datasetVersion,
+          workspaceName: DEMO_MANIFEST.workspaceName,
+          modules: DEMO_MANIFEST.modules,
+        },
+        // En proceso: el job se ejecuta aquí mismo en lugar de encolarse.
+        jobs: {
+          enqueueLoad: async (job) => {
+            captured = job;
+          },
+          enqueuePurge: () => Promise.reject(new SeedRejectedError('la seed no purga workspaces demo')),
+        },
+      },
+    });
+    try {
+      await demo.requestDemoData(ownerId, originId);
+    } catch (err) {
+      if (isDomainError(err) && err.code === 'DEMO_WORKSPACE_ALREADY_EXISTS') {
+        logger.info('el owner ya tiene un workspace demo vigente: perfil demo sin cambios');
+        return;
+      }
+      throw err;
+    }
+    if (!captured) throw new Error('RequestDemoData no encoló la carga');
+    const outcome = await new DemoDataLoader({ pool, logger, demo, config }).load(captured);
+    if (outcome !== 'READY') throw new Error(`la carga demo terminó en ${outcome}`);
+  } finally {
+    await pool.end();
+  }
 }

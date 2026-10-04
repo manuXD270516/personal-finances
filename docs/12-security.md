@@ -208,6 +208,35 @@ sequenceDiagram
 
 ---
 
+### 5.1 Purga de workspaces demo (add-demo-data, ADR-0026)
+
+Única ruta de `DELETE` sobre tablas append-only (INV-007, INV-029), acotada a workspaces demo:
+
+- **Barrera 1 — marca inmutable:** `iam.workspace.is_demo` (y su origen) solo se fija en el `INSERT` del workspace demo; el trigger
+  `iam.guard_demo_workspace()` rechaza cualquier cambio con PF003, también para `pf_migrator`, y valida las transiciones
+  `LOADING → READY | FAILED → CLEANING → PURGED`.
+- **Barrera 2 — función acotada:** `platform.purge_demo_workspace(uuid)` es `SECURITY DEFINER` (dueño `pf_migrator`,
+  `search_path` fijo), `EXECUTE` solo para `pf_worker` y además exige `session_user = 'pf_worker'`; rechaza con **SQLSTATE PF006**
+  (`DEMO_PURGE_NOT_ALLOWED`) un workspace inexistente, real o que no esté en `CLEANING`. Borra en orden de FKs las filas del
+  workspace de toda tabla registrada en `platform.workspace_scoped_table` y deja una lápida (`status = PURGED`).
+- **Barrera 3 — `platform.forbid_mutation()` (nueva versión):** `DELETE` de fila permitido SOLO si el usuario efectivo es el dueño
+  de la tabla (dentro de la función), la GUC `pf.demo_purge_workspace` coincide con el `workspace_id` de la fila y ese workspace es
+  demo en `CLEANING`. `UPDATE`/`TRUNCATE` siguen prohibidos; para workspaces reales nada cambia. Las políticas `demo_purge_*` del
+  dueño se acotan a la misma GUC (con RLS forzada ni el dueño ve filas sin ellas).
+- `pf_app`/`pf_worker` (y los roles que pueden asumir) no tienen grant `DELETE` sobre ledger/auditoría: fijar la GUC no les da nada.
+- **Catálogo:** toda tabla con `workspace_id` DEBE registrarse con `platform.register_workspace_scoped_table(tabla, orden)`; el test
+  de catálogo (TC-SECURITY-RLS-004 ampliado) falla si falta o si el orden no respeta las FKs.
+- Pruebas: `apps/api/test/db/demo-purge.int.test.ts` (TC-IDENTITY-DEMO-005/-006/-011).
+
+| SQLSTATE | Significado |
+|---|---|
+| PF001 | Asiento descuadrado (INV-004) |
+| PF002 | Sin contexto RLS (fail-closed) |
+| PF003 | Registro inmutable / marca demo inmutable |
+| PF004 | Periodo cerrado |
+| PF005 | Asiento con menos de dos postings |
+| PF006 | Purga demo no permitida (`DEMO_PURGE_NOT_ALLOWED`) |
+
 ## 6. Validación de entrada y salida
 
 - **Schema-first**: toda request validada contra el contrato OpenAPI (Ajv, `additionalProperties: false`, límites `maxLength`/`maxItems`, patrones de `DecimalString`, `CurrencyCode`, `uuid`). Body máx. 1 MiB (imports/documents van a object storage).

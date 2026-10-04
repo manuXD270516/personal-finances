@@ -46,6 +46,8 @@ export interface WorkspaceSummary {
   readonly name: string;
   readonly role: Role;
   readonly baseCurrency: string;
+  /** Marca demo (add-demo-data); ausente = `false`. */
+  readonly isDemo?: boolean;
 }
 
 export interface WorkspaceRepository {
@@ -56,13 +58,23 @@ export interface WorkspaceRepository {
   findById(id: string): Promise<Workspace | null>;
   /** Guarda configuración y membresías con control optimista; `false` si la versión cambió. */
   update(workspace: Workspace, expectedVersion: number): Promise<boolean>;
-  /** Membresías activas del usuario ordenadas por id de workspace (keyset `id > afterId`, máx. `limit`). */
+  /**
+   * Membresías activas del usuario en workspaces NO retirados (un demo limpiado deja de listarse), ordenadas por id
+   * de workspace (keyset `id > afterId`, máx. `limit`).
+   */
   listForUser(userId: string, page?: WorkspacePageRequest): Promise<readonly WorkspaceSummary[]>;
+  /** Serializa las solicitudes de demo de un usuario (`pg_advisory_xact_lock`; add-demo-data). */
+  lockDemoRequests(userId: string): Promise<void>;
+  /** Workspace demo no purgado solicitado por el usuario (FR-IDENTITY-016), o `null`. */
+  findActiveDemoFor(userId: string): Promise<Workspace | null>;
 }
 
 /** Membresía activa por request (sin caché: una revocación tiene efecto inmediato). */
 export interface MembershipReader {
+  /** Rol activo en un workspace NO retirado (un demo archivado o purgado responde como inexistente). */
   activeRole(userId: string, workspaceId: string): Promise<Role | null>;
+  /** Rol activo en un workspace demo retirado (archivado), o `null` (add-demo-data: limpieza idempotente y estado). */
+  retiredRole(userId: string, workspaceId: string): Promise<Role | null>;
 }
 
 /** Catálogo de monedas (`fx.currency`); `null` si el código no existe o no está activo. */
@@ -72,7 +84,11 @@ export interface CurrencyCatalogPort {
 
 export interface OutboxEvent {
   readonly eventId: string;
-  readonly eventType: 'identity.WorkspaceCreated' | 'identity.WorkspaceSettingsChanged';
+  readonly eventType:
+    | 'identity.WorkspaceCreated'
+    | 'identity.WorkspaceSettingsChanged'
+    | 'identity.DemoDataLoaded'
+    | 'identity.DemoDataCleaned';
   readonly eventVersion: 1;
   readonly aggregateType: 'Workspace';
   readonly aggregateId: string;
@@ -80,7 +96,7 @@ export interface OutboxEvent {
   readonly workspaceId: string;
   readonly occurredAt: string;
   /** Quién originó el cambio (envelope v1 `actor`). */
-  readonly actor: { readonly type: 'USER'; readonly id: string };
+  readonly actor: { readonly type: 'USER' | 'SYSTEM'; readonly id: string };
   readonly payload: Readonly<Record<string, unknown>>;
 }
 
@@ -135,3 +151,88 @@ export interface IdentityDeps {
 }
 
 export type { AuditPort };
+
+// ------------------------------------------------------------------ datos de demostración (add-demo-data)
+
+/** Progreso de la carga (módulos del manifiesto ya cargados). */
+export interface DemoProgress {
+  readonly completedModules: readonly string[];
+  readonly totalModules: number;
+}
+
+/** Registro de una carga demo (`platform.demo_workspace_run`): evidencia de instalación, sin datos financieros. */
+export interface DemoRun {
+  readonly workspaceId: string;
+  readonly originWorkspaceId: string;
+  readonly requestedBy: string;
+  readonly datasetVersion: string;
+  /** Fecha ancla (YYYY-MM-DD, hoy en la zona del workspace de origen). */
+  readonly anchorDate: string;
+  readonly requestedAt: string;
+  readonly loadedAt: string | null;
+  readonly failedAt: string | null;
+  readonly errorCode: string | null;
+  readonly progress: DemoProgress;
+  readonly cleanupRequestedAt: string | null;
+  readonly purgedAt: string | null;
+  readonly rowsDeleted: Readonly<Record<string, number>> | null;
+}
+
+export type DemoRunPatch = Partial<
+  Pick<DemoRun, 'progress' | 'loadedAt' | 'failedAt' | 'errorCode' | 'cleanupRequestedAt'>
+>;
+
+/** Lectura/escritura de `platform.demo_workspace_run` (RLS: solo las filas del usuario en contexto). */
+export interface DemoRunRepository {
+  insert(run: DemoRun): Promise<void>;
+  find(workspaceId: string): Promise<DemoRun | null>;
+  /** Última carga pedida por el usuario desde un workspace de origen. */
+  latestForOrigin(originWorkspaceId: string, userId: string): Promise<DemoRun | null>;
+  update(workspaceId: string, patch: DemoRunPatch): Promise<void>;
+}
+
+/** Job de carga `demo.load` (worker). */
+export interface DemoLoadJob {
+  readonly demoWorkspaceId: string;
+  readonly originWorkspaceId: string;
+  readonly requestedBy: string;
+  readonly datasetVersion: string;
+  readonly anchorDate: string;
+}
+
+/**
+ * Encola los jobs del worker EN la transacción del comando (existen solo si confirma; `JobQueue.enqueueInTransaction`).
+ */
+export interface DemoJobPort {
+  enqueueLoad(job: DemoLoadJob): Promise<void>;
+  enqueuePurge(job: DemoPurgeJob): Promise<void>;
+}
+
+/** Configuración de la carga demo (`DEMO_DATA_ENABLED`, docs/31 D41) y del dataset. */
+export interface DemoDataSettings {
+  readonly enabled: boolean;
+  readonly datasetVersion: string;
+  /** Nombre del workspace demo ("Demo — Finanzas de Valeria"). */
+  readonly workspaceName: string;
+  /** Módulos del manifiesto (para el progreso inicial). */
+  readonly modules: readonly string[];
+}
+
+/** Purga física acotada (`platform.purge_demo_workspace`, solo `pf_worker`): filas borradas por tabla. */
+export interface DemoPurgePort {
+  purge(demoWorkspaceId: string): Promise<Readonly<Record<string, number>>>;
+}
+
+/** Job de purga `demo.purge` (worker). */
+export interface DemoPurgeJob {
+  readonly demoWorkspaceId: string;
+  readonly originWorkspaceId: string;
+  readonly requestedBy: string;
+}
+
+export interface DemoDataDeps extends IdentityDeps {
+  readonly demoRuns: DemoRunRepository;
+  readonly demoJobs: DemoJobPort;
+  readonly demoPurge: DemoPurgePort;
+  readonly demo: DemoDataSettings;
+}

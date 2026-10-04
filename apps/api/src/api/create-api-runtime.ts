@@ -83,6 +83,7 @@ export async function createApiRuntime(
               pool: resources.pool,
               conventions,
               logger,
+              queue: resources.queue,
               ...(options.identity?.jwt ? { jwt: options.identity.jwt } : {}),
               ...(options.identity?.audit ? { audit: options.identity.audit } : {}),
               ...(options.identity?.lifecycle ? { lifecycle: options.identity.lifecycle } : {}),

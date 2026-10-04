@@ -31,6 +31,7 @@ import {
   type ApiRequest,
   type ApiResponse,
 } from '@pf/platform/nest';
+import type { DemoDataService, DemoDataStatusView } from '../application/demo-data.service.js';
 import type { IdentityService, WorkspaceView } from '../application/identity.service.js';
 import type { IdentityDeps, WorkspaceDefaults } from '../application/ports/index.js';
 import { isRole, type Role } from '../domain/role.js';
@@ -41,6 +42,13 @@ export const IDENTITY_SERVICE = Symbol('IDENTITY_SERVICE');
 export const IDENTITY_DEPS = Symbol('IDENTITY_DEPS');
 export const JWT_VERIFIER = Symbol('JWT_VERIFIER');
 export const IDENTITY_DEFAULTS = Symbol('IDENTITY_DEFAULTS');
+export const DEMO_DATA_SERVICE = Symbol('DEMO_DATA_SERVICE');
+
+/**
+ * Operaciones que siguen disponibles sobre un workspace demo ARCHIVADO (add-demo-data): consultar su estado y repetir
+ * la limpieza (idempotente). Cualquier otra ruta de un workspace retirado responde 404 como si no existiera.
+ */
+const RETIRED_WORKSPACE_OPERATIONS: ReadonlySet<string> = new Set(['getDemoDataStatus', 'cleanupDemoData']);
 
 /** Jerarquía de roles para `x-required-role` (OWNER ⊃ EDITOR ⊃ VIEWER). */
 const RANK: Record<Role, number> = { VIEWER: 1, EDITOR: 2, OWNER: 3 };
@@ -89,10 +97,16 @@ export class IdentityAccessGuard implements CanActivate {
     const required = op.requiredRole;
     if (op.hasWorkspaceScope && required !== undefined && isRole(required)) {
       const workspaceId = req.params?.['workspaceId'] ?? '';
-      const role = await this.deps.uow.run({ userId, workspaceId: null }, () =>
-        this.deps.memberships.activeRole(userId, workspaceId),
-      );
+      const { role, retired } = await this.deps.uow.run({ userId, workspaceId: null }, async () => {
+        const active = await this.deps.memberships.activeRole(userId, workspaceId);
+        if (active) return { role: active, retired: false };
+        return { role: await this.deps.memberships.retiredRole(userId, workspaceId), retired: true };
+      });
       if (!role) throw new ApiProblem('WORKSPACE_ACCESS_DENIED', 'not an active member of the workspace');
+      // Demo limpiado (add-demo-data): deja de existir para toda ruta salvo su estado y la limpieza idempotente.
+      if (retired && !RETIRED_WORKSPACE_OPERATIONS.has(op.operationId)) {
+        throw new ApiProblem('RESOURCE_NOT_FOUND', 'workspace not found');
+      }
       if (RANK[role] < RANK[required]) {
         throw new ApiProblem('INSUFFICIENT_ROLE', `role ${role} does not satisfy ${required}`);
       }
@@ -129,6 +143,7 @@ export class IdentityController {
     @Inject(IDENTITY_SERVICE) private readonly service: IdentityService,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
     @Inject(IDENTITY_DEFAULTS) private readonly defaults: WorkspaceDefaults,
+    @Inject(DEMO_DATA_SERVICE) private readonly demo: DemoDataService,
   ) {}
 
   @Get('me')
@@ -254,14 +269,41 @@ export class IdentityController {
     return this.workspace(view);
   }
 
-  private me(user: User, workspaces: readonly { id: string; name: string; role: Role }[]) {
+  // ------------------------------------------------------------------ datos de demostración (add-demo-data)
+
+  /** `POST W/demo-data` (OWNER): crea el workspace demo dedicado y encola la carga. 202 `DemoDataStatus`. */
+  @Post('workspaces/:workspaceId/demo-data')
+  @HttpCode(202)
+  async requestDemoData(@Req() req: ApiRequest, @Param('workspaceId') workspaceId: string) {
+    return demoStatus(await this.demo.requestDemoData(userId(req), workspaceId));
+  }
+
+  @Get('workspaces/:workspaceId/demo-data')
+  async getDemoDataStatus(@Req() req: ApiRequest, @Param('workspaceId') workspaceId: string) {
+    return demoStatus(await this.demo.getDemoDataStatus(userId(req), workspaceId));
+  }
+
+  /** `POST W/demo-data/cleanup` (OWNER del demo): archivo inmediato + purga encolada. 202 `DemoDataStatus`. */
+  @Post('workspaces/:workspaceId/demo-data/cleanup')
+  @HttpCode(202)
+  async cleanupDemoData(@Req() req: ApiRequest, @Param('workspaceId') workspaceId: string) {
+    return demoStatus(await this.demo.cleanupDemoData(userId(req), workspaceId));
+  }
+
+  private me(user: User, workspaces: readonly { id: string; name: string; role: Role; isDemo?: boolean }[]) {
     return {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
       locale: user.locale.value,
       timezone: user.timeZone?.value ?? this.defaults.timeZone,
-      memberships: workspaces.map((w) => ({ workspaceId: w.id, workspaceName: w.name, role: w.role })),
+      memberships: workspaces.map((w) => ({
+        workspaceId: w.id,
+        workspaceName: w.name,
+        role: w.role,
+        isDemo: w.isDemo ?? false,
+      })),
+      features: { demoData: this.demo.enabled },
       version: user.version,
     };
   }
@@ -281,8 +323,28 @@ export class IdentityController {
         : null,
       status: ws.status,
       role,
+      isDemo: ws.isDemo,
+      demoStatus: ws.demo?.status ?? null,
       version: ws.version,
       createdAt: ws.createdAt ?? this.options.clock.now().toString(),
     };
   }
+}
+
+function demoStatus(v: DemoDataStatusView) {
+  return {
+    demoWorkspaceId: v.demoWorkspaceId,
+    originWorkspaceId: v.originWorkspaceId,
+    status: v.status,
+    datasetVersion: v.datasetVersion,
+    anchorDate: v.anchorDate,
+    progress: v.progress
+      ? { completedModules: [...v.progress.completedModules], totalModules: v.progress.totalModules }
+      : null,
+    errorCode: v.errorCode,
+    requestedAt: v.requestedAt,
+    loadedAt: v.loadedAt,
+    cleanupRequestedAt: v.cleanupRequestedAt,
+    purgedAt: v.purgedAt,
+  };
 }

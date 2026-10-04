@@ -42,7 +42,7 @@ export const DEFAULT_EVENT_RETRY_LIMIT = 5;
 export const eventQueueName = (consumer: string): string => `events.${consumer}`;
 export const deadLetterQueueName = (consumer: string): string => `events.${consumer}.dlq`;
 
-export type DeliveryOutcome = 'applied' | 'duplicate';
+export type DeliveryOutcome = 'applied' | 'duplicate' | 'skipped';
 
 function queueOptions(def: EventConsumerDefinition): QueueOptions {
   return {
@@ -168,6 +168,12 @@ export class EventConsumerRuntime {
       correlationId && ambient?.correlationId !== correlationId
         ? await runWithCorrelation({ correlationId }, run)
         : await run();
+    if (outcome === 'skipped') {
+      this.options.logger.info(
+        { consumer: def.consumer, event: fullEventName(event), event_id: event.eventId },
+        'event for a retired demo workspace skipped',
+      );
+    }
     if (outcome === 'duplicate') {
       this.options.metrics?.duplicate(def.consumer);
       this.options.logger.info(
@@ -185,6 +191,12 @@ export class EventConsumerRuntime {
   ): Promise<DeliveryOutcome> {
     return this.uow.run({ userId: null, workspaceId: event.workspaceId }, async () => {
       const tx = requireSqlExecutor();
+      // add-demo-data (ADR-0026): un workspace demo archivado o purgado ya no recibe efectos (no-op idempotente y SIN
+      // fila de inbox: la purga no debe dejar rastro del workspace).
+      const retired = await tx.query('SELECT platform.workspace_is_retired($1) AS retired', [
+        event.workspaceId,
+      ]);
+      if ((retired.rows[0] as { retired?: boolean } | undefined)?.retired === true) return 'skipped' as const;
       const inserted = await tx.query(
         `INSERT INTO platform.inbox (consumer, event_id, workspace_id) VALUES ($1, $2, $3)
          ON CONFLICT (consumer, event_id) DO NOTHING RETURNING 1`,

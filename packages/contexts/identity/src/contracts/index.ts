@@ -20,6 +20,17 @@ export interface WorkspaceCreatedV1 {
   readonly origin: 'PERSONAL_DEFAULT' | 'USER_CREATED';
 }
 
+/** Payload de `identity.DemoDataLoaded.v1` / `identity.DemoDataCleaned.v1` (contracts/events/identity). */
+export interface DemoDataEventV1 {
+  readonly workspaceId: string;
+  readonly originWorkspaceId: string;
+  readonly datasetVersion: string;
+}
+
+/** Colas del worker de add-demo-data (job `demo.load` y `demo.purge`). */
+export const DEMO_LOAD_QUEUE = 'demo.load' as const;
+export const DEMO_PURGE_QUEUE = 'demo.purge' as const;
+
 /**
  * Allow-list de auditoría de los agregados de IDENTITY (openspec add-audit-trail, NFR-SEC-015): lo que no figura
  * aquí nunca se copia a `audit.audit_log` (p. ej. `preferences`, email, issuer/subject del IdP).
@@ -35,6 +46,12 @@ export const IDENTITY_AUDIT_POLICY = {
     origin: 'plain',
     memberUserId: 'plain',
     memberRole: 'plain',
+    // add-demo-data: carga/limpieza/purga auditadas en el workspace de origen (sin datos financieros del demo).
+    demoWorkspaceId: 'plain',
+    datasetVersion: 'plain',
+    anchorDate: 'plain',
+    demoStatus: 'plain',
+    rowsDeleted: 'plain',
   },
   User: { displayName: 'plain', locale: 'plain', timeZone: 'plain' },
 } as const satisfies AuditFieldPoliciesDto;

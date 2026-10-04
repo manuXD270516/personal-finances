@@ -63,3 +63,11 @@ Se elige la **opción 1**:
 - El seed `pnpm db:seed -- --profile=demo` (solo local/CI, docs/29) reutiliza el mismo cargador y crea el mismo tipo de workspace demo; nunca escribe datos financieros en W1/W2 de la Minimal Seed.
 - Decisiones del owner 2026-10-04 (docs/31 D41): `DEMO_DATA_ENABLED` deshabilitado por defecto en `staging`/`production`; ventana del dataset de 21 meses (recorte a 6 meses si la carga desde la UI supera 2 min).
 - Si en el futuro se implementa FR-IDENTITY-012 (borrado definitivo de workspace real con periodo de gracia), deberá tener su propio ADR: este no lo habilita.
+- **Revisión de seguridad del amend a `platform.forbid_mutation()` (2026-10-04, implementación de `add-demo-data`):** superada con
+  tests Testcontainers (`apps/api/test/db/demo-purge.int.test.ts`): `pf_app`/`pf_worker` (incluso fijando la GUC o asumiendo
+  `pf_maintenance`/`pf_ledger_maintenance`/`pf_workspace_directory`) no pueden borrar ledger ni auditoría (42501); la función rechaza
+  workspaces reales, demos fuera de limpieza, nulos e inexistentes y llamadores distintos de `pf_worker` (PF006, o 42501 sin EXECUTE);
+  el trigger solo permite DELETE al dueño con la GUC del mismo workspace demo en `CLEANING`; la purga borra todas las filas del demo de
+  toda tabla registrada (verificado contra el catálogo) y deja intactos los conteos e invariantes del workspace real. Decisión de
+  implementación: la comprobación del rol usa "dueño de la tabla" (equivale a `pf_migrator`) y la sesión exige `pf_worker`.
+

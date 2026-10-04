@@ -92,6 +92,29 @@ Expand-only: columnas nuevas en `iam.workspace` con default (no reescriben datos
 
 Dependencias: requiere aplicados todos los changes de Phase 1 hasta `add-basic-dashboard` (los casos de uso que el cargador invoca) y, idealmente, `add-lifecycle-timeline` (para que la demo muestre recorridos). `add-event-outbox` para jobs y eventos.
 
+## Threat model de la purga (STRIDE, implementación 2026-10-04)
+
+| Amenaza | Vector | Mitigación (verificada) |
+|---|---|---|
+| **Tampering / Elevation:** borrar datos de un workspace real | `pf_app` comprometido fija `pf.demo_purge_workspace` y hace `DELETE` | Sin grant `DELETE` en ledger/auditoría (42501) para `pf_app`/`pf_worker` ni para los roles que pueden asumir; las políticas `demo_purge_*` son solo para el dueño; `forbid_mutation()` exige ser el dueño (TC-IDENTITY-DEMO-006). |
+| Tampering: convertir un workspace real en demo para purgarlo | `UPDATE iam.workspace SET is_demo = true` (app o migrador) | Trigger `iam.guard_demo_workspace()` ⇒ PF003, también para `pf_migrator`; no existe endpoint ni comando que toque la marca (TC-IDENTITY-DEMO-005). |
+| Elevation: invocar la purga | `SELECT platform.purge_demo_workspace(W1)` desde la API u otra sesión | `EXECUTE` solo `pf_worker` + guarda `session_user = 'pf_worker'`; exige `is_demo AND demo_status = CLEANING` (PF006); la GUC la fija la propia función y se limpia al terminar. |
+| Repudio | Purga sin evidencia | `identity.demo.*` auditado en el workspace de ORIGEN (sobrevive), `platform.demo_workspace_run.rows_deleted` por tabla, log `demo.purge_failed`. |
+| Information disclosure: rastros del demo tras la purga | Tabla nueva con `workspace_id` no registrada; consumidores que escriben tras la purga | Catálogo verificado en CI (falta registro u orden de FKs ⇒ falla); `platform.workspace_is_retired()` hace que los consumidores ignoren workspaces demo archivados/purgados sin dejar inbox; la purga toma `FOR UPDATE` del workspace (espera a consumidores con `FOR KEY SHARE` por FK). |
+| Denial of service | Purga que falla repetidamente | Reintentos con backoff; agotados, modo degradado (archivado e invisible, ADR opción 3). |
+
+Riesgo residual: la sesión del propio `pf_migrator` (dueño, ya todopoderoso sobre el esquema) puede fijar la GUC y borrar filas de un demo **en limpieza**; no amplía su poder actual. Registrado como RISK-026 (docs/26).
+
+## Decisiones de implementación (2026-10-04)
+
+- **Actor `system:demo`:** los casos de uso se ejecutan con el contexto RLS del OWNER solicitante (único miembro del demo; los comandos exigen `userId` y las lecturas de IDENTITY dependen de la membresía) y el cargador envuelve `AuditPort`/outbox para atribuir auditoría y eventos a `SYSTEM`/`system:demo` (incluido el recorrido de add-lifecycle-timeline). La auditoría usa el reloj real (particiones mensuales vigentes); el dominio usa un `FixedClock` posicionado en cada fecha simulada.
+- **Jobs transaccionales:** `demo.load` y `demo.purge` se encolan con `JobQueue.enqueueInTransaction` en la transacción del comando (existen solo si confirma; id del job = id del demo). `DemoDataCleaned.v1` se publica en el workspace de origen; `DemoDataLoaded.v1` en el demo (REPORTING lo consume).
+- **Workspace retirado:** el guard responde 404 `RESOURCE_NOT_FOUND` a toda ruta de un demo archivado salvo `getDemoDataStatus` y `cleanupDemoData` (idempotente); no se lista en `/me` ni en `/workspaces`. Un ajeno sigue recibiendo 403.
+- **Limpieza de un demo que aún carga:** 409 `INVALID_STATUS_TRANSITION` (evita purgar en paralelo con la carga). Un reintento del job de carga con progreso previo marca `FAILED` (`DEMO_LOAD_INTERRUPTED`) en lugar de reanudar.
+- **Contrato:** además de lo listado, `DemoDataStatus.errorCode` (TC-IDENTITY-DEMO-008), `Me.memberships[].isDemo` (etiqueta del selector) y `Me.features.demoData` (la UI oculta la carga si está deshabilitada). Cambios aditivos.
+- **Dataset:** vive en `apps/api/src/demo/dataset/` (TS + `golden-summary.json`, empaquetado con la imagen) en lugar de `seeds/demo/`; ESLint prohíbe `Math.random`/`Date.now`/`new Date()` allí. Phase 1: préstamo con pagos simples (capital + interés), sin metas/presupuestos/cierres. Con `anchor=today` las fechas se desplazan `hoy − 2026-09-30` días y los saldos coinciden con el golden.
+- **Cobertura genérica de la purga:** la migración registra explícitamente las tablas conocidas y, además, toda tabla previa con `workspace_id` no listada (p. ej. `audit.lifecycle_transition`) como hoja; las migraciones posteriores deben registrar las suyas y el test de catálogo falla si no.
+
 ## Preguntas abiertas
 
 1. ~~**Habilitación en staging/producción**~~: resuelta por el owner el 2026-10-04 (docs/31 D41): `DEMO_DATA_ENABLED` por defecto `false` en `staging`/`production`.

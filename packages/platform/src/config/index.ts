@@ -12,6 +12,7 @@ export {
   loadConfig,
   loadConfigOrExit,
   isNextBuildPhase,
+  demoDataEnabled,
   type ApiConfig,
   type AppConfig,
   type ConfigProblem,

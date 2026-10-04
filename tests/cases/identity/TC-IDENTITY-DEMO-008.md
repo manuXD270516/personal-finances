@@ -12,9 +12,9 @@ invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/demo/demo-data.int.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts","packages/contexts/identity/src/domain/demo-workspace.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","failure"]
@@ -30,7 +30,7 @@ expected_result:
   - "El workspace demo no se presenta como listo y la UI ofrece \"Limpiar datos de demostración\""
   - "La limpieza posterior funciona igual que con un demo READY"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-008 — Una carga fallida queda en FAILED y nunca se presenta como lista

@@ -101,6 +101,29 @@ export default tseslint.config(
     rules: providersLosslessJson,
   },
   {
+    // docs/29 §3 (add-demo-data): el dataset Demo es determinista (PRNG sembrado, sin reloj).
+    files: ['apps/api/src/demo/dataset/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...noSessionRlsContext['no-restricted-syntax'].slice(1),
+        {
+          selector: "MemberExpression[object.name='Math'][property.name='random']",
+          message: 'Prohibido Math.random en el dataset Demo: usa SeededRandom (docs/29 §3).',
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'Prohibido Date.now() en el dataset Demo: las fechas derivan de la ancla (docs/29 §3).',
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: 'Prohibido new Date() sin argumentos en el dataset Demo (docs/29 §3).',
+        },
+      ],
+    },
+  },
+  {
     // Nest usa clases inyectables y decoradores: las clases sin miembros son legítimas.
     files: ['apps/api/**/*.ts', 'packages/platform/src/nest/**/*.ts'],
     rules: { '@typescript-eslint/no-extraneous-class': 'off' },

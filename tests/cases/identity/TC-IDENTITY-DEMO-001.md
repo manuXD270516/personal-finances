@@ -12,9 +12,9 @@ invariants: []
 priority: high
 type: api
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/demo/demo-data.int.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts","packages/contexts/identity/src/domain/demo-workspace.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","workspace"]
@@ -34,7 +34,7 @@ expected_result:
   - "El workspace demo tiene un único miembro: el solicitante con rol OWNER"
   - "El workspace demo contiene cuentas, transacciones, transferencias, conversiones y tasas de demostración"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-001 — El OWNER carga los datos de demostración en un workspace demo nuevo

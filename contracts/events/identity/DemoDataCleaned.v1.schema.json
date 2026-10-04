@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/identity/DemoDataCleaned.v1.schema.json",
+  "title": "identity.DemoDataCleaned.v1",
+  "description": "El OWNER pidió limpiar los datos de demostración: el workspace demo queda archivado (CLEANING) y su purga encolada (openspec add-demo-data, ADR-0026). Productor: IDENTITY. Se publica en el workspace de ORIGEN (real, sobrevive a la purga). Consumidores: informativo (REPORTING). Idempotencia natural: workspaceId. Sin datos financieros.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "identity.DemoDataCleaned"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Workspace"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "originWorkspaceId",
+        "datasetVersion"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Workspace de demostración."
+        },
+        "originWorkspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Workspace real desde el que se pidió la carga."
+        },
+        "datasetVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "Versión del dataset Demo (docs/29)."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000901",
+      "eventType": "identity.DemoDataCleaned",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-04T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Workspace",
+      "aggregateId": "01928c4e-0000-7000-8000-00000000d001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000d001",
+        "originWorkspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "datasetVersion": "1"
+      }
+    }
+  ]
+}

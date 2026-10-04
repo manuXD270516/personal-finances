@@ -12,9 +12,9 @@ invariants: ["INV-007","INV-029"]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/demo-data.api.test.ts","apps/api/test/db/demo-purge.int.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts","packages/contexts/identity/src/domain/demo-workspace.test.ts"]
+status: automated
 regression_suite: true
 phase: 1
 tags: ["demo-data","purge","security"]
@@ -32,7 +32,7 @@ expected_result:
   - "El DELETE directo falla (sin grant / PF003)"
   - "\"Banco Real\" sigue en 1500.00 BOB y el número de asientos y registros de auditoría de W1 no cambia"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-006 — Limpiar o purgar un workspace real se rechaza sin borrar nada

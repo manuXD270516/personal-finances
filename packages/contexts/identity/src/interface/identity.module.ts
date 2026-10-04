@@ -5,15 +5,26 @@ import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import { DomainError, type Clock } from '@pf/shared-kernel';
 import { currentRequestContext, PgUnitOfWork } from '@pf/platform/api';
 import type { Pool } from 'pg';
+import { DemoDataService } from '../application/demo-data.service.js';
 import { IdentityService } from '../application/identity.service.js';
 import type {
   AuditPort,
+  DemoDataSettings,
+  DemoJobPort,
+  IdentityDeps,
   OutboxPort,
   WorkspaceCreatedHook,
   WorkspaceDefaults,
 } from '../application/ports/index.js';
-import { PgUserRepository, PgWorkspaceRepository, pgIdentityDeps } from '../infrastructure/pg-identity.js';
 import {
+  PgDemoRunRepository,
+  PgUserRepository,
+  PgWorkspaceRepository,
+  pgDemoPurge,
+  pgIdentityDeps,
+} from '../infrastructure/pg-identity.js';
+import {
+  DEMO_DATA_SERVICE,
   IDENTITY_DEFAULTS,
   IDENTITY_DEPS,
   IDENTITY_SERVICE,
@@ -35,6 +46,33 @@ export interface IdentityModuleOptions {
   readonly audit: AuditPort;
   /** Provisión síncrona de otros contextos al crear un workspace (add-classification). */
   readonly onWorkspaceCreated?: WorkspaceCreatedHook;
+  /** Datos de demostración (add-demo-data): habilitación, dataset y cola de jobs. Ausente ⇒ carga deshabilitada. */
+  readonly demo?: DemoDataOptions;
+}
+
+export interface DemoDataOptions {
+  readonly settings: DemoDataSettings;
+  readonly jobs: DemoJobPort;
+}
+
+/** Carga deshabilitada (sin configuración): la API rechaza con `DEMO_DATA_DISABLED`; los jobs nunca se encolan. */
+const DISABLED_DEMO: DemoDataOptions = {
+  settings: { enabled: false, datasetVersion: '1', workspaceName: 'Demo', modules: [] },
+  jobs: {
+    enqueueLoad: () => Promise.reject(new Error('demo jobs not configured')),
+    enqueuePurge: () => Promise.reject(new Error('demo jobs not configured')),
+  },
+};
+
+/** `DemoDataService` sobre PostgreSQL (API con pf_app; worker con pf_worker, que además puede purgar). */
+export function demoDataService(deps: IdentityDeps, demo: DemoDataOptions = DISABLED_DEMO): DemoDataService {
+  return new DemoDataService({
+    ...deps,
+    demoRuns: new PgDemoRunRepository(),
+    demoJobs: demo.jobs,
+    demoPurge: pgDemoPurge,
+    demo: demo.settings,
+  });
 }
 
 /**
@@ -60,6 +98,7 @@ export class IdentityModule {
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: IDENTITY_DEPS, useValue: deps },
         { provide: IDENTITY_SERVICE, useValue: new IdentityService(deps) },
+        { provide: DEMO_DATA_SERVICE, useValue: demoDataService(deps, options.demo) },
         { provide: IDENTITY_DEFAULTS, useValue: options.defaults },
         { provide: JWT_VERIFIER, useValue: new JwtVerifier(options.jwt) },
         { provide: APP_GUARD, useClass: IdentityAccessGuard },
@@ -158,3 +197,40 @@ export function identityUserLocales(pool: Pool): { localeOf(userId: string): Pro
 
 export { JwtVerifier };
 export type { AuditPort, OutboxPort, WorkspaceCreatedHook, WorkspaceDefaults };
+
+/**
+ * Composición de `DemoDataService` para el worker (jobs `demo.load` y `demo.purge`; add-demo-data). El `pool` es el del
+ * worker (`pf_worker`): solo él puede ejecutar `platform.purge_demo_workspace`.
+ */
+export function createDemoDataRuntime(input: {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  readonly outbox: OutboxPort;
+  readonly audit: AuditPort;
+  readonly defaults: WorkspaceDefaults;
+  readonly demo: DemoDataOptions;
+  readonly onWorkspaceCreated?: WorkspaceCreatedHook;
+}): DemoDataService {
+  const deps = pgIdentityDeps({
+    pool: input.pool,
+    outbox: input.outbox,
+    audit: input.audit,
+    clock: input.clock,
+    defaults: input.defaults,
+    ...(input.onWorkspaceCreated ? { onWorkspaceCreated: input.onWorkspaceCreated } : {}),
+  });
+  return demoDataService(deps, input.demo);
+}
+
+export {
+  DEMO_ACTOR_PROCESS,
+  DemoDataService,
+  type DemoDataStatusView,
+} from '../application/demo-data.service.js';
+export type {
+  DemoDataSettings,
+  DemoJobPort,
+  DemoLoadJob,
+  DemoProgress,
+  DemoPurgeJob,
+} from '../application/ports/index.js';

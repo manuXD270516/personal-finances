@@ -12,9 +12,9 @@ invariants: ["INV-029"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/demo/demo-data.int.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","audit"]
@@ -29,7 +29,7 @@ expected_result:
   - "W1 contiene identity.demo.load_requested, identity.demo.loaded, identity.demo.cleanup_requested e identity.demo.purged en orden, con actor, instante e id del workspace demo"
   - "Ningún registro de auditoría contiene datos financieros del demo"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-013 — La auditoría de carga y limpieza queda en el workspace de origen y sobrevive a la purga

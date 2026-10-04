@@ -28,7 +28,9 @@
     "transactions": "Transacciones",
     "accounts": "Cuentas",
     "fx": "Cripto y FX",
-    "classification": "Clasificación"
+    "classification": "Clasificación",
+    "demoIndicator": "Datos de demostración — este espacio contiene datos ficticios y se puede limpiar por completo.",
+    "demoOption": "{name} (demostración)"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -939,5 +941,26 @@
         "SUPERSEDE": "Reemplazar"
       }
     }
+  },
+  "Demo": {
+    "title": "Datos de demostración",
+    "description": "Carga datos financieros ficticios con apariencia real en un espacio de trabajo de demostración NUEVO. Este espacio de trabajo no se modifica.",
+    "inDemo": "Este es un espacio de trabajo de demostración. Puedes limpiarlo por completo cuando quieras.",
+    "load": "Cargar datos de demostración",
+    "loadConfirmTitle": "¿Cargar datos de demostración?",
+    "loadConfirmBody": "Se creará un espacio de trabajo de demostración separado, del que serás el único propietario. Tus datos reales no cambian.",
+    "loadConfirm": "Sí, cargar",
+    "loading": "Cargando datos de demostración…",
+    "progress": "{done} de {total} módulos cargados",
+    "ready": "Datos de demostración listos (al {date}).",
+    "failed": "La carga de datos de demostración falló. Límpiala e inténtalo de nuevo.",
+    "cleaning": "Limpiando los datos de demostración…",
+    "open": "Ir al espacio de demostración",
+    "cleanup": "Limpiar datos de demostración",
+    "cleanupConfirmTitle": "¿Limpiar los datos de demostración?",
+    "cleanupConfirmBody": "El espacio de demostración dejará de estar disponible de inmediato y todos sus datos se borrarán por completo. Esta acción no se puede deshacer.",
+    "cleanupConfirm": "Sí, limpiar",
+    "cancel": "Cancelar",
+    "disabled": "La carga de datos de demostración está deshabilitada en este entorno."
   }
 }

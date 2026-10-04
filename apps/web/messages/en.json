@@ -28,7 +28,9 @@
     "transactions": "Transactions",
     "accounts": "Accounts",
     "fx": "Crypto & FX",
-    "classification": "Classification"
+    "classification": "Classification",
+    "demoIndicator": "Demo data — this workspace contains fictitious data and can be fully cleaned up.",
+    "demoOption": "{name} (demo)"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -939,5 +941,26 @@
         "SUPERSEDE": "Supersede"
       }
     }
+  },
+  "Demo": {
+    "title": "Demo data",
+    "description": "Loads realistic-looking fictitious financial data into a NEW demo workspace. This workspace is not modified.",
+    "inDemo": "This is a demo workspace. You can fully clean it up at any time.",
+    "load": "Load demo data",
+    "loadConfirmTitle": "Load demo data?",
+    "loadConfirmBody": "A separate demo workspace will be created with you as its only owner. Your real data does not change.",
+    "loadConfirm": "Yes, load",
+    "loading": "Loading demo data…",
+    "progress": "{done} of {total} modules loaded",
+    "ready": "Demo data ready (as of {date}).",
+    "failed": "Loading demo data failed. Clean it up and try again.",
+    "cleaning": "Cleaning up demo data…",
+    "open": "Go to the demo workspace",
+    "cleanup": "Clean up demo data",
+    "cleanupConfirmTitle": "Clean up demo data?",
+    "cleanupConfirmBody": "The demo workspace will become unavailable immediately and all its data will be permanently deleted. This cannot be undone.",
+    "cleanupConfirm": "Yes, clean up",
+    "cancel": "Cancel",
+    "disabled": "Loading demo data is disabled in this environment."
   }
 }

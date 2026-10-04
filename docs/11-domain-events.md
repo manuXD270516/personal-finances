@@ -178,6 +178,12 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 - **Payload:** `workspaceId`, `changes: [{field: name|baseCurrency|timeZone|locale|fiscalMonthStartDay|minimumLiquidityReserve, before, after}]` (`minimumLiquidityReserve` como `Money`).
 - **Idem.:** natural `(workspaceId, aggregateVersion)`. **Ord.:** por `Workspace`. **PII:** B (`name`).
 
+#### `identity.DemoDataLoaded.v1` / `identity.DemoDataCleaned.v1` (add-demo-data, ADR-0026)
+- **Productor:** IDENTITY (`DemoDataLoaded` desde el job `demo.load` del worker, actor `system:demo`, en el workspace demo; `DemoDataCleaned` desde `CleanupDemoData`, en el workspace de ORIGEN, que sobrevive a la purga). **Consumidores:** REPORTING (`DemoDataLoaded` invalida la caché del resumen); informativo.
+- **Payload:** `workspaceId` (demo), `originWorkspaceId`, `datasetVersion`. Sin datos financieros.
+- **Idem.:** natural `workspaceId`. **Ord.:** por `Workspace`. **PII:** ninguna.
+- **Workspaces retirados:** los consumidores ignoran (no-op, sin fila de inbox) los eventos de un workspace demo archivado o purgado (`platform.workspace_is_retired`).
+
 ### 3.3 Fases posteriores (schemas se crean al implementar)
 
 | Evento | Productor | Consumidores | Trigger | Payload (resumen) | Idem. natural | PII |

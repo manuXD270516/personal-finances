@@ -22,7 +22,23 @@ export interface WorkspaceSettings {
   readonly minimumLiquidityReserve: Money | null;
 }
 
-export type WorkspaceStatus = 'ACTIVE' | 'PENDING_DELETION';
+/**
+ * `ARCHIVED`/`PURGED` (add-demo-data): un workspace demo limpiado deja de listarse y responde como inexistente
+ * (`ARCHIVED`) hasta que la purga lo deja como lápida (`PURGED`). En Phase 1 solo los workspaces demo se archivan.
+ */
+export type WorkspaceStatus = 'ACTIVE' | 'PENDING_DELETION' | 'ARCHIVED' | 'PURGED';
+
+/** Estado de un workspace demo (design.md decisión 1/5/6): `LOADING → READY | FAILED → CLEANING → PURGED`. */
+export type DemoStatus = 'LOADING' | 'READY' | 'FAILED' | 'CLEANING' | 'PURGED';
+
+/** Marca demo (inmutable desde `Workspace.createDemo`; ADR-0026) y su estado. */
+export interface DemoInfo {
+  readonly status: DemoStatus;
+  /** Workspace real desde el que se pidió la carga (allí vive su auditoría). */
+  readonly originWorkspaceId: string;
+  readonly requestedBy: string;
+  readonly datasetVersion: string;
+}
 export type SettingsField =
   'name' | 'baseCurrency' | 'timeZone' | 'locale' | 'fiscalMonthStartDay' | 'minimumLiquidityReserve';
 export type SettingsValue = string | number | MoneyJson | null;
@@ -39,6 +55,8 @@ export interface WorkspaceProps {
   readonly memberships: readonly Membership[];
   readonly personalOfUserId: string | null;
   readonly status: WorkspaceStatus;
+  /** `null` = workspace real; la marca solo la fija `Workspace.createDemo` (add-demo-data). */
+  readonly demo?: DemoInfo | null;
   readonly version: number;
   /** Instante de alta (ISO 8601 UTC) cuando viene de persistencia; ausente en un agregado recién creado. */
   readonly createdAt?: string;
@@ -142,6 +160,35 @@ export class Workspace {
     });
   }
 
+  /**
+   * Workspace de demostración dedicado (ADR-0026): el solicitante es su único OWNER, nace `LOADING` y la marca demo
+   * no puede activarse ni desactivarse después (no existe otra operación que la toque).
+   */
+  static createDemo(input: {
+    readonly id: string;
+    readonly name: string;
+    readonly baseCurrency: Currency;
+    readonly timeZone: string;
+    readonly locale: string;
+    readonly ownerUserId: string;
+    readonly originWorkspaceId: string;
+    readonly datasetVersion: string;
+  }): Workspace {
+    if (input.originWorkspaceId === input.id) {
+      throw new DomainError('VALIDATION_FAILED', 'a demo workspace cannot be its own origin');
+    }
+    const base = Workspace.create({ ...input, personal: false }).snapshot();
+    return new Workspace({
+      ...base,
+      demo: {
+        status: 'LOADING',
+        originWorkspaceId: input.originWorkspaceId,
+        requestedBy: input.ownerUserId,
+        datasetVersion: input.datasetVersion,
+      },
+    });
+  }
+
   static restore(props: WorkspaceProps): Workspace {
     return new Workspace({ ...props, memberships: [...props.memberships] });
   }
@@ -160,6 +207,9 @@ export class Workspace {
     validateFiscalMonthStartDay(p.settings.fiscalMonthStartDay);
     if (p.settings.minimumLiquidityReserve?.isNegative()) {
       throw new DomainError('AMOUNT_OUT_OF_RANGE', 'minimumLiquidityReserve must be >= 0');
+    }
+    if ((p.status === 'ARCHIVED' || p.status === 'PURGED') && !p.demo) {
+      throw new DomainError('VALIDATION_FAILED', `only demo workspaces can be ${p.status}`);
     }
   }
 
@@ -183,6 +233,65 @@ export class Workspace {
   }
   get version(): number {
     return this.props.version;
+  }
+  /** Marca demo (ADR-0026): solo lectura. */
+  get isDemo(): boolean {
+    return Boolean(this.props.demo);
+  }
+  get demo(): DemoInfo | null {
+    return this.props.demo ?? null;
+  }
+  /** Demo limpiado (archivado o purgado): no se lista y toda ruta de negocio responde como inexistente. */
+  get isRetired(): boolean {
+    return this.props.status === 'ARCHIVED' || this.props.status === 'PURGED';
+  }
+
+  /** `MarkDemoLoaded`: LOADING → READY. */
+  markDemoLoaded(): void {
+    this.transitionDemo(['LOADING'], 'READY');
+  }
+
+  /** `MarkDemoFailed`: LOADING → FAILED (nunca READY con datos parciales). */
+  markDemoFailed(): void {
+    this.transitionDemo(['LOADING'], 'FAILED');
+  }
+
+  /**
+   * `CleanupDemoData`: READY | FAILED → CLEANING y archivo inmediato. Idempotente: `false` si ya estaba en limpieza
+   * o purgado. Un workspace real ⇒ `WORKSPACE_NOT_DEMO`; un demo que aún carga ⇒ `INVALID_STATUS_TRANSITION`.
+   */
+  requestDemoCleanup(): boolean {
+    const demo = this.requireDemo();
+    if (demo.status === 'CLEANING' || demo.status === 'PURGED') return false;
+    this.transitionDemo(['READY', 'FAILED'], 'CLEANING', 'ARCHIVED');
+    return true;
+  }
+
+  /** `MarkDemoPurged`: CLEANING → PURGED (lápida). */
+  markDemoPurged(): void {
+    this.transitionDemo(['CLEANING'], 'PURGED', 'PURGED');
+  }
+
+  private requireDemo(): DemoInfo {
+    if (!this.props.demo)
+      throw new DomainError('WORKSPACE_NOT_DEMO', `workspace ${this.props.id} is not a demo`);
+    return this.props.demo;
+  }
+
+  private transitionDemo(from: readonly DemoStatus[], to: DemoStatus, status?: WorkspaceStatus): void {
+    const demo = this.requireDemo();
+    if (!from.includes(demo.status)) {
+      throw new DomainError(
+        'INVALID_STATUS_TRANSITION',
+        `demo workspace cannot go from ${demo.status} to ${to}`,
+      );
+    }
+    this.props = {
+      ...this.props,
+      demo: { ...demo, status: to },
+      ...(status ? { status } : {}),
+      version: this.props.version + 1,
+    };
   }
 
   /** Rol activo del usuario, o `null` si no es miembro activo. */
@@ -256,6 +365,6 @@ export class Workspace {
   }
 
   snapshot(): WorkspaceProps {
-    return { ...this.props, memberships: [...this.props.memberships] };
+    return { ...this.props, memberships: [...this.props.memberships], demo: this.props.demo ?? null };
   }
 }

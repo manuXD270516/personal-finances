@@ -81,6 +81,14 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
 
 > La disponibilidad de cada bloque depende de la fase: Planning (presupuestos, cierres) desde Phase 2, Commitments desde Phase 3, Goals/Debt desde Phase 4. El manifiesto (`modules:`) indica qué se genera en cada versión.
 
+> **As-built (add-demo-data, 2026-10-04).** Dataset Demo v1 de Phase 1 en `apps/api/src/demo/dataset/` (manifiesto `DEMO_MANIFEST`,
+> generador `buildDemoPlan`, PRNG mulberry32 sembrado y `golden-summary.json`): cuentas de Banco Andino Demo (BOB y USD), efectivo,
+> P2P Exchange Demo (USDT), Cold Wallet BTC, Tarjeta Andina Demo y préstamo vehicular (pagos simples: capital fijo + interés 0.75 %/mes;
+> la amortización francesa llega con Debt), ~560 transacciones (salario, alquiler, servicios por QR, suscripciones USD, tarjeta con
+> pago total y uno parcial, conversiones P2P con fees, reembolsos, split, ajuste, 2 ediciones, 1 anulación, 2 pendientes) y 210 tasas
+> manuales "Demo". Se carga desde la app ("Cargar datos de demostración", job `demo.load`) o con `pnpm db:seed -- --profile=demo`
+> (mismo cargador, workspace demo de `owner@demo.pfos.test` con origen W1). Metas, presupuestos y cierres llegarán con sus fases.
+
 ### 2.3 Large Dataset Seed
 
 - **Ventana:** 2021-10-01 → 2026-09-30 (5 años).

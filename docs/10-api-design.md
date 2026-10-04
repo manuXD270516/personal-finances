@@ -231,6 +231,9 @@ Content-Type: application/json
 | identity | `INVALID_TIMEZONE` | 422 | Zona horaria que no es un identificador IANA válido (`PATCH /me`, workspaces) |
 | identity | `WORKSPACE_PENDING_DELETION` | 409 | Workspace en borrado; solo lectura |
 | identity | `LAST_OWNER_CANNOT_LEAVE` | 409 | Debe existir un OWNER |
+| identity | `DEMO_WORKSPACE_ALREADY_EXISTS` | 409 | El usuario ya tiene un workspace demo no purgado (add-demo-data, FR-IDENTITY-016) |
+| identity | `WORKSPACE_NOT_DEMO` | 409 | "Limpiar datos de demostración" sobre un workspace real (ADR-0026) |
+| identity | `DEMO_DATA_DISABLED` | 403 | Carga de datos demo deshabilitada por entorno (`DEMO_DATA_ENABLED=false`) |
 | accounts | `ACCOUNT_ARCHIVED` | 409 | La cuenta archivada no admite movimientos |
 | accounts | `ACCOUNT_CLOSED` | 409 | La cuenta cerrada no admite movimientos (crear, editar, anular o registrar `pending`; INV-026) |
 | accounts | `ACCOUNT_BALANCE_NOT_ZERO` | 409 | Solo se cierra una cuenta con saldo cero (`POST …/close`) |

@@ -12,9 +12,9 @@ invariants: ["INV-025"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/demo/demo-data.int.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: true
 phase: 1
 tags: ["demo-data","isolation"]
@@ -31,7 +31,7 @@ expected_result:
   - "Los conteos de asientos y transacciones de W1 no cambian"
   - "La auditoría de W1 solo agrega los registros de la acción de carga"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-014 — Cargar la demo no altera ningún dato del workspace real

@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { PgUnitOfWork, unitOfWorkKysely } from '@pf/platform/api';
-import { Money, currency, type Currency, type Clock } from '@pf/shared-kernel';
+import { DomainError, Money, currency, type Currency, type Clock } from '@pf/shared-kernel';
 import { sql, type Generated, type Kysely } from 'kysely';
 import type { Pool } from 'pg';
 import type {
   AuditPort,
   CurrencyCatalogPort,
+  DemoProgress,
+  DemoPurgePort,
+  DemoRun,
+  DemoRunPatch,
+  DemoRunRepository,
   IdGenerator,
   IdentityDeps,
   MembershipReader,
@@ -23,7 +28,7 @@ import { LocaleTag } from '../domain/locale-tag.js';
 import { isRole, type Role } from '../domain/role.js';
 import { TimeZoneId } from '../domain/time-zone.js';
 import { User, type UserStatus } from '../domain/user.js';
-import { Workspace, type Membership, type WorkspaceStatus } from '../domain/workspace.js';
+import { Workspace, type DemoStatus, type Membership, type WorkspaceStatus } from '../domain/workspace.js';
 
 /**
  * Adaptadores PostgreSQL de IDENTITY con Kysely (ADR-0007) sobre la conexión de la `PgUnitOfWork` en curso
@@ -60,6 +65,28 @@ interface IamWorkspaceTable {
   version: number;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+  archived_at: Date | null;
+  is_demo: Generated<boolean>;
+  demo_status: DemoStatus | null;
+  demo_origin_workspace_id: string | null;
+  demo_requested_by: string | null;
+  demo_dataset_version: string | null;
+}
+
+interface DemoWorkspaceRunTable {
+  workspace_id: string;
+  origin_workspace_id: string;
+  requested_by: string;
+  dataset_version: string;
+  anchor_date: string;
+  requested_at: string;
+  loaded_at: string | null;
+  failed_at: string | null;
+  error_code: string | null;
+  progress: DemoProgress;
+  cleanup_requested_at: string | null;
+  purged_at: string | null;
+  rows_deleted: Record<string, number> | null;
 }
 
 interface IamMembershipTable {
@@ -83,6 +110,7 @@ export interface IdentityDb {
   'iam.workspace': IamWorkspaceTable;
   'iam.workspace_membership': IamMembershipTable;
   'fx.currency': FxCurrencyTable;
+  'platform.demo_workspace_run': DemoWorkspaceRunTable;
 }
 
 const db = (): Kysely<IdentityDb> => unitOfWorkKysely<IdentityDb>();
@@ -181,8 +209,24 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
         personal_of_user_id: ws.personalOfUserId,
         status: ws.status,
         version: ws.version,
+        ...(ws.demo
+          ? {
+              is_demo: true,
+              demo_status: ws.demo.status,
+              demo_origin_workspace_id: ws.demo.originWorkspaceId,
+              demo_requested_by: ws.demo.requestedBy,
+              demo_dataset_version: ws.demo.datasetVersion,
+            }
+          : {}),
       })
-      .execute();
+      .execute()
+      .catch((err: unknown) => {
+        // FR-IDENTITY-016: el índice único parcial respalda el chequeo de aplicación ante carreras.
+        if ((err as { constraint?: string }).constraint === 'workspace_demo_active_per_user_uq') {
+          throw new DomainError('DEMO_WORKSPACE_ALREADY_EXISTS', 'the user already has a demo workspace');
+        }
+        throw err;
+      });
     for (const m of ws.memberships) {
       await db()
         .insertInto('iam.workspace_membership')
@@ -217,6 +261,11 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
         'w.status',
         'w.version',
         'w.created_at',
+        'w.is_demo',
+        'w.demo_status',
+        'w.demo_origin_workspace_id',
+        'w.demo_requested_by',
+        'w.demo_dataset_version',
       ])
       .where('w.id', '=', id)
       .executeTakeFirst();
@@ -244,6 +293,19 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
       memberships: members.map((m) => ({ userId: m.user_id, role: toRole(m.role), status: m.status })),
       personalOfUserId: r.personal_of_user_id,
       status: r.status,
+      demo:
+        r.is_demo &&
+        r.demo_status &&
+        r.demo_origin_workspace_id &&
+        r.demo_requested_by &&
+        r.demo_dataset_version
+          ? {
+              status: r.demo_status,
+              originWorkspaceId: r.demo_origin_workspace_id,
+              requestedBy: r.demo_requested_by,
+              datasetVersion: r.demo_dataset_version,
+            }
+          : null,
       version: r.version,
       createdAt: r.created_at.toISOString(),
     });
@@ -261,6 +323,9 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
         fiscal_month_start_day: s.fiscalMonthStartDay,
         min_liquidity_reserve_amount: s.minimumLiquidityReserve?.toFixed() ?? null,
         min_liquidity_reserve_currency: s.minimumLiquidityReserve?.currency.code ?? null,
+        status: ws.status,
+        ...(ws.demo ? { demo_status: ws.demo.status } : {}),
+        ...(ws.isRetired ? { archived_at: sql<Date>`coalesce(archived_at, now())` } : {}),
         version: ws.version,
         updated_at: now,
       })
@@ -274,29 +339,165 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
     let q = db()
       .selectFrom('iam.workspace_membership as m')
       .innerJoin('iam.workspace as w', 'w.id', 'm.workspace_id')
-      .select(['w.id', 'w.name', 'm.role', 'w.base_currency'])
+      .select(['w.id', 'w.name', 'm.role', 'w.base_currency', 'w.is_demo'])
       .where('m.user_id', '=', userId)
       .where('m.status', '=', 'ACTIVE')
+      .where('w.status', 'not in', ['ARCHIVED', 'PURGED'])
       .orderBy('w.id');
     if (page?.afterId !== undefined) q = q.where('w.id', '>', page.afterId);
     if (page?.limit !== undefined) q = q.limit(page.limit);
     const rows = await q.execute();
-    return rows.map((r) => ({ id: r.id, name: r.name, role: toRole(r.role), baseCurrency: r.base_currency }));
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      role: toRole(r.role),
+      baseCurrency: r.base_currency,
+      isDemo: r.is_demo,
+    }));
+  }
+
+  async lockDemoRequests(userId: string): Promise<void> {
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${'iam.demo:' + userId}, 0))`.execute(db());
+  }
+
+  async findActiveDemoFor(userId: string): Promise<Workspace | null> {
+    const r = await db()
+      .selectFrom('iam.workspace')
+      .select('id')
+      .where('demo_requested_by', '=', userId)
+      .where('is_demo', '=', true)
+      .where('demo_status', 'in', ['LOADING', 'READY', 'FAILED', 'CLEANING'])
+      .executeTakeFirst();
+    return r ? this.findById(r.id) : null;
   }
 }
 
 export class PgMembershipReader implements MembershipReader {
   async activeRole(userId: string, workspaceId: string): Promise<Role | null> {
+    return this.roleIn(userId, workspaceId, false);
+  }
+
+  async retiredRole(userId: string, workspaceId: string): Promise<Role | null> {
+    return this.roleIn(userId, workspaceId, true);
+  }
+
+  /** Membresía activa del usuario; `retired` elige workspaces demo archivados/purgados o el resto (add-demo-data). */
+  private async roleIn(userId: string, workspaceId: string, retired: boolean): Promise<Role | null> {
     const r = await db()
-      .selectFrom('iam.workspace_membership')
-      .select('role')
-      .where('user_id', '=', userId)
-      .where('workspace_id', '=', workspaceId)
-      .where('status', '=', 'ACTIVE')
+      .selectFrom('iam.workspace_membership as m')
+      .innerJoin('iam.workspace as w', 'w.id', 'm.workspace_id')
+      .select('m.role')
+      .where('m.user_id', '=', userId)
+      .where('m.workspace_id', '=', workspaceId)
+      .where('m.status', '=', 'ACTIVE')
+      .where('w.status', retired ? 'in' : 'not in', ['ARCHIVED', 'PURGED'])
       .executeTakeFirst();
     return r ? toRole(r.role) : null;
   }
 }
+
+const iso = (v: string | Date | null): string | null =>
+  v === null ? null : v instanceof Date ? v.toISOString() : new Date(v).toISOString();
+
+/** `platform.demo_workspace_run` (RLS: solo las filas pedidas por el usuario en contexto). */
+export class PgDemoRunRepository implements DemoRunRepository {
+  async insert(run: DemoRun): Promise<void> {
+    await db()
+      .insertInto('platform.demo_workspace_run')
+      .values({
+        workspace_id: run.workspaceId,
+        origin_workspace_id: run.originWorkspaceId,
+        requested_by: run.requestedBy,
+        dataset_version: run.datasetVersion,
+        anchor_date: run.anchorDate,
+        requested_at: run.requestedAt,
+        progress: sql<DemoProgress>`${JSON.stringify(run.progress)}::jsonb`,
+      })
+      .execute();
+  }
+
+  async find(workspaceId: string): Promise<DemoRun | null> {
+    const r = await this.select().where('workspace_id', '=', workspaceId).executeTakeFirst();
+    return r ? toRun(r) : null;
+  }
+
+  async latestForOrigin(originWorkspaceId: string, userId: string): Promise<DemoRun | null> {
+    const r = await this.select()
+      .where('origin_workspace_id', '=', originWorkspaceId)
+      .where('requested_by', '=', userId)
+      .orderBy('requested_at', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return r ? toRun(r) : null;
+  }
+
+  async update(workspaceId: string, patch: DemoRunPatch): Promise<void> {
+    await db()
+      .updateTable('platform.demo_workspace_run')
+      .set({
+        ...(patch.progress ? { progress: sql<DemoProgress>`${JSON.stringify(patch.progress)}::jsonb` } : {}),
+        ...(patch.loadedAt !== undefined ? { loaded_at: patch.loadedAt } : {}),
+        ...(patch.failedAt !== undefined ? { failed_at: patch.failedAt } : {}),
+        ...(patch.errorCode !== undefined ? { error_code: patch.errorCode } : {}),
+        ...(patch.cleanupRequestedAt !== undefined ? { cleanup_requested_at: patch.cleanupRequestedAt } : {}),
+      })
+      .where('workspace_id', '=', workspaceId)
+      .execute();
+  }
+
+  private select() {
+    return db()
+      .selectFrom('platform.demo_workspace_run')
+      .select([
+        'workspace_id',
+        'origin_workspace_id',
+        'requested_by',
+        'dataset_version',
+        sql<string>`to_char(anchor_date, 'YYYY-MM-DD')`.as('anchor_date'),
+        'requested_at',
+        'loaded_at',
+        'failed_at',
+        'error_code',
+        'progress',
+        'cleanup_requested_at',
+        'purged_at',
+        'rows_deleted',
+      ]);
+  }
+}
+
+function toRun(r: DemoWorkspaceRunTable): DemoRun {
+  return {
+    workspaceId: r.workspace_id,
+    originWorkspaceId: r.origin_workspace_id,
+    requestedBy: r.requested_by,
+    datasetVersion: r.dataset_version,
+    anchorDate: r.anchor_date,
+    requestedAt: iso(r.requested_at) as string,
+    loadedAt: iso(r.loaded_at),
+    failedAt: iso(r.failed_at),
+    errorCode: r.error_code,
+    progress: r.progress,
+    cleanupRequestedAt: iso(r.cleanup_requested_at),
+    purgedAt: iso(r.purged_at),
+    rowsDeleted: r.rows_deleted,
+  };
+}
+
+/**
+ * Purga física acotada: `platform.purge_demo_workspace` (SECURITY DEFINER, EXECUTE solo `pf_worker`; ADR-0026). Se
+ * invoca en la transacción de la unidad de trabajo en curso. Los conteos llegan como números JSON enteros.
+ */
+export const pgDemoPurge: DemoPurgePort = {
+  async purge(demoWorkspaceId) {
+    const { rows } = await sql<{
+      deleted: Record<string, number | string>;
+    }>`SELECT platform.purge_demo_workspace(${demoWorkspaceId}) AS deleted`.execute(db());
+    const out: Record<string, number> = {};
+    for (const [table, n] of Object.entries(rows[0]?.deleted ?? {})) out[table] = Number(n);
+    return out;
+  },
+};
 
 /** Adapter de solo lectura sobre el catálogo sembrado `fx.currency` (hasta que FX publique su contrato). */
 export class PgCurrencyCatalog implements CurrencyCatalogPort {

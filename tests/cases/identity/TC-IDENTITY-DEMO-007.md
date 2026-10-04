@@ -12,9 +12,9 @@ invariants: ["INV-004"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/test/db/seed-demo.int.test.ts","apps/api/test/demo/demo-data.int.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","determinism","golden"]
@@ -32,7 +32,7 @@ expected_result:
   - "Cada asiento de A y de B suma 0 por moneda"
   - "Las instituciones son ficticias (p. ej. \"Banco Andino Demo\") y los identificadores de cuenta empiezan con DEMO-"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-007 — Dos cargas con la misma ancla producen los mismos saldos y asientos balanceados

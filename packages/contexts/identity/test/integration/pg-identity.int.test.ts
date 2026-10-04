@@ -175,7 +175,7 @@ describe('Repositorios PostgreSQL de IDENTITY (tareas 6.1 y 6.2)', () => {
     });
     const list = await svc.listMyWorkspaces(userId);
     expect(list.filter((w) => w.name === 'Hogar')).toEqual([
-      { id: workspace.id, name: 'Hogar', role: 'OWNER', baseCurrency: 'BOB' },
+      { id: workspace.id, name: 'Hogar', role: 'OWNER', baseCurrency: 'BOB', isDemo: false },
     ]);
     await expect(
       svc.createWorkspace(userId, { name: 'X', baseCurrency: 'XYZ', timezone: 'UTC', locale: 'es-BO' }),

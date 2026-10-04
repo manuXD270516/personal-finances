@@ -14,6 +14,8 @@ export interface Membership {
   readonly workspaceId: string;
   readonly workspaceName: string;
   readonly role: Role;
+  /** Workspace de demostración dedicado (add-demo-data). */
+  readonly isDemo?: boolean;
 }
 
 export interface Me {
@@ -23,6 +25,8 @@ export interface Me {
   readonly locale: string;
   readonly timezone: string;
   readonly memberships: readonly Membership[];
+  /** Funciones habilitadas por entorno (p. ej. carga de datos de demostración). */
+  readonly features?: { readonly demoData?: boolean };
   readonly version: number;
 }
 

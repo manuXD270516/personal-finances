@@ -271,6 +271,90 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ─────────────────────── Identity: datos de demostración (add-demo-data, ADR-0026) ───────────────────────
+  /workspaces/{workspaceId}/demo-data:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Identity]
+      operationId: requestDemoData
+      summary: Load demo data into a NEW dedicated demo workspace (owner action, asynchronous)
+      description: |
+        Creates a dedicated demo workspace (`isDemo = true`, immutable) whose only member is the caller (OWNER) and
+        enqueues the asynchronous load of the versioned Demo dataset (docs/29) anchored at "today" in the workspace
+        time zone. The current workspace is only the ORIGIN (where the action is audited): no data is ever written into
+        it. Disabled by environment ⇒ 403 `DEMO_DATA_DISABLED`; a non-purged demo of the caller already exists ⇒ 409
+        `DEMO_WORKSPACE_ALREADY_EXISTS`.
+      x-openspec-capability: identity/demo-data
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Demo workspace created; load in progress (`LOADING`)
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoDataStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Identity]
+      operationId: getDemoDataStatus
+      summary: Demo data status (on a demo workspace, or the caller's latest demo requested from a real workspace)
+      description: |
+        On a demo workspace (any member; also while it is being cleaned) returns its load. On a real workspace returns
+        the latest demo the caller requested from it (404 if none). `status = PURGED` means it was fully removed.
+      x-openspec-capability: identity/demo-data
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Demo data status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoDataStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/demo-data/cleanup:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Identity]
+      operationId: cleanupDemoData
+      summary: Clean up a demo workspace (immediate archive + asynchronous full purge)
+      description: |
+        Only on a demo workspace (`WORKSPACE_NOT_DEMO` otherwise). The demo workspace is archived immediately: it is
+        no longer listed and every other route answers as if it did not exist; its physical purge is enqueued. Safe to
+        repeat while it is being cleaned (202 without further effects). A demo still `LOADING` ⇒ 409
+        `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: identity/demo-data
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '202':
+          description: Demo workspace archived; purge enqueued (`CLEANING`)
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoDataStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Accounts ─────────────────────────────
   /workspaces/{workspaceId}/accounts:
     parameters:
@@ -3455,6 +3539,9 @@ components:
         - INVALID_TIMEZONE                  # 422
         - WORKSPACE_PENDING_DELETION        # 409 (later phase)
         - LAST_OWNER_CANNOT_LEAVE           # 409 (later phase)
+        - DEMO_WORKSPACE_ALREADY_EXISTS     # 409 (add-demo-data: one non-purged demo per user)
+        - WORKSPACE_NOT_DEMO                # 409 (add-demo-data: cleanup on a real workspace)
+        - DEMO_DATA_DISABLED                # 403 (add-demo-data: DEMO_DATA_ENABLED=false)
         # money / ledger
         - MONEY_INVALID_AMOUNT              # 422
         - AMOUNT_OUT_OF_RANGE               # 422
@@ -3529,6 +3616,16 @@ components:
               workspaceId: { $ref: '#/components/schemas/Uuid' }
               workspaceName: { type: string }
               role: { $ref: '#/components/schemas/WorkspaceRole' }
+              isDemo:
+                type: boolean
+                description: Dedicated demo workspace (add-demo-data); the UI labels it in the workspace selector
+        features:
+          type: object
+          description: Installation features relevant to the UI
+          properties:
+            demoData:
+              type: boolean
+              description: Loading demo data is enabled in this environment (DEMO_DATA_ENABLED); cleanup is always available
         version: { $ref: '#/components/schemas/Version' }
     SessionEvent:
       type: object
@@ -3569,9 +3666,58 @@ components:
           enum: [ACTIVE, PENDING_DELETION]
         role:
           $ref: '#/components/schemas/WorkspaceRole'
+        isDemo:
+          type: boolean
+          description: Dedicated demo workspace (add-demo-data, ADR-0026). Set only at creation; immutable. Always present in finance-api responses.
+        demoStatus:
+          description: Load/cleanup status of a demo workspace; null for real workspaces
+          oneOf:
+            - $ref: '#/components/schemas/DemoStatus'
+            - type: 'null'
         version: { $ref: '#/components/schemas/Version' }
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
+    DemoStatus:
+      type: string
+      enum: [LOADING, READY, FAILED, CLEANING, PURGED]
+    DemoDataStatus:
+      type: object
+      required:
+        [demoWorkspaceId, originWorkspaceId, status, datasetVersion, anchorDate, progress, errorCode, requestedAt,
+         loadedAt, cleanupRequestedAt, purgedAt]
+      properties:
+        demoWorkspaceId: { $ref: '#/components/schemas/Uuid' }
+        originWorkspaceId: { $ref: '#/components/schemas/Uuid' }
+        status: { $ref: '#/components/schemas/DemoStatus' }
+        datasetVersion: { type: string, examples: ['1'] }
+        anchorDate: { $ref: '#/components/schemas/LocalDate' }
+        progress:
+          description: Load progress (LOADING/FAILED); null otherwise
+          oneOf:
+            - type: object
+              required: [completedModules, totalModules]
+              properties:
+                completedModules: { type: array, items: { type: string } }
+                totalModules: { type: integer, minimum: 0 }
+            - type: 'null'
+        errorCode:
+          description: Failure code when status = FAILED
+          oneOf:
+            - type: string
+            - type: 'null'
+        requestedAt: { $ref: '#/components/schemas/Instant' }
+        loadedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        cleanupRequestedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        purgedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
     WorkspaceCreate:
       type: object
       additionalProperties: false

@@ -12,9 +12,9 @@ invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/demo-data.api.test.ts","packages/contexts/identity/src/application/demo-data.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data"]
@@ -28,7 +28,7 @@ expected_result:
   - "Respuesta 409 con code DEMO_WORKSPACE_ALREADY_EXISTS"
   - "No se crea otro workspace"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-DEMO-009 — Una segunda carga con un workspace demo vigente se rechaza
