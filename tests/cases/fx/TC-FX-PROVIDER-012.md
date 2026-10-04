@@ -15,7 +15,9 @@ level: api
 automation_status: automated
 automated_tests:
   - apps/api/test/api/fx-providers.api.test.ts
-status: ready
+  - apps/web/src/ui/fx/providers.test.tsx
+  - tests/e2e/specs/fx-providers.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","provider","attribution","cc-by","license"]
@@ -38,7 +40,7 @@ expected_result:
   - "Para bo.dolarapi.com el texto es \"Fuente: bo.dolarapi.com\" con enlace https://bo.dolarapi.com"
   - "La tasa manual muestra \"Casa de cambio centro\" y attribution null"
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-012 — Toda tasa de provider y todo monto valorado con ella muestran la atribución de la fuente
@@ -60,3 +62,4 @@ Entonces junto a la tasa veo "Fuente: paralelo.bo" con enlace y licencia CC BY 4
 - Texto de atribución pedido por paralelo.bo (verificado el 2026-10-02): "paralelo.bo (https://paralelo.bo)".
 - Fechas fijas con `FixedClock`; instantes en UTC (America/La_Paz = UTC−4). Sin red en CI: providers simulados con fixtures grabados.
 - Automatización parcial (2026-10-03): Pendiente: RateSourceBadge en la UI (tarea 6.1) y ReportSummary.meta.attributions (add-basic-dashboard).
+- Automatización completa (2026-10-04): `RateSourceBadge`/`RateAttributionLink` (tests de componentes en `apps/web/src/ui/fx/providers.test.tsx`: paralelo.bo con CC BY 4.0, bo.dolarapi.com sin licencia, manual sin atribución) y E2E con providers simulados (`tests/e2e/specs/fx-providers.spec.ts`: enlace y licencia junto a la tasa 12.02 en `/fx` → Proveedores y en la pestaña Tasas). `ReportSummary.meta.attributions` lo cubre add-basic-dashboard (reporting).

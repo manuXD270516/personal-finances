@@ -15,6 +15,8 @@ level: api
 automation_status: automated
 automated_tests:
   - packages/contexts/classification/src/application/classification.service.test.ts
+  - apps/web/src/ui/classification/classification.test.tsx
+  - tests/e2e/specs/classification.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -38,7 +40,7 @@ expected_result:
 - El listado por defecto no contiene "Old Gym"
 - El listado con includeArchived=true contiene "Old Gym" con archivedAt
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-ARCHIVE-002 — Una categoría archivada no puede asignarse a transacciones nuevas ni aparece en el selector

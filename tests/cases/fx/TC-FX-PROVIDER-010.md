@@ -19,6 +19,8 @@ automated_tests:
   - packages/contexts/fx/src/application/market-rate-providers.test.ts
   - packages/contexts/fx/test/integration/providers.int.test.ts
   - apps/api/test/api/fx-providers.api.test.ts
+  - apps/web/src/ui/fx/providers.test.tsx
+  - tests/e2e/specs/fx-providers.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -45,7 +47,7 @@ expected_result:
   - "La segunda revisión responde 409 FX_RATE_ANOMALY_ALREADY_REVIEWED"
   - "Variante: 12.10 (+0.6656 %) se usa sin confirmación"
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-010 — Una muestra con variación mayor al umbral queda retenida hasta que un editor la confirma

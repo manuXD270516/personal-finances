@@ -16,6 +16,8 @@ automation_status: automated
 automated_tests:
   - packages/contexts/fx/src/application/market-rate-providers.test.ts
   - apps/api/test/api/fx-providers.api.test.ts
+  - apps/web/src/ui/fx/providers.test.tsx
+  - tests/e2e/specs/fx-providers.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -37,7 +39,7 @@ expected_result:
   - "attribution presente en cada provider"
   - "Variante: ambos providers con health DISABLED y nextAttemptAt null"
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-015 — El estado de los providers informa salud, última tasa, fallas y carga histórica

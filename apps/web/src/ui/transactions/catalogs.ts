@@ -77,8 +77,9 @@ export function useCatalogs(ctx: WorkspaceContext): Catalogs {
 }
 
 /**
- * Opciones de categoría para un tipo de movimiento: activas, del tipo (`EXPENSE` para gastos y reembolsos,
- * `INCOME` para ingresos), agrupadas por grupo y con las subcategorías bajo su padre.
+ * Opciones de categoría para un tipo de movimiento: activas (nunca archivadas), del tipo (`EXPENSE` para gastos y
+ * reembolsos, `INCOME` para ingresos), agrupadas por grupo en el orden persistente y con las subcategorías bajo su
+ * padre.
  */
 export function categoryOptions(
   categories: readonly Category[],
@@ -87,6 +88,12 @@ export function categoryOptions(
 ): { group: string; options: { id: string; label: string; system: boolean }[] }[] {
   const active = categories.filter((c) => c.kind === kind && !c.archivedAt);
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
+  // Orden persistente de los grupos (sortOrder, luego nombre): el mismo de la pantalla de clasificación.
+  const groupRank = new Map(
+    [...groups]
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+      .map((g, i) => [g.id, i]),
+  );
   const byGroup = new Map<string, Category[]>();
   for (const c of active) byGroup.set(c.groupId, [...(byGroup.get(c.groupId) ?? []), c]);
   const order = (a: Category, b: Category) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
@@ -102,7 +109,12 @@ export function categoryOptions(
       // Subcategorías cuyo padre está archivado o fuera del filtro: se listan igual.
       for (const orphan of list.filter((c) => c.parentId && !parents.some((p) => p.id === c.parentId)))
         options.push({ id: orphan.id, label: orphan.name, system: orphan.isSystem });
-      return { group: groupName.get(groupId) ?? '', options };
+      return {
+        group: groupName.get(groupId) ?? '',
+        rank: groupRank.get(groupId) ?? Number.MAX_SAFE_INTEGER,
+        options,
+      };
     })
-    .sort((a, b) => a.group.localeCompare(b.group));
+    .sort((a, b) => a.rank - b.rank || a.group.localeCompare(b.group))
+    .map(({ group, options }) => ({ group, options }));
 }

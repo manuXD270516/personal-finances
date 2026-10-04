@@ -201,6 +201,8 @@ export function CreateWorkspaceForm() {
   const inFlight = useRef(false);
   const [name, setName] = useState('');
   const [baseCurrency, setBaseCurrency] = useState('BOB');
+  // Catálogo sugerido de categorías (add-classification 8.3): opcional; las de sistema se crean siempre.
+  const [seedCatalog, setSeedCatalog] = useState(true);
   const [created, setCreated] = useState<string | undefined>();
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [busy, setBusy] = useState(false);
@@ -219,7 +221,7 @@ export function CreateWorkspaceForm() {
       const r = await api.command<{ id: string; name: string }>(
         'POST',
         '/workspaces',
-        { name, baseCurrency },
+        { name, baseCurrency, seedDefaultCategories: seedCatalog },
         { idempotencyKey: attemptKey.current },
       );
       setCreated(r.data?.name ?? name);
@@ -248,6 +250,15 @@ export function CreateWorkspaceForm() {
             <option key={c}>{c}</option>
           ))}
         </select>
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          name="seedDefaultCategories"
+          checked={seedCatalog}
+          onChange={(e) => setSeedCatalog(e.target.checked)}
+        />
+        {t('seedCatalog')}
       </label>
       <button type="submit" disabled={busy}>
         {busy ? t('creating') : t('create')}

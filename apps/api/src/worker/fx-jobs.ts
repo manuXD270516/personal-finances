@@ -6,6 +6,7 @@ import {
   FX_POLL_QUEUE,
   FX_WORKSPACE_PROVISIONING_CONSUMER,
   type FxMarketRateJobs,
+  type FxMarketRateJobsOptions,
 } from '@pf/fx/interface/fx.module';
 import { runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
@@ -20,6 +21,22 @@ export interface FxJobsOptions {
 interface BackfillPayload {
   readonly workspaceId: string;
   readonly timeZone: string;
+}
+
+/**
+ * URL base alternativas de los providers (`FX_PROVIDER_PARALELO_BO_URL`, `FX_PROVIDER_DOLARAPI_BO_URL`; el contrato de
+ * configuración las rechaza fuera de local/ci): las pruebas E2E apuntan el worker a un servidor HTTP local que
+ * simula a los providers (nunca la red real). La allowlist de hosts suma los de esas URL.
+ */
+export function fxEndpointsFromConfig(config: {
+  readonly FX_PROVIDER_PARALELO_BO_URL?: string | undefined;
+  readonly FX_PROVIDER_DOLARAPI_BO_URL?: string | undefined;
+}): FxMarketRateJobsOptions['endpoints'] | undefined {
+  const baseUrls = {
+    ...(config.FX_PROVIDER_PARALELO_BO_URL ? { PARALELO_BO: config.FX_PROVIDER_PARALELO_BO_URL } : {}),
+    ...(config.FX_PROVIDER_DOLARAPI_BO_URL ? { DOLARAPI_BO: config.FX_PROVIDER_DOLARAPI_BO_URL } : {}),
+  };
+  return Object.keys(baseUrls).length > 0 ? { baseUrls } : undefined;
 }
 
 const asWorker = <T>(process: string, fn: () => Promise<T>): Promise<T> =>

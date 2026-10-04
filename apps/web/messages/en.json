@@ -48,7 +48,8 @@
     "create": "Create workspace",
     "creating": "Creating…",
     "created": "Workspace created: {name}.",
-    "readOnly": "Only the owner can change these settings."
+    "readOnly": "Only the owner can change these settings.",
+    "seedCatalog": "Load the suggested category catalog (you can edit it later)"
   },
   "Preferences": {
     "title": "My preferences",
@@ -177,7 +178,9 @@
       "sourceLabel": "Source: {label}",
       "fallback": "fallback",
       "asOf": "valid as of: {date}",
-      "stale": "stale"
+      "stale": "stale",
+      "lastKnown": "last known",
+      "requested": "requested type: {type}"
     },
     "age": {
       "now": "less than 1 min ago",
@@ -719,7 +722,9 @@
       "PARALLEL": "Parallel",
       "P2P": "P2P",
       "BANK": "Bank",
-      "CUSTOM": "Custom"
+      "CUSTOM": "Custom",
+      "PARALLEL_BUY": "Buy",
+      "PARALLEL_SELL": "Sell"
     },
     "detail": {
       "title": "Conversion detail (revision {revision})",
@@ -787,7 +792,7 @@
       "reasonMin": "The reason needs at least 3 characters."
     },
     "rates": {
-      "title": "Crypto & FX: rates",
+      "title": "Exchange rates",
       "actions": "FX actions",
       "newConversion": "New conversion",
       "conversions": "View conversions",
@@ -819,6 +824,99 @@
       "newValue": "Corrected value",
       "correctReason": "Correction reason",
       "saveCorrection": "Save correction"
+    },
+    "screen": {
+      "title": "Crypto and FX",
+      "tabs": "FX sections",
+      "rates": "Rates",
+      "providers": "Providers"
+    },
+    "providers": {
+      "title": "Market rate providers",
+      "intro": "The system queries paralelo.bo (primary) and bo.dolarapi.com (fallback and official) in the background, without sending your data. If they fail, the last known rate marked as stale or your manual rates are used.",
+      "loading": "Loading provider status…",
+      "never": "never",
+      "health": {
+        "HEALTHY": "Healthy",
+        "DEGRADED": "Degraded",
+        "DOWN": "Down",
+        "DISABLED": "Disabled"
+      },
+      "lastAttempt": "Last attempt",
+      "lastSuccess": "Last success",
+      "failures": "Consecutive failures",
+      "lastError": "Last error",
+      "nextAttempt": "Next attempt",
+      "retryAfter": "Waiting for the usage limit until",
+      "disabled": "Disabled by configuration: not queried; the rest of the system keeps working with manual rates.",
+      "errors": {
+        "PROVIDER_UNAVAILABLE": "Unavailable",
+        "PROVIDER_TIMEOUT": "Timed out",
+        "PROVIDER_RATE_LIMITED": "Usage limit reached",
+        "PROVIDER_PAYLOAD_INVALID": "Invalid response",
+        "PROVIDER_SCHEMA_CHANGED": "Response format changed",
+        "FX_PROVIDER_CONFIG_INVALID": "Invalid configuration"
+      },
+      "feeds": "Published rates",
+      "feed": "Pair and type",
+      "role": "Role",
+      "lastRate": "Last rate",
+      "age": "Age",
+      "roles": {
+        "PRIMARY": "Primary",
+        "FALLBACK": "Fallback"
+      },
+      "noRate": "no rate",
+      "stale": "stale",
+      "quoteSidesHint": "Buy: what you pay to buy 1 {base}. Sell: what you get when selling it. Only used when requested.",
+      "backfill": {
+        "title": "Historical load",
+        "status": {
+          "PENDING": "pending",
+          "RUNNING": "running",
+          "COMPLETED": "completed",
+          "FAILED": "failed",
+          "NOT_APPLICABLE": "not applicable"
+        },
+        "points": "{n} points",
+        "range": "from {from} to {to}",
+        "lastRun": "last run {date}"
+      },
+      "selection": {
+        "PRIMARY": "primary",
+        "FALLBACK": "fallback",
+        "LAST_KNOWN_STALE": "last known, stale",
+        "MANUAL": "manual"
+      },
+      "valuation": {
+        "title": "Current valuation rate",
+        "hint": "Used to value balances and as conversion reference: primary → fallback → last known (stale) or manual.",
+        "none": "no rate available (record a manual one)"
+      },
+      "anomalies": {
+        "title": "Anomalies pending review ({n})",
+        "hint": "Samples that moved more than the threshold vs the previous one: not used until you confirm them. Once rejected, never used.",
+        "readOnly": "Read only: an editor or owner of the workspace can confirm or reject them.",
+        "empty": "No pending anomalies.",
+        "variation": "change {pct} % (threshold {threshold} %)",
+        "reviewLabel": "Review the anomaly {rate}",
+        "reasonLabel": "Reason",
+        "confirm": "Confirm",
+        "reject": "Reject",
+        "confirmed": "Anomaly confirmed: {rate} is now used for valuation.",
+        "rejected": "Anomaly rejected: {rate} will not be used.",
+        "reviewed": "Recently reviewed",
+        "reason": "reason: {reason}",
+        "status": {
+          "PENDING": "pending anomaly",
+          "CONFIRMED": "confirmed anomaly",
+          "REJECTED": "rejected anomaly"
+        },
+        "errors": {
+          "REASON_MIN": "The reason must have at least 3 characters.",
+          "REASON_MAX": "The reason allows up to 500 characters."
+        }
+      }
     }
   },
   "Classification": {
@@ -862,7 +960,89 @@
     "archived": "“{name}” archived.",
     "unarchived": "“{name}” unarchived.",
     "categoryCreated": "Category “{name}” created.",
-    "system": "system (protected)"
+    "system": "system (protected)",
+    "sections": "Classification sections",
+    "catalogHint": "The suggested catalog adds common groups and categories for Bolivia; it only creates what is missing (by name) and you can edit or archive them later.",
+    "newGroup": "New group",
+    "groupCreated": "Group “{name}” created.",
+    "kind": "Type",
+    "reorderHint": "To reorder, use the ↑ and ↓ buttons of each category (keyboard) or drag it onto another one at the same level.",
+    "emptyGroup": "No categories.",
+    "reordered": "Order saved: “{name}” moved.",
+    "categoryUpdated": "Category “{name}” updated.",
+    "moveUp": "Move “{name}” up",
+    "moveDown": "Move “{name}” down",
+    "edit": "Edit",
+    "editNamed": "Edit “{name}”",
+    "archiveNamed": "Archive “{name}”",
+    "unarchiveNamed": "Unarchive “{name}”",
+    "systemNameHint": "System categories cannot be renamed; you can change their icon, color and order.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "icon": "Icon",
+    "noIcon": "No icon",
+    "color": "Color",
+    "noColor": "No color",
+    "tagUpdated": "Tag “{name}” updated.",
+    "emptyTags": "No tags yet.",
+    "emptyCounterparties": "No counterparties yet.",
+    "unknownCategory": "category not available",
+    "defaultCategory": "Default category",
+    "defaultCategoryHint": "Suggested when recording a transaction with this counterparty.",
+    "noDefaultCategory": "None",
+    "aliases": "Aliases",
+    "aliasesHint": "Texts it appears with in bank descriptions, comma separated (at least 3 characters each).",
+    "aliasesList": "Aliases: {aliases}",
+    "defaultCategoryIs": "Default category: {name}",
+    "counterpartyUpdated": "Counterparty “{name}” updated.",
+    "errors": {
+      "ALIAS_MIN": "Each alias must have between 3 and 120 characters.",
+      "ALIAS_MAX_COUNT": "Up to 20 aliases are allowed."
+    },
+    "icons": {
+      "baby": "Baby",
+      "bike": "Bike",
+      "bolt": "Electricity",
+      "book": "Book",
+      "briefcase": "Briefcase",
+      "building": "Building",
+      "bus": "Bus",
+      "car": "Car",
+      "cart": "Cart",
+      "clock": "Clock",
+      "coffee": "Coffee",
+      "dots": "Other",
+      "dumbbell": "Gym",
+      "fuel": "Fuel",
+      "gift": "Gift",
+      "glass": "Glass",
+      "graduation": "Graduation",
+      "heart": "Heart",
+      "home": "Home",
+      "key": "Key",
+      "laptop": "Laptop",
+      "paw": "Pet",
+      "pencil": "Pencil",
+      "pie": "Pie",
+      "pill": "Medicine",
+      "plane": "Plane",
+      "play": "Entertainment",
+      "school": "School",
+      "shield": "Insurance",
+      "shirt": "Clothes",
+      "sofa": "Furniture",
+      "sparkles": "Personal care",
+      "stethoscope": "Doctor",
+      "tag": "Tag",
+      "taxi": "Taxi",
+      "ticket": "Ticket",
+      "tooth": "Dentist",
+      "trending-up": "Investment",
+      "undo": "Refund",
+      "users": "People",
+      "utensils": "Food",
+      "wrench": "Maintenance"
+    }
   },
   "Lifecycle": {
     "tabs": {

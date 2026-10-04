@@ -15,6 +15,8 @@ level: domain
 automation_status: automated
 automated_tests:
   - packages/contexts/classification/src/domain/domain.test.ts
+  - apps/web/src/ui/classification/classification.test.tsx
+  - tests/e2e/specs/classification.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -34,7 +36,7 @@ expected_result:
 - La segunda no reconoce ninguna counterparty
 - La tercera no reconoce "Entel" porque está archivada
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-ALIAS-001 — Una descripción bancaria se reconoce por el alias de la counterparty

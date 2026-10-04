@@ -16,6 +16,7 @@ automation_status: automated
 automated_tests:
   - packages/contexts/classification/src/application/classification.service.test.ts
   - packages/contexts/classification/test/integration/pg-classification.int.test.ts
+  - tests/e2e/specs/classification.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -33,7 +34,7 @@ expected_result:
 - Las 3 transacciones siguen referenciando "Old Gym" con sus montos intactos
 - El reporte de 2025 muestra "Old Gym" = 450.00 BOB marcada como archivada
 created: 2026-10-01
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-ARCHIVE-001 — Una categoría archivada conserva sus transacciones y su total histórico

@@ -1048,6 +1048,9 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.23.1
+      pg-boss:
+        specifier: 'catalog:'
+        version: 12.35.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

@@ -4,9 +4,10 @@ import { Client } from 'pg';
 import { bff, createKeycloakUser, env, login } from '../src/helpers.js';
 
 /**
- * Home de Phase 1 (openspec add-basic-dashboard, tarea 7.2). Sin red: el stack E2E corre con `FX_PROVIDER_* = none`,
- * así que la tasa "del provider simulado" se registra como lo haría la ingesta (fila `PROVIDER`/`PARALELO_BO` en el
- * workspace del usuario, como `pf_app` bajo RLS); la API nunca llama a un provider.
+ * Home de Phase 1 (openspec add-basic-dashboard, tarea 7.2). Sin red: los providers del stack E2E apuntan a simulados
+ * que solo responden durante `fx-providers.spec.ts` (y el cron corre cada 24 h), así que aquí la tasa "del provider" se
+ * registra como lo haría la ingesta (fila `PROVIDER`/`PARALELO_BO` en el workspace del usuario, como `pf_app` bajo RLS);
+ * la API nunca llama a un provider.
  */
 
 /** Hoy (fecha de negocio) en America/La_Paz. */

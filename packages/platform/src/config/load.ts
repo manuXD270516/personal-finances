@@ -168,6 +168,16 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     });
   }
 
+  // Providers de tasas simulados (pruebas E2E): una URL alternativa de provider solo se acepta en local/ci.
+  for (const name of ['FX_PROVIDER_PARALELO_BO_URL', 'FX_PROVIDER_DOLARAPI_BO_URL'] as const) {
+    if (names.includes(name) && cloud && values[name] !== undefined) {
+      problems.push({
+        variable: name,
+        reason: 'solo se permite con PFOS_ENV=local|ci (providers simulados)',
+      });
+    }
+  }
+
   if (problems.length > 0) throw new ConfigError(app, problems);
   return Object.freeze(values) as AppConfig<A>;
 }

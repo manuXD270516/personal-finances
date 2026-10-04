@@ -518,6 +518,19 @@ export const VARIABLES = {
     default: 'true',
   }),
 
+  FX_PROVIDER_PARALELO_BO_URL: variable(httpOrigin, {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Solo local/CI: origen alternativo de paralelo.bo para el worker (servidor HTTP local que simula al provider en las pruebas E2E; nunca la red real). Sin definir se usa https://paralelo.bo. Rechazado con PFOS_ENV=staging|production.',
+    optional: true,
+  }),
+  FX_PROVIDER_DOLARAPI_BO_URL: variable(httpOrigin, {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Solo local/CI: origen alternativo de bo.dolarapi.com para el worker (servidor HTTP local que simula al provider en las pruebas E2E). Sin definir se usa https://bo.dolarapi.com. Rechazado con PFOS_ENV=staging|production.',
+    optional: true,
+  }),
+
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
     group: 'OpenTelemetry',
@@ -625,6 +638,8 @@ export const APP_VARIABLES = {
     'LEDGER_INTEGRITY_CRON',
     'LEDGER_INTEGRITY_CRON_TZ',
     ...FX_PROVIDERS,
+    'FX_PROVIDER_PARALELO_BO_URL',
+    'FX_PROVIDER_DOLARAPI_BO_URL',
     'HEALTH_CHECK_TIMEOUT_MS',
     'SHUTDOWN_TIMEOUT_MS',
   ],

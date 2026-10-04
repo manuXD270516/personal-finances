@@ -3,7 +3,13 @@
  * conversiones, tasas y clasificación. Montos y tasas: `DecimalString` (INV-001), nunca `number`.
  */
 import type { AuditLogEntry } from '../AuditHistory';
-import type { AccountType, Money, RateAttribution, ResolvedRate } from '../dashboard/types';
+import type {
+  AccountType,
+  FxRateType as DashboardFxRateType,
+  Money,
+  RateAttribution,
+  ResolvedRate,
+} from '../dashboard/types';
 
 export type { AccountType, Money } from '../dashboard/types';
 export type { AuditLogEntry } from '../AuditHistory';
@@ -274,8 +280,31 @@ export interface CurrencyInfo {
   readonly enabled: boolean;
 }
 
-export type FxRateType = 'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM';
-export const FX_RATE_TYPES: readonly FxRateType[] = ['OFFICIAL', 'PARALLEL', 'P2P', 'BANK', 'CUSTOM'];
+export type FxRateType = DashboardFxRateType;
+/**
+ * Tipos aceptados en las solicitudes (`FxRateTypeInput`). `PARALLEL_BUY`/`PARALLEL_SELL` se muestran como "Compra"
+ * y "Venta" desde el lado del owner (docs/31 D39): compra = BOB que pagas al comprar 1 USD; venta = BOB que recibes.
+ */
+export const FX_RATE_TYPES: readonly FxRateType[] = [
+  'OFFICIAL',
+  'PARALLEL',
+  'PARALLEL_BUY',
+  'PARALLEL_SELL',
+  'P2P',
+  'BANK',
+  'CUSTOM',
+];
+
+export interface FxRateAnomaly {
+  readonly baselineRateId: string;
+  /** Porcentaje (`12.3128`), DecimalString. */
+  readonly variationPct: string;
+  readonly thresholdPct: string;
+  readonly status: 'PENDING' | 'CONFIRMED' | 'REJECTED';
+  readonly reviewedBy?: string | null;
+  readonly reviewedAt?: string | null;
+  readonly reason?: string | null;
+}
 
 export interface FxRate {
   readonly id: string;
@@ -292,7 +321,9 @@ export interface FxRate {
   readonly supersedeReason?: string | null;
   readonly createdAt: string;
   readonly provider?: string | null;
+  readonly fetchedAt?: string | null;
   readonly attribution?: RateAttribution | null;
+  readonly anomaly?: FxRateAnomaly | null;
 }
 
 export interface FxRatePreference {

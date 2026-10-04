@@ -30,6 +30,9 @@ const PORT_PREFIX = /^[35]$/.test(process.env['PF_E2E_PORT_PREFIX'] ?? '')
   ? process.env['PF_E2E_PORT_PREFIX']!
   : '4';
 
+/** Puerto del servidor de providers simulados en el host (`<prefijo>9090`; `PF_E2E_FX_SIM_PORT` lo cambia). */
+export const FX_SIM_PORT = Number.parseInt(process.env['PF_E2E_FX_SIM_PORT'] ?? `${PORT_PREFIX}9090`, 10);
+
 /** Variables que comparten global setup y workers (Playwright hereda `process.env` del proceso principal). */
 export const ENV_FILE_VAR = 'PF_E2E_ENV_FILE';
 
@@ -43,13 +46,23 @@ export function createEnvFile(): string {
       ports.set(line.key, `${PORT_PREFIX}${line.value!.slice(1)}`);
   }
   // CI reutiliza las imágenes del job `image` (FINANCE_*_IMAGE en el entorno del proceso).
-  // Sin red en E2E: providers de tasas de mercado deshabilitados (add-market-rate-providers).
+  // Sin red en E2E: los providers de tasas de mercado apuntan a providers SIMULADOS por el harness
+  // (`src/fx-sim.ts`, servidor HTTP local en el host; add-market-rate-providers 7.2), nunca a la red real. El cron
+  // de consulta corre cada 24 h: las pruebas disparan cada ciclo (`triggerPoll`) para controlar el escenario.
+  const simUrl = `http://host.docker.internal:${FX_SIM_PORT}`;
   const e2eOverrides = new Map([
-    ['FX_PROVIDER_PRIMARY', 'none'],
-    ['FX_PROVIDER_FALLBACK', 'none'],
-    ['FX_PROVIDER_OFFICIAL', 'none'],
+    ['FX_PROVIDER_PRIMARY', 'paralelo_bo'],
+    ['FX_PROVIDER_FALLBACK', 'dolarapi_bo'],
+    ['FX_PROVIDER_OFFICIAL', 'dolarapi_bo'],
+    ['FX_POLL_INTERVAL', '24h'],
+    ['FX_BACKFILL_ENABLED', 'true'],
   ]);
-  writeFileSync(file, renderEnv(example, e2eOverrides, ports).text);
+  const extra = new Map([
+    ['FX_PROVIDER_PARALELO_BO_URL', simUrl],
+    ['FX_PROVIDER_DOLARAPI_BO_URL', simUrl],
+  ]);
+  // Las claves que no están en `.env.example` (URL de los simulados) se agregan al final del `.env` desechable.
+  writeFileSync(file, renderEnv(example, new Map([...e2eOverrides, ...extra]), ports).text);
   return file;
 }
 

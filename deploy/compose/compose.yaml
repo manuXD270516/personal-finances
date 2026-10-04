@@ -261,6 +261,10 @@ services:
       WORKER_DATABASE_URL: *worker-db
       WORKER_HEALTH_PORT: '8082' # solo red interna, no se publica
       WORKER_HEALTH_BIND_ADDRESS: 0.0.0.0
+    # E2E (solo local/ci): `FX_PROVIDER_*_URL` apunta a providers simulados por el harness en el host; en Linux
+    # `host.docker.internal` no existe por defecto (Docker Desktop ya lo resuelve).
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     depends_on: *app-depends
     healthcheck:
       test: ['CMD', 'node', '/usr/local/lib/pfos/healthcheck.mjs', 'http://127.0.0.1:8082/health/ready']

@@ -123,6 +123,27 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(err.problems.map((p) => p.variable)).toEqual(['OBJECT_STORAGE_ENSURE_BUCKET']);
   });
 
+  it('acepta URL alternativas de los providers de tasas (providers simulados) solo en local/ci y solo en el worker', () => {
+    const { DATABASE_URL: _app, ...storage } = API_ENV;
+    const env = {
+      ...storage,
+      WORKER_DATABASE_URL: 'postgres://pf_worker:s3cr3t-wk@db.internal:5432/pfos',
+      FX_PROVIDER_PARALELO_BO_URL: 'http://host.docker.internal:39090',
+      FX_PROVIDER_DOLARAPI_BO_URL: 'http://host.docker.internal:39090',
+    };
+    const config = loadConfig('worker', env);
+    expect(config.FX_PROVIDER_PARALELO_BO_URL).toBe('http://host.docker.internal:39090');
+    expect(Object.keys(loadConfig('api', API_ENV))).not.toContain('FX_PROVIDER_PARALELO_BO_URL');
+    const cloud = captureError(() => loadConfig('worker', { ...env, PFOS_ENV: 'production' }));
+    expect(cloud.problems.map((p) => p.variable)).toEqual(
+      expect.arrayContaining(['FX_PROVIDER_PARALELO_BO_URL', 'FX_PROVIDER_DOLARAPI_BO_URL']),
+    );
+    const path = captureError(() =>
+      loadConfig('worker', { ...env, FX_PROVIDER_PARALELO_BO_URL: 'http://sim:1/api' }),
+    );
+    expect(path.problems.map((p) => p.variable)).toEqual(['FX_PROVIDER_PARALELO_BO_URL']);
+  });
+
   it('valida la lista de orígenes CORS del bucket', () => {
     const env = { ...API_ENV, DATABASE_MIGRATOR_URL: 'postgres://pf_migrator:x@db.internal:5432/pfos' };
     expect(

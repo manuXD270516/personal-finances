@@ -48,7 +48,8 @@
     "create": "Crear espacio",
     "creating": "Creando…",
     "created": "Espacio de trabajo creado: {name}.",
-    "readOnly": "Solo el propietario puede modificar esta configuración."
+    "readOnly": "Solo el propietario puede modificar esta configuración.",
+    "seedCatalog": "Cargar el catálogo sugerido de categorías (puedes editarlo después)"
   },
   "Preferences": {
     "title": "Mis preferencias",
@@ -177,7 +178,9 @@
       "sourceLabel": "Fuente: {label}",
       "fallback": "respaldo",
       "asOf": "vigencia: {date}",
-      "stale": "obsoleta"
+      "stale": "obsoleta",
+      "lastKnown": "última conocida",
+      "requested": "tipo pedido: {type}"
     },
     "age": {
       "now": "hace menos de 1 min",
@@ -719,7 +722,9 @@
       "PARALLEL": "Paralelo",
       "P2P": "P2P",
       "BANK": "Bancaria",
-      "CUSTOM": "Personalizada"
+      "CUSTOM": "Personalizada",
+      "PARALLEL_BUY": "Compra",
+      "PARALLEL_SELL": "Venta"
     },
     "detail": {
       "title": "Detalle de la conversión (revisión {revision})",
@@ -787,7 +792,7 @@
       "reasonMin": "El motivo debe tener al menos 3 caracteres."
     },
     "rates": {
-      "title": "Cripto y FX: tasas",
+      "title": "Tasas de cambio",
       "actions": "Acciones de FX",
       "newConversion": "Nueva conversión",
       "conversions": "Ver conversiones",
@@ -819,6 +824,99 @@
       "newValue": "Valor corregido",
       "correctReason": "Motivo de la corrección",
       "saveCorrection": "Guardar corrección"
+    },
+    "screen": {
+      "title": "Cripto y FX",
+      "tabs": "Secciones de FX",
+      "rates": "Tasas",
+      "providers": "Proveedores"
+    },
+    "providers": {
+      "title": "Proveedores de tasas de mercado",
+      "intro": "El sistema consulta paralelo.bo (principal) y bo.dolarapi.com (respaldo y oficial) en segundo plano, sin enviar datos tuyos. Si fallan, se usa la última tasa conocida marcada como obsoleta o tus tasas manuales.",
+      "loading": "Cargando el estado de los proveedores…",
+      "never": "nunca",
+      "health": {
+        "HEALTHY": "Saludable",
+        "DEGRADED": "Degradado",
+        "DOWN": "Caído",
+        "DISABLED": "Deshabilitado"
+      },
+      "lastAttempt": "Último intento",
+      "lastSuccess": "Último éxito",
+      "failures": "Fallas seguidas",
+      "lastError": "Último error",
+      "nextAttempt": "Próximo intento",
+      "retryAfter": "En espera por límite de uso hasta",
+      "disabled": "Deshabilitado por configuración: no se consulta y el resto del sistema sigue con tasas manuales.",
+      "errors": {
+        "PROVIDER_UNAVAILABLE": "No disponible",
+        "PROVIDER_TIMEOUT": "Tiempo de espera agotado",
+        "PROVIDER_RATE_LIMITED": "Límite de uso alcanzado",
+        "PROVIDER_PAYLOAD_INVALID": "Respuesta inválida",
+        "PROVIDER_SCHEMA_CHANGED": "Cambió el formato de la respuesta",
+        "FX_PROVIDER_CONFIG_INVALID": "Configuración inválida"
+      },
+      "feeds": "Tasas que publica",
+      "feed": "Par y tipo",
+      "role": "Rol",
+      "lastRate": "Última tasa",
+      "age": "Antigüedad",
+      "roles": {
+        "PRIMARY": "Principal",
+        "FALLBACK": "Respaldo"
+      },
+      "noRate": "sin tasa",
+      "stale": "obsoleta",
+      "quoteSidesHint": "Compra: lo que pagas al comprar 1 {base}. Venta: lo que recibes al venderlo. Solo se usan si las pides.",
+      "backfill": {
+        "title": "Carga histórica",
+        "status": {
+          "PENDING": "pendiente",
+          "RUNNING": "en curso",
+          "COMPLETED": "completada",
+          "FAILED": "fallida",
+          "NOT_APPLICABLE": "no aplica"
+        },
+        "points": "{n} puntos",
+        "range": "del {from} al {to}",
+        "lastRun": "última ejecución {date}"
+      },
+      "selection": {
+        "PRIMARY": "principal",
+        "FALLBACK": "respaldo",
+        "LAST_KNOWN_STALE": "última conocida, obsoleta",
+        "MANUAL": "manual"
+      },
+      "valuation": {
+        "title": "Tasa de valoración vigente",
+        "hint": "La que se usa para valorar saldos y como referencia de conversiones: principal → respaldo → última conocida (obsoleta) o manual.",
+        "none": "sin tasa disponible (registra una manual)"
+      },
+      "anomalies": {
+        "title": "Anomalías pendientes de revisión ({n})",
+        "hint": "Muestras que variaron más que el umbral respecto de la anterior: no se usan hasta que las confirmes. Rechazada, no se usa nunca.",
+        "readOnly": "Solo lectura: un editor o propietario del espacio puede confirmarlas o rechazarlas.",
+        "empty": "No hay anomalías pendientes.",
+        "variation": "variación {pct} % (umbral {threshold} %)",
+        "reviewLabel": "Revisar la anomalía {rate}",
+        "reasonLabel": "Motivo",
+        "confirm": "Confirmar",
+        "reject": "Rechazar",
+        "confirmed": "Anomalía confirmada: {rate} ya se usa para valorar.",
+        "rejected": "Anomalía rechazada: {rate} no se usará.",
+        "reviewed": "Revisadas recientemente",
+        "reason": "motivo: {reason}",
+        "status": {
+          "PENDING": "anomalía pendiente",
+          "CONFIRMED": "anomalía confirmada",
+          "REJECTED": "anomalía rechazada"
+        },
+        "errors": {
+          "REASON_MIN": "El motivo debe tener al menos 3 caracteres.",
+          "REASON_MAX": "El motivo admite hasta 500 caracteres."
+        }
+      }
     }
   },
   "Classification": {
@@ -862,7 +960,89 @@
     "archived": "«{name}» archivada.",
     "unarchived": "«{name}» desarchivada.",
     "categoryCreated": "Categoría «{name}» creada.",
-    "system": "de sistema (protegida)"
+    "system": "de sistema (protegida)",
+    "sections": "Secciones de clasificación",
+    "catalogHint": "El catálogo sugerido agrega grupos y categorías comunes en Bolivia; solo crea lo que falta (por nombre) y puedes editarlas o archivarlas después.",
+    "newGroup": "Nuevo grupo",
+    "groupCreated": "Grupo «{name}» creado.",
+    "kind": "Tipo",
+    "reorderHint": "Para reordenar, usa los botones ↑ y ↓ de cada categoría (teclado) o arrástrala sobre otra del mismo nivel.",
+    "emptyGroup": "Sin categorías.",
+    "reordered": "Orden guardado: «{name}» movida.",
+    "categoryUpdated": "Categoría «{name}» actualizada.",
+    "moveUp": "Subir «{name}»",
+    "moveDown": "Bajar «{name}»",
+    "edit": "Editar",
+    "editNamed": "Editar «{name}»",
+    "archiveNamed": "Archivar «{name}»",
+    "unarchiveNamed": "Desarchivar «{name}»",
+    "systemNameHint": "Las categorías de sistema no se renombran; puedes cambiar su icono, color y orden.",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "icon": "Icono",
+    "noIcon": "Sin icono",
+    "color": "Color",
+    "noColor": "Sin color",
+    "tagUpdated": "Etiqueta «{name}» actualizada.",
+    "emptyTags": "Todavía no hay etiquetas.",
+    "emptyCounterparties": "Todavía no hay contrapartes.",
+    "unknownCategory": "categoría no disponible",
+    "defaultCategory": "Categoría por defecto",
+    "defaultCategoryHint": "Se sugiere al registrar un movimiento con esta contraparte.",
+    "noDefaultCategory": "Ninguna",
+    "aliases": "Alias",
+    "aliasesHint": "Textos con que aparece en descripciones bancarias, separados por comas (mínimo 3 caracteres cada uno).",
+    "aliasesList": "Alias: {aliases}",
+    "defaultCategoryIs": "Categoría por defecto: {name}",
+    "counterpartyUpdated": "Contraparte «{name}» actualizada.",
+    "errors": {
+      "ALIAS_MIN": "Cada alias debe tener entre 3 y 120 caracteres.",
+      "ALIAS_MAX_COUNT": "Se admiten hasta 20 alias."
+    },
+    "icons": {
+      "baby": "Bebé",
+      "bike": "Bicicleta",
+      "bolt": "Electricidad",
+      "book": "Libro",
+      "briefcase": "Maletín",
+      "building": "Edificio",
+      "bus": "Bus",
+      "car": "Auto",
+      "cart": "Carrito",
+      "clock": "Reloj",
+      "coffee": "Café",
+      "dots": "Otros",
+      "dumbbell": "Gimnasio",
+      "fuel": "Combustible",
+      "gift": "Regalo",
+      "glass": "Copa",
+      "graduation": "Graduación",
+      "heart": "Corazón",
+      "home": "Casa",
+      "key": "Llave",
+      "laptop": "Computadora",
+      "paw": "Mascota",
+      "pencil": "Lápiz",
+      "pie": "Postre",
+      "pill": "Medicamento",
+      "plane": "Avión",
+      "play": "Entretenimiento",
+      "school": "Escuela",
+      "shield": "Seguro",
+      "shirt": "Ropa",
+      "sofa": "Hogar y muebles",
+      "sparkles": "Cuidado personal",
+      "stethoscope": "Médico",
+      "tag": "Etiqueta",
+      "taxi": "Taxi",
+      "ticket": "Entrada",
+      "tooth": "Dentista",
+      "trending-up": "Inversión",
+      "undo": "Reembolso",
+      "users": "Personas",
+      "utensils": "Comida",
+      "wrench": "Mantenimiento"
+    }
   },
   "Lifecycle": {
     "tabs": {

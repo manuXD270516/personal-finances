@@ -18,6 +18,8 @@ automated_tests:
   - packages/contexts/fx/src/application/market-rate-providers.test.ts
   - packages/contexts/fx/src/domain/valuation-rate-selector.test.ts
   - packages/contexts/fx/test/integration/providers.int.test.ts
+  - apps/web/src/ui/fx/providers.test.tsx
+  - tests/e2e/specs/fx-providers.spec.ts
 status: automated
 regression_suite: true
 phase: 1
@@ -40,7 +42,7 @@ expected_result:
   - "Sin preferencia o con preferencia PARALLEL: 1202.00 BOB con la mediana; con preferencia PARALLEL_SELL: 1192.00 BOB, selection PRIMARY"
   - "El CHECK de tipo de tasa (fx.exchange_rate, fx.rate_preference, txn.conversion_detail) admite PARALLEL_BUY y PARALLEL_SELL"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-FX-PROVIDER-016 — Compra y venta publicadas se registran como PARALLEL_BUY y PARALLEL_SELL sin cambiar la valoración por defecto

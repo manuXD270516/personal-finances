@@ -14,5 +14,8 @@ export default function Page({
   const q = use(searchParams);
   const base = one(q['base']);
   const quote = one(q['quote']);
-  return <FxRatesPage {...(base ? { base } : {})} {...(quote ? { quote } : {})} />;
+  const view = one(q['vista']);
+  return (
+    <FxRatesPage {...(base ? { base } : {})} {...(quote ? { quote } : {})} {...(view ? { view } : {})} />
+  );
 }
