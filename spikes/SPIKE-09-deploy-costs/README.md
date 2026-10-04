@@ -1,6 +1,6 @@
 # SPIKE-09 — Opciones de despliegue cloud de bajo costo
 
-> Investigación **documental** con mediciones locales; **sin código productivo** y sin cuenta cloud. Evidencia para [ADR-0013](../../docs/adr/0013-cloud-deployment-strategy.md) y para la propuesta [ADR-0027](../../docs/adr/0027-destino-de-despliegue-inicial-vps-compose.md). Ejecutado el **2026-10-03** desde la máquina del owner (Windows 11, zona horaria `SA Western Standard Time` = Bolivia, UTC−4). Precios consultados el **2026-10-03** en las fuentes de §15; todo lo marcado **(est.)** es una estimación propia.
+> Investigación **documental** con mediciones locales; **sin código productivo** y sin cuenta cloud. Evidencia para [ADR-0013](../../docs/adr/0013-cloud-deployment-strategy.md) y para la propuesta [ADR-0027](../../docs/adr/0027-destino-de-despliegue-inicial-vps-compose.md). **Anexo A (2026-10-04, D42): [PaaS — Vercel, Railway, Fly.io, Render, …](anexo-a-paas.md).** Ejecutado el **2026-10-03** desde la máquina del owner (Windows 11, zona horaria `SA Western Standard Time` = Bolivia, UTC−4). Precios consultados el **2026-10-03** en las fuentes de §15; todo lo marcado **(est.)** es una estimación propia.
 
 ## 1. Pregunta
 
@@ -81,6 +81,8 @@ Se reutilizan las mismas imágenes de GHCR por digest y el mismo contrato de con
 - **Encaje container-first + contrato único:** **máximo** — es el modo B de [docs/19](../../docs/19-local-development.md) con otro override; `verify-by-digest` de `main.yml` ya prueba exactamente ese stack.
 
 ### 5.2 (b) PaaS: Fly.io, Railway, Render
+
+> Ampliado y re-verificado el 2026-10-04 en el [Anexo A](anexo-a-paas.md) (Fly MPG solo PG 16/17 y sin `CREATEROLE`; Railway con PG 18 en contenedor y sin región SA; Vercel para `web`). Las cifras de esta sección son las del 2026-10-03.
 
 | PaaS | Estimación PFOS (web, api, worker 512 MB + Keycloak 1 GB + PG) | Región cercana | PITR / PG 18 | Comentario |
 |---|---|---|---|---|
@@ -289,4 +291,5 @@ Invariante que habilita todo: **contratos estándar** (Postgres wire, API S3, OI
 - **ADR-0010:** el IdP cloud queda en Keycloak propio para N1–N3.
 - **ADR-0014:** sin cambio; se suman providers `aws` (Lightsail), `hcloud`, `b2`, `cloudflare`, `grafana`.
 - **ARCHITECTURE §15**, **DESIGN-GATE Q3** y área 14, **docs/21** (nota de vigencia), `spikes/README.md`: actualizados en este cambio.
+- **Anexo A (2026-10-04):** ninguna PaaS supera a N2/N1 con todas las restricciones; Railway (≈ USD 25–30, `us-east4`) y Fly.io `gru` con PG 18 propio (≈ USD 38–48) quedan como variantes P1/P2 en ADR-0027.
 - Futuro change OpenSpec (`platform/delivery-pipeline`): `compose.prod.yaml`, módulo OpenTofu del host, job de deploy, pgBackRest y drill.

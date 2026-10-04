@@ -11,7 +11,8 @@
 - [ ] 1.3 Decisiones del owner 2026-10-03 (docs/31 D34, D35): spec ampliada (scenarios "Cuenta cerrada incluida y archivada excluida", "Tasa manual de otro tipo no fresca descartada" y "Tasa manual de otro tipo con desvío excesivo descartada") y TC-REPORTING-DASHBOARD-008/-009 redactados (draft)
   - [ ] 1.3.1 Verificar (test de API) que el resumen lista cuentas `CLOSED` no archivadas (TC-REPORTING-DASHBOARD-008); la regla ya está implementada (decisión 12), falta el test con el TC-id
   - [ ] 1.3.2 Cuando FX implemente D34 en `ValuationRateSelector` (coordinado con `add-market-rate-providers`; este change no toca `packages/contexts/fx`), automatizar TC-REPORTING-DASHBOARD-009 y re-automatizar la variante manual de TC-REPORTING-DASHBOARD-007 con `P2P`
-  - [ ] 1.3.3 Confirmar con el owner el máximo de frescura de manuales en el último recurso (propuesta 24 h, `FX_MANUAL_FALLBACK_MAX_AGE`)
+  - [x] 1.3.3 Confirmar con el owner el máximo de frescura de manuales en el último recurso (propuesta 24 h, `FX_MANUAL_FALLBACK_MAX_AGE`)
+    - Nota (2026-10-04): confirmado 24 h por el owner (docs/31 D38); es el default vigente, sin cambios de código.
 
 ## 2. DOMAIN (TDD, lógica financiera crítica)
 

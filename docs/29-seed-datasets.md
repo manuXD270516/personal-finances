@@ -190,7 +190,7 @@ scripts/seed/            # CLI TS: parse args, PRNG, clock, runner, verificació
 ## 7. Preguntas abiertas
 
 1. ¿Los snapshots de Large se guardan como artefacto de CI, en un bucket S3 de dev, o en GitHub Releases? (Tamaño estimado: cientos de MB).
-2. ¿El seed `demo` debe poder cargarse en **staging** para demos externas? Requiere decisión de seguridad. — Parcialmente resuelta por D36: la carga es una acción de la app en un workspace demo aislado y purgable; queda para el owner si `DEMO_DATA_ENABLED` se habilita en staging/producción (default propuesto: deshabilitado).
+2. ¿El seed `demo` debe poder cargarse en **staging** para demos externas? Requiere decisión de seguridad. — Parcialmente resuelta por D36: la carga es una acción de la app en un workspace demo aislado y purgable; queda para el owner si `DEMO_DATA_ENABLED` se habilita en staging/producción (default propuesto: deshabilitado). **Resuelta por el owner el 2026-10-04 (docs/31 D41):** deshabilitado por defecto en `staging`/`production`; ventana del dataset de 21 meses.
 3. ¿Montos del Demo Seed (salario 12 000 BOB, alquiler 3 500 BOB) representativos para el owner, o se prefiere escalarlos?
 4. ¿Las credenciales de los usuarios de prueba viven solo en el realm import de Keycloak dev ([19-local-development.md](./19-local-development.md)) o también en `.env.example`?
 5. ¿Generación del Large seed vía application services es suficientemente rápida? Si no, evaluar un "bulk use case" de dominio (sigue validando invariantes) en lugar de SQL directo.

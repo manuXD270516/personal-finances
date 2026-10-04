@@ -1,10 +1,11 @@
 # Tareas
 
-> Requiere aplicados: `add-event-outbox`, `add-workspace-identity`, `add-audit-trail`, `add-ledger-core`, `add-classification`, `add-accounts-management`, `add-transaction-recording`, `add-transfers`, `add-manual-conversions`, `add-market-rate-providers`, `add-basic-dashboard`; recomendado `add-lifecycle-timeline`. Decisión del owner docs/31 D36; ADR-0026 (Propuesto).
+> Requiere aplicados: `add-event-outbox`, `add-workspace-identity`, `add-audit-trail`, `add-ledger-core`, `add-classification`, `add-accounts-management`, `add-transaction-recording`, `add-transfers`, `add-manual-conversions`, `add-market-rate-providers`, `add-basic-dashboard`; recomendado `add-lifecycle-timeline`. Decisiones del owner docs/31 D36 y D41; ADR-0026 (Aceptado 2026-10-04).
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner la spec `identity/demo-data` y las preguntas abiertas de design.md (habilitación en staging/producción, ventana del dataset, aceptación de ADR-0026); verificar con `openspec validate add-demo-data --strict`
+- [x] 1.1 Revisar con el owner la spec `identity/demo-data` y las preguntas abiertas de design.md (habilitación en staging/producción, ventana del dataset, aceptación de ADR-0026); verificar con `openspec validate add-demo-data --strict`
+  - Nota (2026-10-04): resueltas por el owner en docs/31 D41 — `DEMO_DATA_ENABLED` deshabilitado por defecto en `staging`/`production`, ventana de 21 meses (recorte a 6 si la carga supera 2 min), ADR-0026 Aceptado. La revisión de seguridad del amend a `forbid_mutation()` sigue como gate de implementación.
 - [ ] 1.2 Revisar TC-IDENTITY-DEMO-001..014 contra los scenarios (fechas fijas, `FixedClock`); verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC
 
 ## 2. DOMAIN (TDD)
@@ -42,5 +43,5 @@
 
 ## 8. DOCUMENTACIÓN y cierre
 
-- [ ] 8.1 Actualizar docs/29 (perfil demo vía app), docs/08 (columnas y tablas nuevas), docs/10 §9.1 (códigos), docs/12 (función de purga y amend de `forbid_mutation`), docs/11 (eventos), docs/26 (nuevo RISK de purga física) y docs/19 (guion de demo); proponer la aceptación de ADR-0026 tras la revisión de seguridad
+- [ ] 8.1 Actualizar docs/29 (perfil demo vía app), docs/08 (columnas y tablas nuevas), docs/10 §9.1 (códigos), docs/12 (función de purga y amend de `forbid_mutation`), docs/11 (eventos), docs/26 (nuevo RISK de purga física) y docs/19 (guion de demo); registrar en ADR-0026 (Aceptado 2026-10-04, docs/31 D41) el resultado de la revisión de seguridad
 - [ ] 8.2 Actualizar estados de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict` y `pnpm traceability:check`

@@ -1,9 +1,9 @@
 # ADR-0026: Datos de demostración en un workspace dedicado, cargado por acción explícita y purgable
 
-- Estado: Propuesto (2026-10-03, decisión del owner D36; pendiente de aceptación del diseño de purga)
+- Estado: Aceptado (2026-10-04, decisión del owner D41; propuesto el 2026-10-03, D36)
 - Fecha: 2026-10-03
 - Decisores: Owner (Product/Tech Lead)
-- Relacionado: docs/31-phase-1-consolidation-decisions.md (D7, D36); docs/29-seed-datasets.md; docs/09-ledger-design.md (INV-007, INV-019, INV-029); docs/12-security.md (roles `pf_migrator`, `pf_app`, `pf_worker`); ADR-0004, ADR-0008, ADR-0023; OpenSpec change `add-demo-data` (capability `identity/demo-data`)
+- Relacionado: docs/31-phase-1-consolidation-decisions.md (D7, D36, D41); docs/29-seed-datasets.md; docs/09-ledger-design.md (INV-007, INV-019, INV-029); docs/12-security.md (roles `pf_migrator`, `pf_app`, `pf_worker`); ADR-0004, ADR-0008, ADR-0023; OpenSpec change `add-demo-data` (capability `identity/demo-data`)
 
 ## Contexto y problema
 
@@ -56,9 +56,10 @@ Se elige la **opción 1**:
 
 - Tests de integración: tras la purga no queda ninguna fila con ese `workspace_id` en ninguna tabla registrada; un workspace real no puede purgarse (ni con la GUC fijada por `pf_app`); `UPDATE is_demo` falla.
 - `pnpm traceability:check` cubre los TC de `identity/demo-data`.
-- Revisión de seguridad del amend a `platform.forbid_mutation()` antes de aceptar este ADR.
+- Revisión de seguridad del amend a `platform.forbid_mutation()` como gate de implementación de `add-demo-data` (TC-IDENTITY-DEMO-005/-006); el owner aceptó el ADR el 2026-10-04 (docs/31 D41) y, si la revisión encontrara un problema, rige el modo degradado (opción 3) hasta corregirlo.
 
 ## Notas
 
 - El seed `pnpm db:seed -- --profile=demo` (solo local/CI, docs/29) reutiliza el mismo cargador y crea el mismo tipo de workspace demo; nunca escribe datos financieros en W1/W2 de la Minimal Seed.
+- Decisiones del owner 2026-10-04 (docs/31 D41): `DEMO_DATA_ENABLED` deshabilitado por defecto en `staging`/`production`; ventana del dataset de 21 meses (recorte a 6 meses si la carga desde la UI supera 2 min).
 - Si en el futuro se implementa FR-IDENTITY-012 (borrado definitivo de workspace real con periodo de gracia), deberá tener su propio ADR: este no lo habilita.
