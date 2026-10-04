@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
@@ -65,18 +65,29 @@ function Register({
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [status, setStatus] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  // Consulta (sin cursor) cuyos resultados se muestran; difiere de `query` mientras la recarga está en curso.
+  const [shownQuery, setShownQuery] = useState<string | undefined>();
+  // Solo la última petición escribe la lista: una respuesta tardía de filtros anteriores se descarta.
+  const latest = useRef(0);
+  const query = transactionsQuery(filters).toString();
 
   const load = useCallback(
     (append?: string | null) => {
+      const seq = (latest.current += 1);
+      const shown = transactionsQuery(filters).toString();
       ctx.api
         .get<Page<Transaction>>(`${ctx.base}/transactions?${transactionsQuery(filters, append).toString()}`)
         .then((r) => {
+          if (seq !== latest.current) return;
           const data = r.data?.data ?? [];
           setItems((prev) => (append ? [...(prev ?? []), ...data] : data));
           setCursor(r.data?.page.hasMore ? r.data.page.nextCursor : null);
+          setShownQuery(shown);
           setProblem(undefined);
         })
-        .catch((err: unknown) => setProblem(problemOf(err)));
+        .catch((err: unknown) => {
+          if (seq === latest.current) setProblem(problemOf(err));
+        });
     },
     [ctx.api, ctx.base, filters],
   );
@@ -117,7 +128,13 @@ function Register({
   const setFilter = (patch: Partial<TransactionFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
 
   return (
-    <section aria-labelledby="transactions-title" style={pageStyle}>
+    <section
+      aria-labelledby="transactions-title"
+      style={pageStyle}
+      data-testid="transactions-register"
+      data-shown-query={shownQuery}
+      aria-busy={shownQuery !== query}
+    >
       <h1 id="transactions-title">{t('list.title')}</h1>
       {ctx.canEdit ? (
         <nav aria-label={t('list.newActions')} style={rowStyle}>

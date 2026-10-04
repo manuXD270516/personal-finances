@@ -259,6 +259,10 @@ test.describe('Transacciones: formulario, registro, detalle e historial (transac
     // Filtro por medio de pago QR: solo la compra y el cobro.
     await go(page, '/transacciones');
     await page.getByLabel('Medio de pago').selectOption('QR');
+    // La lista ya muestra el resultado de la consulta filtrada (no la carga inicial sin filtros).
+    const register = page.getByTestId('transactions-register');
+    await expect(register).toHaveAttribute('data-shown-query', /(^|&)paymentMethod=QR(&|$)/);
+    await expect(register).toHaveAttribute('aria-busy', 'false');
     const rows = page.getByTestId('transaction-row');
     await expect(rows).toHaveCount(2);
     await expect(rows.getByTestId('tx-payment-method')).toHaveText(['QR', 'QR']);
