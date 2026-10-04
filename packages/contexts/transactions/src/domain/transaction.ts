@@ -9,6 +9,11 @@ import {
   type ReferenceRateInfo,
 } from './conversion.js';
 import { assertTransition, hasActiveEntry, type TransactionStatus } from './transaction-status.js';
+import {
+  TRANSACTION_LIFECYCLE,
+  type TransactionTransition,
+  type TransactionTransitionRecord,
+} from './transaction-lifecycle.js';
 
 /** Kinds de este change (transfers/conversions/opening los agregan otros changes sobre el mismo agregado). */
 export const TRANSACTION_KINDS = [
@@ -523,10 +528,17 @@ export class Transaction {
   readonly persistedVersion: number | null;
   /** Splits reemplazados en esta unidad de trabajo (quedan con `superseded_in_revision`). */
   private replacedSplits = false;
+  /**
+   * Paso del flujo producido en esta unidad de trabajo (add-lifecycle-timeline decisión 2), validado contra
+   * `TRANSACTION_LIFECYCLE`; `null` si el comando no cambió el estado (edición descriptiva ⇒ anotación).
+   */
+  private transitionRecord: TransactionTransitionRecord | null = null;
 
   private constructor(state: TransactionState, persistedVersion: number | null) {
     this.state = state;
     this.persistedVersion = persistedVersion;
+    // Un agregado nuevo nace con la transición RECORD (∅ → PENDING | POSTED | CLEARED).
+    if (persistedVersion === null) this.mark('RECORD', null, state.status, null, state.revision);
   }
 
   static rehydrate(state: TransactionState): Transaction {
@@ -757,6 +769,7 @@ export class Transaction {
       version: s.version + 1,
     };
     this.replacedSplits = true;
+    if (ledgerImpact) this.mark('REVISE', previousStatus, this.state.status, s.revision, revision);
     const changed: ChangedField[] = ['amount', 'businessDate', 'accountId', 'splits'];
     if (this.state.status !== previousStatus) changed.push('status');
     return {
@@ -789,6 +802,10 @@ export class Transaction {
   get splitsReplaced(): boolean {
     return this.replacedSplits;
   }
+  /** Transición registrada por el último comando (o `null` si no cambió el estado). */
+  get lastTransition(): TransactionTransitionRecord | null {
+    return this.transitionRecord;
+  }
   /** ¿Necesita asiento (estado no PENDING ni VOIDED)? INV-023. */
   get needsEntry(): boolean {
     return hasActiveEntry(this.state.status);
@@ -806,6 +823,7 @@ export class Transaction {
   post(): void {
     assertTransition(this.state.status, 'POSTED');
     if (this.state.status !== 'PENDING') return;
+    this.mark('POST', 'PENDING', 'POSTED', null, null);
     this.bump({ status: 'POSTED' });
   }
 
@@ -817,6 +835,9 @@ export class Transaction {
       throw new DomainError('INVALID_STATUS_TRANSITION', 'use postTransaction to post a PENDING transaction');
     }
     assertTransition(from, to);
+    const code: TransactionTransition =
+      to === 'CLEARED' ? 'CLEAR' : to === 'RECONCILED' ? 'RECONCILE' : 'UNCLEAR';
+    this.mark(code, from, to, null, null);
     this.bump({ status: to });
     return from;
   }
@@ -829,6 +850,7 @@ export class Transaction {
       throw new DomainError('INVALID_STATUS_TRANSITION', 'only RECONCILED transactions can be un-reconciled');
     }
     assertTransition('RECONCILED', 'CLEARED', { unreconcile: true });
+    this.mark('UNRECONCILE', 'RECONCILED', 'CLEARED', null, null);
     this.bump({ status: 'CLEARED' });
   }
 
@@ -844,6 +866,7 @@ export class Transaction {
     assertText(reason, 500, '/reason');
     const previousStatus = this.state.status;
     assertTransition(previousStatus, 'VOIDED');
+    this.mark('VOID', previousStatus, 'VOIDED', null, null);
     const entryToReverse = this.state.activeEntryId;
     this.bump({ status: 'VOIDED', activeEntryId: null, voidedAt, voidReason: reason.trim() });
     return { previousStatus, entryToReverse };
@@ -1038,8 +1061,20 @@ export class Transaction {
     }
     if (splitsReplaced || (financial && ledgerImpact)) this.replacedSplits = true;
     this.state = { ...next, version: s.version + 1 };
+    if (ledgerImpact) this.mark('REVISE', previousStatus, this.state.status, s.revision, this.state.revision);
     if (this.state.status !== previousStatus) changed.push('status');
     return { changedFields: changed, ledgerImpact, classificationChanges, previousStatus, previousEntryId };
+  }
+
+  /** Valida el paso contra la máquina declarada y lo deja como `lastTransition` (una sola fuente de reglas). */
+  private mark(
+    code: TransactionTransition,
+    from: TransactionStatus | null,
+    to: TransactionStatus,
+    revisionFrom: number | null,
+    revisionTo: number | null,
+  ): void {
+    this.transitionRecord = { ...TRANSACTION_LIFECYCLE.transition(code, from, to), revisionFrom, revisionTo };
   }
 
   /** Mutación con `version + 1` (optimistic locking). */

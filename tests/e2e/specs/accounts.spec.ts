@@ -115,6 +115,7 @@ test.describe('Cuentas: listado, alta, edición, archivo y reactivación (accoun
     await page.getByRole('alertdialog').getByRole('button', { name: 'Sí, reactivar' }).click();
     await expect(page.getByRole('status')).toHaveText('Cuenta reactivada.');
     await expect(page.getByTestId('account-status')).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Historial de cambios' }).click();
     const history = page.getByTestId('audit-history');
     await expect(history.locator('li[data-action="accounts.account.archived"]')).toContainText(
       'Cuenta archivada',

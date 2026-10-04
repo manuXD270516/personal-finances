@@ -1,6 +1,11 @@
-import type { AuditEntry } from '@pf/audit/contracts';
+import type { AuditEntry, LifecycleStepInput } from '@pf/audit/contracts';
 import { DomainError, FixedClock, Instant, Money } from '@pf/shared-kernel';
-import { CurrencyDefinition, type CurrencyKind, type ExchangeRate } from '../../domain/index.js';
+import {
+  CurrencyDefinition,
+  EXCHANGE_RATE_LIFECYCLE,
+  type CurrencyKind,
+  type ExchangeRate,
+} from '../../domain/index.js';
 import type {
   ActiveWorkspacesPort,
   AnomalyReview,
@@ -55,6 +60,8 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
       payload: Record<string, unknown>;
     }[],
     audit: [] as AuditEntry[],
+    /** Pasos del recorrido (doble de `LifecyclePort`). */
+    lifecycle: [] as (LifecycleStepInput & { aggregateId: string; action: string })[],
     reviews: [] as AnomalyReview[],
     runs: [] as ProviderRun[],
     /** Workspaces activos (worker): id → zona horaria. */
@@ -68,6 +75,7 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     preferences: new Map(state.preferences),
     outbox: [...state.outbox],
     audit: [...state.audit],
+    lifecycle: [...state.lifecycle],
     reviews: [...state.reviews],
     runs: [...state.runs],
     workspaces: new Map(state.workspaces),
@@ -251,6 +259,70 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
           }
         }
         state.audit.push(entry);
+      },
+    },
+    lifecycle: {
+      async record(entry, steps) {
+        await deps.audit.append(entry);
+        for (const step of steps) {
+          state.lifecycle.push({
+            ...step,
+            aggregateId: step.aggregateId ?? entry.aggregateId,
+            action: entry.action,
+            ...(step.kind === 'TRANSITION' ? { reason: step.reason ?? entry.reason ?? null } : {}),
+          });
+        }
+      },
+    },
+    lifecycleQuery: {
+      machineOf: () => EXCHANGE_RATE_LIFECYCLE.definition,
+      async lifecycleOf(input) {
+        const own = state.lifecycle.filter((l) => l.aggregateId === input.aggregateId);
+        return {
+          aggregateType: input.aggregateType,
+          aggregateId: input.aggregateId,
+          currentState: input.currentState,
+          path: own.flatMap((l) => (l.kind === 'TRANSITION' ? [l.toState] : [])),
+          historyComplete: own.find((l) => l.kind === 'TRANSITION')?.fromState === null,
+          machine: EXCHANGE_RATE_LIFECYCLE.definition,
+          items: own.map((l, i) =>
+            l.kind === 'TRANSITION'
+              ? {
+                  sequence: i + 1,
+                  kind: 'TRANSITION' as const,
+                  transition: l.transition,
+                  fromState: l.fromState,
+                  toState: l.toState,
+                  machineVersion: l.machineVersion,
+                  occurredAt: clock.now().toString(),
+                  actor: { type: 'USER' as const, id: input.userId, displayName: null },
+                  origin: 'api' as const,
+                  reason: l.reason ?? null,
+                  revisionFrom: null,
+                  revisionTo: null,
+                  aggregateVersion: null,
+                  journalEntries: { reversed: null, reversal: null, posted: null },
+                  detailRefs: l.detailRefs ?? {},
+                  events: (l.events ?? []).map((e) => e.eventType),
+                  auditLogId: null,
+                  derived: false,
+                }
+              : {
+                  sequence: i + 1,
+                  kind: 'ANNOTATION' as const,
+                  occurredAt: clock.now().toString(),
+                  actor: { type: 'USER' as const, id: input.userId, displayName: null },
+                  origin: 'api' as const,
+                  changedFields: [...l.changedFields],
+                  revisionFrom: null,
+                  revisionTo: null,
+                  aggregateVersion: null,
+                  events: (l.events ?? []).map((e) => e.eventType),
+                  auditLogId: null,
+                  derived: false,
+                },
+          ),
+        };
       },
     },
     ids,

@@ -861,5 +861,83 @@
     "unarchived": "“{name}” desarquivada.",
     "categoryCreated": "Categoria “{name}” criada.",
     "system": "do sistema (protegida)"
+  },
+  "Lifecycle": {
+    "tabs": {
+      "label": "Seções do detalhe",
+      "detail": "Detalhe",
+      "lifecycle": "Percurso",
+      "history": "Histórico de alterações"
+    },
+    "title": "Percurso",
+    "subtitle": "O caminho deste item pela sua máquina de estados: cada transição, quem a fez e quando.",
+    "loading": "Carregando o percurso…",
+    "empty": "Ainda não há transições registradas.",
+    "incomplete": "Histórico anterior incompleto: parte do percurso foi reconstruída a partir da auditoria e não há evidência dos passos anteriores.",
+    "diagram": {
+      "label": "Diagrama de estados: estado atual {current}. Caminho: {path}.",
+      "noState": "sem estado",
+      "current": "(atual)",
+      "legend": "Destacado: estados e transições percorridos, numerados na ordem em que ocorreram (registrar é o ponto de entrada). Atenuado: não percorridos. A linha do tempo descreve o mesmo percurso."
+    },
+    "timeline": {
+      "title": "Linha do tempo",
+      "none": "—",
+      "derived": "derivada",
+      "derivedHint": "Reconstruída a partir da auditoria (anterior ao registro de transições).",
+      "annotation": "Alteração descritiva: {fields}",
+      "revision": "Revisão {revision}",
+      "revisionChange": "Revisão {from} → {to}",
+      "amountWithFee": "{amount} + tarifa {fee}",
+      "viewRevision": "ver revisão {revision}",
+      "reason": "Motivo: {reason}",
+      "journal": "ver lançamentos",
+      "journalEntries": {
+        "reversed": "Lançamento revertido: {id}",
+        "reversal": "Lançamento de estorno: {id}",
+        "posted": "Lançamento novo: {id}"
+      },
+      "events": "Eventos: {events}",
+      "actor": {
+        "you": "Você",
+        "named": "{id}",
+        "user": "Usuário …{id}",
+        "process": "Processo {id}"
+      }
+    },
+    "revisions": {
+      "title": "Revisões",
+      "item": "Revisão {revision}",
+      "conversion": "Converte {source} → {target} · taxa {rate}",
+      "fees": "tarifas: {fees}"
+    },
+    "legRoles": {
+      "MAIN": "principal",
+      "SOURCE": "origem",
+      "TARGET": "destino",
+      "FEE": "tarifa"
+    },
+    "transitions": {
+      "Transaction": {
+        "RECORD": "Registrar",
+        "POST": "Contabilizar",
+        "CLEAR": "Confirmar",
+        "UNCLEAR": "Remover confirmação",
+        "RECONCILE": "Conciliar",
+        "UNRECONCILE": "Desconciliar",
+        "REVISE": "Revisar",
+        "VOID": "Anular"
+      },
+      "Account": {
+        "OPEN": "Abrir",
+        "CLOSE": "Encerrar",
+        "ARCHIVE": "Arquivar",
+        "REACTIVATE": "Reativar"
+      },
+      "ExchangeRate": {
+        "RECORD": "Registrar",
+        "SUPERSEDE": "Substituir"
+      }
+    }
   }
 }

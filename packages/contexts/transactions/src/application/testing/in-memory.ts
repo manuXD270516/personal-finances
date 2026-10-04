@@ -1,9 +1,15 @@
-import type { AuditEntry, AuditLogEntryDto } from '@pf/audit/contracts';
+import type { AuditEntry, AuditLogEntryDto, LifecycleStepInput } from '@pf/audit/contracts';
 import type { PostingEligibilityDto } from '@pf/accounts/contracts';
 import type { CurrencyInfoDto, ReferenceRateDto } from '@pf/fx/contracts';
 import type { PostJournalEntryCommand, ReverseJournalEntryCommand } from '@pf/ledger/contracts';
 import { currency, DomainError, FixedClock, Instant, Money, Rate } from '@pf/shared-kernel';
-import { Transaction, type ConversionDetail, type TransactionState } from '../../domain/index.js';
+import {
+  TRANSACTION_LIFECYCLE,
+  Transaction,
+  type ConversionDetail,
+  type LegRole,
+  type TransactionState,
+} from '../../domain/index.js';
 import type { TransactionsDeps } from '../ports/index.js';
 
 /** Igual que `AuditPort` real: solo valores planos (string/boolean/entero/null) o `Money` (`AUDIT_INVALID_VALUE`). */
@@ -59,6 +65,15 @@ interface Entry {
   readonly postings: readonly { readonly key: string; readonly amount: string; readonly currency: string }[];
 }
 
+/** Fila del recorrido registrada por el doble de `LifecyclePort`. */
+export type LifecycleRow = LifecycleStepInput & {
+  readonly aggregateType: string;
+  readonly aggregateId: string;
+  readonly sequence: number;
+  readonly action: string;
+  readonly reason: string | null;
+};
+
 /**
  * Dobles en memoria para los tests de aplicación. La unidad de trabajo toma una copia de TODO el estado y la restaura
  * si el callback falla: emula el rollback de la transacción PG (TC-TRANSACTIONS-POSTING-001).
@@ -72,11 +87,13 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     entries: [] as Entry[],
     outbox: [] as { eventType: string; aggregateId: string; payload: Record<string, unknown> }[],
     audit: [] as AuditEntry[],
+    lifecycle: [] as LifecycleRow[],
+    legHistory: new Map<string, Map<number, { accountId: string; role: LegRole; amount: Money }[]>>(),
     accounts: new Map((options.accounts ?? []).map((a) => [a.accountId, a])),
     details: new Map<string, { detail: ConversionDetail; createdAt: string }[]>(),
     rates: [] as FakeRate[],
   };
-  const faults: { ledger?: Error; audit?: Error } = {};
+  const faults: { ledger?: Error; audit?: Error; lifecycle?: Error } = {};
   let depth = 0;
 
   const snapshot = () => ({
@@ -85,6 +102,8 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     entries: [...state.entries],
     outbox: [...state.outbox],
     audit: [...state.audit],
+    lifecycle: [...state.lifecycle],
+    legHistory: new Map([...state.legHistory].map(([k, v]) => [k, new Map(v)])),
     details: new Map([...state.details].map(([k, v]) => [k, [...v]])),
     rates: [...state.rates],
   });
@@ -95,6 +114,15 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       list.push({ detail: s.conversion, createdAt: '2026-10-01T12:00:00.000Z' });
       state.details.set(s.id, list);
     }
+  };
+  /** Legs por revisión (la revisión vigente se reescribe in situ al editar un PENDING, como `txn.transaction_leg`). */
+  const keepLegs = (s: TransactionState) => {
+    const byRevision = state.legHistory.get(s.id) ?? new Map();
+    byRevision.set(
+      s.revision,
+      s.legs.map((l) => ({ accountId: l.accountId, role: l.role, amount: l.amount })),
+    );
+    state.legHistory.set(s.id, byRevision);
   };
   const supersededBy = (id: string) => state.rates.find((r) => r.supersedes === id)?.id ?? null;
   const toReference = (r: FakeRate): ReferenceRateDto => ({
@@ -138,12 +166,14 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     transactions: {
       async insert(tx) {
         state.txs.set(tx.id, tx.snapshot);
+        keepLegs(tx.snapshot);
         keepDetail(tx.snapshot);
       },
       async update(tx) {
         const current = state.txs.get(tx.id);
         if (!current || current.version !== tx.persistedVersion) return false;
         state.txs.set(tx.id, tx.snapshot);
+        keepLegs(tx.snapshot);
         keepDetail(tx.snapshot);
         return true;
       },
@@ -193,6 +223,9 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       },
       async linkedEntries(_ws, transactionId) {
         return state.links.filter((l) => l.transactionId === transactionId).map((l) => l.journalEntryId);
+      },
+      async revisionLegs(_ws, transactionId) {
+        return new Map(state.legHistory.get(transactionId) ?? []);
       },
       async postedEntriesByRevision(_ws, transactionId) {
         return new Map(
@@ -311,6 +344,91 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
           }
         }
         state.audit.push(entry);
+      },
+    },
+    // Doble de `LifecyclePort`: valida como el adaptador real (auditoría + pasos con sequence 1..n por agregado,
+    // estados en código de máquina y eventos `<ctx>.<Name>.vN`) y comparte el rollback de la unidad de trabajo.
+    lifecycle: {
+      async record(entry, steps) {
+        await deps.audit.append(entry);
+        if (faults.lifecycle) throw faults.lifecycle;
+        for (const step of steps) {
+          const aggregateId = step.aggregateId ?? entry.aggregateId;
+          const own = state.lifecycle.filter((l) => l.aggregateId === aggregateId);
+          if (step.kind === 'TRANSITION' && !/^[A-Z][A-Z0-9_]*$/.test(step.toState)) {
+            throw new Error(`invalid toState ${step.toState}`);
+          }
+          for (const e of step.events ?? []) {
+            if (!/^[a-z]+\.[A-Z][A-Za-z0-9]*\.v[1-9]\d*$/.test(e.eventType)) {
+              throw new Error(`invalid event type ${e.eventType}`);
+            }
+          }
+          state.lifecycle.push({
+            ...step,
+            aggregateType: step.aggregateType ?? entry.aggregateType,
+            aggregateId,
+            sequence: own.length + 1,
+            action: entry.action,
+            reason: step.kind === 'TRANSITION' ? (step.reason ?? entry.reason ?? null) : null,
+          });
+        }
+      },
+    },
+    lifecycleQuery: {
+      machineOf: () => ({ ...TRANSACTION_LIFECYCLE.definition }),
+      async lifecycleOf(input) {
+        const own = state.lifecycle.filter((l) => l.aggregateId === input.aggregateId);
+        const items = own.map((l) =>
+          l.kind === 'TRANSITION'
+            ? {
+                sequence: l.sequence,
+                kind: 'TRANSITION' as const,
+                transition: l.transition,
+                fromState: l.fromState,
+                toState: l.toState,
+                machineVersion: l.machineVersion,
+                occurredAt: '2026-10-01T12:00:00.000Z',
+                actor: { type: 'USER' as const, id: input.userId, displayName: null },
+                origin: 'api' as const,
+                reason: l.reason,
+                revisionFrom: l.revisionFrom ?? null,
+                revisionTo: l.revisionTo ?? null,
+                aggregateVersion: null,
+                journalEntries: {
+                  reversed: l.journalEntries?.reversed ?? null,
+                  reversal: l.journalEntries?.reversal ?? null,
+                  posted: l.journalEntries?.posted ?? null,
+                },
+                detailRefs: l.detailRefs ?? {},
+                events: (l.events ?? []).map((e) => e.eventType),
+                auditLogId: null,
+                derived: false,
+              }
+            : {
+                sequence: l.sequence,
+                kind: 'ANNOTATION' as const,
+                occurredAt: '2026-10-01T12:00:00.000Z',
+                actor: { type: 'USER' as const, id: input.userId, displayName: null },
+                origin: 'api' as const,
+                changedFields: [...l.changedFields],
+                revisionFrom: l.revisionFrom ?? null,
+                revisionTo: l.revisionTo ?? null,
+                aggregateVersion: null,
+                events: (l.events ?? []).map((e) => e.eventType),
+                auditLogId: null,
+                derived: false,
+              },
+        );
+        const path = own.flatMap((l) => (l.kind === 'TRANSITION' ? [l.toState] : []));
+        return {
+          aggregateType: input.aggregateType,
+          aggregateId: input.aggregateId,
+          currentState: input.currentState,
+          path,
+          historyComplete: own.find((l) => l.kind === 'TRANSITION')?.fromState === null,
+          machine: { ...TRANSACTION_LIFECYCLE.definition },
+          items,
+        };
       },
     },
     history: {

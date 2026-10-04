@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/accounts/AccountReactivated.v1.schema.json",
   "title": "accounts.AccountReactivated.v1",
-  "description": "Una cuenta CLOSED o ARCHIVED volvió a ACTIVE. Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: (accountId, aggregateVersion). Sin PII.",
+  "description": "Una cuenta CLOSED o ARCHIVED volvió a ACTIVE. Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: (accountId, aggregateVersion). Sin PII. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
   "type": "object",
   "allOf": [
     {
@@ -44,6 +44,16 @@
         },
         "reactivatedOn": {
           "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "transition": {
+          "description": "Transición de la máquina `Account` que originó el evento (opcional, aditivo).",
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "CLOSE",
+            "ARCHIVE",
+            "REACTIVATE"
+          ]
         }
       }
     }
@@ -67,7 +77,8 @@
       "payload": {
         "accountId": "01928c4e-0000-7000-8000-000000acc003",
         "previousStatus": "CLOSED",
-        "reactivatedOn": "2026-10-02"
+        "reactivatedOn": "2026-10-02",
+        "transition": "REACTIVATE"
       }
     }
   ]

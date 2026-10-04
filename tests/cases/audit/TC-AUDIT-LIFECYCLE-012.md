@@ -12,9 +12,10 @@ invariants: ["INV-007","INV-029"]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["lifecycle","immutability"]
@@ -28,7 +29,7 @@ expected_result:
   - "Todas fallan (sin grant o SQLSTATE PF003)"
   - "La transición queda igual"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-012 — Los registros de transición son inmutables en la base de datos
@@ -48,3 +49,4 @@ Entonces la base de datos lo rechaza
 ## Notas
 
 - Si add-demo-data está aplicado, la única excepción es la purga de un workspace demo (ADR-0026).
+- Implementación (2026-10-04): `pf_app`/`pf_worker` reciben 42501 (sin grant) o PF003 (trigger); el owner recibe PF003 en `TRUNCATE` (trigger de sentencia); la RLS forzada le oculta las filas para UPDATE/DELETE.

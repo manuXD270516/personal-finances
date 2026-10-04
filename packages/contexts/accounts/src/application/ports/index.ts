@@ -1,4 +1,4 @@
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { AccountOpeningBalancePort, MoneyDto } from '../../contracts/index.js';
@@ -137,6 +137,10 @@ export interface AccountsDeps {
   readonly openingBalance: AccountOpeningBalancePort;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  /** Auditoría + registro de transición/anotación en la misma unidad de trabajo (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
+  /** `GetLifecycle` de AUDIT para `GET W/accounts/{id}/lifecycle`. */
+  readonly lifecycleQuery: LifecycleQuery;
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly calendar: WorkspaceCalendar;

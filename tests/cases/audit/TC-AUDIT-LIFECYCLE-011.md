@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - apps/web/src/ui/lifecycle/lifecycle.test.tsx
+  - packages/contexts/audit/src/application/lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","backfill"]
@@ -31,7 +34,7 @@ expected_result:
   - "Gasto 2: historyComplete false, sin transiciones inventadas"
   - "La segunda ejecución no duplica filas"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-011 — Las transiciones previas se reconstruyen desde la auditoría marcadas como derivadas
@@ -49,4 +52,4 @@ Entonces muestra registrar y anular marcadas como derivadas
 ```
 
 ## Notas
-
+- Implementación (2026-10-04): el job `audit.lifecycle-backfill` deriva los registros de auditoría aún no respaldados por ninguna fila del recorrido; el recorrido se ordena por instante y secuencia, así que una transición derivada queda antes de las vivas posteriores.

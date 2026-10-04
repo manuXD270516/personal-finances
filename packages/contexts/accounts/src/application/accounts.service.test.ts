@@ -436,3 +436,47 @@ describe('Instituciones', () => {
     ).toBe('NAME_TAKEN');
   });
 });
+
+describe('Recorrido de una cuenta (add-lifecycle-timeline)', () => {
+  it('[TC-AUDIT-LIFECYCLE-009] Bank C: abrir con 500.00 BOB, archivar ("sin uso"), reactivar, vaciar y cerrar deja OPEN, ARCHIVE, REACTIVATE y CLOSE', async () => {
+    const c = await openBank('Bank C', {
+      openingBalance: { amount: { amount: '500.00', currency: 'BOB' }, date: '2026-03-01' },
+    });
+    const id = c.account.id;
+    await svc.archiveAccount(W1, id, 1, 'sin uso');
+    await svc.reactivateAccount(W1, id, 2);
+    // La transferencia del saldo a "Bank A" no es una transición de la cuenta: solo deja el saldo en 0.00 BOB.
+    mem.ledger.set(id, { amount: '0.00', currency: 'BOB', nature: 'ASSET' });
+    await svc.updateAccount(W1, id, 3, { notes: 'cuenta antigua' });
+    await svc.closeAccount(W1, id, 4, { closedOn: '2026-03-31' });
+    const view = await svc.accountLifecycle({ userId: 'u1', workspaceId: W1, accountId: id });
+    expect(
+      view.items.map((i) =>
+        i.kind === 'TRANSITION'
+          ? [i.transition, i.fromState, i.toState, i.reason]
+          : [i.kind, i.changedFields],
+      ),
+    ).toEqual([
+      ['OPEN', null, 'ACTIVE', null],
+      ['ARCHIVE', 'ACTIVE', 'ARCHIVED', 'sin uso'],
+      ['REACTIVATE', 'ARCHIVED', 'ACTIVE', null],
+      ['ANNOTATION', ['notes']],
+      ['CLOSE', 'ACTIVE', 'CLOSED', null],
+    ]);
+    expect(view.items[0]).toMatchObject({
+      journalEntries: { posted: `je-${id}` },
+      events: ['accounts.AccountOpened.v1'],
+    });
+    expect(view.currentState).toBe('CLOSED');
+    expect(view.path).toEqual(['ACTIVE', 'ARCHIVED', 'ACTIVE', 'CLOSED']);
+    expect(mem.events.find((e) => e.eventType === 'accounts.AccountClosed')?.payload).toMatchObject({
+      transition: 'CLOSE',
+    });
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-006] el recorrido de una cuenta inexistente (u otro workspace) responde RESOURCE_NOT_FOUND', async () => {
+    expect(await code(svc.accountLifecycle({ userId: 'u1', workspaceId: W1, accountId: 'nope' }))).toBe(
+      'RESOURCE_NOT_FOUND',
+    );
+  });
+});

@@ -21,6 +21,11 @@ export interface AuditChangeInput {
 
 /** Lo que aporta el comando; el resto (instante, correlación, IP, user agent…) lo completa AUDIT. */
 export interface AuditEntry {
+  /**
+   * Id del registro (UUIDv7). Opcional: lo fija `LifecyclePort` para que el registro de transición referencie su
+   * `audit_log_id` (add-lifecycle-timeline); por defecto lo genera AUDIT.
+   */
+  readonly id?: string;
   readonly workspaceId: string;
   /** `<context>.<aggregate>.<verbo-en-pasado>`, p. ej. `transactions.transaction.voided`. */
   readonly action: string;
@@ -94,6 +99,161 @@ export interface AuditHistoryQuery {
   }): Promise<readonly AuditLogEntryDto[]>;
 }
 
+// ───────────────────────────────────────────── add-lifecycle-timeline (docs/31 D37)
+
+/** Tipos de agregado con máquina de estados declarada en Phase 1. */
+export const LIFECYCLE_AGGREGATE_TYPES = ['Transaction', 'Account', 'ExchangeRate'] as const;
+export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
+
+/** Definición de una máquina de estados (dato puro; `from: []` = creación). Contrato `LifecycleMachine`. */
+export interface LifecycleMachineDto {
+  readonly aggregateType: string;
+  readonly machineVersion: number;
+  readonly states: readonly { readonly code: string; readonly terminal: boolean }[];
+  readonly transitions: readonly {
+    readonly code: string;
+    readonly from: readonly string[];
+    readonly to: readonly string[];
+    readonly guard: string;
+    readonly events: readonly string[];
+  }[];
+}
+
+/** Evento publicado por un paso del flujo (`eventType` con versión: `transactions.TransactionPosted.v1`). */
+export interface LifecycleEventRefDto {
+  readonly eventId: string;
+  readonly eventType: string;
+}
+
+/** Asientos del ledger involucrados en un paso (`reversed` = revertido, `reversal` = su reversa, `posted` = nuevo). */
+export interface LifecycleJournalEntriesDto {
+  readonly reversed: string | null;
+  readonly reversal: string | null;
+  readonly posted: string | null;
+}
+
+/** Referencias a detalles por revisión (p. ej. `conversionRevision`, `supersededByRateId`, `supersedesRateId`). */
+export type LifecycleDetailRefsDto = Readonly<Record<string, string | number>>;
+
+interface LifecycleStepBase {
+  /** Por defecto, el agregado de la entrada de auditoría (una corrección de tasa también mueve la tasa original). */
+  readonly aggregateType?: string;
+  readonly aggregateId?: string;
+  /** Por defecto, `aggregateVersion` de la entrada de auditoría. */
+  readonly aggregateVersion?: number | null;
+  readonly revisionFrom?: number | null;
+  readonly revisionTo?: number | null;
+  readonly events?: readonly LifecycleEventRefDto[];
+}
+
+/** Paso de estado validado por la máquina del contexto dueño. */
+export interface LifecycleTransitionInput extends LifecycleStepBase {
+  readonly kind: 'TRANSITION';
+  readonly transition: string;
+  /** `null` = creación (∅). */
+  readonly fromState: string | null;
+  readonly toState: string;
+  readonly machineVersion: number;
+  readonly journalEntries?: Partial<LifecycleJournalEntriesDto>;
+  readonly detailRefs?: LifecycleDetailRefsDto;
+  /** Por defecto, el `reason` de la entrada de auditoría. */
+  readonly reason?: string | null;
+}
+
+/** Cambio descriptivo (sin cambio de estado ni de ledger): solo los nombres de los campos cambiados. */
+export interface LifecycleAnnotationInput extends LifecycleStepBase {
+  readonly kind: 'ANNOTATION';
+  readonly changedFields: readonly string[];
+}
+
+export type LifecycleStepInput = LifecycleTransitionInput | LifecycleAnnotationInput;
+
+/**
+ * Puerto síncrono del recorrido (add-lifecycle-timeline decisión 5; INV-029): escribe la entrada de auditoría y, a
+ * continuación, sus pasos (transiciones o anotaciones) en `audit.lifecycle_transition`, TODO en la unidad de trabajo del
+ * comando (falla fuera de ella con `AUDIT_OUTSIDE_UNIT_OF_WORK`). Si un paso no puede escribirse, el comando completo
+ * hace rollback. Reemplaza a `AuditPort.append` en los comandos que cambian estado o editan un agregado con máquina.
+ */
+export interface LifecyclePort {
+  record(entry: AuditEntry, steps: readonly LifecycleStepInput[]): Promise<void>;
+}
+
+export interface LifecycleActorDto {
+  readonly type: 'USER' | 'SYSTEM' | 'WORKER';
+  /** `userId` o identificador del proceso. */
+  readonly id: string;
+  readonly displayName: string | null;
+}
+
+export interface LifecycleTransitionDto {
+  readonly sequence: number;
+  readonly kind: 'TRANSITION';
+  readonly transition: string;
+  readonly fromState: string | null;
+  readonly toState: string;
+  readonly machineVersion: number;
+  readonly occurredAt: string;
+  readonly actor: LifecycleActorDto;
+  readonly origin: AuditOriginDto;
+  readonly reason: string | null;
+  readonly revisionFrom: number | null;
+  readonly revisionTo: number | null;
+  readonly aggregateVersion: number | null;
+  readonly journalEntries: LifecycleJournalEntriesDto;
+  readonly detailRefs: LifecycleDetailRefsDto;
+  readonly events: readonly string[];
+  readonly auditLogId: string | null;
+  readonly derived: boolean;
+}
+
+export interface LifecycleAnnotationDto {
+  readonly sequence: number;
+  readonly kind: 'ANNOTATION';
+  readonly occurredAt: string;
+  readonly actor: LifecycleActorDto;
+  readonly origin: AuditOriginDto;
+  readonly changedFields: readonly string[];
+  readonly revisionFrom: number | null;
+  readonly revisionTo: number | null;
+  readonly aggregateVersion: number | null;
+  readonly events: readonly string[];
+  readonly auditLogId: string | null;
+  readonly derived: boolean;
+}
+
+export type LifecycleItemDto = LifecycleTransitionDto | LifecycleAnnotationDto;
+
+/** Recorrido de un agregado (contrato `Lifecycle`, sin enriquecer: el contexto dueño agrega montos por revisión). */
+export interface LifecycleDto {
+  readonly aggregateType: string;
+  readonly aggregateId: string;
+  /** Estado actual del agregado (lo aporta el contexto dueño; fuente de verdad). */
+  readonly currentState: string | null;
+  /** Estados visitados en orden (destino de cada transición). */
+  readonly path: readonly string[];
+  /** `false` si el recorrido no arranca en una creación (historia previa sin evidencia, FR-AUDIT-012). */
+  readonly historyComplete: boolean;
+  readonly machine: LifecycleMachineDto;
+  readonly items: readonly LifecycleItemDto[];
+}
+
+/**
+ * Consulta `GetLifecycle` (decisión 7). La invoca el contexto dueño del agregado DESPUÉS de verificar que el usuario
+ * puede verlo (404 idéntico a inexistente si es de otro workspace); las filas de otros workspaces nunca aparecen (RLS).
+ */
+export interface LifecycleQuery {
+  lifecycleOf(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly aggregateType: LifecycleAggregateType;
+    readonly aggregateId: string;
+    readonly currentState: string | null;
+  }): Promise<LifecycleDto>;
+  machineOf(aggregateType: LifecycleAggregateType): LifecycleMachineDto;
+}
+
 /** Tokens de inyección (Nest) de los puertos públicos. */
 export const AUDIT_PORT = Symbol.for('pf.audit.AuditPort');
 export const AUDIT_HISTORY_QUERY = Symbol.for('pf.audit.AuditHistoryQuery');
+export const LIFECYCLE_PORT = Symbol.for('pf.audit.LifecyclePort');
+export const LIFECYCLE_QUERY = Symbol.for('pf.audit.LifecycleQuery');

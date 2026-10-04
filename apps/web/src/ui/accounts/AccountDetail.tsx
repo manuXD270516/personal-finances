@@ -8,7 +8,9 @@ import { formatLocalDate, formatMoney } from '../dashboard/format';
 import { todayIn } from '../common/dates';
 import type { Account, Institution } from '../common/types';
 import { ConfirmPanel, Field, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
+import { Tabs } from '../common/Tabs';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { AccountForm } from './AccountForm';
 import { AccountStatusBadge, BalanceText, BaseEquivalent } from './AccountsListView';
 import { maskedIdentifier } from './logic';
@@ -56,7 +58,8 @@ type Pending = 'archive' | 'close' | 'reactivate' | null;
 
 /**
  * Detalle de cuenta: saldo (pasivos como "Adeuda"), equivalente en moneda base, acciones archivar/cerrar/reactivar
- * con confirmación, edición (tipo inmutable) y pestaña Historial (add-audit-trail; OWNER/EDITOR).
+ * con confirmación, edición (tipo inmutable); pestañas "Detalle" | "Recorrido" (add-lifecycle-timeline; VIEWER+) |
+ * "Historial de cambios" (add-audit-trail; OWNER/EDITOR).
  */
 function AccountDetail({
   ctx,
@@ -68,6 +71,7 @@ function AccountDetail({
   created: boolean;
 }) {
   const f = useFormat('Accounts', ctx);
+  const lf = useFormat('Lifecycle', ctx);
   const { t, locale } = f;
   const institutions = useInstitutions(ctx);
   const [account, setAccount] = useState<Account | undefined>();
@@ -151,104 +155,148 @@ function AccountDetail({
         </strong>{' '}
         <BaseEquivalent account={account} baseCurrency={ctx.ws.baseCurrency} ctx={f} />
       </p>
-      {account.pendingAmount && !/^-?0*(\.0*)?$/.test(account.pendingAmount.amount) ? (
-        <p style={mutedStyle}>{t('pending', { amount: formatMoney(account.pendingAmount, locale) })}</p>
-      ) : null}
-      <p style={mutedStyle}>
-        {account.includeInNetWorth ? t('includedInNetWorth') : t('excludedFromNetWorth')}
-        {account.openedOn ? ` · ${t('openedOn', { date: formatLocalDate(account.openedOn, locale) })}` : ''}
-        {account.closedOn ? ` · ${t('closedOn', { date: formatLocalDate(account.closedOn, locale) })}` : ''}
-      </p>
-      <nav aria-label={t('actions')} style={rowStyle}>
-        <a href={ctx.href(`/transacciones?cuenta=${account.id}`)}>{t('viewTransactions')}</a>
-        {ctx.canEdit && account.status === 'ACTIVE' ? (
-          <a href={ctx.href(`/transacciones/nueva?cuenta=${account.id}`)}>{t('recordMovement')}</a>
-        ) : null}
-      </nav>
-      {status ? <p role="status">{status}</p> : null}
-      {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
-      {ctx.canEdit ? (
-        <div style={rowStyle}>
-          <button type="button" onClick={() => setEditing(true)} disabled={editing}>
-            {t('edit')}
-          </button>
-          {account.status === 'ACTIVE' ? (
-            <>
-              <button type="button" onClick={() => setPending('archive')}>
-                {t('archive')}
-              </button>
-              <button type="button" onClick={() => setPending('close')}>
-                {t('close')}
-              </button>
-            </>
-          ) : (
-            <button type="button" onClick={() => setPending('reactivate')}>
-              {t('reactivate')}
-            </button>
-          )}
-        </div>
-      ) : null}
-      {pending ? (
-        <ConfirmPanel
-          title={t(`confirm.${pending}.title`, { name: account.name })}
-          description={t(`confirm.${pending}.description`)}
-          confirmLabel={t(`confirm.${pending}.confirm`)}
-          cancelLabel={t('form.cancel')}
-          busy={busy}
-          onConfirm={() => void run(pending)}
-          onCancel={() => setPending(null)}
-        >
-          {pending === 'close' ? (
-            <div style={rowStyle}>
-              <Field label={t('confirm.close.date')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    type="date"
-                    name="closedOn"
-                    style={inputStyle}
-                    value={closedOn}
-                    onChange={(e) => setClosedOn(e.target.value)}
+      <Tabs
+        idPrefix="account"
+        label={lf.t('tabs.label')}
+        tabs={[
+          {
+            id: 'detail',
+            label: lf.t('tabs.detail'),
+            content: (
+              <>
+                {account.pendingAmount && !/^-?0*(\.0*)?$/.test(account.pendingAmount.amount) ? (
+                  <p style={mutedStyle}>
+                    {t('pending', { amount: formatMoney(account.pendingAmount, locale) })}
+                  </p>
+                ) : null}
+                <p style={mutedStyle}>
+                  {account.includeInNetWorth ? t('includedInNetWorth') : t('excludedFromNetWorth')}
+                  {account.openedOn
+                    ? ` · ${t('openedOn', { date: formatLocalDate(account.openedOn, locale) })}`
+                    : ''}
+                  {account.closedOn
+                    ? ` · ${t('closedOn', { date: formatLocalDate(account.closedOn, locale) })}`
+                    : ''}
+                </p>
+                <nav aria-label={t('actions')} style={rowStyle}>
+                  <a href={ctx.href(`/transacciones?cuenta=${account.id}`)}>{t('viewTransactions')}</a>
+                  {ctx.canEdit && account.status === 'ACTIVE' ? (
+                    <a href={ctx.href(`/transacciones/nueva?cuenta=${account.id}`)}>{t('recordMovement')}</a>
+                  ) : null}
+                </nav>
+                {status ? <p role="status">{status}</p> : null}
+                {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
+                {ctx.canEdit ? (
+                  <div style={rowStyle}>
+                    <button type="button" onClick={() => setEditing(true)} disabled={editing}>
+                      {t('edit')}
+                    </button>
+                    {account.status === 'ACTIVE' ? (
+                      <>
+                        <button type="button" onClick={() => setPending('archive')}>
+                          {t('archive')}
+                        </button>
+                        <button type="button" onClick={() => setPending('close')}>
+                          {t('close')}
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setPending('reactivate')}>
+                        {t('reactivate')}
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+                {pending ? (
+                  <ConfirmPanel
+                    title={t(`confirm.${pending}.title`, { name: account.name })}
+                    description={t(`confirm.${pending}.description`)}
+                    confirmLabel={t(`confirm.${pending}.confirm`)}
+                    cancelLabel={t('form.cancel')}
+                    busy={busy}
+                    onConfirm={() => void run(pending)}
+                    onCancel={() => setPending(null)}
+                  >
+                    {pending === 'close' ? (
+                      <div style={rowStyle}>
+                        <Field label={t('confirm.close.date')}>
+                          {(p) => (
+                            <input
+                              {...p}
+                              type="date"
+                              name="closedOn"
+                              style={inputStyle}
+                              value={closedOn}
+                              onChange={(e) => setClosedOn(e.target.value)}
+                            />
+                          )}
+                        </Field>
+                        <Field label={t('confirm.reason')}>
+                          {(p) => (
+                            <input
+                              {...p}
+                              name="reason"
+                              maxLength={500}
+                              style={inputStyle}
+                              value={reason}
+                              onChange={(e) => setReason(e.target.value)}
+                            />
+                          )}
+                        </Field>
+                      </div>
+                    ) : null}
+                  </ConfirmPanel>
+                ) : null}
+                {editing ? (
+                  <AccountForm
+                    ctx={ctx}
+                    account={account}
+                    institutions={institutions}
+                    onCancel={() => setEditing(false)}
+                    onSaved={(a) => {
+                      setAccount(a);
+                      setEditing(false);
+                      setStatus(t('saved'));
+                    }}
                   />
-                )}
-              </Field>
-              <Field label={t('confirm.reason')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    name="reason"
-                    maxLength={500}
-                    style={inputStyle}
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
-                )}
-              </Field>
-            </div>
-          ) : null}
-        </ConfirmPanel>
-      ) : null}
-      {editing ? (
-        <AccountForm
-          ctx={ctx}
-          account={account}
-          institutions={institutions}
-          onCancel={() => setEditing(false)}
-          onSaved={(a) => {
-            setAccount(a);
-            setEditing(false);
-            setStatus(t('saved'));
-          }}
-        />
-      ) : null}
-      <AuditHistory
-        workspaceId={ctx.ws.id}
-        aggregateType="Account"
-        aggregateId={account.id}
-        role={ctx.ws.role}
-        locale={ctx.formatLocale}
-        timeZone={ctx.timeZone}
-        refreshKey={account.version}
+                ) : null}
+              </>
+            ),
+          },
+          {
+            id: 'lifecycle',
+            label: lf.t('tabs.lifecycle'),
+            content: (
+              <LifecycleTab
+                ctx={ctx}
+                path={`accounts/${account.id}`}
+                refreshKey={account.version}
+                stateLabel={(code) => (f.has(`status.${code}`) ? t(`status.${code}`) : code)}
+                idPrefix="account-lifecycle"
+              />
+            ),
+          },
+          // El log de auditoría solo lo leen OWNER/EDITOR (D28): VIEWER no tiene esta pestaña.
+          ...(ctx.canEdit
+            ? [
+                {
+                  id: 'history',
+                  label: lf.t('tabs.history'),
+                  content: (
+                    <AuditHistory
+                      workspaceId={ctx.ws.id}
+                      aggregateType="Account"
+                      aggregateId={account.id}
+                      role={ctx.ws.role}
+                      locale={ctx.formatLocale}
+                      timeZone={ctx.timeZone}
+                      refreshKey={account.version}
+                    />
+                  ),
+                },
+              ]
+            : []),
+        ]}
       />
     </section>
   );

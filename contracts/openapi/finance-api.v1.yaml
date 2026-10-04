@@ -478,6 +478,31 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/accounts/{accountId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      tags: [Accounts]
+      operationId: getAccountLifecycle
+      summary: Recorrido de una cuenta (apertura, cierre, archivo, reactivación y anotaciones)
+      description: |
+        Recorrido de la cuenta (docs/31 D37) con la máquina `Account`; la apertura enlaza el asiento del saldo
+        inicial. VIEWER+; otro workspace ⇒ 404 idéntico a inexistente.
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Recorrido de la cuenta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/accounts/{accountId}/archive:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -1098,6 +1123,34 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/transactions/{transactionId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      tags: [Transactions]
+      operationId: getTransactionLifecycle
+      summary: Recorrido de una transacción (máquina de estados, camino y transiciones; visible para VIEWER)
+      description: |
+        Recorrido completo (docs/31 D37): estado actual, estados visitados, transiciones y anotaciones en orden con
+        actor, instante, motivo, revisión, asientos del ledger y eventos publicados, más la definición de la máquina
+        `Transaction` y los montos de cada revisión (transferencias: monto y comisión; conversiones: detalle).
+        Lo lee todo miembro que pueda ver la transacción, incluido VIEWER (D28); otro workspace ⇒ 404 idéntico a
+        inexistente.
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Recorrido de la transacción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionLifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/transactions/{transactionId}/void:
@@ -2638,6 +2691,31 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/fx-rates/{fxRateId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/FxRateId'
+    get:
+      tags: [FX]
+      operationId: getRateLifecycle
+      summary: Recorrido de una tasa de cambio manual (registro y reemplazo)
+      description: |
+        Registro (`RECORD`) y, si fue corregida, reemplazo (`SUPERSEDE`) enlazado a la tasa que la reemplazó
+        (`detailRefs.supersededByRateId`); la tasa original no se modifica (INV-011). VIEWER+.
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Recorrido de la tasa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/fx-rates/{fxRateId}/anomaly-review:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -2890,6 +2968,35 @@ paths:
           description: 'VALIDATION_FAILED, INVALID_CURSOR, INVALID_FILTER (aggregateId without aggregateType, from > to).'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/lifecycle-machines/{aggregateType}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - name: aggregateType
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/LifecycleAggregateType' }
+    get:
+      tags: [Audit]
+      operationId: getLifecycleMachine
+      summary: Definición vigente de la máquina de estados de un tipo de agregado
+      description: |
+        Estados (con sus terminales) y transiciones declaradas (origen, destino, guarda y eventos). `from: []` declara
+        la transición de creación (∅). Toda transición no declarada se rechaza con `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Máquina de estados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LifecycleMachine' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -4921,6 +5028,224 @@ components:
           type: array
           items: { $ref: '#/components/schemas/AuditLogEntry' }
         page: { $ref: '#/components/schemas/PageInfo' }
+
+    # ── Recorrido del ciclo de vida (add-lifecycle-timeline, docs/31 D37) ──
+    LifecycleAggregateType:
+      type: string
+      enum: [Transaction, Account, ExchangeRate]
+    LifecycleMachine:
+      type: object
+      description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
+      additionalProperties: false
+      required: [aggregateType, machineVersion, states, transitions]
+      properties:
+        aggregateType: { type: string, examples: [Transaction] }
+        machineVersion: { type: integer, minimum: 1 }
+        states:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [code, terminal]
+            properties:
+              code: { type: string, examples: [POSTED] }
+              terminal: { type: boolean }
+        transitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [code, from, to, guard, events]
+            properties:
+              code: { type: string, examples: [REVISE] }
+              from:
+                type: array
+                items: { type: string }
+              to:
+                type: array
+                minItems: 1
+                items: { type: string }
+              guard: { type: string }
+              events:
+                type: array
+                items: { type: string, examples: [transactions.TransferRevised.v1] }
+    LifecycleActor:
+      type: object
+      additionalProperties: false
+      required: [type, id, displayName]
+      properties:
+        type: { $ref: '#/components/schemas/AuditActorType' }
+        id: { type: string, description: 'userId (USER) o identificador del proceso (SYSTEM/WORKER)' }
+        displayName: { type: [string, 'null'] }
+    LifecycleJournalEntries:
+      type: object
+      description: Asientos del ledger del paso (revertido, su reversa y el nuevo); null si no aplica.
+      additionalProperties: false
+      required: [reversed, reversal, posted]
+      properties:
+        reversed: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        reversal: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        posted: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+    LifecycleTransition:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - kind
+        - transition
+        - fromState
+        - toState
+        - machineVersion
+        - occurredAt
+        - actor
+        - origin
+        - reason
+        - revisionFrom
+        - revisionTo
+        - aggregateVersion
+        - journalEntries
+        - detailRefs
+        - events
+        - auditLogId
+        - derived
+      properties:
+        sequence: { type: integer, minimum: 1 }
+        kind: { type: string, const: TRANSITION }
+        transition: { type: string, examples: [REVISE] }
+        fromState: { type: [string, 'null'], description: 'null = creación (∅)' }
+        toState: { type: string }
+        machineVersion: { type: integer, minimum: 1 }
+        occurredAt: { $ref: '#/components/schemas/Instant' }
+        actor: { $ref: '#/components/schemas/LifecycleActor' }
+        origin: { $ref: '#/components/schemas/AuditOrigin' }
+        reason: { type: [string, 'null'] }
+        revisionFrom: { type: [integer, 'null'], minimum: 1 }
+        revisionTo: { type: [integer, 'null'], minimum: 1 }
+        aggregateVersion: { type: [integer, 'null'], minimum: 1 }
+        journalEntries: { $ref: '#/components/schemas/LifecycleJournalEntries' }
+        detailRefs:
+          type: object
+          description: Referencias a detalles (`conversionRevision`, `supersededByRateId`, `supersedesRateId`).
+          additionalProperties:
+            oneOf: [{ type: string }, { type: integer }]
+        events:
+          type: array
+          items: { type: string, examples: [transactions.TransferRevised.v1] }
+        auditLogId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        derived:
+          type: boolean
+          description: true si se reconstruyó desde la auditoría (datos anteriores al registro de transiciones).
+    LifecycleAnnotation:
+      type: object
+      description: Cambio descriptivo (sin cambio de estado ni de ledger) en el recorrido.
+      additionalProperties: false
+      required:
+        - sequence
+        - kind
+        - occurredAt
+        - actor
+        - origin
+        - changedFields
+        - revisionFrom
+        - revisionTo
+        - aggregateVersion
+        - events
+        - auditLogId
+        - derived
+      properties:
+        sequence: { type: integer, minimum: 1 }
+        kind: { type: string, const: ANNOTATION }
+        occurredAt: { $ref: '#/components/schemas/Instant' }
+        actor: { $ref: '#/components/schemas/LifecycleActor' }
+        origin: { $ref: '#/components/schemas/AuditOrigin' }
+        changedFields:
+          type: array
+          items: { type: string }
+        revisionFrom: { type: [integer, 'null'], minimum: 1 }
+        revisionTo: { type: [integer, 'null'], minimum: 1 }
+        aggregateVersion: { type: [integer, 'null'], minimum: 1 }
+        events:
+          type: array
+          items: { type: string }
+        auditLogId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        derived: { type: boolean }
+    Lifecycle:
+      type: object
+      description: Recorrido de un elemento (docs/31 D37).
+      required: [aggregateType, aggregateId, currentState, path, historyComplete, machine, items]
+      properties:
+        aggregateType: { $ref: '#/components/schemas/LifecycleAggregateType' }
+        aggregateId: { $ref: '#/components/schemas/Uuid' }
+        currentState: { type: [string, 'null'] }
+        path:
+          type: array
+          description: Estados visitados en orden (destino de cada transición).
+          items: { type: string }
+        historyComplete:
+          type: boolean
+          description: false si el recorrido no arranca en una creación (historia previa sin evidencia).
+        machine: { $ref: '#/components/schemas/LifecycleMachine' }
+        items:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/LifecycleTransition'
+              - $ref: '#/components/schemas/LifecycleAnnotation'
+            discriminator:
+              propertyName: kind
+              mapping:
+                TRANSITION: '#/components/schemas/LifecycleTransition'
+                ANNOTATION: '#/components/schemas/LifecycleAnnotation'
+    LifecycleRevision:
+      type: object
+      description: Montos de una revisión de la transacción (legs vigentes y reemplazados; detalle de conversión).
+      additionalProperties: false
+      required: [revision, amount, fee, legs, conversion]
+      properties:
+        revision: { type: integer, minimum: 1 }
+        amount: { $ref: '#/components/schemas/Money' }
+        fee: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
+        legs:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [accountId, role, amount]
+            properties:
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              role: { type: string, enum: [MAIN, SOURCE, TARGET, FEE] }
+              amount: { $ref: '#/components/schemas/Money' }
+        conversion:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [sourceAccountId, targetAccountId, sourceAmount, targetAmount, effectiveRate, fees]
+              properties:
+                sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+                targetAccountId: { $ref: '#/components/schemas/Uuid' }
+                sourceAmount: { $ref: '#/components/schemas/Money' }
+                targetAmount: { $ref: '#/components/schemas/Money' }
+                effectiveRate: { $ref: '#/components/schemas/Rate' }
+                fees:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [type, amount]
+                    properties:
+                      type: { $ref: '#/components/schemas/ConversionFeeType' }
+                      amount: { $ref: '#/components/schemas/Money' }
+    TransactionLifecycle:
+      description: Recorrido de una transacción con los montos de cada revisión.
+      allOf:
+        - $ref: '#/components/schemas/Lifecycle'
+        - type: object
+          required: [revisions]
+          properties:
+            revisions:
+              type: array
+              items: { $ref: '#/components/schemas/LifecycleRevision' }
 
     # ── Reporting ──
     CurrencyTotals:

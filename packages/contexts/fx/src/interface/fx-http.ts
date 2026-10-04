@@ -284,6 +284,21 @@ export class FxController {
     return toFxRateDto(stored, this.threshold);
   }
 
+  /**
+   * `GET W/fx-rates/{id}/lifecycle` (`getRateLifecycle`, add-lifecycle-timeline § Contratos; VIEWER+): registro y,
+   * si fue corregida, reemplazo enlazado a la tasa que la reemplazó (INV-011).
+   */
+  @Get('workspaces/:workspaceId/fx-rates/:fxRateId/lifecycle')
+  async getRateLifecycle(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('fxRateId') fxRateId: string,
+  ) {
+    const principal = principalOf(req);
+    if (!principal) throw new ApiProblem('UNAUTHENTICATED', 'an authenticated user is required');
+    return this.service.rateLifecycle({ userId: principal.userId, workspaceId, rateId: fxRateId });
+  }
+
   @Post('workspaces/:workspaceId/fx-rates/:fxRateId/anomaly-review')
   @HttpCode(200)
   async reviewFxRateAnomaly(

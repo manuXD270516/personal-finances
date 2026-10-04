@@ -169,19 +169,108 @@ describe('RecordTransfer', () => {
     expect(state.outbox).toHaveLength(0);
   });
 
-  it('amend del monto revierte y re-emite TransferCompleted con el nuevo asiento', async () => {
+  it('[TC-TRANSACTIONS-TRANSFER-009] corregir 300.00 → 250.00 BOB publica un único TransferCompleted y un único TransferRevised con los tres asientos', async () => {
     const { service, state, balanceOf } = setup();
+    await service.recordTransaction({
+      workspaceId: WS,
+      userId: USER,
+      kind: 'INCOME',
+      transactionDate: '2026-03-01',
+      accountId: A,
+      amount: { amount: '1000.00', currency: 'BOB' },
+    });
+    const tx = await service.recordTransfer(cmd());
+    const firstEntry = tx.activeEntryId;
+    const revised = await service.updateTransaction({
+      workspaceId: WS,
+      userId: USER,
+      transactionId: tx.id,
+      expectedVersion: tx.version,
+      amount: { amount: '250.00', currency: 'BOB' },
+    });
+    expect(balanceOf(A)).toBe('750.00');
+    expect(balanceOf(B)).toBe('250.00');
+    expect(netWorth(balanceOf)).toBe('1000.00');
+    const completed = state.outbox.filter((e) => e.eventType === 'transactions.TransferCompleted');
+    expect(completed).toHaveLength(1);
+    expect(completed[0]?.payload['amount']).toEqual({ amount: '300.00', currency: 'BOB' });
+    const revisedEvents = state.outbox.filter((e) => e.eventType === 'transactions.TransferRevised');
+    expect(revisedEvents).toHaveLength(1);
+    const p = revisedEvents[0]?.payload ?? {};
+    const reversal = state.entries.find((e) => e.reverses === firstEntry)?.id;
+    expect(p).toEqual({
+      transactionId: tx.id,
+      revisionFrom: 1,
+      revisionTo: 2,
+      businessDate: '2026-03-15',
+      fromAccountId: A,
+      toAccountId: B,
+      amount: { amount: '250.00', currency: 'BOB' },
+      fee: null,
+      reversedJournalEntryId: firstEntry,
+      reversalJournalEntryId: reversal,
+      journalEntryId: revised.activeEntryId,
+    });
+    // TransactionPosted de la revisión enlaza el asiento reemplazado y nombra la transición.
+    const posted = state.outbox.filter((e) => e.eventType === 'transactions.TransactionPosted').at(-1);
+    expect(posted?.payload).toMatchObject({ supersedesJournalEntryId: firstEntry, transition: 'REVISE' });
+  });
+
+  it('[TC-TRANSACTIONS-TRANSFER-009] la edición descriptiva de una transferencia no publica TransferRevised ni TransferCompleted', async () => {
+    const { service, state } = setup();
     const tx = await service.recordTransfer(cmd());
     await service.updateTransaction({
       workspaceId: WS,
       userId: USER,
       transactionId: tx.id,
       expectedVersion: tx.version,
-      amount: { amount: '400.00', currency: 'BOB' },
+      description: 'ahorro mensual',
     });
-    expect(balanceOf(A)).toBe('-400.00');
-    expect(balanceOf(B)).toBe('400.00');
-    expect(state.outbox.filter((e) => e.eventType === 'transactions.TransferCompleted')).toHaveLength(2);
+    expect(state.outbox.filter((e) => e.eventType === 'transactions.TransferCompleted')).toHaveLength(1);
+    expect(state.outbox.filter((e) => e.eventType === 'transactions.TransferRevised')).toHaveLength(0);
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-007] el recorrido de la transferencia corregida muestra RECORD (300.00, completada) y REVISE (250.00, revisada)', async () => {
+    const { service } = setup();
+    const tx = await service.recordTransfer(cmd());
+    await service.updateTransaction({
+      workspaceId: WS,
+      userId: USER,
+      transactionId: tx.id,
+      expectedVersion: tx.version,
+      amount: { amount: '250.00', currency: 'BOB' },
+    });
+    const view = await service.transactionLifecycle({ userId: USER, workspaceId: WS, transactionId: tx.id });
+    const transitions = view.lifecycle.items.filter((i) => i.kind === 'TRANSITION');
+    expect(
+      transitions.map((t) => [t.transition, t.fromState, t.toState, t.revisionFrom, t.revisionTo]),
+    ).toEqual([
+      ['RECORD', null, 'POSTED', null, 1],
+      ['REVISE', 'POSTED', 'POSTED', 1, 2],
+    ]);
+    expect(transitions[0]?.events).toContain('transactions.TransferCompleted.v1');
+    expect(transitions[1]?.events).toContain('transactions.TransferRevised.v1');
+    expect(transitions[1]?.events).not.toContain('transactions.TransferCompleted.v1');
+    expect(
+      view.revisions.map((r) => [r.revision, r.amount.toFixed(), r.legs.map((l) => [l.role, l.accountId])]),
+    ).toEqual([
+      [
+        1,
+        '300.00',
+        [
+          ['SOURCE', A],
+          ['TARGET', B],
+        ],
+      ],
+      [
+        2,
+        '250.00',
+        [
+          ['SOURCE', A],
+          ['TARGET', B],
+        ],
+      ],
+    ]);
   });
 
   it('amend del destino a otra moneda ⇒ TRANSFER_CURRENCY_MISMATCH', async () => {

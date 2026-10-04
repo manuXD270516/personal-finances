@@ -28,6 +28,7 @@ import {
   exactRateValue,
   splitsAudit,
   splitsPayload,
+  transactionSteps,
 } from './posting-support.js';
 import type { TransactionsDeps } from './ports/index.js';
 import type { MoneyDto } from './transactions.service.js';
@@ -162,37 +163,43 @@ export class ConversionsService {
       await this.deps.transactions.insert(tx);
       if (entryId) await linkEntry(this.deps, tx, entryId, 'POSTED');
       const s = tx.snapshot;
-      await publishEvent(this.deps, tx, TRANSACTION_EVENTS.created, {
-        transactionId: s.id,
-        kind: s.kind,
-        status: s.status,
-        businessDate: s.businessDate,
-        description: s.description,
-        counterpartyId: s.counterpartyId,
-        origin: { type: s.source, refId: null },
-        legs: legsPayload(s),
-        splits: splitsPayload(s),
-        postingDate: s.postingDate,
-        refundOfTransactionId: null,
-        paymentMethod: null,
-      });
-      if (entryId) await publishPosted(this.deps, tx, entryId, null, null);
-      await this.audit.append({
-        workspaceId: s.workspaceId,
-        action: 'transactions.conversion.created',
-        aggregateType: 'Transaction',
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        changes: [
-          { field: 'kind', before: null, after: s.kind },
-          { field: 'status', before: null, after: s.status },
-          { field: 'transactionDate', before: null, after: s.businessDate },
-          ...detailChanges(null, s.conversion as ConversionDetail),
-          ...(s.splits.length > 0 ? [{ field: 'splits', before: null, after: splitsAudit(s) }] : []),
-          ...(s.description ? [{ field: 'description', before: null, after: s.description }] : []),
-          ...(entryId ? [{ field: 'journalEntryId', before: null, after: entryId }] : []),
-        ],
-      });
+      const events = [
+        await publishEvent(this.deps, tx, TRANSACTION_EVENTS.created, {
+          transactionId: s.id,
+          kind: s.kind,
+          status: s.status,
+          businessDate: s.businessDate,
+          description: s.description,
+          counterpartyId: s.counterpartyId,
+          origin: { type: s.source, refId: null },
+          legs: legsPayload(s),
+          splits: splitsPayload(s),
+          postingDate: s.postingDate,
+          refundOfTransactionId: null,
+          paymentMethod: null,
+          transition: 'RECORD',
+        }),
+      ];
+      if (entryId) events.push(...(await publishPosted(this.deps, tx, entryId, null, null)));
+      await this.deps.lifecycle.record(
+        {
+          workspaceId: s.workspaceId,
+          action: 'transactions.conversion.created',
+          aggregateType: 'Transaction',
+          aggregateId: s.id,
+          aggregateVersion: s.version,
+          changes: [
+            { field: 'kind', before: null, after: s.kind },
+            { field: 'status', before: null, after: s.status },
+            { field: 'transactionDate', before: null, after: s.businessDate },
+            ...detailChanges(null, s.conversion as ConversionDetail),
+            ...(s.splits.length > 0 ? [{ field: 'splits', before: null, after: splitsAudit(s) }] : []),
+            ...(s.description ? [{ field: 'description', before: null, after: s.description }] : []),
+            ...(entryId ? [{ field: 'journalEntryId', before: null, after: entryId }] : []),
+          ],
+        },
+        transactionSteps(tx, { events, journalEntries: { posted: entryId } }),
+      );
       return { transaction: s, totalCost: await this.totalCost(s.workspaceId, s.conversion ?? null) };
     });
   }
@@ -249,19 +256,26 @@ export class ConversionsService {
       }
       if (newEntryId) await linkEntry(this.deps, tx, newEntryId, 'POSTED');
       const after = tx.snapshot;
-      await publishEvent(this.deps, tx, TRANSACTION_EVENTS.updated, {
-        transactionId: after.id,
-        revision: after.revision,
-        status: after.status,
-        previousStatus: after.status !== result.previousStatus ? result.previousStatus : null,
-        changedFields: [...result.changedFields],
-        ledgerImpact: result.ledgerImpact,
-        reason,
-        paymentMethod: after.paymentMethod,
-      });
-      if (newEntryId)
-        await publishPosted(this.deps, tx, newEntryId, result.previousStatus, result.previousEntryId);
-      await this.audit.append({
+      const transition = tx.lastTransition?.transition;
+      const events = [
+        await publishEvent(this.deps, tx, TRANSACTION_EVENTS.updated, {
+          transactionId: after.id,
+          revision: after.revision,
+          status: after.status,
+          previousStatus: after.status !== result.previousStatus ? result.previousStatus : null,
+          changedFields: [...result.changedFields],
+          ledgerImpact: result.ledgerImpact,
+          reason,
+          paymentMethod: after.paymentMethod,
+          ...(transition ? { transition } : {}),
+        }),
+      ];
+      if (newEntryId) {
+        events.push(
+          ...(await publishPosted(this.deps, tx, newEntryId, result.previousStatus, result.previousEntryId)),
+        );
+      }
+      const auditEntry = {
         workspaceId,
         action: 'transactions.conversion.amended',
         aggregateType: 'Transaction',
@@ -283,7 +297,21 @@ export class ConversionsService {
             : []),
           ...(reversalId ? [{ field: 'reversalJournalEntryId', before: null, after: reversalId }] : []),
         ],
-      });
+      };
+      // Una conversión PENDING corregida incrementa la revisión sin asiento: anotación (no REVISE).
+      await this.deps.lifecycle.record(
+        auditEntry,
+        transactionSteps(tx, {
+          events,
+          journalEntries: {
+            reversed: reversalId ? result.previousEntryId : null,
+            reversal: reversalId,
+            posted: newEntryId,
+          },
+          changedFields: ['amount', 'transactionDate', 'accountId', 'splits'],
+          revisionBefore: before.revision,
+        }),
+      );
       return { transaction: after, totalCost: await this.totalCost(workspaceId, after.conversion ?? null) };
     });
   }

@@ -526,6 +526,40 @@ export class PgTransactionRepository implements TransactionRepository {
       .execute();
   }
 
+  async revisionLegs(
+    workspaceId: string,
+    transactionId: string,
+  ): Promise<Map<number, { accountId: string; role: LegRole; amount: Money }[]>> {
+    const rows = await db()
+      .selectFrom('txn.transaction_leg as l')
+      .select([
+        'l.revision',
+        'l.account_id',
+        'l.role',
+        'l.currency',
+        sql<number>`(SELECT c.scale FROM fx.currency c WHERE c.code = l.currency)`.as('scale'),
+        sql<string>`l.amount::text`.as('amount'),
+      ])
+      .where('l.workspace_id', '=', workspaceId)
+      .where('l.transaction_id', '=', transactionId)
+      .orderBy('l.revision')
+      .execute();
+    const out = new Map<number, { accountId: string; role: LegRole; amount: Money }[]>();
+    for (const r of rows) {
+      const list = out.get(Number(r.revision)) ?? [];
+      list.push({
+        accountId: r.account_id,
+        role: r.role,
+        amount: Money.parse(r.amount, makeCurrency(r.currency, Number(r.scale))),
+      });
+      out.set(Number(r.revision), list);
+    }
+    for (const list of out.values()) {
+      list.sort((a, b) => LEG_ORDER.indexOf(a.role) - LEG_ORDER.indexOf(b.role));
+    }
+    return out;
+  }
+
   async postedEntriesByRevision(workspaceId: string, transactionId: string): Promise<Map<number, string>> {
     const rows = await db()
       .selectFrom('txn.transaction_journal_link')

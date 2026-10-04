@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/TransferRevised.v1.schema.json",
+  "title": "transactions.TransferRevised.v1",
+  "description": "Edición financiera (monto, comisión, cuentas o fecha) de una transferencia posteada: transición REVISE de la máquina Transaction (reversa exacta del asiento activo + asiento nuevo con la revisión siguiente; docs/31 D37, openspec add-lifecycle-timeline decisión 9). Lleva el asiento revertido, su reversa y el asiento nuevo. TransferCompleted.v1 NO se re-emite. Productor: TRANSACTIONS. Consumidores: REPORTING (Phase 1), GOALS y DEBT (Phase 4). Idempotencia natural: (transactionId, revisionTo). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.TransferRevised"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Transaction"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "revisionFrom",
+        "revisionTo",
+        "businessDate",
+        "fromAccountId",
+        "toAccountId",
+        "amount",
+        "fee",
+        "reversedJournalEntryId",
+        "reversalJournalEntryId",
+        "journalEntryId"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "revisionFrom": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revisionTo": {
+          "type": "integer",
+          "minimum": 2,
+          "description": "revisionFrom + 1"
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "fromAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "toAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+        },
+        "fee": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reversedJournalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Asiento de la revisión anterior (revertido)"
+        },
+        "reversalJournalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Reversa exacta del asiento revertido (INV-008)"
+        },
+        "journalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Asiento nuevo de la revisión revisionTo"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000201",
+      "eventType": "transactions.TransferRevised",
+      "eventVersion": 1,
+      "occurredAt": "2026-03-16T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "revisionFrom": 1,
+        "revisionTo": 2,
+        "businessDate": "2026-03-15",
+        "fromAccountId": "01928c4e-0000-7000-8000-000000acc001",
+        "toAccountId": "01928c4e-0000-7000-8000-000000acc002",
+        "amount": {
+          "amount": "250.00",
+          "currency": "BOB"
+        },
+        "fee": null,
+        "reversedJournalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+        "reversalJournalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e2",
+        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e3"
+      }
+    }
+  ]
+}

@@ -69,6 +69,10 @@ Regla: el **código** usa el término en inglés; la **UI y la documentación** 
 | Corrida de pronóstico | `ForecastRun` / `ForecastResult` | FORECAST | Ejecución del modelo y sus series. |
 | Notificación | `Notification` | NOTIFY | Mensaje al usuario por canal. |
 | Bitácora de auditoría | `AuditLog` | AUDIT | Registro inmutable de quién cambió qué. |
+| Máquina de estados | `LifecycleMachine` | SHARED KERNEL (declarada por cada contexto) | Estados, terminales y transiciones permitidas (origen, destino, guarda, eventos) de un agregado; única fuente de las reglas de transición (docs/31 D37). |
+| Transición | `LifecycleTransition` | AUDIT | Paso explícito del flujo de un agregado (p. ej. `POST`, `REVISE`, `VOID`) con actor, instante, motivo, revisión, asientos y eventos; inmutable. |
+| Anotación | `LifecycleAnnotation` | AUDIT | Cambio descriptivo del recorrido (sin cambio de estado ni de ledger). |
+| Recorrido | `Lifecycle` | AUDIT (compuesto por el contexto dueño) | Camino completo de un elemento: estado actual, estados visitados y transiciones/anotaciones en orden. |
 | Fecha de negocio | `businessDate` / `entryDate` (`LocalDate`) | todos | Fecha en la TZ del workspace (no instante). |
 | Instante | `Instant` (UTC) | todos | Momento absoluto (`occurredAt`, `executedAt`). |
 
@@ -368,6 +372,7 @@ Sin agregados transaccionales: **read models** reconstruibles desde eventos + qu
 - **Port público**: `AuditPort.append(entry)` (`@pf/audit/contracts`) — **síncrono en la misma transacción** (ARCHITECTURE §7, INV-029); fuera de una unidad de trabajo falla con `AUDIT_OUTSIDE_UNIT_OF_WORK`. Cada contexto declara la allow-list de redacción de sus agregados (`RedactionPolicy`).
 - **Queries**: `SearchAuditLog({from, to, aggregateType?})`, `GetHistory(aggregateType, aggregateId)` y `AuditHistoryQuery.historyOf(entities)` (vistas de historial por entidad, p. ej. `getTransactionHistory`, D28). Implementado por `add-audit-trail` (`packages/contexts/audit`).
 - **Invariantes**: append-only (sin UPDATE/DELETE grants); retención configurable.
+- **Recorrido del ciclo de vida** (`add-lifecycle-timeline`, docs/31 D37): `LifecycleEntry` append-only (`audit.lifecycle_transition`), un paso por cambio de estado (`TRANSITION`) o por edición descriptiva (`ANNOTATION`), escrito por `LifecyclePort.record(auditEntry, steps)` en la misma unidad de trabajo que el cambio, su auditoría y su outbox. `GetLifecycle` (`LifecycleQuery`) lo sirve al contexto dueño, que compone montos por revisión. Las máquinas (`TRANSACTION_LIFECYCLE`, `ACCOUNT_LIFECYCLE`, `EXCHANGE_RATE_LIFECYCLE`) las declara cada contexto en su dominio sobre `LifecycleMachine` (shared-kernel); AUDIT no conoce reglas. Job `audit.lifecycle-backfill` reconstruye (`derived = true`) el recorrido de datos anteriores desde la auditoría.
 
 ### 3.18 ASSISTANT — AI Assistant (Phase 10)
 
@@ -397,6 +402,19 @@ stateDiagram-v2
 ```
 
 `reconciled → void` no es directo: requiere des-conciliar primero. `void` es terminal (para "deshacer" se registra una transacción nueva).
+
+**Máquina declarada `Transaction` (`TRANSACTION_LIFECYCLE`, machineVersion 1; docs/31 D37).** El diagrama anterior es la vista de negocio; la máquina declarada usa los códigos del contrato y nombra cada transición, que queda registrada en el recorrido:
+
+| Transición | Origen → destino | Eventos |
+|---|---|---|
+| `RECORD` | ∅ → `PENDING` \| `POSTED` \| `CLEARED` | `TransactionCreated` (+ `TransactionPosted`, `TransferCompleted` / `ConversionRecorded` si nace posteada) |
+| `POST` | `PENDING` → `POSTED` | `TransactionPosted` (+ `TransferCompleted` / `ConversionRecorded`) |
+| `CLEAR` / `UNCLEAR` | `POSTED` ↔ `CLEARED` | `TransactionUpdated` |
+| `RECONCILE` / `UNRECONCILE` | `CLEARED` ↔ `RECONCILED` (des-reconciliar con motivo) | `TransactionUpdated` |
+| `REVISE` | `POSTED` \| `CLEARED` → `POSTED` (revisión n → n+1: asiento revertido, reversa y nuevo) | `TransactionPosted` + `TransactionUpdated` (+ `TransferRevised` / `ConversionRecorded`) |
+| `VOID` | `PENDING` \| `POSTED` \| `CLEARED` → `VOIDED` (terminal) | `TransactionVoided` |
+
+La edición de una transacción `PENDING` y las ediciones descriptivas son anotaciones. `Account` (`ACCOUNT_LIFECYCLE`): `OPEN` ∅ → `ACTIVE`, `CLOSE` `ACTIVE` → `CLOSED`, `ARCHIVE` `ACTIVE`\|`CLOSED` → `ARCHIVED`, `REACTIVATE` `ARCHIVED`\|`CLOSED` → `ACTIVE`. `ExchangeRate` manual (`EXCHANGE_RATE_LIFECYCLE`): `RECORD` ∅ → `RECORDED`, `SUPERSEDE` `RECORDED` → `SUPERSEDED` (terminal; enlaza la tasa que la reemplazó).
 
 ### 4.2 FinancialPeriod
 

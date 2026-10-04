@@ -12,9 +12,14 @@ invariants: ["INV-025"]
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - packages/contexts/audit/src/application/lifecycle.test.ts
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+  - tests/e2e/specs/lifecycle.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","authorization","rls"]
@@ -30,7 +35,7 @@ expected_result:
   - "VIEWER: 200 con la transición REVISE, su actor (EDITOR) e instante"
   - "Usuario de W2: 404 idéntico al de un id inexistente, sin datos de W1"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-006 — Un VIEWER ve el recorrido y otro workspace recibe recurso inexistente
@@ -51,3 +56,4 @@ Entonces ve la transición de revisión
 ## Notas
 
 - Cubre también el scenario "Usuario de otro workspace".
+- Implementación (2026-10-04): un usuario sin membresía en W1 recibe del guard de identidad la misma respuesta para el recorrido de un gasto de W1 que para un id inexistente; con el workspace propio, `RESOURCE_NOT_FOUND` (404) idéntico al de un id que nunca existió.

@@ -342,6 +342,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | forecasts | `POST W/forecasts` (202), `GET …/{id}`, `GET W/forecasts/latest?kind=` | `forecast/expense-forecasting` | 8 |
 | notifications | `GET W/notifications`, `POST …/{id}/read`, `GET/PUT W/notification-preferences` | `notifications/alerts` | 2 |
 | audit-log | `GET W/audit-log?aggregateType=&aggregateId=&from=&to=&sort=` (`listAuditLog`, EDITOR+; filtro `actor` en Phase 2) y `POST /me/session-events` (`recordSessionEvent`, auditoría de login/logout que invoca el BFF) | `audit/audit-trail` | 1 |
+| lifecycle | `GET W/transactions/{id}/lifecycle` (`getTransactionLifecycle`, con `revisions[]`), `GET W/accounts/{id}/lifecycle` (`getAccountLifecycle`), `GET W/fx-rates/{id}/lifecycle` (`getRateLifecycle`), `GET W/lifecycle-machines/{Transaction\|Account\|ExchangeRate}` (`getLifecycleMachine`); VIEWER+ (D28), otro workspace ⇒ 404; sin códigos de error nuevos (`INVALID_STATUS_TRANSITION` ya existía) | `audit/lifecycle-timeline` | 1 |
 | operations | `GET W/operations/{id}`, `POST …/{id}/cancel` | `platform/api-conventions` | 1 (contrato) / 6 (uso) |
 | exports | `POST W/exports` (202), `GET W/exports/{id}` | `reporting/financial-reports` + privacidad | 7 |
 | assistant | `POST W/assistant/conversations`, `POST …/{id}/messages` | `assistant/read-only-assistant` | 10 |

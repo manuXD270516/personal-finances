@@ -1403,6 +1403,7 @@ erDiagram
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
 | `audit_log` | PK `(occurred_at, id)` (requisito de particionado) | `actor_type='USER'` ⇒ `actor_user_id IS NOT NULL`; `actor_type<>'USER'` ⇒ `actor_process IS NOT NULL`; `origin IN ('ui','api','import','rule','recurring','system')` (FR-AUDIT-002) | `(workspace_id, aggregate_type, aggregate_id, occurred_at)`; `(workspace_id, occurred_at DESC)`; `(workspace_id, actor_user_id, occurred_at DESC)` | **WS-RO** | Particionada `PARTITION BY RANGE (occurred_at)` mensual (`pg_partman` o job propio). Sin UPDATE/DELETE/TRUNCATE para `pf_app`/`pf_worker`. |
+| `lifecycle_transition` | PK `id`; `UNIQUE (workspace_id, aggregate_type, aggregate_id, sequence)` | `kind IN ('TRANSITION','ANNOTATION')`; una transición lleva `transition`, `to_state` y `machine_version`; una anotación no lleva estado, máquina ni `reason`; `revision_to > revision_from`; `cardinality(event_ids) = cardinality(event_types)`; actor como en `audit_log` | `(workspace_id, occurred_at DESC)`; `(workspace_id, audit_log_id)` | **WS-RO** | Append-only (`platform.forbid_mutation()` de fila y de sentencia). Un paso del flujo (transición) o una anotación por comando, en la misma transacción que el cambio, su `audit_log` y su outbox (`add-lifecycle-timeline`, docs/31 D37). Columnas: `sequence`, `kind`, `transition`, `from_state`, `to_state`, `machine_version`, `revision_from/to`, `aggregate_version`, `occurred_at`, actor, `origin`, `reason`, `correlation_id`, `audit_log_id`, `event_ids uuid[]`, `event_types text[]`, `journal_entries jsonb {reversed, reversal, posted}`, `detail_refs jsonb`, `changed_fields text[]`, `derived` (reconstruida desde `audit_log` por el job `audit.lifecycle-backfill`). Sin montos. |
 
 Se escribe **en la misma transacción** que el comando (ARCHITECTURE §7). `changes` nunca contiene secretos ni tokens; sí montos (es el propósito del audit financiero). Hash chain (`prev_hash`/`row_hash` por workspace) es opcional — ver Preguntas abiertas.
 
@@ -1549,7 +1550,7 @@ erDiagram
 | `fx.exchange_rate`, `fx.rate_anomaly_review` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; sin UPDATE/DELETE) |
 | `fx.provider_run` (instalación) | SELECT | SELECT, INSERT, DELETE (purga) | No |
 | `planning.budget_template_version`, `budget_template_line` | SELECT, INSERT | SELECT | Sí |
-| `audit.audit_log` | SELECT, INSERT | SELECT, INSERT | Sí |
+| `audit.audit_log`, `audit.lifecycle_transition` | SELECT, INSERT | SELECT, INSERT | Sí |
 | `goals.goal_contribution`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |
 | `reporting.*` | SELECT | SELECT, INSERT, UPDATE, DELETE, TRUNCATE | No |
 | Resto de tablas de negocio | SELECT, INSERT, UPDATE | SELECT, INSERT, UPDATE | No (DELETE no concedido salvo tablas de enlace/técnicas: `split_tag`, `split_custom_field_value`, `attachment_link`, `reconciliation_item`; purgas de `imports.staged_transaction` solo `pf_maintenance`) |

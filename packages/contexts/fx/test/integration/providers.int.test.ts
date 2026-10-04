@@ -297,6 +297,13 @@ describe('PollMarketRates sobre PostgreSQL (fx/market-rate-providers)', () => {
       workspaces: { settingsOf: async () => ({ baseCurrency: 'BOB', timeZone: 'America/La_Paz' }) },
       outbox: { append: async () => undefined },
       audit: { append: async () => undefined },
+      lifecycle: { record: async () => undefined },
+      lifecycleQuery: {
+        machineOf: () => {
+          throw new Error('not used');
+        },
+        lifecycleOf: () => Promise.reject(new Error('not used')),
+      },
       ids: uuidV7Ids,
       clock,
     } satisfies FxDeps;

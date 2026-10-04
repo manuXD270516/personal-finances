@@ -28,7 +28,7 @@ import type {
   TransactionState,
   TransactionStatus,
 } from '../domain/index.js';
-import { conversionDetailDto } from './conversion-dto.js';
+import { conversionDetailDto, rateDto } from './conversion-dto.js';
 
 export const TRANSACTIONS_SERVICE = Symbol('TRANSACTIONS_SERVICE');
 
@@ -349,6 +349,42 @@ export class TransactionsController {
       (position) => this.options.cursors.encode(scope, position),
     );
     return { data: page.data.map(auditEntryDto), page: page.page };
+  }
+
+  /**
+   * `GET W/transactions/{id}/lifecycle` (`getTransactionLifecycle`, add-lifecycle-timeline § Contratos; VIEWER+, D28):
+   * recorrido (máquina, camino, transiciones y anotaciones) + montos de cada revisión. Otro workspace ⇒ 404.
+   */
+  @Get('workspaces/:workspaceId/transactions/:transactionId/lifecycle')
+  async getTransactionLifecycle(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    const view = await this.service.transactionLifecycle({
+      userId: userIdOf(req),
+      workspaceId,
+      transactionId,
+    });
+    return {
+      ...view.lifecycle,
+      revisions: view.revisions.map((r) => ({
+        revision: r.revision,
+        amount: r.amount.toJSON(),
+        fee: r.fee?.toJSON() ?? null,
+        legs: r.legs.map((l) => ({ accountId: l.accountId, role: l.role, amount: l.amount.toJSON() })),
+        conversion: r.conversion
+          ? {
+              sourceAccountId: r.conversion.sourceAccountId,
+              targetAccountId: r.conversion.targetAccountId,
+              sourceAmount: r.conversion.sourceAmount.toJSON(),
+              targetAmount: r.conversion.targetAmount.toJSON(),
+              effectiveRate: rateDto(r.conversion.effectiveRate),
+              fees: r.conversion.fees.map((f) => ({ type: f.type, amount: f.amount.toJSON() })),
+            }
+          : null,
+      })),
+    };
   }
 
   @Post('workspaces/:workspaceId/transactions/:transactionId/void')

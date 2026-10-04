@@ -12,9 +12,12 @@ invariants: ["INV-023"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle.test.ts
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","api"]
@@ -32,7 +35,7 @@ expected_result:
   - "Cada transición trae actor, occurredAt, origin y auditLogId; machine es la definición de Transaction"
   - "Saldo final de \"Bank A\" 1000.00 BOB"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-005 — El recorrido de un gasto lista todas sus transiciones en orden con el camino de estados
@@ -53,3 +56,4 @@ Entonces obtengo cinco transiciones en orden
 ## Notas
 
 - El saldo vuelve a 1000.00 BOB porque la anulación revierte el asiento activo de 85.00 BOB.
+- Implementación (2026-10-04): estados con los códigos del contrato; la API también devuelve `revisions[]` con el monto de cada revisión (80.00 y 85.00 BOB).

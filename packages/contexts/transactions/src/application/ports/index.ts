@@ -1,4 +1,4 @@
-import type { AuditHistoryQuery, AuditPort } from '@pf/audit/contracts';
+import type { AuditHistoryQuery, AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { AccountsQueryPort } from '@pf/accounts/contracts';
 import type { ClassificationValidator } from '@pf/classification/contracts';
 import type { FxConversionPricingPort } from '@pf/fx/contracts';
@@ -6,6 +6,7 @@ import type { LedgerPostingPort } from '@pf/ledger/contracts';
 import type { Clock, Money } from '@pf/shared-kernel';
 import type {
   ConversionDetail,
+  LegRole,
   PaymentMethod,
   Transaction,
   TransactionKind,
@@ -74,6 +75,19 @@ export interface TransactionRepository {
     readonly linkType: 'POSTED' | 'REVERSAL';
   }): Promise<void>;
   linkedEntries(workspaceId: string, transactionId: string): Promise<string[]>;
+  /**
+   * Legs de cada revisión (vigentes y reemplazadas; `superseded_in_revision` no las borra) para los montos por revisión
+   * del recorrido (add-lifecycle-timeline decisión 7).
+   */
+  revisionLegs(
+    workspaceId: string,
+    transactionId: string,
+  ): Promise<
+    ReadonlyMap<
+      number,
+      readonly { readonly accountId: string; readonly role: LegRole; readonly amount: Money }[]
+    >
+  >;
   /** Asientos POSTED por revisión (para el historial de revisiones de una conversión). */
   postedEntriesByRevision(workspaceId: string, transactionId: string): Promise<Map<number, string>>;
   /** Todas las revisiones del `ConversionDetail` (inmutables), de la más antigua a la vigente. */
@@ -129,7 +143,11 @@ export interface TransactionsDeps {
   readonly fx: FxConversionPricingPort;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  /** Auditoría + registro de transición/anotación en la misma unidad de trabajo (add-lifecycle-timeline). */
+  readonly lifecycle: LifecyclePort;
   readonly history: AuditHistoryQuery;
+  /** `GetLifecycle` de AUDIT (el recorrido lo compone TRANSACTIONS con los montos de sus revisiones). */
+  readonly lifecycleQuery: LifecycleQuery;
   readonly ids: IdGenerator;
   readonly clock: Clock;
 }

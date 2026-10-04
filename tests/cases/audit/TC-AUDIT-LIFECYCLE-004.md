@@ -12,9 +12,13 @@ invariants: ["INV-033"]
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/lifecycle/lifecycle.test.tsx
+  - packages/contexts/audit/src/application/lifecycle.test.ts
+  - packages/contexts/transactions/src/application/lifecycle.service.test.ts
+  - packages/contexts/transactions/src/domain/transaction-lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","annotation"]
@@ -29,7 +33,7 @@ expected_result:
   - "El recorrido agrega una anotación con changedFields [categoryId]"
   - "El número de transiciones y de asientos no cambia"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-004 — Recategorizar un gasto aparece como anotación sin nueva transición ni asiento

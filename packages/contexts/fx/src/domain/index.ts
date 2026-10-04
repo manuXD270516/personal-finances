@@ -6,3 +6,4 @@ export * from './conversion-pricing.js';
 export * from './market-rate-provider.js';
 export * from './valuation-rate-selector.js';
 export * from './anomaly-detector.js';
+export * from './exchange-rate-lifecycle.js';

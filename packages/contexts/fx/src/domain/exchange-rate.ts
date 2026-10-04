@@ -1,5 +1,6 @@
 import { DomainError, Instant, Rate, type Currency } from '@pf/shared-kernel';
 import type { FxRateProvider, FxRateSource, FxRateType } from './fx-types.js';
+import { EXCHANGE_RATE_LIFECYCLE } from './exchange-rate-lifecycle.js';
 import type { ProviderSample } from './market-rate-provider.js';
 
 /** NUMERIC(38,18): como máximo 20 dígitos enteros y 18 decimales; las tasas NO se redondean a la escala de la moneda. */
@@ -199,6 +200,8 @@ export class ExchangeRate {
     if (s.workspaceId === null) {
       throw new DomainError('VALIDATION_FAILED', 'global provider rates cannot be superseded by a workspace');
     }
+    // Paso declarado RECORDED → SUPERSEDED (add-lifecycle-timeline decisión 4; la máquina es la única fuente).
+    EXCHANGE_RATE_LIFECYCLE.transition('SUPERSEDE', 'RECORDED');
     return new ExchangeRate({
       ...s,
       id: input.id,

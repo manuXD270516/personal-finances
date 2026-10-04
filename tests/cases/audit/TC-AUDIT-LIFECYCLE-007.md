@@ -12,9 +12,11 @@ invariants: ["INV-009"]
 priority: high
 type: api
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle.api.test.ts
+  - packages/contexts/transactions/src/application/transfers.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle","transfer"]
@@ -31,7 +33,7 @@ expected_result:
   - "REVISE (posted → posted, revisión 1 → 2, 250.00 BOB, events incluye transactions.TransferRevised.v1)"
   - "\"A\" 750.00 BOB, \"B\" 250.00 BOB; patrimonio 1000.00 BOB"
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-AUDIT-LIFECYCLE-007 — El recorrido de una transferencia corregida muestra completada y revisada con sus montos

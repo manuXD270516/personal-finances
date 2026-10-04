@@ -1,5 +1,11 @@
 import { DomainError } from '@pf/shared-kernel';
 import {
+  ACCOUNT_LIFECYCLE,
+  type AccountLifecycleStatus,
+  type AccountTransition,
+  type AccountTransitionRecord,
+} from './account-lifecycle.js';
+import {
   accountType,
   defaultLiquidityFor,
   liquidity as parseLiquidity,
@@ -10,7 +16,7 @@ import {
 } from './account-type.js';
 
 /** Estado derivado de `closedOn`/`archivedAt` (docs/31 D4): solo ACTIVE acepta movimientos (INV-026). */
-export type AccountStatus = 'ACTIVE' | 'CLOSED' | 'ARCHIVED';
+export type AccountStatus = AccountLifecycleStatus;
 
 /** Clase de moneda del catálogo `fx.currency` (la provee la aplicación). */
 export type CurrencyKind = 'FIAT' | 'CRYPTO' | 'COMMODITY' | 'CUSTOM' | string;
@@ -128,10 +134,23 @@ export class Account {
   private state: AccountState;
   /** Versión leída de la base (la que exige el `UPDATE … WHERE version = ?`). */
   readonly persistedVersion: number;
+  /** Paso del flujo de esta unidad de trabajo, validado contra `ACCOUNT_LIFECYCLE` (add-lifecycle-timeline). */
+  private transitionRecord: AccountTransitionRecord | null = null;
 
   private constructor(state: AccountState, persistedVersion: number) {
     this.state = state;
     this.persistedVersion = persistedVersion;
+    // Una cuenta nueva (persistedVersion 0) nace con OPEN (∅ → ACTIVE).
+    if (persistedVersion === 0) this.mark('OPEN', null, 'ACTIVE');
+  }
+
+  /** Transición del último comando (`null` si fue un cambio de metadatos: anotación). */
+  get lastTransition(): AccountTransitionRecord | null {
+    return this.transitionRecord;
+  }
+
+  private mark(code: AccountTransition, from: AccountStatus | null, to: AccountStatus): void {
+    this.transitionRecord = ACCOUNT_LIFECYCLE.transition(code, from, to);
   }
 
   static restore(state: AccountState): Account {
@@ -271,6 +290,7 @@ export class Account {
     if (this.status === 'ARCHIVED') {
       throw new DomainError('INVALID_STATUS_TRANSITION', `account ${this.id} is already archived`);
     }
+    this.mark('ARCHIVE', this.status, 'ARCHIVED');
     this.state = {
       ...this.state,
       archivedAt: at,
@@ -294,6 +314,7 @@ export class Account {
     if (!ctx.balanceIsZero) {
       throw new DomainError('ACCOUNT_BALANCE_NOT_ZERO', `account ${this.id} balance is not zero`);
     }
+    this.mark('CLOSE', 'ACTIVE', 'CLOSED');
     this.state = {
       ...this.state,
       closedOn,
@@ -308,6 +329,7 @@ export class Account {
     if (previous === 'ACTIVE') {
       throw new DomainError('INVALID_STATUS_TRANSITION', `account ${this.id} is already active`);
     }
+    this.mark('REACTIVATE', previous, 'ACTIVE');
     this.state = {
       ...this.state,
       archivedAt: null,

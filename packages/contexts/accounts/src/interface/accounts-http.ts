@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Put, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Put, Req, Res } from '@nestjs/common';
 import { ApiProblem, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, buildPage } from '@pf/platform/api';
 import {
   API_CONVENTIONS,
   ExpectedVersion,
   ValidatedQuery,
+  principalOf,
   type ApiConventionsOptions,
+  type ApiRequest,
   type ApiResponse,
 } from '@pf/platform/nest';
 import type { AccountsService, AccountSort, AccountView } from '../application/accounts.service.js';
@@ -220,6 +222,21 @@ export class AccountsController {
   @Get('workspaces/:workspaceId/accounts/:accountId')
   async getAccount(@Param('workspaceId') workspaceId: string, @Param('accountId') accountId: string) {
     return toAccountDto(await this.service.getAccount(workspaceId, accountId));
+  }
+
+  /**
+   * `GET W/accounts/{id}/lifecycle` (`getAccountLifecycle`, add-lifecycle-timeline § Contratos; VIEWER+): recorrido
+   * de la cuenta (apertura con su asiento de saldo inicial, cierre, archivo, reactivación y anotaciones).
+   */
+  @Get('workspaces/:workspaceId/accounts/:accountId/lifecycle')
+  async getAccountLifecycle(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('accountId') accountId: string,
+  ) {
+    const principal = principalOf(req);
+    if (!principal) throw new ApiProblem('UNAUTHENTICATED', 'an authenticated user is required');
+    return this.service.accountLifecycle({ userId: principal.userId, workspaceId, accountId });
   }
 
   @Patch('workspaces/:workspaceId/accounts/:accountId')

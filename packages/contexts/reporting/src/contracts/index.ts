@@ -16,6 +16,8 @@ export const REPORTING_INVALIDATING_EVENTS = [
   { type: 'transactions.TransactionPosted', version: 1 },
   { type: 'transactions.TransactionVoided', version: 1 },
   { type: 'transactions.TransactionCategorized', version: 1 },
+  // add-lifecycle-timeline (docs/31 D37): la edición financiera de una transferencia (sin re-emitir TransferCompleted).
+  { type: 'transactions.TransferRevised', version: 1 },
   { type: 'accounts.AccountOpened', version: 1 },
   { type: 'accounts.AccountArchived', version: 1 },
   { type: 'fx.RateRecorded', version: 1 },
