@@ -440,6 +440,13 @@ describe('Conversiones por HTTP (transactions/conversions, fx/conversion-pricing
     expect(contract().validateResponse('createConversion', 201, r.body)).toEqual([]);
     conversionId = r.body['id'] as string;
     expect(r.headers.get('location')).toBe(`${W(u)}/conversions/${conversionId}`);
+    // createdAt del 201 = el persistido (ni epoch ni nulo), igual al de la consulta.
+    expect(new Date(r.body['createdAt'] as string).getTime()).toBeGreaterThan(
+      Date.parse('2000-01-01T00:00:00Z'),
+    );
+    expect(
+      (await call('GET', `${W(u)}/conversions/${conversionId}`, { token: u.token })).body['createdAt'],
+    ).toBe(r.body['createdAt']);
     const postings = await postingsOf(u, conversionId);
     expect(new Set(postings.map((p) => p.entry)).size).toBe(1);
     expect(postings.map((p) => [p.who, p.amount])).toEqual([
