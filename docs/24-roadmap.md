@@ -125,7 +125,7 @@ flowchart LR
 ### 5.2 Phase 2 — Planificación, presupuestos y cierre
 
 - **Objetivo:** planificar el mes, controlar presupuestos con alertas y cerrar meses con snapshot inmutable.
-- **Alcance:** periodos (draft/active/closed/reopened), plan mensual, templates versionados, presupuestos (fixed/maximum Must; minimum/range/rollover/% ingreso Should; zero-based Could), umbrales 50/75/90/100/custom, month closing con checklist y snapshot, reconciliación por sesiones, bulk edit, custom fields, notificaciones in-app/email, export de workspace, evolución de net worth, audit global.
+- **Alcance:** periodos (draft/active/closed/reopened), plan mensual, templates versionados, presupuestos (fixed/maximum Must; minimum/range/rollover/% ingreso Should; zero-based Could), umbrales 50/75/90/100/custom, month closing con checklist y snapshot, reconciliación por sesiones (con el evento dedicado `transactions.TransactionCleared`, que en Phase 1 se cubre con `TransactionUpdated` + `changedFields=[status]`; docs/31 D47), bulk edit, custom fields, notificaciones in-app/email, export de workspace, evolución de net worth, audit global.
 - **Capabilities:** `planning/financial-periods`, `planning/budgets`, `planning/budget-templates`, `planning/month-closing`, `notifications/alerts`, `transactions/reconciliation` (completa), `transactions/bulk-edit`, `classification/custom-fields`.
 - **Exit criteria:** owner cierra ≥ 1 mes real con reconciliación de todas las cuentas a diferencia 0; reabrir/re-cerrar genera nuevo snapshot sin alterar el anterior; alertas de umbral entregadas exactamente una vez; export→import round-trip reproduce saldos.
 - **Dependencias:** Phase 1 (LEDGER para bloqueo de periodos, TRANSACTIONS/CLASSIFICATION para presupuesto vs real, FX para conversión a base).
@@ -314,7 +314,7 @@ gantt
 ## Preguntas abiertas
 
 1. ¿Aprueba el owner tratar el hardening de producción como Hito H paralelo (no como fase) y la Colaboración como track posterior no numerado?
-2. ¿Se hará el **despliegue personal mínimo** al final de Phase 2 o el owner prefiere operar local-only hasta el Hito H? (Depende de SPIKE-09 y del presupuesto.)
+2. ¿Se hará el **despliegue personal mínimo** al final de Phase 2 o el owner prefiere operar local-only hasta el Hito H? (Depende de SPIKE-09 y del presupuesto.) *Presupuesto fijado por el owner el 2026-10-05: USD 10–20/mes (docs/31 D51); el host lo elige el change de despliegue (ADR-0027).*
 3. ~~¿Phase 5 (FX providers) puede adelantarse?~~ Resuelta 2026-10-02: los providers de tasa paralela se adelantan a Phase 1 (docs/31 D29, ADR-0025); Phase 5 conserva más providers, cripto y commodities.
 4. ¿El CSV básico (Phase 3, Could) se considera necesario para cargar el histórico del owner, o el owner empezará "desde cero" con saldos iniciales?
 5. ¿El umbral "≥ 6 meses de datos cerrados" para Phase 8 se cumplirá a tiempo según el cronograma? Si no, Phase 8 puede posponerse sin bloquear Phase 9/10.

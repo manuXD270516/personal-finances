@@ -30,7 +30,7 @@ Motivación y alcance: ver proposal.md. Decisión del owner D37 (docs/31). Se co
    | `UNCLEAR` | `cleared` → `posted` | — | `TransactionUpdated` |
    | `RECONCILE` | `cleared` → `reconciled` | — | `TransactionUpdated` |
    | `UNRECONCILE` | `reconciled` → `cleared` | motivo obligatorio | `TransactionUpdated` |
-   | `REVISE` | `posted` \| `cleared` → `posted` | campos financieros cambian; versión esperada; cuentas activas; misma moneda en `TRANSFER` (`TRANSFER_CURRENCY_MISMATCH`) | `TransactionPosted` (`supersedesJournalEntryId`) + `TransactionUpdated` (`ledgerImpact`) + `TransferRevised` si `TRANSFER` (+ `ConversionRecorded` con el detalle nuevo si `CONVERSION`, comportamiento vigente de `add-manual-conversions`) |
+   | `REVISE` | `posted` \| `cleared` → `posted` | campos financieros cambian; versión esperada; cuentas activas; misma moneda en `TRANSFER` (`TRANSFER_CURRENCY_MISMATCH`) | `TransactionPosted` (`supersedesJournalEntryId`) + `TransactionUpdated` (`ledgerImpact`) + `TransferRevised` si `TRANSFER` + `ConversionRevised` si `CONVERSION` (docs/31 D48; antes se re-emitía `ConversionRecorded` con el detalle nuevo) |
    | `VOID` | `pending` \| `posted` \| `cleared` → `void` | motivo; no `reconciled` (D16); cuentas activas para la reversa | `TransactionVoided` |
 
    La edición de una transacción `pending` (sin asiento) y las ediciones descriptivas son **anotaciones** (no cambian estado ni ledger).
@@ -58,6 +58,7 @@ Migración `audit_00xx_lifecycle_transition` (expand, no destructiva).
 |---|---|---|
 | `transactions.TransferRevised.v1` (nuevo) | `REVISE` de una transferencia | natural `(transactionId, revisionTo)` |
 | `transactions.TransferCompleted.v1` (semántica) | Solo primer asiento de la transferencia | natural `transactionId` |
+| `transactions.ConversionRevised.v1` (nuevo, docs/31 D48) | `REVISE` de una conversión (`ConversionRecorded.v1` queda solo para el primer asiento) | natural `(transactionId, revisionTo)` |
 | Eventos de transacciones y cuentas (aditivo) | Sin cambio de momento; agregan `transition` | sin cambio |
 
 Consumidores: REPORTING (`reporting.data-version` suma `TransferRevised.v1`); GOALS/DEBT (Phase 4) consumirán `TransferCompleted` + `TransferRevised` + `TransactionVoided`.
@@ -92,10 +93,10 @@ Dependencias: requiere aplicados `add-audit-trail`, `add-accounts-management`, `
 
 ## Preguntas abiertas
 
-1. **Comisión de transferencia en otra moneda o desde una tercera cuenta** — propuesta: no en Phase 1 (conversión o gasto aparte). Pendiente de confirmación del owner (docs/31 D37).
-2. ¿Agregar `transactions.ConversionRevised.v1` por simetría con `TransferRevised`, o mantener la re-emisión de `ConversionRecorded` con el detalle nuevo? Propuesta: `ConversionRevised.v1` en un change posterior cuando exista un consumidor que lo necesite.
-3. ¿Recorrido también para categorías/contrapartes (archivar, fusionar) en Phase 1? Propuesta: no; mismo mecanismo en Phase 2.
-4. ¿Exportar el recorrido (CSV/PDF) junto con el export del workspace (FR-IDENTITY-010, Phase 2)?
+1. ~~**Comisión de transferencia en otra moneda o desde una tercera cuenta**~~ — resuelta por el owner el 2026-10-04 (docs/31 D40): no se soporta; se registra como conversión o gasto aparte (`TRANSFER_CURRENCY_MISMATCH`).
+2. ~~¿Agregar `transactions.ConversionRevised.v1` por simetría con `TransferRevised`, o mantener la re-emisión de `ConversionRecorded`?~~ — resuelta por el owner el 2026-10-05 (docs/31 D48): se agrega `ConversionRevised.v1` (`ConversionRecorded.v1` una sola vez, en el primer posteo; cada edición financiera publica `ConversionRevised.v1` con las revisiones y los asientos revertido, de reversa y nuevo). Spec: `transactions/conversions` en `add-manual-conversions`.
+3. ¿Recorrido también para categorías/contrapartes (archivar, fusionar) en Phase 1? Propuesta: no; mismo mecanismo en Phase 2. **Sigue abierta** (pendiente del owner, docs/31 tras D51).
+4. ¿Exportar el recorrido (CSV/PDF) junto con el export del workspace (FR-IDENTITY-010, Phase 2)? **Sigue abierta** (pendiente del owner, docs/31 tras D51).
 
 ## Decisiones de implementación (2026-10-04)
 

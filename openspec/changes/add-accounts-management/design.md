@@ -106,6 +106,7 @@ Cambios **exactos** requeridos (no se editan aquí; los consolida el proceso de 
 
 - ~~FR-ACCOUNTS-003 exige crear el `LedgerAccount` en la misma transacción que la cuenta~~ — resuelta (docs/31 D6): get-or-create al primer posting; FR-ACCOUNTS-003 reescrito.
 - ~~¿Las cuentas archivadas con saldo ≠ 0 cuentan en el patrimonio neto del dashboard?~~ — resuelta por el owner el 2026-10-03 (docs/31 D35): el resumen incluye solo cuentas **no archivadas** (`ACTIVE` y `CLOSED`).
+- ~~¿"Moneda habilitada" para crear una cuenta = activa en el catálogo global `fx.currency` (decisión de implementación 5) o habilitada en el workspace (`fx.workspace_currency`)?~~ — resuelta por el owner el 2026-10-05 (docs/31 D45): debe estar **habilitada en el workspace** (`fx.workspace_currency`); si no, `CURRENCY_NOT_ENABLED`. La decisión de implementación 5 queda reemplazada (el ajuste de código lo lleva el change).
 - ~~¿Liquidez por defecto de los pasivos (`ILLIQUID`)…?~~ — resuelta (docs/31 D5, D35): cuenta líquida = `ASSET` + `LIQUID`; los pasivos quedan fuera del eje de liquidez del resumen.
 
 ## Implementación (2026-10-03, owner ausente — decisiones registradas)

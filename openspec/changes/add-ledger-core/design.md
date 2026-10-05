@@ -50,7 +50,7 @@ Capas afectadas:
 10. **Verificador de invariantes** (`VerifyLedgerIntegrity`, job diario en el worker y tras `restore:local`): consultas SQL que detectan asientos con Σ ≠ 0 por moneda, asientos con < 2 postings, postings en cero, snapshots ≠ Σ postings, reversas que no niegan exactamente su original. Cada violación → log `error` estructurado con `workspaceId`, métrica `ledger_invariant_violations_total{invariant}` y alerta crítica (NFR-OBS-005; en local vía log/notify).
 11. **Evento.** `PostJournalEntry` y `ReverseJournalEntry` escriben `ledger.JournalEntryPosted.v1` en `platform.outbox` en la misma transacción (ADR-0008). Idempotencia del consumidor: `eventId` + `journalEntryId` como clave natural en `platform.inbox`; Reporting ordena proyecciones por `sequence`. No se consumen eventos de otros contextos.
 12. **RLS y grants** (ADR-0023, docs/08 §1.4 y §6): todas las tablas `ledger.*` con `ENABLE` + `FORCE ROW LEVEL SECURITY` y política `workspace_id = platform.current_workspace_id()` (fail-closed `PF002`). `journal_entry`, `posting`, `entry_reversal` = **WS-RO** (`SELECT, INSERT`); `ledger_account` = WS (`SELECT, INSERT`, `UPDATE(archived_at)`); `period_lock` = WS (`SELECT, INSERT, DELETE` para `pf_app`); `balance_snapshot` = **DRV**. Un posting contra una cuenta contable de otro workspace no es visible bajo RLS → el repositorio la resuelve como inexistente (`REFERENCE_NOT_FOUND`).
-13. **Endpoint técnico (Could).** `GET /api/v1/workspaces/{workspaceId}/ledger/trial-balance?asOf=` solo `OWNER` (RBAC en aplicación, `INSUFFICIENT_ROLE`), sin `Idempotency-Key` (lectura). Se implementa al final y puede posponerse sin afectar a otros changes.
+13. **Endpoint técnico (Could).** `GET /api/v1/workspaces/{workspaceId}/ledger/trial-balance?asOf=` con rol mínimo `VIEWER` (docs/31 D44, owner 2026-10-05: el contrato con `x-required-role: VIEWER` es el correcto; antes decía solo `OWNER`; no miembro ⇒ `WORKSPACE_ACCESS_DENIED`), sin `Idempotency-Key` (lectura). Se implementa al final y puede posponerse sin afectar a otros changes.
 
 ## Contratos
 
@@ -94,7 +94,7 @@ Cambios EXACTOS requeridos (este change no edita los archivos; los consolida otr
 
 - [Colisión de `SQLSTATE PF002` en docs/08] → `PF005` para el mínimo de postings; reportado al owner para corregir docs/08 §10.2.
 - [Creación concurrente de cuentas de sistema o de usuario] → `ON CONFLICT DO NOTHING` + relectura; test de concurrencia (TC-LEDGER-CHART-002/003).
-- [Trigger diferido por fila: costo por posting] → medido en SPIKE-02 (despreciable con 2–20 postings); seguir con `EXPLAIN ANALYZE` y medir overhead de RLS (< 10 %, ADR-0023).
+- [Trigger diferido por fila: costo por posting] → medido en SPIKE-02 (despreciable con 2–20 postings); seguir con `EXPLAIN ANALYZE` y medir overhead de RLS (< 10 %, ADR-0023). **Criterio (docs/31 D43, owner 2026-10-05):** el < 10 % se mide sobre la consulta real de saldos en lote de la aplicación; el agregado sintético de todo el workspace queda solo informativo; se mantiene el fail-closed `PF002` (nunca 0 filas sin contexto).
 - [`sequence` no refleja el orden de commit] → snapshots con checkpoints conservadores, invalidación por fecha y reconstrucción completa como red; el verificador compara contra Σ postings.
 - [Doble redondeo en multiplicaciones con precisión 40] → cuantización racional exacta con `bigint` (H3) y PBT de borde.
 - [Uso accidental de `number`] → regla tipada `pf/no-number-money`, prohibición del `Decimal` global, architecture test sobre DTOs y Spectral (`type: number` prohibido en montos).
@@ -111,6 +111,8 @@ Sin datos existentes: no hay backfill. Rollback en local = `down` de las migraci
 
 ## Preguntas abiertas
 
+- ~~**Criterio de overhead de RLS** (tarea 5.5: el agregado sintético de todo el workspace mide 18–20 %)~~ — resuelta por el owner el 2026-10-05 (docs/31 D43): el objetivo < 10 % se mide sobre la consulta real de saldos en lote; el agregado sintético queda solo informativo; se mantiene el fail-closed `PF002`.
+- ~~**Rol del balance de comprobación** (contrato `VIEWER` vs tarea 6.3 / TC `OWNER`)~~ — resuelta por el owner el 2026-10-05 (docs/31 D44): rol mínimo `VIEWER` (el contrato es correcto); spec, decisión 13 y TC-LEDGER-TRIAL-001 corregidos.
 - **SQLSTATE del mínimo de postings:** se propone `PF005` porque docs/08 asigna `PF002` tanto a RLS fail-closed (§1.4) como al trigger de mínimo de postings (§10.2). Requiere corrección del owner en docs/08; no bloquea las specs.
 - **Granularidad del bloqueo:** docs/09 §10 habla de `year_month`; docs/08 usa rangos `period_start/period_end`. Se adopta el rango (generaliza meses calendario); confirmar al redactar `planning/month-closing`.
 - **Reversa en periodo cerrado con "corregir en el periodo actual"** (docs/09 Preguntas abiertas 3): la decide Transactions al elegir `reverseDate`; el ledger solo valida. No bloquea este change.

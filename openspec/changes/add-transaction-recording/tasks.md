@@ -4,7 +4,8 @@
 
 ## 1. SPEC y test cases
 
-- [ ] 1.1 Revisar con el owner las preguntas abiertas de design.md (ajuste informativo en cero, `reconciled→void`, sobre-reembolso, evento `TransactionCleared`); verificar que las respuestas quedan reflejadas en las specs y que `openspec validate add-transaction-recording --strict` pasa
+- [x] 1.1 Revisar con el owner las preguntas abiertas de design.md (ajuste informativo en cero, `reconciled→void`, sobre-reembolso, evento `TransactionCleared`); verificar que las respuestas quedan reflejadas en las specs y que `openspec validate add-transaction-recording --strict` pasa
+  > Resuelto 2026-10-05: ajuste en cero (docs/31 D17), `reconciled→void` (D16), sobre-reembolso con confirmación explícita y sin evento `TransactionCleared` en Phase 1 (D47, owner 2026-10-05); las specs ya reflejaban esas respuestas.
   > Revisado 2026-10-04 (sigue pendiente del owner): 1 ajuste en cero (D17) y 2 `reconciled → void` (D16) resueltos en docs/31. Siguen abiertas sin decisión: 3 sobre-reembolso con confirmación explícita (implementado con `confirmRefundExceedsOriginal`) y 4 evento propio `TransactionCleared` vs `TransactionUpdated` (implementado con `TransactionUpdated`).
 - [x] 1.2 Confirmar los TC listados en proposal.md (estado `ready`, `requirement` exacto); verificar con el chequeo del catálogo de `scripts/traceability` que no hay requirement Must sin TC
   > Verificado 2026-10-04: todos los TC de proposal.md existen en `tests/cases/transactions/` con `requirement` exacto (comparado con los `### Requirement:`), en `ready` o `automated`; `pnpm traceability:check` sin requirement Must sin TC.

@@ -105,9 +105,9 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 | 6 | `add-accounts-management` | `accounts/account-management`, `accounts/institutions` | 1 |
 | 7 | `add-transaction-recording` | `transactions/transaction-recording`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection` | 1 |
 | 8 | `add-transfers` | `transactions/transfers` | 1 |
-| 9 | `add-manual-conversions` | `transactions/conversions`, `fx/conversion-pricing`, `fx/market-rates` (manual) | 1 |
+| 9 | `add-manual-conversions` | `transactions/conversions` (incluye `ConversionRevised.v1`; docs/31 D48), `fx/conversion-pricing`, `fx/market-rates` (manual; par sin preferencia ⇒ `PARALLEL`, D48) | 1 |
 | 9b | `add-market-rate-providers` | `fx/market-rate-providers` (paralelo.bo principal, bo.dolarapi.com respaldo/oficial; docs/31 D29, ADR-0025) | 1 |
-| 10 | `add-basic-dashboard` | `reporting/dashboard`, `reporting/net-worth` (valoración USD/USDT con la tasa paralela del provider) | 1 |
+| 10 | `add-basic-dashboard` | `reporting/dashboard` (incluye FR-REPORTING-004 en el Home; docs/31 D50), `reporting/net-worth` (valoración USD/USDT con la tasa paralela del provider) | 1 |
 | 11 | `add-lifecycle-timeline` | `audit/lifecycle-timeline` (máquinas de estado explícitas por agregado, `GET …/{id}/lifecycle`, reporte de recorrido en la UI) + `transactions/transfers` (`TransferRevised.v1`; docs/31 D37) | 1 |
 | 12 | `add-demo-data` | `identity/demo-data` (carga y limpieza de datos de demostración por acción explícita del OWNER, en un workspace demo dedicado y purgable; docs/31 D36, ADR-0026) | 1 |
 

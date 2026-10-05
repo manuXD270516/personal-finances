@@ -179,10 +179,15 @@ Trace: FR-CLASSIFICATION-006 · Priority: Should
 - **ENTONCES** la operación se rechaza con `CATEGORY_GROUP_NOT_EMPTY`
 
 ### Requirement: Recategorizar no modifica el ledger
-Cambiar la categoría de una transacción NO DEBE (MUST NOT) crear, modificar ni revertir asientos contables ni alterar ningún saldo de cuenta; solo DEBE (MUST) cambiar los totales por categoría.
+Cambiar la categoría de una transacción NO DEBE (MUST NOT) crear, modificar ni revertir asientos contables ni alterar ningún saldo de cuenta; solo DEBE (MUST) cambiar los totales por categoría. Recategorizar una transacción cuya fecha cae en un periodo cerrado NO DEBE (MUST NOT) permitirse: DEBE (MUST) rechazarse con `PERIOD_CLOSED` sin cambiar la categoría.
 Trace: FR-LEDGER-008, FR-TRANSACTIONS-008 · Priority: Must
 
 #### Scenario: Recategorizar un gasto contabilizado
 - **CUANDO** un gasto contabilizado de 150.00 BOB desde "Banco BOB" (saldo 2,000.00 BOB) se recategoriza de "Supermercado" a "Hogar"
 - **ENTONCES** el número de asientos contables no cambia y el saldo de "Banco BOB" sigue siendo 2,000.00 BOB
 - **Y** en el mes "Supermercado" disminuye 150.00 BOB y "Hogar" aumenta 150.00 BOB
+
+#### Scenario: Recategorizar en un periodo cerrado
+- **CUANDO** un gasto contabilizado de 150.00 BOB del 2026-03-15 categorizado como "Supermercado" pertenece a marzo de 2026, que está cerrado, y el usuario intenta recategorizarlo a "Hogar"
+- **ENTONCES** se rechaza con `PERIOD_CLOSED`
+- **Y** la porción sigue en "Supermercado", los totales de marzo por categoría no cambian y no se escribe auditoría ni evento

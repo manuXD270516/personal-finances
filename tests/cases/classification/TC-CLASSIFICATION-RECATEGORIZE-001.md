@@ -63,6 +63,6 @@ Entonces no se crea ni modifica ningún asiento ni posting
 
 ## Notas
 
-- Recategorizar en periodo cerrado (INV-015) no aplica en Phase 1; se decide con planning/month-closing (Phase 2).
+- Recategorizar en periodo cerrado: decisión del owner 2026-10-05 (docs/31 D49), se rechaza con `PERIOD_CLOSED`; lo cubre TC-CLASSIFICATION-RECATEGORIZE-002.
 - Se automatiza cuando exista add-transaction-recording (tasks 7.1).
 - Automatizado 2026-10-04 (add-classification 7.1) por HTTP contra Transactions, Ledger y Reporting reales: huella fila a fila de asientos/postings, saldo, totales del mes por categoría, auditoría y `TransactionCategorized.v1` validado.

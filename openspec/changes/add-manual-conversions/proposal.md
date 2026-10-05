@@ -42,6 +42,8 @@ El caso de uso diario del owner es convertir entre BOB, USD y USDT (P2P, casas d
 
 **Test cases:** AÑADIDOS — TC-FX-CURRENCY-001, TC-FX-RATE-001, TC-FX-RATE-002, TC-FX-RATE-003, TC-FX-RATE-004, TC-FX-HISTORICAL-002, TC-FX-PRICING-002, TC-FX-PRICING-003, TC-FX-PRICING-004, TC-FX-PRICING-005, TC-FX-PRICING-006, TC-TRANSACTIONS-CONVERSION-003, TC-TRANSACTIONS-CONVERSION-004, TC-TRANSACTIONS-CONVERSION-005, TC-TRANSACTIONS-CONVERSION-006, TC-TRANSACTIONS-CONVERSION-007, TC-TRANSACTIONS-CONVERSION-008, TC-TRANSACTIONS-CONVERSION-009, TC-TRANSACTIONS-CONVERSION-010, TC-TRANSACTIONS-CONVERSION-011. MODIFICADOS (requirement firme, `ready`) — TC-FX-CONVERSION-001, TC-FX-HISTORICAL-001, TC-FX-PRICING-001 (referencia corregida a 6.95 y spread en %), TC-TRANSACTIONS-CONVERSION-001, TC-TRANSACTIONS-CONVERSION-002. DEPRECADOS — ninguno.
 
+**Test cases (docs/31 D48, 2026-10-05):** AÑADIDOS — TC-FX-RATE-005 (par sin preferencia ⇒ `PARALLEL`), TC-TRANSACTIONS-CONVERSION-012 (`ConversionRevised.v1`).
+
 **Impacto de regresión:** se suman a la Financial Regression Suite el ejemplo canónico USDT→BOB, el cripto→cripto con fee en tercera moneda, la inmutabilidad de tasas y el no-recálculo (INV-004, INV-010, INV-011, INV-012). Afecta saldos de cuentas y totales de gasto (*Fees*) que leerá `add-basic-dashboard`.
 
 **Riesgos introducidos:** RISK-001 (redondeo de tasas y montos; mitigado con precisión 40 y cuantización única), RISK-003 (corrupción del FX histórico; mitigado con append-only + supersede + grants), RISK-017 (complejidad multi-moneda), RISK-023 (fuentes de tasa P2P/paralela volátiles; en este change el usuario elige la fuente y el tipo; los providers automáticos y su mitigación están en `add-market-rate-providers`).

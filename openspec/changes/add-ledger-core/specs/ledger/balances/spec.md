@@ -98,13 +98,13 @@ Trace: FR-LEDGER-015, NFR-DATA-008, NFR-OBS-005 · Priority: Must
 - **ENTONCES** la verificación termina sin violaciones y no emite alertas
 
 ### Requirement: Vista técnica de balance de comprobación
-El sistema DEBE (MUST) ofrecer, solo a miembros con rol `OWNER`, un balance de comprobación por moneda a una fecha con el saldo de cada cuenta contable y el total por moneda; cualquier otro rol DEBE (MUST) recibir `INSUFFICIENT_ROLE`.
+El sistema DEBE (MUST) ofrecer a todo miembro del workspace con rol mínimo `VIEWER` (docs/31 D44) un balance de comprobación por moneda a una fecha con el saldo de cada cuenta contable y el total por moneda; quien no es miembro del workspace DEBE (MUST) recibir `WORKSPACE_ACCESS_DENIED`.
 Trace: FR-LEDGER-016 · Priority: Could
 
-#### Scenario: Consulta por el propietario
-- **CUANDO** un `OWNER` consulta el balance de comprobación al 2026-03-31 de un workspace con "Bank A" 685.00 BOB, `EQUITY:FX_TRADING:BOB` -690.00 BOB y `EXPENSE:BOB` 5.00 BOB
+#### Scenario: Consulta por un miembro
+- **CUANDO** un miembro con rol `VIEWER` consulta el balance de comprobación al 2026-03-31 de un workspace con "Bank A" 685.00 BOB, `EQUITY:FX_TRADING:BOB` -690.00 BOB y `EXPENSE:BOB` 5.00 BOB
 - **ENTONCES** recibe esas tres líneas con total 0.00 BOB
 
-#### Scenario: Consulta por un rol no propietario
-- **CUANDO** un miembro sin rol `OWNER` solicita el balance de comprobación
-- **ENTONCES** recibe `INSUFFICIENT_ROLE`
+#### Scenario: Consulta por un no miembro
+- **CUANDO** un usuario que no es miembro del workspace solicita el balance de comprobación
+- **ENTONCES** recibe `WORKSPACE_ACCESS_DENIED` y ninguna línea del ledger
