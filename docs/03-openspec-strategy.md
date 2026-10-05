@@ -110,8 +110,16 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 | 10 | `add-basic-dashboard` | `reporting/dashboard` (incluye FR-REPORTING-004 en el Home; docs/31 D50), `reporting/net-worth` (valoración USD/USDT con la tasa paralela del provider) | 1 |
 | 11 | `add-lifecycle-timeline` | `audit/lifecycle-timeline` (máquinas de estado explícitas por agregado, `GET …/{id}/lifecycle`, reporte de recorrido en la UI) + `transactions/transfers` (`TransferRevised.v1`; docs/31 D37) | 1 |
 | 12 | `add-demo-data` | `identity/demo-data` (carga y limpieza de datos de demostración por acción explícita del OWNER, en un workspace demo dedicado y purgable; docs/31 D36, ADR-0026) | 1 |
+| P2·c1 | `add-custom-fields` | `classification/custom-fields` (nueva) + MODIFIED `transactions/transaction-recording` (custom fields por split y filtro del listado) | 2 |
+| P2·c2 | `add-reconciliation` | `transactions/reconciliation` (completa: sesiones por cuenta con fecha y saldo de extracto, diferencia 0 para finalizar, ajuste auditado, `TransactionCleared.v1` por docs/31 D47, estado por cuenta para el cierre) + `audit/lifecycle-timeline` (máquina `RECONCILIATION_LIFECYCLE`) | 2 |
+| P2·c3 | `add-bulk-edit` | `transactions/bulk-edit` (nueva: todo o nada, versión por ítem, `bulkOperationId`, `PERIOD_CLOSED` por D49) | 2 |
+| P2·c4 | `add-global-audit-view` | `audit/audit-trail` (consulta global con filtros, export CSV OWNER, fallos de autorización auditados; FR-AUDIT-005/006) | 2 |
+| P2·c5 | `add-net-worth-evolution` | `reporting/net-worth` (serie mensual de patrimonio, FR-REPORTING-006; usa los snapshots de `planning/month-closing`) | 2 |
+| P2·c6 | `add-workspace-export` | `identity/workspace-portability` (nueva: export completo, versionado y cifrado + import a workspace nuevo con verificación de la ida y vuelta; FR-IDENTITY-010/017; criterio de salida de Phase 2) | 2 |
 
 Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29, y el 2b `add-event-outbox`, agregado el 2026-10-03, docs/31 D30; los 11 `add-lifecycle-timeline` y 12 `add-demo-data` se agregaron el 2026-10-03 por decisión del owner, docs/31 D37 y D36) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
+
+**Phase 2 — reconciliación y operaciones (borrador 2026-10-05, hilo pf-p2c).** Las filas `P2·c1`…`P2·c6` son el orden relativo de este hilo; el lead fija la numeración definitiva al consolidar con los changes de periodos y cierre (pf-p2a: `planning/financial-periods`, `planning/month-closing`) y de presupuestos y alertas (pf-p2b: `planning/budgets`, `planning/budget-templates`, `notifications/alerts`). Dependencias: `add-reconciliation` lee `ledger.period_lock` y expone el estado de reconciliación que consume el checklist de cierre (pf-p2a); `add-net-worth-evolution` va después de `planning/month-closing`; `add-workspace-export` va al final de Phase 2 porque exporta e importa los datos de todos los demás changes.
 
 ## 8. Integración con CI y herramientas
 
