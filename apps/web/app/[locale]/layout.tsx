@@ -16,7 +16,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Metadata' });
-  return { title: t('title'), description: t('description') };
+  // Las páginas hijas declaran su propio título ("Inicio · PFOS"); sin él se usa el del producto.
+  return { title: { default: t('title'), template: '%s · PFOS' }, description: t('description') };
 }
 
 export default async function LocaleLayout({

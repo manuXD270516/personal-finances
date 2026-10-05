@@ -1,7 +1,6 @@
 import { formatMoney } from './format';
 import { ActionHint, statusOf } from './QuestionWidgets';
 import { RateSourceBadge } from './RateSourceBadge';
-import { amountStyle, cardStyle, listStyle, mutedStyle, warningStyle } from './styles';
 import type { FormatContext, ReportSummary, ResolvedRate } from './types';
 
 /**
@@ -51,11 +50,9 @@ export function LiquidBalanceCard({
       data-question="Q1"
       data-status={q1.status}
       aria-labelledby="liquid-balance-title"
-      style={cardStyle}
+      className="pf-home-card pf-home-hero"
     >
-      <h2 id="liquid-balance-title" style={{ fontSize: '1rem', margin: 0 }}>
-        {t('questions.Q1')}
-      </h2>
+      <h2 id="liquid-balance-title">{t('questions.Q1')}</h2>
       {q1.status === 'NO_DATA' ? (
         <div data-testid="liquid-balance-no-accounts">
           <p>{t('noAccounts')}</p>
@@ -68,17 +65,19 @@ export function LiquidBalanceCard({
         </div>
       ) : (
         <>
-          <p data-testid="liquid-balance-amount" style={amountStyle}>
+          <p data-testid="liquid-balance-amount" className="pf-home-amount">
             {formatMoney(consolidated.liquidBalance, locale)}
           </p>
-          <p style={mutedStyle}>{t('liquid.caption', { currency: consolidated.currency })}</p>
+          <p className="pf-home-muted">{t('liquid.caption', { currency: consolidated.currency })}</p>
           {liquid.length > 0 ? (
-            <ul data-testid="liquid-balance-by-currency" style={listStyle}>
+            <ul data-testid="liquid-balance-by-currency" className="pf-home-list">
               {liquid.map((c) => {
                 const rate = rateForCurrency(summary, c.currency);
                 return (
-                  <li key={c.currency} data-currency={c.currency} style={{ margin: '0.5rem 0' }}>
-                    <span data-testid="liquid-currency-amount">{formatMoney(c.liquidBalance!, locale)}</span>
+                  <li key={c.currency} data-currency={c.currency}>
+                    <span data-testid="liquid-currency-amount" className="pf-home-num">
+                      {formatMoney(c.liquidBalance!, locale)}
+                    </span>
                     {rate ? <RateSourceBadge rate={rate} ctx={ctx} /> : null}
                   </li>
                 );
@@ -86,10 +85,10 @@ export function LiquidBalanceCard({
             </ul>
           ) : null}
           {!consolidated.complete ? (
-            <div data-testid="liquid-balance-incomplete" style={warningStyle}>
-              <p style={{ margin: 0 }}>{t('liquid.incomplete')}</p>
+            <div data-testid="liquid-balance-incomplete" className="pf-home-warning">
+              <p>{t('liquid.incomplete')}</p>
               {consolidated.unconverted.length > 0 ? (
-                <ul data-testid="unconverted" style={listStyle}>
+                <ul data-testid="unconverted" className="pf-home-list">
                   {consolidated.unconverted.map((m) => (
                     <li key={m.currency} data-currency={m.currency}>
                       <span data-testid="unconverted-amount">{formatMoney(m, locale)}</span> ·{' '}

@@ -4,10 +4,12 @@
     "description": "Personal finance operating system"
   },
   "Home": {
-    "title": "Personal finances",
-    "subtitle": "Your active workspace and your account.",
+    "title": "Home",
+    "subtitle": "Your money today, how the month is going and your net worth.",
     "language": "Language",
-    "greeting": "Hi, {name}"
+    "greeting": "Hi, {name}",
+    "metaTitle": "Home",
+    "metaDescription": "Workspace summary: available money, income and expenses of the month by category and net worth."
   },
   "App": {
     "nav": "Main navigation",
@@ -175,6 +177,15 @@
       "PREVIOUS_PERIOD_TO_DATE": "compared with the same days of the previous month ({from} – {to})",
       "PREVIOUS_PERIOD": "compared with the previous period ({from} – {to})"
     },
+    "month": {
+      "title": "This month",
+      "empty": "No transactions this month yet."
+    },
+    "sections": {
+      "wealth": "Net worth and accounts",
+      "upcoming": "Coming soon",
+      "upcomingCaption": "Questions enabled in upcoming phases."
+    },
     "questions": {
       "Q1": "How much money do I have?",
       "Q2": "How much came in?",
@@ -245,7 +256,19 @@
     },
     "topCategories": {
       "title": "Top spending categories",
-      "empty": "No expenses recorded this month."
+      "empty": "No expenses recorded this month.",
+      "caption": "{n, plural, one {The category with the highest net spending this month} other {The # categories with the highest net spending this month}}",
+      "emptyAction": "Record an expense",
+      "previous": "last month: {amount}",
+      "comparing": "Comparing with last month…",
+      "legendPrevious": "Marker: spending in the same days of last month",
+      "trend": {
+        "up": "more than last month",
+        "down": "less than last month",
+        "flat": "same as last month",
+        "new": "new: no spending last month",
+        "unknown": "no comparison with last month"
+      }
     },
     "netWorth": {
       "title": "Net worth",

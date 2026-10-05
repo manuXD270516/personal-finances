@@ -1,4 +1,3 @@
-import { cardStyle, mutedStyle } from './styles';
 import type { FormatContext, HomeQuestion, HomeQuestionStatus, ReportSummary } from './types';
 
 /** Estado de disponibilidad de una pregunta del Home (docs/00 §6); sin entrada se asume disponible. */
@@ -42,13 +41,11 @@ export function NotAvailableWidget({ status, ctx }: { status: HomeQuestionStatus
       data-question={status.question}
       data-status={status.status}
       aria-labelledby={`question-${status.question}-title`}
-      style={{ ...cardStyle, borderStyle: 'dashed' }}
+      className="pf-home-card pf-home-soon"
     >
-      <h2 id={`question-${status.question}-title`} style={{ fontSize: '1rem', margin: 0 }}>
-        {t(`questions.${status.question}`)}
-      </h2>
+      <h3 id={`question-${status.question}-title`}>{t(`questions.${status.question}`)}</h3>
       <p data-testid="question-not-available">{t('notAvailable')}</p>
-      <div style={mutedStyle}>
+      <div className="pf-home-muted">
         <ActionHint code={status.actionHint} ctx={ctx} />
       </div>
     </section>

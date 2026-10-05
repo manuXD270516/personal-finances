@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs';
 import { createTranslator } from 'next-intl';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { compareCategory, previousCategoriesQuery, type PreviousCategories } from './category-comparison';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import { EMPTY_SUMMARY, PARALLEL_RATE, SUMMARY } from './fixtures';
 import { formatAge, formatSignedDecimal } from './format';
 import { RateSourceBadge } from './RateSourceBadge';
-import type { FormatContext, ReportSummary, ResolvedRate } from './types';
+import type { FormatContext, ReportSummary, ResolvedRate, TopCategory } from './types';
 
 const messages = JSON.parse(
   readFileSync(new URL('../../../messages/es.json', import.meta.url), 'utf8'),
@@ -19,7 +20,8 @@ const ctx: FormatContext = {
   has: (key) => tr.has(key as never),
 };
 
-const render = (summary: ReportSummary) => renderToStaticMarkup(<DashboardView summary={summary} {...ctx} />);
+const render = (summary: ReportSummary, previousCategories?: PreviousCategories) =>
+  renderToStaticMarkup(<DashboardView summary={summary} {...ctx} previousCategories={previousCategories} />);
 const renderBadge = (rate: ResolvedRate) => renderToStaticMarkup(<RateSourceBadge rate={rate} ctx={ctx} />);
 /** HTML de la primera sección con ese `data-testid` (las secciones del Home no se anidan). */
 const section = (html: string, testId: string): string => {
@@ -27,7 +29,30 @@ const section = (html: string, testId: string): string => {
   if (!m) throw new Error(`sin sección ${testId}`);
   return m[0];
 };
-const text = (html: string) => html.replace(/<[^>]+>/g, '');
+const text = (html: string) => html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, '');
+/** Elemento `<li data-testid="top-category">` de una categoría (no anidan otros `<li>`). */
+const categoryRow = (html: string, name: string): string => {
+  const rows = html.match(/<li data-testid="top-category"[\s\S]*?<\/li>/g) ?? [];
+  const row = rows.find((r) => r.includes(`>${name}<`));
+  if (!row) throw new Error(`sin categoría ${name}`);
+  return row;
+};
+const cat = (id: string, name: string, amount: string): TopCategory => ({
+  categoryId: `0190a000-0000-7000-8000-0000000000${id}`,
+  name,
+  amount: { amount, currency: 'BOB' },
+  complete: true,
+});
+/** Mismo tramo de agosto: Supermercado 1000.00, Restaurantes 150.00, Fees 5.00. */
+const AUGUST: PreviousCategories = {
+  status: 'ready',
+  saturated: false,
+  items: [
+    cat('d1', 'Supermercado', '1000.00'),
+    cat('d2', 'Restaurantes', '150.00'),
+    cat('d3', 'Fees', '5.00'),
+  ],
+};
 
 describe('Home: dinero disponible y tasa usada (add-basic-dashboard, tarea 6.1)', () => {
   it('Q1 muestra el consolidado, los totales líquidos por moneda y la tasa USDT/BOB PARALLEL con su fuente', () => {
@@ -216,7 +241,146 @@ describe('Home: ingresos, gastos, ahorro y comparación (tarea 6.1)', () => {
     const html = renderToStaticMarkup(<DashboardSkeleton label="Cargando el resumen…" />);
     expect(html).toContain('data-testid="dashboard-skeleton"');
     expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('role="status"');
+    expect(text(html)).toContain('Cargando el resumen…');
     expect(html).not.toMatch(/\d+,\d{2}/);
+  });
+});
+
+describe('Home: "Este mes" con categorías y comparación con el mes anterior (FR-REPORTING-004, D50)', () => {
+  it('jerarquía: h2 dinero disponible → h2 "Este mes" (h3 ingresos, gastos, ahorro, categorías) → h2 patrimonio → h2 próximamente', () => {
+    const html = render(SUMMARY);
+    const headings = [...html.matchAll(/<(h[1-6])[^>]*>([^<]*)<\/h[1-6]>/g)].map((m) => `${m[1]} ${m[2]}`);
+    expect(headings).toEqual([
+      'h2 ¿Cuánto dinero tengo?',
+      'h2 Este mes',
+      'h3 ¿Cuánto ingresó?',
+      'h3 ¿Cuánto gasté?',
+      'h3 ¿Cuánto ahorré?',
+      'h3 Principales categorías de gasto',
+      'h2 Patrimonio y cuentas',
+      'h3 Patrimonio neto',
+      'h3 Saldos por cuenta',
+      'h2 Próximamente',
+      'h3 ¿Cuánto está comprometido?',
+      'h3 ¿Cuánto puedo gastar?',
+      'h3 ¿Qué pagos vienen?',
+      'h3 ¿Voy a cumplir mis metas?',
+    ]);
+    // "Este mes" va justo después del dinero disponible y antes del patrimonio.
+    const month = html.indexOf('data-testid="month-overview"');
+    expect(month).toBeGreaterThan(html.indexOf('data-testid="liquid-balance"'));
+    expect(month).toBeLessThan(html.indexOf('data-testid="net-worth"'));
+    // Tokens del sistema de diseño (docs/28 §5) y rejilla mobile-first.
+    expect(html).toContain('--pf-fin-warning:#B45309');
+    expect(html).toContain('@media (min-width:768px)');
+    expect(html).toContain('prefers-reduced-motion');
+  });
+
+  it('[TC-REPORTING-KPI-006] categorías en el orden de la API, numeradas, con barras decorativas proporcionales a la mayor', () => {
+    const top = section(render(SUMMARY), 'top-categories');
+    expect(text(top)).toContain('Las 3 categorías con más gasto neto del mes');
+    expect(top).toContain('<ol class="pf-home-cats">');
+    const sup = categoryRow(top, 'Supermercado');
+    expect(sup).toContain('<div class="pf-home-meter" aria-hidden="true">');
+    expect(sup).toContain('width:100.0%');
+    expect(categoryRow(top, 'Restaurantes')).toContain('width:8.3%');
+    // Sin comparación disponible no se inventan variaciones.
+    expect(top).toContain('data-comparison="unavailable"');
+    expect(top).not.toContain('top-category-trend');
+  });
+
+  it('[TC-REPORTING-KPI-007] cada categoría muestra la variación contra el mismo tramo del mes anterior con glifo, signo y texto', () => {
+    const top = section(render(SUMMARY, AUGUST), 'top-categories');
+    expect(top).toContain('data-comparison="ready"');
+    const sup = categoryRow(top, 'Supermercado');
+    expect(sup).toContain('data-trend="up"');
+    expect(sup).toContain('data-tone="warning"');
+    expect(sup).toContain('<span aria-hidden="true" class="pf-home-trend-icon">▲</span>');
+    expect(text(sup)).toContain('+200,00 BOB más que el mes anterior · mes anterior: 1.000,00 BOB');
+    const res = categoryRow(top, 'Restaurantes');
+    expect(res).toContain('data-trend="down"');
+    expect(res).toContain('data-tone="ok"');
+    expect(text(res)).toContain('-50,00 BOB menos que el mes anterior · mes anterior: 150,00 BOB');
+    // Marca de "mes anterior" en la barra: 150 / 1200 = 12,5 %.
+    expect(res).toContain('left:calc(12.5% - 1px)');
+    const fees = categoryRow(top, 'Fees');
+    expect(fees).toContain('data-trend="flat"');
+    expect(text(fees)).toContain('igual que el mes anterior · mes anterior: 5,00 BOB');
+    expect(text(top)).toContain('Marca: gasto en los mismos días del mes anterior');
+  });
+
+  it('sin gasto el mes anterior la categoría es "nueva"; si el top anterior llegó al máximo y no aparece, no se afirma nada', () => {
+    const only: PreviousCategories = {
+      status: 'ready',
+      saturated: false,
+      items: [cat('d1', 'Supermercado', '1200.00')],
+    };
+    const res = categoryRow(section(render(SUMMARY, only), 'top-categories'), 'Restaurantes');
+    expect(res).toContain('data-trend="new"');
+    expect(text(res)).toContain('+100,00 BOB nuevo: sin gasto el mes anterior');
+    expect(res).not.toContain('data-testid="top-category-previous"');
+    const saturated = categoryRow(
+      section(render(SUMMARY, { ...only, saturated: true }), 'top-categories'),
+      'Restaurantes',
+    );
+    expect(saturated).toContain('data-trend="unknown"');
+    expect(text(saturated)).toContain('sin comparación con el mes anterior');
+  });
+
+  it('mientras llega la comparación cada categoría lo indica, sin cifras inventadas', () => {
+    const top = section(render(SUMMARY, { status: 'loading' }), 'top-categories');
+    expect(top.match(/data-testid="top-category-trend-loading"/g)).toHaveLength(3);
+    expect(text(top)).toContain('Comparando con el mes anterior…');
+  });
+
+  it('la resta por categoría es exacta (bigint) y un neto negativo no tiene barra', () => {
+    const cmp = compareCategory(cat('e1', 'Grande', '12345678901234567.89'), {
+      status: 'ready',
+      saturated: false,
+      items: [cat('e1', 'Grande', '0.01')],
+    });
+    expect(cmp).toEqual({
+      trend: 'up',
+      previous: { amount: '0.01', currency: 'BOB' },
+      delta: { amount: '12345678901234567.88', currency: 'BOB' },
+    });
+    const html = render({ ...SUMMARY, topExpenseCategories: [cat('d4', 'Reembolsado', '-30.00')] });
+    expect(categoryRow(section(html, 'top-categories'), 'Reembolsado')).toContain('width:0.0%');
+  });
+
+  it('la consulta del periodo anterior usa el tramo de la comparación, la moneda de reporte y el máximo del contrato', () => {
+    expect(previousCategoriesQuery(SUMMARY)).toBe(
+      'dateFrom=2026-08-01&dateTo=2026-08-30&reportingCurrency=BOB&compare=NONE&topCategories=20',
+    );
+    expect(previousCategoriesQuery({ ...SUMMARY, comparison: null })).toBeUndefined();
+    expect(previousCategoriesQuery({ ...SUMMARY, topExpenseCategories: [] })).toBeUndefined();
+  });
+
+  it('con cuentas y sin gastos, el top muestra un estado vacío con la acción de registrar un gasto', () => {
+    const html = renderToStaticMarkup(
+      <DashboardView
+        summary={{ ...SUMMARY, topExpenseCategories: [] }}
+        {...ctx}
+        registerExpenseHref="/transacciones/nueva"
+      />,
+    );
+    const top = section(html, 'top-categories');
+    expect(text(top)).toContain('Sin gastos registrados este mes.');
+    expect(top).toContain(
+      '<a href="/transacciones/nueva" data-testid="register-expense-action">Registrar un gasto</a>',
+    );
+  });
+
+  it('los KPI del mes indican el sentido con glifo decorativo y tono semántico además del texto', () => {
+    const html = render(SUMMARY);
+    const expense = section(html, 'expense');
+    expect(expense).toContain('data-tone="warning"');
+    expect(expense).toContain('<span aria-hidden="true" class="pf-home-trend-icon">▲</span>');
+    expect(section(html, 'income')).toContain('data-tone="ok"');
+    // Barras ingresos vs gastos a la misma escala (8000 vs 1305 ⇒ 16,3 %).
+    expect(expense).toContain('width:16.3%');
+    expect(section(html, 'income')).toContain('width:100.0%');
   });
 });
 
@@ -254,6 +418,11 @@ describe('Home: preguntas no disponibles y estados vacíos (tarea 6.2)', () => {
     // Ningún cero sustituto en todo el Home.
     expect(html).not.toMatch(/0,00 BOB|0\.00 BOB/);
     expect(html).not.toContain('net-worth-amount');
+    // "Este mes" sin cuentas: un único estado vacío con la acción, sin KPI en cero ni top de categorías.
+    expect(html).toContain('data-testid="month-no-data"');
+    expect(text(html)).toContain('Aún no hay movimientos este mes.');
+    expect(html).not.toContain('data-testid="income-amount"');
+    expect(html).not.toContain('data-testid="top-categories"');
   });
 });
 
