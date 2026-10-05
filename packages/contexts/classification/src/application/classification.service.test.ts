@@ -81,6 +81,22 @@ describe('Categorías y grupos (tarea 4.1)', () => {
     expect((await q.getCategory(USER, WS, sub.id)).groupId).toBe(ocio.id);
   });
 
+  it('[TC-PLATFORM-API-014] carrera perdida al guardar ⇒ 412 con la versión ganadora (relee la fila)', async () => {
+    const t = await svc.createTag(USER, WS, { name: 'Viaje' });
+    const update = mem.tags.update.bind(mem.tags);
+    // Otro escritor confirma entre la carga (versión 1 vigente) y el UPDATE condicional.
+    mem.tags.update = async (tag, expected) => {
+      const cur = mem.tags.rows.get(tag.id)!;
+      mem.tags.rows.set(tag.id, { ...cur, version: cur.version + 1 });
+      return update(tag, expected);
+    };
+    const err = await svc.updateTag(USER, WS, t.id, 1, { color: '#000000' }).catch((e: unknown) => e);
+    expect(isDomainError(err) && [err.code, err.details]).toEqual([
+      'PRECONDITION_FAILED',
+      { currentVersion: 2 },
+    ]);
+  });
+
   it('[TC-CLASSIFICATION-RENAME-001] renombrar conserva id y audita nombre anterior y nuevo', async () => {
     const g = await expenseGroup();
     const c = await svc.createCategory(USER, WS, { groupId: g.id, name: 'Super' });

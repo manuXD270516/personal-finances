@@ -143,7 +143,7 @@ describe('[TC-IDENTITY-AUTH-006] GET /me devuelve perfil, locale, zona horaria y
 });
 
 describe('[TC-IDENTITY-AUTH-008] el usuario actualiza locale y zona horaria; una zona inválida se rechaza', () => {
-  it('PATCH /me con If-Match: 200 y ETag nuevo; zona inválida 422 INVALID_TIMEZONE; versión vieja 412', async () => {
+  it('[TC-PLATFORM-API-014] PATCH /me con If-Match: 200 y ETag nuevo; zona inválida 422 INVALID_TIMEZONE; versión vieja 412 con currentVersion', async () => {
     const u = await user(`kc-prefs-${randomUUID()}`);
     const v = Number((await call('GET', '/api/v1/me', { token: u.token })).body['version']);
     const ok = await call('PATCH', '/api/v1/me', {
@@ -169,6 +169,7 @@ describe('[TC-IDENTITY-AUTH-008] el usuario actualiza locale y zona horaria; una
       headers: { 'if-match': `"${v}"` },
     });
     expectProblem(stale, 412, 'PRECONDITION_FAILED');
+    expect(stale.body['currentVersion']).toBe(v + 1);
     const after = await call('GET', '/api/v1/me', { token: u.token });
     expect(after.body).toMatchObject({ timezone: 'America/Sao_Paulo', version: v + 1 });
   });

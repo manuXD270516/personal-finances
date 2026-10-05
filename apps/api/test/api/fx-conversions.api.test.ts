@@ -384,7 +384,9 @@ describe('FX: catálogo, tasas manuales y preferencias (fx/market-rates)', () =>
     const latest = () =>
       call('GET', `${W(u)}/fx-rates/latest?base=USD&quote=BOB&asOf=2026-10-01T03:00:00Z`, { token: u.token });
     expect((await latest()).body).toMatchObject({ rateType: 'OFFICIAL', rate: { value: '6.96' } });
-    expectProblem(await put('"1"', 'PARALLEL'), 412, 'PRECONDITION_FAILED');
+    const stale = await put('"1"', 'PARALLEL');
+    expectProblem(stale, 412, 'PRECONDITION_FAILED');
+    expect(stale.body['currentVersion']).toBe(2);
     await put('"2"', 'PARALLEL');
     expect((await latest()).body).toMatchObject({ rateType: 'PARALLEL', rate: { value: '9.8' } });
   });

@@ -212,7 +212,9 @@ export class FxService {
     return this.deps.uow.run(cmd.workspaceId, async () => {
       const current = await this.deps.preferences.get(cmd.workspaceId, { forUpdate: true });
       if (current.version !== cmd.expectedVersion) {
-        throw new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+        throw new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+          details: { currentVersion: current.version },
+        });
       }
       const seen = new Set<string>();
       for (const [i, p] of cmd.preferences.entries()) {

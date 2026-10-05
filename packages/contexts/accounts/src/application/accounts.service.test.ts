@@ -1,6 +1,7 @@
 import type { FxValuationPort, ValuationRateDto } from '@pf/fx/contracts';
 import { DomainError } from '@pf/shared-kernel';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { Account } from '../domain/index.js';
 import { AccountsService } from './accounts.service.js';
 import { InstitutionsService } from './institutions.service.js';
 import { InMemoryAccounts } from './testing/in-memory.js';
@@ -172,6 +173,29 @@ describe('Comandos de cuenta', () => {
     expect(audit?.changes).toContainEqual({ field: 'name', before: 'Bank A', after: 'Banco principal' });
     expect(await code(svc.updateAccount(W1, a.account.id, 1, { name: 'Otro' }))).toBe('PRECONDITION_FAILED');
     expect(mem.openingEntries).toHaveLength(1);
+  });
+
+  it('[TC-PLATFORM-API-014] carrera perdida al guardar ⇒ 412 con la versión ganadora (relee la fila)', async () => {
+    const a = await openBank('Bank A');
+    const deps = mem.deps();
+    const racy = new AccountsService({
+      ...deps,
+      accounts: {
+        ...deps.accounts,
+        // Otro escritor confirma entre la carga (versión 1 vigente) y el UPDATE condicional.
+        update: async (account) => {
+          const cur = mem.accounts.get(account.id)!;
+          mem.accounts.set(account.id, Account.restore({ ...cur.snapshot, version: cur.version + 1 }));
+          return deps.accounts.update(account);
+        },
+      },
+    });
+    const err = await racy.updateAccount(W1, a.account.id, 1, { name: 'Otro' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DomainError);
+    expect([(err as DomainError).code, (err as DomainError).details]).toEqual([
+      'PRECONDITION_FAILED',
+      { currentVersion: 2 },
+    ]);
   });
 
   it('[TC-ACCOUNTS-CURRENCY-002] cambio de moneda solo sin movimientos, auditado', async () => {
