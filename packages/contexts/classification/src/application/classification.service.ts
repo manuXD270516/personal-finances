@@ -53,6 +53,9 @@ const preconditionFailed = (currentVersion?: number) =>
   new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
     ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
   });
+/** El UPDATE condicional perdió una carrera: relee la fila para publicar la versión ganadora. */
+const lostRace = async (current: Promise<{ readonly version: number } | null>) =>
+  preconditionFailed((await current)?.version);
 
 type Snap = Readonly<Record<string, unknown>>;
 
@@ -577,7 +580,7 @@ export class ClassificationService {
       const before = tagView(tag);
       if (!tag.update(patch)) return tag;
       if (!tag.isArchived) await this.assertTagNameFree(tag);
-      if (!(await this.deps.tags.update(tag, expectedVersion))) throw preconditionFailed();
+      await this.saveTag(tag, expectedVersion);
       await this.auditTag(userId, 'updated', before, tag);
       return tag;
     });
@@ -588,7 +591,7 @@ export class ClassificationService {
       const tag = await this.loadTag(workspaceId, id, expectedVersion);
       const before = tagView(tag);
       tag.archive(this.now());
-      if (!(await this.deps.tags.update(tag, expectedVersion))) throw preconditionFailed();
+      await this.saveTag(tag, expectedVersion);
       await this.auditTag(userId, 'archived', before, tag);
       return tag;
     });
@@ -600,7 +603,7 @@ export class ClassificationService {
       const before = tagView(tag);
       tag.unarchive();
       await this.assertTagNameFree(tag);
-      if (!(await this.deps.tags.update(tag, expectedVersion))) throw preconditionFailed();
+      await this.saveTag(tag, expectedVersion);
       await this.auditTag(userId, 'unarchived', before, tag);
       return tag;
     });
@@ -648,7 +651,7 @@ export class ClassificationService {
       if (patch.defaultCategoryId !== undefined && patch.defaultCategoryId !== before['defaultCategoryId']) {
         await this.assertDefaultCategory(workspaceId, cp.defaultCategoryId);
       }
-      if (!(await this.deps.counterparties.update(cp, expectedVersion))) throw preconditionFailed();
+      await this.saveCounterparty(cp, expectedVersion);
       await this.auditCounterparty(userId, 'updated', before, cp);
       return cp;
     });
@@ -664,7 +667,7 @@ export class ClassificationService {
       const cp = await this.loadCounterparty(workspaceId, id, expectedVersion);
       const before = counterpartyView(cp);
       cp.archive(this.now());
-      if (!(await this.deps.counterparties.update(cp, expectedVersion))) throw preconditionFailed();
+      await this.saveCounterparty(cp, expectedVersion);
       await this.auditCounterparty(userId, 'archived', before, cp);
       return cp;
     });
@@ -681,7 +684,7 @@ export class ClassificationService {
       const before = counterpartyView(cp);
       cp.unarchive();
       await this.assertCounterpartyFree(cp);
-      if (!(await this.deps.counterparties.update(cp, expectedVersion))) throw preconditionFailed();
+      await this.saveCounterparty(cp, expectedVersion);
       await this.auditCounterparty(userId, 'unarchived', before, cp);
       return cp;
     });
@@ -718,11 +721,27 @@ export class ClassificationService {
   }
 
   private async saveGroup(group: CategoryGroup, expected: number): Promise<void> {
-    if (!(await this.deps.groups.update(group, expected))) throw preconditionFailed();
+    if (!(await this.deps.groups.update(group, expected))) {
+      throw await lostRace(this.deps.groups.findById(group.workspaceId, group.id));
+    }
   }
 
   private async saveCategory(category: Category, expected: number): Promise<void> {
-    if (!(await this.deps.categories.update(category, expected))) throw preconditionFailed();
+    if (!(await this.deps.categories.update(category, expected))) {
+      throw await lostRace(this.deps.categories.findById(category.workspaceId, category.id));
+    }
+  }
+
+  private async saveTag(tag: Tag, expected: number): Promise<void> {
+    if (!(await this.deps.tags.update(tag, expected))) {
+      throw await lostRace(this.deps.tags.findById(tag.workspaceId, tag.id));
+    }
+  }
+
+  private async saveCounterparty(cp: Counterparty, expected: number): Promise<void> {
+    if (!(await this.deps.counterparties.update(cp, expected))) {
+      throw await lostRace(this.deps.counterparties.findById(cp.workspaceId, cp.id));
+    }
   }
 
   private async assertGroupNameFree(group: CategoryGroup): Promise<void> {

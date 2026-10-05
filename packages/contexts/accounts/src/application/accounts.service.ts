@@ -31,6 +31,9 @@ const preconditionFailed = (currentVersion?: number) =>
   new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
     ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
   });
+/** El UPDATE condicional perdió una carrera: relee la fila para publicar la versión ganadora. */
+const lostRace = async (current: Promise<{ readonly version: number } | null>) =>
+  preconditionFailed((await current)?.version);
 
 export interface OpenAccountCommand {
   readonly workspaceId: string;
@@ -214,7 +217,7 @@ export class AccountsService {
         ...(currencyKind === undefined ? {} : { currencyKind }),
       });
       if (changed.length === 0) return this.view(account);
-      if (!(await accounts.update(account))) throw preconditionFailed();
+      if (!(await accounts.update(account))) throw await lostRace(accounts.findById(workspaceId, accountId));
       const after = account.snapshot;
       const payload: Record<string, unknown> = { accountId, changedFields: changed };
       for (const f of ['name', 'institutionId', 'liquidity', 'includeInNetWorth', 'currency'] as const) {
@@ -496,7 +499,9 @@ export class AccountsService {
   }
 
   private async save(account: Account): Promise<void> {
-    if (!(await this.deps.accounts.update(account))) throw preconditionFailed();
+    if (!(await this.deps.accounts.update(account))) {
+      throw await lostRace(this.deps.accounts.findById(account.workspaceId, account.id));
+    }
   }
 
   private async enabledCurrency(code: string, pointer: string): Promise<CurrencyInfo> {

@@ -149,7 +149,9 @@ export class IdentityService {
         ...(changes.preferences === undefined ? {} : { preferences: changes.preferences }),
       };
       if (!user.updatePreferences(prefs)) return user;
-      if (!(await this.deps.users.savePreferences(user, expectedVersion))) throw preconditionFailed();
+      if (!(await this.deps.users.savePreferences(user, expectedVersion))) {
+        throw await lostRace(this.deps.users.findById(userId));
+      }
       const after = profileOf(user);
       const diff = PROFILE_FIELDS.filter((f) => before[f] !== after[f]).map((field) => ({
         field,
@@ -248,7 +250,9 @@ export class IdentityService {
       }
       const changes = workspace.updateSettings(patch);
       if (changes.length > 0) {
-        if (!(await this.deps.workspaces.update(workspace, expectedVersion))) throw preconditionFailed();
+        if (!(await this.deps.workspaces.update(workspace, expectedVersion))) {
+          throw await lostRace(this.deps.workspaces.findById(workspaceId));
+        }
         await this.deps.outbox.append({
           eventId: this.deps.ids.next(),
           eventType: 'identity.WorkspaceSettingsChanged',
@@ -350,4 +354,9 @@ function preconditionFailed(currentVersion?: number): DomainError {
   return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
     ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
   });
+}
+
+/** El UPDATE condicional perdió una carrera: relee la fila para publicar la versión ganadora. */
+async function lostRace(current: Promise<{ readonly version: number } | null>): Promise<DomainError> {
+  return preconditionFailed((await current)?.version);
 }
