@@ -19,7 +19,7 @@ export default async function AuthErrorPage({
   const reason: Reason = (REASONS as readonly string[]).includes(raw ?? '') ? (raw as Reason) : 'unknown';
   const t = await getTranslations({ locale, namespace: 'Auth' });
   return (
-    <main>
+    <main className="pf-status">
       <h1>{reason === 'expired' ? t('expiredTitle') : t('errorTitle')}</h1>
       <p role="alert" data-reason={reason}>
         {t(`reasons.${reason}`)}

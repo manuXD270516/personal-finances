@@ -127,6 +127,8 @@ test.describe('autenticación vía BFF con Keycloak real (identity/authenticatio
     try {
       const { tokens } = await sessionTokens(db);
       const endSession = page.waitForRequest((r) => r.url().includes('/protocol/openid-connect/logout'));
+      // "Cerrar sesión" vive en el menú de la cuenta de la barra superior (AppFrame).
+      await page.getByTestId('user-menu').click();
       await page.getByTestId('logout').click();
       await endSession; // RP-initiated logout en el IdP
       await expect(page).toHaveURL(/\/realms\/pfos\/protocol\/openid-connect\/auth/); // volvió a pedir login

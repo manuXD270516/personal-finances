@@ -29,17 +29,19 @@ const listStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: '0.25rem',
-  borderBottom: '1px solid #d0d7de',
+  borderBottom: '1px solid var(--pf-border)',
 };
 const tabStyle = (selected: boolean): CSSProperties => ({
   font: 'inherit',
-  padding: '0.5rem 0.75rem',
+  padding: 'var(--pf-space-2) var(--pf-space-3)',
+  minHeight: '2.75rem',
   border: '1px solid transparent',
-  borderBottom: selected ? '3px solid #0969da' : '3px solid transparent',
+  borderRadius: 'var(--pf-radius-sm) var(--pf-radius-sm) 0 0',
+  borderBottom: selected ? '3px solid var(--pf-primary)' : '3px solid transparent',
   background: 'none',
-  fontWeight: selected ? 600 : 400,
+  fontWeight: selected ? 600 : 500,
   cursor: 'pointer',
-  color: 'inherit',
+  color: selected ? 'var(--pf-primary)' : 'var(--pf-fg-muted)',
 });
 const panelStyle: CSSProperties = { display: 'grid', gap: '1rem', minWidth: 0, paddingTop: '1rem' };
 

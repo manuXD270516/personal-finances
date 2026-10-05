@@ -1,0 +1,673 @@
+/*
+ * Hoja global de PFOS (docs/28 §5, §10, §11): tokens semánticos como variables CSS, estilos base de elementos y el
+ * marco de la app autenticada (`.pf-shell`). Sin framework CSS ni fuentes externas: pila de fuentes del sistema
+ * (Inter queda como pregunta abierta de docs/28; si se adopta, se autohospeda vía `next/font/local`). Es un recurso
+ * estático de la propia app (`style-src 'self'`), compatible con la CSP de docs/12 §6.
+ *
+ * Tema: solo light por ahora. Los valores viven en `:root` y los componentes consumen únicamente los nombres
+ * semánticos; el tema dark (docs/28 §9) se añadirá redefiniendo estos tokens bajo `[data-theme='dark']` /
+ * `prefers-color-scheme`, sin tocar los selectores de componentes.
+ *
+ * Especificidad: los estilos base van envueltos en `:where()` (especificidad 0) para que los estilos por página
+ * (objetos `style` y clases como `.pf-home`) siempre ganen.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Color base (docs/28 §5.1). */
+  --pf-bg: #ffffff;
+  --pf-surface: #f8fafc;
+  --pf-surface-raised: #ffffff;
+  --pf-surface-sunken: #f1f5f9;
+  --pf-fg: #0f172a;
+  --pf-fg-muted: #475569;
+  --pf-border: #e2e8f0;
+  --pf-border-strong: #94a3b8;
+  --pf-control-border: #64748b;
+  --pf-primary: #1d4ed8;
+  --pf-primary-hover: #1e40af;
+  --pf-primary-fg: #ffffff;
+  --pf-primary-soft: #eff6ff;
+  --pf-focus: #2563eb;
+  --pf-destructive: #b91c1c;
+  --pf-error: #b91c1c;
+
+  /* Semántica financiera (docs/28 §5.2; nunca solo color). */
+  --pf-fin-income: #047857;
+  --pf-fin-expense: #0f172a;
+  --pf-fin-transfer: #475569;
+  --pf-fin-conversion: #6d28d9;
+  --pf-fin-neutral: #64748b;
+  --pf-fin-warning: #b45309;
+  --pf-fin-over-budget: #b91c1c;
+  --pf-fin-ok: #15803d;
+  --pf-warning-bg: #fff8c5;
+  --pf-warning-border: #9a6700;
+  --pf-warning-fg: #3b2300;
+
+  /* Tipografía (docs/28 §5.3). */
+  --pf-font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans', Arial,
+    sans-serif;
+  --pf-font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+  --pf-text-xs: 0.75rem;
+  --pf-text-sm: 0.875rem;
+  --pf-text-base: 1rem;
+  --pf-text-lg: 1.125rem;
+  --pf-text-xl: 1.25rem;
+  --pf-text-2xl: 1.5rem;
+  --pf-text-3xl: 1.875rem;
+  --pf-text-display: 2.25rem;
+
+  /* Espaciado: escala de 4 px (docs/28 §5.4). */
+  --pf-space-1: 0.25rem;
+  --pf-space-2: 0.5rem;
+  --pf-space-3: 0.75rem;
+  --pf-space-4: 1rem;
+  --pf-space-6: 1.5rem;
+  --pf-space-8: 2rem;
+  --pf-space-12: 3rem;
+
+  /* Radios y elevación. */
+  --pf-radius-sm: 4px;
+  --pf-radius-md: 8px;
+  --pf-radius-lg: 12px;
+  --pf-radius-full: 9999px;
+  --pf-shadow-raised: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
+  --pf-shadow-overlay: 0 4px 12px rgb(15 23 42 / 0.12), 0 2px 4px rgb(15 23 42 / 0.08);
+
+  /* Controles y marco. */
+  --pf-control-h: 2.5rem;
+  --pf-topbar-h: 3.5rem;
+  --pf-sidebar-w: 15rem;
+  --pf-content-max: 72rem;
+  --pf-duration: 150ms;
+}
+
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--pf-surface);
+  color: var(--pf-fg);
+  font-family: var(--pf-font-sans);
+  font-size: var(--pf-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(h1, h2, h3, h4) {
+  margin: 0;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--pf-fg);
+}
+:where(h1) {
+  font-size: var(--pf-text-2xl);
+}
+:where(h2) {
+  font-size: var(--pf-text-xl);
+}
+:where(h3) {
+  font-size: var(--pf-text-lg);
+}
+:where(h4) {
+  font-size: var(--pf-text-base);
+}
+:where(p) {
+  margin: 0;
+}
+:where(small) {
+  font-size: var(--pf-text-sm);
+}
+:where(code, kbd, samp) {
+  font-family: var(--pf-font-mono);
+  font-size: 0.9em;
+}
+
+:where(a) {
+  color: var(--pf-primary);
+  text-underline-offset: 0.15em;
+}
+:where(a:hover) {
+  color: var(--pf-primary-hover);
+}
+
+/* Foco visible y consistente (docs/28 §5.1 `--focus-ring`: 2 px + offset; WCAG 2.4.7). */
+:focus-visible {
+  outline: 2px solid var(--pf-focus);
+  outline-offset: 2px;
+}
+:where(main):focus {
+  outline: none;
+}
+
+/* Controles de formulario: alto mínimo, borde con contraste ≥ 3:1 (1.4.11) y 16 px en móvil (sin zoom iOS). */
+:where(
+  input:not([type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file']),
+  select,
+  textarea
+) {
+  font: inherit;
+  font-size: var(--pf-text-base);
+  color: var(--pf-fg);
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-control-border);
+  border-radius: var(--pf-radius-md);
+  padding: var(--pf-space-2) var(--pf-space-3);
+  min-height: var(--pf-control-h);
+  max-width: 100%;
+}
+:where(textarea) {
+  min-height: 5rem;
+}
+:where(input, select, textarea):disabled {
+  background: var(--pf-surface-sunken);
+  color: var(--pf-fg-muted);
+  cursor: not-allowed;
+}
+:where(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--pf-error);
+}
+:where(input[type='checkbox'], input[type='radio']) {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--pf-primary);
+  margin: 0 var(--pf-space-1) 0 0;
+  vertical-align: -0.15em;
+}
+:where(label) {
+  font-weight: 500;
+}
+:where(fieldset) {
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-md);
+  padding: var(--pf-space-3);
+  margin: 0;
+  min-width: 0;
+}
+:where(legend) {
+  font-weight: 600;
+  padding: 0 var(--pf-space-1);
+}
+
+/* Botones: secundario por defecto; `type=submit` como acción principal. */
+:where(button) {
+  font: inherit;
+  font-weight: 500;
+  color: var(--pf-fg);
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-control-border);
+  border-radius: var(--pf-radius-md);
+  padding: var(--pf-space-2) var(--pf-space-4);
+  min-height: var(--pf-control-h);
+  cursor: pointer;
+  transition:
+    background-color var(--pf-duration) ease,
+    border-color var(--pf-duration) ease;
+}
+:where(button:hover:not(:disabled)) {
+  background: var(--pf-surface-sunken);
+}
+:where(button[type='submit']) {
+  background: var(--pf-primary);
+  border-color: var(--pf-primary);
+  color: var(--pf-primary-fg);
+}
+:where(button[type='submit']:hover:not(:disabled)) {
+  background: var(--pf-primary-hover);
+  border-color: var(--pf-primary-hover);
+}
+:where(button:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Tablas: cabecera sutil, filas separadas, montos tabulares (docs/28 §5.3). */
+:where(table) {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+:where(th) {
+  font-weight: 600;
+  font-size: var(--pf-text-sm);
+  color: var(--pf-fg-muted);
+  text-align: left;
+}
+:where(thead th) {
+  background: var(--pf-surface);
+}
+:where(caption) {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: var(--pf-space-2);
+}
+
+:where(hr) {
+  border: 0;
+  border-top: 1px solid var(--pf-border);
+  margin: var(--pf-space-4) 0;
+}
+:where(img, svg) {
+  max-width: 100%;
+}
+
+.pf-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Marco de la app (AppFrame) ---------- */
+
+.pf-skip {
+  position: absolute;
+  left: var(--pf-space-2);
+  top: -10rem;
+  z-index: 100;
+  padding: var(--pf-space-2) var(--pf-space-4);
+  background: var(--pf-primary);
+  color: var(--pf-primary-fg);
+  border-radius: var(--pf-radius-md);
+  font-weight: 600;
+}
+.pf-skip:focus {
+  top: var(--pf-space-2);
+  color: var(--pf-primary-fg);
+}
+
+.pf-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'top' 'nav' 'main';
+}
+
+.pf-topbar {
+  grid-area: top;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-2) var(--pf-space-3);
+  min-height: var(--pf-topbar-h);
+  padding: var(--pf-space-2) var(--pf-space-4);
+  background: var(--pf-bg);
+  border-bottom: 1px solid var(--pf-border);
+}
+.pf-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pf-space-2);
+  font-weight: 700;
+  font-size: var(--pf-text-lg);
+  letter-spacing: 0.02em;
+  color: var(--pf-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pf-brand:hover {
+  color: var(--pf-fg);
+}
+.pf-brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-primary);
+  color: var(--pf-primary-fg);
+  font-size: var(--pf-text-sm);
+}
+.pf-topbar-spacer {
+  flex: 1 1 auto;
+}
+
+.pf-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pf-space-2);
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: var(--pf-space-2);
+}
+.pf-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+
+/* Selector de workspace en la barra superior. */
+.pf-ws {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-2);
+  min-width: 0;
+}
+.pf-ws label {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-2);
+  min-width: 0;
+}
+.pf-ws-label {
+  font-size: var(--pf-text-sm);
+  color: var(--pf-fg-muted);
+  white-space: nowrap;
+}
+.pf-ws select {
+  min-width: 0;
+  max-width: 16rem;
+}
+.pf-ws-role {
+  font-size: var(--pf-text-xs);
+  color: var(--pf-fg-muted);
+  white-space: nowrap;
+}
+
+/* Menú de usuario (disclosure). */
+.pf-user {
+  position: relative;
+}
+.pf-user-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pf-space-2);
+  border-color: transparent;
+  background: transparent;
+  padding: var(--pf-space-1) var(--pf-space-2);
+  min-height: 2.75rem;
+}
+.pf-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--pf-radius-full);
+  background: var(--pf-primary-soft);
+  color: var(--pf-primary);
+  font-weight: 700;
+  font-size: var(--pf-text-sm);
+  flex: none;
+}
+.pf-user-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--pf-space-1));
+  z-index: 30;
+  width: min(18rem, calc(100vw - 2rem));
+  display: grid;
+  gap: var(--pf-space-1);
+  padding: var(--pf-space-2);
+  background: var(--pf-surface-raised);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-lg);
+  box-shadow: var(--pf-shadow-overlay);
+}
+.pf-user-panel[hidden] {
+  display: none;
+}
+.pf-user-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.pf-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  border: 0;
+  border-radius: var(--pf-radius-md);
+  background: transparent;
+  color: var(--pf-fg);
+  font-weight: 500;
+  text-decoration: none;
+  text-align: left;
+}
+.pf-menu-item:hover {
+  background: var(--pf-surface-sunken);
+  color: var(--pf-fg);
+}
+.pf-menu-sep {
+  border-top: 1px solid var(--pf-border);
+  margin: var(--pf-space-1) 0;
+}
+.pf-menu-heading {
+  padding: var(--pf-space-1) var(--pf-space-3) 0;
+  font-size: var(--pf-text-xs);
+  font-weight: 600;
+  color: var(--pf-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pf-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pf-space-1);
+  padding: var(--pf-space-1) var(--pf-space-3) var(--pf-space-2);
+}
+.pf-langs a {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.75rem;
+  min-height: 2.25rem;
+  padding: 0 var(--pf-space-2);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-full);
+  font-size: var(--pf-text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.pf-langs a[aria-current='true'] {
+  background: var(--pf-primary);
+  border-color: var(--pf-primary);
+  color: var(--pf-primary-fg);
+}
+
+/* Navegación principal: panel plegable en móvil, sidebar fija desde `md 768`. */
+.pf-sidenav {
+  grid-area: nav;
+  background: var(--pf-bg);
+  border-bottom: 1px solid var(--pf-border);
+  padding: var(--pf-space-2) var(--pf-space-3);
+}
+.pf-sidenav[data-open='false'] {
+  display: none;
+}
+.pf-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.pf-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-space-3);
+  min-height: 2.75rem;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  border-radius: var(--pf-radius-md);
+  color: var(--pf-fg-muted);
+  font-weight: 500;
+  text-decoration: none;
+}
+.pf-nav-link:hover {
+  background: var(--pf-surface-sunken);
+  color: var(--pf-fg);
+}
+.pf-nav-link[aria-current='page'] {
+  background: var(--pf-primary-soft);
+  color: var(--pf-primary);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--pf-primary);
+}
+
+.pf-main {
+  grid-area: main;
+  min-width: 0;
+  padding: var(--pf-space-4);
+  /* El foco no queda oculto bajo la barra sticky (WCAG 2.4.11). */
+  scroll-padding-top: var(--pf-topbar-h);
+}
+.pf-main-inner {
+  display: grid;
+  gap: var(--pf-space-4);
+  max-width: var(--pf-content-max);
+  min-width: 0;
+}
+.pf-demo {
+  margin: 0;
+  padding: var(--pf-space-2) var(--pf-space-3);
+  border: 2px solid var(--pf-warning-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-warning-bg);
+  color: var(--pf-warning-fg);
+  font-weight: 600;
+}
+.pf-status {
+  display: grid;
+  gap: var(--pf-space-3);
+  max-width: 40rem;
+  margin: var(--pf-space-8) auto;
+  padding: var(--pf-space-6);
+  background: var(--pf-surface-raised);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-lg);
+}
+
+html {
+  scroll-padding-top: calc(var(--pf-topbar-h) + var(--pf-space-2));
+}
+
+/* Acciones de página (`<nav>` de enlaces directamente bajo la sección): enlaces con forma de botón. */
+.pf-main :where(section > nav) > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--pf-control-h);
+  padding: var(--pf-space-2) var(--pf-space-4);
+  border: 1px solid var(--pf-control-border);
+  border-radius: var(--pf-radius-md);
+  background: var(--pf-bg);
+  color: var(--pf-fg);
+  font-weight: 500;
+  text-decoration: none;
+}
+.pf-main :where(section > nav) > a:hover {
+  background: var(--pf-surface-sunken);
+  color: var(--pf-fg);
+}
+.pf-main :where(section > nav) > a:first-child {
+  background: var(--pf-primary);
+  border-color: var(--pf-primary);
+  color: var(--pf-primary-fg);
+}
+.pf-main :where(section > nav) > a:first-child:hover {
+  background: var(--pf-primary-hover);
+}
+
+/* Etiquetas de rol, nombre corto: solo en pantallas anchas. */
+.pf-hide-sm {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .pf-hide-sm {
+    display: inline;
+  }
+}
+
+/* Bajo `lg 1024` el rótulo del selector de workspace queda solo para lectores de pantalla (el `<label>` se conserva). */
+@media (max-width: 1023.98px) {
+  .pf-ws-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .pf-ws-role {
+    display: none;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .pf-topbar {
+    flex-wrap: wrap;
+  }
+  .pf-ws {
+    order: 10;
+    flex: 1 1 100%;
+  }
+  .pf-ws label {
+    flex: 1 1 auto;
+  }
+  .pf-ws select {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .pf-shell {
+    grid-template-columns: var(--pf-sidebar-w) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'top top' 'nav main';
+  }
+  .pf-nav-toggle {
+    display: none;
+  }
+  .pf-sidenav,
+  .pf-sidenav[data-open='false'] {
+    display: block;
+    position: sticky;
+    top: var(--pf-topbar-h);
+    align-self: start;
+    height: calc(100vh - var(--pf-topbar-h));
+    overflow-y: auto;
+    border-bottom: 0;
+    border-right: 1px solid var(--pf-border);
+    padding: var(--pf-space-4) var(--pf-space-3);
+  }
+  .pf-main {
+    padding: var(--pf-space-6) var(--pf-space-8);
+  }
+}
+
+/* Movimiento reducido (docs/28 §10): sin transiciones ni animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

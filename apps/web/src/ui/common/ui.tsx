@@ -1,44 +1,85 @@
 import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react';
-import { cardStyle, mutedStyle, warningStyle } from '../dashboard/styles';
 
 /**
  * Piezas mínimas de UI (sin framework CSS) compartidas por las pantallas financieras: campos rotulados con error
- * accesible, paneles de confirmación y estilos que colapsan a una columna en móvil (NFR-USAB-006, 360 px).
+ * accesible, paneles de confirmación y estilos que colapsan a una columna en móvil (NFR-USAB-006, 360 px). Los
+ * colores, radios y espaciados salen de los tokens de `app/globals.css` (docs/28 §5); controles, botones y tablas
+ * toman su aspecto base de esa hoja, por eso aquí solo se fija el layout.
  */
 
-export const pageStyle: CSSProperties = { display: 'grid', gap: '1rem', maxWidth: '64rem', minWidth: 0 };
-export const formStyle: CSSProperties = { ...cardStyle, display: 'grid', gap: '0.75rem' };
+export const cardStyle: CSSProperties = {
+  background: 'var(--pf-surface-raised)',
+  border: '1px solid var(--pf-border)',
+  borderRadius: 'var(--pf-radius-md)',
+  padding: 'var(--pf-space-4)',
+  minWidth: 0,
+  overflowWrap: 'anywhere',
+};
+export const mutedStyle: CSSProperties = { color: 'var(--pf-fg-muted)', fontSize: 'var(--pf-text-sm)' };
+export const warningStyle: CSSProperties = {
+  borderLeft: '4px solid var(--pf-warning-border)',
+  borderRadius: 'var(--pf-radius-sm)',
+  background: 'var(--pf-warning-bg)',
+  padding: 'var(--pf-space-2) var(--pf-space-3)',
+  color: 'var(--pf-warning-fg)',
+};
+export const pageStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--pf-space-4)',
+  maxWidth: '64rem',
+  minWidth: 0,
+  alignContent: 'start',
+};
+export const formStyle: CSSProperties = { ...cardStyle, display: 'grid', gap: 'var(--pf-space-3)' };
 export const rowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '0.5rem',
+  gap: 'var(--pf-space-2) var(--pf-space-3)',
   alignItems: 'end',
 };
-export const fieldStyle: CSSProperties = { display: 'grid', gap: '0.25rem', minWidth: 0, flex: '1 1 12rem' };
-export const inputStyle: CSSProperties = {
-  font: 'inherit',
-  padding: '0.375rem',
+export const fieldStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--pf-space-1)',
   minWidth: 0,
-  maxWidth: '100%',
+  flex: '1 1 12rem',
+  alignContent: 'start',
 };
-export const errorStyle: CSSProperties = { color: '#cf222e', fontSize: '0.875rem', margin: 0 };
-export const tableWrapStyle: CSSProperties = { overflowX: 'auto', maxWidth: '100%' };
-export const tableStyle: CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' };
+export const inputStyle: CSSProperties = { minWidth: 0, maxWidth: '100%' };
+export const errorStyle: CSSProperties = {
+  color: 'var(--pf-error)',
+  fontSize: 'var(--pf-text-sm)',
+  margin: 0,
+};
+export const tableWrapStyle: CSSProperties = {
+  overflowX: 'auto',
+  maxWidth: '100%',
+  background: 'var(--pf-surface-raised)',
+  border: '1px solid var(--pf-border)',
+  borderRadius: 'var(--pf-radius-md)',
+};
+export const tableStyle: CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9375rem' };
 export const cellStyle: CSSProperties = {
-  padding: '0.375rem 0.5rem',
-  borderBottom: '1px solid #d0d7de',
+  padding: 'var(--pf-space-2) var(--pf-space-3)',
+  borderBottom: '1px solid var(--pf-border)',
   textAlign: 'left',
   verticalAlign: 'top',
 };
-export const numCellStyle: CSSProperties = { ...cellStyle, textAlign: 'right', whiteSpace: 'nowrap' };
+export const numCellStyle: CSSProperties = {
+  ...cellStyle,
+  textAlign: 'right',
+  whiteSpace: 'nowrap',
+  fontVariantNumeric: 'tabular-nums',
+};
 export const badgeStyle: CSSProperties = {
   display: 'inline-block',
-  border: '1px solid #d0d7de',
-  borderRadius: '1rem',
-  padding: '0 0.5rem',
-  fontSize: '0.8rem',
+  border: '1px solid var(--pf-border-strong)',
+  borderRadius: 'var(--pf-radius-full)',
+  padding: '0 var(--pf-space-2)',
+  fontSize: 'var(--pf-text-xs)',
+  fontWeight: 500,
+  lineHeight: 1.6,
+  whiteSpace: 'nowrap',
 };
-export { cardStyle, mutedStyle, warningStyle };
 
 /** Campo rotulado: el `<label>` envuelve el control; el error se asocia con `aria-describedby`. */
 export function Field({
