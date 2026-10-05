@@ -37,3 +37,12 @@ tests/traceability/regression-suite.md
 # Benchmarks nightly y smoke en vivo de providers FX (artefactos de CI)
 reports/perf/
 reports/fx-smoke/
+
+# OpenTofu (infra/): providers descargados, state/planes locales y variables/backends con datos del owner
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+infra/**/backend.hcl

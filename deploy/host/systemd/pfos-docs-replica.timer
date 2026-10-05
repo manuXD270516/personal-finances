@@ -1,0 +1,12 @@
+# PFOS — réplica nocturna de documentos a B2 (UTC; La Paz = UTC−4). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS réplica nocturna de documentos a B2
+
+[Timer]
+OnCalendar=*-*-* 07:30:00 UTC
+Unit=pfos-backup@docs-replica.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

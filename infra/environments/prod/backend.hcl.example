@@ -1,0 +1,4 @@
+# Copiar a backend.hcl (ignorado por git). Bucket creado a mano una sola vez (runbook §2.1): versioning ON,
+# Block Public Access ON, SSE-S3. Costo: céntimos al mes.
+bucket = "pfos-tfstate-CAMBIAR"
+region = "sa-east-1"

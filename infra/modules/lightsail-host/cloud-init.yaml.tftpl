@@ -1,0 +1,121 @@
+#cloud-config
+# Host PFOS N1 (ADR-0027, SPIKE-09 §11). Estable a propósito: cambiarlo reemplaza la instancia. La lógica de deploy,
+# backups y timers vive en el repo (deploy/host) y llega en cada deploy al commit desplegado.
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - jq
+  - ufw
+  - unattended-upgrades
+  - apt-listchanges
+
+users:
+  - default
+  # Usuario de CI: solo puede ejecutar el comando forzado (sin shell, sin pty, sin forwarding).
+  - name: pfos-deploy
+    shell: /bin/sh
+    lock_passwd: true
+    ssh_authorized_keys:
+      - 'restrict,command="sudo -n /usr/local/sbin/pfos-deploy \"$SSH_ORIGINAL_COMMAND\"" ${deploy_ssh_public_key}'
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-pfos.conf
+    permissions: '0644'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      X11Forwarding no
+      AllowUsers ubuntu pfos-deploy
+      MaxAuthTries 3
+
+  - path: /etc/sudoers.d/90-pfos-deploy
+    permissions: '0440'
+    content: |
+      pfos-deploy ALL=(root) NOPASSWD: /usr/local/sbin/pfos-deploy *
+
+  - path: /usr/local/sbin/pfos-deploy
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      # Comando forzado del deploy (un solo argumento = SSH_ORIGINAL_COMMAND). Valida TODO antes de tocar nada y
+      # delega en deploy/host/pfos-deploy.sh del commit (de main) que se despliega.
+      set -euo pipefail
+      repo=/opt/pfos/repo
+      read -r action sha api web pg extra <<<"$1" || true
+      die() { echo "pfos-deploy: $*" >&2; exit 64; }
+      [ -z "$extra" ] || die "argumentos de más"
+      case "$action" in
+        deploy)
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "sha inválido"
+          [[ "$api" =~ ^ghcr\.io/manuxd270516/finance-api@sha256:[0-9a-f]{64}$ ]] || die "ref de finance-api inválida"
+          [[ "$web" =~ ^ghcr\.io/manuxd270516/finance-web@sha256:[0-9a-f]{64}$ ]] || die "ref de finance-web inválida"
+          [[ "$pg" =~ ^ghcr\.io/manuxd270516/pfos-postgres@sha256:[0-9a-f]{64}$ ]] || die "ref de pfos-postgres inválida"
+          git -C "$repo" fetch --quiet origin main
+          git -C "$repo" merge-base --is-ancestor "$sha" origin/main || die "$sha no está en main"
+          git -C "$repo" -c advice.detachedHead=false checkout --quiet --detach "$sha"
+          exec /bin/bash "$repo/deploy/host/pfos-deploy.sh" deploy "$sha" "$api" "$web" "$pg"
+          ;;
+        rollback|status)
+          [ -z "$sha" ] || die "$action no recibe argumentos"
+          exec /bin/bash "$repo/deploy/host/pfos-deploy.sh" "$action"
+          ;;
+        *) die "acción desconocida (deploy|rollback|status)" ;;
+      esac
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: '0644'
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  - path: /etc/apt/apt.conf.d/52pfos-unattended
+    permissions: '0644'
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      // 08:30 UTC = 04:30 America/La_Paz, fuera de los jobs de backup (06:00–07:00 UTC).
+      Unattended-Upgrade::Automatic-Reboot-Time "08:30";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+  - path: /etc/docker/daemon.json
+    permissions: '0644'
+    content: |
+      {"log-driver": "local", "live-restore": true, "userland-proxy": false}
+
+  - path: /etc/sysctl.d/90-pfos.conf
+    permissions: '0644'
+    content: |
+      vm.swappiness = 10
+
+runcmd:
+  # Swap (el plan de 2 GB lo necesita como colchón; SPIKE-09 §3).
+  - fallocate -l ${swap_size_mb}M /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  - sysctl --system
+  # Docker Engine + Compose plugin desde el repositorio oficial (firmado).
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+  # Tailscale (acceso de administración y de CI; el owner lo une a su tailnet desde la consola, runbook §2.4).
+  - curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+  - curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin tailscale
+  - systemctl enable --now docker tailscaled
+  # Firewall del host (además del de Lightsail): 80/443 públicos, 22 solo para la consola de Lightsail, todo por tailscale0.
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 443/udp
+  - ufw allow 22/tcp
+  - ufw allow in on tailscale0
+  - ufw --force enable
+  # Directorios de PFOS: secretos (root, 0700), estado de releases y checkout del repo público.
+  - install -d -m 0700 -o root -g root /etc/pfos
+  - install -d -m 0750 -o root -g root /var/lib/pfos
+  - git clone --quiet ${repo_url} /opt/pfos/repo
+  - systemctl restart ssh

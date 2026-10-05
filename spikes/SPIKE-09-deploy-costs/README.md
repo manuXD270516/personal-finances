@@ -1,5 +1,7 @@
 # SPIKE-09 — Opciones de despliegue cloud de bajo costo
 
+> **Addendum 2026-10-05 (§17): presupuesto del owner USD 10–20 → default AWS Lightsail 2 GB São Paulo (≈ USD 14/mes), fallback Oracle A1; Hetzner CX ya no es contratable; ADR-0027 Aceptado.**
+>
 > Investigación **documental** con mediciones locales; **sin código productivo** y sin cuenta cloud. Evidencia para [ADR-0013](../../docs/adr/0013-cloud-deployment-strategy.md) y para la propuesta [ADR-0027](../../docs/adr/0027-destino-de-despliegue-inicial-vps-compose.md). **Anexo A (2026-10-04, D42): [PaaS — Vercel, Railway, Fly.io, Render, …](anexo-a-paas.md).** Ejecutado el **2026-10-03** desde la máquina del owner (Windows 11, zona horaria `SA Western Standard Time` = Bolivia, UTC−4). Precios consultados el **2026-10-03** en las fuentes de §15; todo lo marcado **(est.)** es una estimación propia.
 
 ## 1. Pregunta
@@ -292,4 +294,65 @@ Invariante que habilita todo: **contratos estándar** (Postgres wire, API S3, OI
 - **ADR-0014:** sin cambio; se suman providers `aws` (Lightsail), `hcloud`, `b2`, `cloudflare`, `grafana`.
 - **ARCHITECTURE §15**, **DESIGN-GATE Q3** y área 14, **docs/21** (nota de vigencia), `spikes/README.md`: actualizados en este cambio.
 - **Anexo A (2026-10-04):** ninguna PaaS supera a N2/N1 con todas las restricciones; Railway (≈ USD 25–30, `us-east4`) y Fly.io `gru` con PG 18 propio (≈ USD 38–48) quedan como variantes P1/P2 en ADR-0027.
-- Futuro change OpenSpec (`platform/delivery-pipeline`): `compose.prod.yaml`, módulo OpenTofu del host, job de deploy, pgBackRest y drill.
+- Futuro change OpenSpec (`platform/delivery-pipeline`): `compose.prod.yaml`, módulo OpenTofu del host, job de deploy, pgBackRest y drill. **2026-10-05:** scaffolding construido (§17.4).
+
+## 17. Addendum 2026-10-05 — presupuesto del owner USD 10–20/mes (Q3 cerrada)
+
+> El owner fijó el presupuesto en **USD 10–20/mes** (2026-10-05). Precios re-verificados el **2026-10-05** (fuentes en §17.5); **(est.)** = estimación propia. Sin impuestos (Bolivia: +~15 % est., §12).
+
+### 17.1 Hallazgos nuevos que cambian el N1
+
+- **Hetzner Cost-Optimized (CX/CAX) no se puede contratar:** la página oficial muestra "currently unavailable" en CX23/CX33/CAX* (verificado 2026-10-05) y el status page mantiene "Limited availability of cloud instances" desde el 2026-06-26, con restricción de altas a clientes nuevos. El precio de referencia del CX33 (€8.49–8.99 sin IPv4) ya no es alcanzable; la alternativa disponible con 8 GB (CPX32) cuesta **€35.99**. → **El N1 Hetzner deja de ser viable.**
+- **Hetzner EE. UU.** (Ashburn/Hillsboro): solo líneas CPX, con subidas de hasta **+192 %** (CPX11 US) el 2026-06-15; un CPX11 (2 GB) quedaría ≈ €14–15 (est.) con 131–140 ms de RTT y la misma restricción de altas → sin ventaja sobre Lightsail SP.
+- **AWS Lightsail** (página oficial, 2026-10-05): Linux con IPv4 2 GB **USD 12** (2 vCPU burst, 60 GB), 4 GB **USD 24**, 8 GB USD 44; mismo precio en São Paulo con la **mitad de transferencia** incluida (2 GB → 1.5 TB). Snapshots USD 0.05/GB-mes. Los planes **IPv6-only** (2 GB USD 10, 4 GB USD 20) no sirven: `ghcr.io` y `paralelo.bo` no publican registros AAAA (verificado con `nslookup` el 2026-10-05), así que el host no podría bajar imágenes ni consultar el provider FX principal.
+- **Oracle Always Free A1:** confirmado el recorte a **2 OCPU / 12 GB** (1 500 OCPU-h + 9 000 GB-h/mes) desde el 2026-06-15, sin aviso; reclamo de instancias ociosas (CPU, red **y memoria** < 20 % p95 en 7 días). PFOS usaría ≈ 2 GiB de 12 (≈ 17 %) → **candidato a reclamo** salvo cuenta Pay-As-You-Go.
+- **DigitalOcean:** 2 GB USD 12 (1 vCPU), 4 GB USD 24; sigue sin región en Sudamérica.
+- **Vultr São Paulo:** VC2 2 vCPU/4 GB **USD 30**; 2 GB ≈ USD 15 (est., 1.5× el precio de EE. UU.) con 1 vCPU; backups automáticos +20 %. Mejor RTT pagado (79–83 ms) pero ≈ USD 19 con backups y sin el ecosistema AWS (Budgets, ruta a N4).
+- **Backblaze B2:** USD 6.95/TB-mes, **primeros 10 GB gratis**, egress gratis hasta 3× lo almacenado, llamadas A/B/C gratis. **Grafana Cloud Free:** 10k series, 50 GB logs, 50 GB trazas, 14 días (sin cambios).
+
+### 17.2 ¿Cabe el stack en 2 GB?
+
+Con las mediciones de §3 (Keycloak 545–581 MiB, PostgreSQL 75 MiB idle en dev, SeaweedFS 63–112 MiB, api 160–342 MiB) y **sin Grafana Alloy** (la app exporta OTLP directo a Grafana Cloud: −80–150 MiB):
+
+| Servicio | Uso estable (est. desde lo medido) | Techo en `compose.prod.yaml` |
+|---|---|---|
+| Keycloak (`start`, caché local, SerialGC, `MaxRAMPercentage=50`) | 500–600 MiB | 704m |
+| PostgreSQL 18 (`shared_buffers=96MB`, `max_connections=60`) | 150–250 MiB | 384m |
+| finance-api (`--max-old-space-size=192`) | 160–340 MiB | 320m |
+| finance-worker | ≈ 200 MiB | 288m |
+| finance-web (`--max-old-space-size=160`) | 150–250 MiB | 288m |
+| SeaweedFS (`GOMEMLIMIT=140MiB`) | 60–110 MiB | 192m |
+| Caddy | ≈ 30 MiB | 64m |
+| **Total contenedores** | **≈ 1.3–1.6 GiB** | (techos no simultáneos) |
+| SO + Docker | ≈ 200–300 MiB | + swap 2 GiB (`swappiness=10`) |
+
+**Veredicto:** 4 GB es holgado (como decía §3); **2 GB cabe con ajuste** (heaps acotados, sin Alloy, pools de 5 conexiones, swap como colchón) con ≈ 150–400 MiB de margen. Riesgo principal: picos de Keycloak (908 MiB tras E2E sin límite) → con techo de 704m un pico se traduce en GC más frecuente o, en el peor caso, un `OOMKilled` que Docker reinicia. Se valida en el PoC (§14.2); disparadores de salida en el [runbook §1](../../docs/runbooks/deploy-and-restore.md). CPU: el plan de 2 GB es *burstable*; el arranque de Keycloak consume créditos, pero la carga personal es ≪ 1 req/s.
+
+### 17.3 Comparación con presupuesto USD 10–20 (producción, USD/mes)
+
+| Opción | Host | Snapshots / backups de VM | B2 | Dominio | **Total** | RTT (ms) | Veredicto |
+|---|---|---|---|---|---|---|---|
+| **Lightsail 2 GB SP** | 12.00 | ≈ 0.5–1 (est.: 7 snapshots incrementales ≈ 10–20 GB) | 0 (< 10 GB) | ≈ 1 (est.) | **≈ 13.5–14** (≈ 15.5–16.5 con impuestos) | 112 | **Default** |
+| Oracle A1 Santiago (PAYG) | 0 | 0 (dentro del free tier, verificar) | 0 | ≈ 1 | **≈ 1** | 63 | **Fallback** (capacidad, reclamo, ARM) |
+| Vultr 2 GB SP | ≈ 15 (est.) | ≈ 3 | 0 | ≈ 1 | ≈ 19 | 79–83 | Alternativa si el RTT pesa más que el ecosistema |
+| DigitalOcean 2 GB (NYC) | 12 | 2.4 (backups 20 %) | 0 | ≈ 1 | ≈ 15.5 | ≈ 140 (est.) | Peor RTT, 1 vCPU |
+| Lightsail 4 GB SP | 24 | ≈ 1 | 0 | ≈ 1 | ≈ 26–27 | 112 | Fuera de presupuesto (escalón natural) |
+| Hetzner CX33 (EU) | — | — | — | — | — | 235–263 | **No contratable** (2026-10) |
+| Hetzner CPX (US) | ≈ 14–15 (est.) | +20 % | 0 | ≈ 1 | ≈ 18–19 | 131–140 | Sin ventaja; altas restringidas |
+
+Grafana Cloud Free, Tailscale Personal, DNS de Cloudflare y healthchecks.io: USD 0. State de OpenTofu en S3: céntimos. AWS Budgets: sin costo (presupuestos sin acciones). WAL a B2 con `archive_timeout=300s` y zstd: ≈ 2–4 GB en la ventana de 14 días (est.), dentro de los 10 GB gratis.
+
+### 17.4 Recomendación (aplicada en ADR-0027, Aceptado 2026-10-05)
+
+- **Default: AWS Lightsail Linux 2 GB en São Paulo + Docker Compose ≈ USD 14/mes** (≈ 16 con impuestos). Conserva lo que hacía atractivo al N2 (amd64 sin tocar el build, cuenta AWS con Budgets/CloudTrail, ruta a N4 en la misma región, snapshots diarios) dentro del presupuesto; subir a 4 GB es cambiar una variable si el owner amplía el presupuesto.
+- **Fallback: Oracle Cloud A1 (Santiago, cuenta PAYG para evitar el reclamo) ≈ USD 1/mes**, si el PoC muestra que 2 GB no alcanza y el presupuesto no se amplía. Costo de habilitarlo: **imágenes multi-arch** — `main.yml` pasa a una matriz imagen × plataforma con runners nativos `ubuntu-24.04-arm` (gratis en repos públicos como este), `push-by-digest` por plataforma y un job `merge` con `docker buildx imagetools create`; el digest registrado pasa a ser el del índice multi-arch y `verify-by-digest` no cambia. Las imágenes de terceros del stack (postgres 18.6, Keycloak 26.8, SeaweedFS 4.48, Caddy 2.11) ya publican `linux/arm64` (verificado 2026-10-05). Estimación: **½–1 día** + ~2× minutos de build (sin costo en repo público) + un módulo `oci` nuevo en `infra/`.
+- Construido con esta decisión: `infra/` (OpenTofu), `deploy/compose/compose.prod.yaml`, imagen `pfos-postgres` (PG 18.6 + pgBackRest 2.59.2, `docker/postgres.Dockerfile`), `deploy/pgbackrest/`, `deploy/host/`, `.github/workflows/deploy.yml` y [docs/runbooks/deploy-and-restore.md](../../docs/runbooks/deploy-and-restore.md). Validado sin cloud: `tofu fmt`/`validate` (OpenTofu 1.12.7, `-backend=false`), `cloud-init schema`, `caddy validate`, `actionlint`, `shellcheck`, `docker compose config` del overlay y un ciclo real de pgBackRest con repos locales (archive-push asíncrono, full en repo1 y repo2, restore PITR por timestamp).
+
+### 17.5 Fuentes (consultadas el 2026-10-05)
+
+- AWS: [Lightsail pricing (oficial)](https://aws.amazon.com/lightsail/pricing/) — bundles IPv4/IPv6-only, excepción de transferencia en São Paulo, snapshots USD 0.05/GB-mes
+- Hetzner: [Cloud cost-optimized (oficial, "currently unavailable")](https://www.hetzner.com/cloud/cost-optimized/), [findstack — subida y disponibilidad (2026-09-16)](https://findstack.com/resources/hetzner-price-increase-2026), [wz-it — CPX/CCX junio 2026](https://wz-it.com/en/blog/hetzner-price-increase-june-2026-cpx-ccx-alternatives/), [privatedevops — repricing 2026-06-15](https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do)
+- Oracle: [Always Free Resources (oficial)](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm), [InfoQ — límites del free tier (2026-07)](https://infoq.com/news/2026/07/oracle-cloud-free-tier-limits/), [braindetox — recorte 2026](https://braindetox.kr/en/posts/oracle_always_free_tier_reduced_2026.html)
+- Vultr: [cloud-mercato — VC2 2c/4 GB por región](https://pcr.cloud-mercato.com/providers/vultr/flavors/vc2-2c-4gb/pricing); DigitalOcean: [costbench DO](https://costbench.com/software/cloud-infrastructure/digitalocean)
+- Backblaze: [B2 pricing (oficial)](https://www.backblaze.com/cloud-storage/pricing); Grafana: [Grafana Cloud pricing (oficial)](https://grafana.com/pricing/)
+- Tailscale: [tailscale/github-action v4.2.0 (2026-09-22, federación OIDC)](https://github.com/tailscale/github-action)

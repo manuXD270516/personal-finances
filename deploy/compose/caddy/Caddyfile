@@ -1,0 +1,30 @@
+# Caddy — único proceso con puertos públicos en producción N1 (ADR-0027, SPIKE-09 §11). TLS automático (ACME,
+# Let's Encrypt) para los dos hostnames; HSTS; consola de Keycloak bloqueada desde Internet.
+{
+	email {$PF_ACME_EMAIL}
+	admin localhost:2019
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+# finance-web (Next.js BFF). El navegador solo habla con este origen y con el de Keycloak.
+{$PF_DOMAIN_APP} {
+	import security_headers
+	encode zstd gzip
+	reverse_proxy finance-web:3000
+}
+
+# Keycloak (issuer OIDC = https://{$PF_DOMAIN_AUTH}/realms/pfos).
+{$PF_DOMAIN_AUTH} {
+	import security_headers
+	@admin path /admin /admin/*
+	respond @admin 404
+	reverse_proxy keycloak:8080
+}

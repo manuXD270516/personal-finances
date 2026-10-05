@@ -1,0 +1,12 @@
+# PFOS — backup full semanal (repo1, PITR 14 d) (UTC; La Paz = UTC−4). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS backup full semanal (repo1, PITR 14 d)
+
+[Timer]
+OnCalendar=Sun *-*-* 06:00:00 UTC
+Unit=pfos-backup@full.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

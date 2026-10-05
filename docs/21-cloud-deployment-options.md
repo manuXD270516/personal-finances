@@ -4,6 +4,8 @@
 
 > **Actualización 2026-10-03:** [SPIKE-09](../spikes/SPIKE-09-deploy-costs/README.md) re-verificó precios, midió latencia desde Bolivia y amplió el análisis a VPS único + Compose, PostgreSQL gestionado barato, object storage, IdP y observabilidad; propone [ADR-0027](adr/0027-destino-de-despliegue-inicial-vps-compose.md) (default ≈ USD 27–30/mes). Este documento se conserva como análisis de las opciones de plataforma (nivel N4 y alternativas).
 
+> **Actualización 2026-10-05:** el owner fijó el presupuesto en **USD 10–20/mes** y [ADR-0027](adr/0027-destino-de-despliegue-inicial-vps-compose.md) quedó **Aceptado**: producción en **AWS Lightsail 2 GB São Paulo + Docker Compose (≈ USD 14/mes)**, fallback Oracle Cloud A1; [ADR-0013](adr/0013-cloud-deployment-strategy.md) pasa a *Reemplazado* y la Option A de este documento es el nivel N4. Precios re-verificados y desglose en [SPIKE-09 §17](../spikes/SPIKE-09-deploy-costs/README.md); operación en el [runbook](runbooks/deploy-and-restore.md).
+
 > **Precios:** todas las cifras son **aproximadas**, en USD, región `us-east-1` (o equivalente más barata del proveedor) salvo indicación, consultadas en fuentes públicas a **2026-10-01**, sin impuestos ni free tier salvo que se diga. **Verificar en SPIKE-09** con la calculadora oficial y un PoC real antes de decidir.
 
 ---

@@ -1,9 +1,9 @@
 # ADR-0027: Destino de despliegue inicial — VPS único con Docker Compose (AWS Lightsail São Paulo), escalable por niveles
 
-- Estado: Propuesto (pendiente de que el owner confirme el presupuesto mensual, DESIGN-GATE Q3)
-- Fecha: 2026-10-03
+- Estado: **Aceptado (2026-10-05)** — presupuesto del owner USD 10–20/mes; default **AWS Lightsail 2 GB en São Paulo** (≈ USD 14/mes), fallback Oracle Cloud A1 (ver [Decisión del owner 2026-10-05](#decisión-del-owner-2026-10-05-presupuesto-usd-1020))
+- Fecha: 2026-10-03 (propuesta) · 2026-10-05 (aceptación)
 - Decisores: Owner (Product/Tech Lead)
-- Relacionado: Reemplazaría a ADR-0013 al aceptarse; [SPIKE-09](../../spikes/SPIKE-09-deploy-costs/README.md); docs/ARCHITECTURE.md §5, §15; docs/19-local-development.md; docs/21-cloud-deployment-options.md; docs/22-infrastructure.md; docs/30-backup-and-disaster-recovery.md; ADR-0005, ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0020, ADR-0023; OpenSpec capability `platform/delivery-pipeline`
+- Relacionado: Reemplaza a ADR-0013; [runbook de despliegue y restauración](../runbooks/deploy-and-restore.md); `infra/`, `deploy/compose/compose.prod.yaml`, `.github/workflows/deploy.yml`; [SPIKE-09](../../spikes/SPIKE-09-deploy-costs/README.md); docs/ARCHITECTURE.md §5, §15; docs/19-local-development.md; docs/21-cloud-deployment-options.md; docs/22-infrastructure.md; docs/30-backup-and-disaster-recovery.md; ADR-0005, ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0020, ADR-0023; OpenSpec capability `platform/delivery-pipeline`
 
 ## Contexto y problema
 
@@ -29,34 +29,37 @@ ADR-0013 recomendó AWS ECS/Fargate + RDS con un perfil de costo mínimo, condic
 
 ## Decisión
 
-Desplegar por **niveles**, con un default y disparadores explícitos de cambio:
+Desplegar por **niveles**, con un default y disparadores explícitos de cambio (tabla re-verificada el 2026-10-05 con el presupuesto del owner, SPIKE-09 §17):
 
 | Nivel | Costo (prod, 2026-10) | Destino |
 |---|---|---|
-| N1 | ≈ USD 10–15/mes | Hetzner CX33 (DE/FI) + Compose; PITR propio |
-| **N2 (default)** | **≈ USD 27–30/mes** | **AWS Lightsail 4 GB en `sa-east-1` (São Paulo) + Compose**; PITR propio |
+| **N1 (default)** | **≈ USD 14/mes** (≈ 16 con impuestos) | **AWS Lightsail 2 GB en `sa-east-1` (São Paulo) + Compose**; PITR propio con pgBackRest → B2 |
+| N1-F (fallback) | ≈ USD 1/mes | Oracle Cloud A1 (Santiago, cuenta Pay-As-You-Go) + Compose; requiere imágenes multi-arch |
+| N2 | ≈ USD 27–30/mes | Lightsail 4 GB São Paulo (mismo stack; solo cambia `lightsail_bundle_id`) |
 | N3 | ≈ USD 50–60/mes | N2 con PostgreSQL en Neon Launch `aws-sa-east-1` (PG 18, PITR 7 días) |
 | N4 | ≥ USD 110/mes | ECS Fargate + RDS (contenido de ADR-0013) |
 
+Hetzner CX33 (el N1 de la propuesta del 2026-10-03) queda **descartado**: los planes CX/CAX figuran como no disponibles para contratar desde agosto de 2026 (SPIKE-09 §17.1).
+
 Para N1/N2 se decide además:
 
-- **Runtime:** `docker compose` con un override de producción (`compose.prod.yaml`) sobre las mismas imágenes por digest; Caddy como único proceso con puertos públicos (80/443, TLS ACME); `migrate` como `compose run --rm` antes de `up -d`.
-- **PostgreSQL 18 en contenedor** con **pgBackRest** (WAL continuo + base diaria, cifrado del lado cliente) hacia **Backblaze B2** con versioning y Object Lock, clave del host sin permiso de borrado; restore drill mensual en VM efímera (docs/30).
+- **Runtime:** `docker compose` con el override `deploy/compose/compose.prod.yaml` sobre `compose.yaml` y las mismas imágenes por digest; Caddy como único proceso con puertos públicos (80/443, TLS ACME); `migrate` corre como dependencia de `up --wait` (si falla, api/worker siguen en N-1). Límites de memoria por contenedor dimensionados para 2 GB + 2 GiB de swap.
+- **PostgreSQL 18 en contenedor** con **pgBackRest** (imagen `pfos-postgres` construida por `main.yml`: WAL continuo asíncrono, full semanal + diferencial diario con retención de 14 días, full mensual × 12, cifrado del lado cliente) hacia **Backblaze B2** con versioning y **Object Lock governance**; la clave del host no tiene `bypassGovernance` ni permisos sobre retenciones (puede ocultar archivos para que pgBackRest expire, pero no destruir versiones bloqueadas). Backup incremental previo a cada migración. Restore drill mensual en VM efímera con clave de solo lectura (docs/30).
 - **Object storage:** SeaweedFS en el host (validado en SPIKE-07) con réplica nocturna a B2. **Cloudflare R2 no se usa** para documentos ni backups (sin versioning ni Object Lock).
-- **Identidad:** Keycloak 26 propio (`start --optimized`); IdP gestionado solo se reevalúa al pasar a N4.
-- **Observabilidad:** Grafana Cloud Free vía OTLP (Grafana Alloy en el host), sampling de trazas 10 %, check sintético de `/health/ready`.
-- **IaC:** OpenTofu/Terraform (ADR-0014) con provider `aws` (`aws_lightsail_*`) o `hcloud`, más `b2`, `cloudflare`/DNS y `grafana`; cloud-init para el host; state en S3 cifrado.
-- **Deploy:** job de GitHub Actions posterior a `verify-by-digest`, por SSH a través de Tailscale (sin SSH público); los secretos viven en el host, CI solo envía digests.
-- **Staging:** efímero (VM creada y destruida con OpenTofu para validar releases o drills), no permanente.
+- **Identidad:** Keycloak 26 propio en modo `start` (no `start-dev`), caché local y heap acotado; realm de producción sin usuarios demo; consola de administración solo por túnel. IdP gestionado solo se reevalúa al pasar a N4.
+- **Observabilidad:** Grafana Cloud Free vía OTLP **directo desde la app** (sin Grafana Alloy en 2 GB), sampling de trazas 10 %, checks sintéticos de `/api/health/ready` y del discovery OIDC.
+- **IaC:** OpenTofu (ADR-0014) en `infra/`: providers `aws` (`aws_lightsail_*`, Budgets) y `b2`; cloud-init para el host; state en S3 con **cifrado del lado cliente** de OpenTofu. Sin `apply` desde CI.
+- **Deploy:** `.github/workflows/deploy.yml` (solo `workflow_dispatch`, environment `production` con aprobación del owner) toma los digests de una corrida exitosa de `main.yml` y los envía por SSH a través de Tailscale (federación OIDC, sin auth key guardada; sin SSH público) a un **comando forzado** que valida los argumentos; los secretos viven solo en el host. Rollback por digest al release anterior.
+- **Staging:** efímero (VM de drill creada y destruida con OpenTofu, `drill_enabled`), no permanente.
 
-**Disparadores:** presupuesto < USD 20 → N1; un drill de restore fallido dos veces o deseo de no operar PITR → N3; varios usuarios reales, HA/RTO < 1 h u objetivo de aprendizaje AWS → N4 (nuevo ADR o reactivación de ADR-0013).
+**Disparadores:** 2 GB insuficiente en el PoC (OOM, swap sostenido, memoria > 85 %) → N2 si el owner amplía el presupuesto, si no N1-F; un drill de restore fallido dos veces o deseo de no operar PITR → N3; varios usuarios reales, HA/RTO < 1 h u objetivo de aprendizaje AWS → N4 (nuevo ADR o reactivación de ADR-0013).
 
 ## Análisis de opciones
 
-### 1. VPS único + Compose (elegida, N1/N2)
-- **Pros:** el más barato con requisitos completos; paridad máxima (es el modo B de docs/19); lock-in mínimo; RAM medida cabe en 4 GB (≈ 1.8–2.8 GiB).
+### 1. VPS único + Compose (elegida: N1 Lightsail 2 GB; N1-F Oracle A1; N2 Lightsail 4 GB)
+- **Pros:** el más barato con requisitos completos; paridad máxima (es el modo B de docs/19); lock-in mínimo; RAM medida cabe holgada en 4 GB (≈ 1.8–2.8 GiB con Alloy) y ajustada en 2 GB (≈ 1.3–1.6 GiB sin Alloy, heaps acotados, swap; SPIKE-09 §17.2).
 - **Contras:** sin HA; PITR y parches del SO a cargo del owner; un solo blast radius.
-- **Costo:** N1 ≈ USD 10–15; N2 ≈ USD 27–30. **Complejidad operativa:** media.
+- **Costo:** N1 ≈ USD 14; N1-F ≈ USD 1; N2 ≈ USD 27–30. **Complejidad operativa:** media.
 
 ### 2. VPS + PostgreSQL gestionado (N3)
 - **Pros:** PITR gestionado; Neon tiene PG 18 y región São Paulo; mismo VPS para el resto.
@@ -82,9 +85,9 @@ Para N1/N2 se decide además:
 ## Consecuencias
 
 **Positivas**
-- Costo de producción ≈ USD 30/mes con PG 18 + RLS + PITR, OIDC y observabilidad.
+- Costo de producción ≈ USD 14/mes (≈ 16 con impuestos) con PG 18 + RLS + PITR, OIDC y observabilidad, dentro del presupuesto del owner (USD 10–20).
 - Cero cambios en la aplicación: mismas imágenes, mismo contrato de configuración, mismos adapters.
-- Ruta de crecimiento en la misma cuenta y región AWS (N2 → N4).
+- Ruta de crecimiento en la misma cuenta y región AWS (N1 → N2 cambiando el plan; → N4).
 
 **Negativas**
 - El owner opera backups/PITR, parches del SO y Docker.
@@ -93,15 +96,24 @@ Para N1/N2 se decide además:
 
 **Riesgos**
 - PITR propio mal configurado. *Mitigación:* drill mensual automatizado que falla si no restaura; alerta por `archive` atrasado; escalar a N3.
-- Memoria insuficiente en 4 GB. *Mitigación:* límites por contenedor, swap, subir a Lightsail 8 GB (USD 44).
+- Memoria insuficiente en 2 GB (Keycloak llegó a 908 MiB sin límite tras E2E). *Mitigación:* techos por contenedor, heaps acotados, swap de 2 GiB, señales de salida en el runbook §1; N2 (4 GB, USD 24) con OK del owner o fallback N1-F.
+- Fallback Oracle A1: capacidad escasa, reclamo de instancias ociosas, ARM. *Mitigación:* solo con cuenta PAYG y tras habilitar imágenes multi-arch (½–1 día, SPIKE-09 §17.4).
 - Cambios de precio del proveedor. *Mitigación:* contratos estándar y IaC → mover de proveedor en horas; AWS Budgets.
 - Telemetría en un tercero. *Mitigación:* redacción y detectores restringidos (SPIKE-10).
 
 ## Validación
 
-- **Owner:** confirmar presupuesto (Q3); con eso el ADR pasa a Aceptado y ADR-0013 a "Reemplazado por ADR-0027".
-- **PoC de 48 h** al abrir el change de despliegue: N2 creado con OpenTofu, stack completo con carga E2E (RAM ≤ 3 GiB), un restore PITR completo con RTO < 1 h y costo facturado ≤ USD 35/mes en Cost Explorer.
-- Métricas continuas: AWS Budgets (alerta a USD 35), resultado del drill mensual, uso de memoria por contenedor.
+- **Owner (hecho 2026-10-05):** presupuesto USD 10–20/mes → ADR Aceptado; ADR-0013 pasa a "Reemplazado por ADR-0027".
+- **PoC de 48 h** al abrir el change de despliegue: N1 creado con OpenTofu (`infra/environments/prod`), stack completo con carga E2E (memoria de contenedores ≤ 1.7 GiB, sin `OOMKilled`, swap-in no sostenido), un restore PITR completo con RTO < 1 h (runbook §6) y costo facturado ≤ USD 20/mes en Cost Explorer.
+- Métricas continuas: AWS Budgets (límite USD 20: alertas al 80 % real y 100 % pronosticado), resultado del drill mensual, uso de memoria por contenedor, heartbeat de backups.
+
+## Decisión del owner 2026-10-05 (presupuesto USD 10–20)
+
+- **Default N1: AWS Lightsail Linux 2 GB, São Paulo.** Desglose mensual (SPIKE-09 §17.3): instancia USD 12.00 (IPv4 y 1.5 TB de transferencia incluidos) + snapshots automáticos ≈ 0.5–1 + Backblaze B2 ≈ 0 (dentro de los 10 GB gratis) + Grafana Cloud Free 0 + Tailscale/Cloudflare DNS 0 + dominio ≈ 1 → **≈ USD 14** (≈ 16 con IVA/IT est.).
+- **Fallback N1-F: Oracle Cloud A1 (Santiago, PAYG) ≈ USD 1**, solo si 2 GB no alcanza y el presupuesto no sube; exige imágenes multi-arch en `main.yml`.
+- Descartados por presupuesto o disponibilidad: Lightsail 4 GB (≈ USD 27), Hetzner CX33 (no contratable desde 2026-08), Hetzner CPX US y Vultr/DigitalOcean 2 GB (sin ventaja frente a Lightsail SP; ver SPIKE-09 §17.3). Lightsail IPv6-only descartado: `ghcr.io` y `paralelo.bo` no tienen AAAA.
+- Diferencia con la propuesta del 2026-10-03: la clave B2 del host **sí** tiene `deleteFiles` (pgBackRest necesita expirar); la inmutabilidad la da Object Lock governance sin `bypassGovernance`. Comportamiento de expiración con lock a verificar en el PoC (SPIKE-09 §14.3).
+- Implementación (sin `apply`): `infra/`, `deploy/compose/compose.prod.yaml`, `docker/postgres.Dockerfile`, `deploy/pgbackrest/`, `deploy/host/`, `.github/workflows/deploy.yml`, [runbook](../runbooks/deploy-and-restore.md).
 
 ## Notas
 
