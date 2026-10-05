@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import golden from './golden-summary.json' with { type: 'json' };
 import {
@@ -14,16 +15,34 @@ const plan = buildLargePlan();
 const main = plan.workspaces[0]!;
 const ops = (ws: (typeof plan.workspaces)[number]) => ws.months.flatMap((m) => m.ops);
 
+// Huella SHA-256 de la serialización completa del plan (bigint/Map/Set incluidos): comparar dos grafos de ~90k
+// transacciones con `toEqual` rozaba el timeout por defecto en runners compartidos de CI.
+const digest = (value: unknown): string =>
+  createHash('sha256')
+    .update(
+      JSON.stringify(value, (_key, v: unknown) => {
+        if (typeof v === 'bigint') return `${v}n`;
+        if (v instanceof Map) return { $map: [...v.entries()] };
+        if (v instanceof Set) return { $set: [...v] };
+        return v;
+      }),
+    )
+    .digest('hex');
+
 describe('Large Dataset Seed v1 (docs/29 §2.3)', () => {
-  it('es determinista y coincide con su golden summary (saldos del principal y volumen por workspace)', () => {
-    expect(buildLargePlan()).toEqual(plan);
-    const summary = summarizeLargeWorkspace(main);
-    expect({
-      datasetVersion: plan.datasetVersion,
-      main: summary,
-      satellites: plan.workspaces.slice(1).map((w) => summarizeLargeWorkspace(w).counts.transactions),
-    }).toEqual(golden);
-  });
+  it(
+    'es determinista y coincide con su golden summary (saldos del principal y volumen por workspace)',
+    { timeout: 30_000 },
+    () => {
+      expect(digest(buildLargePlan())).toBe(digest(plan));
+      const summary = summarizeLargeWorkspace(main);
+      expect({
+        datasetVersion: plan.datasetVersion,
+        main: summary,
+        satellites: plan.workspaces.slice(1).map((w) => summarizeLargeWorkspace(w).counts.transactions),
+      }).toEqual(golden);
+    },
+  );
 
   it('volumen: 5 años, ≥ 50 000 transacciones en el principal (precondición de NFR-PERF-*), 25 cuentas y 20 satélites de 1 000–5 000', () => {
     const summary = summarizeLargeWorkspace(main);
