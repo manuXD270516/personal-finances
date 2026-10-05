@@ -1,7 +1,14 @@
 import { unitOfWorkKysely } from '@pf/platform/api';
-import { DomainError, LocalDate, Money, type Clock } from '@pf/shared-kernel';
+import {
+  currency as makeCurrency,
+  DomainError,
+  LocalDate,
+  Money,
+  type Clock,
+  type Currency,
+} from '@pf/shared-kernel';
 import { sql } from 'kysely';
-import type { CurrencyCatalog, LedgerUnitOfWork } from '../application/ports/index.js';
+import type { LedgerUnitOfWork } from '../application/ports/index.js';
 import type {
   AccountBalanceDto,
   AccountBalancesDto,
@@ -20,6 +27,7 @@ interface BalanceRow {
   type: LedgerAccountNatureDto;
   source_account_id: string | null;
   currency: string;
+  scale: number | string;
   balance: string;
 }
 
@@ -35,7 +43,6 @@ interface BalanceRow {
 export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
   constructor(
     private readonly uow: LedgerUnitOfWork,
-    private readonly currencies: CurrencyCatalog,
     private readonly clock?: Clock,
   ) {}
 
@@ -70,16 +77,16 @@ export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
     asOf?: string;
   }): Promise<readonly MoneyDto[]> {
     return this.uow.run(input.workspaceId, async () => {
+      // Sin ids: solo cuentas del usuario (ASSET/LIABILITY ⇔ `source_account_id`, ledger_account_user_ck), en SQL.
       const rows = await this.balances(
         input.workspaceId,
         await this.asOfDate(input.workspaceId, input.asOf),
         input.ledgerAccountIds ?? null,
+        input.ledgerAccountIds === undefined ? { accountIds: null } : null,
       );
       const totals = new Map<string, Money>();
       for (const row of rows) {
-        if (input.ledgerAccountIds === undefined && row.type !== 'ASSET' && row.type !== 'LIABILITY')
-          continue;
-        const cur = await this.currencies.currencyOf(row.currency);
+        const cur = this.currencyOf(row);
         const amount = Money.parse(row.balance, cur);
         totals.set(row.currency, (totals.get(row.currency) ?? Money.zero(cur)).add(amount));
       }
@@ -98,12 +105,10 @@ export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
   }): Promise<AccountBalancesDto> {
     return this.uow.run(input.workspaceId, async () => {
       const asOf = await this.asOfDate(input.workspaceId, input.asOf);
-      const wanted = input.accountIds === undefined ? null : new Set(input.accountIds);
-      const rows = (await this.balances(input.workspaceId, asOf, null)).filter(
-        (r) => r.source_account_id !== null && (wanted === null || wanted.has(r.source_account_id)),
-      );
-      const balances: AccountBalanceDto[] = [];
-      for (const row of rows) balances.push(await this.toDto(row));
+      const rows = await this.balances(input.workspaceId, asOf, null, {
+        accountIds: input.accountIds ?? null,
+      });
+      const balances = rows.map((row) => this.toDto(row));
       const { rows: latest } = await sql<{ created_at: Date | string }>`
         SELECT created_at FROM ledger.journal_entry WHERE workspace_id = ${input.workspaceId}
          ORDER BY sequence DESC LIMIT 1`.execute(unitOfWorkKysely());
@@ -122,9 +127,9 @@ export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
       const rows = await this.balances(input.workspaceId, asOf, null);
       const byCurrency = new Map<string, { lines: AccountBalanceDto[]; total: Money }>();
       for (const row of rows) {
-        const cur = await this.currencies.currencyOf(row.currency);
+        const cur = this.currencyOf(row);
         const group = byCurrency.get(row.currency) ?? { lines: [], total: Money.zero(cur) };
-        group.lines.push(await this.toDto(row));
+        group.lines.push(this.toDto(row));
         group.total = group.total.add(Money.parse(row.balance, cur));
         byCurrency.set(row.currency, group);
       }
@@ -168,36 +173,76 @@ export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
     });
   }
 
+  /**
+   * Saldos por cuenta contable. `userAccounts` restringe a las cuentas del usuario (`source_account_id`, opcionalmente
+   * solo las indicadas) EN SQL, sin calcular las de sistema. La escala de cada moneda viene del catálogo en la misma
+   * consulta (sin una lectura de `fx.currency` por fila).
+   *
+   * Invalidación de snapshots (INV-022) sin recorrer el historial por cuenta: primero el checkpoint mínimo
+   * (`last_sequence`) de los snapshots candidatos; luego, UNA vez, los postings de asientos posteriores a ese checkpoint
+   * (`journal_entry_sequence_ix`, típicamente solo los del día) materializados; un snapshot es válido si ninguno de ellos
+   * toca su cuenta con `sequence > last_sequence` y `entry_date ≤ as_of_date`. Mismo resultado que el `NOT EXISTS`
+   * correlacionado original (el snapshot válido más reciente o, si no hay, Σ completa), con coste proporcional a lo
+   * registrado desde la reconstrucción y no al historial (NFR-PERF-005). Sin snapshot válido el lateral devuelve
+   * `('-infinity', 0)`, de modo que el tramo posterior es siempre `entry_date > s.as_of_date`: una comparación
+   * leakproof que, también bajo RLS, es condición del índice `posting_balance_ix` (con `as_of_date IS NULL OR …` o un
+   * `COALESCE` el índice recorre todos los postings de la cuenta y filtra).
+   */
   private async balances(
     workspaceId: string,
     asOf: string | null,
     ids: readonly string[] | null,
+    userAccounts: { readonly accountIds: readonly string[] | null } | null = null,
   ): Promise<BalanceRow[]> {
+    const db = unitOfWorkKysely();
+    const onlyUser = userAccounts !== null;
+    const accountIds = userAccounts?.accountIds ?? null;
+    const { rows: floor } = await sql<{ seq: string | null }>`
+      SELECT min(bs.last_sequence)::text AS seq FROM ledger.balance_snapshot bs
+       WHERE bs.workspace_id = ${workspaceId}
+         AND (${asOf}::date IS NULL OR bs.as_of_date <= ${asOf}::date)
+         AND (${ids === null}::boolean OR bs.ledger_account_id = ANY(${ids ?? []}::uuid[]))`.execute(db);
+    // Sin snapshots candidatos no hay nada que invalidar (`> NULL` no devuelve filas).
+    const checkpoint = floor[0]?.seq ?? null;
     const { rows } = await sql<BalanceRow>`
-      SELECT a.id AS ledger_account_id, a.code, a.type, a.source_account_id, a.currency,
-             (COALESCE(s.balance, 0) + COALESCE((
+      WITH late AS MATERIALIZED (
+        SELECT p2.ledger_account_id, e.sequence, e.entry_date
+          FROM ledger.journal_entry e
+          JOIN ledger.posting p2 ON p2.workspace_id = e.workspace_id AND p2.journal_entry_id = e.id
+         WHERE e.workspace_id = ${workspaceId} AND e.sequence > ${checkpoint}::bigint)
+      SELECT a.id AS ledger_account_id, a.code, a.type, a.source_account_id, a.currency, c.scale,
+             (s.balance + COALESCE((
                SELECT SUM(p.amount) FROM ledger.posting p
                 WHERE p.workspace_id = a.workspace_id AND p.ledger_account_id = a.id
-                  AND (s.as_of_date IS NULL OR p.entry_date > s.as_of_date)
+                  AND p.entry_date > s.as_of_date
                   AND (${asOf}::date IS NULL OR p.entry_date <= ${asOf}::date)), 0))::text AS balance
         FROM ledger.ledger_account a
-        LEFT JOIN LATERAL (
-          SELECT bs.as_of_date, bs.balance FROM ledger.balance_snapshot bs
-           WHERE bs.workspace_id = a.workspace_id AND bs.ledger_account_id = a.id
-             AND (${asOf}::date IS NULL OR bs.as_of_date <= ${asOf}::date)
-             AND NOT EXISTS (
-               SELECT 1 FROM ledger.journal_entry e JOIN ledger.posting p2 ON p2.journal_entry_id = e.id
-                WHERE e.workspace_id = bs.workspace_id AND e.sequence > bs.last_sequence
-                  AND e.entry_date <= bs.as_of_date AND p2.ledger_account_id = bs.ledger_account_id)
-           ORDER BY bs.as_of_date DESC LIMIT 1) s ON true
+        JOIN fx.currency c ON c.code = a.currency
+        CROSS JOIN LATERAL (
+          (SELECT bs.as_of_date, bs.balance FROM ledger.balance_snapshot bs
+            WHERE bs.workspace_id = a.workspace_id AND bs.ledger_account_id = a.id
+              AND (${asOf}::date IS NULL OR bs.as_of_date <= ${asOf}::date)
+              AND NOT EXISTS (
+                SELECT 1 FROM late l
+                 WHERE l.ledger_account_id = bs.ledger_account_id AND l.sequence > bs.last_sequence
+                   AND l.entry_date <= bs.as_of_date)
+            ORDER BY bs.as_of_date DESC LIMIT 1)
+          UNION ALL SELECT '-infinity'::date, 0
+          ORDER BY 1 DESC LIMIT 1) s
        WHERE a.workspace_id = ${workspaceId}
          AND (${ids === null}::boolean OR a.id = ANY(${ids ?? []}::uuid[]))
-       ORDER BY a.currency, a.code`.execute(unitOfWorkKysely());
+         AND (NOT ${onlyUser}::boolean OR a.source_account_id IS NOT NULL)
+         AND (${accountIds === null}::boolean OR a.source_account_id = ANY(${accountIds ?? []}::uuid[]))
+       ORDER BY a.currency, a.code`.execute(db);
     return rows;
   }
 
-  private async toDto(row: BalanceRow): Promise<AccountBalanceDto> {
-    const balance = Money.parse(row.balance, await this.currencies.currencyOf(row.currency));
+  private currencyOf(row: BalanceRow): Currency {
+    return makeCurrency(row.currency, Number(row.scale));
+  }
+
+  private toDto(row: BalanceRow): AccountBalanceDto {
+    const balance = Money.parse(row.balance, this.currencyOf(row));
     return {
       ledgerAccountId: row.ledger_account_id,
       code: row.code,

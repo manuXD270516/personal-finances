@@ -95,8 +95,11 @@ export class ReportSummaryQueries {
     }
     const settings = await deps.workspaces.settingsOf(ws);
     const timeZone = settings.timeZone;
+    // Catálogo (escala canónica de TODA moneda activa) y monedas habilitadas, en una sola lectura.
+    const catalog = await deps.rates.workspaceCurrencies(ws);
+    const known = new Map<string, Currency>(catalog.map((c) => [c.code, makeCurrency(c.code, c.scale)]));
     const currencies = new Map<string, Currency>(
-      (await deps.rates.enabledCurrencies(ws)).map((c) => [c.code, makeCurrency(c.code, c.scale)]),
+      catalog.filter((c) => c.enabled).map((c) => [c.code, known.get(c.code) as Currency]),
     );
     const reportingCode = query.reportingCurrency ?? settings.baseCurrency;
     const reporting = currencies.get(reportingCode);
@@ -127,12 +130,12 @@ export class ReportSummaryQueries {
       dateFrom: flowFrom.toString(),
       dateTo: period.to.toString(),
     });
-    const scaleOf = (code: string) => currencies.get(code) ?? makeCurrency(code, 18);
-    const money = (dto: MoneyDto): Money => {
-      const ccy =
-        currencies.get(dto.currency) ?? makeCurrency(dto.currency, dto.amount.split('.')[1]?.length ?? 0);
-      return Money.parse(dto.amount, ccy);
-    };
+    // Escala del catálogo aunque la moneda no esté habilitada en el workspace (una cuenta sin postings vale cero a la
+    // MISMA escala que las líneas del ledger: nunca BTC(8) vs BTC(18)). Solo una moneda fuera del catálogo activo cae a
+    // los decimales del importe recibido.
+    const decimalsOf = (amount: string) => amount.split('.')[1]?.length ?? 0;
+    const scaleOf = (code: string, amount = '0') => known.get(code) ?? makeCurrency(code, decimalsOf(amount));
+    const money = (dto: MoneyDto): Money => Money.parse(dto.amount, scaleOf(dto.currency, dto.amount));
     const flows: NominalFlow[] = rows.map((r) => ({
       businessDate: r.businessDate,
       nature: r.nature,

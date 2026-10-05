@@ -17,6 +17,7 @@ level: api
 automation_status: automated
 automated_tests:
 - apps/api/test/api/identity.api.test.ts
+- tests/e2e/specs/workspace-identity.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -44,7 +45,7 @@ expected_result:
 - 'Segundo PATCH: 422 problem+json con código INVALID_TIMEZONE'
 - El perfil final conserva America/Sao_Paulo
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-AUTH-008 — El usuario actualiza locale y zona horaria y una zona inválida se rechaza

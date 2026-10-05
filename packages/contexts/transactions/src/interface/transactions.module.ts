@@ -24,8 +24,8 @@ import {
   pgCurrencyCatalog,
   uuidV7Ids,
 } from '../infrastructure/pg-transactions.js';
-import { PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
-import type { NominalFlowQuery } from '../contracts/index.js';
+import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
+import type { CounterpartyCategoryUsageQuery, NominalFlowQuery } from '../contracts/index.js';
 import { CONVERSIONS_SERVICE, ConversionsController } from './conversions-http.js';
 import { TRANSACTIONS_SERVICE, TransactionsController } from './transactions-http.js';
 
@@ -52,6 +52,8 @@ export interface TransactionsRuntime {
   readonly conversions: ConversionsService;
   /** Query pública `SummarizeNominalFlows` para Reporting (add-basic-dashboard). */
   readonly flows: NominalFlowQuery;
+  /** Última categoría usada con una counterparty, para la sugerencia de CLASSIFICATION (add-classification). */
+  readonly categoryUsage: CounterpartyCategoryUsageQuery;
 }
 
 /** Composición de TRANSACTIONS sobre PostgreSQL. */
@@ -77,6 +79,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     service: new TransactionsService(deps),
     conversions: new ConversionsService(deps),
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
+    categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
   };
 }
 

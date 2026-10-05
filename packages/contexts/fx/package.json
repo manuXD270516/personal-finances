@@ -24,7 +24,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "smoke:live": "tsx --conditions=@pf/source test/live/smoke-live.ts"
   },
   "dependencies": {
     "@nestjs/common": "catalog:",

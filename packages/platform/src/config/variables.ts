@@ -317,6 +317,35 @@ export const VARIABLES = {
     description: 'Tolerancia de reloj en segundos para `exp`/`nbf`.',
     default: '30',
   }),
+  OIDC_PROFILE: variable(z.enum(['keycloak', 'cognito']), {
+    group: 'Identidad (OIDC)',
+    description:
+      'Perfil del IdP para validar access tokens. `keycloak`: `aud` contiene `OIDC_API_AUDIENCE` y `azp` (si `OIDC_AUTHORIZED_PARTIES` está definida). `cognito`: sin `aud`; exige `token_use=access` y `client_id` en `OIDC_AUTHORIZED_PARTIES`.',
+    default: 'keycloak',
+  }),
+  OIDC_AUTHORIZED_PARTIES: variable(
+    z
+      .string()
+      .min(1)
+      .refine(
+        (v) => v.split(',').every((c) => c.trim().length > 0),
+        'lista separada por comas de client ids',
+      ),
+    {
+      group: 'Identidad (OIDC)',
+      description:
+        'Client ids autorizados, separados por comas (`azp` en Keycloak, `client_id` en Cognito). Sin ella no se restringe el cliente (perfil `keycloak`); obligatoria con `OIDC_PROFILE=cognito`.',
+      optional: true,
+      requiredWhen: '`OIDC_PROFILE=cognito`',
+      example: 'pfos-web',
+    },
+  ),
+  OIDC_JWKS_FALLBACK_MAX_AGE: variable(duration, {
+    group: 'Identidad (OIDC)',
+    description:
+      'Antigüedad máxima del último JWKS obtenido con éxito que se sigue usando si el IdP no responde (log `warn` y métrica `pf.auth.jwks_fallback`). Pasado ese plazo los tokens se rechazan con 401.',
+    default: '24h',
+  }),
   // ── BFF (finance-web): login OIDC, sesiones y proxy hacia finance-api (ADR-0010 enmienda, ADR-0019) ──
   WEB_PUBLIC_URL: variable(httpOrigin, {
     group: 'BFF (finance-web)',
@@ -620,6 +649,9 @@ export const APP_VARIABLES = {
     'OIDC_API_AUDIENCE',
     'OIDC_REQUIRED_SCOPE',
     'OIDC_CLOCK_SKEW_SECONDS',
+    'OIDC_PROFILE',
+    'OIDC_AUTHORIZED_PARTIES',
+    'OIDC_JWKS_FALLBACK_MAX_AGE',
     'DEMO_DATA_ENABLED',
     ...FX_PROVIDERS,
   ],

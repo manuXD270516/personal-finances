@@ -12,9 +12,10 @@ invariants: [INV-033]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/classification-ledger.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: [classification, ledger, regression]
@@ -40,7 +41,7 @@ expected_result:
 - Registro de auditoría con la categoría anterior y la nueva
 - Se emite transactions.TransactionCategorized.v1
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-CLASSIFICATION-RECATEGORIZE-001 — Recategorizar una transacción no afecta el ledger
@@ -64,3 +65,4 @@ Entonces no se crea ni modifica ningún asiento ni posting
 
 - Recategorizar en periodo cerrado (INV-015) no aplica en Phase 1; se decide con planning/month-closing (Phase 2).
 - Se automatiza cuando exista add-transaction-recording (tasks 7.1).
+- Automatizado 2026-10-04 (add-classification 7.1) por HTTP contra Transactions, Ledger y Reporting reales: huella fila a fila de asientos/postings, saldo, totales del mes por categoría, auditoría y `TransactionCategorized.v1` validado.

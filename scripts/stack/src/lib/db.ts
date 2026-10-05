@@ -14,9 +14,12 @@ export async function migrateInContainer(): Promise<void> {
  * Seed one-shot: `docker compose --profile core run --rm seed seed --profile=<p>` (SPIKE-08: nunca dentro de
  * `up --wait`; `--profile seed` solo es inválido porque depende de `migrate`).
  */
-export async function seedInContainer(profile: string): Promise<void> {
+export async function seedInContainer(profile: string, extraArgs: readonly string[] = []): Promise<void> {
   log(`seed (contenedor): perfil ${profile}`);
-  await composeOrThrow(['core'], ['run', '--rm', '--no-TTY', 'seed', 'seed', `--profile=${profile}`]);
+  await composeOrThrow(
+    ['core'],
+    ['run', '--rm', '--no-TTY', 'seed', 'seed', `--profile=${profile}`, ...extraArgs],
+  );
 }
 
 const API_DIST = resolve(ROOT, 'apps/api/dist/entrypoint.js');

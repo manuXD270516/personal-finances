@@ -12,6 +12,10 @@ import { DemoDataLoader } from '../demo/demo-data-loader.js';
 import { AUDIT_POLICIES, outboxPort } from '../identity/identity-wiring.js';
 import { Client, Pool } from 'pg';
 import { seedWorkspaceProvisioning } from '../identity/workspace-provisioning.js';
+import { seedInstitutionCatalog } from './institution-catalog.js';
+import { seedLarge } from './large/seed-large.js';
+import { SeedRejectedError } from './seed-errors.js';
+import { LARGE_MANIFEST } from './large/large-plan.js';
 
 export const SEED_PROFILES = ['minimal', 'demo', 'large'] as const;
 export type SeedProfile = (typeof SEED_PROFILES)[number];
@@ -20,13 +24,17 @@ export type SeedProfile = (typeof SEED_PROFILES)[number];
  * Datasets disponibles (docs/29). La Minimal Seed registra su ejecución en `platform.seed_run` y, desde la versión
  * 2, siembra las identidades de IDENTITY (usuarios del realm de desarrollo, W1/W2 y sus membresías); desde la 3,
  * provisiona W1/W2 por el MISMO gancho que `CreateWorkspace` (categorías de sistema + catálogo sugerido es-BO y
- * monedas por defecto). Cada contexto añadirá sus datos. `demo`/`large` llegan con los datasets de docs/29.
+ * monedas por defecto); desde la 4, carga en W1/W2 el catálogo inicial de instituciones ficticias
+ * (`seed/minimal/institutions.json`, add-accounts-management 2.4). Cada contexto añadirá sus datos. `demo`/`large`
+ * llegan con los datasets de docs/29.
  */
 export const SEED_DATASETS: Partial<Record<SeedProfile, { readonly datasetVersion: number }>> = {
-  minimal: { datasetVersion: 3 },
+  minimal: { datasetVersion: 4 },
   // add-demo-data: crea el workspace DEMO dedicado de owner@demo.pfos.test (origen W1) con el MISMO cargador que la
   // acción "Cargar datos de demostración" de la app. Nunca escribe datos financieros en W1/W2.
   demo: { datasetVersion: Number(DEMO_MANIFEST.datasetVersion) },
+  // docs/29 §2.3: workspace principal de 5 años (~100 000 transacciones) + 20 satélites, por los casos de uso públicos.
+  large: { datasetVersion: Number(LARGE_MANIFEST.datasetVersion) },
 };
 
 /**
@@ -70,7 +78,7 @@ export const MINIMAL_WORKSPACES: readonly {
  * Usuarios + W1/W2 + membresías, idempotente, con el rol de la app bajo RLS: cada
  * workspace en su propia transacción con `app.user_id`/`app.workspace_id` LOCAL (como la UnitOfWork).
  */
-async function seedIdentity(client: Client, config: SeedConfig): Promise<Map<SeedUser, string>> {
+export async function seedIdentity(client: Client, config: SeedConfig): Promise<Map<SeedUser, string>> {
   const issuer = config.OIDC_ISSUER_URL!.replace(/\/+$/, '');
   const ids = new Map<SeedUser, string>();
   for (const u of MINIMAL_USERS) {
@@ -120,7 +128,10 @@ async function seedIdentity(client: Client, config: SeedConfig): Promise<Map<See
  * presentes y las monedas ya habilitadas se omiten). Sin ella, registrar un gasto sin categoría falla con
  * `REFERENCE_NOT_FOUND` (no existe `UNCATEGORIZED`).
  */
-async function provisionWorkspaces(config: SeedConfig, owners: ReadonlyMap<SeedUser, string>): Promise<void> {
+export async function provisionWorkspaces(
+  config: SeedConfig,
+  owners: ReadonlyMap<SeedUser, string>,
+): Promise<void> {
   const pool = new Pool({ connectionString: config.DATABASE_URL, application_name: 'pfos-seed', max: 2 });
   try {
     const hook = seedWorkspaceProvisioning(pool, systemClock);
@@ -133,8 +144,46 @@ async function provisionWorkspaces(config: SeedConfig, owners: ReadonlyMap<SeedU
   }
 }
 
-export class SeedRejectedError extends Error {
-  override readonly name = 'SeedRejectedError';
+export { SeedRejectedError };
+
+export interface SeedOptions {
+  /** Solo `large`: fracción (0, 1] del volumen (corridas locales rápidas; los NFR se miden con 1). */
+  readonly scale?: number;
+  /** Solo `large`: workspaces cargados en paralelo (por defecto 4). */
+  readonly concurrency?: number;
+  /** Solo `large`: ruta del JSONL de etiquetas de anomalías (fuera de la BD, docs/29 §2.3). */
+  readonly labelsOut?: string;
+  /** Solo `large` y pruebas: primeros N meses y cantidad de satélites. */
+  readonly months?: number;
+  readonly satellites?: number;
+}
+
+/** `--scale=<0..1>`, `--concurrency=<n>` y `--labels-out=<ruta>` (solo el perfil large). */
+export function parseSeedOptions(argv: readonly string[]): SeedOptions {
+  const value = (name: string) => argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+  const scale = value('scale');
+  const concurrency = value('concurrency');
+  const labelsOut = value('labels-out');
+  const options: { scale?: number; concurrency?: number; labelsOut?: string; months?: number } = {};
+  if (scale !== undefined) {
+    const n = Number(scale);
+    if (!(n > 0 && n <= 1)) throw new SeedRejectedError(`--scale fuera de rango (0, 1]: ${scale}`);
+    options.scale = n;
+  }
+  if (concurrency !== undefined) {
+    const n = Number(concurrency);
+    if (!Number.isInteger(n) || n < 1 || n > 16)
+      throw new SeedRejectedError(`--concurrency inválido: ${concurrency}`);
+    options.concurrency = n;
+  }
+  if (labelsOut) options.labelsOut = labelsOut;
+  const months = value('months');
+  if (months !== undefined) {
+    const n = Number(months);
+    if (!Number.isInteger(n) || n < 1 || n > 60) throw new SeedRejectedError(`--months inválido: ${months}`);
+    options.months = n;
+  }
+  return options;
 }
 
 export function parseSeedProfile(argv: readonly string[]): SeedProfile {
@@ -147,7 +196,12 @@ export function parseSeedProfile(argv: readonly string[]): SeedProfile {
 }
 
 /** Idempotente por `platform.seed_run`: re-ejecutar no duplica datos. Usa el rol de la app (DATABASE_URL). */
-export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedProfile): Promise<void> {
+export async function runSeed(
+  config: SeedConfig,
+  logger: Logger,
+  profile: SeedProfile,
+  options: SeedOptions = {},
+): Promise<void> {
   // Los seeds son solo de desarrollo/CI (docs/19 §6.1, docs/29): nunca contra staging/production.
   if (config.PFOS_ENV === 'staging' || config.PFOS_ENV === 'production') {
     throw new SeedRejectedError('seed rejected outside local/ci');
@@ -159,7 +213,19 @@ export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedP
   await client.connect();
   try {
     if (profile === 'minimal' && config.OIDC_ISSUER_URL) {
-      await provisionWorkspaces(config, await seedIdentity(client, config));
+      const previous = await client.query<{ dataset_version: number }>(
+        `SELECT dataset_version FROM platform.seed_run WHERE profile = 'minimal'`,
+      );
+      const owners = await seedIdentity(client, config);
+      await provisionWorkspaces(config, owners);
+      // Catálogo inicial de instituciones (v4): se carga UNA vez; re-ejecutar la seed no restaura lo que el usuario
+      // renombró o archivó después (TC-ACCOUNTS-INSTITUTION-002).
+      if ((previous.rows[0]?.dataset_version ?? 0) < 4) {
+        for (const ws of MINIMAL_WORKSPACES) {
+          const owner = owners.get(ws.members.find((m) => m.role === 'OWNER')!.user)!;
+          await seedInstitutionCatalog(client, { userId: owner, workspaceId: ws.id });
+        }
+      }
     } else if (profile === 'minimal') {
       logger.warn('OIDC_ISSUER_URL ausente: la Minimal Seed no siembra identidades');
     } else if (profile === 'demo') {
@@ -169,6 +235,11 @@ export async function runSeed(config: SeedConfig, logger: Logger, profile: SeedP
       const owners = await seedIdentity(client, config);
       await provisionWorkspaces(config, owners);
       await seedDemo(config, logger, owners.get('owner')!, MINIMAL_WORKSPACES[0]!.id);
+    } else if (profile === 'large') {
+      if (!config.OIDC_ISSUER_URL) throw new SeedRejectedError('el perfil large requiere OIDC_ISSUER_URL');
+      const owners = await seedIdentity(client, config);
+      await provisionWorkspaces(config, owners);
+      await seedLarge(client, config, logger, owners.get('owner')!, options);
     }
     await client.query('BEGIN');
     await client.query(

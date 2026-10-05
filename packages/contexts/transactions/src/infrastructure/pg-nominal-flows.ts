@@ -2,7 +2,11 @@ import { unitOfWorkKysely } from '@pf/platform/api';
 import { Money, currency as makeCurrency, LocalDate } from '@pf/shared-kernel';
 import { sql } from 'kysely';
 import type { CurrencyCatalog, UnitOfWork } from '../application/ports/index.js';
-import type { NominalFlowQuery, NominalFlowRowDto } from '../contracts/index.js';
+import type {
+  CounterpartyCategoryUsageQuery,
+  NominalFlowQuery,
+  NominalFlowRowDto,
+} from '../contracts/index.js';
 
 interface FlowRow {
   business_date: string;
@@ -66,6 +70,36 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
         });
       }
       return out;
+    });
+  }
+}
+
+/**
+ * `CounterpartyCategoryUsageQuery` sobre PostgreSQL (add-classification 5.3/1.3): reemplaza el stub sin historial que
+ * dejaba la sugerencia `LAST_USED` siempre en `NONE`. Lee solo el schema dueño de los splits (sin joins cross-schema).
+ */
+export class PgCounterpartyCategoryUsage implements CounterpartyCategoryUsageQuery {
+  constructor(private readonly uow: UnitOfWork) {}
+
+  lastCategoryUsed(input: {
+    readonly workspaceId: string;
+    readonly counterpartyId: string;
+    readonly kind: 'EXPENSE' | 'INCOME';
+  }): Promise<string | null> {
+    const kinds = input.kind === 'INCOME' ? ['INCOME'] : ['EXPENSE', 'REFUND'];
+    return this.uow.run(input.workspaceId, async () => {
+      const { rows } = await sql<{ category_id: string }>`
+        SELECT s.category_id
+          FROM txn.transaction t
+          JOIN txn.transaction_split s
+            ON s.workspace_id = t.workspace_id AND s.transaction_id = t.id AND s.superseded_in_revision IS NULL
+         WHERE t.workspace_id = ${input.workspaceId}
+           AND t.status <> 'VOIDED'
+           AND t.kind = ANY(${kinds}::text[])
+           AND COALESCE(s.counterparty_id, t.counterparty_id) = ${input.counterpartyId}::uuid
+         ORDER BY t.transaction_date DESC, t.created_at DESC, t.id DESC, s.position
+         LIMIT 1`.execute(unitOfWorkKysely());
+      return rows[0]?.category_id ?? null;
     });
   }
 }

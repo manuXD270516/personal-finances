@@ -21,3 +21,5 @@ tests/e2e/playwright-report
 tests/e2e/test-results
 # Respuestas grabadas de providers de tasas (texto exacto byte a byte; add-market-rate-providers 1.3)
 packages/contexts/fx/test/fixtures/providers
+# Reportes generados (Stryker, benchmarks nightly, smoke de providers)
+reports

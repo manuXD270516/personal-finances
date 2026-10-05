@@ -13,7 +13,8 @@
     "start:api": "node --import @pf/platform/otel/register dist/main.api.js",
     "start:worker": "node --import @pf/platform/otel/register dist/main.worker.js",
     "migrate": "node dist/entrypoint.js migrate",
-    "seed": "node dist/entrypoint.js seed"
+    "seed": "node dist/entrypoint.js seed",
+    "perf:bench": "vitest run --config vitest.perf.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

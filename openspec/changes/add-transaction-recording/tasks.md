@@ -65,8 +65,9 @@
 - [x] 7.1 Asegurar que cada TC del change tiene al menos un test con `[TC-…]` al inicio del nombre y actualizar `automation_status`/`automated_tests`; verificar con la matriz de trazabilidad
 - [x] 7.2 E2E Playwright: registrar un gasto dividido, editar su monto, marcarlo cleared y anular otro, comprobando saldos en pantalla; verificar en CI con el stack `core`
   - Nota (2026-10-03): `tests/e2e/specs/transactions.spec.ts` (gasto dividido, edición del monto con reversa ⇒ revisión 2, confirmación individual y en lote, anulación de otro, saldos en pantalla; QR, contrapartes en línea, reembolso, ajuste, duplicar como pendiente; historial visible para VIEWER); corrido localmente contra el stack desechable `pfos-e2e*` (perfil core, Minimal Seed, `FX_PROVIDER_* = none`).
-- [ ] 7.3 Benchmark de NFR-PERF-001 (listado 50k) y NFR-PERF-003 (comando de escritura); verificar p95 dentro de umbral en el job nightly
+- [x] 7.3 Benchmark de NFR-PERF-001 (listado 50k) y NFR-PERF-003 (comando de escritura); verificar p95 dentro de umbral en el job nightly
   > Verificado 2026-10-04 (pendiente, benchmark): no existe tooling de benchmark ni workflow nightly (`.github/workflows` solo tiene `pr.yml` y `main.yml`, sin `schedule`).
+  > Hecho 2026-10-04 (ci/nightly-perf): `apps/api/test/perf/nightly.perf.ts` en el job nightly `perf`. Medido en local 2026-10-04 (`pnpm perf:bench`, Large Seed completo: 97 374 transacciones / 200 617 postings en el principal + 20 satélites; Windows 11 + Docker Desktop, PostgreSQL 18 por Testcontainers; tiempos de ida y vuelta HTTP en el mismo host): **NFR-PERF-001** listado limit 50, 300 muestras en 6 escenarios (sin filtros, mes, cuenta, categoría, cuenta+categoría+año, cursor) p95 **82 ms** ≤ 300 ms local (objetivo cloud 200 ms); peor escenario cuenta+categoría+año p95 94 ms. **NFR-PERF-003** p95 `POST /transactions` **64 ms**, `POST /transfers` **48 ms**, `POST /conversions` **56 ms** ≤ 150 ms. Pendiente: primera corrida en GitHub tras el merge.
 
 ## 8. DOCUMENTACIÓN y cierre
 

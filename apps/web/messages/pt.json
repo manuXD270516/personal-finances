@@ -30,7 +30,9 @@
     "fx": "Cripto e câmbio",
     "classification": "Classificação",
     "demoIndicator": "Dados de demonstração — este espaço contém dados fictícios e pode ser limpo por completo.",
-    "demoOption": "{name} (demonstração)"
+    "demoOption": "{name} (demonstração)",
+    "workspaceSwitched": "Espaço de trabalho ativo: {name}.",
+    "switching": "Trocando de espaço de trabalho…"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -49,7 +51,29 @@
     "creating": "Criando…",
     "created": "Espaço de trabalho criado: {name}.",
     "readOnly": "Somente o proprietário pode alterar esta configuração.",
-    "seedCatalog": "Carregar o catálogo sugerido de categorias (você pode editá-lo depois)"
+    "seedCatalog": "Carregar o catálogo sugerido de categorias (você pode editá-lo depois)",
+    "minimumReserveIn": "Reserva mínima de liquidez ({currency})",
+    "timezoneHint": "Identificador IANA, por exemplo America/La_Paz.",
+    "localeHint": "Formato de números, valores e datas do espaço de trabalho.",
+    "fiscalHint": "Um dia entre 1 e 28.",
+    "baseCurrencyWarning": "Alterar a moeda base não modifica valores, lançamentos nem taxas já registrados; os totais são recalculados na nova moeda.",
+    "noChanges": "Não há alterações para salvar.",
+    "reloadLatest": "Carregar a versão atual",
+    "reloaded": "A versão atual foi carregada. Revise os valores e salve novamente.",
+    "membersNote": "A gestão de membros e convites chegará em uma próxima versão.",
+    "errors": {
+      "nameRequired": "Informe um nome.",
+      "nameTooLong": "O nome admite até 100 caracteres.",
+      "timezoneInvalid": "Não é um fuso horário IANA válido (por exemplo America/La_Paz).",
+      "fiscalRange": "Escolha um dia entre 1 e 28.",
+      "localeRequired": "Escolha um idioma e formato.",
+      "amount": {
+        "EMPTY": "Informe um valor.",
+        "INVALID": "Não é um valor válido.",
+        "SCALE": "{currency} admite até {scale} casas decimais.",
+        "NOT_POSITIVE": "A reserva não pode ser negativa."
+      }
+    }
   },
   "Preferences": {
     "title": "Minhas preferências",
@@ -57,7 +81,18 @@
     "locale": "Idioma",
     "timezone": "Fuso horário",
     "save": "Salvar preferências",
-    "saved": "Preferências salvas."
+    "saved": "Preferências salvas.",
+    "saving": "Salvando…",
+    "localeHint": "Idioma da interface e formato das suas preferências. A tela muda de idioma ao salvar.",
+    "timezoneHint": "Identificador IANA, por exemplo America/La_Paz.",
+    "noChanges": "Não há alterações para salvar.",
+    "reloadLatest": "Carregar a versão atual",
+    "reloaded": "A versão atual foi carregada. Revise os valores e salve novamente.",
+    "errors": {
+      "displayNameRequired": "Informe um nome de exibição.",
+      "displayNameTooLong": "O nome admite até 100 caracteres.",
+      "timezoneInvalid": "Não é um fuso horário IANA válido (por exemplo America/La_Paz)."
+    }
   },
   "Auth": {
     "errorTitle": "Não conseguimos iniciar sua sessão",
@@ -1142,5 +1177,10 @@
     "cleanupConfirm": "Sim, limpar",
     "cancel": "Cancelar",
     "disabled": "O carregamento de dados de demonstração está desativado neste ambiente."
+  },
+  "Locales": {
+    "es-BO": "Español (Bolivia)",
+    "en-US": "English (United States)",
+    "pt-BR": "Português (Brasil)"
   }
 }

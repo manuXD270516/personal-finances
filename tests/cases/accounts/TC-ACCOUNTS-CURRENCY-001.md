@@ -12,9 +12,11 @@ invariants: [INV-002, INV-006]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/accounts-ledger.api.test.ts
+  - packages/contexts/accounts/src/application/accounts.service.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["multi-currency"]
@@ -37,7 +39,7 @@ expected_result:
   - "El saldo de USD Savings se mantiene en 500.00 USD"
   - "La creación de Euro Cash se rechaza con CURRENCY_NOT_ENABLED"
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-CURRENCY-001 — Se rechaza registrar un monto en una moneda distinta de la moneda de la cuenta
@@ -59,3 +61,4 @@ Entonces se rechaza con el código "CURRENCY_MISMATCH"
 
 - El código se alinea con el catálogo docs/10 §9.1 (`CURRENCY_MISMATCH`); antes figuraba `ACCOUNT_CURRENCY_MISMATCH`, que no existe en el catálogo.
 - Revisado 2026-10-04: se mantiene `not_automated` (advertencia R3 intencional). El test con su id solo cubre `CURRENCY_NOT_ENABLED`; falta el gasto en otra moneda rechazado con `CURRENCY_MISMATCH` contra Transactions real sin persistir nada (add-accounts-management 6.3).
+- Automatizado 2026-10-04 (add-accounts-management 6.3): `CURRENCY_MISMATCH` contra Transactions real sin persistir transacción, asiento, auditoría ni outbox. Divergencia con la precondición "EUR no habilitada en W1": por add-manual-conversions (decisión 11) "habilitada" = existente y activa en el catálogo global (no hay habilitación por workspace en Phase 1) y EUR está activa desde la migración 20261003220000, así que el test usa un código inexistente (`XYZ`) para `CURRENCY_NOT_ENABLED`. Pendiente de decisión del owner si la creación de cuentas debe exigir `fx.workspace_currency`.

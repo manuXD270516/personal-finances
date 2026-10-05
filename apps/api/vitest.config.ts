@@ -4,5 +4,6 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: { conditions: ['@pf/source'] },
   ssr: { resolve: { conditions: ['@pf/source'] } },
-  test: { include: ['src/**/*.test.ts'], exclude: ['**/*.int.test.ts'] },
+  // `test/perf/*.test.ts`: utilidades del benchmark nightly (sin Docker).
+  test: { include: ['src/**/*.test.ts', 'test/perf/**/*.test.ts'], exclude: ['**/*.int.test.ts'] },
 });
