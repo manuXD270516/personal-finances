@@ -93,7 +93,12 @@ describe('Propiedades FX (INV-032, INV-011, INV-012)', () => {
     fc.assert(
       fc.property(later, (events) => {
         const candidates: RateCandidate[] = [{ state: r2.snapshot, supersededById: null }];
-        const before = new RateResolver(candidates).resolveForConversion({ base: USDT, quote: BOB, at: T0 });
+        const before = new RateResolver(candidates).resolveForConversion({
+          base: USDT,
+          quote: BOB,
+          at: T0,
+          rateType: 'P2P',
+        });
         let k = 0;
         for (const e of events) {
           k += 1;
@@ -114,7 +119,12 @@ describe('Propiedades FX (INV-032, INV-011, INV-012)', () => {
             supersededById: null,
           });
         }
-        const after = new RateResolver(candidates).resolveForConversion({ base: USDT, quote: BOB, at: T0 });
+        const after = new RateResolver(candidates).resolveForConversion({
+          base: USDT,
+          quote: BOB,
+          at: T0,
+          rateType: 'P2P',
+        });
         expect(after?.fxRateId).toBe(before?.fxRateId);
         expect(after?.rate.value.toFixed()).toBe('6.95');
         // La versión R2 leída por id sigue idéntica (inmutable, INV-011), aunque luego se reemplace.

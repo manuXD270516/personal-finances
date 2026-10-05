@@ -233,7 +233,7 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 - **Ports**: `LedgerPostingPort` (sync), `AccountDirectory` (Accounts query), `ClassificationValidator` (Classification query), `ReferenceRateProvider` (FX query), `AuditPort`, `Clock`, `IdGenerator`.
 - **Comandos** (públicos; algunos invocados por Debt/Goals/Commitments/Imports/Rules): `RecordTransaction` (income/expense con splits), `RecordTransfer`, `RecordConversion`, `RecordRefund`, `RecordAdjustment`, `RecordOpeningBalance`, `RecordLoanDisbursement`, `RecordLoanPayment`, `PostTransaction` (pending→posted), `ClearTransaction`, `AmendTransaction`, `VoidTransaction`, `ApplyClassification` (categoría/tags/custom fields/contraparte por split, con `appliedBy: USER|RULE|IMPORT`), `BulkEditTransactions`, `StartReconciliation`, `ToggleCleared`, `CompleteReconciliation`, `UnreconcileTransaction`, `ResolveDuplicate` (confirm/dismiss/merge), `LinkAsTransfer`, `ImportTransactions` (batch con fingerprints, usado por Imports).
 - **Queries**: `GetTransaction`, `ListTransactions(filters, cursor)`, `SearchTransactions`, `GetReconciliation`, `GetClearedBalance(accountId, asOf)`, `ListDuplicateCandidates`, `CountPendingInPeriod(yearMonth)`.
-- **Eventos**: `TransactionCreated`, `TransactionUpdated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransferCompleted`, `ConversionRecorded`, `TransactionCleared`, `ReconciliationCompleted`, `DuplicateDetected`.
+- **Eventos**: `TransactionCreated`, `TransactionUpdated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransferCompleted`, `TransferRevised`, `ConversionRecorded`, `ConversionRevised`, `TransactionCleared`, `ReconciliationCompleted`, `DuplicateDetected`.
 - **Invariantes**: INV-002, 003, 009, 010, 012, 016, 021, 023, 024, 026, 027, 033; además: transfer requiere misma moneda y cuentas distintas; conversión requiere monedas distintas; legs de cuentas con su moneda; `reconciled` ⇒ campos financieros inmutables; `REFUND` no puede exceder el original (advertencia, no bloqueo).
 
 ### 3.5 CLASSIFICATION (`classification`)
@@ -418,7 +418,7 @@ stateDiagram-v2
 | `POST` | `PENDING` → `POSTED` | `TransactionPosted` (+ `TransferCompleted` / `ConversionRecorded`) |
 | `CLEAR` / `UNCLEAR` | `POSTED` ↔ `CLEARED` | `TransactionUpdated` |
 | `RECONCILE` / `UNRECONCILE` | `CLEARED` ↔ `RECONCILED` (des-reconciliar con motivo) | `TransactionUpdated` |
-| `REVISE` | `POSTED` \| `CLEARED` → `POSTED` (revisión n → n+1: asiento revertido, reversa y nuevo) | `TransactionPosted` + `TransactionUpdated` (+ `TransferRevised` / `ConversionRecorded`) |
+| `REVISE` | `POSTED` \| `CLEARED` → `POSTED` (revisión n → n+1: asiento revertido, reversa y nuevo) | `TransactionPosted` + `TransactionUpdated` (+ `TransferRevised` / `ConversionRevised`, docs/31 D37/D48) |
 | `VOID` | `PENDING` \| `POSTED` \| `CLEARED` → `VOIDED` (terminal) | `TransactionVoided` |
 
 La edición de una transacción `PENDING` y las ediciones descriptivas son anotaciones. `Account` (`ACCOUNT_LIFECYCLE`): `OPEN` ∅ → `ACTIVE`, `CLOSE` `ACTIVE` → `CLOSED`, `ARCHIVE` `ACTIVE`\|`CLOSED` → `ARCHIVED`, `REACTIVATE` `ARCHIVED`\|`CLOSED` → `ACTIVE`. `ExchangeRate` manual (`EXCHANGE_RATE_LIFECYCLE`): `RECORD` ∅ → `RECORDED`, `SUPERSEDE` `RECORDED` → `SUPERSEDED` (terminal; enlaza la tasa que la reemplazó).

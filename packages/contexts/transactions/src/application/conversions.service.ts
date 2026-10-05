@@ -276,7 +276,21 @@ export class ConversionsService {
       ];
       if (newEntryId) {
         events.push(
-          ...(await publishPosted(this.deps, tx, newEntryId, result.previousStatus, result.previousEntryId)),
+          ...(await publishPosted(
+            this.deps,
+            tx,
+            newEntryId,
+            result.previousStatus,
+            result.previousEntryId,
+            // REVISE: ConversionRevised con los tres asientos (docs/31 D48); ConversionRecorded no se re-emite.
+            reversalId && result.previousEntryId
+              ? {
+                  revisionFrom: before.revision,
+                  reversedJournalEntryId: result.previousEntryId,
+                  reversalJournalEntryId: reversalId,
+                }
+              : null,
+          )),
         );
       }
       const auditEntry = {

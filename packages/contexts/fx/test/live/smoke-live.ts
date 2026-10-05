@@ -2,7 +2,8 @@
 // reales. Una solicitud a cada endpoint (paralelo.bo `/api/v1/rate` y `/api/v1/historical.json`, bo.dolarapi.com
 // `/v1/dolares`) con el MISMO cliente HTTP y adapters que el worker (allowlist de hosts, User-Agent genérico, sin
 // query, cookies ni credenciales), validación de cada respuesta contra el consumer contract del adapter y hash SHA-256
-// de `https://paralelo.bo/openapi.json` contra el valor grabado. Solo corre en el job nightly `fx-smoke-live`
+// del spec de paralelo.bo (URL canónica `https://paralelo.bo/api/v1/openapi.json`, docs/31 D46) contra la línea base
+// grabada (`<sha256>  <url>`, ver `openapi-baseline.ts`). Solo corre en el job nightly `fx-smoke-live`
 // (`continue-on-error`): su falla abre/actualiza un issue para revisar el adapter y nunca bloquea el pipeline.
 //
 // Uso: pnpm fx:smoke-live [-- --out <dir>] [--update-baseline]
@@ -28,9 +29,10 @@ import {
   ProviderHttpClient,
 } from '../../src/infrastructure/providers/provider-http-client.js';
 import { validateContract, type JsonContract } from './json-contract.js';
+import { compareBaseline, formatBaseline, PARALELO_OPENAPI_PATH } from './openapi-baseline.js';
 
 const BASELINE = fileURLToPath(new URL('../fixtures/providers/paralelo-bo/openapi.sha256', import.meta.url));
-const OPENAPI_URL = `${PARALELO_BO_BASE_URL}/openapi.json`;
+const OPENAPI_URL = `${PARALELO_BO_BASE_URL}${PARALELO_OPENAPI_PATH}`;
 const TIMEOUT_MS = 15_000;
 
 interface Check {
@@ -101,7 +103,7 @@ async function openapiHash(): Promise<Check> {
       return { name: 'openapi.json (hash)', url: OPENAPI_URL, ok: false, detail: `HTTP ${res.status}` };
     const hash = createHash('sha256').update(res.body, 'utf8').digest('hex');
     if (values['update-baseline']) {
-      writeFileSync(BASELINE, `${hash}\n`, 'utf8');
+      writeFileSync(BASELINE, formatBaseline({ sha256: hash, url: OPENAPI_URL }), 'utf8');
       return {
         name: 'openapi.json (hash)',
         url: OPENAPI_URL,
@@ -109,16 +111,9 @@ async function openapiHash(): Promise<Check> {
         detail: `línea base actualizada: ${hash}`,
       };
     }
-    const baseline = existsSync(BASELINE) ? readFileSync(BASELINE, 'utf8').trim() : '';
-    return {
-      name: 'openapi.json (hash)',
-      url: OPENAPI_URL,
-      ok: hash === baseline,
-      detail:
-        hash === baseline
-          ? `sha256 ${hash} (sin cambios)`
-          : `sha256 ${hash} ≠ grabado ${baseline || '(sin línea base)'}: revisar el adapter de paralelo.bo`,
-    };
+    const recorded = existsSync(BASELINE) ? readFileSync(BASELINE, 'utf8') : '';
+    const comparison = compareBaseline({ sha256: hash, url: OPENAPI_URL }, recorded);
+    return { name: 'openapi.json (hash)', url: OPENAPI_URL, ...comparison };
   } catch (err) {
     return { name: 'openapi.json (hash)', url: OPENAPI_URL, ok: false, detail: message(err) };
   }

@@ -1,6 +1,7 @@
 import { DomainError, type Instant, Rate, type Currency } from '@pf/shared-kernel';
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
+  DEFAULT_RATE_TYPE,
   DEFAULT_RATE_WINDOW_DAYS,
   isQuoteSideRateType,
   type FxRateProvider,
@@ -45,7 +46,7 @@ export interface ResolvedRate {
   readonly components: readonly ExchangeRateState[];
   readonly rateType: FxRateType;
   /**
-   * Tipo pedido (explícito o preferido del par); `null` = sin tipo. Si difiere de `rateType`, la valoración usó una
+   * Tipo pedido (explícito, preferido del par o `DEFAULT_RATE_TYPE` sin preferencia, D48). Si difiere de `rateType`, la valoración usó una
    * tasa manual fresca de otro tipo en el nivel de manuales (decisión del owner 2026-10-03).
    */
   readonly requestedRateType: FxRateType | null;
@@ -69,7 +70,10 @@ export interface ResolveQuery {
   readonly base: Currency;
   readonly quote: Currency;
   readonly at: Instant;
-  /** Tipo pedido explícitamente; si falta se usa el preferido del par y, sin preferencia, cualquier tipo. */
+  /**
+   * Tipo pedido explícitamente; si falta se usa el preferido del par y, sin preferencia, `DEFAULT_RATE_TYPE`
+   * (`PARALLEL`, docs/31 D48).
+   */
   readonly rateType?: FxRateType | null;
   /** Tipo preferido de un par (en cualquier orientación); `null` = sin preferencia (FR-FX-006). */
   readonly preferenceOf?: (a: string, b: string) => FxRateType | null;
@@ -86,7 +90,7 @@ interface Pick extends ValuationChoice {
 /**
  * DS `RateResolver` (FR-FX-004/005/006; design.md decisión 4), puro: la tasa vigente de un par a un instante es la
  * tasa NO reemplazada más reciente con `asOf ≤ instante` y dentro de la ventana (7 días por defecto), del tipo pedido
- * o del preferido del par (sin preferencia: cualquier tipo, informando cuál). Orden: directa → inversa (derivada de
+ * o del preferido del par (sin preferencia: `PARALLEL`, docs/31 D48; informando el tipo usado). Orden: directa → inversa (derivada de
  * la original a precisión 40, INV-032) → cruzada por pivote solo si `allowCross`. Nunca inventa un valor ni usa 1:1.
  */
 export class RateResolver {
@@ -133,7 +137,9 @@ export class RateResolver {
       throw new DomainError('VALIDATION_FAILED', 'base and quote must differ').at('/quote');
     }
     const windowDays = query.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
-    const typeFor = (a: string, b: string) => query.rateType ?? query.preferenceOf?.(a, b) ?? null;
+    // Tipo pedido > preferencia del par > PARALLEL (docs/31 D48: el default de los pares BOB para todo par).
+    const typeFor = (a: string, b: string): FxRateType =>
+      query.rateType ?? query.preferenceOf?.(a, b) ?? DEFAULT_RATE_TYPE;
     const requested = typeFor(base.code, quote.code);
     const direct = this.pick(base.code, quote.code, at, windowDays, requested, mode);
     if (direct) return this.single(direct, base, at, requested);

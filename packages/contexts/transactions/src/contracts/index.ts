@@ -17,6 +17,8 @@ export const TRANSACTION_EVENTS = {
   /** Edición financiera de una transferencia (add-lifecycle-timeline decisión 9; docs/31 D37). */
   transferRevised: { eventType: 'transactions.TransferRevised', eventVersion: 1 },
   conversionRecorded: { eventType: 'transactions.ConversionRecorded', eventVersion: 1 },
+  /** Corrección financiera de una conversión posteada (docs/31 D48, simétrico a `transferRevised`). */
+  conversionRevised: { eventType: 'transactions.ConversionRevised', eventVersion: 1 },
 } as const;
 
 export interface FlowMoneyDto {

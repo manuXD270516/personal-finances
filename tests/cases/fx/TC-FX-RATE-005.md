@@ -12,9 +12,10 @@ invariants: ["INV-020"]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-resolver.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["fx","valuation","preferences"]

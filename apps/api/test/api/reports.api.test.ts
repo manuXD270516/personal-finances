@@ -655,6 +655,7 @@ describe('Consumidor reporting.data-version (platform.inbox)', () => {
       'transactions.TransactionVoided.v1',
       'transactions.TransactionCategorized.v1',
       'transactions.TransferRevised.v1',
+      'transactions.ConversionRevised.v1',
       'accounts.AccountOpened.v1',
       'accounts.AccountArchived.v1',
       'fx.RateRecorded.v1',
