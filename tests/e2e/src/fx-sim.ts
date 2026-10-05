@@ -92,11 +92,19 @@ export class FxProviderSim {
   }
 }
 
-/** Días UTC `YYYY-MM-DD` desde hace `from` hasta hace `to` días (inclusive), del más antiguo al más reciente. */
+/** America/La_Paz es UTC−4 fijo (sin horario de verano). */
+const LA_PAZ_OFFSET_MS = 4 * 3_600_000;
+
+/**
+ * Días `YYYY-MM-DD` del calendario de America/La_Paz desde hace `from` hasta hace `to` días (inclusive), del más antiguo
+ * al más reciente. El provider cierra cada día histórico al final del día en La Paz: con días UTC, entre las 00:00 y las
+ * 04:00 UTC "hace 2 días" quedaba a solo ~20 h.
+ */
 export function pastDays(from: number, to: number, now = new Date()): string[] {
   const out: string[] = [];
+  const laPazNow = now.getTime() - LA_PAZ_OFFSET_MS;
   for (let d = from; d >= to; d -= 1)
-    out.push(new Date(now.getTime() - d * 86_400_000).toISOString().slice(0, 10));
+    out.push(new Date(laPazNow - d * 86_400_000).toISOString().slice(0, 10));
   return out;
 }
 
