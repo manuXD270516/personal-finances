@@ -142,20 +142,38 @@ export const SUMMARY: ReportSummary = {
       liquid: false,
     },
   ],
+  // Monto anterior = mismo tramo de agosto (1..30): Supermercado 1000.00, Restaurantes 150.00, Fees 5.00.
   topExpenseCategories: [
     {
       categoryId: '0190a000-0000-7000-8000-0000000000d1',
       name: 'Supermercado',
       amount: bob('1200.00'),
       complete: true,
+      previousAmount: bob('1000.00'),
     },
     {
       categoryId: '0190a000-0000-7000-8000-0000000000d2',
       name: 'Restaurantes',
       amount: bob('100.00'),
       complete: true,
+      previousAmount: bob('150.00'),
     },
-    { categoryId: '0190a000-0000-7000-8000-0000000000d3', name: 'Fees', amount: bob('5.00'), complete: true },
+    {
+      categoryId: '0190a000-0000-7000-8000-0000000000d3',
+      name: 'Fees',
+      amount: bob('5.00'),
+      complete: true,
+      previousAmount: bob('5.00'),
+    },
+  ],
+  topIncomeCategories: [
+    {
+      categoryId: '0190a000-0000-7000-8000-0000000000c1',
+      name: 'Salario',
+      amount: bob('8000.00'),
+      complete: true,
+      previousAmount: bob('7500.00'),
+    },
   ],
   netWorth: {
     assets: bob('1406.50'),
@@ -228,6 +246,7 @@ export const EMPTY_SUMMARY: ReportSummary = {
   comparison: null,
   accounts: [],
   topExpenseCategories: [],
+  topIncomeCategories: [],
   netWorth: {
     assets: bob('0.00'),
     liabilities: bob('0.00'),

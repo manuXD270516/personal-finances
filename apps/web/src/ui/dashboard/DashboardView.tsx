@@ -1,5 +1,4 @@
 import { AccountBalancesList } from './AccountBalancesList';
-import type { PreviousCategories } from './category-comparison';
 import { ExpenseCard, IncomeCard, SavingsCard } from './FlowCards';
 import { formatInstant, formatLocalDate } from './format';
 import { LiquidBalanceCard } from './LiquidBalanceCard';
@@ -17,8 +16,6 @@ export interface DashboardViewProps extends FormatContext {
   readonly registerRateHref?: string | undefined;
   /** Destino de la acción "registrar un gasto" del estado vacío de categorías. */
   readonly registerExpenseHref?: string | undefined;
-  /** Top de categorías del mismo tramo del mes anterior (variación por categoría); sin él no hay variaciones. */
-  readonly previousCategories?: PreviousCategories | undefined;
 }
 
 /** Hoja de estilos del Home (tokens de docs/28 §5). */
@@ -27,7 +24,8 @@ const HomeStyles = () => <style>{HOME_CSS}</style>;
 /**
  * Home (reporting/dashboard, tareas 6.1 y 6.2; D50): jerarquía visual de lo más consultado a lo menos —
  * (1) "¿Cuánto dinero tengo?" destacado; (2) "Este mes" (FR-REPORTING-004): ingresos, gastos y ahorro con la
- * variación contra el mes anterior y el top de categorías de gasto con barras y variación por categoría;
+ * variación contra el mes anterior y los tops de categorías de gasto y de ingreso con barras y variación por
+ * categoría (el monto anterior llega en la misma respuesta);
  * (3) patrimonio y cuentas; (4) preguntas que llegan en fases siguientes, sin montos. Encabezados h2 por grupo y h3
  * por tarjeta bajo el h1 de la página. Presentacional: textos del namespace `Dashboard`, montos formateados desde el
  * string decimal en el locale del workspace e instantes en su zona horaria.
@@ -37,7 +35,6 @@ export function DashboardView({
   createAccountHref,
   registerRateHref,
   registerExpenseHref,
-  previousCategories,
   ...ctx
 }: DashboardViewProps) {
   const { t, locale } = ctx;
@@ -92,12 +89,15 @@ export function DashboardView({
               <ExpenseCard summary={summary} ctx={fctx} />
               <SavingsCard summary={summary} ctx={fctx} />
             </div>
-            <TopCategoriesWidget
-              summary={summary}
-              ctx={fctx}
-              previous={previousCategories}
-              registerExpenseHref={registerExpenseHref}
-            />
+            <div className="pf-home-tops">
+              <TopCategoriesWidget
+                summary={summary}
+                ctx={fctx}
+                kind="expense"
+                registerExpenseHref={registerExpenseHref}
+              />
+              <TopCategoriesWidget summary={summary} ctx={fctx} kind="income" />
+            </div>
           </div>
         )}
       </section>

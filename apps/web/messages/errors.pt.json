@@ -35,7 +35,6 @@
   "LEDGER_SPLIT_REQUIRED": "Não foi possível vincular a partida contábil ao seu detalhe. Avise-nos se acontecer de novo.",
   "LEDGER_ENTRY_ALREADY_REVERSED": "Este lançamento já foi estornado.",
   "LEDGER_ENTRY_NOT_REVERSIBLE": "Este lançamento não pode ser estornado.",
-  "LEDGER_IMMUTABLE": "Lançamentos contábeis registrados não podem ser alterados.",
   "PERIOD_CLOSED": "O mês dessa data está fechado. Escolha uma data de um período aberto.",
   "ACCOUNT_ARCHIVED": "A conta está arquivada e não aceita movimentos.",
   "ACCOUNT_CLOSED": "A conta está encerrada e não aceita movimentos.",

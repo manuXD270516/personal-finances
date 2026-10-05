@@ -264,13 +264,26 @@
       "caption": "{n, plural, one {La categoría con más gasto neto del mes} other {Las # categorías con más gasto neto del mes}}",
       "emptyAction": "Registrar un gasto",
       "previous": "mes anterior: {amount}",
-      "comparing": "Comparando con el mes anterior…",
       "legendPrevious": "Marca: gasto en los mismos días del mes anterior",
       "trend": {
         "up": "más que el mes anterior",
         "down": "menos que el mes anterior",
         "flat": "igual que el mes anterior",
         "new": "nuevo: sin gasto el mes anterior",
+        "unknown": "sin comparación con el mes anterior"
+      }
+    },
+    "topIncomeCategories": {
+      "title": "Principales fuentes de ingreso",
+      "empty": "Sin ingresos registrados este mes.",
+      "caption": "{n, plural, one {La categoría con más ingreso neto del mes} other {Las # categorías con más ingreso neto del mes}}",
+      "previous": "mes anterior: {amount}",
+      "legendPrevious": "Marca: ingreso en los mismos días del mes anterior",
+      "trend": {
+        "up": "más que el mes anterior",
+        "down": "menos que el mes anterior",
+        "flat": "igual que el mes anterior",
+        "new": "nuevo: sin ingreso el mes anterior",
         "unknown": "sin comparación con el mes anterior"
       }
     },

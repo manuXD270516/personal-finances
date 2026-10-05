@@ -2,7 +2,8 @@
 # `main` ni cambia los de `pr.yml`. Jobs independientes (uno que falla no cancela a los demás):
 #   regression     Financial Regression Suite derivada de tests/cases (`regression_suite: true`), unit + integración,
 #                  con NIGHTLY=1 (property-based tests a 10 000 corridas, semilla aleatoria impresa en cada falla).
-#   mutation       shared-kernel: cobertura (≥ 95 % líneas / ≥ 90 % ramas) y Stryker (mutation score ≥ 80 %).
+#   mutation       shared-kernel: cobertura (≥ 95 % líneas / ≥ 90 % ramas) y Stryker (mutation score ≥ 80 %);
+#                  dominio IDENTITY: cobertura ≥ 90 % (add-workspace-identity 4.1).
 #   perf           Large Seed (docs/29 §2.3) + benchmarks NFR-PERF-001/003/004/005 y overhead de RLS (Testcontainers);
 #                  falla si un p95 supera su umbral de docs/02. Reporte JSON + Markdown como artefacto.
 #   fx-smoke-live  ÚNICO job con red hacia terceros: smoke de los providers de tasas reales. `continue-on-error`:
@@ -56,7 +57,7 @@ jobs:
           retention-days: 30
 
   mutation:
-    name: mutation (shared-kernel)
+    name: mutation (shared-kernel) + cobertura de dominio
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -69,12 +70,19 @@ jobs:
       - name: Stryker (mutation score ≥ 80 %)
         if: ${{ !cancelled() }}
         run: pnpm --filter @pf/shared-kernel run test:mutation
+      # add-workspace-identity 4.1: umbral (≥ 90 % líneas/sentencias/funciones/ramas) en
+      # packages/contexts/identity/vitest.config.ts, medido solo sobre src/domain.
+      - name: Cobertura del dominio IDENTITY (≥ 90 %)
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @pf/identity run test:coverage
       - name: Resumen
         if: ${{ !cancelled() }}
         run: |
           {
             echo '### shared-kernel'
             node -e "const s=require('./packages/shared-kernel/coverage/coverage-summary.json').total;console.log('| métrica | % |\n|---|---|\n| líneas | '+s.lines.pct+' |\n| ramas | '+s.branches.pct+' |')" || true
+            echo '### dominio IDENTITY'
+            node -e "const s=require('./packages/contexts/identity/coverage/coverage-summary.json').total;console.log('| métrica | % |\n|---|---|\n| líneas | '+s.lines.pct+' |\n| ramas | '+s.branches.pct+' |')" || true
             node -e "const r=require('./packages/shared-kernel/reports/mutation/mutation.json');let k=0,t=0;for(const f of Object.values(r.files))for(const m of f.mutants){if(['Killed','Timeout'].includes(m.status))k++;if(!['CompileError','RuntimeError','Ignored'].includes(m.status))t++;}console.log('\nMutation score: '+(100*k/t).toFixed(2)+' % ('+k+'/'+t+')')" || true
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -84,6 +92,7 @@ jobs:
           path: |
             packages/shared-kernel/coverage
             packages/shared-kernel/reports/mutation
+            packages/contexts/identity/coverage
           if-no-files-found: warn
           retention-days: 30
 

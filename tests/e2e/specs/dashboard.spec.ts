@@ -192,6 +192,7 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
       '¿Cuánto gasté?',
       '¿Cuánto ahorré?',
       'Principales categorías de gasto',
+      'Principales fuentes de ingreso',
     ]);
     // Top de categorías con la variación contra el mismo tramo del mes anterior, en texto (no solo color).
     const top = month.getByTestId('top-categories');
@@ -206,6 +207,12 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     // Restaurantes: 300.00 − 200.00 de reembolso = 100.00, sin gasto el mes anterior ⇒ "nuevo".
     await expect(row(resName).getByTestId('top-category-amount')).toHaveText('100,00 BOB');
     await expect(row(resName).getByTestId('top-category-trend')).toHaveAttribute('data-trend', 'new');
+    // Top de ingresos (FR-REPORTING-004) en la misma respuesta: el salario sin ingreso el mes anterior ⇒ "nuevo".
+    const income = month.getByTestId('top-income-categories');
+    await expect(income).toHaveAttribute('data-comparison', 'ready');
+    await expect(income.getByTestId('top-category')).toHaveCount(1);
+    await expect(income.getByTestId('top-category-amount')).toHaveText('8.000,00 BOB');
+    await expect(income.getByTestId('top-category-trend')).toHaveAttribute('data-trend', 'new');
     await page.screenshot({ path: testInfo.outputPath('home-desktop.png'), fullPage: true });
     // Banco 1000 + 8000 − 1200 − 300 + 200 + 685 = 8385.00; 50.000000 USDT × 12.02 = 601.00 ⇒ 8986.00 BOB.
     const liquid = page.getByTestId('liquid-balance');

@@ -599,6 +599,26 @@ describe('GET /reports/summary — flujos del mes (PG real)', () => {
     expect(m(cmp.expense.previous)).toBe('0.00 BOB');
   });
 
+  it('[TC-REPORTING-KPI-009] [TC-REPORTING-KPI-010] top de ingresos y monto anterior por categoría en la misma respuesta', async () => {
+    const r = await summary(flows, '?month=2026-10');
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    type Line = { categoryId: string; amount: Money; previousAmount: Money | null };
+    const income = r.body['topIncomeCategories'] as Line[];
+    expect(income).toHaveLength(1);
+    expect(m(income[0]!.amount)).toBe('8000.00 BOB');
+    // Comparación a la fecha 1..2 de septiembre: sin flujos en esas categorías → 0.00 (no null).
+    expect(m(income[0]!.previousAmount!)).toBe('0.00 BOB');
+    const expense = r.body['topExpenseCategories'] as Line[];
+    expect(m(expense.find((t) => t.categoryId === sup)!.previousAmount!)).toBe('0.00 BOB');
+    const none = await summary(flows, '?month=2026-10&compare=NONE');
+    const lines = [
+      ...(none.body['topIncomeCategories'] as Line[]),
+      ...(none.body['topExpenseCategories'] as Line[]),
+    ];
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.every((l) => l.previousAmount === null)).toBe(true);
+  });
+
   it('[TC-REPORTING-DASHBOARD-006] un gasto recién posteado aparece en la siguiente lectura; ETag e If-None-Match', async () => {
     const first = await summary(flows, '?month=2026-10');
     const etag = first.headers.get('etag');

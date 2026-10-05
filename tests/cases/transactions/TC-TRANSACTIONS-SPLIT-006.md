@@ -12,9 +12,10 @@ invariants: [INV-019]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/transactions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["splits", "classification", "validation"]
@@ -36,7 +37,7 @@ expected_result:
   - "Segundo: 422 CATEGORY_KIND_MISMATCH"
   - "Nada persistido"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-05
 ---
 
 # TC-TRANSACTIONS-SPLIT-006 — Un split rechaza categorías archivadas o de tipo incompatible

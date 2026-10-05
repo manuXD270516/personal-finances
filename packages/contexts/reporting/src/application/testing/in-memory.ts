@@ -66,7 +66,12 @@ export class InMemoryReporting {
   readonly rateRequests: { base: string; quote: string; at: string }[] = [];
   latestEntryAt: string | null = '2026-09-30T21:00:00.000Z';
   version = '0';
+  /** Ventana con la que se "compuso" FX (se usa si el llamador no pasa la suya). */
   windowDays = 7;
+  /** Ajuste de Reporting `REPORTING_RATE_VALIDITY_WINDOW` (docs/31 D53); `undefined` = default de Reporting. */
+  rateValidityWindowDays: number | undefined;
+  /** Ventanas recibidas por el puerto de FX en cada llamada. */
+  readonly windowRequests: (number | undefined)[] = [];
 
   addAccount(
     over: Partial<AccountSummaryDto> & Pick<AccountSummaryDto, 'name' | 'type' | 'currency'>,
@@ -99,9 +104,12 @@ export class InMemoryReporting {
     this.flows.push({ businessDate, nature, categoryId, amount: { amount, currency } });
   }
 
-  private resolve(req: { base: string; quote: string; at: string }): ValuationRateDto | null {
+  private resolve(
+    req: { base: string; quote: string; at: string },
+    windowDays: number,
+  ): ValuationRateDto | null {
     const at = Date.parse(req.at);
-    const from = at - this.windowDays * 86_400_000;
+    const from = at - windowDays * 86_400_000;
     const candidates = this.rates
       .filter((r) => {
         const t = Date.parse(r.asOf);
@@ -138,9 +146,10 @@ export class InMemoryReporting {
   deps(): ReportingDeps {
     const fx: FxValuationPort = {
       windowDays: this.windowDays,
-      resolveValuationRates: async ({ requests }) => {
+      resolveValuationRates: async ({ requests, windowDays }) => {
         this.rateRequests.push(...requests);
-        return requests.map((r) => this.resolve(r));
+        this.windowRequests.push(windowDays);
+        return requests.map((r) => this.resolve(r, windowDays ?? this.windowDays));
       },
       enabledCurrencies: async () => this.currencies.filter((c) => c.enabled),
       workspaceCurrencies: async () => this.currencies,
@@ -176,6 +185,9 @@ export class InMemoryReporting {
       rates: fx,
       versions: { versionOf: async () => this.version, bump: async () => undefined },
       clock: this.clock,
+      ...(this.rateValidityWindowDays === undefined
+        ? {}
+        : { rateValidityWindowDays: this.rateValidityWindowDays }),
     };
   }
 }

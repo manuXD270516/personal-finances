@@ -44,4 +44,10 @@ export interface ReportingDeps {
   readonly rates: FxValuationPort;
   readonly versions: DataVersionStore;
   readonly clock: Clock;
+  /**
+   * Ventana de vigencia (días) de las tasas de valoración: ajuste PROPIO de Reporting (docs/31 D53,
+   * `REPORTING_RATE_VALIDITY_WINDOW`); se entrega a FX en cada resolución y se informa en `meta.rateWindowDays`.
+   * Por defecto `DEFAULT_RATE_VALIDITY_WINDOW_DAYS` (7).
+   */
+  readonly rateValidityWindowDays?: number;
 }

@@ -25,10 +25,11 @@
 
 ## 4. Dominio IDENTITY
 
-- [ ] 4.1 Escribir primero (TDD) tests de dominio de `Workspace` (≥ 1 OWNER, una membresía por usuario, `fiscalMonthStartDay` 1..28, reserva mínima ≥ 0 con escala de su moneda: 1500.00 BOB válido, 1500.005 BOB → `AMOUNT_SCALE_EXCEEDED`) y de `User`/`TimeZoneId` (IANA válido/ inválido); verificar cobertura de dominio ≥ 90 %
+- [x] 4.1 Escribir primero (TDD) tests de dominio de `Workspace` (≥ 1 OWNER, una membresía por usuario, `fiscalMonthStartDay` 1..28, reserva mínima ≥ 0 con escala de su moneda: 1500.00 BOB válido, 1500.005 BOB → `AMOUNT_SCALE_EXCEEDED`) y de `User`/`TimeZoneId` (IANA válido/ inválido); verificar cobertura de dominio ≥ 90 %
   > Pendiente (2026-10-02): tests de dominio escritos y en verde (`src/domain/workspace.test.ts`), pero la cobertura ≥ 90 % no se midió: `@vitest/coverage-v8` no está en el catálogo del monorepo.
   > Verificado 2026-10-04 (parcial): los tests de dominio existen (`packages/contexts/identity/src/domain/workspace.test.ts`: un OWNER, una membresía, `fiscalMonthStartDay`, 1500.00/1500.005 BOB, IANA válido/inválido). Falta: medir cobertura de dominio ≥ 90 % (no hay proveedor de coverage ni umbrales en `vitest.config.ts`, ni job de CI).
   > Nota 2026-10-04: la medición de cobertura de dominio ≥ 90 % queda al agente de nightly (cobertura/mutación en CI, pf-nightly); no se cierra en esta sesión.
+  > Hecho (2026-10-05): `@vitest/coverage-v8` en `@pf/identity` (`pnpm --filter @pf/identity run test:coverage`) con umbrales ≥ 90 % (líneas, sentencias, funciones y ramas) sobre `src/domain` en `vitest.config.ts`; medido: 100 % líneas/sentencias/funciones y 95,7 % ramas (tests nuevos de alias IANA, `LocaleTag` largo, `isRole`/`minimumRoleFor`, identidad del IdP de `User`, preferencias demasiado grandes y `restore` con reserva negativa o ARCHIVED/PURGED no demo). El job nightly `mutation` corre esa cobertura y publica el resumen y el reporte. Además, la variante property-based de `[TC-SECURITY-ISOLATION-001]` a nivel API con fast-check (`apps/api/test/api/isolation.api.test.ts`).
 - [x] 4.2 Implementar AR `User`, AR `Workspace`, entidad `Membership`, VOs `WorkspaceSettings`, `TimeZoneId`, `LocaleTag`, `Role` y `roleGrants`; verificar que dependency-cruiser no reporta imports de framework en `domain`
 - [x] 4.3 Implementar la regla "cambiar moneda base no toca historia" como ausencia de dependencia hacia Ledger/Transactions en `UpdateWorkspaceSettings`; verificar con test de arquitectura
 

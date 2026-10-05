@@ -58,6 +58,7 @@ overflow-wrap:anywhere;display:grid;gap:0.5rem;align-content:start}
 .pf-home-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));align-items:start}
 .pf-home-kpis{display:grid;gap:1rem;grid-template-columns:1fr}
 .pf-home-month{display:grid;gap:1rem;grid-template-columns:minmax(0,1fr)}
+.pf-home-tops{display:grid;gap:1rem;min-width:0;align-content:start}
 .pf-home-trend{display:inline}
 .pf-home-trend-icon{font-size:0.75rem}
 .pf-home-trend[data-tone="ok"]{color:var(--pf-fin-ok)}

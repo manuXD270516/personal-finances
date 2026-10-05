@@ -2,47 +2,23 @@ import { subtractAmounts } from '../common/money';
 import { isNegative, isZero } from './format';
 import type { Money, ReportSummary, TopCategory } from './types';
 
-/** Máximo de `topCategories` que admite `GET /reports/summary` (contrato: 0..20). */
-export const MAX_TOP_CATEGORIES = 20;
-
-/**
- * Top de categorías del periodo de comparación (Q7 básico, FR-REPORTING-004): `loading` mientras se consulta,
- * `unavailable` si no hay comparación o la consulta falló (el Home se muestra igual, sin variaciones), `ready` con
- * las categorías del periodo anterior. `saturated` = la respuesta llegó al máximo del contrato, así que una categoría
- * ausente pudo quedar fuera del top (no se puede afirmar que antes fue cero).
- */
-export type PreviousCategories =
-  | { readonly status: 'loading' }
-  | { readonly status: 'unavailable' }
-  | { readonly status: 'ready'; readonly items: readonly TopCategory[]; readonly saturated: boolean };
-
 export type CategoryTrend = 'up' | 'down' | 'flat' | 'new' | 'unknown';
 
 export interface CategoryComparison {
   readonly trend: CategoryTrend;
-  /** Gasto neto de la categoría en el periodo anterior (`null` si no se puede saber). */
+  /** Neto de la categoría en el periodo anterior (`null` si no se puede saber). */
   readonly previous: Money | null;
   /** Actual − anterior, exacto con bigint (`null` si no se puede saber). */
   readonly delta: Money | null;
 }
 
 /**
- * Consulta del periodo anterior "a la fecha" que usa la propia respuesta (`comparison.previousPeriod`), en la misma
- * moneda de reporte y sin comparación anidada; `undefined` si el Home no tiene comparación (Q7 no disponible) o no
- * hay categorías que comparar.
+ * ¿Hay variación por categoría (Q7 básico, FR-REPORTING-004)? Solo si la respuesta trae comparación y Q7 está
+ * disponible: el monto anterior de cada categoría viene en la misma respuesta (`previousAmount`), sin otra consulta.
  */
-export function previousCategoriesQuery(summary: ReportSummary): string | undefined {
-  const cmp = summary.comparison;
+export function hasCategoryComparison(summary: ReportSummary): boolean {
   const q7 = summary.questions.find((q) => q.question === 'Q7');
-  if (!cmp || (q7 && q7.status !== 'AVAILABLE') || summary.topExpenseCategories.length === 0)
-    return undefined;
-  return new URLSearchParams({
-    dateFrom: cmp.previousPeriod.from,
-    dateTo: cmp.previousPeriod.to,
-    reportingCurrency: summary.meta.reportingCurrency,
-    compare: 'NONE',
-    topCategories: String(MAX_TOP_CATEGORIES),
-  }).toString();
+  return !!summary.comparison && (!q7 || q7.status === 'AVAILABLE');
 }
 
 const fractionDigits = (amount: string): number => amount.split('.')[1]?.length ?? 0;
@@ -51,21 +27,21 @@ const trendOf = (delta: string): CategoryTrend =>
   isZero(delta) ? 'flat' : isNegative(delta) ? 'down' : 'up';
 
 /**
- * Variación de una categoría contra el periodo anterior. La resta es exacta (`Money` del shared-kernel, bigint) sobre
- * los montos ya redondeados por la API en la moneda de reporte: nunca pasa por `number`.
+ * Variación de una categoría contra el periodo anterior con su `previousAmount` (cero = no tuvo flujos; `null` = la
+ * API no pudo saberlo, p. ej. un monto sin tasa). La resta es exacta (`Money` del shared-kernel, bigint) sobre los
+ * montos ya redondeados por la API en la moneda de reporte: nunca pasa por `number`.
  */
-export function compareCategory(
-  current: TopCategory,
-  previous: PreviousCategories,
-): CategoryComparison | undefined {
-  if (previous.status !== 'ready') return undefined;
+export function compareCategory(current: TopCategory): CategoryComparison {
   const { currency, amount } = current.amount;
-  const before = previous.items.find((c) => c.categoryId === current.categoryId);
-  if (before && before.amount.currency !== currency) return { trend: 'unknown', previous: null, delta: null };
-  if (!before && previous.saturated) return { trend: 'unknown', previous: null, delta: null };
-  const scale = fractionDigits(amount);
-  const prevAmount = before?.amount.amount ?? (scale > 0 ? `0.${'0'.repeat(scale)}` : '0');
-  const delta = subtractAmounts(amount, prevAmount, currency, Math.max(scale, fractionDigits(prevAmount)));
+  const before = current.previousAmount ?? null;
+  if (!before || before.currency !== currency) return { trend: 'unknown', previous: null, delta: null };
+  const prevAmount = before.amount;
+  const delta = subtractAmounts(
+    amount,
+    prevAmount,
+    currency,
+    Math.max(fractionDigits(amount), fractionDigits(prevAmount)),
+  );
   const trend: CategoryTrend = isZero(prevAmount) && !isZero(amount) ? 'new' : trendOf(delta);
   return { trend, previous: { amount: prevAmount, currency }, delta: { amount: delta, currency } };
 }

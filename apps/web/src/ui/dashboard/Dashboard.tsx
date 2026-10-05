@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { localized, useSession } from '../session-context';
-import { MAX_TOP_CATEGORIES, previousCategoriesQuery, type PreviousCategories } from './category-comparison';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import type { ReportSummary } from './types';
 
@@ -18,13 +17,10 @@ interface Loaded {
   readonly formatLocale: string;
 }
 
-const UNAVAILABLE: PreviousCategories = { status: 'unavailable' };
-const LOADING: PreviousCategories = { status: 'loading' };
-
 /**
- * Home del workspace activo: `GET /workspaces/{id}/reports/summary` vía BFF, presentado con `DashboardView`. Tras
- * mostrarlo, pide el top de categorías del mismo tramo del mes anterior (mismo endpoint, `compare=NONE`) para la
- * variación por categoría (FR-REPORTING-004); si esa lectura falla, el Home queda igual pero sin variaciones.
+ * Home del workspace activo: `GET /workspaces/{id}/reports/summary` vía BFF, presentado con `DashboardView`. Una
+ * sola lectura del resumen: los tops de gasto e ingreso ya traen el monto del periodo anterior por categoría
+ * (`previousAmount`, FR-REPORTING-004), así que la variación por categoría no necesita otra consulta.
  */
 export function Dashboard() {
   const t = useTranslations('Dashboard');
@@ -32,7 +28,6 @@ export function Dashboard() {
   const { state } = useSession();
   const [loaded, setLoaded] = useState<Loaded | undefined>();
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
-  const [previous, setPrevious] = useState<{ key: string; value: PreviousCategories } | undefined>();
 
   const ready = state.status === 'ready' ? state : undefined;
   const api = ready?.api;
@@ -64,30 +59,6 @@ export function Dashboard() {
     };
   }, [api, workspaceId]);
 
-  const previousQuery = loaded ? previousCategoriesQuery(loaded.summary) : undefined;
-  const previousKey = loaded && previousQuery ? `${loaded.workspaceId}?${previousQuery}` : undefined;
-
-  useEffect(() => {
-    if (!api || !loaded || !previousQuery || !previousKey) return;
-    let cancelled = false;
-    api
-      .get<ReportSummary>(`/workspaces/${loaded.workspaceId}/reports/summary?${previousQuery}`)
-      .then((r) => {
-        if (cancelled) return;
-        const items = r.data?.topExpenseCategories ?? [];
-        setPrevious({
-          key: previousKey,
-          value: { status: 'ready', items, saturated: items.length >= MAX_TOP_CATEGORIES },
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setPrevious({ key: previousKey, value: UNAVAILABLE });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api, loaded, previousQuery, previousKey]);
-
   if (!ready) return null;
   if (!workspaceId) return <p data-testid="dashboard-no-workspace">{t('noWorkspace')}</p>;
   if (problem) return <ProblemMessage problem={problem} locale={uiLocale} />;
@@ -102,9 +73,6 @@ export function Dashboard() {
       createAccountHref={localized(uiLocale, '/cuentas/nueva')}
       registerRateHref={localized(uiLocale, '/fx')}
       registerExpenseHref={localized(uiLocale, '/transacciones/nueva')}
-      previousCategories={
-        !previousKey ? UNAVAILABLE : previous?.key === previousKey ? previous.value : LOADING
-      }
     />
   );
 }

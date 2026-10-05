@@ -133,6 +133,63 @@ describe('KpiCalculator (docs/14 §4)', () => {
     ]);
   });
 
+  it('[TC-REPORTING-KPI-009] top de categorías de INGRESO: ordena por ingreso neto descendente e ignora los gastos', () => {
+    const names: Record<string, string> = {
+      sal: 'Salario',
+      frl: 'Freelance',
+      int: 'Intereses',
+      sup: 'Supermercado',
+    };
+    const flows = [
+      flow('INCOME', bob('8000.00'), 'sal', '2026-09-05'),
+      flow('INCOME', bob('1500.00'), 'frl', '2026-09-12'),
+      flow('INCOME', bob('-200.00'), 'frl', '2026-09-20'),
+      flow('INCOME', bob('12.50'), 'int', '2026-09-30'),
+      flow('EXPENSE', bob('9000.00'), 'sup'),
+    ];
+    const opts = {
+      target: BOB,
+      rateFor: () => null,
+      nameOf: (id: string) => names[id] ?? id,
+      nature: 'INCOME' as const,
+    };
+    expect(
+      KpiCalculator.topCategories(flows, 5, opts).map((c) => `${c.name} ${present(c.amount, BOB).toFixed()}`),
+    ).toEqual(['Salario 8000.00', 'Freelance 1300.00', 'Intereses 12.50']);
+    expect(KpiCalculator.topCategories(flows, 1, opts).map((c) => c.name)).toEqual(['Salario']);
+    // Sin `nature` el top sigue siendo de gasto (compatibilidad).
+    expect(KpiCalculator.topCategories(flows, 5, { ...opts, nature: undefined }).map((c) => c.name)).toEqual([
+      'Supermercado',
+    ]);
+  });
+
+  it('[TC-REPORTING-KPI-010] monto por categoría del periodo anterior: neto, con la tasa de cada fecha y cero si no hubo flujos', () => {
+    const rate: ExactRate = { base: 'USD', quote: 'BOB', value: dec('6.96') };
+    const flows = [
+      flow('EXPENSE', bob('1000.00'), 'sup', '2026-08-03'),
+      flow('EXPENSE', bob('200.00'), 'sup', '2026-08-14'),
+      flow('EXPENSE', bob('-50.00'), 'resto', '2026-08-10'),
+      flow('EXPENSE', bob('150.00'), 'resto', '2026-08-11'),
+      flow('EXPENSE', Money.parse('10.00', USD), 'viajes', '2026-08-12'),
+      flow('EXPENSE', Money.parse('3.00', USD), 'libros', '2026-08-13'),
+      flow('INCOME', bob('8000.00'), 'sup', '2026-08-05'),
+    ];
+    const totals = KpiCalculator.categoryTotals(flows, 'EXPENSE', {
+      target: BOB,
+      rateFor: (_ccy, date) => (date === '2026-08-12' ? rate : null),
+    });
+    const show = (id: string) => {
+      const t = totals.get(id);
+      return t ? [present(t.amount, BOB).toFixed(), t.complete] : undefined;
+    };
+    expect(show('sup')).toEqual(['1200.00', true]);
+    expect(show('resto')).toEqual(['100.00', true]);
+    expect(show('viajes')).toEqual(['69.60', true]);
+    expect(show('libros')).toEqual(['0.00', false]);
+    expect(show('salario')).toBeUndefined();
+    expect(KpiCalculator.categoryTotals(flows, 'INCOME', { target: BOB, rateFor: () => null }).size).toBe(1);
+  });
+
   it('within filtra por fecha de negocio inclusiva', () => {
     const flows = [
       flow('EXPENSE', bob('1.00'), 'x', '2026-08-31'),

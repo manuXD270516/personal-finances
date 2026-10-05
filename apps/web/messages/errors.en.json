@@ -35,7 +35,6 @@
   "LEDGER_SPLIT_REQUIRED": "We could not link the accounting posting to its detail. Let us know if it happens again.",
   "LEDGER_ENTRY_ALREADY_REVERSED": "This entry was already reversed.",
   "LEDGER_ENTRY_NOT_REVERSIBLE": "This entry cannot be reversed.",
-  "LEDGER_IMMUTABLE": "Recorded accounting entries cannot be changed.",
   "PERIOD_CLOSED": "The month of that date is closed. Choose a date in an open period.",
   "ACCOUNT_ARCHIVED": "The account is archived and does not accept transactions.",
   "ACCOUNT_CLOSED": "The account is closed and does not accept transactions.",

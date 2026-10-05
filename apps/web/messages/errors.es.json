@@ -35,7 +35,6 @@
   "LEDGER_SPLIT_REQUIRED": "No pudimos asociar el movimiento contable a su detalle. Avísanos si se repite.",
   "LEDGER_ENTRY_ALREADY_REVERSED": "Este movimiento ya fue revertido.",
   "LEDGER_ENTRY_NOT_REVERSIBLE": "Este movimiento no se puede revertir.",
-  "LEDGER_IMMUTABLE": "Los movimientos contables registrados no se pueden modificar.",
   "PERIOD_CLOSED": "El mes de esa fecha está cerrado. Elige una fecha de un periodo abierto.",
   "ACCOUNT_ARCHIVED": "La cuenta está archivada y no admite movimientos.",
   "ACCOUNT_CLOSED": "La cuenta está cerrada y no admite movimientos.",

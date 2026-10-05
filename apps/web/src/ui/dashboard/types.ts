@@ -124,12 +124,17 @@ export interface NetWorthBreakdown {
   readonly unvalued: readonly Money[];
 }
 
-/** Categoría del top-N de gasto neto del periodo (moneda de reporte; puede ser negativa si hubo reembolsos). */
+/** Categoría del top-N de gasto (o ingreso) neto del periodo (moneda de reporte; puede ser negativa). */
 export interface TopCategory {
   readonly categoryId: string;
   readonly name: string;
   readonly amount: Money;
   readonly complete: boolean;
+  /**
+   * Neto de la misma categoría en el periodo de comparación (cero si no tuvo flujos); `null` sin comparación o si la
+   * API no pudo convertirlo (FR-REPORTING-004).
+   */
+  readonly previousAmount?: Money | null;
 }
 
 export type HomeQuestion = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5' | 'Q6' | 'Q7' | 'Q8' | 'Q9';
@@ -149,6 +154,8 @@ export interface ReportSummary {
   readonly comparison?: PeriodComparison | null;
   readonly accounts: readonly AccountBalanceLine[];
   readonly topExpenseCategories: readonly TopCategory[];
+  /** Principales categorías de ingreso del periodo (FR-REPORTING-004). */
+  readonly topIncomeCategories?: readonly TopCategory[];
   readonly netWorth: NetWorthBreakdown;
   readonly questions: readonly HomeQuestionStatus[];
   readonly meta: {

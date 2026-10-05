@@ -138,6 +138,22 @@ Trace: FR-REPORTING-004 · Priority: Must
 - **CUANDO** el mes tiene Supermercado 1200.00 BOB, Restaurantes 100.00 BOB (neto de reembolso), Transporte 80.00 BOB y Fees 5.00 BOB, y se piden 2 categorías
 - **ENTONCES** se listan Supermercado 1200.00 BOB y Restaurantes 100.00 BOB en ese orden
 
+### Requirement: Principales categorías de ingreso del mes
+El resumen DEBE (MUST) listar también las N categorías con mayor ingreso neto del mes (mismo N, orden descendente y desempate por nombre que el top de gasto), en la moneda de reporte, en la misma respuesta.
+Trace: FR-REPORTING-004 · Priority: Must
+
+#### Scenario: Salario y freelance
+- **CUANDO** el mes tiene Salario 8000.00 BOB y Freelance 1500.00 BOB de ingresos y Supermercado 1200.00 BOB de gasto
+- **ENTONCES** el top de ingresos lista Salario 8000.00 BOB y Freelance 1500.00 BOB en ese orden y el top de gastos solo Supermercado
+
+### Requirement: Monto anterior por categoría del top
+Cada categoría de los tops de gasto e ingreso DEBE (MUST) traer su neto en el periodo de comparación (cero si no tuvo flujos), convertido con la tasa de la fecha de cada flujo; sin comparación, o si algún monto anterior queda sin tasa, el monto anterior DEBE (MUST) informarse como no disponible (nunca inventado).
+Trace: FR-REPORTING-004 · Priority: Must
+
+#### Scenario: Supermercado contra el mismo tramo de agosto
+- **CUANDO** el 2026-09-15 Supermercado suma 1305.00 BOB del 1 al 15 de septiembre y 1200.00 BOB del 1 al 15 de agosto, y Fees 5.00 BOB solo en septiembre
+- **ENTONCES** Supermercado trae 1200.00 BOB como monto anterior y Fees 0.00 BOB
+
 ### Requirement: Comparación básica con el mes anterior
 El resumen DEBE (MUST) comparar ingresos, gastos y ahorro con el mes anterior en valor absoluto y porcentaje; para el mes en curso la comparación DEBE (MUST) ser a la misma fecha (días 1 a N de ambos meses); si el valor anterior es cero, la variación porcentual se informa como "nuevo".
 Trace: FR-REPORTING-004, FR-REPORTING-018 · Priority: Must

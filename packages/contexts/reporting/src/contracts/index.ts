@@ -100,6 +100,20 @@ export interface HomeQuestionStatusDto {
   readonly actionHint: string | null;
 }
 
+/** Línea de un top de categorías (gasto o ingreso) del resumen. */
+export interface TopCategoryDto {
+  readonly categoryId: string;
+  readonly name: string;
+  /** Neto del periodo en la moneda de reporte (puede ser negativo). */
+  readonly amount: MoneyDto;
+  readonly complete: boolean;
+  /**
+   * Neto de la misma categoría en el periodo de comparación (cero si no tuvo flujos); `null` sin comparación o si
+   * algún monto anterior quedó sin tasa.
+   */
+  readonly previousAmount: MoneyDto | null;
+}
+
 /** `ReportSummary` del contrato (`GET /workspaces/{workspaceId}/reports/summary`). */
 export interface ReportSummaryDto {
   readonly period: { readonly from: string; readonly to: string };
@@ -113,12 +127,9 @@ export interface ReportSummaryDto {
     readonly savings: MoneyVariationDto;
   } | null;
   readonly accounts: readonly AccountBalanceLineDto[];
-  readonly topExpenseCategories: readonly {
-    readonly categoryId: string;
-    readonly name: string;
-    readonly amount: MoneyDto;
-    readonly complete: boolean;
-  }[];
+  readonly topExpenseCategories: readonly TopCategoryDto[];
+  /** Principales categorías de ingreso del periodo (FR-REPORTING-004). */
+  readonly topIncomeCategories: readonly TopCategoryDto[];
   readonly netWorth: NetWorthBreakdownDto;
   readonly questions: readonly HomeQuestionStatusDto[];
   readonly meta: {
