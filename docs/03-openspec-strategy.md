@@ -113,6 +113,15 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 
 Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29, y el 2b `add-event-outbox`, agregado el 2026-10-03, docs/31 D30; los 11 `add-lifecycle-timeline` y 12 `add-demo-data` se agregaron el 2026-10-03 por decisión del owner, docs/31 D37 y D36) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
 
+**Phase 2 — periodos y cierre (borrador del 2026-10-05, pendiente de consolidar con los demás changes de Phase 2):**
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 13 | `add-financial-periods` | `planning/financial-periods` (periodos mensuales según el día de inicio del mes financiero, creación automática con anticipación, ciclo `draft/active/closed/reopened`, activación por zona horaria del workspace, guard de planificación para el plan mensual) | 2 |
+| 13b | `add-month-closing` | `planning/month-closing` (checklist, cierre atómico con bloqueo del ledger, snapshot inmutable y versionado, reapertura por el OWNER, reporte y exportación) + `ledger/journal-posting` (bloqueo por rango del periodo financiero, ADR-0028 propuesto) + `audit/lifecycle-timeline` (recorrido del periodo). Se aplica **después** de la reconciliación completa de Phase 2 (`transactions/reconciliation`), de la que depende el ítem de cuentas conciliadas y el criterio de salida | 2 |
+
+Los presupuestos y templates (`planning/budgets`, `planning/budget-templates`) cuelgan su plan mensual de los periodos de `add-financial-periods`, por lo que se aplican después de él; el orden definitivo de todos los changes de Phase 2 lo fija el lead al consolidar.
+
 ## 8. Integración con CI y herramientas
 
 - CLI fijada como devDependency raíz (`@fission-ai/openspec@1.14.0`) al crear el skeleton; actualizaciones solo vía change dedicado (riesgo de evolución rápida del CLI v1.x).
