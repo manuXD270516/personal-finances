@@ -304,7 +304,7 @@ describe('If-Match / ETag e Idempotency-Key sobre /transactions', () => {
     expect(final.body['amount']).toEqual(winners[0]!.body['amount']);
   });
 
-  it('[TC-TRANSACTIONS-IDEMPOTENCY-001] repetir POST /transactions con la misma clave devuelve el original sin duplicar', async () => {
+  it('[TC-TRANSACTIONS-IDEMPOTENCY-001] [TC-TRANSACTIONS-IDEMPOTENT-001] repetir POST /transactions con la misma clave devuelve el original sin duplicar; con otro payload ⇒ 422 IDEMPOTENCY_KEY_REUSED', async () => {
     const owner = await user(`kc-txn-idem-${randomUUID()}`);
     const bank = await account(owner, 'Bank A', 'BOB', '1000.00');
     const cats = await get(owner, '/categories?kind=EXPENSE');
@@ -353,6 +353,35 @@ describe('If-Match / ETag e Idempotency-Key sobre /transactions', () => {
       'transactions.TransactionCreated',
       'transactions.TransactionPosted',
     ]);
+    expect(await balanceOf(owner, bank)).toBe('925.00');
+
+    // Misma clave con OTRO payload (76.00): 422 IDEMPOTENCY_KEY_REUSED (RFC 9457) y nada cambia.
+    const reused = await post(
+      owner,
+      '/transactions',
+      {
+        ...body,
+        amount: { amount: '76.00', currency: 'BOB' },
+        splits: [{ amount: { amount: '76.00', currency: 'BOB' }, categoryId: transport }],
+      },
+      { 'idempotency-key': key },
+    );
+    expect(reused.status, JSON.stringify(reused.body)).toBe(422);
+    expect(reused.headers.get('content-type')).toContain('application/problem+json');
+    expect(reused.body['code']).toBe('IDEMPOTENCY_KEY_REUSED');
+    const list = await get(owner, '/transactions?limit=50');
+    expect((list.body['data'] as { id: string }[]).map((t) => t.id)).toEqual([id]);
+    const entries = await asApp(owner, async (c) =>
+      Number(
+        (
+          await c.query<{ n: string }>(
+            'SELECT count(*) AS n FROM ledger.journal_entry WHERE source_id = $1',
+            [id],
+          )
+        ).rows[0]!.n,
+      ),
+    );
+    expect(entries).toBe(1);
     expect(await balanceOf(owner, bank)).toBe('925.00');
   });
 
@@ -647,6 +676,80 @@ describe('Transferencias y advertencias', () => {
     expect(second['warnings']).toEqual([
       { code: 'POSSIBLE_DUPLICATE', transactionIds: [first.id], detail: expect.any(String) },
     ]);
+  });
+});
+
+describe('Medio de pago y categorías válidas de un split', () => {
+  it('[TC-TRANSACTIONS-PAYMETHOD-001] el medio de pago se persiste y filtra; QR y DEBIT_CARD producen asientos idénticos', async () => {
+    const owner = await user(`kc-txn-paymethod-${randomUUID()}`);
+    const bank = await account(owner, 'Bank A', 'BOB', '1000.00');
+    const cats = await get(owner, '/categories?kind=EXPENSE');
+    const groceries = (cats.body['data'] as { id: string; systemCode: string | null }[]).find(
+      (c) => c.systemCode === null,
+    )!.id;
+    const split = [{ amount: { amount: '45.90', currency: 'BOB' }, categoryId: groceries }];
+    const qr = await expense(owner, bank, '45.90', { paymentMethod: 'QR', splits: split });
+    const debit = await expense(owner, bank, '45.90', { paymentMethod: 'DEBIT_CARD', splits: split });
+    expect([qr['paymentMethod'], debit['paymentMethod']]).toEqual(['QR', 'DEBIT_CARD']);
+    expect((await get(owner, `/transactions/${qr.id}`)).body['paymentMethod']).toBe('QR');
+    expect(await balanceOf(owner, bank)).toBe('908.20');
+    const filtered = await get(owner, '/transactions?paymentMethod=QR&limit=50');
+    expect(filtered.status, JSON.stringify(filtered.body)).toBe(200);
+    expect((filtered.body['data'] as { id: string }[]).map((t) => t.id)).toEqual([qr.id]);
+    // INV-033: el medio de pago no altera el ledger (mismos postings: cuenta contable, monto y moneda).
+    const postingsOf = (id: string) =>
+      asApp(
+        owner,
+        async (c) =>
+          (
+            await c.query<{ code: string; amount: string; currency: string }>(
+              `SELECT la.code, p.amount::text AS amount, p.currency
+               FROM ledger.posting p
+               JOIN ledger.journal_entry e ON e.id = p.journal_entry_id
+               JOIN ledger.ledger_account la ON la.id = p.ledger_account_id
+              WHERE e.source_id = $1
+              ORDER BY la.code, p.amount`,
+              [id],
+            )
+          ).rows,
+      );
+    const a = await postingsOf(qr.id);
+    expect(a).toHaveLength(2);
+    expect(await postingsOf(debit.id)).toEqual(a);
+  });
+
+  it('[TC-TRANSACTIONS-SPLIT-006] un split con categoría archivada ⇒ 409 CATEGORY_ARCHIVED; con categoría de ingreso ⇒ 422 CATEGORY_KIND_MISMATCH; nada persiste', async () => {
+    const owner = await user(`kc-txn-split006-${randomUUID()}`);
+    const bank = await account(owner, 'Bank A', 'BOB', '1000.00');
+    const group = await post(owner, '/category-groups', { name: 'Hábitos', kind: 'EXPENSE' });
+    expect(group.status, JSON.stringify(group.body)).toBe(201);
+    const gym = await post(owner, '/categories', { groupId: group.body['id'], name: 'Old Gym' });
+    expect(gym.status, JSON.stringify(gym.body)).toBe(201);
+    const archived = await post(owner, `/categories/${String(gym.body['id'])}/archive`, undefined, {
+      'if-match': `"${String(gym.body['version'])}"`,
+    });
+    expect(archived.status, JSON.stringify(archived.body)).toBe(200);
+    const incomes = await get(owner, '/categories?kind=INCOME');
+    const salary = (incomes.body['data'] as { id: string; systemCode: string | null }[]).find(
+      (c) => c.systemCode === null,
+    )!.id;
+    const attempt = (categoryId: string) =>
+      post(owner, '/transactions', {
+        kind: 'EXPENSE',
+        transactionDate: '2026-03-10',
+        accountId: bank,
+        amount: { amount: '40.00', currency: 'BOB' },
+        splits: [{ amount: { amount: '40.00', currency: 'BOB' }, categoryId }],
+      });
+    const first = await attempt(gym.body['id'] as string);
+    expect(first.status, JSON.stringify(first.body)).toBe(409);
+    expect(first.body['code']).toBe('CATEGORY_ARCHIVED');
+    const second = await attempt(salary);
+    expect(second.status, JSON.stringify(second.body)).toBe(422);
+    expect(second.body['code']).toBe('CATEGORY_KIND_MISMATCH');
+    const list = await get(owner, '/transactions?limit=50');
+    expect(list.body['data']).toEqual([]);
+    expect(await balanceOf(owner, bank)).toBe('1000.00');
   });
 });
 

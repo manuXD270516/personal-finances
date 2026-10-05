@@ -264,13 +264,26 @@
       "caption": "{n, plural, one {A categoria com mais gasto líquido do mês} other {As # categorias com mais gasto líquido do mês}}",
       "emptyAction": "Registrar um gasto",
       "previous": "mês anterior: {amount}",
-      "comparing": "Comparando com o mês anterior…",
       "legendPrevious": "Marca: gasto nos mesmos dias do mês anterior",
       "trend": {
         "up": "mais que o mês anterior",
         "down": "menos que o mês anterior",
         "flat": "igual ao mês anterior",
         "new": "novo: sem gasto no mês anterior",
+        "unknown": "sem comparação com o mês anterior"
+      }
+    },
+    "topIncomeCategories": {
+      "title": "Principais fontes de renda",
+      "empty": "Sem receitas registradas neste mês.",
+      "caption": "{n, plural, one {A categoria com mais receita líquida do mês} other {As # categorias com mais receita líquida do mês}}",
+      "previous": "mês anterior: {amount}",
+      "legendPrevious": "Marca: receita nos mesmos dias do mês anterior",
+      "trend": {
+        "up": "mais que o mês anterior",
+        "down": "menos que o mês anterior",
+        "flat": "igual ao mês anterior",
+        "new": "novo: sem receita no mês anterior",
         "unknown": "sem comparação com o mês anterior"
       }
     },

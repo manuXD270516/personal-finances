@@ -49,7 +49,6 @@ export const ERROR_CATALOG = {
   LEDGER_SPLIT_REQUIRED: { status: 422, title: 'Posting must reference a split' },
   LEDGER_ENTRY_ALREADY_REVERSED: { status: 409, title: 'Journal entry already reversed' },
   LEDGER_ENTRY_NOT_REVERSIBLE: { status: 409, title: 'Journal entry cannot be reversed' },
-  LEDGER_IMMUTABLE: { status: 409, title: 'Ledger records are immutable' },
   PERIOD_CLOSED: { status: 409, title: 'Accounting period is closed' },
   // accounts
   ACCOUNT_ARCHIVED: { status: 409, title: 'Account is archived' },

@@ -3092,7 +3092,7 @@ paths:
     get:
       tags: [Reporting]
       operationId: getReportSummary
-      summary: Basic dashboard KPIs for a period (income, expenses, net, balances, top categories)
+      summary: Basic dashboard KPIs for a period (income, expenses, net, balances, top expense and income categories)
       description: |
         In Phase 1 the summary is computed from the source of truth (ledger + posted transactions), without read
         models. Figures are reported per currency (`byCurrency`) and consolidated in `reportingCurrency`: the
@@ -3554,7 +3554,7 @@ components:
         - LEDGER_SPLIT_REQUIRED             # 422
         - LEDGER_ENTRY_ALREADY_REVERSED     # 409
         - LEDGER_ENTRY_NOT_REVERSIBLE       # 409
-        - LEDGER_IMMUTABLE                  # 409 (DB immutability guard PF003, if surfaced)
+        # LEDGER_IMMUTABLE retirado (docs/31 D56): PF003 siempre es un bug y se responde 500 INTERNAL_ERROR (D19).
         - PERIOD_CLOSED                     # 409
         # accounts
         - ACCOUNT_ARCHIVED                  # 409
@@ -5575,6 +5575,36 @@ components:
                 $ref: '#/components/schemas/Money'
                 description: Net expense (expenses − refunds) in the reporting currency; may be negative
               complete: { type: boolean }
+              previousAmount:
+                description: |
+                  Net expense of the same category in the comparison period (`comparison.previousPeriod`), in the
+                  reporting currency, converted at the rate of each flow's date (zero if it had no flows there). Null
+                  when there is no comparison (compare=NONE) or when some previous amount could not be converted.
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
+        topIncomeCategories:
+          type: array
+          description: |
+            Top N income categories of the period (same N, ordering and tie-break as `topExpenseCategories`), by net
+            income in the reporting currency (FR-REPORTING-004).
+          items:
+            type: object
+            required: [categoryId, name, amount, complete]
+            properties:
+              categoryId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              amount:
+                $ref: '#/components/schemas/Money'
+                description: Net income in the reporting currency; may be negative
+              complete: { type: boolean }
+              previousAmount:
+                description: |
+                  Net income of the same category in the comparison period, in the reporting currency (zero if it
+                  had no flows there). Null when there is no comparison or some previous amount could not be converted.
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
         netWorth: { $ref: '#/components/schemas/NetWorthBreakdown' }
         questions:
           type: array

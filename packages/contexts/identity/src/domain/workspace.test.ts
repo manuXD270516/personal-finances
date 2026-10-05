@@ -1,7 +1,7 @@
-import { currency, isDomainError } from '@pf/shared-kernel';
+import { currency, isDomainError, Money } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import { LocaleTag } from './locale-tag.js';
-import { PERMISSIONS, ROLES, minimumRoleFor, roleAtLeast, roleGrants } from './role.js';
+import { PERMISSIONS, ROLES, isRole, minimumRoleFor, roleAtLeast, roleGrants } from './role.js';
 import { TimeZoneId } from './time-zone.js';
 import { User } from './user.js';
 import { Workspace } from './workspace.js';
@@ -207,5 +207,74 @@ describe('roleGrants (docs/12 §4)', () => {
       }
       expect(roleGrants(minimumRoleFor(p), p)).toBe(true);
     }
+  });
+});
+
+describe('VOs e invariantes restantes (cobertura de dominio ≥ 90 %, add-workspace-identity 4.1)', () => {
+  it('TimeZoneId acepta alias IANA que el motor resuelve y compara por valor', () => {
+    const alias = TimeZoneId.of('America/Buenos_Aires');
+    expect(alias.toString()).toBe('America/Buenos_Aires');
+    expect(alias.equals(TimeZoneId.of('America/Buenos_Aires'))).toBe(true);
+    expect(alias.equals(TimeZoneId.of('America/La_Paz'))).toBe(false);
+    expect(codeOf(() => TimeZoneId.of(42 as unknown as string))).toBe('INVALID_TIMEZONE');
+  });
+
+  it('LocaleTag rechaza etiquetas demasiado largas y se serializa como su valor canónico', () => {
+    expect(String(LocaleTag.of('pt-br'))).toBe('pt-BR');
+    expect(
+      codeOf(() => LocaleTag.of(`es-${'x'.repeat(8)}-${'y'.repeat(8)}-${'z'.repeat(8)}-${'w'.repeat(8)}`)),
+    ).toBe('VALIDATION_FAILED');
+  });
+
+  it('isRole y minimumRoleFor reflejan la tabla de docs/12 §4', () => {
+    expect(ROLES.every((r) => isRole(r))).toBe(true);
+    expect([isRole('ADMIN'), isRole(null), isRole(1)]).toEqual([false, false, false]);
+    expect(minimumRoleFor('finance:read')).toBe('VIEWER');
+    expect(minimumRoleFor('import:revert')).toBe('EDITOR');
+    expect(minimumRoleFor('audit:read')).toBe('OWNER');
+  });
+
+  it('User expone su identidad del IdP y rechaza preferencias demasiado grandes sin cambios', () => {
+    const user = User.restore({
+      id: OWNER,
+      idpIssuer: 'http://keycloak/realms/pfos',
+      idpSubject: 'kc-0001',
+      email: 'owner@demo.pfos.test',
+      displayName: 'Owner',
+      locale: LocaleTag.of('es-BO'),
+      timeZone: null,
+      status: 'DISABLED',
+      version: 1,
+    });
+    expect([user.idpIssuer, user.idpSubject, user.status, user.email]).toEqual([
+      'http://keycloak/realms/pfos',
+      'kc-0001',
+      'DISABLED',
+      'owner@demo.pfos.test',
+    ]);
+    expect(user.preferences).toEqual({});
+    expect(codeOf(() => user.updatePreferences({ preferences: { big: 'x'.repeat(20_000) } }))).toBe(
+      'VALIDATION_FAILED',
+    );
+    expect(user.preferences).toEqual({});
+    expect(user.version).toBe(1);
+  });
+
+  it('restore rechaza estados imposibles: reserva negativa y ARCHIVED/PURGED de un workspace real', () => {
+    const snap = personal().snapshot();
+    expect(personal().createdAt).toBeNull();
+    expect(
+      codeOf(() =>
+        Workspace.restore({
+          ...snap,
+          settings: { ...snap.settings, minimumLiquidityReserve: Money.parse('-1.00', BOB) },
+        }),
+      ),
+    ).toBe('AMOUNT_OUT_OF_RANGE');
+    expect(codeOf(() => Workspace.restore({ ...snap, status: 'ARCHIVED' }))).toBe('VALIDATION_FAILED');
+    expect(codeOf(() => Workspace.restore({ ...snap, status: 'PURGED' }))).toBe('VALIDATION_FAILED');
+    expect(Workspace.restore({ ...snap, createdAt: '2026-10-01T00:00:00Z' }).createdAt).toBe(
+      '2026-10-01T00:00:00Z',
+    );
   });
 });

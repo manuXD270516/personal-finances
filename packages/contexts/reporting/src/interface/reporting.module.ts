@@ -10,7 +10,12 @@ import type { NominalFlowQuery } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { DataVersionProjector } from '../application/data-version-projector.js';
 import type { WorkspaceSettingsPort } from '../application/ports/index.js';
-import { ReportSummaryQueries } from '../application/report-summary.queries.js';
+import {
+  DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
+  ReportSummaryQueries,
+} from '../application/report-summary.queries.js';
+
+export { DEFAULT_RATE_VALIDITY_WINDOW_DAYS };
 import { REPORTING_DATA_VERSION_CONSUMER, REPORTING_INVALIDATING_EVENTS } from '../contracts/index.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
 import { REPORT_SUMMARY_QUERIES, ReportingController } from './reporting-http.js';
@@ -26,15 +31,24 @@ export interface ReportingRuntimeOptions {
   readonly flows: NominalFlowQuery;
   readonly categories: CategoryCatalogQuery;
   readonly rates: FxValuationPort;
+  /**
+   * Ventana de vigencia (días) de las tasas de valoración y de referencia (`REPORTING_RATE_VALIDITY_WINDOW`, docs/31
+   * D53). La composición entrega el MISMO valor a FX (`createFxRuntime({ windowDays })`).
+   */
+  readonly rateValidityWindowDays?: number;
 }
 
 export interface ReportingRuntime {
   readonly summary: ReportSummaryQueries;
+  /** Ventana de vigencia efectiva (días). */
+  readonly rateValidityWindowDays: number;
 }
 
 /** Composición de REPORTING (solo lectura) sobre PostgreSQL. */
 export function createReportingRuntime(options: ReportingRuntimeOptions): ReportingRuntime {
+  const rateValidityWindowDays = options.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
   return {
+    rateValidityWindowDays,
     summary: new ReportSummaryQueries({
       uow: new PgReportingUnitOfWork(options.pool),
       workspaces: options.workspaces,
@@ -45,6 +59,7 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
       rates: options.rates,
       versions: new PgDataVersionStore(),
       clock: options.clock,
+      rateValidityWindowDays,
     }),
   };
 }

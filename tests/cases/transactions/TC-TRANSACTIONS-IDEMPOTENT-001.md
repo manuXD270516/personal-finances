@@ -17,9 +17,10 @@ invariants:
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/transactions.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags:
@@ -65,7 +66,7 @@ expected_result:
 - 'Payload distinto con la misma clave: 422 con code IDEMPOTENCY_KEY_REUSED (RFC 9457)'
 - Tras el 422 siguen existiendo una sola transacción y un solo asiento, y el saldo sigue en 925.00 BOB
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-05
 ---
 
 # TC-TRANSACTIONS-IDEMPOTENT-001 — Reenviar la creación con la misma Idempotency-Key devuelve el mismo resultado y con payload distinto se rechaza con 422

@@ -52,7 +52,10 @@ export interface FxRuntimeOptions {
   readonly outbox: OutboxPort;
   /** Moneda de reporte y zona horaria del workspace (IDENTITY, vía composition root). */
   readonly workspaces: WorkspaceSettingsPort;
-  /** Ventana de vigencia de la resolución *as-of* en días (7 por defecto). */
+  /**
+   * Ventana de vigencia de la resolución *as-of* en días (7 por defecto). Es un ajuste de REPORTING (docs/31 D53):
+   * la composición lo lee de `REPORTING_RATE_VALIDITY_WINDOW` y lo entrega aquí; FX no tiene variable propia.
+   */
   readonly windowDays?: number;
   /** Configuración `FX_*` validada (roles, obsolescencia, umbral de anomalía); por defecto la de design.md. */
   readonly providers?: FxProviderSettings;
@@ -85,10 +88,11 @@ function valuationPort(queries: FxQueries): FxValuationPort {
     get windowDays() {
       return queries.windowDays;
     },
-    async resolveValuationRates({ workspaceId, requests }) {
+    async resolveValuationRates({ workspaceId, requests, windowDays }) {
       const found = await queries.resolveValuationRates(
         workspaceId,
         requests.map((r) => ({ base: r.base, quote: r.quote, at: Instant.parse(r.at) })),
+        windowDays,
       );
       return found.map((r) => (r ? { resolved: toResolvedRateDto(r), exact: exactRate(r) } : null));
     },

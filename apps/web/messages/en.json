@@ -264,13 +264,26 @@
       "caption": "{n, plural, one {The category with the highest net spending this month} other {The # categories with the highest net spending this month}}",
       "emptyAction": "Record an expense",
       "previous": "last month: {amount}",
-      "comparing": "Comparing with last month…",
       "legendPrevious": "Marker: spending in the same days of last month",
       "trend": {
         "up": "more than last month",
         "down": "less than last month",
         "flat": "same as last month",
         "new": "new: no spending last month",
+        "unknown": "no comparison with last month"
+      }
+    },
+    "topIncomeCategories": {
+      "title": "Top income sources",
+      "empty": "No income recorded this month.",
+      "caption": "{n, plural, one {The category with the highest net income this month} other {The # categories with the highest net income this month}}",
+      "previous": "last month: {amount}",
+      "legendPrevious": "Marker: income in the same days of last month",
+      "trend": {
+        "up": "more than last month",
+        "down": "less than last month",
+        "flat": "same as last month",
+        "new": "new: no income last month",
         "unknown": "no comparison with last month"
       }
     },

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createTranslator } from 'next-intl';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { compareCategory, previousCategoriesQuery, type PreviousCategories } from './category-comparison';
+import { compareCategory, hasCategoryComparison } from './category-comparison';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import { EMPTY_SUMMARY, PARALLEL_RATE, SUMMARY } from './fixtures';
 import { formatAge, formatSignedDecimal } from './format';
@@ -20,8 +20,7 @@ const ctx: FormatContext = {
   has: (key) => tr.has(key as never),
 };
 
-const render = (summary: ReportSummary, previousCategories?: PreviousCategories) =>
-  renderToStaticMarkup(<DashboardView summary={summary} {...ctx} previousCategories={previousCategories} />);
+const render = (summary: ReportSummary) => renderToStaticMarkup(<DashboardView summary={summary} {...ctx} />);
 const renderBadge = (rate: ResolvedRate) => renderToStaticMarkup(<RateSourceBadge rate={rate} ctx={ctx} />);
 /** HTML de la primera sección con ese `data-testid` (las secciones del Home no se anidan). */
 const section = (html: string, testId: string): string => {
@@ -37,22 +36,20 @@ const categoryRow = (html: string, name: string): string => {
   if (!row) throw new Error(`sin categoría ${name}`);
   return row;
 };
-const cat = (id: string, name: string, amount: string): TopCategory => ({
+const cat = (id: string, name: string, amount: string, previous?: string | null): TopCategory => ({
   categoryId: `0190a000-0000-7000-8000-0000000000${id}`,
   name,
   amount: { amount, currency: 'BOB' },
   complete: true,
+  ...(previous === undefined
+    ? {}
+    : { previousAmount: previous === null ? null : { amount: previous, currency: 'BOB' } }),
 });
-/** Mismo tramo de agosto: Supermercado 1000.00, Restaurantes 150.00, Fees 5.00. */
-const AUGUST: PreviousCategories = {
-  status: 'ready',
-  saturated: false,
-  items: [
-    cat('d1', 'Supermercado', '1000.00'),
-    cat('d2', 'Restaurantes', '150.00'),
-    cat('d3', 'Fees', '5.00'),
-  ],
-};
+/** El fixture con el top de gasto reemplazado. */
+const withExpenseTop = (...items: TopCategory[]): ReportSummary => ({
+  ...SUMMARY,
+  topExpenseCategories: items,
+});
 
 describe('Home: dinero disponible y tasa usada (add-basic-dashboard, tarea 6.1)', () => {
   it('Q1 muestra el consolidado, los totales líquidos por moneda y la tasa USDT/BOB PARALLEL con su fuente', () => {
@@ -258,6 +255,7 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
       'h3 ¿Cuánto gasté?',
       'h3 ¿Cuánto ahorré?',
       'h3 Principales categorías de gasto',
+      'h3 Principales fuentes de ingreso',
       'h2 Patrimonio y cuentas',
       'h3 Patrimonio neto',
       'h3 Saldos por cuenta',
@@ -278,20 +276,20 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
   });
 
   it('[TC-REPORTING-KPI-006] categorías en el orden de la API, numeradas, con barras decorativas proporcionales a la mayor', () => {
-    const top = section(render(SUMMARY), 'top-categories');
+    const top = section(render({ ...SUMMARY, comparison: null }), 'top-categories');
     expect(text(top)).toContain('Las 3 categorías con más gasto neto del mes');
     expect(top).toContain('<ol class="pf-home-cats">');
     const sup = categoryRow(top, 'Supermercado');
     expect(sup).toContain('<div class="pf-home-meter" aria-hidden="true">');
     expect(sup).toContain('width:100.0%');
     expect(categoryRow(top, 'Restaurantes')).toContain('width:8.3%');
-    // Sin comparación disponible no se inventan variaciones.
+    // Sin comparación no se inventan variaciones (aunque la respuesta traiga montos anteriores).
     expect(top).toContain('data-comparison="unavailable"');
     expect(top).not.toContain('top-category-trend');
   });
 
-  it('[TC-REPORTING-KPI-007] cada categoría muestra la variación contra el mismo tramo del mes anterior con glifo, signo y texto', () => {
-    const top = section(render(SUMMARY, AUGUST), 'top-categories');
+  it('[TC-REPORTING-KPI-007] [TC-REPORTING-KPI-010] cada categoría muestra la variación contra el mismo tramo del mes anterior (de la misma respuesta) con glifo, signo y texto', () => {
+    const top = section(render(SUMMARY), 'top-categories');
     expect(top).toContain('data-comparison="ready"');
     const sup = categoryRow(top, 'Supermercado');
     expect(sup).toContain('data-trend="up"');
@@ -310,51 +308,79 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
     expect(text(top)).toContain('Marca: gasto en los mismos días del mes anterior');
   });
 
-  it('sin gasto el mes anterior la categoría es "nueva"; si el top anterior llegó al máximo y no aparece, no se afirma nada', () => {
-    const only: PreviousCategories = {
-      status: 'ready',
-      saturated: false,
-      items: [cat('d1', 'Supermercado', '1200.00')],
-    };
-    const res = categoryRow(section(render(SUMMARY, only), 'top-categories'), 'Restaurantes');
+  it('[TC-REPORTING-KPI-010] monto anterior cero = categoría "nueva"; monto anterior no disponible (null) = no se afirma nada', () => {
+    const html = render(
+      withExpenseTop(
+        cat('d1', 'Supermercado', '1200.00', '1200.00'),
+        cat('d2', 'Restaurantes', '100.00', '0.00'),
+        cat('d3', 'Viajes', '80.00', null),
+      ),
+    );
+    const res = categoryRow(section(html, 'top-categories'), 'Restaurantes');
     expect(res).toContain('data-trend="new"');
     expect(text(res)).toContain('+100,00 BOB nuevo: sin gasto el mes anterior');
     expect(res).not.toContain('data-testid="top-category-previous"');
-    const saturated = categoryRow(
-      section(render(SUMMARY, { ...only, saturated: true }), 'top-categories'),
-      'Restaurantes',
-    );
-    expect(saturated).toContain('data-trend="unknown"');
-    expect(text(saturated)).toContain('sin comparación con el mes anterior');
+    const viajes = categoryRow(section(html, 'top-categories'), 'Viajes');
+    expect(viajes).toContain('data-trend="unknown"');
+    expect(text(viajes)).toContain('sin comparación con el mes anterior');
+    expect(viajes).not.toContain('top-category-previous-marker');
   });
 
-  it('mientras llega la comparación cada categoría lo indica, sin cifras inventadas', () => {
-    const top = section(render(SUMMARY, { status: 'loading' }), 'top-categories');
-    expect(top.match(/data-testid="top-category-trend-loading"/g)).toHaveLength(3);
-    expect(text(top)).toContain('Comparando con el mes anterior…');
+  it('[TC-REPORTING-KPI-009] top de ingresos junto al de gastos: barras de ingreso y "más ingreso" en tono positivo', () => {
+    const html = render(SUMMARY);
+    const income = section(html, 'top-income-categories');
+    expect(income).toContain('aria-labelledby="top-income-categories-title"');
+    expect(text(income)).toContain('La categoría con más ingreso neto del mes');
+    const sal = categoryRow(income, 'Salario');
+    expect(sal).toContain('data-kind="income"');
+    expect(sal).toContain('data-trend="up"');
+    expect(sal).toContain('data-tone="ok"');
+    expect(text(sal)).toContain('+500,00 BOB más que el mes anterior · mes anterior: 7.500,00 BOB');
+    // Menos ingreso que el mes anterior = atención (texto + glifo, no solo color).
+    const less = render({ ...SUMMARY, topIncomeCategories: [cat('c1', 'Salario', '7000.00', '7500.00')] });
+    const down = categoryRow(section(less, 'top-income-categories'), 'Salario');
+    expect(down).toContain('data-tone="warning"');
+    expect(text(down)).toContain('-500,00 BOB menos que el mes anterior');
+    // Los dos tops van juntos en la columna de categorías de "Este mes", gasto primero.
+    expect(html).toContain('<div class="pf-home-tops">');
+    expect(html.indexOf('data-testid="top-categories"')).toBeLessThan(
+      html.indexOf('data-testid="top-income-categories"'),
+    );
+  });
+
+  it('sin ingresos en el mes el top de ingresos muestra su estado vacío; una respuesta sin el campo no lo muestra', () => {
+    const empty = section(render({ ...SUMMARY, topIncomeCategories: [] }), 'top-income-categories');
+    expect(text(empty)).toContain('Sin ingresos registrados este mes.');
+    expect(empty).not.toContain('register-expense-action');
+    const { topIncomeCategories: _omit, ...legacy } = SUMMARY;
+    expect(render(legacy)).not.toContain('data-testid="top-income-categories"');
   });
 
   it('la resta por categoría es exacta (bigint) y un neto negativo no tiene barra', () => {
-    const cmp = compareCategory(cat('e1', 'Grande', '12345678901234567.89'), {
-      status: 'ready',
-      saturated: false,
-      items: [cat('e1', 'Grande', '0.01')],
-    });
-    expect(cmp).toEqual({
+    expect(compareCategory(cat('e1', 'Grande', '12345678901234567.89', '0.01'))).toEqual({
       trend: 'up',
       previous: { amount: '0.01', currency: 'BOB' },
       delta: { amount: '12345678901234567.88', currency: 'BOB' },
     });
-    const html = render({ ...SUMMARY, topExpenseCategories: [cat('d4', 'Reembolsado', '-30.00')] });
+    // Moneda distinta (no debería ocurrir) o sin monto anterior: sin variación.
+    expect(
+      compareCategory({ ...cat('e1', 'X', '1.00'), previousAmount: { amount: '1.00', currency: 'USD' } })
+        .trend,
+    ).toBe('unknown');
+    expect(compareCategory(cat('e1', 'X', '1.00')).trend).toBe('unknown');
+    const html = render(withExpenseTop(cat('d4', 'Reembolsado', '-30.00')));
     expect(categoryRow(section(html, 'top-categories'), 'Reembolsado')).toContain('width:0.0%');
   });
 
-  it('la consulta del periodo anterior usa el tramo de la comparación, la moneda de reporte y el máximo del contrato', () => {
-    expect(previousCategoriesQuery(SUMMARY)).toBe(
-      'dateFrom=2026-08-01&dateTo=2026-08-30&reportingCurrency=BOB&compare=NONE&topCategories=20',
-    );
-    expect(previousCategoriesQuery({ ...SUMMARY, comparison: null })).toBeUndefined();
-    expect(previousCategoriesQuery({ ...SUMMARY, topExpenseCategories: [] })).toBeUndefined();
+  it('la variación por categoría sale de la misma respuesta: solo con comparación y Q7 disponible', () => {
+    expect(hasCategoryComparison(SUMMARY)).toBe(true);
+    expect(hasCategoryComparison({ ...SUMMARY, comparison: null })).toBe(false);
+    expect(
+      hasCategoryComparison({
+        ...SUMMARY,
+        questions: SUMMARY.questions.map((q) => (q.question === 'Q7' ? { ...q, status: 'NO_DATA' } : q)),
+      }),
+    ).toBe(false);
   });
 
   it('con cuentas y sin gastos, el top muestra un estado vacío con la acción de registrar un gasto', () => {

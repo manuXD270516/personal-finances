@@ -1,4 +1,4 @@
-import { DomainError } from '@pf/shared-kernel';
+import { DomainError, Instant } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import { FxQueries } from './fx.queries.js';
 import { FxService, type RecordManualRateCommand } from './fx.service.js';
@@ -204,6 +204,21 @@ describe('Preferencias y valoración (fx/market-rates)', () => {
         }),
       ),
     ).toBe('FX_RATE_NOT_FOUND');
+  });
+
+  it('[TC-FX-RATE-003] la ventana de la valoración la fija Reporting (D53): la del llamador o la compuesta, nunca 1:1', async () => {
+    const { service, queries, deps } = setup();
+    await service.recordManualRate(p2p({ value: '6.96', rateType: 'PARALLEL' }));
+    // 11 días después de la tasa (2026-09-29T19:00Z).
+    const req = [{ base: 'USDT', quote: 'BOB', at: Instant.parse('2026-10-10T19:00:00Z') }];
+    expect(await queries.resolveValuationRates(WS, req)).toEqual([null]);
+    const [found] = await queries.resolveValuationRates(WS, req, 14);
+    expect(found?.rate.value.toFixed()).toBe('6.96');
+    expect(await codeOf(queries.resolveValuationRates(WS, req, 0))).toBe('VALIDATION_FAILED');
+    // Compuesta con la ventana de Reporting (createFxRuntime({ windowDays })): misma resolución sin pasarla.
+    const composed = new FxQueries({ ...deps, windowDays: 14 });
+    expect(composed.windowDays).toBe(14);
+    expect((await composed.resolveValuationRates(WS, req))[0]?.rate.value.toFixed()).toBe('6.96');
   });
 
   it('[TC-FX-PRICING-006] referencia para una conversión: explícita por id o resuelta con el tipo preferido, nunca cruzada', async () => {

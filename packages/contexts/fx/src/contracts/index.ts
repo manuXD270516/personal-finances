@@ -154,6 +154,11 @@ export interface FxValuationPort {
   resolveValuationRates(input: {
     readonly workspaceId: string;
     readonly requests: readonly { readonly base: string; readonly quote: string; readonly at: string }[];
+    /**
+     * Ventana de vigencia (días) que fija el llamador: es un ajuste de REPORTING (docs/31 D53,
+     * `REPORTING_RATE_VALIDITY_WINDOW`). Sin ella, la ventana con la que se compuso FX (`windowDays`).
+     */
+    readonly windowDays?: number;
   }): Promise<readonly (ValuationRateDto | null)[]>;
   /** Monedas habilitadas del workspace con su escala canónica. */
   enabledCurrencies(workspaceId: string): Promise<readonly CurrencyInfoDto[]>;
@@ -162,7 +167,10 @@ export interface FxValuationPort {
    * no habilitada (p. ej. una cuenta BTC sin postings) sale del catálogo, nunca de un valor de respaldo.
    */
   workspaceCurrencies(workspaceId: string): Promise<readonly WorkspaceCurrencyDto[]>;
-  /** Ventana de vigencia en días de la resolución *as-of* (7 por defecto). */
+  /**
+   * Ventana de vigencia en días con la que se compuso FX: la entrega la composición desde el ajuste de REPORTING
+   * (docs/31 D53); 7 por defecto.
+   */
   readonly windowDays: number;
 }
 

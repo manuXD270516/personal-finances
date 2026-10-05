@@ -45,7 +45,10 @@ export function toReferenceDto(stored: StoredRate): ReferenceRateDto {
 export class FxQueries implements FxConversionPricingPort {
   constructor(private readonly deps: FxDeps) {}
 
-  /** Ventana de vigencia (días) de la resolución *as-of*. */
+  /**
+   * Ventana de vigencia (días) de la resolución *as-of*. El valor es un ajuste de REPORTING (docs/31 D53,
+   * `REPORTING_RATE_VALIDITY_WINDOW`) que la composición inyecta en `FxDeps.windowDays`; FX solo lo aplica.
+   */
   get windowDays(): number {
     return this.deps.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
   }
@@ -159,7 +162,14 @@ export class FxQueries implements FxConversionPricingPort {
   resolveValuationRates(
     workspaceId: string,
     requests: readonly { readonly base: string; readonly quote: string; readonly at: Instant }[],
+    windowDaysOverride?: number,
   ): Promise<(ResolvedRate | null)[]> {
+    const windowDays = windowDaysOverride ?? this.windowDays;
+    if (!Number.isInteger(windowDays) || windowDays < 1) {
+      return Promise.reject(
+        new DomainError('VALIDATION_FAILED', 'windowDays must be a positive integer').at('/windowDays'),
+      );
+    }
     return this.deps.uow.run(workspaceId, async () => {
       if (requests.length === 0) return [];
       const defs = new Map<string, Currency | null>();
@@ -174,7 +184,7 @@ export class FxQueries implements FxConversionPricingPort {
       }
       const codes = [...defs.entries()].filter(([, c]) => c !== null).map(([code]) => code);
       const times = requests.map((r) => r.at.epochMillis);
-      const from = Instant.ofEpochMillis(Math.min(...times) - this.windowDays * DAY_MS);
+      const from = Instant.ofEpochMillis(Math.min(...times) - windowDays * DAY_MS);
       const to = Instant.ofEpochMillis(Math.max(...times));
       const candidates = await this.deps.rates.candidates(workspaceId, codes, from, to);
       const { preferences } = await this.deps.preferences.get(workspaceId);
@@ -190,7 +200,7 @@ export class FxQueries implements FxConversionPricingPort {
           quote,
           at: r.at,
           preferenceOf,
-          windowDays: this.windowDays,
+          windowDays,
           allowCross: true,
           pivot,
         });

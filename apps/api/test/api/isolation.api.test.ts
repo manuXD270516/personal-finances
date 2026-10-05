@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { ApiContract, type ContractOperation } from '@pf/platform/api';
 import { FixedClock, Instant } from '@pf/shared-kernel';
+import fc from 'fast-check';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { resolveContractPath } from '../../src/api/api-conventions.js';
@@ -422,6 +423,35 @@ describe('[TC-SECURITY-ISOLATION-001] un recurso de otro workspace es indistingu
     expect(exercised).toBeGreaterThan(30);
     expect(await w2Snapshot()).toBe(before);
   });
+
+  it('propiedad: operación aleatoria × actor × id ajeno de W2 (de cualquier tipo) ⇒ nunca 2xx ni datos de W2', async () => {
+    // Operaciones con ruta implementada (un id inexistente responde con código de problema).
+    const implemented: ContractOperation[] = [];
+    for (const op of byId) {
+      const probe = await invoke(op, owner, pathFor(op, w1, randomUUID()));
+      if (!(probe.status === 404 && probe.body['code'] === undefined)) implemented.push(op);
+    }
+    expect(implemented.length).toBeGreaterThan(30);
+    const foreignIds = [...Object.values(w2Ids).map((r) => r.id), w2Conversion.id, w2Wallet, w2Cash, w2];
+    const before = await w2Snapshot();
+    // 60 corridas por PR (semilla fija); `NIGHTLY=1` → 600 con semilla aleatoria (fast-check la imprime al fallar).
+    const nightly = Boolean(process.env['NIGHTLY']);
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom(...implemented),
+        fc.constantFrom(owner, editor),
+        fc.constantFrom(...foreignIds),
+        async (op, actor, foreignId) => {
+          const r = await invoke(op, actor, pathFor(op, w1, foreignId));
+          const ctx = `${op.operationId} ${actor === owner ? 'owner' : 'editor'} ${foreignId}`;
+          expect(r.status >= 200 && r.status < 300, `${ctx}: ${r.status}`).toBe(false);
+          expect(leaks(r), ctx).toEqual([]);
+        },
+      ),
+      { numRuns: nightly ? 600 : 60, ...(nightly ? {} : { seed: 20261005 }) },
+    );
+    expect(await w2Snapshot()).toBe(before);
+  }, 300_000);
 
   it('toda operación de colección que recibe ids en el cuerpo rechaza los de W2 igual que uno inexistente', async () => {
     const before = await w2Snapshot();

@@ -37,7 +37,11 @@ export type FxRateSource = (typeof FX_RATE_SOURCES)[number];
 export const CURRENCY_KINDS = ['FIAT', 'CRYPTO', 'COMMODITY', 'CUSTOM'] as const;
 export type CurrencyKind = (typeof CURRENCY_KINDS)[number];
 
-/** Ventana de vigencia por defecto de la resolución *as-of* (FR-FX-004; design.md pregunta abierta: se modela en FX). */
+/**
+ * Respaldo técnico de la ventana de vigencia de la resolución *as-of* (FR-FX-004). El valor es un ajuste de REPORTING
+ * (docs/31 D53, `REPORTING_RATE_VALIDITY_WINDOW`) que la composición inyecta (`FxDeps.windowDays`); esto solo aplica si
+ * FX se compone sin él (tests, provisión de la seed).
+ */
 export const DEFAULT_RATE_WINDOW_DAYS = 7;
 /**
  * Tipo de tasa de un par SIN preferencia (decisión del owner 2026-10-05, docs/31 D48): `PARALLEL`, el mismo que se

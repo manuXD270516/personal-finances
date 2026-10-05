@@ -560,6 +560,21 @@ export const VARIABLES = {
     optional: true,
   }),
 
+  // ── REPORTING (docs/31 D53: la ventana de vigencia es un ajuste de Reporting, no de FX) ──
+  REPORTING_RATE_VALIDITY_WINDOW: variable(
+    z
+      .string()
+      .regex(/^\d+d$/, 'duración en días (`7d`)')
+      .transform((v) => Number(v.slice(0, -1)))
+      .refine((days) => days >= 1 && days <= 90, 'entre 1d y 90d'),
+    {
+      group: 'Reporting',
+      description:
+        'Ventana de vigencia (días, `1d`–`90d`) de las tasas de valoración y de referencia: una tasa más antigua que el instante valorado menos esta ventana no se usa (el monto queda sin convertir, nunca 1:1). La define Reporting (docs/31 D53) y la composición de la API la entrega a FX, que resuelve con ella la valoración del Home, el equivalente de cuentas y la tasa de referencia de las conversiones; se informa en `meta.rateWindowDays` del resumen.',
+      default: '7d',
+    },
+  ),
+
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
     group: 'OpenTelemetry',
@@ -654,6 +669,7 @@ export const APP_VARIABLES = {
     'OIDC_JWKS_FALLBACK_MAX_AGE',
     'DEMO_DATA_ENABLED',
     ...FX_PROVIDERS,
+    'REPORTING_RATE_VALIDITY_WINDOW',
   ],
   // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
   worker: [

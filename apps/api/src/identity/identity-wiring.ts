@@ -37,7 +37,11 @@ import { demoJobsPort } from '../demo/demo-jobs-port.js';
 import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
-import { createReportingRuntime, ReportingModule } from '@pf/reporting/interface/reporting.module';
+import {
+  createReportingRuntime,
+  DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
+  ReportingModule,
+} from '@pf/reporting/interface/reporting.module';
 import {
   createTransactionsRuntime,
   TRANSACTION_LIFECYCLE_MACHINE,
@@ -184,10 +188,16 @@ export function financeRuntimes(input: {
   readonly lifecycleQuery: FinanceLifecycleQuery;
   readonly history: AuditHistoryQuery;
   readonly logger: Logger;
-  readonly config: Pick<ApiConfig, 'APP_TIMEZONE'> & Parameters<typeof parseFxProviderSettings>[0];
+  readonly config: Pick<ApiConfig, 'APP_TIMEZONE'> &
+    Partial<Pick<ApiConfig, 'REPORTING_RATE_VALIDITY_WINDOW'>> &
+    Parameters<typeof parseFxProviderSettings>[0];
   readonly outbox?: OutboxWriter;
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
+  // docs/31 D53: la ventana de vigencia de las tasas de valoración y de referencia es un ajuste de REPORTING
+  // (`REPORTING_RATE_VALIDITY_WINDOW`, 7 d por defecto); FX la recibe de aquí y la aplica sin cambiar su semántica.
+  const rateValidityWindowDays =
+    input.config.REPORTING_RATE_VALIDITY_WINDOW ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
   // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
   // La sugerencia `LAST_USED` lee el historial de TRANSACTIONS, que se compone después (depende del validador de
   // CLASSIFICATION): referencia diferida a su query pública.
@@ -213,6 +223,7 @@ export function financeRuntimes(input: {
     workspaces: identityWorkspaceSettings(input.pool),
     // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
     providers: parseFxProviderSettings(input.config),
+    windowDays: rateValidityWindowDays,
   });
   // ACCOUNTS (add-accounts-management).
   const { accounts, ledger } = accountsRuntime({
@@ -255,6 +266,7 @@ export function financeRuntimes(input: {
     flows: transactions.flows,
     categories: classification.categories,
     rates: fx.valuation,
+    rateValidityWindowDays,
   });
   return { classification, fx, accounts, ledger, transactions, reporting };
 }

@@ -15,6 +15,7 @@ import type {
   MoneyDto,
   MoneyVariationDto,
   ReportSummaryDto,
+  TopCategoryDto,
 } from '../contracts/index.js';
 import {
   ConsolidationService,
@@ -27,6 +28,8 @@ import {
   sumByCurrency,
   type CompareMode,
   type DateRange,
+  type CategoryAmount,
+  type CategoryTotal,
   type ExactRate,
   type NominalFlow,
   type ValuedAccount,
@@ -34,6 +37,8 @@ import {
 import type { ReportingDeps } from './ports/index.js';
 
 export const DEFAULT_TOP_CATEGORIES = 5;
+/** Ventana de vigencia por defecto de las tasas de valoración (días; docs/31 D53: ajuste de Reporting). */
+export const DEFAULT_RATE_VALIDITY_WINDOW_DAYS = 7;
 export const MAX_TOP_CATEGORIES = 20;
 
 export interface GetReportSummaryQuery {
@@ -177,8 +182,9 @@ export class ReportSummaryQueries {
         return { base: code, quote: reporting.code, at: atClose(date) };
       }),
     ];
+    const windowDays = deps.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
     const resolved = requests.length
-      ? await deps.rates.resolveValuationRates({ workspaceId: ws, requests })
+      ? await deps.rates.resolveValuationRates({ workspaceId: ws, requests, windowDays })
       : [];
     const stockRates = new Map<string, ValuationRateDto>();
     stockCodes.forEach((code, i) => {
@@ -228,18 +234,20 @@ export class ReportSummaryQueries {
     const income = flowTotals(inPeriod, 'INCOME');
     const expense = flowTotals(inPeriod, 'EXPENSE');
     const savings = income.total.minus(expense.total);
-    const categoryIds = [...new Set(inPeriod.filter((f) => f.nature === 'EXPENSE').map((f) => f.categoryId))];
+    const categoryIds = [...new Set(inPeriod.map((f) => f.categoryId))];
     const names = new Map(
       (categoryIds.length
         ? await deps.categories.categoriesByIds({ userId: query.userId ?? '', workspaceId: ws, categoryIds })
         : []
       ).map((c) => [c.categoryId, c.name]),
     );
-    const top = KpiCalculator.topCategories(inPeriod, topN, {
+    const topOptions = {
       target: reporting,
       rateFor: flowRateFor,
-      nameOf: (id) => names.get(id) ?? id,
-    });
+      nameOf: (id: string) => names.get(id) ?? id,
+    };
+    const top = KpiCalculator.topCategories(inPeriod, topN, { ...topOptions, nature: 'EXPENSE' });
+    const topIncome = KpiCalculator.topCategories(inPeriod, topN, { ...topOptions, nature: 'INCOME' });
 
     // ---- comparación
     const variation = (cur: Decimal, prev: Decimal): MoneyVariationDto => {
@@ -254,9 +262,14 @@ export class ReportSummaryQueries {
     };
     let comparisonDto: ReportSummaryDto['comparison'] = null;
     let comparisonComplete = true;
+    // Neto por categoría del periodo de comparación (variación por categoría del Home, FR-REPORTING-004).
+    let previousExpenseByCategory: ReadonlyMap<string, CategoryAmount> | null = null;
+    let previousIncomeByCategory: ReadonlyMap<string, CategoryAmount> | null = null;
     if (comparison) {
       const cur = KpiCalculator.within(flows, range(comparison.current));
       const prev = KpiCalculator.within(flows, range(comparison.previous));
+      previousExpenseByCategory = KpiCalculator.categoryTotals(prev, 'EXPENSE', topOptions);
+      previousIncomeByCategory = KpiCalculator.categoryTotals(prev, 'INCOME', topOptions);
       const ci = flowTotals(cur, 'INCOME');
       const ce = flowTotals(cur, 'EXPENSE');
       const pi = flowTotals(prev, 'INCOME');
@@ -336,6 +349,20 @@ export class ReportSummaryQueries {
     const attributions = new Map<string, RateAttributionDto>();
     for (const r of ratesUsed) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
     const show = (v: Decimal) => present(v, reporting).toJSON();
+    const zero = dec('0');
+    const topLine =
+      (previous: ReadonlyMap<string, CategoryAmount> | null) =>
+      (c: CategoryTotal): TopCategoryDto => {
+        const before = previous?.get(c.categoryId);
+        return {
+          categoryId: c.categoryId,
+          name: c.name,
+          amount: show(c.amount),
+          complete: c.complete,
+          previousAmount:
+            previous === null || (before && !before.complete) ? null : show(before?.amount ?? zero),
+        };
+      };
 
     const summary: ReportSummaryDto = {
       period: periodText,
@@ -355,12 +382,8 @@ export class ReportSummaryQueries {
       },
       comparison: comparisonDto,
       accounts: accountLines,
-      topExpenseCategories: top.map((c) => ({
-        categoryId: c.categoryId,
-        name: c.name,
-        amount: show(c.amount),
-        complete: c.complete,
-      })),
+      topExpenseCategories: top.map(topLine(previousExpenseByCategory)),
+      topIncomeCategories: topIncome.map(topLine(previousIncomeByCategory)),
       netWorth: {
         assets: show(nw.assets),
         liabilities: show(nw.liabilities),
@@ -382,8 +405,12 @@ export class ReportSummaryQueries {
         reportingCurrency: reporting.code,
         approx: ratesUsed.some((r) => r.approx),
         timeZone,
-        rateWindowDays: deps.rates.windowDays,
-        complete: consolidatedComplete && comparisonComplete && top.every((c) => c.complete),
+        rateWindowDays: windowDays,
+        complete:
+          consolidatedComplete &&
+          comparisonComplete &&
+          top.every((c) => c.complete) &&
+          topIncome.every((c) => c.complete),
         ...(balances.latestEntryAt ? { dataFreshness: balances.latestEntryAt } : {}),
         ratesUsed,
         attributions: [...attributions.values()],

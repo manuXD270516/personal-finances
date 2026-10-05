@@ -4,6 +4,8 @@ export {
   type CategoryTotal,
   type DateRangeText,
   type NominalFlow,
+  type CategoryAmount,
+  type CategoryTotalsOptions,
   type TopCategoriesOptions,
 } from './kpi-calculator.js';
 export {

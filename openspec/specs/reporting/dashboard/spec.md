@@ -186,3 +186,19 @@ Trace: FR-REPORTING-007, FR-REPORTING-002 · Priority: Must
 - **CUANDO** el usuario postea un gasto de 50.00 BOB y consulta el resumen inmediatamente después
 - **ENTONCES** los gastos del mes incluyen los 50.00 BOB
 - **Y** la respuesta indica periodo, moneda de reporte BOB, instante de generación y frescura
+
+### Requirement: Principales categorías de ingreso del mes
+El resumen DEBE (MUST) listar también las N categorías con mayor ingreso neto del mes (mismo N, orden descendente y desempate por nombre que el top de gasto), en la moneda de reporte, en la misma respuesta.
+Trace: FR-REPORTING-004 · Priority: Must
+
+#### Scenario: Salario y freelance
+- **CUANDO** el mes tiene Salario 8000.00 BOB y Freelance 1500.00 BOB de ingresos y Supermercado 1200.00 BOB de gasto
+- **ENTONCES** el top de ingresos lista Salario 8000.00 BOB y Freelance 1500.00 BOB en ese orden y el top de gastos solo Supermercado
+
+### Requirement: Monto anterior por categoría del top
+Cada categoría de los tops de gasto e ingreso DEBE (MUST) traer su neto en el periodo de comparación (cero si no tuvo flujos), convertido con la tasa de la fecha de cada flujo; sin comparación, o si algún monto anterior queda sin tasa, el monto anterior DEBE (MUST) informarse como no disponible (nunca inventado).
+Trace: FR-REPORTING-004 · Priority: Must
+
+#### Scenario: Supermercado contra el mismo tramo de agosto
+- **CUANDO** el 2026-09-15 Supermercado suma 1305.00 BOB del 1 al 15 de septiembre y 1200.00 BOB del 1 al 15 de agosto, y Fees 5.00 BOB solo en septiembre
+- **ENTONCES** Supermercado trae 1200.00 BOB como monto anterior y Fees 0.00 BOB

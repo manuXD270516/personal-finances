@@ -97,6 +97,24 @@ describe('GetReportSummary — dinero disponible y saldos (reporting/dashboard)'
     expect(s.consolidated.unconverted.map(amount)).toEqual(['0.01000000 BTC', '50.000000 USDT']);
   });
 
+  it('[TC-REPORTING-DASHBOARD-003] la ventana de vigencia es un ajuste de Reporting (D53): se entrega a FX y se informa en meta', async () => {
+    canonical();
+    // USDT/BOB de hace 10 días: fuera de la ventana por defecto (7 d), dentro de una de 14 d.
+    mem.rates.push({ base: 'USDT', quote: 'BOB', value: '12.02', asOf: '2026-09-20T12:00:00Z' });
+    let s = await summary();
+    expect(s.meta.rateWindowDays).toBe(7);
+    expect(mem.windowRequests.at(-1)).toBe(7);
+    expect(amount(s.consolidated.liquidBalance)).toBe('805.50 BOB');
+    expect(s.consolidated.unconverted.map(amount)).toEqual(['50.000000 USDT']);
+
+    mem.rateValidityWindowDays = 14;
+    s = await summary();
+    expect(s.meta.rateWindowDays).toBe(14);
+    expect(mem.windowRequests.at(-1)).toBe(14);
+    expect(amount(s.consolidated.liquidBalance)).toBe('1406.50 BOB');
+    expect(s.consolidated.complete).toBe(true);
+  });
+
   it('[TC-REPORTING-DASHBOARD-007] con providers caídos usa la última tasa obsoleta (8 h) y, si hay una manual más reciente, la manual', async () => {
     canonical();
     mem.rates.push({
@@ -246,6 +264,61 @@ describe('GetReportSummary — flujos del mes (reporting/dashboard)', () => {
       deltaPct: null,
       isNew: true,
     });
+  });
+
+  it('[TC-REPORTING-KPI-009] top de ingresos del mes junto al de gastos, con el mismo N y orden por neto descendente', async () => {
+    mem.categories.push({
+      categoryId: 'frl',
+      name: 'Freelance',
+      kind: 'INCOME',
+      parentId: null,
+      systemCode: null,
+      archived: false,
+    });
+    mem.flow('2026-09-05', 'INCOME', 'sal', '8000.00');
+    mem.flow('2026-09-12', 'INCOME', 'frl', '1500.00');
+    mem.flow('2026-09-10', 'EXPENSE', 'sup', '1200.00');
+    const s = await summary({ month: '2026-09', compare: 'NONE' });
+    expect(s.topIncomeCategories.map((c) => [c.name, amount(c.amount), c.complete])).toEqual([
+      ['Salario', '8000.00 BOB', true],
+      ['Freelance', '1500.00 BOB', true],
+    ]);
+    expect(s.topExpenseCategories.map((c) => c.name)).toEqual(['Supermercado']);
+    // Sin comparación no hay monto anterior por categoría.
+    expect(s.topIncomeCategories.every((c) => c.previousAmount === null)).toBe(true);
+    expect(s.topExpenseCategories.every((c) => c.previousAmount === null)).toBe(true);
+    expect((await summary({ month: '2026-09', topCategories: 1 })).topIncomeCategories).toHaveLength(1);
+  });
+
+  it('[TC-REPORTING-KPI-010] cada categoría del top trae su neto del mismo tramo del mes anterior (cero si no tuvo)', async () => {
+    mem.clock.set(Instant.parse('2026-09-15T16:00:00Z'));
+    mem.flow('2026-08-03', 'EXPENSE', 'sup', '1000.00');
+    mem.flow('2026-08-14', 'EXPENSE', 'sup', '200.00');
+    mem.flow('2026-08-20', 'EXPENSE', 'sup', '999.00'); // fuera de 1..15
+    mem.flow('2026-08-10', 'EXPENSE', 'res', '150.00');
+    mem.flow('2026-08-11', 'EXPENSE', 'res', '-50.00'); // reembolso
+    mem.flow('2026-08-05', 'INCOME', 'sal', '7500.00');
+    mem.flow('2026-09-05', 'INCOME', 'sal', '8000.00');
+    mem.flow('2026-09-10', 'EXPENSE', 'sup', '1305.00');
+    mem.flow('2026-09-11', 'EXPENSE', 'res', '80.00');
+    mem.flow('2026-09-12', 'EXPENSE', 'fee', '5.00');
+    const s = await summary();
+    expect(s.topExpenseCategories.map((c) => [c.name, amount(c.amount), amount(c.previousAmount)])).toEqual([
+      ['Supermercado', '1305.00 BOB', '1200.00 BOB'],
+      ['Restaurantes', '80.00 BOB', '100.00 BOB'],
+      ['Fees', '5.00 BOB', '0.00 BOB'],
+    ]);
+    expect(s.topIncomeCategories.map((c) => [c.name, amount(c.previousAmount)])).toEqual([
+      ['Salario', '7500.00 BOB'],
+    ]);
+
+    // Un monto anterior sin tasa (USD sin cotización en la ventana) no se inventa: previousAmount = null.
+    mem.flow('2026-08-12', 'EXPENSE', 'res', '10.00', 'USD');
+    const t = await summary();
+    expect(t.topExpenseCategories.find((c) => c.name === 'Restaurantes')?.previousAmount).toBeNull();
+    expect(amount(t.topExpenseCategories.find((c) => c.name === 'Supermercado')?.previousAmount)).toBe(
+      '1200.00 BOB',
+    );
   });
 
   it('[TC-REPORTING-KPI-006] topCategories fuera de 0..20 se rechaza con VALIDATION_FAILED', async () => {

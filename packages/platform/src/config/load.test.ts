@@ -34,6 +34,17 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(Object.isFrozen(config)).toBe(true);
   });
 
+  it('REPORTING_RATE_VALIDITY_WINDOW (docs/31 D53): ajuste de Reporting en días, 7d por defecto, 1d–90d, solo en la API', () => {
+    expect(loadConfig('api', API_ENV).REPORTING_RATE_VALIDITY_WINDOW).toBe(7);
+    expect(
+      loadConfig('api', { ...API_ENV, REPORTING_RATE_VALIDITY_WINDOW: '14d' }).REPORTING_RATE_VALIDITY_WINDOW,
+    ).toBe(14);
+    for (const bad of ['0d', '91d', '7h', '7', 'siete']) {
+      const err = captureError(() => loadConfig('api', { ...API_ENV, REPORTING_RATE_VALIDITY_WINDOW: bad }));
+      expect(err.problems.map((p) => p.variable)).toEqual(['REPORTING_RATE_VALIDITY_WINDOW']);
+    }
+  });
+
   it('falla listando TODAS las variables obligatorias faltantes, no solo la primera', () => {
     const err = captureError(() => loadConfig('api', {}));
     expect(err.problems.map((p) => p.variable).sort()).toEqual(
