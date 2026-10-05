@@ -14,7 +14,7 @@
   "App": {
     "nav": "Navegação principal",
     "home": "Início",
-    "settings": "Configuração do espaço",
+    "settings": "Configurações",
     "preferences": "Minhas preferências",
     "newWorkspace": "Novo espaço de trabalho",
     "logout": "Sair",
@@ -34,7 +34,11 @@
     "demoIndicator": "Dados de demonstração — este espaço contém dados fictícios e pode ser limpo por completo.",
     "demoOption": "{name} (demonstração)",
     "workspaceSwitched": "Espaço de trabalho ativo: {name}.",
-    "switching": "Trocando de espaço de trabalho…"
+    "switching": "Trocando de espaço de trabalho…",
+    "skipToContent": "Pular para o conteúdo",
+    "menu": "Menu de navegação",
+    "userMenu": "Menu da conta",
+    "language": "Idioma"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",

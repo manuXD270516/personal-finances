@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { useTranslations } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { use } from 'react';
-import { routing } from '../../../i18n/routing';
 import { Dashboard } from '../../../src/ui/dashboard/Dashboard';
 
 /**
@@ -28,24 +27,14 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
   setRequestLocale(locale);
   const t = useTranslations('Home');
   return (
-    <section aria-labelledby="home-title" style={{ display: 'grid', gap: '1rem', minWidth: 0 }}>
+    <section aria-labelledby="home-title" style={{ display: 'grid', gap: '1.5rem', minWidth: 0 }}>
       <div>
         <h1 id="home-title" style={{ margin: 0 }}>
           {t('title')}
         </h1>
-        <p style={{ margin: '0.25rem 0 0', color: '#475569' }}>{t('subtitle')}</p>
+        <p style={{ margin: '0.25rem 0 0', color: 'var(--pf-fg-muted)' }}>{t('subtitle')}</p>
       </div>
       <Dashboard />
-      <nav aria-label={t('language')}>
-        {routing.locales.map((l, i) => (
-          <span key={l}>
-            {i > 0 ? ' · ' : null}
-            <a href={l === routing.defaultLocale ? '/' : `/${l}`} hrefLang={l} lang={l}>
-              {l.toUpperCase()}
-            </a>
-          </span>
-        ))}
-      </nav>
     </section>
   );
 }
