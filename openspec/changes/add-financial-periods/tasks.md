@@ -5,7 +5,7 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar `specs/planning/financial-periods/spec.md` con el owner y cerrar P-A1..P-A6; verificar con `pnpm spec:validate`
-- [ ] 1.2 Confirmar los 18 TC AÑADIDOS de proposal.md en `tests/cases/planning/` (`requirement_status: confirmed`, `status: ready`); verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC no deprecado
+- [ ] 1.2 Confirmar los 19 TC AÑADIDOS de proposal.md en `tests/cases/planning/` (`requirement_status: confirmed`, `status: ready`); verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC no deprecado
 - [ ] 1.3 Consolidar en `contracts/` los cambios de design.md §Contratos (OpenAPI y `contracts/events/planning/PeriodActivated.v1.schema.json`); verificar Spectral y `oasdiff` sin cambios incompatibles
 
 ## 2. DOMAIN (TDD)
@@ -18,9 +18,10 @@
 ## 3. APPLICATION
 
 - [ ] 3.1 `EnsurePeriods` (cobertura retroactiva mientras no haya cierres, lookahead `PLANNING_PERIOD_LOOKAHEAD`, tope de 24 meses) con `LedgerActivityRangeQuery` y `WorkspaceCalendarQuery`; tests de aplicación con fakes `[TC-PLANNING-AUTOCREATE-001]`, `[TC-PLANNING-COVERAGE-001]`, `[TC-PLANNING-AUTOCREATE-003]`
+- [ ] 3.1b Puerto `PeriodCreatedHook.onPeriodCreated(period, uow)` en `@pf/planning/contracts` con registro de participantes (vacío por defecto) e invocación síncrona por cada periodo insertado por `EnsurePeriods`, dentro de su Unit of Work; test `[TC-PLANNING-AUTOCREATE-004]`
 - [ ] 3.2 `ActivateDuePeriods` y `ActivatePeriod` con `Clock.today(tz)`, `AuditPort`, `LifecycleTransitionPort` y outbox de `planning.PeriodActivated.v1`; tests `[TC-PLANNING-ACTIVATION-001]`, `[TC-PLANNING-AUDIT-001]`
 - [ ] 3.3 `RescheduleDraftPeriods` (consumidor de `identity.WorkspaceSettingsChanged.v1`, inbox idempotente) con auditoría `before/after`; tests `[TC-PLANNING-FISCALDAY-001]` (aplicación)
-- [ ] 3.4 Queries `GetPeriod`, `ListPeriods`, `GetPeriodContaining` y contrato público `PeriodQuery` + `PlanningEditGuard` en `@pf/planning/contracts`; tests `[TC-PLANNING-QUERY-001]`, `[TC-PLANNING-PLANGUARD-001]` (contra el guard)
+- [ ] 3.4 Queries `GetPeriod`, `ListPeriods`, `GetPeriodContaining` y contrato público `PeriodQuery` (`getPeriod`, `getPeriodContaining`, `listPeriods`, `getPrevious`) + `PlanningEditGuard` en `@pf/planning/contracts`; tests `[TC-PLANNING-QUERY-001]`, `[TC-PLANNING-PLANGUARD-001]` (contra el guard)
 
 ## 4. INFRASTRUCTURE
 

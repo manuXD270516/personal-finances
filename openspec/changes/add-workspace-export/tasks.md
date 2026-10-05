@@ -1,11 +1,11 @@
 # Tareas
 
-> Requiere aplicados todos los changes de Phase 1 (ver design.md § Dependencias) y, recomendado, los demás changes de Phase 2 que agregan datos (`add-reconciliation`, `add-custom-fields`, periodos/cierre de pf-p2a, presupuestos/alertas de pf-p2b). Resolver antes las preguntas abiertas 1, 3 y 4 de design.md.
+> Requiere aplicados todos los changes de Phase 1 (ver design.md § Dependencias) y los demás changes de Phase 2 (es el último del orden consolidado, docs/03 §7); las tablas a cubrir están en design.md § "Datos de Phase 2 cubiertos". Resolver antes las preguntas abiertas 1, 3 y 4 de design.md.
 
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar con el owner `identity/workspace-portability`, la reasignación de FR-IDENTITY-010, el nuevo FR-IDENTITY-017 y las preguntas abiertas 1–6 de design.md; verificar con `openspec validate add-workspace-export --strict`
-- [ ] 1.2 Revisar TC-IDENTITY-EXPORT-001..011 y TC-IDENTITY-RESTORE-001..005 (cifras: 3099.10 + 50.000000 × 12.02 − 520.00 = 3180.10 BOB); pasar a `ready` y `requirement_status: confirmed` al aprobar
+- [ ] 1.2 Revisar TC-IDENTITY-EXPORT-001..012 y TC-IDENTITY-RESTORE-001..005 (cifras: 3099.10 + 50.000000 × 12.02 − 520.00 = 3180.10 BOB); pasar a `ready` y `requirement_status: confirmed` al aprobar
 
 ## 2. DOMAIN (TDD)
 
@@ -16,14 +16,14 @@
 ## 3. APPLICATION
 
 - [ ] 3.1 `RequestWorkspaceExport` (OWNER, re-auth, idempotencia, operación) y `RunWorkspaceExport` (instantánea `REPEATABLE READ`, registry de secciones, ZIP en streaming, cifrado de sobre) (TC-IDENTITY-EXPORT-001, -002, -004, -005)
-- [ ] 3.2 Exporters por contexto (`WorkspaceDataExporter`) en accounts, classification, transactions, ledger, fx, audit (y planning cuando exista) sin secretos (TC-IDENTITY-EXPORT-002)
+- [ ] 3.2 Exporters/importers por contexto (`WorkspaceDataExporter`/`WorkspaceDataImporter`) en accounts, classification, transactions, ledger, fx, audit, planning y notifications (preferencias), con todas las tablas de design.md § "Datos de Phase 2 cubiertos", sin secretos (TC-IDENTITY-EXPORT-002, TC-IDENTITY-EXPORT-012)
 - [ ] 3.3 `DownloadWorkspaceExport` (descifrado en streaming con verificación por bloque), `DiscardWorkspaceExport`, `ExpireWorkspaceExports` (job) (TC-IDENTITY-EXPORT-006, -007, -008)
 - [ ] 3.4 Auditoría del ciclo y evento `WorkspaceExportCompleted.v1`; aviso in-app si NOTIFY existe (TC-IDENTITY-EXPORT-009, -011)
 - [ ] 3.5 `RequestWorkspaceImport` (validación previa del archivo) y `RunWorkspaceImport` (importers por contexto en orden topológico, una transacción, `RebuildBalanceSnapshots`, `VerifyLedgerIntegrity`, verificación contra el manifiesto, auditoría `identity.workspace.restored`, `WorkspaceRestored.v1`) (TC-IDENTITY-RESTORE-001..005)
 
 ## 4. INFRASTRUCTURE
 
-- [ ] 4.1 Migración expand (`platform.operation` si falta, `iam.workspace_export`, `iam.workspace_import`, CHECK de `iam.workspace.status`, `restored_from_export`) y revisión de grants `INSERT` de `pf_worker` por tabla de negocio; tests de RLS y de permisos
+- [ ] 4.1 Migración expand (`platform.operation` —la crea este change—, `iam.workspace_export`, `iam.workspace_import`, CHECK de `iam.workspace.status`, `restored_from_export`) y revisión de grants `INSERT` de `pf_worker` por tabla de negocio; tests de RLS y de permisos
 - [ ] 4.2 `ExportKeyProvider` (keyring local + adapter KMS) y formato de cifrado por bloques documentado en `contracts/export/v1/ENCRYPTION.md`; tests: objeto sin texto en claro, alteración detectada (TC-IDENTITY-EXPORT-005)
 - [ ] 4.3 Bucket `exports` (migrate local/CI, IaC cloud con SSE y lifecycle), config nueva en `@pf/platform` y `docs/config-reference.md` (`pnpm config:docs`)
 - [ ] 4.4 Esquemas `contracts/export/v1/*.schema.json` y test que valida cada sección exportada contra su esquema (TC-IDENTITY-EXPORT-003)

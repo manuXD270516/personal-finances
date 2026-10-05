@@ -6,7 +6,7 @@
 
 - [ ] 1.1 Revisar con el owner la spec `planning/budgets` y las preguntas abiertas 1–8 de design.md; registrar las decisiones en docs/31 (sección Phase 2) y verificar con `openspec validate add-budgets --strict`
 - [ ] 1.2 Revisar TC-PLANNING-BUDGET-001..021, TC-PLANNING-ACTUAL-001..007 y TC-PLANNING-THRESHOLD-001..007 contra los scenarios (cifras a mano, fechas fijas, `FixedClock` en America/La_Paz); pasar a `ready` y `requirement_status: confirmed` tras la revisión; verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC
-- [ ] 1.3 Coordinar con `add-financial-periods` y `add-month-closing` (pf-p2a): estados no cerrados, `PeriodCatalog`, payloads de `planning.MonthClosed.v1`/`PeriodReopened.v1` y el uso de `BudgetVsActualQuery` en el snapshot
+- [ ] 1.3 Coordinar con `add-financial-periods` y `add-month-closing` (pf-p2a): estados no cerrados, `PeriodQuery`, payloads de `planning.MonthClosed.v1`/`PeriodReopened.v1` y el uso de `BudgetVsActualQuery` en el snapshot
 
 ## 2. DOMAIN (TDD, lógica financiera crítica)
 
@@ -19,7 +19,7 @@
 ## 3. APPLICATION
 
 - [ ] 3.1 `CreateBudget`, `AddBudgetLine`, `UpdateBudgetLine`, `RemoveBudgetLine`, `SetZeroBasedMode` con `AuditPort` en la UoW, rol EDITOR/OWNER y rechazo `PERIOD_CLOSED`; evaluación síncrona de umbrales al editar; tests con dobles de TC-PLANNING-BUDGET-002, -012, -013 y TC-PLANNING-THRESHOLD-007
-- [ ] 3.2 `GetBudgetVsActual` (pública) orquestando `PeriodCatalog`, `NominalFlowQuery`, `CategoryTreeQuery`, `FxValuationPort` (`windowDays` del setting de REPORTING) y `Clock`: tests de TC-PLANNING-BUDGET-003, -014, -021 y TC-PLANNING-ACTUAL-001..006
+- [ ] 3.2 `GetBudgetVsActual` (pública como `BudgetVsActualQuery.getForPeriod` en `@pf/planning/contracts`) orquestando `PeriodQuery`, `NominalFlowQuery`, `CategoryTreeQuery`, `FxValuationPort` (`windowDays` del setting de REPORTING) y `Clock`: tests de TC-PLANNING-BUDGET-003, -014, -021 y TC-PLANNING-ACTUAL-001..006
 - [ ] 3.3 Consumidor `planning.budget-thresholds` (inbox, `key_strict_fifo` por workspace, `SELECT … FOR UPDATE` del plan, `ON CONFLICT DO NOTHING`, un evento al outbox) y `planning.rollover-finalizer` (`MonthClosed`/`PeriodReopened`): tests de TC-PLANNING-THRESHOLD-005 y TC-PLANNING-BUDGET-018
 - [ ] 3.4 Ampliaciones aditivas de contratos: `NominalFlowQuery` (`categoryIds?`, `tagIds` por fila) en Transactions y `categoryTree` en Classification, con tests de contrato entre módulos
 

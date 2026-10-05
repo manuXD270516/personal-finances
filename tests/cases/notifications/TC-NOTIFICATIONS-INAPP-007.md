@@ -24,7 +24,7 @@ preconditions:
   - 'Miembros OWNER, EDITOR y VIEWER con preferencias por defecto'
   - 'Periodo "2026-10" terminado y sin cerrar'
 input:
-  event: 'planning.MonthClosePending.v1 periodo 2026-10 (nombre provisional)'
+  event: 'planning.MonthClosePending.v1 periodo 2026-10 (publicado por add-month-closing)'
 steps:
   - 'Procesar el evento dos veces'
 expected_result:

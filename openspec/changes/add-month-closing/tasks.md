@@ -1,13 +1,13 @@
 # Tareas
 
-> Requiere `add-financial-periods` aplicado y, para el criterio de salida de Phase 2, la reconciliación completa de pf-p2c (`ReconciliationStatusQuery`, rechazo de cambios de conciliación en periodos cerrados). No iniciar sin respuesta del owner a P-A7 (ADR-0028) y P-A8; el resto de preguntas abiertas pueden implementarse con su recomendación. El evaluador del checklist, el constructor del snapshot (montos, consolidación, redondeo) y la barrera por rango del ledger son lógica financiera crítica: **test-first (TDD)**, primero el test rojo nombrado con su TC-id.
+> Requiere aplicados (orden consolidado, docs/03 §7): `add-financial-periods`, `add-custom-fields`, `add-reconciliation` (`ReconciliationStatusQuery.getCoverage`, rechazo de cambios de conciliación en periodos cerrados), `add-budgets` (`BudgetVsActualQuery.getForPeriod`) y `add-budget-templates`. No iniciar sin respuesta del owner a P-A7 (ADR-0028) y P-A8; el resto de preguntas abiertas pueden implementarse con su recomendación. El evaluador del checklist, el constructor del snapshot (montos, consolidación, redondeo) y la barrera por rango del ledger son lógica financiera crítica: **test-first (TDD)**, primero el test rojo nombrado con su TC-id.
 
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar `specs/planning/month-closing/spec.md`, el delta de `ledger/journal-posting` y el de `audit/lifecycle-timeline` con el owner; cerrar P-A7..P-A17 y pasar ADR-0028 a `Aceptado` (o aplicar su Opción 2); verificar con `pnpm spec:validate`
-- [ ] 1.2 Confirmar los 27 TC AÑADIDOS de proposal.md (`requirement_status: confirmed`, `status: ready`) y verificar que TC-LEDGER-PERIOD-001/002 siguen enlazando sus scenarios del requirement modificado; `pnpm traceability:check` sin errores
-- [ ] 1.3 Consolidar en `contracts/` los cambios de design.md §Contratos (OpenAPI, `MonthClosed.v1`, `PeriodReopened.v1`); verificar Spectral y `oasdiff` sin cambios incompatibles
-- [ ] 1.4 Acordar con pf-p2c y pf-p2b los contratos internos de design.md (`ReconciliationStatusQuery.getCoverage`, rechazo `PERIOD_CLOSED` en conciliación, `BudgetVsActualQuery.getForPeriod`) y registrarlos en sus design.md
+- [ ] 1.2 Confirmar los 29 TC AÑADIDOS de proposal.md (`requirement_status: confirmed`, `status: ready`) y verificar que TC-LEDGER-PERIOD-001/002 siguen enlazando sus scenarios del requirement modificado; `pnpm traceability:check` sin errores
+- [ ] 1.3 Consolidar en `contracts/` los cambios de design.md §Contratos (OpenAPI, `MonthClosed.v1`, `PeriodReopened.v1`, `MonthClosePending.v1`); verificar Spectral y `oasdiff` sin cambios incompatibles
+- [ ] 1.4 Verificar que los contratos internos consolidados el 2026-10-05 (`ReconciliationStatusQuery.getCoverage` de `add-reconciliation`, `BudgetVsActualQuery.getForPeriod` de `add-budgets`, `ClosingSnapshotQuery` para `add-net-worth-evolution`, `planning.MonthClosePending.v1` para `add-alerts`) siguen alineados con lo implementado en esos changes
 
 ## 2. DOMAIN (TDD)
 
@@ -24,6 +24,8 @@
 - [ ] 3.3 `ReopenPeriod` (OWNER, motivo, orden inverso, `unlockPeriod`, `period_reopening`, outbox) y re-cierre con `close_no + 1`; tests `[TC-PLANNING-REOPEN-001]`, `[TC-PLANNING-REOPEN-002]`, `[TC-PLANNING-RECLOSE-001]`
 - [ ] 3.4 Queries `ListCloseSnapshots`, `GetCloseSnapshot`, `CompareCloseSnapshots`, `GetCloseReport` (MoM) y `ExportCloseReport` (CSV/PDF con el renderizador de `add-lifecycle-timeline`); tests `[TC-PLANNING-REPORT-001]`, `[TC-PLANNING-REPORT-002]`, `[TC-PLANNING-REPORT-003]`
 - [ ] 3.5 TRANSACTIONS: `TransactionsClosingQuery` (pendientes, duplicados abiertos, sin categoría por rango) e implementación de `VoidRequest.correctInCurrentPeriod` con `firstOpenDateOnOrAfter`; tests `[TC-PLANNING-LOCK-001]` (anulación corregida)
+- [ ] 3.5b Alcance de la edición en periodos cerrados en TRANSACTIONS y CLASSIFICATION: `ApplyClassification` (tags, contraparte, custom fields) y `SetClearedStatus` llaman a `LedgerService.assertPeriodOpen({date})`; ediciones descriptivas sin chequeo; test `[TC-PLANNING-LOCK-004]` (individual y masiva)
+- [ ] 3.5c Job `planning.close-pending` (dentro del cron `planning.ensure-periods`; `PLANNING_CLOSE_PENDING_DELAY_DAYS`, default 3) con `planning.close_pending_notice` (`ON CONFLICT DO NOTHING`) y outbox `planning.MonthClosePending.v1`; test `[TC-PLANNING-EVENT-004]` con reloj fijo y TZ forzada
 - [ ] 3.6 REPORTING: `PeriodFlowsQuery` (rango) y `NetWorthQuery` (`asOf`) aceptando la transacción del llamador, sin cambiar `GET /reports/summary`; tests de regresión de `reporting/dashboard` y `reporting/net-worth` en verde
 
 ## 4. INFRASTRUCTURE
@@ -33,13 +35,13 @@
 - [ ] 4.3 Migración *expand* de `planning.closing_policy`, `close_snapshot`, `close_snapshot_balance`, `period_reopening` (WS-RO con `forbid_mutation`, RLS `ENABLE/FORCE`, grants); test de BD `[TC-PLANNING-SNAPSHOT-002]` (`UPDATE`/`DELETE` rechazados) y test de catálogo RLS
 - [ ] 4.4 Repositorios append-only con validación del contenido `jsonb` contra el schema interno `close-snapshot-content.v1` (montos solo como string decimal) y `content_sha256`; tests de integración `[TC-PLANNING-SNAPSHOT-001]` (ida y vuelta exacta de montos)
 - [ ] 4.5 Verificador `planning.verify-closings` (saldos del snapshot vigente = Σ postings a `periodEnd`, hash, un lock por periodo `CLOSED`) con métrica `planning_closing_violations_total{check}`; test de integración con corrupción simulada
-- [ ] 4.6 Purga del workspace demo (ADR-0026) y export de workspace (pf-p2c) con las tablas nuevas; verificar con TC-IDENTITY-DEMO-005 y el *round-trip* de pf-p2c
+- [ ] 4.6 Migración de `planning.close_pending_notice` (WS-RO, `forbid_mutation`); purga del workspace demo (ADR-0026) con las tablas nuevas (el export las incluye en `add-workspace-export`); verificar con TC-IDENTITY-DEMO-005 y el *round-trip* de pf-p2c
 
 ## 5. API
 
 - [ ] 5.1 Endpoints `getCloseChecklist`, `closePeriod`, `reopenPeriod`, `getClosingPolicy`, `updateClosingPolicy` con `If-Match`, `Idempotency-Key` y roles; problem+json con `blockingItems`/`warningItems`; tests de API `[TC-PLANNING-CLOSE-002]`, `[TC-PLANNING-CLOSE-003]`, `[TC-PLANNING-ROLE-002]`, `[TC-PLANNING-REOPEN-002]`
 - [ ] 5.2 Endpoints de snapshots, comparación, reporte y exportación; tests de contrato (respuestas validan contra el OpenAPI, montos como string decimal) `[TC-PLANNING-REPORT-001]`, `[TC-PLANNING-REPORT-003]`
-- [ ] 5.3 Tests de contrato de los productores `planning.MonthClosed.v1` y `planning.PeriodReopened.v1`; tests `[TC-PLANNING-EVENT-002]`, `[TC-PLANNING-EVENT-003]`
+- [ ] 5.3 Tests de contrato de los productores `planning.MonthClosed.v1`, `planning.PeriodReopened.v1` y `planning.MonthClosePending.v1`; tests `[TC-PLANNING-EVENT-002]`, `[TC-PLANNING-EVENT-003]`, `[TC-PLANNING-EVENT-004]`
 - [ ] 5.4 Recorrido del periodo (`GET …/periods/{id}/lifecycle` y exportación) con la máquina `FINANCIAL_PERIOD_LIFECYCLE`; test `[TC-AUDIT-PERIODLIFECYCLE-001]`
 - [ ] 5.5 Mensajes i18n es/en/pt de los cinco códigos nuevos y retiro propuesto de `PERIOD_OVERLAP`/`MONTH_CLOSING_IN_PROGRESS` de docs/10 (no están en el enum del OpenAPI)
 

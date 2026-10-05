@@ -48,4 +48,5 @@ Expand: índices nuevos (creación en la tabla padre particionada; en local es i
 ## Dependencias entre changes
 
 - **Requiere aplicados:** `add-audit-trail`, `add-workspace-identity`, `add-lifecycle-timeline` (convenciones de CSV de D52).
+- **Orden consolidado (docs/03 §7): 21**, después de `add-bulk-edit` (20), `add-reconciliation` (15) y `add-month-closing` (18), cuyas acciones ya existen al implementarlo; `add-workspace-export` (23) agrega `identity.export.*` al catálogo de categorías.
 - **Se beneficia de** (no bloqueante): `add-bulk-edit` (filtro por operación masiva), `add-reconciliation`, `add-workspace-export` (acciones `identity.export.*` en la categoría `SECURITY`), pf-p2a (`planning.period.reopened`). El catálogo de categorías se amplía en cada change que agrega acciones de seguridad.

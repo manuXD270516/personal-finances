@@ -52,6 +52,18 @@ Trace: FR-PLANNING-002 · Priority: Must
 - **CUANDO** hoy pasa a ser 2026-11-02 y se ejecuta la creación automática
 - **ENTONCES** se crea el periodo "2027-02" en `draft` y no se modifica ningún periodo existente salvo la activación de "2026-11"
 
+### Requirement: Participantes de la creación de periodos en la misma transacción
+Cada periodo creado DEBE (MUST) notificarse, en la misma transacción que lo crea, a los participantes de planificación registrados (como el template predeterminado de presupuestos); si un participante falla, el periodo NO DEBE (MUST NOT) crearse, y reintentar la creación NO DEBE (MUST NOT) duplicar periodos ni efectos de los participantes. Sin participantes registrados la creación no cambia.
+Trace: FR-PLANNING-002, FR-PLANNING-010 · Priority: Must
+
+#### Scenario: Participante notificado una sola vez por periodo
+- **CUANDO** hay un participante registrado y la creación automática crea "2027-02" y luego se ejecuta otra vez
+- **ENTONCES** el participante recibe "2027-02" exactamente una vez, dentro de la transacción que lo creó
+
+#### Scenario: Falla de un participante
+- **CUANDO** el participante registrado falla al recibir "2027-02"
+- **ENTONCES** "2027-02" no se crea y la siguiente ejecución lo crea y lo notifica
+
 ### Requirement: Cobertura retroactiva desde la primera actividad
 Mientras el workspace no tenga ningún periodo cerrado, el sistema DEBE (MUST) crear los periodos necesarios para que toda fecha de negocio de un asiento del ledger, desde la más antigua hasta 24 meses después de hoy, pertenezca a un periodo; los periodos creados que ya terminaron o contienen hoy DEBEN (MUST) quedar `active` y los futuros `draft`.
 Trace: FR-PLANNING-002, FR-LEDGER-011 · Priority: Must

@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Agrega la evolución mensual del patrimonio neto (FR-REPORTING-006, Phase 2): una serie de fin de mes valorada con las tasas de cada fecha, honesta cuando falta una tasa, estable para los meses cerrados y con la variación mensual, para responder "¿cómo evolucionó lo que valgo?".
+Agrega la evolución mensual del patrimonio neto (FR-REPORTING-006, Phase 2): una serie por periodo financiero mensual (fin de mes con día de inicio 1) valorada con las tasas de cada fecha, honesta cuando falta una tasa, estable para los meses cerrados y con la variación mensual, para responder "¿cómo evolucionó lo que valgo?".
 
 ## ADDED Requirements
 
 ### Requirement: Serie mensual del patrimonio neto
-El sistema DEBERÍA ofrecer, para un rango de meses, el patrimonio neto de cada fin de mes (activos, pasivos y neto en la moneda de reporte) calculado con los saldos de las cuentas incluidas en el patrimonio al último día del mes en la zona horaria del workspace; cuando se ofrece, el mes en curso DEBE (MUST) calcularse a la fecha de hoy y marcarse como parcial.
+El sistema DEBERÍA ofrecer, para un rango de periodos financieros mensuales (`planning/financial-periods`), el patrimonio neto al fin de cada periodo (activos, pasivos y neto en la moneda de reporte) con los saldos de las cuentas incluidas en el patrimonio a esa fecha; con día de inicio 1 el fin es el último día del mes. Cuando se ofrece, el periodo en curso DEBE (MUST) calcularse a la fecha de hoy en la zona horaria del workspace y marcarse como parcial.
 Trace: FR-REPORTING-006, FR-REPORTING-005 · Priority: Should
 
 #### Scenario: Tres meses de patrimonio
@@ -18,6 +18,10 @@ Trace: FR-REPORTING-006, FR-REPORTING-005 · Priority: Should
 #### Scenario: Mes en curso parcial
 - **CUANDO** hoy es 2026-04-12 y se pide la serie hasta abril de 2026
 - **ENTONCES** el punto de abril se calcula al 2026-04-12 y se marca como parcial
+
+#### Scenario: Periodos con día de inicio 25
+- **CUANDO** el workspace usa día de inicio 25, "Banco BOB" tiene 2000.00 BOB al 2026-02-24 y 2600.00 BOB al 2026-02-28 y se pide la serie del periodo "2026-01" (del 2026-01-25 al 2026-02-24)
+- **ENTONCES** el punto "2026-01" se calcula al 2026-02-24 e informa 2000.00 BOB
 
 ### Requirement: Valoración histórica con la tasa de cada fin de mes
 Cada punto de la serie DEBE (MUST) valorar los saldos en otras monedas con la tasa vigente a su propia fecha de fin de mes, con el mismo selector de tasa y ventana de vigencia que el patrimonio actual, y NO DEBE (MUST NOT) usar la tasa de hoy para meses pasados; cada punto DEBE (MUST) informar las tasas usadas con su fuente y vigencia.

@@ -111,7 +111,7 @@ Trace: FR-CLASSIFICATION-009 · Priority: Should
 - **ENTONCES** se rechaza con `CUSTOM_FIELD_OPTION_IN_USE`
 
 ### Requirement: Custom fields de transacciones en periodos cerrados
-Asignar, cambiar o quitar valores de custom fields de una transacción cuya fecha de negocio cae en un periodo cerrado DEBERÍA rechazarse; cuando se rechaza, DEBE (MUST) hacerlo con `PERIOD_CLOSED` sin cambiar el valor ni escribir auditoría.
+Asignar, cambiar o quitar valores de custom fields de una transacción cuya fecha de negocio cae en un periodo cerrado DEBE (MUST) rechazarse con `PERIOD_CLOSED`, sin cambiar el valor ni escribir auditoría, según el alcance de la edición en periodos cerrados de `planning/month-closing`; los custom fields de cuentas no dependen de periodos.
 Trace: FR-CLASSIFICATION-009, FR-PLANNING-005, INV-015 · Priority: Should
 
 #### Scenario: Cambiar el centro de costo en marzo cerrado

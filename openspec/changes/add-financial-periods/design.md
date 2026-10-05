@@ -10,7 +10,7 @@ Capas afectadas:
 |---|---|
 | planning/domain | AR `FinancialPeriod {id, workspaceId, label: YearMonth, range: DateRange, status: DRAFT\|ACTIVE\|CLOSED\|REOPENED, startDay: 1..28, isTransition, closeCount, reopenCount, version}`; VO `PeriodLabel` (= `YearMonth` del inicio); DS `PeriodCalendar` (cálculo puro de rangos, transición y cobertura); máquina declarada `FINANCIAL_PERIOD_LIFECYCLE` (docs/31 D37). Sin dependencias de framework. |
 | planning/application | Comandos `EnsurePeriods(through?)`, `ActivatePeriod(periodId, version)`, `ActivateDuePeriods` (job), `RescheduleDraftPeriods(newStartDay)` (consumidor); queries `GetPeriod`, `ListPeriods`, `GetPeriodContaining(date)`. Puertos de salida: `FinancialPeriodRepository`, `WorkspaceCalendarQuery` (IDENTITY: `timeZone`, `fiscalMonthStartDay`), `LedgerActivityRangeQuery` (LEDGER), `AuditPort`, `LifecycleTransitionPort`, `OutboxPort`, `Clock`, `IdGenerator`. |
-| planning/contracts (API pública) | `PeriodQuery` (`getPeriodContaining(date)`, `getPeriod(id)`, `listPeriods`) y `PlanningEditGuard.assertPlanEditable(periodId)` para pf-p2b. Ningún otro contexto importa internals de PLANNING (ADR-0003). |
+| planning/contracts (API pública) | `PeriodQuery` (`getPeriodContaining(date)`, `getPeriod(id)`, `listPeriods({status?})`, `getPrevious(periodId)`), `PlanningEditGuard.assertPlanEditable(periodId)` y el puerto `PeriodCreatedHook` (decisión 15) para `add-budgets`/`add-budget-templates`. `PeriodQuery` es el único nombre del catálogo de periodos (los borradores de pf-p2b lo llamaban `PeriodCatalog`). Ningún otro contexto importa internals de PLANNING (ADR-0003). |
 | planning/infrastructure | Repositorio Kysely sobre la Unit of Work, migración del schema `planning`, consumidores pg-boss, job cron `planning.ensure-periods`. |
 | planning/interface | Controlador REST `periods` (Nest) y módulo de composición. |
 | ledger/contracts | Query pública nueva `LedgerActivityRangeQuery.getActivityRange(workspaceId) → {minEntryDate, maxEntryDate} \| null` (lectura de `ledger.journal_entry` por el índice `(workspace_id, entry_date)`). Aditiva. |
@@ -58,6 +58,8 @@ Capas afectadas:
 13. **RLS y grants** (ADR-0023): `planning.financial_period` = **WS** con `ENABLE` + `FORCE`, política `workspace_id = platform.current_workspace_id()` (fail-closed `PF002`); `pf_app`: `SELECT, INSERT, UPDATE` (sin `DELETE`; los periodos nunca se borran); `pf_worker` hereda de `pf_app` y opera por workspace con `SET LOCAL`.
 
 14. **Autorización:** lectura con rol mínimo `VIEWER` (docs/10 §10 "Leer cualquier recurso de negocio"); `ensurePeriods` y `activatePeriod` con `EDITOR` (mismo nivel que "Presupuestos, templates…"). La reapertura (OWNER) la define `add-month-closing`.
+
+15. **`PeriodCreatedHook`** (contrato con `add-budget-templates`, consolidación 2026-10-05): `EnsurePeriods` invoca `PeriodCreatedHook.onPeriodCreated(period, uow)` de forma **síncrona**, dentro de su misma Unit of Work, por cada fila efectivamente insertada (las que `ON CONFLICT DO NOTHING` descarta no se notifican). Los participantes se registran en la composición del módulo PLANNING (lista vacía por defecto; `add-budget-templates` registra la aplicación del template predeterminado). Una excepción de un participante revierte la creación (la ejecución siguiente la reintenta); los participantes deben ser idempotentes. Alternativa descartada: evento `planning.PeriodCreated.v1` + consumidor (eventual; un periodo podría quedar visible sin su plan). Requirement "Participantes de la creación de periodos en la misma transacción".
 
 ## Contratos
 
@@ -108,7 +110,8 @@ Cambios EXACTOS requeridos (este change no edita `contracts/`; los consolida el 
 ## Dependencias con otros changes
 
 - **Requiere (Phase 1, ya archivados):** `add-workspace-identity` (`timeZone`, `fiscalMonthStartDay`, roles), `add-event-outbox` (outbox/inbox/jobs), `add-audit-trail`, `add-ledger-core` (rango de actividad del ledger), `add-lifecycle-timeline` (registro de transiciones).
-- **Habilita:** `add-month-closing` (este mismo bloque pf-p2a; usa `FinancialPeriod`, la máquina y `PeriodQuery`), y en pf-p2b `add-budgets` / `add-budget-templates` (plan mensual por `periodId`, `PlanningEditGuard`, propagación "a futuro" solo a periodos `DRAFT` — FR-PLANNING-014 — consultando `listPeriods(status=DRAFT)`), `notifications/alerts` (umbral "una sola vez por periodo": la clave de dedup usa `periodId`/`label` de este change).
+- **Habilita:** `add-month-closing` (este mismo bloque pf-p2a; usa `FinancialPeriod`, la máquina y `PeriodQuery`), y en pf-p2b `add-budgets` / `add-budget-templates` (plan mensual por `periodId`, `PlanningEditGuard`, `PeriodCreatedHook`, periodo anterior con `PeriodQuery.getPrevious`, propagación "a futuro" solo a periodos `DRAFT` — FR-PLANNING-014 — consultando `listPeriods(status=DRAFT)`), `notifications/alerts` (umbral "una sola vez por periodo": la clave de dedup usa `periodId`/`label` de este change).
+- **Contrato con `add-budget-templates`:** implementa y registra un participante de `PeriodCreatedHook` (decisión 15).
 - **Contrato que pf-p2b debe respetar:** el plan mensual (FR-PLANNING-008) se asocia a `periodId` (no a un `YearMonth` calendario) y antes de toda mutación llama a `PlanningEditGuard.assertPlanEditable(periodId)` en su Unit of Work. Si pf-p2b modela el presupuesto por `(periodId, currency)` (docs/08 `planning.budget`), sus FKs apuntan a `planning.financial_period(id)`.
 - **Sin dependencia** de pf-p2c en este change.
 

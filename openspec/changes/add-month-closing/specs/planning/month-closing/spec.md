@@ -106,7 +106,7 @@ Trace: FR-PLANNING-004, FR-PLANNING-005, INV-015, INV-029 · Priority: Must
 - **Y** un gasto de 30.00 BOB con fecha 2026-10-20 todavía se acepta
 
 ### Requirement: Bloqueo del ledger en periodos cerrados
-Mientras un periodo esté `closed`, el sistema DEBE (MUST) rechazar con `PERIOD_CLOSED` todo registro, revisión, anulación sin corrección en el periodo actual, recategorización o cambio de conciliación con fecha dentro de su rango, y todo asiento con fecha anterior al inicio del primer periodo cerrado; un cierre concurrente con un posteo NO DEBE (MUST NOT) dejar un asiento del periodo fuera de su snapshot.
+Mientras un periodo esté `closed`, el sistema DEBE (MUST) rechazar con `PERIOD_CLOSED` todo registro, revisión o anulación sin corrección en el periodo actual con fecha dentro de su rango (las demás ediciones siguen el alcance de la edición en periodos cerrados), y todo asiento con fecha anterior al inicio del primer periodo cerrado; un cierre concurrente con un posteo NO DEBE (MUST NOT) dejar un asiento del periodo fuera de su snapshot.
 Trace: FR-PLANNING-005, FR-LEDGER-011, INV-015 · Priority: Must
 
 #### Scenario: Operaciones sobre un mes cerrado
@@ -127,8 +127,21 @@ Trace: FR-PLANNING-005, FR-LEDGER-011, INV-015 · Priority: Must
 - **CUANDO** el primer periodo del workspace, "2026-07" (del 2026-07-01 al 2026-07-31), está `closed` y se intenta registrar un saldo inicial de 1000.00 BOB con fecha 2026-06-15
 - **ENTONCES** se rechaza con `PERIOD_CLOSED` y no se crea ningún periodo anterior a "2026-07"
 
+### Requirement: Alcance de la edición en periodos cerrados
+Mientras un periodo esté `closed`, el sistema DEBE (MUST) rechazar con `PERIOD_CLOSED`, sin cambios ni auditoría, toda edición individual, masiva o desde una conciliación de una transacción con fecha de negocio en su rango que cambie categoría, tags, contraparte, custom fields o el estado de confirmación o conciliación; cambiar notas, descripción, adjuntos o medio de pago DEBE (MUST) permitirse con auditoría, sin alterar saldos ni snapshot.
+Trace: FR-PLANNING-005, FR-TRANSACTIONS-033, FR-CLASSIFICATION-009, INV-015 · Priority: Must
+
+#### Scenario: Clasificación de un gasto de un mes cerrado
+- **CUANDO** "2026-10" está `closed` y el EDITOR intenta agregar el tag "viaje", cambiar la contraparte o desmarcar como confirmado un gasto de 80.00 BOB del 2026-10-10
+- **ENTONCES** cada edición se rechaza con `PERIOD_CLOSED` y el gasto conserva sus tags, su contraparte y su estado
+
+#### Scenario: Ediciones descriptivas en un mes cerrado
+- **CUANDO** "2026-10" está `closed` y el EDITOR cambia las notas y la descripción del mismo gasto de 80.00 BOB
+- **ENTONCES** el cambio se acepta y queda auditado
+- **Y** el saldo al 2026-10-31 y el snapshot vigente de "2026-10" no cambian
+
 ### Requirement: Contenido del snapshot de cierre
-El snapshot de cierre DEBE (MUST) registrar al fin del periodo los saldos por cuenta y moneda, el patrimonio neto en la moneda base con cada tasa usada y si está completo, los ingresos, gastos, ahorro y tasa de ahorro por moneda y consolidados en la moneda base con la tasa de cada transacción, el presupuesto contra lo real por categoría cuando exista plan, los aportes a metas cuando existan y el resultado del checklist.
+El snapshot de cierre DEBE (MUST) registrar al fin del periodo los saldos por cuenta y moneda, el patrimonio neto en la moneda base con cada tasa usada y si está completo, los ingresos, gastos, ahorro y tasa de ahorro por moneda y consolidados en la moneda base con la tasa de cada transacción, el presupuesto contra lo real por línea del plan cuando exista plan, los aportes a metas cuando existan y el resultado del checklist.
 Trace: FR-PLANNING-004, INV-022, INV-031 · Priority: Must
 
 #### Scenario: Snapshot de octubre de 2026
@@ -242,6 +255,19 @@ Trace: FR-PLANNING-004, FR-PLANNING-006, NFR-REL-008 · Priority: Must
 #### Scenario: Cierre rechazado sin evento
 - **CUANDO** un cierre de "2026-10" se rechaza con `MONTH_CLOSING_BLOCKED`
 - **ENTONCES** no se publica ningún evento de mes cerrado
+
+### Requirement: Aviso de cierre pendiente
+Cuando un periodo `active` o `reopened` siga sin cerrar 3 días (plazo configurable) después de su fecha de fin, contados en la zona horaria del workspace, el sistema DEBE (MUST) publicar exactamente un hecho de cierre pendiente para ese periodo en toda su vida, aun con reintentos o ejecuciones concurrentes; un periodo cerrado antes del plazo NO DEBE (MUST NOT) generarlo.
+Trace: FR-PLANNING-003, FR-NOTIFY-004 · Priority: Must
+
+#### Scenario: Octubre sin cerrar tres días después
+- **CUANDO** "2026-10" (del 2026-10-01 al 2026-10-31) sigue `active` y hoy pasa a ser 2026-11-03 en La Paz
+- **ENTONCES** se publica un hecho de cierre pendiente de "2026-10" con su fecha de fin
+- **Y** las ejecuciones siguientes, aunque "2026-10" siga sin cerrar o se reabra después, no publican otro
+
+#### Scenario: Cerrado antes del plazo
+- **CUANDO** "2026-10" se cierra el 2026-11-02 y hoy pasa a ser 2026-11-03 en La Paz
+- **ENTONCES** no se publica ningún hecho de cierre pendiente de "2026-10"
 
 ### Requirement: Autorización del cierre
 Cerrar un periodo DEBE (MUST) requerir rol EDITOR u OWNER y consultar el checklist, los snapshots y el reporte DEBE (MUST) permitirse a todo miembro; un VIEWER que intenta cerrar DEBE (MUST) recibir `INSUFFICIENT_ROLE` sin cambios.

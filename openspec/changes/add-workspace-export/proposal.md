@@ -27,13 +27,13 @@ El owner necesita poder llevarse **todos** sus datos financieros en un formato a
 
 ## Impact
 
-**Specs impactadas:** crea `identity/workspace-portability` (13 requirements: 11 Must, 2 Should).
+**Specs impactadas:** crea `identity/workspace-portability` (14 requirements: 12 Must, 2 Should).
 
 **Componentes/contextos impactados:** IDENTITY (`@pf/identity`): orquestador `WorkspaceExportService` / `WorkspaceImportService`, agregados `WorkspaceExport` y `WorkspaceImport`, puerto `ExportKeyProvider` (cifrado de sobre; adapter local por keyring y adapter KMS en cloud), puerto `ExportObjectStore` (S3 API). Cada contexto con datos (accounts, classification, transactions, ledger, fx, audit, planning cuando exista) implementa en su `contracts` los puertos `WorkspaceDataExporter` (lee su sección dentro de la transacción de instantánea) y `WorkspaceDataImporter` (inserta su sección con IDs remapeados), respetando las fronteras hexagonales. PLATFORM: tabla `platform.operation` y endpoint `getOperation` (docs/10 §8) si aún no existen. `apps/worker` (jobs `identity.workspace-export`, `identity.workspace-import`, `identity.export-retention`), `apps/api` (controllers, descarga en streaming), `apps/web` (configuración del workspace → "Exportar datos", "Importar workspace"; re-autenticación vía BFF con `max_age`).
 
 **APIs impactadas:** `contracts/openapi/finance-api.v1.yaml` — `requestWorkspaceExport` (`POST W/exports`, 202), `listWorkspaceExports` (`GET W/exports`), `getWorkspaceExport` (`GET W/exports/{id}`), `downloadWorkspaceExport` (`GET W/exports/{id}/download`, `application/zip`), `discardWorkspaceExport` (`POST W/exports/{id}/discard`: elimina el archivo, conserva el registro), `requestWorkspaceImport` (`POST /workspace-imports`, multipart, 202), `getWorkspaceImport` (`GET /workspace-imports/{id}`); `getOperation` con `kind: EXPORT`. docs/10 §13 reasigna `exports` de `reporting/financial-reports` (Phase 7) a `identity/workspace-portability` (Phase 2). Códigos nuevos: `REAUTHENTICATION_REQUIRED` (403), `EXPORT_IN_PROGRESS` (409), `EXPORT_NOT_READY` (409), `EXPORT_EXPIRED` (410), `EXPORT_FILE_CORRUPTED` (422), `EXPORT_FORMAT_UNSUPPORTED` (422), `EXPORT_VERIFICATION_FAILED` (422, error de la operación de importación). Esquemas de datos del export en `contracts/export/v1/*.schema.json`.
 
-**Tablas impactadas:** nuevas `iam.workspace_export`, `iam.workspace_import`, `platform.operation` (docs/08 §OPERATION, si no la creó antes otro change); columna `iam.workspace.restored_from_export_id` (aditiva). Lectura de todas las tablas de negocio del workspace; en la importación, inserción en todas ellas para el workspace nuevo (rol `pf_worker`, RLS con el `workspace_id` nuevo).
+**Tablas impactadas:** nuevas `iam.workspace_export`, `iam.workspace_import`, `platform.operation` (docs/08 §OPERATION; la crea este change, el único de Phase 2 con operaciones asíncronas); columna `iam.workspace.restored_from_export_id` (aditiva). Lectura de todas las tablas de negocio del workspace; en la importación, inserción en todas ellas para el workspace nuevo (rol `pf_worker`, RLS con el `workspace_id` nuevo).
 
 **Eventos impactados:** nuevo `identity.WorkspaceExportCompleted.v1` (también en falla, con `status`) consumido por NOTIFY (pf-p2b) para el aviso in-app; nuevo `identity.WorkspaceRestored.v1` (workspace creado por importación). Ningún evento de negocio se re-publica al importar (los consumidores reconstruyen proyecciones con `RebuildProjection`).
 
@@ -41,7 +41,7 @@ El owner necesita poder llevarse **todos** sus datos financieros en un formato a
 
 **Invariantes afectadas:** INV-001/INV-003 (montos exactos con escala en el archivo), INV-004/INV-022 (saldos y balance reproducidos), INV-007/INV-011 (el import inserta historia inmutable; no actualiza nada), INV-025 (todo lo importado pertenece al workspace nuevo), INV-027 (idempotencia de la solicitud), INV-029 (auditoría).
 
-**Test cases:** AÑADIDOS — TC-IDENTITY-EXPORT-001..011 y TC-IDENTITY-RESTORE-001..005 (`draft`/`ready`, `not_automated`). MODIFICADOS — ninguno. DEPRECADOS — ninguno.
+**Test cases:** AÑADIDOS — TC-IDENTITY-EXPORT-001..012 y TC-IDENTITY-RESTORE-001..005 (`draft`/`ready`, `not_automated`). MODIFICADOS — ninguno. DEPRECADOS — ninguno.
 
 **Impacto de regresión:** cada change futuro que agregue una tabla de negocio DEBE agregar su sección al export/import y su esquema (regla en docs/03 §4 y test de arquitectura que compara `platform.workspace_scoped_table` con las secciones exportadas). El test nightly de ida y vuelta (NFR-REL-014) entra a la Financial Regression Suite.
 

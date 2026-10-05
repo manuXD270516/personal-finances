@@ -32,7 +32,7 @@ Un presupuesto solo controla el gasto si avisa a tiempo. docs/24 §5.2 pone en P
 
 **Tablas impactadas:** nuevo schema `notifications`: `notifications.notification`, `notifications.notification_delivery`, `notifications.notification_preference`, `notifications.user_setting`; `platform.inbox`; lectura vía contrato de `iam.user`/`iam.membership`.
 
-**Eventos impactados:** ninguno producido. Consume `planning.BudgetThresholdReached.v1` (`add-budgets`) y `planning.MonthClosePending.v1` (nombre provisional; lo publica `add-month-closing`, ver design.md pregunta 4).
+**Eventos impactados:** ninguno producido. Consume `planning.BudgetThresholdReached.v1` (`add-budgets`) y `planning.MonthClosePending.v1` (lo publica `add-month-closing`, requirement "Aviso de cierre pendiente").
 
 **Migraciones requeridas:** expand, no destructiva: `CREATE SCHEMA notifications`, cuatro tablas con RLS forzada por `workspace_id` (y por `user_id` para lectura de `pf_app`), grants (`pf_worker` inserta notificaciones y entregas; `pf_app` lee y actualiza estado propio), índices de bandeja y de entregas pendientes, registro en `platform.workspace_scoped_table`. Variables nuevas en config-reference (`EMAIL_DRIVER`, `SMTP_*`, `EMAIL_FROM`, `APP_PUBLIC_URL`, `NOTIFY_EMAIL_MAX_ATTEMPTS`, `NOTIFY_RETENTION`).
 

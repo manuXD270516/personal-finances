@@ -6,7 +6,7 @@
 
 - [ ] 1.1 Revisar con el owner la spec `planning/budget-templates` y las preguntas abiertas 1–6 de design.md; registrar decisiones en docs/31 (Phase 2) y verificar con `openspec validate add-budget-templates --strict`
 - [ ] 1.2 Revisar TC-PLANNING-TEMPLATE-001..019 contra los scenarios (fechas fijas, `FixedClock`); pasar a `ready`/`confirmed` tras la revisión; `pnpm traceability:check` sin requirements Must sin TC
-- [ ] 1.3 Acordar con `add-financial-periods` (pf-p2a) la invocación de `PeriodCreatedHook` (o el evento alternativo, pregunta 1), `PeriodCatalog.previousOf` y la consulta de periodos futuros en borrador
+- [ ] 1.3 Verificar contra `add-financial-periods` (contrato consolidado el 2026-10-05: declara e invoca `PeriodCreatedHook` en la Unit of Work de `EnsurePeriods`, expone `PeriodQuery.getPrevious` y `listPeriods(status=DRAFT)`) que el participante de este change cumple el contrato
 
 ## 2. DOMAIN (TDD)
 
@@ -24,7 +24,7 @@
 ## 4. INFRASTRUCTURE
 
 - [ ] 4.1 Migración expand de `planning.budget_template`, `budget_template_version`, `budget_template_line` (RLS forzada, WS-RO con `forbid_mutation`, índices parciales) y FKs `NOT VALID`+`VALIDATE` hacia `planning.budget`/`budget_line`; registro en `platform.workspace_scoped_table`; tests de integración: inmutabilidad de versiones (UPDATE/DELETE fallan con `PF003`), un solo predeterminado bajo concurrencia, aislamiento entre workspaces
-- [ ] 4.2 Repositorios Kysely y adapters (`PeriodCatalog`, estado de objetivos de Classification)
+- [ ] 4.2 Repositorios Kysely y adapters (`PeriodQuery`, estado de objetivos de Classification)
 
 ## 5. API
 

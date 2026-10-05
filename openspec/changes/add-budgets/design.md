@@ -10,8 +10,8 @@ Reglas que se respetan: el dinero nunca es float (INV-001, ADR-0006); moneda exp
 |---|---|---|---|
 | Planning | AR `Budget {id, workspaceId, periodId, currency, origin (EMPTY\|TEMPLATE\|CLONE), templateVersionId?, clonedFromBudgetId?, zeroBased, lines[], version}`; entidad `BudgetLine {id, target (CATEGORY\|GROUP\|TAG + id), nature (EXPENSE\|INCOME), kind, amounts, percent?, incomeBasis?, rolloverPolicy, rolloverCap?, thresholds[], source, templateLineId?, overridden}`; VOs `BudgetLineKind`, `Threshold` (`Percentage` del shared-kernel, 0 < t ≤ 1000, 2 decimales), `RolloverPolicy` | domain | Nuevo |
 | Planning | DS puros `BudgetProgressCalculator` (planificado efectivo, gastado, restante, %, proyección, estado, disponible, por asignar), `ThresholdEvaluator` (umbrales nuevos cruzados ⇒ máximo + menores), `RolloverCalculator`, `TargetOverlapPolicy` | domain | Nuevo |
-| Planning | Comandos `CreateBudget`, `AddBudgetLine`, `UpdateBudgetLine`, `RemoveBudgetLine`, `SetZeroBasedMode`; queries `GetBudget`, `GetBudgetByPeriod`, `GetBudgetVsActual` (pública, para `add-month-closing`); consumidor `planning.budget-thresholds`; consumidor `planning.rollover-finalizer` | application | Nuevo |
-| Planning | Puertos `PeriodCatalog` (mismo contexto, de `add-financial-periods`), `NominalFlowQuery` (→ `@pf/transactions/contracts`), `CategoryTreeQuery` (→ `@pf/classification/contracts`), `FxValuationPort` (→ `@pf/fx/contracts`), `WorkspaceSettingsPort` (moneda base, TZ), `AuditPort`, `Clock`, `UnitOfWork`, `OutboxPort` | application/infrastructure | Adapters nuevos |
+| Planning | Comandos `CreateBudget`, `AddBudgetLine`, `UpdateBudgetLine`, `RemoveBudgetLine`, `SetZeroBasedMode`; queries `GetBudget`, `GetBudgetByPeriod`, `GetBudgetVsActual` (expuesta como contrato público `BudgetVsActualQuery.getForPeriod` para `add-month-closing`); consumidor `planning.budget-thresholds`; consumidor `planning.rollover-finalizer` | application | Nuevo |
+| Planning | Puertos `PeriodQuery` (mismo contexto, de `add-financial-periods`), `NominalFlowQuery` (→ `@pf/transactions/contracts`), `CategoryTreeQuery` (→ `@pf/classification/contracts`), `FxValuationPort` (→ `@pf/fx/contracts`), `WorkspaceSettingsPort` (moneda base, TZ), `AuditPort`, `Clock`, `UnitOfWork`, `OutboxPort` | application/infrastructure | Adapters nuevos |
 | Shared kernel | `FlowValuation` (pura): agrega flujos por moneda y día, pide **una** tasa por (moneda, día) al cierre del día en la TZ del workspace, convierte en `Decimal` precisión 40, separa `unconverted`, HALF_EVEN a la escala solo al presentar | domain | **Extraída** de `ConsolidationService.consolidateFlows` de Reporting sin cambio de comportamiento |
 | Transactions | `NominalFlowQuery.summarizeNominalFlows` | contracts | Ampliación aditiva: filtro opcional por `categoryIds` y `tagIds[]` por fila (solo para líneas de tag, Could) |
 | Classification | `CategoryCatalogQuery` | contracts | Ampliación aditiva: `categoryTree(workspaceId)` → grupos, categorías, subcategorías con `kind` y `status` |
@@ -22,7 +22,7 @@ Reglas que se respetan: el dinero nunca es float (INV-001, ADR-0006); moneda exp
 - Plan mensual por periodo con líneas de gasto e ingreso y los tipos Must/Should/Could de docs/24 §5.2.
 - Presupuesto vs real exacto y explicable (tasas usadas, parte sin convertir), con la misma valoración de flujos que el Home: el gasto de "Restaurantes" en el presupuesto coincide con la categoría "Restaurantes" del top de gastos del Home para el mismo rango.
 - Umbrales con emisión **exactamente una vez** por (objetivo, umbral, periodo) bajo reentregas y concurrencia.
-- Query pública `GetBudgetVsActual(periodId)` estable para el snapshot de cierre.
+- Query pública `BudgetVsActualQuery.getForPeriod({workspaceId, periodId, asOf?})` estable para el snapshot de cierre.
 
 **No objetivos:**
 - Templates, clonado y aplicación a futuro (`add-budget-templates`); notificaciones (`add-alerts`).
@@ -77,7 +77,7 @@ Schemas: `BudgetLineKind` enum `[FIXED, MAXIMUM, MINIMUM, RANGE, PERCENT_OF_INCO
 
 **`contracts/events/planning/BudgetCreated.v1.schema.json`** — `budgetId`, `periodId`, `periodLabel`, `currency`, `origin`, `templateId?`, `templateVersionNo?`, `clonedFromBudgetId?`, `lineCount`.
 
-**Contratos entre módulos:** `@pf/planning/contracts` exporta `BudgetVsActualQuery.getBudgetVsActual({workspaceId, periodId, asOf?})` (para `add-month-closing`), los nombres de eventos y el consumidor. Ampliaciones aditivas de `@pf/transactions/contracts` (`NominalFlowQuery`: `categoryIds?` y `tagIds` por fila) y `@pf/classification/contracts` (`categoryTree`).
+**Contratos entre módulos:** `@pf/planning/contracts` exporta `BudgetVsActualQuery.getForPeriod({workspaceId, periodId, asOf?}) → BudgetVsActual | null` (para `add-month-closing`; `null` si el periodo no tiene plan; `BudgetVsActual = {budgetId, currency, lines: [{budgetLineId, target: {kind, id}, nature, kind, reference: Money, actual: Money, actualComplete, status}], totals: {planned, actual, remaining, availableToSpend, complete, unconverted[]}, ratesUsed[]}`; nombre y forma consolidados el 2026-10-05 con `add-month-closing`), los nombres de eventos y el consumidor. Ampliaciones aditivas de `@pf/transactions/contracts` (`NominalFlowQuery`: `categoryIds?` y `tagIds` por fila) y `@pf/classification/contracts` (`categoryTree`).
 
 ## Riesgos / Trade-offs
 
@@ -93,7 +93,7 @@ Schemas: `BudgetLineKind` enum `[FIXED, MAXIMUM, MINIMUM, RANGE, PERCENT_OF_INCO
 Expand-only, sin datos que migrar: `CREATE SCHEMA IF NOT EXISTS planning`; `CREATE TABLE` de las tres tablas con RLS forzada, políticas WS y grants; trigger `platform.forbid_mutation()` en `budget_threshold_crossing`; registro en `platform.workspace_scoped_table`. Requiere que `planning.financial_period` exista (orden: `add-financial-periods` antes). Rollback: revertir el despliegue; las tablas pueden quedar vacías. La extracción de `FlowValuation` es un refactor de código sin migración.
 
 **Dependencias con otros changes:**
-- Requiere aplicados: `add-financial-periods` (sibling pf-p2a: `planning.financial_period`, estados, rango de fechas, query `PeriodCatalog`), `add-classification` (árbol y grupos; aún activo), `add-transaction-recording`, `add-transfers`, `add-manual-conversions`, `add-market-rate-providers`, `add-basic-dashboard` (`FlowValuation`, `NominalFlowQuery`), `add-event-outbox`, `add-audit-trail`, `add-api-conventions`.
+- Requiere aplicados: `add-financial-periods` (sibling pf-p2a: `planning.financial_period`, estados, rango de fechas, query `PeriodQuery`), `add-classification` (árbol y grupos; aún activo), `add-transaction-recording`, `add-transfers`, `add-manual-conversions`, `add-market-rate-providers`, `add-basic-dashboard` (`FlowValuation`, `NominalFlowQuery`), `add-event-outbox`, `add-audit-trail`, `add-api-conventions`.
 - Habilita: `add-budget-templates` (crea planes desde templates/clonado y propaga), `add-alerts` (consume `planning.BudgetThresholdReached.v1`), `add-month-closing` (sibling pf-p2a: usa `BudgetVsActualQuery` en el snapshot y publica `planning.MonthClosed.v1`/`PeriodReopened.v1` que consume el rollover), export de workspace (sibling pf-p2c: debe incluir `planning.budget*`, FR-IDENTITY-010).
 - Coordinación con pf-p2a: nombres y payloads de `MonthClosed.v1`/`PeriodReopened.v1` (docs/11) y semántica de "periodo no cerrado" (`draft|active|reopened`).
 

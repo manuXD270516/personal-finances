@@ -13,7 +13,7 @@
 - [ ] 2.1 `ReconciliationCalculator` puro, test-first: saldo confirmado y diferencia por naturaleza de cuenta (activo y pasivo como deuda), exclusión de `pending`/`posted`/`void` y de fechas posteriores al extracto, saldo inicial incluido una sola vez (TC-TRANSACTIONS-RECONCILIATION-003, -004); PBT: diferencia = extracto − Σ incluidas para conjuntos aleatorios
 - [ ] 2.2 AR `Reconciliation` con `RECONCILIATION_LIFECYCLE` (START/COMPLETE/CANCEL, terminales) y guardas: una en curso por cuenta, fecha del extracto, escala de la moneda (TC-TRANSACTIONS-RECONCILIATION-001, -002, -009; TC-AUDIT-LIFECYCLE-025)
 - [ ] 2.3 Dirección y monto del ajuste a partir de la diferencia (activo/pasivo), test-first con el traductor de `ADJUSTMENT` existente: asiento balanceado (INV-004/INV-005) (TC-TRANSACTIONS-RECONCILIATION-008)
-- [ ] 2.4 `Transaction`: `RECONCILE` exige `reconciliationId`; el marcado directo se rechaza con `RECONCILIATION_SESSION_REQUIRED` (TC-TRANSACTIONS-RECONCILIATION-014); guardas de periodo cerrado en `CLEAR`/`UNCLEAR`/`RECONCILE`/`UNRECONCILE` (TC-TRANSACTIONS-RECONCILIATION-012)
+- [ ] 2.4 `Transaction`: `RECONCILE` exige `reconciliationId`; el marcado directo se rechaza con `RECONCILIATION_SESSION_REQUIRED` (TC-TRANSACTIONS-RECONCILIATION-014); guardas de periodo cerrado en `CLEAR`/`UNCLEAR`/`RECONCILE`/`UNRECONCILE` vía `LedgerService.assertPeriodOpen({date})`, según el alcance único de `planning/month-closing` (TC-TRANSACTIONS-RECONCILIATION-012)
 
 ## 3. APPLICATION
 
@@ -22,7 +22,7 @@
 - [ ] 3.3 `CompleteReconciliation` en `SERIALIZABLE` con reintento: diferencia, `PERIOD_CLOSED`, ajuste opcional, `RECONCILE` por transacción, ítems, auditoría, transiciones y outbox en una UoW; test de atomicidad con fallo inyectado (TC-TRANSACTIONS-RECONCILIATION-006, -007, -008, -012, -013)
 - [ ] 3.4 `TransactionCleared.v1` en todo `CLEAR`/`UNCLEAR` (individual, lote, sesión) además de `TransactionUpdated.v1`; `ReconciliationCompleted.v1` (TC-TRANSACTIONS-RECONCILIATION-011)
 - [ ] 3.5 `UnreconcileTransaction` anota la sesión (`reconciliation_item.unreconciled_*`) y respeta `PERIOD_CLOSED` (TC-TRANSACTIONS-RECONCILIATION-015)
-- [ ] 3.6 Query `GetReconciliationStatus` como contrato público (`@pf/transactions/contracts`) para PLANNING (TC-TRANSACTIONS-RECONCILIATION-010)
+- [ ] 3.6 Query pública `ReconciliationStatusQuery.getCoverage({workspaceId, accountIds, through})` en `@pf/transactions/contracts` para PLANNING, con `reconciledThrough` según design.md decisión 9, y endpoint `getReconciliationStatus` sobre la misma query (TC-TRANSACTIONS-RECONCILIATION-010)
 - [ ] 3.7 Composición del recorrido de la sesión y referencia de la sesión en el recorrido de la transacción (TC-AUDIT-LIFECYCLE-025, -026)
 
 ## 4. INFRASTRUCTURE

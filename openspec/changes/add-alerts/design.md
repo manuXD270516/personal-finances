@@ -32,7 +32,7 @@ NOTIFY (`notifications`, `@pf/notifications`, contexto genérico; docs/05 §2.16
 10. **Preferencias.** `notification_preference (workspace_id, user_id, notification_type, channel, enabled)`: la ausencia de fila = activado (default: in-app y email activos); `user_setting (workspace_id, user_id, quiet_hours_start, quiet_hours_end, include_details_in_email default false)`. Horario de silencio interpretado en la zona horaria del usuario (`iam.user.time_zone`, D23) al calcular `not_before` y de nuevo al despachar (si el usuario cambió su horario). Silencio solo difiere el email; el in-app se crea siempre al procesar el evento.
 11. **Retención.** Job diario `notifications.purge` borra notificaciones (y sus entregas) con `created_at` > `NOTIFY_RETENTION` (12 meses, docs/08 §13.1). Las tablas de notificaciones no son append-only (no son hechos financieros).
 12. **Observabilidad.** Métricas `notifications_created_total{type}`, `notifications_email_deliveries_total{status}`, lag evento→notificación (histograma); logs solo con ids opacos (`notificationId`, `deliveryId`, `workspaceId`), nunca direcciones de email, asuntos con detalles ni montos (docs/12 §13.1, test "canario" de redacción).
-13. **Cierre de mes pendiente.** El hecho lo decide y publica Planning (`add-month-closing`), una vez por periodo: nombre provisional `planning.MonthClosePending.v1 {periodId, periodLabel, periodEnd, pendingSince}` (pregunta 4). NOTIFY solo lo traduce.
+13. **Cierre de mes pendiente.** El hecho lo decide y publica Planning: `add-month-closing` (requirement "Aviso de cierre pendiente", decisión 16 de su design.md, consolidado el 2026-10-05) publica `planning.MonthClosePending.v1 {workspaceId, periodId, periodLabel, periodStart, periodEnd, pendingSince, delayDays}` una sola vez por periodo, 3 días (configurable) después de su fin si sigue sin cerrar. NOTIFY solo lo traduce (dedupe `month-close-pending:<periodId>`).
 
 ### Modelo de datos (expand-only, schema `notifications`)
 
@@ -76,15 +76,15 @@ Expand-only: `CREATE SCHEMA notifications`, las cuatro tablas con RLS forzada y 
 
 **Dependencias:**
 - Requiere: `add-event-outbox` (inbox, colas por consumidor, dead-letter), `add-workspace-identity` (miembros, roles, locale, zona horaria, email verificado; se amplía su contrato público), `add-budgets` (evento `planning.BudgetThresholdReached.v1`), `add-api-conventions`, `add-audit-trail`.
-- Requiere de `add-month-closing` (sibling pf-p2a) el hecho de cierre pendiente (pregunta 4); sin él, el requirement "Aviso de cierre de mes pendiente" queda bloqueado (el resto del change no).
-- Export de workspace (sibling pf-p2c): decidir si incluye preferencias de notificación (recomendado sí; las notificaciones no, son derivadas).
+- Requiere `add-month-closing` (orden consolidado 18 → 19), que publica `planning.MonthClosePending.v1`; el requirement "Aviso de cierre de mes pendiente" depende explícitamente de su requirement "Aviso de cierre pendiente".
+- Export de workspace (`add-workspace-export`, 23): incluye `notifications.notification_preference` y `notifications.user_setting`; las notificaciones y entregas se excluyen (derivadas y con retención de 12 meses).
 
 ## Preguntas abiertas
 
 1. **Proveedor de email de producción** (ADR-0027 VPS + Compose, presupuesto USD 10–20/mes, D51). **Recomendación:** elegirlo en el change de despliegue con un ADR corto ("proveedor de email transaccional"): uno con relay SMTP **y** API HTTP con `Idempotency-Key`, plan gratuito para bajo volumen y región cercana; mientras tanto producción con `EMAIL_DRIVER=none` (solo in-app).
 2. **Email activado por defecto.** **Recomendación:** activado para ambos tipos (un solo usuario quiere enterarse) con detalles desactivados; el usuario lo apaga en preferencias.
 3. **VIEWER como destinatario de umbrales.** **Recomendación:** sí (puede ver presupuestos); el cierre pendiente solo OWNER/EDITOR.
-4. **Hecho de cierre pendiente.** **Recomendación:** que `add-month-closing` publique `planning.MonthClosePending.v1` una vez por periodo, **3 días** después de `period_end` si el periodo sigue sin cerrar (configurable), con dedupe por periodo; NOTIFY solo lo traduce. Coordinar nombre y payload con pf-p2a.
+4. **Hecho de cierre pendiente.** *(Resuelta en la consolidación del 2026-10-05: incorporada a `add-month-closing` con esta recomendación.)* **Recomendación:** que `add-month-closing` publique `planning.MonthClosePending.v1` una vez por periodo, **3 días** después de `period_end` si el periodo sigue sin cerrar (configurable), con dedupe por periodo; NOTIFY solo lo traduce. Coordinar nombre y payload con pf-p2a.
 5. **Aviso de violación de invariante** (FR-NOTIFY-004, "OWNER, 1→2"). **Recomendación:** change pequeño posterior cuando el job de integridad del ledger publique `ledger.IntegrityViolationDetected.v1`; tipo `CRITICAL` que ignora el horario de silencio. Phase 1 ya lo cubre con log/métrica.
 6. **Filtro de email por umbral** (docs/08 sugería "umbral 80 100" en preferencias). **Recomendación:** no en Phase 2 (solo activar/desactivar por tipo y canal); si el owner lo pide, `settings.minThresholdForEmail` por tipo.
 7. **Auditar lectura/archivo de notificaciones.** **Recomendación:** no auditar (no es dato financiero ni de configuración); sí auditar cambios de preferencias.

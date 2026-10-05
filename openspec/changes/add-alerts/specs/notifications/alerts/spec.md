@@ -64,7 +64,7 @@ Trace: FR-NOTIFY-005 · Priority: Must
 - **ENTONCES** no se crea una segunda notificación
 
 ### Requirement: Aviso de cierre de mes pendiente
-Por cada hecho de periodo terminado pendiente de cierre publicado por Planning, el sistema DEBE (MUST) crear una sola notificación de tipo cierre pendiente para cada miembro con permiso de cerrar el periodo (OWNER y EDITOR) que no la haya desactivado.
+Por cada hecho de periodo terminado pendiente de cierre publicado por Planning (requirement "Aviso de cierre pendiente" de `planning/month-closing`), el sistema DEBE (MUST) crear una sola notificación de tipo cierre pendiente para cada miembro con permiso de cerrar el periodo (OWNER y EDITOR) que no la haya desactivado.
 Trace: FR-NOTIFY-004 · Priority: Must
 
 #### Scenario: Octubre sin cerrar

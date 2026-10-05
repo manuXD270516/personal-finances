@@ -6,7 +6,7 @@
 
 - [ ] 1.1 Revisar con el owner la spec `notifications/alerts` y las preguntas abiertas 1–8 de design.md; registrar decisiones en docs/31 (Phase 2) y verificar con `openspec validate add-alerts --strict`
 - [ ] 1.2 Revisar TC-NOTIFICATIONS-INAPP-001..007, TC-NOTIFICATIONS-DEDUP-001..002, TC-NOTIFICATIONS-EMAIL-001..007, TC-NOTIFICATIONS-I18N-001..002 y TC-NOTIFICATIONS-PREFS-001..003 contra los scenarios (`FixedClock`, TZ America/La_Paz); pasar a `ready`/`confirmed`; `pnpm traceability:check` sin Must sin TC
-- [ ] 1.3 Acordar con `add-month-closing` (pf-p2a) nombre, payload y momento de `planning.MonthClosePending.v1` (pregunta 4) y publicar su JSON Schema
+- [ ] 1.3 Verificar el consumidor contra `contracts/events/planning/MonthClosePending.v1.schema.json` publicado por `add-month-closing` (contrato consolidado el 2026-10-05)
 
 ## 2. DOMAIN (TDD)
 

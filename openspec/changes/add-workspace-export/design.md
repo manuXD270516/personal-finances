@@ -54,7 +54,7 @@ Configuración nueva (docs/config-reference): `OBJECT_STORAGE_EXPORTS_BUCKET`, `
 
 | Tabla | Definición | RLS / grants |
 |---|---|---|
-| `platform.operation` | docs/08 §OPERATION (`id, workspace_id, kind, status, progress_pct, resource_type, resource_id, result, error, requested_by, created_at, updated_at, expires_at`) — solo si ningún change previo la creó | WS; `pf_app` SELECT/INSERT, `pf_worker` SELECT/UPDATE |
+| `platform.operation` | docs/08 §OPERATION (`id, workspace_id, kind, status, progress_pct, resource_type, resource_id, result, error, requested_by, created_at, updated_at, expires_at`) — **la crea este change** (consolidación 2026-10-05: es el primer y único change de Phase 2 con operaciones asíncronas `202 + operation`; los demás comandos de Phase 2 son síncronos) | WS; `pf_app` SELECT/INSERT, `pf_worker` SELECT/UPDATE |
 | `iam.workspace_export` | `id, workspace_id, operation_id, status CHECK IN ('REQUESTED','RUNNING','READY','FAILED','EXPIRED','DISCARDED'), format_version, object_key NULL, size_bytes NULL, sha256 bytea NULL, key_id NULL, wrapped_key bytea NULL, counts jsonb, requested_by, requested_at, completed_at NULL, expires_at NULL, discarded_at/by NULL, expired_at NULL, error jsonb NULL, version`. Único parcial `(workspace_id) WHERE status IN ('REQUESTED','RUNNING')` | WS forzada; `pf_app` SELECT/INSERT/UPDATE; `pf_worker` SELECT/UPDATE |
 | `iam.workspace_import` | `id, requested_by, status, object_key, key_id, wrapped_key, source_workspace_id, source_exported_at, format_version, target_workspace_id NULL, report jsonb, error jsonb, created_at, completed_at` | Sin RLS de workspace (aún no existe); acceso solo por la API filtrando por `requested_by`; `pf_worker` SELECT/UPDATE |
 | `iam.workspace` | Columnas aditivas `status` admite `RESTORING` (CHECK ampliado) y `restored_from_export jsonb NULL` (`sourceWorkspaceId`, `exportedAt`, `importId`) | sin cambios |
@@ -65,6 +65,22 @@ Configuración nueva (docs/config-reference): `OBJECT_STORAGE_EXPORTS_BUCKET`, `
 |---|---|---|---|
 | `identity.WorkspaceExportCompleted.v1` | Export `READY` o `FAILED` | `exportId`, `status`, `expiresAt|null` (sin cifras) | NOTIFY (pf-p2b) — aviso in-app |
 | `identity.WorkspaceRestored.v1` | Import `SUCCEEDED` | `workspaceId`, `importId`, `sourceExportedAt` | REPORTING (invalidar/reconstruir), NOTIFY |
+
+### Datos de Phase 2 cubiertos (consolidación 2026-10-05)
+
+| Change | Tablas incluidas en export/import | Excluidas (motivo) |
+|---|---|---|
+| `add-financial-periods` | `planning.financial_period` | — |
+| `add-custom-fields` | `classification.custom_field_definition`, `txn.split_custom_field_value`, `accounts.account_custom_field_value` | — |
+| `add-reconciliation` | `txn.reconciliation`, `txn.reconciliation_item` (y la columna `txn.transaction.reconciliation_id`) | — |
+| `add-budgets` | `planning.budget`, `planning.budget_line`, `planning.budget_threshold_crossing` (se importa para no re-emitir umbrales) | — |
+| `add-budget-templates` | `planning.budget_template`, `planning.budget_template_version`, `planning.budget_template_line` | — |
+| `add-month-closing` | `planning.closing_policy`, `planning.close_snapshot`, `planning.close_snapshot_balance`, `planning.period_reopening`, `planning.close_pending_notice`, `ledger.period_lock` (con `period_start`/`period_end`, ADR-0028) | — |
+| `add-alerts` | `notifications.notification_preference`, `notifications.user_setting` | `notifications.notification`, `notifications.notification_delivery` (derivadas, retención 12 meses) |
+| `add-workspace-export` | — | `iam.workspace_export`, `iam.workspace_import`, `platform.operation` (metadatos técnicos) |
+| `add-bulk-edit`, `add-global-audit-view`, `add-net-worth-evolution` | sin tablas nuevas | — |
+
+Orden de importación (extiende la decisión 2): … → `planning.financial_period` → `planning.budget_template*` → `planning.budget` → `planning.budget_line` → `planning.budget_threshold_crossing` → `planning.closing_policy` → `planning.close_snapshot*` → `planning.period_reopening` → `planning.close_pending_notice` → `notifications.*` (preferencias) → audit/lifecycle → `ledger.period_lock` (al final, decisión 12). Las tablas append-only (`forbid_mutation`) se insertan como historia; ninguna se recalcula. Requirement "Datos de Phase 2 en el export" (TC-IDENTITY-EXPORT-012).
 
 ### Cobertura de tablas (regla nueva)
 
@@ -79,7 +95,7 @@ Test de arquitectura: toda tabla registrada en `platform.workspace_scoped_table`
 
 ## Plan de migración
 
-1. Expand: `platform.operation` (si falta), `iam.workspace_export`, `iam.workspace_import`, ampliación del CHECK de `iam.workspace.status` y columna `restored_from_export`; grants `INSERT` de `pf_worker` en tablas de negocio necesarias para el import (lista revisada en la tarea 4.1). No destructiva.
+1. Expand: `platform.operation` (creada aquí), `iam.workspace_export`, `iam.workspace_import`, ampliación del CHECK de `iam.workspace.status` y columna `restored_from_export`; grants `INSERT` de `pf_worker` en tablas de negocio necesarias para el import (lista revisada en la tarea 4.1). No destructiva.
 2. Bucket `exports` en local/CI (`migrate` con `OBJECT_STORAGE_ENSURE_BUCKET`) y en IaC (versioning OFF para exports, lifecycle 8 días, SSE).
 3. Secretos nuevos en `.env.example` (sin valores) y `pnpm setup:env` (genera una clave local aleatoria).
 4. Contrato: operaciones nuevas (MINOR); `exports` pasa de "Phase 7" a Phase 2 en docs/10.
@@ -97,6 +113,6 @@ Test de arquitectura: toda tabla registrada en `platform.workspace_scoped_table`
 ## Dependencias entre changes
 
 - **Requiere aplicados (Phase 1):** `add-workspace-identity`, `add-api-conventions`, `add-event-outbox`, `add-audit-trail`, `add-ledger-core`, `add-classification`, `add-accounts-management`, `add-transaction-recording`, `add-transfers`, `add-manual-conversions`, `add-market-rate-providers`, `add-lifecycle-timeline`, `add-demo-data` (`platform.workspace_scoped_table`).
-- **Debe aplicarse después de los demás changes de Phase 2 que agregan datos** — `add-reconciliation`, `add-custom-fields` (este hilo) y los de pf-p2a (`planning/financial-periods`, `planning/month-closing`: periodos, snapshots de cierre) y pf-p2b (`planning/budgets`, `planning/budget-templates`, `notifications/alerts`: presupuestos, templates versionados, preferencias y alertas) — o, si se aplica antes, cada uno de esos changes debe incluir la tarea "agregar su sección al export/import" (regla de cobertura de tablas). Recomendado: último change de Phase 2.
+- **Orden consolidado (docs/03 §7): último change de Phase 2 (23).** Debe aplicarse después de los demás changes de Phase 2 que agregan datos — `add-reconciliation`, `add-custom-fields` (este hilo) y los de pf-p2a (`planning/financial-periods`, `planning/month-closing`: periodos, snapshots de cierre) y pf-p2b (`planning/budgets`, `planning/budget-templates`, `notifications/alerts`: presupuestos, templates versionados, preferencias y alertas) — o, si se aplica antes, cada uno de esos changes debe incluir la tarea "agregar su sección al export/import" (regla de cobertura de tablas). Recomendado: último change de Phase 2.
 - **pf-p2b (`notifications/alerts`)**: consume `identity.WorkspaceExportCompleted.v1` para el aviso in-app (requirement Should); sin NOTIFY la UI muestra el estado en la pantalla de exportación.
-- **`platform.operation`**: si otro change de Phase 2 (p. ej. generación de periodos o de snapshots de pf-p2a) la crea antes, este change la reutiliza.
+- **`platform.operation`**: la crea este change (ningún change anterior de Phase 2 la necesita; verificado en la consolidación).

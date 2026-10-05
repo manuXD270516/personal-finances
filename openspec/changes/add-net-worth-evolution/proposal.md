@@ -6,7 +6,7 @@ Phase 1 responde "¿cuánto valgo hoy?" (`reporting/net-worth`), pero no "¿cóm
 
 ## What Changes
 
-- Nuevo endpoint `GET W/reports/net-worth/history` (VIEWER+) con la serie mensual de fin de mes: activos, pasivos, patrimonio neto, completitud, saldos no valorados, fuente del punto (`SNAPSHOT` de cierre o `COMPUTED`), parcialidad del mes en curso y variación respecto al mes anterior.
+- Nuevo endpoint `GET W/reports/net-worth/history` (VIEWER+) con la serie por periodo financiero mensual de `planning/financial-periods` (fin del periodo; con día de inicio 1, fin de mes calendario): activos, pasivos, patrimonio neto, completitud, saldos no valorados, fuente del punto (`SNAPSHOT` de cierre o `COMPUTED`), parcialidad del mes en curso y variación respecto al mes anterior.
 - Valoración de cada punto con la tasa vigente a su fecha (mismo selector de valoración de FX y ventana de vigencia de REPORTING, D53), nunca con la tasa de hoy; tasas usadas y atribuciones informadas.
 - Meses cerrados desde el snapshot vigente de `planning/month-closing` (cuando exista); meses abiertos por cálculo as-of desde el ledger.
 - Cuentas consideradas según su saldo a cada fecha (incluidas las hoy archivadas/cerradas).

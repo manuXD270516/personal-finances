@@ -95,13 +95,17 @@ Trace: FR-TRANSACTIONS-033, FR-AUDIT-001, FR-AUDIT-002, INV-029 · Priority: Mus
 - **ENTONCES** ninguna de las tres transacciones cambia
 
 ### Requirement: Edición masiva y periodos cerrados
-Una edición masiva que cambie la clasificación o el estado de confirmación de alguna transacción cuya fecha de negocio cae en un periodo cerrado DEBE (MUST) rechazarse completa con `PERIOD_CLOSED` indicando cada transacción afectada, sin cambios, sin auditoría y sin eventos.
+Una edición masiva DEBE (MUST) aplicar a cada transacción el mismo alcance de la edición en periodos cerrados que la edición individual (`planning/month-closing`): si cambia categoría, tags, contraparte, custom fields o el estado de confirmación de alguna transacción con fecha de negocio en un periodo cerrado, DEBE (MUST) rechazarse completa con `PERIOD_CLOSED` indicando cada transacción afectada, sin cambios, sin auditoría y sin eventos; cambiar solo notas DEBE (MUST) permitirse.
 Trace: FR-TRANSACTIONS-033, FR-PLANNING-005, INV-015 · Priority: Must
 
 #### Scenario: Recategorizar en lote incluyendo un gasto de un mes cerrado
 - **CUANDO** marzo de 2026 está cerrado y el lote "categoría Hogar" incluye un gasto de 150.00 BOB del 2026-03-15 y uno de 45.90 BOB del 2026-04-02
 - **ENTONCES** se rechaza con `PERIOD_CLOSED` indicando el gasto del 2026-03-15
 - **Y** ninguno de los dos cambia de categoría y no se escribe auditoría
+
+#### Scenario: Notas en lote con un gasto de un mes cerrado
+- **CUANDO** marzo de 2026 está cerrado y el lote reemplaza las notas del gasto de 150.00 BOB del 2026-03-15 y del de 45.90 BOB del 2026-04-02
+- **ENTONCES** ambos gastos cambian sus notas y sus montos y saldos no cambian
 
 ### Requirement: Límite e idempotencia de la edición masiva
 Una edición masiva DEBERÍA admitir hasta 500 transacciones y exigir clave de idempotencia; cuando se exige, un lote de más de 500 DEBE (MUST) rechazarse con `VALIDATION_FAILED`, el reenvío con la misma clave y el mismo contenido DEBE (MUST) devolver el resultado original sin aplicar cambios de nuevo y la misma clave con contenido distinto DEBE (MUST) rechazarse con `IDEMPOTENCY_KEY_REUSED`.

@@ -105,12 +105,12 @@ Trace: FR-TRANSACTIONS-030 · Priority: Should
 - **ENTONCES** se rechaza con `INVALID_STATUS_TRANSITION`
 
 ### Requirement: Estado de reconciliación por cuenta
-El sistema DEBE (MUST) informar, para una cuenta y una fecha de corte, la fecha y el saldo del extracto de su última sesión completada con fecha menor o igual al corte, si tiene una sesión en curso y cuántas transacciones `posted` o `cleared` con fecha de negocio menor o igual al corte siguen sin reconciliar; esta consulta es la fuente del ítem "cuentas sin reconciliar" del checklist de cierre de mes.
+El sistema DEBE (MUST) informar, para una o varias cuentas y una fecha de corte, la fecha y el saldo del extracto de la última sesión completada de cada cuenta, si tiene una sesión en curso, cuántas transacciones `posted` o `cleared` con fecha de negocio menor o igual al corte siguen sin reconciliar y si la cuenta está reconciliada al corte (extracto completado con fecha igual o posterior al corte y ninguna sin reconciliar); es la fuente del ítem "cuentas sin conciliar" del checklist de cierre.
 Trace: FR-TRANSACTIONS-030, FR-PLANNING-003 · Priority: Must
 
 #### Scenario: Estado de "Bank A" al cierre de marzo
 - **CUANDO** "Bank A" completó una sesión al 2026-03-31 por 3350.00 BOB, el gasto de 45.90 BOB del 2026-03-20 sigue `posted` y se consulta el estado con corte 2026-03-31
-- **ENTONCES** se informa reconciliada al 2026-03-31 con saldo 3350.00 BOB, sin sesión en curso y 1 transacción sin reconciliar
+- **ENTONCES** se informa la última sesión al 2026-03-31 con saldo 3350.00 BOB, sin sesión en curso, 1 transacción sin reconciliar y la cuenta no reconciliada al corte
 
 #### Scenario: Cuenta nunca reconciliada
 - **CUANDO** se consulta el estado de "Caja BOB", que nunca tuvo una sesión completada
@@ -129,7 +129,7 @@ Trace: FR-TRANSACTIONS-029, FR-TRANSACTIONS-030 · Priority: Must
 - **ENTONCES** el consumidor aplica su efecto una sola vez
 
 ### Requirement: Reconciliación y periodos cerrados
-Ninguna operación de reconciliación DEBE (MUST) cambiar en silencio un periodo cerrado: confirmar o desconfirmar una transacción, reconciliarla al finalizar una sesión o des-reconciliarla DEBE (MUST) rechazarse con `PERIOD_CLOSED` cuando su fecha de negocio cae en un periodo cerrado, y el ajuste de una sesión cuya fecha de extracto cae en un periodo cerrado también; el rechazo DEBE (MUST) dejar todo sin cambios.
+Ninguna operación de reconciliación DEBE (MUST) cambiar en silencio un periodo cerrado (alcance de la edición en periodos cerrados de `planning/month-closing`): confirmar o desconfirmar una transacción, reconciliarla al finalizar una sesión o des-reconciliarla DEBE (MUST) rechazarse con `PERIOD_CLOSED` cuando su fecha de negocio cae en un periodo cerrado, y el ajuste de una sesión cuya fecha de extracto cae en un periodo cerrado también; el rechazo DEBE (MUST) dejar todo sin cambios.
 Trace: FR-TRANSACTIONS-030, FR-PLANNING-005, INV-015 · Priority: Must
 
 #### Scenario: Finalizar con una transacción de un mes cerrado

@@ -19,19 +19,19 @@ Motivación y alcance: ver proposal.md. Fuentes: FR-REPORTING-006, docs/14 §4 (
 
 ## Decisiones
 
-1. **Fecha de corte = último día calendario del mes** en la zona horaria del workspace (coherente con el bloqueo mensual por `year_month`, D10); el mes en curso usa hoy (`partial: true`). Si el workspace usa `fiscal_month_start_day ≠ 1`, la serie sigue en meses calendario (pregunta abierta 1).
+1. **Fecha de corte = fin del periodo financiero** (consolidación 2026-10-05, P-1 resuelta): los puntos son los periodos mensuales de `planning/financial-periods` (`PeriodQuery.listPeriods`), con fecha de corte `periodEnd` (con día de inicio 1, último día del mes calendario) y etiqueta `label` (`YYYY-MM` del inicio); el periodo en curso usa hoy en la TZ del workspace (`partial: true`). Coherente con el bloqueo por rango del periodo financiero (ADR-0028) y con los snapshots de cierre, que congelan el patrimonio a `periodEnd`. Para fechas anteriores al primer periodo existente (antes de cualquier asiento) la serie no tiene puntos. Un periodo de transición (cambio del día de inicio) es un punto más con su propio rango.
 2. **Saldo a la fecha** = Σ postings de la cuenta con `entry_date ≤ corte` (fecha de negocio, decisión 1 de `add-transaction-recording`), incluidas reversas: una corrección posterior fechada en el pasado cambia los puntos pasados abiertos (correcto: la serie refleja el ledger vigente), salvo meses cerrados (decisión 4).
 3. **Valoración** con `ValuationRateSelector` de FX en la fecha de corte y `windowDays` del setting `REPORTING_RATE_VALIDITY_WINDOW` (D53), mismos niveles que el patrimonio actual (`PRIMARY → FALLBACK → LAST_KNOWN_STALE/MANUAL`, D34/D38) pero **evaluados a esa fecha** (solo tasas con vigencia ≤ corte). Sin tasa ⇒ punto incompleto (`complete: false`, `unconverted[]`), nunca 1:1.
-4. **Meses cerrados**: si `ClosingSnapshotQuery` (pf-p2a, `planning/month-closing`) devuelve un snapshot vigente para el mes con patrimonio en la moneda de reporte pedida, el punto usa sus valores (`source: SNAPSHOT`, `closed: true`); si la moneda de reporte pedida difiere de la del snapshot, se calcula (`COMPUTED`) y se marca `closed: true` con aviso. Mientras pf-p2a no esté aplicado, el puerto devuelve vacío (todo `COMPUTED`).
+4. **Periodos cerrados**: `ClosingSnapshotQuery.listCurrent({workspaceId, periodIds})` (contrato de `add-month-closing`, §Contratos internos) devuelve el snapshot vigente de cada periodo cerrado con patrimonio, activos y pasivos en la moneda base; si la moneda de reporte pedida es la del snapshot, el punto usa sus valores (`source: SNAPSHOT`, `closed: true`); si difiere, se calcula (`COMPUTED`) y se marca `closed: true` con aviso. En el orden consolidado `add-month-closing` (18) se aplica antes que este change (22).
 5. **Cuentas por fecha**: entran las cuentas con `includeInNetWorth = true` (valor vigente; no hay historia del flag, pregunta abierta 2) cuyo saldo a la fecha sea ≠ 0 o que existían a esa fecha (`opened_on ≤ corte`); el estado actual (`ARCHIVED`/`CLOSED`) no excluye fechas pasadas.
 6. **Variación** = neto(n) − neto(n−1) en la moneda de reporte; `comparable: false` si alguno es incompleto.
-7. **Rango**: por defecto 12 meses terminando en el actual; máximo 120; `from ≤ to ≤ mes actual`.
+7. **Rango**: por etiquetas de periodo (`from`/`to` = `YYYY-MM`); por defecto 12 periodos terminando en el actual; máximo 120; `from ≤ to ≤ periodo actual`.
 8. **Caché**: `ETag` = hash(versión de datos del workspace, rango, moneda, setting de ventana, último instante de tasas usado); `304` con `If-None-Match`.
 9. **Rendimiento**: saldos as-of en lote para todas las fechas en una consulta por cuenta usando `balance_snapshot`; tasas resueltas en lote por (par, fecha). Objetivo p95 ≤ 800 ms con 24 meses y dataset `large`.
 
 ### Contrato
 
-`getNetWorthHistory` — `GET W/reports/net-worth/history?from=2026-01&to=2026-03&reportingCurrency=BOB` (VIEWER) ⇒ `NetWorthHistory { reportingCurrency, points: NetWorthPoint[], meta { ratesUsed[], attributions[], rateWindowDays, dataFreshness } }`; `NetWorthPoint { month, asOf (fecha), assets, liabilities, netWorth (DecimalString), change|null, comparable, complete, unconverted[{ currency, amount }], source: COMPUTED|SNAPSHOT, closed, partial }`.
+`getNetWorthHistory` — `GET W/reports/net-worth/history?from=2026-01&to=2026-03&reportingCurrency=BOB` (VIEWER) ⇒ `NetWorthHistory { reportingCurrency, points: NetWorthPoint[], meta { ratesUsed[], attributions[], rateWindowDays, dataFreshness } }`; `NetWorthPoint { period (label), periodId, asOf (fecha de corte = periodEnd u hoy), assets, liabilities, netWorth (DecimalString), change|null, comparable, complete, unconverted[{ currency, amount }], source: COMPUTED|SNAPSHOT, closed, partial }`.
 
 ## Riesgos / Trade-offs
 
@@ -44,12 +44,12 @@ Sin migraciones. Contrato: operación nueva (MINOR). La spec principal `reportin
 
 ## Preguntas abiertas
 
-1. **Mes calendario vs mes financiero.** Si el workspace configura un día de inicio de mes ≠ 1 (FR-IDENTITY-005), ¿la serie usa el fin del periodo financiero en lugar del fin de mes calendario? **Recomendación:** seguir la definición de periodo que adopte pf-p2a (`planning/financial-periods`); mientras el bloqueo del ledger sea por mes calendario (D10), usar mes calendario.
+1. **Mes calendario vs mes financiero.** *(Resuelta en la consolidación del 2026-10-05: la serie sigue los periodos financieros de `add-financial-periods` y el bloqueo por rango de ADR-0028; decisión 1.)*
 2. **Historia de `includeInNetWorth`.** ¿Un cambio del flag debe afectar solo desde la fecha del cambio? **Recomendación:** no en Phase 2 (se aplica el valor vigente a toda la serie y la UI lo advierte); la historia exacta llega con los snapshots de cierre, que congelan el valor.
 3. **Ubicación en la UI.** ¿Gráfico en el Home (Q1 "¿cuánto tengo?") o solo en una vista de patrimonio? **Recomendación:** tarjeta compacta en el Home (últimos 6 meses) con enlace a la vista completa (12 meses), aplicando la jerarquía visual de D50.
 
 ## Dependencias entre changes
 
 - **Requiere aplicados:** `add-basic-dashboard` (spec `reporting/net-worth`, valuador), `add-ledger-core` (saldos as-of), `add-market-rate-providers` (selector de valoración), `add-accounts-management`.
-- **Coordina con pf-p2a** (`planning/month-closing`): consume `ClosingSnapshotQuery` (snapshot vigente por mes con patrimonio por moneda y consolidado) y los eventos de cierre/reapertura para invalidar la caché. Sin pf-p2a funciona en modo solo `COMPUTED`.
+- **Requiere (orden consolidado):** `add-financial-periods` (13; puntos = periodos, `PeriodQuery`) y `add-month-closing` (18; `ClosingSnapshotQuery.listCurrent` y los eventos `planning.MonthClosed.v1`/`PeriodReopened.v1` para invalidar la caché).
 - **Lo consume:** nada en Phase 2; Phase 7 (`reporting/financial-reports`, reporte 8 "Net Worth") lo extiende con la descomposición del cambio.

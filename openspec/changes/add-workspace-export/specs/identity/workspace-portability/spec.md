@@ -27,7 +27,7 @@ Trace: FR-IDENTITY-010, FR-IDENTITY-006, NFR-SEC-003 · Priority: Must
 - **ENTONCES** se rechaza con `EXPORT_IN_PROGRESS`
 
 ### Requirement: Contenido completo del export
-El export DEBE (MUST) contener todos los datos de negocio del workspace —configuración, monedas habilitadas, instituciones, cuentas, catálogos de clasificación con sus alias, definiciones y valores de custom fields, transacciones con legs, splits, todas sus revisiones y detalles de conversión, cuentas contables, asientos y postings (incluidas reversas), bloqueos de periodo, tasas de cambio y preferencias, sesiones de reconciliación, auditoría y recorridos, y los datos de planificación que existan— y NO DEBE (MUST NOT) contener secretos, tokens, sesiones, claves de idempotencia, mensajes del outbox ni hashes de IP.
+El export DEBE (MUST) contener todos los datos de negocio del workspace —configuración, monedas habilitadas, instituciones, cuentas, catálogos de clasificación con sus alias, definiciones y valores de custom fields, transacciones con legs, splits, todas sus revisiones y detalles de conversión, cuentas contables, asientos y postings (incluidas reversas), bloqueos de periodo, tasas de cambio y preferencias, sesiones de reconciliación, auditoría y recorridos, y los datos de Phase 2 del requirement siguiente— y NO DEBE (MUST NOT) contener secretos, tokens, sesiones, claves de idempotencia, mensajes del outbox ni hashes de IP.
 Trace: FR-IDENTITY-010, NFR-COMP-002, NFR-SEC-015 · Priority: Must
 
 #### Scenario: Conteos del export
@@ -37,6 +37,15 @@ Trace: FR-IDENTITY-010, NFR-COMP-002, NFR-SEC-015 · Priority: Must
 #### Scenario: Sin secretos en el export
 - **CUANDO** se inspecciona el export de "W1"
 - **ENTONCES** no contiene tokens, cookies, claves de idempotencia, mensajes del outbox ni hashes de IP de la auditoría
+
+### Requirement: Datos de Phase 2 en el export
+El export DEBE (MUST) incluir, y la importación restaurar, los periodos financieros, los planes de presupuesto con sus líneas y cruces de umbral, los templates con todas sus versiones, la política de cierre, los snapshots de cierre con sus saldos, las reaperturas, los avisos de cierre pendiente, los bloqueos de periodo y las preferencias de notificación; las notificaciones y sus entregas NO DEBEN (MUST NOT) exportarse.
+Trace: FR-IDENTITY-010, FR-IDENTITY-017, FR-PLANNING-004 · Priority: Must
+
+#### Scenario: Ida y vuelta de un mes cerrado con presupuesto
+- **CUANDO** "W1" tiene "2026-10" cerrado con el snapshot 2 tras una reapertura, un plan de "2026-11" desde la versión 3 de un template con el umbral 90 % de "Restaurantes" ya cruzado, y el OWNER exporta e importa
+- **ENTONCES** el workspace nuevo tiene "2026-10" cerrado con los snapshots 1 y 2 sin cambios, la reapertura con su motivo, el plan de "2026-11" con su template en la versión 3 y el cruce registrado
+- **Y** un gasto con fecha 2026-10-15 se rechaza con `PERIOD_CLOSED` y no se emite de nuevo el umbral 90 %
 
 ### Requirement: Formato abierto y versionado del export
 El export DEBE (MUST) ser un único archivo comprimido con un manifiesto (formato `pfos-export`, versión de formato, workspace, instante de exportación, moneda base, secciones con conteo y suma SHA-256 de cada archivo), datos en JSON validables contra un esquema JSON publicado por versión de formato y vistas planas en CSV RFC 4180 UTF-8; los montos DEBEN (MUST) escribirse como texto decimal exacto con la escala de su moneda y las celdas CSV que empiecen con `=`, `+`, `-`, `@`, tabulación o retorno DEBEN (MUST) neutralizarse.

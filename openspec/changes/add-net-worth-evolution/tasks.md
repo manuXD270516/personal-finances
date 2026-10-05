@@ -1,6 +1,6 @@
 # Tareas
 
-> Requiere aplicados: `add-basic-dashboard`, `add-ledger-core`, `add-market-rate-providers`, `add-accounts-management`. Recomendado después de `planning/month-closing` (pf-p2a) para usar los snapshots de cierre.
+> Requiere aplicados: `add-basic-dashboard`, `add-ledger-core`, `add-market-rate-providers`, `add-accounts-management` y, en el orden consolidado (docs/03 §7), `add-financial-periods` (puntos = periodos financieros) y `add-month-closing` (`ClosingSnapshotQuery.listCurrent`).
 
 ## 1. SPEC y TEST CASES
 
@@ -9,7 +9,7 @@
 
 ## 2. DOMAIN (TDD)
 
-- [ ] 2.1 `NetWorthSeriesBuilder` puro, test-first: puntos, completitud, variación y comparabilidad, parcialidad del mes en curso, fuente `SNAPSHOT`/`COMPUTED` (TC-REPORTING-NETWORTH-006, -008, -009, -011)
+- [ ] 2.1 `NetWorthSeriesBuilder` puro, test-first: puntos por periodo financiero (incluido día de inicio 25 y periodo de transición), completitud, variación y comparabilidad, parcialidad del mes en curso, fuente `SNAPSHOT`/`COMPUTED` (TC-REPORTING-NETWORTH-006, -008, -009, -011)
 - [ ] 2.2 PBT: el punto del mes en curso a hoy coincide con el patrimonio actual de Phase 1 para el mismo conjunto de saldos y tasas (INV-031)
 
 ## 3. APPLICATION
