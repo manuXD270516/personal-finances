@@ -14,11 +14,10 @@ type: integration
 level: application
 automation_status: automated
 automated_tests:
-  - apps/api/test/api/fx-conversions.api.test.ts
-  - packages/contexts/fx/src/application/fx.service.test.ts
   - packages/contexts/fx/src/domain/exchange-rate.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
   - packages/contexts/fx/test/integration/pg-fx.int.test.ts
-  - tests/e2e/specs/fx.spec.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
 status: automated
 regression_suite: false
 phase: 1
