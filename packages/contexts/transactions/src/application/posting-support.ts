@@ -146,6 +146,41 @@ export function conversionRecordedPayload(s: TransactionState, d: ConversionDeta
   };
 }
 
+/**
+ * Payload de `transactions.ConversionRevised.v1` (docs/31 D48): el `ConversionDetail` de la revisión nueva y los
+ * tres asientos de la transición `REVISE` (revertido, reversa y nuevo). Idempotencia natural `(transactionId,
+ * revisionTo)`.
+ */
+export function conversionRevisedPayload(
+  s: TransactionState,
+  d: ConversionDetail,
+  revision: RevisionPosting,
+  journalEntryId: string,
+) {
+  const p = conversionRecordedPayload(s, d, journalEntryId);
+  return {
+    transactionId: p.transactionId,
+    revisionFrom: revision.revisionFrom,
+    revisionTo: s.revision,
+    businessDate: p.businessDate,
+    executedAt: p.executedAt,
+    source: p.source,
+    target: p.target,
+    quotedRate: p.quotedRate,
+    effectiveRate: p.effectiveRate,
+    referenceRate: p.referenceRate,
+    fees: p.fees,
+    spread: p.spread,
+    provider: p.provider,
+    convertedSource: p.convertedSource,
+    grossTarget: p.grossTarget,
+    quotedRateDeviation: p.quotedRateDeviation,
+    reversedJournalEntryId: revision.reversedJournalEntryId,
+    reversalJournalEntryId: revision.reversalJournalEntryId,
+    journalEntryId,
+  };
+}
+
 /** Revisión que reemplaza el asiento activo (transición `REVISE`): asientos revertido y de reversa. */
 export interface RevisionPosting {
   readonly revisionFrom: number;
@@ -159,7 +194,10 @@ export interface RevisionPosting {
  *   `transactionId`); cada edición financiera (`REVISE`, `revision` presente) publica `TransferRevised` con los tres
  *   asientos (docs/31 D37, add-lifecycle-timeline decisión 9; reemplaza la re-emisión de add-transfers decisión 6).
  *   Idempotencia natural de `TransferRevised`: `(transactionId, revisionTo)`.
- * - `CONVERSION`: `ConversionRecorded` por revisión posteada (comportamiento vigente de add-manual-conversions).
+ * - `CONVERSION`: `ConversionRecorded` UNA SOLA VEZ, en su primer asiento; cada corrección financiera (`REVISE`)
+ *   publica `ConversionRevised` con el detalle nuevo y los tres asientos (docs/31 D48, simétrico a `TransferRevised`;
+ *   reemplaza la re-emisión de `ConversionRecorded` con `revision + 1`). Idempotencia natural `(transactionId,
+ *   revisionTo)`.
  * `TransactionPosted` lleva el campo aditivo `transition` (decisión 10). Devuelve las referencias de los eventos.
  */
 export async function publishPosted(
@@ -221,12 +259,19 @@ export async function publishPosted(
   if (s.kind === 'CONVERSION') {
     if (!s.conversion) throw new DomainError('INTERNAL_ERROR', 'conversion without ConversionDetail');
     refs.push(
-      await publishEvent(
-        deps,
-        tx,
-        TRANSACTION_EVENTS.conversionRecorded,
-        conversionRecordedPayload(s, s.conversion, journalEntryId),
-      ),
+      revision
+        ? await publishEvent(
+            deps,
+            tx,
+            TRANSACTION_EVENTS.conversionRevised,
+            conversionRevisedPayload(s, s.conversion, revision, journalEntryId),
+          )
+        : await publishEvent(
+            deps,
+            tx,
+            TRANSACTION_EVENTS.conversionRecorded,
+            conversionRecordedPayload(s, s.conversion, journalEntryId),
+          ),
     );
   }
   return refs;

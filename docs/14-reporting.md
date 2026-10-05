@@ -49,7 +49,7 @@ flowchart LR
 | `reporting.monthly_account_agg` | `(workspace, period_month, account_id, currency)` → inflow, outflow, net, closing_balance | Postings (`ledger.EntryPosted`) | Account views, Cash Flow histórico |
 | `reporting.daily_balance` | `(workspace, account_id, date)` → balance (moneda de la cuenta) | `ledger.EntryPosted` (delta acumulado) | Account Balance History, Net Worth histórico |
 | `reporting.monthly_tag_agg` | `(workspace, period_month, currency, tag_id)` | `txn_fact` | Expenses by Tags |
-| `reporting.fx_conversion_fact` | 1 fila por conversión: monedas, montos, quoted/effective rate, reference rate, spread, fees | `transactions.ConversionRecorded` | FX/Crypto report |
+| `reporting.fx_conversion_fact` | 1 fila por conversión: monedas, montos, quoted/effective rate, reference rate, spread, fees | `transactions.ConversionRecorded` + `transactions.ConversionRevised` (corrección, docs/31 D48) | FX/Crypto report |
 | `reporting.fee_fact` | 1 fila por fee (conversión, bancaria, préstamo, tarjeta) | `txn_fact` filtrado categoría *Fees* + subtipos | Fees report |
 | `reporting.commitment_occurrence` | Ocurrencias futuras/pasadas de compromisos (expected vs matched) | `commitments.*` | Recurring Costs, Subscriptions, Cash Flow Calendar |
 | `reporting.goal_progress` | `(goal, date)` → saved, target | `goals.*` | Savings Goals |

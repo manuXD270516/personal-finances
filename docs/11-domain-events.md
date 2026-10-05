@@ -47,7 +47,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `transactions.TransactionVoided` | **Mantener** (Phase 1) | Revertir efectos derivados (actuals, aportes, ocurrencias). |
 | `transactions.TransactionCategorized` | **Mantener** (Phase 1) | Recategorización no toca el ledger; consumidores (Planning, Reporting) necesitan el delta por split. |
 | `transactions.TransferCompleted` | **Mantener** (Phase 1) | Redundante con `TransactionPosted(kind=TRANSFER)` para proyecciones, **pero** expresa el hecho de negocio que Goals y Debt escuchan (aporte a cuenta vinculada, pago de tarjeta/préstamo hecho a mano), y también se emite cuando dos transacciones importadas se **emparejan** como transferencia. |
-| `transactions.ConversionRecorded` | **Mantener** (Phase 1) | Lleva `ConversionDetail` (tasas, fees, spread) para FX (observación de tasa) y Reporting (historial de conversiones). |
+| `transactions.ConversionRecorded` | **Mantener** (Phase 1) | Lleva `ConversionDetail` (tasas, fees, spread) para FX (observación de tasa) y Reporting (historial de conversiones). Una sola vez por conversión (docs/31 D48). |
+| `transactions.ConversionRevised` | **Agregar** (Phase 1, docs/31 D48) | Corrección financiera de una conversión posteada (transición `REVISE`), simétrico a `TransferRevised`: detalle nuevo + asientos revertido, de reversa y nuevo. |
 | `ledger.JournalEntryPosted` | **Mantener** (Phase 1) | Fuente de proyecciones de saldo en Reporting; incluye reversas. |
 | `accounts.AccountOpened` / `AccountArchived` | **Mantener** (Phase 1) | Proyecciones (lista de cuentas en dashboard, net worth), réplicas locales futuras. Ledger **no** los necesita (get-or-create). |
 | `accounts.AccountUpdated` / `AccountClosed` / `AccountReactivated` | **Agregar** (Phase 1, docs/31) | Ciclo de vida completo de la cuenta (`ACTIVE`/`CLOSED`/`ARCHIVED`) para proyecciones del dashboard. |
@@ -109,9 +110,16 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `transactions.ConversionRecorded.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** FX (observación de tasa), REPORTING.
+- **Trigger:** **primer** posteo de la conversión (creación posteada o pending→posted); se publica **una sola vez** por conversión: una corrección financiera publica `ConversionRevised.v1` y la anulación `TransactionVoided.v1` (docs/31 D48).
 - **Payload:** `transactionId`, `journalEntryId`, `businessDate`, `executedAt`, `source: {accountId, amount: Money}` (bruto), `target: {accountId, amount: Money}` (neto), `quotedRate: Rate|null`, `effectiveRate: Rate`, `referenceRate: {rate: Rate, fxRateId, source}|null`, `fees: [{type: PROVIDER|NETWORK|BANK|TAX|OTHER, amount: Money, paidFromAccountId|null}]`, `spread: {percentage: string, amount: Money}|null`, `provider: {counterpartyId|null, name|null}`. `Rate = {base, quote, value: string}`. Opcionales aditivos (`add-manual-conversions`): `revision` (1 al registrar, +1 por amend), `convertedSource`, `grossTarget`, `quotedRateDeviation|null`.
-- **Re-emisión:** un amend (`PUT …/conversions/{transactionId}`) vuelve a publicar el evento con `revision + 1` y el `journalEntryId` activo.
-- **Idem.:** natural `(transactionId, journalEntryId)`. **Ord.:** por `Transaction`. **PII:** B (nombre de proveedor/persona P2P).
+- **Sin re-emisión (docs/31 D48, 2026-10-05):** un amend (`PUT …/conversions/{transactionId}`) ya **no** vuelve a publicar este evento con `revision + 1` (comportamiento anterior de `add-manual-conversions`): publica `ConversionRevised.v1`. Una conversión `PENDING` corregida y luego posteada publica este evento una vez, con la revisión vigente al postear.
+- **Idem.:** natural `(transactionId, journalEntryId)` (equivale a `transactionId`: hay uno solo). **Ord.:** por `Transaction`. **PII:** B (nombre de proveedor/persona P2P).
+
+#### `transactions.ConversionRevised.v1`
+- **Productor:** TRANSACTIONS. **Consumidores:** REPORTING (Phase 1, `reporting.data-version` invalida el resumen; idempotente vía `platform.inbox`); FX (observación de tasa, cuando exista ese consumidor).
+- **Trigger:** transición `REVISE` de una conversión posteada o cleared (montos, cuentas, fecha, tasa cotizada, referencia o fees): reversa exacta del asiento activo + asiento nuevo + `ConversionDetail` con la revisión siguiente (docs/31 D48, simétrico a `TransferRevised.v1`). La corrección de una conversión `PENDING` es una anotación y no lo publica.
+- **Payload:** `transactionId`, `revisionFrom`, `revisionTo`, `businessDate`, el detalle de la revisión `revisionTo` con la misma forma que `ConversionRecorded.v1` (`executedAt`, `source`, `target`, `quotedRate|null`, `effectiveRate`, `referenceRate|null`, `fees[]`, `spread|null`, `provider`, `convertedSource`, `grossTarget`, `quotedRateDeviation|null`) y los asientos `reversedJournalEntryId`, `reversalJournalEntryId`, `journalEntryId`. Schema: `contracts/events/transactions/ConversionRevised.v1.schema.json`.
+- **Idem.:** natural `(transactionId, revisionTo)`. **Ord.:** por `Transaction`. **PII:** B (nombre de proveedor/persona P2P).
 
 #### `ledger.JournalEntryPosted.v1`
 - **Productor:** LEDGER. **Consumidores:** REPORTING (saldos), GOALS (earmarks vs saldo).

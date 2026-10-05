@@ -28,7 +28,8 @@ contracts/events/
 │  ├─ TransactionCategorized.v1.schema.json
 │  ├─ TransferCompleted.v1.schema.json
 │  ├─ TransferRevised.v1.schema.json    # add-lifecycle-timeline (docs/31 D37)
-│  └─ ConversionRecorded.v1.schema.json
+│  ├─ ConversionRecorded.v1.schema.json
+│  └─ ConversionRevised.v1.schema.json  # docs/31 D48 (simétrico a TransferRevised)
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/
@@ -87,6 +88,7 @@ Resumen de [docs/11-domain-events.md §4](../../docs/11-domain-events.md):
 | `transactions.TransferCompleted.v1` | TRANSACTIONS | GOALS, DEBT, REPORTING |
 | `transactions.TransferRevised.v1` | TRANSACTIONS | REPORTING (GOALS, DEBT en Phase 4) |
 | `transactions.ConversionRecorded.v1` | TRANSACTIONS | FX, REPORTING |
+| `transactions.ConversionRevised.v1` | TRANSACTIONS | REPORTING (FX) |
 | `fx.RateRecorded.v1` | FX | REPORTING |
 | `ledger.JournalEntryPosted.v1` | LEDGER | REPORTING, GOALS |
 

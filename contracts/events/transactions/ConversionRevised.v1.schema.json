@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contracts.pfos.local/events/transactions/ConversionRecorded.v1.schema.json",
-  "title": "transactions.ConversionRecorded.v1",
-  "description": "Se registró (posteó) una conversión entre monedas con su ConversionDetail inmutable. source.amount = bruto entregado; target.amount = neto recibido. Productor: TRANSACTIONS. Consumidores: FX (observación de tasa), REPORTING. Idempotencia natural: (transactionId, journalEntryId). PII baja: provider.name. Se publica UNA sola vez por conversión (primer posteo); cada corrección financiera (REVISE) publica transactions.ConversionRevised.v1 (docs/31 D48).",
+  "$id": "https://contracts.pfos.local/events/transactions/ConversionRevised.v1.schema.json",
+  "title": "transactions.ConversionRevised.v1",
+  "description": "Corrección financiera (montos, cuentas, fecha, tasa cotizada, referencia o fees) de una conversión posteada: transición REVISE de la máquina Transaction (reversa exacta del asiento activo + asiento nuevo + ConversionDetail con la revisión siguiente; docs/31 D48, simétrico a TransferRevised.v1). Lleva el detalle de la revisión nueva (misma forma que ConversionRecorded.v1) y los asientos revertido, de reversa y nuevo. ConversionRecorded.v1 NO se re-emite. Productor: TRANSACTIONS. Consumidores: REPORTING (Phase 1), FX (observación de tasa). Idempotencia natural: (transactionId, revisionTo). PII baja: provider.name.",
   "type": "object",
   "allOf": [
     {
@@ -11,7 +11,7 @@
   ],
   "properties": {
     "eventType": {
-      "const": "transactions.ConversionRecorded"
+      "const": "transactions.ConversionRevised"
     },
     "eventVersion": {
       "const": 1
@@ -29,7 +29,8 @@
       "additionalProperties": false,
       "required": [
         "transactionId",
-        "journalEntryId",
+        "revisionFrom",
+        "revisionTo",
         "businessDate",
         "executedAt",
         "source",
@@ -39,14 +40,26 @@
         "referenceRate",
         "fees",
         "spread",
-        "provider"
+        "provider",
+        "convertedSource",
+        "grossTarget",
+        "quotedRateDeviation",
+        "reversedJournalEntryId",
+        "reversalJournalEntryId",
+        "journalEntryId"
       ],
       "properties": {
         "transactionId": {
           "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
         },
-        "journalEntryId": {
-          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        "revisionFrom": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revisionTo": {
+          "type": "integer",
+          "minimum": 2,
+          "description": "revisionFrom + 1"
         },
         "businessDate": {
           "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
@@ -126,18 +139,13 @@
             }
           }
         },
-        "revision": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Revisión de ConversionDetail (1 en el registro; +1 por cada amend). Opcional por cambio aditivo."
-        },
         "convertedSource": {
           "$ref": "../envelope.v1.schema.json#/$defs/Money",
-          "description": "Monto origen efectivamente convertido (bruto − fees en moneda origen). Opcional por cambio aditivo."
+          "description": "Monto origen efectivamente convertido (bruto − fees en moneda origen) de la revisión revisionTo."
         },
         "grossTarget": {
           "$ref": "../envelope.v1.schema.json#/$defs/Money",
-          "description": "Monto destino antes de fees en moneda destino. Opcional por cambio aditivo."
+          "description": "Monto destino antes de fees en moneda destino de la revisión revisionTo."
         },
         "quotedRateDeviation": {
           "oneOf": [
@@ -148,7 +156,19 @@
               "type": "null"
             }
           ],
-          "description": "Bruto destino − convertido × tasa cotizada, si supera una unidad mínima. Opcional por cambio aditivo."
+          "description": "Bruto destino − convertido × tasa cotizada, si supera una unidad mínima."
+        },
+        "reversedJournalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Asiento de la revisión anterior (revertido)"
+        },
+        "reversalJournalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Reversa exacta del asiento revertido (INV-008)"
+        },
+        "journalEntryId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Asiento nuevo de la revisión revisionTo"
         }
       }
     },
@@ -256,15 +276,15 @@
   },
   "examples": [
     {
-      "eventId": "01928c4e-7a3b-7c11-8f00-000000000002",
-      "eventType": "transactions.ConversionRecorded",
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000202",
+      "eventType": "transactions.ConversionRevised",
       "eventVersion": 1,
-      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "occurredAt": "2026-10-01T15:10:05.300Z",
       "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
       "aggregateType": "Transaction",
       "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
-      "aggregateVersion": 1,
-      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c2",
       "causationId": null,
       "actor": {
         "type": "USER",
@@ -272,7 +292,8 @@
       },
       "payload": {
         "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
-        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+        "revisionFrom": 1,
+        "revisionTo": 2,
         "businessDate": "2026-10-01",
         "executedAt": "2026-10-01T13:58:00Z",
         "source": {
@@ -285,7 +306,7 @@
         "target": {
           "accountId": "01928c4e-0000-7000-8000-000000acc001",
           "amount": {
-            "amount": "685.00",
+            "amount": "686.00",
             "currency": "BOB"
           }
         },
@@ -297,7 +318,7 @@
         "effectiveRate": {
           "base": "USDT",
           "quote": "BOB",
-          "value": "6.85"
+          "value": "6.860000000000000000"
         },
         "referenceRate": {
           "rate": {
@@ -313,7 +334,7 @@
           {
             "type": "PROVIDER",
             "amount": {
-              "amount": "5.00",
+              "amount": "4.00",
               "currency": "BOB"
             },
             "paidFromAccountId": null
@@ -330,7 +351,6 @@
           "counterpartyId": null,
           "name": "Binance P2P"
         },
-        "revision": 1,
         "convertedSource": {
           "amount": "100.000000",
           "currency": "USDT"
@@ -339,7 +359,10 @@
           "amount": "690.00",
           "currency": "BOB"
         },
-        "quotedRateDeviation": null
+        "quotedRateDeviation": null,
+        "reversedJournalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+        "reversalJournalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e2",
+        "journalEntryId": "01928c4e-7a3b-7c11-8f00-0000000000e3"
       }
     }
   ]
