@@ -364,7 +364,7 @@ export function WorkspaceSelector(p: WorkspaceSelectorProps) {
   return (
     <>
       <label>
-        {p.t('activeWorkspace')}{' '}
+        <span className="pf-ws-label">{p.t('activeWorkspace')}</span>{' '}
         <select
           data-testid="workspace-selector"
           value={p.activeId ?? ''}
@@ -383,7 +383,10 @@ export function WorkspaceSelector(p: WorkspaceSelectorProps) {
         </select>
       </label>
       {active ? (
-        <span data-testid="active-role"> {p.t('role', { role: p.t(`roles.${active.role}`) })}</span>
+        <span data-testid="active-role" className="pf-ws-role">
+          {' '}
+          {p.t('role', { role: p.t(`roles.${active.role}`) })}
+        </span>
       ) : null}
       {/* Anuncio para lectores de pantalla al cambiar de workspace (la página recarga sus datos). */}
       {/* `aria-live` sin `role="status"`: no compite con los mensajes de estado de cada pantalla. */}

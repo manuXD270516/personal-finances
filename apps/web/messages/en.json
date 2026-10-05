@@ -14,7 +14,7 @@
   "App": {
     "nav": "Main navigation",
     "home": "Home",
-    "settings": "Workspace settings",
+    "settings": "Settings",
     "preferences": "My preferences",
     "newWorkspace": "New workspace",
     "logout": "Sign out",
@@ -34,7 +34,11 @@
     "demoIndicator": "Demo data — this workspace contains fictitious data and can be fully cleaned up.",
     "demoOption": "{name} (demo)",
     "workspaceSwitched": "Active workspace: {name}.",
-    "switching": "Switching workspace…"
+    "switching": "Switching workspace…",
+    "skipToContent": "Skip to content",
+    "menu": "Navigation menu",
+    "userMenu": "Account menu",
+    "language": "Language"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",

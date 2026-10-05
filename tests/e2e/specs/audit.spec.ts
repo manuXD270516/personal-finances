@@ -81,6 +81,8 @@ test.describe('pista de auditoría (audit/audit-trail)', () => {
       await db.end();
     }
     const userAgent = await page.evaluate(() => navigator.userAgent);
+    // "Cerrar sesión" vive en el menú de la cuenta de la barra superior (AppFrame).
+    await page.getByTestId('user-menu').click();
     await page.getByTestId('logout').click();
     await expect
       .poll(async () => (await auditRowsOfW1(userId)).some((r) => r['action'] === 'identity.session.ended'))
