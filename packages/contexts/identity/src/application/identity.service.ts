@@ -140,7 +140,7 @@ export class IdentityService {
     return this.deps.uow.run({ userId, workspaceId: null }, async () => {
       const user = await this.deps.users.findById(userId);
       if (!user) throw notFound('user');
-      if (user.version !== expectedVersion) throw preconditionFailed();
+      if (user.version !== expectedVersion) throw preconditionFailed(user.version);
       const before = profileOf(user);
       const prefs: UserPreferenceChanges = {
         ...(changes.displayName === undefined ? {} : { displayName: changes.displayName }),
@@ -149,7 +149,9 @@ export class IdentityService {
         ...(changes.preferences === undefined ? {} : { preferences: changes.preferences }),
       };
       if (!user.updatePreferences(prefs)) return user;
-      if (!(await this.deps.users.savePreferences(user, expectedVersion))) throw preconditionFailed();
+      if (!(await this.deps.users.savePreferences(user, expectedVersion))) {
+        throw await lostRace(this.deps.users.findById(userId));
+      }
       const after = profileOf(user);
       const diff = PROFILE_FIELDS.filter((f) => before[f] !== after[f]).map((field) => ({
         field,
@@ -224,7 +226,7 @@ export class IdentityService {
     return this.deps.uow.run({ userId, workspaceId }, async () => {
       const workspace = await this.deps.workspaces.findById(workspaceId);
       if (!workspace) throw accessDenied();
-      if (workspace.version !== expectedVersion) throw preconditionFailed();
+      if (workspace.version !== expectedVersion) throw preconditionFailed(workspace.version);
       const patch: {
         -readonly [K in keyof SettingsPatch]: SettingsPatch[K];
       } = {};
@@ -248,7 +250,9 @@ export class IdentityService {
       }
       const changes = workspace.updateSettings(patch);
       if (changes.length > 0) {
-        if (!(await this.deps.workspaces.update(workspace, expectedVersion))) throw preconditionFailed();
+        if (!(await this.deps.workspaces.update(workspace, expectedVersion))) {
+          throw await lostRace(this.deps.workspaces.findById(workspaceId));
+        }
         await this.deps.outbox.append({
           eventId: this.deps.ids.next(),
           eventType: 'identity.WorkspaceSettingsChanged',
@@ -345,6 +349,14 @@ function profileOf(user: User): Record<(typeof PROFILE_FIELDS)[number], string |
   return { displayName: user.displayName, locale: user.locale.value, timeZone: user.timeZone?.value ?? null };
 }
 
-function preconditionFailed(): DomainError {
-  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
+function preconditionFailed(currentVersion?: number): DomainError {
+  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
+  });
+}
+
+/** El UPDATE condicional perdió una carrera: relee la fila para publicar la versión ganadora. */
+async function lostRace(current: Promise<{ readonly version: number } | null>): Promise<DomainError> {
+  return preconditionFailed((await current)?.version);
 }

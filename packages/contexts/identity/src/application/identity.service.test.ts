@@ -1,5 +1,6 @@
 import { isDomainError } from '@pf/shared-kernel';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { User } from '../domain/user.js';
 import { IdentityService } from './identity.service.js';
 import type { VerifiedIdentity } from './ports/index.js';
 import { InMemoryIdentity } from './testing/in-memory.js';
@@ -155,6 +156,27 @@ describe('Me, workspaces y autorización', () => {
     const me = await svc.getMe(owner.id);
     expect(me.user.timeZone?.value).toBe('America/Sao_Paulo');
     expect(me.user.locale.value).toBe('en-US');
+  });
+
+  it('[TC-PLATFORM-API-014] carrera perdida al guardar ⇒ 412 con la versión ganadora (relee la fila)', async () => {
+    const deps = mem.deps();
+    const racy = new IdentityService({
+      ...deps,
+      users: {
+        ...deps.users,
+        // Otro escritor confirma entre la carga (versión 1 vigente) y el UPDATE condicional.
+        savePreferences: async (user, expected) => {
+          const cur = mem.users.get(user.id)!;
+          mem.users.set(user.id, User.restore({ ...cur.snapshot(), version: cur.version + 1 }));
+          return deps.users.savePreferences(user, expected);
+        },
+      },
+    });
+    const err = await racy.updateMyPreferences(owner.id, 1, { locale: 'en-US' }).catch((e: unknown) => e);
+    expect(isDomainError(err) && [err.code, err.details]).toEqual([
+      'PRECONDITION_FAILED',
+      { currentVersion: 2 },
+    ]);
   });
 
   it('[TC-IDENTITY-WORKSPACE-003] el OWNER configura el workspace; valores inválidos se rechazan sin cambios', async () => {

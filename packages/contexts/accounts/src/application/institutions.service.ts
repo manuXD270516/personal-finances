@@ -57,7 +57,9 @@ export class InstitutionsService {
       const before = institution.snapshot;
       const changed = institution.update(changes);
       if (changed.length === 0) return before;
-      if (!(await this.deps.institutions.update(institution))) throw preconditionFailed();
+      if (!(await this.deps.institutions.update(institution))) {
+        throw await lostRace(this.deps.institutions.findById(workspaceId, id));
+      }
       const after = institution.snapshot;
       await this.audit.append({
         workspaceId,
@@ -76,7 +78,9 @@ export class InstitutionsService {
     return this.deps.uow.run(workspaceId, async () => {
       const institution = await this.load(workspaceId, id, expectedVersion);
       if (!institution.archive(this.deps.clock.now().toString())) return institution.snapshot;
-      if (!(await this.deps.institutions.update(institution))) throw preconditionFailed();
+      if (!(await this.deps.institutions.update(institution))) {
+        throw await lostRace(this.deps.institutions.findById(workspaceId, id));
+      }
       const s = institution.snapshot;
       await this.audit.append({
         workspaceId,
@@ -118,11 +122,19 @@ export class InstitutionsService {
   private async load(workspaceId: string, id: string, expectedVersion: number): Promise<Institution> {
     const institution = await this.deps.institutions.findById(workspaceId, id);
     if (!institution) throw notFound(id);
-    if (institution.version !== expectedVersion) throw preconditionFailed();
+    if (institution.version !== expectedVersion) throw preconditionFailed(institution.version);
     return institution;
   }
 }
 
-function preconditionFailed(): DomainError {
-  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
+function preconditionFailed(currentVersion?: number): DomainError {
+  return new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
+  });
+}
+
+/** El UPDATE condicional perdió una carrera: relee la fila para publicar la versión ganadora. */
+async function lostRace(current: Promise<{ readonly version: number } | null>): Promise<DomainError> {
+  return preconditionFailed((await current)?.version);
 }

@@ -597,7 +597,9 @@ describe('comandos de cuenta', () => {
       balance: { amount: '925.00', currency: 'BOB' },
     });
     expect(contract().validateResponse('updateAccount', 200, first.body)).toEqual([]);
-    expectProblem(await patch(editor, id, 1, { name: 'Otro' }), 412, 'PRECONDITION_FAILED');
+    const stale = await patch(editor, id, 1, { name: 'Otro' });
+    expectProblem(stale, 412, 'PRECONDITION_FAILED');
+    expect(stale.body['currentVersion']).toBe(2);
     expect(await postingsOf(editor, id)).toHaveLength(2);
     const updated = (await outbox(editor, id)).at(-1)!;
     expect(updated.event_type).toBe('accounts.AccountUpdated');

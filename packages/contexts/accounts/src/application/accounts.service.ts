@@ -26,8 +26,14 @@ import { baseCurrencyBalanceOf, type BaseCurrencyBalanceDto } from './base-curre
 import type { AccountListFilter, AccountsDeps, CurrencyInfo } from './ports/index.js';
 
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `account ${id} not found`);
-const preconditionFailed = () =>
-  new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version');
+/** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
+const preconditionFailed = (currentVersion?: number) =>
+  new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+    ...(currentVersion === undefined ? {} : { details: { currentVersion } }),
+  });
+/** El UPDATE condicional perdió una carrera: relee la fila para publicar la versión ganadora. */
+const lostRace = async (current: Promise<{ readonly version: number } | null>) =>
+  preconditionFailed((await current)?.version);
 
 export interface OpenAccountCommand {
   readonly workspaceId: string;
@@ -213,7 +219,7 @@ export class AccountsService {
         ...(currencyKind === undefined ? {} : { currencyKind }),
       });
       if (changed.length === 0) return this.view(account);
-      if (!(await accounts.update(account))) throw preconditionFailed();
+      if (!(await accounts.update(account))) throw await lostRace(accounts.findById(workspaceId, accountId));
       const after = account.snapshot;
       const payload: Record<string, unknown> = { accountId, changedFields: changed };
       for (const f of ['name', 'institutionId', 'liquidity', 'includeInNetWorth', 'currency'] as const) {
@@ -490,12 +496,14 @@ export class AccountsService {
   private async load(workspaceId: string, id: string, expectedVersion: number, forUpdate = false) {
     const account = await this.deps.accounts.findById(workspaceId, id, { forUpdate });
     if (!account) throw notFound(id);
-    if (account.version !== expectedVersion) throw preconditionFailed();
+    if (account.version !== expectedVersion) throw preconditionFailed(account.version);
     return account;
   }
 
   private async save(account: Account): Promise<void> {
-    if (!(await this.deps.accounts.update(account))) throw preconditionFailed();
+    if (!(await this.deps.accounts.update(account))) {
+      throw await lostRace(this.deps.accounts.findById(account.workspaceId, account.id));
+    }
   }
 
   private async enabledCurrency(code: string, pointer: string): Promise<CurrencyInfo> {
