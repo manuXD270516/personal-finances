@@ -124,6 +124,14 @@ export interface NetWorthBreakdown {
   readonly unvalued: readonly Money[];
 }
 
+/** Categoría del top-N de gasto neto del periodo (moneda de reporte; puede ser negativa si hubo reembolsos). */
+export interface TopCategory {
+  readonly categoryId: string;
+  readonly name: string;
+  readonly amount: Money;
+  readonly complete: boolean;
+}
+
 export type HomeQuestion = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'Q5' | 'Q6' | 'Q7' | 'Q8' | 'Q9';
 export type HomeQuestionAvailability = 'AVAILABLE' | 'NO_DATA' | 'NOT_AVAILABLE_IN_PHASE';
 
@@ -140,12 +148,7 @@ export interface ReportSummary {
   readonly consolidated: ConsolidatedTotals;
   readonly comparison?: PeriodComparison | null;
   readonly accounts: readonly AccountBalanceLine[];
-  readonly topExpenseCategories: readonly {
-    readonly categoryId: string;
-    readonly name: string;
-    readonly amount: Money;
-    readonly complete: boolean;
-  }[];
+  readonly topExpenseCategories: readonly TopCategory[];
   readonly netWorth: NetWorthBreakdown;
   readonly questions: readonly HomeQuestionStatus[];
   readonly meta: {

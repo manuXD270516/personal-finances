@@ -4,10 +4,12 @@
     "description": "Sistema operativo de finanzas personales"
   },
   "Home": {
-    "title": "Finanzas personales",
-    "subtitle": "Tu espacio de trabajo activo y tu cuenta.",
+    "title": "Inicio",
+    "subtitle": "Tu dinero hoy, cómo va el mes y tu patrimonio.",
     "language": "Idioma",
-    "greeting": "Hola, {name}"
+    "greeting": "Hola, {name}",
+    "metaTitle": "Inicio",
+    "metaDescription": "Resumen del espacio de trabajo: dinero disponible, ingresos y gastos del mes por categoría y patrimonio neto."
   },
   "App": {
     "nav": "Navegación principal",
@@ -175,6 +177,15 @@
       "PREVIOUS_PERIOD_TO_DATE": "comparado con los mismos días del mes anterior ({from} – {to})",
       "PREVIOUS_PERIOD": "comparado con el periodo anterior ({from} – {to})"
     },
+    "month": {
+      "title": "Este mes",
+      "empty": "Aún no hay movimientos este mes."
+    },
+    "sections": {
+      "wealth": "Patrimonio y cuentas",
+      "upcoming": "Próximamente",
+      "upcomingCaption": "Preguntas que se habilitan en las siguientes fases."
+    },
     "questions": {
       "Q1": "¿Cuánto dinero tengo?",
       "Q2": "¿Cuánto ingresó?",
@@ -245,7 +256,19 @@
     },
     "topCategories": {
       "title": "Principales categorías de gasto",
-      "empty": "Sin gastos registrados este mes."
+      "empty": "Sin gastos registrados este mes.",
+      "caption": "{n, plural, one {La categoría con más gasto neto del mes} other {Las # categorías con más gasto neto del mes}}",
+      "emptyAction": "Registrar un gasto",
+      "previous": "mes anterior: {amount}",
+      "comparing": "Comparando con el mes anterior…",
+      "legendPrevious": "Marca: gasto en los mismos días del mes anterior",
+      "trend": {
+        "up": "más que el mes anterior",
+        "down": "menos que el mes anterior",
+        "flat": "igual que el mes anterior",
+        "new": "nuevo: sin gasto el mes anterior",
+        "unknown": "sin comparación con el mes anterior"
+      }
     },
     "netWorth": {
       "title": "Patrimonio neto",

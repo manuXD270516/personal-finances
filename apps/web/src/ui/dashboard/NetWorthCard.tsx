@@ -1,10 +1,13 @@
 import { formatMoney } from './format';
 import { statusOf } from './QuestionWidgets';
-import { amountStyle, cardStyle, mutedStyle, warningStyle } from './styles';
 import type { FormatContext, ReportSummary } from './types';
 
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' } as const;
-const cell = { textAlign: 'right', padding: '0.125rem 0.25rem' } as const;
+const cell = {
+  textAlign: 'right',
+  padding: '0.125rem 0.25rem',
+  fontVariantNumeric: 'tabular-nums',
+} as const;
 
 /**
  * Patrimonio neto actual (reporting/net-worth): activos − pasivos en la moneda de reporte, advertencia si hay montos
@@ -15,28 +18,26 @@ export function NetWorthCard({ summary, ctx }: { summary: ReportSummary; ctx: Fo
   const nw = summary.netWorth;
   const noAccounts = statusOf(summary, 'Q1').status === 'NO_DATA';
   return (
-    <section data-testid="net-worth" aria-labelledby="net-worth-title" style={cardStyle}>
-      <h2 id="net-worth-title" style={{ fontSize: '1rem', margin: 0 }}>
-        {t('netWorth.title')}
-      </h2>
+    <section data-testid="net-worth" aria-labelledby="net-worth-title" className="pf-home-card">
+      <h3 id="net-worth-title">{t('netWorth.title')}</h3>
       {noAccounts ? (
         <p data-testid="net-worth-no-accounts">{t('noAccounts')}</p>
       ) : (
         <>
-          <p data-testid="net-worth-amount" style={amountStyle}>
+          <p data-testid="net-worth-amount" className="pf-home-amount">
             {formatMoney(nw.netWorth, locale)}
           </p>
-          <p style={mutedStyle}>
+          <p className="pf-home-muted">
             {t('netWorth.assets')}{' '}
             <span data-testid="net-worth-assets">{formatMoney(nw.assets, locale)}</span> ·{' '}
             {t('netWorth.liabilities')}{' '}
             <span data-testid="net-worth-liabilities">{formatMoney(nw.liabilities, locale)}</span>
           </p>
           {!nw.complete ? (
-            <div data-testid="net-worth-incomplete" style={warningStyle}>
-              <p style={{ margin: 0 }}>{t('netWorth.incomplete')}</p>
+            <div data-testid="net-worth-incomplete" className="pf-home-warning">
+              <p>{t('netWorth.incomplete')}</p>
               {nw.unvalued.length > 0 ? (
-                <p style={{ margin: 0 }} data-testid="net-worth-unvalued">
+                <p data-testid="net-worth-unvalued">
                   {nw.unvalued.map((m) => formatMoney(m, locale)).join(' · ')}
                 </p>
               ) : null}

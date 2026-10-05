@@ -1,6 +1,6 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { go, newFinanceUser, openAccount } from '../src/finance.js';
+import { api, bob, go, newFinanceUser, openAccount, todayLaPaz, userCategories } from '../src/finance.js';
 
 /**
  * Accesibilidad de las pantallas principales (NFR-USAB-001, WCAG 2.1 AA): axe-core sin violaciones `serious` ni
@@ -51,11 +51,24 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     const { context, page, W } = await newFinanceUser(browser, 'a11y');
     const bank = await openAccount(page, W, 'Banco a11y', 'BANK', 'BOB', '1000.00');
     await openAccount(page, W, 'Ahorro USD a11y', 'SAVINGS', 'USD', '100.00');
+    // Un gasto categorizado para que el Home analice "Este mes" con el top de categorías (barras y variación, D50).
+    const [food] = await userCategories(page, W, 'EXPENSE');
+    await api(page, 'POST', `${W}/transactions`, {
+      kind: 'EXPENSE',
+      transactionDate: todayLaPaz(),
+      accountId: bank,
+      amount: bob('120.00'),
+      splits: [{ amount: bob('120.00'), categoryId: food!.id }],
+    });
 
     const found: Record<string, Awaited<ReturnType<typeof seriousViolations>>> = {};
     for (const p of PAGES) {
       await go(page, p.path);
       await expect(page.locator('main, [role="main"]').first()).toBeVisible();
+      // El Home se analiza ya cargado, con la comparación por categoría resuelta (no el esqueleto).
+      if (p.path === '/') {
+        await expect(page.getByTestId('top-categories')).toHaveAttribute('data-comparison', 'ready');
+      }
       const violations = await seriousViolations(page);
       if (violations.length > 0) found[`${p.name} (${p.path})`] = violations;
     }

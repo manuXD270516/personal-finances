@@ -4,10 +4,12 @@
     "description": "Sistema operacional de finanças pessoais"
   },
   "Home": {
-    "title": "Finanças pessoais",
-    "subtitle": "Seu espaço de trabalho ativo e sua conta.",
+    "title": "Início",
+    "subtitle": "Seu dinheiro hoje, como vai o mês e seu patrimônio.",
     "language": "Idioma",
-    "greeting": "Olá, {name}"
+    "greeting": "Olá, {name}",
+    "metaTitle": "Início",
+    "metaDescription": "Resumo do espaço de trabalho: dinheiro disponível, receitas e gastos do mês por categoria e patrimônio líquido."
   },
   "App": {
     "nav": "Navegação principal",
@@ -175,6 +177,15 @@
       "PREVIOUS_PERIOD_TO_DATE": "comparado com os mesmos dias do mês anterior ({from} – {to})",
       "PREVIOUS_PERIOD": "comparado com o período anterior ({from} – {to})"
     },
+    "month": {
+      "title": "Este mês",
+      "empty": "Ainda não há movimentações neste mês."
+    },
+    "sections": {
+      "wealth": "Patrimônio e contas",
+      "upcoming": "Em breve",
+      "upcomingCaption": "Perguntas habilitadas nas próximas fases."
+    },
     "questions": {
       "Q1": "Quanto dinheiro eu tenho?",
       "Q2": "Quanto entrou?",
@@ -245,7 +256,19 @@
     },
     "topCategories": {
       "title": "Principais categorias de gasto",
-      "empty": "Sem gastos registrados neste mês."
+      "empty": "Sem gastos registrados neste mês.",
+      "caption": "{n, plural, one {A categoria com mais gasto líquido do mês} other {As # categorias com mais gasto líquido do mês}}",
+      "emptyAction": "Registrar um gasto",
+      "previous": "mês anterior: {amount}",
+      "comparing": "Comparando com o mês anterior…",
+      "legendPrevious": "Marca: gasto nos mesmos dias do mês anterior",
+      "trend": {
+        "up": "mais que o mês anterior",
+        "down": "menos que o mês anterior",
+        "flat": "igual ao mês anterior",
+        "new": "novo: sem gasto no mês anterior",
+        "unknown": "sem comparação com o mês anterior"
+      }
     },
     "netWorth": {
       "title": "Patrimônio líquido",
