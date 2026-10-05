@@ -1,0 +1,12 @@
+# PFOS — verificación horaria de archivado WAL y antigüedad del último backup (UTC; La Paz = UTC−4). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS verificación horaria de archivado WAL y antigüedad del último backup
+
+[Timer]
+OnCalendar=hourly
+Unit=pfos-backup@check.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

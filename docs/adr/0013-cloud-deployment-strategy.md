@@ -1,6 +1,6 @@
 # ADR-0013: Estrategia de despliegue cloud — AWS ECS/Fargate (perfil de costo mínimo), Cloud Run como plan B, EKS rechazado
 
-- Estado: Propuesto (decisión final del owner sobre presupuesto tras SPIKE-09)
+- Estado: Reemplazado por [ADR-0027](0027-destino-de-despliegue-inicial-vps-compose.md) (2026-10-05: presupuesto del owner USD 10–20/mes → VPS único + Compose en AWS Lightsail São Paulo). Este ADR queda como referencia del nivel N4 (ECS/Fargate + RDS)
 - Fecha: 2026-10-01
 - Decisores: Owner (Product/Tech Lead)
 - Relacionado: docs/ARCHITECTURE.md §5, §11; docs/21-cloud-deployment-options.md (análisis detallado); docs/22-infrastructure.md; ADR-0005, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0014, ADR-0015, ADR-0020; OpenSpec capability `platform/delivery-pipeline`; SPIKE-09

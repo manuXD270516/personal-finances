@@ -1,0 +1,12 @@
+# PFOS — backup diferencial diario (repo1) (UTC; La Paz = UTC−4). Instalado y habilitado por deploy/host/pfos-deploy.sh.
+[Unit]
+Description=PFOS backup diferencial diario (repo1)
+
+[Timer]
+OnCalendar=Mon..Sat *-*-* 06:00:00 UTC
+Unit=pfos-backup@diff.service
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

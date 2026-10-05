@@ -12,7 +12,7 @@
 | SPIKE-06 Auth Keycloak + BFF | [SPIKE-06-auth-bff](SPIKE-06-auth-bff/README.md) | 0010, 0019 | Completado — recomienda aceptar (openid-client, sin Auth.js) |
 | SPIKE-07 Object storage local | [SPIKE-07-object-storage](SPIKE-07-object-storage/README.md) | 0009 | Completado — SeaweedFS |
 | SPIKE-08 Compose en Windows | [SPIKE-08-compose-windows](SPIKE-08-compose-windows/README.md) | 0011, 0012 | Completado (ADR-0012 Propuesto) |
-| SPIKE-09 Costo cloud | [SPIKE-09-deploy-costs](SPIKE-09-deploy-costs/README.md) | 0013, 0027 | Completado (investigación + latencia medida) — recomienda VPS + Compose en Lightsail São Paulo (≈ USD 27–30/mes); ADR-0027 Propuesto; **presupuesto del owner (Q3) y PoC de costo facturado pendientes**. [Anexo A — PaaS](SPIKE-09-deploy-costs/anexo-a-paas.md) (2026-10-04, D42): ninguna PaaS supera a N2/N1; variantes P1 Railway (≈ 25–30) y P2 Fly.io `gru` (≈ 38–48) |
+| SPIKE-09 Costo cloud | [SPIKE-09-deploy-costs](SPIKE-09-deploy-costs/README.md) | 0013, 0027 | Completado (investigación + latencia medida). [Anexo A — PaaS](SPIKE-09-deploy-costs/anexo-a-paas.md) (2026-10-04, D42): ninguna PaaS supera a los VPS. **§17 (2026-10-05):** presupuesto del owner USD 10–20 → default AWS Lightsail 2 GB São Paulo (≈ USD 14/mes), fallback Oracle A1; Hetzner CX no contratable; **ADR-0027 Aceptado**, ADR-0013 reemplazado; scaffolding de deploy (`infra/`, `compose.prod.yaml`, `deploy.yml`) validado sin cloud. PoC de costo facturado pendiente |
 | SPIKE-10 Observabilidad local | [SPIKE-10-observability](SPIKE-10-observability/README.md) | 0020 | Completado (ADR en Propuesto) |
 
 ## Reglas

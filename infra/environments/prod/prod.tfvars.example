@@ -1,0 +1,5 @@
+# Copiar a prod.tfvars (ignorado por git). Sin secretos: la passphrase del state va por TF_VAR_state_passphrase.
+deploy_ssh_public_key = "ssh-ed25519 AAAA... pfos-deploy@github-actions"
+b2_bucket_name        = "pfos-prod-backups-CAMBIAR"
+budget_alert_email    = "owner@example.com"
+# lightsail_bundle_id = "medium_3_0" # 4 GB (USD 24) si el PoC mide falta de memoria y el presupuesto lo permite

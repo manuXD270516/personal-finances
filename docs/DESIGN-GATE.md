@@ -45,7 +45,7 @@ Este documento cierra el bloque de diseño de Phase 0. **No se escribe código p
 | 11 | Test case catalog Phase 0/1 | **PARTIAL** | 50 TCs en `draft`; se completan al redactar los changes de Phase 1 (Implementation Gate) |
 | 12 | Local container architecture / stack local | **PARTIAL** | Object storage (SeaweedFS vs Garage, MinIO descartado) → SPIKE-07; Compose en Windows/WSL2 → SPIKE-08; ¿Redis opcional? → SPIKE-05 |
 | 13 | Technology ADRs | **PARTIAL** | 23 en *Propuesto*; cada uno se acepta al cerrar su spike (SPIKE-01..10) |
-| 14 | Deployment architecture (cloud) | **PARTIAL** | Presupuesto mensual del owner → ECS/Fargate (~120–195 USD/mes) vs Cloud Run (~60–110 USD/mes), SPIKE-09. No bloquea Phase 1 (local-first). **2026-10-03:** SPIKE-09 completado (investigación) → ADR-0027 propone VPS + Compose por niveles (default ≈ USD 27–30/mes); falta Q3 |
+| 14 | Deployment architecture (cloud) | **PARTIAL** | Presupuesto mensual del owner → ECS/Fargate (~120–195 USD/mes) vs Cloud Run (~60–110 USD/mes), SPIKE-09. No bloquea Phase 1 (local-first). **2026-10-03:** SPIKE-09 completado (investigación) → ADR-0027 propone VPS + Compose por niveles (default ≈ USD 27–30/mes). **2026-10-05:** Q3 resuelta (D51, USD 10–20/mes) → ADR-0027 **Aceptado**: Lightsail 2 GB São Paulo (≈ USD 14/mes), fallback Oracle A1 Santiago |
 | 15 | IaC / CI-CD | **READY** | Terraform vs OpenTofu como binario por defecto (menor) |
 | 16 | Observability | **READY** | — |
 | 17 | Backup / restore / DR | **READY** | — |

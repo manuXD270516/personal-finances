@@ -1,6 +1,7 @@
 # Build once (platform/delivery-pipeline, NFR-PORT-006, docs/23 §5.2): cada push a main construye UNA vez
 # finance-api y finance-web, las publica en GHCR con tag `sha-<commit>` y registra sus digests. Un segundo job
-# descarga las imágenes POR DIGEST y verifica que corren sin reconstruir. Sin deploy (aún no hay cloud).
+# descarga las imágenes POR DIGEST y verifica que corren sin reconstruir. El deploy a producción es aparte y manual
+# (deploy.yml, workflow_dispatch con aprobación) y reutiliza los digests registrados aquí (incluido pfos-postgres).
 # Acciones de terceros fijadas por SHA de commit completo (comentario = tag verificado).
 name: main
 
@@ -37,6 +38,9 @@ jobs:
             dockerfile: docker/api.Dockerfile
           - image: finance-web
             dockerfile: docker/web.Dockerfile
+          # PostgreSQL 18 + pgBackRest para producción N1 (ADR-0027); el stack local/CI sigue usando postgres oficial.
+          - image: pfos-postgres
+            dockerfile: docker/postgres.Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }

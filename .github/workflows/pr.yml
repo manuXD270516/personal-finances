@@ -165,6 +165,9 @@ jobs:
             dockerfile: docker/api.Dockerfile
           - image: finance-web
             dockerfile: docker/web.Dockerfile
+          # Imagen de producción N1 (ADR-0027): se construye y escanea en el PR para no descubrir fallas recién en main.
+          - image: pfos-postgres
+            dockerfile: docker/postgres.Dockerfile
     env:
       IMAGE_REF: pfos/${{ matrix.image }}:ci
     steps:

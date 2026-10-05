@@ -106,7 +106,7 @@ Notas:
 
 ## 7. Runbook de restauración (producción)
 
-Ubicación final: `docs/runbooks/restore-production.md` (Phase 1). Resumen:
+Ubicación final: [`docs/runbooks/deploy-and-restore.md`](runbooks/deploy-and-restore.md) (ADR-0027, 2026-10-05). Resumen:
 
 ```mermaid
 flowchart TD

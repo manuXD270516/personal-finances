@@ -4,6 +4,8 @@
 
 > Todo HCL de este documento es **ilustrativo** (Phase 0). No se crea `infra/terraform/` hasta después del DESIGN GATE.
 
+> **Actualización 2026-10-05:** con [ADR-0027](adr/0027-destino-de-despliegue-inicial-vps-compose.md) aceptado (presupuesto USD 10–20/mes), la IaC real del nivel N1 vive en **`infra/`** (OpenTofu, sin `terraform/` intermedio): ver §14. El layout multi-cuenta/ECS de §2–§11 queda como diseño del nivel N4.
+
 ---
 
 ## 1. Principios
@@ -421,3 +423,38 @@ Documentados en `docs/runbooks/bootstrap-aws.md` (a crear en Phase 1):
 5. Deploy de imágenes vía CLI/API (fuera de Terraform, `ignore_changes`) vs vía Terraform — propuesta: CLI/API.
 6. Región de DR para copias cross-region (p. ej. `us-west-2` o `sa-east-1`).
 7. ¿Infracost (requiere API key gratuita) en PRs desde Phase 1?
+
+## 14. Implementación N1 (2026-10-05, ADR-0027)
+
+Estado: código validado **sin aplicar** (`tofu fmt -check` y `tofu validate` con OpenTofu 1.12.7, `init -backend=false`, sin credenciales). Operación: [runbook de despliegue y restauración](runbooks/deploy-and-restore.md).
+
+```
+infra/
+├─ modules/
+│  ├─ lightsail-host/   # aws_lightsail_instance (Ubuntu 24.04, small_3_0 = 2 GB) + IP estática + firewall (80/443; 22 solo
+│  │                    # alias lightsail-connect) + snapshots diarios; cloud-init: Docker, Tailscale, ufw, unattended-upgrades,
+│  │                    # swap 2 GiB, usuario pfos-deploy con comando forzado
+│  └─ b2-backups/       # bucket B2 (SSE-B2, Object Lock governance 21 d, lifecycle por prefijo) + clave del host
+│                       # (sin bypassGovernance) + clave de solo lectura para restore drills
+└─ environments/
+   └─ prod/             # composición + AWS Budgets (USD 20) + VM de drill opcional (drill_enabled); backend S3 parcial
+                        # (backend.hcl local) con lockfile nativo; .terraform.lock.hcl versionado (linux/darwin/windows)
+```
+
+Diferencias deliberadas con §2–§11 (que describen el N4):
+
+| Tema | N1 (implementado) | Motivo |
+|---|---|---|
+| Cuentas | Una cuenta AWS (Identity Center + MFA), sin Organizations | 1 recurso de cómputo; multi-cuenta llega con el N4 |
+| Secretos | Archivos `/etc/pfos/*.env` (root, 0600) en el host, copia cifrada en el gestor del owner; nunca en el state ni en CI | Sin Secrets Manager (costo y complejidad para un host) |
+| State | S3 + **cifrado del lado cliente de OpenTofu** (`encryption` pbkdf2 + AES-GCM, `enforced`): el state contiene la clave B2 del host | Defensa en profundidad además de SSE-S3 |
+| CI/CD | **Sin plan/apply en CI**; el deploy de imágenes va por `deploy.yml` (SSH por Tailscale a un comando forzado), fuera de OpenTofu (§13 P5: CLI/API) | Superficie mínima: CI no tiene credenciales de AWS ni de B2 |
+| Providers | `hashicorp/aws ~> 6.67`, `Backblaze/b2 ~> 0.14` | Los mínimos del N1; DNS (Cloudflare) y Grafana quedan manuales hasta que haya más de un registro/alerta |
+
+Responde §13 P4: el binario por defecto es **OpenTofu** (el cifrado de state es exclusivo de OpenTofu). Validación local reproducible:
+
+```bash
+TOFU=ghcr.io/opentofu/opentofu:1.12.7@sha256:3f068ee39a7233d39d9179fb2116a052a6fecdc350dfe2fccebb45b17ef1aa86
+docker run --rm -v "$PWD/infra:/infra" -w /infra "$TOFU" fmt -check -recursive
+docker run --rm --entrypoint sh -v "$PWD/infra:/infra" -w /infra/environments/prod "$TOFU" -c "tofu init -backend=false && tofu validate"
+```
