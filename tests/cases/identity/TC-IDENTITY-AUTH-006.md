@@ -16,6 +16,7 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
+- apps/api/test/api/workspace-base-currency.api.test.ts
 - apps/api/test/api/identity.api.test.ts
 status: automated
 regression_suite: false
@@ -38,7 +39,7 @@ expected_result:
 - memberships contiene exactamente W1 Personal Demo (OWNER) y W2 Other Demo (OWNER); W3 no aparece
 - La respuesta cumple el schema Me
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-AUTH-006 — GET /me devuelve el perfil del usuario con locale, zona horaria y membresías activas

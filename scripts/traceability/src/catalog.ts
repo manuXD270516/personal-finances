@@ -164,6 +164,7 @@ export function parseCaseFile(file: string, content: string): ParsedCase {
       automationStatus: fm.automation_status,
       automatedTests: fm.automated_tests ?? [],
       status: fm.status,
+      regressionSuite: fm.regression_suite ?? false,
     },
   };
 }

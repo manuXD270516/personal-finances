@@ -12,9 +12,10 @@ invariants: [INV-022]
 priority: critical
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/accounts-ledger.api.test.ts
+status: automated
 regression_suite: true
 phase: 1
 tags: ["accounts", "balance"]
@@ -29,7 +30,7 @@ expected_result:
   - "El PATCH se rechaza con VALIDATION_FAILED"
   - "El saldo sigue siendo 925.00 BOB y no se crea ningún asiento"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-ACCOUNTS-BALANCE-001 — El saldo de la cuenta se deriva de sus movimientos y no puede editarse directamente
@@ -46,3 +47,7 @@ Cuando el usuario intenta fijar su saldo en 2000.00 BOB
 Entonces se rechaza con VALIDATION_FAILED
   Y el saldo sigue en 925.00 BOB
 ```
+
+## Notas
+
+- Automatizado 2026-10-04 (add-accounts-management 6.3) contra Ledger y Transactions reales.

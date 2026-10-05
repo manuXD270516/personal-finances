@@ -292,6 +292,27 @@ describe('GET /reports/summary — saldos, dinero disponible y patrimonio (PG re
     );
   });
 
+  it('[TC-REPORTING-NETWORTH-001] (regresión) una cuenta BTC sin postings con BTC no habilitada no rompe el resumen (escala 8 del catálogo, no 18)', async () => {
+    const btc = await user(`kc-rep-e-${randomUUID()}`);
+    await account(btc, 'Cold Wallet BTC', 'CRYPTO_WALLET', 'BTC', '0.01000000');
+    await post(btc, '/accounts', { name: 'Exchange BTC', type: 'CRYPTO_WALLET', currency: 'BTC' });
+    const currencies = await call('GET', `${W(btc)}/currencies?enabled=true`, { token: btc.token });
+    expect(currencies.status).toBe(200);
+    expect(JSON.stringify(currencies.body)).not.toContain('"BTC"');
+
+    const r = await summary(btc);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const lines = r.body['accounts'] as { name: string; balance: Money }[];
+    expect(lines.map((l) => [l.name, m(l.balance)])).toEqual([
+      ['Cold Wallet BTC', '0.01000000 BTC'],
+      ['Exchange BTC', '0.00000000 BTC'],
+    ]);
+    const byCurrency = r.body['byCurrency'] as { currency: string; liquidBalance: Money; netWorth: Money }[];
+    expect(byCurrency.map((c) => [c.currency, m(c.liquidBalance), m(c.netWorth)])).toEqual([
+      ['BTC', '0.01000000 BTC', '0.01000000 BTC'],
+    ]);
+  });
+
   it('[TC-REPORTING-DASHBOARD-007] con providers caídos usa la última tasa marcada obsoleta y luego una manual más reciente', async () => {
     clock.set(Instant.parse('2026-10-02T17:00:00Z')); // 8 h 6 min 52 s después de la última tasa de provider
     try {

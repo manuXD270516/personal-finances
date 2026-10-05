@@ -28,7 +28,8 @@ import {
   type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
-import type { JwtVerifierOptions } from '@pf/platform/api';
+import { JWKS_METRICS, type JwksObserver, type JwtVerifierOptions } from '@pf/platform/api';
+import { otelCounters, type CounterMetrics } from '@pf/platform/otel';
 import { demoDataEnabled, type ApiConfig } from '@pf/platform/config';
 import type { JobQueue } from '@pf/platform/queue';
 import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
@@ -42,7 +43,7 @@ import {
   TRANSACTION_LIFECYCLE_MACHINE,
   TransactionsModule,
 } from '@pf/transactions/interface/transactions.module';
-import { TRANSACTIONS_AUDIT_POLICY } from '@pf/transactions/contracts';
+import { TRANSACTIONS_AUDIT_POLICY, type CounterpartyCategoryUsageQuery } from '@pf/transactions/contracts';
 import type { AuditHistoryQuery } from '@pf/audit/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
@@ -50,16 +51,55 @@ import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
 import { workspaceCreatedHook } from './workspace-provisioning.js';
 
+/**
+ * Logs y métricas del JWKS remoto (add-workspace-identity design §3): refetch fallido ⇒ `warn` (o `error` si ya no
+ * queda JWKS de respaldo) + `pf.auth.jwks_refresh_failures`; token verificado con el JWKS de respaldo ⇒
+ * `pf.auth.jwks_fallback`.
+ */
+export function jwksObserver(
+  logger: Pick<Logger, 'warn' | 'error'>,
+  counters: CounterMetrics = otelCounters('pfos.identity'),
+): JwksObserver {
+  return {
+    refreshFailed: ({ error, fallbackAgeMs }) => {
+      counters.increment(JWKS_METRICS.refreshFailures, { fallback: String(fallbackAgeMs !== null) });
+      if (fallbackAgeMs === null) {
+        logger.error(
+          { err: error },
+          'JWKS del IdP no disponible y sin JWKS de respaldo vigente: tokens rechazados',
+        );
+      } else {
+        logger.warn(
+          { err: error, fallbackAgeSeconds: Math.round(fallbackAgeMs / 1000) },
+          'JWKS del IdP no disponible: se usa el último JWKS conocido',
+        );
+      }
+    },
+    fallbackUsed: () => counters.increment(JWKS_METRICS.fallback, {}),
+  };
+}
+
 /** Opciones JWT desde el contrato de configuración (`OIDC_*`); `undefined` si no hay emisor configurado. */
-export function jwtOptionsFromConfig(config: ApiConfig): JwtVerifierOptions | undefined {
+export function jwtOptionsFromConfig(
+  config: ApiConfig,
+  logger?: Pick<Logger, 'warn' | 'error'>,
+): JwtVerifierOptions | undefined {
   if (!config.OIDC_ISSUER_URL) return undefined;
   const issuer = config.OIDC_ISSUER_URL.replace(/\/+$/, '');
+  const parties = (config.OIDC_AUTHORIZED_PARTIES ?? '')
+    .split(',')
+    .map((c) => c.trim())
+    .filter((c) => c.length > 0);
   return {
     issuer,
     audience: config.OIDC_API_AUDIENCE,
+    profile: config.OIDC_PROFILE,
     requiredScope: config.OIDC_REQUIRED_SCOPE,
     clockSkewSeconds: config.OIDC_CLOCK_SKEW_SECONDS,
+    ...(parties.length > 0 ? { authorizedParties: parties } : {}),
     jwks: new URL(config.OIDC_JWKS_URI ?? `${issuer}/protocol/openid-connect/certs`),
+    jwksFallbackMaxAgeMs: config.OIDC_JWKS_FALLBACK_MAX_AGE,
+    ...(logger ? { jwksObserver: jwksObserver(logger) } : {}),
   };
 }
 
@@ -148,12 +188,18 @@ export function financeRuntimes(input: {
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
+  // La sugerencia `LAST_USED` lee el historial de TRANSACTIONS, que se compone después (depende del validador de
+  // CLASSIFICATION): referencia diferida a su query pública.
+  const deferred: { categoryUsage?: CounterpartyCategoryUsageQuery } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
     clock: input.clock,
     outbox: classificationOutbox(writer),
     audit: input.audit,
     locales: identityUserLocales(input.pool),
+    lastCategoryUsed: {
+      lastCategoryUsed: (query) => deferred.categoryUsage?.lastCategoryUsed(query) ?? Promise.resolve(null),
+    },
   });
   // FX (add-manual-conversions): catálogo, tasas manuales y pricing de conversiones; moneda de reporte de IDENTITY.
   const fx = createFxRuntime({
@@ -195,6 +241,7 @@ export function financeRuntimes(input: {
     lookup: classification.lookup,
     fx: fx.pricing,
   });
+  deferred.categoryUsage = transactions.categoryUsage;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
   const reporting = createReportingRuntime({
     pool: input.pool,
@@ -226,7 +273,7 @@ export function identityImports(input: {
   /** Cola de jobs (add-demo-data: `demo.load`/`demo.purge` encolados en la transacción del comando). */
   readonly queue?: JobQueue;
 }): NonNullable<ModuleMetadata['imports']> {
-  const jwt = input.jwt ?? jwtOptionsFromConfig(input.config);
+  const jwt = input.jwt ?? jwtOptionsFromConfig(input.config, input.logger);
   if (!jwt) {
     input.logger.warn(
       'OIDC_ISSUER_URL ausente: rutas /api/v1/me, /api/v1/workspaces y /audit-log no montadas (solo local/ci)',

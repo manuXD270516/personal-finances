@@ -40,6 +40,8 @@ export interface Dependencies {
   readonly workerDatabaseUrl: string;
   /** Rol propietario de migraciones (`pf_migrator`). */
   readonly migratorUrl: string;
+  /** Superusuario del contenedor (ignora RLS): solo para medir el overhead de RLS en los benchmarks nightly. */
+  readonly superuserUrl: string;
   readonly postgresHost: string;
   readonly postgresPort: number;
   readonly s3Endpoint: string;
@@ -129,6 +131,7 @@ export default async function setup(project: TestProject) {
     bffDatabaseUrl,
     workerDatabaseUrl,
     migratorUrl,
+    superuserUrl: withCredentials(pg.getConnectionUri(), pg.getUsername(), pg.getPassword()),
     postgresHost: pg.getHost(),
     postgresPort: pg.getPort(),
     s3Endpoint,

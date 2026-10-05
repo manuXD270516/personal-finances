@@ -17,6 +17,7 @@ automation_status: automated
 automated_tests:
 - packages/contexts/identity/src/application/identity.service.test.ts
 - apps/api/test/api/identity.api.test.ts
+- tests/e2e/specs/workspace-identity.spec.ts
 status: automated
 regression_suite: false
 phase: 1
@@ -52,7 +53,7 @@ expected_result:
 - 'Moneda XYZ: 422 REFERENCE_NOT_FOUND'
 - El workspace final mantiene la versión 2 y los valores del primer PATCH
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-WORKSPACE-003 — El OWNER configura el workspace y los valores inválidos se rechazan sin cambios

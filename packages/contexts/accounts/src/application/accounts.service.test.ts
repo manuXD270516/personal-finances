@@ -347,6 +347,7 @@ describe('Equivalente en moneda base', () => {
     const rates: FxValuationPort = {
       windowDays: 7,
       enabledCurrencies: async () => [],
+      workspaceCurrencies: async () => [],
       resolveValuationRates: async (input) => {
         calls.push(input);
         return input.requests.map((r) => (r.base === 'USD' && r.quote === 'BOB' ? usdBob : null));

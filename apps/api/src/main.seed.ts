@@ -1,7 +1,7 @@
 // Comando `seed` (one-shot): `seed --profile=minimal|demo|large`. Solo local/CI (docs/19 §8, docs/29).
 import { loadConfigOrExit } from '@pf/platform/config';
 import { createLogger } from '@pf/platform/logging';
-import { parseSeedProfile, runSeed, SeedRejectedError } from './seed/run-seed.js';
+import { parseSeedOptions, parseSeedProfile, runSeed, SeedRejectedError } from './seed/run-seed.js';
 
 const config = loadConfigOrExit('seed');
 const logger = createLogger({
@@ -12,7 +12,8 @@ const logger = createLogger({
 });
 
 try {
-  await runSeed(config, logger, parseSeedProfile(process.argv.slice(2)));
+  const argv = process.argv.slice(2);
+  await runSeed(config, logger, parseSeedProfile(argv), parseSeedOptions(argv));
 } catch (err) {
   const message = err instanceof Error ? err.message : String(err);
   logger.error({ err: { type: err instanceof Error ? err.name : typeof err, message } }, 'seed failed');

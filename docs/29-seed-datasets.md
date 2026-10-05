@@ -45,6 +45,7 @@ Diseñado para que los test cases del catálogo se puedan ejecutar sobre él sin
 
   Tipos según la lista canónica de FR-ACCOUNTS-001 (docs/31 D3: el antiguo "checking" es `BANK`); naturaleza derivada del tipo y liquidez por defecto según FR-ACCOUNTS-011 (D5). Las cuentas con saldo de apertura 0 no generan asiento; su `LedgerAccount` nace con el primer posting (get-or-create, D6).
 - **Categorías:** cada workspace se provisiona por el mismo gancho que `CreateWorkspace` (dataset `minimal` v3, `apps/api/src/seed/run-seed.ts`): las 11 categorías de sistema (FR-CLASSIFICATION-003) y el catálogo sugerido es-BO de [§2.4](#24-catálogo-inicial-de-categorías-sugerido) (incluye, p. ej., *Supermercado*, *Alquiler*, *Servicios básicos*, *Sueldo*, *Suscripciones digitales*, *Transporte público*). Pendiente para TC-CLASSIFICATION-ARCHIVE-001: una categoría archivada con transacciones (`Old Gym`).
+- **Instituciones (dataset `minimal` v4):** catálogo inicial ficticio por workspace (`apps/api/src/seed/minimal/institutions.json`: *Banco Andino Demo*, *Cooperativa Illimani Demo*, *Billetera Altiplano Demo*, *P2P Exchange Demo*) cargado una vez en W1 y W2 como instituciones normales de cada workspace (editables y archivables; re-ejecutar la seed no restaura lo renombrado). Nunca en migraciones ni en código de producto (FR-ACCOUNTS-012, add-accounts-management 2.4).
 - **Transacciones:** pocas y con propósito (un gasto con split, un pending, un refund, una transacción voided). Los saldos de apertura coinciden con los ejemplos de los TCs (p. ej. TC-LEDGER-TRANSFER-001 parte de Bank A = 1 000.00 BOB, Bank B = 0.00 BOB) **antes** de aplicar esas transacciones; los tests que necesitan el estado "virgen" usan el snapshot `minimal@opening`.
 - **W2:** una cuenta `W2 Bank` BOB 5 000.00 y 3 transacciones, usadas solo para verificar que nunca aparecen desde W1.
 
@@ -100,6 +101,23 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
   - **Ruido:** distribución log-normal de montos por categoría; días de semana vs fin de semana.
   - **Anomalías inyectadas con etiquetas** (para detección de anomalías futura): gastos atípicos (×5–×20 del percentil 95 de la categoría), cargos duplicados, suscripción olvidada que sube de precio, fraude simulado con counterparty nuevo, saltos de tasa P2P. Las etiquetas viven **fuera de la BD del producto** en `seeds/large/labels/anomalies.v<N>.jsonl` (`transactionId`, `kind`, `injectedAt`, `severity`), para no contaminar el dominio.
 - **Uso en performance:** k6 sobre listados filtrados, net worth histórico, reportes por categoría y cash-flow calendar ([16-testing-strategy.md §5.15](./16-testing-strategy.md)).
+
+> **As-built (ci/nightly-perf, 2026-10-04; v2 desde perf/balance-query: la cuenta `P2P Exchange Demo — BTC` ya no
+> tiene saldo de apertura — queda sin postings, regresión del 422 `CURRENCY_MISMATCH` del resumen).** Large Seed v2 en `apps/api/src/seed/large/`: plan determinista `buildLargePlan`
+> (`large-plan.ts`, mismo PRNG mulberry32 y aritmética de unidades mínimas `bigint` que el dataset Demo, regla ESLint de
+> determinismo, `golden-summary.json` verificado por test) ejecutado por `loadLargeWorkspace` con los **casos de uso
+> públicos** (`applyPlanOp`, compartido con el `DemoDataLoader`), un lote por mes, reloj simulado, actor `system:seed` y
+> verificación final de saldos contra el plan + balance de comprobación en cero. Contenido: workspace principal
+> `Large — Principal` (owner = `owner@demo.pfos.test`) 2021-10 → 2026-09 con **97 374 transacciones**, 25 cuentas,
+> ~120 categorías (catálogo + 42 extra), 600 contrapartes, 40 suscripciones (5 con alza de precio), 600 tasas manuales,
+> estacionalidad (diciembre +40 %, febrero +15 %, invierno), inflación de alimentos +0.4 %/mes, montos log-normales y
+> 172 anomalías etiquetadas (OUTLIER, DUPLICATE_CHARGE, NEW_COUNTERPARTY_FRAUD, SUBSCRIPTION_PRICE_HIKE, P2P_RATE_JUMP)
+> exportables con `--labels-out` (JSONL fuera de la BD); 20 satélites con 1 079–4 775 transacciones (56 116 en total).
+> `pnpm db:seed -- --profile=large [--scale=0.1] [--concurrency=4] [--months=N]` (contenedor o `--host`); rechazada con
+> `PFOS_ENV=staging|production`, idempotente por `platform.seed_run` y rechaza una carga parcial previa. Carga completa
+> medida en local (Windows 11 + Docker Desktop, 4 workspaces en paralelo): **≈ 32 min** (~20 ms por operación, dominado por
+> la latencia de ida y vuelta a PostgreSQL); aún sin snapshot `pg_dump` restaurable (§7 pregunta 1). Los IDs de las
+> filas no son deterministas (los casos de uso generan UUIDv7); sí lo son fechas, montos, claves del plan y saldos.
 
 ## 3. Generación determinista
 

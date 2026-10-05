@@ -16,6 +16,8 @@ type: api
 level: api
 automation_status: automated
 automated_tests:
+- packages/platform/src/api/auth/jwks-cache.test.ts
+- packages/platform/src/config/load.test.ts
 - apps/api/test/api/identity.api.test.ts
 - packages/platform/src/api/auth/jwt-verifier.test.ts
 status: automated
@@ -47,7 +49,7 @@ expected_result:
 - 'Token expirado dentro del skew y token válido: 200'
 - 'GET /health/live sin token: no responde 401'
 created: 2026-10-01
-updated: 2026-10-02
+updated: 2026-10-04
 ---
 
 # TC-IDENTITY-AUTH-001 — Las solicitudes sin un token de acceso válido se rechazan con 401
@@ -69,3 +71,4 @@ Entonces el estado de la respuesta es 401
 
 - Incluye los casos negativos validados en SPIKE-06 (alg none, HS256, kid desconocido, payload manipulado, id token).
 - Relacionado: TC-IDENTITY-AUTH-007 (provisión del usuario).
+- Ampliado 2026-10-04 (add-workspace-identity 7.1): JWKS remoto con caché 10 min, refetch limitado (cooldown 30 s), fallback al último JWKS conocido hasta 24 h (`OIDC_JWKS_FALLBACK_MAX_AGE`, log + métrica `pf.auth.jwks_fallback`), y perfil por IdP (`OIDC_PROFILE=keycloak|cognito`, `OIDC_AUTHORIZED_PARTIES`) en `jwks-cache.test.ts`; contrato de configuración en `load.test.ts`.

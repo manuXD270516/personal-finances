@@ -60,6 +60,11 @@ export interface CurrencyInfoDto {
   readonly scale: number;
 }
 
+/** Moneda activa del catálogo con su escala canónica y si está habilitada en el workspace. */
+export interface WorkspaceCurrencyDto extends CurrencyInfoDto {
+  readonly enabled: boolean;
+}
+
 /**
  * Puerto que TRANSACTIONS consume (in-process, dentro de SU unidad de trabajo) para el pricing de conversiones.
  * Errores (`DomainError.code`): `REFERENCE_NOT_FOUND` (id explícito inexistente), `CURRENCY_MISMATCH` (la tasa
@@ -152,6 +157,11 @@ export interface FxValuationPort {
   }): Promise<readonly (ValuationRateDto | null)[]>;
   /** Monedas habilitadas del workspace con su escala canónica. */
   enabledCurrencies(workspaceId: string): Promise<readonly CurrencyInfoDto[]>;
+  /**
+   * Catálogo de monedas activas con su escala canónica y `enabled` por workspace (UNA lectura): la escala de una moneda
+   * no habilitada (p. ej. una cuenta BTC sin postings) sale del catálogo, nunca de un valor de respaldo.
+   */
+  workspaceCurrencies(workspaceId: string): Promise<readonly WorkspaceCurrencyDto[]>;
   /** Ventana de vigencia en días de la resolución *as-of* (7 por defecto). */
   readonly windowDays: number;
 }

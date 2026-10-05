@@ -118,6 +118,11 @@ jobs:
       - name: Matriz de trazabilidad (artefacto)
         if: ${{ !cancelled() }}
         run: pnpm traceability:matrix
+      # Financial Regression Suite (docs/16 §11.3): lista derivada de tests/cases; sus tests ya corren completos en
+      # `unit` e `integration`. La ejecución agrupada con NIGHTLY=1 (PBT a 10 000 corridas) es el job nightly `regression`.
+      - name: Financial Regression Suite (lista, artefacto)
+        if: ${{ !cancelled() }}
+        run: pnpm traceability:regression
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
@@ -125,6 +130,8 @@ jobs:
           path: |
             tests/traceability/matrix.md
             tests/traceability/matrix.json
+            tests/traceability/regression-suite.md
+            tests/traceability/regression-suite.json
           if-no-files-found: error
           retention-days: 7
 

@@ -7,8 +7,9 @@
 - [ ] 1.1 Revisar las specs `classification/categories`, `classification/tags` y `classification/counterparties` con el owner y resolver las preguntas abiertas de design.md (OPENING_BALANCE, provisión síncrona); verificar con `openspec validate add-classification --strict`
   > Revisado 2026-10-04 (sigue pendiente del owner): `OPENING_BALANCE` y `Cashback` quedan resueltos por docs/31 D9 (la lista canónica de 11 códigos del design no los incluye), además de D7/D8. Siguen abiertas sin decisión en docs/31: provisión síncrona vs `identity.WorkspaceCreated` (implementada síncrona y documentada en docs/05 §2.5 como decisión provisional) y recategorizar en periodo cerrado (diferida a Phase 2).
 - [x] 1.2 Confirmar los TC MODIFICADOS (TC-CLASSIFICATION-ARCHIVE-001, -DELETE-001, -RECATEGORIZE-001) y los 24 AÑADIDOS en `tests/cases/classification/`; verificar que el chequeo del catálogo de trazabilidad los acepta y que todo requirement Must tiene ≥ 1 TC
-- [ ] 1.3 Redactar los TC de los requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia de categoría); verificar con el chequeo del catálogo
+- [x] 1.3 Redactar los TC de los requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia de categoría); verificar con el chequeo del catálogo
   > Verificado 2026-10-04 (pendiente): ningún TC de `tests/cases/classification/` cubre los 7 requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia por counterparty).
+  > Hecho (2026-10-04): TC de los 7 requirements Should en `tests/cases/classification/`: UNARCHIVE-001 (categoría), UNARCHIVE-002 (tag), UNARCHIVE-003 (counterparty), ORDER-001, GROUP-001 (total por grupo), GROUP-002 (grupo no vacío) y SUGGESTION-001; declarados en proposal.md (Test Impact). Automatizados en `apps/api/test/api/classification-should.api.test.ts` salvo GROUP-001 (`not_automated`: Phase 1 no expone un reporte por grupo). `pnpm traceability:check` en verde.
 
 ## 2. DOMAIN — categorías y grupos (TDD)
 
@@ -35,6 +36,7 @@
 - [x] 5.1 Migración *expand* del schema `classification` (tablas, índices parciales, CHECKs, triggers de tipo/profundidad/sistema, RLS `ENABLE/FORCE`, grants sin `DELETE`) y migración de nombres i18n; verificar con test de migración sobre PG vacío y test de RLS/grants (Testcontainers)
 - [x] 5.2 Repositorios PostgreSQL con optimistic locking y adaptador de outbox; tests de integración de repositorio nombrados con TC-CLASSIFICATION-ARCHIVE-001, -TAG-003, -COUNTERPARTY-003
 - [x] 5.3 Adaptador `LastCategoryUsedQueryPort` contra el `contracts` de Transactions (stub hasta `add-transaction-recording`); verificar con test de integración
+  > Corrección (2026-10-04): el composition root nunca sustituyó el stub `noTransactionsYet`, así que la sugerencia `LAST_USED` respondía siempre `NONE`. Ahora TRANSACTIONS expone `CounterpartyCategoryUsageQuery` (`@pf/transactions/contracts`, `PgCounterpartyCategoryUsage`) y `financeRuntimes` lo conecta a CLASSIFICATION; regresión `[TC-CLASSIFICATION-SUGGESTION-001]`.
 - [x] 5.4 Schema de evento `classification.CategoryArchived.v1` y test de contrato del productor; verificar que el payload valida contra el schema
 
 ## 6. API
@@ -45,12 +47,15 @@
 
 ## 7. Integración con Transactions (cuando exista `add-transaction-recording`)
 
-- [ ] 7.1 Test de integración INV-033: recategorizar un gasto de 150.00 BOB no cambia asientos ni saldos; nombrado con TC-CLASSIFICATION-RECATEGORIZE-001
+- [x] 7.1 Test de integración INV-033: recategorizar un gasto de 150.00 BOB no cambia asientos ni saldos; nombrado con TC-CLASSIFICATION-RECATEGORIZE-001
   > Verificado 2026-10-04 (pendiente, código): no hay test `[TC-CLASSIFICATION-RECATEGORIZE-001]`; el comportamiento se cubre parcialmente con otros ids (`[TC-AUDIT-LIFECYCLE-004]`, `[TC-TRANSACTIONS-SPLIT-004]`), no en integración.
-- [ ] 7.2 Tests de integración de etiquetado y cambio de counterparty sin efecto en el ledger; nombrados con TC-CLASSIFICATION-TAG-006 y TC-CLASSIFICATION-COUNTERPARTY-005
+  > Hecho (2026-10-04): `[TC-CLASSIFICATION-RECATEGORIZE-001]` en `apps/api/test/api/classification-ledger.api.test.ts` (HTTP contra Transactions, Ledger y Reporting reales): huella fila a fila de asientos y postings idéntica, saldo 2,000.00 BOB, totales del mes Supermercado 150.00 → 0.00 y Hogar 0.00 → 150.00, auditoría con ambas categorías y `TransactionCategorized.v1` válido.
+- [x] 7.2 Tests de integración de etiquetado y cambio de counterparty sin efecto en el ledger; nombrados con TC-CLASSIFICATION-TAG-006 y TC-CLASSIFICATION-COUNTERPARTY-005
   > Verificado 2026-10-04 (pendiente, código): no hay tests `[TC-CLASSIFICATION-TAG-006]` ni `[TC-CLASSIFICATION-COUNTERPARTY-005]`.
-- [ ] 7.3 Test de totales por tag sin doble conteo; nombrado con TC-CLASSIFICATION-TAG-002
+  > Hecho (2026-10-04): `[TC-CLASSIFICATION-TAG-006]` (100.000000 USDT, `addedTagIds = [Trabajo]`) y `[TC-CLASSIFICATION-COUNTERPARTY-005]` (Hipermaxi → Fidalga, 300.00 USD, auditoría) en `classification-ledger.api.test.ts`.
+- [x] 7.3 Test de totales por tag sin doble conteo; nombrado con TC-CLASSIFICATION-TAG-002
   > Verificado 2026-10-04 (pendiente, código): no hay test `[TC-CLASSIFICATION-TAG-002]`.
+  > Hecho (2026-10-04): `[TC-CLASSIFICATION-TAG-002]` en `classification-ledger.api.test.ts`: 230.00 BOB por tag, filtro `tagId` devuelve la transacción una vez por tag y el gasto del mes pasa de 1,000.00 a 1,230.00 BOB. El tag repetido lo rechaza el contrato (`uniqueItems`) con `VALIDATION_FAILED`. También `[TC-CLASSIFICATION-KIND-002]` por API (ingreso rechazado sin transacción ni asiento; reembolso 500.00 → 450.00 BOB).
 
 ## 8. UI
 
@@ -66,6 +71,7 @@
 ## 9. AUTOMATED TESTS y E2E
 
 - [ ] 9.1 Completar los tests automatizados de todos los TC de este change y marcar `automation_status: automated`; verificar que el chequeo de trazabilidad no reporta TC sin test
+  > Nota 2026-10-04: todos los TC del change están `automated` salvo TC-CLASSIFICATION-GROUP-001 (sin reporte por grupo en Phase 1).
 - [x] 9.2 E2E (Playwright): crear workspace con catálogo, crear subcategoría, archivarla y comprobar que desaparece del selector pero sigue en el historial; crear counterparty inline; verificar en CI
   - Nota (2026-10-04): `tests/e2e/specs/classification.spec.ts`: workspace nuevo con catálogo por la UI, subcategoría "Fibra óptica" con icono y color, reordenada con el teclado (persiste tras recargar), gasto clasificado en ella, archivada → fuera del árbol y del selector de `/transacciones/nueva`, visible con "Mostrar archivadas" y en el detalle del gasto; contraparte con alias y categoría por defecto (resuelta por alias) y etiqueta. La creación inline de contraparte ya la cubre `transactions.spec.ts` (TC-CLASSIFICATION-COUNTERPARTY-002). Páginas nuevas en `a11y.spec.ts`.
 

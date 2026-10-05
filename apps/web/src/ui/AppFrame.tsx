@@ -1,8 +1,9 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ProblemMessage } from '../errors/ProblemMessage';
+import { WorkspaceSelector } from './identity/IdentityViews';
 import { localized, useSession } from './session-context';
 
 /** Marco de las páginas autenticadas: saludo, selector de workspace activo, navegación y logout. */
@@ -12,6 +13,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const tAuth = useTranslations('Auth');
   const locale = useLocale();
   const { state, selectWorkspace, logout } = useSession();
+  const [switching, setSwitching] = useState(false);
 
   if (state.status === 'loading') return <p data-testid="loading">{t('loading')}</p>;
   if (state.status === 'expired') {
@@ -32,23 +34,16 @@ export function AppFrame({ children }: { children: ReactNode }) {
     <>
       <header>
         <p data-testid="welcome">{tHome('greeting', { name: me.displayName })}</p>
-        <label>
-          {t('activeWorkspace')}{' '}
-          <select
-            data-testid="workspace-selector"
-            value={active?.workspaceId ?? ''}
-            onChange={(e) => void selectWorkspace(e.target.value)}
-          >
-            {me.memberships.map((m) => (
-              <option key={m.workspaceId} value={m.workspaceId}>
-                {m.isDemo ? t('demoOption', { name: m.workspaceName }) : m.workspaceName}
-              </option>
-            ))}
-          </select>
-        </label>
-        {active ? (
-          <span data-testid="active-role"> {t('role', { role: t(`roles.${active.role}`) })}</span>
-        ) : null}
+        <WorkspaceSelector
+          t={(key, values) => t(key as never, values as never)}
+          memberships={me.memberships}
+          activeId={active?.workspaceId}
+          busy={switching}
+          onSelect={(id) => {
+            setSwitching(true);
+            void selectWorkspace(id).finally(() => setSwitching(false));
+          }}
+        />
         <nav aria-label={t('nav')}>
           <a href={localized(locale, '/')}>{t('home')}</a> ·{' '}
           <a href={localized(locale, '/transacciones')}>{t('transactions')}</a> ·{' '}
