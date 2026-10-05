@@ -587,6 +587,34 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/accounts/{accountId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      tags: [Accounts]
+      operationId: exportAccountLifecycle
+      summary: Exportar el recorrido de una cuenta (CSV o PDF)
+      description: |
+        Descarga síncrona del recorrido (docs/31 D52): `format=csv` (RFC 4180, UTF-8 con BOM, fechas
+        es-BO en la zona horaria del workspace, montos como decimal string sin cambios, celdas neutralizadas contra
+        CSV injection) o `format=pdf` (título, elemento, camino de estados, línea de tiempo, fecha de generación y zona
+        horaria). Mismo alcance que el recorrido: VIEWER+; otro workspace ⇒ 404 idéntico a inexistente. La exportación
+        queda auditada (`audit.lifecycle.exported`).
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/accounts/{accountId}/archive:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -1231,6 +1259,34 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TransactionLifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/transactions/{transactionId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      tags: [Transactions]
+      operationId: exportTransactionLifecycle
+      summary: Exportar el recorrido de una transacción (CSV o PDF)
+      description: |
+        Descarga síncrona del recorrido (docs/31 D52); el CSV y el PDF incluyen monto y comisión de cada revisión: `format=csv` (RFC 4180, UTF-8 con BOM, fechas
+        es-BO en la zona horaria del workspace, montos como decimal string sin cambios, celdas neutralizadas contra
+        CSV injection) o `format=pdf` (título, elemento, camino de estados, línea de tiempo, fecha de generación y zona
+        horaria). Mismo alcance que el recorrido: VIEWER+; otro workspace ⇒ 404 idéntico a inexistente. La exportación
+        queda auditada (`audit.lifecycle.exported`).
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -2025,6 +2081,61 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/categories/{categoryId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    get:
+      tags: [Classification]
+      operationId: getCategoryLifecycle
+      summary: Recorrido de una categoría (creación, archivado, desarchivado y anotaciones)
+      description: |
+        Recorrido de la categoría (docs/31 D52) con la máquina `Category` (`ACTIVE` ↔ `ARCHIVED`: `CREATE`,
+        `ARCHIVE`, `UNARCHIVE`; renombrar, mover, icono, color y orden son anotaciones). Archivar una categoría
+        archiva sus subcategorías activas, cada una con su propia transición. VIEWER+; otro workspace ⇒ 404
+        idéntico a inexistente.
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Recorrido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/categories/{categoryId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CategoryId'
+    get:
+      tags: [Classification]
+      operationId: exportCategoryLifecycle
+      summary: Exportar el recorrido de una categoría (CSV o PDF)
+      description: |
+        Descarga síncrona del recorrido (docs/31 D52): `format=csv` (RFC 4180, UTF-8 con BOM, fechas
+        es-BO en la zona horaria del workspace, montos como decimal string sin cambios, celdas neutralizadas contra
+        CSV injection) o `format=pdf` (título, elemento, camino de estados, línea de tiempo, fecha de generación y zona
+        horaria). Mismo alcance que el recorrido: VIEWER+; otro workspace ⇒ 404 idéntico a inexistente. La exportación
+        queda auditada (`audit.lifecycle.exported`).
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/categories/{categoryId}/archive:
     parameters:
@@ -2416,6 +2527,60 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    get:
+      tags: [Classification]
+      operationId: getCounterpartyLifecycle
+      summary: Recorrido de una contraparte (creación, archivado, desarchivado y anotaciones)
+      description: |
+        Recorrido de la contraparte (docs/31 D52) con la máquina `Counterparty` (`ACTIVE` ↔ `ARCHIVED`: `CREATE`,
+        `ARCHIVE`, `UNARCHIVE`; nombre, tipo, alias, icono y categoría por defecto son anotaciones). VIEWER+; otro
+        workspace ⇒ 404 idéntico a inexistente.
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Recorrido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/counterparties/{counterpartyId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CounterpartyId'
+    get:
+      tags: [Classification]
+      operationId: exportCounterpartyLifecycle
+      summary: Exportar el recorrido de una contraparte (CSV o PDF)
+      description: |
+        Descarga síncrona del recorrido (docs/31 D52): `format=csv` (RFC 4180, UTF-8 con BOM, fechas
+        es-BO en la zona horaria del workspace, montos como decimal string sin cambios, celdas neutralizadas contra
+        CSV injection) o `format=pdf` (título, elemento, camino de estados, línea de tiempo, fecha de generación y zona
+        horaria). Mismo alcance que el recorrido: VIEWER+; otro workspace ⇒ 404 idéntico a inexistente. La exportación
+        queda auditada (`audit.lifecycle.exported`).
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /workspaces/{workspaceId}/counterparties/{counterpartyId}/archive:
     parameters:
@@ -2800,6 +2965,34 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/fx-rates/{fxRateId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/FxRateId'
+    get:
+      tags: [FX]
+      operationId: exportRateLifecycle
+      summary: Exportar el recorrido de una tasa de cambio (CSV o PDF)
+      description: |
+        Descarga síncrona del recorrido (docs/31 D52): `format=csv` (RFC 4180, UTF-8 con BOM, fechas
+        es-BO en la zona horaria del workspace, montos como decimal string sin cambios, celdas neutralizadas contra
+        CSV injection) o `format=pdf` (título, elemento, camino de estados, línea de tiempo, fecha de generación y zona
+        horaria). Mismo alcance que el recorrido: VIEWER+; otro workspace ⇒ 404 idéntico a inexistente. La exportación
+        queda auditada (`audit.lifecycle.exported`).
+      x-openspec-capability: audit/lifecycle-timeline
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/fx-rates/{fxRateId}/anomaly-review:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -3061,7 +3254,7 @@ paths:
       - name: aggregateType
         in: path
         required: true
-        schema: { $ref: '#/components/schemas/LifecycleAggregateType' }
+        schema: { $ref: '#/components/schemas/LifecycleAggregateTypeInput' }
     get:
       tags: [Audit]
       operationId: getLifecycleMachine
@@ -3189,6 +3382,14 @@ components:
         talks to the API directly (BFF pattern, ADR-0010/ADR-0019).
 
   parameters:
+    LifecycleExportFormat:
+      name: format
+      in: query
+      required: true
+      description: Formato de la descarga del recorrido (docs/31 D52).
+      schema:
+        type: string
+        enum: [csv, pdf]
     WorkspaceId:
       name: workspaceId
       in: path
@@ -3316,6 +3517,22 @@ components:
       schema: { type: string, examples: ['<https://pfos.dev/deprecations/2026-10>; rel="deprecation"'] }
 
   responses:
+    LifecycleExport:
+      description: >-
+        Recorrido exportado como adjunto (`Content-Disposition: attachment; filename="recorrido-<tipo>-<id>.<csv|pdf>"`).
+      headers:
+        Content-Disposition:
+          description: Siempre `attachment` con un nombre de archivo ASCII seguro.
+          schema: { type: string }
+      content:
+        text/csv:
+          schema:
+            type: string
+            description: CSV RFC 4180 (coma, CRLF, cabecera) con BOM UTF-8.
+        application/pdf:
+          schema:
+            type: string
+            format: binary
     NotModified:
       description: Not modified (If-None-Match matched)
     BadRequest:
@@ -5178,7 +5395,17 @@ components:
     # ── Recorrido del ciclo de vida (add-lifecycle-timeline, docs/31 D37) ──
     LifecycleAggregateType:
       type: string
-      enum: [Transaction, Account, ExchangeRate]
+      description: >-
+        Tipo de agregado con máquina de estados declarada (docs/31 D37; Category y Counterparty, D52). Open set —
+        clients must handle unknown values.
+      pattern: '^[A-Z][A-Za-z]{0,63}$'
+      # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
+      # aditiva (Category y Counterparty, decisión del owner D52).
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty]
+    LifecycleAggregateTypeInput:
+      type: string
+      description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).

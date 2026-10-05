@@ -1,4 +1,4 @@
-import type { AuditEntry } from '@pf/audit/contracts';
+import type { AuditEntry, LifecycleDto, LifecycleStepInput } from '@pf/audit/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import { Category, CategoryGroup } from '../../domain/category.js';
 import { Counterparty } from '../../domain/counterparty.js';
@@ -73,6 +73,8 @@ export class InMemoryClassification {
   );
   readonly events: CategoryArchivedEvent[] = [];
   readonly audits: AuditEntry[] = [];
+  /** Pasos del recorrido escritos con `LifecyclePort` (con la acción de su registro de auditoría). */
+  readonly steps: (LifecycleStepInput & { readonly action: string; readonly aggregateId: string })[] = [];
   readonly contexts: RlsContext[] = [];
   readonly lastUsed = new Map<string, string>();
   private seq = 0;
@@ -95,6 +97,7 @@ export class InMemoryClassification {
           const saved = repos.map((r) => new Map(r.rows as Map<string, unknown>));
           const ev = this.events.length;
           const au = this.audits.length;
+          const st = this.steps.length;
           this.depth += 1;
           try {
             return await fn();
@@ -106,6 +109,7 @@ export class InMemoryClassification {
             });
             this.events.length = ev;
             this.audits.length = au;
+            this.steps.length = st;
             throw err;
           } finally {
             this.depth -= 1;
@@ -122,6 +126,30 @@ export class InMemoryClassification {
           if (this.depth === 0) throw new Error('AUDIT_OUTSIDE_UNIT_OF_WORK');
           this.audits.push(a);
         },
+      },
+      lifecycle: {
+        record: async (entry, steps) => {
+          if (this.depth === 0) throw new Error('AUDIT_OUTSIDE_UNIT_OF_WORK');
+          this.audits.push(entry);
+          for (const step of steps)
+            this.steps.push({
+              ...step,
+              action: entry.action,
+              aggregateId: step.aggregateId ?? entry.aggregateId,
+            });
+        },
+      },
+      lifecycleQuery: {
+        lifecycleOf: async (input): Promise<LifecycleDto> => ({
+          aggregateType: input.aggregateType,
+          aggregateId: input.aggregateId,
+          currentState: input.currentState,
+          path: [],
+          historyComplete: false,
+          machine: { aggregateType: input.aggregateType, machineVersion: 1, states: [], transitions: [] },
+          items: [],
+        }),
+        machineOf: (aggregateType) => ({ aggregateType, machineVersion: 1, states: [], transitions: [] }),
       },
       lastCategoryUsed: {
         lastCategoryUsed: async ({ counterpartyId, kind }) =>

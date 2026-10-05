@@ -101,8 +101,14 @@ export interface AuditHistoryQuery {
 
 // ───────────────────────────────────────────── add-lifecycle-timeline (docs/31 D37)
 
-/** Tipos de agregado con máquina de estados declarada en Phase 1. */
-export const LIFECYCLE_AGGREGATE_TYPES = ['Transaction', 'Account', 'ExchangeRate'] as const;
+/** Tipos de agregado con máquina de estados declarada en Phase 1 (docs/31 D37; catálogos de CLASSIFICATION: D52). */
+export const LIFECYCLE_AGGREGATE_TYPES = [
+  'Transaction',
+  'Account',
+  'ExchangeRate',
+  'Category',
+  'Counterparty',
+] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 
 /** Definición de una máquina de estados (dato puro; `from: []` = creación). Contrato `LifecycleMachine`. */
@@ -257,3 +263,48 @@ export const AUDIT_PORT = Symbol.for('pf.audit.AuditPort');
 export const AUDIT_HISTORY_QUERY = Symbol.for('pf.audit.AuditHistoryQuery');
 export const LIFECYCLE_PORT = Symbol.for('pf.audit.LifecyclePort');
 export const LIFECYCLE_QUERY = Symbol.for('pf.audit.LifecycleQuery');
+
+// ───────────────────────────────────────────── exportación del recorrido (docs/31 D52)
+
+/** Formatos de descarga del recorrido (`GET …/lifecycle/export?format=`). */
+export const LIFECYCLE_EXPORT_FORMATS = ['csv', 'pdf'] as const;
+export type LifecycleExportFormat = (typeof LIFECYCLE_EXPORT_FORMATS)[number];
+
+/** Monto de una revisión tal como lo publica el contrato (`Money`: decimal string + moneda, sin conversiones). */
+export interface LifecycleMoneyDto {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/** Monto (y comisión) de cada revisión de una transacción; solo lo aporta TRANSACTIONS. */
+export interface LifecycleRevisionAmountDto {
+  readonly revision: number;
+  readonly amount: LifecycleMoneyDto;
+  readonly fee: LifecycleMoneyDto | null;
+}
+
+/** Recorrido ya compuesto por el contexto dueño (mismo contenido que su `GET …/lifecycle`). */
+export interface LifecycleExportSource {
+  readonly lifecycle: LifecycleDto;
+  /** Nombre o descripción visible del elemento (nombre de la cuenta, categoría o contraparte; descripción). */
+  readonly label?: string | null;
+  readonly revisions?: readonly LifecycleRevisionAmountDto[];
+}
+
+/**
+ * Carga del recorrido de UN tipo de agregado por su contexto dueño: verifica que el agregado existe en el workspace
+ * (404 idéntico a inexistente si es de otro) y devuelve el mismo recorrido que su consulta HTTP. La aporta el
+ * composition root desde los runtimes de cada contexto.
+ */
+export type LifecycleExportLoader = (input: {
+  readonly userId: string;
+  readonly workspaceId: string;
+  readonly aggregateId: string;
+}) => Promise<LifecycleExportSource>;
+
+export type LifecycleExportLoaders = Readonly<Partial<Record<LifecycleAggregateType, LifecycleExportLoader>>>;
+
+/** Allow-list de auditoría de la exportación del recorrido (evento auditado, docs/12 §13.2). */
+export const LIFECYCLE_EXPORT_AUDIT_POLICY = {
+  LifecycleExport: { aggregateType: 'plain', format: 'plain' },
+} as const satisfies AuditFieldPoliciesDto;

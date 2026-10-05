@@ -5,16 +5,20 @@ import type { Pool } from 'pg';
 import { AuditQueries } from '../application/audit-queries.js';
 import { AuditRecorder } from '../application/audit-recorder.js';
 import { LIFECYCLE_BACKFILL_JOB, LifecycleBackfill } from '../application/lifecycle-backfill.js';
+import { LifecycleExporter } from '../application/lifecycle-export.js';
 import { LifecycleQueries } from '../application/lifecycle-queries.js';
 import { LifecycleRecorder } from '../application/lifecycle-recorder.js';
 import type { WorkspaceTimeZones } from '../application/ports/index.js';
 import {
   AUDIT_HISTORY_QUERY,
   AUDIT_PORT,
+  LIFECYCLE_EXPORT_AUDIT_POLICY,
   LIFECYCLE_QUERY,
   type AuditFieldPoliciesDto,
   type AuditHistoryQuery,
   type AuditPort,
+  type LifecycleExportLoaders,
+  type LifecycleExportSource,
   type LifecycleMachineDto,
   type LifecyclePort,
   type LifecycleQuery,
@@ -36,6 +40,8 @@ import {
   type LifecycleDivergence,
 } from '../infrastructure/pg-lifecycle.js';
 import { AUDIT_QUERIES, AuditLogController } from './audit-log.controller.js';
+import { PdfkitLifecyclePdf } from '../infrastructure/pdfkit-lifecycle-pdf.js';
+import { LIFECYCLE_EXPORTER, LifecycleExportController } from './lifecycle-export.controller.js';
 import { LifecycleMachinesController } from './lifecycle-machines.controller.js';
 
 export interface AuditRuntimeOptions {
@@ -66,12 +72,18 @@ export interface AuditRuntime {
   lifecycleFor(port: AuditPort): LifecyclePort;
   /** Consulta `GetLifecycle` y definiciones de máquinas. */
   readonly lifecycleQuery: LifecycleQuery;
+  /** Exportación CSV/PDF del recorrido (docs/31 D52) con las cargas de cada contexto dueño. */
+  lifecycleExporter(loaders: LifecycleExportLoaders): LifecycleExporter;
 }
 
 /** Composición de AUDIT sobre PostgreSQL (misma transacción que la `PgUnitOfWork` de cada comando). */
 export function createAuditRuntime(options: AuditRuntimeOptions): AuditRuntime {
   const store = new PgAuditLogStore();
-  const policy = options.policies.reduce((acc, p) => acc.with(p), new RedactionPolicy());
+  // La exportación del recorrido es un evento auditado propio de AUDIT (docs/31 D52, docs/12 §13.2).
+  const policy = [...options.policies, LIFECYCLE_EXPORT_AUDIT_POLICY].reduce(
+    (acc, p) => acc.with(p),
+    new RedactionPolicy(),
+  );
   const port = new AuditRecorder({
     env: platformAuditEnvironment,
     store,
@@ -106,6 +118,15 @@ export function createAuditRuntime(options: AuditRuntimeOptions): AuditRuntime {
     lifecycle: lifecycleFor(port),
     lifecycleFor,
     lifecycleQuery,
+    lifecycleExporter: (loaders) =>
+      new LifecycleExporter({
+        loaders,
+        timeZones: options.timeZones,
+        uow: pgReadUnitOfWork(options.pool),
+        audit: port,
+        clock: options.clock,
+        pdf: new PdfkitLifecyclePdf(),
+      }),
   };
 }
 
@@ -126,6 +147,11 @@ export interface AuditModuleOptions {
   readonly runtime: AuditRuntime;
   /** Convenciones de API (contrato, cursores, reloj) del composition root. */
   readonly conventions: ApiConventionsOptions;
+  /**
+   * Cargas del recorrido por tipo de agregado para la exportación CSV/PDF (docs/31 D52); sin ellas, la descarga de
+   * ese tipo responde 404.
+   */
+  readonly lifecycleExport?: LifecycleExportLoaders;
 }
 
 /**
@@ -138,13 +164,17 @@ export class AuditModule {
   static register(options: AuditModuleOptions): DynamicModule {
     return {
       module: AuditModule,
-      controllers: [AuditLogController, LifecycleMachinesController],
+      controllers: [AuditLogController, LifecycleMachinesController, LifecycleExportController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: AUDIT_QUERIES, useValue: options.runtime.queries },
         { provide: AUDIT_PORT, useValue: options.runtime.port },
         { provide: AUDIT_HISTORY_QUERY, useValue: options.runtime.history },
         { provide: LIFECYCLE_QUERY, useValue: options.runtime.lifecycleQuery },
+        {
+          provide: LIFECYCLE_EXPORTER,
+          useValue: options.runtime.lifecycleExporter(options.lifecycleExport ?? {}),
+        },
       ],
       exports: [AUDIT_PORT, AUDIT_HISTORY_QUERY, LIFECYCLE_QUERY],
     };
@@ -165,6 +195,8 @@ export type {
   AuditPort,
   LifecycleBackfill,
   LifecycleDivergence,
+  LifecycleExportLoaders,
+  LifecycleExportSource,
   LifecycleMachineDto,
   LifecyclePort,
   LifecycleQuery,

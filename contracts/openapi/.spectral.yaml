@@ -71,7 +71,8 @@ rules:
     resolved: false
     given:
       - '#Operations.responses[?(@property.match(/^[45]/))]'
-      - '$.components.responses[?(@property != "NotModified")]'
+      # Respuestas de componentes que no son errores: 304 y la descarga del recorrido (200 CSV/PDF).
+      - '$.components.responses[?(@property != "NotModified" && @property != "LifecycleExport")]'
     then:
       function: schema
       functionOptions:

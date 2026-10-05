@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
+import { BFF_API } from '../session-context';
 import { LifecycleReport } from './LifecycleReport';
 import type { Lifecycle, TransactionLifecycle } from './types';
 
@@ -53,14 +54,61 @@ export function LifecycleTab({
   if (problem) return <ProblemMessage problem={problem} locale={ctx.uiLocale} />;
   if (!lifecycle) return <p aria-busy="true">{f.t('loading')}</p>;
   return (
-    <LifecycleReport
-      lifecycle={lifecycle}
-      f={f}
-      stateLabel={stateLabel}
-      {...(fieldLabel ? { fieldLabel } : {})}
-      {...(accountName ? { accountName } : {})}
-      currentUserId={ctx.me.id}
-      idPrefix={idPrefix}
-    />
+    <>
+      <LifecycleExportActions
+        href={(format) => `${BFF_API}${ctx.base}/${path}/lifecycle/export?format=${format}`}
+        label={f.t('export.label')}
+        csv={f.t('export.csv')}
+        pdf={f.t('export.pdf')}
+        idPrefix={idPrefix}
+      />
+      <LifecycleReport
+        lifecycle={lifecycle}
+        f={f}
+        stateLabel={stateLabel}
+        {...(fieldLabel ? { fieldLabel } : {})}
+        {...(accountName ? { accountName } : {})}
+        currentUserId={ctx.me.id}
+        idPrefix={idPrefix}
+      />
+    </>
+  );
+}
+
+/**
+ * Acciones "Exportar CSV" y "Exportar PDF" del recorrido (docs/31 D52): enlaces de descarga al proxy del BFF (GET
+ * autenticado con la cookie de sesión; la API responde `Content-Disposition: attachment`). Mismo rol que el recorrido
+ * (VIEWER incluido).
+ */
+export function LifecycleExportActions({
+  href,
+  label,
+  csv,
+  pdf,
+  idPrefix,
+}: {
+  href: (format: 'csv' | 'pdf') => string;
+  label: string;
+  csv: string;
+  pdf: string;
+  idPrefix: string;
+}) {
+  const linkStyle = {
+    display: 'inline-block',
+    padding: '0.375rem 0.75rem',
+    border: '1px solid #8c959f',
+    borderRadius: 6,
+    textDecoration: 'none',
+    color: 'inherit',
+  } as const;
+  return (
+    <nav aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <a href={href('csv')} download data-testid={`${idPrefix}-export-csv`} style={linkStyle}>
+        {csv}
+      </a>
+      <a href={href('pdf')} download data-testid={`${idPrefix}-export-pdf`} style={linkStyle}>
+        {pdf}
+      </a>
+    </nav>
   );
 }

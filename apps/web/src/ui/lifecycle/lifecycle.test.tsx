@@ -303,6 +303,80 @@ describe('recorrido: reporte visual y línea de tiempo (add-lifecycle-timeline 6
   });
 });
 
+describe('recorrido de categorías y contrapartes (docs/31 D52, tarea 9.6)', () => {
+  const cls = esContext('Classification');
+  const clsState = (code: string) => (cls.has(`states.${code}`) ? cls.t(`states.${code}`) : code);
+  const CATEGORY_MACHINE = {
+    aggregateType: 'Category',
+    machineVersion: 1,
+    states: [
+      { code: 'ACTIVE', terminal: false },
+      { code: 'ARCHIVED', terminal: false },
+    ],
+    transitions: [
+      { code: 'CREATE', from: [], to: ['ACTIVE'], guard: 'g', events: [] },
+      { code: 'ARCHIVE', from: ['ACTIVE'], to: ['ARCHIVED'], guard: 'g', events: [] },
+      { code: 'UNARCHIVE', from: ['ARCHIVED'], to: ['ACTIVE'], guard: 'g', events: [] },
+    ],
+  };
+  const SUPERMERCADO: Lifecycle = {
+    aggregateType: 'Category',
+    aggregateId: ACCOUNT,
+    currentState: 'ACTIVE',
+    path: ['ACTIVE', 'ARCHIVED', 'ACTIVE'],
+    historyComplete: true,
+    machine: CATEGORY_MACHINE,
+    items: [
+      step({ sequence: 1, transition: 'CREATE', toState: 'ACTIVE' }),
+      step({
+        sequence: 2,
+        transition: 'ARCHIVE',
+        fromState: 'ACTIVE',
+        toState: 'ARCHIVED',
+        occurredAt: '2026-03-12T15:00:00.000Z',
+      }),
+      step({
+        sequence: 3,
+        transition: 'UNARCHIVE',
+        fromState: 'ARCHIVED',
+        toState: 'ACTIVE',
+        occurredAt: '2026-03-12T16:00:00.000Z',
+      }),
+    ],
+  };
+
+  it('[TC-AUDIT-LIFECYCLE-020] layout fijo de dos estados: Activa a la izquierda, Archivada a la derecha (abajo en móvil)', () => {
+    for (const type of ['Category', 'Counterparty']) {
+      const machine = { ...CATEGORY_MACHINE, aggregateType: type };
+      const h = layoutFor(machine, 'horizontal');
+      const v = layoutFor(machine, 'vertical');
+      const at = (l: typeof h, code: string) => l.nodes.find((n) => n.code === code)!;
+      expect(at(h, 'ACTIVE').x).toBeLessThan(at(h, 'ARCHIVED').x);
+      expect(at(h, 'ACTIVE').y).toBe(at(h, 'ARCHIVED').y);
+      expect(at(v, 'ACTIVE').y).toBeLessThan(at(v, 'ARCHIVED').y);
+    }
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-020] archivar (1) y desarchivar (2) numeradas, Activa "(actual)", línea de tiempo en hora de La Paz', () => {
+    const html = render(SUPERMERCADO, clsState);
+    expect(attr(html, 'lifecycle-node', 'ACTIVE', 'data-current')).toBe('true');
+    expect(attr(html, 'lifecycle-node', 'ARCHIVED', 'data-visited')).toBe('true');
+    expect(html).toMatch(
+      /data-code="ARCHIVE" data-from="ACTIVE" data-to="ARCHIVED" data-traversed="true" data-order="1"/,
+    );
+    expect(html).toMatch(
+      /data-code="UNARCHIVE" data-from="ARCHIVED" data-to="ACTIVE" data-traversed="true" data-order="2"/,
+    );
+    expect(textOf(html)).toContain('Activa(actual)');
+    const entries = (html.match(/<li data-testid="lifecycle-entry"[\s\S]*?<\/li>/g) ?? []).map(textOf);
+    expect(entries[0]).toContain('Crear');
+    expect(entries[1]).toMatch(/^1\. Archivar/);
+    expect(entries[1]).toContain('Activa → Archivada');
+    expect(entries[2]).toMatch(/^2\. Desarchivar/);
+    expect(entries[1]).toContain('11:00');
+  });
+});
+
 describe('pestañas accesibles (patrón WAI-ARIA tabs)', () => {
   it('flechas, Inicio y Fin mueven la pestaña activa (con vuelta al principio)', () => {
     expect(tabTarget('ArrowRight', 0, 3)).toBe(1);

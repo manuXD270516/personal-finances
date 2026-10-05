@@ -17,6 +17,8 @@ export interface CategoryArchivedV1 {
   readonly kind: CategoryKindDto;
   readonly archivedAt: string;
   readonly cascadedFromCategoryId: string | null;
+  /** Transición de la máquina `Category` (opcional, aditivo; docs/31 D52). */
+  readonly transition?: 'ARCHIVE';
 }
 
 /**

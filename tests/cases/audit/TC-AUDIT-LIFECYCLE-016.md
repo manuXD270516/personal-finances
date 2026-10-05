@@ -12,8 +12,11 @@ invariants: ["INV-029"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "classification", "api"]
@@ -50,4 +53,4 @@ Entonces las tres muestran la transición archivar con la misma correlación
 ## Notas
 
 - Atomicidad: mismo patrón que TC-AUDIT-LIFECYCLE-002 (fallo inyectado en la escritura de la transición).
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

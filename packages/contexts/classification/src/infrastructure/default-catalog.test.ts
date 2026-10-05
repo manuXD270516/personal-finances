@@ -42,9 +42,11 @@ describe('Catálogo inicial es-BO.v1 (tarea 4.3)', () => {
     expect(again.skipped).toBe(13 + 67 - 4);
     const third = await svc.applyDefaultCatalog(USER, WS, 'es-BO.v1');
     expect(third).toMatchObject({ createdGroups: 0, createdCategories: 0, skipped: 13 + 67 });
+    // Alta del workspace (origen sistema, docs/31 D54) + la reaplicación que creó 4; la tercera no creó nada pero se
+    // audita igual (comando explícito del usuario).
     expect(
       mem.audits.map((a) => a.action).filter((a) => a === 'classification.catalog.applied'),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     await expect(svc.applyDefaultCatalog(USER, WS, 'xx.v9')).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
     });

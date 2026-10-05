@@ -269,6 +269,27 @@ const LAYOUTS: Readonly<Record<string, Readonly<Record<Orientation, LayoutSpec>>
   },
 };
 
+/**
+ * Layout fijo de dos estados para los catálogos de CLASSIFICATION (docs/31 D52): Activa ⇄ Archivada, con la creación
+ * como punto de entrada; archivar y desarchivar son un par de aristas opuestas (curvas en sentidos contrarios).
+ */
+const CLASSIFICATION_LAYOUT: Readonly<Record<Orientation, LayoutSpec>> = {
+  horizontal: {
+    start: { x: 20, y: 150 },
+    nodes: { ACTIVE: { x: 130, y: 150 }, ARCHIVED: { x: 380, y: 150 } },
+  },
+  vertical: {
+    start: { x: 170, y: 20 },
+    nodes: { ACTIVE: { x: 170, y: 100 }, ARCHIVED: { x: 170, y: 260 } },
+  },
+};
+
+const LAYOUT_BY_TYPE: Readonly<Record<string, Readonly<Record<Orientation, LayoutSpec>>>> = {
+  ...LAYOUTS,
+  Category: CLASSIFICATION_LAYOUT,
+  Counterparty: CLASSIFICATION_LAYOUT,
+};
+
 /** Layout genérico (máquinas sin layout propio, p. ej. `ExchangeRate`): estados en orden de declaración. */
 function genericSpec(machine: LifecycleMachine, orientation: Orientation): LayoutSpec {
   const index = new Map(machine.states.map((s, i) => [s.code, i]));
@@ -415,7 +436,7 @@ export function layoutFor(
   orientation: Orientation,
   labelOf: (transition: string) => string = (t) => t,
 ): DiagramLayout {
-  const spec = LAYOUTS[machine.aggregateType]?.[orientation] ?? genericSpec(machine, orientation);
+  const spec = LAYOUT_BY_TYPE[machine.aggregateType]?.[orientation] ?? genericSpec(machine, orientation);
   const fallback = genericSpec(machine, orientation);
   const pos = (code: string): Point => spec.nodes[code] ?? fallback.nodes[code]!;
   const declared = machineEdges(machine);

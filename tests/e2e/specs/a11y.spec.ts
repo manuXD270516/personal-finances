@@ -94,6 +94,16 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     await expect(page.locator('[data-testid="category-edit-form"]:visible')).toHaveCount(1);
     const editing = await seriousViolations(page);
     if (editing.length > 0) found['Clasificación con edición abierta (/clasificacion)'] = editing;
+    // Recorrido de una categoría en su detalle (docs/31 D52, tarea 9.6): pestaña Recorrido + exportar.
+    await page
+      .locator('[data-testid="category"]:visible')
+      .first()
+      .getByRole('tab', { name: 'Recorrido' })
+      .click();
+    await expect(page.locator('[data-testid="lifecycle-diagram"]:visible')).toHaveCount(1);
+    const categoryLifecycle = await seriousViolations(page);
+    if (categoryLifecycle.length > 0)
+      found['Clasificación con recorrido de categoría (/clasificacion)'] = categoryLifecycle;
     expect(found).toEqual({});
     await context.close();
   });

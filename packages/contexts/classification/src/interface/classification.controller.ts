@@ -334,6 +334,19 @@ export class ClassificationController {
     return categoryDto(await this.queries.getCategory(user, ws, id), await this.locales.localeOf(user));
   }
 
+  /**
+   * `GET W/categories/{id}/lifecycle` (`getCategoryLifecycle`, docs/31 D52; VIEWER+): recorrido de la categoría
+   * (creación, archivado, desarchivado y anotaciones). Otro workspace ⇒ 404 idéntico a inexistente.
+   */
+  @Get(`${WS}/categories/:categoryId/lifecycle`)
+  getCategoryLifecycle(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('categoryId') id: string,
+  ) {
+    return this.queries.lifecycleOf(userId(req), ws, 'Category', id);
+  }
+
   @Patch(`${WS}/categories/:categoryId`)
   async updateCategory(
     @Req() req: ApiRequest,
@@ -513,6 +526,19 @@ export class ClassificationController {
     @Param('counterpartyId') id: string,
   ) {
     return counterpartyDto(await this.queries.getCounterparty(userId(req), ws, id));
+  }
+
+  /**
+   * `GET W/counterparties/{id}/lifecycle` (`getCounterpartyLifecycle`, docs/31 D52; VIEWER+): recorrido de la
+   * contraparte. Otro workspace ⇒ 404 idéntico a inexistente.
+   */
+  @Get(`${WS}/counterparties/:counterpartyId/lifecycle`)
+  getCounterpartyLifecycle(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('counterpartyId') id: string,
+  ) {
+    return this.queries.lifecycleOf(userId(req), ws, 'Counterparty', id);
   }
 
   @Patch(`${WS}/counterparties/:counterpartyId`)

@@ -1,6 +1,17 @@
-import type { AuditChangeInput, AuditEntry } from '@pf/audit/contracts';
+import type {
+  AuditChangeInput,
+  AuditEntry,
+  LifecycleEventRefDto,
+  LifecycleStepInput,
+} from '@pf/audit/contracts';
 import { DomainError } from '@pf/shared-kernel';
 import { Category, CategoryGroup, type CategoryPatch } from '../domain/category.js';
+import {
+  CATEGORY_LIFECYCLE,
+  COUNTERPARTY_LIFECYCLE,
+  type ClassificationLifecycleMachine,
+  type ClassificationTransitionRecord,
+} from '../domain/classification-lifecycle.js';
 import {
   Counterparty,
   aliasList,
@@ -315,8 +326,8 @@ export class ClassificationService {
       const before = categoryView(category);
       category.archive(at);
       await this.saveCategory(category, expectedVersion);
-      await this.auditCategory(userId, 'archived', before, category);
-      await this.emitArchived(userId, category, null);
+      const event = await this.emitArchived(userId, category, null);
+      await this.auditCategory(userId, 'archived', before, category, [event]);
       const children = (await this.deps.categories.listAll(workspaceId)).filter(
         (c) => c.parentId === id && !c.isArchived,
       );
@@ -325,8 +336,8 @@ export class ClassificationService {
         const v = child.version;
         child.archive(at);
         await this.saveCategory(child, v);
-        await this.auditCategory(userId, 'archived', childBefore, child);
-        await this.emitArchived(userId, child, category.id);
+        const childEvent = await this.emitArchived(userId, child, category.id);
+        await this.auditCategory(userId, 'archived', childBefore, child, [childEvent]);
       }
       return category;
     });
@@ -394,7 +405,12 @@ export class ClassificationService {
    * normalizado) los grupos "Finanzas", "Otros gastos" y "Otros ingresos".
    */
   async provisionSystemCategories(userId: string, workspaceId: string): Promise<CatalogResult> {
-    return this.run(userId, workspaceId, () => this.provisionInTx(workspaceId));
+    return this.run(userId, workspaceId, async () => {
+      const created: Category[] = [];
+      const result = await this.provisionInTx(workspaceId, created);
+      if (created.length > 0) await this.recordCatalog(userId, workspaceId, result, created, 'system');
+      return result;
+    });
   }
 
   /** `ApplyDefaultCategoryCatalog` a demanda (POST …/apply-default-catalog): idempotente y auditado. */
@@ -404,27 +420,55 @@ export class ClassificationService {
     version: string = DEFAULT_CATALOG_VERSION,
   ): Promise<CatalogResult> {
     return this.run(userId, workspaceId, async () => {
-      const result = await this.applyCatalogInTx(workspaceId, version);
-      await this.audit(userId, {
+      const created: Category[] = [];
+      const result = await this.applyCatalogInTx(workspaceId, version, created);
+      await this.recordCatalog(userId, workspaceId, result, created);
+      return result;
+    });
+  }
+
+  /**
+   * Registro `classification.catalog.applied` + `CREATE` de cada categoría creada por el catálogo (docs/31 D52): un
+   * paso del recorrido puede apuntar a otro agregado (cada categoría), respaldado por este único registro.
+   */
+  private recordCatalog(
+    userId: string,
+    workspaceId: string,
+    result: CatalogResult,
+    created: readonly Category[],
+    origin?: 'system',
+  ): Promise<void> {
+    const steps: LifecycleStepInput[] = created.map((c) => ({
+      ...transitionStep(c.lastTransition, CATEGORY_LIFECYCLE),
+      aggregateType: 'Category',
+      aggregateId: c.id,
+      aggregateVersion: c.version,
+    }));
+    return this.deps.lifecycle.record(
+      {
         workspaceId,
         action: 'classification.catalog.applied',
         aggregateType: 'CategoryCatalog',
         aggregateId: workspaceId,
+        actor: { type: 'USER', userId },
+        ...(origin ? { origin } : {}),
         changes: [
           { field: 'catalogVersion', before: null, after: result.catalogVersion },
           { field: 'createdGroups', before: null, after: result.createdGroups },
           { field: 'createdCategories', before: null, after: result.createdCategories },
           { field: 'skipped', before: null, after: result.skipped },
         ],
-      });
-      return result;
-    });
+      },
+      steps,
+    );
   }
 
   /**
-   * Gancho síncrono de `CreateWorkspace` (design §6-§7): dentro de la MISMA unidad de trabajo que crea el workspace
-   * provisiona las 11 categorías de sistema y, si `seedDefaultCategories`, el catálogo inicial. No escribe auditoría
-   * propia: el alta ya queda auditada como `identity.workspace.created` (decisión de implementación del design).
+   * Gancho síncrono de `CreateWorkspace` (design §6-§7; docs/31 D54): dentro de la MISMA unidad de trabajo que crea el
+   * workspace provisiona las 11 categorías de sistema y, si `seedDefaultCategories`, el catálogo inicial. Recorrido
+   * (docs/31 D52): cada categoría creada registra `CREATE` con `origin = system`, respaldado por UN registro
+   * `classification.catalog.applied` (agregado `CategoryCatalog`, id = workspace; mismo formato que
+   * `POST …/apply-default-catalog`). Si no se creó nada (provisión repetida), no se escribe nada.
    */
   async onWorkspaceCreated(input: {
     readonly workspaceId: string;
@@ -432,13 +476,28 @@ export class ClassificationService {
     readonly seedDefaultCategories: boolean;
   }): Promise<void> {
     await this.run(input.userId, input.workspaceId, async () => {
-      await this.provisionInTx(input.workspaceId);
-      if (input.seedDefaultCategories)
-        await this.applyCatalogInTx(input.workspaceId, DEFAULT_CATALOG_VERSION);
+      const created: Category[] = [];
+      const system = await this.provisionInTx(input.workspaceId, created);
+      const catalog = input.seedDefaultCategories
+        ? await this.applyCatalogInTx(input.workspaceId, DEFAULT_CATALOG_VERSION, created)
+        : null;
+      if (created.length === 0) return;
+      await this.recordCatalog(
+        input.userId,
+        input.workspaceId,
+        {
+          catalogVersion: catalog?.catalogVersion ?? system.catalogVersion,
+          createdGroups: system.createdGroups + (catalog?.createdGroups ?? 0),
+          createdCategories: system.createdCategories + (catalog?.createdCategories ?? 0),
+          skipped: system.skipped + (catalog?.skipped ?? 0),
+        },
+        created,
+        'system',
+      );
     });
   }
 
-  private async provisionInTx(workspaceId: string): Promise<CatalogResult> {
+  private async provisionInTx(workspaceId: string, created: Category[] = []): Promise<CatalogResult> {
     const groups = await this.deps.groups.listAll(workspaceId);
     const categories = await this.deps.categories.listAll(workspaceId);
     let createdGroups = 0;
@@ -473,12 +532,17 @@ export class ClassificationService {
       });
       await this.deps.categories.insert(category);
       categories.push(category);
+      created.push(category);
       createdCategories += 1;
     }
     return { catalogVersion: 'system', createdGroups, createdCategories, skipped };
   }
 
-  private async applyCatalogInTx(workspaceId: string, version: string): Promise<CatalogResult> {
+  private async applyCatalogInTx(
+    workspaceId: string,
+    version: string,
+    created: Category[] = [],
+  ): Promise<CatalogResult> {
     const catalog = this.deps.catalogs.get(version);
     if (!catalog) throw validation(`unknown catalog version '${version}'`, '/catalogVersion');
     const groups = await this.deps.groups.listAll(workspaceId);
@@ -500,7 +564,7 @@ export class ClassificationService {
         return existing;
       }
       if (parent?.isSystem) return null;
-      const created = Category.create({
+      const category = Category.create({
         id: this.deps.ids.next(),
         group,
         parent,
@@ -509,10 +573,11 @@ export class ClassificationService {
         color: entry.color ?? null,
         sortOrder: siblings.length,
       });
-      await this.deps.categories.insert(created);
-      categories.push(created);
+      await this.deps.categories.insert(category);
+      categories.push(category);
+      created.push(category);
       createdCategories += 1;
-      return created;
+      return category;
     };
     for (const g of catalog.groups) {
       let group = groups.find(
@@ -799,9 +864,14 @@ export class ClassificationService {
     }
   }
 
-  private async emitArchived(userId: string, c: Category, cascadedFrom: string | null): Promise<void> {
+  private async emitArchived(
+    userId: string,
+    c: Category,
+    cascadedFrom: string | null,
+  ): Promise<LifecycleEventRefDto> {
+    const eventId = this.deps.ids.next();
     await this.deps.outbox.append({
-      eventId: this.deps.ids.next(),
+      eventId,
       eventType: 'classification.CategoryArchived',
       eventVersion: 1,
       aggregateType: 'Category',
@@ -817,21 +887,57 @@ export class ClassificationService {
         kind: c.kind,
         archivedAt: c.archivedAt ?? this.now(),
         cascadedFromCategoryId: cascadedFrom,
+        transition: 'ARCHIVE',
       },
     });
+    return { eventId, eventType: 'classification.CategoryArchived.v1' };
   }
 
-  private auditCategory(userId: string, verb: string, before: Snap | null, c: Category): Promise<void> {
-    return this.audit(userId, {
-      workspaceId: c.workspaceId,
-      action: `classification.category.${verb}`,
-      aggregateType: 'Category',
-      aggregateId: c.id,
-      aggregateVersion: c.version,
-      changes: diff(before, categoryView(c), CATEGORY_FIELDS),
-    });
+  /**
+   * Auditoría + paso del recorrido en la unidad de trabajo del comando (add-lifecycle-timeline decisión 5, docs/31
+   * D52): la transición validada por la máquina del agregado o, si el comando no cambió el estado, una anotación con
+   * los nombres de los campos cambiados (sin valores).
+   */
+  private record(
+    userId: string,
+    entry: Omit<AuditEntry, 'actor'> & { readonly changes: readonly AuditChangeInput[] },
+    transition: ClassificationTransitionRecord | null,
+    machine: ClassificationLifecycleMachine,
+    events: readonly LifecycleEventRefDto[] = [],
+  ): Promise<void> {
+    const changedFields = entry.changes.map((c) => c.field).filter((f) => f !== 'status');
+    const step: LifecycleStepInput | null = transition
+      ? { ...transitionStep(transition, machine), events }
+      : changedFields.length > 0
+        ? { kind: 'ANNOTATION', changedFields, events }
+        : null;
+    return this.deps.lifecycle.record({ ...entry, actor: { type: 'USER', userId } }, step ? [step] : []);
   }
 
+  private auditCategory(
+    userId: string,
+    verb: string,
+    before: Snap | null,
+    c: Category,
+    events: readonly LifecycleEventRefDto[] = [],
+  ): Promise<void> {
+    return this.record(
+      userId,
+      {
+        workspaceId: c.workspaceId,
+        action: `classification.category.${verb}`,
+        aggregateType: 'Category',
+        aggregateId: c.id,
+        aggregateVersion: c.version,
+        changes: diff(before, categoryView(c), CATEGORY_FIELDS),
+      },
+      c.lastTransition,
+      CATEGORY_LIFECYCLE,
+      events,
+    );
+  }
+
+  /** Los tags no tienen máquina de estados (docs/31 D52): solo auditoría. */
   private auditTag(userId: string, verb: string, before: Snap | null, t: Tag): Promise<void> {
     return this.audit(userId, {
       workspaceId: t.workspaceId,
@@ -849,13 +955,33 @@ export class ClassificationService {
     before: Snap | null,
     c: Counterparty,
   ): Promise<void> {
-    return this.audit(userId, {
-      workspaceId: c.workspaceId,
-      action: `classification.counterparty.${verb}`,
-      aggregateType: 'Counterparty',
-      aggregateId: c.id,
-      aggregateVersion: c.version,
-      changes: diff(before, counterpartyView(c), COUNTERPARTY_FIELDS),
-    });
+    return this.record(
+      userId,
+      {
+        workspaceId: c.workspaceId,
+        action: `classification.counterparty.${verb}`,
+        aggregateType: 'Counterparty',
+        aggregateId: c.id,
+        aggregateVersion: c.version,
+        changes: diff(before, counterpartyView(c), COUNTERPARTY_FIELDS),
+      },
+      c.lastTransition,
+      COUNTERPARTY_LIFECYCLE,
+    );
   }
+}
+
+/** Paso `TRANSITION` desde el registro validado por la máquina (sin registro ⇒ error de programación). */
+function transitionStep(
+  t: ClassificationTransitionRecord | null,
+  machine: ClassificationLifecycleMachine,
+): LifecycleStepInput & { readonly kind: 'TRANSITION' } {
+  if (!t) throw new Error(`${machine.aggregateType}: missing lifecycle transition`);
+  return {
+    kind: 'TRANSITION',
+    transition: t.transition,
+    fromState: t.from,
+    toState: t.to,
+    machineVersion: machine.version,
+  };
 }

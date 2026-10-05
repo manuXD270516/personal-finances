@@ -12,8 +12,11 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle-export.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "export", "security"]
@@ -49,4 +52,4 @@ Entonces la celda del motivo queda neutralizada
 ## Notas
 
 - Convención de escape de docs/14 §12 (prefijo ').
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

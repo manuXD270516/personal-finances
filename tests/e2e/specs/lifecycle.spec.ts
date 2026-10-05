@@ -213,3 +213,113 @@ test.describe('Recorrido del ciclo de vida (audit/lifecycle-timeline)', () => {
     await viewer.context.close();
   });
 });
+
+/** Descarga un archivo con la acción indicada y devuelve su nombre sugerido y su contenido (docs/31 D52). */
+async function downloadFrom(page: Page, scope: Locator, name: string) {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    scope.getByRole('link', { name }).click(),
+  ]);
+  const path = await download.path();
+  const { readFile } = await import('node:fs/promises');
+  return { fileName: download.suggestedFilename(), bytes: new Uint8Array(await readFile(path)) };
+}
+
+test.describe('Exportación del recorrido y recorrido de categorías (docs/31 D52)', () => {
+  test('[TC-AUDIT-LIFECYCLE-021] [TC-AUDIT-LIFECYCLE-023] "Exportar CSV" y "Exportar PDF" en el Recorrido de un gasto descargan el archivo', async ({
+    browser,
+  }) => {
+    const { context, page, W } = await newFinanceUser(browser, 'exportar');
+    const bank = await openAccount(page, W, 'Banco export', 'BANK', 'BOB', '1000.00');
+    const created = await api(page, 'POST', `${W}/transactions`, {
+      kind: 'EXPENSE',
+      status: 'POSTED',
+      transactionDate: todayLaPaz(),
+      accountId: bank,
+      amount: bob('80.00'),
+      description: 'Gasto exportado',
+    });
+    const id = String(created['id']);
+    await api(
+      page,
+      'POST',
+      `${W}/transactions/${id}/void`,
+      { reason: '=SUM(A1:A9)' },
+      { 'if-match': `"${String(created['version'])}"` },
+    );
+    await go(page, `/transacciones/${id}`);
+    await openLifecycleTab(page);
+    const actions = page.getByRole('navigation', { name: 'Exportar el recorrido' });
+    await expect(actions).toBeVisible();
+
+    const csv = await downloadFrom(page, actions, 'Exportar CSV');
+    expect(csv.fileName).toBe(`recorrido-Transaction-${id}.csv`);
+    expect([...csv.bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const lines = new TextDecoder().decode(csv.bytes).split('\r\n');
+    expect(lines[0]).toMatch(/^sequence,kind,transition,fromState,toState,occurredAt,/);
+    expect(lines[1]).toMatch(/^1,TRANSITION,RECORD,,POSTED,\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-04:00,/);
+    expect(lines[1]).toContain(',80.00,,BOB,');
+    expect(lines[2]).toContain(",'=SUM(A1:A9),");
+
+    const pdf = await downloadFrom(page, actions, 'Exportar PDF');
+    expect(pdf.fileName).toBe(`recorrido-Transaction-${id}.pdf`);
+    expect(Buffer.from(pdf.bytes.subarray(0, 5)).toString('latin1')).toBe('%PDF-');
+    await context.close();
+  });
+
+  test('[TC-AUDIT-LIFECYCLE-020] el Recorrido de "Supermercado" (creada, archivada y desarchivada) destaca su camino y se exporta en CSV y PDF', async ({
+    browser,
+  }) => {
+    const { context, page, W } = await newFinanceUser(browser, 'recorrido-categoria');
+    const suffix = randomUUID().slice(0, 6);
+    const group = await api(page, 'POST', `${W}/category-groups`, {
+      name: `Alimentos ${suffix}`,
+      kind: 'EXPENSE',
+    });
+    const name = `Supermercado ${suffix}`;
+    const created = await api(page, 'POST', `${W}/categories`, { groupId: String(group['id']), name });
+    const id = String(created['id']);
+    await api(page, 'POST', `${W}/categories/${id}/archive`, undefined, { 'if-match': '"1"' });
+    await api(page, 'POST', `${W}/categories/${id}/unarchive`, undefined, { 'if-match': '"2"' });
+
+    await go(page, '/clasificacion');
+    const row = page.locator(`[data-testid="category"][data-category="${name}"]`);
+    await row.getByRole('button', { name: `Recorrido de «${name}»` }).click();
+    const detail = page.getByTestId(`category-${id}-detail`);
+    await expect(detail.getByRole('tab', { name: 'Recorrido' })).toHaveAttribute('aria-selected', 'true');
+    const report = detail.getByTestId('lifecycle-report');
+    await expect(report).toBeVisible();
+    const svg = report.locator('svg[data-orientation="horizontal"]');
+    await expect(node(svg, 'ACTIVE')).toHaveAttribute('data-current', 'true');
+    await expect(node(svg, 'ARCHIVED')).toHaveAttribute('data-visited', 'true');
+    await expect(node(svg, 'ACTIVE')).toContainText('(actual)');
+    await expect(edge(svg, 'ARCHIVE', 'ACTIVE', 'ARCHIVED')).toHaveAttribute('data-order', '1');
+    await expect(edge(svg, 'UNARCHIVE', 'ARCHIVED', 'ACTIVE')).toHaveAttribute('data-order', '2');
+    const entries = report.getByTestId('lifecycle-entry');
+    await expect(entries.getByTestId('lifecycle-entry-title')).toHaveText([
+      'Crear',
+      '1. Archivar',
+      '2. Desarchivar',
+    ]);
+    for (let i = 0; i < 3; i += 1) {
+      const who = entries.nth(i).getByTestId('lifecycle-entry-who');
+      await expect(who).toContainText('Tú');
+      const at = await who.locator('time').getAttribute('datetime');
+      await expect(who.locator('time')).toHaveText(LA_PAZ.format(new Date(at!)));
+    }
+
+    const actions = detail.getByRole('navigation', { name: 'Exportar el recorrido' });
+    const csv = await downloadFrom(page, actions, 'Exportar CSV');
+    expect(csv.fileName).toBe(`recorrido-Category-${id}.csv`);
+    const rows = new TextDecoder().decode(csv.bytes).split('\r\n').slice(1, -1);
+    expect(rows.map((r) => r.split(',').slice(2, 5).join(' '))).toEqual([
+      'CREATE  ACTIVE',
+      'ARCHIVE ACTIVE ARCHIVED',
+      'UNARCHIVE ARCHIVED ACTIVE',
+    ]);
+    const pdf = await downloadFrom(page, actions, 'Exportar PDF');
+    expect(pdf.fileName).toBe(`recorrido-Category-${id}.pdf`);
+    expect(Buffer.from(pdf.bytes.subarray(0, 5)).toString('latin1')).toBe('%PDF-');
+    await context.close();
+  });
+});

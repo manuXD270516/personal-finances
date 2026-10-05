@@ -12,8 +12,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle-export.test.ts
+  - tests/e2e/specs/lifecycle.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "export", "api"]
@@ -52,4 +56,4 @@ Entonces obtengo cinco filas en orden con hora de La Paz y montos exactos
 ## Notas
 
 - Mismos datos que TC-AUDIT-LIFECYCLE-005.
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

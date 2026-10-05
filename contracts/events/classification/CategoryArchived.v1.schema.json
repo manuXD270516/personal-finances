@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/classification/CategoryArchived.v1.schema.json",
   "title": "classification.CategoryArchived.v1",
-  "description": "Una categoría fue archivada (nunca se elimina, INV-019); el historial la sigue referenciando. Si se archivó en cascada desde su categoría padre, cascadedFromCategoryId lo indica. Productor: CLASSIFICATION. Consumidores: REPORTING (Phase 1); PLANNING y RULES en sus fases. Idempotencia natural: (categoryId, aggregateVersion). Sin PII.",
+  "description": "Una categoría fue archivada (nunca se elimina, INV-019); el historial la sigue referenciando. Si se archivó en cascada desde su categoría padre, cascadedFromCategoryId lo indica. Productor: CLASSIFICATION. Consumidores: REPORTING (Phase 1); PLANNING y RULES en sus fases. Idempotencia natural: (categoryId, aggregateVersion). Sin PII. Campo opcional aditivo `transition` (docs/31 D52; add-lifecycle-timeline, decisión 10): la transición de la máquina `Category`; los consumidores existentes lo ignoran.",
   "type": "object",
   "allOf": [
     {
@@ -70,6 +70,13 @@
               "type": "null"
             }
           ]
+        },
+        "transition": {
+          "description": "Transición de la máquina `Category` que originó el evento (opcional, aditivo; docs/31 D52).",
+          "type": "string",
+          "enum": [
+            "ARCHIVE"
+          ]
         }
       }
     }
@@ -96,7 +103,8 @@
         "groupId": "01928c4e-0000-7000-8000-0000000cb001",
         "kind": "EXPENSE",
         "archivedAt": "2026-10-02T14:03:22.120Z",
-        "cascadedFromCategoryId": null
+        "cascadedFromCategoryId": null,
+        "transition": "ARCHIVE"
       }
     }
   ]
