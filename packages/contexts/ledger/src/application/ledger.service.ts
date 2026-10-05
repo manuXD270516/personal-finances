@@ -140,6 +140,15 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
     });
   }
 
+  assertPeriodOpen(input: { readonly workspaceId: string; readonly date: string }): Promise<void> {
+    return this.deps.uow.run(input.workspaceId, async () => {
+      const date = LocalDate.parse(input.date);
+      if (await this.deps.periods.isLocked(input.workspaceId, YearMonth.of(date))) {
+        throw new DomainError('PERIOD_CLOSED', `${date.toString()} is in a closed period`);
+      }
+    });
+  }
+
   lockPeriod(input: {
     readonly workspaceId: string;
     readonly yearMonth: string;

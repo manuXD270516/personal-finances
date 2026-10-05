@@ -145,8 +145,8 @@ const MAIN_ACCOUNTS: readonly [string, string, AccountType, DemoCurrency, string
   ['usdt2', 'P2P Exchange Demo — Ahorro USDT', 'CRYPTO_WALLET', 'USDT', 'p2p', 200_000_000n],
   ['usdt3', 'Cold Wallet Demo — USDT', 'CRYPTO_WALLET', 'USDT', 'cold', 0n],
   ['btc1', 'Cold Wallet BTC', 'CRYPTO_WALLET', 'BTC', 'cold', 1_000_000n],
-  // Sin postings y con BTC no habilitada en el workspace: GET /reports/summary la presenta en cero a la escala del
-  // catálogo (TC-REPORTING-NETWORTH-001, regresión del CURRENCY_MISMATCH BTC(8) vs BTC(18)).
+  // Sin postings: GET /reports/summary la presenta en cero a la escala del catálogo (TC-REPORTING-NETWORTH-001,
+  // regresión del CURRENCY_MISMATCH BTC(8) vs BTC(18)). BTC se habilita en el workspace antes de abrirla (docs/31 D45).
   ['btc2', 'P2P Exchange Demo — BTC', 'CRYPTO_WALLET', 'BTC', 'p2p', 0n],
   ['card1', 'Tarjeta Andina Demo', 'CREDIT_CARD', 'BOB', 'andino', 0n],
   ['card2', 'Tarjeta Sol Demo', 'CREDIT_CARD', 'BOB', 'sol', 0n],

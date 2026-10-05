@@ -22,7 +22,11 @@ export const PERF_THRESHOLDS = {
   },
 } as const;
 
-/** add-ledger-core 5.5: overhead de RLS < 10 % (EXPLAIN ANALYZE). Bajo `noiseFloorMs` la diferencia es ruido. */
+/**
+ * add-ledger-core 5.5 (criterio docs/31 D43): overhead de RLS < 10 % (EXPLAIN ANALYZE) medido sobre las consultas REALES
+ * de la aplicación (las sentencias que emite `PgBalanceQuery`, con sus parámetros) y las de índice; el agregado
+ * sintético de todo el workspace se reporta como informativo (no falla). Bajo `noiseFloorMs` la diferencia es ruido.
+ */
 export const RLS_OVERHEAD = { maxRatio: 0.1, noiseFloorMs: 0.5 } as const;
 
 export type NfrId = keyof typeof PERF_THRESHOLDS | 'RLS-OVERHEAD';
@@ -114,6 +118,8 @@ export function rlsResult(input: {
   withoutRls: readonly number[];
   /** Nodos del plan con RLS (p. ej. `Index Only Scan (posting_balance_ix)`). */
   plan?: string;
+  /** `false` ⇒ informativo: se reporta pero no es una brecha (agregado sintético, docs/31 D43). */
+  gate?: boolean;
 }): BenchResult {
   const a = stats(input.withRls);
   const b = stats(input.withoutRls);
@@ -127,7 +133,7 @@ export function rlsResult(input: {
     value: Math.round(ratio * 1000) / 1000,
     limit: RLS_OVERHEAD.maxRatio,
     unit: 'ratio',
-    gate: true,
+    gate: input.gate ?? true,
     passed,
     notes: `mediana con RLS ${a.p50} ms vs sin RLS ${b.p50} ms (p95 ${a.p95} vs ${b.p95})${
       a.p50 - b.p50 < RLS_OVERHEAD.noiseFloorMs

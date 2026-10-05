@@ -108,7 +108,7 @@ export class AccountsService {
   openAccount(cmd: OpenAccountCommand): Promise<AccountView> {
     const { uow, accounts, ids } = this.deps;
     return uow.run(cmd.workspaceId, async () => {
-      const ccy = await this.enabledCurrency(cmd.currency, '/currency');
+      const ccy = await this.enabledCurrency(cmd.workspaceId, cmd.currency, '/currency');
       if (cmd.institutionId) await this.assertAssignableInstitution(cmd.workspaceId, cmd.institutionId);
       if (cmd.tagIds && cmd.tagIds.length > 0) {
         await this.deps.tags.assertAssignable(cmd.workspaceId, cmd.tagIds);
@@ -205,7 +205,7 @@ export class AccountsService {
       let currencyKind: string | undefined;
       let hasPostings = false;
       if (changes.currency !== undefined && changes.currency !== before.currency) {
-        currencyKind = (await this.enabledCurrency(changes.currency, '/currency')).kind;
+        currencyKind = (await this.enabledCurrency(workspaceId, changes.currency, '/currency')).kind;
         hasPostings = (await this.deps.balances.balancesOf(workspaceId, [accountId])).has(accountId);
       }
       if (changes.institutionId && changes.institutionId !== before.institutionId) {
@@ -506,10 +506,18 @@ export class AccountsService {
     }
   }
 
-  private async enabledCurrency(code: string, pointer: string): Promise<CurrencyInfo> {
+  /**
+   * Moneda activa en el catálogo global Y habilitada en el workspace (docs/31 D45; FR-ACCOUNTS-002). Si no,
+   * `CURRENCY_NOT_ENABLED` (422) apuntando al campo.
+   */
+  private async enabledCurrency(workspaceId: string, code: string, pointer: string): Promise<CurrencyInfo> {
+    const notEnabled = () =>
+      new DomainError('CURRENCY_NOT_ENABLED', `currency ${code} is not enabled`).at(pointer);
     const ccy = await this.deps.currencies.find(code);
-    if (!ccy || !ccy.active) {
-      throw new DomainError('CURRENCY_NOT_ENABLED', `currency ${code} is not enabled`).at(pointer);
+    if (!ccy || !ccy.active) throw notEnabled();
+    const workspace = this.deps.workspaceCurrencies;
+    if (workspace && !(await workspace.enabledCurrencies(workspaceId)).some((c) => c.code === code)) {
+      throw notEnabled();
     }
     return ccy;
   }

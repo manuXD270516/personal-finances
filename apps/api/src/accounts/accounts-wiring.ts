@@ -6,6 +6,7 @@ import {
   type AccountsRuntime,
   type BaseCurrencyValuationDeps,
   type WorkspaceCalendar,
+  type WorkspaceCurrenciesPort,
 } from '@pf/accounts/interface/accounts.module';
 import { identityWorkspaceTimeZones } from '@pf/identity/interface/identity.module';
 import { createLedgerRuntime, type LedgerRuntime } from '@pf/ledger/interface/ledger.module';
@@ -54,6 +55,8 @@ export function accountsRuntime(input: {
   readonly outbox?: OutboxWriter;
   /** Equivalente en moneda base (FX `FxValuationPort` + ajustes de IDENTITY); ausente ⇒ `null`. */
   readonly valuation?: BaseCurrencyValuationDeps;
+  /** Monedas habilitadas del workspace (FX, docs/31 D45). */
+  readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
 }): { readonly ledger: LedgerRuntime; readonly accounts: AccountsRuntime } {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   const ledger = createLedgerRuntime({
@@ -74,6 +77,7 @@ export function accountsRuntime(input: {
     openingBalance: new OpenAccountWithOpeningBalance(ledger.posting),
     calendar: workspaceCalendar(input.pool, input.clock, input.defaultTimeZone),
     ...(input.valuation ? { valuation: input.valuation } : {}),
+    ...(input.workspaceCurrencies ? { workspaceCurrencies: input.workspaceCurrencies } : {}),
   });
   return { ledger, accounts };
 }

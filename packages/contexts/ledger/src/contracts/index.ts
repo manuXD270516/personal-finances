@@ -75,6 +75,11 @@ export interface LedgerPostingPort {
     readonly nature: 'ASSET' | 'LIABILITY';
     readonly currency: string;
   }): Promise<{ readonly ledgerAccountId: string; readonly code: string }>;
+  /**
+   * Rechaza con `PERIOD_CLOSED` si el mes de `date` (`YYYY-MM-DD`) está cerrado (INV-015; docs/31 D49): lo usan los
+   * cambios que no generan asiento pero alteran lo reportado de un periodo cerrado (recategorizar). Sin efectos.
+   */
+  assertPeriodOpen(input: { readonly workspaceId: string; readonly date: string }): Promise<void>;
 }
 
 /** Bloqueo MENSUAL de periodos (docs/31 D10). Idempotente; lo usará Planning (Phase 2) en su transacción de cierre. */

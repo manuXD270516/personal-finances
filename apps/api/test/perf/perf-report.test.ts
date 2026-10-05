@@ -58,4 +58,24 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     expect(rlsResult({ id: 'r', title: 't', withRls: [15], withoutRls: [10] }).passed).toBe(false);
     expect(rlsResult({ id: 'r', title: 't', withRls: [0.4], withoutRls: [0.2] }).passed).toBe(true);
   });
+
+  it('docs/31 D43: el agregado sintético de RLS es informativo (no es brecha); la consulta real sí es gate', () => {
+    const synthetic = rlsResult({
+      id: 's',
+      title: 'agregado',
+      withRls: [21.5],
+      withoutRls: [18.2],
+      gate: false,
+    });
+    const real = rlsResult({ id: 'q', title: 'PgBalanceQuery', withRls: [4.0], withoutRls: [3.1] });
+    expect([synthetic.gate, synthetic.passed, real.gate, real.passed]).toEqual([false, false, true, false]);
+    const report = buildReport({
+      generatedAt: 'x',
+      environment: {},
+      dataset: {},
+      results: [synthetic, real],
+    });
+    expect(report.breaches).toEqual(['RLS-OVERHEAD q: 0.29 > 0.1']);
+    expect(renderMarkdown(report)).toContain('| informativo | FALLA |');
+  });
 });

@@ -15,7 +15,7 @@ import {
 } from '../common/types';
 import { Field, formStyle, inputStyle, mutedStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
-import { defaultLiquidity, lastFourOf, maskedIdentifier, natureOf } from './logic';
+import { accountCurrencyOptions, defaultLiquidity, lastFourOf, maskedIdentifier, natureOf } from './logic';
 
 interface FormState {
   name: string;
@@ -78,13 +78,11 @@ export function AccountForm({
   const attemptKey = useRef(uuidv7());
   const inFlight = useRef(false);
 
-  const enabled = ctx.currencies.filter((c) => c.enabled || c.code === s.currency);
-  const currencyOptions =
-    s.type === 'CRYPTO_WALLET'
-      ? enabled.filter((c) => c.kind === 'CRYPTO')
-      : enabled.length
-        ? enabled
-        : [{ code: ctx.ws.baseCurrency }];
+  const currencyOptions = accountCurrencyOptions(ctx.currencies, {
+    type: s.type,
+    baseCurrency: ctx.ws.baseCurrency,
+    ...(account ? { currentCurrency: account.currency } : {}),
+  });
   const liability = natureOf(s.type) === 'LIABILITY';
   const set = (patch: Partial<FormState>) => setS((prev) => ({ ...prev, ...patch }));
 

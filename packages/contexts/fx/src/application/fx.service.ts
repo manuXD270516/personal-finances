@@ -266,6 +266,25 @@ export class FxService {
     });
   }
 
+  /**
+   * Habilita monedas ACTIVAS del catálogo en el workspace (idempotente; conserva las ya habilitadas, incluido el
+   * conjunto por defecto de un workspace sin filas). Sin endpoint en Phase 1: lo usan los cargadores de datos (seed y
+   * demo) para abrir cuentas en monedas fuera del conjunto por defecto (docs/31 D45). Inexistente o inactiva ⇒
+   * `CURRENCY_NOT_ENABLED`.
+   */
+  enableCurrencies(input: {
+    readonly workspaceId: string;
+    readonly codes: readonly string[];
+  }): Promise<void> {
+    return this.deps.uow.run(input.workspaceId, async () => {
+      for (const [i, code] of input.codes.entries()) await this.currency(code, `/codes/${i}`);
+      const current = (await this.deps.currencies.list(input.workspaceId, {}))
+        .filter((r) => r.enabled)
+        .map((r) => r.definition.code);
+      await this.deps.currencies.enable(input.workspaceId, [...new Set([...current, ...input.codes])]);
+    });
+  }
+
   // ------------------------------------------------------------------ helpers
 
   private async currency(code: string, pointer: string): Promise<Currency> {

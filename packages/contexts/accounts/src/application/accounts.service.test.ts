@@ -120,10 +120,20 @@ describe('OpenAccount con saldo inicial', () => {
     expect(mem.accounts.size).toBe(1);
   });
 
-  it('[TC-ACCOUNTS-CURRENCY-001] una moneda no habilitada se rechaza con CURRENCY_NOT_ENABLED', async () => {
-    expect(
-      await code(svc.openAccount({ workspaceId: W1, name: 'Euro Cash', type: 'CASH', currency: 'EUR' })),
-    ).toBe('CURRENCY_NOT_ENABLED');
+  it('[TC-ACCOUNTS-CURRENCY-001] EUR activa en el catálogo pero no habilitada en el workspace ⇒ CURRENCY_NOT_ENABLED (D45)', async () => {
+    const euroCash = { workspaceId: W1, name: 'Euro Cash', type: 'CASH', currency: 'EUR' } as const;
+    expect(await code(svc.openAccount(euroCash))).toBe('CURRENCY_NOT_ENABLED');
+    // Inactiva en el catálogo global: mismo código.
+    expect(await code(svc.openAccount({ ...euroCash, currency: 'XAU' }))).toBe('CURRENCY_NOT_ENABLED');
+    expect([mem.accounts.size, mem.events.length, mem.audits.length]).toEqual([0, 0, 0]);
+    // Cambiar la moneda de una cuenta sin movimientos a una no habilitada: mismo rechazo.
+    const usd = await svc.openAccount({ ...euroCash, name: 'USD Cash', currency: 'USD' });
+    expect(await code(svc.updateAccount(W1, usd.account.id, usd.account.version, { currency: 'EUR' }))).toBe(
+      'CURRENCY_NOT_ENABLED',
+    );
+    // Habilitada en el workspace ⇒ se acepta.
+    mem.enabledCurrencies.add('EUR');
+    expect((await svc.openAccount(euroCash)).account.currency).toBe('EUR');
   });
 });
 

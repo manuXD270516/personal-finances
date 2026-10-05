@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { resolveContractPath } from '../../src/api/api-conventions.js';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
-import { connect, inTx, sqlState } from '../support/db.js';
+import { connect, enableCurrencies, inTx, sqlState } from '../support/db.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
 /** Recorta un NUMERIC (string decimal) a la escala de la moneda sin pasar por `number` (INV-001). */
@@ -659,6 +659,7 @@ describe('comandos de cuenta', () => {
       currency: 'USD',
       ...opening('500.00', 'USD'),
     });
+    await enableCurrencies(deps.databaseUrl, { userId: u.id, workspaceId: u.ws }, ['BTC']); // docs/31 D45
     const btc = await create(u, {
       name: 'BTC Wallet',
       type: 'CRYPTO_WALLET',

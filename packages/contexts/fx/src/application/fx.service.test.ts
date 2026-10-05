@@ -297,6 +297,18 @@ describe('Preferencias y valoración (fx/market-rates)', () => {
     const enabled = await queries.listCurrencies(WS, { enabled: true });
     expect(enabled.map((c) => c.definition.code).sort()).toEqual(['BOB', 'USD', 'USDT']);
   });
+
+  it('[TC-ACCOUNTS-CURRENCY-001] enableCurrencies habilita monedas activas sin perder las por defecto; inexistente ⇒ CURRENCY_NOT_ENABLED', async () => {
+    const { service, queries } = setup();
+    // Workspace sin filas (se trata como el conjunto por defecto): habilitar BTC conserva BOB/USD/USDT.
+    await service.enableCurrencies({ workspaceId: WS, codes: ['BTC'] });
+    await service.enableCurrencies({ workspaceId: WS, codes: ['BTC'] }); // idempotente
+    const enabled = await queries.listCurrencies(WS, { enabled: true });
+    expect(enabled.map((c) => c.definition.code).sort()).toEqual(['BOB', 'BTC', 'USD', 'USDT']);
+    expect(await codeOf(service.enableCurrencies({ workspaceId: WS, codes: ['XYZ'] }))).toBe(
+      'CURRENCY_NOT_ENABLED',
+    );
+  });
 });
 
 describe('Recorrido de una tasa manual (add-lifecycle-timeline)', () => {

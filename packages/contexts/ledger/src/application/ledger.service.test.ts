@@ -355,4 +355,17 @@ describe('LedgerService — ReverseJournalEntry y periodos', () => {
       cmd([system('EXPENSE', '45.00', 'BOB', S1), asset(BANK_A, '-45.00')], { entryDate: '2026-08-15' }),
     );
   });
+
+  it('[TC-CLASSIFICATION-RECATEGORIZE-002] assertPeriodOpen: PERIOD_CLOSED en un mes cerrado, sin efectos; abierto ⇒ ok', async () => {
+    await svc.lockPeriod({ workspaceId: W1, yearMonth: '2026-08', periodId: T1 });
+    const [audits, events, entries] = [mem.audits.length, mem.events.length, mem.entries.length];
+    expect(await codeOf(svc.assertPeriodOpen({ workspaceId: W1, date: '2026-08-31' }))).toBe('PERIOD_CLOSED');
+    expect(await codeOf(svc.assertPeriodOpen({ workspaceId: W1, date: '2026-08-01' }))).toBe('PERIOD_CLOSED');
+    await svc.assertPeriodOpen({ workspaceId: W1, date: '2026-09-01' });
+    await svc.assertPeriodOpen({ workspaceId: W1, date: '2026-07-31' });
+    expect(await codeOf(svc.assertPeriodOpen({ workspaceId: W1, date: '2026-02-30' }))).toBe(
+      'VALIDATION_FAILED',
+    );
+    expect([mem.audits.length, mem.events.length, mem.entries.length]).toEqual([audits, events, entries]);
+  });
 });

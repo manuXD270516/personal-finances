@@ -16,6 +16,8 @@ automation_status: automated
 automated_tests:
   - apps/api/test/api/accounts-ledger.api.test.ts
   - packages/contexts/accounts/src/application/accounts.service.test.ts
+  - packages/contexts/fx/src/application/fx.service.test.ts
+  - apps/web/src/ui/accounts/AccountsListView.test.tsx
 status: automated
 regression_suite: true
 phase: 1
@@ -63,3 +65,5 @@ Entonces se rechaza con el código "CURRENCY_MISMATCH"
 - Revisado 2026-10-04: se mantiene `not_automated` (advertencia R3 intencional). El test con su id solo cubre `CURRENCY_NOT_ENABLED`; falta el gasto en otra moneda rechazado con `CURRENCY_MISMATCH` contra Transactions real sin persistir nada (add-accounts-management 6.3).
 - Automatizado 2026-10-04 (add-accounts-management 6.3): `CURRENCY_MISMATCH` contra Transactions real sin persistir transacción, asiento, auditoría ni outbox. Divergencia con la precondición "EUR no habilitada en W1": por add-manual-conversions (decisión 11) "habilitada" = existente y activa en el catálogo global (no hay habilitación por workspace en Phase 1) y EUR está activa desde la migración 20261003220000, así que el test usa un código inexistente (`XYZ`) para `CURRENCY_NOT_ENABLED`. Pendiente de decisión del owner si la creación de cuentas debe exigir `fx.workspace_currency`.
 - Decisión del owner 2026-10-05 (docs/31 D45): crear una cuenta exige que la moneda esté **habilitada en el workspace** (`fx.workspace_currency`), no solo activa en el catálogo global; resuelve la divergencia anterior. El test de `CURRENCY_NOT_ENABLED` debe usar EUR (activa en el catálogo, no habilitada en W1) en lugar del código inexistente `XYZ`; lo ajusta add-accounts-management junto con el cambio de código.
+- Implementado 2026-10-05 (D45): `AccountsService` exige la moneda habilitada en el workspace (`FxValuationPort.enabledCurrencies`) al abrir la cuenta y al cambiar su moneda; el test de API usa EUR (activa, no habilitada) ⇒ 422 `CURRENCY_NOT_ENABLED` en `/currency` sin escribir nada; el formulario web solo ofrece monedas habilitadas; `FxService.enableCurrencies` (sin endpoint) lo usan los cargadores de datos.
+

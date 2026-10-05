@@ -5,6 +5,7 @@ import type {
   LifecycleQuery,
   LifecycleStepInput,
 } from '@pf/audit/contracts';
+import type { CurrencyKindDto } from '@pf/fx/contracts';
 import { DomainError, FixedClock, Instant } from '@pf/shared-kernel';
 import type { AccountOpeningBalancePort, MoneyDto } from '../../contracts/index.js';
 import { ACCOUNT_LIFECYCLE, Account, Institution } from '../../domain/index.js';
@@ -47,8 +48,11 @@ export class InMemoryAccounts {
     ['USD', { code: 'USD', kind: 'FIAT', scale: 2, active: true }],
     ['USDT', { code: 'USDT', kind: 'CRYPTO', scale: 6, active: true }],
     ['BTC', { code: 'BTC', kind: 'CRYPTO', scale: 8, active: true }],
-    ['EUR', { code: 'EUR', kind: 'FIAT', scale: 2, active: false }],
+    ['EUR', { code: 'EUR', kind: 'FIAT', scale: 2, active: true }],
+    ['XAU', { code: 'XAU', kind: 'COMMODITY', scale: 4, active: false }],
   ]);
+  /** Monedas habilitadas en el workspace (`fx.workspace_currency`, D45): las por defecto + BTC; EUR activa pero no. */
+  readonly enabledCurrencies = new Set(['BOB', 'USD', 'USDT', 'BTC']);
 
   readonly audit: AuditPort = { append: async (e) => void this.audits.push(e) };
 
@@ -154,6 +158,12 @@ export class InMemoryAccounts {
       accounts,
       institutions,
       currencies: { find: async (code) => this.currencies.get(code) ?? null },
+      workspaceCurrencies: {
+        enabledCurrencies: async () =>
+          [...this.currencies.values()]
+            .filter((c) => c.active && this.enabledCurrencies.has(c.code))
+            .map((c) => ({ code: c.code, kind: c.kind as CurrencyKindDto, scale: c.scale })),
+      },
       balances: {
         balancesOf: async (_ws, ids) => {
           const out = new Map<string, LedgerAccountBalance>();

@@ -70,3 +70,30 @@ export async function rlsCatalogViolations(client: Client): Promise<string[]> {
   );
   return rows.map((r) => r.name);
 }
+
+/**
+ * Habilita monedas en el workspace (`fx.workspace_currency`, como `FxService.enableCurrencies`; sin endpoint en
+ * Phase 1). docs/31 D45: una cuenta solo puede abrirse en una moneda habilitada (p. ej. BTC, TRX).
+ */
+export async function enableCurrencies(
+  url: string,
+  ctx: { readonly userId: string; readonly workspaceId: string },
+  codes: readonly string[],
+): Promise<void> {
+  const client = await connect(url);
+  try {
+    await inTx(
+      client,
+      ctx,
+      () =>
+        client.query(
+          `INSERT INTO fx.workspace_currency (workspace_id, currency_code)
+           SELECT $1, code FROM unnest($2::text[]) AS code ON CONFLICT DO NOTHING`,
+          [ctx.workspaceId, codes],
+        ),
+      true,
+    );
+  } finally {
+    await client.end();
+  }
+}

@@ -136,7 +136,12 @@ autónoma, a revisar por el owner:
    sola vez a la escala de la base; `rateDate` = fecha del `asOf` en la zona del workspace; `rate` (aditivo) lleva la
    `ResolvedRate` completa (`stale`, selección, atribución). `null` si la cuenta está en la moneda base o sin tasa
    (contrato). TC-ACCOUNTS-LIST-001 automatizado.
-5. **Moneda habilitada** = existe en `fx.currency` con `is_active` (no hay aún catálogo de monedas por workspace).
+5. **Moneda habilitada** (actualizado 2026-10-05, docs/31 D45; reemplaza "existe y activa en el catálogo global"):
+   activa en `fx.currency` **y** habilitada en el workspace (`fx.workspace_currency`, leída con
+   `FxValuationPort.enabledCurrencies` de `@pf/fx/contracts` en la unidad de trabajo del comando; un workspace sin filas
+   tiene el conjunto por defecto BOB/USD/USDT). Se exige al abrir la cuenta y al cambiar su moneda; si no,
+   `CURRENCY_NOT_ENABLED` (422, `/currency`). Sin endpoint para habilitar monedas en Phase 1: los cargadores de datos
+   (seed `large`, demo) usan `FxService.enableCurrencies` (p. ej. BTC); el formulario web solo ofrece las habilitadas.
 6. **Etiquetas**: `TagCatalogPort` por defecto permisivo hasta `add-classification`; `account_tag.tag_id` sin FK.
 7. **Fechas de negocio** (`openedOn` por defecto, `archivedOn`, `reactivatedOn`): "hoy" en la zona del workspace (vía
    `identityWorkspaceTimeZones`), con `APP_TIMEZONE` como respaldo. `openedOn` por defecto = fecha del saldo inicial o

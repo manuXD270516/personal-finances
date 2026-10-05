@@ -205,6 +205,12 @@ export class DemoDataLoader {
         });
         institutions.set(inst.key, created.id);
       }
+      // docs/31 D45: la moneda de cada cuenta debe estar habilitada en el workspace (p. ej. BTC, fuera del conjunto
+      // por defecto BOB/USD/USDT); mismo caso de uso de FX, idempotente.
+      await r.fx.service.enableCurrencies({
+        workspaceId: ws,
+        codes: [...new Set(plan.accounts.map((a) => a.currency))],
+      });
       for (const a of plan.accounts) {
         clock.set(noon(a.openedOn));
         const view = await r.accounts.accounts.openAccount({

@@ -11,7 +11,7 @@ import { resolveContractPath } from '../../src/api/api-conventions.js';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
-import { connect, inTx, sqlState } from '../support/db.js';
+import { connect, enableCurrencies, inTx, sqlState } from '../support/db.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
 // FX (tasas manuales, catálogo, preferencias) y conversiones por HTTP contra PostgreSQL real (Testcontainers):
@@ -421,6 +421,7 @@ describe('Conversiones por HTTP (transactions/conversions, fx/conversion-pricing
     walletUsdt = await account(u, 'Wallet USDT', 'CRYPTO_WALLET', 'USDT', '1100.000000');
     bankBob = await account(u, 'Banco BOB', 'BANK', 'BOB', '0.00');
     cashBob = await account(u, 'Caja BOB', 'CASH', 'BOB', '0.00');
+    await enableCurrencies(deps.databaseUrl, { userId: u.id, workspaceId: u.ws }, ['BTC', 'TRX']); // docs/31 D45
     walletBtc = await account(u, 'Wallet BTC', 'CRYPTO_WALLET', 'BTC', '0.00000000');
     walletTrx = await account(u, 'Wallet TRX', 'CRYPTO_WALLET', 'TRX', '50.000000');
     const rate = await post(u, '/fx-rates', {

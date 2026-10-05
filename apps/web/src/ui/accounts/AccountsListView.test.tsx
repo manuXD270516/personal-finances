@@ -4,6 +4,7 @@ import { ACCOUNT_TYPES, type Account, type Institution } from '../common/types';
 import { esContext, textOf } from '../test-support';
 import { AccountsListView } from './AccountsListView';
 import {
+  accountCurrencyOptions,
   accountsQuery,
   defaultLiquidity,
   EMPTY_ACCOUNT_FILTERS,
@@ -222,5 +223,39 @@ describe('pantalla Cuentas (add-accounts-management 7.1)', () => {
         includeArchived: true,
       }).toString(),
     ).toBe('type=BANK&currency=USD&includeArchived=true&limit=200');
+  });
+});
+
+describe('monedas del formulario de cuenta', () => {
+  const ccy = (code: string, kind: 'FIAT' | 'CRYPTO', enabled: boolean) => ({
+    code,
+    kind,
+    name: code,
+    scale: kind === 'CRYPTO' ? 6 : 2,
+    enabled,
+  });
+  const catalog = [
+    ccy('BOB', 'FIAT', true),
+    ccy('USD', 'FIAT', true),
+    ccy('EUR', 'FIAT', false),
+    ccy('USDT', 'CRYPTO', true),
+    ccy('BTC', 'CRYPTO', false),
+  ];
+  const codes = (list: readonly { code: string }[]) => list.map((c) => c.code);
+
+  it('[TC-ACCOUNTS-CURRENCY-001] al crear solo se ofrecen las monedas habilitadas del workspace (EUR no habilitada, docs/31 D45)', () => {
+    expect(codes(accountCurrencyOptions(catalog, { type: 'CASH', baseCurrency: 'BOB' }))).toEqual([
+      'BOB',
+      'USD',
+      'USDT',
+    ]);
+    expect(codes(accountCurrencyOptions(catalog, { type: 'CRYPTO_WALLET', baseCurrency: 'BOB' }))).toEqual([
+      'USDT',
+    ]);
+    // Al editar se conserva la moneda actual aunque ya no esté habilitada.
+    expect(
+      codes(accountCurrencyOptions(catalog, { type: 'CASH', baseCurrency: 'BOB', currentCurrency: 'EUR' })),
+    ).toEqual(['BOB', 'USD', 'EUR', 'USDT']);
+    expect(codes(accountCurrencyOptions([], { type: 'CASH', baseCurrency: 'BOB' }))).toEqual(['BOB']);
   });
 });

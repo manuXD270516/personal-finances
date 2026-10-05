@@ -127,11 +127,19 @@ export interface BaseCurrencyValuationDeps {
   readonly workspaces: WorkspaceSettingsPort;
 }
 
+/**
+ * Monedas habilitadas del workspace (`fx.workspace_currency`, API pública de FX `@pf/fx/contracts`; docs/31 D45): una
+ * cuenta solo puede abrirse o cambiarse a una moneda habilitada. Corre en la unidad de trabajo del llamador.
+ */
+export type WorkspaceCurrenciesPort = Pick<FxValuationPort, 'enabledCurrencies'>;
+
 export interface AccountsDeps {
   readonly uow: UnitOfWork;
   readonly accounts: AccountRepository;
   readonly institutions: InstitutionRepository;
   readonly currencies: CurrencyCatalog;
+  /** Habilitación por workspace (D45); ausente ⇒ solo se exige que la moneda esté activa en el catálogo global. */
+  readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
   readonly balances: LedgerBalancesPort;
   readonly tags: TagCatalogPort;
   readonly openingBalance: AccountOpeningBalancePort;

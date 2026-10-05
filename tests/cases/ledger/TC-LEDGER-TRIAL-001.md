@@ -12,9 +12,10 @@ invariants: [INV-004]
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/ledger-trial-balance.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [trial-balance, rbac]
@@ -48,3 +49,7 @@ Dado un workspace cuyo ledger tiene "Bank A" 685.00 BOB, "EQUITY:FX_TRADING:BOB"
 Cuando un miembro con rol VIEWER consulta el balance de comprobación al 2026-03-31
 Entonces el total en BOB es 0.00 BOB
 ```
+
+## Notas
+
+- Automatizado 2026-10-05 (add-ledger-core 6.3) por HTTP contra PostgreSQL real: OWNER y VIEWER obtienen el mismo cuerpo (validado contra el contrato `getLedgerTrialBalance`), con las líneas BOB 685.00 / -690.00 / 5.00 y totales `0.00 BOB` y `0.000000 USDT`; un no miembro recibe 403 `WORKSPACE_ACCESS_DENIED` sin líneas; `asOf` por defecto = hoy en la zona del workspace.
