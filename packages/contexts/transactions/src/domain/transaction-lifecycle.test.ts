@@ -40,6 +40,19 @@ describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
     expect(TRANSACTION_LIFECYCLE.transitionDefinition('REVISE')?.events).toContain(
       'transactions.TransferRevised.v1',
     );
+    // [TC-TRANSACTIONS-CONVERSION-012] docs/31 D48: REVISE de una conversión publica ConversionRevised, no
+    // ConversionRecorded (que solo sale en RECORD/POST, su primer asiento).
+    expect(TRANSACTION_LIFECYCLE.transitionDefinition('REVISE')?.events).toContain(
+      'transactions.ConversionRevised.v1',
+    );
+    expect(TRANSACTION_LIFECYCLE.transitionDefinition('REVISE')?.events).not.toContain(
+      'transactions.ConversionRecorded.v1',
+    );
+    for (const code of ['RECORD', 'POST'] as const) {
+      expect(TRANSACTION_LIFECYCLE.transitionDefinition(code)?.events).toContain(
+        'transactions.ConversionRecorded.v1',
+      );
+    }
   });
 
   it('[TC-AUDIT-LIFECYCLE-001] reconciliar un gasto pendiente de 80.00 BOB se rechaza y no deja transición', () => {

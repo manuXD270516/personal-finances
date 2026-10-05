@@ -103,7 +103,7 @@ export const TRANSACTION_LIFECYCLE = LifecycleMachine.define({
         'transactions.TransactionPosted.v1',
         'transactions.TransactionUpdated.v1',
         'transactions.TransferRevised.v1',
-        'transactions.ConversionRecorded.v1',
+        'transactions.ConversionRevised.v1',
       ],
     },
     {

@@ -2,6 +2,7 @@ import { currency, type DomainError, Instant, Money, type Currency } from '@pf/s
 import { describe, expect, it } from 'vitest';
 import { totalCost } from './conversion-pricing.js';
 import { ExchangeRate } from './exchange-rate.js';
+import { ProviderSample } from './market-rate-provider.js';
 import type { FxRateType } from './fx-types.js';
 import { RateResolver, type RateCandidate } from './rate-resolver.js';
 
@@ -110,7 +111,7 @@ describe('RateResolver (fx/market-rates)', () => {
     expect(resolver.tryResolve(q)).toBeNull();
   });
 
-  it('[TC-FX-RATE-004] la valoración usa el tipo preferido del par; sin preferencia, la más reciente de cualquier tipo', () => {
+  it('[TC-FX-RATE-004] la valoración usa el tipo preferido del par; sin preferencia, PARALLEL', () => {
     const official = rate(USD, BOB, '6.96', '2026-09-30T12:00:00Z', 'OFFICIAL');
     const parallel = rate(USD, BOB, '9.80', '2026-09-30T12:00:00Z', 'PARALLEL');
     const resolver = new RateResolver(live(official, parallel));
@@ -128,11 +129,128 @@ describe('RateResolver (fx/market-rates)', () => {
       'PARALLEL',
       '980.00',
     ]);
-    // Sin preferencia: la más reciente de cualquier tipo, informando el tipo usado.
+    // Sin preferencia: PARALLEL (docs/31 D48), aunque haya una de otro tipo más reciente (no fresca: > 24 h, D34);
+    // antes se usaba la más reciente de cualquier tipo (BANK). Informa el tipo usado.
     const bank = rate(USD, BOB, '6.97', '2026-09-30T15:00:00Z', 'BANK');
-    const any = new RateResolver(live(official, parallel, bank)).resolve(q);
-    expect([any.fxRateId, any.rateType]).toEqual([bank.id, 'BANK']);
+    const byDefault = new RateResolver(live(official, parallel, bank)).resolve({
+      ...q,
+      at: at('2026-10-01T16:00:00Z'),
+    });
+    expect([byDefault.fxRateId, byDefault.rateType, byDefault.requestedRateType]).toEqual([
+      parallel.id,
+      'PARALLEL',
+      'PARALLEL',
+    ]);
     expect(official.valueText).toBe('6.96');
+  });
+
+  describe('[TC-FX-RATE-005] par sin preferencia: el tipo por defecto es PARALLEL (docs/31 D48)', () => {
+    const BTC = currency('BTC', 8);
+    const pAt = at('2026-10-05T12:00:00Z');
+    // Las de otro tipo son más recientes que la PARALLEL pero no frescas (> 24 h): no entran al último recurso (D34).
+    const usdtUsdParallel = rate(USDT, USD, '0.9990', '2026-10-02T12:00:00Z', 'PARALLEL');
+    const usdtUsdP2p = rate(USDT, USD, '1.0010', '2026-10-04T09:00:00Z', 'P2P');
+    const btcUsdtParallel = rate(BTC, USDT, '62000', '2026-10-01T12:00:00Z', 'PARALLEL');
+    const btcUsdtCustom = rate(BTC, USDT, '62500', '2026-10-04T09:00:00Z', 'CUSTOM');
+    const resolver = new RateResolver(live(usdtUsdParallel, usdtUsdP2p, btcUsdtParallel, btcUsdtCustom));
+    const none = () => null;
+
+    it('escenario del TC: USD/BOB sin preferencia, PARALLEL 9.80 (paralelo.bo) del 30/09 y OFFICIAL 6.96 del 01/10 → 980.00 BOB', () => {
+      const parallelBo = ExchangeRate.fromProviderSample(
+        ProviderSample.of({
+          provider: 'PARALELO_BO',
+          base: 'USD',
+          quote: 'BOB',
+          rateType: 'PARALLEL',
+          value: '9.80',
+          asOf: '2026-09-30T12:00:00Z',
+          fetchedAt: '2026-09-30T12:00:00Z',
+          rawPayload: '{}',
+          sourceLabel: 'paralelo.bo',
+        }),
+        {
+          id: 'P-9.80',
+          workspaceId: 'ws',
+          base: USD,
+          quote: BOB,
+          effectiveDate: '2026-09-30',
+          createdAt: '2026-09-30T12:00:00Z',
+          anomaly: null,
+        },
+      );
+      const official = rate(USD, BOB, '6.96', '2026-10-01T12:00:00Z', 'OFFICIAL');
+      const found = new RateResolver(live(parallelBo, official)).resolve({
+        base: USD,
+        quote: BOB,
+        at: at('2026-10-02T03:59:59Z'), // 2026-10-01T23:59:59-04:00
+        preferenceOf: () => null,
+      });
+      expect([found.fxRateId, found.rateType, found.requestedRateType, found.sourceLabel]).toEqual([
+        'P-9.80',
+        'PARALLEL',
+        'PARALLEL',
+        'paralelo.bo',
+      ]);
+      expect(found.rate.convert(Money.parse('100.00', USD)).toFixed()).toBe('980.00');
+      // La OFFICIAL más reciente (fresca) no entra al último recurso: se desvía > 5 % de la PARALLEL (D34).
+      expect(found.selection).toBe('LAST_KNOWN_STALE');
+    });
+
+    it('USDT/USD y BTC/USDT sin preferencia usan PARALLEL aunque haya otra más reciente de otro tipo', () => {
+      const usdt = resolver.resolve({ base: USDT, quote: USD, at: pAt, preferenceOf: none });
+      expect([usdt.fxRateId, usdt.rateType, usdt.requestedRateType]).toEqual([
+        usdtUsdParallel.id,
+        'PARALLEL',
+        'PARALLEL',
+      ]);
+      const btc = resolver.resolve({ base: BTC, quote: USDT, at: pAt });
+      expect([btc.fxRateId, btc.rateType, btc.rate.value.toFixed()]).toEqual([
+        btcUsdtParallel.id,
+        'PARALLEL',
+        '62000',
+      ]);
+      // La referencia de una conversión real también usa PARALLEL (directa o inversa, nunca cruzada).
+      const reference = resolver.resolveForConversion({ base: USDT, quote: BTC, at: pAt });
+      expect([reference?.fxRateId, reference?.derivation, reference?.rateType]).toEqual([
+        btcUsdtParallel.id,
+        'INVERSE',
+        'PARALLEL',
+      ]);
+    });
+
+    it('una preferencia explícita del par o un tipo pedido siguen ganando sobre el default', () => {
+      const preferP2p = (a: string, b: string) => ([a, b].sort().join('/') === 'USD/USDT' ? 'P2P' : null);
+      const preferred = resolver.resolve({ base: USDT, quote: USD, at: pAt, preferenceOf: preferP2p });
+      expect([preferred.fxRateId, preferred.rateType]).toEqual([usdtUsdP2p.id, 'P2P']);
+      const requested = resolver.resolve({ base: BTC, quote: USDT, at: pAt, rateType: 'CUSTOM' });
+      expect([requested.fxRateId, requested.rateType]).toEqual([btcUsdtCustom.id, 'CUSTOM']);
+    });
+
+    it('sin PARALLEL del par: FX_RATE_NOT_FOUND salvo el último recurso fresco (D34); la referencia de conversión queda vacía', () => {
+      const onlyP2p = new RateResolver(live(rate(USDT, USD, '1.0010', '2026-10-01T11:00:00Z', 'P2P')));
+      expect(onlyP2p.resolveForConversion({ base: USDT, quote: USD, at: pAt })).toBeNull();
+      // Una manual de otro tipo vieja (> 24 h) no entra en el último recurso (D34).
+      expect(onlyP2p.tryResolve({ base: USDT, quote: USD, at: pAt })).toBeNull();
+      let code: string | undefined;
+      try {
+        onlyP2p.resolve({ base: USDT, quote: USD, at: pAt });
+      } catch (err) {
+        code = (err as DomainError).code;
+      }
+      expect(code).toBe('FX_RATE_NOT_FOUND');
+      // Cadena de fallback vigente: una manual de otro tipo FRESCA (≤ 24 h) sí se usa para valorar (selection MANUAL),
+      // pero nunca como referencia de una conversión real.
+      const fresh = rate(USDT, USD, '1.0020', '2026-10-05T08:00:00Z', 'P2P');
+      const withFresh = new RateResolver(live(fresh));
+      const valued = withFresh.resolve({ base: USDT, quote: USD, at: pAt });
+      expect([valued.fxRateId, valued.rateType, valued.requestedRateType, valued.selection]).toEqual([
+        fresh.id,
+        'P2P',
+        'PARALLEL',
+        'MANUAL',
+      ]);
+      expect(withFresh.resolveForConversion({ base: USDT, quote: USD, at: pAt })).toBeNull();
+    });
   });
 });
 

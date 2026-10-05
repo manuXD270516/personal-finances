@@ -400,8 +400,10 @@ describe('AmendConversion y revisiones', () => {
       'transactions.conversion.amended',
       'monto real según extracto',
     ]);
+    // docs/31 D48: ConversionRecorded una sola vez; la corrección publica ConversionRevised (TC-…-CONVERSION-012).
     const recorded = state.outbox.filter((e) => e.eventType === 'transactions.ConversionRecorded');
-    expect(recorded.map((e) => e.payload['revision'])).toEqual([1, 2]);
+    expect(recorded.map((e) => e.payload['revision'])).toEqual([1]);
+    expect(state.outbox.filter((e) => e.eventType === 'transactions.ConversionRevised')).toHaveLength(1);
     expect(
       await codeOf(
         conversions.amendConversion({
@@ -422,6 +424,75 @@ describe('AmendConversion y revisiones', () => {
     const recorded = state.outbox.filter((e) => e.eventType === 'transactions.ConversionRecorded');
     expect(recorded).toHaveLength(1);
     expect(recorded[0]?.payload['journalEntryId']).toBe(posted.activeEntryId);
+  });
+
+  it('[TC-TRANSACTIONS-CONVERSION-012] corregir 685.00 → 686.00 BOB publica un único ConversionRecorded y un único ConversionRevised con los tres asientos', async () => {
+    const { conversions, state } = setup();
+    const { transaction: original } = await conversions.recordConversion(canonicalCmd());
+    const originalEntry = state.entries.at(-1);
+    const { transaction: amended } = await conversions.amendConversion({
+      ...canonicalCmd({
+        targetAmount: { amount: '686.00', currency: 'BOB' },
+        fees: [{ type: 'PROVIDER', amount: { amount: '4.00', currency: 'BOB' } }],
+      }),
+      transactionId: original.id,
+      expectedVersion: original.version,
+      reason: 'monto real según extracto',
+    });
+    const [reversal, posted] = state.entries.slice(-2);
+    const ofType = (t: string) => state.outbox.filter((e) => e.eventType === t);
+    expect(ofType('transactions.ConversionRecorded')).toHaveLength(1);
+    expect(ofType('transactions.ConversionRecorded')[0]?.payload['journalEntryId']).toBe(originalEntry?.id);
+    const revised = ofType('transactions.ConversionRevised');
+    expect(revised).toHaveLength(1);
+    expect(revised[0]?.payload).toMatchObject({
+      transactionId: original.id,
+      revisionFrom: 1,
+      revisionTo: 2,
+      businessDate: '2026-09-30',
+      executedAt: '2026-09-30T18:42:00.000Z',
+      source: { accountId: WALLET_USDT, amount: { amount: '100.000000', currency: 'USDT' } },
+      target: { accountId: BANK_BOB, amount: { amount: '686.00', currency: 'BOB' } },
+      effectiveRate: { base: 'USDT', quote: 'BOB', value: '6.860000000000000000' },
+      fees: [{ type: 'PROVIDER', amount: { amount: '4.00', currency: 'BOB' }, paidFromAccountId: null }],
+      grossTarget: { amount: '690.00', currency: 'BOB' },
+      reversedJournalEntryId: originalEntry?.id,
+      reversalJournalEntryId: reversal?.id,
+      journalEntryId: posted?.id,
+    });
+    expect(amended.revision).toBe(2);
+    // Una segunda corrección: otro ConversionRevised 2 → 3; ConversionRecorded nunca se re-emite.
+    await conversions.amendConversion({
+      ...canonicalCmd({ targetAmount: { amount: '687.00', currency: 'BOB' }, fees: [] }),
+      transactionId: original.id,
+      expectedVersion: amended.version,
+      reason: 'otra corrección',
+    });
+    expect(ofType('transactions.ConversionRecorded')).toHaveLength(1);
+    expect(
+      ofType('transactions.ConversionRevised').map((e) => [
+        e.payload['revisionFrom'],
+        e.payload['revisionTo'],
+      ]),
+    ).toEqual([
+      [1, 2],
+      [2, 3],
+    ]);
+  });
+
+  it('[TC-TRANSACTIONS-CONVERSION-012] corregir una conversión PENDING no publica ConversionRevised; al postearla, un único ConversionRecorded', async () => {
+    const { conversions, transactions, state } = setup();
+    const { transaction: pending } = await conversions.recordConversion(canonicalCmd({ status: 'PENDING' }));
+    const { transaction: edited } = await conversions.amendConversion({
+      ...canonicalCmd({ status: 'PENDING', targetAmount: { amount: '686.00', currency: 'BOB' } }),
+      transactionId: pending.id,
+      expectedVersion: pending.version,
+    });
+    expect(state.outbox.filter((e) => e.eventType === 'transactions.ConversionRevised')).toHaveLength(0);
+    await transactions.postTransaction(WS, edited.id, edited.version);
+    const recorded = state.outbox.filter((e) => e.eventType === 'transactions.ConversionRecorded');
+    expect(recorded.map((e) => e.payload['revision'])).toEqual([edited.revision]);
+    expect(state.outbox.filter((e) => e.eventType === 'transactions.ConversionRevised')).toHaveLength(0);
   });
 
   it('la conversión se anula con reversa y no admite cambios financieros por PATCH /transactions', async () => {

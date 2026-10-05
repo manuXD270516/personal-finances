@@ -39,6 +39,13 @@ export type CurrencyKind = (typeof CURRENCY_KINDS)[number];
 
 /** Ventana de vigencia por defecto de la resolución *as-of* (FR-FX-004; design.md pregunta abierta: se modela en FX). */
 export const DEFAULT_RATE_WINDOW_DAYS = 7;
+/**
+ * Tipo de tasa de un par SIN preferencia (decisión del owner 2026-10-05, docs/31 D48): `PARALLEL`, el mismo que se
+ * siembra para USD/BOB y USDT/BOB (D29). Una preferencia explícita del par o un tipo pedido siempre ganan. Se
+ * resuelve exactamente igual que una preferencia `PARALLEL` (incluido el último recurso con manuales frescas de otro
+ * tipo en la valoración, D34).
+ */
+export const DEFAULT_RATE_TYPE: FxRateType = 'PARALLEL';
 /** Moneda pivote por defecto para tasas cruzadas (FR-FX-005). */
 export const DEFAULT_PIVOT_CURRENCY = 'USD';
 

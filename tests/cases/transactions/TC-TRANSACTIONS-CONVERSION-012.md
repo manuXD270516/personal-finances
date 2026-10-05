@@ -12,9 +12,12 @@ invariants: ["INV-028", "INV-027"]
 priority: high
 type: integration
 level: event-contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - packages/contexts/transactions/src/domain/transaction-lifecycle.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["conversion","outbox","events","lifecycle"]

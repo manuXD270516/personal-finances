@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { resolveContractPath } from '../../src/api/api-conventions.js';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
+import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
 import { connect, inTx, sqlState } from '../support/db.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
@@ -431,6 +432,14 @@ describe('Conversiones por HTTP (transactions/conversions, fx/conversion-pricing
       sourceLabel: 'Mediana Binance P2P',
     });
     r2 = rate.body['id'] as string;
+    // La referencia canónica es la P2P 6.95: sin preferencia el par usaría PARALLEL (docs/31 D48), así que el
+    // workspace fija la preferencia P2P para USDT/BOB (una preferencia explícita gana sobre el default).
+    const prefs = await call('PUT', `${W(u)}/fx-rate-preferences`, {
+      token: u.token,
+      body: { data: [{ base: 'USDT', quote: 'BOB', rateType: 'P2P' }] },
+      headers: { 'if-match': '"1"' },
+    });
+    expect(prefs.status, apiErrors()).toBe(200);
   });
 
   it('[TC-TRANSACTIONS-CONVERSION-001] canónica USDT→BOB: una transacción, un asiento por moneda, saldos y detalle', async () => {
@@ -623,7 +632,54 @@ describe('Conversiones por HTTP (transactions/conversions, fx/conversion-pricing
     const recorded = (await outbox(u, conversionId)).filter(
       (e) => e.event_type === 'transactions.ConversionRecorded',
     );
-    expect(recorded.map((e) => (e.envelope.payload as { revision: number }).revision)).toEqual([1, 2]);
+    // docs/31 D48: ConversionRecorded solo en el primer posteo; la corrección publica ConversionRevised.
+    expect(recorded.map((e) => (e.envelope.payload as { revision: number }).revision)).toEqual([1]);
+  });
+
+  it('[TC-TRANSACTIONS-CONVERSION-012] la corrección publicó un único ConversionRevised válido (1 → 2, tres asientos) y reporting.data-version lo aplica una sola vez', async () => {
+    const events = await outbox(u, conversionId);
+    expect(events.filter((e) => e.event_type === 'transactions.ConversionRecorded')).toHaveLength(1);
+    const revised = events.filter((e) => e.event_type === 'transactions.ConversionRevised');
+    expect(revised).toHaveLength(1);
+    const envelope = revised[0]!.envelope;
+    expect(eventSchemaRegistry().validate(envelope)).toBeUndefined();
+    const lc = await call('GET', `${W(u)}/transactions/${conversionId}/lifecycle`, { token: u.token });
+    expect(lc.status).toBe(200);
+    const items = lc.body['items'] as {
+      transition?: string;
+      events: string[];
+      journalEntries?: Record<string, string | null>;
+    }[];
+    const revise = items.find((i) => i.transition === 'REVISE');
+    expect(revise?.events).toContain('transactions.ConversionRevised.v1');
+    expect(revise?.events).not.toContain('transactions.ConversionRecorded.v1');
+    expect(envelope.payload).toMatchObject({
+      transactionId: conversionId,
+      revisionFrom: 1,
+      revisionTo: 2,
+      source: { amount: { amount: '100.000000', currency: 'USDT' } },
+      target: { amount: { amount: '686.00', currency: 'BOB' } },
+      effectiveRate: { value: '6.860000000000000000' },
+      fees: [{ type: 'PROVIDER', amount: { amount: '4.00', currency: 'BOB' } }],
+      reversedJournalEntryId: revise?.journalEntries?.['reversed'],
+      reversalJournalEntryId: revise?.journalEntries?.['reversal'],
+      journalEntryId: revise?.journalEntries?.['posted'],
+    });
+    const workerPool = new Pool({ connectionString: deps.workerDatabaseUrl, max: 2 });
+    try {
+      const def = reportingDataVersionConsumer();
+      expect(def.events).toContainEqual({ type: 'transactions.ConversionRevised', version: 1 });
+      const consumers = new EventConsumerRuntime({
+        pool: workerPool,
+        queue: {} as JobQueue,
+        subscriptions: new EventSubscriptions([def]),
+        logger: capturingLogger('finance-worker', 'worker').logger,
+      });
+      expect(await consumers.deliver(def, envelope)).toBe('applied');
+      expect(await consumers.deliver(def, envelope)).toBe('duplicate');
+    } finally {
+      await workerPool.end();
+    }
   });
 
   it('[TC-TRANSACTIONS-CONVERSION-005] USDT→BTC con fee de red en TRX desde Wallet TRX: un asiento que cuadra en tres monedas', async () => {

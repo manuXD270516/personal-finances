@@ -16,6 +16,7 @@
   - 2026-10-04: `LifecycleMachine` en `@pf/shared-kernel` (validación de la declaración, `transition`, `replay`, `reachableStates`); máquinas `TRANSACTION_LIFECYCLE`, `ACCOUNT_LIFECYCLE`, `EXCHANGE_RATE_LIFECYCLE` en el dominio de cada contexto; `transaction-status.ts` deriva de la máquina sin cambiar guardas (`TRANSACTION_RECONCILED`, D16). Tests primero con TC-AUDIT-LIFECYCLE-001 (incl. PBT fast-check y enumeración exhaustiva para cuentas). Ver design.md § Decisiones de implementación 1–2.
 - [x] 2.2 Agregados `Transaction`, `Account` y `ExchangeRate` validan cada cambio de estado contra su máquina y devuelven el `TransitionRecord` (origen, destino, revisión, asientos); TDD de la revisión de transacciones y transferencias (TC-AUDIT-LIFECYCLE-003, TC-TRANSACTIONS-TRANSFER-009: `TransferCompleted` una sola vez, `TransferRevised` en `REVISE`)
   - 2026-10-04: `Transaction.lastTransition` / `Account.lastTransition` (validados contra la máquina en cada método; `REVISE` solo con `ledgerImpact`); `TransferCompleted` una sola vez y `TransferRevised.v1` en `REVISE` (`publishPosted`); test de arquitectura `lifecycle.architecture.test.ts`. TC-AUDIT-LIFECYCLE-003 y TC-TRANSACTIONS-TRANSFER-009 en dominio y aplicación (el test que esperaba la re-emisión de `TransferCompleted` se reemplazó por TRANSFER-009, como prevé proposal § Impacto de regresión).
+  - 2026-10-05 (docs/31 D48): simetría para conversiones — `ConversionRecorded.v1` solo en el primer asiento (`RECORD`/`POST`) y `REVISE` de `kind=CONVERSION` publica `transactions.ConversionRevised.v1` (`publishPosted`/`conversionRevisedPayload`, `AmendConversion` pasa los tres asientos); eventos de `REVISE` en `TRANSACTION_LIFECYCLE` cambian `ConversionRecorded.v1` por `ConversionRevised.v1`. TDD con TC-TRANSACTIONS-CONVERSION-012 (dominio y aplicación; la corrección de una `PENDING` no lo publica).
 
 ## 3. APPLICATION
 
@@ -34,11 +35,13 @@
   - 2026-10-04: `20261004150000_audit_lifecycle_transition.sql` (RLS forzada, SELECT/INSERT, `forbid_mutation` de fila y sentencia, CHECK por `kind`). TC-AUDIT-LIFECYCLE-012 (pf_app, pf_worker y owner) y TC-AUDIT-LIFECYCLE-006 (RLS; respuesta idéntica a inexistente). `add-demo-data` no está aplicado: el registro en `platform.workspace_scoped_table` queda para ese change.
 - [x] 4.2 Consumidor `reporting.data-version` suscrito a `transactions.TransferRevised.v1`; test de idempotencia (reentrega, TC-TRANSACTIONS-TRANSFER-009)
   - 2026-10-04: `REPORTING_INVALIDATING_EVENTS` incluye `transactions.TransferRevised.v1`; reentrega verificada con `EventConsumerRuntime` (`applied` → `duplicate`) en `lifecycle.api.test.ts` (TC-TRANSACTIONS-TRANSFER-009).
+  - 2026-10-05 (docs/31 D48): `REPORTING_INVALIDATING_EVENTS` suma `transactions.ConversionRevised.v1`; reentrega `applied` → `duplicate` en `fx-conversions.api.test.ts` (TC-TRANSACTIONS-CONVERSION-012).
 
 ## 5. API
 
 - [x] 5.1 Endpoints de lifecycle y de máquinas según design.md § Contratos; tests de API y de contrato (TC-AUDIT-LIFECYCLE-005, -006); schemas de eventos `TransferRevised.v1` y campo `transition` validados con Ajv strict (productor)
   - 2026-10-04: `getTransactionLifecycle`, `getAccountLifecycle`, `getRateLifecycle` (path `fx-rates/{fxRateId}/lifecycle`), `getLifecycleMachine`; schemas `Lifecycle`, `LifecycleTransition`, `LifecycleAnnotation`, `LifecycleMachine` (`to: string[]`), `LifecycleRevision`, `TransactionLifecycle`. Respuestas validadas contra el contrato en los tests de API; oasdiff sin cambios incompatibles. Eventos: `TransferRevised.v1` nuevo, `transition` opcional en 8 schemas, descripción de `TransferCompleted.v1`; validados con el registro Ajv (productor) en los tests.
+  - 2026-10-05 (docs/31 D48): schema nuevo `contracts/events/transactions/ConversionRevised.v1.schema.json` (aditivo, con `examples`); el payload del outbox se valida con el registro Ajv en `fx-conversions.api.test.ts`; `ConversionRecorded.v1` cambia solo su `description`.
 
 ## 6. UI
 
@@ -58,5 +61,6 @@
 
 - [x] 8.1 Actualizar docs/04 (máquinas de estado como lenguaje ubicuo), docs/08 (`audit.lifecycle_transition`), docs/10 (endpoints de lifecycle), docs/11 (`TransferRevised.v1`, semántica de `TransferCompleted`, campo `transition`) y docs/28 (patrón visual "Recorrido")
   - 2026-10-04: docs/04 (glosario + máquinas declaradas en §3.17 y §4.1), docs/08 (`audit.lifecycle_transition` y grants), docs/10 (inventario de recursos), docs/11 (`TransferRevised.v1`, semántica de `TransferCompleted`, campo `transition`) y docs/28 (§6.1 patrón "Recorrido").
+  - 2026-10-05 (docs/31 D48): docs/11 (`ConversionRevised.v1`, `ConversionRecorded.v1` una sola vez), docs/04 (`REVISE`), docs/05, docs/14 y `contracts/events/README.md`.
 - [x] 8.2 Actualizar estados de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict` y `pnpm traceability:check`
   - 2026-10-04: TC-AUDIT-LIFECYCLE-001..013 y TC-TRANSACTIONS-TRANSFER-009 en `automated` con sus `automated_tests`; `pnpm traceability:check` OK (solo advertencias R3 previas, ajenas); `pnpm traceability:matrix` regenera la matriz (artefacto ignorado por git); `pnpm spec:validate` (`openspec validate --all --strict`) OK.
