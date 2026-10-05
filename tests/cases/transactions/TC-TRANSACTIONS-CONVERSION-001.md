@@ -14,10 +14,9 @@ type: domain
 level: application
 automation_status: automated
 automated_tests:
-  - apps/api/test/api/fx-conversions.api.test.ts
-  - packages/contexts/transactions/src/application/conversions.service.test.ts
   - packages/contexts/transactions/src/domain/conversion.test.ts
-  - tests/e2e/specs/fx.spec.ts
+  - packages/contexts/transactions/src/application/conversions.service.test.ts
+  - apps/api/test/api/fx-conversions.api.test.ts
 status: automated
 regression_suite: true
 phase: 1
