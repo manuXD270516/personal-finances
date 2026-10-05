@@ -1,4 +1,4 @@
-# PR gate (platform/delivery-pipeline, docs/23 §5.1 y §6). Todos los jobs salvo `e2e` son checks requeridos en `main`
+# PR gate (platform/delivery-pipeline, docs/23 §5.1 y §6). Todos los jobs son checks requeridos en `main`
 # (lista en docs/23 §16). Acciones de terceros fijadas por SHA de commit completo; binarios (Trivy, gitleaks)
 # por versión + SHA-256 verificado. El comentario junto a cada SHA es el tag de origen verificado.
 name: pr

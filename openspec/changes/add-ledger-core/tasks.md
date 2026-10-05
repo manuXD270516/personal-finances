@@ -80,9 +80,10 @@
 
 ## 9. Documentación y cierre
 
-- [ ] 9.1 Reportar al owner las correcciones de docs detectadas (PF002 duplicado en docs/08, FR-ACCOUNTS-003 vs get-or-create de docs/09 §2.2, prioridades FR-LEDGER-014/015 vs NFR-DATA-008/009, FR erróneos en TC previos) y actualizar docs/09/docs/08 cuando el owner lo apruebe
+- [x] 9.1 Reportar al owner las correcciones de docs detectadas (PF002 duplicado en docs/08, FR-ACCOUNTS-003 vs get-or-create de docs/09 §2.2, prioridades FR-LEDGER-014/015 vs NFR-DATA-008/009, FR erróneos en TC previos) y actualizar docs/09/docs/08 cuando el owner lo apruebe
   > Pendiente de aprobación del owner: ver design.md → "Registro de implementación (2026-10-03)".
   > Revisado 2026-10-05 (sigue abierta): ya aplicados por docs/31 — PF002 único en docs/08 (D19, §tabla de SQLSTATE), FR-ACCOUNTS-003 reescrito como get-or-create al primer posting (D6) y FR-LEDGER-014/015 en Must (D20). Pendiente: docs/09 §13 todavía usa `'LEDGER_IMMUTABLE'` como mensaje de `forbid_mutation` (la función real emite `IMMUTABLE_RECORD`) y la propuesta de retirar/documentar `LEDGER_IMMUTABLE` del enum (design.md → Registro, punto 6) no tiene decisión del owner.
+  > Cerrada 2026-10-05 (docs/31 D56): el owner retira `LEDGER_IMMUTABLE` (la API nunca lo devuelve; la inmutabilidad se garantiza con `PF003` y sin `UPDATE`/`DELETE`). docs/09 §13 ahora muestra `platform.forbid_mutation()` (`IMMUTABLE_RECORD`, `PF003`) y docs/10 retira la fila del catálogo (el `500 INTERNAL_ERROR` documenta el caso). El retiro del enum del OpenAPI y de los copys de `apps/web/messages/errors.*.json` lo hace el change de código (pf-inc).
 - [x] 9.2 Actualizar `automation_status`/`status` de los TC, regenerar `tests/traceability/matrix.{md,json}` y ejecutar `openspec validate add-ledger-core --strict --no-interactive`
   > Parcial (2026-10-03): TC-LEDGER-BALANCES-001/002/005, SNAPSHOT-001 e INTEGRITY-001 y TC-PLATFORM-ARCH-002 marcados automatizados; queda TC-LEDGER-TRIAL-001 (6.3, Could).
   > Hecho 2026-10-05: TC-LEDGER-TRIAL-001 `automated` (`ledger-trial-balance.api.test.ts`; también TC-CLASSIFICATION-RECATEGORIZE-002 y TC-ACCOUNTS-CURRENCY-001 actualizados), `pnpm traceability:check` sin errores ni advertencias, `pnpm traceability:matrix` regenerada (344 TC, 336 automatizados) y `openspec validate add-ledger-core --strict --no-interactive` válido.

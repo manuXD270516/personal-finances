@@ -72,5 +72,7 @@
 
 ## 8. DOCUMENTACIÓN y cierre
 
-- [ ] 8.1 Actualizar docs/01 (pregunta abierta 1 resuelta), docs/08 §5.4 (columnas añadidas), docs/10 §9.1 (códigos nuevos) y docs/11 (`TransactionUpdated.v1` en Phase 1); verificar enlaces
-- [ ] 8.2 Regenerar la matriz de trazabilidad, actualizar estados de los TC y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar el change
+- [x] 8.1 Actualizar docs/01 (pregunta abierta 1 resuelta), docs/08 §5.4 (columnas añadidas), docs/10 §9.1 (códigos nuevos) y docs/11 (`TransactionUpdated.v1` en Phase 1); verificar enlaces
+  > Verificado y cerrado 2026-10-05 contra main: docs/01 pregunta abierta 1 marcada resuelta (fecha contable = `businessDate`, decisión 1); docs/08 §5.4 ya tenía `posting_date`, `refund_of_transaction_id`, `adjustment_reason`/`adjustment_direction`, `payment_method`, `superseded_in_revision` y `transaction_journal_link`; docs/10 §9.1 con los códigos del change; docs/11 con `TransactionUpdated.v1` en Phase 1 (D47). Enlaces verificados.
+- [x] 8.2 Regenerar la matriz de trazabilidad, actualizar estados de los TC y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar el change
+  > Cerrada 2026-10-05: `pnpm spec:validate` (18/18), `pnpm traceability:check` (355 TC, 0 advertencias) y `pnpm traceability:matrix` (355 TC, 336 automatizados) en verde el 2026-10-05. Estados de TC coherentes con los tests existentes; quedan `not_automated` (`ready`) TC-TRANSACTIONS-IDEMPOTENT-001, TC-TRANSACTIONS-PAYMETHOD-001 y TC-TRANSACTIONS-SPLIT-006 (sin test con su id), lo que contradice la nota de 7.1: hace falta un change de código que los automatice antes de archivar.

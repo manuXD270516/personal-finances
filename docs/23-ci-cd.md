@@ -29,7 +29,7 @@ Orden de gates alineado con ARCHITECTURE §11 y la progresión de [16-testing-st
 ## 2. Estrategia de ramas y repositorio
 
 - **Trunk-based**: `main` siempre desplegable; ramas cortas (`feat/…`, `fix/…`, `chore/…`, ≤ 2–3 días), PR obligatorio; **squash merge** con título Conventional Commit.
-- **Ruleset/branch protection en `main`**: PR requerido (1 aprobación — para un owner único, ver nota), checks requeridos (`pr / gate`), historial lineal, sin force-push, sin borrado, conversaciones resueltas, *require branches up to date* (o **merge queue** cuando haya colaboradores). **As-built (2026-10-02):** se aplicó con 0 aprobaciones y los **14 jobs de `pr.yml` como checks requeridos** (no hay job `gate`); ver §16.1.
+- **Ruleset/branch protection en `main`**: PR requerido (1 aprobación — para un owner único, ver nota), checks requeridos (`pr / gate`), historial lineal, sin force-push, sin borrado, conversaciones resueltas, *require branches up to date* (o **merge queue** cuando haya colaboradores). **As-built (2026-10-02):** se aplicó con 0 aprobaciones y los **14 jobs de `pr.yml` como checks requeridos** (no hay job `gate`); ver §16.1. Desde el 2026-10-05 son **17** (§16, docs/31 D57).
   - Nota equipo de 1: GitHub no permite aprobar el propio PR. Opciones: (a) 0 aprobaciones requeridas pero checks obligatorios + autorevisión con plantilla; (b) revisión asistida por bot. Se propone (a) mientras el equipo sea 1 (Preguntas abiertas).
 - **CODEOWNERS** (ilustrativo):
 
@@ -425,13 +425,15 @@ Implementados en `.github/workflows/pr.yml` y `.github/workflows/main.yml` (setu
 | `integration` | `pnpm test:integration` (Testcontainers) |
 | `image (finance-api)` | build buildx sin push, non-root, Trivy CRITICAL con fix |
 | `image (finance-web)` | idem |
+| `image (pfos-postgres)` | idem para la imagen propia de PostgreSQL de producción N1 (`docker/postgres.Dockerfile`, ADR-0027); requerido desde el 2026-10-05 (docs/31 D57) |
 | `stack-smoke` | `pnpm test:stack` (perfil core) con las imágenes del job `image`, sin reconstruir |
 | `dependency-scan` | `trivy fs` CRITICAL con fix |
 | `secrets` | gitleaks sobre los commits de la PR |
+| `e2e` | Playwright/Chromium contra el stack desechable `pfos-e2e` con Keycloak real y las imágenes del job `image` (add-workspace-identity) |
 
-Son **15 checks requeridos** (`contract` se agregó con add-api-conventions). El job **`e2e`** (Playwright/Chromium contra el stack desechable `pfos-e2e` con Keycloak real y las imágenes del job `image`, add-workspace-identity) corre en cada PR pero está **pendiente de agregar a la protección de rama**: se agregará cuando acumule corridas estables en GitHub.
+Son **17 checks requeridos** (verificado el 2026-10-05 con `gh api repos/manuXD270516/personal-finances/branches/main/protection`): los 14 originales, `contract` (add-api-conventions), `e2e` (agregado a la protección tras acumular corridas estables) e `image (pfos-postgres)` (2026-10-05, docs/31 D57).
 
-Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branches up to date*, historial lineal, sin force-push ni borrado. `main.yml` (jobs `build-push (finance-api)`, `build-push (finance-web)`, `verify-by-digest`) corre tras el merge y **no** es un check requerido.
+Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branches up to date*, historial lineal, sin force-push ni borrado y `enforce_admins` activo (desde 2026-10-03: el owner tampoco puede saltarse los checks). `main.yml` (jobs `build-push (finance-api)`, `build-push (finance-web)`, `verify-by-digest`) corre tras el merge y **no** es un check requerido.
 
 ### 16.1 Estado real — as-built (2026-10-02)
 
@@ -440,6 +442,7 @@ Además: PR obligatorio, 0 aprobaciones (owner único, §15.1), *require branche
 - **Tras el merge:** el PR #1 se fusionó en `main` (commit `ff6b8e0`) y el run `37046732572` de `main.yml` terminó en verde (`build-push` ×2 y `verify-by-digest`).
 - Reproducción local de los checks que no necesitan GitHub (verificado en Windows 11, PowerShell y Git Bash): `pnpm format:check`, `pnpm turbo run typecheck lint test`, `pnpm spec:validate`, `pnpm config:docs:check`, `pnpm arch:check`, `pnpm traceability:check`, `pnpm test:integration`. `pnpm test:stack` y `pnpm test:e2e` requieren Docker y tardan varios minutos.
 - **Actualización (add-api-conventions / add-workspace-identity):** la protección de `main` pasa a **15 checks requeridos** (se agregó `contract`). `e2e` existe en `pr.yml` pero aún **no** es requerido (pendiente de agregar a la protección).
+- **Actualización (2026-10-05, docs/31 D57):** la protección de `main` tiene **17 checks requeridos**: se sumaron `e2e` e `image (pfos-postgres)` (este último aplicado por el lead el 2026-10-05), con `enforce_admins` activo. El comentario de cabecera de `pr.yml` que dice que `e2e` no es requerido quedó desactualizado.
 
 ### 16.2 Nightly — as-built (2026-10-04)
 

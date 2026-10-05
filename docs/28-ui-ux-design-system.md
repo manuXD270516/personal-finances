@@ -261,6 +261,8 @@ Reglas: el rojo se reserva para **problemas** (excedido, faltante, error), no pa
 
 Pestaña **Recorrido** en el detalle de transacción y de cuenta (`add-lifecycle-timeline`): arriba, un **diagrama SVG** generado desde la máquina declarada del agregado (`GET W/lifecycle-machines/{aggregateType}` o `machine` del recorrido) con un **layout fijo por máquina** (estados en columnas según el flujo principal; `VOIDED`/`ARCHIVED` a un costado); estados visitados y transiciones recorridas destacados y **numerados en el orden en que ocurrieron** (la creación es el punto de entrada y no se numera), el estado actual con énfasis y lo no recorrido atenuado; abajo, la **línea de tiempo** (transición en español, origen → destino, actor, fecha/hora en la zona del workspace, motivo, chip "derivada", enlaces "ver revisión n" y "ver asientos" en vista técnica). La línea de tiempo es la **alternativa accesible** del diagrama (`role="img"` + `aria-describedby`); bajo 768 px el diagrama pasa a orientación vertical y la línea de tiempo sigue disponible. Si el recorrido no arranca en una creación se muestra "historia previa incompleta". No usa ECharts: el diagrama es estático y determinista.
 
+Por docs/31 D52 (implementación pendiente, `add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrece para **categorías y contrapartes** (acción "Recorrido" en el árbol de categorías y en la lista de contrapartes, panel o diálogo accesible, layout fijo de dos estados `Activa` ⇄ `Archivada`) y toda vista del recorrido suma las acciones **"Exportar CSV"** y **"Exportar PDF"** (botones secundarios junto al título; descarga directa, sin modal).
+
 ## 7. Convenciones de gráficos (ECharts)
 
 | Convención | Regla |
