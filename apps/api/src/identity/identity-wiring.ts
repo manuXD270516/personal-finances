@@ -9,7 +9,9 @@ import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
 import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
 import {
+  CATEGORY_LIFECYCLE_MACHINE,
   ClassificationModule,
+  COUNTERPARTY_LIFECYCLE_MACHINE,
   createClassificationRuntime,
 } from '@pf/classification/interface/classification.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
@@ -48,7 +50,7 @@ import {
   TransactionsModule,
 } from '@pf/transactions/interface/transactions.module';
 import { TRANSACTIONS_AUDIT_POLICY, type CounterpartyCategoryUsageQuery } from '@pf/transactions/contracts';
-import type { AuditHistoryQuery } from '@pf/audit/contracts';
+import type { AuditHistoryQuery, LifecycleExportLoaders } from '@pf/audit/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
@@ -137,6 +139,9 @@ export const LIFECYCLE_MACHINES = [
   TRANSACTION_LIFECYCLE_MACHINE,
   ACCOUNT_LIFECYCLE_MACHINE,
   EXCHANGE_RATE_LIFECYCLE_MACHINE,
+  // docs/31 D52: catálogos de CLASSIFICATION.
+  CATEGORY_LIFECYCLE_MACHINE,
+  COUNTERPARTY_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -207,6 +212,8 @@ export function financeRuntimes(input: {
     clock: input.clock,
     outbox: classificationOutbox(writer),
     audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
     locales: identityUserLocales(input.pool),
     lastCategoryUsed: {
       lastCategoryUsed: (query) => deferred.categoryUsage?.lastCategoryUsed(query) ?? Promise.resolve(null),
@@ -330,7 +337,12 @@ export function identityImports(input: {
       // add-demo-data: "Cargar/Limpiar datos de demostración" (DEMO_DATA_ENABLED, docs/31 D41).
       ...(input.queue ? { demo: demoDataOptions(input.config, input.queue) } : {}),
     }),
-    AuditModule.register({ runtime: audit, conventions: input.conventions }),
+    AuditModule.register({
+      runtime: audit,
+      conventions: input.conventions,
+      // docs/31 D52: exportación CSV/PDF del recorrido con la consulta de cada contexto dueño.
+      lifecycleExport: lifecycleExportLoaders({ transactions, accounts, fx, classification }),
+    }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
     // ACCOUNTS — openspec add-accounts-management.
     ...accountsImports({ runtime: accounts, conventions: input.conventions }),
@@ -340,6 +352,56 @@ export function identityImports(input: {
     FxModule.register({ runtime: fx, conventions: input.conventions }),
     ReportingModule.register({ runtime: reporting, conventions: input.conventions }),
   ];
+}
+
+/**
+ * Cargas del recorrido para su exportación CSV/PDF (docs/31 D52): cada una usa la MISMA consulta que el
+ * `GET …/lifecycle` del contexto dueño (existencia en el workspace ⇒ 404 idéntico, RLS, estado actual). Las
+ * transacciones agregan el monto y la comisión de cada revisión tal como los publica el contrato (`Money`).
+ */
+export function lifecycleExportLoaders(
+  runtimes: Pick<ReturnType<typeof financeRuntimes>, 'transactions' | 'accounts' | 'fx' | 'classification'>,
+): LifecycleExportLoaders {
+  const { transactions, accounts, fx, classification } = runtimes;
+  return {
+    Transaction: async ({ userId, workspaceId, aggregateId }) => {
+      const view = await transactions.service.transactionLifecycle({
+        userId,
+        workspaceId,
+        transactionId: aggregateId,
+      });
+      const txn = await transactions.service.getTransaction(workspaceId, aggregateId);
+      return {
+        lifecycle: view.lifecycle,
+        label: txn.description ?? null,
+        revisions: view.revisions.map((r) => ({
+          revision: r.revision,
+          amount: r.amount.toJSON(),
+          fee: r.fee?.toJSON() ?? null,
+        })),
+      };
+    },
+    Account: async ({ userId, workspaceId, aggregateId }) => {
+      const lifecycle = await accounts.accounts.accountLifecycle({
+        userId,
+        workspaceId,
+        accountId: aggregateId,
+      });
+      const view = await accounts.accounts.getAccount(workspaceId, aggregateId);
+      return { lifecycle, label: view.account.name };
+    },
+    ExchangeRate: async ({ userId, workspaceId, aggregateId }) => ({
+      lifecycle: await fx.service.rateLifecycle({ userId, workspaceId, rateId: aggregateId }),
+    }),
+    Category: async ({ userId, workspaceId, aggregateId }) => ({
+      lifecycle: await classification.queries.lifecycleOf(userId, workspaceId, 'Category', aggregateId),
+      label: (await classification.queries.getCategory(userId, workspaceId, aggregateId)).name,
+    }),
+    Counterparty: async ({ userId, workspaceId, aggregateId }) => ({
+      lifecycle: await classification.queries.lifecycleOf(userId, workspaceId, 'Counterparty', aggregateId),
+      label: (await classification.queries.getCounterparty(userId, workspaceId, aggregateId)).name,
+    }),
+  };
 }
 
 /** Opciones de datos de demostración de IDENTITY desde la configuración y la cola (add-demo-data). */

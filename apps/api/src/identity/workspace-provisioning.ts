@@ -1,6 +1,12 @@
+import { createAuditRuntime } from '@pf/audit/interface/audit.module';
+import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
 import { createClassificationRuntime } from '@pf/classification/interface/classification.module';
 import { createFxRuntime } from '@pf/fx/interface/fx.module';
-import { identityUserLocales, type WorkspaceCreatedHook } from '@pf/identity/interface/identity.module';
+import {
+  identityUserLocales,
+  identityWorkspaceTimeZones,
+  type WorkspaceCreatedHook,
+} from '@pf/identity/interface/identity.module';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 
@@ -34,17 +40,32 @@ const unavailable = (what: string) => () => {
 
 /**
  * Provisión fuera de la API (Minimal Seed): los mismos provisores sobre PostgreSQL con el rol de la app (RLS). La
- * provisión no audita ni publica eventos (el alta del workspace es quien los emite), así que auditoría, recorrido,
- * outbox y ajustes de workspace fallan en voz alta si alguna vez se usaran aquí.
+ * provisión de categorías registra su `CREATE` en el recorrido respaldado por `classification.catalog.applied`
+ * (docs/31 D52, D54), así que CLASSIFICATION recibe el `LifecyclePort` real; el resto (auditoría directa, outbox,
+ * consultas del recorrido y ajustes de workspace) falla en voz alta si alguna vez se usara aquí.
  */
 export function seedWorkspaceProvisioning(pool: Pool, clock: Clock): WorkspaceCreatedHook {
   const audit = { append: unavailable('AuditPort') };
   const outbox = { append: unavailable('OutboxPort') };
+  const lifecycle = { record: unavailable('LifecyclePort') };
+  // Solo CLASSIFICATION escribe aquí (registro del catálogo + CREATE de cada categoría provisionada).
+  const classificationLifecycle = createAuditRuntime({
+    pool,
+    clock,
+    policies: [CLASSIFICATION_AUDIT_POLICY],
+    timeZones: identityWorkspaceTimeZones(pool),
+  }).lifecycle;
+  const lifecycleQuery = {
+    lifecycleOf: unavailable('LifecycleQuery'),
+    machineOf: unavailable('LifecycleQuery'),
+  };
   return workspaceCreatedHook({
     classification: createClassificationRuntime({
       pool,
       clock,
       audit,
+      lifecycle: classificationLifecycle,
+      lifecycleQuery,
       outbox,
       locales: identityUserLocales(pool),
     }),
@@ -53,11 +74,8 @@ export function seedWorkspaceProvisioning(pool: Pool, clock: Clock): WorkspaceCr
       clock,
       audit,
       outbox,
-      lifecycle: { record: unavailable('LifecyclePort') },
-      lifecycleQuery: {
-        lifecycleOf: unavailable('LifecycleQuery'),
-        machineOf: unavailable('LifecycleQuery'),
-      },
+      lifecycle,
+      lifecycleQuery,
       workspaces: { settingsOf: unavailable('WorkspaceSettingsPort') },
     }),
   });

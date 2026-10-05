@@ -283,7 +283,15 @@ function bodyFor(op: ContractOperation): unknown {
   return bodies[op.operationId];
 }
 
-const QUERY: Record<string, string> = { getCounterpartyCategorySuggestion: '?kind=EXPENSE' };
+const QUERY: Record<string, string> = {
+  getCounterpartyCategorySuggestion: '?kind=EXPENSE',
+  // Exportación del recorrido (docs/31 D52): `format` es obligatorio.
+  exportTransactionLifecycle: '?format=csv',
+  exportAccountLifecycle: '?format=pdf',
+  exportRateLifecycle: '?format=csv',
+  exportCategoryLifecycle: '?format=pdf',
+  exportCounterpartyLifecycle: '?format=csv',
+};
 
 /** Ruta de la operación bajo W1 con el id dado en cada parámetro de recurso (`null` ⇒ el id de W2). */
 function pathFor(op: ContractOperation, ws: string, forced?: string): string {

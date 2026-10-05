@@ -1,4 +1,11 @@
 import { DomainError } from '@pf/shared-kernel';
+import {
+  CATEGORY_LIFECYCLE,
+  classificationStatus,
+  type ClassificationStatus,
+  type ClassificationTransition,
+  type ClassificationTransitionRecord,
+} from './classification-lifecycle.js';
 import { invalidTransition, validation } from './errors.js';
 import { normalizeText } from './normalized-text.js';
 import { SystemCategoryPolicy, type CategoryKind, type SystemCode } from './system-categories.js';
@@ -132,7 +139,24 @@ export interface CategoryPatch {
  * (`CATEGORY_DEPTH_EXCEEDED`), sin eliminación (solo archivado, INV-019) y protecciones de sistema.
  */
 export class Category {
+  /** Paso del flujo de esta unidad de trabajo, validado contra `CATEGORY_LIFECYCLE` (docs/31 D52). */
+  private transitionRecord: ClassificationTransitionRecord | null = null;
+
   private constructor(private s: CategorySnapshot) {}
+
+  /** Transición del último comando (`null` si fue un cambio descriptivo: anotación). */
+  get lastTransition(): ClassificationTransitionRecord | null {
+    return this.transitionRecord;
+  }
+
+  /** Estado de la máquina (`ACTIVE` | `ARCHIVED`). */
+  get status(): ClassificationStatus {
+    return classificationStatus(this.s.archivedAt);
+  }
+
+  private mark(code: ClassificationTransition): void {
+    this.transitionRecord = CATEGORY_LIFECYCLE.transition(code, code === 'CREATE' ? null : this.status);
+  }
 
   /**
    * Crea una categoría en `group` (y bajo `parent` si es subcategoría). El grupo y el padre deben estar activos
@@ -166,7 +190,7 @@ export class Category {
         throw validation('a subcategory belongs to the group of its parent', '/groupId');
       }
     }
-    return new Category({
+    const category = new Category({
       id: input.id,
       workspaceId: group.workspaceId,
       groupId: group.id,
@@ -180,6 +204,8 @@ export class Category {
       archivedAt: null,
       version: 1,
     });
+    category.mark('CREATE');
+    return category;
   }
 
   static restore(s: CategorySnapshot): Category {
@@ -292,6 +318,7 @@ export class Category {
   archive(at: string): void {
     if (this.isSystem) throw SystemCategoryPolicy.immutable('system categories cannot be archived');
     if (this.isArchived) throw invalidTransition('category is already archived');
+    this.mark('ARCHIVE');
     this.s = { ...this.s, archivedAt: at, version: this.s.version + 1 };
   }
 
@@ -300,6 +327,7 @@ export class Category {
     if (!this.isArchived) throw invalidTransition('category is not archived');
     if (group.isArchived) throw archivedError('category group');
     if (parent?.isArchived) throw archivedError('parent category');
+    this.mark('UNARCHIVE');
     this.s = { ...this.s, archivedAt: null, version: this.s.version + 1 };
   }
 }

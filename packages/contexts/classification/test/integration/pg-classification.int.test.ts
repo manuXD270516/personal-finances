@@ -89,6 +89,14 @@ describe('Repositorios PostgreSQL de CLASSIFICATION (tareas 5.1 y 5.2)', () => {
       pool,
       outbox: { append: async (e) => void events.push(e) },
       audit: { append: async (a) => void audits.push(a) },
+      // Recorrido (docs/31 D52): el registro de auditoría sigue pasando por el doble; los pasos se descartan aquí.
+      lifecycle: { record: async (a) => void audits.push(a) },
+      lifecycleQuery: {
+        lifecycleOf: () => Promise.reject(new Error('not used')),
+        machineOf: () => {
+          throw new Error('not used');
+        },
+      },
       clock: new FixedClock(Instant.parse('2026-10-03T12:00:00Z')),
     });
     svc = new ClassificationService(d);

@@ -1117,6 +1117,30 @@
       "users": "People",
       "utensils": "Food",
       "wrench": "Maintenance"
+    },
+    "lifecycle": "Lifecycle",
+    "lifecycleNamed": "Lifecycle of “{name}”",
+    "detailTabs": {
+      "label": "Details of “{name}”",
+      "edit": "Edit"
+    },
+    "states": {
+      "ACTIVE": "Active",
+      "ARCHIVED": "Archived"
+    },
+    "fields": {
+      "name": "Name",
+      "icon": "Icon",
+      "color": "Color",
+      "sortOrder": "Order",
+      "groupId": "Group",
+      "parentId": "Parent category",
+      "kind": "Type",
+      "aliases": "Aliases",
+      "defaultCategoryId": "Default category",
+      "notes": "Notes",
+      "website": "Website",
+      "systemCode": "System code"
     }
   },
   "Lifecycle": {
@@ -1194,7 +1218,22 @@
       "ExchangeRate": {
         "RECORD": "Record",
         "SUPERSEDE": "Supersede"
+      },
+      "Category": {
+        "CREATE": "Create",
+        "ARCHIVE": "Archive",
+        "UNARCHIVE": "Unarchive"
+      },
+      "Counterparty": {
+        "CREATE": "Create",
+        "ARCHIVE": "Archive",
+        "UNARCHIVE": "Unarchive"
       }
+    },
+    "export": {
+      "label": "Export the lifecycle",
+      "csv": "Export CSV",
+      "pdf": "Export PDF"
     }
   },
   "Demo": {

@@ -1117,6 +1117,30 @@
       "users": "Pessoas",
       "utensils": "Comida",
       "wrench": "Manutenção"
+    },
+    "lifecycle": "Percurso",
+    "lifecycleNamed": "Percurso de «{name}»",
+    "detailTabs": {
+      "label": "Detalhe de «{name}»",
+      "edit": "Editar"
+    },
+    "states": {
+      "ACTIVE": "Ativa",
+      "ARCHIVED": "Arquivada"
+    },
+    "fields": {
+      "name": "Nome",
+      "icon": "Ícone",
+      "color": "Cor",
+      "sortOrder": "Ordem",
+      "groupId": "Grupo",
+      "parentId": "Categoria pai",
+      "kind": "Tipo",
+      "aliases": "Apelidos",
+      "defaultCategoryId": "Categoria padrão",
+      "notes": "Notas",
+      "website": "Site",
+      "systemCode": "Código de sistema"
     }
   },
   "Lifecycle": {
@@ -1194,7 +1218,22 @@
       "ExchangeRate": {
         "RECORD": "Registrar",
         "SUPERSEDE": "Substituir"
+      },
+      "Category": {
+        "CREATE": "Criar",
+        "ARCHIVE": "Arquivar",
+        "UNARCHIVE": "Desarquivar"
+      },
+      "Counterparty": {
+        "CREATE": "Criar",
+        "ARCHIVE": "Arquivar",
+        "UNARCHIVE": "Desarquivar"
       }
+    },
+    "export": {
+      "label": "Exportar o percurso",
+      "csv": "Exportar CSV",
+      "pdf": "Exportar PDF"
     }
   },
   "Demo": {

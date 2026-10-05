@@ -12,8 +12,11 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle-export.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "export", "security", "rbac"]
@@ -50,4 +53,4 @@ Entonces el VIEWER recibe el archivo
 ## Notas
 
 - Por el BFF un no miembro de W1 recibe 403 WORKSPACE_ACCESS_DENIED del guard (como en TC-AUDIT-LIFECYCLE-006); el 404 se verifica por API con el id de W1 bajo W2.
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

@@ -165,7 +165,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 #### `classification.CategoryArchived.v1`
 - **Productor:** CLASSIFICATION. **Consumidores:** REPORTING (Phase 1, marca "archivada" en el dashboard); PLANNING y RULES desde sus fases.
 - **Trigger:** `POST …/categories/{id}/archive`. Archivar una categoría padre archiva sus subcategorías activas en la misma transacción y emite **un evento por categoría** archivada (`add-classification`).
-- **Payload:** `categoryId`, `parentId|null`, `groupId`, `kind: EXPENSE|INCOME`, `archivedAt: instant`, `cascadedFromCategoryId|null` (la categoría padre cuando se archivó en cascada).
+- **Payload:** `categoryId`, `parentId|null`, `groupId`, `kind: EXPENSE|INCOME`, `archivedAt: instant`, `cascadedFromCategoryId|null` (la categoría padre cuando se archivó en cascada); opcional aditivo `transition: ARCHIVE` (transición de la máquina `Category`, docs/31 D52; los consumidores lo ignoran).
 - **Idem.:** natural `(categoryId, aggregateVersion)`. **Ord.:** por `Category`. **PII:** N.
 
 #### `fx.RateRecorded.v1`

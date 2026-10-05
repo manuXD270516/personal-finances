@@ -4,9 +4,12 @@ import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { ClassificationQueries } from '../application/classification.queries.js';
 import { ClassificationService } from '../application/classification.service.js';
+import type { LifecycleMachineDto } from '@pf/audit/contracts';
 import type {
   AuditPort,
   LastCategoryUsedQueryPort,
+  LifecyclePort,
+  LifecycleQuery,
   LocaleResolver,
   OutboxPort,
 } from '../application/ports/index.js';
@@ -16,6 +19,7 @@ import type {
   ClassificationValidator,
   WorkspaceCatalogProvisioner,
 } from '../contracts/index.js';
+import { CATEGORY_LIFECYCLE, COUNTERPARTY_LIFECYCLE } from '../domain/classification-lifecycle.js';
 import { pgClassificationDeps } from '../infrastructure/pg-classification.js';
 import {
   CLASSIFICATION_LOCALES,
@@ -29,6 +33,9 @@ export interface ClassificationRuntimeOptions {
   readonly clock: Clock;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  /** Auditoría + recorrido (add-lifecycle-timeline, docs/31 D52). */
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: LifecycleQuery;
   /** Locale del usuario (`Me.locale`, IDENTITY) para los nombres de categorías de sistema. */
   readonly locales: LocaleResolver;
   /** Adapter hacia Transactions; por defecto, stub sin historial (hasta add-transaction-recording). */
@@ -55,6 +62,8 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
     clock: options.clock,
     outbox: options.outbox,
     audit: options.audit,
+    lifecycle: options.lifecycle,
+    lifecycleQuery: options.lifecycleQuery,
     ...(options.lastCategoryUsed ? { lastCategoryUsed: options.lastCategoryUsed } : {}),
   });
   const service = new ClassificationService(deps);
@@ -110,4 +119,11 @@ export class ClassificationModule {
   }
 }
 
-export type { AuditPort, LocaleResolver, OutboxPort };
+/**
+ * Máquinas de estado `Category` y `Counterparty` declaradas por el dominio (docs/31 D52), para AUDIT en el
+ * composition root (`GET W/lifecycle-machines/{aggregateType}` y el recorrido).
+ */
+export const CATEGORY_LIFECYCLE_MACHINE: LifecycleMachineDto = CATEGORY_LIFECYCLE.definition;
+export const COUNTERPARTY_LIFECYCLE_MACHINE: LifecycleMachineDto = COUNTERPARTY_LIFECYCLE.definition;
+
+export type { AuditPort, LifecyclePort, LifecycleQuery, LocaleResolver, OutboxPort };

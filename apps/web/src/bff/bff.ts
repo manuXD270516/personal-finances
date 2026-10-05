@@ -64,6 +64,8 @@ const FORWARD_REQUEST_HEADERS = [
 ];
 const FORWARD_RESPONSE_HEADERS = [
   'content-type',
+  // Descargas (exportación del recorrido, docs/31 D52): adjunto con nombre de archivo seguro fijado por finance-api.
+  'content-disposition',
   'etag',
   'retry-after',
   'idempotent-replayed',

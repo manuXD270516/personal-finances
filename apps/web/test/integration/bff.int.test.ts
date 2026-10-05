@@ -121,6 +121,14 @@ function fakeApi(userId: () => string) {
         ? new Response(null, { status: 204 })
         : Response.json({ code: 'INTERNAL_ERROR' }, { status: state.sessionEventsStatus });
     }
+    if (url.includes('/lifecycle/export')) {
+      return new Response('\uFEFFsequence,kind\r\n1,TRANSITION\r\n', {
+        headers: {
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': 'attachment; filename="recorrido-Category-c1.csv"',
+        },
+      });
+    }
     if (init?.method === 'POST') {
       return Response.json(
         { id: randomUUID() },
@@ -459,6 +467,31 @@ describe('[TC-IDENTITY-SESSION-002] el BFF rechaza mutaciones sin token anti-CSR
     expect(ok.status).toBe(201);
     expect(ok.headers.get('location')).toBe('/api/bff/v1/workspaces/abc');
     expect(api.calls.at(-1)).toMatchObject({ method: 'POST', url: `${API}/api/v1/${path.join('/')}` });
+  });
+});
+
+describe('[TC-AUDIT-LIFECYCLE-020] descarga del recorrido por el BFF (docs/31 D52)', () => {
+  it('un GET de exportación (sin token CSRF: método seguro) reenvía el archivo con Content-Disposition y Accept-Language', async () => {
+    const { bff, api } = setup();
+    const { sid } = await login(bff);
+    const path = ['workspaces', randomUUID(), 'categories', randomUUID(), 'lifecycle', 'export'];
+    const r = await bff.proxy(
+      new Request(`${APP}/api/bff/v1/${path.join('/')}?format=csv`, {
+        headers: withSid(sid, { 'accept-language': 'es-BO,es;q=0.9' }),
+      }),
+      path,
+    );
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(r.headers.get('content-disposition')).toBe('attachment; filename="recorrido-Category-c1.csv"');
+    expect(r.headers.get('cache-control')).toBe('no-store');
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // BOM intacto (se reenv\u00EDa sin re-codificar)
+    expect(new TextDecoder().decode(bytes)).toBe('sequence,kind\r\n1,TRANSITION\r\n');
+    const call = api.calls.at(-1)!;
+    expect(call.url).toBe(`${API}/api/v1/${path.join('/')}?format=csv`);
+    expect(call.headers.get('accept-language')).toBe('es-BO,es;q=0.9');
+    expect(call.authorization).toMatch(/^Bearer /);
   });
 });
 

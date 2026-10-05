@@ -6,6 +6,7 @@ import { badgeStyle, cardStyle, Field, formStyle, inputStyle, mutedStyle, rowSty
 import type { WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import { categoryOptions } from '../transactions/catalogs';
+import { ClassificationDetail, type DetailMode } from './ClassificationDetail';
 import type { ClassificationData, Run } from './types';
 import { parseAliases } from './logic';
 
@@ -212,7 +213,9 @@ function CounterpartyRow({
   categoryName: (id: string) => string;
 }) {
   const { t } = f;
-  const [editing, setEditing] = useState(false);
+  const [mode, setMode] = useState<DetailMode | null>(null);
+  const editing = mode === 'edit';
+  const setEditing = (on: boolean) => setMode(on ? 'edit' : null);
   const toDraft = (): Draft => ({
     name: c.name,
     kind: c.kind,
@@ -258,46 +261,71 @@ function CounterpartyRow({
           </button>
         </span>
       ) : null}
-      {editing ? (
-        <form
-          style={{ ...formStyle, padding: '0.5rem' }}
-          aria-label={t('editNamed', { name: c.name })}
-          data-testid="counterparty-edit-form"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            const aliases = parseAliases(draft.aliases);
-            if (!aliases.ok) return setError(t(`errors.${aliases.error}`));
-            setError(undefined);
-            const name = draft.name.trim();
-            void run(
-              () =>
-                ctx.api.command(
-                  'PATCH',
-                  `${ctx.base}/counterparties/${c.id}`,
-                  {
-                    ...(name && name !== c.name ? { name } : {}),
-                    kind: draft.kind,
-                    aliases: aliases.aliases,
-                    defaultCategoryId: draft.defaultCategoryId || null,
-                  },
-                  { ifMatch: c.version },
-                ),
-              t('counterpartyUpdated', { name: name || c.name }),
-            ).then((ok) => ok && setEditing(false));
-          }}
+      <span>
+        <button
+          type="button"
+          aria-expanded={mode === 'lifecycle'}
+          aria-label={t('lifecycleNamed', { name: c.name })}
+          onClick={() => setMode(mode === 'lifecycle' ? null : 'lifecycle')}
         >
-          <CounterpartyFields f={f} data={data} draft={draft} onChange={setDraft} aliasError={error} />
-          <div style={rowStyle}>
-            <button type="submit">{t('save')}</button>
-            <button type="button" onClick={() => setEditing(false)}>
-              {t('cancel')}
-            </button>
-          </div>
-        </form>
+          {t('lifecycle')}
+        </button>
+      </span>
+      {mode ? (
+        <ClassificationDetail
+          ctx={ctx}
+          f={f}
+          mode={mode}
+          name={c.name}
+          path={`counterparties/${c.id}`}
+          version={c.version}
+          idPrefix={`counterparty-${c.id}`}
+          {...(ctx.canEdit ? { edit: editForm() } : {})}
+        />
       ) : null}
     </div>
   );
+
+  function editForm() {
+    return (
+      <form
+        style={{ ...formStyle, padding: '0.5rem' }}
+        aria-label={t('editNamed', { name: c.name })}
+        data-testid="counterparty-edit-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          const aliases = parseAliases(draft.aliases);
+          if (!aliases.ok) return setError(t(`errors.${aliases.error}`));
+          setError(undefined);
+          const name = draft.name.trim();
+          void run(
+            () =>
+              ctx.api.command(
+                'PATCH',
+                `${ctx.base}/counterparties/${c.id}`,
+                {
+                  ...(name && name !== c.name ? { name } : {}),
+                  kind: draft.kind,
+                  aliases: aliases.aliases,
+                  defaultCategoryId: draft.defaultCategoryId || null,
+                },
+                { ifMatch: c.version },
+              ),
+            t('counterpartyUpdated', { name: name || c.name }),
+          ).then((ok) => ok && setEditing(false));
+        }}
+      >
+        <CounterpartyFields f={f} data={data} draft={draft} onChange={setDraft} aliasError={error} />
+        <div style={rowStyle}>
+          <button type="submit">{t('save')}</button>
+          <button type="button" onClick={() => setEditing(false)}>
+            {t('cancel')}
+          </button>
+        </div>
+      </form>
+    );
+  }
 }
 
 /** Resumen de una contraparte: nombre, tipo, marca de archivada, alias y categoría por defecto. */

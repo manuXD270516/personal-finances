@@ -57,7 +57,8 @@ interface SessionContextValue {
 
 const Ctx = createContext<SessionContextValue | undefined>(undefined);
 
-const BFF_API = '/api/bff/v1';
+/** Prefijo del proxy autenticado del BFF (`/api/bff/v1/*` → finance-api `/api/v1/*`). */
+export const BFF_API = '/api/bff/v1';
 
 async function readSession(): Promise<SessionInfo | null> {
   const res = await fetch('/api/bff/session', { cache: 'no-store', credentials: 'same-origin' });

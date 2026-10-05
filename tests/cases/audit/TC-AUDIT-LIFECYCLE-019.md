@@ -12,8 +12,11 @@ invariants: []
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/audit/src/application/lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "classification", "backfill"]
@@ -49,4 +52,4 @@ Entonces su recorrido muestra crear y archivar derivadas
 ## Notas
 
 - Las categorías provisionadas con el workspace antes de D52 no tienen auditoría propia (add-classification, decisión de implementación 2): su recorrido derivado queda vacío con historyComplete = false; nunca se inventa la creación.
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

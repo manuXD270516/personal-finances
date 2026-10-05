@@ -1,3 +1,4 @@
+import type { LifecycleDto } from '@pf/audit/contracts';
 import { DomainError } from '@pf/shared-kernel';
 import type { Category, CategoryGroup } from '../domain/category.js';
 import { CounterpartyMatcher, type Counterparty, type CounterpartyKind } from '../domain/counterparty.js';
@@ -66,6 +67,33 @@ export class ClassificationQueries {
         .filter((g) => f.kind === undefined || g.kind === f.kind)
         .sort((a, b) => a.kind.localeCompare(b.kind) || byOrder(a, b)),
     );
+  }
+
+  /**
+   * `GetLifecycle` de una categoría o contraparte (add-lifecycle-timeline decisión 7, docs/31 D52; VIEWER+):
+   * verifica que el agregado existe en el workspace (404 idéntico a inexistente si es de otro, RLS) y pide el recorrido
+   * a AUDIT con su estado actual (`ACTIVE` | `ARCHIVED`) como fuente de verdad.
+   */
+  lifecycleOf(
+    userId: string,
+    workspaceId: string,
+    aggregateType: 'Category' | 'Counterparty',
+    id: string,
+  ): Promise<LifecycleDto> {
+    return this.run(userId, workspaceId, async () => {
+      const item: Category | Counterparty | null =
+        aggregateType === 'Category'
+          ? await this.deps.categories.findById(workspaceId, id)
+          : await this.deps.counterparties.findById(workspaceId, id);
+      if (!item) throw notFound(aggregateType === 'Category' ? 'category' : 'counterparty');
+      return this.deps.lifecycleQuery.lifecycleOf({
+        userId,
+        workspaceId,
+        aggregateType,
+        aggregateId: item.id,
+        currentState: item.status,
+      });
+    });
   }
 
   getCategoryGroup(userId: string, workspaceId: string, id: string): Promise<CategoryGroup> {

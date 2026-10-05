@@ -1,3 +1,10 @@
+import {
+  COUNTERPARTY_LIFECYCLE,
+  classificationStatus,
+  type ClassificationStatus,
+  type ClassificationTransition,
+  type ClassificationTransitionRecord,
+} from './classification-lifecycle.js';
 import { invalidTransition, validation } from './errors.js';
 import { normalizeText } from './normalized-text.js';
 
@@ -94,7 +101,24 @@ function checkName(raw: string): string {
 
 /** AR `Counterparty` (design §8): tipo, alias únicos, categoría por defecto; archivado/desarchivado. */
 export class Counterparty {
+  /** Paso del flujo de esta unidad de trabajo, validado contra `COUNTERPARTY_LIFECYCLE` (docs/31 D52). */
+  private transitionRecord: ClassificationTransitionRecord | null = null;
+
   private constructor(private s: CounterpartySnapshot) {}
+
+  /** Transición del último comando (`null` si fue un cambio descriptivo: anotación). */
+  get lastTransition(): ClassificationTransitionRecord | null {
+    return this.transitionRecord;
+  }
+
+  /** Estado de la máquina (`ACTIVE` | `ARCHIVED`). */
+  get status(): ClassificationStatus {
+    return classificationStatus(this.s.archivedAt);
+  }
+
+  private mark(code: ClassificationTransition): void {
+    this.transitionRecord = COUNTERPARTY_LIFECYCLE.transition(code, code === 'CREATE' ? null : this.status);
+  }
 
   static create(input: {
     id: string;
@@ -107,7 +131,7 @@ export class Counterparty {
     notes?: string | null;
     website?: string | null;
   }): Counterparty {
-    return new Counterparty({
+    const created = new Counterparty({
       id: input.id,
       workspaceId: input.workspaceId,
       name: checkName(input.name),
@@ -120,6 +144,8 @@ export class Counterparty {
       archivedAt: null,
       version: 1,
     });
+    created.mark('CREATE');
+    return created;
   }
 
   static restore(s: CounterpartySnapshot): Counterparty {
@@ -192,11 +218,13 @@ export class Counterparty {
 
   archive(at: string): void {
     if (this.isArchived) throw invalidTransition('counterparty is already archived');
+    this.mark('ARCHIVE');
     this.s = { ...this.s, archivedAt: at, version: this.s.version + 1 };
   }
 
   unarchive(): void {
     if (!this.isArchived) throw invalidTransition('counterparty is not archived');
+    this.mark('UNARCHIVE');
     this.s = { ...this.s, archivedAt: null, version: this.s.version + 1 };
   }
 }

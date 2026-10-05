@@ -1,4 +1,4 @@
-import type { AuditPort } from '@pf/audit/contracts';
+import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { Category, CategoryGroup } from '../../domain/category.js';
 import type { Counterparty } from '../../domain/counterparty.js';
@@ -51,6 +51,8 @@ export interface CategoryArchivedEvent {
     readonly kind: CategoryKind;
     readonly archivedAt: string;
     readonly cascadedFromCategoryId: string | null;
+    /** Transición de la máquina `Category` (opcional, aditivo; docs/31 D52). */
+    readonly transition?: 'ARCHIVE';
   };
 }
 
@@ -113,10 +115,14 @@ export interface ClassificationDeps {
   readonly outbox: OutboxPort;
   /** Auditoría síncrona (`@pf/audit/contracts`): misma transacción que el comando (INV-029). */
   readonly audit: AuditPort;
+  /** Auditoría + recorrido (add-lifecycle-timeline, docs/31 D52) de Category, Counterparty y Tag. */
+  readonly lifecycle: LifecyclePort;
+  /** Consulta `GetLifecycle` de AUDIT (el contexto dueño verifica el agregado y aporta su estado). */
+  readonly lifecycleQuery: LifecycleQuery;
   readonly lastCategoryUsed: LastCategoryUsedQueryPort;
   readonly catalogs: DefaultCatalogSource;
   readonly ids: IdGenerator;
   readonly clock: Clock;
 }
 
-export type { AuditPort };
+export type { AuditPort, LifecyclePort, LifecycleQuery };

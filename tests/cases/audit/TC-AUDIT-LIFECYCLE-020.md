@@ -12,8 +12,14 @@ invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - apps/web/src/ui/classification/classification.test.tsx
+  - apps/web/src/ui/lifecycle/lifecycle.test.tsx
+  - apps/web/test/integration/bff.int.test.ts
+  - tests/e2e/specs/lifecycle.spec.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "ui", "classification"]
@@ -50,4 +56,4 @@ Entonces veo el camino destacado y la línea de tiempo
 ## Notas
 
 - Contrapartes: mismo componente; el E2E puede cubrir una de las dos y la otra en test de componente.
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

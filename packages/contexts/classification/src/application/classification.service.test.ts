@@ -167,7 +167,7 @@ describe('Categorías y grupos (tarea 4.1)', () => {
 });
 
 describe('Categorías de sistema (tarea 4.2)', () => {
-  it('[TC-CLASSIFICATION-SYSTEM-001] un workspace nuevo sin catálogo tiene exactamente las 11 de sistema; reprovisionar no duplica', async () => {
+  it('[TC-CLASSIFICATION-SYSTEM-001] [TC-AUDIT-LIFECYCLE-017] un workspace nuevo sin catálogo tiene exactamente las 11 de sistema, cada una con CREATE; reprovisionar no duplica', async () => {
     await svc.onWorkspaceCreated({ workspaceId: WS, userId: USER, seedDefaultCategories: false });
     const all = await q.listCategories(USER, WS, { includeArchived: true });
     expect(all).toHaveLength(11);
@@ -181,8 +181,23 @@ describe('Categorías de sistema (tarea 4.2)', () => {
       'EXPENSE:Otros gastos',
       'INCOME:Otros ingresos',
     ]);
-    // La provisión al crear el workspace no escribe auditoría propia (la cubre identity.workspace.created).
-    expect(mem.audits).toEqual([]);
+    // docs/31 D52/D54: la provisión escribe UN registro `classification.catalog.applied` (origen sistema) que respalda
+    // el CREATE de cada categoría provisionada; reprovisionar sin cambios no escribe nada.
+    expect(mem.audits.map((a) => [a.action, a.aggregateType, a.aggregateId, a.origin])).toEqual([
+      ['classification.catalog.applied', 'CategoryCatalog', WS, 'system'],
+    ]);
+    expect(mem.steps).toHaveLength(11);
+    expect(new Set(mem.steps.map((st) => st.aggregateId))).toEqual(new Set(all.map((c) => c.id)));
+    expect(
+      mem.steps.every(
+        (st) =>
+          st.kind === 'TRANSITION' &&
+          st.transition === 'CREATE' &&
+          st.fromState === null &&
+          st.toState === 'ACTIVE' &&
+          st.aggregateType === 'Category',
+      ),
+    ).toBe(true);
   });
 
   it('[TC-CLASSIFICATION-SYSTEM-002] archivar o renombrar FEES ⇒ SYSTEM_CATEGORY_IMMUTABLE; el color sí cambia', async () => {
@@ -373,5 +388,106 @@ describe('Contrato del evento (tarea 5.4)', () => {
     for (const e of mem.events) {
       expect(validate(JSON.parse(JSON.stringify(e.payload))), JSON.stringify(validate.errors)).toBe(true);
     }
+  });
+});
+
+describe('Recorrido de categorías y contrapartes (docs/31 D52, tarea 9.2)', () => {
+  const stepsOf = (aggregateId: string) =>
+    mem.steps
+      .filter((st) => st.aggregateId === aggregateId)
+      .map((st) =>
+        st.kind === 'TRANSITION'
+          ? [st.transition, st.fromState, st.toState]
+          : ['ANNOTATION', [...st.changedFields].join(',')],
+      );
+
+  it('[TC-AUDIT-LIFECYCLE-015] crear, renombrar, archivar y desarchivar: CREATE, anotación [name], ARCHIVE (con su evento) y UNARCHIVE', async () => {
+    const g = await expenseGroup();
+    const c = await svc.createCategory(USER, WS, { groupId: g.id, name: 'Super' });
+    await svc.updateCategory(USER, WS, c.id, 1, { name: 'Supermercado' });
+    await svc.archiveCategory(USER, WS, c.id, 2);
+    await svc.unarchiveCategory(USER, WS, c.id, 3);
+    expect(stepsOf(c.id)).toEqual([
+      ['CREATE', null, 'ACTIVE'],
+      ['ANNOTATION', 'name'],
+      ['ARCHIVE', 'ACTIVE', 'ARCHIVED'],
+      ['UNARCHIVE', 'ARCHIVED', 'ACTIVE'],
+    ]);
+    const archive = mem.steps.find((st) => st.kind === 'TRANSITION' && st.transition === 'ARCHIVE');
+    expect(archive?.events).toEqual([
+      { eventId: mem.events[0]?.eventId, eventType: 'classification.CategoryArchived.v1' },
+    ]);
+    expect(mem.events[0]?.payload.transition).toBe('ARCHIVE');
+    expect(archive?.action).toBe('classification.category.archived');
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-016] archivar un padre registra ARCHIVE en él y en cada subcategoría activa; un fallo revierte todo', async () => {
+    const g = await expenseGroup('Vivienda');
+    const sb = await svc.createCategory(USER, WS, { groupId: g.id, name: 'Servicios básicos' });
+    const luz = await svc.createCategory(USER, WS, { groupId: g.id, parentId: sb.id, name: 'Luz' });
+    const agua = await svc.createCategory(USER, WS, { groupId: g.id, parentId: sb.id, name: 'Agua' });
+
+    // Atomicidad: si la escritura del recorrido de la 2.ª subcategoría falla, nada queda archivado.
+    const deps = mem.deps();
+    let calls = 0;
+    const failing = new ClassificationService({
+      ...deps,
+      lifecycle: {
+        record: async (entry, steps) => {
+          calls += 1;
+          if (calls === 3) throw new Error('lifecycle store unavailable (fault injected)');
+          await deps.lifecycle.record(entry, steps);
+        },
+      },
+    });
+    await expect(failing.archiveCategory(USER, WS, sb.id, 1)).rejects.toThrow(/fault injected/);
+    for (const id of [sb.id, luz.id, agua.id])
+      expect((await q.getCategory(USER, WS, id)).isArchived).toBe(false);
+    expect(mem.steps.filter((st) => st.kind === 'TRANSITION' && st.transition === 'ARCHIVE')).toEqual([]);
+
+    await svc.archiveCategory(USER, WS, sb.id, 1);
+    for (const id of [sb.id, luz.id, agua.id]) {
+      expect(stepsOf(id).at(-1)).toEqual(['ARCHIVE', 'ACTIVE', 'ARCHIVED']);
+      expect((await q.getCategory(USER, WS, id)).status).toBe('ARCHIVED');
+    }
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-017] archivar una categoría de sistema se rechaza sin escribir pasos', async () => {
+    await svc.onWorkspaceCreated({ workspaceId: WS, userId: USER, seedDefaultCategories: false });
+    const fees = (await q.listCategories(USER, WS)).find((c) => c.systemCode === 'FEES')!;
+    const before = mem.steps.length;
+    expect(await codeOf(svc.archiveCategory(USER, WS, fees.id, 1))).toBe('SYSTEM_CATEGORY_IMMUTABLE');
+    expect(mem.steps).toHaveLength(before);
+    expect(stepsOf(fees.id)).toEqual([['CREATE', null, 'ACTIVE']]);
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-018] contraparte: CREATE, anotación [aliases], ARCHIVE y UNARCHIVE; consulta con su estado actual', async () => {
+    const cp = await svc.createCounterparty(USER, WS, { name: 'Entel' });
+    await svc.updateCounterparty(USER, WS, cp.id, 1, { aliases: ['ENTEL S.A.'] });
+    await svc.archiveCounterparty(USER, WS, cp.id, 2);
+    await svc.unarchiveCounterparty(USER, WS, cp.id, 3);
+    expect(stepsOf(cp.id)).toEqual([
+      ['CREATE', null, 'ACTIVE'],
+      ['ANNOTATION', 'aliases'],
+      ['ARCHIVE', 'ACTIVE', 'ARCHIVED'],
+      ['UNARCHIVE', 'ARCHIVED', 'ACTIVE'],
+    ]);
+    const lifecycle = await q.lifecycleOf(USER, WS, 'Counterparty', cp.id);
+    expect(lifecycle).toMatchObject({
+      aggregateType: 'Counterparty',
+      aggregateId: cp.id,
+      currentState: 'ACTIVE',
+    });
+    expect(await codeOf(q.lifecycleOf(USER, OTHER_WS, 'Counterparty', cp.id))).toBe('RESOURCE_NOT_FOUND');
+  });
+
+  it('[TC-AUDIT-LIFECYCLE-015] los tags y los grupos no tienen recorrido (solo auditoría)', async () => {
+    const tag = await svc.createTag(USER, WS, { name: 'viaje' });
+    await expenseGroup('Ocio');
+    expect(mem.steps.filter((st) => st.aggregateId === tag.id)).toEqual([]);
+    expect(mem.audits.map((a) => a.action)).toEqual([
+      'classification.tag.created',
+      'classification.category_group.created',
+    ]);
   });
 });

@@ -422,11 +422,14 @@ describe('auditoría de las mutaciones de IDENTITY por HTTP', () => {
     expect(created.status).toBe(201);
     const id = String(created.body['id']);
     const rows = await rawAudit(u.id, id);
-    // Ambas filas comparten occurred_at (reloj fijo): el orden entre ellas no está definido.
+    // Las filas comparten occurred_at (reloj fijo): el orden entre ellas no está definido. La provisión síncrona del
+    // catálogo (docs/31 D52/D54) agrega UN registro `classification.catalog.applied` de origen sistema.
     expect(rows.map((x) => x['action']).sort()).toEqual([
+      'classification.catalog.applied',
       'identity.workspace.created',
       'identity.workspace.member_added',
     ]);
+    expect(rows.find((x) => x['action'] === 'classification.catalog.applied')?.['origin']).toBe('system');
     expect(rows.find((x) => x['action'] === 'identity.workspace.created')?.['idempotency_key']).toEqual(
       expect.any(String),
     );

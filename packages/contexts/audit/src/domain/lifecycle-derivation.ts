@@ -38,6 +38,11 @@ const STATUS_ACTIONS: Readonly<Record<string, { readonly transition: string; rea
   'accounts.account.archived': { transition: 'ARCHIVE', to: 'ARCHIVED' },
   'accounts.account.closed': { transition: 'CLOSE', to: 'CLOSED' },
   'accounts.account.reactivated': { transition: 'REACTIVATE', to: 'ACTIVE' },
+  // docs/31 D52: catálogos de CLASSIFICATION (sin eliminación, solo archivado).
+  'classification.category.archived': { transition: 'ARCHIVE', to: 'ARCHIVED' },
+  'classification.category.unarchived': { transition: 'UNARCHIVE', to: 'ACTIVE' },
+  'classification.counterparty.archived': { transition: 'ARCHIVE', to: 'ARCHIVED' },
+  'classification.counterparty.unarchived': { transition: 'UNARCHIVE', to: 'ACTIVE' },
 };
 const CREATIONS: Readonly<Record<string, { readonly transition: string; readonly to?: string }>> = {
   'transactions.transaction.created': { transition: 'RECORD' },
@@ -46,11 +51,19 @@ const CREATIONS: Readonly<Record<string, { readonly transition: string; readonly
   'accounts.account.opened': { transition: 'OPEN', to: 'ACTIVE' },
   'fx.exchange_rate.recorded': { transition: 'RECORD', to: 'RECORDED' },
   'fx.exchange_rate.superseded': { transition: 'RECORD', to: 'RECORDED' },
+  'classification.category.created': { transition: 'CREATE', to: 'ACTIVE' },
+  'classification.counterparty.created': { transition: 'CREATE', to: 'ACTIVE' },
 };
 const REVISIONS = new Set(['transactions.transaction.updated', 'transactions.conversion.amended']);
 
 /** Tipos de agregado que reconstruye el job. */
-export const DERIVABLE_AGGREGATE_TYPES = ['Transaction', 'Account', 'ExchangeRate'] as const;
+export const DERIVABLE_AGGREGATE_TYPES = [
+  'Transaction',
+  'Account',
+  'ExchangeRate',
+  'Category',
+  'Counterparty',
+] as const;
 
 /**
  * Reconstruye los pasos de UN agregado a partir de su auditoría cronológica (decisión 8). Solo deriva los registros

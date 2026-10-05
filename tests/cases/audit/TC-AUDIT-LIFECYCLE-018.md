@@ -12,8 +12,12 @@ invariants: ["INV-033"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/classification/src/application/classification.service.test.ts
+  - packages/contexts/classification/src/infrastructure/lifecycle.architecture.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "classification", "api"]
@@ -52,4 +56,4 @@ Entonces su recorrido muestra crear, archivar y desarchivar
 ## Notas
 
 - 1000.00 − 120.00 = 880.00 BOB.
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

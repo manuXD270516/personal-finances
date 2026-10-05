@@ -342,3 +342,124 @@ describe('Reconstrucción desde la auditoría (job audit.lifecycle-backfill)', (
     ]);
   });
 });
+
+describe('Reconstrucción de categorías y contrapartes (docs/31 D52, tarea 9.3)', () => {
+  const CP = '0190a000-0000-7000-8000-0000000000d1';
+  const CAT = '0190a000-0000-7000-8000-0000000000d2';
+  const record = (
+    id: string,
+    aggregateType: string,
+    aggregateId: string,
+    action: string,
+    at: string,
+    changes: unknown[],
+  ) =>
+    AuditRecord.create({
+      id,
+      workspaceId: W1,
+      occurredAt: Instant.parse(at),
+      actor: { type: 'USER', userId: U1 },
+      action,
+      aggregateType,
+      aggregateId,
+      aggregateVersion: 1,
+      changes: changes as never,
+      reason: null,
+      origin: 'ui',
+      correlationId: id,
+      requestId: null,
+      idempotencyKey: null,
+      clientIpHash: null,
+      userAgent: null,
+    });
+
+  it('[TC-AUDIT-LIFECYCLE-019] "Entel" creada y archivada antes del registro: CREATE y ARCHIVE derivadas, historia completa; idempotente', async () => {
+    mem.rows.push(
+      record(
+        '0190a000-0000-7000-8000-00000000ab01',
+        'Counterparty',
+        CP,
+        'classification.counterparty.created',
+        '2026-01-05T12:00:00Z',
+        [
+          { field: 'name', before: null, after: 'Entel' },
+          { field: 'status', before: null, after: 'ACTIVE' },
+        ],
+      ),
+      record(
+        '0190a000-0000-7000-8000-00000000ab02',
+        'Counterparty',
+        CP,
+        'classification.counterparty.updated',
+        '2026-01-06T12:00:00Z',
+        [{ field: 'aliases', before: '', after: 'ENTEL S.A.' }],
+      ),
+      record(
+        '0190a000-0000-7000-8000-00000000ab03',
+        'Counterparty',
+        CP,
+        'classification.counterparty.archived',
+        '2026-01-07T12:00:00Z',
+        [{ field: 'status', before: 'ACTIVE', after: 'ARCHIVED' }],
+      ),
+      // Categoría provisionada antes de D52 (sin registro de creación): solo su archivo ⇒ anotación, sin inventar.
+      record(
+        '0190a000-0000-7000-8000-00000000ab04',
+        'Category',
+        CAT,
+        'classification.category.updated',
+        '2026-01-08T12:00:00Z',
+        [{ field: 'color', before: null, after: '#2E7D32' }],
+      ),
+    );
+    const machine = (aggregateType: string): LifecycleMachineDto => ({
+      aggregateType,
+      machineVersion: 1,
+      states: [
+        { code: 'ACTIVE', terminal: false },
+        { code: 'ARCHIVED', terminal: false },
+      ],
+      transitions: [],
+    });
+    const q = new LifecycleQueries({
+      uow: mem,
+      store: mem,
+      machines: [machine('Counterparty'), machine('Category')],
+    });
+    const job = new LifecycleBackfill({
+      uow: { run: (ws, fn) => mem.run({ workspaceId: ws }, fn) },
+      source: mem,
+      store: mem,
+      ids: sequentialIds('0190a000-0000-7000-8003-'),
+    });
+    expect(await job.run(W1)).toEqual({ aggregates: 2, derived: 4 });
+    expect(await job.run(W1)).toEqual({ aggregates: 0, derived: 0 });
+    const entel = await q.lifecycleOf({
+      userId: U1,
+      workspaceId: W1,
+      aggregateType: 'Counterparty',
+      aggregateId: CP,
+      currentState: 'ARCHIVED',
+    });
+    expect(
+      entel.items.map((i) =>
+        i.kind === 'TRANSITION' ? [i.transition, i.fromState, i.toState] : i.changedFields,
+      ),
+    ).toEqual([['CREATE', null, 'ACTIVE'], ['aliases'], ['ARCHIVE', 'ACTIVE', 'ARCHIVED']]);
+    expect(entel.items.every((i) => i.derived)).toBe(true);
+    expect(entel).toMatchObject({
+      historyComplete: true,
+      currentState: 'ARCHIVED',
+      path: ['ACTIVE', 'ARCHIVED'],
+    });
+    const cat = await q.lifecycleOf({
+      userId: U1,
+      workspaceId: W1,
+      aggregateType: 'Category',
+      aggregateId: CAT,
+      currentState: 'ACTIVE',
+    });
+    expect(cat.items.map((i) => i.kind)).toEqual(['ANNOTATION']);
+    expect(cat.historyComplete).toBe(false);
+  });
+});

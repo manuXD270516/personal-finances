@@ -333,7 +333,7 @@ Phase 1 expone solo `GET …/reports/summary` (Home); el endpoint dedicado `kpis
 | Formato | Fase | Detalle |
 |---|---|---|
 | CSV | 2 | Por reporte y lista de transacciones. UTF-8 con BOM (Excel en Windows), separador `;` y coma decimal **o** `,` y punto (setting por locale). Montos como texto decimal exacto. Escape de CSV injection (`= + - @` → prefijo `'`). |
-| CSV y PDF del **recorrido** de un elemento | 1 | Descarga síncrona por elemento (transacción, cuenta, tasa, categoría, contraparte), VIEWER+, sin job ni Object Storage: CSV UTF-8 con BOM, `,` y punto decimal, encabezado estable, instantes en la TZ del workspace con desfase, escape de CSV injection; PDF generado en la API sin navegador headless (FR-AUDIT-013, docs/31 D52; spec `audit/lifecycle-timeline`). |
+| CSV y PDF del **recorrido** de un elemento | 1 | Descarga síncrona por elemento (transacción, cuenta, tasa, categoría, contraparte), VIEWER+, sin job ni Object Storage: CSV UTF-8 con BOM, `,` y punto decimal, encabezado estable, instantes en la TZ del workspace con desfase, escape de CSV injection; PDF generado en la API sin navegador headless (pdfkit); cada descarga se audita (`audit.lifecycle.exported`, sin el contenido del archivo) (FR-AUDIT-013, docs/31 D52; spec `audit/lifecycle-timeline`). |
 | XLSX | 7 (Could) | Hojas por reporte, celdas numéricas con formato de moneda. |
 | PDF | 7 / later | Render server-side (headless Chromium en worker) de la vista del reporte; job asíncrono → archivo en Object Storage → link presigned (expira 15 min). |
 | JSON | 7 | Export completo del workspace (portabilidad); formato compatible con el import JSON (13-import-architecture.md). |

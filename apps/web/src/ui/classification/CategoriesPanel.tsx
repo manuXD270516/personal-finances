@@ -6,6 +6,7 @@ import { badgeStyle, cardStyle, Field, formStyle, inputStyle, mutedStyle, rowSty
 import type { WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import type { ClassificationData, Run } from './types';
+import { ClassificationDetail, type DetailMode } from './ClassificationDetail';
 import { ColorField, ColorSwatch, IconField, IconGlyph } from './fields';
 import { activeSiblings, categoryTree, moveBy, moveTo } from './logic';
 
@@ -101,6 +102,7 @@ export function CategoriesPanel({
     return {
       c,
       f,
+      ctx,
       canEdit: ctx.canEdit,
       position: ids.indexOf(c.id),
       count: ids.length,
@@ -304,12 +306,14 @@ export function CategoriesPanel({
 
 /**
  * Fila de una categoría: icono y color decorativos, nombre, marcas (sistema protegida, archivada) y acciones:
- * editar, subir/bajar (alternativa por teclado a arrastrar) y archivar/desarchivar. Las de sistema solo cambian
- * icono, color y orden (`SYSTEM_CATEGORY_IMMUTABLE`).
+ * editar, subir/bajar (alternativa por teclado a arrastrar), archivar/desarchivar y "Recorrido" (todos los roles,
+ * docs/31 D52). Editar y Recorrido abren el detalle en pestañas. Las de sistema solo cambian icono, color y orden
+ * (`SYSTEM_CATEGORY_IMMUTABLE`).
  */
 export function CategoryRow({
   c,
   f,
+  ctx,
   canEdit,
   position,
   count,
@@ -319,6 +323,7 @@ export function CategoryRow({
 }: {
   c: Category;
   f: FormatContext;
+  ctx: WorkspaceContext;
   canEdit: boolean;
   /** Posición entre las hermanas activas (−1 si está archivada). */
   position: number;
@@ -330,7 +335,9 @@ export function CategoryRow({
   drag?: unknown;
 }) {
   const { t } = f;
-  const [editing, setEditing] = useState(false);
+  const [mode, setMode] = useState<DetailMode | null>(null);
+  const editing = mode === 'edit';
+  const setEditing = (on: boolean) => setMode(on ? 'edit' : null);
   const [draft, setDraft] = useState({ name: c.name, icon: c.icon ?? '', color: c.color ?? '' });
   const archived = !!c.archivedAt;
   return (
@@ -393,44 +400,67 @@ export function CategoryRow({
             ) : null}
           </>
         ) : null}
-      </span>
-      {editing ? (
-        <form
-          style={{ ...rowStyle, ...mutedStyle }}
-          aria-label={t('editNamed', { name: c.name })}
-          data-testid="category-edit-form"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            const name = draft.name.trim();
-            void onSave({
-              ...(c.isSystem || !name || name === c.name ? {} : { name }),
-              icon: draft.icon || null,
-              color: draft.color || null,
-            }).then((ok) => ok && setEditing(false));
-          }}
+        <button
+          type="button"
+          aria-expanded={mode === 'lifecycle'}
+          aria-label={t('lifecycleNamed', { name: c.name })}
+          onClick={() => setMode(mode === 'lifecycle' ? null : 'lifecycle')}
         >
-          <Field label={t('name')} hint={c.isSystem ? t('systemNameHint') : undefined}>
-            {(p) => (
-              <input
-                {...p}
-                name="name"
-                maxLength={80}
-                style={inputStyle}
-                value={draft.name}
-                disabled={c.isSystem}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              />
-            )}
-          </Field>
-          <IconField f={f} value={draft.icon} onChange={(icon) => setDraft({ ...draft, icon })} />
-          <ColorField f={f} value={draft.color} onChange={(color) => setDraft({ ...draft, color })} />
-          <button type="submit">{t('save')}</button>
-          <button type="button" onClick={() => setEditing(false)}>
-            {t('cancel')}
-          </button>
-        </form>
+          {t('lifecycle')}
+        </button>
+      </span>
+      {mode ? (
+        <ClassificationDetail
+          ctx={ctx}
+          f={f}
+          mode={mode}
+          name={c.name}
+          path={`categories/${c.id}`}
+          version={c.version}
+          idPrefix={`category-${c.id}`}
+          {...(canEdit ? { edit: editForm() } : {})}
+        />
       ) : null}
     </div>
   );
+
+  function editForm() {
+    return (
+      <form
+        style={{ ...rowStyle, ...mutedStyle }}
+        aria-label={t('editNamed', { name: c.name })}
+        data-testid="category-edit-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          const name = draft.name.trim();
+          void onSave({
+            ...(c.isSystem || !name || name === c.name ? {} : { name }),
+            icon: draft.icon || null,
+            color: draft.color || null,
+          }).then((ok) => ok && setEditing(false));
+        }}
+      >
+        <Field label={t('name')} hint={c.isSystem ? t('systemNameHint') : undefined}>
+          {(p) => (
+            <input
+              {...p}
+              name="name"
+              maxLength={80}
+              style={inputStyle}
+              value={draft.name}
+              disabled={c.isSystem}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            />
+          )}
+        </Field>
+        <IconField f={f} value={draft.icon} onChange={(icon) => setDraft({ ...draft, icon })} />
+        <ColorField f={f} value={draft.color} onChange={(color) => setDraft({ ...draft, color })} />
+        <button type="submit">{t('save')}</button>
+        <button type="button" onClick={() => setEditing(false)}>
+          {t('cancel')}
+        </button>
+      </form>
+    );
+  }
 }

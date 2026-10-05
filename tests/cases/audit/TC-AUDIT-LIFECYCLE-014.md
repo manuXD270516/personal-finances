@@ -12,8 +12,12 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/lifecycle-export.api.test.ts
+  - packages/contexts/classification/src/domain/classification-lifecycle.test.ts
+  - packages/contexts/classification/src/infrastructure/lifecycle.architecture.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: ["lifecycle", "classification"]
@@ -53,4 +57,4 @@ Entonces ambas tienen ACTIVE y ARCHIVED con crear, archivar y desarchivar
 
 - La fusión (FR-CLASSIFICATION-007/013) es Could de Phase 2; cuando llegue, su change agrega la transición con machineVersion 2.
 - Las categorías de sistema tienen la misma máquina; la guarda de ARCHIVE las rechaza con SYSTEM_CATEGORY_IMMUTABLE (TC-AUDIT-LIFECYCLE-017).
-- Decisión del owner docs/31 D52 (2026-10-05). Pendiente de automatizar por la implementación (tareas 9.x de add-lifecycle-timeline).
+- Decisión del owner docs/31 D52 (2026-10-05). Automatizado en las tareas 9.x de add-lifecycle-timeline.

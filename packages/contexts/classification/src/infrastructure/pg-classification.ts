@@ -10,6 +10,8 @@ import type {
   DefaultCatalogSource,
   IdGenerator,
   LastCategoryUsedQueryPort,
+  LifecyclePort,
+  LifecycleQuery,
   OutboxPort,
   Repository,
 } from '../application/ports/index.js';
@@ -482,6 +484,8 @@ export function pgClassificationDeps(input: {
   readonly pool: Pool;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  readonly lifecycle: LifecyclePort;
+  readonly lifecycleQuery: LifecycleQuery;
   readonly clock: Clock;
   readonly lastCategoryUsed?: LastCategoryUsedQueryPort;
   readonly ids?: IdGenerator;
@@ -494,6 +498,8 @@ export function pgClassificationDeps(input: {
     counterparties: new PgCounterpartyRepository(),
     outbox: input.outbox,
     audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
     lastCategoryUsed: input.lastCategoryUsed ?? noTransactionsYet,
     catalogs: defaultCatalogs,
     ids: input.ids ?? uuidV7,
