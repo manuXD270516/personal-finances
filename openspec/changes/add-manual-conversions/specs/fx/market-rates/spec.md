@@ -125,7 +125,7 @@ Trace: FR-FX-005 · Priority: Should
 - **ENTONCES** la conversión queda sin tasa de referencia y sin spread
 
 ### Requirement: Tipo de tasa preferido por par para valoración
-El workspace DEBE (MUST) poder fijar, por par, el tipo de tasa preferido para valorar saldos (por ejemplo `OFFICIAL` para USD/BOB y `P2P` para USDT/BOB); la valoración DEBE (MUST) usar ese tipo y mostrar la tasa, su tipo, su fuente y su fecha. Sin preferencia, se usa la tasa más reciente de cualquier tipo, indicando cuál.
+El workspace DEBE (MUST) poder fijar, por par, el tipo de tasa preferido para valorar saldos (por ejemplo `OFFICIAL` para USD/BOB y `P2P` para USDT/BOB); la valoración DEBE (MUST) usar ese tipo y mostrar la tasa, su tipo, su fuente y su fecha. Sin preferencia para el par, la valoración DEBE (MUST) usar por defecto el tipo `PARALLEL` (el mismo default de los pares con BOB), indicando el tipo usado.
 Trace: FR-FX-006 · Priority: Must
 
 #### Scenario: USD valorado con la tasa oficial
@@ -138,3 +138,9 @@ Trace: FR-FX-006 · Priority: Must
 - **CUANDO** el usuario cambia la preferencia de USD/BOB a `PARALLEL`
 - **ENTONCES** la siguiente valoración de 100.00 USD da 980.00 BOB
 - **Y** ninguna tasa ni transacción registrada cambia
+
+#### Scenario: Par sin preferencia usa el tipo paralelo
+- **CUANDO** USD/BOB no tiene preferencia de tipo, tiene `PARALLEL` = 9.80 del 2026-09-30 y `OFFICIAL` = 6.96 del 2026-10-01 (más reciente)
+- **Y** se valoran 100.00 USD en BOB al 2026-10-01
+- **ENTONCES** el resultado es 980.00 BOB
+- **Y** se informa que se usó la tasa `PARALLEL` 9.80 del 2026-09-30, no la `OFFICIAL` más reciente

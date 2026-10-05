@@ -6,6 +6,7 @@
 
 - [ ] 1.1 (Pendiente del owner; las preguntas abiertas quedaron con una decisión provisional en design.md, decisiones 11–24) Revisar con el owner los specs `fx/market-rates`, `fx/conversion-pricing` y `transactions/conversions`, y resolver las preguntas abiertas de design.md (tipos de tasa, default sin preferencia); verificar con `openspec validate add-manual-conversions --strict`
   > Revisado 2026-10-04 (sigue pendiente del owner): tipos de tasa (D13, D39), edición de conversión (D11) y tipos de fee (D12) resueltos en docs/31; la preferencia `PARALLEL` para USD/BOB y USDT/BOB la fija D29. Siguen abiertas: el default sin preferencia de tipo para otros pares y si la ventana de vigencia (7 días) es setting de FX o de Reporting.
+  > Revisado 2026-10-05: el default sin preferencia de tipo quedó resuelto por el owner (docs/31 D48: `PARALLEL`), junto con `ConversionRevised.v1`. Sigue abierta la ubicación del setting de la ventana de vigencia de 7 días (FX o Reporting), por eso 1.1 no se cierra.
 - [x] 1.2 Revisar los TC de tests/cases/fx y TC-TRANSACTIONS-CONVERSION-001..011 contra los scenarios (montos que cuadran por moneda, fechas fijas); verificar que el chequeo del catálogo de TC los acepta y que todo requirement Must tiene ≥ 1 TC
 
 ## 2. Catálogo de monedas y tasas manuales (fx/market-rates)

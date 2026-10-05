@@ -116,8 +116,8 @@ Trace: FR-TRANSACTIONS-024, FR-TRANSACTIONS-008 · Priority: Must
 - **Y** el saldo neto de "Banco BOB" refleja solo +686.00 BOB
 
 ### Requirement: Notificación de la conversión registrada
-Al postear una conversión el sistema DEBE (MUST) publicar, en la misma unidad de trabajo, exactamente un hecho "conversión registrada" con los montos, tasas, fees, referencia, spread y proveedor; su reentrega NO DEBE (MUST NOT) duplicar efectos en los consumidores.
-Trace: FR-TRANSACTIONS-022, NFR-REL-007 · Priority: Must
+Al postear por primera vez una conversión el sistema DEBE (MUST) publicar, en la misma unidad de trabajo, exactamente un hecho "conversión registrada" con los montos, tasas, fees, referencia, spread y proveedor; cada corrección financiera posterior DEBE (MUST) publicar, en la misma unidad de trabajo, un hecho "conversión revisada" con la revisión anterior y la nueva y los asientos revertido, de reversa y nuevo, y NO DEBE (MUST NOT) volver a publicar "conversión registrada"; la reentrega de cualquiera de los dos NO DEBE (MUST NOT) duplicar efectos en los consumidores.
+Trace: FR-TRANSACTIONS-022, FR-TRANSACTIONS-024, NFR-REL-007 · Priority: Must
 
 #### Scenario: Publicación única con el detalle
 - **CUANDO** se postea la conversión canónica
@@ -126,6 +126,12 @@ Trace: FR-TRANSACTIONS-022, NFR-REL-007 · Priority: Must
 #### Scenario: Reentrega del hecho
 - **CUANDO** el hecho "conversión registrada" se entrega dos veces a un consumidor
 - **ENTONCES** el consumidor aplica su efecto una sola vez
+
+#### Scenario: Corrección publica una revisión
+- **CUANDO** el usuario corrige la conversión canónica de 685.00 BOB a 686.00 BOB recibidos (fee 4.00 BOB)
+- **ENTONCES** se publica un único hecho "conversión revisada" de la revisión 1 a la 2 con el asiento original revertido, su reversa y el asiento nuevo, origen 100.000000 USDT, destino 686.00 BOB y efectiva 6.86
+- **Y** no se publica un segundo hecho "conversión registrada"
+- **Y** su reentrega no duplica efectos en los consumidores
 
 ### Requirement: Vista previa del cálculo antes de confirmar
 El sistema DEBE (MUST) permitir, sin registrar nada, ingresar dos de {monto entregado, monto recibido, tasa cotizada} más los fees y obtener el tercer valor, la tasa efectiva y el costo total en la moneda de reporte, con los mismos cálculos que el registro definitivo.

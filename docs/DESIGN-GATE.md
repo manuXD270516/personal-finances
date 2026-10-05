@@ -71,6 +71,7 @@ Este documento cierra el bloque de diseño de Phase 0. **No se escribe código p
 
 - **Q3. Presupuesto cloud** mensual máximo y si se acepta operar **local-only** hasta el Hito H (o un despliegue mínimo al final de Phase 2). Decide ECS/Fargate vs Cloud Run (ADR-0013).
   - **Nota 2026-10-03 — [SPIKE-09](../spikes/SPIKE-09-deploy-costs/README.md):** propone [ADR-0027](adr/0027-destino-de-despliegue-inicial-vps-compose.md) con niveles **N1 ≈ USD 10–15/mes** (Hetzner + Compose), **N2 ≈ USD 27–30/mes** (AWS Lightsail 4 GB São Paulo + Compose, **default recomendado**), **N3 ≈ USD 50–60/mes** (N2 + Neon PG gestionado) y **N4 ≥ USD 110/mes** (ECS/Fargate + RDS, ADR-0013). **Pendiente: confirmación del presupuesto por el owner**; sin respuesta se planifica N2.
+  - **Respuesta del owner 2026-10-05 ([docs/31 D51](31-phase-1-consolidation-decisions.md)):** presupuesto cloud **USD 10–20/mes**. El host concreto dentro de ese rango lo elige el change de despliegue, que actualiza ADR-0027.
 - **Q4. Object storage local:** ¿aceptas reemplazar MinIO (archivado, sin imágenes desde oct-2025) por SeaweedFS o Garage?
 - **Q5. Redis:** ¿preferís minimizar dependencias usando la cola sobre PostgreSQL (BullMQ v6 backend PG o pg-boss) si SPIKE-05 lo valida?
 - **Q6. Frontend:** ¿confirmas Next.js como UI + BFF (tokens fuera del navegador) frente a una SPA Vite + BFF separado?

@@ -143,8 +143,9 @@ Dependencias con otros changes de Phase 1 (deben aplicarse antes): `add-workspac
 
 ## Preguntas abiertas
 
-- **Tipos de tasa:** FR-FX-002 (`official, parallel, p2p, bank, custom`), docs/04 §2.4 (`MID|BUY|SELL|P2P|OFFICIAL`) y docs/08 §5.10 (`MID BUY SELL P2P_MEDIAN OFFICIAL`) difieren. Este change adopta FR-FX-002; docs/04 y docs/08 deben alinearse.
-- **Edición de conversión:** docs/08 §5.4 dice "editar = void + nueva" para `conversion_detail`, mientras FR-TRANSACTIONS-024 exige reversa + nueva entry + nuevo detalle en la misma transacción. Se adopta FR-TRANSACTIONS-024 con `revision` en el PK.
-- **Tipos de fee:** FR-TRANSACTIONS-022 enumera `provider, network, bank, other`; docs/09 §7, contrato y evento agregan `TAX`. Se adopta el conjunto de cinco.
-- **Default sin preferencia de tipo** (más reciente de cualquier tipo) — confirmar con el owner. Para USD/BOB y USDT/BOB quedó resuelto (docs/31 D29): `add-market-rate-providers` siembra la preferencia `PARALLEL` al crear el workspace; el promedio de conversiones propias se descartó como default.
-- **Ventana de vigencia** (7 días) configurable por workspace: ¿setting de FX o de Reporting? Se modela en FX (`RateResolver` policy).
+- ~~**Tipos de tasa:**~~ resuelta (docs/31 D13, D39). FR-FX-002 (`official, parallel, p2p, bank, custom`), docs/04 §2.4 (`MID|BUY|SELL|P2P|OFFICIAL`) y docs/08 §5.10 (`MID BUY SELL P2P_MEDIAN OFFICIAL`) difieren. Este change adopta FR-FX-002; docs/04 y docs/08 deben alinearse.
+- ~~**Edición de conversión:**~~ resuelta (docs/31 D11). docs/08 §5.4 dice "editar = void + nueva" para `conversion_detail`, mientras FR-TRANSACTIONS-024 exige reversa + nueva entry + nuevo detalle en la misma transacción. Se adopta FR-TRANSACTIONS-024 con `revision` en el PK.
+- ~~**Tipos de fee:**~~ resuelta (docs/31 D12). FR-TRANSACTIONS-022 enumera `provider, network, bank, other`; docs/09 §7, contrato y evento agregan `TAX`. Se adopta el conjunto de cinco.
+- ~~**Default sin preferencia de tipo** (más reciente de cualquier tipo)~~ — resuelta por el owner el 2026-10-05 (docs/31 D48): un par sin preferencia usa por defecto el tipo **`PARALLEL`**, el mismo default de los pares con BOB (D29: `add-market-rate-providers` siembra la preferencia `PARALLEL` para USD/BOB y USDT/BOB). Reemplaza "la más reciente de cualquier tipo" de las decisiones 6 y 14 (el ajuste de código lo lleva el change).
+- ~~**Evento de la edición de una conversión**~~ — resuelta por el owner el 2026-10-05 (docs/31 D48): `ConversionRecorded.v1` solo en el primer posteo; cada edición financiera publica `transactions.ConversionRevised.v1` (simetría con `TransferRevised.v1`, D37).
+- **Ventana de vigencia** (7 días) configurable por workspace: ¿setting de FX o de Reporting? Se modela en FX (`RateResolver` policy). **Sigue abierta** (pendiente del owner; no la cubren D43–D51).

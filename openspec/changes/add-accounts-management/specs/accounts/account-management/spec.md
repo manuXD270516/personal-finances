@@ -42,7 +42,7 @@ Trace: FR-ACCOUNTS-003, FR-ACCOUNTS-002 · Priority: Must
 - **Y** el gasto del mes es 350.00 BOB, contado una sola vez
 
 ### Requirement: Una sola moneda por cuenta
-Toda cuenta DEBE (MUST) tener exactamente una moneda, habilitada en el workspace, y todo movimiento sobre la cuenta DEBE (MUST) estar expresado en esa moneda; un movimiento en otra moneda NO DEBE (MUST NOT) aceptarse (los cambios de moneda se registran como conversiones).
+Toda cuenta DEBE (MUST) tener exactamente una moneda, habilitada en el workspace (presente en el conjunto de monedas del workspace; no basta con que esté activa en el catálogo global), y todo movimiento sobre la cuenta DEBE (MUST) estar expresado en esa moneda; un movimiento en otra moneda NO DEBE (MUST NOT) aceptarse (los cambios de moneda se registran como conversiones).
 Trace: FR-ACCOUNTS-002 · Priority: Must
 
 #### Scenario: Gasto en moneda distinta
@@ -53,6 +53,11 @@ Trace: FR-ACCOUNTS-002 · Priority: Must
 #### Scenario: Moneda no habilitada
 - **CUANDO** un usuario crea una cuenta en EUR y EUR no está habilitada en el workspace
 - **ENTONCES** se rechaza con `CURRENCY_NOT_ENABLED`
+
+#### Scenario: Moneda activa en el catálogo global pero no habilitada en el workspace
+- **CUANDO** EUR está activa en el catálogo global de monedas, el workspace solo tiene habilitadas BOB, USD y USDT y un usuario crea la cuenta "Euro Cash" en EUR
+- **ENTONCES** se rechaza con `CURRENCY_NOT_ENABLED`
+- **Y** no se persiste la cuenta ni se escribe auditoría ni evento
 
 ### Requirement: Moneda inmutable con movimientos
 La moneda de una cuenta NO DEBE (MUST NOT) poder cambiarse una vez que la cuenta tenga algún movimiento contable; mientras no tenga ninguno, el cambio DEBE (MUST) permitirse.

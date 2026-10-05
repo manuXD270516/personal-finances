@@ -111,8 +111,8 @@ Dependencias con otros changes de Phase 1: `add-workspace-identity` (moneda de r
 ## Preguntas abiertas
 
 - ~~**Q1 "dinero disponible"**~~: resuelta por el owner el 2026-10-03 (docs/31 D35): cuenta líquida = `nature = ASSET` y `liquidity = LIQUID`; el resumen incluye cuentas no archivadas (`ACTIVE` y `CLOSED`).
-- **Lista de preguntas del Home**: docs/14 §9.1 propone otra numeración/redacción (Q2 = safe to spend, Q6 = top categorías…) distinta de docs/00 §6. Este change sigue docs/00 §6 (canónica para el dashboard).
+- ~~**Lista de preguntas del Home**~~: resuelta (docs/31 D14): docs/00 §6 es canónica y docs/14 §9.1 se alinea.
 - ~~**Tasa para USD/USDT↔BOB**~~: resuelta por el owner el 2026-10-02 (docs/31 D29, ADR-0025): tasa `PARALLEL` del provider (paralelo.bo, respaldo bo.dolarapi.com) con fallback a la última tasa conocida o manual. El promedio de conversiones propias queda descartado como default.
-- **Ubicación de FR-REPORTING-004** (`reporting/financial-reports` en docs/01) vs su uso en el Home: ¿mover la parte del Home a `reporting/dashboard` en docs/01?
-- `/reports/summary` vs `/reports/kpis` en Phase 7 (docs/10 pregunta abierta 2).
+- ~~**Ubicación de FR-REPORTING-004**~~: resuelta por el owner el 2026-10-05 (docs/31 D50): pasa a `reporting/dashboard` en Phase 1 (docs/01 actualizado), servido por `GET /reports/summary` en el Home con la ubicación que dé la mejor jerarquía visual.
+- `/reports/summary` vs `/reports/kpis` en Phase 7 (docs/10 pregunta abierta 2). **Sigue abierta.**
 - ~~**Tasa manual de otro tipo en el fallback**~~ — resuelta por el owner el 2026-10-03 (docs/31 D34, decisión 20): sí, solo si es fresca y confiable; máximo de frescura **24 h confirmado por el owner el 2026-10-04 (docs/31 D38)**. Contexto original (detectada al implementar, 2026-10-03): con la preferencia `PARALLEL` sembrada, el resolver de FX solo considera tasas `PARALLEL`; la variante de TC-REPORTING-DASHBOARD-007 (manual `P2P` 11.98 más reciente que la de provider obsoleta) solo se cumple si la manual se registra como `PARALLEL`. ¿Debe el nivel 3 de `ValuationRateSelector` admitir manuales de cualquier tipo del par? Automatizado hoy con manual `PARALLEL`.

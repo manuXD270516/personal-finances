@@ -129,10 +129,10 @@ Expand-only y no destructiva: migración `txn_0001_transactions_core` crea el sc
 
 ## Preguntas abiertas
 
-1. FR-TRANSACTIONS-005 admite un "adjustment informativo" con monto cero, incompatible con INV-005 (posting ≠ 0) y con `PositiveMoney`; se excluye de Phase 1 hasta que el owner aclare su semántica (¿nota sin asiento?).
-2. ¿`reconciled → void` debe permitirse directo (FR-TRANSACTIONS-006 dice "cualquier estado no-void → void") o exigir des-reconciliar (docs/04 §4.1, adoptado aquí)?
-3. Sobre-reembolso: docs/04 §3.4 lo define como advertencia no bloqueante; FR-TRANSACTIONS-016 exige confirmación explícita (adoptado aquí).
-4. ¿Se requiere un evento propio `transactions.TransactionCleared` (docs/04/05) o basta `TransactionUpdated` con `changedFields=[status]` (adoptado aquí)?
+1. ~~FR-TRANSACTIONS-005 admite un "adjustment informativo" con monto cero, incompatible con INV-005 (posting ≠ 0) y con `PositiveMoney`~~ — resuelta (docs/31 D17): ajuste de monto cero no permitido (`AMOUNT_NOT_POSITIVE`).
+2. ~~¿`reconciled → void` debe permitirse directo o exigir des-reconciliar?~~ — resuelta (docs/31 D16): exige des-reconciliar antes (`TRANSACTION_RECONCILED`).
+3. ~~Sobre-reembolso: advertencia no bloqueante (docs/04 §3.4) o confirmación explícita (FR-TRANSACTIONS-016)?~~ — resuelta por el owner el 2026-10-05 (docs/31 D47): se permite **con confirmación explícita** (`confirmRefundExceedsOriginal`, auditado como `confirmedRefundExcess`), comportamiento vigente.
+4. ~~¿Evento propio `transactions.TransactionCleared` o `TransactionUpdated` con `changedFields=[status]`?~~ — resuelta por el owner el 2026-10-05 (docs/31 D47): en Phase 1 se mantiene `TransactionUpdated` con `changedFields=[status]`; el evento dedicado `transactions.TransactionCleared` se planifica para Phase 2 junto con la reconciliación (docs/24).
 
 ## Contratos adicionales (decisiones del owner D27/D28, 2026-10-02)
 

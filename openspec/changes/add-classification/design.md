@@ -163,10 +163,9 @@ Solo *expand*: `db/migrations/classification/<ts>_create_classification_schema.s
 
 ## Preguntas abiertas
 
-- **OPENING_BALANCE como categoría de sistema** (FR-CLASSIFICATION-003 lo lista; docs/09 §6.17 no le asigna porciones). Decisión provisional: no se provisiona. Requiere actualizar FR-CLASSIFICATION-003 o justificar su uso en reportes.
-- **Provisión síncrona vs evento `identity.WorkspaceCreated`** (docs/05 §2.5). Decisión provisional: síncrona; actualizar docs/05.
-- **Cashback** aparece como categoría de sistema en el glosario de docs/04 pero no en FR-CLASSIFICATION-003; no se provisiona.
-- **Recategorizar en periodo cerrado** (TC-CLASSIFICATION-RECATEGORIZE-001, INV-015): no aplica en Phase 1 (sin cierre de mes); se decide en Phase 2 (`planning/month-closing`).
+- **Provisión síncrona vs evento `identity.WorkspaceCreated`** (docs/05 §2.5). Decisión provisional: síncrona (implementada y documentada en docs/05 §2.5). **Sigue abierta** (sin decisión del owner en docs/31).
+- ~~**Recategorizar en periodo cerrado** (INV-015)~~ — resuelta por el owner el 2026-10-05 (docs/31 D49): **no se permite**; se rechaza con `PERIOD_CLOSED` (semántica `PF004`) sin cambiar la categoría. Escenario "Recategorizar en un periodo cerrado" en `classification/categories` y TC-CLASSIFICATION-RECATEGORIZE-002.
+- ~~**OPENING_BALANCE** y **Cashback** como categorías de sistema~~ — resueltas (docs/31 D9): la lista canónica de 11 códigos no los incluye.
 
 ## Decisiones de implementación
 
