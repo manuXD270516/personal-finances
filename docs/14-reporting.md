@@ -170,7 +170,7 @@ SafeToSpend(h) = LiquidBalance(hoy)
 | Budget vs Actual | Gasto en moneda del budget con `conv_t`; si el budget es multi-moneda, por moneda | Coherente con flujos. |
 | Forecast | Moneda nativa; consolidado con tasa del `generatedAt` | Ver 15-ml-architecture.md. |
 
-- **Tasa faltante**: se usa la tasa disponible más cercana **anterior** (máx. 7 días; configurable) y se marca el valor con `approx: true` + fecha de la tasa usada. Sin tasa en la ventana → el monto se excluye del consolidado (que queda `complete = false`) y se lista en `unconverted[]` ("no convertible") con link para cargar la tasa. Nunca se convierte con 1:1 implícito.
+- **Tasa faltante**: se usa la tasa disponible más cercana **anterior** (máx. 7 días; configurable por workspace como **setting de REPORTING**, que se pasa a FX como parámetro `windowDays` de la consulta — docs/31 D53) y se marca el valor con `approx: true` + fecha de la tasa usada. Sin tasa en la ventana → el monto se excluye del consolidado (que queda `complete = false`) y se lista en `unconverted[]` ("no convertible") con link para cargar la tasa. Nunca se convierte con 1:1 implícito.
 - Conversión aplicada **por agregado diario por moneda** (Σ por día × tasa del día) — equivalente a por-posting y mucho más barato.
 - Redondeo: los agregados internos se mantienen en `Decimal` sin redondear; se redondea HALF_EVEN a la escala de RC **solo al presentar**. Los totales mostrados se calculan del valor sin redondear (pueden diferir ±0.01 de la suma de filas redondeadas; se documenta en el tooltip).
 
@@ -314,7 +314,7 @@ Widgets adicionales: `AttentionInbox` (transacciones sin categoría, pending ven
 
 ## 10. API (resumen)
 
-`/api/v1/workspaces/{ws}/reports/...`: `kpis?period=&compare=`, `income-expenses`, `budget-vs-actual`, `expenses/by-category`, `expenses/by-tag`, `expenses/by-account`, `trends`, `cash-flow`, `cash-flow-calendar?horizon=30`, `net-worth`, `goals`, `debts`, `recurring`, `subscriptions`, `conversions`, `fees`, `accounts/{id}/balance-history`, `forecast-vs-actual`, `dashboard`, `exports`. Respuestas con `meta: { reportingCurrency, rateMode, approx, generatedAt, dataFreshness }`. Detalle en 10-api-design.md.
+Phase 1 expone solo `GET …/reports/summary` (Home); el endpoint dedicado `kpis` y el resto de esta lista llegan en Phase 7 (docs/31 D55). `/api/v1/workspaces/{ws}/reports/...`: `kpis?period=&compare=`, `income-expenses`, `budget-vs-actual`, `expenses/by-category`, `expenses/by-tag`, `expenses/by-account`, `trends`, `cash-flow`, `cash-flow-calendar?horizon=30`, `net-worth`, `goals`, `debts`, `recurring`, `subscriptions`, `conversions`, `fees`, `accounts/{id}/balance-history`, `forecast-vs-actual`, `dashboard`, `exports`. Respuestas con `meta: { reportingCurrency, rateMode, approx, generatedAt, dataFreshness }`. Detalle en 10-api-design.md.
 
 ## 11. Rendimiento
 
@@ -333,6 +333,7 @@ Widgets adicionales: `AttentionInbox` (transacciones sin categoría, pending ven
 | Formato | Fase | Detalle |
 |---|---|---|
 | CSV | 2 | Por reporte y lista de transacciones. UTF-8 con BOM (Excel en Windows), separador `;` y coma decimal **o** `,` y punto (setting por locale). Montos como texto decimal exacto. Escape de CSV injection (`= + - @` → prefijo `'`). |
+| CSV y PDF del **recorrido** de un elemento | 1 | Descarga síncrona por elemento (transacción, cuenta, tasa, categoría, contraparte), VIEWER+, sin job ni Object Storage: CSV UTF-8 con BOM, `,` y punto decimal, encabezado estable, instantes en la TZ del workspace con desfase, escape de CSV injection; PDF generado en la API sin navegador headless (FR-AUDIT-013, docs/31 D52; spec `audit/lifecycle-timeline`). |
 | XLSX | 7 (Could) | Hojas por reporte, celdas numéricas con formato de moneda. |
 | PDF | 7 / later | Render server-side (headless Chromium en worker) de la vista del reporte; job asíncrono → archivo en Object Storage → link presigned (expira 15 min). |
 | JSON | 7 | Export completo del workspace (portabilidad); formato compatible con el import JSON (13-import-architecture.md). |

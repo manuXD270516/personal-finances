@@ -227,7 +227,7 @@ Content-Type: application/json
 | platform | `IDEMPOTENCY_KEY_REUSED` | 422 | Clave reutilizada con otro payload |
 | platform | `REFERENCE_NOT_FOUND` | 422 | Un ID del body no existe en el workspace |
 | platform | `RATE_LIMITED` | 429 | Límite excedido |
-| platform | `INTERNAL_ERROR` / `SERVICE_UNAVAILABLE` | 500 / 503 | Error inesperado / dependencia caída |
+| platform | `INTERNAL_ERROR` / `SERVICE_UNAVAILABLE` | 500 / 503 | Error inesperado / dependencia caída. Incluye la mutación prohibida de un registro inmutable (SQLSTATE `PF003`, `IMMUTABLE_RECORD`): siempre es un bug, se responde `500` + métrica y no tiene código propio (el antiguo `LEDGER_IMMUTABLE` quedó retirado, docs/31 D56) |
 | identity | `INVALID_TIMEZONE` | 422 | Zona horaria que no es un identificador IANA válido (`PATCH /me`, workspaces) |
 | identity | `WORKSPACE_PENDING_DELETION` | 409 | Workspace en borrado; solo lectura |
 | identity | `LAST_OWNER_CANNOT_LEAVE` | 409 | Debe existir un OWNER |
@@ -247,7 +247,6 @@ Content-Type: application/json
 | ledger | `LEDGER_SPLIT_REQUIRED` | 422 | Posting nominal (`INCOME`/`EXPENSE`) sin split de origen |
 | ledger | `LEDGER_ENTRY_ALREADY_REVERSED` | 409 | El asiento ya fue revertido (reversa única, también bajo concurrencia) |
 | ledger | `LEDGER_ENTRY_NOT_REVERSIBLE` | 409 | No se revierte un asiento de tipo `REVERSAL` |
-| ledger | `LEDGER_IMMUTABLE` | 409 | Reservado ("if surfaced"): la mutación prohibida (SQLSTATE `PF003`) siempre es un bug y hoy se responde `500 INTERNAL_ERROR` + métrica (docs/31 D19) |
 | ledger | `PERIOD_CLOSED` | 409 | Fecha en periodo cerrado |
 | ledger | `CURRENCY_MISMATCH` | 422 | Moneda distinta a la de la cuenta |
 | transactions | `SPLITS_DO_NOT_SUM` | 422 | Σ splits ≠ monto |
@@ -367,7 +366,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | forecasts | `POST W/forecasts` (202), `GET …/{id}`, `GET W/forecasts/latest?kind=` | `forecast/expense-forecasting` | 8 |
 | notifications | `GET W/notifications`, `POST …/{id}/read`, `GET/PUT W/notification-preferences` | `notifications/alerts` | 2 |
 | audit-log | `GET W/audit-log?aggregateType=&aggregateId=&from=&to=&sort=` (`listAuditLog`, EDITOR+; filtro `actor` en Phase 2) y `POST /me/session-events` (`recordSessionEvent`, auditoría de login/logout que invoca el BFF) | `audit/audit-trail` | 1 |
-| lifecycle | `GET W/transactions/{id}/lifecycle` (`getTransactionLifecycle`, con `revisions[]`), `GET W/accounts/{id}/lifecycle` (`getAccountLifecycle`), `GET W/fx-rates/{id}/lifecycle` (`getRateLifecycle`), `GET W/lifecycle-machines/{Transaction\|Account\|ExchangeRate}` (`getLifecycleMachine`); VIEWER+ (D28), otro workspace ⇒ 404; sin códigos de error nuevos (`INVALID_STATUS_TRANSITION` ya existía) | `audit/lifecycle-timeline` | 1 |
+| lifecycle | `GET W/transactions/{id}/lifecycle` (`getTransactionLifecycle`, con `revisions[]`), `GET W/accounts/{id}/lifecycle` (`getAccountLifecycle`), `GET W/fx-rates/{id}/lifecycle` (`getRateLifecycle`), `GET W/lifecycle-machines/{Transaction\|Account\|ExchangeRate}` (`getLifecycleMachine`); VIEWER+ (D28), otro workspace ⇒ 404. Por docs/31 D52 (pendiente de implementar, tareas 9.x de `add-lifecycle-timeline`): `GET W/categories/{id}/lifecycle` (`getCategoryLifecycle`), `GET W/counterparties/{id}/lifecycle` (`getCounterpartyLifecycle`), `lifecycle-machines/{Category\|Counterparty}` y la descarga `GET W/{transactions\|accounts\|fx-rates\|categories\|counterparties}/{id}/lifecycle/export?format=csv\|pdf` (`export*Lifecycle`, `text/csv` o `application/pdf` con `Content-Disposition: attachment`; `format` inválido ⇒ 400 `VALIDATION_FAILED`); sin códigos de error nuevos (`INVALID_STATUS_TRANSITION` ya existía) | `audit/lifecycle-timeline` | 1 |
 | operations | `GET W/operations/{id}`, `POST …/{id}/cancel` (P6, aún no en el contrato) | `platform/api-conventions` | 1 (contrato) / 6 (uso) |
 | exports | `POST W/exports` (202), `GET W/exports/{id}` | `reporting/financial-reports` + privacidad | 7 |
 | assistant | `POST W/assistant/conversations`, `POST …/{id}/messages` | `assistant/read-only-assistant` | 10 |
@@ -469,7 +468,7 @@ RateLimit: "default";r=118;t=60
 ## 18. Preguntas abiertas
 
 1. **Capability para el catálogo de monedas**: la taxonomía §14 no tiene `fx/currencies`; se usa `fx/market-rates`. ¿Agregar `fx/currencies`?
-2. **`/reports/summary` vs `/reports/kpis` + `/reports/dashboard`** de [14-reporting.md](14-reporting.md): propuesta — `summary` es el endpoint mínimo de Phase 1 y se convierte en alias de `kpis` en Phase 7 (o se deprecia con `Sunset`).
+2. ~~**`/reports/summary` vs `/reports/kpis` + `/reports/dashboard`** de [14-reporting.md](14-reporting.md)~~ — resuelta por el owner el 2026-10-05 ([docs/31 D55](31-phase-1-consolidation-decisions.md)): Phase 1 mantiene `GET /reports/summary` como único endpoint del Home; el endpoint dedicado `GET /reports/kpis` pertenece a Phase 7, y el change de Phase 7 decide si `summary` pasa a alias de `kpis` o se depreca con `Sunset`.
 3. **Dominio de `type` de problem details** (`https://pfos.dev/problems/...` es placeholder) — requiere decidir dominio del producto.
 4. **Cliente propone IDs** (UUIDv7 en el body): simplifica idempotencia y UI optimista, pero exige validar versión/timestamp del UUID para evitar IDs "del futuro". ¿Se adopta en Phase 1?
 5. **`POST /transactions/{id}/post`** (pending → posted) vs `PATCH status`: se propone acción explícita; confirmar con la spec `transactions/transaction-recording`.

@@ -581,10 +581,11 @@ CREATE CONSTRAINT TRIGGER posting_balanced
 -- 3) Append-only: sin grants + trigger de defensa
 REVOKE UPDATE, DELETE, TRUNCATE ON ledger.posting, ledger.journal_entry, ledger.entry_reversal FROM pf_app;
 GRANT INSERT, SELECT ON ledger.posting, ledger.journal_entry, ledger.entry_reversal TO pf_app;
-CREATE FUNCTION ledger.forbid_mutation() RETURNS trigger AS $$
-BEGIN RAISE EXCEPTION 'LEDGER_IMMUTABLE' USING ERRCODE = 'PF003'; END $$ LANGUAGE plpgsql;
+--    La función real es la compartida platform.forbid_mutation() (docs/08 §10), que emite 'IMMUTABLE_RECORD'
+--    con SQLSTATE PF003. La API nunca devuelve un código propio para esto: PF003 siempre es un bug y se responde
+--    500 INTERNAL_ERROR + métrica (docs/31 D19). El código LEDGER_IMMUTABLE quedó retirado (docs/31 D56).
 CREATE TRIGGER posting_immutable BEFORE UPDATE OR DELETE ON ledger.posting
-  FOR EACH ROW EXECUTE FUNCTION ledger.forbid_mutation();
+  FOR EACH ROW EXECUTE FUNCTION platform.forbid_mutation();
 
 -- 4) Periodo bloqueado
 --    BEFORE INSERT ON ledger.journal_entry: rechaza (PF004, PERIOD_CLOSED) si existe period_lock para (workspace_id, to_char(entry_date,'YYYY-MM'))

@@ -4,9 +4,10 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 (Pendiente del owner; las preguntas abiertas quedaron con una decisión provisional en design.md, decisiones 11–24) Revisar con el owner los specs `fx/market-rates`, `fx/conversion-pricing` y `transactions/conversions`, y resolver las preguntas abiertas de design.md (tipos de tasa, default sin preferencia); verificar con `openspec validate add-manual-conversions --strict`
+- [x] 1.1 (Pendiente del owner; las preguntas abiertas quedaron con una decisión provisional en design.md, decisiones 11–24) Revisar con el owner los specs `fx/market-rates`, `fx/conversion-pricing` y `transactions/conversions`, y resolver las preguntas abiertas de design.md (tipos de tasa, default sin preferencia); verificar con `openspec validate add-manual-conversions --strict`
   > Revisado 2026-10-04 (sigue pendiente del owner): tipos de tasa (D13, D39), edición de conversión (D11) y tipos de fee (D12) resueltos en docs/31; la preferencia `PARALLEL` para USD/BOB y USDT/BOB la fija D29. Siguen abiertas: el default sin preferencia de tipo para otros pares y si la ventana de vigencia (7 días) es setting de FX o de Reporting.
   > Revisado 2026-10-05: el default sin preferencia de tipo quedó resuelto por el owner (docs/31 D48: `PARALLEL`), junto con `ConversionRevised.v1`. Sigue abierta la ubicación del setting de la ventana de vigencia de 7 días (FX o Reporting), por eso 1.1 no se cierra.
+  > Cerrada 2026-10-05 (docs/31 D53): la ventana de vigencia de 7 días es un setting de REPORTING (FX recibe `windowDays` como parámetro y conserva 7 días por omisión); design.md actualizado. No quedan preguntas abiertas en design.md.
 - [x] 1.2 Revisar los TC de tests/cases/fx y TC-TRANSACTIONS-CONVERSION-001..011 contra los scenarios (montos que cuadran por moneda, fechas fijas); verificar que el chequeo del catálogo de TC los acepta y que todo requirement Must tiene ≥ 1 TC
 
 ## 2. Catálogo de monedas y tasas manuales (fx/market-rates)
@@ -55,5 +56,6 @@
 
 ## 8. DOCUMENTACIÓN y cierre
 
-- [ ] 8.1 (Pendiente: los cambios a documentar están en design.md, decisiones 11–24) Actualizar docs/04 §2.4 y docs/08 §5.4/§5.10 (tipos de tasa, `revision` en `conversion_detail`, `fx.rate_preference`), docs/10 (tabla de recursos y códigos) y docs/11 (`fx.RateRecorded.v1` a Phase 1); verificar enlaces
+- [x] 8.1 (Pendiente: los cambios a documentar están en design.md, decisiones 11–24) Actualizar docs/04 §2.4 y docs/08 §5.4/§5.10 (tipos de tasa, `revision` en `conversion_detail`, `fx.rate_preference`), docs/10 (tabla de recursos y códigos) y docs/11 (`fx.RateRecorded.v1` a Phase 1); verificar enlaces
+  > Verificado y cerrado 2026-10-05 contra main: docs/04 §2.4/§3.10 (tipos de tasa D13/D39, `fx.rate_preference`), docs/08 §5.4 (`conversion_detail`/`conversion_fee` con `revision` en la PK, D11) y §5.10 (`rate_preference`, tipos de tasa), docs/10 (recursos `conversions`, `fx-rates`, `fx-rate-preferences` y los códigos `CONVERSION_*`/`FX_*`/`CURRENCY_NOT_ENABLED`; los 67 códigos del enum `ErrorCode` del contrato están en el catálogo) y docs/11 (`fx.RateRecorded.v1` en Phase 1, `ConversionRevised.v1`). D53 propagado a docs/01 (FR-FX-004) y docs/14 §5. Enlaces verificados.
 - [x] 8.2 Actualizar estados de automatización de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict`; verificar 0 requirements Must sin cobertura — 25 TC marcados `automated`; `traceability:check` y `spec:validate` en verde

@@ -72,5 +72,7 @@
 
 ## 9. Documentación y cierre
 
-- [ ] 9.1 Actualizar docs/04 §3.2, docs/08 §5.2 (tipos, liquidez, sin `ledger_account_id`, `account_tag`), docs/10 §9.1 (códigos nuevos), docs/11 §3.2 (eventos nuevos) y docs/29 (tipos de la Minimal Seed); verificar enlaces
+- [x] 9.1 Actualizar docs/04 §3.2, docs/08 §5.2 (tipos, liquidez, sin `ledger_account_id`, `account_tag`), docs/10 §9.1 (códigos nuevos), docs/11 §3.2 (eventos nuevos) y docs/29 (tipos de la Minimal Seed); verificar enlaces
+  > Verificado y cerrado 2026-10-05 contra main: docs/04 §3.2 (tipos D3, `liquidity` D5, sin `ledgerAccountId`), docs/08 §5.2 (tipos, `liquidity`, sin `ledger_account_id`, `account_tag`), docs/10 §9.1 (códigos `ACCOUNT_*`/`INSTITUTION_ARCHIVED`), docs/11 (`AccountUpdated/Closed/Reactivated.v1` en Phase 1) y docs/29 (tipos y liquidez de la Minimal Seed). Enlaces verificados.
 - [ ] 9.2 Actualizar estados de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict --no-interactive`; archivar el change
+  > Revisado 2026-10-05: estados de TC actualizados (todos los TC del change `automated`), `pnpm spec:validate` (18/18), `pnpm traceability:check` (355 TC, 0 advertencias) y `pnpm traceability:matrix` (355 TC, 336 automatizados) en verde el 2026-10-05. Solo falta archivar el change, que hace el lead tras el merge.

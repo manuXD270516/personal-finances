@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Hace que el ciclo de vida de cada elemento con estados (transacciones —incluidas transferencias y conversiones—, cuentas y tasas de cambio) sea un flujo trazable de transiciones explícitas y no una serie de actualizaciones sueltas: cada agregado declara su máquina de estados, cada transición queda registrada con actor, instante, motivo, revisión y asientos del ledger, y el usuario puede recorrer el camino completo que tomó un elemento en el tiempo, por API y en un reporte visual tipo máquina de estados (docs/31 D37).
+Hace que el ciclo de vida de cada elemento con estados (transacciones —incluidas transferencias y conversiones—, cuentas, tasas de cambio, categorías y contrapartes) sea un flujo trazable de transiciones explícitas y no una serie de actualizaciones sueltas: cada agregado declara su máquina de estados, cada transición queda registrada con actor, instante, motivo, revisión y asientos del ledger, y el usuario puede recorrer el camino completo que tomó un elemento en el tiempo, por API, en un reporte visual tipo máquina de estados y exportado en CSV o PDF (docs/31 D37, D52).
 
 ## ADDED Requirements
 
 ### Requirement: Máquina de estados declarada por agregado
-Cada tipo de agregado con ciclo de vida (transacción, cuenta, tasa de cambio) DEBE (MUST) tener una máquina de estados declarada con sus estados, sus estados terminales y sus transiciones permitidas, cada una con su estado de origen, su estado de destino, su guarda y el evento que publica; toda transición no declarada DEBE (MUST) rechazarse con `INVALID_STATUS_TRANSITION` y el sistema DEBE (MUST) exponer la definición vigente de cada máquina.
+Cada tipo de agregado con ciclo de vida (transacción, cuenta, tasa de cambio, categoría y contraparte) DEBE (MUST) tener una máquina de estados declarada con sus estados, sus estados terminales y sus transiciones permitidas, cada una con su estado de origen, su estado de destino, su guarda y el evento que publica, si lo hay; toda transición no declarada DEBE (MUST) rechazarse con `INVALID_STATUS_TRANSITION` y el sistema DEBE (MUST) exponer la definición vigente de cada máquina.
 Trace: FR-AUDIT-009, FR-TRANSACTIONS-006, FR-ACCOUNTS-007 · Priority: Must
 
 #### Scenario: Definición de la máquina de una transacción
@@ -18,6 +18,11 @@ Trace: FR-AUDIT-009, FR-TRANSACTIONS-006, FR-ACCOUNTS-007 · Priority: Must
 #### Scenario: Transición no declarada
 - **CUANDO** el usuario intenta reconciliar un gasto `pending` de 80.00 BOB
 - **ENTONCES** se rechaza con `INVALID_STATUS_TRANSITION` y no se registra ninguna transición
+
+#### Scenario: Definición de la máquina de una categoría y de una contraparte
+- **CUANDO** el usuario consulta la definición de la máquina de estados de las categorías y la de las contrapartes
+- **ENTONCES** cada una tiene los estados `ACTIVE` y `ARCHIVED`, ninguno terminal, y las transiciones crear (a `ACTIVE`), archivar (`ACTIVE` a `ARCHIVED`) y desarchivar (`ARCHIVED` a `ACTIVE`) con su guarda
+- **Y** archivar una categoría publica el evento de categoría archivada, y ninguna de las dos declara una transición de fusión
 
 ### Requirement: Registro de transición atómico con el cambio
 Toda transición de estado de un agregado, incluida su creación, DEBE (MUST) registrarse como un registro de transición inmutable en la misma transacción de base de datos que el cambio, su auditoría y sus eventos; si cualquiera de ellos falla, nada DEBE (MUST) persistir.
@@ -107,6 +112,60 @@ Trace: FR-AUDIT-010, FR-FX-002, FR-FX-003, INV-011 · Priority: Should
 - **ENTONCES** el recorrido de la tasa 6.95 muestra registrar (a `RECORDED`) y reemplazar (`RECORDED` a `SUPERSEDED`) enlazada a la tasa 6.96
 - **Y** la tasa 6.95 sigue consultable con su valor original
 
+### Requirement: Recorrido de una categoría
+El recorrido de una categoría DEBE (MUST) mostrar sus transiciones de creación (alta del usuario, catálogo inicial o categoría de sistema), archivo y desarchivo con actor, instante y origen; los cambios de nombre, icono, color, orden y grupo DEBEN (MUST) aparecer como anotaciones. Archivar una categoría DEBE (MUST) registrar en la misma operación una transición de archivo en cada subcategoría activa que archiva, y una operación rechazada NO DEBE (MUST NOT) registrar ninguna transición.
+Trace: FR-AUDIT-009, FR-AUDIT-010, FR-CLASSIFICATION-002, FR-CLASSIFICATION-003 · Priority: Must
+
+#### Scenario: Categoría renombrada, archivada y desarchivada
+- **CUANDO** el usuario crea la categoría de gasto "Super", la renombra a "Supermercado", la archiva, la desarchiva y consulta su recorrido
+- **ENTONCES** obtiene tres transiciones en orden: crear (a `ACTIVE`), archivar (`ACTIVE` a `ARCHIVED`) y desarchivar (`ARCHIVED` a `ACTIVE`), más una anotación con el campo nombre cambiado entre crear y archivar
+- **Y** el estado actual es `ACTIVE` y la secuencia de estados visitados es `ACTIVE`, `ARCHIVED`, `ACTIVE`
+
+#### Scenario: Archivar una categoría con subcategorías
+- **CUANDO** el usuario archiva "Servicios básicos", que tiene las subcategorías activas "Luz" y "Agua"
+- **ENTONCES** los recorridos de "Servicios básicos", "Luz" y "Agua" muestran cada uno la transición archivar (`ACTIVE` a `ARCHIVED`) con el mismo actor, instante y correlación
+
+#### Scenario: Archivar una categoría de sistema
+- **CUANDO** el usuario intenta archivar la categoría de sistema "Comisiones"
+- **ENTONCES** se rechaza con `SYSTEM_CATEGORY_IMMUTABLE`
+- **Y** el recorrido de "Comisiones" sigue con una sola transición, crear (a `ACTIVE`) con origen sistema, y estado actual `ACTIVE`
+
+### Requirement: Recorrido de una contraparte
+El recorrido de una contraparte DEBE (MUST) mostrar sus transiciones de creación (incluida la creación en línea al registrar una transacción), archivo y desarchivo con actor, instante y origen; los cambios de nombre, tipo, alias, icono, notas y categoría por defecto DEBEN (MUST) aparecer como anotaciones, y ninguna de ellas DEBE (MUST) modificar las transacciones que la referencian ni el ledger.
+Trace: FR-AUDIT-009, FR-AUDIT-010, FR-CLASSIFICATION-010, FR-CLASSIFICATION-012 · Priority: Must
+
+#### Scenario: Contraparte creada en línea, archivada y desarchivada
+- **CUANDO** el usuario registra un gasto de 120.00 BOB creando en línea la contraparte "Entel", le agrega el alias "ENTEL S.A.", la archiva, la desarchiva y consulta su recorrido
+- **ENTONCES** obtiene tres transiciones en orden: crear (a `ACTIVE`), archivar (`ACTIVE` a `ARCHIVED`) y desarchivar (`ARCHIVED` a `ACTIVE`), más una anotación con el campo alias cambiado
+- **Y** el gasto sigue en 120.00 BOB con el mismo asiento
+
+### Requirement: Exportación del recorrido en CSV
+Todo miembro que pueda ver el recorrido de un elemento (transacción, cuenta, tasa de cambio, categoría o contraparte), incluido un VIEWER, DEBE (MUST) poder descargarlo en CSV: una fila por transición o anotación en el orden del recorrido, con secuencia, tipo, transición, estado de origen y de destino, instante en la zona horaria del workspace con su desfase, actor, origen, motivo, revisiones, asientos, eventos y marca de derivada. Los montos DEBEN (MUST) escribirse como texto decimal exacto con su moneda, todo texto que empiece con `=`, `+`, `-` o `@` DEBE (MUST) neutralizarse y exportar NO DEBE (MUST NOT) modificar el recorrido. Un usuario de otro workspace DEBE (MUST) recibir la misma respuesta que para un elemento inexistente.
+Trace: FR-AUDIT-013, FR-AUDIT-010, NFR-SEC-003 · Priority: Must
+
+#### Scenario: Exportar a CSV el recorrido de un gasto
+- **CUANDO** el usuario exporta a CSV el recorrido de un gasto de 80.00 BOB registrado pendiente, posteado, marcado cleared, corregido a 85.00 BOB y anulado con motivo "duplicado", en un workspace con zona horaria America/La_Paz
+- **ENTONCES** el archivo tiene una fila de encabezado y cinco filas en el orden del recorrido: registrar, postear, marcar cleared, revisar (revisión 1 a 2, 85.00 BOB) y anular (motivo "duplicado")
+- **Y** cada instante está en la hora de La Paz con desfase -04:00 y cada monto como texto decimal exacto con su moneda
+
+#### Scenario: Motivo que parece una fórmula
+- **CUANDO** el usuario anula un gasto de 40.00 BOB con motivo "=SUM(A1:A9)" y exporta su recorrido a CSV
+- **ENTONCES** la celda del motivo contiene el texto neutralizado "'=SUM(A1:A9)" y no se interpreta como fórmula
+
+#### Scenario: Exportación por un VIEWER y desde otro workspace
+- **CUANDO** un VIEWER de "W1" exporta a CSV el recorrido de un gasto de 120.00 BOB de "W1" y un usuario de "W2" intenta exportar el mismo recorrido
+- **ENTONCES** el VIEWER recibe el archivo con el recorrido completo
+- **Y** el usuario de "W2" recibe la respuesta de recurso inexistente y no se revela ningún dato de "W1"
+
+### Requirement: Exportación del recorrido en PDF
+Todo miembro que pueda ver el recorrido de un elemento DEBE (MUST) poder descargarlo en PDF con la identificación del elemento, su estado actual, la secuencia de estados visitados y la línea de tiempo (transición, origen y destino, actor, fecha y hora en la zona horaria del workspace, motivo, revisión con su monto y marca de derivada), con la misma visibilidad que el recorrido; el PDF PUEDE incluir el diagrama de la máquina de estados.
+Trace: FR-AUDIT-013, FR-AUDIT-010 · Priority: Must
+
+#### Scenario: Exportar a PDF el recorrido de una cuenta
+- **CUANDO** el usuario exporta a PDF el recorrido de "Bank C", que se abrió con saldo inicial 500.00 BOB, se archivó con motivo "sin uso", se reactivó y se cerró
+- **ENTONCES** el PDF identifica la cuenta "Bank C" con estado actual `CLOSED` y la secuencia de estados `ACTIVE`, `ARCHIVED`, `ACTIVE`, `CLOSED`
+- **Y** su línea de tiempo lista abrir (con el asiento de 500.00 BOB), archivar (motivo "sin uso"), reactivar y cerrar, con actor y fecha en la zona horaria del workspace
+
 ### Requirement: Transiciones previas reconstruidas desde la auditoría
 Para los elementos creados antes de existir el registro de transiciones, el recorrido DEBE (MUST) reconstruirse desde el historial de auditoría y marcar esas transiciones como derivadas; si no hay evidencia de una transición, el recorrido NO DEBE (MUST NOT) inventarla y DEBE (MUST) indicar que la historia previa es incompleta.
 Trace: FR-AUDIT-012, FR-AUDIT-004 · Priority: Should
@@ -115,11 +174,20 @@ Trace: FR-AUDIT-012, FR-AUDIT-004 · Priority: Should
 - **CUANDO** un gasto de 60.00 BOB se registró posteado y luego se anuló antes de existir el registro de transiciones, y su auditoría tiene la creación y la anulación
 - **ENTONCES** su recorrido muestra registrar (a `posted`) y anular (`posted` a `void`), ambas marcadas como derivadas
 
+#### Scenario: Contraparte anterior al registro de transiciones
+- **CUANDO** la contraparte "Entel" se creó y se archivó antes de existir el registro de transiciones, y su auditoría tiene la creación y el archivo
+- **ENTONCES** su recorrido muestra crear (a `ACTIVE`) y archivar (`ACTIVE` a `ARCHIVED`), ambas marcadas como derivadas
+
 ### Requirement: Reporte visual del recorrido en la UI
-El detalle de una transacción y de una cuenta DEBE (MUST) ofrecer un reporte de recorrido con un diagrama de su máquina de estados en el que el camino recorrido y el estado actual se destacan y las transiciones no recorridas se atenúan, más una línea de tiempo de las transiciones con enlace a cada revisión y a sus asientos; la línea de tiempo DEBE (MUST) ser la alternativa accesible del diagrama.
-Trace: FR-AUDIT-011, NFR-USAB-001 · Priority: Should
+El detalle de una transacción, de una cuenta, de una categoría y de una contraparte DEBE (MUST) ofrecer un reporte de recorrido con un diagrama de su máquina de estados en el que el camino recorrido y el estado actual se destacan y las transiciones no recorridas se atenúan, más una línea de tiempo de las transiciones con enlace a cada revisión y a sus asientos; la línea de tiempo DEBE (MUST) ser la alternativa accesible del diagrama, y el reporte DEBE (MUST) ofrecer exportar el recorrido en CSV y en PDF.
+Trace: FR-AUDIT-011, FR-AUDIT-013, NFR-USAB-001 · Priority: Should
 
 #### Scenario: Reporte de un gasto corregido y anulado
 - **CUANDO** el usuario abre la pestaña "Recorrido" de un gasto de 80.00 BOB registrado pendiente, posteado, corregido a 85.00 BOB y anulado
 - **ENTONCES** el diagrama destaca `pending`, `posted` y `void` con las transiciones postear, revisar y anular numeradas en el orden en que ocurrieron, y `void` como estado actual
 - **Y** `cleared` y `reconciled` aparecen atenuados y la línea de tiempo lista las cuatro transiciones con actor, fecha en la zona horaria del workspace y enlace a la revisión 2
+
+#### Scenario: Recorrido de una categoría en la UI
+- **CUANDO** el usuario abre el recorrido de la categoría "Supermercado", que se creó, se archivó y se desarchivó
+- **ENTONCES** el diagrama destaca `ACTIVE` y `ARCHIVED` con archivar (1) y desarchivar (2) numeradas en el orden en que ocurrieron, y `ACTIVE` como estado actual
+- **Y** la línea de tiempo lista crear, archivar y desarchivar con actor y fecha en la zona horaria del workspace, y el reporte ofrece exportar el recorrido en CSV y en PDF

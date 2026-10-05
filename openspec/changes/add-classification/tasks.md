@@ -4,9 +4,10 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar las specs `classification/categories`, `classification/tags` y `classification/counterparties` con el owner y resolver las preguntas abiertas de design.md (OPENING_BALANCE, provisión síncrona); verificar con `openspec validate add-classification --strict`
+- [x] 1.1 Revisar las specs `classification/categories`, `classification/tags` y `classification/counterparties` con el owner y resolver las preguntas abiertas de design.md (OPENING_BALANCE, provisión síncrona); verificar con `openspec validate add-classification --strict`
   > Revisado 2026-10-04 (sigue pendiente del owner): `OPENING_BALANCE` y `Cashback` quedan resueltos por docs/31 D9 (la lista canónica de 11 códigos del design no los incluye), además de D7/D8. Siguen abiertas sin decisión en docs/31: provisión síncrona vs `identity.WorkspaceCreated` (implementada síncrona y documentada en docs/05 §2.5 como decisión provisional) y recategorizar en periodo cerrado (diferida a Phase 2).
   > Revisado 2026-10-05: recategorizar en periodo cerrado quedó resuelto por el owner (docs/31 D49: se rechaza con `PERIOD_CLOSED`; escenario nuevo y TC-CLASSIFICATION-RECATEGORIZE-002). Sigue abierta la provisión síncrona vs `identity.WorkspaceCreated`, por eso 1.1 no se cierra.
+  > Cerrada 2026-10-05 (docs/31 D54): provisión síncrona del catálogo en la misma operación que la creación del workspace (comportamiento vigente). No quedan preguntas abiertas en design.md.
 - [x] 1.2 Confirmar los TC MODIFICADOS (TC-CLASSIFICATION-ARCHIVE-001, -DELETE-001, -RECATEGORIZE-001) y los 24 AÑADIDOS en `tests/cases/classification/`; verificar que el chequeo del catálogo de trazabilidad los acepta y que todo requirement Must tiene ≥ 1 TC
 - [x] 1.3 Redactar los TC de los requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia de categoría); verificar con el chequeo del catálogo
   > Verificado 2026-10-04 (pendiente): ningún TC de `tests/cases/classification/` cubre los 7 requirements Should (desarchivar categoría/tag/counterparty, orden persistente, grupos, grupo no vacío, sugerencia por counterparty).
@@ -73,10 +74,13 @@
 
 - [ ] 9.1 Completar los tests automatizados de todos los TC de este change y marcar `automation_status: automated`; verificar que el chequeo de trazabilidad no reporta TC sin test
   > Nota 2026-10-04: todos los TC del change están `automated` salvo TC-CLASSIFICATION-GROUP-001 (sin reporte por grupo en Phase 1).
+  > Revisado 2026-10-05 (sigue abierta): único TC sin automatizar TC-CLASSIFICATION-GROUP-001 (`not_automated`, `ready`); requiere que REPORTING agregue por grupo, que Phase 1 no expone. Opciones para el lead: automatizarlo por la API de categorías (total por grupo) o moverlo a la fase del reporte por grupo.
 - [x] 9.2 E2E (Playwright): crear workspace con catálogo, crear subcategoría, archivarla y comprobar que desaparece del selector pero sigue en el historial; crear counterparty inline; verificar en CI
   - Nota (2026-10-04): `tests/e2e/specs/classification.spec.ts`: workspace nuevo con catálogo por la UI, subcategoría "Fibra óptica" con icono y color, reordenada con el teclado (persiste tras recargar), gasto clasificado en ella, archivada → fuera del árbol y del selector de `/transacciones/nueva`, visible con "Mostrar archivadas" y en el detalle del gasto; contraparte con alias y categoría por defecto (resuelta por alias) y etiqueta. La creación inline de contraparte ya la cubre `transactions.spec.ts` (TC-CLASSIFICATION-COUNTERPARTY-002). Páginas nuevas en `a11y.spec.ts`.
 
 ## 10. DOCUMENTACIÓN y cierre
 
-- [ ] 10.1 Actualizar docs/08 §5.5 (unique de nombre por padre, `category_name_i18n`, `system_code`, `icon`, `normalized_name` de tags), docs/10 §9.1 (nuevos códigos), docs/11 (`classification.CategoryArchived.v1`), docs/05 §2.5 (provisión síncrona) y docs/29 (catálogo inicial) según lo aprobado
-- [ ] 10.2 Actualizar estados de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar el change
+- [x] 10.1 Actualizar docs/08 §5.5 (unique de nombre por padre, `category_name_i18n`, `system_code`, `icon`, `normalized_name` de tags), docs/10 §9.1 (nuevos códigos), docs/11 (`classification.CategoryArchived.v1`), docs/05 §2.5 (provisión síncrona) y docs/29 (catálogo inicial) según lo aprobado
+  > Verificado y cerrado 2026-10-05 contra main: docs/08 §5.5 (unique de nombre por padre, `category_name_i18n`, `system_code`, `icon`, `normalized_name` de tags), docs/10 §9.1 (códigos de classification en el catálogo), docs/11 (`classification.CategoryArchived.v1`), docs/05 §2.5 (provisión síncrona, ahora citando D54) y docs/29 §2.4 (catálogo inicial). Enlaces verificados.
+- [x] 10.2 Actualizar estados de los TC, regenerar la matriz de trazabilidad y ejecutar `openspec validate --all --strict --no-interactive`; verificar que pasa antes de archivar el change
+  > Cerrada 2026-10-05: estados de TC coherentes (todos `automated` salvo TC-CLASSIFICATION-GROUP-001, ver 9.1); `pnpm spec:validate` (18/18), `pnpm traceability:check` (355 TC, 0 advertencias) y `pnpm traceability:matrix` (355 TC, 336 automatizados) en verde el 2026-10-05. El archivado lo hace el lead.

@@ -44,9 +44,9 @@ flowchart LR
 | Reporting | REPORTING | reporting/* (4) | 19 | 14 | 4 | 1 | 0 | 1 |
 | Forecasting | FORECAST | forecast/expense-forecasting | 10 | 6 | 3 | 1 | 0 | 8 |
 | Notifications | NOTIFY | notifications/alerts | 9 | 4 | 3 | 1 | 1 | 2 |
-| Audit | AUDIT | audit/audit-trail, audit/lifecycle-timeline | 12 | 7 | 4 | 1 | 0 | 1 |
+| Audit | AUDIT | audit/audit-trail, audit/lifecycle-timeline | 13 | 8 | 4 | 1 | 0 | 1 |
 | AI Assistant | ASSISTANT | assistant/read-only-assistant | 11 | 8 | 1 | 0 | 2 | 10 |
-| **Total** | | | **281** | **192** | **63** | **21** | **4** | |
+| **Total** | | | **282** | **193** | **63** | **21** | **4** | |
 
 > FRs con prioridad mixta (p.ej. FR-REPORTING-008) se cuentan por su prioridad más alta. Los conteos son orientativos y se recalculan al cerrar el DESIGN GATE.
 
@@ -309,7 +309,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-FX-001 | El sistema DEBE gestionar un catálogo de monedas con `code`, nombre, símbolo, `kind` (`FIAT`, `CRYPTO`, `COMMODITY`, `CUSTOM`) y `scale`; el catálogo base (BOB, USD, EUR, USDT, BTC, ETH, …) se carga como seed y es extensible por el usuario (CUSTOM/COMMODITY). | Must | 1 | fx/market-rates |
 | FR-FX-002 | El usuario DEBE poder registrar manualmente tasas de referencia: par (base/quote), fecha y hora, valor (NUMERIC, string en API), tipo (`OFFICIAL`, `PARALLEL`, `P2P`, `BANK`, `CUSTOM`) y fuente. (rev. 2026-10-02, D13) Además existen `PARALLEL_BUY` / `PARALLEL_SELL` (compra/venta "desde el lado del owner"), que los providers registran junto con la mediana `PARALLEL` y que solo se usan si se piden explícitamente (rev. 2026-10-04, D39; FR-FX-009). | Must | 1 | fx/market-rates |
 | FR-FX-003 | (INV-011) Las tasas históricas DEBEN ser **inmutables**: una corrección crea una nueva versión que `supersedes` a la anterior; la anterior sigue consultable y las operaciones que la usaron conservan su referencia. | Must | 1 | fx/market-rates |
-| FR-FX-004 | Lookup de tasa *as-of* por par y tipo con política explícita (exacta o última anterior dentro de una ventana máxima configurable, default 7 días); si no hay tasa válida → `FX_RATE_NOT_FOUND` (nunca un valor inventado). | Must | 1 | fx/market-rates |
+| FR-FX-004 | Lookup de tasa *as-of* por par y tipo con política explícita (exacta o última anterior dentro de una ventana máxima configurable, default 7 días; la ventana de valoración es un setting de REPORTING que se pasa a FX como parámetro, docs/31 D53); si no hay tasa válida → `FX_RATE_NOT_FOUND` (nunca un valor inventado). | Must | 1 | fx/market-rates |
 | FR-FX-005 | Tasas cruzadas vía moneda pivote (p.ej. USDT→USD→BOB) con trazabilidad de las tasas componentes. | Should | 1 | fx/market-rates |
 | FR-FX-006 | Valoración de saldos en moneda base para vistas (dashboard, net worth) usando la tasa vigente del tipo preferido por el workspace (p.ej. `P2P` para USDT, `OFFICIAL` o `PARALLEL` para USD), mostrando fecha y fuente. Un par sin preferencia usa por defecto el tipo `PARALLEL` (el mismo default de los pares con BOB). (rev. 2026-10-02, D13; rev. 2026-10-05, D48) | Must | 1 | fx/market-rates |
 | FR-FX-007 | **Conversion pricing**: dado monto enviado, monto recibido y fees, el sistema DEBE calcular tasa efectiva, spread vs tasa de referencia del momento (si existe), costo total de la conversión en moneda base y diferencia quoted vs actual. | Must | 1 | fx/conversion-pricing |
@@ -441,10 +441,11 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-AUDIT-006 | Consulta global del audit log con filtros (actor, acción, entidad, rango de fechas) y export CSV (solo `OWNER`). | Should | 2 | audit/audit-trail |
 | FR-AUDIT-007 | Política de retención configurable (default: indefinida para eventos financieros, 2 años para eventos de acceso). | Should | 9 | audit/audit-trail |
 | FR-AUDIT-008 | Hash encadenado (tamper-evidence) por workspace verificable por job. | Could | 9 | audit/audit-trail |
-| FR-AUDIT-009 | Cada agregado con ciclo de vida (`Transaction` —incluidas transferencias y conversiones—, `Account`, `ExchangeRate`) DEBE declarar una **máquina de estados explícita** (estados, transiciones permitidas con su guarda y **un evento por transición**); toda transición, incluida la edición financiera (reversa + nueva revisión), DEBE registrarse como un **registro de transición append-only** en la misma transacción de BD que el cambio. (docs/31 D37, 2026-10-03) | Must | 1 | audit/lifecycle-timeline |
+| FR-AUDIT-009 | Cada agregado con ciclo de vida (`Transaction` —incluidas transferencias y conversiones—, `Account`, `ExchangeRate` y, por docs/31 D52, `Category` y `Counterparty`) DEBE declarar una **máquina de estados explícita** (estados, transiciones permitidas con su guarda y **un evento por transición**); toda transición, incluida la edición financiera (reversa + nueva revisión), DEBE registrarse como un **registro de transición append-only** en la misma transacción de BD que el cambio. (docs/31 D37, 2026-10-03) | Must | 1 | audit/lifecycle-timeline |
 | FR-AUDIT-010 | El sistema DEBE exponer el **recorrido** de un elemento (`GET …/{id}/lifecycle`): transiciones en orden con actor, instante, origen, motivo, revisión/versión, asientos del ledger (revertido, de reversa, nuevo) y evento emitido, junto con la definición de su máquina de estados; visible para todo miembro que pueda ver el elemento, incluido `VIEWER` (D28). (docs/31 D37) | Must | 1 | audit/lifecycle-timeline |
 | FR-AUDIT-011 | La UI DEBE ofrecer un **reporte de recorrido tipo máquina de estados**: diagrama de estados con el camino recorrido resaltado y el estado actual destacado, más una línea de tiempo de transiciones con enlace a cada revisión y a sus asientos. (docs/31 D37) | Should | 1 | audit/lifecycle-timeline |
 | FR-AUDIT-012 | Las transiciones ocurridas antes de existir el registro de transiciones DEBEN reconstruirse desde el audit log y marcarse como **derivadas**; el recorrido nunca inventa transiciones sin evidencia. (docs/31 D37) | Should | 1 | audit/lifecycle-timeline |
+| FR-AUDIT-013 | El **recorrido** de cualquier elemento (transacción, cuenta, tasa, categoría, contraparte) DEBE poder **exportarse en CSV y en PDF** por todo miembro que pueda verlo (incluido `VIEWER`), con instantes en la zona horaria del workspace, montos como decimal exacto y neutralización de CSV injection; exportar no modifica el recorrido. (docs/31 D52, 2026-10-05) | Must | 1 | audit/lifecycle-timeline |
 
 ## 20. ASSISTANT — AI Assistant (solo lectura)
 
@@ -482,7 +483,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 
 ## Preguntas abiertas
 
-1. **Fecha contable**: ¿la `entry_date` del ledger debe ser la fecha de negocio (`date`) o la `posting date` bancaria? Propuesta: `date`; `posting date` informativa y usada en reconciliación. Afecta FR-LEDGER-009 y el cierre de mes.
+1. ~~**Fecha contable**: ¿la `entry_date` del ledger debe ser la fecha de negocio (`date`) o la `posting date` bancaria?~~ Resuelta por `add-transaction-recording` (design.md, decisión 1): `JournalEntry.entryDate` = fecha de negocio (`businessDate`); `postingDate` (fecha valor bancaria) es informativa, se persiste y se usará en la reconciliación de Phase 2.
 2. ¿Se permite `transfer` hacia/desde cuentas de **otro workspace** (p.ej. personal → hogar) en el track de Colaboración? Implica dos entries en workspaces distintos y un vínculo cross-workspace.
 3. **Fixed principal vs German**: en la literatura son a menudo sinónimos. Se propone *fixed principal* = capital por cuota definido por el usuario (con balloon). ¿Coincide con los préstamos reales del owner?
 4. ~~¿Qué tipo de tasa (`OFFICIAL`, `PARALLEL`, `P2P`) se usa por defecto para valorar USD y USDT en BOB? ¿Configurable por moneda?~~ Resuelta (docs/31 D29, ADR-0025): `PARALLEL` del provider, sembrada como preferencia de USD/BOB y USDT/BOB al crear el workspace y configurable por par (FR-FX-006).
