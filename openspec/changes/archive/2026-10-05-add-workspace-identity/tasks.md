@@ -93,5 +93,6 @@
 
 - [x] 10.1 Actualizar docs/12 (store de sesiones en PostgreSQL, rol `pf_bff`, código `CSRF_REJECTED`), docs/08 §5.1 (`iam.bff_session`, columnas nuevas de `iam.user`/`iam.workspace`), docs/10 §9.1 (`INVALID_TIMEZONE`), docs/19 (variables `SESSION_*`, `BFF_SESSION_ENC_KEY`, `OIDC_*`) y el README de `@pf/identity`; verificar enlaces
   > Hecho (2026-10-02): docs/12 §3 (as-built del BFF), docs/08 §5.1 (`idp_display_name`), docs/10 §9.1 (`INVALID_TIMEZONE`), docs/19 §8.2/§10 (realm, login local, usuarios de prueba sin contraseñas, E2E), docs/23 §16 (15 checks requeridos; `e2e` pendiente de agregar a la protección), `docs/config-reference.md` regenerado y README de `@pf/web`.
-- [ ] 10.2 Actualizar `status`/`automation_status` de los TC, regenerar la matriz de trazabilidad, ejecutar `openspec validate --all --strict --no-interactive` y archivar el change
+- [x] 10.2 Actualizar `status`/`automation_status` de los TC, regenerar la matriz de trazabilidad, ejecutar `openspec validate --all --strict --no-interactive` y archivar el change
+  > Cerrada 2026-10-05: todos los TC de identity/security automatizados, matriz regenerada, `openspec validate --all --strict` en verde; archivado en este PR.
   > Parcial (2026-10-02): TC actualizados (AUTH-002..005, SESSION-001/002, WORKSPACE-001, MEMBERSHIP-001, RBAC-003, PLATFORM-API-009/014) y validación estricta en verde. El archivado lo hace el lead.
