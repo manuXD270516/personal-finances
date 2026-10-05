@@ -458,6 +458,28 @@ describe('Campos, fechas e historial a nivel API', () => {
     expect((listed.body['data'] as { id: string }[]).map((t) => t.id)).toEqual([id]);
   });
 
+  it('[TC-TRANSACTIONS-FIELDS-001] el 201 de createTransaction y createTransfer devuelve el createdAt persistido (ni epoch ni nulo), igual al del GET', async () => {
+    const owner = await user(`kc-txn-created-at-${randomUUID()}`);
+    const a = await account(owner, 'Bank A', 'BOB', '1000.00');
+    const b = await account(owner, 'Bank B', 'BOB');
+    const transfer = await post(owner, '/transfers', {
+      transactionDate: '2026-03-15',
+      fromAccountId: a,
+      toAccountId: b,
+      amount: { amount: '100.00', currency: 'BOB' },
+    });
+    expect(transfer.status, JSON.stringify(transfer.body)).toBe(201);
+    expect(contract.validateResponse('createTransfer', 201, transfer.body)).toEqual([]);
+    for (const created of [await expense(owner, a, '45.90'), transfer.body]) {
+      const createdAt = created['createdAt'] as string;
+      expect(createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(new Date(createdAt).getTime()).toBeGreaterThan(Date.parse('2000-01-01T00:00:00Z'));
+      const fetched = await get(owner, `/transactions/${String(created['id'])}`);
+      expect(fetched.status).toBe(200);
+      expect(fetched.body['createdAt']).toBe(createdAt);
+    }
+  });
+
   it('[TC-TRANSACTIONS-DATES-001] el asiento usa la fecha de negocio (2026-03-31) y no la de posteo bancaria (2026-04-02)', async () => {
     const owner = await user(`kc-txn-dates-${randomUUID()}`);
     const bank = await account(owner, 'Bank A', 'BOB', '1000.00');
