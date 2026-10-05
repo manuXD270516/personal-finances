@@ -200,7 +200,9 @@ export class ConversionsService {
         },
         transactionSteps(tx, { events, journalEntries: { posted: entryId } }),
       );
-      return { transaction: s, totalCost: await this.totalCost(s.workspaceId, s.conversion ?? null) };
+      // Releer la fila: `created_at` lo fija la base al insertar; sin esto el 201 llevaba `createdAt` nulo (1970-01-01).
+      const saved = ((await this.deps.transactions.findById(s.workspaceId, s.id)) ?? tx).snapshot;
+      return { transaction: saved, totalCost: await this.totalCost(s.workspaceId, s.conversion ?? null) };
     });
   }
 

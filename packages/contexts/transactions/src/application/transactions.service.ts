@@ -326,7 +326,9 @@ export class TransactionsService {
         },
         { events, journalEntries: { posted: entryId } },
       );
-      return { transaction: tx.snapshot, warnings };
+      // Releer la fila: `created_at` lo fija la base al insertar; sin esto el 201 llevaba `createdAt` nulo,
+      // presentado como 1970-01-01 (regresión en transactions.api.test.ts, TC-TRANSACTIONS-FIELDS-001).
+      return { transaction: ((await transactions.findById(s.workspaceId, s.id)) ?? tx).snapshot, warnings };
     });
   }
 
@@ -439,7 +441,8 @@ export class TransactionsService {
         },
         { events, journalEntries: { posted: entryId } },
       );
-      return tx.snapshot;
+      // Releer la fila: `created_at` lo fija la base al insertar (ver `recordTransaction`).
+      return ((await this.deps.transactions.findById(s.workspaceId, s.id)) ?? tx).snapshot;
     });
   }
 
