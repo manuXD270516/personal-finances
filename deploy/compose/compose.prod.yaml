@@ -14,7 +14,7 @@
 #
 # Diferencias con el modo B local:
 # - Imágenes de la app SOLO por digest (FINANCE_*_IMAGE / PFOS_POSTGRES_IMAGE obligatorias); nunca se construye.
-# - Solo Caddy publica puertos (80/443). Keycloak queda en loopback del host (PF_BIND_ADDR=127.0.0.1) para su
+# - Solo Caddy publica puertos (80/443). Keycloak queda en loopback del host (PF_BIND_ADDR = dirección de loopback) para su
 #   consola de administración vía túnel SSH por Tailscale; el resto no publica nada.
 # - Sin mailpit, sin realm de desarrollo (usuarios demo), sin `start-dev`, sin host.docker.internal.
 # - PostgreSQL con pgBackRest (WAL a Backblaze B2) y telemetría directa a Grafana Cloud (OTLP, sin Alloy: RAM).
@@ -57,6 +57,7 @@ services:
       finance-web: { condition: service_healthy }
       keycloak: { condition: service_healthy }
     healthcheck:
+      # pf-allow-loopback: healthcheck dentro del contenedor de Caddy contra su propia API de administración
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
       interval: 30s
       timeout: 3s
@@ -133,6 +134,7 @@ services:
       ]
     environment:
       # Consola de administración solo por túnel (Caddy devuelve 404 en /admin desde Internet).
+      # pf-allow-loopback: consola de administración de Keycloak solo vía túnel al loopback del host, nunca pública
       KC_HOSTNAME_ADMIN: http://localhost:${PF_KEYCLOAK_PORT}
       KC_DB_POOL_MAX_SIZE: '10'
       # Heap acotado para 2 GB (SPIKE-06: funciona con 512 MiB; 545–581 MiB medidos con límite de 1 GiB).
@@ -145,7 +147,7 @@ services:
       PF_DEV_KC_OUTSIDER_PASSWORD: !reset null
     volumes: !override
       - ./keycloak/realm-pfos-prod.json:/opt/keycloak/data/import/realm-pfos-prod.json:ro
-    # Se conserva el puerto del archivo base, pero en loopback: PF_BIND_ADDR=127.0.0.1 en pfos.env.
+    # Se conserva el puerto del archivo base, pero en loopback: PF_BIND_ADDR apunta al loopback en pfos.env.
     deploy:
       resources:
         limits: { cpus: '1.5', memory: 704m }

@@ -2,6 +2,7 @@
 # Let's Encrypt) para los dos hostnames; HSTS; consola de Keycloak bloqueada desde Internet.
 {
 	email {$PF_ACME_EMAIL}
+	# pf-allow-loopback: API de administración de Caddy solo dentro del contenedor
 	admin localhost:2019
 }
 
