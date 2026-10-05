@@ -12,9 +12,12 @@ invariants: [INV-015, INV-033]
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/classification-ledger.api.test.ts
+  - packages/contexts/transactions/src/application/transactions.service.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+status: automated
 regression_suite: false
 phase: 1
 tags: [classification, ledger, period-lock]
@@ -59,3 +62,4 @@ Entonces se rechaza con el código "PERIOD_CLOSED"
 ## Notas
 
 - Lo automatiza add-classification junto con la validación del bloqueo de periodo en la recategorización.
+- Automatizado 2026-10-05 (docs/31 D49): antes del cambio el PATCH respondía 200 (recategorizar no genera asiento y el ledger no veía el periodo cerrado). Transactions consulta `LedgerPostingPort.assertPeriodOpen` (nuevo, sin efectos) cuando cambia la categoría de algún split; por HTTP: 409 `PERIOD_CLOSED`, la porción sigue en "Supermercado" con la misma versión, totales de marzo, asientos/postings, saldo, auditoría y outbox sin cambios.

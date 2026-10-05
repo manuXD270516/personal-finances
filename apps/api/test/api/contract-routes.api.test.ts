@@ -19,7 +19,7 @@ const AUDIENCE = 'finance-api';
 const contract = ApiContract.fromFile(resolveContractPath());
 
 /** Operaciones del contrato cuyo change aún no las implementa (fuera de Phase 1 o de su alcance). */
-const PENDING_OPERATIONS = ['getLedgerTrialBalance', 'getOperation'];
+const PENDING_OPERATIONS = ['getOperation'];
 
 type Key = Awaited<ReturnType<typeof generateKeyPair>>['privateKey'];
 let signingKey: Key;

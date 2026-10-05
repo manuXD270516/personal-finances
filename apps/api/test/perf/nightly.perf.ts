@@ -101,9 +101,14 @@ const dataOf = (body: unknown): Record<string, unknown>[] =>
   (Array.isArray(body) ? body : ((body as { data?: unknown[] }).data ?? [])) as Record<string, unknown>[];
 
 /** `EXPLAIN (ANALYZE, FORMAT JSON)` → Execution Time (ms) y nodos del plan. */
-async function explain(client: Client, sql: string): Promise<{ ms: number; nodes: string[] }> {
+async function explain(
+  client: Client,
+  sql: string,
+  values: readonly unknown[] = [],
+): Promise<{ ms: number; nodes: string[] }> {
   const { rows } = await client.query<{ 'QUERY PLAN': [{ 'Execution Time': number; Plan: PlanNode }] }>(
     `EXPLAIN (ANALYZE, FORMAT JSON) ${sql}`,
+    [...values],
   );
   const [root] = rows[0]!['QUERY PLAN'];
   const nodes: string[] = [];
@@ -118,6 +123,40 @@ interface PlanNode {
   'Node Type': string;
   'Index Name'?: string;
   Plans?: PlanNode[];
+}
+
+interface CapturedSql {
+  readonly text: string;
+  readonly values: readonly unknown[];
+}
+
+/**
+ * Sentencias (texto + parámetros) que la aplicación emite por `pool` mientras corre `fn`, sin las de control de
+ * transacción ni de contexto RLS: permite medir con EXPLAIN ANALYZE exactamente la consulta REAL (docs/31 D43).
+ */
+async function captureSql(pool: Pool, fn: () => Promise<unknown>): Promise<CapturedSql[]> {
+  const captured: CapturedSql[] = [];
+  const patched: { query: unknown }[] = [];
+  const onAcquire = (client: { query: (...args: unknown[]) => unknown }) => {
+    const original = client.query.bind(client);
+    client.query = (...args: unknown[]) => {
+      const [q, v] = args as [string | { text?: string; values?: unknown[] }, unknown[] | undefined];
+      const text = typeof q === 'string' ? q : q?.text;
+      const values = (typeof q === 'string' ? v : (q?.values ?? v)) ?? [];
+      if (text && !/^\s*(BEGIN|COMMIT|ROLLBACK|SELECT set_config)/i.test(text))
+        captured.push({ text, values });
+      return original(...args);
+    };
+    patched.push(client);
+  };
+  pool.on('acquire', onAcquire);
+  try {
+    await fn();
+  } finally {
+    pool.off('acquire', onAcquire);
+    for (const client of patched) delete client.query; // vuelve al método del prototipo
+  }
+  return captured;
 }
 
 /** Ejecuta `fn` como `pf_app` con el contexto RLS del owner sobre el workspace principal (siempre ROLLBACK). */
@@ -416,7 +455,7 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
   });
 
-  it('RLS: overhead < 10 % en las consultas de saldo y listado (EXPLAIN ANALYZE, pf_app vs superusuario)', async () => {
+  it('RLS: overhead < 10 % en la consulta real de saldos (PgBalanceQuery) y las de índice; agregado sintético informativo (docs/31 D43)', async () => {
     const card = ids.accounts.get('Tarjeta Andina Demo')!;
     const { rows } = await superuser.query<{ id: string }>(
       `SELECT id::text FROM ledger.ledger_account WHERE workspace_id = $1 AND source_account_id = $2`,
@@ -424,39 +463,92 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
     const ledgerAccount = rows[0]!.id;
     const lit = (v: string) => superuser.escapeLiteral(v);
-    const queries: Record<string, string> = {
-      'saldo por cuenta (índice INCLUDE)': `SELECT COALESCE(SUM(p.amount), 0) FROM ledger.posting p
-         WHERE p.workspace_id = ${lit(WS)} AND p.ledger_account_id = ${lit(ledgerAccount)}
-           AND p.entry_date <= DATE '2026-09-30'`,
-      'saldos de todas las cuentas': `SELECT p.ledger_account_id, SUM(p.amount) FROM ledger.posting p
-         WHERE p.workspace_id = ${lit(WS)} GROUP BY p.ledger_account_id`,
-      'página de transacciones (1 mes)': `SELECT t.id FROM txn.transaction t
-         WHERE t.workspace_id = ${lit(WS)} AND t.transaction_date BETWEEN DATE '2025-06-01' AND DATE '2025-06-30'
-         ORDER BY t.transaction_date DESC, t.id DESC LIMIT 50`,
-    };
-    for (const [name, sql] of Object.entries(queries)) {
+    /** EXPLAIN ANALYZE con RLS (pf_app + contexto) vs sin RLS (superusuario), intercalados; Σ de las sentencias. */
+    const measure = async (statements: readonly CapturedSql[]) => {
+      const run = async (client: Client) => {
+        let total = 0;
+        let nodes: string[] = [];
+        for (const st of statements) {
+          const r = await explain(client, st.text, st.values);
+          total += r.ms;
+          if (r.nodes.length > nodes.length) nodes = r.nodes; // el plan de la sentencia principal
+        }
+        return { ms: total, nodes };
+      };
       const withRls: number[] = [];
       const withoutRls: number[] = [];
       let nodes: string[] = [];
       for (let i = 0; i < 5; i += 1) {
-        await asApp(() => explain(appClient, sql));
-        await explain(superuser, sql);
+        await asApp(() => run(appClient));
+        await run(superuser);
       }
       for (let i = 0; i < 40; i += 1) {
-        const a = await asApp(() => explain(appClient, sql));
+        const a = await asApp(() => run(appClient));
         withRls.push(a.ms);
         nodes = a.nodes;
-        withoutRls.push((await explain(superuser, sql)).ms);
+        withoutRls.push((await run(superuser)).ms);
       }
-      results.push(
-        rlsResult({
-          id: `rls-${name}`,
-          title: `Overhead RLS: ${name}`,
-          withRls,
-          withoutRls,
-          plan: nodes.join(' → '),
-        }),
-      );
+      return { withRls, withoutRls, plan: nodes.join(' → ') };
+    };
+
+    // 1) Gate (D43): las sentencias que emite la aplicación (`PgBalanceQuery`, con snapshots del job diario).
+    const capturePool = new Pool({ connectionString: deps.databaseUrl, max: 1 });
+    try {
+      const ledger = createLedgerRuntime({
+        pool: capturePool,
+        clock: systemClock,
+        audit: { append: () => Promise.reject(new Error('solo lectura')) },
+        outbox: { append: () => Promise.reject(new Error('solo lectura')) },
+      });
+      const asOwner = <T>(fn: () => Promise<T>) =>
+        runWithRequestContext({ actor: { type: 'USER', userId: ownerId }, origin: 'api' }, fn);
+      const real: Record<string, CapturedSql[]> = {
+        'consulta real de saldos en lote (PgBalanceQuery.getAccountBalances)': await captureSql(
+          capturePool,
+          () => asOwner(() => ledger.accountBalances.getAccountBalances({ workspaceId: WS })),
+        ),
+        'consulta real de saldo por cuenta (PgBalanceQuery.getBalance)': await captureSql(capturePool, () =>
+          asOwner(() => ledger.balances.getBalance({ workspaceId: WS, ledgerAccountId: ledgerAccount })),
+        ),
+      };
+      for (const [name, statements] of Object.entries(real)) {
+        expect(statements.length, name).toBeGreaterThan(0);
+        const m = await measure(statements);
+        results.push(
+          rlsResult({
+            id: `rls-${name}`,
+            title: `Overhead RLS: ${name} (${statements.length} sentencias)`,
+            ...m,
+          }),
+        );
+      }
+    } finally {
+      await capturePool.end();
+    }
+
+    // 2) Consultas de índice (gate) y agregado sintético de todo el workspace (informativo, D43).
+    const queries: Record<string, { sql: string; gate: boolean }> = {
+      'saldo por cuenta (índice INCLUDE)': {
+        sql: `SELECT COALESCE(SUM(p.amount), 0) FROM ledger.posting p
+         WHERE p.workspace_id = ${lit(WS)} AND p.ledger_account_id = ${lit(ledgerAccount)}
+           AND p.entry_date <= DATE '2026-09-30'`,
+        gate: true,
+      },
+      'agregado sintético de todo el workspace (informativo)': {
+        sql: `SELECT p.ledger_account_id, SUM(p.amount) FROM ledger.posting p
+         WHERE p.workspace_id = ${lit(WS)} GROUP BY p.ledger_account_id`,
+        gate: false,
+      },
+      'página de transacciones (1 mes)': {
+        sql: `SELECT t.id FROM txn.transaction t
+         WHERE t.workspace_id = ${lit(WS)} AND t.transaction_date BETWEEN DATE '2025-06-01' AND DATE '2025-06-30'
+         ORDER BY t.transaction_date DESC, t.id DESC LIMIT 50`,
+        gate: true,
+      },
+    };
+    for (const [name, q] of Object.entries(queries)) {
+      const m = await measure([{ text: q.sql, values: [] }]);
+      results.push(rlsResult({ id: `rls-${name}`, title: `Overhead RLS: ${name}`, gate: q.gate, ...m }));
     }
   });
 

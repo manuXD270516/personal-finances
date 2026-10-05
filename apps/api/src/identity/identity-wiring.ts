@@ -49,6 +49,7 @@ import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
+import { LedgerHttpModule } from '../ledger/ledger-http.js';
 import { workspaceCreatedHook } from './workspace-provisioning.js';
 
 /**
@@ -225,6 +226,8 @@ export function financeRuntimes(input: {
     outbox: writer,
     // Equivalente en moneda base con el puerto público de valoración de FX (misma semántica que Reporting).
     valuation: { rates: fx.valuation, workspaces: identityWorkspaceSettings(input.pool) },
+    // docs/31 D45: la moneda de una cuenta debe estar habilitada en el workspace (`fx.workspace_currency`).
+    workspaceCurrencies: fx.valuation,
   });
   // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({
@@ -286,7 +289,7 @@ export function identityImports(input: {
   const lifecyclePort = input.lifecycle
     ? input.lifecycle(audit.lifecycleFor(auditPort))
     : audit.lifecycleFor(auditPort);
-  const { classification, fx, accounts, transactions, reporting } = financeRuntimes({
+  const { classification, fx, accounts, ledger, transactions, reporting } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
@@ -317,8 +320,10 @@ export function identityImports(input: {
     }),
     AuditModule.register({ runtime: audit, conventions: input.conventions }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
-    // ACCOUNTS (+ LEDGER sin HTTP) — openspec add-accounts-management.
+    // ACCOUNTS — openspec add-accounts-management.
     ...accountsImports({ runtime: accounts, conventions: input.conventions }),
+    // LEDGER: solo la vista técnica de balance de comprobación (add-ledger-core 6.3, docs/31 D44).
+    LedgerHttpModule.register({ balances: ledger.balances, conventions: input.conventions }),
     TransactionsModule.register({ runtime: transactions, conventions: input.conventions }),
     FxModule.register({ runtime: fx, conventions: input.conventions }),
     ReportingModule.register({ runtime: reporting, conventions: input.conventions }),

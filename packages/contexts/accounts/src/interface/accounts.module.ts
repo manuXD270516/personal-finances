@@ -14,6 +14,7 @@ import type {
   OutboxPort,
   TagCatalogPort,
   WorkspaceCalendar,
+  WorkspaceCurrenciesPort,
 } from '../application/ports/index.js';
 import {
   ACCOUNTS_QUERY_PORT,
@@ -57,6 +58,11 @@ export interface AccountsRuntimeOptions {
    * `baseCurrencyBalance: null`.
    */
   readonly valuation?: BaseCurrencyValuationDeps;
+  /**
+   * Monedas habilitadas del workspace (`FxValuationPort.enabledCurrencies` de `@pf/fx/contracts`, docs/31 D45).
+   * Ausente ⇒ solo se exige la moneda activa en el catálogo global.
+   */
+  readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
 }
 
 export interface AccountsRuntime {
@@ -75,6 +81,7 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
     accounts: new PgAccountRepository(),
     institutions: new PgInstitutionRepository(),
     currencies: pgCurrencyCatalog,
+    ...(options.workspaceCurrencies ? { workspaceCurrencies: options.workspaceCurrencies } : {}),
     balances: new LedgerBalancesAdapter(options.balances),
     tags: options.tags ?? { assertAssignable: async () => undefined },
     openingBalance: options.openingBalance,
@@ -132,4 +139,5 @@ export type {
   OutboxPort,
   TagCatalogPort,
   WorkspaceCalendar,
+  WorkspaceCurrenciesPort,
 };

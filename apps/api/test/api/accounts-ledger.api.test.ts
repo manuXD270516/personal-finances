@@ -221,10 +221,16 @@ describe('una sola moneda por cuenta', () => {
     expect(await footprint(u)).toEqual(before);
     expect(await balanceOf(u, usd.id)).toEqual({ amount: '500.00', currency: 'USD' });
     expect(await ledgerBalance(u, usd.id)).toBe('500.00');
-    // "No habilitada" = inexistente o inactiva en el catálogo global (add-manual-conversions, decisión 11: en Phase 1
-    // no hay habilitación por workspace; EUR está activa desde 20261003220000, así que se usa un código inexistente).
+    // docs/31 D45: EUR está activa en el catálogo global pero no habilitada en W1 (`fx.workspace_currency` = BOB, USD,
+    // USDT) ⇒ la creación de la cuenta se rechaza con CURRENCY_NOT_ENABLED apuntando a /currency, sin escribir nada.
+    const currencies = await call('GET', `${W(u)}/currencies?enabled=true`, { token: u.token });
+    expect((currencies.body['data'] as { code: string }[]).map((c) => c.code)).not.toContain('EUR');
+    const euro = await post(u, '/accounts', { name: 'Euro Cash', type: 'CASH', currency: 'EUR' });
+    expectProblem(euro, 422, 'CURRENCY_NOT_ENABLED');
+    expect(JSON.stringify(euro.body)).toContain('/currency');
+    // Un código inexistente en el catálogo: mismo código.
     expectProblem(
-      await post(u, '/accounts', { name: 'Euro Cash', type: 'CASH', currency: 'XYZ' }),
+      await post(u, '/accounts', { name: 'X Cash', type: 'CASH', currency: 'XYZ' }),
       422,
       'CURRENCY_NOT_ENABLED',
     );

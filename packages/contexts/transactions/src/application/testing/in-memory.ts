@@ -92,6 +92,8 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     accounts: new Map((options.accounts ?? []).map((a) => [a.accountId, a])),
     details: new Map<string, { detail: ConversionDetail; createdAt: string }[]>(),
     rates: [] as FakeRate[],
+    /** Meses cerrados (`YYYY-MM`, INV-015) para `assertPeriodOpen`. */
+    closedMonths: new Set<string>(),
   };
   const faults: { ledger?: Error; audit?: Error; lifecycle?: Error } = {};
   let depth = 0;
@@ -309,6 +311,11 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       },
       async ledgerAccountForUserAccount() {
         throw new Error('not used');
+      },
+      async assertPeriodOpen(input) {
+        if (state.closedMonths.has(input.date.slice(0, 7))) {
+          throw new DomainError('PERIOD_CLOSED', `${input.date} is in a closed period`);
+        }
       },
     },
     classification: {

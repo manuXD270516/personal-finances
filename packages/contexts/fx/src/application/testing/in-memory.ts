@@ -2,6 +2,7 @@ import type { AuditEntry, LifecycleStepInput } from '@pf/audit/contracts';
 import { DomainError, FixedClock, Instant, Money } from '@pf/shared-kernel';
 import {
   CurrencyDefinition,
+  DEFAULT_WORKSPACE_CURRENCIES,
   EXCHANGE_RATE_LIFECYCLE,
   type CurrencyKind,
   type ExchangeRate,
@@ -203,7 +204,10 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
           .filter((d) => !filter.kind || d.kind === filter.kind)
           .map((definition) => ({
             definition,
-            enabled: state.enabled.get(ws)?.has(definition.code) ?? false,
+            // Como PgCurrencyRepository: un workspace sin filas tiene el conjunto por defecto.
+            enabled:
+              state.enabled.get(ws)?.has(definition.code) ??
+              (DEFAULT_WORKSPACE_CURRENCIES as readonly string[]).includes(definition.code),
           }));
       },
       async find(code) {

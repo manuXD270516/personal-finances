@@ -354,3 +354,43 @@ describe('TransactionsService — edición, anulación y reconciliación', () =>
     expect(found).toHaveLength(1);
   });
 });
+
+describe('TransactionsService — periodo cerrado (INV-015, docs/31 D49)', () => {
+  it('[TC-CLASSIFICATION-RECATEGORIZE-002] recategorizar en un mes cerrado ⇒ PERIOD_CLOSED sin cambios; en un mes abierto se acepta', async () => {
+    const { service, state } = setup();
+    const { transaction } = await service.recordTransaction(
+      expense({
+        transactionDate: '2026-02-10',
+        splits: [{ amount: { amount: '150.00', currency: 'BOB' }, categoryId: 'groceries' }],
+      }),
+    );
+    state.closedMonths.add('2026-02');
+    const before = { outbox: state.outbox.length, audit: state.audit.length, entries: state.entries.length };
+    expect(
+      await codeOf(
+        service.updateTransaction({
+          workspaceId: WS,
+          userId: USER,
+          transactionId: transaction.id,
+          expectedVersion: transaction.version,
+          splits: [{ amount: { amount: '150.00', currency: 'BOB' }, categoryId: 'home' }],
+        }),
+      ),
+    ).toBe('PERIOD_CLOSED');
+    expect(state.txs.get(transaction.id)?.splits.map((s) => s.categoryId)).toEqual(['groceries']);
+    expect(state.txs.get(transaction.id)?.version).toBe(transaction.version);
+    expect({ outbox: state.outbox.length, audit: state.audit.length, entries: state.entries.length }).toEqual(
+      before,
+    );
+    // En un mes abierto la recategorización se acepta.
+    state.closedMonths.delete('2026-02');
+    const reclassified = await service.updateTransaction({
+      workspaceId: WS,
+      userId: USER,
+      transactionId: transaction.id,
+      expectedVersion: transaction.version,
+      splits: [{ amount: { amount: '150.00', currency: 'BOB' }, categoryId: 'home' }],
+    });
+    expect(reclassified.splits.map((s) => s.categoryId)).toEqual(['home']);
+  });
+});

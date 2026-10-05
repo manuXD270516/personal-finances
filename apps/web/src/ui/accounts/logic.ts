@@ -1,4 +1,11 @@
-import type { Account, AccountLiquidity, AccountStatus, AccountType, Institution } from '../common/types';
+import type {
+  Account,
+  AccountLiquidity,
+  AccountStatus,
+  AccountType,
+  CurrencyInfo,
+  Institution,
+} from '../common/types';
 
 /** Tipos de pasivo (docs/31 D3): el resto son activos. */
 const LIABILITY_TYPES: ReadonlySet<AccountType> = new Set(['CREDIT_CARD', 'LOAN', 'MANUAL_LIABILITY']);
@@ -102,4 +109,19 @@ export function accountsQuery(f: AccountFilters): URLSearchParams {
   if (f.includeArchived) q.set('includeArchived', 'true');
   q.set('limit', '200');
   return q;
+}
+
+/**
+ * Monedas ofrecidas en el formulario de cuenta (docs/31 D45, TC-ACCOUNTS-CURRENCY-001): solo las HABILITADAS en el
+ * workspace (`GET /currencies`, `enabled`); al editar se conserva además la moneda actual de la cuenta aunque ya no
+ * esté habilitada (no se envía si no cambia). Una billetera cripto solo ofrece monedas `CRYPTO`. Sin catálogo cargado,
+ * la moneda base del workspace.
+ */
+export function accountCurrencyOptions(
+  currencies: readonly CurrencyInfo[],
+  input: { readonly type: AccountType; readonly baseCurrency: string; readonly currentCurrency?: string },
+): readonly Pick<CurrencyInfo, 'code'>[] {
+  const enabled = currencies.filter((c) => c.enabled || c.code === input.currentCurrency);
+  if (input.type === 'CRYPTO_WALLET') return enabled.filter((c) => c.kind === 'CRYPTO');
+  return enabled.length ? enabled : [{ code: input.baseCurrency }];
 }

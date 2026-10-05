@@ -537,6 +537,11 @@ export class TransactionsService {
         ]);
       }
       const result = tx.amend(changes);
+      // INV-015 (docs/31 D49): recategorizar no genera asiento, pero cambia lo reportado del mes; en un periodo cerrado
+      // se rechaza con PERIOD_CLOSED (los cambios con asiento ya los rechaza el ledger, PF004).
+      if (result.classificationChanges.some((c) => c.previousCategoryId !== c.newCategoryId)) {
+        await this.deps.ledger.assertPeriodOpen({ workspaceId, date: before.businessDate });
+      }
       let previousStatus: TransactionStatus | null = result.changedFields.includes('status')
         ? result.previousStatus
         : null;

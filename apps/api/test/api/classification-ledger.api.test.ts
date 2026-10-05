@@ -247,6 +247,59 @@ describe('clasificar no toca el ledger (INV-033)', () => {
     });
   });
 
+  it('[TC-CLASSIFICATION-RECATEGORIZE-002] recategorizar un gasto de un mes cerrado ⇒ 409 PERIOD_CLOSED sin escribir nada (docs/31 D49)', async () => {
+    const u = await user();
+    const banco = await account(u, 'Banco BOB', 'BANK', 'BOB', '2150.00');
+    const supermercado = await expenseCategory(u, 'Supermercado');
+    const hogar = await expenseCategory(u, 'Hogar');
+    const t1 = await create(u, '/transactions', {
+      kind: 'EXPENSE',
+      status: 'POSTED',
+      transactionDate: '2026-03-15',
+      accountId: banco,
+      amount: money('150.00'),
+      splits: [{ amount: money('150.00'), categoryId: supermercado }],
+    });
+    // Cierre del mes 2026-03 (lo escribirá Planning en Phase 2 vía LedgerPeriodLockPort; aquí directo con pf_app).
+    const app = await connect(deps.databaseUrl);
+    try {
+      await inTx(
+        app,
+        { userId: u.id, workspaceId: u.ws },
+        () =>
+          app.query(`INSERT INTO ledger.period_lock (workspace_id, year_month) VALUES ($1, '2026-03')`, [
+            u.ws,
+          ]),
+        true,
+      );
+    } finally {
+      await app.end();
+    }
+    const before = await ledger(u);
+    const reportBefore = await summary(u);
+    const auditBefore = await lastAudit(u, t1['id'] as string);
+    const eventBefore = await lastEvent(u, t1['id'] as string);
+
+    const r = await patchTx(u, t1, { splits: [{ amount: money('150.00'), categoryId: hogar }] });
+    expectProblem(r, 409, 'PERIOD_CLOSED');
+
+    const after = await call('GET', `${W(u)}/transactions/${String(t1['id'])}`, { token: u.token });
+    expect(after.body['version']).toBe(t1['version']);
+    expect((after.body['splits'] as { categoryId: string }[]).map((s) => s.categoryId)).toEqual([
+      supermercado,
+    ]);
+    const reportAfter = await summary(u);
+    expect([categoryTotal(reportAfter, supermercado), categoryTotal(reportAfter, hogar)]).toEqual([
+      categoryTotal(reportBefore, supermercado),
+      categoryTotal(reportBefore, hogar),
+    ]);
+    expect(categoryTotal(reportAfter, supermercado)).toBe('150.00');
+    expect(await ledger(u)).toEqual(before);
+    expect(await balanceOf(u, banco)).toEqual(money('2000.00'));
+    expect(await lastAudit(u, t1['id'] as string)).toBe(auditBefore);
+    expect((await lastEvent(u, t1['id'] as string)).eventId).toBe(eventBefore.eventId);
+  });
+
   it('[TC-CLASSIFICATION-TAG-006] añadir el tag "Trabajo" a un gasto de 100.000000 USDT no crea asientos ni cambia el saldo', async () => {
     const u = await user();
     const wallet = await account(u, 'Wallet USDT', 'CRYPTO_WALLET', 'USDT', '600.000000');

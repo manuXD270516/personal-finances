@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { resolveContractPath } from '../../src/api/api-conventions.js';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
+import { connect, enableCurrencies } from '../support/db.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
 // Resumen del Home por HTTP contra PostgreSQL real (Testcontainers): saldos, flujos y patrimonio leídos de la fuente
@@ -294,8 +295,20 @@ describe('GET /reports/summary — saldos, dinero disponible y patrimonio (PG re
 
   it('[TC-REPORTING-NETWORTH-001] (regresión) una cuenta BTC sin postings con BTC no habilitada no rompe el resumen (escala 8 del catálogo, no 18)', async () => {
     const btc = await user(`kc-rep-e-${randomUUID()}`);
+    // docs/31 D45: abrir cuentas BTC exige BTC habilitada; luego se deshabilita (datos previos a la deshabilitación,
+    // sin endpoint en Phase 1: directo en la BD) para conservar la regresión "cuenta en moneda no habilitada".
+    await enableCurrencies(deps.databaseUrl, { userId: btc.id, workspaceId: btc.ws }, ['BTC']);
     await account(btc, 'Cold Wallet BTC', 'CRYPTO_WALLET', 'BTC', '0.01000000');
     await post(btc, '/accounts', { name: 'Exchange BTC', type: 'CRYPTO_WALLET', currency: 'BTC' });
+    const admin = await connect(deps.superuserUrl);
+    try {
+      await admin.query(
+        `DELETE FROM fx.workspace_currency WHERE workspace_id = $1 AND currency_code = 'BTC'`,
+        [btc.ws],
+      );
+    } finally {
+      await admin.end();
+    }
     const currencies = await call('GET', `${W(btc)}/currencies?enabled=true`, { token: btc.token });
     expect(currencies.status).toBe(200);
     expect(JSON.stringify(currencies.body)).not.toContain('"BTC"');
