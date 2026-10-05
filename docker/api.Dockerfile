@@ -50,6 +50,12 @@ ENV NODE_ENV=production \
     PFOS_GIT_SHA=${GIT_SHA} \
     NODE_OPTIONS="--enable-source-maps"
 # Sin gestores de paquetes en runtime (superficie mínima, docs/20 §1).
+# Parches de seguridad de Debian sobre la base fijada por digest (p. ej. perl-base CVE-2026-13221/42496/8376):
+# Trivy bloquea CRITICAL con corrección disponible; se aplican al construir sin cambiar la base.
+RUN apt-get update \
+ && apt-get -y upgrade --no-install-recommends \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
            /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* \
            /usr/local/bin/yarn /usr/local/bin/yarnpkg
