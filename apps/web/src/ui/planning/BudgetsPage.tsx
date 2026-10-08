@@ -13,6 +13,8 @@ import {
   buildLineBody,
   emptyLineForm,
   formFromLine,
+  lineHighlight,
+  requestedPeriodId,
   type Budget,
   type BudgetLine,
   type LineBody,
@@ -21,7 +23,7 @@ import {
 } from './budget-logic';
 import { BudgetLineForm, natureOf, type TargetOptions } from './BudgetLineForm';
 import { loadCatalog, type Catalog } from './catalog';
-import { BudgetLinesTable, targetName, type TargetNames } from './BudgetLinesTable';
+import { BudgetLinesTable, LineMissingNotice, targetName, type TargetNames } from './BudgetLinesTable';
 import { BudgetTotalsView } from './BudgetTotalsView';
 import { defaultPeriodId, formatBusinessDate, periodName, type FinancialPeriod } from './logic';
 import { loadPeriods } from './PeriodsPage';
@@ -52,8 +54,22 @@ function createBody(values: LineFormValues, body: LineBody) {
   return out;
 }
 
-export function BudgetsPage() {
-  return <WithWorkspace>{(ctx) => <Budgets ctx={ctx} />}</WithWorkspace>;
+export function BudgetsPage({ periodo, linea }: { periodo?: string; linea?: string } = {}) {
+  return (
+    <WithWorkspace>
+      {(ctx) => <Budgets ctx={ctx} requestedPeriod={periodo} highlightLine={linea} />}
+    </WithWorkspace>
+  );
+}
+
+/** Desplazamiento a la línea resaltada: suave salvo que el usuario pida movimiento reducido. */
+function scrollToLine(lineId: string) {
+  const row = Array.from(document.querySelectorAll<HTMLElement>('[data-line-id]')).find(
+    (el) => el.dataset['lineId'] === lineId,
+  );
+  if (!row || typeof row.scrollIntoView !== 'function') return;
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  row.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
 }
 
 type Panel = { readonly type: 'add' } | { readonly type: 'edit'; readonly line: BudgetLine } | undefined;
@@ -64,7 +80,15 @@ type Panel = { readonly type: 'add' } | { readonly type: 'edit'; readonly line: 
  * umbrales, disponible para gastar, tasas usadas y montos sin convertir, rollover provisional/definitivo y edición con
  * los errores de la API traducidos por `code` (NFR-USAB-009). Un periodo cerrado es de solo lectura.
  */
-function Budgets({ ctx }: { ctx: WorkspaceContext }) {
+function Budgets({
+  ctx,
+  requestedPeriod,
+  highlightLine,
+}: {
+  ctx: WorkspaceContext;
+  requestedPeriod: string | undefined;
+  highlightLine: string | undefined;
+}) {
   const f = useFormat('Budgets', ctx);
   const pf = useFormat('Planning', ctx);
   const today = todayIn(ctx.timeZone);
@@ -93,7 +117,15 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
       .catch((err: unknown) => setProblem(problemOf(err)));
   }, [ctx]);
 
-  const periodId = periods ? (selected ?? defaultPeriodId(periods, today)) : undefined;
+  const requestedId = periods ? requestedPeriodId(periods, requestedPeriod) : undefined;
+  const periodId = periods ? (selected ?? requestedId ?? defaultPeriodId(periods, today)) : undefined;
+  // El resaltado solo aplica al periodo pedido; al cambiar de periodo en el selector se descarta.
+  const lineId =
+    highlightLine && periodId !== undefined && periodId === requestedId ? highlightLine : undefined;
+  const highlight = budget && lineId ? lineHighlight(budget, lineId) : undefined;
+  useEffect(() => {
+    if (highlight === 'found' && lineId) scrollToLine(lineId);
+  }, [highlight, lineId]);
   const period = periods?.find((p) => p.id === periodId);
 
   const loadBudget = useCallback(() => {
@@ -220,6 +252,7 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
       <PlanningNav f={f} />
       <h1 id="budgets-title">{f.t('title')}</h1>
       <p style={mutedStyle}>{f.t('intro')}</p>
+      {highlight === 'missing' ? <LineMissingNotice f={f} /> : null}
       {status ? <p role="status">{status}</p> : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {periods === undefined ? (
@@ -306,6 +339,7 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
               onConfirmRemove={(line) => void remove(line)}
               omitted={omitted}
               onChanged={loadBudget}
+              highlightedId={highlight === 'found' ? lineId : undefined}
             />
           )}
         </>
@@ -337,6 +371,7 @@ function PlanView({
   onConfirmRemove,
   omitted,
   onChanged,
+  highlightedId,
 }: {
   ctx: WorkspaceContext;
   f: FormatContext;
@@ -360,6 +395,7 @@ function PlanView({
   onConfirmRemove: (line: BudgetLine) => void;
   omitted: readonly OmittedLine[];
   onChanged: () => void;
+  highlightedId: string | undefined;
 }) {
   return (
     <>
@@ -408,6 +444,7 @@ function PlanView({
           f={f}
           canEdit={canWrite}
           editingId={panel?.type === 'edit' ? panel.line.id : undefined}
+          highlightedId={highlightedId}
           busyId={busy ? '*' : undefined}
           onEdit={onEdit}
           onRemove={onAskRemove}

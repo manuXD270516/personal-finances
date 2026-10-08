@@ -64,3 +64,25 @@ export const IDENTITY_AUDIT_POLICY = {
 export interface WorkspaceCalendarQuery {
   calendarOf(workspaceId: string): Promise<{ readonly timeZone: string; readonly fiscalMonthStartDay: number }>;
 }
+
+/** Miembro activo de un workspace tal como lo necesita NOTIFY para resolver destinatarios (openspec add-alerts). */
+export interface WorkspaceRecipientDto {
+  readonly userId: string;
+  readonly role: WorkspaceRoleDto;
+  /** Locale del perfil del usuario (`Me.locale`, p. ej. `es-BO`). */
+  readonly locale: string;
+  /** Zona horaria IANA del usuario; si no la configuró, la del workspace. */
+  readonly timeZone: string;
+}
+
+/**
+ * Destinatarios de notificaciones (openspec add-alerts, design § Contratos; ampliación aditiva). La implementación del
+ * worker lee con el rol de directorio de IDENTITY (`pf_workspace_directory`: `pf_worker` no ve `iam.*` por membresía).
+ * `emailFor` devuelve el email VERIFICADO del usuario o `null`; solo lo usa el despacho del email y NUNCA se persiste
+ * en las tablas de notificaciones ni se loguea (RISK-010).
+ */
+export interface WorkspaceRecipientsQuery {
+  /** Miembros con membresía `ACTIVE` en este momento (usuarios activos), ordenados por `userId`. */
+  activeMembers(workspaceId: string): Promise<readonly WorkspaceRecipientDto[]>;
+  emailFor(userId: string): Promise<string | null>;
+}

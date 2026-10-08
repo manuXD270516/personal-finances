@@ -3,11 +3,16 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtVerifier, type JwtVerifierOptions } from '@pf/platform/api';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import { DomainError, type Clock } from '@pf/shared-kernel';
-import { currentRequestContext, PgUnitOfWork } from '@pf/platform/api';
-import type { Pool } from 'pg';
+import { currentRequestContext, PgUnitOfWork, requireSqlExecutor } from '@pf/platform/api';
+import type { Pool, PoolClient } from 'pg';
 import { DemoDataService } from '../application/demo-data.service.js';
 import { IdentityService } from '../application/identity.service.js';
-import type { WorkspaceCalendarQuery } from '../contracts/index.js';
+import type {
+  WorkspaceCalendarQuery,
+  WorkspaceRecipientDto,
+  WorkspaceRecipientsQuery,
+  WorkspaceRoleDto,
+} from '../contracts/index.js';
 import type {
   AuditPort,
   DemoDataSettings,
@@ -235,6 +240,64 @@ export function identityWorkspaceCalendarDirectory(pool: Pool): WorkspaceCalenda
 }
 
 /**
+ * `WorkspaceRecipientsQuery` del worker (openspec add-alerts, design § Contratos): miembros ACTIVOS de un workspace con
+ * su rol, locale y zona horaria, y el email verificado de un usuario al despachar un correo. `pf_worker` no ve `iam.*`
+ * por membresía (RLS), así que lee en una conexión PROPIA con el rol de directorio (`SET LOCAL ROLE
+ * pf_workspace_directory`, columnas mínimas; migración 20261008190000), nunca dentro de la transacción del llamador.
+ * El email no se persiste ni se loguea en NOTIFY: se pide solo en el momento del envío.
+ */
+export function identityWorkspaceRecipients(pool: Pool): WorkspaceRecipientsQuery {
+  async function inDirectory<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN READ ONLY');
+      await client.query('SET LOCAL ROLE pf_workspace_directory');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  return {
+    activeMembers: (workspaceId) =>
+      inDirectory(async (client) => {
+        const { rows } = await client.query<{
+          user_id: string;
+          role: WorkspaceRoleDto;
+          locale: string;
+          time_zone: string;
+        }>(
+          `SELECT m.user_id::text AS user_id, m.role, u.locale, coalesce(u.time_zone, w.time_zone) AS time_zone
+             FROM iam.workspace_membership m
+             JOIN iam."user" u ON u.id = m.user_id AND u.status = 'ACTIVE'
+             JOIN iam.workspace w ON w.id = m.workspace_id
+            WHERE m.workspace_id = $1 AND m.status = 'ACTIVE'
+            ORDER BY m.user_id`,
+          [workspaceId],
+        );
+        return rows.map((r): WorkspaceRecipientDto => ({
+          userId: r.user_id,
+          role: r.role,
+          locale: r.locale,
+          timeZone: r.time_zone,
+        }));
+      }),
+    emailFor: (userId) =>
+      inDirectory(async (client) => {
+        const { rows } = await client.query<{ email: string }>(
+          `SELECT email FROM iam."user" WHERE id = $1 AND status = 'ACTIVE' AND email_verified`,
+          [userId],
+        );
+        return rows[0]?.email ?? null;
+      }),
+  };
+}
+
+/**
  * Directorio de workspaces ACTIVOS (id y zona horaria) para jobs de instalación del worker (add-market-rate-providers:
  * FX copia cada tasa de provider a cada workspace). Requiere el pool del worker (`pf_worker`): asume
  * `pf_workspace_directory` solo dentro de la transacción de la consulta (migración 20261003230100).
@@ -277,6 +340,34 @@ export function identityUserLocales(pool: Pool): { localeOf(userId: string): Pro
         { userId, workspaceId: null },
         async () => (await users.findById(userId))?.locale.value ?? 'es',
       ),
+  };
+}
+
+/**
+ * Locale del perfil (`iam.user.locale`) como TEXTO tolerante, para presentar contenido en el idioma del usuario
+ * (openspec add-alerts: `es-*`, `en-*`, `pt-*` y español de respaldo para cualquier otro, incluso un tag que el perfil ya
+ * no admite). A diferencia de `identityUserLocales`, no reconstruye el agregado `User` (su `Locale` rechaza tags no
+ * soportados) y NO cambia el contexto RLS de la transacción en curso: lee con el `app.user_id` ya fijado por la
+ * petición (política `user_self_read`). Fuera de una unidad de trabajo abre una propia solo con el usuario.
+ */
+export function identityUserLocaleTags(pool: Pool): { localeOf(userId: string): Promise<string> } {
+  const uow = new PgUnitOfWork(pool);
+  const read = async (userId: string): Promise<string> => {
+    const { rows } = await requireSqlExecutor().query('SELECT locale FROM iam."user" WHERE id = $1', [
+      userId,
+    ]);
+    const locale = (rows[0] as { locale?: unknown } | undefined)?.locale;
+    return typeof locale === 'string' ? locale : 'es';
+  };
+  return {
+    localeOf: (userId) => {
+      try {
+        requireSqlExecutor();
+      } catch {
+        return uow.run({ userId, workspaceId: null }, () => read(userId));
+      }
+      return read(userId);
+    },
   };
 }
 

@@ -96,7 +96,12 @@ export class PgBossJobQueue implements JobQueue {
           traceContext: job.traceContext,
           payload: job.payload,
         };
-        return { id: job.id, data, ...(job.key ? { singletonKey: job.key } : {}) };
+        return {
+          id: job.id,
+          data,
+          ...(job.key ? { singletonKey: job.key } : {}),
+          ...(job.startAfter ? { startAfter: job.startAfter } : {}),
+        };
       }),
       { db: { executeSql: (text: string, values?: unknown[]) => tx.query(text, values) } },
     );

@@ -155,6 +155,53 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(path.problems.map((p) => p.variable)).toEqual(['FX_PROVIDER_PARALELO_BO_URL']);
   });
 
+  it('canal email de las notificaciones (add-alerts, docs/33 D87): none sin SMTP_HOST, smtp en local/ci con Mailpit; solo en el worker', () => {
+    const { DATABASE_URL: _app, ...storage } = API_ENV;
+    const worker = {
+      ...storage,
+      WORKER_DATABASE_URL: 'postgres://pf_worker:s3cr3t-wk@db.internal:5432/pfos',
+    };
+    // Sin configuración de SMTP: solo in-app (no rompe los entornos existentes).
+    const plain = loadConfig('worker', worker);
+    expect(plain.EMAIL_DRIVER).toBe('none');
+    expect(plain.NOTIFY_EMAIL_MAX_ATTEMPTS).toBe(5);
+    expect(plain.NOTIFY_RETENTION).toBe(12);
+    expect(plain.EMAIL_FROM).toBe('PFOS <notificaciones@pfos.local>');
+    expect(plain.SMTP_PORT).toBe(1025);
+    expect(plain.SMTP_SECURE).toBe(false);
+    // Local/CI con Mailpit: smtp por defecto.
+    const mailpit = { ...worker, SMTP_HOST: 'mailpit', APP_PUBLIC_URL: 'http://localhost:23000' };
+    expect(loadConfig('worker', mailpit).EMAIL_DRIVER).toBe('smtp');
+    // Producción nunca activa el email sin pedirlo, aunque haya SMTP_HOST.
+    expect(loadConfig('worker', { ...mailpit, PFOS_ENV: 'production' }).EMAIL_DRIVER).toBe('none');
+    // smtp explícito exige servidor y URL pública.
+    const missing = captureError(() => loadConfig('worker', { ...worker, EMAIL_DRIVER: 'smtp' }));
+    expect(missing.problems.map((p) => p.variable).sort()).toEqual(['APP_PUBLIC_URL', 'SMTP_HOST']);
+    // La URL pública es un origen sin ruta; el remitente, una dirección; la retención, meses.
+    const bad = captureError(() =>
+      loadConfig('worker', {
+        ...mailpit,
+        APP_PUBLIC_URL: 'http://localhost:23000/app',
+        EMAIL_FROM: 'sin-arroba',
+        NOTIFY_RETENTION: '12d',
+        NOTIFY_EMAIL_MAX_ATTEMPTS: '11',
+      }),
+    );
+    expect(bad.problems.map((p) => p.variable).sort()).toEqual([
+      'APP_PUBLIC_URL',
+      'EMAIL_FROM',
+      'NOTIFY_EMAIL_MAX_ATTEMPTS',
+      'NOTIFY_RETENTION',
+    ]);
+    // Ni la contraseña SMTP ni sus valores aparecen en los mensajes de error.
+    const secret = captureError(() =>
+      loadConfig('worker', { ...mailpit, SMTP_PASSWORD: 'p4ss-secreta', NOTIFY_RETENTION: 'x' }),
+    );
+    expect(secret.message).not.toContain('p4ss-secreta');
+    // La API no lee el canal email.
+    expect(Object.keys(loadConfig('api', API_ENV))).not.toContain('EMAIL_DRIVER');
+  });
+
   it('valida la lista de orígenes CORS del bucket', () => {
     const env = { ...API_ENV, DATABASE_MIGRATOR_URL: 'postgres://pf_migrator:x@db.internal:5432/pfos' };
     expect(

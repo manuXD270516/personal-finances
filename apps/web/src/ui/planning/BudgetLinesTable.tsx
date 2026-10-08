@@ -1,4 +1,4 @@
-import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle } from '../common/ui';
+import { cellStyle, mutedStyle, numCellStyle, tableStyle, tableWrapStyle, warningStyle } from '../common/ui';
 import { formatMoney, formatSignedMoney } from '../dashboard/format';
 import { formatDecimal } from '../AuditHistory';
 import type { FormatContext } from '../dashboard/types';
@@ -95,6 +95,7 @@ export function BudgetLinesTable({
   f,
   canEdit,
   editingId,
+  highlightedId,
   busyId,
   onEdit,
   onRemove,
@@ -104,6 +105,8 @@ export function BudgetLinesTable({
   f: FormatContext;
   canEdit: boolean;
   editingId?: string | undefined;
+  /** Línea a resaltar (enlace desde una notificación): fila marcada y con texto, no solo color. */
+  highlightedId?: string | undefined;
   busyId?: string | undefined;
   onEdit?: (line: BudgetLine) => void;
   onRemove?: (line: BudgetLine) => void;
@@ -167,10 +170,29 @@ export function BudgetLinesTable({
                 data-line-id={line.id}
                 data-target-id={line.target.id}
                 data-kind={line.kind}
-                aria-current={editingId === line.id ? 'true' : undefined}
+                aria-current={editingId === line.id || highlightedId === line.id ? 'true' : undefined}
+                data-highlighted={highlightedId === line.id ? 'true' : undefined}
+                style={
+                  highlightedId === line.id
+                    ? {
+                        background: 'var(--pf-primary-soft)',
+                        outline: '2px solid var(--pf-primary)',
+                        outlineOffset: '-2px',
+                      }
+                    : undefined
+                }
               >
                 <th scope="row" style={{ ...cellStyle, fontWeight: 600 }}>
                   {name}
+                  {highlightedId === line.id ? (
+                    <small
+                      data-testid="line-highlight-note"
+                      style={{ color: 'var(--pf-primary)', fontWeight: 600 }}
+                    >
+                      {' '}
+                      {f.t('lineFromNotification')}
+                    </small>
+                  ) : null}
                   <br />
                   <small style={{ ...mutedStyle, fontWeight: 400 }}>
                     {f.t(`targetKind.${line.target.kind}`)} · {f.t(`kind.${line.kind}`)}
@@ -284,5 +306,14 @@ export function BudgetLinesTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Aviso cuando la línea que originó una notificación ya no existe en el plan (el plan se sigue mostrando). */
+export function LineMissingNotice({ f }: { f: FormatContext }) {
+  return (
+    <p role="status" style={warningStyle} data-testid="budget-line-missing">
+      {f.t('lineMissing')}
+    </p>
   );
 }

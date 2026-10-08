@@ -609,6 +609,93 @@ export const VARIABLES = {
     },
   ),
 
+  // ── Notificaciones (openspec add-alerts, design decisiones 6, 7, 9 y 11; docs/33 D87–D93) ──
+  EMAIL_DRIVER: variable(z.enum(['smtp', 'none']), {
+    group: 'Notificaciones',
+    description:
+      'Adaptador del canal email de las notificaciones. `smtp` envía por SMTP (Mailpit en local/CI; cualquier relay SMTP después); `none` suprime las entregas por email (`SUPPRESSED`/`CHANNEL_DISABLED`, sin error ni reintentos) y deja solo el in-app. Sin valor: `smtp` en local/ci cuando `SMTP_HOST` está definido (Mailpit) y `none` en cualquier otro caso, en particular en staging/production hasta elegir el proveedor de producción (docs/33 D87).',
+    optional: true,
+    example: 'smtp',
+  }),
+  SMTP_HOST: variable(z.string().min(1).max(253), {
+    group: 'Notificaciones',
+    description:
+      'Servidor SMTP del canal email. En local y CI es Mailpit (`PF_MAILPIT_SMTP_PORT` en el host; `mailpit:1025` dentro de Compose).',
+    optional: true,
+    requiredWhen: 'EMAIL_DRIVER=smtp',
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: '127.0.0.1',
+  }),
+  SMTP_PORT: variable(port, {
+    group: 'Notificaciones',
+    description: 'Puerto del servidor SMTP.',
+    default: '1025',
+  }),
+  SMTP_SECURE: variable(bool, {
+    group: 'Notificaciones',
+    description:
+      'TLS implícito desde el inicio de la conexión (puerto 465). Con `false` se usa STARTTLS si el servidor lo ofrece.',
+    default: 'false',
+  }),
+  SMTP_USER: variable(z.string().min(1).max(320), {
+    group: 'Notificaciones',
+    description: 'Usuario SMTP. Mailpit de desarrollo no autentica.',
+    optional: true,
+  }),
+  SMTP_PASSWORD: variable(z.string().min(1).max(1000), {
+    group: 'Notificaciones',
+    description:
+      'Contraseña SMTP. Secreto: en cloud viene del secrets manager; nunca se imprime ni se loguea.',
+    optional: true,
+    secret: true,
+  }),
+  EMAIL_FROM: variable(
+    z
+      .string()
+      .max(320)
+      .regex(
+        /^(?:[^<>]*<)?[^\s<>@]+@[^\s<>@.]+(?:\.[^\s<>@.]+)+>?$/,
+        'debe ser una dirección o `Nombre <dirección>`',
+      ),
+    {
+      group: 'Notificaciones',
+      description:
+        'Remitente de los emails de notificación. El dominio de esta dirección forma el `Message-ID` determinista de cada entrega (`<deliveryId@dominio>`).',
+      default: 'PFOS <notificaciones@pfos.local>',
+    },
+  ),
+  APP_PUBLIC_URL: variable(httpOrigin, {
+    group: 'Notificaciones',
+    description:
+      'Origen público de la app (el de `WEB_PUBLIC_URL`): base de los enlaces de los emails (`/notificaciones/{id}` y `/preferencias`). Solo ruta e identificador opaco: sin tokens ni datos financieros.',
+    optional: true,
+    requiredWhen: 'EMAIL_DRIVER=smtp',
+    // pf-allow-loopback: ejemplo de documentación (valor del modo A en .env), no una dirección en código
+    example: 'http://localhost:23000',
+  }),
+  NOTIFY_EMAIL_MAX_ATTEMPTS: variable(
+    positiveInt.refine((n) => n <= 10, 'entre 1 y 10 intentos'),
+    {
+      group: 'Notificaciones',
+      description:
+        'Intentos de envío por entrega de email (backoff exponencial 1 min, 5 min, 25 min, 2 h) antes de marcarla `FAILED` y contar `notifications_email_deliveries_total{status="failed"}`. La notificación in-app no depende del resultado.',
+      default: '5',
+    },
+  ),
+  NOTIFY_RETENTION: variable(
+    z
+      .string()
+      .regex(/^\d+mo$/, 'duración en meses (`12mo`)')
+      .transform((v) => Number(v.slice(0, -2)))
+      .refine((months) => months >= 1 && months <= 120, 'entre 1mo y 120mo'),
+    {
+      group: 'Notificaciones',
+      description:
+        'Retención de las notificaciones (todas, archivadas incluidas) y sus entregas, en meses (`12mo`, docs/33 D93). El job diario `notifications.purge` borra las más antiguas.',
+      default: '12mo',
+    },
+  ),
+
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
     group: 'OpenTelemetry',
@@ -725,6 +812,17 @@ export const APP_VARIABLES = {
     'PLANNING_PERIODS_CRON',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
+    // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).
+    'EMAIL_DRIVER',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_SECURE',
+    'SMTP_USER',
+    'SMTP_PASSWORD',
+    'EMAIL_FROM',
+    'APP_PUBLIC_URL',
+    'NOTIFY_EMAIL_MAX_ATTEMPTS',
+    'NOTIFY_RETENTION',
     ...FX_PROVIDERS,
     'FX_PROVIDER_PARALELO_BO_URL',
     'FX_PROVIDER_DOLARAPI_BO_URL',

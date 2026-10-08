@@ -76,6 +76,20 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     values['DEMO_DATA_ENABLED'] = values['PFOS_ENV'] === 'local' || values['PFOS_ENV'] === 'ci';
   }
 
+  // EMAIL_DRIVER sin valor: `smtp` en local/ci cuando hay SMTP_HOST (Mailpit); `none` en cualquier otro caso, en
+  // particular en staging/production hasta elegir el proveedor de email (docs/33 D87).
+  if (names.includes('EMAIL_DRIVER') && values['EMAIL_DRIVER'] === undefined) {
+    const dev = values['PFOS_ENV'] === 'local' || values['PFOS_ENV'] === 'ci';
+    values['EMAIL_DRIVER'] = dev && values['SMTP_HOST'] !== undefined ? 'smtp' : 'none';
+  }
+  if (names.includes('EMAIL_DRIVER') && values['EMAIL_DRIVER'] === 'smtp') {
+    for (const name of ['SMTP_HOST', 'APP_PUBLIC_URL'] as const) {
+      if (values[name] === undefined && !problems.some((p) => p.variable === name)) {
+        problems.push({ variable: name, reason: 'falta (obligatoria cuando EMAIL_DRIVER=smtp)' });
+      }
+    }
+  }
+
   // Reglas entre variables (toggles de dependencias, docs/19 §0.3 punto 6).
   if (names.includes('VALKEY_URL')) {
     const needsValkey = values['JOB_QUEUE_DRIVER'] === 'bullmq' || values['SESSION_STORE'] === 'valkey';

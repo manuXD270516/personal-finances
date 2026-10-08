@@ -1450,53 +1450,72 @@ erDiagram
 
 Verificación: job diario compara una muestra de `daily_balance` y `ledger.balance_snapshot` con `Σ posting.amount` (completo semanal); divergencia ⇒ alerta + rebuild.
 
-### 5.15 `notifications` (Phase 2)
+### 5.15 `notifications` (Phase 2, as-built de `add-alerts`)
 
 ```mermaid
 erDiagram
-  NOTIFICATION ||--o{ NOTIFICATION_DELIVERY : "entregas"
+  NOTIFICATION ||--o| NOTIFICATION_DELIVERY : "entrega email"
   NOTIFICATION_PREFERENCE {
-    uuid id PK
-    uuid workspace_id FK
-    uuid user_id
-    text notification_type "BUDGET_THRESHOLD BILL_DUE GOAL_REACHED IMPORT_DONE"
-    text channel "IN_APP EMAIL"
+    uuid workspace_id PK
+    uuid user_id PK
+    text notification_type PK "BUDGET_THRESHOLD MONTH_CLOSE_PENDING"
+    text channel PK "IN_APP EMAIL"
     boolean enabled
-    jsonb settings "umbral 80 100"
     int version
+    timestamptz updated_at
+  }
+  USER_SETTING {
+    uuid workspace_id PK
+    uuid user_id PK
+    time quiet_hours_start
+    time quiet_hours_end
+    boolean include_details_in_email "false por defecto"
+    int version "ETag de las preferencias"
+    timestamptz updated_at
   }
   NOTIFICATION {
     uuid id PK
     uuid workspace_id FK
-    uuid user_id
+    uuid user_id FK
     text notification_type
     text severity "INFO WARNING CRITICAL"
-    text title
-    text body
-    jsonb payload "ids, sin montos en email"
+    text message_key "sin texto congelado"
+    jsonb params "ids, umbral, montos como string + moneda"
+    jsonb link "BUDGET_LINE PERIOD_CLOSE"
     text dedupe_key
-    text status "UNREAD READ DISMISSED"
+    uuid source_event_id
+    text status "UNREAD READ ARCHIVED"
     timestamptz created_at
     timestamptz read_at
+    timestamptz archived_at
   }
   NOTIFICATION_DELIVERY {
     uuid id PK
     uuid workspace_id FK
     uuid notification_id FK
-    text channel
-    text status "PENDING SENT FAILED SUPPRESSED"
-    smallint attempts
-    text provider_message_id
-    text last_error
+    text channel "EMAIL"
+    text status "PENDING SENDING RETRY SENT FAILED SUPPRESSED"
+    text suppression_reason "CHANNEL_DISABLED NO_EMAIL NOT_MEMBER PREFERENCE_DISABLED NOTIFICATION_GONE"
+    timestamptz not_before
+    int attempts
+    timestamptz lease_until
+    text provider
+    text provider_message_id "Message-ID determinista"
+    text last_error_code "sin direcciones de email"
     timestamptz sent_at
   }
 ```
 
-| Tabla | Unique | Check | Índices | RLS | version / archivo |
-|-------|--------|-------|---------|-----|-------------------|
-| `notification_preference` | `(workspace_id, user_id, notification_type, channel)` | — | — | WS | `version` |
-| `notification` | `(workspace_id, user_id, dedupe_key)` (p. ej. `budget:<lineId>:80`) | — | `(workspace_id, user_id, created_at DESC) WHERE status='UNREAD'` | WS (+ filtro `user_id = app.user_id` en lectura) | Retención 12 meses |
-| `notification_delivery` | `(notification_id, channel)` | `attempts >= 0` | `(status) WHERE status='PENDING'` | WS | — |
+Cambios respecto del diseño original (docs/33 D87–D93): `DISMISSED` → `ARCHIVED`; `title/body` → `message_key/params` (el texto se renderiza al leer en el locale del usuario); `settings` por tipo → tabla `user_setting` (horario de silencio, detalles en email; D91: sin filtro por umbral); `NOTIFICATION_DELIVERY` con lease, `not_before` y motivos de supresión. **Ninguna tabla guarda direcciones de email** (se resuelven al despachar; RISK-010).
+
+| Tabla | Unique | Check | Índices | RLS | Notas |
+|-------|--------|-------|---------|-----|-------|
+| `notification` | `(workspace_id, user_id, dedupe_key)` (p. ej. `budget-threshold:<periodId>:CATEGORY:<id>:90`) | coherencia estado ↔ `read_at`/`archived_at` | `(workspace_id, user_id, status, created_at DESC, id DESC)`, `(created_at)` | WS + `user_id` (`notifications.is_row_user`): `pf_app` SELECT propias y UPDATE de estado propio; `pf_worker` INSERT, SELECT y DELETE (purga) | Retención 12 meses (D93), archivadas incluidas |
+| `notification_delivery` | `(notification_id, channel)` | `attempts >= 0`; `SUPPRESSED` ⇒ motivo; `SENT` ⇒ `sent_at` | `(status, not_before) WHERE status IN ('PENDING','RETRY')`, `(lease_until) WHERE status='SENDING'` | WS; `pf_worker` todo; `pf_app` solo `(workspace_id, notification_id, channel, status)` de las entregas de SUS notificaciones | No exportada |
+| `notification_preference` | `(workspace_id, user_id, notification_type, channel)` (PK) | — | — | WS + `user_id`; `pf_worker` SELECT | Ausencia = activado; exportada |
+| `user_setting` | `(workspace_id, user_id)` (PK) | horario: ambos nulos o ambos presentes y distintos | — | WS + `user_id`; `pf_worker` SELECT | `version` = ETag; exportada |
+
+Las cuatro tablas están registradas en `platform.workspace_scoped_table` (purga del workspace demo, órdenes 120–126).
 
 ### 5.16 `audit` — Audit trail (Phase 1)
 

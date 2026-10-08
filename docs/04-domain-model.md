@@ -369,12 +369,15 @@ Sin agregados transaccionales: **read models** reconstruibles desde eventos + qu
 
 ### 3.16 NOTIFY — Notifications (`notifications`)
 
-- **AR `Notification`**: `id, recipientUserId, type, channel (IN_APP|EMAIL|PUSH), title, body, data, dedupKey, status (PENDING|SENT|FAILED|READ|DISMISSED), attempts, sentAt?`.
-- **AR `NotificationPreference`**: `userId, type, channels[], quietHours`.
-- **Ports**: `NotificationRepository`, `NotificationSender` (SMTP/Mailpit, push), `TemplateRenderer`, `Clock`.
-- **Comandos**: `Notify` (interno, desde handlers de eventos), `MarkAsRead`, `Dismiss`, `UpdatePreferences`.
-- **Queries**: `ListNotifications`, `GetUnreadCount`.
-- **Invariantes**: una notificación por `dedupKey` (p. ej. `budget-threshold:<budgetItemId>:<threshold>:<yearMonth>`).
+Implementado por `add-alerts` (Phase 2; `packages/contexts/notifications`). NOTIFY **solo traduce hechos publicados** en notificaciones: no decide reglas de alerta.
+
+- **AR `Notification`**: `id, workspaceId, userId, type (BUDGET_THRESHOLD|MONTH_CLOSE_PENDING), severity (INFO|WARNING|CRITICAL), messageKey, params (ids, umbral, montos como string decimal + moneda, periodo), link ({BUDGET_LINE|PERIOD_CLOSE, …}), dedupeKey, sourceEventId, status (UNREAD|READ|ARCHIVED), createdAt, readAt?, archivedAt?`. No guarda texto ni emails: el título y el cuerpo se renderizan al leer en el locale del perfil (es/en/pt, respaldo es) con los nombres vigentes de la categoría/grupo/tag.
+- **Entidad `NotificationDelivery`** (canal EMAIL): `status (PENDING|SENDING|RETRY|SENT|FAILED|SUPPRESSED), suppressionReason, notBefore, attempts, leaseUntil, providerMessageId, lastErrorCode`.
+- **AR `NotificationPreferences`** (por usuario y workspace): `byType {tipo → {IN_APP, EMAIL}}` (ausencia = activado), `quietHours? (HH:mm en la zona del usuario, puede cruzar la medianoche)`, `includeDetailsInEmail` (por defecto `false`). **VOs**: `NotificationType`, `QuietHours`, `NotificationLocale`. **Registro** `NotificationTypeCatalog`: por tipo, evento de origen, destinatarios, `dedupeKey`, severidad y enlace (extensible por fase).
+- **Ports**: `NotificationRepository`, `DeliveryRepository`, `PreferencesRepository`, `WorkspaceRecipientsQuery` (`@pf/identity/contracts`), `CategoryCatalogQuery` (nombres), `EmailSender` (adapters `smtp` y `none`), `EmailDispatchScheduler`, `Clock`, `UnitOfWork`.
+- **Casos de uso**: `NotifyFromEvent` (consumidores `notifications.budget-threshold` y `notifications.month-close-pending`), `DispatchEmailDelivery`, `MarkAsRead`, `MarkAllAsRead`, `Archive`, `UpdatePreferences` (auditado), `PurgeExpiredNotifications`. **Queries**: `ListNotifications`, `GetNotification`, `GetUnreadCount`, `GetPreferences`.
+- **Destinatarios (docs/33 D89)**: `BUDGET_THRESHOLD` a todo miembro activo (OWNER, EDITOR, VIEWER); `MONTH_CLOSE_PENDING` a OWNER y EDITOR.
+- **Invariantes**: una notificación por (workspace, usuario, `dedupeKey`) —`budget-threshold:<periodId>:<targetKind>:<targetId>:<threshold>` y `month-close-pending:<periodId>`— además del inbox `(consumer, eventId)` (INV-028); a lo sumo un email aceptado por notificación y canal (claim con lease, `Message-ID` determinista); el in-app nunca depende del email; el email no lleva montos ni nombres salvo opt-in; sin direcciones de email en las tablas de NOTIFY ni en logs.
 
 ### 3.17 AUDIT (`audit`)
 

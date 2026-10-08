@@ -213,6 +213,13 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 - **Idem.:** natural `workspaceId`. **Ord.:** por `Workspace`. **PII:** ninguna.
 - **Workspaces retirados:** los consumidores ignoran (no-op, sin fila de inbox) los eventos de un workspace demo archivado o purgado (`platform.workspace_is_retired`).
 
+#### Consumidores de NOTIFY (add-alerts, Phase 2)
+- **`notifications.budget-threshold`** (cola `events.notifications.budget-threshold`): consume `planning.BudgetThresholdReached.v1`; destinatarios: todo miembro activo (OWNER, EDITOR, VIEWER; docs/33 D89). Clave de deduplicación de negocio por destinatario: `budget-threshold:<periodId>:<targetKind>:<targetId>:<threshold>`.
+- **`notifications.month-close-pending`** (cola `events.notifications.month-close-pending`): consume `planning.MonthClosePending.v1`; destinatarios: OWNER y EDITOR. Clave: `month-close-pending:<periodId>`.
+- **Idempotencia en dos capas (INV-028)**: `platform.inbox (consumer, eventId)` en la transacción del consumidor + `UNIQUE (workspace_id, user_id, dedupe_key)` con `ON CONFLICT DO NOTHING`; un segundo evento del mismo hecho con otro `eventId` no duplica. La entrega por email se crea solo si la notificación se insertó y su job `notifications.email-dispatch` se encola en la misma transacción.
+- **Fallo**: un payload mal formado reintenta y termina en `platform.dead_letter` del consumidor (no bloquea a los demás); la caída del SMTP no afecta a los consumidores (cola propia `notifications.email-dispatch`).
+- **Métricas**: `notifications_created_total{type}`, `notifications_email_deliveries_total{status}` (`sent|retry|failed|suppressed`) y el histograma `notifications_event_lag` (evento → notificación in-app, NFR-PERF-008).
+
 ### 3.3 Fases posteriores (schemas se crean al implementar)
 
 | Evento | Productor | Consumidores | Trigger | Payload (resumen) | Idem. natural | PII |

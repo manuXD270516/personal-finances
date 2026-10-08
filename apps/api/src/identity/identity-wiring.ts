@@ -25,12 +25,18 @@ import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
 import {
   IdentityModule,
   identityUserLocales,
+  identityUserLocaleTags,
   identityWorkspaceCalendar,
   identityWorkspaceSettings,
   identityWorkspaceTimeZones,
   type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
+import { NOTIFICATIONS_AUDIT_POLICY } from '@pf/notifications/contracts';
+import {
+  createNotificationsApiRuntime,
+  NotificationsModule,
+} from '@pf/notifications/interface/notifications.module';
 import { PLANNING_AUDIT_POLICY } from '@pf/planning/contracts';
 import {
   createPlanningRuntime,
@@ -169,6 +175,8 @@ export const AUDIT_POLICIES = [
   TRANSACTIONS_AUDIT_POLICY,
   FX_AUDIT_POLICY,
   PLANNING_AUDIT_POLICY,
+  // add-alerts (Phase 2): los cambios de preferencias de notificaciones se auditan (docs/33 D92).
+  NOTIFICATIONS_AUDIT_POLICY,
 ];
 
 /**
@@ -332,7 +340,16 @@ export function financeRuntimes(input: {
       lifecycleQuery: input.lifecycleQuery,
     },
   });
-  return { classification, fx, accounts, ledger, transactions, reporting, planning };
+  // NOTIFY (add-alerts): bandeja in-app y preferencias; los nombres vigentes vienen de CLASSIFICATION y el idioma del
+  // perfil del usuario de IDENTITY (el texto se compone al leer).
+  const notifications = createNotificationsApiRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    catalog: classification.categories,
+    locales: identityUserLocaleTags(input.pool),
+  });
+  return { classification, fx, accounts, ledger, transactions, reporting, planning, notifications };
 }
 
 /**
@@ -365,16 +382,17 @@ export function identityImports(input: {
   const lifecyclePort = input.lifecycle
     ? input.lifecycle(audit.lifecycleFor(auditPort))
     : audit.lifecycleFor(auditPort);
-  const { classification, fx, accounts, ledger, transactions, reporting, planning } = financeRuntimes({
-    pool: input.pool,
-    clock: input.conventions.clock,
-    audit: auditPort,
-    lifecycle: lifecyclePort,
-    lifecycleQuery: audit.lifecycleQuery,
-    history: audit.history,
-    logger: input.logger,
-    config: input.config,
-  });
+  const { classification, fx, accounts, ledger, transactions, reporting, planning, notifications } =
+    financeRuntimes({
+      pool: input.pool,
+      clock: input.conventions.clock,
+      audit: auditPort,
+      lifecycle: lifecyclePort,
+      lifecycleQuery: audit.lifecycleQuery,
+      history: audit.history,
+      logger: input.logger,
+      config: input.config,
+    });
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -410,6 +428,8 @@ export function identityImports(input: {
     ReportingModule.register({ runtime: reporting, conventions: input.conventions }),
     // PLANNING — openspec add-financial-periods (Phase 2).
     PlanningModule.register({ runtime: planning, conventions: input.conventions }),
+    // NOTIFY — openspec add-alerts (Phase 2): `/notifications*` y `/notification-preferences`.
+    NotificationsModule.register({ runtime: notifications, conventions: input.conventions }),
   ];
 }
 

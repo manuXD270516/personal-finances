@@ -1746,7 +1746,9 @@
       "createSubmit": "Crear template",
       "templateCreated": "Template {name} creado con {count} líneas.",
       "applied": "Cambios propagados a los meses futuros."
-    }
+    },
+    "lineFromNotification": "Línea de la notificación",
+    "lineMissing": "La línea del presupuesto que originó la notificación ya no existe en este plan."
   },
   "Templates": {
     "title": "Templates de presupuesto",
@@ -2070,6 +2072,107 @@
       "saved": "Política de cierre guardada.",
       "reload": "Cargar la versión actual",
       "loading": "Cargando la política de cierre…"
+    }
+  },
+  "Notifications": {
+    "bell": {
+      "label": "Notificaciones",
+      "unreadHint": "({count} sin leer)",
+      "announce": "{count, plural, one {Tienes # notificación sin leer.} other {Tienes # notificaciones sin leer.}}"
+    },
+    "title": "Notificaciones",
+    "intro": "Avisos de tus presupuestos y del cierre de mes. Se conservan hasta que los archives.",
+    "loading": "Cargando notificaciones…",
+    "loadingMore": "Cargando…",
+    "loadMore": "Cargar más",
+    "empty": "No tienes notificaciones",
+    "noWorkspace": "Selecciona o crea un espacio de trabajo para ver tus notificaciones.",
+    "filters": {
+      "label": "Filtrar notificaciones",
+      "RECENT": "Recientes",
+      "UNREAD": "Sin leer",
+      "ARCHIVED": "Archivadas"
+    },
+    "list": {
+      "label": "Lista de notificaciones"
+    },
+    "item": {
+      "unread": "Sin leer",
+      "read": "Leída",
+      "archived": "Archivada",
+      "markRead": "Marcar como leída",
+      "markReadNamed": "Marcar como leída: {title}",
+      "archive": "Archivar",
+      "archiveNamed": "Archivar: {title}",
+      "openDetail": "Ver detalle",
+      "severity": {
+        "INFO": "Información",
+        "WARNING": "Advertencia",
+        "CRITICAL": "Crítica"
+      },
+      "email": "Email: {status}",
+      "emailStatus": {
+        "PENDING": "Pendiente",
+        "SENT": "Enviado",
+        "FAILED": "Fallido",
+        "SUPPRESSED": "Suprimido"
+      }
+    },
+    "markAllRead": "Marcar todas como leídas",
+    "done": {
+      "read": "Notificación marcada como leída.",
+      "archived": "Notificación archivada.",
+      "allRead": "{count, plural, =0 {No había notificaciones sin leer.} one {# notificación marcada como leída.} other {# notificaciones marcadas como leídas.}}"
+    },
+    "detail": {
+      "loading": "Cargando la notificación…",
+      "notFound": "Esta notificación no existe o no es tuya.",
+      "back": "Volver a la bandeja",
+      "received": "Recibida",
+      "severity": "Severidad",
+      "status": "Estado",
+      "openBudgetLine": "Ver la línea en el plan de {period}",
+      "openPeriodClose": "Ir al cierre de {period}"
+    },
+    "prefs": {
+      "title": "Notificaciones",
+      "intro": "Elige qué avisos recibes y por qué canal. Cualquier miembro puede configurar los suyos.",
+      "loading": "Cargando preferencias de notificaciones…",
+      "tableCaption": "Canales por tipo de notificación",
+      "columns": {
+        "type": "Tipo de notificación",
+        "inApp": "En la app",
+        "email": "Email"
+      },
+      "channels": {
+        "inApp": "En la app",
+        "email": "Email"
+      },
+      "types": {
+        "BUDGET_THRESHOLD": "Alertas de presupuesto",
+        "MONTH_CLOSE_PENDING": "Cierre de mes pendiente"
+      },
+      "checkbox": "{type} · {channel}",
+      "includeDetails": "Incluir detalles (montos y nombres) en los emails",
+      "privacy": "Los emails viajan por canales externos; por defecto no incluyen montos ni nombres de categorías. Activa esta opción solo si aceptas ver esos datos en tu correo. Las notificaciones dentro de la app no cambian.",
+      "quiet": {
+        "legend": "Horario de silencio",
+        "enable": "Activar horario de silencio",
+        "start": "Inicio",
+        "end": "Fin",
+        "hint": "Hora de {timezone} (24 h). Los emails dentro de este horario se envían al terminar; las notificaciones dentro de la app llegan al momento."
+      },
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Preferencias de notificaciones guardadas.",
+      "noChanges": "No hay cambios para guardar.",
+      "reload": "Cargar la versión actual",
+      "reloaded": "Se cargó la versión actual. Revisa los valores y vuelve a guardar.",
+      "errors": {
+        "format": "Indica la hora con el formato HH:mm (24 h).",
+        "same": "La hora de inicio y la de fin deben ser distintas.",
+        "server": "El horario de silencio no es válido. Revisa las horas."
+      }
     }
   }
 }

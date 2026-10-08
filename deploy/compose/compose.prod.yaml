@@ -184,6 +184,8 @@ services:
     pull_policy: missing
     environment:
       <<: *prod-app-env
+      # Sin proveedor de email elegido (docs/33 D87, add-alerts): solo notificaciones in-app. Sin mailpit en producción.
+      EMAIL_DRIVER: none
     extra_hosts: !reset []
     depends_on: !override
       migrate: { condition: service_completed_successfully }

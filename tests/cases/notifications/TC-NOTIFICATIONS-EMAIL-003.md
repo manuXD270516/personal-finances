@@ -12,9 +12,12 @@ invariants: []
 priority: critical
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/notifications/notifications.test.tsx
+  - packages/contexts/notifications/src/domain/render.test.ts
+  - tests/e2e/specs/notifications.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['notifications', 'email', 'security']

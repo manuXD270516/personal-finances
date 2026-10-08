@@ -180,7 +180,8 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 - **Responsabilidades:** traducir eventos en notificaciones, preferencias, deduplicación, envío por canal, reintentos, bandeja in-app.
 - **NO responsabilidades:** decidir reglas de negocio de alerta (el productor emite el hecho, p. ej. `BudgetThresholdReached`).
 - **Eventos consumidos:** `planning.BudgetThresholdReached`, `commitments.RecurringOccurrenceDue`, `SubscriptionRenewalUpcoming`, `SubscriptionPriceChanged`, `debt.LoanInstallmentOverdue`, `CardPaymentDue`, `goals.GoalReached`, `EarmarkExceedsBalance`, `imports.ImportCompleted`, `ImportFailed`, `BankConnectionExpired`, `forecast.ForecastGenerated`.
-- **Dependencias:** `NotificationSender` (SMTP/push), Identity (query de destinatarios/preferencias).
+- **Dependencias:** `EmailSender` (SMTP/push), Identity (`WorkspaceRecipientsQuery`: miembros activos con rol, locale, zona horaria y email verificado), Classification (nombres vigentes al presentar), Audit (cambios de preferencias).
+- **Phase 2 (`add-alerts`, docs/33 D87–D93):** tipos `BUDGET_THRESHOLD` (todo miembro activo) y `MONTH_CLOSE_PENDING` (OWNER y EDITOR); consumidores `notifications.budget-threshold` y `notifications.month-close-pending` (de `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`); canal email detrás de `EmailSender` (`smtp` → Mailpit en local/CI; `none` en producción hasta elegir proveedor); preferencias por tipo y canal con horario de silencio; retención de 12 meses. Fuera de alcance: digest, push, webhook, SSE, tipos de Phases 3–7 y el aviso de violación de invariante (change posterior).
 - **Extracción:** Alta.
 
 ### 2.17 AUDIT (`audit`, `@pf/audit`)

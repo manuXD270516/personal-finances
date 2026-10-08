@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/notifications.int.test.ts
+  - packages/contexts/notifications/src/application/dispatch-email-delivery.test.ts
+  - tests/e2e/specs/notifications.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['notifications', 'email', 'mailpit']

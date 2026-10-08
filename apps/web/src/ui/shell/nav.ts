@@ -46,3 +46,11 @@ export function initialOf(name: string): string {
   const first = Array.from(name.trim())[0];
   return first ? first.toLocaleUpperCase() : '?';
 }
+
+/**
+ * La bandeja y el detalle de notificaciones (/notificaciones, /notificaciones/{id}) no son una sección de la
+ * sidebar: su acceso es la campana de la barra superior, que se marca con aria-current en esas rutas.
+ */
+export function isNotificationsRoute(pathname: string): boolean {
+  return within(stripLocale(pathname), '/notificaciones');
+}

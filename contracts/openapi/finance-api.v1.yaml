@@ -61,7 +61,7 @@ tags:
   - name: Planning
     description: "Phase 2: financial periods, monthly plan, budgets, templates and month closing."
   - name: Notifications
-    description: "LATER (Phase 2): in-app/email notifications and preferences."
+    description: "Phase 2: in-app notification center, email channel and preferences (budget thresholds, month pending close)."
   - name: Commitments
     description: "LATER (Phase 3): recurring definitions, occurrences and subscriptions."
   - name: Goals
@@ -5203,6 +5203,229 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ───────────────────────────── Notifications (Phase 2, add-alerts) ─────────────────────────────
+  # Todas las operaciones son "self": cualquier miembro activo (VIEWER+) opera SOLO sobre sus propias notificaciones y
+  # preferencias del workspace; la notificación de otro usuario o de otro workspace responde 404 RESOURCE_NOT_FOUND.
+  /workspaces/{workspaceId}/notifications:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: List the caller's notifications (newest first)
+      description: |
+        By default the `UNREAD` and `READ` notifications of the caller in this workspace; `status=ARCHIVED` lists the
+        archived ones. `title` and `body` are rendered in the caller's current locale (`/me.locale`: `es-*`, `en-*`,
+        `pt-*`; Spanish otherwise) with the current names of the categories, groups and tags, so changing the locale
+        changes the text of the existing notifications. `emailStatus` is the aggregated state of the email delivery
+        (absent if the notification has no email delivery); it never contains the email address.
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          description: Only the notifications in this state (default `UNREAD` and `READ`).
+          schema: { $ref: '#/components/schemas/NotificationStatus' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Notifications page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/notifications/unread-count:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Notifications]
+      operationId: getUnreadNotificationCount
+      summary: Count the caller's unread notifications
+      description: Archived notifications are not counted. The `ETag` lets the bell poll cheaply (`If-None-Match` → 304).
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Unread count
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationUnreadCount' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/notifications/read-all:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all the caller's unread notifications as read
+      description: Idempotent. `updated` is how many notifications changed (0 when there were none unread).
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Notifications marked as read
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationReadAllResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/notifications/{notificationId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/NotificationId'
+    get:
+      tags: [Notifications]
+      operationId: getNotification
+      summary: Get one of the caller's notifications
+      description: |
+        Target of the link of the notification email (`/notificaciones/{notificationId}` in the app, which requires a
+        session). A notification of another user or workspace is indistinguishable from a missing one (404).
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Notification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/notifications/{notificationId}/read:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/NotificationId'
+    post:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      summary: Mark a notification as read
+      description: Idempotent (an already read or archived notification is returned unchanged).
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Notification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/notifications/{notificationId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/NotificationId'
+    post:
+      tags: [Notifications]
+      operationId: archiveNotification
+      summary: Archive a notification
+      description: |
+        Idempotent. Archived notifications leave the default list and the unread count; they stay available with
+        `status=ARCHIVED` until the retention (12 months) purges them.
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Notification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/notification-preferences:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Notifications]
+      operationId: getNotificationPreferences
+      summary: Get the caller's notification preferences in this workspace
+      description: |
+        Defaults: in-app and email enabled for every type, email without amounts or names
+        (`includeDetailsInEmail = false`) and no quiet hours. The version is the `ETag`.
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Preferences
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [Notifications]
+      operationId: updateNotificationPreferences
+      summary: Replace the caller's notification preferences
+      description: |
+        Per type and channel (in-app, email), the inclusion of details in the email and the quiet hours (`HH:mm` in
+        the caller's time zone, which may cross midnight; start and end must differ; `null` removes them). Types
+        omitted from `types` keep their value. The change is audited. Quiet hours defer the email, never the in-app
+        notification.
+      x-openspec-capability: [notifications/alerts]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationPreferencesInput' }
+      responses:
+        '200':
+          description: Saved preferences
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Platform ─────────────────────────────
   /workspaces/{workspaceId}/operations/{operationId}:
     parameters:
@@ -5262,6 +5485,12 @@ components:
       in: path
       required: true
       description: Financial period UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      description: Notification UUIDv7. Must be one of the caller's own notifications.
       schema: { $ref: '#/components/schemas/Uuid' }
     BudgetId:
       name: budgetId
@@ -9386,3 +9615,141 @@ components:
             - type: 'null'
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
+
+    # ── Notifications (add-alerts, Phase 2) ──
+    NotificationType:
+      type: string
+      description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
+      pattern: '^[A-Z][A-Z0-9_]*$'
+      examples: [BUDGET_THRESHOLD]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING]
+    NotificationSeverity:
+      type: string
+      description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
+      enum: [INFO, WARNING, CRITICAL]
+    NotificationStatus:
+      type: string
+      enum: [UNREAD, READ, ARCHIVED]
+    NotificationEmailStatus:
+      type: string
+      description: |
+        Aggregated state of the email delivery. `PENDING` covers queued, in progress and waiting for a retry or for
+        the end of the quiet hours; `SUPPRESSED` means the email will never be sent (channel disabled, no verified
+        address, preference turned off).
+      enum: [PENDING, SENT, FAILED, SUPPRESSED]
+    NotificationLink:
+      type: object
+      description: |
+        Resource that originated the notification. The app translates it to a route; if the budget line no longer
+        exists the plan of the period shows that it is not available any more (the notification is not modified).
+      additionalProperties: false
+      required: [kind, periodId, periodLabel]
+      properties:
+        kind:
+          type: string
+          enum: [BUDGET_LINE, PERIOD_CLOSE]
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        budgetId: { $ref: '#/components/schemas/Uuid' }
+        budgetLineId: { $ref: '#/components/schemas/Uuid' }
+        targetKind:
+          type: string
+          enum: [CATEGORY, GROUP, TAG]
+        targetId: { $ref: '#/components/schemas/Uuid' }
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, title, body, messageKey, params, link, status, createdAt, readAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        severity: { $ref: '#/components/schemas/NotificationSeverity' }
+        title:
+          type: string
+          description: Rendered in the caller's locale (Spanish fallback) from `messageKey` and `params`.
+        body: { type: string }
+        messageKey:
+          type: string
+          description: Versioned message key (e.g. `notifications.budget_threshold.v1`).
+        params:
+          type: object
+          description: |
+            Facts of the source event (periodLabel, threshold, alsoCrossed, reference and actual as Money, utilization,
+            ids); decimals as strings. Never names or free text.
+          additionalProperties: true
+        link: { $ref: '#/components/schemas/NotificationLink' }
+        status: { $ref: '#/components/schemas/NotificationStatus' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        readAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        emailStatus: { $ref: '#/components/schemas/NotificationEmailStatus' }
+    NotificationPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    NotificationUnreadCount:
+      type: object
+      additionalProperties: false
+      required: [unread]
+      properties:
+        unread: { type: integer, minimum: 0 }
+    NotificationReadAllResult:
+      type: object
+      additionalProperties: false
+      required: [updated]
+      properties:
+        updated: { type: integer, minimum: 0 }
+    QuietHours:
+      type: object
+      description: Quiet hours in the user's time zone, `[start, end)`; may cross midnight (22:00–07:00). Start and end differ.
+      additionalProperties: false
+      required: [start, end]
+      properties:
+        start: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', examples: ['22:00'] }
+        end: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', examples: ['07:00'] }
+    NotificationTypePreference:
+      type: object
+      additionalProperties: false
+      required: [type, inApp, email]
+      properties:
+        type: { $ref: '#/components/schemas/NotificationType' }
+        inApp: { type: boolean }
+        email: { type: boolean }
+    NotificationPreferences:
+      type: object
+      additionalProperties: false
+      required: [types, quietHours, includeDetailsInEmail, version]
+      properties:
+        types:
+          type: array
+          description: Every notification type of the catalog with its channels.
+          items: { $ref: '#/components/schemas/NotificationTypePreference' }
+        quietHours:
+          oneOf:
+            - $ref: '#/components/schemas/QuietHours'
+            - type: 'null'
+        includeDetailsInEmail:
+          type: boolean
+          description: Opt-in to amounts and names in the email body. The in-app content never changes with this option.
+        version: { type: integer, minimum: 1 }
+    NotificationPreferencesInput:
+      type: object
+      additionalProperties: false
+      required: [types, quietHours, includeDetailsInEmail]
+      properties:
+        types:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/NotificationTypePreference' }
+        quietHours:
+          oneOf:
+            - $ref: '#/components/schemas/QuietHours'
+            - type: 'null'
+        includeDetailsInEmail: { type: boolean }

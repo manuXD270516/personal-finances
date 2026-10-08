@@ -27,6 +27,7 @@
     "@pf/fx": "workspace:*",
     "@pf/identity": "workspace:*",
     "@pf/ledger": "workspace:*",
+    "@pf/notifications": "workspace:*",
     "@pf/planning": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/reporting": "workspace:*",

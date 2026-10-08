@@ -35,7 +35,7 @@ contracts/events/
 ├─ planning/
 │  ├─ PeriodActivated.v1.schema.json
 │  ├─ BudgetCreated.v1.schema.json
-│  ├─ BudgetThresholdReached.v1.schema.json
+│  ├─ BudgetThresholdReached.v1.schema.json  # add-budgets: lo consume NOTIFY (add-alerts, notifications.budget-threshold)
 │  ├─ MonthClosed.v1.schema.json         # add-month-closing: cierre aceptado (snapshot versión closeNo)
 │  ├─ PeriodReopened.v1.schema.json      # add-month-closing: reapertura por el OWNER con motivo
 │  └─ MonthClosePending.v1.schema.json   # add-month-closing: aviso único por periodo (consume NOTIFY)

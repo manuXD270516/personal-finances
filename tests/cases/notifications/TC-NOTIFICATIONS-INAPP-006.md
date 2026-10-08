@@ -12,9 +12,12 @@ invariants: ['INV-025']
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/notifications.api.test.ts
+  - packages/contexts/notifications/src/application/inbox.test.ts
+  - packages/contexts/notifications/test/integration/pg-notifications.int.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['notifications', 'rls', 'privacy']
