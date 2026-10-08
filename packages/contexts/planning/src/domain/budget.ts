@@ -38,6 +38,8 @@ export class Budget {
     readonly currency: Currency;
     readonly zeroBased?: boolean;
     readonly origin?: BudgetOrigin;
+    readonly templateVersionId?: string | null;
+    readonly clonedFromBudgetId?: string | null;
     readonly at: string;
   }): Budget {
     return new Budget(
@@ -47,8 +49,8 @@ export class Budget {
         periodId: input.periodId,
         currency: input.currency.code,
         origin: input.origin ?? 'EMPTY',
-        templateVersionId: null,
-        clonedFromBudgetId: null,
+        templateVersionId: input.templateVersionId ?? null,
+        clonedFromBudgetId: input.clonedFromBudgetId ?? null,
         zeroBased: input.zeroBased ?? false,
         version: 1,
         createdAt: input.at,
@@ -149,6 +151,32 @@ export class Budget {
     this.lineList = this.lineList.map((l) => (l.id === before.id ? after : l));
     this.bump();
     return { before, after };
+  }
+
+  /**
+   * Incorpora líneas ya validadas de una versión de template o del plan anterior (add-budget-templates decisiones 2 y
+   * 4): el origen garantiza objetivos únicos y sin solapamientos; no suben la versión (el plan nace con ellas).
+   */
+  seedLines(lines: readonly BudgetLine[]): void {
+    this.lineList = [...this.lineList, ...lines];
+  }
+
+  /** Propagación: línea nueva proveniente del template (no cuenta como edición manual). */
+  attachTemplateLine(line: BudgetLine): void {
+    this.lineList = [...this.lineList, line];
+    this.bump();
+  }
+
+  /** Propagación: reemplaza una línea por la de la versión nueva del template. */
+  replaceTemplateLine(line: BudgetLine): void {
+    this.lineList = this.lineList.map((l) => (l.id === line.id ? line : l));
+    this.bump();
+  }
+
+  /** Propagación: el plan pasa a apuntar a la versión nueva del template. */
+  adoptTemplateVersion(templateVersionId: string): void {
+    this.state = { ...this.state, templateVersionId };
+    this.bump();
   }
 
   removeLine(lineId: string): BudgetLine {

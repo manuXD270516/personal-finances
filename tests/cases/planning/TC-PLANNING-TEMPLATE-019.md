@@ -12,9 +12,10 @@ invariants: ['INV-029']
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/templates.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'rbac', 'audit']

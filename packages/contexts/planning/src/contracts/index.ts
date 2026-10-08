@@ -244,10 +244,32 @@ export const PLANNING_AUDIT_POLICY = {
     rolloverStatus: 'plain',
     thresholds: 'plain',
     source: 'plain',
+    // add-budget-templates: origen (template y versión, plan clonado, líneas omitidas) y propagación.
+    templateId: 'plain',
+    templateVersionNo: 'plain',
+    clonedFromBudgetId: 'plain',
+    lineCount: 'plain',
+    omittedLines: 'plain',
+    propagatedChanges: 'plain',
+    propagationConflicts: 'plain',
     threshold: 'plain',
     alsoCrossed: 'plain',
     reference: 'money',
     actual: 'money',
     utilization: 'plain',
+  },
+  // add-budget-templates: el template y sus versiones se auditan sobre el agregado `BudgetTemplate`; las líneas viajan
+  // como texto JSON (docs/31 D19).
+  BudgetTemplate: {
+    name: 'plain',
+    description: 'plain',
+    status: 'plain',
+    isDefault: 'plain',
+    versionNo: 'plain',
+    changeNote: 'plain',
+    lineCount: 'plain',
+    lines: 'plain',
+    clonedFromTemplateId: 'plain',
+    clonedFromVersionNo: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;

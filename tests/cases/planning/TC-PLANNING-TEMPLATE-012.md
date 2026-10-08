@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/templates.service.test.ts
+  - packages/contexts/planning/test/integration/pg-templates.int.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'default']

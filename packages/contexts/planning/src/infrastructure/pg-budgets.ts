@@ -182,6 +182,17 @@ export class PgBudgetRepository implements BudgetRepository {
     return (await hydrate(rows))[0] ?? null;
   }
 
+  async listByTemplate(workspaceId: string, templateId: string): Promise<Budget[]> {
+    const { rows } = await sql<BudgetRow>`
+      SELECT ${budgetSelect}
+       WHERE b.workspace_id = ${workspaceId}::uuid
+         AND b.template_version_id IN (
+           SELECT v.id FROM planning.budget_template_version v
+            WHERE v.workspace_id = ${workspaceId}::uuid AND v.template_id = ${templateId}::uuid)
+       ORDER BY b.created_at, b.id`.execute(db());
+    return hydrate(rows);
+  }
+
   async listByPeriods(workspaceId: string, periodIds: readonly string[]): Promise<Budget[]> {
     if (periodIds.length === 0) return [];
     const { rows } = await sql<BudgetRow>`
@@ -210,7 +221,8 @@ export class PgBudgetRepository implements BudgetRepository {
     const s = budget.snapshot;
     const res = await sql`
       UPDATE planning.budget
-         SET zero_based = ${s.zeroBased}, version = ${s.version}, updated_at = now(), updated_by = ${currentUserId()}::uuid
+         SET zero_based = ${s.zeroBased}, template_version_id = ${s.templateVersionId}::uuid, version = ${s.version},
+             updated_at = now(), updated_by = ${currentUserId()}::uuid
        WHERE workspace_id = ${s.workspaceId}::uuid AND id = ${s.id}::uuid AND version = ${budget.persistedVersion}`.execute(
       db(),
     );

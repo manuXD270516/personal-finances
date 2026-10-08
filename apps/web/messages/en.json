@@ -1563,7 +1563,8 @@
     "nav": {
       "label": "Planning",
       "periods": "Periods",
-      "budgets": "Budgets"
+      "budgets": "Budgets",
+      "templates": "Templates"
     },
     "totals": {
       "title": "Plan summary",
@@ -1695,6 +1696,180 @@
       "goToBudgets": "View budgets",
       "noPlan": "This period does not have a plan yet: there is no available-to-spend amount to show.",
       "createPlan": "Create this month's plan"
+    },
+    "origin": {
+      "title": "Where the plan comes from",
+      "EMPTY": "Empty plan",
+      "TEMPLATE": "From a template",
+      "CLONE_PREVIOUS": "Clone the plan of the previous month",
+      "template": "Template",
+      "version": "Version",
+      "latest": "Latest version",
+      "versionOption": "Version {versionNo}",
+      "default": "default",
+      "noTemplates": "There are no active templates.",
+      "cloneHint": "The lines of the previous month are copied, without spent amounts or thresholds already alerted."
+    },
+    "omitted": {
+      "title": "Some lines were not copied",
+      "TARGET_ARCHIVED": "{name}: its category, group or tag is archived.",
+      "CURRENCY_MISMATCH": "{name}: it is in a different currency than the plan."
+    },
+    "originInfo": {
+      "EMPTY": "Origin: plan created empty.",
+      "TEMPLATE": "Origin: template {name}, version {versionNo}.",
+      "CLONE": "Origin: cloned from the previous month plan.",
+      "CLONE_TEMPLATE": "Origin: cloned from the previous month plan (template {name}, version {versionNo})."
+    },
+    "propagate": {
+      "open": "Apply to future months…",
+      "createTemplate": "Create a template with these lines",
+      "noOrigin": "This plan does not come from a template, so it cannot be propagated.",
+      "selectTitle": "Lines to propagate",
+      "selectHint": "Pick the lines you want to carry to the template and to the future draft months.",
+      "edited": "edited",
+      "preview": "See preview",
+      "createHint": "A template will be created with the {count} lines of this plan. You can then apply it to other months.",
+      "templateName": "Template name",
+      "createSubmit": "Create template",
+      "templateCreated": "Template {name} created with {count} lines.",
+      "applied": "Changes propagated to the future months."
+    }
+  },
+  "Templates": {
+    "title": "Budget templates",
+    "intro": "A template stores the lines of a monthly plan in immutable versions. Apply it when creating the plan of a period, or make it the default so every new period starts with its plan.",
+    "loading": "Loading templates…",
+    "empty": "There are no templates yet. Create one to reuse your planning month after month.",
+    "list": {
+      "caption": "Workspace templates",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "version": "Current version",
+        "lines": "Lines",
+        "actions": "Actions"
+      },
+      "default": "Default",
+      "status": {
+        "ACTIVE": "Active",
+        "ARCHIVED": "Archived"
+      },
+      "open": "Open",
+      "openLabel": "Open the template {name}"
+    },
+    "create": {
+      "title": "New template",
+      "name": "Name",
+      "nameRequired": "The name is required.",
+      "description": "Description (optional)",
+      "submit": "Create template",
+      "done": "Template created. Add its lines and publish the next version."
+    },
+    "detail": {
+      "title": "Template {name}",
+      "currentVersion": "Current version: {versionNo}"
+    },
+    "actions": {
+      "edit": "Edit lines",
+      "setDefault": "Make default",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "cancel": "Cancel",
+      "defaultDone": "Template set as the default.",
+      "archiveDone": "Template archived.",
+      "unarchiveDone": "Template unarchived."
+    },
+    "archive": {
+      "title": "Archive the template {name}?",
+      "body": "It stops being the default and can no longer be applied. Its versions and the plans already created do not change."
+    },
+    "lines": {
+      "caption": "Lines of version {versionNo}",
+      "empty": "This version has no lines.",
+      "columns": {
+        "target": "Budget",
+        "spec": "Type and amount",
+        "thresholds": "Thresholds",
+        "rollover": "Rollover",
+        "actions": "Actions"
+      }
+    },
+    "versions": {
+      "caption": "Template versions (immutable)",
+      "columns": {
+        "version": "Version",
+        "note": "Change note",
+        "date": "Published",
+        "lines": "Lines",
+        "actions": "Actions"
+      },
+      "version": "Version {versionNo}",
+      "current": "current",
+      "view": "View",
+      "viewLabel": "View version {versionNo}"
+    },
+    "compare": {
+      "title": "Compare versions",
+      "from": "From",
+      "to": "To",
+      "run": "Compare",
+      "caption": "Changes from version {a} to version {b}",
+      "none": "No differences.",
+      "change": "Change",
+      "before": "Before",
+      "after": "After",
+      "ADDED": "Added",
+      "CHANGED": "Changed",
+      "REMOVED": "Removed"
+    },
+    "draft": {
+      "title": "Version {versionNo} (draft)",
+      "intro": "Edit the lines and publish: a new, complete version is created; version {versionNo} does not change.",
+      "linesCaption": "Draft lines",
+      "addLine": "Add line",
+      "changesTitle": "Changes compared with version {versionNo}",
+      "note": "Change note (optional)",
+      "noteHint": "For example: Inflation.",
+      "publish": "Publish version",
+      "propagate": "Apply to future months…",
+      "discard": "Discard draft",
+      "published": "Version {versionNo} published."
+    },
+    "clone": {
+      "title": "Clone as a new template",
+      "intro": "Version {versionNo} is copied as an independent template with its own version 1.",
+      "name": "Name of the clone",
+      "submit": "Clone",
+      "done": "Template cloned."
+    },
+    "propagation": {
+      "title": "Apply to future months",
+      "intro": "Only the plans of future draft periods are updated. Lines you edited by hand are not touched. Nothing changes until you confirm.",
+      "loading": "Computing the preview…",
+      "newVersion": "Version {versionNo} of the template will be published: {added} lines added, {updated} changed and {removed} removed.",
+      "noPeriods": "There are no plans of future draft periods that follow this template.",
+      "noChangesInPeriod": "No changes in this period.",
+      "changesLabel": "Changes in {period}",
+      "conflictsLabel": "Lines left untouched in {period}",
+      "action": {
+        "ADD": "is added",
+        "UPDATE": "changes",
+        "REMOVE": "is removed"
+      },
+      "to": "to",
+      "keeps": "kept",
+      "reason": {
+        "OVERRIDDEN": "you edited it by hand",
+        "MANUAL_LINE": "it is a line of the plan itself",
+        "TARGET_OVERLAP": "it would overlap another line of the plan",
+        "CURRENCY_MISMATCH": "the plan is in another currency"
+      },
+      "confirm": "Confirm and publish",
+      "cancel": "Cancel",
+      "close": "Close",
+      "reload": "Refresh the preview",
+      "done": "Propagation applied: the new template version was published and the plans were updated."
     }
   }
 }

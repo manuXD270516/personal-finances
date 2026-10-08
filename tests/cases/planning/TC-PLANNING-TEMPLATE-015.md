@@ -12,8 +12,12 @@ invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/templates.api.test.ts
+  - packages/contexts/planning/src/application/propagation.service.test.ts
+  - apps/web/src/ui/planning/templates.test.tsx
+  - tests/e2e/specs/templates.spec.ts
 status: draft
 regression_suite: false
 phase: 2

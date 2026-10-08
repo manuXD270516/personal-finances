@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/templates.service.test.ts
+  - apps/web/src/ui/planning/templates.test.tsx
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'apply', 'archived']

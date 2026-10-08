@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/templates.api.test.ts
+  - packages/contexts/planning/src/application/propagation.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'propagation', 'concurrency']

@@ -5,12 +5,21 @@ import type {
   ValuationRateDto,
   WorkspaceCurrencyDto,
 } from '@pf/fx/contracts';
-import { Instant } from '@pf/shared-kernel';
+import { DomainError, Instant } from '@pf/shared-kernel';
 import type { NominalFlowRowDto } from '@pf/transactions/contracts';
 import { PeriodQueries } from '../period.queries.js';
-import { Budget, BudgetLine, type BudgetLineState, type BudgetState } from '../../domain/index.js';
+import {
+  Budget,
+  BudgetLine,
+  BudgetTemplate,
+  type BudgetLineState,
+  type BudgetState,
+  type BudgetTemplateState,
+  type TemplateVersion,
+} from '../../domain/index.js';
 import type {
   BudgetRepository,
+  BudgetTemplateRepository,
   BudgetsDeps,
   CrossingKey,
   ThresholdCrossingRepository,
@@ -40,6 +49,7 @@ export class InMemoryBudgets {
   readonly mem = new InMemoryPlanning();
   readonly budgetRows = new Map<string, { state: BudgetState; lines: BudgetLineState[] }>();
   readonly crossingRows: ThresholdCrossingRow[] = [];
+  readonly templateRows = new Map<string, { state: BudgetTemplateState; versions: TemplateVersion[] }>();
   readonly flowRows: NominalFlowRowDto[] = [];
   readonly rateRows: StoredRate[] = [];
   tree: CategoryTreeDto = { groups: [], categories: [], tags: [] };
@@ -55,6 +65,9 @@ export class InMemoryBudgets {
       const snapshot = {
         budgets: new Map([...this.budgetRows].map(([k, v]) => [k, { state: v.state, lines: [...v.lines] }])),
         crossings: this.crossingRows.length,
+        templates: new Map(
+          [...this.templateRows].map(([k, v]) => [k, { state: v.state, versions: [...v.versions] }]),
+        ),
       };
       this.inTx = true;
       try {
@@ -63,6 +76,8 @@ export class InMemoryBudgets {
         this.budgetRows.clear();
         for (const [k, v] of snapshot.budgets) this.budgetRows.set(k, v);
         this.crossingRows.length = snapshot.crossings;
+        this.templateRows.clear();
+        for (const [k, v] of snapshot.templates) this.templateRows.set(k, v);
         throw err;
       } finally {
         this.inTx = false;
@@ -80,6 +95,17 @@ export class InMemoryBudgets {
         (r) => r.state.workspaceId === workspaceId && r.state.periodId === periodId,
       );
       return row ? this.restore(row) : null;
+    },
+    listByTemplate: async (workspaceId, templateId) => {
+      const versionIds = new Set((this.templateRows.get(templateId)?.versions ?? []).map((v) => v.id));
+      return [...this.budgetRows.values()]
+        .filter(
+          (r) =>
+            r.state.workspaceId === workspaceId &&
+            r.state.templateVersionId !== null &&
+            versionIds.has(r.state.templateVersionId),
+        )
+        .map((r) => this.restore(r));
     },
     listByPeriods: async (workspaceId, periodIds) =>
       [...this.budgetRows.values()]
@@ -119,6 +145,108 @@ export class InMemoryBudgets {
     },
     deleteLine: async (_workspaceId, lineId) => {
       for (const row of this.budgetRows.values()) row.lines = row.lines.filter((l) => l.id !== lineId);
+    },
+  };
+
+  private currentVersion(row: { state: BudgetTemplateState; versions: TemplateVersion[] }): TemplateVersion {
+    return row.versions.find((v) => v.versionNo === row.state.currentVersionNo)!;
+  }
+
+  private templateOf(row: { state: BudgetTemplateState; versions: TemplateVersion[] }): BudgetTemplate {
+    return BudgetTemplate.restore(row.state, this.currentVersion(row));
+  }
+
+  /** Doble en memoria con las barreras de BD: nombre activo único, un solo predeterminado, versiones inmutables. */
+  readonly templates: BudgetTemplateRepository = {
+    lockDefaults: async () => undefined,
+    insert: async (template) => {
+      const s = template.snapshot;
+      const dup = [...this.templateRows.values()].some(
+        (r) =>
+          r.state.workspaceId === s.workspaceId &&
+          r.state.status === 'ACTIVE' &&
+          r.state.name.trim().toLowerCase() === s.name.trim().toLowerCase(),
+      );
+      if (dup) throw new DomainError('NAME_TAKEN', 'an active template already uses this name');
+      this.templateRows.set(s.id, { state: s, versions: [template.currentVersion] });
+    },
+    insertCurrentVersion: async (template) => {
+      const row = this.templateRows.get(template.id);
+      if (!row) throw new Error('template missing');
+      row.versions.push(template.currentVersion);
+    },
+    save: async (template) => {
+      const row = this.templateRows.get(template.id);
+      if (!row || row.state.version !== template.persistedVersion) return false;
+      const s = template.snapshot;
+      const clash = [...this.templateRows.values()].some(
+        (r) =>
+          r.state.id !== s.id &&
+          r.state.workspaceId === s.workspaceId &&
+          ((s.status === 'ACTIVE' &&
+            r.state.status === 'ACTIVE' &&
+            r.state.name.trim().toLowerCase() === s.name.trim().toLowerCase()) ||
+            (s.isDefault && r.state.isDefault && r.state.status === 'ACTIVE')),
+      );
+      if (clash) throw new Error('budget_template unique violation (23505)');
+      row.state = s;
+      return true;
+    },
+    findById: async (workspaceId, id) => {
+      const row = this.templateRows.get(id);
+      return row && row.state.workspaceId === workspaceId ? this.templateOf(row) : null;
+    },
+    findActiveByName: async (workspaceId, name) => {
+      const row = [...this.templateRows.values()].find(
+        (r) =>
+          r.state.workspaceId === workspaceId &&
+          r.state.status === 'ACTIVE' &&
+          r.state.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      );
+      return row ? this.templateOf(row) : null;
+    },
+    findDefault: async (workspaceId) => {
+      const row = [...this.templateRows.values()].find(
+        (r) => r.state.workspaceId === workspaceId && r.state.isDefault && r.state.status === 'ACTIVE',
+      );
+      return row ? this.templateOf(row) : null;
+    },
+    list: async (workspaceId, status) =>
+      [...this.templateRows.values()]
+        .filter((r) => r.state.workspaceId === workspaceId && (!status || r.state.status === status))
+        .map((r) => this.templateOf(r)),
+    listVersions: async (workspaceId, templateId) => {
+      const row = this.templateRows.get(templateId);
+      if (!row || row.state.workspaceId !== workspaceId) return [];
+      return [...row.versions]
+        .sort((a, b) => b.versionNo - a.versionNo)
+        .map((v) => ({
+          versionNo: v.versionNo,
+          basedOnVersionNo: v.basedOnVersionNo,
+          changeNote: v.changeNote,
+          createdAt: v.createdAt,
+          createdBy: v.createdBy,
+          lineCount: v.lines.length,
+        }));
+    },
+    findVersion: async (workspaceId, templateId, versionNo) => {
+      const row = this.templateRows.get(templateId);
+      if (!row || row.state.workspaceId !== workspaceId) return null;
+      return row.versions.find((v) => v.versionNo === versionNo) ?? null;
+    },
+    versionRef: async (workspaceId, versionId) => {
+      for (const row of this.templateRows.values()) {
+        const v = row.versions.find((x) => x.id === versionId);
+        if (v && row.state.workspaceId === workspaceId) {
+          return {
+            versionId,
+            templateId: row.state.id,
+            versionNo: v.versionNo,
+            templateName: row.state.name,
+          };
+        }
+      }
+      return null;
     },
   };
 
@@ -238,6 +366,7 @@ export class InMemoryBudgets {
       uow: this.uow,
       periods: this.mem.repository,
       budgets: this.budgets,
+      templates: this.templates,
       crossings: this.crossings,
       calendar: this.mem.calendar,
       settings: { settingsOf: async () => ({ baseCurrency: this.baseCurrency, timeZone: 'America/La_Paz' }) },

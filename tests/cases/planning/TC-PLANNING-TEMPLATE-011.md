@@ -12,8 +12,10 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/templates.api.test.ts
+  - packages/contexts/planning/src/application/period-created.hook.test.ts
 status: draft
 regression_suite: false
 phase: 2

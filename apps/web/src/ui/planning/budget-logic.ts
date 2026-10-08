@@ -98,6 +98,18 @@ export interface Budget {
   readonly periodStatus: 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'REOPENED';
   readonly currency: string;
   readonly origin: 'EMPTY' | 'TEMPLATE' | 'CLONE';
+  /** Template y versión de los que nació el plan (o que heredó al clonar), add-budget-templates. */
+  readonly templateVersion?: {
+    readonly templateId: string;
+    readonly versionNo: number;
+    readonly name: string;
+  } | null;
+  readonly clonedFromBudgetId?: string | null;
+  /** Solo en la respuesta de la creación: líneas del origen que no se copiaron. */
+  readonly omittedLines?: readonly {
+    readonly target: { readonly kind: BudgetTargetKind; readonly id: string };
+    readonly reason: 'TARGET_ARCHIVED' | 'CURRENCY_MISMATCH';
+  }[];
   readonly zeroBased: boolean;
   readonly lines: readonly BudgetLine[];
   readonly totals: BudgetTotals;

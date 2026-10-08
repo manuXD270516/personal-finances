@@ -151,6 +151,39 @@ export function identityWorkspaceSettings(pool: Pool): {
 }
 
 /**
+ * Moneda base y zona horaria del workspace para el worker (openspec add-budget-templates: el job de creación de periodos
+ * crea el plan del template predeterminado en la moneda base). Igual que `identityWorkspaceCalendarDirectory`: lee en
+ * una conexión PROPIA con el rol de directorio (`SET LOCAL ROLE pf_workspace_directory`, columnas `base_currency` y
+ * `time_zone`; migración 20261008160000), nunca dentro de la transacción del llamador.
+ */
+export function identityWorkspaceSettingsDirectory(pool: Pool): {
+  settingsOf(workspaceId: string): Promise<{ readonly baseCurrency: string; readonly timeZone: string }>;
+} {
+  return {
+    async settingsOf(workspaceId) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN READ ONLY');
+        await client.query('SET LOCAL ROLE pf_workspace_directory');
+        const { rows } = await client.query<{ base_currency: string; time_zone: string }>(
+          `SELECT base_currency, time_zone FROM iam.workspace WHERE id = $1`,
+          [workspaceId],
+        );
+        await client.query('COMMIT');
+        const row = rows[0];
+        if (!row) throw new DomainError('RESOURCE_NOT_FOUND', `workspace ${workspaceId} not found`);
+        return { baseCurrency: row.base_currency, timeZone: row.time_zone };
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+/**
  * `WorkspaceCalendarQuery` de la API (openspec add-financial-periods): zona horaria y día de inicio del mes financiero
  * con el contexto RLS del usuario de la petición (membresía). Reutiliza la unidad de trabajo del llamador si existe.
  */

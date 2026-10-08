@@ -252,6 +252,8 @@ export class BudgetLine {
     readonly spec: BudgetLineSpec;
     readonly source?: BudgetLineSource;
     readonly templateLineId?: string | null;
+    /** Clonado del periodo anterior: conserva la marca de línea modificada a mano. */
+    readonly overridden?: boolean;
   }): BudgetLine {
     return new BudgetLine(
       {
@@ -265,7 +267,7 @@ export class BudgetLine {
         rolloverStatus: 'NONE',
         source: input.source ?? 'MANUAL',
         templateLineId: input.templateLineId ?? null,
-        overridden: false,
+        overridden: input.overridden ?? false,
         version: 1,
       },
       0,
@@ -308,6 +310,24 @@ export class BudgetLine {
         ...spec,
         // El remanente recibido lo gobierna la política de la línea del periodo anterior: no se toca aquí.
         overridden: this.state.source === 'MANUAL' ? false : true,
+        version: this.state.version + 1,
+      },
+      this.persistedVersion,
+    );
+  }
+
+  /**
+   * Propagación de una versión nueva del template (add-budget-templates decisión 7): reemplaza la especificación SIN
+   * marcar la línea como modificada (el origen sigue siendo el template) y la apunta a la línea de la versión nueva.
+   */
+  withTemplateSpec(spec: BudgetLineSpec, templateLineId: string): BudgetLine {
+    return new BudgetLine(
+      {
+        ...this.state,
+        ...spec,
+        source: this.state.source === 'MANUAL' ? 'TEMPLATE' : this.state.source,
+        templateLineId,
+        overridden: false,
         version: this.state.version + 1,
       },
       this.persistedVersion,

@@ -9,9 +9,12 @@ import type { PeriodCreatedHook, PlanningEditGuard } from '../../contracts/index
 import type {
   Budget,
   BudgetLine,
+  BudgetTemplate,
   FinancialPeriod,
   FinancialPeriodStatus,
   TargetKind,
+  TemplateStatus,
+  TemplateVersion,
 } from '../../domain/index.js';
 
 /**
@@ -117,6 +120,8 @@ export interface BudgetRepository {
     periodId: string,
     options?: { readonly lock?: 'update' },
   ): Promise<Budget | null>;
+  /** Planes cuya versión de origen pertenece al template (con sus líneas); base de la propagación. */
+  listByTemplate(workspaceId: string, templateId: string): Promise<Budget[]>;
   /** Planes de los periodos dados (con sus líneas). */
   listByPeriods(workspaceId: string, periodIds: readonly string[]): Promise<Budget[]>;
   /** `INSERT … ON CONFLICT (workspace_id, period_id) DO NOTHING`; `false` si el periodo ya tenía plan. */
@@ -127,6 +132,50 @@ export interface BudgetRepository {
   /** Control optimista por la versión persistida de la línea. */
   updateLine(line: BudgetLine): Promise<boolean>;
   deleteLine(workspaceId: string, lineId: string): Promise<void>;
+}
+
+/** Datos de la versión de origen de un plan (`templateVersion` de la API). */
+export interface TemplateVersionRef {
+  readonly versionId: string;
+  readonly templateId: string;
+  readonly versionNo: number;
+  readonly templateName: string;
+}
+
+/** Encabezado de una versión (sin sus líneas) para el historial de versiones. */
+export interface TemplateVersionHeader {
+  readonly versionNo: number;
+  readonly basedOnVersionNo: number | null;
+  readonly changeNote: string | null;
+  readonly createdAt: string;
+  readonly createdBy: string | null;
+  readonly lineCount: number;
+}
+
+/** Templates, versiones y líneas (add-budget-templates; versiones y líneas son WS-RO en la BD). */
+export interface BudgetTemplateRepository {
+  /** Candado consultivo por workspace que serializa "marcar como predeterminado" (`pg_advisory_xact_lock`). */
+  lockDefaults(workspaceId: string): Promise<void>;
+  /** Inserta el template, su versión 1 y sus líneas (23505 en el nombre => `NAME_TAKEN`). */
+  insert(template: BudgetTemplate): Promise<void>;
+  /** Inserta la versión vigente (recién publicada) y sus líneas. */
+  insertCurrentVersion(template: BudgetTemplate): Promise<void>;
+  /** Control optimista por `persistedVersion`; actualiza nombre, estado, predeterminado y versión vigente. */
+  save(template: BudgetTemplate): Promise<boolean>;
+  /** Template con su versión vigente; `lock: 'update'` = `SELECT … FOR UPDATE`. */
+  findById(
+    workspaceId: string,
+    id: string,
+    options?: { readonly lock?: 'update' },
+  ): Promise<BudgetTemplate | null>;
+  /** Template ACTIVO con ese nombre (sin distinguir mayúsculas). */
+  findActiveByName(workspaceId: string, name: string): Promise<BudgetTemplate | null>;
+  /** Template ACTIVO marcado como predeterminado. */
+  findDefault(workspaceId: string): Promise<BudgetTemplate | null>;
+  list(workspaceId: string, status?: TemplateStatus): Promise<BudgetTemplate[]>;
+  listVersions(workspaceId: string, templateId: string): Promise<TemplateVersionHeader[]>;
+  findVersion(workspaceId: string, templateId: string, versionNo: number): Promise<TemplateVersion | null>;
+  versionRef(workspaceId: string, versionId: string): Promise<TemplateVersionRef | null>;
 }
 
 export interface ThresholdCrossingRepository {
@@ -154,6 +203,7 @@ export interface BudgetsDeps {
   readonly uow: UnitOfWork;
   readonly periods: FinancialPeriodRepository;
   readonly budgets: BudgetRepository;
+  readonly templates: BudgetTemplateRepository;
   readonly crossings: ThresholdCrossingRepository;
   readonly calendar: WorkspaceCalendarQuery;
   /** Solo la API (crear planes); el worker evalúa con la moneda del propio plan. */
