@@ -25,6 +25,18 @@ export interface FinancialPeriodState {
   readonly activatedAt: string | null;
 }
 
+/** Guardas del cierre (decisión 4): periodo inmediatamente anterior (`null` si es el primero) y hoy en la zona del workspace. */
+export interface CloseGuards {
+  readonly previousStatus: FinancialPeriodStatus | null;
+  readonly today: LocalDate;
+}
+
+/** Guardas de la reapertura: estado del periodo inmediatamente siguiente (`null` si no existe) y motivo. */
+export interface ReopenGuards {
+  readonly nextStatus: FinancialPeriodStatus | null;
+  readonly reason: string;
+}
+
 /**
  * AR `FinancialPeriod` (PLANNING, docs/04 §3.6; decisiones 3, 4 y 9). Rango inclusivo de fechas de negocio con
  * etiqueta `YYYY-MM` única por workspace. Toda transición de estado se valida contra `FINANCIAL_PERIOD_LIFECYCLE`; el
@@ -124,23 +136,56 @@ export class FinancialPeriod {
     this.mark('ACTIVATE', 'DRAFT', 'ACTIVE');
   }
 
-  /** `CLOSE` declarado (comando y guardas en add-month-closing). */
-  close(_at: string): void {
+  /**
+   * `CLOSE` (add-month-closing decisión 4). Orden de las guardas: estado (`INVALID_STATUS_TRANSITION`) → periodo
+   * anterior cerrado (`PERIOD_PREVIOUS_NOT_CLOSED`; el primero del workspace no tiene anterior) → terminado en la zona
+   * del workspace (`PERIOD_NOT_ENDED`: el fin debe ser anterior a hoy, RISK-020). La versión del snapshot es
+   * `closeCount + 1` (re-cierre = n+1).
+   */
+  close(_at: string, guards: CloseGuards): number {
     const from = this.status;
     FINANCIAL_PERIOD_LIFECYCLE.transition('CLOSE', from, 'CLOSED');
-    this.apply({
-      status: 'CLOSED',
-      closeCount: this.state.closeCount + 1,
-      latestCloseNo: this.state.closeCount + 1,
-    });
+    if (guards.previousStatus !== null && guards.previousStatus !== 'CLOSED') {
+      throw new DomainError(
+        'PERIOD_PREVIOUS_NOT_CLOSED',
+        `the previous period is ${guards.previousStatus}: periods close in chronological order`,
+      );
+    }
+    if (this.range.end.compare(guards.today) >= 0) {
+      throw new DomainError(
+        'PERIOD_NOT_ENDED',
+        `period ${this.label} ends on ${this.state.periodEnd}, which is not before ${guards.today.toString()}`,
+      );
+    }
+    const closeNo = this.state.closeCount + 1;
+    this.apply({ status: 'CLOSED', closeCount: closeNo, latestCloseNo: closeNo });
     this.mark('CLOSE', from, 'CLOSED');
+    return closeNo;
   }
 
-  /** `REOPEN` declarado (comando, rol OWNER y motivo en add-month-closing). */
-  reopen(_at: string): void {
+  /**
+   * `REOPEN` (add-month-closing decisión 4): solo un periodo `CLOSED` (`INVALID_STATUS_TRANSITION`), con motivo de 1 a
+   * 500 caracteres (`VALIDATION_FAILED`) y sin que el siguiente esté `CLOSED` (`PERIOD_NEXT_CLOSED`, sin cascada).
+   * Devuelve el número de reapertura. El rol OWNER lo exige el guard HTTP.
+   */
+  reopen(_at: string, guards: ReopenGuards): number {
+    const reason = guards.reason.trim();
     FINANCIAL_PERIOD_LIFECYCLE.transition('REOPEN', this.status, 'REOPENED');
-    this.apply({ status: 'REOPENED', reopenCount: this.state.reopenCount + 1 });
+    if (reason.length < 1 || reason.length > 500) {
+      throw new DomainError('VALIDATION_FAILED', 'reason must have between 1 and 500 characters').at(
+        '/reason',
+      );
+    }
+    if (guards.nextStatus === 'CLOSED') {
+      throw new DomainError(
+        'PERIOD_NEXT_CLOSED',
+        'the next period is closed: reopen periods in reverse chronological order',
+      );
+    }
+    const reopenNo = this.state.reopenCount + 1;
+    this.apply({ status: 'REOPENED', reopenCount: reopenNo });
     this.mark('REOPEN', 'CLOSED', 'REOPENED');
+    return reopenNo;
   }
 
   /**

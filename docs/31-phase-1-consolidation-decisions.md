@@ -17,7 +17,7 @@ Prioridad de fuentes ante contradicción: ARCHITECTURE.md > ADRs aceptados > spe
 | D7 | Borrado de categorías | Nunca hard delete; solo archivar (INV-019). FR-CLASSIFICATION-002 se reescribe; DELETE → 405. |
 | D8 | Jerarquía de categorías | Tres niveles: grupo → categoría → subcategoría (spec de classification). Alinear docs/04, FR-CLASSIFICATION-001 y unicidad de nombre por padre en docs/08. |
 | D9 | Categorías de sistema | Lista de 11 códigos del design de `add-classification` (§7) es canónica: alinear enum `systemCode` en docs/08, OpenAPI y FR-CLASSIFICATION-003. |
-| D10 | Bloqueo de periodo | Mensual (docs/09); docs/08 `ledger.period_lock` por (workspace, year_month). |
+| D10 | Bloqueo de periodo | Mensual (docs/09); docs/08 `ledger.period_lock` por (workspace, year_month). **Enmendada el 2026-10-08 (ADR-0028, docs/33 D107):** el bloqueo sigue el rango del periodo financiero (`period_start`/`period_end`); el primer periodo cerrado protege todo lo anterior; con día de inicio 1 el comportamiento no cambia. |
 | D11 | Editar una conversión | Reversa + nuevo asiento + nueva revisión de `ConversionDetail` (FR-TRANSACTIONS-024, spec de conversions). Alinear docs/08. |
 | D12 | Tipos de fee de conversión | Los cinco del contrato/docs/09 (incluye `TAX`). FR-TRANSACTIONS-022 se alinea. |
 | D13 | Tipos de tasa | Los de FR-FX-002 (spec `fx/market-rates`). Alinear docs/04 y docs/08. |

@@ -49,6 +49,8 @@ export class ApiProblem extends Error {
       readonly fields?: readonly ProblemField[];
       readonly headers?: Readonly<Record<string, string>>;
       readonly extensions?: Readonly<Record<string, unknown>>;
+      /** Estado HTTP distinto del del catálogo (p. ej. 404 `REFERENCE_NOT_FOUND` del reporte de cierre). */
+      readonly status?: number;
       readonly cause?: unknown;
     } = {},
   ) {
@@ -56,7 +58,7 @@ export class ApiProblem extends Error {
       detail ?? ErrorCatalog.title(code),
       options.cause === undefined ? undefined : { cause: options.cause },
     );
-    this.status = ErrorCatalog.status(code);
+    this.status = options.status ?? ErrorCatalog.status(code);
     this.fields = options.fields ?? [];
     this.headers = options.headers ?? {};
     this.extensions = options.extensions ?? {};
@@ -174,7 +176,7 @@ export function renderProblem(err: unknown, ctx: RenderContext): RenderedProblem
     unexpected = true;
   }
 
-  const status = ErrorCatalog.status(code);
+  const status = err instanceof ApiProblem ? err.status : ErrorCatalog.status(code);
   const body: ProblemBody = {
     ...extensions,
     type: ErrorCatalog.typeUri(code, ctx.problemTypeBase),

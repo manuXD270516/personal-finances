@@ -451,7 +451,9 @@ export class TransactionsController {
     @Body() body: Json,
   ) {
     return toTransactionDto(
-      await this.service.voidTransaction(workspaceId, transactionId, expected, str(body, 'reason') ?? ''),
+      await this.service.voidTransaction(workspaceId, transactionId, expected, str(body, 'reason') ?? '', {
+        correctInCurrentPeriod: body['correctInCurrentPeriod'] === true,
+      }),
     );
   }
 

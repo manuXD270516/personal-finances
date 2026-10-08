@@ -1,4 +1,4 @@
-import { PgUnitOfWork, unitOfWorkKysely } from '@pf/platform/api';
+import { currentSqlExecutor, PgUnitOfWork, unitOfWorkKysely } from '@pf/platform/api';
 import { sql } from 'kysely';
 import type { Pool } from 'pg';
 import type { DataVersionStore, ReportingUnitOfWork } from '../application/ports/index.js';
@@ -19,6 +19,12 @@ export class PgReportingUnitOfWork implements ReportingUnitOfWork {
     fn: () => Promise<T>,
   ): Promise<T> {
     return this.uow.run(ctx, fn);
+  }
+
+  join<T>(workspaceId: string, fn: () => Promise<T>): Promise<T> {
+    // Dentro de una transacción ajena se reutiliza tal cual (su RLS y su usuario ya están fijados).
+    if (currentSqlExecutor()) return fn();
+    return this.uow.run({ userId: null, workspaceId }, fn);
   }
 }
 

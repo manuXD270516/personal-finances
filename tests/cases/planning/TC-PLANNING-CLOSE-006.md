@@ -12,9 +12,14 @@ invariants: [INV-022]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - apps/web/src/ui/planning/closing.test.tsx
+  - packages/contexts/planning/src/application/closing.service.test.ts
+  - packages/contexts/planning/src/domain/close-snapshot.test.ts
+  - packages/contexts/transactions/test/integration/pg-closing.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ["close", "snapshot", "without-statement"]

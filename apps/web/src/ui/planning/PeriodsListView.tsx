@@ -9,6 +9,36 @@ import {
   type FinancialPeriod,
 } from './logic';
 
+/**
+ * Enlace de cierre de la fila (openspec add-month-closing 6.1): "Cerrar mes" en un periodo terminado y no cerrado,
+ * "Ver reporte" en uno cerrado. Es un enlace (lo ven todos los roles): la pantalla de destino deshabilita las acciones
+ * según el rol.
+ */
+function closeAction(p: FinancialPeriod, href: (path: string) => string, f: FormatContext) {
+  const name = periodName(p.label, f.locale);
+  if (p.status === 'CLOSED')
+    return (
+      <a
+        href={href(`/planificacion/periodos/${p.id}/reporte`)}
+        aria-label={f.t('viewReportLabel', { name })}
+        data-testid="period-view-report"
+      >
+        {f.t('viewReport')}
+      </a>
+    );
+  if (p.pendingClosure)
+    return (
+      <a
+        href={href(`/planificacion/periodos/${p.id}/cierre`)}
+        aria-label={f.t('closeMonthLabel', { name })}
+        data-testid="period-close-month"
+      >
+        {f.t('closeMonth')}
+      </a>
+    );
+  return null;
+}
+
 const pendingBadge = {
   ...badgeStyle,
   borderColor: 'var(--pf-warning-border)',
@@ -28,6 +58,7 @@ export function PeriodsListView({
   f,
   busyId,
   onActivate,
+  href = (path) => path,
 }: {
   periods: readonly FinancialPeriod[];
   today: string;
@@ -35,6 +66,8 @@ export function PeriodsListView({
   f: FormatContext;
   busyId?: string | undefined;
   onActivate?: (period: FinancialPeriod) => void;
+  /** Ruta localizada de la app (por defecto la ruta tal cual): enlaces "Cerrar mes" y "Ver reporte". */
+  href?: (path: string) => string;
 }) {
   if (periods.length === 0) {
     return (
@@ -65,6 +98,9 @@ export function PeriodsListView({
                 {f.t('columns.actions')}
               </th>
             ) : null}
+            <th scope="col" style={cellStyle}>
+              {f.t('columns.closing')}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -124,6 +160,7 @@ export function PeriodsListView({
                     ) : null}
                   </td>
                 ) : null}
+                <td style={cellStyle}>{closeAction(p, href, f)}</td>
               </tr>
             );
           })}

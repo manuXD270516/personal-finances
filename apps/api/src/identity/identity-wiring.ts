@@ -318,6 +318,19 @@ export function financeRuntimes(input: {
       settings: identityWorkspaceSettings(input.pool),
       history: input.history,
     },
+    // add-month-closing: checklist, bloqueo del ledger y snapshot sobre los puertos públicos de cada contexto.
+    closing: {
+      settings: identityWorkspaceSettings(input.pool),
+      lock: ledger.periodLock,
+      ledger: ledger.posting,
+      accounts: accounts.catalog,
+      balances: ledger.accountBalances,
+      closing: transactions.closing,
+      reconciliation: transactions.reconciliationStatus,
+      flows: reporting.periodFlows,
+      netWorth: reporting.netWorth,
+      lifecycleQuery: input.lifecycleQuery,
+    },
   });
   return { classification, fx, accounts, ledger, transactions, reporting, planning };
 }
@@ -385,7 +398,7 @@ export function identityImports(input: {
       runtime: audit,
       conventions: input.conventions,
       // docs/31 D52: exportación CSV/PDF del recorrido con la consulta de cada contexto dueño.
-      lifecycleExport: lifecycleExportLoaders({ transactions, accounts, fx, classification }),
+      lifecycleExport: lifecycleExportLoaders({ transactions, accounts, fx, classification, planning }),
     }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
     // ACCOUNTS — openspec add-accounts-management.
@@ -406,9 +419,12 @@ export function identityImports(input: {
  * transacciones agregan el monto y la comisión de cada revisión tal como los publica el contrato (`Money`).
  */
 export function lifecycleExportLoaders(
-  runtimes: Pick<ReturnType<typeof financeRuntimes>, 'transactions' | 'accounts' | 'fx' | 'classification'>,
+  runtimes: Pick<
+    ReturnType<typeof financeRuntimes>,
+    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning'
+  >,
 ): LifecycleExportLoaders {
-  const { transactions, accounts, fx, classification } = runtimes;
+  const { transactions, accounts, fx, classification, planning } = runtimes;
   return {
     Transaction: async ({ userId, workspaceId, aggregateId }) => {
       const view = await transactions.service.transactionLifecycle({
@@ -434,6 +450,15 @@ export function lifecycleExportLoaders(
         reconciliationId: aggregateId,
       });
       return { lifecycle: view.lifecycle, label: view.reconciliation.statementDate };
+    },
+    FinancialPeriod: async ({ userId, workspaceId, aggregateId }) => {
+      const closing = planning.closing;
+      if (!closing) throw new Error('planning closing runtime is not composed');
+      const period = await planning.queries.period(workspaceId, aggregateId);
+      return {
+        lifecycle: await closing.queries.lifecycle({ userId, workspaceId, periodId: aggregateId }),
+        label: period.label,
+      };
     },
     Account: async ({ userId, workspaceId, aggregateId }) => {
       const lifecycle = await accounts.accounts.accountLifecycle({

@@ -5,7 +5,7 @@ import { localized } from '../session-context';
 import type { FormatContext } from '../dashboard/types';
 
 /**
- * Navegación entre las pantallas de planificación (periodos, presupuestos y templates). `aria-current` marca la pantalla
+ * Navegación entre las pantallas de planificación (periodos, presupuestos, templates y cierre de mes). `aria-current` marca la pantalla
  * activa; los textos salen del namespace `Budgets` (`nav.*`).
  */
 export function PlanningNav({
@@ -13,13 +13,14 @@ export function PlanningNav({
   current = 'budgets',
 }: {
   f: FormatContext;
-  current?: 'periods' | 'budgets' | 'templates';
+  current?: 'periods' | 'budgets' | 'templates' | 'closing';
 }) {
   const locale = useLocale();
   const items = [
     { key: 'periods', href: localized(locale, '/planificacion/periodos') },
     { key: 'budgets', href: localized(locale, '/planificacion/presupuestos') },
     { key: 'templates', href: localized(locale, '/planificacion/templates') },
+    { key: 'closing', href: localized(locale, '/planificacion/cierre') },
   ] as const;
   return (
     <nav aria-label={f.t('nav.label')} data-testid="planning-nav">

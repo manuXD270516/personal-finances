@@ -32,6 +32,13 @@ contracts/events/
 │  ├─ ConversionRevised.v1.schema.json  # docs/31 D48 (simétrico a TransferRevised)
 │  ├─ TransactionCleared.v1.schema.json # add-reconciliation (docs/31 D47): CLEAR/UNCLEAR
 │  └─ ReconciliationCompleted.v1.schema.json # add-reconciliation: fin de una sesión
+├─ planning/
+│  ├─ PeriodActivated.v1.schema.json
+│  ├─ BudgetCreated.v1.schema.json
+│  ├─ BudgetThresholdReached.v1.schema.json
+│  ├─ MonthClosed.v1.schema.json         # add-month-closing: cierre aceptado (snapshot versión closeNo)
+│  ├─ PeriodReopened.v1.schema.json      # add-month-closing: reapertura por el OWNER con motivo
+│  └─ MonthClosePending.v1.schema.json   # add-month-closing: aviso único por periodo (consume NOTIFY)
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/

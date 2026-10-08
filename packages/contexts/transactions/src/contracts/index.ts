@@ -126,6 +126,76 @@ export interface CounterpartyCategoryUsageQuery {
   }): Promise<string | null>;
 }
 
+/** Detalle de un hallazgo del checklist de cierre (openspec add-month-closing; planning/month-closing). */
+export interface ClosingFindingDetailDto {
+  readonly refType: 'TRANSACTION' | 'ACCOUNT' | 'DUPLICATE_CANDIDATE' | 'SPLIT';
+  readonly refId: string;
+  readonly label: string;
+  readonly date: string | null;
+  readonly amount: { readonly amount: string; readonly currency: string } | null;
+}
+
+/**
+ * Hallazgo agregado: `count` total, `amounts` = Σ por moneda a su escala canónica (orden por moneda), `details` hasta 50
+ * por fecha ascendente y luego id, `truncated` si hay más de los listados.
+ */
+export interface ClosingFindingDto {
+  readonly count: number;
+  readonly amounts: readonly { readonly amount: string; readonly currency: string }[];
+  readonly details: readonly ClosingFindingDetailDto[];
+  readonly truncated: boolean;
+}
+
+/**
+ * Query pública `TransactionsClosingQuery` para el checklist y el snapshot del cierre de PLANNING (openspec
+ * add-month-closing, tareas 2.5/3.5). Solo lectura, sin efectos: corre en la unidad de trabajo del llamador (RLS del
+ * workspace). Los rangos son inclusivos por fecha de negocio (`YYYY-MM-DD`).
+ */
+export interface TransactionsClosingQuery {
+  /** Transacciones `PENDING` con fecha de negocio en el rango (refType `TRANSACTION`). */
+  countPendingInRange(input: ClosingRangeInput): Promise<ClosingFindingDto>;
+  /**
+   * Posibles duplicados sin resolver. DERIVADO: aún no existe flujo de descarte ni tabla de candidatos persistidos, así
+   * que "sin resolver" = pares de transacciones no anuladas, con al menos una en el rango, que `findDuplicates` considera
+   * posibles duplicados (misma cuenta/monto/moneda, ventana `DUPLICATE_WINDOW_DAYS`). `count` = nº de pares; refType
+   * `DUPLICATE_CANDIDATE` con `refId` = la transacción más reciente del par.
+   */
+  countOpenDuplicatesInRange(input: ClosingRangeInput): Promise<ClosingFindingDto>;
+  /**
+   * Porciones `POSTED | CLEARED | RECONCILED` (asiento activo) del rango con la categoría de sistema *Uncategorized* o
+   * *Uncategorized income* (D9). Transferencias y conversiones no cuentan. `count` = nº de porciones (refType `SPLIT`,
+   * `refId` = id de la porción).
+   */
+  countUncategorizedInRange(input: ClosingRangeInput): Promise<ClosingFindingDto>;
+  /**
+   * Transacciones `RECONCILED` en modo `WITHOUT_STATEMENT` con fecha en el rango que tocan alguna de las cuentas
+   * dadas (docs/33 D74/D111). `amount` = efecto neto con signo sobre esa cuenta (Σ de sus patas vigentes).
+   */
+  listReconciledWithoutStatementInRange(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    readonly dateFrom: string;
+    readonly dateTo: string;
+  }): Promise<
+    readonly {
+      readonly accountId: string;
+      readonly transactionId: string;
+      readonly businessDate: string;
+      readonly amount: { readonly amount: string; readonly currency: string };
+    }[]
+  >;
+  /** Cuentas con patas vigentes de transacciones no `VOIDED` ni `PENDING` con fecha en el rango. */
+  listAccountIdsWithActivityInRange(input: ClosingRangeInput): Promise<readonly string[]>;
+}
+
+export interface ClosingRangeInput {
+  readonly workspaceId: string;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+}
+
+export const TRANSACTIONS_CLOSING_QUERY = Symbol.for('pf.transactions.TransactionsClosingQuery');
+
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.

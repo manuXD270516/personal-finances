@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/planning/MonthClosePending.v1.schema.json",
+  "title": "planning.MonthClosePending.v1",
+  "description": "Un periodo financiero ACTIVE o REOPENED sigue sin cerrar `delayDays` días después de su fin (zona horaria del workspace; openspec add-month-closing decisión 16). Se publica UNA sola vez por periodo en toda su vida (planning.close_pending_notice con ON CONFLICT DO NOTHING). Productor: PLANNING (job planning.close-pending dentro del cron planning.ensure-periods). Consumidor: NOTIFY (add-alerts, dedupe `month-close-pending:<periodId>`). Idempotencia natural: periodId. Sin montos ni PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "planning.MonthClosePending"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "FinancialPeriod"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "periodId",
+        "periodLabel",
+        "periodStart",
+        "periodEnd",
+        "pendingSince",
+        "delayDays"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodLabel": {
+          "description": "Año y mes de la fecha de inicio (YYYY-MM, docs/33 D59).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        },
+        "periodStart": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "periodEnd": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "pendingSince": {
+          "description": "Primer día en que el periodo estuvo terminado sin cerrar (periodEnd + 1).",
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "delayDays": {
+          "description": "Plazo configurado (`PLANNING_CLOSE_PENDING_DELAY_DAYS`, por defecto 3).",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000303",
+      "eventType": "planning.MonthClosePending",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-03T04:05:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "FinancialPeriod",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa011",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c2",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa011",
+        "periodLabel": "2026-10",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-10-31",
+        "pendingSince": "2026-11-01",
+        "delayDays": 3
+      }
+    }
+  ]
+}

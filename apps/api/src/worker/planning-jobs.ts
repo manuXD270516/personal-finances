@@ -2,6 +2,7 @@ import {
   PLANNING_ENSURE_PERIODS_JOB,
   runEnsurePeriods,
   type ActiveWorkspaceDirectory,
+  type ClosePendingService,
   type PeriodsService,
 } from '@pf/planning/interface/planning.module';
 import type { Logger } from '@pf/platform/logging';
@@ -26,12 +27,13 @@ export interface PlanningPeriodsPayload {
 export async function registerPlanningPeriodsJob(
   queue: JobQueue,
   service: PeriodsService,
+  closePending: ClosePendingService,
   workspaces: ActiveWorkspaceDirectory,
   logger: Logger,
   options: PlanningPeriodsJobOptions,
 ): Promise<void> {
   await queue.work<PlanningPeriodsPayload>(PLANNING_ENSURE_PERIODS_JOB, { concurrency: 1 }, async (job) => {
-    await runEnsurePeriods(service, workspaces, logger, job.payload.trigger);
+    await runEnsurePeriods(service, workspaces, logger, job.payload.trigger, closePending);
   });
   if (options.cron === 'off') {
     await queue.unschedule(PLANNING_ENSURE_PERIODS_JOB);

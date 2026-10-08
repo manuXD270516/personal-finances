@@ -144,3 +144,57 @@ export interface ReportSummaryDto {
     readonly attributions: readonly RateAttributionDto[];
   };
 }
+
+/** Símbolos de inyección de las queries de cifras de cierre (add-month-closing; las consume PLANNING). */
+export const PERIOD_FLOWS_QUERY = Symbol.for('pf.reporting.PeriodFlowsQuery');
+export const NET_WORTH_QUERY = Symbol.for('pf.reporting.NetWorthQuery');
+
+/** Totales de flujos (ingresos, gastos, ahorro) de un periodo en una moneda. */
+export interface PeriodFlowsCurrencyDto {
+  readonly currency: string;
+  readonly income: MoneyDto;
+  readonly expense: MoneyDto;
+  readonly net: MoneyDto;
+  /** Tasa de ahorro (un decimal, HALF_EVEN) o `null` sin ingresos. */
+  readonly savingsRate: string | null;
+}
+
+/** Flujos del periodo: las MISMAS cifras que `GET /reports/summary` (D15, D53). */
+export interface PeriodFlowsDto {
+  readonly period: { readonly from: string; readonly to: string };
+  readonly reportingCurrency: string;
+  readonly byCurrency: readonly PeriodFlowsCurrencyDto[];
+  readonly consolidated: PeriodFlowsCurrencyDto & {
+    readonly complete: boolean;
+    /** Montos de ingresos/gastos sin tasa utilizable (ingresos primero), nunca convertidos 1:1. */
+    readonly unconverted: readonly MoneyDto[];
+  };
+  /** Tasas por flujo (cierre de su día) efectivamente usadas. */
+  readonly ratesUsed: readonly ResolvedRateDto[];
+}
+
+export interface PeriodFlowsQuery {
+  getFlows(input: {
+    readonly workspaceId: string;
+    readonly dateFrom: string;
+    readonly dateTo: string;
+    readonly reportingCurrency?: string;
+  }): Promise<PeriodFlowsDto>;
+}
+
+/** Patrimonio neto a una fecha de corte, valorado con las tasas vigentes al cierre de ese día. */
+export interface NetWorthAtDto {
+  readonly asOf: string;
+  readonly reportingCurrency: string;
+  readonly netWorth: NetWorthBreakdownDto;
+  readonly accounts: readonly AccountBalanceLineDto[];
+  readonly ratesUsed: readonly ResolvedRateDto[];
+}
+
+export interface NetWorthQuery {
+  getNetWorth(input: {
+    readonly workspaceId: string;
+    readonly asOf: string;
+    readonly reportingCurrency?: string;
+  }): Promise<NetWorthAtDto>;
+}

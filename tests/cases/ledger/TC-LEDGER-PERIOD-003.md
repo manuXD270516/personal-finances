@@ -17,9 +17,13 @@ invariants:
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/ledger/src/domain/period-range.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:

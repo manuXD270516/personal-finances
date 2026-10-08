@@ -1,13 +1,26 @@
+import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { AuditHistoryQuery, AuditPort, LifecyclePort } from '@pf/audit/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
-import type { LedgerActivityRangeQuery } from '@pf/ledger/contracts';
+import type {
+  AccountBalancesQuery,
+  LedgerActivityRangeQuery,
+  LedgerPeriodLockPort,
+  LedgerPostingPort,
+} from '@pf/ledger/contracts';
+import type { NetWorthQuery, PeriodFlowsQuery } from '@pf/reporting/contracts';
 import type { Clock } from '@pf/shared-kernel';
-import type { NominalFlowQuery } from '@pf/transactions/contracts';
-import type { PeriodCreatedHook, PlanningEditGuard } from '../../contracts/index.js';
+import type {
+  NominalFlowQuery,
+  ReconciliationStatusQuery,
+  TransactionsClosingQuery,
+} from '@pf/transactions/contracts';
+import type { BudgetVsActualQuery, PeriodCreatedHook, PlanningEditGuard } from '../../contracts/index.js';
 import type {
   Budget,
+  ClosingPolicy,
+  CloseSnapshotContent,
   BudgetLine,
   BudgetTemplate,
   FinancialPeriod,
@@ -220,4 +233,99 @@ export interface BudgetsDeps {
   readonly clock: Clock;
   /** `REPORTING_RATE_VALIDITY_WINDOW` en días (docs/31 D53); la misma ventana que el resumen del Home. */
   readonly rateValidityWindowDays: number;
+}
+
+// ───────────────────────────────────────────── add-month-closing
+
+export interface ClosingPolicyRepository {
+  /** `null` si el workspace nunca guardó una política (valores por defecto). */
+  find(workspaceId: string): Promise<ClosingPolicy | null>;
+  /** INSERT si `persistedVersion` es 0, UPDATE condicional por versión si no; `false` si la versión cambió. */
+  save(policy: ClosingPolicy): Promise<boolean>;
+}
+
+/** Cabecera de un snapshot de cierre (inmutable). */
+export interface SnapshotHeader {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly periodId: string;
+  readonly closeNo: number;
+  readonly closedAt: string;
+  readonly closedBy: string | null;
+  readonly previousSnapshotId: string | null;
+}
+
+export interface StoredSnapshot extends SnapshotHeader {
+  readonly contentSha256: string;
+  readonly content: CloseSnapshotContent;
+}
+
+/** Repositorio append-only de snapshots (sin update ni delete; `forbid_mutation` en BD, PF003). */
+export interface CloseSnapshotRepository {
+  /** Inserta cabecera, saldos y transacciones conciliadas sin extracto; calcula `content_sha256` del contenido. */
+  insert(snapshot: SnapshotHeader & { readonly content: CloseSnapshotContent }): Promise<string>;
+  /** Versiones del periodo por `close_no` ascendente. */
+  list(workspaceId: string, periodId: string): Promise<readonly SnapshotHeader[]>;
+  find(workspaceId: string, periodId: string, closeNo: number): Promise<StoredSnapshot | null>;
+  /** Vigente (mayor `close_no`) de cada periodo dado. */
+  listCurrent(workspaceId: string, periodIds: readonly string[]): Promise<readonly StoredSnapshot[]>;
+  /** Vigentes de todos los periodos con snapshot (verificador). */
+  listAllCurrent(workspaceId: string): Promise<readonly StoredSnapshot[]>;
+}
+
+export interface PeriodReopeningRow {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly periodId: string;
+  readonly reopenNo: number;
+  readonly reason: string;
+  readonly reopenedBy: string | null;
+  readonly reopenedAt: string;
+  readonly closedSnapshotId: string;
+}
+
+export interface PeriodReopeningRepository {
+  insert(row: PeriodReopeningRow): Promise<void>;
+}
+
+export interface ClosePendingNoticeRepository {
+  /** `INSERT … ON CONFLICT DO NOTHING`; `true` solo si insertó (una vez por periodo en toda su vida). */
+  insertIfAbsent(input: { workspaceId: string; periodId: string; eventId: string }): Promise<boolean>;
+}
+
+export interface ClosingMetricsPort {
+  increment(name: string, labels: Readonly<Record<string, string>>, value?: number): void;
+}
+
+/** Dependencias de cierre, reapertura, política, consultas del snapshot y verificador (add-month-closing). */
+export interface ClosingDeps {
+  readonly uow: UnitOfWork;
+  readonly periods: FinancialPeriodRepository;
+  readonly policies: ClosingPolicyRepository;
+  readonly snapshots: CloseSnapshotRepository;
+  readonly reopenings: PeriodReopeningRepository;
+  readonly notices: ClosePendingNoticeRepository;
+  readonly calendar: WorkspaceCalendarQuery;
+  readonly settings: WorkspaceSettingsPort;
+  /** Bloqueo del rango en el ledger (misma transacción, candado consultivo exclusivo). */
+  readonly lock: LedgerPeriodLockPort;
+  readonly ledger: Pick<LedgerPostingPort, 'assertPeriodOpen'>;
+  readonly accounts: AccountCatalogQuery;
+  readonly balances: AccountBalancesQuery;
+  readonly closing: TransactionsClosingQuery;
+  readonly reconciliation: ReconciliationStatusQuery;
+  readonly flows: PeriodFlowsQuery;
+  readonly netWorth: NetWorthQuery;
+  /** Presupuesto vs real (add-budgets); ausente si los presupuestos no están compuestos. */
+  readonly budgets?: BudgetVsActualQuery;
+  readonly catalog?: Pick<CategoryCatalogQuery, 'categoryTree'>;
+  readonly audit: AuditPort;
+  readonly lifecycle: LifecyclePort;
+  readonly outbox: OutboxPort;
+  readonly actor: ActorPort;
+  readonly ids: IdGenerator;
+  readonly clock: Clock;
+  /** `PLANNING_CLOSE_PENDING_DELAY_DAYS` (default 3). */
+  readonly closePendingDelayDays: number;
+  readonly metrics?: ClosingMetricsPort;
 }

@@ -20,9 +20,13 @@ invariants:
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - apps/web/src/ui/planning/closing.test.tsx
+  - packages/contexts/planning/src/domain/close-snapshot.test.ts
+  - packages/contexts/reporting/src/application/closing-figures.queries.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:

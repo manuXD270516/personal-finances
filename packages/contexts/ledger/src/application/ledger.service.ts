@@ -12,8 +12,10 @@ import { JOURNAL_ENTRY_POSTED } from '../contracts/index.js';
 import {
   JournalEntry,
   ReversalFactory,
+  newPeriodLock,
   YearMonth,
   type LedgerAccount,
+  type PeriodLock,
   type PostingInput,
   type SourceRef,
 } from '../domain/index.js';
@@ -66,7 +68,7 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
           createdBy: context.actorUserId(),
           postings,
         },
-        { periodLocked: await periods.isLocked(command.workspaceId, YearMonth.of(entryDate)) },
+        { periodLocked: await periods.isLocked(command.workspaceId, entryDate) },
       );
       const saved = await entries.append(entry);
       await this.publish(saved);
@@ -105,7 +107,7 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
           correlationId: context.correlationId(),
           createdBy: context.actorUserId(),
         },
-        { periodLocked: await periods.isLocked(command.workspaceId, YearMonth.of(entryDate)) },
+        { periodLocked: await periods.isLocked(command.workspaceId, entryDate) },
       );
       const saved = await entries.append(reversal);
       await entries.recordReversal(command.workspaceId, original.id, saved.id);
@@ -143,25 +145,43 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
   assertPeriodOpen(input: { readonly workspaceId: string; readonly date: string }): Promise<void> {
     return this.deps.uow.run(input.workspaceId, async () => {
       const date = LocalDate.parse(input.date);
-      if (await this.deps.periods.isLocked(input.workspaceId, YearMonth.of(date))) {
+      if (await this.deps.periods.isLocked(input.workspaceId, date)) {
         throw new DomainError('PERIOD_CLOSED', `${date.toString()} is in a closed period`);
       }
     });
+  }
+
+  firstOpenDateOnOrAfter(input: { readonly workspaceId: string; readonly date: string }): Promise<string> {
+    return this.deps.uow.run(input.workspaceId, async () =>
+      (
+        await this.deps.periods.firstOpenDateOnOrAfter(input.workspaceId, LocalDate.parse(input.date))
+      ).toString(),
+    );
   }
 
   lockPeriod(input: {
     readonly workspaceId: string;
     readonly yearMonth: string;
     readonly periodId?: string | null;
+    readonly periodStart?: string | null;
+    readonly periodEnd?: string | null;
+    readonly openStart?: boolean;
   }): Promise<void> {
     return this.deps.uow.run(input.workspaceId, async () => {
       const yearMonth = YearMonth.parse(input.yearMonth);
-      const changed = await this.deps.periods.lock(
-        { workspaceId: input.workspaceId, yearMonth, periodId: input.periodId ?? null },
-        this.deps.context.actorUserId(),
-      );
-      if (changed)
-        await this.auditPeriod(input.workspaceId, input.periodId ?? null, yearMonth, 'locked', null);
+      const lock = newPeriodLock({
+        workspaceId: input.workspaceId,
+        yearMonth,
+        periodId: input.periodId ?? null,
+        periodStart: input.periodStart ? LocalDate.parse(input.periodStart) : null,
+        periodEnd: input.periodEnd ? LocalDate.parse(input.periodEnd) : null,
+        openStart: input.openStart === true,
+      });
+      // Candado EXCLUSIVO del workspace ANTES de insertar el lock: espera a los posteos en vuelo (que lo toman
+      // compartido) y bloquea los nuevos hasta el commit del llamador (ADR-0028).
+      await this.deps.periods.acquireExclusiveWorkspaceLock(input.workspaceId);
+      const changed = await this.deps.periods.lock(lock, this.deps.context.actorUserId());
+      if (changed) await this.auditPeriod(input.workspaceId, input.periodId ?? null, lock, 'locked', null);
     });
   }
 
@@ -173,7 +193,15 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
     return this.deps.uow.run(input.workspaceId, async () => {
       const yearMonth = YearMonth.parse(input.yearMonth);
       const changed = await this.deps.periods.unlock(input.workspaceId, yearMonth);
-      if (changed) await this.auditPeriod(input.workspaceId, null, yearMonth, 'unlocked', input.reason);
+      if (changed) {
+        await this.auditPeriod(
+          input.workspaceId,
+          null,
+          newPeriodLock({ workspaceId: input.workspaceId, yearMonth }),
+          'unlocked',
+          input.reason,
+        );
+      }
     });
   }
 
@@ -222,7 +250,7 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
   private auditPeriod(
     workspaceId: string,
     periodId: string | null,
-    yearMonth: YearMonth,
+    lock: PeriodLock,
     verb: 'locked' | 'unlocked',
     reason: string | null,
   ): Promise<void> {
@@ -236,9 +264,19 @@ export class LedgerService implements LedgerPostingPort, LedgerPeriodLockPort {
       changes: [
         {
           field: 'yearMonth',
-          before: verb === 'locked' ? null : yearMonth.value,
-          after: verb === 'locked' ? yearMonth.value : null,
+          before: verb === 'locked' ? null : lock.yearMonth.value,
+          after: verb === 'locked' ? lock.yearMonth.value : null,
         },
+        // Rango como texto (valores compuestos de auditoría como texto; `-infinity` = abierto hacia atrás).
+        ...(verb === 'locked'
+          ? [
+              {
+                field: 'range',
+                before: null,
+                after: `${lock.periodStart?.toString() ?? '-infinity'}..${lock.periodEnd.toString()}`,
+              },
+            ]
+          : []),
       ],
     });
   }

@@ -1292,6 +1292,12 @@
         "START": "Iniciar",
         "COMPLETE": "Finalizar",
         "CANCEL": "Cancelar"
+      },
+      "FinancialPeriod": {
+        "CREATE": "Crear",
+        "ACTIVATE": "Activar",
+        "CLOSE": "Cerrar",
+        "REOPEN": "Reabrir"
       }
     },
     "export": {
@@ -1335,7 +1341,8 @@
       "period": "Periodo",
       "range": "Fechas",
       "status": "Estado",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "closing": "Cierre"
     },
     "range": "{from} – {to}",
     "status": {
@@ -1358,7 +1365,11 @@
       "label": "Periodo",
       "option": "{name} · {from} – {to} · {status}",
       "current": "(actual)"
-    }
+    },
+    "closeMonth": "Cerrar mes",
+    "closeMonthLabel": "Cerrar el mes {name}",
+    "viewReport": "Ver reporte",
+    "viewReportLabel": "Ver el reporte de cierre de {name}"
   },
   "CustomFields": {
     "title": "Campos personalizados",
@@ -1564,7 +1575,8 @@
       "label": "Planificación",
       "periods": "Periodos",
       "budgets": "Presupuestos",
-      "templates": "Templates"
+      "templates": "Templates",
+      "closing": "Cierre de mes"
     },
     "totals": {
       "title": "Resumen del plan",
@@ -1870,6 +1882,194 @@
       "close": "Cerrar",
       "reload": "Actualizar la vista previa",
       "done": "Propagación aplicada: se publicó la versión nueva del template y se actualizaron los planes."
+    }
+  },
+  "Closing": {
+    "title": "Cierre de mes",
+    "intro": "Revisa el checklist del periodo, reconoce de forma explícita las advertencias y ciérralo. Al cerrar se bloquean los movimientos con fecha en el periodo y se guarda una versión inmutable del reporte.",
+    "loading": "Cargando periodos…",
+    "noPeriods": "Todavía no hay periodos para cerrar.",
+    "periodNotFound": "No encontramos ese periodo en tu espacio de trabajo.",
+    "closedOk": "Mes {name} cerrado. Versión {closeNo} del cierre guardada.",
+    "reopenedOk": "Periodo {name} reabierto. Al volver a cerrarlo se creará una nueva versión del cierre.",
+    "viewReport": "Ver reporte de cierre",
+    "alreadyClosed": "Este periodo está cerrado (versión {closeNo} del cierre).",
+    "notClosable": "Un periodo en estado «{status}» no se puede cerrar.",
+    "notEnded": "El periodo termina el {end}: podrás cerrarlo a partir del día siguiente.",
+    "kinds": {
+      "PENDING_TRANSACTIONS": "Transacciones pendientes",
+      "UNRECONCILED_ACCOUNTS": "Cuentas sin conciliar",
+      "UNRESOLVED_DUPLICATES": "Duplicados sin resolver",
+      "UNCATEGORIZED": "Transacciones sin categoría",
+      "UNRESOLVED_RECURRING": "Recurrentes sin resolver",
+      "RECONCILED_WITHOUT_STATEMENT": "Conciliada sin extracto — pendiente de revisión"
+    },
+    "tone": {
+      "BLOCKING": "Bloqueante",
+      "WARNING": "Advertencia",
+      "INFO": "Informativo",
+      "NOT_AVAILABLE": "No disponible"
+    },
+    "notAvailable": "Este control todavía no está disponible: no bloquea el cierre.",
+    "count": "{count, plural, one {# hallazgo} other {# hallazgos}}",
+    "noObservations": "Sin observaciones.",
+    "amounts": "Montos por moneda (sin convertir): {amounts}",
+    "withoutStatementHint": "Estas transacciones se concilian sin extracto: no bloquean el cierre ni requieren reconocimiento, pero quedan pendientes de revisión.",
+    "detailLabel": "Detalle: {kind}",
+    "truncated": "Se muestran {shown} de {total} hallazgos.",
+    "reviewAll": "Revisar todo: {kind}",
+    "problem": {
+      "blocking": "Ítems que impiden el cierre",
+      "warning": "Advertencias sin reconocer"
+    },
+    "checklist": {
+      "title": "Checklist de cierre",
+      "evaluated": "Evaluado el {at}.",
+      "blocked": "Hay ítems bloqueantes: resuélvelos antes de cerrar el mes.",
+      "warningsOnly": "Solo hay advertencias: puedes cerrar si las reconoces de forma explícita.",
+      "clear": "Sin ítems pendientes: el mes se puede cerrar.",
+      "loading": "Evaluando el checklist…"
+    },
+    "close": {
+      "title": "Cerrar el mes",
+      "acknowledge": "Reconozco las advertencias de arriba y quiero cerrar el mes de todos modos.",
+      "note": "Nota del cierre (opcional)",
+      "noteHint": "Hasta {max} caracteres. Queda registrada en la auditoría.",
+      "action": "Cerrar mes",
+      "closing": "Cerrando…",
+      "blocked": {
+        "ROLE": "Tu rol (solo lectura) no permite cerrar el mes.",
+        "STATUS": "Este periodo no está en un estado que permita cerrarlo.",
+        "NOT_ENDED": "El periodo aún no terminó en la zona horaria del espacio de trabajo.",
+        "BLOCKING": "Resuelve los ítems bloqueantes para poder cerrar.",
+        "ACK_REQUIRED": "Marca el reconocimiento de las advertencias para poder cerrar.",
+        "UNAVAILABLE": "Esperando el resultado del checklist."
+      }
+    },
+    "reopen": {
+      "action": "Reabrir periodo",
+      "confirmTitle": "¿Reabrir el periodo {name}?",
+      "confirmBody": "Se desbloquean los movimientos del periodo. Las versiones del cierre ya guardadas no cambian; al volver a cerrar se crea una versión nueva.",
+      "confirm": "Reabrir",
+      "cancel": "Cancelar",
+      "reason": "Motivo de la reapertura",
+      "reasonHint": "Obligatorio, hasta {max} caracteres. Queda registrado en la auditoría y en el recorrido.",
+      "errors": {
+        "REQUIRED": "Indica el motivo de la reapertura.",
+        "TOO_LONG": "El motivo admite hasta {max} caracteres."
+      }
+    },
+    "lifecycle": {
+      "title": "Recorrido del periodo",
+      "closeNo": "Versión {closeNo} del cierre."
+    },
+    "report": {
+      "title": "Reporte de cierre",
+      "period": "Periodo {name} ({status}).",
+      "backToClosing": "Volver al cierre de mes",
+      "loading": "Cargando el reporte…",
+      "neverClosed": "Este periodo todavía no se ha cerrado: no hay reporte de cierre.",
+      "version": "Versión del cierre",
+      "versionOption": "Versión {closeNo}{current} · {at}",
+      "currentTag": "(vigente)",
+      "current": "vigente",
+      "previous": "anterior",
+      "versionInfo": "Versión {closeNo} ({current}), cerrada el {at}. Periodo del {from} al {to}.",
+      "export": {
+        "label": "Exportar el reporte",
+        "csv": "Exportar CSV",
+        "pdf": "Exportar PDF"
+      },
+      "incomplete": "incompleto",
+      "incompleteTitle": "Cifras incompletas: faltan tasas de cambio.",
+      "unconverted": "Montos sin convertir: {amounts}.",
+      "kpis": "Indicadores del periodo",
+      "kpi": {
+        "INCOME": "Ingresos",
+        "EXPENSE": "Gastos",
+        "SAVINGS": "Ahorro",
+        "SAVINGS_RATE": "Tasa de ahorro",
+        "NET_WORTH": "Patrimonio neto"
+      },
+      "noIncome": "Sin ingresos",
+      "variation": {
+        "vs": "Frente al periodo anterior:",
+        "unavailable": "no disponible",
+        "points": "{value} pp",
+        "noPercent": "sin % (el valor anterior era 0)"
+      },
+      "comparisonReason": {
+        "NO_PREVIOUS_PERIOD": "No hay variación respecto al periodo anterior: este es el primer periodo.",
+        "NO_PREVIOUS_SNAPSHOT": "No hay variación respecto al periodo anterior: el periodo anterior no tiene un cierre.",
+        "UNKNOWN": "No hay variación respecto al periodo anterior."
+      },
+      "comparedWith": "Variación frente a {label} (versión {closeNo} del cierre).",
+      "flows": {
+        "title": "Flujos por moneda",
+        "caption": "Ingresos, gastos y ahorro del periodo en cada moneda, sin convertir",
+        "currency": "Moneda"
+      },
+      "balances": {
+        "title": "Saldos por cuenta",
+        "empty": "El cierre no incluye saldos de cuentas.",
+        "caption": "Saldo de cada cuenta al fin del periodo y su base de conciliación",
+        "account": "Cuenta",
+        "balance": "Saldo",
+        "basis": "Base de conciliación",
+        "basisValue": {
+          "STATEMENT": "Conciliada con extracto",
+          "WITHOUT_STATEMENT": "Conciliada sin extracto",
+          "NONE": "Sin conciliar"
+        },
+        "statement": "Extracto del {date}: {balance}",
+        "reviewPending": "Pendientes de revisión"
+      },
+      "budget": {
+        "title": "Presupuesto vs real",
+        "unavailable": "No disponible: el periodo no tenía un plan mensual.",
+        "caption": "Referencia del presupuesto y monto real de cada línea al cierre",
+        "target": "Línea",
+        "reference": "Presupuesto",
+        "actual": "Real",
+        "status": "Estado",
+        "totals": "Totales",
+        "statusValue": {
+          "UNDER": "Por debajo del objetivo",
+          "ON_TARGET": "En el objetivo",
+          "OVER": "Excedido",
+          "WITHIN": "Dentro del límite",
+          "BELOW": "Por debajo del rango",
+          "ABOVE": "Por encima del rango",
+          "PENDING": "Mínimo pendiente",
+          "MET": "Mínimo cumplido",
+          "NO_BUDGET": "Sin presupuesto"
+        }
+      },
+      "acknowledged": {
+        "title": "Advertencias reconocidas",
+        "body": "Se cerró reconociendo: {items}. Reconocido el {at}."
+      }
+    },
+    "diff": {
+      "title": "Comparar versiones del cierre",
+      "from": "Desde la versión",
+      "to": "Hasta la versión",
+      "same": "Elige dos versiones distintas para compararlas.",
+      "singleVersion": "Este periodo tiene una sola versión de cierre: no hay nada que comparar todavía.",
+      "summary": "Diferencia de la versión {to} menos la versión {from}.",
+      "balancesCaption": "Variación del saldo de cada cuenta entre las dos versiones",
+      "delta": "Variación",
+      "noChanges": "Los saldos no cambiaron entre las dos versiones."
+    },
+    "policy": {
+      "title": "Política de cierre de mes",
+      "intro": "Define si cada control del checklist bloquea el cierre o solo lo advierte. Una advertencia exige reconocimiento explícito al cerrar.",
+      "readOnly": "Solo el propietario puede cambiar la política de cierre.",
+      "infoNote": "El control «conciliada sin extracto» es solo informativo y no se puede configurar.",
+      "save": "Guardar política",
+      "saved": "Política de cierre guardada.",
+      "reload": "Cargar la versión actual",
+      "loading": "Cargando la política de cierre…"
     }
   }
 }

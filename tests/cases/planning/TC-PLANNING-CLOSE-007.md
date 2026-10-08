@@ -12,9 +12,11 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - packages/contexts/transactions/test/integration/pg-closing.int.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["snapshot", "without-statement", "follow-up"]

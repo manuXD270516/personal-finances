@@ -17,9 +17,10 @@ invariants:
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/closing.service.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:

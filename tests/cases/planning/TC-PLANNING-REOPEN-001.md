@@ -15,9 +15,11 @@ invariants:
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - packages/contexts/planning/src/application/closing.service.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:

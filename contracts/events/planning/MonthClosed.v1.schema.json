@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/planning/MonthClosed.v1.schema.json",
+  "title": "planning.MonthClosed.v1",
+  "description": "Un periodo financiero se cerró (openspec add-month-closing): una vez por cierre aceptado, con el snapshot inmutable versión closeNo. Productor: PLANNING (misma transacción que el cierre, ADR-0008). Consumidores: PLANNING/budgets (rollover-finalizer, usa payload.periodId), REPORTING (caché de periodos cerrados, evolución del patrimonio), FORECAST (Phase 8). Idempotencia natural: (periodId, closeNo). Todo monto es texto decimal exacto a la escala de su moneda; los consolidados en la moneda base se cuantizan una sola vez con HALF_EVEN (INV-020). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "planning.MonthClosed"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "FinancialPeriod"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "periodId",
+        "label",
+        "periodStart",
+        "periodEnd",
+        "closeNo",
+        "snapshotId",
+        "previousSnapshotId",
+        "closedAt",
+        "closedBy",
+        "baseCurrency",
+        "totalsByCurrency",
+        "consolidated",
+        "balances",
+        "netWorth"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "label": {
+          "description": "Año y mes de la fecha de inicio (YYYY-MM, docs/33 D59).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        },
+        "periodStart": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "periodEnd": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "closeNo": {
+          "description": "Versión del snapshot (1 en el primer cierre; n+1 en cada re-cierre).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "snapshotId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "previousSnapshotId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "closedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "closedBy": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baseCurrency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "totalsByCurrency": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "income",
+              "expense"
+            ],
+            "properties": {
+              "currency": {
+                "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+              },
+              "income": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Money"
+              },
+              "expense": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Money"
+              }
+            }
+          }
+        },
+        "consolidated": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "income",
+            "expense",
+            "savings",
+            "savingsRate"
+          ],
+          "properties": {
+            "income": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            "expense": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            "savings": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            "savingsRate": {
+              "description": "Porcentaje con un decimal (HALF_EVEN); null sin ingresos.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "balances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "accountId",
+              "balance"
+            ],
+            "properties": {
+              "accountId": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+              },
+              "balance": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Money"
+              }
+            }
+          }
+        },
+        "netWorth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "amount",
+            "complete"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            "complete": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000301",
+      "eventType": "planning.MonthClosed",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-03T15:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "FinancialPeriod",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa011",
+      "aggregateVersion": 5,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c2",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-0000000fd001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa011",
+        "label": "2026-10",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-10-31",
+        "closeNo": 2,
+        "snapshotId": "01928c4e-0000-7000-8000-0000000fb002",
+        "previousSnapshotId": "01928c4e-0000-7000-8000-0000000fb001",
+        "closedAt": "2026-11-03T15:00:00.000Z",
+        "closedBy": "01928c4e-0000-7000-8000-0000000fd001",
+        "baseCurrency": "BOB",
+        "totalsByCurrency": [
+          {
+            "currency": "BOB",
+            "income": {
+              "amount": "12000.00",
+              "currency": "BOB"
+            },
+            "expense": {
+              "amount": "8225.50",
+              "currency": "BOB"
+            }
+          },
+          {
+            "currency": "USD",
+            "income": {
+              "amount": "0.00",
+              "currency": "USD"
+            },
+            "expense": {
+              "amount": "20.00",
+              "currency": "USD"
+            }
+          }
+        ],
+        "consolidated": {
+          "income": {
+            "amount": "12000.00",
+            "currency": "BOB"
+          },
+          "expense": {
+            "amount": "8465.50",
+            "currency": "BOB"
+          },
+          "savings": {
+            "amount": "3534.50",
+            "currency": "BOB"
+          },
+          "savingsRate": "29.5"
+        },
+        "balances": [
+          {
+            "accountId": "01928c4e-0000-7000-8000-0000000fc001",
+            "balance": {
+              "amount": "5185.00",
+              "currency": "BOB"
+            }
+          }
+        ],
+        "netWorth": {
+          "amount": {
+            "amount": "32526.00",
+            "currency": "BOB"
+          },
+          "complete": true
+        }
+      }
+    }
+  ]
+}
