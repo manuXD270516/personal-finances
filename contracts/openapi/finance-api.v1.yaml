@@ -3743,6 +3743,382 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ───────────────────────────── Planning: cierre de mes (Phase 2, add-month-closing) ─────────────────────────────
+  /workspaces/{workspaceId}/periods/{periodId}/close-checklist:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: getCloseChecklist
+      summary: Pre-close checklist of a period (no side effects)
+      description: |
+        Items: `PENDING_TRANSACTIONS`, `UNRECONCILED_ACCOUNTS`, `UNRESOLVED_DUPLICATES`, `UNCATEGORIZED`,
+        `UNRESOLVED_RECURRING` (`NOT_AVAILABLE` until Phase 3) and the informational `RECONCILED_WITHOUT_STATEMENT`
+        (severity `INFO`: never blocks nor requires acknowledgement). Severity of the first five comes from the closing
+        policy of the workspace. Consulting it changes nothing and writes no audit entry.
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Checklist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CloseChecklist' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/close:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    post:
+      tags: [Planning]
+      operationId: closePeriod
+      summary: 'Close a finished period (atomic: state, ledger lock, snapshot, audit, lifecycle, event)'
+      description: |
+        Only `active`/`reopened` periods that already ended in the workspace time zone (`PERIOD_NOT_ENDED`), in
+        chronological order (`PERIOD_PREVIOUS_NOT_CLOSED`), without blocking checklist items
+        (`MONTH_CLOSING_BLOCKED`, extension `blockingItems`) and with the warnings explicitly acknowledged
+        (`MONTH_CLOSING_WARNINGS_NOT_ACKNOWLEDGED`, extension `warningItems`). In ONE transaction: period `closed`,
+        ledger range locked (the first closed period also protects every earlier date), immutable snapshot version
+        `closeCount`, audit, lifecycle transition and `planning.MonthClosed.v1`. Responds with the period and the
+        `Location` of the snapshot.
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClosePeriodRequest' }
+      responses:
+        '200':
+          description: Closed period
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location:
+              description: URL of the snapshot just created
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialPeriod' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: >-
+            MONTH_CLOSING_BLOCKED, MONTH_CLOSING_WARNINGS_NOT_ACKNOWLEDGED, PERIOD_NOT_ENDED,
+            PERIOD_PREVIOUS_NOT_CLOSED or INVALID_STATUS_TRANSITION (draft or already closed).
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    post:
+      tags: [Planning]
+      operationId: reopenPeriod
+      summary: Reopen a closed period (OWNER only, with a reason, in reverse order)
+      description: |
+        Moves the period to `reopened`, removes its ledger lock, audits the reason, records the transition and publishes
+        `planning.PeriodReopened.v1` in one transaction. No snapshot is ever modified; closing again creates version n+1.
+        The next period closed → 409 `PERIOD_NEXT_CLOSED` (no cascade).
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReopenPeriodRequest' }
+      responses:
+        '200':
+          description: Reopened period
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialPeriod' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'PERIOD_NEXT_CLOSED or INVALID_STATUS_TRANSITION (not closed).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/close-snapshots:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: listCloseSnapshots
+      summary: Versions of the close snapshot of a period (oldest first)
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/CloseSnapshotSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/close-snapshots/compare:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: compareCloseSnapshots
+      summary: Compare two versions of the close snapshot (`to` minus `from`)
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: to, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Differences by account, totals and net worth
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CloseSnapshotDiff' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/close-snapshots/{closeNo}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+      - name: closeNo
+        in: path
+        required: true
+        description: Snapshot version number of the period (1, 2, …).
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [Planning]
+      operationId: getCloseSnapshot
+      summary: One immutable version of the close snapshot
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CloseSnapshot' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/close-report:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: getCloseReport
+      summary: Close report of a period (current or given version) with variations against the previous period
+      description: |
+        The comparison uses the CURRENT snapshot of the immediately previous period at query time (the report is not
+        frozen; the snapshot is). A never-closed period → 404 `REFERENCE_NOT_FOUND`.
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      parameters:
+        - { name: closeNo, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CloseReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/close-report/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: exportCloseReport
+      summary: Export a version of the close report (CSV or PDF)
+      description: |
+        Synchronous download. CSV (RFC 4180, UTF-8 with BOM) columns `section, account, currency, amount` with amounts as
+        decimal text at the currency scale, the version number and the close date. `closeNo` defaults to the current version.
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      parameters:
+        - { name: format, in: query, required: true, schema: { type: string, enum: [csv, pdf] } }
+        - { name: closeNo, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: File
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: getPeriodLifecycle
+      summary: Lifecycle of a financial period (create, activate, close, reopen, re-close)
+      description: |
+        Machine `FINANCIAL_PERIOD_LIFECYCLE` (docs/31 D37). Closing transitions carry `detailRefs.snapshotId` and
+        `closeNo`; reopenings carry the reason. Range recalculations of a draft are annotations.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Period lifecycle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: exportPeriodLifecycle
+      summary: Export the lifecycle of a financial period (CSV or PDF)
+      description: Same synchronous download as the other lifecycles (docs/31 D52); the export is audited.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/planning/closing-policy:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Planning]
+      operationId: getClosingPolicy
+      summary: Closing policy of the workspace (severity of each checklist item)
+      description: 'Defaults when never saved (version 1): pending transactions and unreconciled accounts block; the rest warn.'
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Policy
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClosingPolicy' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [Planning]
+      operationId: updateClosingPolicy
+      summary: Replace the closing policy (OWNER only; audited with the previous and new severity)
+      x-openspec-capability: [planning/month-closing]
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClosingPolicyUpdate' }
+      responses:
+        '200':
+          description: Updated policy
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClosingPolicy' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Planning: presupuestos (Phase 2, add-budgets) ─────────────────────────────
   /workspaces/{workspaceId}/budgets:
     parameters:
@@ -5236,6 +5612,14 @@ components:
         existingId:
           $ref: '#/components/schemas/Uuid'
           description: RFC 9457 extension. Id of the existing active resource on NAME_TAKEN (e.g. counterparties) so the UI can select it.
+        blockingItems:
+          type: array
+          description: Present on MONTH_CLOSING_BLOCKED. Checklist items that prevent the close.
+          items: { $ref: '#/components/schemas/CloseChecklistItem' }
+        warningItems:
+          type: array
+          description: Present on MONTH_CLOSING_WARNINGS_NOT_ACKNOWLEDGED. Warnings to acknowledge.
+          items: { $ref: '#/components/schemas/CloseChecklistItem' }
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
@@ -5343,6 +5727,11 @@ components:
         - CURRENCY_NOT_ENABLED              # 422
         # planning (Phase 2)
         - PERIOD_NOT_STARTED                # 409 (add-financial-periods: activating a period that has not started)
+        - PERIOD_NOT_ENDED                  # 409 (add-month-closing: the period end is not before today in the workspace zone)
+        - PERIOD_PREVIOUS_NOT_CLOSED        # 409 (add-month-closing: periods close in chronological order)
+        - PERIOD_NEXT_CLOSED                # 409 (add-month-closing: reopen in reverse order, no cascade)
+        - MONTH_CLOSING_BLOCKED             # 409 (add-month-closing: blocking checklist items; extension blockingItems)
+        - MONTH_CLOSING_WARNINGS_NOT_ACKNOWLEDGED # 409 (add-month-closing: warnings must be acknowledged; extension warningItems)
         - BUDGET_ALREADY_EXISTS             # 409 (add-budgets: the period already has a plan)
         - BUDGET_LINE_DUPLICATE_TARGET      # 409 (add-budgets: the plan already has a line for the target)
         - BUDGET_TARGET_OVERLAP             # 409 (add-budgets: category with its subcategory, or group with one of its categories)
@@ -6111,7 +6500,7 @@ components:
         correctInCurrentPeriod:
           type: boolean
           default: false
-          description: If the original period is closed, date the reversal on the first open date instead of failing with PERIOD_CLOSED
+          description: If the original period is closed, date the reversal on the first open date after the original date (the day after the end of the last contiguous closed period) instead of failing with PERIOD_CLOSED
     TransferCreate:
       type: object
       additionalProperties: false
@@ -8334,6 +8723,386 @@ components:
           description: null when not reconciled; WITHOUT_STATEMENT when the range holds transactions reconciled without a statement.
           type: [string, 'null']
           enum: [STATEMENT, WITHOUT_STATEMENT, null]
+    # ── Planning: cierre de mes (add-month-closing) ──
+    ChecklistItemKind:
+      type: string
+      enum:
+        - PENDING_TRANSACTIONS
+        - UNRECONCILED_ACCOUNTS
+        - UNRESOLVED_DUPLICATES
+        - UNCATEGORIZED
+        - UNRESOLVED_RECURRING
+        - RECONCILED_WITHOUT_STATEMENT
+    ChecklistSeverity:
+      type: string
+      description: '`INFO` only for `RECONCILED_WITHOUT_STATEMENT`; it never appears in `ClosingPolicy`.'
+      enum: [BLOCKING, WARNING, INFO]
+    CloseChecklistDetail:
+      type: object
+      additionalProperties: false
+      required: [refType, refId, label, date, amount]
+      properties:
+        refType: { type: string, enum: [TRANSACTION, ACCOUNT, DUPLICATE_CANDIDATE, SPLIT] }
+        refId: { $ref: '#/components/schemas/Uuid' }
+        label: { type: string }
+        date: { oneOf: [{ $ref: '#/components/schemas/LocalDate' }, { type: 'null' }] }
+        amount: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
+    CloseChecklistItem:
+      type: object
+      additionalProperties: false
+      required: [kind, severity, availability, count, amounts, details, truncated]
+      properties:
+        kind: { $ref: '#/components/schemas/ChecklistItemKind' }
+        severity: { $ref: '#/components/schemas/ChecklistSeverity' }
+        availability: { type: string, enum: [AVAILABLE, NOT_AVAILABLE] }
+        count: { type: integer, minimum: 0 }
+        amounts:
+          type: array
+          description: Amounts per currency, never converted.
+          items: { $ref: '#/components/schemas/Money' }
+        details:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/CloseChecklistDetail' }
+        truncated: { type: boolean }
+    CloseChecklist:
+      type: object
+      additionalProperties: false
+      required: [periodId, label, periodStart, periodEnd, evaluatedAt, canClose, requiresAcknowledgement, items]
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        label: { type: string }
+        periodStart: { $ref: '#/components/schemas/LocalDate' }
+        periodEnd: { $ref: '#/components/schemas/LocalDate' }
+        evaluatedAt: { $ref: '#/components/schemas/Instant' }
+        canClose: { type: boolean, description: False when some blocking item has observations }
+        requiresAcknowledgement: { type: boolean, description: True when only warnings have observations }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CloseChecklistItem' }
+    ClosePeriodRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        acknowledgeWarnings: { type: boolean, default: false }
+        note: { type: string, minLength: 0, maxLength: 500 }
+    ReopenPeriodRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    CloseSnapshotSummary:
+      type: object
+      required: [snapshotId, closeNo, closedAt, closedBy, previousSnapshotId, isCurrent]
+      properties:
+        snapshotId: { $ref: '#/components/schemas/Uuid' }
+        closeNo: { type: integer, minimum: 1 }
+        closedAt: { $ref: '#/components/schemas/Instant' }
+        closedBy: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        previousSnapshotId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        isCurrent: { type: boolean }
+    CloseSnapshotBalance:
+      type: object
+      additionalProperties: false
+      required:
+        - accountId
+        - accountName
+        - ledgerAccountId
+        - currency
+        - balance
+        - presented
+        - reconciliation
+        - reconciliationBasis
+        - reconciledWithoutStatementTransactionIds
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        accountName: { type: string }
+        ledgerAccountId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        balance: { $ref: '#/components/schemas/Money' }
+        presented: { $ref: '#/components/schemas/Money' }
+        reconciliation:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [reconciliationId, statementDate, statementBalance]
+              properties:
+                reconciliationId: { $ref: '#/components/schemas/Uuid' }
+                statementDate: { $ref: '#/components/schemas/LocalDate' }
+                statementBalance: { $ref: '#/components/schemas/Money' }
+            - type: 'null'
+        reconciliationBasis:
+          description: Null when the account was not reconciled at close (warning acknowledged).
+          oneOf:
+            - { type: string, enum: [STATEMENT, WITHOUT_STATEMENT] }
+            - { type: 'null' }
+        reconciledWithoutStatementTransactionIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+    CloseSnapshotFlows:
+      type: object
+      additionalProperties: false
+      required: [byCurrency, consolidated]
+      properties:
+        byCurrency:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [currency, income, expense, savings]
+            properties:
+              currency: { $ref: '#/components/schemas/CurrencyCode' }
+              income: { $ref: '#/components/schemas/Money' }
+              expense: { $ref: '#/components/schemas/Money' }
+              savings: { $ref: '#/components/schemas/Money' }
+        consolidated:
+          type: object
+          additionalProperties: false
+          required: [currency, income, expense, savings, savingsRate, complete, unconverted]
+          properties:
+            currency: { $ref: '#/components/schemas/CurrencyCode' }
+            income: { $ref: '#/components/schemas/Money' }
+            expense: { $ref: '#/components/schemas/Money' }
+            savings: { $ref: '#/components/schemas/Money' }
+            savingsRate:
+              description: Percentage with one decimal (HALF_EVEN); null without income.
+              oneOf: [{ type: string }, { type: 'null' }]
+            complete: { type: boolean }
+            unconverted:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+    CloseSnapshot:
+      description: One immutable version of the close snapshot (amounts as decimal text at the currency scale).
+      allOf:
+        - $ref: '#/components/schemas/CloseSnapshotSummary'
+        - type: object
+          required:
+            - periodId
+            - label
+            - periodStart
+            - periodEnd
+            - baseCurrency
+            - balances
+            - reconciledWithoutStatement
+            - flows
+            - netWorth
+            - budgetVsActual
+            - goalContributions
+            - checklist
+            - acknowledgedWarnings
+          properties:
+            periodId: { $ref: '#/components/schemas/Uuid' }
+            label: { type: string }
+            periodStart: { $ref: '#/components/schemas/LocalDate' }
+            periodEnd: { $ref: '#/components/schemas/LocalDate' }
+            baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+            balances:
+              type: array
+              items: { $ref: '#/components/schemas/CloseSnapshotBalance' }
+            reconciledWithoutStatement:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [transactionId, accountId, businessDate, amount]
+                properties:
+                  transactionId: { $ref: '#/components/schemas/Uuid' }
+                  accountId: { $ref: '#/components/schemas/Uuid' }
+                  businessDate: { $ref: '#/components/schemas/LocalDate' }
+                  amount: { $ref: '#/components/schemas/Money' }
+            flows: { $ref: '#/components/schemas/CloseSnapshotFlows' }
+            netWorth:
+              type: object
+              additionalProperties: false
+              required: [amount, assets, liabilities, complete, unconverted, rates]
+              properties:
+                amount: { $ref: '#/components/schemas/Money' }
+                assets: { $ref: '#/components/schemas/Money' }
+                liabilities: { $ref: '#/components/schemas/Money' }
+                complete: { type: boolean }
+                unconverted:
+                  type: array
+                  items: { $ref: '#/components/schemas/Money' }
+                rates:
+                  type: array
+                  description: Every rate used to value the snapshot, with its source.
+                  items: { $ref: '#/components/schemas/ResolvedRate' }
+            budgetVsActual:
+              description: Null when the period has no monthly plan (not available, no invented amounts).
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [budgetId, currency, lines, totals]
+                  properties:
+                    budgetId: { $ref: '#/components/schemas/Uuid' }
+                    currency: { $ref: '#/components/schemas/CurrencyCode' }
+                    lines:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: false
+                        required: [target, targetName, nature, reference, actual, status]
+                        properties:
+                          target:
+                            type: object
+                            additionalProperties: false
+                            required: [kind, id]
+                            properties:
+                              kind: { type: string, enum: [CATEGORY, GROUP, TAG] }
+                              id: { $ref: '#/components/schemas/Uuid' }
+                          targetName: { type: string }
+                          nature: { type: string, enum: [EXPENSE, INCOME] }
+                          reference: { $ref: '#/components/schemas/Money' }
+                          actual: { $ref: '#/components/schemas/Money' }
+                          status: { type: string }
+                    totals:
+                      type: object
+                      additionalProperties: false
+                      required: [planned, actual, complete]
+                      properties:
+                        planned: { $ref: '#/components/schemas/Money' }
+                        actual: { $ref: '#/components/schemas/Money' }
+                        complete: { type: boolean }
+                - type: 'null'
+            goalContributions:
+              description: Null until goals exist (Phase 4).
+              type: 'null'
+            checklist:
+              type: array
+              items: { $ref: '#/components/schemas/CloseChecklistItem' }
+            acknowledgedWarnings:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [items, by, at]
+                  properties:
+                    items:
+                      type: array
+                      items: { $ref: '#/components/schemas/ChecklistItemKind' }
+                    by: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+                    at: { $ref: '#/components/schemas/Instant' }
+                - type: 'null'
+    CloseSnapshotDiff:
+      type: object
+      additionalProperties: false
+      required: [from, to, balances, flows, netWorth]
+      properties:
+        from: { type: integer, minimum: 1 }
+        to: { type: integer, minimum: 1 }
+        balances:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [accountId, currency, delta]
+            properties:
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              currency: { $ref: '#/components/schemas/CurrencyCode' }
+              delta: { $ref: '#/components/schemas/Money' }
+        flows:
+          type: object
+          additionalProperties: false
+          required: [byCurrency, consolidated]
+          properties:
+            byCurrency:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [currency, income, expense, savings]
+                properties:
+                  currency: { $ref: '#/components/schemas/CurrencyCode' }
+                  income: { $ref: '#/components/schemas/Money' }
+                  expense: { $ref: '#/components/schemas/Money' }
+                  savings: { $ref: '#/components/schemas/Money' }
+            consolidated:
+              type: object
+              additionalProperties: false
+              required: [income, expense, savings]
+              properties:
+                income: { $ref: '#/components/schemas/Money' }
+                expense: { $ref: '#/components/schemas/Money' }
+                savings: { $ref: '#/components/schemas/Money' }
+        netWorth:
+          type: object
+          additionalProperties: false
+          required: [delta]
+          properties:
+            delta: { $ref: '#/components/schemas/Money' }
+    CloseReport:
+      type: object
+      additionalProperties: false
+      required: [snapshot, versions, comparison, comparisonUnavailableReason]
+      properties:
+        snapshot: { $ref: '#/components/schemas/CloseSnapshot' }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/CloseSnapshotSummary' }
+        comparison:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [previousPeriodId, previousLabel, previousCloseNo, deltas]
+              properties:
+                previousPeriodId: { $ref: '#/components/schemas/Uuid' }
+                previousLabel: { type: string }
+                previousCloseNo: { type: integer, minimum: 1 }
+                deltas:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [kpi, absolute, percentage]
+                    properties:
+                      kpi: { type: string, enum: [INCOME, EXPENSE, SAVINGS, SAVINGS_RATE, NET_WORTH] }
+                      absolute:
+                        description: Money in the base currency; percentage points (text) for SAVINGS_RATE; null without rate.
+                        oneOf:
+                          - { $ref: '#/components/schemas/Money' }
+                          - { type: string }
+                          - { type: 'null' }
+                      percentage:
+                        description: Relative variation with one decimal (HALF_EVEN); null when the previous value is 0.
+                        oneOf: [{ type: string }, { type: 'null' }]
+            - type: 'null'
+        comparisonUnavailableReason:
+          oneOf:
+            - { type: string, enum: [NO_PREVIOUS_PERIOD, NO_PREVIOUS_SNAPSHOT] }
+            - { type: 'null' }
+    ClosingPolicySeverities:
+      type: object
+      description: Severity of each configurable checklist item (the informational item is not part of the policy).
+      required:
+        - PENDING_TRANSACTIONS
+        - UNRECONCILED_ACCOUNTS
+        - UNRESOLVED_DUPLICATES
+        - UNCATEGORIZED
+        - UNRESOLVED_RECURRING
+      propertyNames:
+        enum:
+          - PENDING_TRANSACTIONS
+          - UNRECONCILED_ACCOUNTS
+          - UNRESOLVED_DUPLICATES
+          - UNCATEGORIZED
+          - UNRESOLVED_RECURRING
+      additionalProperties: { type: string, enum: [BLOCKING, WARNING] }
+    ClosingPolicy:
+      type: object
+      additionalProperties: false
+      required: [severities, version, updatedAt, updatedBy]
+      properties:
+        severities: { $ref: '#/components/schemas/ClosingPolicySeverities' }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+        updatedBy: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+    ClosingPolicyUpdate:
+      type: object
+      additionalProperties: false
+      required: [severities]
+      properties:
+        severities: { $ref: '#/components/schemas/ClosingPolicySeverities' }
+
     ReconciliationLifecycle:
       description: Lifecycle of a reconciliation session with its balances.
       allOf:

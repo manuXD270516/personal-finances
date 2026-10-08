@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/close-checklist.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["checklist", "policy"]

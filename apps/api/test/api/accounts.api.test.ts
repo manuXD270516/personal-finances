@@ -428,9 +428,10 @@ describe('apertura con saldo inicial', () => {
         app,
         { userId: editor.id, workspaceId: editor.ws },
         () =>
-          app.query(`INSERT INTO ledger.period_lock (workspace_id, year_month) VALUES ($1, '2025-12')`, [
-            editor.ws,
-          ]),
+          app.query(
+            `INSERT INTO ledger.period_lock (workspace_id, year_month, period_start, period_end) VALUES ($1, '2025-12', '2025-12-01', '2025-12-31')`,
+            [editor.ws],
+          ),
         true,
       );
     } finally {

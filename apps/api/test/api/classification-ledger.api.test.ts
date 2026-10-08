@@ -267,9 +267,10 @@ describe('clasificar no toca el ledger (INV-033)', () => {
         app,
         { userId: u.id, workspaceId: u.ws },
         () =>
-          app.query(`INSERT INTO ledger.period_lock (workspace_id, year_month) VALUES ($1, '2026-03')`, [
-            u.ws,
-          ]),
+          app.query(
+            `INSERT INTO ledger.period_lock (workspace_id, year_month, period_start, period_end) VALUES ($1, '2026-03', '2026-03-01', '2026-03-31')`,
+            [u.ws],
+          ),
         true,
       );
     } finally {

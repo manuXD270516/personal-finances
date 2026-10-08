@@ -80,14 +80,30 @@ export interface LedgerPostingPort {
    * cambios que no generan asiento pero alteran lo reportado de un periodo cerrado (recategorizar). Sin efectos.
    */
   assertPeriodOpen(input: { readonly workspaceId: string; readonly date: string }): Promise<void>;
+  /**
+   * Primera fecha de negocio ABIERTA `>= date` (`YYYY-MM-DD`): salta los periodos cerrados contiguos (ADR-0028;
+   * anulación corregida en el periodo vigente). Sin efectos.
+   */
+  firstOpenDateOnOrAfter(input: { readonly workspaceId: string; readonly date: string }): Promise<string>;
 }
 
-/** Bloqueo MENSUAL de periodos (docs/31 D10). Idempotente; lo usará Planning (Phase 2) en su transacción de cierre. */
+/**
+ * Bloqueo por RANGO del periodo financiero (ADR-0028; en Phase 1 era el mes calendario, docs/31 D10). Idempotente por
+ * `yearMonth` (etiqueta del periodo); lo usa Planning en su transacción de cierre.
+ */
 export interface LedgerPeriodLockPort {
+  /**
+   * Cierra `[periodStart, periodEnd]` (`YYYY-MM-DD`; sin rango explícito, el mes calendario de `yearMonth`);
+   * `openStart: true` = abierto hacia atrás (primer periodo cerrado). Toma el candado EXCLUSIVO del workspace ANTES de
+   * insertar el lock, en la unidad de trabajo del llamador. Un rango que se solape con otro periodo cerrado falla.
+   */
   lockPeriod(input: {
     readonly workspaceId: string;
     readonly yearMonth: string;
     readonly periodId?: string | null;
+    readonly periodStart?: string | null;
+    readonly periodEnd?: string | null;
+    readonly openStart?: boolean;
   }): Promise<void>;
   unlockPeriod(input: {
     readonly workspaceId: string;
@@ -175,7 +191,9 @@ export interface AccountBalancesQuery {
  * (RLS del workspace). `null` si el workspace no tiene asientos. Sin efectos.
  */
 export interface LedgerActivityRangeQuery {
-  getActivityRange(workspaceId: string): Promise<{ readonly minEntryDate: string; readonly maxEntryDate: string } | null>;
+  getActivityRange(
+    workspaceId: string,
+  ): Promise<{ readonly minEntryDate: string; readonly maxEntryDate: string } | null>;
 }
 
 /**

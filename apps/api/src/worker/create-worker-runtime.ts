@@ -35,8 +35,17 @@ import {
   identityWorkspaceSettingsDirectory,
   identityWorkspaceTimeZones,
 } from '@pf/identity/interface/identity.module';
-import { createLedgerMaintenance, ledgerActivityRange } from '@pf/ledger/interface/ledger.module';
-import { createPlanningRuntime, planningEventConsumers } from '@pf/planning/interface/planning.module';
+import {
+  createLedgerMaintenance,
+  createLedgerRuntime,
+  ledgerActivityRange,
+} from '@pf/ledger/interface/ledger.module';
+import {
+  createPlanningRuntime,
+  planningEventConsumers,
+  runVerifyClosings,
+  type ClosingVerifier,
+} from '@pf/planning/interface/planning.module';
 import { PinoNestLogger } from '@pf/platform/nest';
 import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
 import { otelCounters, shutdownTelemetry } from '@pf/platform/otel';
@@ -142,13 +151,18 @@ export async function createWorkerRuntime(
 
   // Job diario del ledger: verificador de invariantes + snapshots (add-ledger-core 5.6). Corre también al arrancar,
   // así `restore:local` (que reinicia el worker) verifica el ledger restaurado.
+  const closings: { verifier?: ClosingVerifier } = {};
   const activeWorkspaces = identityActiveWorkspaces(pool);
   const auditMetrics = otelCounters('@pf/audit');
   await registerLedgerDailyJob(queue, ledgerMaintenance, logger, {
     cron: config.LEDGER_INTEGRITY_CRON,
     tz: config.LEDGER_INTEGRITY_CRON_TZ,
     runOnStart: options.ledgerMaintenanceOnStart ?? true,
-    afterIntegrity: () => verifyLifecycleConsistency(pool, activeWorkspaces, logger, auditMetrics),
+    afterIntegrity: async () => {
+      await verifyLifecycleConsistency(pool, activeWorkspaces, logger, auditMetrics);
+      // add-month-closing decisión 14: snapshot vigente ↔ ledger, hash y bloqueo por periodo cerrado.
+      if (closings.verifier) await runVerifyClosings(closings.verifier, activeWorkspaces, logger);
+    },
   });
   await registerLifecycleBackfillJob(queue, createLifecycleBackfill(pool), activeWorkspaces, logger, {
     runOnStart: options.lifecycleBackfillOnStart ?? true,
@@ -215,6 +229,15 @@ export async function createWorkerRuntime(
   const rateValidityWindowDays = config.REPORTING_RATE_VALIDITY_WINDOW ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
   // PLANNING (add-financial-periods): job horario `planning.ensure-periods` + consumidores de IDENTITY y LEDGER. El
   // calendario de cada workspace se lee con el rol de directorio (pf_worker no ve iam.workspace por membresía).
+  // Solo lectura del ledger para el verificador de cierres (rol pf_worker, miembro de pf_app).
+  const closingLedger = createLedgerRuntime({
+    pool,
+    clock: options.clock ?? systemClock,
+    audit: demoAudit.port,
+    outbox: fxOutbox,
+    logger,
+  });
+  const closingLedgerPorts = { balances: closingLedger.accountBalances, ledger: closingLedger.posting };
   const planning = createPlanningRuntime({
     pool,
     clock: options.clock ?? systemClock,
@@ -224,6 +247,11 @@ export async function createWorkerRuntime(
     calendar: identityWorkspaceCalendarDirectory(pool),
     activity: ledgerActivityRange(),
     lookahead: config.PLANNING_PERIOD_LOOKAHEAD,
+    closePendingDelayDays: config.PLANNING_CLOSE_PENDING_DELAY_DAYS,
+    verification: {
+      ...closingLedgerPorts,
+      metrics: otelCounters('@pf/planning'),
+    },
     // add-budgets: el consumidor de umbrales lee la fuente de verdad con la MISMA valoración y ventana de vigencia que
     // el Home (`REPORTING_RATE_VALIDITY_WINDOW`, docs/31 D53 y docs/33 D109).
     budgets: {
@@ -241,7 +269,8 @@ export async function createWorkerRuntime(
       calendarCacheMs: 60_000,
     },
   });
-  await registerPlanningPeriodsJob(queue, planning.service, activeWorkspaces, logger, {
+  if (planning.verifier) closings.verifier = planning.verifier;
+  await registerPlanningPeriodsJob(queue, planning.service, planning.closePending, activeWorkspaces, logger, {
     cron: config.PLANNING_PERIODS_CRON,
     runOnStart: options.planningPeriodsOnStart ?? true,
   });

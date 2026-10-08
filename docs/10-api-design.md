@@ -286,7 +286,7 @@ Content-Type: application/json
 | planning (P2) | `BUDGET_TEMPLATE_ARCHIVED` | 409 | Aplicar, versionar o marcar como predeterminado un template archivado (`applyTemplate`, `createBudget` con `TEMPLATE`, `publishTemplateVersion`, `setDefaultTemplate`; add-budget-templates) |
 | planning (P2) | `BUDGET_PROPAGATION_STALE` | 409 | Entre la vista previa y la confirmación cambió un plan, el template o el alcance (`confirmBudgetPropagation`); no se cambia nada |
 | planning (P2) | `BUDGET_NO_TEMPLATE_ORIGIN` | 422 | Propagar desde un plan que no viene de un template (docs/33 D84): la UI ofrece crear un template con esas líneas |
-| planning (P2) | `PERIOD_OVERLAP`, `MONTH_CLOSING_IN_PROGRESS` | 409 | — |
+| planning (P2) | `PERIOD_NOT_STARTED`, `PERIOD_NOT_ENDED`, `PERIOD_PREVIOUS_NOT_CLOSED`, `PERIOD_NEXT_CLOSED`, `MONTH_CLOSING_BLOCKED`, `MONTH_CLOSING_WARNINGS_NOT_ACKNOWLEDGED` | 409 | `PERIOD_OVERLAP` y `MONTH_CLOSING_IN_PROGRESS` se retiran (add-month-closing): los rangos los calcula el sistema y el cierre es síncrono y serializado. |
 | commitments (P3) | `INVALID_RRULE`, `OCCURRENCE_ALREADY_MATERIALIZED` | 422 / 409 | — |
 | debt (P4) | `INSTALLMENT_ALREADY_PAID`, `PAYMENT_BREAKDOWN_MISMATCH` | 409 / 422 | — |
 | goals (P4) | `EARMARK_EXCEEDS_BALANCE` | 422 | INV-018 |

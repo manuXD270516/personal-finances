@@ -15,6 +15,7 @@ import type {
 import {
   JournalEntry,
   LedgerAccount,
+  firstOpenDateOnOrAfter,
   LedgerAccountCode,
   type AccountNature,
   type EntryType,
@@ -68,6 +69,8 @@ interface LedgerDb {
     workspace_id: string;
     year_month: string;
     period_id: string | null;
+    period_start: string;
+    period_end: string;
     locked_by: string | null;
   };
   'fx.currency': { code: string; scale: number };
@@ -446,22 +449,24 @@ export class PgJournalEntryRepository implements JournalEntryRepository {
   }
 }
 
-/** Bloqueo mensual (D10): `lock`/`unlock` idempotentes. */
+/** Bloqueo por rango del periodo financiero (ADR-0028): `lock`/`unlock` idempotentes. */
 export class PgPeriodLockRepository implements PeriodLockRepository {
-  async isLocked(workspaceId: string, yearMonth: YearMonth): Promise<boolean> {
-    const row = await db()
-      .selectFrom('ledger.period_lock')
-      .select('year_month')
-      .where('workspace_id', '=', workspaceId)
-      .where('year_month', '=', yearMonth.value)
-      .executeTakeFirst();
-    return row !== undefined;
+  async isLocked(workspaceId: string, date: LocalDate): Promise<boolean> {
+    const res = await sql<{ locked: boolean }>`
+      SELECT EXISTS (
+        SELECT 1 FROM ledger.period_lock l
+         WHERE l.workspace_id = ${workspaceId}
+           AND ${date.toString()}::date BETWEEN l.period_start AND l.period_end) AS locked`.execute(db());
+    return res.rows[0]?.locked === true;
   }
 
   async lock(lock: PeriodLock, lockedBy: string | null): Promise<boolean> {
+    // Una colisión de la exclusión gist (rango solapado con OTRO periodo) NO la cubre el ON CONFLICT: es un error real.
+    const start = lock.periodStart === null ? '-infinity' : lock.periodStart.toString();
     const res = await sql`
-      INSERT INTO ledger.period_lock (workspace_id, year_month, period_id, locked_by)
-      VALUES (${lock.workspaceId}, ${lock.yearMonth.value}, ${lock.periodId}, ${lockedBy})
+      INSERT INTO ledger.period_lock (workspace_id, year_month, period_id, period_start, period_end, locked_by)
+      VALUES (${lock.workspaceId}, ${lock.yearMonth.value}, ${lock.periodId}, ${start}::date,
+              ${lock.periodEnd.toString()}::date, ${lockedBy})
       ON CONFLICT (workspace_id, year_month) DO NOTHING`.execute(db());
     return (res.numAffectedRows ?? 0n) > 0n;
   }
@@ -473,6 +478,25 @@ export class PgPeriodLockRepository implements PeriodLockRepository {
       .where('year_month', '=', yearMonth.value)
       .executeTakeFirst();
     return res.numDeletedRows > 0n;
+  }
+
+  async firstOpenDateOnOrAfter(workspaceId: string, date: LocalDate): Promise<LocalDate> {
+    // Fechas como texto (`::text`): evita el parser de `date` de pg. Los locks de un workspace son pocos (≤ 1 por periodo).
+    const res = await sql<{ period_start: string; period_end: string }>`
+      SELECT period_start::text AS period_start, period_end::text AS period_end
+        FROM ledger.period_lock WHERE workspace_id = ${workspaceId} ORDER BY period_end`.execute(db());
+    const ranges = res.rows.map((r) => ({
+      periodStart: r.period_start === '-infinity' ? null : LocalDate.parse(r.period_start),
+      periodEnd: LocalDate.parse(r.period_end),
+    }));
+    return firstOpenDateOnOrAfter(ranges, date);
+  }
+
+  async acquireExclusiveWorkspaceLock(workspaceId: string): Promise<void> {
+    // La MISMA clave que cada posteo toma en modo compartido (`PgJournalEntryRepository.insert`).
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${'ledger.balance_snapshot:' + workspaceId}, 0))`.execute(
+      db(),
+    );
   }
 }
 

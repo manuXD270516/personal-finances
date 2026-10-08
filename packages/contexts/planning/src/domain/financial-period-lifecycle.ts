@@ -13,8 +13,7 @@ export type FinancialPeriodTransitionRecord = StateTransition<
 
 /**
  * Máquina `FinancialPeriod` (decisión 4; docs/31 D37). Única fuente de las transiciones del periodo: el agregado valida
- * contra ella. `CLOSE`/`REOPEN` se declaran aquí; sus comandos, guardas (checklist, orden, rol OWNER) y eventos los
- * implementa `add-month-closing`. El recálculo de rango de un DRAFT es una anotación del recorrido, no una transición.
+ * contra ella. `CLOSE`/`REOPEN` las implementa `add-month-closing` (checklist, orden, rol OWNER, eventos). El recálculo de rango de un DRAFT es una anotación del recorrido, no una transición.
  * El tipo de agregado sigue la convención PascalCase de `audit.lifecycle_transition` (`^[A-Z][A-Za-z]*$`).
  */
 export const FINANCIAL_PERIOD_LIFECYCLE = LifecycleMachine.define({
@@ -45,15 +44,16 @@ export const FINANCIAL_PERIOD_LIFECYCLE = LifecycleMachine.define({
       code: 'CLOSE',
       from: ['ACTIVE', 'REOPENED'],
       to: ['CLOSED'],
-      guard: 'add-month-closing: checklist, cierre en orden',
-      events: [],
+      guard:
+        'estado ACTIVE|REOPENED, periodo anterior cerrado (PERIOD_PREVIOUS_NOT_CLOSED), fin anterior a hoy en la zona del workspace (PERIOD_NOT_ENDED), sin ítems bloqueantes y advertencias reconocidas',
+      events: ['planning.MonthClosed.v1'],
     },
     {
       code: 'REOPEN',
       from: ['CLOSED'],
       to: ['REOPENED'],
-      guard: 'add-month-closing: rol OWNER y motivo',
-      events: [],
+      guard: 'rol OWNER, motivo de 1 a 500 caracteres y siguiente periodo no cerrado (PERIOD_NEXT_CLOSED)',
+      events: ['planning.PeriodReopened.v1'],
     },
   ],
 });

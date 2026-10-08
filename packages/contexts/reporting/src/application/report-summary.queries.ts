@@ -4,6 +4,7 @@ import {
   currency as makeCurrency,
   dec,
   DomainError,
+  endOfDayInstant,
   FlowValuation,
   LocalDate,
   Money,
@@ -52,18 +53,34 @@ export interface GetReportSummaryQuery {
   readonly reportingCurrency?: string;
   readonly topCategories?: number;
   readonly compare?: CompareMode;
+  /**
+   * Fecha de corte `YYYY-MM-DD` de los STOCKS (uso interno: cifras de cierre, add-month-closing): saldos a esa fecha y
+   * tasas de valoración al cierre de ese día en la zona del workspace (sin pasar de "ahora"). Ausente = hoy/ahora.
+   */
+  readonly asOf?: string;
+}
+
+/** Tasas usadas separadas por origen (cifras de cierre: flujos vs stocks). */
+export interface ReportSummaryRateSets {
+  readonly flows: readonly ResolvedRateDto[];
+  readonly stocks: readonly ResolvedRateDto[];
+  /** Flujos del periodo sin tasa utilizable (ingresos primero, gastos después) y completitud de ambos. */
+  readonly flowsUnconverted: readonly MoneyDto[];
+  readonly flowsComplete: boolean;
 }
 
 export interface ReportSummaryResult {
   readonly summary: ReportSummaryDto;
   /** Versión derivada de los datos del workspace (parte del ETag). */
   readonly dataVersion: string;
+  /** Uso interno (queries de cierre): tasas usadas por origen. */
+  readonly rateSets: ReportSummaryRateSets;
 }
 
 const range = (r: DateRange) => ({ from: r.from.toString(), to: r.to.toString() });
 
 /** Clave de identidad de una tasa usada (misma versión almacenada y orientación ⇒ una sola entrada). */
-const rateKey = (r: ResolvedRateDto) =>
+export const rateKey = (r: ResolvedRateDto) =>
   `${r.fxRateId ?? JSON.stringify(r.components.map((c) => (c as { id?: unknown }).id))}|${r.rate.base}|${r.rate.quote}`;
 
 const toExact = (v: ValuationRateDto): ExactRate => ({
@@ -87,6 +104,11 @@ export class ReportSummaryQueries {
     return this.deps.uow.run({ userId: query.userId, workspaceId: query.workspaceId }, () =>
       this.compute(query),
     );
+  }
+
+  /** Cálculo del resumen dentro de la unidad de trabajo YA abierta por el llamador (cifras de cierre). */
+  computeInCurrentUnit(query: GetReportSummaryQuery): Promise<ReportSummaryResult> {
+    return this.compute(query);
   }
 
   private async compute(query: GetReportSummaryQuery): Promise<ReportSummaryResult> {
@@ -118,13 +140,14 @@ export class ReportSummaryQueries {
     const period = this.period(query, today);
     const compare = query.compare ?? 'PREVIOUS_PERIOD_TO_DATE';
     const comparison = PeriodComparator.comparison(period, today, compare);
+    const stockDate = query.asOf === undefined ? today : LocalDate.parse(query.asOf);
 
     // ---- lecturas (contratos públicos, misma transacción)
     const accounts = await deps.accounts.listAccounts({ workspaceId: ws });
     const balances = await deps.balances.getAccountBalances({
       workspaceId: ws,
       accountIds: accounts.map((a) => a.accountId),
-      asOf: today.toString(),
+      asOf: stockDate.toString(),
     });
     const flowFrom =
       comparison && comparison.previous.from.compare(period.from) < 0
@@ -164,6 +187,14 @@ export class ReportSummaryQueries {
       (c) => c !== reporting.code,
     );
     const nowText = now.toString();
+    // Tasas de los stocks: "ahora" o, con corte `asOf`, el cierre de ese día (acotado a "ahora").
+    const stockAt =
+      query.asOf === undefined
+        ? nowText
+        : (() => {
+            const close = endOfDayInstant(stockDate.toString(), timeZone);
+            return close.epochMillis > now.epochMillis ? nowText : close.toString();
+          })();
     // Pedidos de tasa de los flujos: `FlowValuation` (shared-kernel, docs/33 D109) comparte las reglas con Planning.
     const flowRequests = FlowValuation.rateRequests(
       flows.map((f) => ({ date: f.businessDate, amount: f.amount })),
@@ -173,7 +204,7 @@ export class ReportSummaryQueries {
     );
     const flowKeys = flowRequests.map((r) => r.key);
     const requests = [
-      ...stockCodes.map((code) => ({ base: code, quote: reporting.code, at: nowText })),
+      ...stockCodes.map((code) => ({ base: code, quote: reporting.code, at: stockAt })),
       ...flowRequests.map(({ base, quote, at }) => ({ base, quote, at })),
     ];
     const windowDays = deps.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
@@ -191,14 +222,20 @@ export class ReportSummaryQueries {
       if (r) flowRates.set(key, r);
     });
     const used = new Map<string, ResolvedRateDto>();
-    const useRate = (r: ValuationRateDto | undefined): ExactRate | null => {
+    const usedStocks = new Map<string, ResolvedRateDto>();
+    const usedFlows = new Map<string, ResolvedRateDto>();
+    const useRate = (
+      r: ValuationRateDto | undefined,
+      own: Map<string, ResolvedRateDto>,
+    ): ExactRate | null => {
       if (!r) return null;
       const key = rateKey(r.resolved);
       if (!used.has(key)) used.set(key, r.resolved);
+      if (!own.has(key)) own.set(key, r.resolved);
       return toExact(r);
     };
-    const stockRateFor = (code: string) => useRate(stockRates.get(code));
-    const flowRateFor = (code: string, date: string) => useRate(flowRates.get(`${code}|${date}`));
+    const stockRateFor = (code: string) => useRate(stockRates.get(code), usedStocks);
+    const flowRateFor = (code: string, date: string) => useRate(flowRates.get(`${code}|${date}`), usedFlows);
 
     // ---- stocks: dinero disponible y patrimonio neto
     const isLiquid = (a: AccountSummaryDto) => a.nature === 'ASSET' && a.liquidity === 'LIQUID';
@@ -230,7 +267,7 @@ export class ReportSummaryQueries {
     const savings = income.total.minus(expense.total);
     const categoryIds = [...new Set(inPeriod.map((f) => f.categoryId))];
     const names = new Map(
-      (categoryIds.length
+      (categoryIds.length > 0 && topN > 0
         ? await deps.categories.categoriesByIds({ userId: query.userId ?? '', workspaceId: ws, categoryIds })
         : []
       ).map((c) => [c.categoryId, c.name]),
@@ -410,7 +447,16 @@ export class ReportSummaryQueries {
         attributions: [...attributions.values()],
       },
     };
-    return { summary, dataVersion: await deps.versions.versionOf(ws) };
+    return {
+      summary,
+      dataVersion: await deps.versions.versionOf(ws),
+      rateSets: {
+        flows: [...usedFlows.values()],
+        stocks: [...usedStocks.values()],
+        flowsUnconverted: [...income.unconverted, ...expense.unconverted].map((m) => m.toJSON()),
+        flowsComplete: income.complete && expense.complete,
+      },
+    };
   }
 
   private period(query: GetReportSummaryQuery, today: LocalDate): DateRange {

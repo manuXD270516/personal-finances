@@ -124,6 +124,7 @@ function Periods({ ctx }: { ctx: WorkspaceContext }) {
             canEdit={ctx.canEdit}
             f={f}
             busyId={busyId}
+            href={ctx.href}
             onActivate={(p) => void activate(p)}
           />
           {periods.length === 0 && ctx.canEdit ? (

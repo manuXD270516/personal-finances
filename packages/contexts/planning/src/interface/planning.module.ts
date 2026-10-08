@@ -1,20 +1,41 @@
 import { Module, type DynamicModule } from '@nestjs/common';
-import type { AuditHistoryQuery, AuditPort, LifecycleMachineDto, LifecyclePort } from '@pf/audit/contracts';
+import type { AccountCatalogQuery } from '@pf/accounts/contracts';
+import type {
+  AuditHistoryQuery,
+  AuditPort,
+  LifecycleMachineDto,
+  LifecyclePort,
+  LifecycleQuery,
+} from '@pf/audit/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
-import type { LedgerActivityRangeQuery } from '@pf/ledger/contracts';
+import type {
+  AccountBalancesQuery,
+  LedgerActivityRangeQuery,
+  LedgerPeriodLockPort,
+  LedgerPostingPort,
+} from '@pf/ledger/contracts';
 import { runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
-import type { NominalFlowQuery } from '@pf/transactions/contracts';
+import type { NetWorthQuery, PeriodFlowsQuery } from '@pf/reporting/contracts';
+import type {
+  NominalFlowQuery,
+  ReconciliationStatusQuery,
+  TransactionsClosingQuery,
+} from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { BudgetQueries } from '../application/budget.queries.js';
 import { BudgetCalculator } from '../application/budget-calculator.js';
 import { BudgetThresholdService } from '../application/budget-thresholds.service.js';
 import { BudgetsService } from '../application/budgets.service.js';
+import { ClosePendingService } from '../application/close-pending-publisher.js';
+import { ClosingQueries, type CloseReportPdfRenderer } from '../application/closing.queries.js';
+import { ClosingService } from '../application/closing.service.js';
+import { ClosingVerifier } from '../application/closing-verifier.js';
 import { PeriodQueries } from '../application/period.queries.js';
 import { RolloverService } from '../application/rollover.service.js';
 import { PeriodsService } from '../application/periods.service.js';
@@ -24,17 +45,22 @@ import { TemplateQueries } from '../application/template.queries.js';
 import { TemplatesService } from '../application/templates.service.js';
 import type {
   BudgetsDeps,
+  ClosingDeps,
+  ClosingMetricsPort,
   OutboxPort,
   PlanningDeps,
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
 import {
   BUDGET_VS_ACTUAL_QUERY,
+  CLOSING_SNAPSHOT_QUERY,
+  DEFAULT_CLOSE_PENDING_DELAY_DAYS,
   PERIOD_QUERY,
   PLANNING_CONSUMERS,
   PLANNING_EDIT_GUARD,
   PLANNING_ENSURE_PERIODS_JOB,
   type BudgetVsActualQuery,
+  type ClosingSnapshotQuery,
   type PeriodCreatedHook,
   type PeriodQuery,
   type PlanningEditGuard,
@@ -46,6 +72,14 @@ import {
   PgThresholdCrossingRepository,
   requestActor,
 } from '../infrastructure/pg-budgets.js';
+import { PdfkitCloseReportPdf } from '../infrastructure/pdfkit-close-report.js';
+import {
+  PgClosePendingNoticeRepository,
+  PgClosingPolicyRepository,
+  PgCloseSnapshotRepository,
+  PgPeriodReopeningRepository,
+  sha256Hex,
+} from '../infrastructure/pg-closing.js';
 import { PgBudgetTemplateRepository } from '../infrastructure/pg-templates.js';
 import {
   PgFinancialPeriodRepository,
@@ -53,6 +87,7 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-planning.js';
 import { BUDGET_QUERIES, BUDGETS_SERVICE, BudgetsController } from './budgets-http.js';
+import { CLOSING_QUERIES, CLOSING_SERVICE, ClosingController } from './closing-http.js';
 import { PERIOD_QUERIES, PERIODS_SERVICE, PeriodsController } from './periods-http.js';
 import {
   PROPAGATION_SERVICE,
@@ -85,6 +120,26 @@ export interface BudgetsRuntimeOptions {
   readonly calendarCacheMs?: number;
 }
 
+/**
+ * Puertos del cierre de mes (openspec add-month-closing): consultas de TRANSACTIONS, ACCOUNTS, LEDGER y REPORTING y el
+ * bloqueo del ledger en la misma transacción. Solo la API los aporta; el worker solo necesita el aviso de cierre pendiente.
+ */
+export interface ClosingRuntimeOptions {
+  readonly settings: WorkspaceSettingsPort;
+  readonly lock: LedgerPeriodLockPort;
+  readonly ledger: Pick<LedgerPostingPort, 'assertPeriodOpen'>;
+  readonly accounts: AccountCatalogQuery;
+  readonly balances: AccountBalancesQuery;
+  readonly closing: TransactionsClosingQuery;
+  readonly reconciliation: ReconciliationStatusQuery;
+  readonly flows: PeriodFlowsQuery;
+  readonly netWorth: NetWorthQuery;
+  readonly lifecycleQuery?: LifecycleQuery;
+  /** Renderizador del PDF del reporte (pdfkit); sin él, solo CSV. */
+  readonly pdf?: CloseReportPdfRenderer;
+  readonly metrics?: ClosingMetricsPort;
+}
+
 export interface PlanningRuntimeOptions {
   readonly pool: Pool;
   readonly clock: Clock;
@@ -102,6 +157,16 @@ export interface PlanningRuntimeOptions {
   readonly onPeriodCreated?: readonly PeriodCreatedHook[];
   /** Presupuestos (add-budgets); sin él solo se componen los periodos. */
   readonly budgets?: BudgetsRuntimeOptions;
+  /** Cierre de mes (add-month-closing); sin él solo se compone el aviso de cierre pendiente. */
+  readonly closing?: ClosingRuntimeOptions;
+  /** `PLANNING_CLOSE_PENDING_DELAY_DAYS` (default 3). */
+  readonly closePendingDelayDays?: number;
+  /** Verificador de cierres (`planning.verify-closings`): solo lectura del ledger y de los snapshots. */
+  readonly verification?: {
+    readonly balances: AccountBalancesQuery;
+    readonly ledger: Pick<LedgerPostingPort, 'assertPeriodOpen'>;
+    readonly metrics?: ClosingMetricsPort;
+  };
 }
 
 export interface BudgetsRuntime {
@@ -117,8 +182,20 @@ export interface BudgetsRuntime {
   readonly vsActual: BudgetVsActualQuery;
 }
 
+export interface ClosingRuntime {
+  readonly service: ClosingService;
+  readonly queries: ClosingQueries;
+  /** Contrato público para `add-net-worth-evolution`. */
+  readonly snapshots: ClosingSnapshotQuery;
+}
+
 export interface PlanningRuntime {
   readonly service: PeriodsService;
+  /** Job `planning.close-pending` (corre dentro del cron `planning.ensure-periods`). */
+  readonly closePending: ClosePendingService;
+  readonly closing?: ClosingRuntime;
+  /** Verificador de cierres (INV-015/INV-022) para el job diario del worker. */
+  readonly verifier?: ClosingVerifier;
   readonly queries: PeriodQueries;
   /** Contratos públicos para `add-month-closing` y pf-p2b. */
   readonly periodQuery: PeriodQuery;
@@ -182,8 +259,75 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
       vsActual: budgetQueries,
     };
   }
+  const closeBase = {
+    uow: deps.uow,
+    periods: deps.periods,
+    notices: new PgClosePendingNoticeRepository(),
+    calendar: options.calendar,
+    outbox: options.outbox,
+    ids: uuidV7Ids,
+    clock: options.clock,
+    closePendingDelayDays: options.closePendingDelayDays ?? DEFAULT_CLOSE_PENDING_DELAY_DAYS,
+  };
+  const closePending = new ClosePendingService(closeBase as ClosingDeps);
+  let closing: ClosingRuntime | undefined;
+  const c = options.closing;
+  if (c) {
+    const closingDeps: ClosingDeps = {
+      ...closeBase,
+      policies: new PgClosingPolicyRepository(),
+      snapshots: new PgCloseSnapshotRepository(),
+      reopenings: new PgPeriodReopeningRepository(),
+      settings: c.settings,
+      lock: c.lock,
+      ledger: c.ledger,
+      accounts: c.accounts,
+      balances: c.balances,
+      closing: c.closing,
+      reconciliation: c.reconciliation,
+      flows: c.flows,
+      netWorth: c.netWorth,
+      ...(budgets ? { budgets: budgets.vsActual } : {}),
+      ...(b?.catalog ? { catalog: b.catalog } : {}),
+      audit: options.audit,
+      lifecycle: options.lifecycle,
+      actor: requestActor,
+      ...(c.metrics ? { metrics: c.metrics } : {}),
+    };
+    const closingQueries = new ClosingQueries(
+      closingDeps,
+      c.pdf ?? new PdfkitCloseReportPdf(),
+      c.lifecycleQuery,
+    );
+    closing = {
+      service: new ClosingService(closingDeps),
+      queries: closingQueries,
+      snapshots: closingQueries,
+    };
+  }
+  const v =
+    options.verification ??
+    (c
+      ? { balances: c.balances, ledger: c.ledger, ...(c.metrics ? { metrics: c.metrics } : {}) }
+      : undefined);
+  const verifier = v
+    ? new ClosingVerifier(
+        {
+          uow: deps.uow,
+          periods: deps.periods,
+          snapshots: new PgCloseSnapshotRepository(),
+          balances: v.balances,
+          ledger: v.ledger,
+          ...(v.metrics ? { metrics: v.metrics } : {}),
+        },
+        sha256Hex,
+      )
+    : undefined;
   return {
     service: new PeriodsService(deps),
+    closePending,
+    ...(verifier ? { verifier } : {}),
+    ...(closing ? { closing } : {}),
     queries,
     periodQuery: queries,
     editGuard: queries,
@@ -202,10 +346,19 @@ export class PlanningModule {
   static register(options: PlanningModuleOptions): DynamicModule {
     return {
       module: PlanningModule,
-      controllers: options.runtime.budgets
-        ? [PeriodsController, BudgetsController, TemplatesController]
-        : [PeriodsController],
+      controllers: [
+        PeriodsController,
+        ...(options.runtime.budgets ? [BudgetsController, TemplatesController] : []),
+        ...(options.runtime.closing ? [ClosingController] : []),
+      ],
       providers: [
+        ...(options.runtime.closing
+          ? [
+              { provide: CLOSING_SERVICE, useValue: options.runtime.closing.service },
+              { provide: CLOSING_QUERIES, useValue: options.runtime.closing.queries },
+              { provide: CLOSING_SNAPSHOT_QUERY, useValue: options.runtime.closing.snapshots },
+            ]
+          : []),
         ...(options.runtime.budgets
           ? [
               { provide: BUDGETS_SERVICE, useValue: options.runtime.budgets.service },
@@ -226,6 +379,7 @@ export class PlanningModule {
         PERIOD_QUERY,
         PLANNING_EDIT_GUARD,
         ...(options.runtime.budgets ? [BUDGET_VS_ACTUAL_QUERY] : []),
+        ...(options.runtime.closing ? [CLOSING_SNAPSHOT_QUERY] : []),
       ],
     };
   }
@@ -322,6 +476,43 @@ export function budgetEventConsumers(budgets: BudgetsRuntime): EventConsumerDefi
   ];
 }
 
+/**
+ * Job `planning.verify-closings` (NFR-DATA-008; design.md decisión 14): tras el verificador del ledger, revisa por
+ * workspace que los saldos del snapshot vigente igualen el ledger, que el hash coincida y que cada periodo cerrado
+ * tenga su bloqueo. Las violaciones se registran con `alert=planning.closing_violation` y la métrica
+ * `planning_closing_violations_total{check}`; un workspace que falla no detiene a los demás.
+ */
+export async function runVerifyClosings(
+  verifier: ClosingVerifier,
+  workspaces: ActiveWorkspaceDirectory,
+  logger: Pick<Logger, 'info' | 'error'>,
+): Promise<number> {
+  return runWithRequestContext(
+    { actor: { type: 'WORKER', process: 'planning.verify-closings' }, origin: 'system' },
+    async () => {
+      let violations = 0;
+      for (const { workspaceId } of await workspaces.list()) {
+        try {
+          for (const v of await verifier.verify(workspaceId)) {
+            violations += 1;
+            logger.error({ alert: 'planning.closing_violation', workspaceId, ...v }, 'closing violation');
+          }
+        } catch (err) {
+          logger.error(
+            {
+              workspaceId,
+              err: { type: err instanceof Error ? err.name : typeof err, message: String(err) },
+            },
+            'verify closings failed for workspace',
+          );
+        }
+      }
+      logger.info({ job: 'planning.verify-closings', violations }, 'closings verified');
+      return violations;
+    },
+  );
+}
+
 export interface ActiveWorkspaceDirectory {
   list(): Promise<readonly { readonly workspaceId: string }[]>;
 }
@@ -336,6 +527,7 @@ export async function runEnsurePeriods(
   workspaces: ActiveWorkspaceDirectory,
   logger: Pick<Logger, 'info' | 'error'>,
   trigger: 'cron' | 'startup' | 'manual',
+  closePending?: ClosePendingService,
 ): Promise<{ readonly workspaces: number; readonly created: number; readonly failed: number }> {
   return runWithRequestContext(
     { actor: { type: 'WORKER', process: `${PLANNING_ENSURE_PERIODS_JOB}:${trigger}` }, origin: 'system' },
@@ -346,6 +538,8 @@ export async function runEnsurePeriods(
       for (const { workspaceId } of all) {
         try {
           created += (await service.ensurePeriods({ workspaceId })).created.length;
+          // add-month-closing decisión 16: el aviso de cierre pendiente corre dentro del mismo cron.
+          await closePending?.publishDue(workspaceId);
         } catch (err) {
           failed += 1;
           logger.error(
@@ -367,5 +561,14 @@ export async function runEnsurePeriods(
 }
 
 export { PLANNING_ENSURE_PERIODS_JOB, PLANNING_CONSUMERS };
-export type { BudgetVsActualQuery, OutboxPort, PeriodCreatedHook, PeriodQuery, PlanningEditGuard };
+export type {
+  BudgetVsActualQuery,
+  ClosingSnapshotQuery,
+  OutboxPort,
+  PeriodCreatedHook,
+  PeriodQuery,
+  PlanningEditGuard,
+};
+export type { ClosingVerifier } from '../application/closing-verifier.js';
+export type { ClosePendingService } from '../application/close-pending-publisher.js';
 export type { PeriodsService } from '../application/periods.service.js';

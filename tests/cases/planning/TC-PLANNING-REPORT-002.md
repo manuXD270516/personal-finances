@@ -13,9 +13,13 @@ invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - apps/web/src/ui/planning/closing.test.tsx
+  - packages/contexts/planning/src/application/closing.service.test.ts
+  - packages/contexts/planning/src/domain/close-snapshot.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:

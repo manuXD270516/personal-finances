@@ -552,6 +552,146 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     expect(await balance(ws, acc)).toBe('55.00');
   });
 
+  it('[TC-LEDGER-PERIOD-003] bloqueo por rango (día de inicio 25): dominio y BD rechazan 10-25 y 11-24; 10-24 y 11-25 pasan; primer periodo abierto hacia atrás; exclusión gist', async () => {
+    const ws = randomUUID();
+    const other = randomUUID();
+    await createWorkspace(ws);
+    await createWorkspace(other);
+    const acc = randomUUID();
+    await post(ws, [userLine(acc, '1000.00'), sysLine('OPENING_BALANCE', '-1000.00')], {
+      entryType: 'OPENING',
+      entryDate: '2026-01-01',
+    });
+    await asUser(() =>
+      ledger.periodLock.lockPeriod({
+        workspaceId: ws,
+        yearMonth: '2026-10',
+        periodId: randomUUID(),
+        periodStart: '2026-10-25',
+        periodEnd: '2026-11-24',
+      }),
+    );
+    const expense = (entryDate: string) =>
+      post(ws, [sysLine('EXPENSE', '20.00', 'BOB', S1), userLine(acc, '-20.00')], { entryDate });
+    for (const date of ['2026-10-25', '2026-11-24']) {
+      expect(await domainCode(expense(date)), date).toBe('PERIOD_CLOSED');
+    }
+    const accounts = await inCtx(
+      app,
+      ws,
+      async (c) =>
+        (await c.query(`SELECT id, type FROM ledger.ledger_account ORDER BY type`)).rows as {
+          id: string;
+          type: string;
+        }[],
+    );
+    const assetId = accounts.find((a) => a.type === 'ASSET')!.id;
+    const equityId = accounts.find((a) => a.type === 'EQUITY')!.id;
+    const direct = (date: string) =>
+      sqlState(() =>
+        inCtx(
+          app,
+          ws,
+          (c) =>
+            rawEntry(c, ws, date, [
+              { account: assetId, type: 'ASSET', amount: '1.00' },
+              { account: equityId, type: 'EQUITY', amount: '-1.00' },
+            ]),
+          true,
+        ),
+      );
+    expect(await direct('2026-10-25')).toBe('PF004');
+    expect(await direct('2026-11-24')).toBe('PF004');
+    await expense('2026-10-24');
+    await expense('2026-11-25');
+    expect(await balance(ws, acc)).toBe('960.00');
+
+    // Primer periodo cerrado, abierto hacia atrás: lo anterior también se rechaza.
+    const acc2 = randomUUID();
+    await asUser(() =>
+      ledger.periodLock.lockPeriod({
+        workspaceId: other,
+        yearMonth: '2026-07',
+        periodStart: null,
+        periodEnd: '2026-07-31',
+        openStart: true,
+      }),
+    );
+    expect(
+      await domainCode(
+        post(other, [userLine(acc2, '500.00'), sysLine('OPENING_BALANCE', '-500.00')], {
+          entryType: 'OPENING',
+          entryDate: '2026-06-15',
+        }),
+      ),
+    ).toBe('PERIOD_CLOSED');
+    const bounds = await inCtx(
+      app,
+      other,
+      async (c) =>
+        (await c.query(`SELECT period_start::text AS s, period_end::text AS e FROM ledger.period_lock`)).rows,
+    );
+    expect(bounds).toEqual([{ s: '-infinity', e: '2026-07-31' }]);
+    await post(other, [userLine(acc2, '500.00'), sysLine('OPENING_BALANCE', '-500.00')], {
+      entryType: 'OPENING',
+      entryDate: '2026-08-01',
+    });
+
+    // Exclusión gist: rangos solapados del mismo workspace se rechazan (23P01), también el idempotente no la oculta.
+    expect(
+      await sqlState(() =>
+        inCtx(
+          app,
+          ws,
+          (c) =>
+            c.query(
+              `INSERT INTO ledger.period_lock (workspace_id, year_month, period_start, period_end)
+               VALUES ($1, '2026-11', '2026-11-01', '2026-11-30')`,
+              [ws],
+            ),
+          true,
+        ),
+      ),
+    ).toBe('23P01');
+    await expect(
+      asUser(() =>
+        ledger.periodLock.lockPeriod({
+          workspaceId: ws,
+          yearMonth: '2026-11',
+          periodStart: '2026-11-20',
+          periodEnd: '2026-12-24',
+        }),
+      ),
+    ).rejects.toThrow();
+    // Contiguo (11-25..12-24) sí; el mismo rango en otro workspace no choca.
+    await asUser(() =>
+      ledger.periodLock.lockPeriod({
+        workspaceId: ws,
+        yearMonth: '2026-11',
+        periodStart: '2026-11-25',
+        periodEnd: '2026-12-24',
+      }),
+    );
+    // Idempotencia por year_month.
+    await asUser(() =>
+      ledger.periodLock.lockPeriod({
+        workspaceId: ws,
+        yearMonth: '2026-11',
+        periodStart: '2026-11-25',
+        periodEnd: '2026-12-24',
+      }),
+    );
+    const firstOpen = (workspaceId: string, date: string) =>
+      asUser(() => ledger.posting.firstOpenDateOnOrAfter({ workspaceId, date }));
+    expect(await firstOpen(ws, '2026-10-30')).toBe('2026-12-25');
+    expect(await firstOpen(ws, '2026-10-24')).toBe('2026-10-24');
+    expect(await firstOpen(other, '2026-03-01')).toBe('2026-08-01');
+    await expect(
+      asUser(() => ledger.posting.assertPeriodOpen({ workspaceId: ws, date: '2026-12-24' })),
+    ).rejects.toMatchObject({ code: 'PERIOD_CLOSED' });
+    await asUser(() => ledger.posting.assertPeriodOpen({ workspaceId: ws, date: '2026-12-25' }));
+  });
+
   it('[TC-LEDGER-REVERSAL-002] dos reversas concurrentes: exactamente una se registra; la otra LEDGER_ENTRY_ALREADY_REVERSED', async () => {
     const acc = randomUUID();
     const e2 = await post(w1, [sysLine('EXPENSE', '45.00', 'BOB', S1), userLine(acc, '-45.00')]);

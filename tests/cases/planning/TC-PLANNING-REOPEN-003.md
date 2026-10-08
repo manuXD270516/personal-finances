@@ -14,9 +14,10 @@ invariants:
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/financial-period.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:

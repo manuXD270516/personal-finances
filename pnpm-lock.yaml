@@ -750,6 +750,9 @@ importers:
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
+      '@pf/accounts':
+        specifier: workspace:*
+        version: link:../accounts
       '@pf/audit':
         specifier: workspace:*
         version: link:../audit
@@ -768,6 +771,9 @@ importers:
       '@pf/platform':
         specifier: workspace:*
         version: link:../../platform
+      '@pf/reporting':
+        specifier: workspace:*
+        version: link:../reporting
       '@pf/shared-kernel':
         specifier: workspace:*
         version: link:../../shared-kernel
@@ -777,6 +783,9 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.29.6
+      pdfkit:
+        specifier: 'catalog:'
+        version: 0.20.2
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -784,6 +793,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
+      '@types/pdfkit':
+        specifier: 'catalog:'
+        version: 0.17.6
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1

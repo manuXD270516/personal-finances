@@ -282,6 +282,14 @@ export class TransactionsService {
           cmd.kind === 'INCOME' ? 'INCOME' : 'EXPENSE',
         );
       }
+      // D69 (transactions/transaction-recording): una PENDING no entra en un periodo cerrado (no genera asiento, así
+      // que el ledger no la frena). Las posteadas las rechaza el ledger al postear.
+      if ((cmd.status ?? 'POSTED') === 'PENDING') {
+        await this.deps.ledger.assertPeriodOpen({
+          workspaceId: cmd.workspaceId,
+          date: cmd.transactionDate,
+        });
+      }
       const tx = Transaction.record({
         id: cmd.id ?? ids.next(),
         workspaceId: cmd.workspaceId,
@@ -417,6 +425,12 @@ export class TransactionsService {
           }
         }
         fee = { amount: feeAmount, categoryId, splitId: ids.next() };
+      }
+      if ((cmd.status ?? 'POSTED') === 'PENDING') {
+        await this.deps.ledger.assertPeriodOpen({
+          workspaceId: cmd.workspaceId,
+          date: cmd.transactionDate,
+        });
       }
       const tx = Transaction.recordTransfer({
         id: cmd.id ?? ids.next(),
@@ -620,11 +634,31 @@ export class TransactionsService {
       // se rechaza con PERIOD_CLOSED (los cambios con asiento ya los rechaza el ledger, PF004).
       // Los custom fields de transacción siguen la misma regla (docs/33 D65, extensión de D49): un cambio en un periodo
       // cerrado se rechaza con PERIOD_CLOSED sin escribir valor ni auditoría (la UoW hace rollback).
+      // Alcance de la edición en periodos cerrados (ADR-0028, planning/month-closing): además de categoría y custom
+      // fields, cambian lo reportado los TAGS y la CONTRAPARTE (de la transacción o de algún split). Notas,
+      // descripción, medio de pago, memo y adjuntos siguen permitidos.
+      const afterAmend = tx.snapshot;
+      const tagsChanged = result.classificationChanges.some(
+        (c) => c.addedTagIds.length > 0 || c.removedTagIds.length > 0,
+      );
+      const counterpartyChanged =
+        before.counterpartyId !== afterAmend.counterpartyId ||
+        before.splits.some((s, i) => {
+          const next = afterAmend.splits[i];
+          return next !== undefined && next.id === s.id && next.counterpartyId !== s.counterpartyId;
+        });
       if (
         result.classificationChanges.some((c) => c.previousCategoryId !== c.newCategoryId) ||
-        result.customFieldChanges.length > 0
+        result.customFieldChanges.length > 0 ||
+        tagsChanged ||
+        counterpartyChanged
       ) {
         await this.deps.ledger.assertPeriodOpen({ workspaceId, date: before.businessDate });
+      }
+      // D69: una PENDING (sin asiento) no puede quedar —ni seguir— con fecha de negocio en un periodo cerrado; se
+      // evalúa la fecha RESULTANTE de la edición.
+      if (before.status === 'PENDING' && result.changedFields.length > 0) {
+        await this.deps.ledger.assertPeriodOpen({ workspaceId, date: afterAmend.businessDate });
       }
       let previousStatus: TransactionStatus | null = result.changedFields.includes('status')
         ? result.previousStatus
@@ -736,6 +770,7 @@ export class TransactionsService {
     transactionId: string,
     expectedVersion: number,
     reason: string,
+    options: { readonly correctInCurrentPeriod?: boolean } = {},
   ): Promise<TransactionState> {
     return this.deps.uow.run(workspaceId, async () => {
       const tx = await this.load(workspaceId, transactionId, expectedVersion);
@@ -746,10 +781,17 @@ export class TransactionsService {
       const { previousStatus, entryToReverse } = tx.void(reason, this.deps.clock.now().toString());
       let reversalId: string | null = null;
       if (entryToReverse) {
+        // Anulación corregida (`VoidRequest.correctInCurrentPeriod`, ADR-0028): si el periodo original está cerrado, la
+        // reversa se fecha en la primera fecha abierta; si no está cerrado, `firstOpenDateOnOrAfter` devuelve la fecha
+        // original. Con `false` y periodo cerrado, el ledger rechaza con PERIOD_CLOSED.
+        const reverseDate =
+          options.correctInCurrentPeriod === true
+            ? await this.deps.ledger.firstOpenDateOnOrAfter({ workspaceId, date: before.businessDate })
+            : before.businessDate;
         const reversal = await this.deps.ledger.reverseJournalEntry({
           workspaceId,
           journalEntryId: entryToReverse,
-          reverseDate: before.businessDate,
+          reverseDate,
           reason: reason.trim(),
         });
         reversalId = reversal.journalEntryId;

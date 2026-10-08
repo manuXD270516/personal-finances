@@ -36,6 +36,9 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/planificacion/presupuestos', name: 'Presupuestos' },
   // add-budget-templates 7.1: templates de presupuesto (la versión con datos y borrador la analiza templates.spec.ts).
   { path: '/planificacion/templates', name: 'Templates de presupuesto' },
+  // add-month-closing 7.3: cierre de mes sin periodo en la ruta (la versión con periodo, checklist y reporte la analiza
+  // month-closing.spec.ts) y la política de cierre dentro de /configuracion.
+  { path: '/planificacion/cierre', name: 'Cierre de mes' },
 ];
 
 async function seriousViolations(page: Page) {

@@ -1,12 +1,13 @@
 import type { AuditEntry, AuditPort } from '@pf/audit/contracts';
 import { currency, DomainError, FixedClock, Instant, type Currency } from '@pf/shared-kernel';
 import {
+  isDateLocked,
+  firstOpenDateOnOrAfter,
   LedgerAccount,
   type JournalEntry,
   type PeriodLock,
   type SourceRef,
   type SystemKind,
-  type YearMonth,
 } from '../../domain/index.js';
 import type { LedgerDeps } from '../ports/index.js';
 
@@ -21,6 +22,12 @@ export class InMemoryLedger {
   entries: JournalEntry[] = [];
   reversals = new Map<string, string>();
   locks = new Map<string, PeriodLock>();
+  /** Workspaces para los que se tomó el candado exclusivo (orden de llamadas). */
+  exclusiveLocks: string[] = [];
+
+  private locksOf(ws: string): PeriodLock[] {
+    return [...this.locks.values()].filter((l) => l.workspaceId === ws);
+  }
   events: {
     eventType: string;
     payload: Record<string, unknown>;
@@ -93,7 +100,7 @@ export class InMemoryLedger {
       },
       entries: {
         append: async (entry) => {
-          if (this.locks.has(`${entry.workspaceId}|${entry.entryDate.toString().slice(0, 7)}`)) {
+          if (isDateLocked(this.locksOf(entry.workspaceId), entry.entryDate)) {
             throw new DomainError('PERIOD_CLOSED', 'PF004');
           }
           this.seq += 1;
@@ -120,14 +127,24 @@ export class InMemoryLedger {
         },
       },
       periods: {
-        isLocked: async (ws, ym: YearMonth) => this.locks.has(`${ws}|${ym.value}`),
+        isLocked: async (ws, date) => isDateLocked(this.locksOf(ws), date),
         lock: async (lock) => {
           const key = `${lock.workspaceId}|${lock.yearMonth.value}`;
           if (this.locks.has(key)) return false;
+          const overlaps = this.locksOf(lock.workspaceId).some(
+            (o) =>
+              (o.periodStart === null || o.periodStart.compare(lock.periodEnd) <= 0) &&
+              (lock.periodStart === null || lock.periodStart.compare(o.periodEnd) <= 0),
+          );
+          if (overlaps) throw new DomainError('INTERNAL_ERROR', 'period_lock range overlaps (exclusion)');
           this.locks.set(key, lock);
           return true;
         },
         unlock: async (ws, ym) => this.locks.delete(`${ws}|${ym.value}`),
+        firstOpenDateOnOrAfter: async (ws, date) => firstOpenDateOnOrAfter(this.locksOf(ws), date),
+        acquireExclusiveWorkspaceLock: async (ws) => {
+          this.exclusiveLocks.push(ws);
+        },
       },
       outbox: {
         append: async (draft) => {

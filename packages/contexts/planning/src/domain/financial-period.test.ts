@@ -1,4 +1,4 @@
-import { DomainError, LocalDate, type StateTransition } from '@pf/shared-kernel';
+import { DomainError, Instant, LocalDate, type StateTransition } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import {
   FINANCIAL_PERIOD_LIFECYCLE,
@@ -29,6 +29,9 @@ const create = (label: string, today: string, startDay = 1) =>
     at: AT,
   });
 const reload = (p: FinancialPeriod) => FinancialPeriod.restore(p.snapshot);
+/** Guardas permisivas: periodo terminado hace mucho y sin periodo anterior / siguiente cerrado. */
+const CLOSABLE = { previousStatus: null, today: LocalDate.parse('2030-01-01') } as const;
+const REOPENABLE = { nextStatus: null, reason: 'Faltó registrar la comisión' } as const;
 
 describe('Máquina FINANCIAL_PERIOD_LIFECYCLE y agregado FinancialPeriod', () => {
   it('la máquina declara DRAFT/ACTIVE/CLOSED/REOPENED sin terminales y CREATE, ACTIVATE, CLOSE, REOPEN', () => {
@@ -66,17 +69,17 @@ describe('Máquina FINANCIAL_PERIOD_LIFECYCLE y agregado FinancialPeriod', () =>
 
   it('[TC-PLANNING-STATE-001] cerrar un DRAFT, reabrir un ACTIVE o activar un CLOSED ⇒ INVALID_STATUS_TRANSITION sin cambios', () => {
     const draft = reload(create('2026-12', '2026-10-05'));
-    expect(code(() => draft.close(AT))).toBe('INVALID_STATUS_TRANSITION');
+    expect(code(() => draft.close(AT, CLOSABLE))).toBe('INVALID_STATUS_TRANSITION');
     expect(draft.status).toBe('DRAFT');
     expect(draft.lastTransition).toBeNull();
 
     const active = reload(create('2026-10', '2026-10-05'));
-    expect(code(() => active.reopen(AT))).toBe('INVALID_STATUS_TRANSITION');
+    expect(code(() => active.reopen(AT, REOPENABLE))).toBe('INVALID_STATUS_TRANSITION');
     expect(active.status).toBe('ACTIVE');
     expect(active.lastTransition).toBeNull();
 
     const closing = reload(create('2026-09', '2026-10-05'));
-    closing.close(AT);
+    closing.close(AT, CLOSABLE);
     const closed = reload(closing);
     expect(code(() => closed.activate(d('2026-10-05'), AT))).toBe('INVALID_STATUS_TRANSITION');
     expect(closed.status).toBe('CLOSED');
@@ -157,8 +160,8 @@ describe('Máquina FINANCIAL_PERIOD_LIFECYCLE y agregado FinancialPeriod', () =>
           p = reload(p);
           try {
             if (op === 'activate') p.activate(d(start), AT);
-            else if (op === 'close') p.close(AT);
-            else p.reopen(AT);
+            else if (op === 'close') p.close(AT, CLOSABLE);
+            else p.reopen(AT, REOPENABLE);
           } catch (err) {
             expect(err).toBeInstanceOf(DomainError);
             expect(p.lastTransition).toBeNull();
@@ -169,5 +172,59 @@ describe('Máquina FINANCIAL_PERIOD_LIFECYCLE y agregado FinancialPeriod', () =>
         expect(FINANCIAL_PERIOD_LIFECYCLE.replay(path)).toBe(p.status);
       }
     }
+  });
+
+  it('[TC-PLANNING-CLOSE-004] (dominio) cerrar exige el periodo anterior cerrado; el primero no tiene anterior', () => {
+    const nov = reload(create('2026-11', '2026-12-05'));
+    expect(code(() => nov.close(AT, { previousStatus: 'ACTIVE', today: d('2026-12-05') }))).toBe(
+      'PERIOD_PREVIOUS_NOT_CLOSED',
+    );
+    expect(code(() => nov.close(AT, { previousStatus: 'REOPENED', today: d('2026-12-05') }))).toBe(
+      'PERIOD_PREVIOUS_NOT_CLOSED',
+    );
+    expect(nov.status).toBe('ACTIVE');
+    expect(nov.lastTransition).toBeNull();
+    const first = reload(create('2026-07', '2026-12-05'));
+    expect(first.close(AT, { previousStatus: null, today: d('2026-12-05') })).toBe(1);
+    const afterClosed = reload(create('2026-11', '2026-12-05'));
+    expect(afterClosed.close(AT, { previousStatus: 'CLOSED', today: d('2026-12-05') })).toBe(1);
+  });
+
+  it('[TC-PLANNING-CLOSE-005] (dominio) solo se cierra un periodo cuyo fin es anterior a hoy en la zona del workspace', () => {
+    // 2026-11-01T03:30Z = 2026-10-31 23:30 en La Paz ⇒ hoy 2026-10-31 (no anterior al fin)
+    const oct = reload(create('2026-10', '2026-10-05'));
+    const lateNight = LocalDate.ofInstant(Instant.parse('2026-11-01T03:30:00Z'), 'America/La_Paz');
+    expect(lateNight.toString()).toBe('2026-10-31');
+    expect(code(() => oct.close(AT, { previousStatus: null, today: lateNight }))).toBe('PERIOD_NOT_ENDED');
+    expect(oct.status).toBe('ACTIVE');
+    // 2026-11-01T04:10Z = 2026-11-01 00:10 en La Paz ⇒ hoy 2026-11-01
+    const nextMinute = LocalDate.ofInstant(Instant.parse('2026-11-01T04:10:00Z'), 'America/La_Paz');
+    expect(oct.close(AT, { previousStatus: null, today: nextMinute })).toBe(1);
+    expect(oct.status).toBe('CLOSED');
+    expect(oct.lastTransition).toEqual({ transition: 'CLOSE', from: 'ACTIVE', to: 'CLOSED' });
+  });
+
+  it('[TC-PLANNING-REOPEN-003] (dominio) reabrir exige CLOSED, motivo 1..500 y siguiente no cerrado; el re-cierre es n+1', () => {
+    const closing = reload(create('2026-10', '2026-12-05'));
+    closing.close(AT, CLOSABLE);
+    const closed = reload(closing);
+    expect(code(() => closed.reopen(AT, { nextStatus: 'CLOSED', reason: 'x' }))).toBe('PERIOD_NEXT_CLOSED');
+    expect(code(() => closed.reopen(AT, { nextStatus: null, reason: '   ' }))).toBe('VALIDATION_FAILED');
+    expect(code(() => closed.reopen(AT, { nextStatus: null, reason: 'x'.repeat(501) }))).toBe(
+      'VALIDATION_FAILED',
+    );
+    expect(closed.status).toBe('CLOSED');
+    expect(closed.snapshot.reopenCount).toBe(0);
+    expect(closed.reopen(AT, { nextStatus: 'ACTIVE', reason: 'Faltó la comisión' })).toBe(1);
+    expect(closed.status).toBe('REOPENED');
+    expect(closed.lastTransition).toEqual({ transition: 'REOPEN', from: 'CLOSED', to: 'REOPENED' });
+    const reopened = reload(closed);
+    expect(reopened.close(AT, CLOSABLE)).toBe(2);
+    expect(reopened.snapshot).toMatchObject({
+      closeCount: 2,
+      latestCloseNo: 2,
+      reopenCount: 1,
+      status: 'CLOSED',
+    });
   });
 });

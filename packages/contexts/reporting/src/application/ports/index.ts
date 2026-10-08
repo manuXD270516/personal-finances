@@ -14,6 +14,11 @@ export interface ReportingUnitOfWork {
     ctx: { readonly userId: string | null; readonly workspaceId: string },
     fn: () => Promise<T>,
   ): Promise<T>;
+  /**
+   * Ejecuta `fn` en la transacción del LLAMADOR si ya hay una (sin tocar su contexto RLS ni su usuario: cifras de cierre
+   * invocadas desde la transacción de Planning); si no la hay, abre una de solo lectura con el RLS del workspace.
+   */
+  join<T>(workspaceId: string, fn: () => Promise<T>): Promise<T>;
 }
 
 /** Moneda de reporte y zona horaria del workspace (IDENTITY, vía composition root). */

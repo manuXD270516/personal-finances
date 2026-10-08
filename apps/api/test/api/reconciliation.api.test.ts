@@ -591,7 +591,10 @@ describe('Periodos cerrados (INV-015, docs/33 D65)', () => {
     asApp(
       u,
       (c) =>
-        c.query(`INSERT INTO ledger.period_lock (workspace_id, year_month) VALUES ($1, '2026-03')`, [u.ws]),
+        c.query(
+          `INSERT INTO ledger.period_lock (workspace_id, year_month, period_start, period_end) VALUES ($1, '2026-03', '2026-03-01', '2026-03-31')`,
+          [u.ws],
+        ),
       true,
     );
 

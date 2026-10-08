@@ -156,10 +156,11 @@ async function closeMonth(u: User, yearMonth: string): Promise<void> {
       app,
       { userId: u.id, workspaceId: u.ws },
       () =>
-        app.query(`INSERT INTO ledger.period_lock (workspace_id, year_month) VALUES ($1, $2)`, [
-          u.ws,
-          yearMonth,
-        ]),
+        app.query(
+          `INSERT INTO ledger.period_lock (workspace_id, year_month, period_start, period_end)
+           VALUES ($1, $2::text, to_date($2::text || '-01', 'YYYY-MM-DD'), (to_date($2::text || '-01', 'YYYY-MM-DD') + INTERVAL '1 month - 1 day')::date)`,
+          [u.ws, yearMonth],
+        ),
       true,
     );
   } finally {

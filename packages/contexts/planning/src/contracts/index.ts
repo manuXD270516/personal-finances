@@ -37,7 +37,10 @@ export interface FinancialPeriodDto {
  */
 export interface PeriodQuery {
   /** `null` si no existe en el workspace. */
-  getPeriod(input: { readonly workspaceId: string; readonly periodId: string }): Promise<FinancialPeriodDto | null>;
+  getPeriod(input: {
+    readonly workspaceId: string;
+    readonly periodId: string;
+  }): Promise<FinancialPeriodDto | null>;
   /** Periodo que contiene la fecha de negocio `date` (`YYYY-MM-DD`); `null` si ningún periodo la cubre. */
   getPeriodContaining(input: {
     readonly workspaceId: string;
@@ -49,7 +52,10 @@ export interface PeriodQuery {
     readonly statuses?: readonly FinancialPeriodStatusDto[];
   }): Promise<readonly FinancialPeriodDto[]>;
   /** Periodo inmediatamente anterior (`null` si es el primero o no existe). */
-  getPrevious(input: { readonly workspaceId: string; readonly periodId: string }): Promise<FinancialPeriodDto | null>;
+  getPrevious(input: {
+    readonly workspaceId: string;
+    readonly periodId: string;
+  }): Promise<FinancialPeriodDto | null>;
 }
 
 /**
@@ -69,7 +75,10 @@ export interface PlanningEditGuard {
  * reintenta, así que los participantes deben ser idempotentes.
  */
 export interface PeriodCreatedHook {
-  onPeriodCreated(input: { readonly workspaceId: string; readonly period: FinancialPeriodDto }): Promise<void>;
+  onPeriodCreated(input: {
+    readonly workspaceId: string;
+    readonly period: FinancialPeriodDto;
+  }): Promise<void>;
 }
 
 /** Payload de `planning.PeriodActivated.v1` (contracts/events/planning/PeriodActivated.v1.schema.json). */
@@ -116,15 +125,7 @@ export type BudgetLineKindDto = 'FIXED' | 'MAXIMUM' | 'MINIMUM' | 'RANGE' | 'PER
 export type BudgetTargetKindDto = 'CATEGORY' | 'GROUP' | 'TAG';
 export type BudgetNatureDto = 'EXPENSE' | 'INCOME';
 export type BudgetLineStatusDto =
-  | 'UNDER'
-  | 'ON_TARGET'
-  | 'OVER'
-  | 'WITHIN'
-  | 'BELOW'
-  | 'ABOVE'
-  | 'PENDING'
-  | 'MET'
-  | 'NO_BUDGET';
+  'UNDER' | 'ON_TARGET' | 'OVER' | 'WITHIN' | 'BELOW' | 'ABOVE' | 'PENDING' | 'MET' | 'NO_BUDGET';
 
 export interface BudgetVsActualLineDto {
   readonly budgetLineId: string;
@@ -208,7 +209,99 @@ export interface BudgetThresholdReachedV1 {
   readonly crossedAt: string;
 }
 
-export const BUDGET_THRESHOLD_REACHED = { eventType: 'planning.BudgetThresholdReached', eventVersion: 1 } as const;
+export const BUDGET_THRESHOLD_REACHED = {
+  eventType: 'planning.BudgetThresholdReached',
+  eventVersion: 1,
+} as const;
+
+// ───────────────────────────────────────────── add-month-closing (planning/month-closing)
+
+/** Hecho `planning.MonthClosed.v1`: cada cierre aceptado (idempotencia natural `(periodId, closeNo)`). */
+export interface MonthClosedV1 {
+  readonly workspaceId: string;
+  readonly periodId: string;
+  readonly label: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly closeNo: number;
+  readonly snapshotId: string;
+  readonly previousSnapshotId: string | null;
+  readonly closedAt: string;
+  readonly closedBy: string | null;
+  readonly baseCurrency: string;
+  readonly totalsByCurrency: readonly {
+    readonly currency: string;
+    readonly income: BudgetMoneyDto;
+    readonly expense: BudgetMoneyDto;
+  }[];
+  readonly consolidated: {
+    readonly income: BudgetMoneyDto;
+    readonly expense: BudgetMoneyDto;
+    readonly savings: BudgetMoneyDto;
+    readonly savingsRate: string | null;
+  };
+  readonly balances: readonly { readonly accountId: string; readonly balance: BudgetMoneyDto }[];
+  readonly netWorth: { readonly amount: BudgetMoneyDto; readonly complete: boolean };
+}
+export const MONTH_CLOSED = { eventType: 'planning.MonthClosed', eventVersion: 1 } as const;
+
+/** Hecho `planning.PeriodReopened.v1` (idempotencia `(periodId, reopenNo)`; `reason` es texto libre). */
+export interface PeriodReopenedV1 {
+  readonly workspaceId: string;
+  readonly periodId: string;
+  readonly label: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly reopenNo: number;
+  readonly reason: string;
+  readonly reopenedBy: string | null;
+  readonly reopenedAt: string;
+  readonly closedSnapshotId: string;
+}
+export const PERIOD_REOPENED = { eventType: 'planning.PeriodReopened', eventVersion: 1 } as const;
+
+/** Hecho `planning.MonthClosePending.v1`: una vez por periodo en toda su vida (consumidor: NOTIFY, add-alerts). */
+export interface MonthClosePendingV1 {
+  readonly workspaceId: string;
+  readonly periodId: string;
+  readonly periodLabel: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  /** Primer día en que el periodo quedó terminado sin cerrar (`periodEnd + 1`). */
+  readonly pendingSince: string;
+  readonly delayDays: number;
+}
+export const MONTH_CLOSE_PENDING = { eventType: 'planning.MonthClosePending', eventVersion: 1 } as const;
+
+/** Plazo por defecto del aviso de cierre pendiente (`PLANNING_CLOSE_PENDING_DELAY_DAYS`, decisión 16). */
+export const DEFAULT_CLOSE_PENDING_DELAY_DAYS = 3;
+
+export const CLOSING_SNAPSHOT_QUERY = Symbol.for('pf.planning.ClosingSnapshotQuery');
+
+/**
+ * Snapshot de cierre vigente por periodo (openspec add-month-closing § Contratos; lo consume `add-net-worth-evolution`
+ * para los puntos de periodos cerrados). Corre en la unidad de trabajo del llamador (o abre una). Sin efectos.
+ */
+export interface ClosingSnapshotQuery {
+  listCurrent(input: { readonly workspaceId: string; readonly periodIds: readonly string[] }): Promise<
+    readonly {
+      readonly periodId: string;
+      readonly label: string;
+      readonly periodStart: string;
+      readonly periodEnd: string;
+      readonly closeNo: number;
+      readonly snapshotId: string;
+      readonly baseCurrency: string;
+      readonly netWorth: {
+        readonly amount: BudgetMoneyDto;
+        readonly complete: boolean;
+        readonly unconverted: readonly BudgetMoneyDto[];
+      };
+      readonly assets: BudgetMoneyDto;
+      readonly liabilities: BudgetMoneyDto;
+    }[]
+  >;
+}
 
 /** Allow-list de auditoría de `FinancialPeriod` (add-audit-trail, NFR-SEC-015). `range` viaja como JSON canónico. */
 export const PLANNING_AUDIT_POLICY = {
@@ -221,6 +314,20 @@ export const PLANNING_AUDIT_POLICY = {
     isTransition: 'plain',
     status: 'plain',
     activation: 'plain',
+    // add-month-closing: cierre (versión, advertencias reconocidas, nota) y reapertura (número).
+    closeNo: 'plain',
+    snapshotId: 'plain',
+    acknowledgedWarnings: 'plain',
+    note: 'plain',
+    reopenNo: 'plain',
+  },
+  // add-month-closing: la política de cierre se audita con severidad anterior y nueva por ítem.
+  ClosingPolicy: {
+    PENDING_TRANSACTIONS: 'plain',
+    UNRECONCILED_ACCOUNTS: 'plain',
+    UNRESOLVED_DUPLICATES: 'plain',
+    UNCATEGORIZED: 'plain',
+    UNRESOLVED_RECURRING: 'plain',
   },
   // add-budgets: el plan y sus líneas se auditan sobre el agregado `Budget` (la línea afectada va en `line`/`target`;
   // los umbrales viajan como texto JSON, docs/31 D19).

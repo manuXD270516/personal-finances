@@ -1292,6 +1292,12 @@
         "START": "Iniciar",
         "COMPLETE": "Concluir",
         "CANCEL": "Cancelar"
+      },
+      "FinancialPeriod": {
+        "CREATE": "Criar",
+        "ACTIVATE": "Ativar",
+        "CLOSE": "Fechar",
+        "REOPEN": "Reabrir"
       }
     },
     "export": {
@@ -1335,7 +1341,8 @@
       "period": "Período",
       "range": "Datas",
       "status": "Status",
-      "actions": "Ações"
+      "actions": "Ações",
+      "closing": "Fechamento"
     },
     "range": "{from} – {to}",
     "status": {
@@ -1358,7 +1365,11 @@
       "label": "Período",
       "option": "{name} · {from} – {to} · {status}",
       "current": "(atual)"
-    }
+    },
+    "closeMonth": "Fechar mês",
+    "closeMonthLabel": "Fechar o mês {name}",
+    "viewReport": "Ver relatório",
+    "viewReportLabel": "Ver o relatório de fechamento de {name}"
   },
   "CustomFields": {
     "title": "Campos personalizados",
@@ -1564,7 +1575,8 @@
       "label": "Planejamento",
       "periods": "Períodos",
       "budgets": "Orçamentos",
-      "templates": "Templates"
+      "templates": "Templates",
+      "closing": "Fechamento do mês"
     },
     "totals": {
       "title": "Resumo do plano",
@@ -1870,6 +1882,194 @@
       "close": "Fechar",
       "reload": "Atualizar a pré-visualização",
       "done": "Propagação aplicada: a nova versão do template foi publicada e os planos foram atualizados."
+    }
+  },
+  "Closing": {
+    "title": "Fechamento do mês",
+    "intro": "Revise o checklist do período, reconheça explicitamente os avisos e feche-o. Ao fechar, os lançamentos com data no período são bloqueados e uma versão imutável do relatório é guardada.",
+    "loading": "Carregando períodos…",
+    "noPeriods": "Ainda não há períodos para fechar.",
+    "periodNotFound": "Não encontramos esse período no seu espaço de trabalho.",
+    "closedOk": "Mês {name} fechado. Versão {closeNo} do fechamento guardada.",
+    "reopenedOk": "Período {name} reaberto. Ao fechá-lo novamente será criada uma nova versão do fechamento.",
+    "viewReport": "Ver relatório de fechamento",
+    "alreadyClosed": "Este período está fechado (versão {closeNo} do fechamento).",
+    "notClosable": "Um período no estado «{status}» não pode ser fechado.",
+    "notEnded": "O período termina em {end}: você poderá fechá-lo a partir do dia seguinte.",
+    "kinds": {
+      "PENDING_TRANSACTIONS": "Transações pendentes",
+      "UNRECONCILED_ACCOUNTS": "Contas sem conciliar",
+      "UNRESOLVED_DUPLICATES": "Duplicadas sem resolver",
+      "UNCATEGORIZED": "Transações sem categoria",
+      "UNRESOLVED_RECURRING": "Recorrentes sem resolver",
+      "RECONCILED_WITHOUT_STATEMENT": "Conciliada sem extrato — pendente de revisão"
+    },
+    "tone": {
+      "BLOCKING": "Bloqueante",
+      "WARNING": "Aviso",
+      "INFO": "Informativo",
+      "NOT_AVAILABLE": "Indisponível"
+    },
+    "notAvailable": "Este controle ainda não está disponível: não bloqueia o fechamento.",
+    "count": "{count, plural, one {# ocorrência} other {# ocorrências}}",
+    "noObservations": "Sem ocorrências.",
+    "amounts": "Valores por moeda (sem converter): {amounts}",
+    "withoutStatementHint": "Estas transações são conciliadas sem extrato: não bloqueiam o fechamento nem exigem reconhecimento, mas ficam pendentes de revisão.",
+    "detailLabel": "Detalhe: {kind}",
+    "truncated": "Mostrando {shown} de {total} ocorrências.",
+    "reviewAll": "Revisar tudo: {kind}",
+    "problem": {
+      "blocking": "Itens que impedem o fechamento",
+      "warning": "Avisos sem reconhecer"
+    },
+    "checklist": {
+      "title": "Checklist de fechamento",
+      "evaluated": "Avaliado em {at}.",
+      "blocked": "Há itens bloqueantes: resolva-os antes de fechar o mês.",
+      "warningsOnly": "Há apenas avisos: você pode fechar se os reconhecer explicitamente.",
+      "clear": "Nada pendente: o mês pode ser fechado.",
+      "loading": "Avaliando o checklist…"
+    },
+    "close": {
+      "title": "Fechar o mês",
+      "acknowledge": "Reconheço os avisos acima e quero fechar o mês mesmo assim.",
+      "note": "Nota do fechamento (opcional)",
+      "noteHint": "Até {max} caracteres. Fica registrada na auditoria.",
+      "action": "Fechar mês",
+      "closing": "Fechando…",
+      "blocked": {
+        "ROLE": "Seu papel (somente leitura) não permite fechar o mês.",
+        "STATUS": "Este período não está em um estado que permita fechá-lo.",
+        "NOT_ENDED": "O período ainda não terminou no fuso horário do espaço de trabalho.",
+        "BLOCKING": "Resolva os itens bloqueantes para poder fechar.",
+        "ACK_REQUIRED": "Marque o reconhecimento dos avisos para poder fechar.",
+        "UNAVAILABLE": "Aguardando o resultado do checklist."
+      }
+    },
+    "reopen": {
+      "action": "Reabrir período",
+      "confirmTitle": "Reabrir o período {name}?",
+      "confirmBody": "Os lançamentos do período são desbloqueados. As versões do fechamento já guardadas não mudam; ao fechar novamente é criada uma nova versão.",
+      "confirm": "Reabrir",
+      "cancel": "Cancelar",
+      "reason": "Motivo da reabertura",
+      "reasonHint": "Obrigatório, até {max} caracteres. Fica registrado na auditoria e no percurso.",
+      "errors": {
+        "REQUIRED": "Informe o motivo da reabertura.",
+        "TOO_LONG": "O motivo admite até {max} caracteres."
+      }
+    },
+    "lifecycle": {
+      "title": "Percurso do período",
+      "closeNo": "Versão {closeNo} do fechamento."
+    },
+    "report": {
+      "title": "Relatório de fechamento",
+      "period": "Período {name} ({status}).",
+      "backToClosing": "Voltar ao fechamento do mês",
+      "loading": "Carregando o relatório…",
+      "neverClosed": "Este período ainda não foi fechado: não há relatório de fechamento.",
+      "version": "Versão do fechamento",
+      "versionOption": "Versão {closeNo}{current} · {at}",
+      "currentTag": "(vigente)",
+      "current": "vigente",
+      "previous": "anterior",
+      "versionInfo": "Versão {closeNo} ({current}), fechada em {at}. Período de {from} a {to}.",
+      "export": {
+        "label": "Exportar o relatório",
+        "csv": "Exportar CSV",
+        "pdf": "Exportar PDF"
+      },
+      "incomplete": "incompleto",
+      "incompleteTitle": "Números incompletos: faltam taxas de câmbio.",
+      "unconverted": "Valores sem converter: {amounts}.",
+      "kpis": "Indicadores do período",
+      "kpi": {
+        "INCOME": "Receitas",
+        "EXPENSE": "Despesas",
+        "SAVINGS": "Economia",
+        "SAVINGS_RATE": "Taxa de economia",
+        "NET_WORTH": "Patrimônio líquido"
+      },
+      "noIncome": "Sem receitas",
+      "variation": {
+        "vs": "Em relação ao período anterior:",
+        "unavailable": "indisponível",
+        "points": "{value} pp",
+        "noPercent": "sem % (o valor anterior era 0)"
+      },
+      "comparisonReason": {
+        "NO_PREVIOUS_PERIOD": "Sem variação em relação ao período anterior: este é o primeiro período.",
+        "NO_PREVIOUS_SNAPSHOT": "Sem variação em relação ao período anterior: o período anterior não tem fechamento.",
+        "UNKNOWN": "Sem variação em relação ao período anterior."
+      },
+      "comparedWith": "Variação em relação a {label} (versão {closeNo} do fechamento).",
+      "flows": {
+        "title": "Fluxos por moeda",
+        "caption": "Receitas, despesas e economia do período em cada moeda, sem converter",
+        "currency": "Moeda"
+      },
+      "balances": {
+        "title": "Saldos por conta",
+        "empty": "O fechamento não inclui saldos de contas.",
+        "caption": "Saldo de cada conta ao fim do período e sua base de conciliação",
+        "account": "Conta",
+        "balance": "Saldo",
+        "basis": "Base de conciliação",
+        "basisValue": {
+          "STATEMENT": "Conciliada com extrato",
+          "WITHOUT_STATEMENT": "Conciliada sem extrato",
+          "NONE": "Sem conciliar"
+        },
+        "statement": "Extrato de {date}: {balance}",
+        "reviewPending": "Pendentes de revisão"
+      },
+      "budget": {
+        "title": "Orçamento vs realizado",
+        "unavailable": "Indisponível: o período não tinha um plano mensal.",
+        "caption": "Referência do orçamento e valor realizado de cada linha no fechamento",
+        "target": "Linha",
+        "reference": "Orçamento",
+        "actual": "Realizado",
+        "status": "Estado",
+        "totals": "Totais",
+        "statusValue": {
+          "UNDER": "Abaixo da meta",
+          "ON_TARGET": "Na meta",
+          "OVER": "Excedido",
+          "WITHIN": "Dentro do limite",
+          "BELOW": "Abaixo da faixa",
+          "ABOVE": "Acima da faixa",
+          "PENDING": "Mínimo pendente",
+          "MET": "Mínimo cumprido",
+          "NO_BUDGET": "Sem orçamento"
+        }
+      },
+      "acknowledged": {
+        "title": "Avisos reconhecidos",
+        "body": "Fechado reconhecendo: {items}. Reconhecido em {at}."
+      }
+    },
+    "diff": {
+      "title": "Comparar versões do fechamento",
+      "from": "Da versão",
+      "to": "Até a versão",
+      "same": "Escolha duas versões diferentes para compará-las.",
+      "singleVersion": "Este período tem uma única versão de fechamento: ainda não há o que comparar.",
+      "summary": "Diferença da versão {to} menos a versão {from}.",
+      "balancesCaption": "Variação do saldo de cada conta entre as duas versões",
+      "delta": "Variação",
+      "noChanges": "Os saldos não mudaram entre as duas versões."
+    },
+    "policy": {
+      "title": "Política de fechamento do mês",
+      "intro": "Defina se cada controle do checklist bloqueia o fechamento ou apenas avisa. Um aviso exige reconhecimento explícito ao fechar.",
+      "readOnly": "Somente o proprietário pode alterar a política de fechamento.",
+      "infoNote": "O controle «conciliada sem extrato» é apenas informativo e não pode ser configurado.",
+      "save": "Guardar política",
+      "saved": "Política de fechamento guardada.",
+      "reload": "Carregar a versão atual",
+      "loading": "Carregando a política de fechamento…"
     }
   }
 }

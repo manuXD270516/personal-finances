@@ -1292,6 +1292,12 @@
         "START": "Start",
         "COMPLETE": "Complete",
         "CANCEL": "Cancel"
+      },
+      "FinancialPeriod": {
+        "CREATE": "Create",
+        "ACTIVATE": "Activate",
+        "CLOSE": "Close",
+        "REOPEN": "Reopen"
       }
     },
     "export": {
@@ -1335,7 +1341,8 @@
       "period": "Period",
       "range": "Dates",
       "status": "Status",
-      "actions": "Actions"
+      "actions": "Actions",
+      "closing": "Close"
     },
     "range": "{from} – {to}",
     "status": {
@@ -1358,7 +1365,11 @@
       "label": "Period",
       "option": "{name} · {from} – {to} · {status}",
       "current": "(current)"
-    }
+    },
+    "closeMonth": "Close month",
+    "closeMonthLabel": "Close the month {name}",
+    "viewReport": "View report",
+    "viewReportLabel": "View the close report of {name}"
   },
   "CustomFields": {
     "title": "Custom fields",
@@ -1564,7 +1575,8 @@
       "label": "Planning",
       "periods": "Periods",
       "budgets": "Budgets",
-      "templates": "Templates"
+      "templates": "Templates",
+      "closing": "Month close"
     },
     "totals": {
       "title": "Plan summary",
@@ -1870,6 +1882,194 @@
       "close": "Close",
       "reload": "Refresh the preview",
       "done": "Propagation applied: the new template version was published and the plans were updated."
+    }
+  },
+  "Closing": {
+    "title": "Month close",
+    "intro": "Review the period checklist, explicitly acknowledge any warnings and close it. Closing locks movements dated in the period and stores an immutable version of the report.",
+    "loading": "Loading periods…",
+    "noPeriods": "There are no periods to close yet.",
+    "periodNotFound": "We could not find that period in your workspace.",
+    "closedOk": "Month {name} closed. Version {closeNo} of the close was saved.",
+    "reopenedOk": "Period {name} reopened. Closing it again will create a new version of the close.",
+    "viewReport": "View close report",
+    "alreadyClosed": "This period is closed (close version {closeNo}).",
+    "notClosable": "A period in status “{status}” cannot be closed.",
+    "notEnded": "The period ends on {end}: you can close it from the next day.",
+    "kinds": {
+      "PENDING_TRANSACTIONS": "Pending transactions",
+      "UNRECONCILED_ACCOUNTS": "Unreconciled accounts",
+      "UNRESOLVED_DUPLICATES": "Unresolved duplicates",
+      "UNCATEGORIZED": "Uncategorized transactions",
+      "UNRESOLVED_RECURRING": "Unresolved recurring items",
+      "RECONCILED_WITHOUT_STATEMENT": "Reconciled without a statement — pending review"
+    },
+    "tone": {
+      "BLOCKING": "Blocking",
+      "WARNING": "Warning",
+      "INFO": "Informational",
+      "NOT_AVAILABLE": "Not available"
+    },
+    "notAvailable": "This check is not available yet: it does not block the close.",
+    "count": "{count, plural, one {# finding} other {# findings}}",
+    "noObservations": "No findings.",
+    "amounts": "Amounts per currency (not converted): {amounts}",
+    "withoutStatementHint": "These transactions are reconciled without a statement: they do not block the close nor require acknowledgement, but remain pending review.",
+    "detailLabel": "Details: {kind}",
+    "truncated": "Showing {shown} of {total} findings.",
+    "reviewAll": "Review all: {kind}",
+    "problem": {
+      "blocking": "Items that prevent the close",
+      "warning": "Unacknowledged warnings"
+    },
+    "checklist": {
+      "title": "Close checklist",
+      "evaluated": "Evaluated on {at}.",
+      "blocked": "There are blocking items: resolve them before closing the month.",
+      "warningsOnly": "There are only warnings: you can close if you explicitly acknowledge them.",
+      "clear": "Nothing pending: the month can be closed.",
+      "loading": "Evaluating the checklist…"
+    },
+    "close": {
+      "title": "Close the month",
+      "acknowledge": "I acknowledge the warnings above and want to close the month anyway.",
+      "note": "Close note (optional)",
+      "noteHint": "Up to {max} characters. It is recorded in the audit trail.",
+      "action": "Close month",
+      "closing": "Closing…",
+      "blocked": {
+        "ROLE": "Your role (read-only) does not allow closing the month.",
+        "STATUS": "This period is not in a status that allows closing it.",
+        "NOT_ENDED": "The period has not ended yet in the workspace time zone.",
+        "BLOCKING": "Resolve the blocking items to be able to close.",
+        "ACK_REQUIRED": "Tick the warning acknowledgement to be able to close.",
+        "UNAVAILABLE": "Waiting for the checklist result."
+      }
+    },
+    "reopen": {
+      "action": "Reopen period",
+      "confirmTitle": "Reopen period {name}?",
+      "confirmBody": "The period's movements are unlocked. Close versions already saved do not change; closing again creates a new version.",
+      "confirm": "Reopen",
+      "cancel": "Cancel",
+      "reason": "Reason for reopening",
+      "reasonHint": "Required, up to {max} characters. It is recorded in the audit trail and the timeline.",
+      "errors": {
+        "REQUIRED": "Enter the reason for reopening.",
+        "TOO_LONG": "The reason allows up to {max} characters."
+      }
+    },
+    "lifecycle": {
+      "title": "Period timeline",
+      "closeNo": "Close version {closeNo}."
+    },
+    "report": {
+      "title": "Close report",
+      "period": "Period {name} ({status}).",
+      "backToClosing": "Back to month close",
+      "loading": "Loading the report…",
+      "neverClosed": "This period has not been closed yet: there is no close report.",
+      "version": "Close version",
+      "versionOption": "Version {closeNo}{current} · {at}",
+      "currentTag": "(current)",
+      "current": "current",
+      "previous": "previous",
+      "versionInfo": "Version {closeNo} ({current}), closed on {at}. Period from {from} to {to}.",
+      "export": {
+        "label": "Export the report",
+        "csv": "Export CSV",
+        "pdf": "Export PDF"
+      },
+      "incomplete": "incomplete",
+      "incompleteTitle": "Incomplete figures: exchange rates are missing.",
+      "unconverted": "Unconverted amounts: {amounts}.",
+      "kpis": "Period indicators",
+      "kpi": {
+        "INCOME": "Income",
+        "EXPENSE": "Expenses",
+        "SAVINGS": "Savings",
+        "SAVINGS_RATE": "Savings rate",
+        "NET_WORTH": "Net worth"
+      },
+      "noIncome": "No income",
+      "variation": {
+        "vs": "Against the previous period:",
+        "unavailable": "not available",
+        "points": "{value} pp",
+        "noPercent": "no % (the previous value was 0)"
+      },
+      "comparisonReason": {
+        "NO_PREVIOUS_PERIOD": "No variation against the previous period: this is the first period.",
+        "NO_PREVIOUS_SNAPSHOT": "No variation against the previous period: the previous period has no close.",
+        "UNKNOWN": "No variation against the previous period."
+      },
+      "comparedWith": "Variation against {label} (close version {closeNo}).",
+      "flows": {
+        "title": "Flows per currency",
+        "caption": "Income, expenses and savings of the period in each currency, not converted",
+        "currency": "Currency"
+      },
+      "balances": {
+        "title": "Balances per account",
+        "empty": "The close does not include account balances.",
+        "caption": "Balance of each account at the end of the period and its reconciliation basis",
+        "account": "Account",
+        "balance": "Balance",
+        "basis": "Reconciliation basis",
+        "basisValue": {
+          "STATEMENT": "Reconciled with statement",
+          "WITHOUT_STATEMENT": "Reconciled without statement",
+          "NONE": "Not reconciled"
+        },
+        "statement": "Statement of {date}: {balance}",
+        "reviewPending": "Pending review"
+      },
+      "budget": {
+        "title": "Budget vs actual",
+        "unavailable": "Not available: the period had no monthly plan.",
+        "caption": "Budget reference and actual amount of each line at close",
+        "target": "Line",
+        "reference": "Budget",
+        "actual": "Actual",
+        "status": "Status",
+        "totals": "Totals",
+        "statusValue": {
+          "UNDER": "Below target",
+          "ON_TARGET": "On target",
+          "OVER": "Over budget",
+          "WITHIN": "Within limit",
+          "BELOW": "Below range",
+          "ABOVE": "Above range",
+          "PENDING": "Minimum pending",
+          "MET": "Minimum met",
+          "NO_BUDGET": "No budget"
+        }
+      },
+      "acknowledged": {
+        "title": "Acknowledged warnings",
+        "body": "Closed acknowledging: {items}. Acknowledged on {at}."
+      }
+    },
+    "diff": {
+      "title": "Compare close versions",
+      "from": "From version",
+      "to": "To version",
+      "same": "Choose two different versions to compare them.",
+      "singleVersion": "This period has a single close version: there is nothing to compare yet.",
+      "summary": "Difference of version {to} minus version {from}.",
+      "balancesCaption": "Change in each account balance between the two versions",
+      "delta": "Change",
+      "noChanges": "Balances did not change between the two versions."
+    },
+    "policy": {
+      "title": "Month close policy",
+      "intro": "Define whether each checklist check blocks the close or only warns. A warning requires explicit acknowledgement when closing.",
+      "readOnly": "Only the owner can change the close policy.",
+      "infoNote": "The “reconciled without a statement” check is informational only and cannot be configured.",
+      "save": "Save policy",
+      "saved": "Close policy saved.",
+      "reload": "Load the current version",
+      "loading": "Loading the close policy…"
     }
   }
 }

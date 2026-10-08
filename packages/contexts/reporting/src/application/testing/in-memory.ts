@@ -155,7 +155,7 @@ export class InMemoryReporting {
       workspaceCurrencies: async () => this.currencies,
     };
     return {
-      uow: { run: (_ctx, fn) => fn() },
+      uow: { run: (_ctx, fn) => fn(), join: (_ws, fn) => fn() },
       workspaces: { settingsOf: async () => this.settings },
       accounts: { listAccounts: async () => [...this.accounts] },
       balances: {

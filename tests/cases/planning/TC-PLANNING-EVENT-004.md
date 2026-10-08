@@ -17,9 +17,11 @@ invariants:
 priority: high
 type: integration
 level: event-contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+  - packages/contexts/planning/src/application/closing.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:

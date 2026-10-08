@@ -1,4 +1,4 @@
-import type { Clock, Currency } from '@pf/shared-kernel';
+import type { Clock, Currency, LocalDate } from '@pf/shared-kernel';
 import type {
   JournalEntry,
   LedgerAccount,
@@ -55,11 +55,23 @@ export interface JournalEntryRepository {
 }
 
 export interface PeriodLockRepository {
-  isLocked(workspaceId: string, yearMonth: YearMonth): Promise<boolean>;
-  /** Idempotente: bloquear un mes ya bloqueado no hace nada. Devuelve si cambió algo. */
+  /** ¿La fecha cae en el RANGO de algún periodo cerrado del workspace? (ADR-0028). */
+  isLocked(workspaceId: string, date: LocalDate): Promise<boolean>;
+  /**
+   * Idempotente por `year_month`: bloquear un periodo ya bloqueado no hace nada (devuelve si cambió algo). Una colisión
+   * de rango con OTRO periodo (exclusión gist) es un error real y se propaga.
+   */
   lock(lock: PeriodLock, lockedBy: string | null): Promise<boolean>;
   /** Idempotente. Devuelve si cambió algo. */
   unlock(workspaceId: string, yearMonth: YearMonth): Promise<boolean>;
+  /** Primera fecha abierta `>= date` (salta periodos cerrados contiguos). */
+  firstOpenDateOnOrAfter(workspaceId: string, date: LocalDate): Promise<LocalDate>;
+  /**
+   * Candado EXCLUSIVO del workspace, la MISMA clave que cada posteo toma en modo compartido
+   * (`pg_advisory_xact_lock(hashtextextended('ledger.balance_snapshot:' || ws, 0))`): serializa el cierre contra
+   * posteos en vuelo (ADR-0028).
+   */
+  acquireExclusiveWorkspaceLock(workspaceId: string): Promise<void>;
 }
 
 /** Puerto del outbox (ADR-0008): escribe el evento en la transacción en curso. */

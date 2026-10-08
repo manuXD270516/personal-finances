@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/planning/PeriodReopened.v1.schema.json",
+  "title": "planning.PeriodReopened.v1",
+  "description": "Un periodo cerrado se reabrió (openspec add-month-closing): solo el OWNER, con motivo; quita el bloqueo del ledger y no modifica ningún snapshot. Productor: PLANNING (misma transacción). Consumidores: PLANNING/budgets (rollover-finalizer, usa payload.periodId: el remanente vuelve a provisional), REPORTING (invalida la caché de periodos cerrados). Idempotencia natural: (periodId, reopenNo). PII baja: `reason` es texto libre del usuario.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "planning.PeriodReopened"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "FinancialPeriod"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "periodId",
+        "label",
+        "periodStart",
+        "periodEnd",
+        "reopenNo",
+        "reason",
+        "reopenedBy",
+        "reopenedAt",
+        "closedSnapshotId"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "label": {
+          "description": "Año y mes de la fecha de inicio (YYYY-MM, docs/33 D59).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        },
+        "periodStart": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "periodEnd": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "reopenNo": {
+          "description": "Número de reapertura del periodo (1, 2, …).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "reopenedBy": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reopenedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        },
+        "closedSnapshotId": {
+          "description": "Snapshot vigente que se reabre (permanece intacto).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000302",
+      "eventType": "planning.PeriodReopened",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-04T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "FinancialPeriod",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa011",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c2",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-0000000fd001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa011",
+        "label": "2026-10",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-10-31",
+        "reopenNo": 1,
+        "reason": "Faltó registrar la comisión bancaria",
+        "reopenedBy": "01928c4e-0000-7000-8000-0000000fd001",
+        "reopenedAt": "2026-11-04T14:00:00.000Z",
+        "closedSnapshotId": "01928c4e-0000-7000-8000-0000000fb001"
+      }
+    }
+  ]
+}

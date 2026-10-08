@@ -77,6 +77,8 @@ interface Entry {
   readonly id: string;
   readonly command: PostJournalEntryCommand | null;
   readonly reverses: string | null;
+  /** Fecha de la reversa (solo en reversas). */
+  readonly reverseDate?: string;
   readonly postings: readonly { readonly key: string; readonly amount: string; readonly currency: string }[];
 }
 
@@ -469,11 +471,15 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         if (state.entries.some((e) => e.reverses === original.id)) {
           throw new DomainError('LEDGER_ENTRY_ALREADY_REVERSED', 'reversed');
         }
+        if (state.closedMonths.has(command.reverseDate.slice(0, 7))) {
+          throw new DomainError('PERIOD_CLOSED', `${command.reverseDate} is in a closed period`);
+        }
         const id = ids.next();
         state.entries.push({
           id,
           command: null,
           reverses: original.id,
+          reverseDate: command.reverseDate,
           postings: original.postings.map((p) => ({
             key: p.key,
             amount: parseIn(p.amount, p.currency).negate().toFixed(),
@@ -489,6 +495,20 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         if (state.closedMonths.has(input.date.slice(0, 7))) {
           throw new DomainError('PERIOD_CLOSED', `${input.date} is in a closed period`);
         }
+      },
+      /** Doble simple: la primera fecha cuyo mes (`YYYY-MM`) no está cerrado. */
+      async firstOpenDateOnOrAfter(input) {
+        let [y, m] = [Number(input.date.slice(0, 4)), Number(input.date.slice(5, 7))];
+        let date = input.date;
+        while (state.closedMonths.has(date.slice(0, 7))) {
+          m += 1;
+          if (m > 12) {
+            m = 1;
+            y += 1;
+          }
+          date = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-01`;
+        }
+        return date;
       },
     },
     classification: {

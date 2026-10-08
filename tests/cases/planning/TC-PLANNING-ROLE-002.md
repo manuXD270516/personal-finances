@@ -15,9 +15,10 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/month-closing.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:

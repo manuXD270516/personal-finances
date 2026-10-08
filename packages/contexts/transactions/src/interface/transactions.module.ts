@@ -26,11 +26,13 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-transactions.js';
 import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
+import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
 import type {
   CounterpartyCategoryUsageQuery,
   NominalFlowQuery,
   ReconciliationStatusQuery,
+  TransactionsClosingQuery,
 } from '../contracts/index.js';
 import { CONVERSIONS_SERVICE, ConversionsController } from './conversions-http.js';
 import { RECONCILIATIONS_SERVICE, ReconciliationsController } from './reconciliations-http.js';
@@ -69,6 +71,8 @@ export interface TransactionsRuntime {
   readonly flows: NominalFlowQuery;
   /** Última categoría usada con una counterparty, para la sugerencia de CLASSIFICATION (add-classification). */
   readonly categoryUsage: CounterpartyCategoryUsageQuery;
+  /** Query pública `TransactionsClosingQuery` para el checklist y el snapshot del cierre de PLANNING (add-month-closing). */
+  readonly closing: TransactionsClosingQuery;
 }
 
 /**
@@ -118,6 +122,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     reconciliationStatus: reconciliations,
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
     categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
+    closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),
   };
 }
 

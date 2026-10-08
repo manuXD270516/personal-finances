@@ -585,6 +585,15 @@ export const VARIABLES = {
       default: '3',
     },
   ),
+  PLANNING_CLOSE_PENDING_DELAY_DAYS: variable(
+    positiveInt.refine((n) => n <= 30, 'entre 1 y 30 días'),
+    {
+      group: 'Planning',
+      description:
+        'Días después del fin de un periodo `active` o `reopened` sin cerrar en que se publica una sola vez `planning.MonthClosePending.v1` (zona horaria del workspace; openspec add-month-closing decisión 16). Lo evalúa el job `planning.ensure-periods` del worker.',
+      default: '3',
+    },
+  ),
   PLANNING_PERIODS_CRON: variable(
     z
       .string()
@@ -712,6 +721,7 @@ export const APP_VARIABLES = {
     'LEDGER_INTEGRITY_CRON',
     'LEDGER_INTEGRITY_CRON_TZ',
     'PLANNING_PERIOD_LOOKAHEAD',
+    'PLANNING_CLOSE_PENDING_DELAY_DAYS',
     'PLANNING_PERIODS_CRON',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',

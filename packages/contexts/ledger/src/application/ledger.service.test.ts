@@ -368,4 +368,44 @@ describe('LedgerService — ReverseJournalEntry y periodos', () => {
     );
     expect([mem.audits.length, mem.events.length, mem.entries.length]).toEqual([audits, events, entries]);
   });
+
+  it('[TC-LEDGER-PERIOD-003] lockPeriod con rango: toma el candado exclusivo, audita el rango y firstOpenDateOnOrAfter salta', async () => {
+    await svc.lockPeriod({
+      workspaceId: W1,
+      yearMonth: '2026-09',
+      periodStart: null,
+      periodEnd: '2026-10-24',
+      openStart: true,
+    });
+    await svc.lockPeriod({
+      workspaceId: W1,
+      yearMonth: '2026-10',
+      periodStart: '2026-10-25',
+      periodEnd: '2026-11-24',
+    });
+    await svc.lockPeriod({
+      workspaceId: W1,
+      yearMonth: '2026-10',
+      periodStart: '2026-10-25',
+      periodEnd: '2026-11-24',
+    }); // idempotente
+    expect(mem.exclusiveLocks).toEqual([W1, W1, W1]);
+    const audits = mem.audits.filter((a) => a.action === 'ledger.period_lock.locked');
+    expect(audits).toHaveLength(2);
+    expect(JSON.stringify(audits[1]?.changes)).toContain('2026-10-25..2026-11-24');
+    expect(JSON.stringify(audits[0]?.changes)).toContain('-infinity..2026-10-24');
+    expect(await codeOf(svc.assertPeriodOpen({ workspaceId: W1, date: '2026-11-24' }))).toBe('PERIOD_CLOSED');
+    expect(await codeOf(svc.assertPeriodOpen({ workspaceId: W1, date: '2020-01-01' }))).toBe('PERIOD_CLOSED');
+    await svc.assertPeriodOpen({ workspaceId: W1, date: '2026-11-25' });
+    expect(await svc.firstOpenDateOnOrAfter({ workspaceId: W1, date: '2026-08-15' })).toBe('2026-11-25');
+    expect(await svc.firstOpenDateOnOrAfter({ workspaceId: W1, date: '2026-12-01' })).toBe('2026-12-01');
+    await expect(
+      svc.lockPeriod({
+        workspaceId: W1,
+        yearMonth: '2026-11',
+        periodStart: '2026-11-20',
+        periodEnd: '2026-12-24',
+      }),
+    ).rejects.toThrow();
+  });
 });

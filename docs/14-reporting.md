@@ -153,7 +153,7 @@ SafeToSpend(h) = LiquidBalance(hoy)
 - **Refunds**: crédito a EXPENSE con la misma categoría → netean en el periodo de la **fecha del refund** (no se reescribe el mes original). Setting futuro "atribuir refund al periodo original" para reportes, sin tocar ledger.
 - **Splits**: una transacción con 3 splits aporta a 3 categorías.
 - **Pending**: excluidas de todos los KPIs históricos; incluidas solo en Safe to spend y Cash Flow Calendar.
-- **Periodos cerrados**: los agregados de meses `closed` se marcan como definitivos (cacheables indefinidamente hasta un reopen, que invalida).
+- **Periodos cerrados**: los agregados de meses `closed` se marcan como definitivos (cacheables indefinidamente hasta un reopen, que invalida). Desde add-month-closing la fuente son `planning.MonthClosed.v1` / `planning.PeriodReopened.v1` y el snapshot inmutable (`ClosingSnapshotQuery.listCurrent`).
 
 ## 5. Reporting multi-moneda
 

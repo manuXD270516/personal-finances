@@ -149,6 +149,13 @@ export class ConversionsService {
     const { uow, ids } = this.deps;
     return uow.run(cmd.workspaceId, async () => {
       const data = await this.conversionData(cmd.workspaceId, cmd.userId, cmd);
+      if ((cmd.status ?? 'POSTED') === 'PENDING') {
+        // D69: una PENDING no entra en un periodo cerrado (no genera asiento, el ledger no la frena).
+        await this.deps.ledger.assertPeriodOpen({
+          workspaceId: cmd.workspaceId,
+          date: cmd.transactionDate,
+        });
+      }
       const tx = Transaction.recordConversion({
         id: cmd.id ?? ids.next(),
         workspaceId: cmd.workspaceId,
@@ -235,6 +242,10 @@ export class ConversionsService {
       }
       const data = await this.conversionData(workspaceId, cmd.userId, cmd);
       const result = tx.amendConversion(data);
+      // D69: una conversión PENDING no puede quedar —ni seguir— con fecha de negocio en un periodo cerrado.
+      if (before.status === 'PENDING') {
+        await this.deps.ledger.assertPeriodOpen({ workspaceId, date: tx.snapshot.businessDate });
+      }
       let newEntryId: string | null = null;
       let reversalId: string | null = null;
       if (result.ledgerImpact && result.previousEntryId) {
