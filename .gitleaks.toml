@@ -14,4 +14,7 @@ regexes = [
   # (p. ej. `MonthClosed.v1` tras "OpenAPI,"): generic-api-key los toma por claves.
   # Anclado al final del match para no ocultar una clave real en la misma línea.
   '''`[A-Z][A-Za-z]+\.v[0-9]+`$''',
+  # Claves i18n versionadas de mensajes (p. ej. 'notifications.month_close_pending.v1')
+  # asignadas a constantes *_KEY: solo minúsculas, puntos y guion bajo con sufijo .vN.
+  '''['"][a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+\.v[0-9]+['"]$''',
 ]

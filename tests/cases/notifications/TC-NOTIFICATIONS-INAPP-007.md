@@ -12,8 +12,12 @@ invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/notifications.int.test.ts
+  - packages/contexts/notifications/src/application/consumed-events.contract.test.ts
+  - packages/contexts/notifications/src/application/notify-from-event.test.ts
+  - packages/contexts/notifications/src/domain/type-catalog.test.ts
 status: draft
 regression_suite: false
 phase: 2

@@ -12,9 +12,17 @@ invariants: ['INV-025']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/notifications.api.test.ts
+  - apps/api/test/events/notifications.int.test.ts
+  - packages/contexts/notifications/src/application/notify-from-event.test.ts
+  - packages/contexts/notifications/src/domain/notification.test.ts
+  - packages/contexts/notifications/src/domain/render.test.ts
+  - packages/contexts/notifications/src/domain/type-catalog.test.ts
+  - packages/contexts/notifications/test/integration/pg-notifications.int.test.ts
+  - tests/e2e/specs/notifications.spec.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['notifications', 'in-app', 'budgets']

@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/notifications.api.test.ts
+  - apps/web/src/ui/notifications/notifications.test.tsx
+  - packages/contexts/notifications/src/application/inbox.test.ts
+  - packages/contexts/notifications/src/domain/render.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['notifications', 'i18n', 'fallback']

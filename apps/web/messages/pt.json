@@ -1746,7 +1746,9 @@
       "createSubmit": "Criar template",
       "templateCreated": "Template {name} criado com {count} linhas.",
       "applied": "Alterações propagadas aos meses futuros."
-    }
+    },
+    "lineFromNotification": "Linha da notificação",
+    "lineMissing": "A linha do orçamento que originou a notificação não existe mais neste plano."
   },
   "Templates": {
     "title": "Templates de orçamento",
@@ -2070,6 +2072,107 @@
       "saved": "Política de fechamento guardada.",
       "reload": "Carregar a versão atual",
       "loading": "Carregando a política de fechamento…"
+    }
+  },
+  "Notifications": {
+    "bell": {
+      "label": "Notificações",
+      "unreadHint": "({count} não lidas)",
+      "announce": "{count, plural, one {Você tem # notificação não lida.} other {Você tem # notificações não lidas.}}"
+    },
+    "title": "Notificações",
+    "intro": "Avisos dos seus orçamentos e do fechamento do mês. Ficam guardados até você arquivá-los.",
+    "loading": "Carregando notificações…",
+    "loadingMore": "Carregando…",
+    "loadMore": "Carregar mais",
+    "empty": "Você não tem notificações",
+    "noWorkspace": "Selecione ou crie um espaço de trabalho para ver suas notificações.",
+    "filters": {
+      "label": "Filtrar notificações",
+      "RECENT": "Recentes",
+      "UNREAD": "Não lidas",
+      "ARCHIVED": "Arquivadas"
+    },
+    "list": {
+      "label": "Lista de notificações"
+    },
+    "item": {
+      "unread": "Não lida",
+      "read": "Lida",
+      "archived": "Arquivada",
+      "markRead": "Marcar como lida",
+      "markReadNamed": "Marcar como lida: {title}",
+      "archive": "Arquivar",
+      "archiveNamed": "Arquivar: {title}",
+      "openDetail": "Ver detalhes",
+      "severity": {
+        "INFO": "Informação",
+        "WARNING": "Aviso",
+        "CRITICAL": "Crítica"
+      },
+      "email": "E-mail: {status}",
+      "emailStatus": {
+        "PENDING": "Pendente",
+        "SENT": "Enviado",
+        "FAILED": "Falhou",
+        "SUPPRESSED": "Suprimido"
+      }
+    },
+    "markAllRead": "Marcar todas como lidas",
+    "done": {
+      "read": "Notificação marcada como lida.",
+      "archived": "Notificação arquivada.",
+      "allRead": "{count, plural, =0 {Não havia notificações não lidas.} one {# notificação marcada como lida.} other {# notificações marcadas como lidas.}}"
+    },
+    "detail": {
+      "loading": "Carregando a notificação…",
+      "notFound": "Esta notificação não existe ou não é sua.",
+      "back": "Voltar à caixa de entrada",
+      "received": "Recebida",
+      "severity": "Severidade",
+      "status": "Estado",
+      "openBudgetLine": "Ver a linha no plano de {period}",
+      "openPeriodClose": "Ir ao fechamento de {period}"
+    },
+    "prefs": {
+      "title": "Notificações",
+      "intro": "Escolha quais avisos você recebe e por qual canal. Cada membro configura os seus.",
+      "loading": "Carregando preferências de notificações…",
+      "tableCaption": "Canais por tipo de notificação",
+      "columns": {
+        "type": "Tipo de notificação",
+        "inApp": "No app",
+        "email": "E-mail"
+      },
+      "channels": {
+        "inApp": "No app",
+        "email": "E-mail"
+      },
+      "types": {
+        "BUDGET_THRESHOLD": "Alertas de orçamento",
+        "MONTH_CLOSE_PENDING": "Fechamento do mês pendente"
+      },
+      "checkbox": "{type} · {channel}",
+      "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
+      "privacy": "Os e-mails viajam por canais externos; por padrão não incluem valores nem nomes de categorias. Ative esta opção somente se aceitar ver esses dados no seu e-mail. As notificações dentro do app não mudam.",
+      "quiet": {
+        "legend": "Horário de silêncio",
+        "enable": "Ativar horário de silêncio",
+        "start": "Início",
+        "end": "Fim",
+        "hint": "Hora de {timezone} (24 h). Os e-mails dentro deste horário são enviados ao terminar; as notificações dentro do app chegam na hora."
+      },
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "saved": "Preferências de notificações salvas.",
+      "noChanges": "Não há alterações para salvar.",
+      "reload": "Carregar a versão atual",
+      "reloaded": "A versão atual foi carregada. Revise os valores e salve novamente.",
+      "errors": {
+        "format": "Informe a hora no formato HH:mm (24 h).",
+        "same": "A hora de início e a de fim devem ser diferentes.",
+        "server": "O horário de silêncio não é válido. Revise as horas."
+      }
     }
   }
 }

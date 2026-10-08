@@ -1746,7 +1746,9 @@
       "createSubmit": "Create template",
       "templateCreated": "Template {name} created with {count} lines.",
       "applied": "Changes propagated to the future months."
-    }
+    },
+    "lineFromNotification": "Line from the notification",
+    "lineMissing": "The budget line that triggered the notification no longer exists in this plan."
   },
   "Templates": {
     "title": "Budget templates",
@@ -2070,6 +2072,107 @@
       "saved": "Close policy saved.",
       "reload": "Load the current version",
       "loading": "Loading the close policy…"
+    }
+  },
+  "Notifications": {
+    "bell": {
+      "label": "Notifications",
+      "unreadHint": "({count} unread)",
+      "announce": "{count, plural, one {You have # unread notification.} other {You have # unread notifications.}}"
+    },
+    "title": "Notifications",
+    "intro": "Alerts about your budgets and month close. They are kept until you archive them.",
+    "loading": "Loading notifications…",
+    "loadingMore": "Loading…",
+    "loadMore": "Load more",
+    "empty": "You have no notifications",
+    "noWorkspace": "Select or create a workspace to see your notifications.",
+    "filters": {
+      "label": "Filter notifications",
+      "RECENT": "Recent",
+      "UNREAD": "Unread",
+      "ARCHIVED": "Archived"
+    },
+    "list": {
+      "label": "Notification list"
+    },
+    "item": {
+      "unread": "Unread",
+      "read": "Read",
+      "archived": "Archived",
+      "markRead": "Mark as read",
+      "markReadNamed": "Mark as read: {title}",
+      "archive": "Archive",
+      "archiveNamed": "Archive: {title}",
+      "openDetail": "View details",
+      "severity": {
+        "INFO": "Information",
+        "WARNING": "Warning",
+        "CRITICAL": "Critical"
+      },
+      "email": "Email: {status}",
+      "emailStatus": {
+        "PENDING": "Pending",
+        "SENT": "Sent",
+        "FAILED": "Failed",
+        "SUPPRESSED": "Suppressed"
+      }
+    },
+    "markAllRead": "Mark all as read",
+    "done": {
+      "read": "Notification marked as read.",
+      "archived": "Notification archived.",
+      "allRead": "{count, plural, =0 {There were no unread notifications.} one {# notification marked as read.} other {# notifications marked as read.}}"
+    },
+    "detail": {
+      "loading": "Loading the notification…",
+      "notFound": "This notification does not exist or is not yours.",
+      "back": "Back to the inbox",
+      "received": "Received",
+      "severity": "Severity",
+      "status": "Status",
+      "openBudgetLine": "View the line in the {period} plan",
+      "openPeriodClose": "Go to the {period} close"
+    },
+    "prefs": {
+      "title": "Notifications",
+      "intro": "Choose which alerts you receive and through which channel. Every member can set their own.",
+      "loading": "Loading notification preferences…",
+      "tableCaption": "Channels by notification type",
+      "columns": {
+        "type": "Notification type",
+        "inApp": "In the app",
+        "email": "Email"
+      },
+      "channels": {
+        "inApp": "In the app",
+        "email": "Email"
+      },
+      "types": {
+        "BUDGET_THRESHOLD": "Budget alerts",
+        "MONTH_CLOSE_PENDING": "Month close pending"
+      },
+      "checkbox": "{type} · {channel}",
+      "includeDetails": "Include details (amounts and names) in emails",
+      "privacy": "Emails travel through external channels; by default they do not include amounts or category names. Turn this on only if you accept seeing that data in your mailbox. In-app notifications do not change.",
+      "quiet": {
+        "legend": "Quiet hours",
+        "enable": "Turn on quiet hours",
+        "start": "Start",
+        "end": "End",
+        "hint": "{timezone} time (24 h). Emails inside this window are sent when it ends; in-app notifications arrive right away."
+      },
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Notification preferences saved.",
+      "noChanges": "There are no changes to save.",
+      "reload": "Load the current version",
+      "reloaded": "The current version was loaded. Review the values and save again.",
+      "errors": {
+        "format": "Enter the time as HH:mm (24 h).",
+        "same": "The start and end times must be different.",
+        "server": "The quiet hours are not valid. Check the times."
+      }
     }
   }
 }

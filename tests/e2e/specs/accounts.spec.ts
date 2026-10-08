@@ -7,7 +7,6 @@ import {
   go,
   newFinanceUser,
   openAccount,
-  todayLaPaz,
 } from '../src/finance.js';
 
 /**
@@ -157,6 +156,22 @@ test.describe('Cuentas: listado, alta, edición, archivo y reactivación (accoun
     await expect(form.getByLabel('Moneda base')).toHaveValue('USD');
     await form.getByLabel('Valor (1 USD = ? BOB)').fill('6,96');
     await form.getByLabel('Tipo de tasa').selectOption('PARALLEL');
+    // Vigencias explícitas y separadas (no "ahora"): el formulario trunca al minuto y la segunda tasa del test debe ser
+    // siempre más reciente que la primera, aunque todo ocurra en el mismo segundo (carrera observada en CI).
+    const firstAsOf = new Date(Math.floor(Date.now() / 60_000) * 60_000 - 2 * 3_600_000);
+    const laPazParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/La_Paz',
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(firstAsOf);
+    const part = (type: string) => laPazParts.find((x) => x.type === type)?.value ?? '';
+    await form
+      .getByLabel(/^Vigencia/)
+      .fill(`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`);
     await form.getByLabel('Fuente (p. ej. casa de cambio)').fill('Casa de cambio centro');
     await form.getByRole('button', { name: 'Registrar tasa' }).click();
     await expect(page.getByRole('status')).toHaveText('Tasa registrada: 1 USD = 6,96 BOB.');
@@ -164,9 +179,8 @@ test.describe('Cuentas: listado, alta, edición, archivo y reactivación (accoun
     await go(page, '/cuentas');
     const usd = accountRow(page, 'USD Savings');
     await expect(usd.getByTestId('account-balance')).toHaveText('500,00 USD');
-    const [y, m, d] = todayLaPaz().split('-');
-    const date = new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeZone: 'UTC' }).format(
-      new Date(`${y}-${m}-${d}T00:00:00Z`),
+    const date = new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeZone: 'America/La_Paz' }).format(
+      firstAsOf,
     );
     await expect(usd.getByTestId('account-base-equivalent')).toHaveText(
       `≈ 3.480,00 BOB · tasa del ${date} · manual`,
@@ -179,7 +193,7 @@ test.describe('Cuentas: listado, alta, edición, archivo y reactivación (accoun
       quote: 'BOB',
       value: '6.97',
       rateType: 'PARALLEL',
-      asOf: new Date(Date.now() - 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      asOf: new Date(firstAsOf.getTime() + 3_600_000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
     });
     await page.reload();
     await expect(accountRow(page, 'USD Savings').getByTestId('account-base-equivalent')).toContainText(

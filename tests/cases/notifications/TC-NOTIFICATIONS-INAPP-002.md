@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/notifications.api.test.ts
+  - packages/contexts/notifications/src/application/notify-from-event.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['notifications', 'preferences']

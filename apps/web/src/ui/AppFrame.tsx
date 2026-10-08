@@ -8,7 +8,8 @@ import { ProblemMessage } from '../errors/ProblemMessage';
 import { WorkspaceSelector } from './identity/IdentityViews';
 import { switchLocalePath, type UiLocale } from './identity/logic';
 import { localized, useSession } from './session-context';
-import { activeNav, initialOf, NAV_ITEMS, type NavKey } from './shell/nav';
+import { NotificationBell } from './notifications/NotificationBell';
+import { activeNav, initialOf, isNotificationsRoute, NAV_ITEMS, type NavKey } from './shell/nav';
 
 /** Nombre de cada idioma de la UI en el catálogo `Locales`. */
 const LOCALE_NAME: Record<UiLocale, 'es-BO' | 'en-US' | 'pt-BR'> = { es: 'es-BO', en: 'en-US', pt: 'pt-BR' };
@@ -112,6 +113,10 @@ export function AppFrame({ children }: { children: ReactNode }) {
           }}
         />
       </div>
+      <NotificationBell
+        href={localized(locale, '/notificaciones')}
+        current={isNotificationsRoute(pathname)}
+      />
       <UserMenu
         greeting={tHome('greeting', { name: me.displayName })}
         initial={initialOf(me.displayName)}

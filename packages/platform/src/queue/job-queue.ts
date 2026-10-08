@@ -59,6 +59,8 @@ export interface TransactionalJob<P extends object = object> {
   readonly correlationId: string;
   /** Contexto de traza W3C capturado al originarse el trabajo (p. ej. al escribir el evento en el outbox). */
   readonly traceContext: Readonly<Record<string, string>>;
+  /** No tomarlo antes de este instante (pg-boss `startAfter`): trabajos diferidos, p. ej. email tras el horario de silencio. */
+  readonly startAfter?: Date;
 }
 
 /** Conexión de una transacción en curso (`pg.PoolClient` o equivalente). */

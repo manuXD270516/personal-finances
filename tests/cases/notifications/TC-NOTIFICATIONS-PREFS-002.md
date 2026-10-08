@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/notifications.api.test.ts
+  - packages/contexts/notifications/src/application/dispatch-email-delivery.test.ts
+  - packages/contexts/notifications/src/application/notify-from-event.test.ts
+  - packages/contexts/notifications/src/domain/quiet-hours.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['notifications', 'quiet-hours', 'timezone']

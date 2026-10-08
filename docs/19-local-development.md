@@ -282,6 +282,10 @@ Fichero real: [`deploy/compose/compose.yaml`](../deploy/compose/compose.yaml) (p
 | `seed` | finance-api (`seed --profile=…`) | seed | — | desactivado (one-shot) |
 | `otel-lgtm` | `grafana/otel-lgtm:0.34.0` | observability | `PF_GRAFANA_PORT` 23001 → 3000, `PF_OTLP_GRPC_PORT` 24317, `PF_OTLP_HTTP_PORT` 24318 | fichero `/tmp/ready` |
 
+### 5.0 Emails de notificación en local y CI (`add-alerts`)
+
+El worker envía los emails de las notificaciones por SMTP a Mailpit (`EMAIL_DRIVER=smtp`, `SMTP_HOST`/`SMTP_PORT` del `.env`: `PF_MAILPIT_SMTP_PORT` desde el host; en modo B Compose apunta a `mailpit:1025`). Los correos no salen a internet: se ven en la UI de Mailpit (`PF_MAILPIT_UI_PORT`) o por su API (`GET /api/v1/messages`, `GET /api/v1/message/{id}`), que es lo que consultan las pruebas de integración (Testcontainers `axllent/mailpit`, misma imagen fijada que Compose) y el E2E. En producción `EMAIL_DRIVER=none` (solo in-app) hasta que el change de despliegue elija proveedor (docs/33 D87). Variables: [config-reference.md](config-reference.md) (grupo "Notificaciones"); diagnóstico de entregas fallidas: [runbooks/notification-email.md](runbooks/notification-email.md).
+
 ### 5.1 Notas de diseño del compose (vigentes)
 
 - **Una sola fuente de configuración:** los servicios de app cargan el `.env` en uso (`env_file: ${PF_APP_ENV_FILE:-../../.env}`; los scripts fijan la ruta absoluta) y el ancla `x-app-addresses` sobrescribe solo `DATABASE_URL`, `OBJECT_STORAGE_ENDPOINT`, `OTEL_EXPORTER_OTLP_ENDPOINT` y `VALKEY_URL` con nombres de servicio y puertos canónicos (§0.3 punto 5).

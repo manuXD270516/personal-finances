@@ -48,6 +48,9 @@ x-app-addresses: &app-addresses
   VALKEY_URL: redis://valkey:6379/0
   # finance-api valida `iss` contra la URL pública (OIDC_ISSUER_URL del .env) pero lee el JWKS por la red interna.
   OIDC_JWKS_URI: http://keycloak:8080/realms/pfos/protocol/openid-connect/certs
+  # add-alerts: el worker envía los emails de notificación a Mailpit por la red Compose (EMAIL_DRIVER=smtp en local/CI).
+  SMTP_HOST: mailpit
+  SMTP_PORT: '1025'
 
 services:
   # ───────────────────────────── deps ─────────────────────────────

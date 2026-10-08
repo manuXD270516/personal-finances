@@ -319,3 +319,26 @@ export function buildLineBody(values: LineFormValues, opts: BuildOptions): Build
     },
   };
 }
+
+// ───────────────────────────── Enlace desde una notificación (add-alerts) ─────────────────────────────
+
+/**
+ * Periodo pedido en `?periodo=`: por etiqueta `YYYY-MM` (la que llevan las notificaciones) o por id. `undefined` si no
+ * viene o no está en la lista (entonces rige el periodo por defecto).
+ */
+export function requestedPeriodId(
+  periods: readonly { readonly id: string; readonly label: string }[],
+  requested: string | undefined,
+): string | undefined {
+  if (!requested) return undefined;
+  return periods.find((p) => p.label === requested)?.id ?? periods.find((p) => p.id === requested)?.id;
+}
+
+/** Línea resaltada por `?linea=`: `found` si existe en el plan, `missing` si ya no existe (TC-NOTIFICATIONS-INAPP-005). */
+export function lineHighlight(
+  budget: Pick<Budget, 'lines'>,
+  lineId: string | undefined,
+): 'found' | 'missing' | undefined {
+  if (!lineId) return undefined;
+  return budget.lines.some((l) => l.id === lineId) ? 'found' : 'missing';
+}

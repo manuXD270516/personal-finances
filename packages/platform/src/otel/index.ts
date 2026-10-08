@@ -1,4 +1,4 @@
-import { metrics, type Counter } from '@opentelemetry/api';
+import { metrics, type Counter, type Histogram } from '@opentelemetry/api';
 import { OTEL_SDK_KEY, type ShutdownableSdk } from './state.js';
 
 const sdk = (): ShutdownableSdk | undefined =>
@@ -40,6 +40,27 @@ export function otelCounters(meterName: string): CounterMetrics {
         counters.set(name, counter);
       }
       counter.add(value, labels);
+    },
+  };
+}
+
+/** Histograma genérico (latencias, retrasos) sobre la API de métricas de OpenTelemetry (no-op sin SDK). */
+export interface HistogramMetrics {
+  record(name: string, value: number, labels: Readonly<Record<string, string>>): void;
+}
+
+/** Crea los histogramas bajo demanda (uno por nombre) con el meter `meterName`. */
+export function otelHistograms(meterName: string): HistogramMetrics {
+  const meter = metrics.getMeter(meterName);
+  const histograms = new Map<string, Histogram>();
+  return {
+    record(name, value, labels) {
+      let histogram = histograms.get(name);
+      if (!histogram) {
+        histogram = meter.createHistogram(name);
+        histograms.set(name, histogram);
+      }
+      histogram.record(value, labels);
     },
   };
 }

@@ -39,6 +39,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   // add-month-closing 7.3: cierre de mes sin periodo en la ruta (la versión con periodo, checklist y reporte la analiza
   // month-closing.spec.ts) y la política de cierre dentro de /configuracion.
   { path: '/planificacion/cierre', name: 'Cierre de mes' },
+  // add-alerts 7.1: bandeja de notificaciones (la versión con datos y el detalle los analiza notifications.spec.ts).
+  { path: '/notificaciones', name: 'Notificaciones' },
 ];
 
 async function seriousViolations(page: Page) {

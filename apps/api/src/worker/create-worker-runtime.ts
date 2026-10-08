@@ -31,6 +31,7 @@ import { createCategoryCatalogQuery } from '@pf/classification/interface/classif
 import {
   createDemoDataRuntime,
   identityActiveWorkspaces,
+  identityWorkspaceRecipients,
   identityWorkspaceCalendarDirectory,
   identityWorkspaceSettingsDirectory,
   identityWorkspaceTimeZones,
@@ -46,9 +47,15 @@ import {
   runVerifyClosings,
   type ClosingVerifier,
 } from '@pf/planning/interface/planning.module';
+import {
+  createEmailSender,
+  createNotificationsWorkerRuntime,
+  notificationEventConsumers,
+} from '@pf/notifications/interface/notifications.module';
+import type { EmailSender } from '@pf/notifications/interface/notifications.module';
 import { PinoNestLogger } from '@pf/platform/nest';
 import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
-import { otelCounters, shutdownTelemetry } from '@pf/platform/otel';
+import { otelCounters, otelHistograms, shutdownTelemetry } from '@pf/platform/otel';
 import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
 import { systemClock, type Clock } from '@pf/shared-kernel';
@@ -58,6 +65,7 @@ import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
+import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
@@ -100,6 +108,17 @@ export interface WorkerRuntimeOptions {
   readonly demoFailAt?: string;
   /** Encola `planning.ensure-periods` al arrancar (por defecto sí; add-financial-periods). */
   readonly planningPeriodsOnStart?: boolean;
+  /** Tests (add-alerts): sustituye el adaptador de email (por defecto, el de `EMAIL_DRIVER`). */
+  readonly emailSender?: EmailSender;
+  /** Tests (add-alerts): backoff y lease del despacho de email, y barridos periódicos. */
+  readonly notifications?: {
+    readonly backoffMs?: readonly number[];
+    readonly leaseMs?: number;
+    /** Programa los barridos de entregas y la purga (por defecto sí). */
+    readonly scheduleCrons?: boolean;
+    /** Encola un barrido de entregas pendientes al arrancar (por defecto sí). */
+    readonly sweepOnStart?: boolean;
+  };
 }
 
 export async function createWorkerRuntime(
@@ -275,6 +294,57 @@ export async function createWorkerRuntime(
     runOnStart: options.planningPeriodsOnStart ?? true,
   });
 
+  // NOTIFY (add-alerts): consumidores de `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`, despacho
+  // del email (adaptador por EMAIL_DRIVER: smtp → Mailpit en local/CI, none → solo in-app), barrido y purga. La cola de
+  // despacho se crea antes de arrancar los consumidores: estos encolan en la transacción de la notificación.
+  const notificationsClock = options.clock ?? systemClock;
+  const emailDriver = config.EMAIL_DRIVER ?? 'none';
+  const notifications = createNotificationsWorkerRuntime({
+    pool,
+    clock: notificationsClock,
+    queue,
+    logger,
+    recipients: identityWorkspaceRecipients(pool),
+    catalog: createCategoryCatalogQuery({ pool, clock: notificationsClock }),
+    sender:
+      options.emailSender ??
+      createEmailSender({
+        driver: emailDriver,
+        ...(emailDriver === 'smtp' && config.SMTP_HOST
+          ? {
+              smtp: {
+                host: config.SMTP_HOST,
+                port: config.SMTP_PORT,
+                secure: config.SMTP_SECURE,
+                user: config.SMTP_USER,
+                password: config.SMTP_PASSWORD,
+                from: config.EMAIL_FROM,
+              },
+            }
+          : {}),
+      }),
+    counters: otelCounters('@pf/notifications'),
+    histograms: otelHistograms('@pf/notifications'),
+    appPublicUrl: config.APP_PUBLIC_URL,
+    emailFrom: config.EMAIL_FROM,
+    maxAttempts: config.NOTIFY_EMAIL_MAX_ATTEMPTS,
+    retentionMonths: config.NOTIFY_RETENTION,
+    ...(options.notifications?.backoffMs ? { backoffMs: options.notifications.backoffMs } : {}),
+    ...(options.notifications?.leaseMs ? { leaseMs: options.notifications.leaseMs } : {}),
+  });
+  await registerNotificationsJobs(queue, {
+    dispatch: notifications.dispatch,
+    purge: notifications.purge,
+    workspaces: activeWorkspaces,
+    logger,
+    ...(options.notifications?.scheduleCrons !== undefined
+      ? { scheduleCrons: options.notifications.scheduleCrons }
+      : {}),
+    ...(options.notifications?.sweepOnStart !== undefined
+      ? { sweepOnStart: options.notifications.sweepOnStart }
+      : {}),
+  });
+
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
   // REPORTING (add-basic-dashboard): versión derivada de los datos por workspace (ETag del resumen del Home).
   const subscriptions = new EventSubscriptions([
@@ -282,6 +352,7 @@ export async function createWorkerRuntime(
     ...fxConsumers,
     reportingDataVersionConsumer(),
     ...planningEventConsumers(planning),
+    ...notificationEventConsumers(notifications),
   ]);
   const consumers = new EventConsumerRuntime({ pool, queue, subscriptions, logger, metrics });
   const relay = new OutboxRelay({

@@ -4,3 +4,6 @@ export const POSTGRES_IMAGE =
 /** SeaweedFS fijado por versión y digest (SPIKE-07 / ADR-0009). */
 export const SEAWEEDFS_IMAGE =
   'chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d';
+/** Mailpit (servidor SMTP de pruebas): la misma imagen fijada de Compose; captura los emails sin salir a internet. */
+export const MAILPIT_IMAGE =
+  'axllent/mailpit:v1.27.7@sha256:cae83a33cd9b9598e4acb210be673dda7e741d5271ed4045310ab456950a136a';
