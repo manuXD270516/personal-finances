@@ -53,6 +53,7 @@ import {
 } from '@pf/reporting/interface/reporting.module';
 import {
   createTransactionsRuntime,
+  RECONCILIATION_LIFECYCLE_MACHINE,
   TRANSACTION_LIFECYCLE_MACHINE,
   TransactionsModule,
 } from '@pf/transactions/interface/transactions.module';
@@ -61,7 +62,12 @@ import type { AuditHistoryQuery, LifecycleExportLoaders } from '@pf/audit/contra
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
-import { accountCustomFields, accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
+import {
+  accountCustomFields,
+  accountsImports,
+  accountsRuntime,
+  workspaceCalendar,
+} from '../accounts/accounts-wiring.js';
 import { LedgerHttpModule } from '../ledger/ledger-http.js';
 import { workspaceCreatedHook } from './workspace-provisioning.js';
 
@@ -151,6 +157,8 @@ export const LIFECYCLE_MACHINES = [
   COUNTERPARTY_LIFECYCLE_MACHINE,
   // add-financial-periods (Phase 2): periodo financiero de PLANNING.
   FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
+  // add-reconciliation (Phase 2): sesión de reconciliación de TRANSACTIONS.
+  RECONCILIATION_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -273,6 +281,9 @@ export function financeRuntimes(input: {
     classification: classification.validator,
     lookup: classification.lookup,
     fx: fx.pricing,
+    // add-reconciliation: saldo inicial (LEDGER) y "hoy" en la zona horaria del workspace (RISK-020).
+    openingBalance: ledger.openingBalance,
+    calendar: workspaceCalendar(input.pool, input.clock, input.config.APP_TIMEZONE),
   });
   deferred.categoryUsage = transactions.categoryUsage;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
@@ -406,6 +417,14 @@ export function lifecycleExportLoaders(
           fee: r.fee?.toJSON() ?? null,
         })),
       };
+    },
+    Reconciliation: async ({ userId, workspaceId, aggregateId }) => {
+      const view = await transactions.reconciliations.lifecycle({
+        userId,
+        workspaceId,
+        reconciliationId: aggregateId,
+      });
+      return { lifecycle: view.lifecycle, label: view.reconciliation.statementDate };
     },
     Account: async ({ userId, workspaceId, aggregateId }) => {
       const lifecycle = await accounts.accounts.accountLifecycle({

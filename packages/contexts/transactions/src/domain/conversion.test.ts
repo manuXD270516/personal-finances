@@ -443,7 +443,7 @@ describe('AmendConversion (reversa + revisión nueva)', () => {
     expect(codeOf(() => voided.amendConversion(data))).toBe('INVALID_STATUS_TRANSITION');
     const reconciled = canonical({ status: 'CLEARED' });
     reconciled.attachEntry('e');
-    reconciled.changeStatus('RECONCILED');
+    reconciled.reconcileWithoutStatement('WITHOUT_STATEMENT');
     expect(codeOf(() => reconciled.amendConversion(data))).toBe('TRANSACTION_RECONCILED');
     const tx = canonical();
     tx.attachEntry('e');

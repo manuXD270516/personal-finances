@@ -108,7 +108,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 - **Payload:** `transactionId`, `revisionFrom`, `revisionTo`, `businessDate`, `fromAccountId`, `toAccountId`, `amount: Money (positivo)`, `fee: Money|null`, `reversedJournalEntryId`, `reversalJournalEntryId`, `journalEntryId`.
 - **Idem.:** natural `(transactionId, revisionTo)`. **Ord.:** por `Transaction`. **PII:** N.
 
-**Campo `transition` (aditivo, `add-lifecycle-timeline`).** `TransactionCreated`, `TransactionPosted`, `TransactionUpdated`, `TransactionVoided`, `AccountOpened`, `AccountClosed`, `AccountArchived` y `AccountReactivated` (v1) llevan el campo opcional `transition` con la transición de la máquina de estados que los originó (`RECORD`, `POST`, `CLEAR`, `UNCLEAR`, `RECONCILE`, `UNRECONCILE`, `REVISE`, `VOID`; `OPEN`, `CLOSE`, `ARCHIVE`, `REACTIVATE`). Es compatible (sin `v2`): los consumidores lo ignoran; `TransactionUpdated` no lo lleva cuando la edición es descriptiva (anotación del recorrido).
+**Campo `transition` (aditivo, `add-lifecycle-timeline`).** `TransactionCreated`, `TransactionPosted`, `TransactionUpdated`, `TransactionVoided`, `AccountOpened`, `AccountClosed`, `AccountArchived` y `AccountReactivated` (v1) llevan el campo opcional `transition` con la transición de la máquina de estados que los originó (`RECORD`, `POST`, `CLEAR`, `UNCLEAR`, `RECONCILE`, `RECONCILE_WITHOUT_STATEMENT` (add-reconciliation, D74), `UNRECONCILE`, `REVISE`, `VOID`; `OPEN`, `CLOSE`, `ARCHIVE`, `REACTIVATE`). Es compatible (sin `v2`): los consumidores lo ignoran; `TransactionUpdated` no lo lleva cuando la edición es descriptiva (anotación del recorrido).
 
 #### `transactions.ConversionRecorded.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** FX (observación de tasa), REPORTING.
@@ -141,8 +141,20 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 #### `transactions.TransactionUpdated.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** REPORTING (Phase 1); PLANNING y COMMITMENTS desde sus fases.
 - **Trigger:** edición descriptiva, cambio `cleared`/`reconciled` (`POST …/mark-cleared`, `PATCH` de reconciliación), des-reconciliación (`POST …/{id}/unreconcile`) o amend financiero; en el amend se emite **junto** a `TransactionPosted.v1` con `ledgerImpact = true` (`add-transaction-recording`).
-- **Payload:** `transactionId`, `revision: int`, `status: PENDING|POSTED|CLEARED|RECONCILED`, `previousStatus|null`, `changedFields: string[]`, `ledgerImpact: boolean`, `reason: string|null`; opcionales aditivos `paymentMethod` y `transition`. **Sin** montos ni valores `before/after` (los consumidores que los necesitan leen `TransactionPosted`).
+- **Payload:** `transactionId`, `revision: int`, `status: PENDING|POSTED|CLEARED|RECONCILED`, `previousStatus|null`, `changedFields: string[]` (aditivo `add-reconciliation`: `reconciliationMode` en la conciliación sin extracto, la des-reconciliación y el cotejo posterior), `ledgerImpact: boolean`, `reason: string|null`; opcionales aditivos `paymentMethod` y `transition`. **Sin** montos ni valores `before/after` (los consumidores que los necesitan leen `TransactionPosted`).
 - **Idem.:** natural `(transactionId, aggregateVersion)`. **Ord.:** por `Transaction`. **PII:** B (`reason`).
+
+#### `transactions.TransactionCleared.v1`
+- **Productor:** TRANSACTIONS. **Consumidores:** ninguno obligatorio (hecho dedicado de docs/31 D47; `reporting.data-version` no necesita suscribirse: no cambia cifras).
+- **Trigger:** cada transición `CLEAR` / `UNCLEAR` (`posted` ↔ `cleared`), individual, en lote, dentro de una sesión de reconciliación o desde una edición masiva. Se publica **además** de `TransactionUpdated.v1` (que sigue llevando `changedFields = [status]`): cambio aditivo (`add-reconciliation`).
+- **Payload:** `transactionId`, `accountId`, `cleared: boolean`, `status: POSTED|CLEARED`, `previousStatus: POSTED|CLEARED`, `revision: int`, `reconciliationId: uuid|null` (sesión en cuyo nombre se confirmó), `bulkOperationId: uuid|null`, `transition: CLEAR|UNCLEAR`.
+- **Idem.:** natural `(transactionId, aggregateVersion)`. **Ord.:** por `Transaction`. **PII:** N.
+
+#### `transactions.ReconciliationCompleted.v1`
+- **Productor:** TRANSACTIONS. **Consumidores:** PLANNING (checklist de cierre, opcional: la consulta es síncrona por `ReconciliationStatusQuery.getCoverage`).
+- **Trigger:** `COMPLETE` de la máquina `RECONCILIATION_LIFECYCLE` (`completeReconciliation`): las transacciones confirmadas hasta la fecha del extracto pasaron a `reconciled` (modo contra extracto), con un ajuste opcional contra `EQUITY:ADJUSTMENTS`. Iniciar y cancelar no publican evento.
+- **Payload:** `reconciliationId`, `accountId`, `currency`, `statementDate`, `statementBalance: Money`, `clearedBalance: Money`, `transactionCount: int`, `transactionIds: uuid[]` (≤ 2 000; se omite si excede), `adjustmentTransactionId: uuid|null`, `transition: COMPLETE`.
+- **Idem.:** natural `reconciliationId`. **Ord.:** por `Reconciliation`. **PII:** N.
 
 #### `accounts.AccountUpdated.v1`
 - **Productor:** ACCOUNTS. **Consumidores:** REPORTING.
@@ -260,4 +272,4 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 1. ¿`eventType` incluye la versión (`transactions.TransactionPosted.v1`) o se separa en `eventVersion` (propuesto aquí: separada, nombre completo = concatenación)? Confirmar en ADR-0008.
 2. Retención de `outbox` publicados (7 vs 30 días) y si sirve como fuente de replay o sólo las tablas fuente.
 3. ¿`TransactionCreated` debe emitirse además de `TransactionPosted` cuando una transacción nace `posted`? Propuesto: sí (dos eventos, semánticas distintas); evaluar ruido.
-4. ¿Se necesita un evento de dominio específico para `Reconciliation` en Phase 1 (`ReconciliationCompleted`) o basta con Audit?
+4. ¿Se necesita un evento de dominio específico para `Reconciliation` en Phase 1 (`ReconciliationCompleted`) o basta con Audit? → **Resuelta (2026-10-08, `add-reconciliation`)**: se publica `transactions.ReconciliationCompleted.v1` (Phase 2) y el hecho dedicado `transactions.TransactionCleared.v1` (D47).

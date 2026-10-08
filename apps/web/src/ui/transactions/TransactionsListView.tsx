@@ -3,6 +3,7 @@ import type { FormatContext } from '../dashboard/types';
 import type { Transaction } from '../common/types';
 import { badgeStyle, mutedStyle } from '../common/ui';
 import { displayValue, valuesOf, type CustomFieldDefinition } from '../custom-fields/logic';
+import { isWithoutStatement } from '../reconciliation/logic';
 import { amountFor } from './logic';
 import type { NameResolver } from './TransactionTimeline';
 
@@ -34,6 +35,28 @@ export function StatusBadge({ status, f }: { status: string; f: FormatContext })
   return (
     <span data-testid="tx-status" data-status={status} style={badgeStyle}>
       {f.t(`status.${status}`)}
+    </span>
+  );
+}
+
+/**
+ * Marca de seguimiento derivada (docs/33 D111): "conciliada sin extracto — pendiente de revisión". El texto lleva
+ * la señal (el color solo la refuerza); `title` explica por qué aparece.
+ */
+export function WithoutStatementBadge({ tx, f }: { tx: Transaction; f: FormatContext }) {
+  if (!isWithoutStatement(tx)) return null;
+  return (
+    <span
+      data-testid="tx-without-statement"
+      title={f.t('flags.RECONCILED_WITHOUT_STATEMENT.hint')}
+      style={{
+        ...badgeStyle,
+        borderColor: 'var(--pf-warning-border)',
+        background: 'var(--pf-warning-bg)',
+        color: 'var(--pf-warning-fg)',
+      }}
+    >
+      {f.t('flags.RECONCILED_WITHOUT_STATEMENT.label')}
     </span>
   );
 }
@@ -127,6 +150,7 @@ export function TransactionsListView({
               <SignedAmount tx={tx} {...(accountId ? { accountId } : {})} f={f} />
             </strong>
             <StatusBadge status={tx.status} f={f} />
+            <WithoutStatementBadge tx={tx} f={f} />
             <span style={{ ...mutedStyle, flexBasis: '100%' }}>
               {t(`kinds.${tx.kind}`)} · {accounts.join(' → ')}
               {categories.length ? ` · ${categories.join(', ')}` : ''}

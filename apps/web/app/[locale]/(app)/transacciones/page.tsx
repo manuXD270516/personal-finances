@@ -14,5 +14,13 @@ export default function Page({
   const q = use(searchParams);
   const accountId = one(q['cuenta']);
   const kind = one(q['tipo']);
-  return <TransactionsPage {...(accountId ? { accountId } : {})} {...(kind ? { kind } : {})} />;
+  // `?sinExtracto=1`: filtro "conciliadas sin extracto — pendientes de revisión" (docs/33 D111).
+  const withoutStatement = one(q['sinExtracto']) === '1';
+  return (
+    <TransactionsPage
+      {...(accountId ? { accountId } : {})}
+      {...(kind ? { kind } : {})}
+      {...(withoutStatement ? { withoutStatement: true } : {})}
+    />
+  );
 }

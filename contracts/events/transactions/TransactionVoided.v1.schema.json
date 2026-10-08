@@ -93,6 +93,7 @@
             "CLEAR",
             "UNCLEAR",
             "RECONCILE",
+            "RECONCILE_WITHOUT_STATEMENT",
             "UNRECONCILE",
             "REVISE",
             "VOID"

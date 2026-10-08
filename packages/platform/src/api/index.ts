@@ -70,6 +70,8 @@ export {
   applyRlsContext,
   currentSqlExecutor,
   type CommandTransaction,
+  type TransactionOptions,
+  isRetryableConflict,
 } from './db/command-transaction.js';
 export { unitOfWorkKysely } from './db/uow-kysely.js';
 export {

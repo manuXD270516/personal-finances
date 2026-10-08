@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reconciliation.api.test.ts
+  - packages/contexts/transactions/src/application/reconciliations.service.test.ts
+  - packages/contexts/transactions/src/domain/reconciliation.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["reconciliation", "validation"]

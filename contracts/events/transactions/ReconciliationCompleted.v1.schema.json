@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/transactions/ReconciliationCompleted.v1.schema.json",
+  "title": "transactions.ReconciliationCompleted.v1",
+  "description": "Se finalizó una sesión de reconciliación de una cuenta: las transacciones confirmadas hasta la fecha del extracto pasaron a reconciled (modo contra extracto), con un ajuste opcional contra EQUITY:ADJUSTMENTS (openspec add-reconciliation). Productor: TRANSACTIONS. Consumidores: PLANNING (checklist de cierre, opcional; consulta síncrona por ReconciliationStatusQuery). Idempotencia natural: reconciliationId. `transactionIds` incluye el ajuste si lo hubo y se omite si hay más de 2000 (queda `transactionCount`). Sin texto libre.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "transactions.ReconciliationCompleted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Reconciliation"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reconciliationId",
+        "accountId",
+        "currency",
+        "statementDate",
+        "statementBalance",
+        "clearedBalance",
+        "transactionCount",
+        "adjustmentTransactionId",
+        "transition"
+      ],
+      "properties": {
+        "reconciliationId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "statementDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "statementBalance": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "clearedBalance": {
+          "description": "Saldo confirmado congelado al completar (= extracto, tras el ajuste si lo hubo).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "transactionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transactionIds": {
+          "type": "array",
+          "maxItems": 2000,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        },
+        "adjustmentTransactionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transition": {
+          "const": "COMPLETE"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000152",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-08T14:30:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "eventType": "transactions.ReconciliationCompleted",
+      "aggregateType": "Reconciliation",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-000000000a01",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c7",
+      "payload": {
+        "reconciliationId": "01928c4e-7a3b-7c11-8f00-000000000a01",
+        "accountId": "01928c4e-7a3b-7c11-8f00-0000000000a1",
+        "currency": "BOB",
+        "statementDate": "2026-03-31",
+        "statementBalance": {
+          "amount": "3350.00",
+          "currency": "BOB"
+        },
+        "clearedBalance": {
+          "amount": "3350.00",
+          "currency": "BOB"
+        },
+        "transactionCount": 2,
+        "transactionIds": [
+          "01928c4e-7a3b-7c11-8f00-0000000000f1",
+          "01928c4e-7a3b-7c11-8f00-0000000000f2"
+        ],
+        "adjustmentTransactionId": null,
+        "transition": "COMPLETE"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000153",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-08T14:30:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "eventType": "transactions.ReconciliationCompleted",
+      "aggregateType": "Reconciliation",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-000000000a02",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c8",
+      "payload": {
+        "reconciliationId": "01928c4e-7a3b-7c11-8f00-000000000a02",
+        "accountId": "01928c4e-7a3b-7c11-8f00-0000000000a1",
+        "currency": "BOB",
+        "statementDate": "2026-03-31",
+        "statementBalance": {
+          "amount": "3345.00",
+          "currency": "BOB"
+        },
+        "clearedBalance": {
+          "amount": "3345.00",
+          "currency": "BOB"
+        },
+        "transactionCount": 3,
+        "transactionIds": [
+          "01928c4e-7a3b-7c11-8f00-0000000000f1",
+          "01928c4e-7a3b-7c11-8f00-0000000000f2",
+          "01928c4e-7a3b-7c11-8f00-0000000000f9"
+        ],
+        "adjustmentTransactionId": "01928c4e-7a3b-7c11-8f00-0000000000f9",
+        "transition": "COMPLETE"
+      }
+    }
+  ]
+}

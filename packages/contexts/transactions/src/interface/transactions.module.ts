@@ -9,14 +9,15 @@ import type {
 } from '@pf/audit/contracts';
 import type { ClassificationLookup, ClassificationValidator } from '@pf/classification/contracts';
 import type { FxConversionPricingPort } from '@pf/fx/contracts';
-import type { LedgerPostingPort } from '@pf/ledger/contracts';
+import type { LedgerOpeningBalanceQuery, LedgerPostingPort } from '@pf/ledger/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
-import type { OutboxPort, TransactionsDeps } from '../application/ports/index.js';
+import type { OutboxPort, TransactionsDeps, WorkspaceCalendar } from '../application/ports/index.js';
 import { ConversionsService } from '../application/conversions.service.js';
+import { ReconciliationsService } from '../application/reconciliations.service.js';
 import { TransactionsService } from '../application/transactions.service.js';
-import { TRANSACTION_LIFECYCLE } from '../domain/index.js';
+import { RECONCILIATION_LIFECYCLE, TRANSACTION_LIFECYCLE } from '../domain/index.js';
 import {
   ClassificationCategoryLookup,
   PgTransactionRepository,
@@ -25,8 +26,14 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-transactions.js';
 import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
-import type { CounterpartyCategoryUsageQuery, NominalFlowQuery } from '../contracts/index.js';
+import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
+import type {
+  CounterpartyCategoryUsageQuery,
+  NominalFlowQuery,
+  ReconciliationStatusQuery,
+} from '../contracts/index.js';
 import { CONVERSIONS_SERVICE, ConversionsController } from './conversions-http.js';
+import { RECONCILIATIONS_SERVICE, ReconciliationsController } from './reconciliations-http.js';
 import { TRANSACTIONS_SERVICE, TransactionsController } from './transactions-http.js';
 
 export interface TransactionsRuntimeOptions {
@@ -45,11 +52,19 @@ export interface TransactionsRuntimeOptions {
   readonly lookup: ClassificationLookup;
   /** Pricing de conversiones de FX (`@pf/fx/contracts`, misma unidad de trabajo). */
   readonly fx: FxConversionPricingPort;
+  /** Saldo inicial de una cuenta en el ledger (add-reconciliation: base del saldo confirmado). */
+  readonly openingBalance: LedgerOpeningBalanceQuery;
+  /** Fecha de hoy en la zona horaria del workspace (add-reconciliation, RISK-020). */
+  readonly calendar: WorkspaceCalendar;
 }
 
 export interface TransactionsRuntime {
   readonly service: TransactionsService;
   readonly conversions: ConversionsService;
+  /** Sesiones de reconciliación (add-reconciliation). */
+  readonly reconciliations: ReconciliationsService;
+  /** Query pública `ReconciliationStatusQuery.getCoverage` para PLANNING (cierre de mes, decisión 9). */
+  readonly reconciliationStatus: ReconciliationStatusQuery;
   /** Query pública `SummarizeNominalFlows` para Reporting (add-basic-dashboard). */
   readonly flows: NominalFlowQuery;
   /** Última categoría usada con una counterparty, para la sugerencia de CLASSIFICATION (add-classification). */
@@ -58,9 +73,10 @@ export interface TransactionsRuntime {
 
 /** Composición de TRANSACTIONS sobre PostgreSQL. */
 export function createTransactionsRuntime(options: TransactionsRuntimeOptions): TransactionsRuntime {
+  const transactionsRepository = new PgTransactionRepository();
   const deps: TransactionsDeps = {
     uow: new PgTransactionsUnitOfWork(options.pool),
-    transactions: new PgTransactionRepository(),
+    transactions: transactionsRepository,
     currencies: pgCurrencyCatalog,
     accounts: options.accounts,
     ledger: options.ledger,
@@ -74,10 +90,24 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     lifecycleQuery: options.lifecycleQuery,
     ids: uuidV7Ids,
     clock: options.clock,
+    reconciliations: new PgReconciliationRepository(transactionsRepository),
+    openingBalances: {
+      openingBalance: (input) =>
+        options.openingBalance.getOpeningBalance({
+          workspaceId: input.workspaceId,
+          accountId: input.accountId,
+          asOf: input.asOf,
+        }),
+    },
+    calendar: options.calendar,
   };
+  const service = new TransactionsService(deps);
+  const reconciliations = new ReconciliationsService(deps, service);
   return {
-    service: new TransactionsService(deps),
+    service,
     conversions: new ConversionsService(deps),
+    reconciliations,
+    reconciliationStatus: reconciliations,
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
     categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
   };
@@ -95,11 +125,12 @@ export class TransactionsModule {
     return {
       module: TransactionsModule,
       // ConversionsController primero: `/conversions/preview` antes que `/conversions/:transactionId`.
-      controllers: [ConversionsController, TransactionsController],
+      controllers: [ConversionsController, ReconciliationsController, TransactionsController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: TRANSACTIONS_SERVICE, useValue: options.runtime.service },
         { provide: CONVERSIONS_SERVICE, useValue: options.runtime.conversions },
+        { provide: RECONCILIATIONS_SERVICE, useValue: options.runtime.reconciliations },
       ],
     };
   }
@@ -109,4 +140,7 @@ export { TRANSACTIONS_AUDIT_POLICY } from '../contracts/index.js';
 
 /** Máquina de estados `Transaction` declarada por el dominio (add-lifecycle-timeline), para AUDIT en el composition root. */
 export const TRANSACTION_LIFECYCLE_MACHINE: LifecycleMachineDto = TRANSACTION_LIFECYCLE.definition;
+
+/** Máquina de estados `Reconciliation` (add-reconciliation), para AUDIT en el composition root. */
+export const RECONCILIATION_LIFECYCLE_MACHINE: LifecycleMachineDto = RECONCILIATION_LIFECYCLE.definition;
 export type { OutboxPort };

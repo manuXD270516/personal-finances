@@ -13,6 +13,8 @@ import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } f
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
+import type { ReconciliationStatus } from '../reconciliation/logic';
+import { ReconciliationIndicator } from '../reconciliation/ReconciliationView';
 import { AccountForm } from './AccountForm';
 import { AccountStatusBadge, BalanceText, BaseEquivalent } from './AccountsListView';
 import { maskedIdentifier } from './logic';
@@ -75,10 +77,13 @@ function AccountDetail({
   const f = useFormat('Accounts', ctx);
   const lf = useFormat('Lifecycle', ctx);
   const cf = useFormat('CustomFields', ctx);
+  const rf = useFormat('Reconciliation', ctx);
   const customFields = useCustomFields(ctx);
   const { t, locale } = f;
   const institutions = useInstitutions(ctx);
   const [account, setAccount] = useState<Account | undefined>();
+  const [reconciliation, setReconciliation] = useState<ReconciliationStatus | undefined>();
+  const today = todayIn(ctx.timeZone);
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
@@ -98,6 +103,22 @@ function AccountDetail({
   }, [ctx.api, ctx.base, accountId]);
 
   useEffect(load, [load]);
+
+  // Estado de reconciliación al corte de hoy (zona del workspace); visible para todo miembro (VIEWER incluido).
+  useEffect(() => {
+    let cancelled = false;
+    ctx.api
+      .get<ReconciliationStatus>(`${ctx.base}/accounts/${accountId}/reconciliation-status?asOf=${today}`)
+      .then((r) => {
+        if (!cancelled) setReconciliation(r.data);
+      })
+      .catch(() => {
+        if (!cancelled) setReconciliation(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx.api, ctx.base, accountId, today, account?.version]);
 
   if (!account) return problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null;
 
@@ -188,7 +209,18 @@ function AccountDetail({
                   f={cf}
                   testId="account-custom-field-values"
                 />
+                {reconciliation ? (
+                  <ReconciliationIndicator
+                    status={reconciliation}
+                    f={rf}
+                    through={today}
+                    withoutStatementHref={ctx.href(`/transacciones?cuenta=${account.id}&sinExtracto=1`)}
+                  />
+                ) : null}
                 <nav aria-label={t('actions')} style={rowStyle}>
+                  <a href={ctx.href(`/cuentas/${account.id}/reconciliar`)} data-testid="reconcile-account">
+                    {ctx.canEdit && account.status === 'ACTIVE' ? t('reconcile') : t('reconciliations')}
+                  </a>
                   <a href={ctx.href(`/transacciones?cuenta=${account.id}`)}>{t('viewTransactions')}</a>
                   {ctx.canEdit && account.status === 'ACTIVE' ? (
                     <a href={ctx.href(`/transacciones/nueva?cuenta=${account.id}`)}>{t('recordMovement')}</a>

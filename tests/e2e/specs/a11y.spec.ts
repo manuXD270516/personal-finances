@@ -126,6 +126,55 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
     const categoryLifecycle = await seriousViolations(page);
     if (categoryLifecycle.length > 0)
       found['Clasificación con recorrido de categoría (/clasificacion)'] = categoryLifecycle;
+    // Reconciliación (add-reconciliation 6.1): formulario de inicio, sesión en curso con diferencia y diálogo de ajuste,
+    // pestaña Recorrido de la sesión, detalle de cuenta con el indicador y conciliación sin extracto en una transacción.
+    await go(page, `/cuentas/${bank}/reconciliar`);
+    await expect(page.getByTestId('reconciliation-start')).toBeVisible();
+    const recStart = await seriousViolations(page);
+    if (recStart.length > 0) found['Reconciliar: inicio (/cuentas/{id}/reconciliar)'] = recStart;
+    await api(page, 'POST', `${W}/reconciliations`, {
+      accountId: bank,
+      statementDate: todayLaPaz(),
+      statementBalance: '900.00',
+    });
+    await go(page, `/cuentas/${bank}/reconciliar`);
+    await expect(page.getByTestId('reconciliation-summary')).toBeVisible();
+    await expect(page.getByTestId('rec-difference')).toHaveAttribute('data-state', 'NEGATIVE');
+    const recSession = await seriousViolations(page);
+    if (recSession.length > 0) found['Reconciliar: sesión en curso'] = recSession;
+    await page.getByTestId('finish-reconciliation').click();
+    await expect(page.getByTestId('adjustment-panel')).toBeVisible();
+    const recAdjustment = await seriousViolations(page);
+    if (recAdjustment.length > 0) found['Reconciliar: diálogo de ajuste'] = recAdjustment;
+    await page.getByRole('tab', { name: 'Recorrido' }).click();
+    await expect(page.locator('[data-testid="lifecycle-diagram"]:visible')).toHaveCount(1);
+    const recLifecycle = await seriousViolations(page);
+    if (recLifecycle.length > 0) found['Reconciliar: recorrido de la sesión'] = recLifecycle;
+    await go(page, `/cuentas/${bank}`);
+    await expect(page.getByTestId('reconciliation-indicator')).toBeVisible();
+    const indicator = await seriousViolations(page);
+    if (indicator.length > 0) found['Detalle de cuenta con indicador de reconciliación'] = indicator;
+    const cleared = await api(page, 'POST', `${W}/transactions`, {
+      kind: 'EXPENSE',
+      status: 'CLEARED',
+      transactionDate: todayLaPaz(),
+      accountId: bank,
+      amount: bob('10.00'),
+      description: 'Sin extracto a11y',
+    });
+    await go(page, `/transacciones/${String(cleared['id'])}`);
+    await page.getByTestId('reconcile-without-statement').click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    const withoutDialog = await seriousViolations(page);
+    if (withoutDialog.length > 0) found['Transacción: confirmar conciliada sin extracto'] = withoutDialog;
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Sí, marcar como conciliada' }).click();
+    await expect(page.getByTestId('tx-without-statement').first()).toBeVisible();
+    const flagged = await seriousViolations(page);
+    if (flagged.length > 0) found['Transacción conciliada sin extracto (marca)'] = flagged;
+    await go(page, `/transacciones?cuenta=${bank}&sinExtracto=1`);
+    await expect(page.getByTestId('transaction-row')).toHaveCount(1);
+    const flaggedList = await seriousViolations(page);
+    if (flaggedList.length > 0) found['Transacciones: filtro conciliadas sin extracto'] = flaggedList;
     expect(found).toEqual({});
     await context.close();
   });

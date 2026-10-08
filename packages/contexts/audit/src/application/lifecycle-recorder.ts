@@ -83,7 +83,7 @@ export class LifecycleRecorder implements LifecyclePort {
             reversal: transition?.journalEntries?.reversal ?? null,
             posted: transition?.journalEntries?.posted ?? null,
           },
-          detailRefs: transition?.detailRefs ?? {},
+          detailRefs: (step.kind === 'TRANSITION' ? step.detailRefs : step.detailRefs) ?? {},
           changedFields: step.kind === 'ANNOTATION' ? [...new Set(step.changedFields)] : [],
           derived: false,
         }),

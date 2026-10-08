@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { formatInstant, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { badgeStyle, cardStyle, mutedStyle, warningStyle } from '../common/ui';
@@ -27,6 +28,7 @@ export function LifecycleReport({
   currentUserId,
   idPrefix,
   accountName = () => undefined,
+  extra,
 }: {
   lifecycle: Lifecycle | TransactionLifecycle;
   f: FormatContext;
@@ -35,6 +37,8 @@ export function LifecycleReport({
   currentUserId?: string;
   idPrefix: string;
   accountName?: (id: string) => string | undefined;
+  /** Líneas adicionales de una fila (p. ej. la sesión de reconciliación enlazada o los saldos del extracto). */
+  extra?: (row: TimelineRow) => ReactNode;
 }) {
   const { t, has, locale, timeZone } = f;
   const type = lifecycle.machine.aggregateType;
@@ -172,6 +176,7 @@ export function LifecycleReport({
               </p>
             ) : null}
             {row.kind === 'TRANSITION' ? revisionLine(row) : null}
+            {extra ? extra(row) : null}
             <p style={{ ...mutedStyle, margin: '0.25rem 0' }} data-testid="lifecycle-entry-who">
               {actorLabel(row.actor)} ·{' '}
               <time dateTime={row.occurredAt}>{formatInstant(row.occurredAt, locale, timeZone)}</time>

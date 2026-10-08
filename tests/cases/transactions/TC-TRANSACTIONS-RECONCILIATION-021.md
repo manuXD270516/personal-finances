@@ -12,9 +12,11 @@ invariants: [INV-015]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reconciliation.api.test.ts
+  - packages/contexts/transactions/src/application/reconciliations.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["without-statement", "period-closed"]

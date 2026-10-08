@@ -24,14 +24,16 @@ preconditions: ["Gasto T1 cleared de 150.00 BOB", "Gasto T2 posted de 150.00 BOB
 input:
   - transaction: "T1"
     status: "RECONCILED"
+    reconciliationMode: "WITHOUT_STATEMENT"
   - transaction: "T2"
     status: "RECONCILED"
-steps: ["Marcar T1 como reconciled", "Intentar marcar T2 como reconciled"]
+    reconciliationMode: "WITHOUT_STATEMENT"
+steps: ["Marcar T1 como reconciled indicando el modo sin extracto", "Intentar marcar T2 como reconciled"]
 expected_result:
-  - "T1 reconciled sin asientos nuevos ni cambio de saldo"
+  - "T1 reconciled en modo sin extracto, sin asientos nuevos ni cambio de saldo"
   - "T2: INVALID_STATUS_TRANSITION; sigue posted"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILED-001 — Solo una transacción cleared puede marcarse como reconciliada
@@ -39,6 +41,12 @@ updated: 2026-10-02
 ## Intención
 
 Phase 1 permite el marcado simple; las sesiones con saldo de extracto llegan en Phase 2 (FR-TRANSACTIONS-030).
+
+## Cambio (openspec add-reconciliation, 2026-10-08)
+
+Actualizado a la semántica MODIFIED del requirement "Marcar una transacción como reconciliada" (docs/33 D74): el marcado
+directo ahora exige el modo explícito `reconciliationMode: WITHOUT_STATEMENT` y deja la transacción en ese modo; la
+regla "solo desde cleared" no cambia. La variante sin el modo (VALIDATION_FAILED) es TC-TRANSACTIONS-RECONCILIATION-017.
 
 ## Escenario
 

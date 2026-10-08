@@ -34,9 +34,10 @@ steps: ["Marcar T1 como cleared", "Desmarcar T1", "Intentar marcar T2 como clear
 expected_result:
   - "T1 cleared y luego posted; activeEntryId = E1 en todo momento; saldo 850.00 BOB"
   - "Auditoría por cada cambio de estado; sin TransactionPosted adicional"
+  - "Cada cambio publica un TransactionCleared (confirmada true/false) además de TransactionUpdated con changedFields = [status]"
   - "T2: INVALID_STATUS_TRANSITION"
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-CLEARED-001 — Marcar y desmarcar cleared no toca el ledger
@@ -44,6 +45,12 @@ updated: 2026-10-02
 ## Intención
 
 cleared es una marca de confirmación bancaria, no un hecho contable (docs/09 §9).
+
+## Cambio (openspec add-reconciliation, 2026-10-08)
+
+Actualizado a la semántica MODIFIED del requirement "Marcar una transacción como cleared": publica además el evento
+dedicado `transactions.TransactionCleared.v1` (docs/31 D47; TC-TRANSACTIONS-RECONCILIATION-011) y se rechaza con
+`PERIOD_CLOSED` si la fecha de negocio está en un periodo cerrado (docs/33 D65).
 
 ## Escenario
 

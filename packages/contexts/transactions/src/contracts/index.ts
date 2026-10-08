@@ -19,7 +19,57 @@ export const TRANSACTION_EVENTS = {
   conversionRecorded: { eventType: 'transactions.ConversionRecorded', eventVersion: 1 },
   /** Corrección financiera de una conversión posteada (docs/31 D48, simétrico a `transferRevised`). */
   conversionRevised: { eventType: 'transactions.ConversionRevised', eventVersion: 1 },
+  /** `CLEAR`/`UNCLEAR` de una transacción (docs/31 D47; add-reconciliation). Aditivo a `updated`. */
+  cleared: { eventType: 'transactions.TransactionCleared', eventVersion: 1 },
+  /** Fin de una sesión de reconciliación (`COMPLETE`, add-reconciliation). Agregado `Reconciliation`. */
+  reconciliationCompleted: { eventType: 'transactions.ReconciliationCompleted', eventVersion: 1 },
 } as const;
+
+export interface ReconciliationMoneyDto {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/**
+ * Estado de reconciliación de una cuenta a un corte (openspec add-reconciliation, design decisión 9; docs/33 D111).
+ * Contrato con `planning/month-closing` (FR-PLANNING-003): "cuentas sin conciliar" y "conciliada sin extracto —
+ * pendiente de revisión". Regla única de `reconciledThrough`: no quedan `posted` ni `cleared` con fecha ≤ corte Y
+ * (hay un extracto completado con fecha ≥ corte O alguna conciliada sin extracto posterior al último extracto).
+ */
+export interface ReconciliationCoverageDto {
+  readonly accountId: string;
+  /** Última sesión `COMPLETED` de la cuenta (mayor fecha de extracto), `null` si nunca se completó una. */
+  readonly lastCompleted: {
+    readonly reconciliationId: string;
+    readonly statementDate: string;
+    readonly statementBalance: ReconciliationMoneyDto;
+    readonly difference: ReconciliationMoneyDto;
+    readonly completedAt: string;
+  } | null;
+  readonly inProgressReconciliationId: string | null;
+  readonly unreconciledPostedCountThrough: number;
+  readonly unreconciledClearedCountThrough: number;
+  /** `RECONCILED` en modo `WITHOUT_STATEMENT` con fecha en `[from, through]`. */
+  readonly reconciledWithoutStatementCount: number;
+  readonly reconciledThrough: boolean;
+  /** `null` si `!reconciledThrough`; `WITHOUT_STATEMENT` si hay conciliadas sin extracto en el rango; si no, `STATEMENT`. */
+  readonly reconciliationBasis: 'STATEMENT' | 'WITHOUT_STATEMENT' | null;
+}
+
+/**
+ * Query pública `ReconciliationStatusQuery.getCoverage` (síncrona, sin efectos): corre en la unidad de trabajo del
+ * llamador si existe (el cierre de mes la invoca dentro de su transacción). `from` por omisión: sin límite inferior.
+ */
+export interface ReconciliationStatusQuery {
+  getCoverage(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    readonly from?: string;
+    readonly through: string;
+  }): Promise<readonly ReconciliationCoverageDto[]>;
+}
+
+export const RECONCILIATION_STATUS_QUERY = Symbol.for('pf.transactions.ReconciliationStatusQuery');
 
 export interface FlowMoneyDto {
   readonly amount: string;
@@ -93,6 +143,9 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     revision: 'plain',
     journalEntryId: 'plain',
     bulkOperationId: 'plain',
+    // Conciliación (add-reconciliation, docs/33 D74): modo (`STATEMENT` | `WITHOUT_STATEMENT`) y sesión del ajuste.
+    reconciliationMode: 'plain',
+    reconciliationId: 'plain',
     // Conversiones (add-manual-conversions): montos exactos y detalle de precio de la revisión.
     targetAmount: 'money',
     convertedSourceAmount: 'money',
@@ -108,5 +161,18 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     externalRef: 'plain',
     // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
     'customFields.*': 'plain',
+  },
+  // Sesión de reconciliación (add-reconciliation): montos exactos; sin texto libre salvo el motivo del ajuste.
+  Reconciliation: {
+    accountId: 'plain',
+    statementDate: 'plain',
+    statementBalance: 'money',
+    clearedBalance: 'money',
+    difference: 'money',
+    status: 'plain',
+    adjustmentTransactionId: 'plain',
+    adjustmentReason: 'plain',
+    transactionCount: 'plain',
+    transactionId: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;

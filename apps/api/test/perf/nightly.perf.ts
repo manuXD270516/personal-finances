@@ -638,6 +638,31 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     }
   });
 
+  it('NFR-PERF-003: saldo confirmado y diferencia en vivo de una sesión de reconciliación (consulta agregada, add-reconciliation 4.2)', async () => {
+    const bank = ids.accounts.get('Banco Andino Demo — Cuenta corriente')!;
+    const started = await call('POST', `${W}/reconciliations`, {
+      accountId: bank,
+      statementDate: '2026-09-30',
+      statementBalance: '0.00',
+    });
+    if (started.status !== 201)
+      throw new Error(`startReconciliation: ${started.status} ${JSON.stringify(started.body)}`);
+    const id = (started.body as { id: string }).id;
+    const samples = await timed(ITERATIONS, async () => {
+      const r = await call('GET', `${W}/reconciliations/${id}`);
+      if (r.status !== 200) throw new Error(`getReconciliation: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id: 'reconciliation-cleared-balance',
+        nfr: 'NFR-PERF-003',
+        title: 'GET /reconciliations/{id} (saldo confirmado y diferencia en vivo; cuenta con más movimiento)',
+        samples,
+        limitMs: PERF_THRESHOLDS['NFR-PERF-003'].limitMs,
+      }),
+    );
+  });
+
   it('ningún p95 supera su umbral (docs/02 §PERF) ni el overhead de RLS (add-ledger-core 5.5)', () => {
     const breaches = results
       .filter((r) => r.gate && !r.passed)

@@ -42,6 +42,7 @@ export function toLifecycleItemDto(e: LifecycleEntry): LifecycleItemDto {
       actor,
       origin: e.origin,
       changedFields: [...e.changedFields],
+      detailRefs: { ...e.detailRefs },
       revisionFrom: e.revisionFrom,
       revisionTo: e.revisionTo,
       aggregateVersion: e.aggregateVersion,

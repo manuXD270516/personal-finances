@@ -225,14 +225,14 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 ### 3.4 TRANSACTIONS (`txn`)
 
 - **AR `Transaction`**: `id, workspaceId, kind, status, businessDate, description, notes, counterpartyId?, legs: VO TransactionLeg[] (accountId, amount: Money firmado), splits: E TransactionSplit[] (id, amount, categoryId?, tagIds[], customFields: CustomFieldValue[], memo, originalAmount?), conversionDetail?: VO ConversionDetail (versionado por revisión: editar = reversa + nuevo asiento + nueva revisión), loanPaymentBreakdown?: VO, origin: VO Origin (MANUAL|IMPORT|RECURRING|DEBT|GOAL|RULE|SYSTEM + refId), externalRef?, fingerprint?, refundOfTransactionId?, transferPairRef?, activeJournalEntryId?, version`.
-- **AR `Reconciliation`**: `id, accountId, statementDate, statementBalance: Money, status (IN_PROGRESS|COMPLETED|CANCELLED), clearedTransactionIds, adjustmentTransactionId?, completedAt`.
+- **AR `Reconciliation`** (as-built `add-reconciliation`, 2026-10-08): `id, workspaceId, accountId, currency, statementDate, statementBalance: Money, status (IN_PROGRESS|COMPLETED|CANCELLED), clearedBalance?, difference?, adjustmentTransactionId?, completedAt?, cancelledAt?, version`; el conjunto incluido NO se guarda mientras la sesión está en curso (es "`cleared` de la cuenta con fecha ≤ extracto" al finalizar) y lo reconciliado queda en `reconciliation_item`. `Transaction` agrega el VO `ReconciliationMode = STATEMENT | WITHOUT_STATEMENT` (no nulo si y solo si `RECONCILED`) y la marca de sistema derivada `RECONCILED_WITHOUT_STATEMENT` (docs/33 D74, D111).
 - **AR `DuplicateCandidate`**: `id, transactionIds[2], score, reasons[], status (OPEN|CONFIRMED_DUPLICATE|DISMISSED|MERGED)`.
 - **VO**: `TransactionKind`, `TransactionStatus`, `TransactionLeg`, `ConversionDetail`, `Fee`, `Rate`, `LoanPaymentBreakdown (principal, interest, fees, insurance, taxes)`, `Origin`, `TransactionFingerprint (accountId + date + amount + normalizedDescription hash)`.
 - **DS**: `TransactionPostingTranslator` (Transaction → JournalEntryDraft; implementa todo el mapeo de [09 §6](09-ledger-design.md)), `SplitAllocator` (largest remainder), `ConversionCalculator` (effective rate, spread, validaciones), `DuplicateDetector`, `TransferMatcher` (empareja dos transacciones importadas como una transferencia), `ReconciliationService`.
 - **Repos**: `TransactionRepository`, `ReconciliationRepository`, `DuplicateCandidateRepository`.
 - **Ports**: `LedgerPostingPort` (sync), `AccountDirectory` (Accounts query), `ClassificationValidator` (Classification query), `ReferenceRateProvider` (FX query), `AuditPort`, `Clock`, `IdGenerator`.
-- **Comandos** (públicos; algunos invocados por Debt/Goals/Commitments/Imports/Rules): `RecordTransaction` (income/expense con splits), `RecordTransfer`, `RecordConversion`, `RecordRefund`, `RecordAdjustment`, `RecordOpeningBalance`, `RecordLoanDisbursement`, `RecordLoanPayment`, `PostTransaction` (pending→posted), `ClearTransaction`, `AmendTransaction`, `VoidTransaction`, `ApplyClassification` (categoría/tags/custom fields/contraparte por split, con `appliedBy: USER|RULE|IMPORT`), `BulkEditTransactions`, `StartReconciliation`, `ToggleCleared`, `CompleteReconciliation`, `UnreconcileTransaction`, `ResolveDuplicate` (confirm/dismiss/merge), `LinkAsTransfer`, `ImportTransactions` (batch con fingerprints, usado por Imports).
-- **Queries**: `GetTransaction`, `ListTransactions(filters, cursor)`, `SearchTransactions`, `GetReconciliation`, `GetClearedBalance(accountId, asOf)`, `ListDuplicateCandidates`, `CountPendingInPeriod(yearMonth)`.
+- **Comandos** (públicos; algunos invocados por Debt/Goals/Commitments/Imports/Rules): `RecordTransaction` (income/expense con splits), `RecordTransfer`, `RecordConversion`, `RecordRefund`, `RecordAdjustment`, `RecordOpeningBalance`, `RecordLoanDisbursement`, `RecordLoanPayment`, `PostTransaction` (pending→posted), `ClearTransaction`, `AmendTransaction`, `VoidTransaction`, `ApplyClassification` (categoría/tags/custom fields/contraparte por split, con `appliedBy: USER|RULE|IMPORT`), `BulkEditTransactions`, `StartReconciliation`, `ToggleClearedInSession`, `CompleteReconciliation` (con ajuste opcional), `CancelReconciliation`, `ReconcileWithoutStatement` (marcado directo con modo explícito, D74), `UnreconcileTransaction`, `ResolveDuplicate` (confirm/dismiss/merge), `LinkAsTransfer`, `ImportTransactions` (batch con fingerprints, usado por Imports).
+- **Queries**: `GetTransaction`, `ListTransactions(filters, cursor)`, `SearchTransactions`, `GetReconciliation` (saldo confirmado y diferencia en vivo), `ListReconciliations`, `ReconciliationStatusQuery.getCoverage({workspaceId, accountIds, from?, through})` (contrato público para PLANNING, D111), `ListDuplicateCandidates`, `CountPendingInPeriod(yearMonth)`.
 - **Eventos**: `TransactionCreated`, `TransactionUpdated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransferCompleted`, `TransferRevised`, `ConversionRecorded`, `ConversionRevised`, `TransactionCleared`, `ReconciliationCompleted`, `DuplicateDetected`.
 - **Invariantes**: INV-002, 003, 009, 010, 012, 016, 021, 023, 024, 026, 027, 033; además: transfer requiere misma moneda y cuentas distintas; conversión requiere monedas distintas; legs de cuentas con su moneda; `reconciled` ⇒ campos financieros inmutables; `REFUND` no puede exceder el original (advertencia, no bloqueo).
 
@@ -401,7 +401,7 @@ stateDiagram-v2
   pending --> void: VoidTransaction (sin ledger)
   posted --> cleared: ClearTransaction / ToggleCleared
   cleared --> posted: ToggleCleared / Amend financiero
-  cleared --> reconciled: CompleteReconciliation
+  cleared --> reconciled: CompleteReconciliation (modo STATEMENT) / marcado sin extracto (modo WITHOUT_STATEMENT)
   reconciled --> cleared: UnreconcileTransaction (auditado)
   posted --> posted: AmendTransaction (reversa + repost, version+1)
   posted --> void: VoidTransaction / reversa
@@ -411,18 +411,20 @@ stateDiagram-v2
 
 `reconciled → void` no es directo: requiere des-conciliar primero. `void` es terminal (para "deshacer" se registra una transacción nueva).
 
-**Máquina declarada `Transaction` (`TRANSACTION_LIFECYCLE`, machineVersion 1; docs/31 D37).** El diagrama anterior es la vista de negocio; la máquina declarada usa los códigos del contrato y nombra cada transición, que queda registrada en el recorrido:
+**Máquina declarada `Transaction` (`TRANSACTION_LIFECYCLE`, machineVersion 2 desde `add-reconciliation`; docs/31 D37).** El diagrama anterior es la vista de negocio; la máquina declarada usa los códigos del contrato y nombra cada transición, que queda registrada en el recorrido:
 
 | Transición | Origen → destino | Eventos |
 |---|---|---|
 | `RECORD` | ∅ → `PENDING` \| `POSTED` \| `CLEARED` | `TransactionCreated` (+ `TransactionPosted`, `TransferCompleted` / `ConversionRecorded` si nace posteada) |
 | `POST` | `PENDING` → `POSTED` | `TransactionPosted` (+ `TransferCompleted` / `ConversionRecorded`) |
-| `CLEAR` / `UNCLEAR` | `POSTED` ↔ `CLEARED` | `TransactionUpdated` |
-| `RECONCILE` / `UNRECONCILE` | `CLEARED` ↔ `RECONCILED` (des-reconciliar con motivo) | `TransactionUpdated` |
+| `CLEAR` / `UNCLEAR` | `POSTED` ↔ `CLEARED` (periodo abierto, D65) | `TransactionCleared` (D47) + `TransactionUpdated` |
+| `RECONCILE` | `CLEARED` → `RECONCILED`, modo `STATEMENT`: al finalizar la sesión de reconciliación de su cuenta | `TransactionUpdated` |
+| `RECONCILE_WITHOUT_STATEMENT` | `CLEARED` → `RECONCILED`, modo `WITHOUT_STATEMENT`: marcado directo con modo explícito, sin sesión (D74) | `TransactionUpdated` |
+| `UNRECONCILE` | `RECONCILED` → `CLEARED` (motivo obligatorio; limpia el modo; periodo abierto) | `TransactionUpdated` |
 | `REVISE` | `POSTED` \| `CLEARED` → `POSTED` (revisión n → n+1: asiento revertido, reversa y nuevo) | `TransactionPosted` + `TransactionUpdated` (+ `TransferRevised` / `ConversionRevised`, docs/31 D37/D48) |
 | `VOID` | `PENDING` \| `POSTED` \| `CLEARED` → `VOIDED` (terminal) | `TransactionVoided` |
 
-La edición de una transacción `PENDING` y las ediciones descriptivas son anotaciones. `Account` (`ACCOUNT_LIFECYCLE`): `OPEN` ∅ → `ACTIVE`, `CLOSE` `ACTIVE` → `CLOSED`, `ARCHIVE` `ACTIVE`\|`CLOSED` → `ARCHIVED`, `REACTIVATE` `ARCHIVED`\|`CLOSED` → `ACTIVE`. `ExchangeRate` manual (`EXCHANGE_RATE_LIFECYCLE`): `RECORD` ∅ → `RECORDED`, `SUPERSEDE` `RECORDED` → `SUPERSEDED` (terminal; enlaza la tasa que la reemplazó). `Category` (`CATEGORY_LIFECYCLE`) y `Counterparty` (`COUNTERPARTY_LIFECYCLE`) (docs/31 D52; `add-lifecycle-timeline` tareas 9.x): `CREATE` ∅ → `ACTIVE`, `ARCHIVE` `ACTIVE` → `ARCHIVED` (en una categoría, también cada subcategoría activa archivada en cascada), `UNARCHIVE` `ARCHIVED` → `ACTIVE`; ningún estado terminal, sin fusión en Phase 1; renombrar, alias, icono, color, orden, grupo y categoría por defecto son anotaciones.
+La edición de una transacción `PENDING` y las ediciones descriptivas son anotaciones; el cotejo posterior de una conciliada sin extracto por una sesión (`WITHOUT_STATEMENT` → `STATEMENT`) es la anotación `RECONCILIATION_VERIFIED` que enlaza la sesión (D111). **`Reconciliation` (`RECONCILIATION_LIFECYCLE`, machineVersion 1; `add-reconciliation`)**: `START` ∅ → `IN_PROGRESS`, `COMPLETE` `IN_PROGRESS` → `COMPLETED` (publica `ReconciliationCompleted`), `CANCEL` `IN_PROGRESS` → `CANCELLED`; `COMPLETED` y `CANCELLED` son terminales; confirmar/desconfirmar dentro de la sesión y las des-reconciliaciones posteriores son anotaciones de su recorrido. `Account` (`ACCOUNT_LIFECYCLE`): `OPEN` ∅ → `ACTIVE`, `CLOSE` `ACTIVE` → `CLOSED`, `ARCHIVE` `ACTIVE`\|`CLOSED` → `ARCHIVED`, `REACTIVATE` `ARCHIVED`\|`CLOSED` → `ACTIVE`. `ExchangeRate` manual (`EXCHANGE_RATE_LIFECYCLE`): `RECORD` ∅ → `RECORDED`, `SUPERSEDE` `RECORDED` → `SUPERSEDED` (terminal; enlaza la tasa que la reemplazó). `Category` (`CATEGORY_LIFECYCLE`) y `Counterparty` (`COUNTERPARTY_LIFECYCLE`) (docs/31 D52; `add-lifecycle-timeline` tareas 9.x): `CREATE` ∅ → `ACTIVE`, `ARCHIVE` `ACTIVE` → `ARCHIVED` (en una categoría, también cada subcategoría activa archivada en cascada), `UNARCHIVE` `ARCHIVED` → `ACTIVE`; ningún estado terminal, sin fusión en Phase 1; renombrar, alias, icono, color, orden, grupo y categoría por defecto son anotaciones.
 
 ### 4.2 FinancialPeriod
 

@@ -10,10 +10,12 @@ import type {
   AccountBalancesQuery,
   BalanceQuery,
   LedgerActivityRangeQuery,
+  LedgerOpeningBalanceQuery,
   LedgerPeriodLockPort,
   LedgerPostingPort,
 } from '../contracts/index.js';
 import { PgLedgerActivityRangeQuery } from '../infrastructure/pg-activity-range.queries.js';
+import { PgLedgerOpeningBalanceQuery } from '../infrastructure/pg-opening-balance.queries.js';
 import { PgBalanceQuery } from '../infrastructure/pg-balance.queries.js';
 import { PgLedgerMaintenanceRepository } from '../infrastructure/pg-ledger-maintenance.js';
 import {
@@ -45,6 +47,8 @@ export interface LedgerRuntime {
   readonly accountBalances: AccountBalancesQuery;
   /** Rango de fechas con asientos (Planning, add-financial-periods: cobertura retroactiva de periodos). */
   readonly activityRange: LedgerActivityRangeQuery;
+  /** Saldo inicial de una cuenta (Transactions, add-reconciliation: base del saldo confirmado). */
+  readonly openingBalance: LedgerOpeningBalanceQuery;
 }
 
 /**
@@ -75,7 +79,16 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     balances,
     accountBalances: balances,
     activityRange: ledgerActivityRange(),
+    openingBalance: ledgerOpeningBalance(),
   };
+}
+
+/**
+ * `LedgerOpeningBalanceQuery` sin pool propio: corre en la unidad de trabajo del llamador (la sesión de reconciliación
+ * de TRANSACTIONS, con el RLS del workspace ya fijado).
+ */
+export function ledgerOpeningBalance(): LedgerOpeningBalanceQuery {
+  return new PgLedgerOpeningBalanceQuery();
 }
 
 /**
@@ -117,6 +130,7 @@ export {
 export type {
   BalanceQuery,
   LedgerActivityRangeQuery,
+  LedgerOpeningBalanceQuery,
   LedgerInvariantViolation,
   LedgerMaintenance,
   LedgerMetrics,

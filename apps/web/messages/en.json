@@ -488,7 +488,9 @@
         "WALLET_PROVIDER": "Wallet provider",
         "OTHER": "Other"
       }
-    }
+    },
+    "reconcile": "Reconcile account",
+    "reconciliations": "View reconciliations"
   },
   "Transactions": {
     "backToList": "← Back to transactions",
@@ -633,7 +635,10 @@
       "category": "Category",
       "dateFrom": "From",
       "dateTo": "To",
-      "any": "All"
+      "any": "All",
+      "withoutStatement": "Reconciled without a statement",
+      "withoutStatementHint": "Transactions marked as reconciled without a statement.",
+      "withoutStatementOnly": "Only those pending review"
     },
     "detail": {
       "recorded": "Movement recorded.",
@@ -659,7 +664,7 @@
       "post": "Post",
       "clear": "Mark as cleared",
       "unclear": "Unmark cleared",
-      "reconcile": "Reconcile",
+      "reconcile": "Mark as reconciled without a statement",
       "unreconcile": "Unreconcile",
       "void": "Void",
       "duplicate": "Duplicate",
@@ -674,19 +679,26 @@
           "description": "It goes back to cleared so it can be corrected. The reason is audited.",
           "confirm": "Yes, unreconcile"
         },
-        "reason": "Reason"
+        "reason": "Reason",
+        "reconcile": {
+          "title": "Mark as reconciled without a statement?",
+          "description": "Use it when there is no statement to check it against (cash, wallets). It stays flagged \"pending review\" until a later reconciliation verifies it. Balances do not change.",
+          "confirm": "Yes, mark as reconciled"
+        }
       },
       "done": {
         "post": "Transaction posted.",
         "clear": "Transaction cleared.",
         "unclear": "The transaction is posted again.",
-        "reconcile": "Transaction reconciled.",
+        "reconcile": "Transaction marked as reconciled without a statement.",
         "void": "Transaction voided.",
         "unreconcile": "Transaction unreconciled.",
         "amended": "Changes saved: reversal and new entry (revision {revision}).",
         "edited": "Changes saved."
       },
-      "customFields": "Custom fields"
+      "customFields": "Custom fields",
+      "reconciliation": "Reconciliation",
+      "statementRef": "Statement of {date} for {balance}"
     },
     "history": {
       "title": "History (lifecycle)",
@@ -742,7 +754,10 @@
         "confirmedRefundExcess": "Refund excess confirmed",
         "adjustmentDirection": "Adjustment effect",
         "adjustmentReason": "Adjustment reason",
-        "reversalJournalEntryId": "Reversal entry"
+        "reversalJournalEntryId": "Reversal entry",
+        "reconciliationMode": "Reconciliation mode",
+        "reconciliationId": "Reconciliation (session)",
+        "RECONCILIATION_VERIFIED": "verified against a statement"
       },
       "ledgerEffect": "Ledger effect: {actions}"
     },
@@ -763,6 +778,16 @@
       "record": "Record transfer",
       "payCard": "Record payment",
       "cardPaymentDescription": "Card payment {card}"
+    },
+    "reconciliationModes": {
+      "STATEMENT": "Against a statement",
+      "WITHOUT_STATEMENT": "Without a statement"
+    },
+    "flags": {
+      "RECONCILED_WITHOUT_STATEMENT": {
+        "label": "Reconciled without a statement — pending review",
+        "hint": "Marked as reconciled without a statement: it stays pending review until a later reconciliation verifies it."
+      }
     }
   },
   "Fx": {
@@ -1209,6 +1234,7 @@
         "CLEAR": "Clear",
         "UNCLEAR": "Unclear",
         "RECONCILE": "Reconcile",
+        "RECONCILE_WITHOUT_STATEMENT": "Reconcile without statement",
         "UNRECONCILE": "Unreconcile",
         "REVISE": "Revise",
         "VOID": "Void"
@@ -1232,6 +1258,11 @@
         "CREATE": "Create",
         "ARCHIVE": "Archive",
         "UNARCHIVE": "Unarchive"
+      },
+      "Reconciliation": {
+        "START": "Start",
+        "COMPLETE": "Complete",
+        "CANCEL": "Cancel"
       }
     },
     "export": {
@@ -1371,6 +1402,119 @@
       "value": "{name}",
       "from": "{name}: from",
       "to": "{name}: to"
+    }
+  },
+  "Reconciliation": {
+    "loading": "Loading the reconciliation…",
+    "title": "Reconcile {account}",
+    "backToAccount": "Back to the account",
+    "intro": "Check the account against a statement balance at a date: confirm the transactions that appear on the statement and finish when the difference is zero.",
+    "introLiability": "Check the card or loan against its statement. Balances are expressed as a positive debt, like on the statement.",
+    "inProgressElsewhere": "A reconciliation is in progress: open it from the history.",
+    "noStart": "There is no reconciliation in progress for this account.",
+    "tabs": {
+      "reconcile": "Reconciliation"
+    },
+    "status": {
+      "IN_PROGRESS": "In progress",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    },
+    "start": {
+      "title": "Start a reconciliation",
+      "intro": "Enter the date and balance shown on the statement. Only one reconciliation can be in progress per account.",
+      "statementDate": "Statement date",
+      "statementBalance": "Statement balance ({currency})",
+      "liabilityHint": "For a card or loan, enter the debt as a positive number.",
+      "submit": "Start reconciliation",
+      "errors": {
+        "EMPTY": "Enter the statement balance.",
+        "INVALID": "The statement balance is not a valid number.",
+        "SCALE": "The balance has more decimals than the currency allows.",
+        "NOT_POSITIVE": "The statement balance is not valid."
+      }
+    },
+    "summary": {
+      "title": "Statement balances",
+      "statementDate": "Statement date",
+      "statementBalance": "Statement balance",
+      "clearedBalance": "Cleared balance",
+      "difference": "Difference",
+      "none": "—",
+      "differenceState": {
+        "ZERO": "Balanced",
+        "POSITIVE": "Still to confirm",
+        "NEGATIVE": "Too much confirmed"
+      },
+      "hint": {
+        "POSITIVE": "The statement exceeds what is confirmed by {amount}. Confirm the missing transactions or finish with an adjustment.",
+        "NEGATIVE": "What is confirmed exceeds the statement by {amount}. Unconfirm what is not on the statement or finish with an adjustment."
+      }
+    },
+    "list": {
+      "title": "Transactions up to {date}",
+      "label": "Account transactions up to the statement date",
+      "help": "Mark as confirmed the ones that appear on the statement. The cleared balance and the difference update instantly.",
+      "readOnly": "This reconciliation no longer accepts changes.",
+      "completedItems": "This reconciliation reconciled or verified {n} transactions.",
+      "empty": "There are no transactions to confirm up to that date.",
+      "confirm": "Confirmed on the statement: {name}"
+    },
+    "actions": {
+      "label": "Reconciliation actions",
+      "finish": "Finish reconciliation",
+      "finishWithAdjustment": "Finish with an adjustment…",
+      "cancel": "Cancel reconciliation",
+      "another": "Start another reconciliation"
+    },
+    "adjustment": {
+      "title": "The difference is not zero",
+      "description": {
+        "INCREASE": "An increase adjustment of {amount} will be created against the equity adjustment account, dated on the statement date, and reconciled with the rest.",
+        "DECREASE": "A decrease adjustment of {amount} will be created against the equity adjustment account, dated on the statement date, and reconciled with the rest."
+      },
+      "reason": "Adjustment reason",
+      "reasonHint": "Required. It is audited (for example: unrecorded bank fee).",
+      "confirm": "Create the adjustment and finish",
+      "cancel": "Go back"
+    },
+    "cancel": {
+      "title": "Cancel this reconciliation?",
+      "description": "The transactions you confirmed stay confirmed and you can start another reconciliation.",
+      "confirm": "Yes, cancel",
+      "keep": "No, keep going"
+    },
+    "done": {
+      "started": "Reconciliation started.",
+      "completed": "Reconciliation finished: the confirmed transactions are now reconciled.",
+      "cancelled": "Reconciliation cancelled."
+    },
+    "history": {
+      "title": "Reconciliation history",
+      "empty": "This account has no reconciliations yet.",
+      "item": "Statement of {date}",
+      "completedAt": "finished on {at}"
+    },
+    "indicator": {
+      "title": "Reconciliation",
+      "reconciled": "Reconciled as of {date}",
+      "reconciledWithoutStatement": "Reconciled without a statement as of {date}",
+      "notReconciled": "Not reconciled as of {date}",
+      "last": "Last reconciled statement: {date} for {balance}.",
+      "never": "It has not been reconciled against a statement yet.",
+      "open": "{n, plural, one {# transaction} other {# transactions}} not reconciled up to today.",
+      "withoutStatement": "{n, plural, one {# transaction} other {# transactions}} reconciled without a statement, pending review.",
+      "reviewWithoutStatement": "Review them"
+    },
+    "fields": {
+      "TRANSACTION_CLEARED": "transaction confirmed in the session",
+      "TRANSACTION_UNCLEARED": "transaction unconfirmed in the session",
+      "TRANSACTION_UNRECONCILED": "transaction unreconciled after completion"
+    },
+    "lifecycle": {
+      "start": "Statement of {date} for {balance}.",
+      "complete": "Cleared balance {cleared} · difference {difference}",
+      "adjustment": "see the adjustment"
     }
   }
 }

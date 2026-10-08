@@ -4,7 +4,7 @@
  */
 import type { Money, Rate } from '../common/types';
 
-export type LifecycleAggregateType = 'Transaction' | 'Account' | 'ExchangeRate';
+export type LifecycleAggregateType = 'Transaction' | 'Account' | 'ExchangeRate' | 'Reconciliation';
 
 export interface LifecycleMachine {
   readonly aggregateType: string;
@@ -61,6 +61,8 @@ export interface LifecycleAnnotation {
   readonly actor: LifecycleActor;
   readonly origin: string;
   readonly changedFields: readonly string[];
+  /** Referencias de la anotación (p. ej. la sesión que cotejó la transacción); ausente en recorridos anteriores. */
+  readonly detailRefs?: Readonly<Record<string, string | number>>;
   readonly revisionFrom: number | null;
   readonly revisionTo: number | null;
   readonly aggregateVersion: number | null;
@@ -102,7 +104,28 @@ export interface LifecycleRevision {
   } | null;
 }
 
+/** Sesión de reconciliación a la que enlaza el recorrido de una transacción (add-reconciliation). */
+export interface TransactionReconciliationRef {
+  readonly reconciliationId: string;
+  readonly accountId: string;
+  readonly statementDate: string;
+  readonly statementBalance: Money;
+}
+
 /** Recorrido de una transacción con los montos de cada revisión. */
 export interface TransactionLifecycle extends Lifecycle {
   readonly revisions: readonly LifecycleRevision[];
+  readonly reconciliations?: readonly TransactionReconciliationRef[];
+}
+
+/** Recorrido de una sesión de reconciliación con sus saldos (add-reconciliation). */
+export interface ReconciliationLifecycle extends Lifecycle {
+  readonly reconciliation: {
+    readonly accountId: string;
+    readonly statementDate: string;
+    readonly statementBalance: Money;
+    readonly clearedBalance: Money | null;
+    readonly difference: Money | null;
+    readonly adjustmentTransactionId: string | null;
+  };
 }

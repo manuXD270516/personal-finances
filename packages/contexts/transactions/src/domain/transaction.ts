@@ -40,6 +40,22 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const TRANSACTION_SOURCES = ['MANUAL', 'IMPORT', 'RECURRING', 'DEBT', 'GOAL', 'SYSTEM'] as const;
 export type TransactionSource = (typeof TRANSACTION_SOURCES)[number];
 
+/**
+ * Modo de conciliación de una transacción `RECONCILED` (openspec add-reconciliation, docs/33 D74/D77): `STATEMENT` =
+ * cotejada contra un extracto al finalizar una sesión; `WITHOUT_STATEMENT` = marcado directo explícito (efectivo,
+ * billeteras sin extracto). No nulo si y solo si el estado es `RECONCILED`.
+ */
+export const RECONCILIATION_MODES = ['STATEMENT', 'WITHOUT_STATEMENT'] as const;
+export type ReconciliationMode = (typeof RECONCILIATION_MODES)[number];
+
+/** Marcas de sistema derivadas y de solo lectura (docs/33 D111): hoy solo la conciliación sin extracto. */
+export const SYSTEM_FLAGS = ['RECONCILED_WITHOUT_STATEMENT'] as const;
+export type SystemFlag = (typeof SYSTEM_FLAGS)[number];
+
+/** `systemFlags` derivado del modo de conciliación (no se almacena: no puede divergir del estado). */
+export const systemFlagsOf = (s: { readonly reconciliationMode: ReconciliationMode | null }): SystemFlag[] =>
+  s.reconciliationMode === 'WITHOUT_STATEMENT' ? ['RECONCILED_WITHOUT_STATEMENT'] : [];
+
 export interface ExternalRef {
   readonly namespace: string;
   readonly id: string;
@@ -145,6 +161,10 @@ export interface TransactionState {
   readonly refundOfTransactionId: string | null;
   readonly adjustmentReason: string | null;
   readonly confirmedRefundExcess: boolean;
+  /** Modo de conciliación; no nulo si y solo si `status = RECONCILED` (CHECK de BD, D74). */
+  readonly reconciliationMode: ReconciliationMode | null;
+  /** Sesión de reconciliación que creó la transacción (solo el ajuste de la sesión); `null` en el resto. */
+  readonly reconciliationId: string | null;
   readonly legs: readonly Leg[];
   readonly splits: readonly Split[];
   readonly revision: number;
@@ -180,6 +200,8 @@ export interface RecordTransactionInput {
   readonly refundOfTransactionId?: string | null;
   readonly reason?: string | null;
   readonly confirmedRefundExcess?: boolean;
+  /** Solo el ajuste que crea una sesión de reconciliación (add-reconciliation decisión 4). */
+  readonly reconciliationId?: string | null;
   /** `undefined` ⇒ un split por el total con `defaultCategoryId` (*Uncategorized*); `[]` ⇒ VALIDATION_FAILED. */
   readonly splits?: readonly SplitInput[];
   readonly defaultCategoryId?: string | null;
@@ -218,7 +240,8 @@ export type ChangedField =
   | 'accountId'
   | 'toAccountId'
   | 'splits'
-  | 'customFields';
+  | 'customFields'
+  | 'reconciliationMode';
 
 /** Cambio de clasificación de un split (payload de `TransactionCategorized.v1`). */
 export interface SplitClassificationChange {
@@ -657,6 +680,8 @@ export class Transaction {
         refundOfTransactionId: input.refundOfTransactionId ?? null,
         adjustmentReason: reason,
         confirmedRefundExcess: input.confirmedRefundExcess ?? false,
+        reconciliationMode: null,
+        reconciliationId: input.reconciliationId ?? null,
         legs: [
           {
             accountId: input.accountId,
@@ -733,6 +758,8 @@ export class Transaction {
         refundOfTransactionId: null,
         adjustmentReason: null,
         confirmedRefundExcess: false,
+        reconciliationMode: null,
+        reconciliationId: null,
         legs: transferLegs(from, to, amount, fee?.amount ?? null),
         splits,
         revision: 1,
@@ -773,6 +800,8 @@ export class Transaction {
         refundOfTransactionId: null,
         adjustmentReason: null,
         confirmedRefundExcess: false,
+        reconciliationMode: null,
+        reconciliationId: null,
         revision: 1,
         version: 1,
         activeEntryId: null,
@@ -883,22 +912,81 @@ export class Transaction {
     this.bump({ status: 'POSTED' });
   }
 
-  /** `POSTED ↔ CLEARED`, `CLEARED → RECONCILED` sin tocar el ledger (transactions/reconciliation Phase 1). */
-  changeStatus(to: 'POSTED' | 'CLEARED' | 'RECONCILED'): TransactionStatus {
+  /**
+   * `POSTED ↔ CLEARED` sin tocar el ledger (transactions/reconciliation). `CLEARED → RECONCILED` ya no pasa por aquí:
+   * lo hacen `reconcile` (sesión) o `reconcileWithoutStatement` (marcado directo explícito, docs/33 D74).
+   */
+  changeStatus(to: 'POSTED' | 'CLEARED'): TransactionStatus {
     const from = this.state.status;
     if (from === to) return from;
     if (from === 'PENDING') {
       throw new DomainError('INVALID_STATUS_TRANSITION', 'use postTransaction to post a PENDING transaction');
     }
     assertTransition(from, to);
-    const code: TransactionTransition =
-      to === 'CLEARED' ? 'CLEAR' : to === 'RECONCILED' ? 'RECONCILE' : 'UNCLEAR';
+    const code: TransactionTransition = to === 'CLEARED' ? 'CLEAR' : 'UNCLEAR';
     this.mark(code, from, to, null, null);
     this.bump({ status: to });
     return from;
   }
 
-  /** `RECONCILED → CLEARED` con motivo obligatorio (TC-TRANSACTIONS-RECONCILED-003). */
+  /**
+   * `RECONCILE` (`CLEARED → RECONCILED`, modo `STATEMENT`): solo al finalizar la sesión de reconciliación
+   * `reconciliationId` de la cuenta (add-reconciliation decisión 4). Sin efectos en el ledger (INV-033).
+   */
+  reconcile(reconciliationId: string): void {
+    if (reconciliationId.trim().length === 0) {
+      throw validation('reconciliationId is required', '/reconciliationId');
+    }
+    this.assertCanReconcile();
+    this.mark('RECONCILE', 'CLEARED', 'RECONCILED', null, null);
+    this.bump({ status: 'RECONCILED', reconciliationMode: 'STATEMENT' });
+  }
+
+  /**
+   * `RECONCILE_WITHOUT_STATEMENT` (`CLEARED → RECONCILED`, modo `WITHOUT_STATEMENT`): marcado directo fuera de una
+   * sesión. Exige el modo explícito (docs/33 D74): sin él `VALIDATION_FAILED`; `STATEMENT` solo se alcanza por una
+   * sesión. Solo desde `CLEARED` (`INVALID_STATUS_TRANSITION`).
+   */
+  reconcileWithoutStatement(mode: string | null | undefined): void {
+    if (mode !== 'WITHOUT_STATEMENT') {
+      throw validation(
+        'reconciling a transaction directly requires reconciliationMode WITHOUT_STATEMENT',
+        '/reconciliationMode',
+      );
+    }
+    this.assertCanReconcile();
+    this.mark('RECONCILE_WITHOUT_STATEMENT', 'CLEARED', 'RECONCILED', null, null);
+    this.bump({ status: 'RECONCILED', reconciliationMode: 'WITHOUT_STATEMENT' });
+  }
+
+  /**
+   * Cotejo posterior (docs/33 D111, decisión 14): una sesión que cubre la transacción la pasa de `WITHOUT_STATEMENT`
+   * a `STATEMENT` sin cambiar el estado ni el ledger. Es una anotación del recorrido, no una transición. Devuelve
+   * `false` (sin cambios) si no estaba conciliada sin extracto.
+   */
+  verifyAgainstStatement(reconciliationId: string): boolean {
+    if (reconciliationId.trim().length === 0) {
+      throw validation('reconciliationId is required', '/reconciliationId');
+    }
+    if (this.state.status !== 'RECONCILED' || this.state.reconciliationMode !== 'WITHOUT_STATEMENT') {
+      return false;
+    }
+    this.transitionRecord = null;
+    this.bump({ reconciliationMode: 'STATEMENT' });
+    return true;
+  }
+
+  private assertCanReconcile(): void {
+    if (this.state.status !== 'CLEARED') {
+      throw new DomainError(
+        'INVALID_STATUS_TRANSITION',
+        `only CLEARED transactions can be reconciled, this one is ${this.state.status}`,
+      );
+    }
+    assertTransition('CLEARED', 'RECONCILED');
+  }
+
+  /** `RECONCILED → CLEARED` con motivo obligatorio (TC-TRANSACTIONS-RECONCILED-003); limpia el modo (D74). */
   unreconcile(reason: string): void {
     if (reason.trim().length === 0) throw validation('reason is required', '/reason');
     assertText(reason, 500, '/reason');
@@ -907,7 +995,7 @@ export class Transaction {
     }
     assertTransition('RECONCILED', 'CLEARED', { unreconcile: true });
     this.mark('UNRECONCILE', 'RECONCILED', 'CLEARED', null, null);
-    this.bump({ status: 'CLEARED' });
+    this.bump({ status: 'CLEARED', reconciliationMode: null });
   }
 
   /**

@@ -178,6 +178,21 @@ export interface LedgerActivityRangeQuery {
   getActivityRange(workspaceId: string): Promise<{ readonly minEntryDate: string; readonly maxEntryDate: string } | null>;
 }
 
+/**
+ * Saldo inicial de una cuenta del usuario (openspec add-reconciliation, design decisión 1): Σ postings con signo
+ * contable (débito +, crédito −) sobre la cuenta contable de la cuenta del usuario de sus asientos de apertura
+ * (`entry_type = OPENING`) con fecha ≤ `asOf`. El asiento de apertura no tiene fila en `txn`, así que la reconciliación
+ * lo lee aquí para sumarlo UNA sola vez al saldo confirmado. `null` si la cuenta no tiene saldo inicial. Sin efectos;
+ * en la unidad de trabajo del llamador (RLS del workspace).
+ */
+export interface LedgerOpeningBalanceQuery {
+  getOpeningBalance(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly asOf: string;
+  }): Promise<MoneyDto | null>;
+}
+
 export const LEDGER_POSTING_PORT = Symbol.for('pf.ledger.LedgerPostingPort');
 export const LEDGER_PERIOD_LOCK_PORT = Symbol.for('pf.ledger.LedgerPeriodLockPort');
 export const BALANCE_QUERY = Symbol.for('pf.ledger.BalanceQuery');

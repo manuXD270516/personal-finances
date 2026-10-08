@@ -16,10 +16,10 @@ const codeOf = (fn: () => unknown) => {
 };
 
 describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
-  it('[TC-AUDIT-LIFECYCLE-001] la definición declara estados, terminal y las 8 transiciones con origen, destino, guarda y eventos', () => {
+  it('[TC-AUDIT-LIFECYCLE-001] la definición declara estados, terminal y las 9 transiciones con origen, destino, guarda y eventos', () => {
     const d = TRANSACTION_LIFECYCLE.definition;
     expect(d.aggregateType).toBe('Transaction');
-    expect(d.machineVersion).toBe(1);
+    expect(d.machineVersion).toBe(2);
     expect(d.states.map((s) => s.code)).toEqual(['PENDING', 'POSTED', 'CLEARED', 'RECONCILED', 'VOIDED']);
     expect(d.states.filter((s) => s.terminal).map((s) => s.code)).toEqual(['VOIDED']);
     expect(d.transitions.map((t) => t.code)).toEqual([
@@ -28,6 +28,7 @@ describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
       'CLEAR',
       'UNCLEAR',
       'RECONCILE',
+      'RECONCILE_WITHOUT_STATEMENT',
       'UNRECONCILE',
       'REVISE',
       'VOID',
@@ -36,6 +37,21 @@ describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
       expect(t.to.length).toBeGreaterThan(0);
       expect(t.guard.length).toBeGreaterThan(0);
       expect(t.events.length).toBeGreaterThan(0);
+    }
+    // [TC-AUDIT-LIFECYCLE-027] docs/33 D74: conciliar sin extracto es una transición propia (CLEARED → RECONCILED),
+    // separada de RECONCILE (que exige una sesión); docs/31 D47: CLEAR/UNCLEAR publican TransactionCleared.
+    const without = TRANSACTION_LIFECYCLE.transitionDefinition('RECONCILE_WITHOUT_STATEMENT');
+    expect(without).toMatchObject({ from: ['CLEARED'], to: ['RECONCILED'] });
+    expect(without?.guard).toMatch(/modo explícito/);
+    expect(without?.guard).toMatch(/periodo abierto/);
+    expect(TRANSACTION_LIFECYCLE.transitionDefinition('RECONCILE')?.guard).toMatch(
+      /sesión de reconciliación/,
+    );
+    for (const code of ['CLEAR', 'UNCLEAR'] as const) {
+      expect(TRANSACTION_LIFECYCLE.transitionDefinition(code)?.events).toEqual([
+        'transactions.TransactionCleared.v1',
+        'transactions.TransactionUpdated.v1',
+      ]);
     }
     expect(TRANSACTION_LIFECYCLE.transitionDefinition('REVISE')?.events).toContain(
       'transactions.TransferRevised.v1',
@@ -58,7 +74,7 @@ describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
   it('[TC-AUDIT-LIFECYCLE-001] reconciliar un gasto pendiente de 80.00 BOB se rechaza y no deja transición', () => {
     const tx = expense({ amount: bob('80.00'), status: 'PENDING' });
     const before = tx.snapshot;
-    expect(codeOf(() => tx.changeStatus('RECONCILED'))).toBe('INVALID_STATUS_TRANSITION');
+    expect(codeOf(() => tx.reconcileWithoutStatement('WITHOUT_STATEMENT'))).toBe('INVALID_STATUS_TRANSITION');
     expect(tx.status).toBe('PENDING');
     expect(tx.snapshot).toBe(before);
     // Sigue siendo la transición de creación: el intento rechazado no registró nada nuevo.
@@ -79,7 +95,7 @@ describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
     expect(tx.lastTransition).toMatchObject({ transition: 'POST', from: 'PENDING', to: 'POSTED' });
     tx.changeStatus('CLEARED');
     expect(tx.lastTransition).toMatchObject({ transition: 'CLEAR', from: 'POSTED', to: 'CLEARED' });
-    tx.changeStatus('RECONCILED');
+    tx.reconcile('rec-1');
     expect(tx.lastTransition).toMatchObject({ transition: 'RECONCILE', to: 'RECONCILED' });
     expect(codeOf(() => tx.void('x', '2026-10-01T00:00:00Z'))).toBe('TRANSACTION_RECONCILED');
     tx.unreconcile('error de conciliación');
@@ -150,7 +166,7 @@ describe('Máquina de estados Transaction (add-lifecycle-timeline)', () => {
               if (op === 'post') tx.post();
               else if (op === 'clear') tx.changeStatus('CLEARED');
               else if (op === 'unclear') tx.changeStatus('POSTED');
-              else if (op === 'reconcile') tx.changeStatus('RECONCILED');
+              else if (op === 'reconcile') tx.reconcileWithoutStatement('WITHOUT_STATEMENT');
               else if (op === 'unreconcile') tx.unreconcile('motivo');
               else if (op === 'revise') tx.amend({ amount: Money.ofMinorUnits(++cents, BOB) });
               else if (op === 'void') tx.void('motivo', '2026-10-01T00:00:00Z');

@@ -30,11 +30,26 @@ const KINDS: readonly TransactionKind[] = [
   'OPENING_BALANCE',
 ];
 
-export function TransactionsPage({ accountId, kind }: { accountId?: string; kind?: string }) {
+export function TransactionsPage({
+  accountId,
+  kind,
+  withoutStatement,
+}: {
+  accountId?: string;
+  kind?: string;
+  withoutStatement?: boolean;
+}) {
   const k = KINDS.find((x) => x === kind);
   return (
     <WithWorkspace>
-      {(ctx) => <Register ctx={ctx} {...(accountId ? { accountId } : {})} {...(k ? { kind: k } : {})} />}
+      {(ctx) => (
+        <Register
+          ctx={ctx}
+          {...(accountId ? { accountId } : {})}
+          {...(k ? { kind: k } : {})}
+          {...(withoutStatement ? { withoutStatement: true } : {})}
+        />
+      )}
     </WithWorkspace>
   );
 }
@@ -47,10 +62,12 @@ function Register({
   ctx,
   accountId,
   kind,
+  withoutStatement,
 }: {
   ctx: WorkspaceContext;
   accountId?: string;
   kind?: TransactionKind;
+  withoutStatement?: boolean;
 }) {
   const f = useFormat('Transactions', ctx);
   const { t } = f;
@@ -62,6 +79,7 @@ function Register({
     ...EMPTY_TRANSACTION_FILTERS,
     accountId: accountId ?? '',
     kind: kind ?? '',
+    withoutStatement: withoutStatement ?? false,
   });
   const [draftQ, setDraftQ] = useState('');
   const [items, setItems] = useState<readonly Transaction[] | undefined>();
@@ -236,6 +254,20 @@ function Register({
                   {t(`status.${st}`)}
                 </option>
               ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t('filters.withoutStatement')} hint={t('filters.withoutStatementHint')}>
+          {(p) => (
+            <select
+              {...p}
+              name="withoutStatement"
+              style={inputStyle}
+              value={filters.withoutStatement ? 'yes' : ''}
+              onChange={(e) => setFilter({ withoutStatement: e.target.value === 'yes' })}
+            >
+              <option value="">{t('filters.any')}</option>
+              <option value="yes">{t('filters.withoutStatementOnly')}</option>
             </select>
           )}
         </Field>

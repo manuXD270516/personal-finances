@@ -488,7 +488,9 @@
         "WALLET_PROVIDER": "Provedor de carteira",
         "OTHER": "Outra"
       }
-    }
+    },
+    "reconcile": "Conciliar conta",
+    "reconciliations": "Ver conciliações"
   },
   "Transactions": {
     "backToList": "← Voltar para transações",
@@ -633,7 +635,10 @@
       "category": "Categoria",
       "dateFrom": "De",
       "dateTo": "Até",
-      "any": "Todos"
+      "any": "Todos",
+      "withoutStatement": "Conciliação sem extrato",
+      "withoutStatementHint": "Transações marcadas como conciliadas sem extrato.",
+      "withoutStatementOnly": "Somente as pendentes de revisão"
     },
     "detail": {
       "recorded": "Movimento registrado.",
@@ -659,7 +664,7 @@
       "post": "Contabilizar",
       "clear": "Marcar como confirmada",
       "unclear": "Remover confirmação",
-      "reconcile": "Conciliar",
+      "reconcile": "Marcar como conciliada sem extrato",
       "unreconcile": "Desfazer conciliação",
       "void": "Anular",
       "duplicate": "Duplicar",
@@ -674,19 +679,26 @@
           "description": "Volta a confirmada para poder ser corrigida. O motivo fica auditado.",
           "confirm": "Sim, desfazer"
         },
-        "reason": "Motivo"
+        "reason": "Motivo",
+        "reconcile": {
+          "title": "Marcar como conciliada sem extrato?",
+          "description": "Use quando não há extrato para conferi-la (dinheiro, carteiras). Fica marcada \"pendente de revisão\" até que uma conciliação posterior a confira. Não altera saldos.",
+          "confirm": "Sim, marcar como conciliada"
+        }
       },
       "done": {
         "post": "Transação contabilizada.",
         "clear": "Transação confirmada.",
         "unclear": "A transação volta a contabilizada.",
-        "reconcile": "Transação conciliada.",
+        "reconcile": "Transação marcada como conciliada sem extrato.",
         "void": "Transação anulada.",
         "unreconcile": "Conciliação desfeita.",
         "amended": "Alterações salvas: estorno e novo lançamento (revisão {revision}).",
         "edited": "Alterações salvas."
       },
-      "customFields": "Campos personalizados"
+      "customFields": "Campos personalizados",
+      "reconciliation": "Conciliação",
+      "statementRef": "Extrato de {date} por {balance}"
     },
     "history": {
       "title": "Histórico (ciclo de vida)",
@@ -742,7 +754,10 @@
         "confirmedRefundExcess": "Excesso de reembolso confirmado",
         "adjustmentDirection": "Efeito do ajuste",
         "adjustmentReason": "Motivo do ajuste",
-        "reversalJournalEntryId": "Lançamento de estorno"
+        "reversalJournalEntryId": "Lançamento de estorno",
+        "reconciliationMode": "Modo de conciliação",
+        "reconciliationId": "Conciliação (sessão)",
+        "RECONCILIATION_VERIFIED": "conferida com um extrato"
       },
       "ledgerEffect": "Efeito contábil: {actions}"
     },
@@ -763,6 +778,16 @@
       "record": "Registrar transferência",
       "payCard": "Registrar pagamento",
       "cardPaymentDescription": "Pagamento do cartão {card}"
+    },
+    "reconciliationModes": {
+      "STATEMENT": "Com extrato",
+      "WITHOUT_STATEMENT": "Sem extrato"
+    },
+    "flags": {
+      "RECONCILED_WITHOUT_STATEMENT": {
+        "label": "Conciliada sem extrato — pendente de revisão",
+        "hint": "Marcada como conciliada sem extrato: fica pendente de revisão até que uma conciliação posterior a confira."
+      }
     }
   },
   "Fx": {
@@ -1209,6 +1234,7 @@
         "CLEAR": "Confirmar",
         "UNCLEAR": "Remover confirmação",
         "RECONCILE": "Conciliar",
+        "RECONCILE_WITHOUT_STATEMENT": "Conciliar sem extrato",
         "UNRECONCILE": "Desconciliar",
         "REVISE": "Revisar",
         "VOID": "Anular"
@@ -1232,6 +1258,11 @@
         "CREATE": "Criar",
         "ARCHIVE": "Arquivar",
         "UNARCHIVE": "Desarquivar"
+      },
+      "Reconciliation": {
+        "START": "Iniciar",
+        "COMPLETE": "Concluir",
+        "CANCEL": "Cancelar"
       }
     },
     "export": {
@@ -1371,6 +1402,119 @@
       "value": "{name}",
       "from": "{name}: de",
       "to": "{name}: até"
+    }
+  },
+  "Reconciliation": {
+    "loading": "Carregando a conciliação…",
+    "title": "Conciliar {account}",
+    "backToAccount": "Voltar para a conta",
+    "intro": "Confira a conta com o saldo de um extrato em uma data: confirme as transações que aparecem no extrato e conclua quando a diferença for zero.",
+    "introLiability": "Confira o cartão ou empréstimo com o extrato. Os saldos são expressos como dívida positiva, como no extrato.",
+    "inProgressElsewhere": "Há uma conciliação em andamento: abra-a pelo histórico.",
+    "noStart": "Não há conciliação em andamento para esta conta.",
+    "tabs": {
+      "reconcile": "Conciliação"
+    },
+    "status": {
+      "IN_PROGRESS": "Em andamento",
+      "COMPLETED": "Concluída",
+      "CANCELLED": "Cancelada"
+    },
+    "start": {
+      "title": "Iniciar uma conciliação",
+      "intro": "Informe a data e o saldo que constam no extrato. Só pode haver uma conciliação em andamento por conta.",
+      "statementDate": "Data do extrato",
+      "statementBalance": "Saldo do extrato ({currency})",
+      "liabilityHint": "Em um cartão ou empréstimo, informe a dívida como número positivo.",
+      "submit": "Iniciar conciliação",
+      "errors": {
+        "EMPTY": "Informe o saldo do extrato.",
+        "INVALID": "O saldo do extrato não é um número válido.",
+        "SCALE": "O saldo tem mais casas decimais do que a moeda admite.",
+        "NOT_POSITIVE": "O saldo do extrato não é válido."
+      }
+    },
+    "summary": {
+      "title": "Saldos do extrato",
+      "statementDate": "Data do extrato",
+      "statementBalance": "Saldo do extrato",
+      "clearedBalance": "Saldo confirmado",
+      "difference": "Diferença",
+      "none": "—",
+      "differenceState": {
+        "ZERO": "Fecha",
+        "POSITIVE": "Falta confirmar",
+        "NEGATIVE": "Confirmado a mais"
+      },
+      "hint": {
+        "POSITIVE": "O extrato supera o confirmado em {amount}. Confirme as transações que faltam ou conclua com um ajuste.",
+        "NEGATIVE": "O confirmado supera o extrato em {amount}. Desconfirme o que não aparece no extrato ou conclua com um ajuste."
+      }
+    },
+    "list": {
+      "title": "Transações até {date}",
+      "label": "Transações da conta até a data do extrato",
+      "help": "Marque como confirmadas as que aparecem no extrato. O saldo confirmado e a diferença são recalculados na hora.",
+      "readOnly": "Esta conciliação não admite mais alterações.",
+      "completedItems": "Esta conciliação conciliou ou conferiu {n} transações.",
+      "empty": "Não há transações para confirmar até essa data.",
+      "confirm": "Confirmada no extrato: {name}"
+    },
+    "actions": {
+      "label": "Ações da conciliação",
+      "finish": "Concluir conciliação",
+      "finishWithAdjustment": "Concluir com um ajuste…",
+      "cancel": "Cancelar conciliação",
+      "another": "Iniciar outra conciliação"
+    },
+    "adjustment": {
+      "title": "A diferença não é zero",
+      "description": {
+        "INCREASE": "Será criado um ajuste de aumento de {amount} contra o ajuste de patrimônio, na data do extrato, e conciliado com as demais.",
+        "DECREASE": "Será criado um ajuste de redução de {amount} contra o ajuste de patrimônio, na data do extrato, e conciliado com as demais."
+      },
+      "reason": "Motivo do ajuste",
+      "reasonHint": "Obrigatório. Fica auditado (por exemplo: tarifa bancária não registrada).",
+      "confirm": "Criar o ajuste e concluir",
+      "cancel": "Voltar"
+    },
+    "cancel": {
+      "title": "Cancelar esta conciliação?",
+      "description": "As transações que você confirmou continuam confirmadas e você poderá iniciar outra conciliação.",
+      "confirm": "Sim, cancelar",
+      "keep": "Não, continuar"
+    },
+    "done": {
+      "started": "Conciliação iniciada.",
+      "completed": "Conciliação concluída: as transações confirmadas ficaram conciliadas.",
+      "cancelled": "Conciliação cancelada."
+    },
+    "history": {
+      "title": "Histórico de conciliações",
+      "empty": "Esta conta ainda não tem conciliações.",
+      "item": "Extrato de {date}",
+      "completedAt": "concluída em {at}"
+    },
+    "indicator": {
+      "title": "Conciliação",
+      "reconciled": "Conciliada em {date}",
+      "reconciledWithoutStatement": "Conciliada sem extrato em {date}",
+      "notReconciled": "Não conciliada em {date}",
+      "last": "Último extrato conciliado: {date} por {balance}.",
+      "never": "Ainda não foi conciliada com um extrato.",
+      "open": "{n, plural, one {# transação} other {# transações}} sem conciliar até hoje.",
+      "withoutStatement": "{n, plural, one {# transação conciliada} other {# transações conciliadas}} sem extrato, pendentes de revisão.",
+      "reviewWithoutStatement": "Revisá-las"
+    },
+    "fields": {
+      "TRANSACTION_CLEARED": "transação confirmada na sessão",
+      "TRANSACTION_UNCLEARED": "transação desconfirmada na sessão",
+      "TRANSACTION_UNRECONCILED": "transação com conciliação desfeita após a conclusão"
+    },
+    "lifecycle": {
+      "start": "Extrato de {date} por {balance}.",
+      "complete": "Saldo confirmado {cleared} · diferença {difference}",
+      "adjustment": "ver o ajuste"
     }
   }
 }

@@ -103,6 +103,7 @@ describe('Recorrido de transacciones (add-lifecycle-timeline)', () => {
         transactionId: transaction.id,
         expectedVersion: transaction.version,
         status: 'RECONCILED',
+        reconciliationMode: 'WITHOUT_STATEMENT',
       }),
     ).rejects.toMatchObject({ code: 'INVALID_STATUS_TRANSITION' });
     expect(state.lifecycle.filter((l) => l.aggregateId === transaction.id)).toHaveLength(1);

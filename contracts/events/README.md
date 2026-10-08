@@ -29,7 +29,9 @@ contracts/events/
 │  ├─ TransferCompleted.v1.schema.json
 │  ├─ TransferRevised.v1.schema.json    # add-lifecycle-timeline (docs/31 D37)
 │  ├─ ConversionRecorded.v1.schema.json
-│  └─ ConversionRevised.v1.schema.json  # docs/31 D48 (simétrico a TransferRevised)
+│  ├─ ConversionRevised.v1.schema.json  # docs/31 D48 (simétrico a TransferRevised)
+│  ├─ TransactionCleared.v1.schema.json # add-reconciliation (docs/31 D47): CLEAR/UNCLEAR
+│  └─ ReconciliationCompleted.v1.schema.json # add-reconciliation: fin de una sesión
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/

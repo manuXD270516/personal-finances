@@ -75,6 +75,8 @@ export interface ContractOperation {
   readonly hasWorkspaceScope: boolean;
   /** `x-required-role` del contrato (`AUTHENTICATED`, `VIEWER`, `EDITOR`, `OWNER`); lo aplican los guards. */
   readonly requiredRole?: string;
+  /** `x-isolation: SERIALIZABLE`: la transacción del comando se abre SERIALIZABLE con reintento (add-reconciliation). */
+  readonly isolation?: 'SERIALIZABLE';
   readonly deprecation?: DeprecationInfo;
   readonly requestBody?: { readonly required: boolean; readonly mediaTypes: readonly string[] };
   validateRequest(input: RequestInput): RequestValidation;
@@ -333,6 +335,7 @@ export class ApiContract {
       ...(typeof operation['x-required-role'] === 'string'
         ? { requiredRole: operation['x-required-role'] }
         : {}),
+      ...(operation['x-isolation'] === 'SERIALIZABLE' ? { isolation: 'SERIALIZABLE' as const } : {}),
       ...(deprecation ? { deprecation } : {}),
       ...(requestBody ? { requestBody: { required: requestBody['required'] === true, mediaTypes } } : {}),
       validateRequest: (input) => {
