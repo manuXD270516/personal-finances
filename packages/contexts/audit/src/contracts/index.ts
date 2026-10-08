@@ -103,7 +103,8 @@ export interface AuditHistoryQuery {
 
 /**
  * Tipos de agregado con máquina de estados declarada (docs/31 D37; catálogos de CLASSIFICATION: D52; periodo
- * financiero de PLANNING: openspec add-financial-periods, Phase 2).
+ * financiero de PLANNING: openspec add-financial-periods, Phase 2; sesión de reconciliación de TRANSACTIONS:
+ * openspec add-reconciliation, Phase 2).
  */
 export const LIFECYCLE_AGGREGATE_TYPES = [
   'Transaction',
@@ -112,6 +113,7 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'Category',
   'Counterparty',
   'FinancialPeriod',
+  'Reconciliation',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 
@@ -174,6 +176,8 @@ export interface LifecycleTransitionInput extends LifecycleStepBase {
 export interface LifecycleAnnotationInput extends LifecycleStepBase {
   readonly kind: 'ANNOTATION';
   readonly changedFields: readonly string[];
+  /** Referencias a otros agregados (UUID o entero), p. ej. la sesión que cotejó una transacción (add-reconciliation). */
+  readonly detailRefs?: LifecycleDetailRefsDto;
 }
 
 export type LifecycleStepInput = LifecycleTransitionInput | LifecycleAnnotationInput;
@@ -223,6 +227,8 @@ export interface LifecycleAnnotationDto {
   readonly actor: LifecycleActorDto;
   readonly origin: AuditOriginDto;
   readonly changedFields: readonly string[];
+  /** Referencias de la anotación (aditivo, add-reconciliation); `{}` si no tiene. */
+  readonly detailRefs?: LifecycleDetailRefsDto;
   readonly revisionFrom: number | null;
   readonly revisionTo: number | null;
   readonly aggregateVersion: number | null;

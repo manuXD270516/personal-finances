@@ -229,6 +229,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: 'Categoría',
       Counterparty: 'Contraparte',
       FinancialPeriod: 'Periodo financiero',
+      Reconciliation: 'Reconciliación',
     },
     states: {
       Transaction: {
@@ -243,6 +244,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: CLASSIFICATION.es.states,
       Counterparty: CLASSIFICATION.es.states,
       FinancialPeriod: { DRAFT: 'Borrador', ACTIVE: 'Activo', CLOSED: 'Cerrado', REOPENED: 'Reabierto' },
+      Reconciliation: { IN_PROGRESS: 'En curso', COMPLETED: 'Completada', CANCELLED: 'Cancelada' },
     },
     transitions: {
       Transaction: {
@@ -251,6 +253,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CLEAR: 'Confirmar',
         UNCLEAR: 'Quitar confirmación',
         RECONCILE: 'Reconciliar',
+        RECONCILE_WITHOUT_STATEMENT: 'Conciliar sin extracto',
         UNRECONCILE: 'Des-reconciliar',
         REVISE: 'Revisar',
         VOID: 'Anular',
@@ -260,6 +263,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: CLASSIFICATION.es.transitions,
       Counterparty: CLASSIFICATION.es.transitions,
       FinancialPeriod: { CREATE: 'Crear', ACTIVATE: 'Activar', CLOSE: 'Cerrar', REOPEN: 'Reabrir' },
+      Reconciliation: { START: 'Iniciar', COMPLETE: 'Finalizar', CANCEL: 'Cancelar' },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -297,6 +301,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: 'Category',
       Counterparty: 'Counterparty',
       FinancialPeriod: 'Financial period',
+      Reconciliation: 'Reconciliation',
     },
     states: {
       Transaction: {
@@ -311,6 +316,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: CLASSIFICATION.en.states,
       Counterparty: CLASSIFICATION.en.states,
       FinancialPeriod: { DRAFT: 'Draft', ACTIVE: 'Active', CLOSED: 'Closed', REOPENED: 'Reopened' },
+      Reconciliation: { IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled' },
     },
     transitions: {
       Transaction: {
@@ -319,6 +325,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CLEAR: 'Clear',
         UNCLEAR: 'Unclear',
         RECONCILE: 'Reconcile',
+        RECONCILE_WITHOUT_STATEMENT: 'Reconcile without statement',
         UNRECONCILE: 'Unreconcile',
         REVISE: 'Revise',
         VOID: 'Void',
@@ -328,6 +335,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: CLASSIFICATION.en.transitions,
       Counterparty: CLASSIFICATION.en.transitions,
       FinancialPeriod: { CREATE: 'Create', ACTIVATE: 'Activate', CLOSE: 'Close', REOPEN: 'Reopen' },
+      Reconciliation: { START: 'Start', COMPLETE: 'Complete', CANCEL: 'Cancel' },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -365,6 +373,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: 'Categoria',
       Counterparty: 'Contraparte',
       FinancialPeriod: 'Período financeiro',
+      Reconciliation: 'Conciliação',
     },
     states: {
       Transaction: {
@@ -379,6 +388,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: CLASSIFICATION.pt.states,
       Counterparty: CLASSIFICATION.pt.states,
       FinancialPeriod: { DRAFT: 'Rascunho', ACTIVE: 'Ativo', CLOSED: 'Fechado', REOPENED: 'Reaberto' },
+      Reconciliation: { IN_PROGRESS: 'Em andamento', COMPLETED: 'Concluída', CANCELLED: 'Cancelada' },
     },
     transitions: {
       Transaction: {
@@ -387,6 +397,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CLEAR: 'Confirmar',
         UNCLEAR: 'Remover confirmação',
         RECONCILE: 'Conciliar',
+        RECONCILE_WITHOUT_STATEMENT: 'Conciliar sem extrato',
         UNRECONCILE: 'Desconciliar',
         REVISE: 'Revisar',
         VOID: 'Anular',
@@ -396,6 +407,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Category: CLASSIFICATION.pt.transitions,
       Counterparty: CLASSIFICATION.pt.transitions,
       FinancialPeriod: { CREATE: 'Criar', ACTIVATE: 'Ativar', CLOSE: 'Fechar', REOPEN: 'Reabrir' },
+      Reconciliation: { START: 'Iniciar', COMPLETE: 'Concluir', CANCEL: 'Cancelar' },
     },
     element: 'Item',
     currentState: 'Estado atual',

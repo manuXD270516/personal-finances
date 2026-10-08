@@ -209,10 +209,16 @@ export interface ConversionDetail extends ConversionPricing {
   readonly externalRef?: string | null;
 }
 
+/** Modo de conciliación de una transacción RECONCILED (docs/33 D74) y marca de seguimiento derivada (D111). */
+export type ReconciliationMode = 'STATEMENT' | 'WITHOUT_STATEMENT';
+export type SystemFlag = 'RECONCILED_WITHOUT_STATEMENT';
+
 export interface Transaction {
   readonly id: string;
   readonly kind: TransactionKind;
   readonly status: TransactionStatus;
+  readonly reconciliationMode?: ReconciliationMode | null;
+  readonly systemFlags?: readonly SystemFlag[];
   readonly transactionDate: string;
   readonly postingDate?: string | null;
   readonly amount: Money;

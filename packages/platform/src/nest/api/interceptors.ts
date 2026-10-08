@@ -247,12 +247,16 @@ export class IdempotencyInterceptor implements NestInterceptor {
     let handlerBody: unknown;
     const run = async (command: CommandContext): Promise<HttpResponseSnapshot> => {
       if (transaction) {
-        return transaction.run(scope, async (tx) => {
-          handlerBody = await lastValueFrom(next.handle(), { defaultValue: undefined });
-          const snapshot = snapshotResponse(res, handlerBody);
-          await command.complete(snapshot, tx);
-          return snapshot;
-        });
+        return transaction.run(
+          scope,
+          async (tx) => {
+            handlerBody = await lastValueFrom(next.handle(), { defaultValue: undefined });
+            const snapshot = snapshotResponse(res, handlerBody);
+            await command.complete(snapshot, tx);
+            return snapshot;
+          },
+          op.isolation ? { isolation: op.isolation } : {},
+        );
       }
       handlerBody = await lastValueFrom(next.handle(), { defaultValue: undefined });
       return snapshotResponse(res, handlerBody);

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/transactions/TransactionUpdated.v1.schema.json",
   "title": "transactions.TransactionUpdated.v1",
-  "description": "La transacción cambió: edición descriptiva, cambio cleared/reconciled, des-reconciliación o amend financiero (en ese caso se emite junto a TransactionPosted, ledgerImpact = true). Sin montos ni texto libre salvo reason. Productor: TRANSACTIONS. Consumidores: REPORTING. Idempotencia natural: (transactionId, aggregateVersion). PII baja: reason. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran. `customFields` en changedFields (openspec add-custom-fields, aditivo): cambió el valor de algún custom field de algún split; los valores no viajan en el evento (INV-033: sin efecto en el ledger, ledgerImpact = false).",
+  "description": "La transacción cambió: edición descriptiva, cambio cleared/reconciled, des-reconciliación o amend financiero (en ese caso se emite junto a TransactionPosted, ledgerImpact = true). Sin montos ni texto libre salvo reason. Productor: TRANSACTIONS. Consumidores: REPORTING. Idempotencia natural: (transactionId, aggregateVersion). PII baja: reason. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran. `customFields` en changedFields (openspec add-custom-fields, aditivo): cambió el valor de algún custom field de algún split; los valores no viajan en el evento (INV-033: sin efecto en el ledger, ledgerImpact = false). `reconciliationMode` en changedFields (openspec add-reconciliation, aditivo): cambió el modo de conciliación (conciliación sin extracto, des-reconciliación o cotejo posterior por una sesión); `RECONCILE_WITHOUT_STATEMENT` es el marcado directo explícito (docs/33 D74). `CLEAR`/`UNCLEAR` publican además `transactions.TransactionCleared.v1` (docs/31 D47).",
   "type": "object",
   "allOf": [
     {
@@ -76,7 +76,8 @@
               "businessDate",
               "accountId",
               "splits",
-              "customFields"
+              "customFields",
+              "reconciliationMode"
             ]
           }
         },
@@ -112,6 +113,7 @@
             "CLEAR",
             "UNCLEAR",
             "RECONCILE",
+            "RECONCILE_WITHOUT_STATEMENT",
             "UNRECONCILE",
             "REVISE",
             "VOID"
@@ -201,6 +203,35 @@
         ],
         "ledgerImpact": true,
         "reason": null
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000143",
+      "eventType": "transactions.TransactionUpdated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-08T14:20:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f2",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c4",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f2",
+        "revision": 1,
+        "status": "RECONCILED",
+        "previousStatus": "CLEARED",
+        "changedFields": [
+          "status",
+          "reconciliationMode"
+        ],
+        "ledgerImpact": false,
+        "reason": null,
+        "transition": "RECONCILE_WITHOUT_STATEMENT"
       }
     }
   ]

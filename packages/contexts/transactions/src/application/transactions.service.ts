@@ -123,7 +123,19 @@ export interface UpdateTransactionCommand {
   readonly counterpartyId?: string | null;
   readonly paymentMethod?: PaymentMethod | null;
   readonly status?: 'POSTED' | 'CLEARED' | 'RECONCILED';
+  /**
+   * Obligatorio (y solo aceptado) con `status = RECONCILED`: el marcado directo exige el modo explícito
+   * `WITHOUT_STATEMENT` (docs/33 D74); cualquier otro valor ⇒ `VALIDATION_FAILED`.
+   */
+  readonly reconciliationMode?: string;
   readonly splits?: readonly SplitDto[];
+}
+
+/** Sesión de reconciliación en cuyo nombre se confirman transacciones (add-reconciliation decisión 2). */
+export interface ClearedSessionContext {
+  readonly reconciliationId: string;
+  readonly accountId: string;
+  readonly statementDate: string;
 }
 
 /** Montos de una revisión para el recorrido (add-lifecycle-timeline decisión 7; transfers y conversions). */
@@ -138,9 +150,19 @@ export interface TransactionRevisionView {
   readonly conversion: ConversionDetail | null;
 }
 
+/** Sesión a la que enlaza el recorrido de una transacción (fecha y saldo del extracto, TC-AUDIT-LIFECYCLE-026). */
+export interface TransactionReconciliationRef {
+  readonly reconciliationId: string;
+  readonly accountId: string;
+  readonly statementDate: string;
+  readonly statementBalance: Money;
+}
+
 export interface TransactionLifecycleView {
   readonly lifecycle: LifecycleDto;
   readonly revisions: readonly TransactionRevisionView[];
+  /** Sesiones referenciadas por las transiciones/anotaciones (`detailRefs.reconciliationId`). */
+  readonly reconciliations: readonly TransactionReconciliationRef[];
 }
 
 export interface TransactionWarning {
@@ -187,6 +209,7 @@ const UPDATED_EVENT_FIELDS: ReadonlySet<ChangedField> = new Set([
   'businessDate',
   'accountId',
   'splits',
+  'reconciliationMode',
 ]);
 const splitKindOf = (kind: TransactionKind) =>
   kind === 'INCOME' ? 'INCOME' : kind === 'REFUND' ? 'REFUND' : 'EXPENSE';
@@ -521,6 +544,20 @@ export class TransactionsService {
           'status changes cannot be combined with financial fields',
         ).at('/status');
       }
+      // Marcado directo (docs/33 D74): `RECONCILED` exige el modo explícito `WITHOUT_STATEMENT` y ese modo solo se
+      // acepta con `status = RECONCILED`; `STATEMENT` únicamente se alcanza finalizando una sesión.
+      if (cmd.status === 'RECONCILED' && cmd.reconciliationMode !== 'WITHOUT_STATEMENT') {
+        throw new DomainError(
+          'VALIDATION_FAILED',
+          'reconciling a transaction directly requires reconciliationMode WITHOUT_STATEMENT',
+        ).at('/reconciliationMode');
+      }
+      if (cmd.reconciliationMode !== undefined && cmd.status !== 'RECONCILED') {
+        throw new DomainError(
+          'VALIDATION_FAILED',
+          'reconciliationMode only applies together with status RECONCILED',
+        ).at('/reconciliationMode');
+      }
       const tx = await this.load(workspaceId, cmd.transactionId, cmd.expectedVersion);
       const before = tx.snapshot;
       const changes: { -readonly [K in keyof TransactionChanges]: TransactionChanges[K] } = {};
@@ -594,8 +631,17 @@ export class TransactionsService {
         : null;
       const changedFields = [...result.changedFields];
       if (cmd.status !== undefined && cmd.status !== tx.status) {
-        previousStatus = tx.changeStatus(cmd.status);
-        changedFields.push('status');
+        // INV-015 (docs/33 D65, extensión de D49): cleared/unclear/conciliar no generan asiento pero cambian el estado
+        // de conciliación que registró el cierre; en un periodo cerrado se rechazan con PERIOD_CLOSED.
+        await this.deps.ledger.assertPeriodOpen({ workspaceId, date: before.businessDate });
+        if (cmd.status === 'RECONCILED') {
+          tx.reconcileWithoutStatement(cmd.reconciliationMode);
+          previousStatus = 'CLEARED';
+          changedFields.push('status', 'reconciliationMode');
+        } else {
+          previousStatus = tx.changeStatus(cmd.status);
+          changedFields.push('status');
+        }
       }
       if (changedFields.length === 0) return tx.snapshot;
       let newEntryId: string | null = null;
@@ -627,6 +673,9 @@ export class TransactionsService {
       const after = tx.snapshot;
       const transition = tx.lastTransition?.transition;
       const events: LifecycleEventRefDto[] = [];
+      if (transition === 'CLEAR' || transition === 'UNCLEAR') {
+        events.push(await this.publishCleared(tx, previousStatus, null, null, transition));
+      }
       const eventFields = changedFields.filter((f) => UPDATED_EVENT_FIELDS.has(f));
       if (eventFields.length > 0) {
         events.push(
@@ -751,7 +800,10 @@ export class TransactionsService {
   ): Promise<TransactionState> {
     return this.deps.uow.run(workspaceId, async () => {
       const tx = await this.load(workspaceId, transactionId, expectedVersion);
+      const before = tx.snapshot;
       tx.unreconcile(reason);
+      // INV-015 (docs/33 D65): el snapshot del cierre registró la conciliación; no se deshace en un periodo cerrado.
+      await this.deps.ledger.assertPeriodOpen({ workspaceId, date: before.businessDate });
       await this.save(tx);
       const s = tx.snapshot;
       const updated = await this.publish(tx, TRANSACTION_EVENTS.updated, {
@@ -759,14 +811,31 @@ export class TransactionsService {
         revision: s.revision,
         status: s.status,
         previousStatus: 'RECONCILED',
-        changedFields: ['status'],
+        changedFields: ['status', 'reconciliationMode'],
         ledgerImpact: false,
         reason: reason.trim(),
         paymentMethod: s.paymentMethod,
         transition: 'UNRECONCILE',
       });
-      await this.record(
-        tx,
+      // La sesión que la reconcilió conserva su resultado y registra la des-reconciliación posterior (decisión 8).
+      const session = await this.deps.reconciliations.markUnreconciled({
+        workspaceId,
+        transactionId,
+        reason: reason.trim(),
+      });
+      const steps = transactionSteps(tx, { events: [updated] });
+      if (session) {
+        steps.push({
+          kind: 'ANNOTATION',
+          aggregateType: 'Reconciliation',
+          aggregateId: session.reconciliationId,
+          aggregateVersion: null,
+          changedFields: ['TRANSACTION_UNRECONCILED'],
+          detailRefs: { transactionId },
+          events: [],
+        });
+      }
+      await this.deps.lifecycle.record(
         {
           workspaceId,
           action: 'transactions.transaction.unreconciled',
@@ -774,9 +843,12 @@ export class TransactionsService {
           aggregateId: s.id,
           aggregateVersion: s.version,
           reason: reason.trim(),
-          changes: [{ field: 'status', before: 'RECONCILED', after: 'CLEARED' }],
+          changes: [
+            { field: 'status', before: 'RECONCILED', after: 'CLEARED' },
+            { field: 'reconciliationMode', before: before.reconciliationMode, after: null },
+          ],
         },
-        { events: [updated] },
+        steps,
       );
       return s;
     });
@@ -790,6 +862,7 @@ export class TransactionsService {
     workspaceId: string,
     items: readonly { readonly id: string; readonly version: number }[],
     cleared: boolean,
+    session?: ClearedSessionContext,
   ): Promise<{ readonly data: readonly TransactionState[]; readonly bulkOperationId: string }> {
     return this.deps.uow.run(workspaceId, async () => {
       if (items.length === 0 || items.length > MAX_BULK) {
@@ -814,8 +887,24 @@ export class TransactionsService {
       }
       const bulkOperationId = this.deps.ids.next();
       const target = cleared ? 'CLEARED' : 'POSTED';
-      for (const tx of loaded) {
-        if (tx.status === 'RECONCILED') {
+      for (const [i, tx] of loaded.entries()) {
+        if (session) {
+          // Dentro de una sesión solo se confirman transacciones de su cuenta con fecha ≤ extracto (decisión 2).
+          const s0 = tx.snapshot;
+          if (!s0.legs.some((l) => l.accountId === session.accountId)) {
+            throw new DomainError(
+              'VALIDATION_FAILED',
+              `transaction ${tx.id} does not belong to the account of the reconciliation`,
+            ).at(`/items/${i}/id`);
+          }
+          if (s0.businessDate > session.statementDate) {
+            throw new DomainError(
+              'VALIDATION_FAILED',
+              `transaction ${tx.id} is dated after the statement date ${session.statementDate}`,
+            ).at(`/items/${i}/id`);
+          }
+        }
+        if (tx.status === 'RECONCILED' && !session) {
           throw new DomainError('TRANSACTION_RECONCILED', `transaction ${tx.id} is reconciled`);
         }
         if (tx.status !== (cleared ? 'POSTED' : 'CLEARED')) {
@@ -824,22 +913,46 @@ export class TransactionsService {
             `transaction ${tx.id} is ${tx.status}, cannot become ${target}`,
           );
         }
+        // INV-015 (docs/33 D65): confirmar o desconfirmar no cambia en silencio un periodo cerrado.
+        await this.deps.ledger.assertPeriodOpen({ workspaceId, date: tx.snapshot.businessDate });
         const previous = tx.changeStatus(target);
-        await this.save(tx);
+        if (!(await this.deps.transactions.updateStatus(tx))) throw concurrencyConflict();
         const s = tx.snapshot;
-        const updated = await this.publish(tx, TRANSACTION_EVENTS.updated, {
-          transactionId: s.id,
-          revision: s.revision,
-          status: s.status,
-          previousStatus: previous,
-          changedFields: ['status'],
-          ledgerImpact: false,
-          reason: null,
-          paymentMethod: s.paymentMethod,
-          transition: cleared ? 'CLEAR' : 'UNCLEAR',
-        });
-        await this.record(
-          tx,
+        const transition = cleared ? 'CLEAR' : 'UNCLEAR';
+        const events: LifecycleEventRefDto[] = [
+          await this.publishCleared(
+            tx,
+            previous,
+            bulkOperationId,
+            session?.reconciliationId ?? null,
+            transition,
+          ),
+          await this.publish(tx, TRANSACTION_EVENTS.updated, {
+            transactionId: s.id,
+            revision: s.revision,
+            status: s.status,
+            previousStatus: previous,
+            changedFields: ['status'],
+            ledgerImpact: false,
+            reason: null,
+            paymentMethod: s.paymentMethod,
+            transition,
+          }),
+        ];
+        const steps = transactionSteps(tx, { events });
+        if (session) {
+          // La sesión registra la confirmación como anotación de su recorrido (no cambia su estado).
+          steps.push({
+            kind: 'ANNOTATION',
+            aggregateType: 'Reconciliation',
+            aggregateId: session.reconciliationId,
+            aggregateVersion: null,
+            changedFields: [cleared ? 'TRANSACTION_CLEARED' : 'TRANSACTION_UNCLEARED'],
+            detailRefs: { transactionId: s.id },
+            events: [],
+          });
+        }
+        await this.deps.lifecycle.record(
           {
             workspaceId,
             action: cleared ? 'transactions.transaction.cleared' : 'transactions.transaction.uncleared',
@@ -851,7 +964,7 @@ export class TransactionsService {
               { field: 'bulkOperationId', before: null, after: bulkOperationId },
             ],
           },
-          { events: [updated] },
+          steps,
         );
       }
       return { data: loaded.map((t) => t.snapshot), bulkOperationId };
@@ -978,7 +1091,24 @@ export class TransactionsService {
             conversion: detail,
           };
         });
-      return { lifecycle, revisions };
+      // Sesiones referenciadas por el recorrido: fecha y saldo del extracto contra el que se reconcilió/cotejó.
+      const sessionIds = [
+        ...new Set(
+          lifecycle.items.flatMap((item) => {
+            const id = item.detailRefs?.['reconciliationId'];
+            return typeof id === 'string' ? [id] : [];
+          }),
+        ),
+      ];
+      const sessions =
+        sessionIds.length > 0 ? await this.deps.reconciliations.findByIds(input.workspaceId, sessionIds) : [];
+      const reconciliations: TransactionReconciliationRef[] = sessions.map((r) => ({
+        reconciliationId: r.id,
+        accountId: r.snapshot.accountId,
+        statementDate: r.snapshot.statementDate,
+        statementBalance: r.snapshot.statementBalance,
+      }));
+      return { lifecycle, revisions, reconciliations };
     });
   }
 
@@ -1178,6 +1308,31 @@ export class TransactionsService {
     return publishPosted(this.deps, tx, journalEntryId, previousStatus, supersedes, revision);
   }
 
+  /**
+   * `TransactionCleared` (docs/31 D47): un hecho por cada `CLEAR`/`UNCLEAR`, individual, en lote o en sesión.
+   * Idempotencia natural `(transactionId, aggregateVersion)`.
+   */
+  private publishCleared(
+    tx: Transaction,
+    previousStatus: TransactionStatus | null,
+    bulkOperationId: string | null,
+    reconciliationId: string | null,
+    transition: 'CLEAR' | 'UNCLEAR',
+  ): Promise<LifecycleEventRefDto> {
+    const s = tx.snapshot;
+    return this.publish(tx, TRANSACTION_EVENTS.cleared, {
+      transactionId: s.id,
+      accountId: s.accountId,
+      cleared: transition === 'CLEAR',
+      status: s.status,
+      previousStatus,
+      revision: s.revision,
+      reconciliationId,
+      bulkOperationId,
+      transition,
+    });
+  }
+
   private publishCategorized(
     tx: Transaction,
     changes: readonly SplitClassificationChange[],
@@ -1223,7 +1378,8 @@ function auditActionForStatus(
   previous: TransactionStatus | null,
 ): string | null {
   if (!requested || !previous) return null;
-  if (requested === 'RECONCILED') return 'transactions.transaction.reconciled';
+  // Marcado directo (docs/33 D74): la acción distingue la conciliación sin extracto de la de una sesión.
+  if (requested === 'RECONCILED') return 'transactions.transaction.reconciled_without_statement';
   if (requested === 'CLEARED') return 'transactions.transaction.cleared';
   if (requested === 'POSTED' && previous === 'CLEARED') return 'transactions.transaction.uncleared';
   return null;

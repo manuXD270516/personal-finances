@@ -12,9 +12,14 @@ invariants: [INV-023, INV-029, INV-033]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reconciliation.api.test.ts
+  - packages/contexts/transactions/src/application/reconciliations.service.test.ts
+  - packages/contexts/transactions/src/domain/reconciliation.test.ts
+  - packages/contexts/transactions/test/integration/pg-reconciliations.int.test.ts
+  - tests/e2e/specs/reconciliation.spec.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ["reconciliation", "atomic"]

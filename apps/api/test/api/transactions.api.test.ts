@@ -754,7 +754,7 @@ describe('Medio de pago y categorías válidas de un split', () => {
 });
 
 describe('Contrato del productor: eventos de TRANSACTIONS emitidos al outbox (Ajv strict)', () => {
-  it('Created, Posted, Updated, Categorized, Voided, TransferCompleted y TransferRevised cumplen contracts/events/transactions', async () => {
+  it('Created, Posted, Updated, Cleared, Categorized, Voided, TransferCompleted y TransferRevised cumplen contracts/events/transactions', async () => {
     const owner = await user(`kc-txn-events-${randomUUID()}`);
     const a = await account(owner, 'Bank A', 'BOB', '1000.00');
     const b = await account(owner, 'Bank B', 'BOB');
@@ -820,6 +820,8 @@ describe('Contrato del productor: eventos de TRANSACTIONS emitidos al outbox (Aj
         'transactions.TransactionCreated',
         'transactions.TransactionPosted',
         'transactions.TransactionUpdated',
+        // docs/31 D47 (add-reconciliation): el CLEAR de la prueba publica además el evento dedicado.
+        'transactions.TransactionCleared',
         'transactions.TransactionCategorized',
         'transactions.TransactionVoided',
         'transactions.TransferCompleted',

@@ -12,9 +12,10 @@ invariants: [INV-007, INV-029]
 priority: high
 type: integration
 level: migration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/test/integration/pg-reconciliations.int.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["migration", "without-statement"]

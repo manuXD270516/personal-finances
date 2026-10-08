@@ -123,7 +123,7 @@ describe('Propiedades del agregado Transaction', () => {
                 tx.attachEntry(nextId());
               } else if (c === 'clear') tx.changeStatus('CLEARED');
               else if (c === 'unclear') tx.changeStatus('POSTED');
-              else if (c === 'reconcile') tx.changeStatus('RECONCILED');
+              else if (c === 'reconcile') tx.reconcileWithoutStatement('WITHOUT_STATEMENT');
               else if (c === 'unreconcile') tx.unreconcile('motivo');
               else if (c === 'void') tx.void('motivo', '2026-10-01T00:00:00Z');
               else {

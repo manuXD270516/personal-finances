@@ -12,9 +12,10 @@ invariants: [INV-023, INV-033]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/domain/transaction.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["reconciled", "modified", "without-statement"]

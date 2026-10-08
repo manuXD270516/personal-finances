@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/transactions/TransactionPosted.v1.schema.json",
   "title": "transactions.TransactionPosted.v1",
-  "description": "La transacción tiene un JournalEntry activo (creación directa en posted, pending→posted o amend que repostea). Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING. Idempotencia natural: (transactionId, revision). Sin PII. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
+  "description": "La transacción tiene un JournalEntry activo (creación directa en posted, pending→posted o amend que repostea). Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING. Idempotencia natural: (transactionId, revision). Sin PII. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran. Campo opcional aditivo `reconciliationId` (openspec add-reconciliation): el ajuste que crea una sesión de reconciliación referencia la sesión.",
   "type": "object",
   "allOf": [
     {
@@ -106,10 +106,15 @@
             "CLEAR",
             "UNCLEAR",
             "RECONCILE",
+            "RECONCILE_WITHOUT_STATEMENT",
             "UNRECONCILE",
             "REVISE",
             "VOID"
           ]
+        },
+        "reconciliationId": {
+          "description": "Sesión de reconciliación que creó la transacción (solo el ajuste de una sesión; opcional, aditivo, openspec add-reconciliation).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
         }
       }
     }

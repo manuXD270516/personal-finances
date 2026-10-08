@@ -5,3 +5,6 @@ export * from './duplicate-detector.js';
 export * from './refund-policy.js';
 export * from './conversion.js';
 export * from './transaction-lifecycle.js';
+export * from './reconciliation-lifecycle.js';
+export * from './reconciliation.js';
+export * from './reconciliation-calculator.js';

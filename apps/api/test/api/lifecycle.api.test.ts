@@ -232,7 +232,7 @@ afterAll(async () => {
 });
 
 describe('Máquinas de estado (GET W/lifecycle-machines/{aggregateType})', () => {
-  it('[TC-AUDIT-LIFECYCLE-001] la máquina Transaction declara estados, terminal y 8 transiciones; reconciliar un pendiente ⇒ 409 sin transición', async () => {
+  it('[TC-AUDIT-LIFECYCLE-001] la máquina Transaction declara estados, terminal y 9 transiciones; reconciliar un pendiente ⇒ 409 sin transición', async () => {
     const r = await get(viewer, '/lifecycle-machines/Transaction');
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(contract().validateResponse('getLifecycleMachine', 200, r.body)).toEqual([]);
@@ -245,6 +245,7 @@ describe('Máquinas de estado (GET W/lifecycle-machines/{aggregateType})', () =>
       'CLEAR',
       'UNCLEAR',
       'RECONCILE',
+      'RECONCILE_WITHOUT_STATEMENT',
       'UNRECONCILE',
       'REVISE',
       'VOID',
@@ -258,6 +259,7 @@ describe('Máquinas de estado (GET W/lifecycle-machines/{aggregateType})', () =>
     const pending = await expense(editor, bankA, '80.00', 'PENDING');
     const rejected = await patch(editor, `/transactions/${pending.id}`, pending.version, {
       status: 'RECONCILED',
+      reconciliationMode: 'WITHOUT_STATEMENT',
     });
     expectProblem(rejected, 409, 'INVALID_STATUS_TRANSITION');
     const lc = await get(editor, `/transactions/${pending.id}/lifecycle`);
@@ -415,7 +417,7 @@ describe('Consulta del recorrido (GET …/lifecycle)', () => {
       currentState: 'VOIDED',
       path: ['PENDING', 'POSTED', 'CLEARED', 'POSTED', 'VOIDED'],
       historyComplete: true,
-      machine: { aggregateType: 'Transaction', machineVersion: 1 },
+      machine: { aggregateType: 'Transaction', machineVersion: 2 },
     });
     const items = lc.body['items'] as Json[];
     expect(items.map((i) => i['occurredAt'])).toEqual([

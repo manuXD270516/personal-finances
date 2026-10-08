@@ -8,6 +8,8 @@ import type {
   ConversionDetail,
   LegRole,
   PaymentMethod,
+  Reconciliation,
+  SystemFlag,
   Transaction,
   TransactionKind,
   TransactionSource,
@@ -17,7 +19,11 @@ import type {
 
 /** Transacción PG + `SET LOCAL app.workspace_id`; reutiliza la del llamador si existe (idempotencia, orquestación). */
 export interface UnitOfWork {
-  run<T>(workspaceId: string, fn: () => Promise<T>): Promise<T>;
+  run<T>(
+    workspaceId: string,
+    fn: () => Promise<T>,
+    options?: { readonly isolation?: 'SERIALIZABLE' },
+  ): Promise<T>;
 }
 
 export type TransactionSort =
@@ -46,6 +52,8 @@ export interface TransactionListFilter {
   readonly targetCurrency?: string;
   readonly dateFrom?: string;
   readonly dateTo?: string;
+  /** Marcas de sistema derivadas (docs/33 D111): `RECONCILED_WITHOUT_STATEMENT`. */
+  readonly systemFlags?: readonly SystemFlag[];
   readonly amountMin?: string;
   readonly amountMax?: string;
   /** Texto ya normalizado (minúsculas, sin acentos). */
@@ -57,6 +65,12 @@ export interface TransactionRepository {
   insert(tx: Transaction): Promise<void>;
   /** Optimistic locking por `persistedVersion`; `false` si otra escritura ganó (CONCURRENCY_CONFLICT). */
   update(tx: Transaction): Promise<boolean>;
+  /**
+   * Persiste SOLO un cambio de estado de conciliación sin tocar legs, splits ni conversiones (`status`,
+   * `reconciliation_mode`, versión): CLEAR/UNCLEAR/RECONCILE/UNRECONCILE/cotejo (add-reconciliation). Optimistic
+   * locking por `persistedVersion`; `false` si otra escritura ganó.
+   */
+  updateStatus(tx: Transaction): Promise<boolean>;
   findById(
     workspaceId: string,
     id: string,
@@ -104,6 +118,116 @@ export interface TransactionRepository {
     workspaceId: string,
     transactionId: string,
   ): Promise<{ readonly detail: ConversionDetail; readonly createdAt: string | null }[]>;
+}
+
+/** Fila de `txn.reconciliation_item`: transacción reconciliada (o cotejada) por una sesión. */
+export interface ReconciliationItem {
+  readonly reconciliationId: string;
+  readonly transactionId: string;
+  readonly reconciledAt: string;
+  /** `true` si la transacción ya estaba conciliada sin extracto y la sesión la coteja (decisión 14). */
+  readonly verifiedWithoutStatement: boolean;
+  readonly unreconciledAt: string | null;
+  readonly unreconciledBy: string | null;
+  readonly unreconcileReason: string | null;
+}
+
+export interface ReconciliationListFilter {
+  readonly accountId?: string;
+  readonly status?: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+}
+
+/** Conteos por cuenta para `ReconciliationStatusQuery.getCoverage` (decisión 9). */
+export interface CoverageCounts {
+  /** Transacciones `POSTED` con un leg en la cuenta y fecha ≤ corte. */
+  readonly unreconciledPostedCount: number;
+  /** Transacciones `CLEARED` con un leg en la cuenta y fecha ≤ corte. */
+  readonly unreconciledClearedCount: number;
+  /** `RECONCILED` en modo `WITHOUT_STATEMENT` con fecha en `[from, through]`. */
+  readonly withoutStatementInRange: number;
+  /** ¿Existe una `RECONCILED/WITHOUT_STATEMENT` con fecha en `(afterDate, through]`? */
+  readonly withoutStatementAfterLastStatement: boolean;
+}
+
+export interface ReconciliationRepository {
+  insert(r: Reconciliation): Promise<void>;
+  /** Optimistic locking por `persistedVersion`; `false` si otra escritura ganó. */
+  update(r: Reconciliation): Promise<boolean>;
+  findById(
+    workspaceId: string,
+    id: string,
+    options?: { readonly forUpdate?: boolean },
+  ): Promise<Reconciliation | null>;
+  /** La sesión `IN_PROGRESS` de la cuenta, si existe (índice único parcial). */
+  findInProgress(workspaceId: string, accountId: string): Promise<Reconciliation | null>;
+  /** La sesión `COMPLETED` de la cuenta con mayor fecha de extracto. */
+  lastCompleted(workspaceId: string, accountId: string): Promise<Reconciliation | null>;
+  /** Orden `statementDate DESC, id DESC`. */
+  list(
+    workspaceId: string,
+    filter: ReconciliationListFilter,
+    page: { readonly offset: number; readonly limit: number },
+  ): Promise<Reconciliation[]>;
+  findByIds(workspaceId: string, ids: readonly string[]): Promise<Reconciliation[]>;
+  /**
+   * Σ de los legs vigentes de la cuenta (signo contable) de transacciones en los `statuses` con fecha de negocio ≤
+   * `through`, y cuántas transacciones son. Consulta agregada (p95 ≤ 150 ms, NFR-PERF-003).
+   */
+  confirmedLegsTotal(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly currency: string;
+    readonly through: string;
+    readonly statuses: readonly ('CLEARED' | 'RECONCILED')[];
+  }): Promise<{ readonly total: Money; readonly count: number }>;
+  /** `CLEARED` con un leg en la cuenta y fecha ≤ `through`, bloqueadas `FOR UPDATE`, por fecha e id. */
+  lockClearedThrough(workspaceId: string, accountId: string, through: string): Promise<Transaction[]>;
+  /** `RECONCILED` en modo `WITHOUT_STATEMENT` con un leg en la cuenta y fecha ≤ `through`, `FOR UPDATE`. */
+  lockWithoutStatementThrough(
+    workspaceId: string,
+    accountId: string,
+    through: string,
+  ): Promise<Transaction[]>;
+  insertItems(
+    workspaceId: string,
+    items: readonly {
+      readonly reconciliationId: string;
+      readonly transactionId: string;
+      readonly verifiedWithoutStatement: boolean;
+    }[],
+  ): Promise<void>;
+  itemsOf(workspaceId: string, reconciliationId: string): Promise<ReconciliationItem[]>;
+  /**
+   * Anota la des-reconciliación posterior en el ítem vigente de la transacción (sin alterar el resultado de la
+   * sesión) y devuelve la sesión; `null` si la transacción no fue reconciliada en una sesión (D77).
+   */
+  markUnreconciled(input: {
+    readonly workspaceId: string;
+    readonly transactionId: string;
+    readonly reason: string;
+  }): Promise<{ readonly reconciliationId: string } | null>;
+  coverageCounts(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly from: string | null;
+    readonly through: string;
+    readonly afterDate: string | null;
+  }): Promise<CoverageCounts>;
+}
+
+/** Saldo inicial de una cuenta en el ledger (asiento de apertura; no tiene fila en `txn`). */
+export interface OpeningBalanceReader {
+  /** Σ postings con signo contable de los asientos de apertura de la cuenta con fecha ≤ `asOf`; `null` si no hay. */
+  openingBalance(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly asOf: string;
+  }): Promise<{ readonly amount: string; readonly currency: string } | null>;
+}
+
+/** Fecha de hoy en la zona horaria del workspace (RISK-020). */
+export interface WorkspaceCalendar {
+  today(workspaceId: string): Promise<string>;
 }
 
 export interface CurrencyCatalog {
@@ -159,4 +283,8 @@ export interface TransactionsDeps {
   readonly lifecycleQuery: LifecycleQuery;
   readonly ids: IdGenerator;
   readonly clock: Clock;
+  /** Sesiones de reconciliación (add-reconciliation). */
+  readonly reconciliations: ReconciliationRepository;
+  readonly openingBalances: OpeningBalanceReader;
+  readonly calendar: WorkspaceCalendar;
 }

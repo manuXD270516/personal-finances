@@ -252,6 +252,9 @@ Content-Type: application/json
 | transactions | `SPLITS_DO_NOT_SUM` | 422 | Σ splits ≠ monto |
 | transactions | `INVALID_STATUS_TRANSITION` | 409 | p. ej. anular una anulada |
 | transactions | `TRANSACTION_RECONCILED` | 409 | Requiere des-reconciliar antes de editar montos |
+| transactions (P2) | `RECONCILIATION_IN_PROGRESS` | 409 | La cuenta ya tiene una sesión de reconciliación en curso (`startReconciliation`, `add-reconciliation`) |
+| transactions (P2) | `RECONCILIATION_STATEMENT_DATE_INVALID` | 422 | Fecha del extracto futura (hoy en la zona del workspace) o no posterior a la de la última sesión completada |
+| transactions (P2) | `RECONCILIATION_DIFFERENCE_NOT_ZERO` | 422 | Finalizar con diferencia ≠ 0 sin ajuste confirmado; el problem incluye la extensión `difference` (`Money`) |
 | transactions | `REFUND_EXCEEDS_ORIGINAL` | 422 | Σ reembolsos vigentes + nuevo > monto del gasto original (salvo `confirmRefundExceedsOriginal: true`, auditado) |
 | transactions | `TRANSFER_SAME_ACCOUNT` | 422 | Origen = destino |
 | transactions | `TRANSFER_CURRENCY_MISMATCH` | 422 | Cuentas (o comisión) en otra moneda: la transferencia es de una sola moneda; el problem incluye `suggestedOperationId` (`createConversion`). Una comisión en otra moneda o desde otra cuenta se registra como conversión o gasto aparte (docs/31 D37, D40) |
@@ -340,7 +343,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | transactions bulk | `POST W/transactions/bulk-edit` | `transactions/bulk-edit` | 2 |
 | transfers | `POST W/transfers` (fachada: crea transacción `TRANSFER`) | `transactions/transfers` | 1 |
 | conversions | `GET/POST W/conversions`, `POST W/conversions/preview` (`previewConversion`, VIEWER, sin efectos), `GET …/{transactionId}`, `PUT …/{transactionId}` (`amendConversion`, nueva revisión de `ConversionDetail`), `GET …/{transactionId}/revisions` (`listConversionRevisions`) | `transactions/conversions`, `fx/conversion-pricing` | 1 |
-| reconciliations | `GET/POST W/reconciliations`, `PATCH …/{id}`, `POST …/{id}/complete` | `transactions/reconciliation` | 2 |
+| reconciliations | `GET/POST W/reconciliations` (`listReconciliations`, `startReconciliation`), `GET …/{id}` (`getReconciliation`, saldo confirmado y diferencia en vivo), `POST …/{id}/cleared` (`toggleReconciliationCleared`), `POST …/{id}/complete` (`completeReconciliation`, con ajuste opcional), `POST …/{id}/cancel` (`cancelReconciliation`), `GET …/{id}/lifecycle` (`getReconciliationLifecycle`) y `GET …/{id}/lifecycle/export` (`exportReconciliationLifecycle`, CSV/PDF, D52), `GET W/accounts/{id}/reconciliation-status` (`getReconciliationStatus`); `PATCH …/transactions/{id}` con `status=RECONCILED` exige `reconciliationMode: WITHOUT_STATEMENT`; filtro `systemFlag` en `listTransactions` | `transactions/reconciliation`, `audit/lifecycle-timeline` | 2 |
 | duplicates | `GET W/duplicate-candidates`, `POST …/{id}/resolve` | `transactions/duplicate-detection` | 6 |
 | categories | `GET/POST W/categories`, `POST W/categories/reorder`, `POST W/categories/apply-default-catalog`, `GET/PATCH …/{id}`, `POST …/archive` (en cascada a subcategorías), `POST …/unarchive` | `classification/categories` | 1 |
 | category-groups | `GET/POST W/category-groups`, `GET/PATCH …/{id}`, `POST …/archive`, `POST …/unarchive` | `classification/categories` | 1 |

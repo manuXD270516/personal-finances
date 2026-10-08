@@ -10,6 +10,7 @@ import {
   type Transaction,
   type TransactionState,
   type TransactionStatus,
+  type TransactionTransitionRecord,
 } from '../domain/index.js';
 import type { TransactionsDeps } from './ports/index.js';
 
@@ -223,6 +224,8 @@ export async function publishPosted(
       splits: splitsPayload(s),
       supersedesJournalEntryId: supersedes,
       ...(transition ? { transition } : {}),
+      // Aditivo (add-reconciliation): el ajuste que crea una sesión de reconciliación referencia la sesión.
+      ...(s.reconciliationId ? { reconciliationId: s.reconciliationId } : {}),
     }),
   ];
   if (s.kind === 'TRANSFER') {
@@ -294,12 +297,20 @@ export function transactionSteps(
     };
     readonly changedFields?: readonly string[];
     readonly revisionBefore?: number;
+    /** Referencias del paso (p. ej. `reconciliationId` de la sesión que reconcilió o cotejó la transacción). */
+    readonly detailRefs?: Readonly<Record<string, string | number>>;
+    /** Paso explícito (varios pasos en un mismo comando); por defecto el último registrado por el agregado. */
+    readonly transition?: TransactionTransitionRecord | null;
   },
 ): LifecycleStepInput[] {
-  const t = tx.lastTransition;
+  const t = input.transition !== undefined ? input.transition : tx.lastTransition;
   const s = tx.snapshot;
   if (t) {
     const linksDetail = s.kind === 'CONVERSION' && (t.transition === 'RECORD' || t.transition === 'REVISE');
+    const detailRefs = {
+      ...(linksDetail ? { conversionRevision: s.revision } : {}),
+      ...(input.detailRefs ?? {}),
+    };
     return [
       {
         kind: 'TRANSITION',
@@ -311,7 +322,7 @@ export function transactionSteps(
         revisionTo: t.revisionTo,
         events: input.events,
         ...(input.journalEntries ? { journalEntries: input.journalEntries } : {}),
-        ...(linksDetail ? { detailRefs: { conversionRevision: s.revision } } : {}),
+        ...(Object.keys(detailRefs).length > 0 ? { detailRefs } : {}),
       },
     ];
   }
@@ -321,6 +332,7 @@ export function transactionSteps(
       kind: 'ANNOTATION',
       changedFields: input.changedFields ?? [],
       events: input.events,
+      ...(input.detailRefs ? { detailRefs: input.detailRefs } : {}),
       ...(revised ? { revisionFrom: input.revisionBefore ?? null, revisionTo: s.revision } : {}),
     },
   ];

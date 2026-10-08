@@ -11,6 +11,7 @@ export const TRANSACTION_TRANSITIONS = [
   'CLEAR',
   'UNCLEAR',
   'RECONCILE',
+  'RECONCILE_WITHOUT_STATEMENT',
   'UNRECONCILE',
   'REVISE',
   'VOID',
@@ -27,13 +28,14 @@ export interface TransactionTransitionRecord extends StateTransition<
 }
 
 /**
- * Máquina `Transaction` (todos los kinds, incluidos `TRANSFER` y `CONVERSION`; `machineVersion = 1`). Es la ÚNICA
+ * Máquina `Transaction` (todos los kinds, incluidos `TRANSFER` y `CONVERSION`; `machineVersion = 2`: add-reconciliation
+ * agrega `RECONCILE_WITHOUT_STATEMENT`, docs/33 D74, y el evento `TransactionCleared`, docs/31 D47). Es la ÚNICA
  * fuente de las transiciones permitidas: `transaction-status.ts` (`canTransition`/`assertTransition`) y el agregado
  * derivan de ella. Las reglas vigentes (FR-TRANSACTIONS-006, D16) no cambian: se declaran.
  */
 export const TRANSACTION_LIFECYCLE = LifecycleMachine.define({
   aggregateType: 'Transaction',
-  machineVersion: 1,
+  machineVersion: 2,
   states: [
     { code: 'PENDING', terminal: false },
     { code: 'POSTED', terminal: false },
@@ -69,28 +71,35 @@ export const TRANSACTION_LIFECYCLE = LifecycleMachine.define({
       code: 'CLEAR',
       from: ['POSTED'],
       to: ['CLEARED'],
-      guard: '—',
-      events: ['transactions.TransactionUpdated.v1'],
+      guard: 'periodo abierto (INV-015)',
+      events: ['transactions.TransactionCleared.v1', 'transactions.TransactionUpdated.v1'],
     },
     {
       code: 'UNCLEAR',
       from: ['CLEARED'],
       to: ['POSTED'],
-      guard: '—',
-      events: ['transactions.TransactionUpdated.v1'],
+      guard: 'periodo abierto (INV-015)',
+      events: ['transactions.TransactionCleared.v1', 'transactions.TransactionUpdated.v1'],
     },
     {
       code: 'RECONCILE',
       from: ['CLEARED'],
       to: ['RECONCILED'],
-      guard: '—',
+      guard: 'al finalizar una sesión de reconciliación de su cuenta; periodo abierto (INV-015)',
+      events: ['transactions.TransactionUpdated.v1'],
+    },
+    {
+      code: 'RECONCILE_WITHOUT_STATEMENT',
+      from: ['CLEARED'],
+      to: ['RECONCILED'],
+      guard: 'modo explícito conciliada sin extracto, sin sesión; periodo abierto (INV-015)',
       events: ['transactions.TransactionUpdated.v1'],
     },
     {
       code: 'UNRECONCILE',
       from: ['RECONCILED'],
       to: ['CLEARED'],
-      guard: 'motivo obligatorio',
+      guard: 'motivo obligatorio; periodo abierto (INV-015)',
       events: ['transactions.TransactionUpdated.v1'],
     },
     {

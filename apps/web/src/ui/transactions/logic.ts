@@ -56,6 +56,8 @@ export interface TransactionFilters {
   readonly dateTo: string;
   /** Filtro por valor de custom field de los splits (`customField[<clave>]`, add-custom-fields). */
   readonly customField: CustomFieldFilter;
+  /** Solo las conciliadas sin extracto, pendientes de revisión (`systemFlag=RECONCILED_WITHOUT_STATEMENT`, D111). */
+  readonly withoutStatement: boolean;
 }
 
 export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
@@ -68,6 +70,7 @@ export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
   dateFrom: '',
   dateTo: '',
   customField: EMPTY_CUSTOM_FIELD_FILTER,
+  withoutStatement: false,
 };
 
 /**
@@ -84,6 +87,7 @@ export function transactionsQuery(
   if (f.accountId) q.append('accountId', f.accountId);
   if (f.kind) q.append('kind', f.kind);
   if (f.status) q.append('status', f.status);
+  if (f.withoutStatement) q.append('systemFlag', 'RECONCILED_WITHOUT_STATEMENT');
   if (f.paymentMethod) q.set('paymentMethod', f.paymentMethod);
   if (f.categoryId) q.append('categoryId', f.categoryId);
   if (f.dateFrom) q.set('dateFrom', f.dateFrom);
@@ -104,6 +108,7 @@ export function availableActions(tx: Transaction) {
     post: s === 'PENDING',
     clear: s === 'POSTED',
     unclear: s === 'CLEARED',
+    // Marcado directo como conciliada SIN extracto (docs/33 D74); la conciliación contra extracto es la sesión.
     reconcile: s === 'CLEARED',
     unreconcile: s === 'RECONCILED',
     void: s !== 'VOIDED' && s !== 'RECONCILED',

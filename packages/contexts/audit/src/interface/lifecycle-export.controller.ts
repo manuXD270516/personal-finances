@@ -85,6 +85,17 @@ export class LifecycleExportController {
     return this.download(req, res, workspaceId, 'Counterparty', id, format);
   }
 
+  @Get(`${WS}/reconciliations/:reconciliationId/lifecycle/export`)
+  reconciliation(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: ApiResponse,
+    @Param('workspaceId') workspaceId: string,
+    @Param('reconciliationId') id: string,
+    @Query('format') format: unknown,
+  ) {
+    return this.download(req, res, workspaceId, 'Reconciliation', id, format);
+  }
+
   private async download(
     req: ApiRequest,
     res: ApiResponse,

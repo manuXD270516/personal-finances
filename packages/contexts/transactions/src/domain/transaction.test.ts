@@ -4,7 +4,7 @@ import { BANK_A, bob, CARD, expense, nextId, UNCATEGORIZED, USD } from './fixtur
 import { toJournalEntryDraft } from './posting-translator.js';
 import { assertRefundAllowed } from './refund-policy.js';
 import { assertTransition, canTransition } from './transaction-status.js';
-import type { Transaction } from './transaction.js';
+import { systemFlagsOf, type Transaction } from './transaction.js';
 
 function codeOf(fn: () => unknown): string | undefined {
   try {
@@ -191,19 +191,67 @@ describe('Edición, anulación y estados', () => {
     expect(pending.void('no ocurrió', 'x').entryToReverse).toBeNull();
   });
 
-  it('[TC-TRANSACTIONS-RECONCILED-001] cleared → reconciled sin ledger; posted → reconciled inválido', () => {
+  it('[TC-TRANSACTIONS-RECONCILED-001] cleared → reconciled sin ledger; posted → reconciled inválido (el marcado directo deja el modo sin extracto)', () => {
     const t1 = expense({ status: 'CLEARED' });
-    t1.changeStatus('RECONCILED');
+    t1.reconcileWithoutStatement('WITHOUT_STATEMENT');
     expect(t1.status).toBe('RECONCILED');
+    expect(t1.snapshot.reconciliationMode).toBe('WITHOUT_STATEMENT');
     const t2 = expense();
-    expect(codeOf(() => t2.changeStatus('RECONCILED'))).toBe('INVALID_STATUS_TRANSITION');
+    expect(codeOf(() => t2.reconcileWithoutStatement('WITHOUT_STATEMENT'))).toBe('INVALID_STATUS_TRANSITION');
     expect(t2.status).toBe('POSTED');
+  });
+
+  it('[TC-TRANSACTIONS-RECONCILIATION-017] el marcado directo sin modo explícito (o con STATEMENT) ⇒ VALIDATION_FAILED y sigue cleared', () => {
+    const tx = expense({ status: 'CLEARED' });
+    expect(codeOf(() => tx.reconcileWithoutStatement(undefined))).toBe('VALIDATION_FAILED');
+    expect(codeOf(() => tx.reconcileWithoutStatement('STATEMENT'))).toBe('VALIDATION_FAILED');
+    expect(tx.status).toBe('CLEARED');
+    expect(tx.snapshot.reconciliationMode).toBeNull();
+  });
+
+  it('[TC-TRANSACTIONS-RECONCILIATION-014] sin extracto: RECONCILE_WITHOUT_STATEMENT, modo y marca de seguimiento derivada; sin cambiar el ledger', () => {
+    const tx = expense({ status: 'CLEARED' });
+    tx.attachEntry('e1');
+    tx.reconcileWithoutStatement('WITHOUT_STATEMENT');
+    expect(tx.lastTransition).toMatchObject({
+      transition: 'RECONCILE_WITHOUT_STATEMENT',
+      from: 'CLEARED',
+      to: 'RECONCILED',
+    });
+    expect(tx.snapshot).toMatchObject({ reconciliationMode: 'WITHOUT_STATEMENT', activeEntryId: 'e1' });
+    expect(systemFlagsOf(tx.snapshot)).toEqual(['RECONCILED_WITHOUT_STATEMENT']);
+    expect(systemFlagsOf(expense({ status: 'CLEARED' }).snapshot)).toEqual([]);
+  });
+
+  it('[TC-TRANSACTIONS-RECONCILED-001] reconcile (sesión) fija el modo STATEMENT sin marca; exige la sesión y partir de cleared', () => {
+    const tx = expense({ status: 'CLEARED' });
+    expect(codeOf(() => tx.reconcile(' '))).toBe('VALIDATION_FAILED');
+    tx.reconcile('rec-1');
+    expect(tx.lastTransition).toMatchObject({ transition: 'RECONCILE', from: 'CLEARED', to: 'RECONCILED' });
+    expect(tx.snapshot.reconciliationMode).toBe('STATEMENT');
+    expect(systemFlagsOf(tx.snapshot)).toEqual([]);
+    expect(codeOf(() => expense().reconcile('rec-1'))).toBe('INVALID_STATUS_TRANSITION');
+  });
+
+  it('[TC-TRANSACTIONS-RECONCILIATION-019] el cotejo posterior pasa WITHOUT_STATEMENT a STATEMENT sin cambiar el estado ni dejar transición', () => {
+    const tx = expense({ status: 'CLEARED' });
+    tx.reconcileWithoutStatement('WITHOUT_STATEMENT');
+    const versionBefore = tx.version;
+    expect(tx.verifyAgainstStatement('rec-1')).toBe(true);
+    expect(tx.status).toBe('RECONCILED');
+    expect(tx.snapshot.reconciliationMode).toBe('STATEMENT');
+    expect(tx.lastTransition).toBeNull();
+    expect(tx.version).toBe(versionBefore + 1);
+    expect(systemFlagsOf(tx.snapshot)).toEqual([]);
+    // Ya cotejada, o no conciliada: sin cambios.
+    expect(tx.verifyAgainstStatement('rec-2')).toBe(false);
+    expect(expense({ status: 'CLEARED' }).verifyAgainstStatement('rec-1')).toBe(false);
   });
 
   it('[TC-TRANSACTIONS-RECONCILED-002] reconciliada: editar monto o anular ⇒ TRANSACTION_RECONCILED; recategorizar sí', () => {
     const tx = expense({ status: 'CLEARED' });
     tx.attachEntry('e1');
-    tx.changeStatus('RECONCILED');
+    tx.reconcileWithoutStatement('WITHOUT_STATEMENT');
     expect(codeOf(() => tx.amend({ amount: bob('155.00') }))).toBe('TRANSACTION_RECONCILED');
     expect(codeOf(() => tx.void('x', 'y'))).toBe('TRANSACTION_RECONCILED');
     const r = tx.amend({ splits: [{ id: 'n', amount: bob('150.00'), categoryId: nextId() }] });
@@ -213,11 +261,14 @@ describe('Edición, anulación y estados', () => {
 
   it('[TC-TRANSACTIONS-RECONCILED-003] des-reconciliar exige motivo y deja la transacción cleared', () => {
     const tx = expense({ status: 'CLEARED' });
-    tx.changeStatus('RECONCILED');
+    tx.reconcileWithoutStatement('WITHOUT_STATEMENT');
     expect(codeOf(() => tx.unreconcile(' '))).toBe('VALIDATION_FAILED');
     expect(tx.status).toBe('RECONCILED');
     tx.unreconcile('corregir monto');
     expect(tx.status).toBe('CLEARED');
+    // D74: des-reconciliar limpia el modo y la marca de seguimiento.
+    expect(tx.snapshot.reconciliationMode).toBeNull();
+    expect(systemFlagsOf(tx.snapshot)).toEqual([]);
     expect(codeOf(() => tx.unreconcile('otra vez'))).toBe('INVALID_STATUS_TRANSITION');
   });
 

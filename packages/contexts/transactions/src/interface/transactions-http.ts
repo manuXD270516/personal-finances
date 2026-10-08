@@ -21,21 +21,23 @@ import type {
   TransactionsService,
   UpdateTransactionCommand,
 } from '../application/transactions.service.js';
-import type {
-  PaymentMethod,
-  TransactionKind,
-  TransactionSource,
-  TransactionState,
-  TransactionStatus,
+import {
+  systemFlagsOf,
+  type PaymentMethod,
+  type SystemFlag,
+  type TransactionKind,
+  type TransactionSource,
+  type TransactionState,
+  type TransactionStatus,
 } from '../domain/index.js';
 import { conversionDetailDto, rateDto } from './conversion-dto.js';
 
 export const TRANSACTIONS_SERVICE = Symbol('TRANSACTIONS_SERVICE');
 
-type Json = Record<string, unknown>;
-const str = (b: Json, k: string): string | undefined =>
+export type Json = Record<string, unknown>;
+export const str = (b: Json, k: string): string | undefined =>
   typeof b[k] === 'string' ? (b[k] as string) : undefined;
-const list = (q: Json, k: string): string[] | undefined => {
+export const list = (q: Json, k: string): string[] | undefined => {
   const v = q[k];
   if (v === undefined) return undefined;
   return (Array.isArray(v) ? v : String(v).split(',')).map(String);
@@ -61,12 +63,12 @@ function customFieldFilters(q: Json): CustomFieldFilter[] {
     );
 }
 
-function limitOf(q: Json): number {
+export function limitOf(q: Json): number {
   const raw = Number(q['limit'] ?? DEFAULT_PAGE_LIMIT);
   return Number.isInteger(raw) ? Math.min(Math.max(raw, 1), MAX_PAGE_LIMIT) : DEFAULT_PAGE_LIMIT;
 }
 
-function userIdOf(req: ApiRequest): string {
+export function userIdOf(req: ApiRequest): string {
   const principal = principalOf(req);
   if (!principal) throw new ApiProblem('UNAUTHENTICATED', 'an authenticated user is required');
   return principal.userId;
@@ -78,6 +80,9 @@ export function toTransactionDto(s: TransactionState, totalCost?: ConversionCost
     id: s.id,
     kind: s.kind,
     status: s.status,
+    // Modo de conciliación (docs/33 D74) y marca de seguimiento derivada de solo lectura (D111).
+    reconciliationMode: s.reconciliationMode,
+    systemFlags: systemFlagsOf(s),
     transactionDate: s.businessDate,
     postingDate: s.postingDate,
     amount: s.amount.toJSON(),
@@ -157,6 +162,7 @@ export class TransactionsController {
       counterpartyId: list(query, 'counterpartyId') ?? null,
       kind: list(query, 'kind') ?? null,
       status: list(query, 'status') ?? null,
+      systemFlag: list(query, 'systemFlag') ?? null,
       currency: str(query, 'currency') ?? null,
       dateFrom: str(query, 'dateFrom') ?? null,
       dateTo: str(query, 'dateTo') ?? null,
@@ -189,6 +195,7 @@ export class TransactionsController {
       ...(filters.counterpartyId ? { counterpartyIds: filters.counterpartyId } : {}),
       ...(filters.kind ? { kinds: filters.kind as TransactionKind[] } : {}),
       ...(filters.status ? { statuses: filters.status as TransactionStatus[] } : {}),
+      ...(filters.systemFlag ? { systemFlags: filters.systemFlag as SystemFlag[] } : {}),
       ...(filters.currency ? { currency: filters.currency } : {}),
       ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
       ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
@@ -349,6 +356,9 @@ export class TransactionsController {
       ...(str(body, 'accountId') ? { accountId: str(body, 'accountId') as string } : {}),
       ...(body['amount'] ? { amount: body['amount'] as MoneyDto } : {}),
       ...(body['status'] ? { status: body['status'] as 'POSTED' | 'CLEARED' | 'RECONCILED' } : {}),
+      ...(str(body, 'reconciliationMode')
+        ? { reconciliationMode: str(body, 'reconciliationMode') as string }
+        : {}),
       ...(splitsOf(body) ? { splits: splitsOf(body) as SplitDto[] } : {}),
       ...pickNullable(body, ['postingDate', 'description', 'notes', 'counterpartyId', 'paymentMethod']),
     };
@@ -406,6 +416,13 @@ export class TransactionsController {
     });
     return {
       ...view.lifecycle,
+      // Sesiones referenciadas por las transiciones (fecha y saldo del extracto, TC-AUDIT-LIFECYCLE-026).
+      reconciliations: view.reconciliations.map((r) => ({
+        reconciliationId: r.reconciliationId,
+        accountId: r.accountId,
+        statementDate: r.statementDate,
+        statementBalance: r.statementBalance.toJSON(),
+      })),
       revisions: view.revisions.map((r) => ({
         revision: r.revision,
         amount: r.amount.toJSON(),

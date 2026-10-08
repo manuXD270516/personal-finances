@@ -28,6 +28,7 @@ import {
   type AdjustmentDirection,
   type LegRole,
   type PaymentMethod,
+  type ReconciliationMode,
   type TransactionKind,
   type TransactionSource,
   type TransactionState,
@@ -65,6 +66,8 @@ interface TxnDb {
     refund_of_transaction_id: string | null;
     adjustment_reason: string | null;
     confirmed_refund_excess: boolean;
+    reconciliation_id: string | null;
+    reconciliation_mode: ReconciliationMode | null;
     revision: number;
     active_entry_id: string | null;
     voided_at: string | null;
@@ -156,6 +159,8 @@ const txColumns = [
   't.refund_of_transaction_id',
   't.adjustment_reason',
   't.confirmed_refund_excess',
+  't.reconciliation_id',
+  't.reconciliation_mode',
   't.revision',
   't.active_entry_id',
   't.void_reason',
@@ -194,6 +199,8 @@ function txRow(s: TransactionState): Omit<TxnDb['txn.transaction'], 'created_at'
     refund_of_transaction_id: s.refundOfTransactionId,
     adjustment_reason: s.adjustmentReason,
     confirmed_refund_excess: s.confirmedRefundExcess,
+    reconciliation_id: s.reconciliationId,
+    reconciliation_mode: s.reconciliationMode,
     revision: s.revision,
     active_entry_id: s.activeEntryId,
     voided_at: s.voidedAt,
@@ -219,6 +226,27 @@ export class PgTransactionRepository implements TransactionRepository {
   private async writeConversion(tx: Transaction): Promise<void> {
     const s = tx.snapshot;
     if (s.conversion) await insertConversionDetail(s.workspaceId, s.id, s.conversion);
+  }
+
+  /**
+   * Cambios de estado de conciliación (CLEAR/UNCLEAR/RECONCILE/UNRECONCILE/cotejo): una sola sentencia, sin tocar legs,
+   * splits ni conversiones (add-reconciliation: finalizar una sesión con ≤ 2 000 transacciones en ≤ 2 s).
+   */
+  async updateStatus(tx: Transaction): Promise<boolean> {
+    const s = tx.snapshot;
+    const result = await db()
+      .updateTable('txn.transaction')
+      .set({
+        status: s.status,
+        reconciliation_mode: s.reconciliationMode,
+        version: s.version,
+        updated_at: sql<string>`now()`,
+      })
+      .where('workspace_id', '=', s.workspaceId)
+      .where('id', '=', s.id)
+      .where('version', '=', tx.persistedVersion ?? -1)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows) === 1;
   }
 
   async update(tx: Transaction): Promise<boolean> {
@@ -407,6 +435,20 @@ export class PgTransactionRepository implements TransactionRepository {
     return (await this.hydrate(workspaceId, [row as TxRow]))[0] ?? null;
   }
 
+  /** Varias transacciones por id (orden de `ids`); lo usa la sesión de reconciliación tras bloquearlas `FOR UPDATE`. */
+  async findByIds(workspaceId: string, ids: readonly string[]): Promise<Transaction[]> {
+    if (ids.length === 0) return [];
+    const rows = await db()
+      .selectFrom('txn.transaction as t')
+      .innerJoin('fx.currency as c', 'c.code', 't.currency')
+      .select(txColumns)
+      .where('t.workspace_id', '=', workspaceId)
+      .where('t.id', 'in', [...ids])
+      .execute();
+    const byId = new Map((await this.hydrate(workspaceId, rows as TxRow[])).map((t) => [t.id, t]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
+  }
+
   async list(
     workspaceId: string,
     filter: TransactionListFilter,
@@ -434,6 +476,10 @@ export class PgTransactionRepository implements TransactionRepository {
           ),
         ]),
       );
+    }
+    // Marca de sistema derivada del modo de conciliación (docs/33 D111): índice parcial `transaction_without_statement_ix`.
+    if (filter.systemFlags?.includes('RECONCILED_WITHOUT_STATEMENT')) {
+      q = q.where('t.reconciliation_mode', '=', 'WITHOUT_STATEMENT');
     }
     if (filter.kinds?.length) q = q.where('t.kind', 'in', [...filter.kinds]);
     if (filter.statuses?.length) q = q.where('t.status', 'in', [...filter.statuses]);
@@ -812,6 +858,8 @@ export class PgTransactionRepository implements TransactionRepository {
         refundOfTransactionId: r.refund_of_transaction_id,
         adjustmentReason: r.adjustment_reason,
         confirmedRefundExcess: r.confirmed_refund_excess,
+        reconciliationMode: r.reconciliation_mode,
+        reconciliationId: r.reconciliation_id,
         legs: legs
           .filter((l) => l.transaction_id === r.id)
           .map((l) => ({
@@ -890,10 +938,14 @@ export class PgTransactionsUnitOfWork implements UnitOfWork {
     this.uow = new PgUnitOfWork(pool);
   }
 
-  run<T>(workspaceId: string, fn: () => Promise<T>): Promise<T> {
+  run<T>(
+    workspaceId: string,
+    fn: () => Promise<T>,
+    options: { readonly isolation?: 'SERIALIZABLE' } = {},
+  ): Promise<T> {
     const actor = currentRequestContext()?.actor;
     const userId = actor && actor.type === 'USER' ? actor.userId : null;
-    return this.uow.run({ userId, workspaceId }, fn);
+    return this.uow.run({ userId, workspaceId }, fn, options);
   }
 }
 

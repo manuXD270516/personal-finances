@@ -28,7 +28,9 @@ import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { useCatalogs } from './catalogs';
 import { availableActions } from './logic';
 import { TransactionForm, type RecordKind } from './TransactionForm';
-import { describe, SignedAmount, StatusBadge } from './TransactionsListView';
+import { isWithoutStatement } from '../reconciliation/logic';
+import type { TransactionLifecycle } from '../lifecycle/types';
+import { describe, SignedAmount, StatusBadge, WithoutStatementBadge } from './TransactionsListView';
 import { TransactionTimeline } from './TransactionTimeline';
 
 export function TransactionDetailPage({ transactionId, notice }: { transactionId: string; notice?: string }) {
@@ -109,7 +111,7 @@ function NewTransaction({
   );
 }
 
-type Pending = 'void' | 'unreconcile' | null;
+type Pending = 'void' | 'unreconcile' | 'reconcile' | null;
 
 /**
  * Detalle de transacción (6.2): datos, patas por cuenta, splits con categoría y tags, detalle de conversión,
@@ -209,7 +211,10 @@ function Detail({
         ctx.api.command<Transaction>(
           'PATCH',
           `${ctx.base}/transactions/${current.id}`,
-          { status: next },
+          // El marcado directo exige el modo explícito "conciliada sin extracto" (docs/33 D74).
+          next === 'RECONCILED'
+            ? { status: next, reconciliationMode: 'WITHOUT_STATEMENT' }
+            : { status: next },
           { ifMatch: current.version },
         ),
       done,
@@ -237,7 +242,7 @@ function Detail({
         <strong>
           <SignedAmount tx={tx} f={f} />
         </strong>{' '}
-        <StatusBadge status={tx.status} f={f} />
+        <StatusBadge status={tx.status} f={f} /> <WithoutStatementBadge tx={tx} f={f} />
       </p>
       {notice === 'duplicado' ? (
         <p role="status" style={warningStyle} data-testid="duplicate-notice">
@@ -270,6 +275,15 @@ function Detail({
                     <>
                       <dt>{t('detail.postingDate')}</dt>
                       <dd style={{ margin: 0 }}>{formatLocalDate(tx.postingDate, locale)}</dd>
+                    </>
+                  ) : null}
+                  {tx.status === 'RECONCILED' && tx.reconciliationMode ? (
+                    <>
+                      <dt>{t('detail.reconciliation')}</dt>
+                      <dd style={{ margin: 0 }} data-testid="detail-reconciliation-mode">
+                        {t(`reconciliationModes.${tx.reconciliationMode}`)}
+                        {isWithoutStatement(tx) ? ` · ${t('flags.RECONCILED_WITHOUT_STATEMENT.hint')}` : ''}
+                      </dd>
                     </>
                   ) : null}
                   <dt>{t('detail.paymentMethod')}</dt>
@@ -443,7 +457,8 @@ function Detail({
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => void patchStatus('RECONCILED', t('detail.done.reconcile'))}
+                        data-testid="reconcile-without-statement"
+                        onClick={() => setPending('reconcile')}
                       >
                         {t('detail.reconcile')}
                       </button>
@@ -470,41 +485,45 @@ function Detail({
                     confirmLabel={t(`detail.confirm.${pending}.confirm`)}
                     cancelLabel={t('form.cancel')}
                     busy={busy}
-                    confirmDisabled={!reason.trim()}
+                    confirmDisabled={pending !== 'reconcile' && !reason.trim()}
                     onCancel={() => setPending(null)}
                     onConfirm={() =>
-                      void act(
-                        () =>
-                          pending === 'void'
-                            ? ctx.api.command<Transaction>(
-                                'POST',
-                                `${ctx.base}/transactions/${current.id}/void`,
-                                { reason: reason.trim() },
-                                { ifMatch: current.version },
-                              )
-                            : ctx.api.command<Transaction>(
-                                'POST',
-                                `${ctx.base}/transactions/${current.id}/unreconcile`,
-                                { reason: reason.trim() },
-                                { ifMatch: current.version, idempotent: false },
-                              ),
-                        t(`detail.done.${pending}`),
-                      )
+                      pending === 'reconcile'
+                        ? void patchStatus('RECONCILED', t('detail.done.reconcile'))
+                        : void act(
+                            () =>
+                              pending === 'void'
+                                ? ctx.api.command<Transaction>(
+                                    'POST',
+                                    `${ctx.base}/transactions/${current.id}/void`,
+                                    { reason: reason.trim() },
+                                    { ifMatch: current.version },
+                                  )
+                                : ctx.api.command<Transaction>(
+                                    'POST',
+                                    `${ctx.base}/transactions/${current.id}/unreconcile`,
+                                    { reason: reason.trim() },
+                                    { ifMatch: current.version, idempotent: false },
+                                  ),
+                            t(`detail.done.${pending}`),
+                          )
                     }
                   >
-                    <Field label={t('detail.confirm.reason')}>
-                      {(p) => (
-                        <input
-                          {...p}
-                          name="reason"
-                          required
-                          maxLength={500}
-                          style={inputStyle}
-                          value={reason}
-                          onChange={(e) => setReason(e.target.value)}
-                        />
-                      )}
-                    </Field>
+                    {pending !== 'reconcile' ? (
+                      <Field label={t('detail.confirm.reason')}>
+                        {(p) => (
+                          <input
+                            {...p}
+                            name="reason"
+                            required
+                            maxLength={500}
+                            style={inputStyle}
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                          />
+                        )}
+                      </Field>
+                    ) : null}
                   </ConfirmPanel>
                 ) : null}
                 {editing && catalogs.loaded ? (
@@ -540,6 +559,28 @@ function Detail({
                 fieldLabel={(name) => (f.has(`history.fields.${name}`) ? t(`history.fields.${name}`) : name)}
                 accountName={(id) => catalogs.names.account(id)}
                 idPrefix="tx-lifecycle"
+                extra={(row, lifecycle) => {
+                  // Sesión de reconciliación que originó o cotejó el paso: fecha y saldo del extracto (add-reconciliation).
+                  const id = row.detailRefs['reconciliationId'];
+                  const ref = (lifecycle as TransactionLifecycle).reconciliations?.find(
+                    (r) => r.reconciliationId === id,
+                  );
+                  if (!ref) return null;
+                  return (
+                    <p style={{ margin: '0.25rem 0' }} data-testid="lifecycle-reconciliation-ref">
+                      <a
+                        href={ctx.href(
+                          `/cuentas/${ref.accountId}/reconciliar?sesion=${ref.reconciliationId}`,
+                        )}
+                      >
+                        {t('detail.statementRef', {
+                          date: formatLocalDate(ref.statementDate, locale),
+                          balance: formatMoney(ref.statementBalance, locale),
+                        })}
+                      </a>
+                    </p>
+                  );
+                }}
               />
             ),
           },

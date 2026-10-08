@@ -5,7 +5,9 @@ import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import { BFF_API } from '../session-context';
+import type { ReactNode } from 'react';
 import { LifecycleReport } from './LifecycleReport';
+import type { TimelineRow } from './logic';
 import type { Lifecycle, TransactionLifecycle } from './types';
 
 /**
@@ -20,6 +22,7 @@ export function LifecycleTab({
   fieldLabel,
   accountName,
   idPrefix,
+  extra,
 }: {
   ctx: WorkspaceContext;
   /** Recurso relativo al workspace, p. ej. `transactions/{id}` o `accounts/{id}`. */
@@ -29,6 +32,8 @@ export function LifecycleTab({
   fieldLabel?: (name: string) => string;
   accountName?: (id: string) => string | undefined;
   idPrefix: string;
+  /** Líneas adicionales por fila, con el recorrido completo cargado (sesiones enlazadas, saldos del extracto…). */
+  extra?: (row: TimelineRow, lifecycle: Lifecycle | TransactionLifecycle) => ReactNode;
 }) {
   const f = useFormat('Lifecycle', ctx);
   const [lifecycle, setLifecycle] = useState<Lifecycle | TransactionLifecycle | undefined>();
@@ -68,6 +73,7 @@ export function LifecycleTab({
         stateLabel={stateLabel}
         {...(fieldLabel ? { fieldLabel } : {})}
         {...(accountName ? { accountName } : {})}
+        {...(extra ? { extra: (row: TimelineRow) => extra(row, lifecycle) } : {})}
         currentUserId={ctx.me.id}
         idPrefix={idPrefix}
       />

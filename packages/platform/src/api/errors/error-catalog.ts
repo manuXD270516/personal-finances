@@ -96,6 +96,16 @@ export const ERROR_CATALOG = {
   CURRENCY_NOT_ENABLED: { status: 422, title: 'Currency not enabled in this workspace' },
   // planning (Phase 2)
   PERIOD_NOT_STARTED: { status: 409, title: 'Financial period has not started yet' },
+  // transactions / reconciliation (Phase 2)
+  RECONCILIATION_IN_PROGRESS: { status: 409, title: 'The account already has a reconciliation in progress' },
+  RECONCILIATION_STATEMENT_DATE_INVALID: {
+    status: 422,
+    title: 'Reconciliation statement date is not allowed',
+  },
+  RECONCILIATION_DIFFERENCE_NOT_ZERO: {
+    status: 422,
+    title: 'Reconciliation difference must be zero or adjusted',
+  },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

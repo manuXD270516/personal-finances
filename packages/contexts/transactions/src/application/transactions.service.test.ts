@@ -238,6 +238,22 @@ describe('TransactionsService — edición, anulación y reconciliación', () =>
     expect(cleared.status).toBe('CLEARED');
     expect(state.entries).toHaveLength(1);
     expect(state.audit.at(-1)?.action).toBe('transactions.transaction.cleared');
+    // [TC-TRANSACTIONS-RECONCILIATION-011] docs/31 D47: un único TransactionCleared además de TransactionUpdated.
+    const clearedEvents = state.outbox.filter((e) => e.eventType === 'transactions.TransactionCleared');
+    expect(clearedEvents).toHaveLength(1);
+    expect(clearedEvents[0]?.payload).toMatchObject({
+      transactionId: transaction.id,
+      cleared: true,
+      status: 'CLEARED',
+      previousStatus: 'POSTED',
+      reconciliationId: null,
+      bulkOperationId: null,
+      transition: 'CLEAR',
+    });
+    expect(state.outbox.at(-1)).toMatchObject({
+      eventType: 'transactions.TransactionUpdated',
+      payload: { changedFields: ['status'], transition: 'CLEAR' },
+    });
     expect(
       await codeOf(
         service.updateTransaction({
@@ -293,12 +309,15 @@ describe('TransactionsService — edición, anulación y reconciliación', () =>
       transactionId: transaction.id,
       expectedVersion: 1,
       status: 'RECONCILED',
+      reconciliationMode: 'WITHOUT_STATEMENT',
     });
+    expect(rec.reconciliationMode).toBe('WITHOUT_STATEMENT');
     expect(await codeOf(service.voidTransaction(WS, transaction.id, rec.version, 'x'))).toBe(
       'TRANSACTION_RECONCILED',
     );
     const un = await service.unreconcileTransaction(WS, transaction.id, rec.version, 'error en el extracto');
     expect(un.status).toBe('CLEARED');
+    expect(un.reconciliationMode).toBeNull();
     const edited = await service.updateTransaction({
       workspaceId: WS,
       userId: USER,

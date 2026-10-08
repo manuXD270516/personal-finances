@@ -4,13 +4,17 @@ import type { CurrencyInfoDto, ReferenceRateDto } from '@pf/fx/contracts';
 import type { PostJournalEntryCommand, ReverseJournalEntryCommand } from '@pf/ledger/contracts';
 import { currency, DomainError, FixedClock, Instant, Money, Rate } from '@pf/shared-kernel';
 import {
+  RECONCILIATION_LIFECYCLE,
+  Reconciliation,
+  systemFlagsOf,
   TRANSACTION_LIFECYCLE,
   Transaction,
   type ConversionDetail,
   type LegRole,
+  type ReconciliationState,
   type TransactionState,
 } from '../../domain/index.js';
-import type { TransactionsDeps } from '../ports/index.js';
+import type { ReconciliationItem, TransactionsDeps } from '../ports/index.js';
 
 /** Igual que `AuditPort` real: solo valores planos (string/boolean/entero/null) o `Money` (`AUDIT_INVALID_VALUE`). */
 const auditable = (v: unknown): boolean =>
@@ -107,6 +111,13 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     closedMonths: new Set<string>(),
     /** Definiciones de custom fields disponibles para `validateCustomFieldValues`. */
     customFields: [] as FakeCustomField[],
+    /** Sesiones de reconciliación (add-reconciliation) e ítems reconciliados/cotejados. */
+    reconciliations: new Map<string, ReconciliationState>(),
+    reconciliationItems: [] as ReconciliationItem[],
+    /** Saldos iniciales por cuenta (asiento de apertura, signo contable). */
+    openings: new Map<string, { amount: string; currency: string }>(),
+    /** Fecha de hoy en la zona del workspace; `null` ⇒ la del reloj fijo. */
+    today: null as string | null,
   };
   const faults: { ledger?: Error; audit?: Error; lifecycle?: Error } = {};
   let depth = 0;
@@ -121,6 +132,8 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     legHistory: new Map([...state.legHistory].map(([k, v]) => [k, new Map(v)])),
     details: new Map([...state.details].map(([k, v]) => [k, [...v]])),
     rates: [...state.rates],
+    reconciliations: new Map(state.reconciliations),
+    reconciliationItems: state.reconciliationItems.map((i) => ({ ...i })),
   });
   const keepDetail = (s: TransactionState) => {
     if (!s.conversion) return;
@@ -192,6 +205,12 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         keepDetail(tx.snapshot);
         return true;
       },
+      async updateStatus(tx) {
+        const current = state.txs.get(tx.id);
+        if (!current || current.version !== tx.persistedVersion) return false;
+        state.txs.set(tx.id, tx.snapshot);
+        return true;
+      },
       async findById(_ws, id) {
         const s = state.txs.get(id);
         return s ? Transaction.rehydrate(s) : null;
@@ -199,6 +218,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       async list(_ws, filter, page) {
         return [...state.txs.values()]
           .filter((s) => !filter.accountIds || filter.accountIds.includes(s.accountId))
+          .filter((s) => !filter.systemFlags || filter.systemFlags.every((f) => systemFlagsOf(s).includes(f)))
           .filter((s) => !filter.statuses || filter.statuses.includes(s.status))
           .filter((s) => !filter.kinds || filter.kinds.includes(s.kind))
           .filter((s) => !filter.currency || s.amount.currency.code === filter.currency)
@@ -255,6 +275,146 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         );
       },
     },
+    reconciliations: {
+      async insert(r) {
+        state.reconciliations.set(r.id, r.snapshot);
+      },
+      async update(r) {
+        const current = state.reconciliations.get(r.id);
+        if (!current || current.version !== r.persistedVersion) return false;
+        state.reconciliations.set(r.id, r.snapshot);
+        return true;
+      },
+      async findById(_ws, id) {
+        const s = state.reconciliations.get(id);
+        return s ? Reconciliation.rehydrate(s) : null;
+      },
+      async findInProgress(_ws, accountId) {
+        const s = [...state.reconciliations.values()].find(
+          (x) => x.accountId === accountId && x.status === 'IN_PROGRESS',
+        );
+        return s ? Reconciliation.rehydrate(s) : null;
+      },
+      async lastCompleted(_ws, accountId) {
+        const s = [...state.reconciliations.values()]
+          .filter((x) => x.accountId === accountId && x.status === 'COMPLETED')
+          .sort((a, b) => (a.statementDate < b.statementDate ? 1 : -1))[0];
+        return s ? Reconciliation.rehydrate(s) : null;
+      },
+      async list(_ws, filter, page) {
+        return [...state.reconciliations.values()]
+          .filter((x) => !filter.accountId || x.accountId === filter.accountId)
+          .filter((x) => !filter.status || x.status === filter.status)
+          .sort((a, b) =>
+            a.statementDate === b.statementDate
+              ? a.id < b.id
+                ? 1
+                : -1
+              : a.statementDate < b.statementDate
+                ? 1
+                : -1,
+          )
+          .slice(page.offset, page.offset + page.limit)
+          .map((x) => Reconciliation.rehydrate(x));
+      },
+      async findByIds(_ws, ids) {
+        return ids.flatMap((id) => {
+          const s = state.reconciliations.get(id);
+          return s ? [Reconciliation.rehydrate(s)] : [];
+        });
+      },
+      async confirmedLegsTotal({ accountId, currency: code, through, statuses }) {
+        const ccy = currency(code, scaleOf(code));
+        const included = [...state.txs.values()].filter(
+          (s) =>
+            (statuses as readonly string[]).includes(s.status) &&
+            s.businessDate <= through &&
+            s.legs.some((l) => l.accountId === accountId),
+        );
+        return {
+          total: Money.sum(
+            included.flatMap((s) => s.legs.filter((l) => l.accountId === accountId).map((l) => l.amount)),
+            ccy,
+          ),
+          count: included.length,
+        };
+      },
+      async lockClearedThrough(_ws, accountId, through) {
+        return [...state.txs.values()]
+          .filter(
+            (s) =>
+              s.status === 'CLEARED' &&
+              s.businessDate <= through &&
+              s.legs.some((l) => l.accountId === accountId),
+          )
+          .sort((a, b) => (a.businessDate + a.id < b.businessDate + b.id ? -1 : 1))
+          .map((s) => Transaction.rehydrate(s));
+      },
+      async lockWithoutStatementThrough(_ws, accountId, through) {
+        return [...state.txs.values()]
+          .filter(
+            (s) =>
+              s.status === 'RECONCILED' &&
+              s.reconciliationMode === 'WITHOUT_STATEMENT' &&
+              s.businessDate <= through &&
+              s.legs.some((l) => l.accountId === accountId),
+          )
+          .sort((a, b) => (a.businessDate + a.id < b.businessDate + b.id ? -1 : 1))
+          .map((s) => Transaction.rehydrate(s));
+      },
+      async insertItems(_ws, items) {
+        for (const i of items) {
+          state.reconciliationItems.push({
+            reconciliationId: i.reconciliationId,
+            transactionId: i.transactionId,
+            reconciledAt: '2026-10-01T12:00:00.000Z',
+            verifiedWithoutStatement: i.verifiedWithoutStatement,
+            unreconciledAt: null,
+            unreconciledBy: null,
+            unreconcileReason: null,
+          });
+        }
+      },
+      async itemsOf(_ws, reconciliationId) {
+        return state.reconciliationItems.filter((i) => i.reconciliationId === reconciliationId);
+      },
+      async markUnreconciled({ transactionId, reason }) {
+        const item = [...state.reconciliationItems]
+          .reverse()
+          .find((i) => i.transactionId === transactionId && i.unreconciledAt === null);
+        if (!item) return null;
+        const idx = state.reconciliationItems.indexOf(item);
+        state.reconciliationItems[idx] = {
+          ...item,
+          unreconciledAt: '2026-10-01T12:00:00.000Z',
+          unreconciledBy: 'user',
+          unreconcileReason: reason,
+        };
+        return { reconciliationId: item.reconciliationId };
+      },
+      async coverageCounts({ accountId, from, through, afterDate }) {
+        const mine = [...state.txs.values()].filter(
+          (s) => s.businessDate <= through && s.legs.some((l) => l.accountId === accountId),
+        );
+        const without = mine.filter(
+          (s) => s.status === 'RECONCILED' && s.reconciliationMode === 'WITHOUT_STATEMENT',
+        );
+        return {
+          unreconciledPostedCount: mine.filter((s) => s.status === 'POSTED').length,
+          unreconciledClearedCount: mine.filter((s) => s.status === 'CLEARED').length,
+          withoutStatementInRange: without.filter((s) => from === null || s.businessDate >= from).length,
+          withoutStatementAfterLastStatement: without.some(
+            (s) => afterDate === null || s.businessDate > afterDate,
+          ),
+        };
+      },
+    },
+    openingBalances: {
+      async openingBalance({ accountId }) {
+        return state.openings.get(accountId) ?? null;
+      },
+    },
+    calendar: { today: async () => state.today ?? '2026-10-01' },
     currencies: { scaleOf: async (code) => CATALOG[code]?.scale ?? null },
     accounts: {
       async getPostingEligibility({ accountIds }) {
@@ -464,7 +624,9 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       },
     },
     lifecycleQuery: {
-      machineOf: () => ({ ...TRANSACTION_LIFECYCLE.definition }),
+      machineOf: (type) => ({
+        ...(type === 'Reconciliation' ? RECONCILIATION_LIFECYCLE : TRANSACTION_LIFECYCLE).definition,
+      }),
       async lifecycleOf(input) {
         const own = state.lifecycle.filter((l) => l.aggregateId === input.aggregateId);
         const items = own.map((l) =>
@@ -500,6 +662,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
                 actor: { type: 'USER' as const, id: input.userId, displayName: null },
                 origin: 'api' as const,
                 changedFields: [...l.changedFields],
+                detailRefs: l.detailRefs ?? {},
                 revisionFrom: l.revisionFrom ?? null,
                 revisionTo: l.revisionTo ?? null,
                 aggregateVersion: null,
@@ -515,7 +678,10 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
           currentState: input.currentState,
           path,
           historyComplete: own.find((l) => l.kind === 'TRANSITION')?.fromState === null,
-          machine: { ...TRANSACTION_LIFECYCLE.definition },
+          machine: {
+            ...(input.aggregateType === 'Reconciliation' ? RECONCILIATION_LIFECYCLE : TRANSACTION_LIFECYCLE)
+              .definition,
+          },
           items,
         };
       },

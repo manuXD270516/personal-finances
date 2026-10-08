@@ -12,9 +12,14 @@ invariants: [INV-023, INV-033]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reconciliation.api.test.ts
+  - apps/web/src/ui/reconciliation/reconciliation.test.tsx
+  - packages/contexts/transactions/src/application/reconciliations.service.test.ts
+  - packages/contexts/transactions/src/domain/reconciliation-calculator.test.ts
+  - packages/contexts/transactions/test/integration/pg-reconciliations.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ["reconciliation", "money"]

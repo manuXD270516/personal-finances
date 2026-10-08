@@ -36,6 +36,8 @@ describe('Arquitectura del recorrido (add-lifecycle-timeline)', () => {
       'amendConversion',
       'changeStatus',
       'post',
+      'reconcile',
+      'reconcileWithoutStatement',
       'recordConversion',
       'recordTransfer',
       'unreconcile',

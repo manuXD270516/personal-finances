@@ -115,6 +115,8 @@ export interface TimelineRow {
   readonly revisionTo: number | null;
   readonly journalEntries: LifecycleJournalEntries | null;
   readonly changedFields: readonly string[];
+  /** Referencias a otros agregados (sesión de reconciliación, transacción de ajuste…). */
+  readonly detailRefs: Readonly<Record<string, string | number>>;
   readonly events: readonly string[];
 }
 
@@ -150,6 +152,7 @@ export function timelineRows(lifecycle: Lifecycle, currentUserId?: string): Time
           reason: item.reason,
           journalEntries: item.journalEntries,
           changedFields: [],
+          detailRefs: item.detailRefs,
         }
       : {
           ...base,
@@ -160,6 +163,7 @@ export function timelineRows(lifecycle: Lifecycle, currentUserId?: string): Time
           reason: null,
           journalEntries: null,
           changedFields: item.changedFields,
+          detailRefs: item.detailRefs ?? {},
         };
   });
 }
@@ -214,6 +218,7 @@ const LAYOUTS: Readonly<Record<string, Readonly<Record<Orientation, LayoutSpec>>
         [edgeId('RECORD', null, 'POSTED')]: -80,
         [edgeId('RECORD', null, 'CLEARED')]: -190,
         [edgeId('REVISE', 'CLEARED', 'POSTED')]: 64,
+        [edgeId('RECONCILE_WITHOUT_STATEMENT', 'CLEARED', 'RECONCILED')]: -56,
         [edgeId('VOID', 'CLEARED', 'VOIDED')]: 96,
         [edgeId('VOID', 'POSTED', 'VOIDED')]: 150,
         [edgeId('VOID', 'PENDING', 'VOIDED')]: 204,
@@ -233,6 +238,7 @@ const LAYOUTS: Readonly<Record<string, Readonly<Record<Orientation, LayoutSpec>>
         [edgeId('RECORD', null, 'POSTED')]: 180,
         [edgeId('RECORD', null, 'CLEARED')]: 280,
         [edgeId('REVISE', 'CLEARED', 'POSTED')]: -112,
+        [edgeId('RECONCILE_WITHOUT_STATEMENT', 'CLEARED', 'RECONCILED')]: 56,
         [edgeId('VOID', 'CLEARED', 'VOIDED')]: -160,
         [edgeId('VOID', 'POSTED', 'VOIDED')]: -215,
         [edgeId('VOID', 'PENDING', 'VOIDED')]: -270,
@@ -284,8 +290,32 @@ const CLASSIFICATION_LAYOUT: Readonly<Record<Orientation, LayoutSpec>> = {
   },
 };
 
+/**
+ * Layout fijo de la sesión de reconciliación (add-reconciliation): en curso a la izquierda (arriba en vertical) y las dos
+ * salidas terminales, completada y cancelada, una sobre la otra.
+ */
+const RECONCILIATION_LAYOUT: Readonly<Record<Orientation, LayoutSpec>> = {
+  horizontal: {
+    start: { x: 20, y: 150 },
+    nodes: {
+      IN_PROGRESS: { x: 130, y: 150 },
+      COMPLETED: { x: 400, y: 70 },
+      CANCELLED: { x: 400, y: 230 },
+    },
+  },
+  vertical: {
+    start: { x: 170, y: 20 },
+    nodes: {
+      IN_PROGRESS: { x: 170, y: 100 },
+      COMPLETED: { x: 100, y: 260 },
+      CANCELLED: { x: 240, y: 260 },
+    },
+  },
+};
+
 const LAYOUT_BY_TYPE: Readonly<Record<string, Readonly<Record<Orientation, LayoutSpec>>>> = {
   ...LAYOUTS,
+  Reconciliation: RECONCILIATION_LAYOUT,
   Category: CLASSIFICATION_LAYOUT,
   Counterparty: CLASSIFICATION_LAYOUT,
 };
