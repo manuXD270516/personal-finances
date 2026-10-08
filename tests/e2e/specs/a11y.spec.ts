@@ -24,6 +24,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/configuracion', name: 'Configuración y datos de demostración' },
   { path: '/clasificacion?vista=etiquetas', name: 'Clasificación: etiquetas' },
   { path: '/clasificacion?vista=contrapartes', name: 'Clasificación: contrapartes' },
+  // add-custom-fields 6.1: pestaña Campos personalizados (lista, formulario de definición).
+  { path: '/clasificacion?vista=campos', name: 'Clasificación: campos personalizados' },
   { path: '/fx?vista=proveedores', name: 'FX: proveedores' },
   // add-workspace-identity 8.4: preferencias personales y alta de workspace.
   { path: '/preferencias', name: 'Mis preferencias' },
@@ -62,6 +64,24 @@ test.describe('Accesibilidad (axe-core) de las pantallas principales', () => {
       amount: bob('120.00'),
       splits: [{ amount: bob('120.00'), categoryId: food!.id }],
     });
+
+    // Custom fields (add-custom-fields 6.1): de transacción (selección y decimal) y de cuenta, para que los formularios y
+    // listados los rendericen completos al analizar nueva transacción, nueva cuenta, registro y clasificación.
+    for (const field of [
+      {
+        key: 'centro_costo',
+        label: 'Centro de costo',
+        dataType: 'SELECT',
+        target: 'TRANSACTION',
+        options: [
+          { key: 'casa', label: 'Casa' },
+          { key: 'oficina', label: 'Oficina' },
+        ],
+      },
+      { key: 'litros', label: 'Litros', dataType: 'DECIMAL', target: 'TRANSACTION' },
+      { key: 'sucursal', label: 'Sucursal', dataType: 'TEXT', target: 'ACCOUNT' },
+    ])
+      await api(page, 'POST', `${W}/custom-fields`, field);
 
     const found: Record<string, Awaited<ReturnType<typeof seriousViolations>>> = {};
     for (const p of PAGES) {

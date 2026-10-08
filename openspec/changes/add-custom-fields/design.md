@@ -29,7 +29,7 @@ Capas afectadas:
 6. **Obligatoriedad no retroactiva**: se valida en creación y cuando el comando de edición incluye `customFields` (o cambia montos de splits, que regenera splits) — no en ediciones descriptivas. Hacer obligatorio un campo existente no requiere migrar datos.
 7. **Archivado**: `archived_at` (soft-archive, docs/08 §1); la unicidad de `key` es parcial sobre activas (`WHERE archived_at IS NULL`), por eso la clave queda libre. Desarchivar con una activa de la misma clave ⇒ `CUSTOM_FIELD_KEY_TAKEN`.
 8. **Periodos cerrados** (alcance único del requirement "Alcance de la edición en periodos cerrados" de `planning/month-closing`, extensión de D49 consolidada el 2026-10-05 y confirmada por el owner, docs/33 D65; pregunta abierta 2): cambiar valores de transacciones con `business_date` en un periodo cerrado ⇒ `PERIOD_CLOSED` vía `LedgerService.assertPeriodOpen({date})` (mes calendario hasta ADR-0028; por rango del periodo financiero después). Sin cierres (antes de `add-month-closing`) el chequeo es inocuo. Valores de cuentas no dependen de periodos.
-9. **Auditoría y eventos**: valores dentro del diff de `transactions.transaction.updated` / `accounts.account.updated` (campo `customFields.<key>` con antes/después; `TEXT` puede contener datos personales: se trata como PII baja y se enmascara en logs, docs/12 §13.1). Evento `classification.CustomFieldDefinitionChanged.v1` (`fieldId`, `key`, `change: DEFINED|UPDATED|ARCHIVED|UNARCHIVED`, `dataType`, `target`) para invalidar cachés; los valores no viajan en eventos.
+9. **Auditoría y eventos**: valores dentro del diff de `transactions.transaction.updated` / `accounts.account.updated` (un campo `customFields.<key>` por clave con antes/después — con varios splits, un texto JSON con el valor de cada split —; la allow-list de AUDIT admite el comodín de prefijo `customFields.*`; `TEXT` puede contener datos personales: se trata como PII baja y se enmascara en logs, docs/12 §13.1). Evento `classification.CustomFieldDefinitionChanged.v1` (`fieldId`, `key`, `change: DEFINED|UPDATED|ARCHIVED|UNARCHIVED`, `dataType`, `target`) para invalidar cachés; los valores no viajan en eventos.
 10. **Límites**: máximo 50 definiciones activas por workspace y 20 valores por split/cuenta (`VALIDATION_FAILED`), para acotar formularios y consultas.
 11. **Filtro**: igualdad para todos los tipos; `gte`/`lte` para `NUMBER`, `DECIMAL`, `DATE`. Índices por tipo de valor: `(workspace_id, field_id, value_text)`, `(…, value_number)`, `(…, value_date)`, `(…, value_bool)`.
 
@@ -43,7 +43,7 @@ Capas afectadas:
 | `updateCustomField` | `PATCH W/custom-fields/{id}` (`If-Match`) | EDITOR |
 | `archiveCustomField` / `unarchiveCustomField` | `POST W/custom-fields/{id}/archive|unarchive` (`If-Match`) | EDITOR |
 
-Schemas: `CustomFieldDefinition`, `CustomFieldDefinitionCreate`, `CustomFieldDefinitionUpdate`, `CustomFieldOption`, `CustomFieldValue { fieldId, key (solo lectura), value: string | boolean | null }` (los números y decimales viajan como string). `TransactionSplit.customFields[]`, `Account.customFields[]`. Códigos nuevos (proposal.md). No hay `DELETE` de definiciones (405, como categorías, D7).
+Schemas: `CustomFieldDefinition`, `CustomFieldDefinitionCreate`, `CustomFieldDefinitionUpdate`, `CustomFieldOption`, `CustomFieldValues` (mapa `clave → string | boolean`; los números y decimales viajan como string) y `CustomFieldValuesInput` (mapa `clave → valor | null`; `null` quita, lo no mencionado se conserva). **As-built (2026-10-08):** `TransactionSplit.customFields` ya existía en el contrato como mapa por clave, así que se conserva esa forma (cambiarla a una lista `[{fieldId, key, value}]` sería un cambio incompatible para oasdiff); `Account.customFields` y `SplitInput`/`AccountCreate`/`AccountUpdate.customFields` siguen el mismo mapa. Códigos nuevos (proposal.md). No hay `DELETE` de definiciones (405, como categorías, D7). El filtro del listado se declara como parámetro `customField` con `style: deepObject` (`customField[clave]=v`, `customField[clave][gte|lte]=v`); la validación de contrato anida las claves planas del parser de consulta de Express.
 
 ### Modelo de datos
 
@@ -63,7 +63,7 @@ Las tres se registran en `platform.workspace_scoped_table` y se incluyen en el e
 
 ## Plan de migración
 
-1. Expand `20261006xxxxxx_classification_custom_fields.sql`: tres tablas, RLS forzada, grants, índices, `platform.workspace_scoped_table`. No destructiva, compatible N-1.
+1. Expand `20261008130000_classification_custom_fields.sql`: tres tablas, RLS forzada, grants, índices, `platform.workspace_scoped_table`. No destructiva, compatible N-1.
 2. Contrato: operaciones nuevas y campos opcionales nuevos (MINOR).
 3. Sin backfill.
 

@@ -65,5 +65,12 @@
   "FX_RATE_ANOMALY_ALREADY_REVIEWED": "That exchange rate anomaly was already reviewed.",
   "FX_RATE_NOT_ANOMALOUS": "That exchange rate is not flagged as anomalous.",
   "CURRENCY_NOT_ENABLED": "That currency is not enabled in this workspace.",
-  "PERIOD_NOT_STARTED": "That period has not started yet in the workspace time zone. You can activate it from its start date."
+  "PERIOD_NOT_STARTED": "That period has not started yet in the workspace time zone. You can activate it from its start date.",
+  "CUSTOM_FIELD_KEY_TAKEN": "An active custom field already uses that key. Pick another one or archive the existing field.",
+  "CUSTOM_FIELD_ARCHIVED": "That custom field is archived and accepts no new values.",
+  "CUSTOM_FIELD_TYPE_LOCKED": "The type and entity of a field that has values cannot be changed.",
+  "CUSTOM_FIELD_OPTION_IN_USE": "You cannot remove an option that is already in use. You can rename it or add others.",
+  "CUSTOM_FIELD_VALUE_INVALID": "The value of a custom field is not valid for its type.",
+  "CUSTOM_FIELD_REQUIRED": "A required custom field is missing.",
+  "CUSTOM_FIELD_TARGET_MISMATCH": "That custom field does not apply to this record."
 }

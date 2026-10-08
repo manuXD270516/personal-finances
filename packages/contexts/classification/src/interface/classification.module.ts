@@ -4,6 +4,8 @@ import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { ClassificationQueries } from '../application/classification.queries.js';
 import { ClassificationService } from '../application/classification.service.js';
+import { CustomFieldsQueries } from '../application/custom-fields.queries.js';
+import { CustomFieldsService } from '../application/custom-fields.service.js';
 import type { LifecycleMachineDto } from '@pf/audit/contracts';
 import type {
   AuditPort,
@@ -26,6 +28,8 @@ import {
   CLASSIFICATION_QUERIES,
   CLASSIFICATION_SERVICE,
   ClassificationController,
+  CUSTOM_FIELDS_QUERIES,
+  CUSTOM_FIELDS_SERVICE,
 } from './classification.controller.js';
 
 export interface ClassificationRuntimeOptions {
@@ -45,6 +49,8 @@ export interface ClassificationRuntimeOptions {
 export interface ClassificationRuntime {
   readonly service: ClassificationService;
   readonly queries: ClassificationQueries;
+  readonly customFields: CustomFieldsService;
+  readonly customFieldQueries: CustomFieldsQueries;
   readonly locales: LocaleResolver;
   /** Gancho síncrono de `CreateWorkspace` (design §6). */
   readonly provisioner: WorkspaceCatalogProvisioner;
@@ -68,14 +74,20 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
   });
   const service = new ClassificationService(deps);
   const queries = new ClassificationQueries(deps);
+  const customFields = new CustomFieldsService(deps);
+  const customFieldQueries = new CustomFieldsQueries(deps);
   return {
     service,
     queries,
+    customFields,
+    customFieldQueries,
     locales: options.locales,
     provisioner: { onWorkspaceCreated: (input) => service.onWorkspaceCreated(input) },
     validator: {
       validate: ({ userId, workspaceId, ...rest }) =>
         queries.validateClassification(userId, workspaceId, rest),
+      validateCustomFieldValues: ({ userId, workspaceId, ...rest }) =>
+        customFieldQueries.validateCustomFieldValues(userId, workspaceId, rest),
     },
     lookup: {
       systemCategoryId: ({ userId, workspaceId, systemCode }) =>
@@ -113,6 +125,8 @@ export class ClassificationModule {
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: CLASSIFICATION_SERVICE, useValue: options.runtime.service },
         { provide: CLASSIFICATION_QUERIES, useValue: options.runtime.queries },
+        { provide: CUSTOM_FIELDS_SERVICE, useValue: options.runtime.customFields },
+        { provide: CUSTOM_FIELDS_QUERIES, useValue: options.runtime.customFieldQueries },
         { provide: CLASSIFICATION_LOCALES, useValue: options.runtime.locales },
       ],
     };

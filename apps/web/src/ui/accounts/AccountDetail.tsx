@@ -10,6 +10,8 @@ import type { Account, Institution } from '../common/types';
 import { ConfirmPanel, Field, inputStyle, mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import { Tabs } from '../common/Tabs';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { useCustomFields } from '../custom-fields/CustomFieldInputs';
+import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { AccountForm } from './AccountForm';
 import { AccountStatusBadge, BalanceText, BaseEquivalent } from './AccountsListView';
@@ -72,6 +74,8 @@ function AccountDetail({
 }) {
   const f = useFormat('Accounts', ctx);
   const lf = useFormat('Lifecycle', ctx);
+  const cf = useFormat('CustomFields', ctx);
+  const customFields = useCustomFields(ctx);
   const { t, locale } = f;
   const institutions = useInstitutions(ctx);
   const [account, setAccount] = useState<Account | undefined>();
@@ -178,6 +182,12 @@ function AccountDetail({
                     ? ` · ${t('closedOn', { date: formatLocalDate(account.closedOn, locale) })}`
                     : ''}
                 </p>
+                <CustomFieldValuesView
+                  definitions={customFields.definitions}
+                  values={account.customFields}
+                  f={cf}
+                  testId="account-custom-field-values"
+                />
                 <nav aria-label={t('actions')} style={rowStyle}>
                   <a href={ctx.href(`/transacciones?cuenta=${account.id}`)}>{t('viewTransactions')}</a>
                   {ctx.canEdit && account.status === 'ACTIVE' ? (

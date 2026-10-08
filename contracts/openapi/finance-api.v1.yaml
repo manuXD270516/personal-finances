@@ -461,10 +461,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'ACCOUNT_NAME_TAKEN, INSTITUTION_ARCHIVED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+          description: 'ACCOUNT_NAME_TAKEN, INSTITUTION_ARCHIVED, CUSTOM_FIELD_ARCHIVED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-          description: 'CURRENCY_NOT_ENABLED, ACCOUNT_CURRENCY_KIND_MISMATCH, AMOUNT_SCALE_EXCEEDED, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED.'
+          description: 'CURRENCY_NOT_ENABLED, ACCOUNT_CURRENCY_KIND_MISMATCH, AMOUNT_SCALE_EXCEEDED, CUSTOM_FIELD_VALUE_INVALID, CUSTOM_FIELD_REQUIRED, CUSTOM_FIELD_TARGET_MISMATCH, REFERENCE_NOT_FOUND, IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -555,9 +555,11 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'ACCOUNT_CURRENCY_IMMUTABLE, ACCOUNT_NAME_TAKEN, ACCOUNT_ARCHIVED, INSTITUTION_ARCHIVED, CONCURRENCY_CONFLICT.'
+          description: 'ACCOUNT_CURRENCY_IMMUTABLE, ACCOUNT_NAME_TAKEN, ACCOUNT_ARCHIVED, INSTITUTION_ARCHIVED, CUSTOM_FIELD_ARCHIVED, CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CUSTOM_FIELD_VALUE_INVALID, CUSTOM_FIELD_REQUIRED (when editing custom fields), CUSTOM_FIELD_TARGET_MISMATCH, VALIDATION_FAILED, REFERENCE_NOT_FOUND.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -967,6 +969,25 @@ paths:
           in: query
           description: Inclusive upper bound on the transaction amount magnitude
           schema: { $ref: '#/components/schemas/PositiveDecimalString' }
+        - name: customField
+          in: query
+          description: |
+            Filter by custom field value of the splits, by field key (`style: deepObject`). Equality for every type:
+            `customField[centro_costo]=oficina`. Range for NUMBER, DECIMAL and DATE: `customField[litros][gte]=10` and/or
+            `customField[litros][lte]=40`. Decimals and numbers are exact decimal strings; booleans `true`/`false`; dates
+            `YYYY-MM-DD`. An unknown key matches nothing; a value invalid for the field type is a 400.
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties:
+              oneOf:
+                - type: string
+                - type: object
+                  additionalProperties: false
+                  properties:
+                    gte: { type: string }
+                    lte: { type: string }
         - name: sort
           in: query
           description: Default `-transactionDate` (ties broken by id).
@@ -1057,10 +1078,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+          description: 'ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED, CUSTOM_FIELD_ARCHIVED, PERIOD_CLOSED, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-          description: 'CURRENCY_MISMATCH, SPLITS_DO_NOT_SUM, AMOUNT_SCALE_EXCEEDED, AMOUNT_NOT_POSITIVE, REFUND_EXCEEDS_ORIGINAL, CATEGORY_KIND_MISMATCH, REFERENCE_NOT_FOUND, VALIDATION_FAILED, IDEMPOTENCY_KEY_REUSED.'
+          description: 'CURRENCY_MISMATCH, SPLITS_DO_NOT_SUM, AMOUNT_SCALE_EXCEEDED, AMOUNT_NOT_POSITIVE, REFUND_EXCEEDS_ORIGINAL, CATEGORY_KIND_MISMATCH, CUSTOM_FIELD_VALUE_INVALID, CUSTOM_FIELD_REQUIRED, CUSTOM_FIELD_TARGET_MISMATCH, REFERENCE_NOT_FOUND, VALIDATION_FAILED, IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -1202,9 +1223,11 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'TRANSACTION_RECONCILED, INVALID_STATUS_TRANSITION, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, PERIOD_CLOSED, CONCURRENCY_CONFLICT.'
+          description: 'TRANSACTION_RECONCILED, INVALID_STATUS_TRANSITION, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, CATEGORY_ARCHIVED, CUSTOM_FIELD_ARCHIVED, PERIOD_CLOSED (also when changing custom field values of a transaction in a closed period), CONCURRENCY_CONFLICT.'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CUSTOM_FIELD_VALUE_INVALID, CUSTOM_FIELD_REQUIRED (when editing custom fields or regenerating the splits), CUSTOM_FIELD_TARGET_MISMATCH, VALIDATION_FAILED, REFERENCE_NOT_FOUND, SPLITS_DO_NOT_SUM.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -2369,6 +2392,214 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: 'NAME_TAKEN (an active tag uses the name), INVALID_STATUS_TRANSITION (not archived).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/custom-fields:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Classification]
+      operationId: listCustomFields
+      summary: List custom field definitions
+      description: |
+        Active definitions ordered by `position`; `includeArchived=true` adds the archived ones (their historical values
+        stay visible on transactions and accounts). `target` limits the list to one entity.
+      x-openspec-capability: classification/custom-fields
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/IncludeArchived'
+        - name: target
+          in: query
+          schema: { $ref: '#/components/schemas/CustomFieldTarget' }
+      responses:
+        '200':
+          description: Custom field definitions page
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomFieldDefinitionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Classification]
+      operationId: createCustomField
+      summary: Define a custom field
+      description: |
+        `key` is `snake_case`, unique among active definitions and immutable. A `SELECT` needs at least one option; other
+        types accept no options. At most 50 active definitions per workspace. Emits
+        `classification.CustomFieldDefinitionChanged.v1`.
+      x-openspec-capability: classification/custom-fields
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomFieldDefinitionCreate' }
+            examples:
+              costCenter:
+                summary: Cost center of the transactions
+                value:
+                  key: centro_costo
+                  label: Centro de costo
+                  dataType: SELECT
+                  target: TRANSACTION
+                  required: false
+                  options:
+                    - { key: casa, label: Casa }
+                    - { key: oficina, label: Oficina }
+      responses:
+        '201':
+          description: Custom field defined
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomFieldDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CUSTOM_FIELD_KEY_TAKEN (an active definition uses the key).'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/custom-fields/{fieldId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CustomFieldId'
+    get:
+      tags: [Classification]
+      operationId: getCustomField
+      summary: Get a custom field definition
+      x-openspec-capability: classification/custom-fields
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Custom field definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomFieldDefinition' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Classification]
+      operationId: updateCustomField
+      summary: Edit a custom field definition
+      description: |
+        `key` cannot change (not accepted ⇒ 400 VALIDATION_FAILED). While the definition has values its `dataType` and
+        `target` are locked (`CUSTOM_FIELD_TYPE_LOCKED`) and an option in use cannot be removed
+        (`CUSTOM_FIELD_OPTION_IN_USE`); adding options and renaming labels is always allowed. `options`, when present,
+        replaces the whole list (its order sets the position). An archived definition cannot be edited.
+      x-openspec-capability: classification/custom-fields
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/CustomFieldDefinitionUpdate' }
+      responses:
+        '200':
+          description: Updated custom field definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomFieldDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CUSTOM_FIELD_TYPE_LOCKED, CUSTOM_FIELD_OPTION_IN_USE, CUSTOM_FIELD_ARCHIVED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/custom-fields/{fieldId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CustomFieldId'
+    post:
+      tags: [Classification]
+      operationId: archiveCustomField
+      summary: Archive a custom field definition
+      description: |
+        Archiving never deletes values: transactions and accounts keep showing them. The definition leaves the forms,
+        accepts no new values (`CUSTOM_FIELD_ARCHIVED`) and its key becomes free for a new active definition.
+      x-openspec-capability: classification/custom-fields
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archived custom field definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomFieldDefinition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already archived).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/custom-fields/{fieldId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CustomFieldId'
+    post:
+      tags: [Classification]
+      operationId: unarchiveCustomField
+      summary: Unarchive a custom field definition
+      x-openspec-capability: classification/custom-fields
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Unarchived custom field definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomFieldDefinition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CUSTOM_FIELD_KEY_TAKEN (an active definition uses the key), INVALID_STATUS_TRANSITION (not archived).'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -3581,6 +3812,12 @@ components:
       in: path
       required: true
       schema: { $ref: '#/components/schemas/Uuid' }
+    CustomFieldId:
+      name: fieldId
+      in: path
+      required: true
+      description: Custom field definition UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     CounterpartyId:
       name: counterpartyId
       in: path
@@ -3955,6 +4192,14 @@ components:
         - SYSTEM_CATEGORY_IMMUTABLE         # 409
         - COUNTERPARTY_ALIAS_TAKEN          # 409
         - NAME_TAKEN                        # 409 (+ existingId for counterparties)
+        # classification: custom fields (Phase 2, add-custom-fields)
+        - CUSTOM_FIELD_KEY_TAKEN            # 409 (an active definition uses the key)
+        - CUSTOM_FIELD_ARCHIVED             # 409 (new value on an archived definition)
+        - CUSTOM_FIELD_TYPE_LOCKED          # 409 (type/target of a definition that has values)
+        - CUSTOM_FIELD_OPTION_IN_USE        # 409 (removing a SELECT option used by values)
+        - CUSTOM_FIELD_VALUE_INVALID        # 422 (value does not match the field type)
+        - CUSTOM_FIELD_REQUIRED             # 422 (mandatory field without value on a new record or an edit of its custom fields)
+        - CUSTOM_FIELD_TARGET_MISMATCH      # 422 (account field on a transaction, or custom fields on transfers/conversions)
         # fx
         - FX_RATE_NOT_FOUND                 # 422
         - FX_RATE_ALREADY_SUPERSEDED        # 409
@@ -4215,6 +4460,7 @@ components:
         tagIds:
           type: array
           items: { $ref: '#/components/schemas/Uuid' }
+        customFields: { $ref: '#/components/schemas/CustomFieldValues' }
         cryptoNetwork: { type: [string, 'null'], maxLength: 20, examples: [TRC20] }
         notes: { type: [string, 'null'] }
         archivedAt: { type: [string, 'null'], format: date-time }
@@ -4259,6 +4505,7 @@ components:
           items: { $ref: '#/components/schemas/Uuid' }
         cryptoNetwork: { type: string, maxLength: 20 }
         notes: { type: string, maxLength: 2000 }
+        customFields: { $ref: '#/components/schemas/CustomFieldValuesInput' }
     AccountUpdate:
       type: object
       additionalProperties: false
@@ -4283,6 +4530,7 @@ components:
           items: { $ref: '#/components/schemas/Uuid' }
         cryptoNetwork: { type: [string, 'null'], maxLength: 20 }
         notes: { type: [string, 'null'], maxLength: 2000 }
+        customFields: { $ref: '#/components/schemas/CustomFieldValuesInput' }
     AccountClose:
       type: object
       additionalProperties: false
@@ -4416,10 +4664,8 @@ components:
           items: { $ref: '#/components/schemas/Uuid' }
         memo: { type: [string, 'null'] }
         customFields:
-          type: object
-          description: Custom field values keyed by field key (Phase 2). Numeric values travel as decimal strings (never JSON numbers).
-          additionalProperties:
-            type: [string, boolean, 'null']
+          $ref: '#/components/schemas/CustomFieldValues'
+          description: Custom field values of this split keyed by field key (Phase 2). Numeric values travel as decimal strings (never JSON numbers).
     SplitInput:
       type: object
       additionalProperties: false
@@ -4434,6 +4680,7 @@ components:
           uniqueItems: true
           items: { $ref: '#/components/schemas/Uuid' }
         memo: { type: string, maxLength: 500 }
+        customFields: { $ref: '#/components/schemas/CustomFieldValuesInput' }
     ExternalRef:
       type: object
       additionalProperties: false
@@ -5076,6 +5323,110 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 50 }
         color: { type: [string, 'null'], maxLength: 20 }
+    CustomFieldDataType:
+      type: string
+      description: |
+        `NUMBER` is an integer of up to 15 digits; `DECIMAL` an exact decimal with up to 18 decimals (both travel as
+        strings, never JSON numbers); `DATE` a calendar date `YYYY-MM-DD`. `MULTI_SELECT` and `MONEY` are out of Phase 2.
+      enum: [TEXT, NUMBER, DECIMAL, DATE, BOOLEAN, SELECT]
+    CustomFieldTarget:
+      type: string
+      description: Entity the field applies to. Transactions carry the value per nominal split; transfers and conversions carry none.
+      enum: [TRANSACTION, ACCOUNT]
+    CustomFieldOption:
+      type: object
+      required: [key, label, position]
+      properties:
+        key: { type: string, pattern: '^[a-z0-9][a-z0-9_]{0,39}$' }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        position: { type: integer, minimum: 0 }
+    CustomFieldOptionInput:
+      type: object
+      additionalProperties: false
+      required: [key, label]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9_]{0,39}$'
+          description: Stable option key; values store it, so renaming the label never touches values.
+        label: { type: string, minLength: 1, maxLength: 80 }
+    CustomFieldDefinition:
+      type: object
+      required: [id, key, label, dataType, target, required, options, position, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,39}$' }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        dataType: { $ref: '#/components/schemas/CustomFieldDataType' }
+        target: { $ref: '#/components/schemas/CustomFieldTarget' }
+        required: { type: boolean }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/CustomFieldOption' }
+        position: { type: integer, minimum: 0 }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        version: { $ref: '#/components/schemas/Version' }
+    CustomFieldDefinitionCreate:
+      type: object
+      additionalProperties: false
+      required: [key, label, dataType, target]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,39}$' }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        dataType: { $ref: '#/components/schemas/CustomFieldDataType' }
+        target: { $ref: '#/components/schemas/CustomFieldTarget' }
+        required:
+          type: boolean
+          default: false
+          description: A mandatory field is required on new records (and when editing their custom fields), never retroactively.
+        options:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/CustomFieldOptionInput' }
+        position: { type: integer, minimum: 0 }
+    CustomFieldDefinitionUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80 }
+        dataType: { $ref: '#/components/schemas/CustomFieldDataType' }
+        target: { $ref: '#/components/schemas/CustomFieldTarget' }
+        required: { type: boolean }
+        options:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/CustomFieldOptionInput' }
+        position: { type: integer, minimum: 0 }
+    CustomFieldDefinitionPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CustomFieldDefinition' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    CustomFieldValues:
+      type: object
+      description: |
+        Custom field values keyed by field key (Phase 2). NUMBER and DECIMAL travel as exact decimal strings (never
+        JSON numbers; trailing zeros are dropped: `"35.125"`), DATE as `YYYY-MM-DD`, SELECT as the option key. Values of
+        archived definitions are still returned.
+      additionalProperties:
+        type: [string, boolean, 'null']
+    CustomFieldValuesInput:
+      type: object
+      description: |
+        Changes to custom field values keyed by field key: a value sets the field, `null` removes it, fields not
+        mentioned keep their value (on a split that is regenerated, the value of the split in the same position).
+        At most 20 values per record. Archived definitions accept no values (`CUSTOM_FIELD_ARCHIVED`); a field of
+        another entity is `CUSTOM_FIELD_TARGET_MISMATCH`; an invalid value is `CUSTOM_FIELD_VALUE_INVALID`; a missing
+        mandatory field is `CUSTOM_FIELD_REQUIRED`.
+      maxProperties: 20
+      propertyNames:
+        pattern: '^[a-z][a-z0-9_]{0,39}$'
+      additionalProperties:
+        type: [string, boolean, 'null']
     TagPage:
       type: object
       required: [data, page]

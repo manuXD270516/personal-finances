@@ -2,6 +2,8 @@ import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contrac
 import type { Clock } from '@pf/shared-kernel';
 import type { Category, CategoryGroup } from '../../domain/category.js';
 import type { Counterparty } from '../../domain/counterparty.js';
+import type { CustomFieldDefinition, CustomFieldUsage } from '../../domain/custom-field.js';
+import type { CustomFieldDataType, CustomFieldTarget } from '../../domain/custom-field-value.js';
 import type { CategoryKind } from '../../domain/system-categories.js';
 import type { Tag } from '../../domain/tag.js';
 
@@ -33,6 +35,16 @@ export type CategoryGroupRepository = Repository<CategoryGroup>;
 export type CategoryRepository = Repository<Category>;
 export type TagRepository = Repository<Tag>;
 export type CounterpartyRepository = Repository<Counterparty>;
+export type CustomFieldRepository = Repository<CustomFieldDefinition>;
+
+/**
+ * Uso de una definición por valores asignados (tablas `txn.split_custom_field_value` y
+ * `accounts.account_custom_field_value`, activos o históricos): sustenta `CUSTOM_FIELD_TYPE_LOCKED` y
+ * `CUSTOM_FIELD_OPTION_IN_USE` (design decisión 5). Corre en la unidad de trabajo en curso.
+ */
+export interface CustomFieldUsagePort {
+  usageOf(workspaceId: string, fieldId: string): Promise<CustomFieldUsage>;
+}
 
 export interface CategoryArchivedEvent {
   readonly eventId: string;
@@ -56,9 +68,28 @@ export interface CategoryArchivedEvent {
   };
 }
 
+export interface CustomFieldDefinitionChangedEvent {
+  readonly eventId: string;
+  readonly eventType: 'classification.CustomFieldDefinitionChanged';
+  readonly eventVersion: 1;
+  readonly aggregateType: 'CustomFieldDefinition';
+  readonly aggregateId: string;
+  readonly aggregateVersion: number;
+  readonly workspaceId: string;
+  readonly occurredAt: string;
+  readonly actor: { readonly type: 'USER'; readonly id: string };
+  readonly payload: {
+    readonly fieldId: string;
+    readonly key: string;
+    readonly change: 'DEFINED' | 'UPDATED' | 'ARCHIVED' | 'UNARCHIVED';
+    readonly dataType: CustomFieldDataType;
+    readonly target: CustomFieldTarget;
+  };
+}
+
 /** Outbox transaccional (`platform.outbox`): misma transacción que el archivado (design §11). */
 export interface OutboxPort {
-  append(event: CategoryArchivedEvent): Promise<void>;
+  append(event: CategoryArchivedEvent | CustomFieldDefinitionChangedEvent): Promise<void>;
 }
 
 /**
@@ -112,6 +143,8 @@ export interface ClassificationDeps {
   readonly categories: CategoryRepository;
   readonly tags: TagRepository;
   readonly counterparties: CounterpartyRepository;
+  readonly customFields: CustomFieldRepository;
+  readonly customFieldUsage: CustomFieldUsagePort;
   readonly outbox: OutboxPort;
   /** Auditoría síncrona (`@pf/audit/contracts`): misma transacción que el comando (INV-029). */
   readonly audit: AuditPort;

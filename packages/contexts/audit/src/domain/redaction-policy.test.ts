@@ -53,3 +53,16 @@ describe('[TC-AUDIT-REDACTION-001] la auditoría excluye datos sensibles y conse
     ).toHaveLength(1);
   });
 });
+
+describe('[TC-CLASSIFICATION-CUSTOMFIELD-007] campos dinámicos con comodín de prefijo (add-custom-fields)', () => {
+  const dynamic = new RedactionPolicy({ Transaction: { amount: 'plain', 'customFields.*': 'plain' } });
+
+  it('customFields.<clave> usa la regla del comodín; el prefijo desnudo o desconocido se omite', () => {
+    const changes = dynamic.apply('Transaction', [
+      { field: 'customFields.centro_costo', before: 'casa', after: 'oficina' },
+      { field: 'customFields', before: 'x', after: 'y' },
+      { field: 'otros.centro_costo', before: 'x', after: 'y' },
+    ]);
+    expect(changes).toEqual([{ field: 'customFields.centro_costo', before: 'casa', after: 'oficina' }]);
+  });
+});

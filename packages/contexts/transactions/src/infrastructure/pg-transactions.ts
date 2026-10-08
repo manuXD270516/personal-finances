@@ -1,11 +1,18 @@
 import type { ClassificationLookup } from '@pf/classification/contracts';
 import { currentRequestContext, PgUnitOfWork, unitOfWorkKysely } from '@pf/platform/api';
 import { uuidv7 } from '@pf/platform/logging';
-import { currency as makeCurrency, Money, type Currency } from '@pf/shared-kernel';
+import {
+  canonicalDecimal,
+  currency as makeCurrency,
+  DomainError,
+  Money,
+  type Currency,
+} from '@pf/shared-kernel';
 import { sql, type Generated, type Kysely } from 'kysely';
 import type { Pool } from 'pg';
 import type {
   CategoryLookupPort,
+  CustomFieldFilter,
   CurrencyCatalog,
   IdGenerator,
   TransactionListFilter,
@@ -15,6 +22,7 @@ import type {
 import {
   normalizeText,
   Transaction,
+  type CustomFieldValue,
   type AccountNature,
   type ConversionDetail,
   type AdjustmentDirection,
@@ -93,6 +101,23 @@ interface TxnDb {
     superseded_in_revision: number | null;
   };
   'txn.split_tag': { workspace_id: string; split_id: string; tag_id: string };
+  'txn.split_custom_field_value': {
+    workspace_id: string;
+    split_id: string;
+    field_id: string;
+    value_text: string | null;
+    value_number: string | null;
+    value_date: string | null;
+    value_bool: boolean | null;
+  };
+  /** Lectura del catálogo de CLASSIFICATION para la clave y el tipo del campo (patrón de `fx.currency`). */
+  'classification.custom_field_definition': {
+    id: string;
+    workspace_id: string;
+    key: string;
+    data_type: string;
+    target: string;
+  };
   'txn.transaction_journal_link': {
     workspace_id: string;
     transaction_id: string;
@@ -259,6 +284,29 @@ export class PgTransactionRepository implements TransactionRepository {
         await k
           .insertInto('txn.split_tag')
           .values(split.tagIds.map((tag_id) => ({ workspace_id: s.workspaceId, split_id: split.id, tag_id })))
+          .execute();
+      }
+      // Valores de custom fields del split (tabla de enlace: se reescriben como los tags; los splits supersedidos
+      // conservan los suyos como historia). Sin efecto en el ledger (INV-033).
+      await k
+        .deleteFrom('txn.split_custom_field_value')
+        .where('workspace_id', '=', s.workspaceId)
+        .where('split_id', '=', split.id)
+        .execute();
+      if (split.customFields.length > 0) {
+        await k
+          .insertInto('txn.split_custom_field_value')
+          .values(
+            split.customFields.map((v) => ({
+              workspace_id: s.workspaceId,
+              split_id: split.id,
+              field_id: v.fieldId,
+              value_text: v.valueType === 'TEXT' ? (v.value as string) : null,
+              value_number: v.valueType === 'NUMBER' ? (v.value as string) : null,
+              value_date: v.valueType === 'DATE' ? (v.value as string) : null,
+              value_bool: v.valueType === 'BOOLEAN' ? (v.value as boolean) : null,
+            })),
+          )
           .execute();
       }
     }
@@ -443,6 +491,9 @@ export class PgTransactionRepository implements TransactionRepository {
         ),
       );
     }
+    for (const f of filter.customFields ?? []) {
+      q = q.where(await this.customFieldPredicate(workspaceId, f));
+    }
     if (filter.tagIds?.length) {
       const ids = [...filter.tagIds];
       q = q.where((eb) =>
@@ -474,6 +525,64 @@ export class PgTransactionRepository implements TransactionRepository {
       .limit(page.limit)
       .execute();
     return this.hydrate(workspaceId, rows as TxRow[]);
+  }
+
+  /**
+   * Filtro por valor de custom field (igualdad; rango para NUMBER, DECIMAL y DATE): resuelve las definiciones de
+   * TRANSACTION con esa clave (activa y archivadas) y compara contra la columna tipada de cada una. Clave
+   * desconocida ⇒ sin resultados; valor inválido para el tipo ⇒ `VALIDATION_FAILED`.
+   */
+  private async customFieldPredicate(workspaceId: string, f: CustomFieldFilter) {
+    const defs = await db()
+      .selectFrom('classification.custom_field_definition')
+      .select(['id', 'data_type'])
+      .where('workspace_id', '=', workspaceId)
+      .where('key', '=', f.key)
+      .where('target', '=', 'TRANSACTION')
+      .execute();
+    const pointer = `/customField[${f.key}]`;
+    const bad = (detail: string) => new DomainError('VALIDATION_FAILED', detail).at(pointer);
+    const terms = defs.map((d) => {
+      const field = sql`v.field_id = ${d.id}`;
+      const ops: [string, string | undefined][] = [
+        ['=', f.eq],
+        ['>=', f.gte],
+        ['<=', f.lte],
+      ];
+      const given = ops.filter(([, value]) => value !== undefined) as [string, string][];
+      const numeric = d.data_type === 'NUMBER' || d.data_type === 'DECIMAL';
+      const ranged = numeric || d.data_type === 'DATE';
+      if (given.some(([op]) => op !== '=') && !ranged) {
+        throw bad(`'${f.key}' (${d.data_type}) only supports equality filters`);
+      }
+      const comparisons = given.map(([op, value]) => {
+        const opSql = sql.raw(op);
+        if (numeric) {
+          if (!/^-?\d+(\.\d+)?$/u.test(value)) throw bad(`'${f.key}' expects a decimal number`);
+          return sql`v.value_number ${opSql} ${value}::numeric`;
+        }
+        if (d.data_type === 'DATE') {
+          if (!/^\d{4}-\d{2}-\d{2}$/u.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+            throw bad(`'${f.key}' expects a date AAAA-MM-DD`);
+          }
+          const d2 = new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10);
+          if (d2 !== value) throw bad(`'${f.key}' expects a valid date`);
+          return sql`v.value_date ${opSql} ${value}::date`;
+        }
+        if (d.data_type === 'BOOLEAN') {
+          if (value !== 'true' && value !== 'false') throw bad(`'${f.key}' expects true or false`);
+          return sql`v.value_bool = ${value === 'true'}`;
+        }
+        return sql`v.value_text = ${value}`;
+      });
+      return sql`(${sql.join([field, ...comparisons], sql` AND `)})`;
+    });
+    if (terms.length === 0) return sql<boolean>`false`;
+    return sql<boolean>`EXISTS (
+      SELECT 1 FROM txn.transaction_split cs
+        JOIN txn.split_custom_field_value v ON v.workspace_id = cs.workspace_id AND v.split_id = cs.id
+       WHERE cs.workspace_id = t.workspace_id AND cs.transaction_id = t.id AND cs.superseded_in_revision IS NULL
+         AND (${sql.join(terms, sql` OR `)}))`;
   }
 
   async duplicateCandidates(
@@ -613,6 +722,49 @@ export class PgTransactionRepository implements TransactionRepository {
       .where('s.superseded_in_revision', 'is', null)
       .orderBy('s.position')
       .execute();
+    const splitIds = splits.map((x) => x.id);
+    const fieldValues =
+      splitIds.length === 0
+        ? []
+        : await k
+            .selectFrom('txn.split_custom_field_value as v')
+            .innerJoin('classification.custom_field_definition as d', (j) =>
+              j.onRef('d.id', '=', 'v.field_id').onRef('d.workspace_id', '=', 'v.workspace_id'),
+            )
+            .select([
+              'v.split_id',
+              'v.field_id',
+              'v.value_text',
+              'v.value_bool',
+              'd.key',
+              sql<string | null>`v.value_number::text`.as('value_number'),
+              sql<string | null>`v.value_date::text`.as('value_date'),
+            ])
+            .where('v.workspace_id', '=', workspaceId)
+            .where('v.split_id', 'in', splitIds)
+            .execute();
+    const customFieldsOf = (splitId: string): CustomFieldValue[] =>
+      fieldValues
+        .filter((v) => v.split_id === splitId)
+        .map((v): CustomFieldValue => {
+          if (v.value_text !== null) {
+            return { fieldId: v.field_id, key: v.key, valueType: 'TEXT', value: v.value_text };
+          }
+          if (v.value_number !== null) {
+            // `numeric(38,18)` rellena con ceros: se devuelve la forma canónica exacta ("35.125").
+            return {
+              fieldId: v.field_id,
+              key: v.key,
+              valueType: 'NUMBER',
+              value: canonicalDecimal(v.value_number),
+            };
+          }
+          if (v.value_date !== null) {
+            return { fieldId: v.field_id, key: v.key, valueType: 'DATE', value: v.value_date };
+          }
+          return { fieldId: v.field_id, key: v.key, valueType: 'BOOLEAN', value: v.value_bool === true };
+        })
+        .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     const legs = await k
       .selectFrom('txn.transaction_leg as l')
       .select([
@@ -678,6 +830,7 @@ export class PgTransactionRepository implements TransactionRepository {
             counterpartyId: s.counterparty_id,
             tagIds: s.tag_ids,
             memo: s.memo,
+            customFields: customFieldsOf(s.id),
           })),
         revision: r.revision,
         version: r.version,

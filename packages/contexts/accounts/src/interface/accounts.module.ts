@@ -2,7 +2,7 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { BalanceQuery } from '@pf/ledger/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
-import type { Clock } from '@pf/shared-kernel';
+import { DomainError, type Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { AccountCatalogQueries } from '../application/account-catalog.queries.js';
 import { AccountsService } from '../application/accounts.service.js';
@@ -11,8 +11,11 @@ import { ACCOUNT_LIFECYCLE } from '../domain/index.js';
 import type {
   AccountsDeps,
   BaseCurrencyValuationDeps,
+  CustomFieldCatalogPort,
+  CustomFieldValueInput,
   OutboxPort,
   TagCatalogPort,
+  ValidatedCustomFieldValue,
   WorkspaceCalendar,
   WorkspaceCurrenciesPort,
 } from '../application/ports/index.js';
@@ -54,6 +57,11 @@ export interface AccountsRuntimeOptions {
   /** Catálogo de etiquetas (Classification); por defecto acepta cualquier id (design.md §Implementación). */
   readonly tags?: TagCatalogPort;
   /**
+   * Validación de custom fields de cuenta (`ValidateCustomFieldValues` de CLASSIFICATION, adaptada en el composition
+   * root). Por defecto no hay definiciones: cualquier valor ⇒ `REFERENCE_NOT_FOUND`.
+   */
+  readonly customFields?: CustomFieldCatalogPort;
+  /**
    * Equivalente en moneda base (`FxValuationPort` de `@pf/fx/contracts` + moneda base/zona de IDENTITY). Ausente ⇒
    * `baseCurrencyBalance: null`.
    */
@@ -64,6 +72,16 @@ export interface AccountsRuntimeOptions {
    */
   readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
 }
+
+/** Sin CLASSIFICATION compuesto no hay definiciones: no se aceptan valores. */
+const noCustomFields: CustomFieldCatalogPort = {
+  validate: async ({ values }) => {
+    if (values.length > 0) {
+      throw new DomainError('REFERENCE_NOT_FOUND', 'custom field not found').at('/customFields/0');
+    }
+    return { set: [], removeFieldIds: [] };
+  },
+};
 
 export interface AccountsRuntime {
   readonly accounts: AccountsService;
@@ -84,6 +102,7 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
     ...(options.workspaceCurrencies ? { workspaceCurrencies: options.workspaceCurrencies } : {}),
     balances: new LedgerBalancesAdapter(options.balances),
     tags: options.tags ?? { assertAssignable: async () => undefined },
+    customFields: options.customFields ?? noCustomFields,
     openingBalance: options.openingBalance,
     outbox: options.outbox,
     audit: options.audit,
@@ -138,6 +157,9 @@ export type {
   BaseCurrencyValuationDeps,
   OutboxPort,
   TagCatalogPort,
+  CustomFieldCatalogPort,
+  CustomFieldValueInput,
+  ValidatedCustomFieldValue,
   WorkspaceCalendar,
   WorkspaceCurrenciesPort,
 };

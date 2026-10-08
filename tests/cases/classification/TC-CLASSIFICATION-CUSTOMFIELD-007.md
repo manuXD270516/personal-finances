@@ -12,9 +12,14 @@ invariants: [INV-033, INV-029]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/custom-fields.service.test.ts
+  - packages/contexts/accounts/src/application/custom-fields.service.test.ts
+  - apps/api/test/api/custom-fields.api.test.ts
+  - packages/contexts/audit/src/domain/redaction-policy.test.ts
+  - apps/web/src/ui/custom-fields/custom-fields.test.tsx
+status: automated
 regression_suite: true
 phase: 2
 tags: ["custom-fields", "ledger", "audit"]

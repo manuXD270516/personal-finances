@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
-import type { Tag } from '../common/types';
+import type { CustomFieldValues, Tag } from '../common/types';
+import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
+import type { CustomFieldDefinition, CustomFieldError } from '../custom-fields/logic';
 import { errorStyle, Field, inputStyle, mutedStyle, rowStyle } from '../common/ui';
 import {
   newSplitRow,
@@ -29,6 +31,7 @@ export function SplitsEditor({
   categories,
   tags,
   f,
+  customFields,
 }: {
   rows: readonly SplitRow[];
   onChange: (rows: SplitRow[]) => void;
@@ -37,6 +40,14 @@ export function SplitsEditor({
   categories: readonly CategoryOptionGroup[];
   tags: readonly Tag[];
   f: FormatContext;
+  /** Custom fields activos de transacción: se piden por split (`cf` es del namespace `CustomFields`). */
+  customFields?: {
+    readonly fields: readonly CustomFieldDefinition[];
+    readonly cf: FormatContext;
+    readonly errors: Readonly<Record<number, Readonly<Record<string, CustomFieldError>>>>;
+    /** Valores guardados del split en la misma posición (edición): se muestran hasta que se editen. */
+    readonly originals?: readonly (CustomFieldValues | undefined)[];
+  };
 }) {
   const { t, locale } = f;
   const [percentError, setPercentError] = useState(false);
@@ -132,6 +143,18 @@ export function SplitsEditor({
                 </select>
               )}
             </Field>
+          ) : null}
+          {customFields && customFields.fields.length > 0 ? (
+            <CustomFieldInputs
+              fields={customFields.fields}
+              draft={r.customFields}
+              errors={customFields.errors[i] ?? {}}
+              f={customFields.cf}
+              idPrefix={`split-${i}-cf`}
+              original={customFields.originals?.[i]}
+              {...(rows.length > 1 ? { suffix: `(${i + 1})` } : {})}
+              onChange={(key, value) => update(r.key, { customFields: { ...r.customFields, [key]: value } })}
+            />
           ) : null}
           {rows.length > 1 ? (
             <button

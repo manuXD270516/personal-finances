@@ -46,6 +46,17 @@ const scaleOf = (code: string): number => {
 };
 const parseIn = (amount: string, code: string) => Money.parse(amount, code, scaleOf(code));
 
+/** Definición de custom field de prueba (CLASSIFICATION en memoria; la validación real vive en ese contexto). */
+export interface FakeCustomField {
+  readonly fieldId: string;
+  readonly key: string;
+  readonly dataType: 'TEXT' | 'NUMBER' | 'DECIMAL' | 'DATE' | 'BOOLEAN' | 'SELECT';
+  readonly target: 'TRANSACTION' | 'ACCOUNT';
+  readonly required?: boolean;
+  readonly archived?: boolean;
+  readonly options?: readonly string[];
+}
+
 /** Tasa de referencia de prueba (FX en memoria: append-only con supersede). */
 export interface FakeRate {
   readonly id: string;
@@ -94,6 +105,8 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     rates: [] as FakeRate[],
     /** Meses cerrados (`YYYY-MM`, INV-015) para `assertPeriodOpen`. */
     closedMonths: new Set<string>(),
+    /** Definiciones de custom fields disponibles para `validateCustomFieldValues`. */
+    customFields: [] as FakeCustomField[],
   };
   const faults: { ledger?: Error; audit?: Error; lifecycle?: Error } = {};
   let depth = 0;
@@ -325,6 +338,75 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
             throw new DomainError('CATEGORY_ARCHIVED', 'archived').at(`/splits/${i}/categoryId`);
           }
         }
+      },
+      /** Réplica mínima del contrato `ValidateCustomFieldValues` (la lógica real se prueba en CLASSIFICATION). */
+      async validateCustomFieldValues(input) {
+        const active = state.customFields.filter((f) => f.target === input.target && !f.archived);
+        return input.items.map((item) => {
+          const set: {
+            fieldId: string;
+            key: string;
+            valueType: 'TEXT' | 'NUMBER' | 'DATE' | 'BOOLEAN';
+            value: string | boolean;
+          }[] = [];
+          const removeFieldIds: string[] = [];
+          for (const [i, v] of item.values.entries()) {
+            const ptr = `${item.pointer}/${i}`;
+            const def = state.customFields.find((f) =>
+              v.fieldId ? f.fieldId === v.fieldId : f.key === v.key,
+            );
+            if (!def) throw new DomainError('REFERENCE_NOT_FOUND', 'custom field not found').at(ptr);
+            if (def.target !== input.target) {
+              throw new DomainError('CUSTOM_FIELD_TARGET_MISMATCH', 'wrong target').at(ptr);
+            }
+            if (def.archived) throw new DomainError('CUSTOM_FIELD_ARCHIVED', 'archived').at(ptr);
+            if (v.value === null) {
+              removeFieldIds.push(def.fieldId);
+              continue;
+            }
+            const okType =
+              def.dataType === 'BOOLEAN'
+                ? typeof v.value === 'boolean'
+                : typeof v.value === 'string' &&
+                  (def.dataType === 'NUMBER'
+                    ? /^-?\d+$/u.test(v.value)
+                    : def.dataType === 'DECIMAL'
+                      ? /^-?\d+(\.\d{1,18})?$/u.test(v.value)
+                      : def.dataType === 'DATE'
+                        ? /^\d{4}-\d{2}-\d{2}$/u.test(v.value)
+                        : def.dataType === 'SELECT'
+                          ? (def.options ?? []).includes(v.value)
+                          : v.value.length > 0);
+            if (!okType) {
+              throw new DomainError('CUSTOM_FIELD_VALUE_INVALID', 'invalid value').at(`${ptr}/value`);
+            }
+            const valueType =
+              def.dataType === 'NUMBER' || def.dataType === 'DECIMAL'
+                ? 'NUMBER'
+                : def.dataType === 'DATE'
+                  ? 'DATE'
+                  : def.dataType === 'BOOLEAN'
+                    ? 'BOOLEAN'
+                    : 'TEXT';
+            set.push({
+              fieldId: def.fieldId,
+              key: def.key,
+              valueType,
+              value:
+                typeof v.value === 'string' && valueType === 'NUMBER' && v.value.includes('.')
+                  ? v.value.replace(/\.?0+$/u, '')
+                  : v.value,
+            });
+          }
+          if (input.requireMandatory) {
+            const final = new Set(item.existingFieldIds ?? []);
+            for (const v of set) final.add(v.fieldId);
+            for (const id of removeFieldIds) final.delete(id);
+            const missing = active.find((f) => f.required && !final.has(f.fieldId));
+            if (missing) throw new DomainError('CUSTOM_FIELD_REQUIRED', 'required').at(item.pointer);
+          }
+          return { set, removeFieldIds };
+        });
       },
     },
     categories: {

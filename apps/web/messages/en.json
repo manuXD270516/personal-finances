@@ -583,7 +583,8 @@
       "dateRequired": "Enter a date.",
       "reasonRequired": "The adjustment needs a reason.",
       "refundExceeds": "The refund exceeds what is left of the original purchase: confirm it to record it.",
-      "sameAccount": "Source and target must be different."
+      "sameAccount": "Source and target must be different.",
+      "customFields": "Check the highlighted custom fields."
     },
     "splits": {
       "title": "Categories (splits)",
@@ -684,7 +685,8 @@
         "unreconcile": "Transaction unreconciled.",
         "amended": "Changes saved: reversal and new entry (revision {revision}).",
         "edited": "Changes saved."
-      }
+      },
+      "customFields": "Custom fields"
     },
     "history": {
       "title": "History (lifecycle)",
@@ -1142,7 +1144,8 @@
       "notes": "Notes",
       "website": "Website",
       "systemCode": "System code"
-    }
+    },
+    "customFields": "Custom fields"
   },
   "Lifecycle": {
     "tabs": {
@@ -1295,6 +1298,79 @@
       "label": "Period",
       "option": "{name} · {from} – {to} · {status}",
       "current": "(current)"
+    }
+  },
+  "CustomFields": {
+    "title": "Custom fields",
+    "intro": "Define your own data for transactions (per split) and accounts: invoice number, cost center, branch… They never affect balances or ledger entries.",
+    "required": "Required",
+    "none": "No value",
+    "yes": "Yes",
+    "no": "No",
+    "archivedBadge": "archived",
+    "empty": "There are no custom fields yet.",
+    "new": "New custom field",
+    "label": "Label",
+    "key": "Key",
+    "keyHint": "Stable lowercase identifier (letters, digits and underscore). It cannot change later.",
+    "keyImmutable": "The key cannot be changed.",
+    "dataType": "Type",
+    "dataTypes": {
+      "TEXT": "Text",
+      "NUMBER": "Whole number",
+      "DECIMAL": "Decimal",
+      "DATE": "Date",
+      "BOOLEAN": "Yes / No",
+      "SELECT": "Selection"
+    },
+    "target": "Applies to",
+    "targets": {
+      "TRANSACTION": "Transactions",
+      "ACCOUNT": "Accounts"
+    },
+    "requiredField": "Required on new records",
+    "requiredBadge": "required",
+    "lockedHint": "The type and the entity cannot change once the field has values.",
+    "options": "Options",
+    "optionLabel": "Label of option {n}",
+    "optionKey": "Key of option {n}",
+    "addOption": "Add option",
+    "removeOption": "Remove option {n}",
+    "removeOptionShort": "Remove",
+    "create": "Create field",
+    "created": "Field \"{name}\" created.",
+    "updated": "Field \"{name}\" updated.",
+    "archivedDone": "Field \"{name}\" archived.",
+    "unarchived": "Field \"{name}\" unarchived.",
+    "reordered": "Order updated.",
+    "edit": "Edit",
+    "editNamed": "Edit {name}",
+    "save": "Save",
+    "cancel": "Cancel",
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "archiveNamed": "Archive {name}",
+    "unarchiveNamed": "Unarchive {name}",
+    "moveUpNamed": "Move {name} up",
+    "moveDownNamed": "Move {name} down",
+    "errors": {
+      "labelRequired": "Enter the field label.",
+      "keyRequired": "Enter the field key.",
+      "optionsRequired": "A selection needs at least one option.",
+      "optionKeyInvalid": "An option key uses lowercase letters, digits and underscore (up to 40 characters).",
+      "optionKeyDuplicated": "Options cannot repeat a key or a label.",
+      "optionLabelRequired": "Every option needs a label.",
+      "INVALID_INTEGER": "Enter a whole number of up to 15 digits.",
+      "INVALID_DECIMAL": "Enter a valid decimal (up to 18 decimals).",
+      "INVALID_DATE": "Enter a valid date.",
+      "TOO_LONG": "At most 500 characters.",
+      "REQUIRED": "This field is required."
+    },
+    "filter": {
+      "field": "Custom field",
+      "value": "{name}",
+      "from": "{name}: from",
+      "to": "{name}: to"
     }
   }
 }

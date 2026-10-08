@@ -13,10 +13,14 @@ import type {
   LifecyclePort,
   LifecycleQuery,
   OutboxPort,
+  CustomFieldRepository,
+  CustomFieldUsagePort,
   Repository,
 } from '../application/ports/index.js';
 import { Category, CategoryGroup } from '../domain/category.js';
 import { Alias, Counterparty, type CounterpartyKind } from '../domain/counterparty.js';
+import { CustomFieldDefinition, type CustomFieldOption } from '../domain/custom-field.js';
+import type { CustomFieldDataType, CustomFieldTarget } from '../domain/custom-field-value.js';
 import type { CategoryKind, SystemCode } from '../domain/system-categories.js';
 import { Tag } from '../domain/tag.js';
 import esBoV1 from './seed/default-catalog.es-BO.v1.json' with { type: 'json' };
@@ -78,7 +82,19 @@ interface AliasTable {
   active: boolean;
 }
 
+interface CustomFieldTable extends Common {
+  key: string;
+  label: string;
+  data_type: CustomFieldDataType;
+  target: CustomFieldTarget;
+  required: boolean;
+  options: CustomFieldOption[];
+  position: number;
+}
+
 export interface ClassificationDb {
+  'classification.custom_field_definition': CustomFieldTable;
+
   'classification.category_group': GroupTable;
   'classification.category': CategoryTable;
   'classification.tag': TagTable;
@@ -88,6 +104,7 @@ export interface ClassificationDb {
 
 const db = (): Kysely<ClassificationDb> => unitOfWorkKysely<ClassificationDb>();
 const now = sql<Date>`now()`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const iso = (d: Date | null): string | null => (d === null ? null : new Date(d).toISOString());
 const ts = (s: string | null): Date | null => (s === null ? null : new Date(s));
 
@@ -99,6 +116,11 @@ async function translateUnique<T>(fn: () => Promise<T>): Promise<T> {
     const e = err as { code?: string; constraint?: string };
     if (e.code === '23505' && e.constraint?.includes('alias')) {
       throw new DomainError('COUNTERPARTY_ALIAS_TAKEN', 'an alias already belongs to another counterparty');
+    }
+    if (e.code === '23505' && e.constraint === 'custom_field_active_key_uq') {
+      throw new DomainError('CUSTOM_FIELD_KEY_TAKEN', 'an active custom field already uses this key').at(
+        '/key',
+      );
     }
     if (e.code === '23505' && e.constraint?.includes('name')) {
       throw new DomainError('NAME_TAKEN', 'an active item already uses this name');
@@ -332,6 +354,112 @@ export class PgTagRepository implements Repository<Tag> {
   }
 }
 
+export class PgCustomFieldRepository implements CustomFieldRepository {
+  private static toDomain(r: Selectable<CustomFieldTable>): CustomFieldDefinition {
+    return CustomFieldDefinition.restore({
+      id: r.id,
+      workspaceId: r.workspace_id,
+      key: r.key,
+      label: r.label,
+      dataType: r.data_type,
+      target: r.target,
+      required: r.required,
+      options: r.options,
+      position: r.position,
+      archivedAt: iso(r.archived_at),
+      version: r.version,
+    });
+  }
+
+  async findById(workspaceId: string, id: string): Promise<CustomFieldDefinition | null> {
+    if (!UUID.test(id)) return null;
+    const r = await db()
+      .selectFrom('classification.custom_field_definition')
+      .selectAll()
+      .where('workspace_id', '=', workspaceId)
+      .where('id', '=', id)
+      .executeTakeFirst();
+    return r ? PgCustomFieldRepository.toDomain(r) : null;
+  }
+
+  async listAll(workspaceId: string): Promise<CustomFieldDefinition[]> {
+    const rows = await db()
+      .selectFrom('classification.custom_field_definition')
+      .selectAll()
+      .where('workspace_id', '=', workspaceId)
+      .execute();
+    return rows.map((r) => PgCustomFieldRepository.toDomain(r));
+  }
+
+  async insert(f: CustomFieldDefinition): Promise<void> {
+    const s = f.snapshot();
+    await translateUnique(() =>
+      db()
+        .insertInto('classification.custom_field_definition')
+        .values({
+          id: s.id,
+          workspace_id: s.workspaceId,
+          key: s.key,
+          label: s.label,
+          data_type: s.dataType,
+          target: s.target,
+          required: s.required,
+          // `options` es jsonb: node-postgres serializa el arreglo como arreglo de Postgres, así que va como texto.
+          options: JSON.stringify(s.options) as never,
+          position: s.position,
+          archived_at: ts(s.archivedAt),
+          version: s.version,
+        })
+        .execute(),
+    );
+  }
+
+  async update(f: CustomFieldDefinition, expectedVersion: number): Promise<boolean> {
+    const s = f.snapshot();
+    const res = await translateUnique(() =>
+      db()
+        .updateTable('classification.custom_field_definition')
+        .set({
+          label: s.label,
+          data_type: s.dataType,
+          target: s.target,
+          required: s.required,
+          options: JSON.stringify(s.options) as never,
+          position: s.position,
+          archived_at: ts(s.archivedAt),
+          version: s.version,
+          updated_at: now,
+        })
+        .where('workspace_id', '=', s.workspaceId)
+        .where('id', '=', s.id)
+        .where('version', '=', expectedVersion)
+        .executeTakeFirst(),
+    );
+    return Number(res.numUpdatedRows) === 1;
+  }
+}
+
+/**
+ * Uso de una definición por valores (activos o históricos) en `txn.split_custom_field_value` y
+ * `accounts.account_custom_field_value`: lectura directa en la unidad de trabajo del comando (mismo patrón que el
+ * `JOIN` a `fx.currency` de TRANSACTIONS; sin FK entre schemas, NFR-DATA-015).
+ */
+export class PgCustomFieldUsage implements CustomFieldUsagePort {
+  async usageOf(workspaceId: string, fieldId: string) {
+    const rows = await sql<{ value_text: string | null }>`
+      SELECT v.value_text FROM (
+        SELECT value_text FROM txn.split_custom_field_value WHERE workspace_id = ${workspaceId} AND field_id = ${fieldId}
+        UNION ALL
+        SELECT value_text FROM accounts.account_custom_field_value
+         WHERE workspace_id = ${workspaceId} AND field_id = ${fieldId}
+      ) v GROUP BY v.value_text`.execute(db());
+    return {
+      hasValues: rows.rows.length > 0,
+      usedOptionKeys: new Set(rows.rows.flatMap((r) => (r.value_text === null ? [] : [r.value_text]))),
+    };
+  }
+}
+
 export class PgCounterpartyRepository implements Repository<Counterparty> {
   private async load(rows: Selectable<CounterpartyTable>[], workspaceId: string): Promise<Counterparty[]> {
     if (rows.length === 0) return [];
@@ -496,6 +624,8 @@ export function pgClassificationDeps(input: {
     categories: new PgCategoryRepository(),
     tags: new PgTagRepository(),
     counterparties: new PgCounterpartyRepository(),
+    customFields: new PgCustomFieldRepository(),
+    customFieldUsage: new PgCustomFieldUsage(),
     outbox: input.outbox,
     audit: input.audit,
     lifecycle: input.lifecycle,

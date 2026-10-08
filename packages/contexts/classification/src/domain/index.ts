@@ -5,3 +5,5 @@ export * from './category.js';
 export * from './tag.js';
 export * from './counterparty.js';
 export * from './classification-lifecycle.js';
+export * from './custom-field-value.js';
+export * from './custom-field.js';

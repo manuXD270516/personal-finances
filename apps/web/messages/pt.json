@@ -583,7 +583,8 @@
       "dateRequired": "Informe uma data.",
       "reasonRequired": "O ajuste precisa de um motivo.",
       "refundExceeds": "O reembolso excede o saldo pendente da compra original: confirme para registrá-lo.",
-      "sameAccount": "Origem e destino devem ser diferentes."
+      "sameAccount": "Origem e destino devem ser diferentes.",
+      "customFields": "Revise os campos personalizados destacados."
     },
     "splits": {
       "title": "Categorias (splits)",
@@ -684,7 +685,8 @@
         "unreconcile": "Conciliação desfeita.",
         "amended": "Alterações salvas: estorno e novo lançamento (revisão {revision}).",
         "edited": "Alterações salvas."
-      }
+      },
+      "customFields": "Campos personalizados"
     },
     "history": {
       "title": "Histórico (ciclo de vida)",
@@ -1142,7 +1144,8 @@
       "notes": "Notas",
       "website": "Site",
       "systemCode": "Código de sistema"
-    }
+    },
+    "customFields": "Campos personalizados"
   },
   "Lifecycle": {
     "tabs": {
@@ -1295,6 +1298,79 @@
       "label": "Período",
       "option": "{name} · {from} – {to} · {status}",
       "current": "(atual)"
+    }
+  },
+  "CustomFields": {
+    "title": "Campos personalizados",
+    "intro": "Defina dados próprios para suas transações (por divisão) e contas: número da nota fiscal, centro de custo, agência… Eles nunca afetam saldos nem lançamentos contábeis.",
+    "required": "Obrigatório",
+    "none": "Sem valor",
+    "yes": "Sim",
+    "no": "Não",
+    "archivedBadge": "arquivado",
+    "empty": "Ainda não há campos personalizados.",
+    "new": "Novo campo personalizado",
+    "label": "Rótulo",
+    "key": "Chave",
+    "keyHint": "Identificador estável em minúsculas (letras, números e sublinhado). Não muda depois.",
+    "keyImmutable": "A chave não pode ser alterada.",
+    "dataType": "Tipo",
+    "dataTypes": {
+      "TEXT": "Texto",
+      "NUMBER": "Número inteiro",
+      "DECIMAL": "Decimal",
+      "DATE": "Data",
+      "BOOLEAN": "Sim / Não",
+      "SELECT": "Seleção"
+    },
+    "target": "Aplica-se a",
+    "targets": {
+      "TRANSACTION": "Transações",
+      "ACCOUNT": "Contas"
+    },
+    "requiredField": "Obrigatório em novos registros",
+    "requiredBadge": "obrigatório",
+    "lockedHint": "O tipo e a entidade não mudam quando o campo já tem valores.",
+    "options": "Opções",
+    "optionLabel": "Rótulo da opção {n}",
+    "optionKey": "Chave da opção {n}",
+    "addOption": "Adicionar opção",
+    "removeOption": "Remover a opção {n}",
+    "removeOptionShort": "Remover",
+    "create": "Criar campo",
+    "created": "Campo \"{name}\" criado.",
+    "updated": "Campo \"{name}\" atualizado.",
+    "archivedDone": "Campo \"{name}\" arquivado.",
+    "unarchived": "Campo \"{name}\" desarquivado.",
+    "reordered": "Ordem atualizada.",
+    "edit": "Editar",
+    "editNamed": "Editar {name}",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "archive": "Arquivar",
+    "unarchive": "Desarquivar",
+    "archiveNamed": "Arquivar {name}",
+    "unarchiveNamed": "Desarquivar {name}",
+    "moveUpNamed": "Subir {name}",
+    "moveDownNamed": "Descer {name}",
+    "errors": {
+      "labelRequired": "Escreva o rótulo do campo.",
+      "keyRequired": "Escreva a chave do campo.",
+      "optionsRequired": "Uma seleção precisa de pelo menos uma opção.",
+      "optionKeyInvalid": "A chave de uma opção usa minúsculas, números e sublinhado (até 40 caracteres).",
+      "optionKeyDuplicated": "As opções não podem repetir chave nem rótulo.",
+      "optionLabelRequired": "Cada opção precisa de um rótulo.",
+      "INVALID_INTEGER": "Escreva um número inteiro de até 15 dígitos.",
+      "INVALID_DECIMAL": "Escreva um decimal válido (até 18 casas decimais).",
+      "INVALID_DATE": "Escreva uma data válida.",
+      "TOO_LONG": "No máximo 500 caracteres.",
+      "REQUIRED": "Este campo é obrigatório."
+    },
+    "filter": {
+      "field": "Campo personalizado",
+      "value": "{name}",
+      "from": "{name}: de",
+      "to": "{name}: até"
     }
   }
 }

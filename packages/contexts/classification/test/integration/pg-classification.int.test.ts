@@ -87,7 +87,11 @@ describe('Repositorios PostgreSQL de CLASSIFICATION (tareas 5.1 y 5.2)', () => {
     }
     const d = pgClassificationDeps({
       pool,
-      outbox: { append: async (e) => void events.push(e) },
+      outbox: {
+        append: async (e) => {
+          if (e.eventType === 'classification.CategoryArchived') events.push(e);
+        },
+      },
       audit: { append: async (a) => void audits.push(a) },
       // Recorrido (docs/31 D52): el registro de auditoría sigue pasando por el doble; los pasos se descartan aquí.
       lifecycle: { record: async (a) => void audits.push(a) },

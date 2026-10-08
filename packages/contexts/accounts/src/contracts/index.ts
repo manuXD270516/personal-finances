@@ -128,6 +128,8 @@ export const ACCOUNTS_AUDIT_POLICY = {
     icon: 'plain',
     notes: 'plain',
     tagIds: 'plain',
+    // Custom fields de cuenta (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
+    'customFields.*': 'plain',
     cryptoNetwork: 'plain',
     openedOn: 'plain',
     closedOn: 'plain',

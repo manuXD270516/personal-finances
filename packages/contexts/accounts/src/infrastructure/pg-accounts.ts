@@ -1,7 +1,7 @@
 import type { BalanceQuery } from '@pf/ledger/contracts';
 import { currentRequestContext, PgUnitOfWork, unitOfWorkKysely } from '@pf/platform/api';
 import { uuidv7 } from '@pf/platform/logging';
-import { DomainError } from '@pf/shared-kernel';
+import { canonicalDecimal, DomainError } from '@pf/shared-kernel';
 import { sql, type Kysely } from 'kysely';
 import type { Pool } from 'pg';
 import type {
@@ -18,6 +18,7 @@ import type {
 import {
   Account,
   Institution,
+  type AccountCustomFieldValue,
   type AccountType,
   type InstitutionKind,
   type Liquidity,
@@ -52,6 +53,15 @@ interface AccountsDb {
     updated_at: string;
   };
   'accounts.account_tag': { workspace_id: string; account_id: string; tag_id: string };
+  'accounts.account_custom_field_value': {
+    workspace_id: string;
+    account_id: string;
+    field_id: string;
+    value_text: string | null;
+    value_number: string | null;
+    value_date: string | null;
+    value_bool: boolean | null;
+  };
   'accounts.institution': {
     id: string;
     workspace_id: string;
@@ -136,9 +146,37 @@ const accountColumns = [
   sql<string>`to_char(a.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`.as('updated_at'),
   sql<string[]>`COALESCE((SELECT array_agg(t.tag_id::text ORDER BY t.tag_id) FROM accounts.account_tag t
      WHERE t.workspace_id = a.workspace_id AND t.account_id = a.id), '{}')`.as('tag_ids'),
+  // Valores de custom fields con la clave de su definición (lectura del catálogo de CLASSIFICATION, patrón `fx.currency`).
+  sql<RawCustomFieldValue[]>`COALESCE((SELECT json_agg(json_build_object(
+       'fieldId', v.field_id, 'key', d.key, 'text', v.value_text, 'number', v.value_number::text,
+       'date', v.value_date::text, 'bool', v.value_bool) ORDER BY d.key)
+     FROM accounts.account_custom_field_value v
+     JOIN classification.custom_field_definition d ON d.id = v.field_id AND d.workspace_id = v.workspace_id
+     WHERE v.workspace_id = a.workspace_id AND v.account_id = a.id), '[]'::json)`.as('custom_fields'),
 ] as const;
 
-function toAccount(row: AccountRow & { tag_ids: string[] }): Account {
+interface RawCustomFieldValue {
+  fieldId: string;
+  key: string;
+  text: string | null;
+  number: string | null;
+  date: string | null;
+  bool: boolean | null;
+}
+
+/** `numeric(38,18)` rellena con ceros: se devuelve la forma canónica exacta ("35.125"). */
+function toCustomFieldValues(raw: readonly RawCustomFieldValue[] | null): AccountCustomFieldValue[] {
+  return (raw ?? []).map((v): AccountCustomFieldValue => {
+    if (v.text !== null) return { fieldId: v.fieldId, key: v.key, valueType: 'TEXT', value: v.text };
+    if (v.number !== null) {
+      return { fieldId: v.fieldId, key: v.key, valueType: 'NUMBER', value: canonicalDecimal(v.number) };
+    }
+    if (v.date !== null) return { fieldId: v.fieldId, key: v.key, valueType: 'DATE', value: v.date };
+    return { fieldId: v.fieldId, key: v.key, valueType: 'BOOLEAN', value: v.bool === true };
+  });
+}
+
+function toAccount(row: AccountRow & { tag_ids: string[]; custom_fields: RawCustomFieldValue[] }): Account {
   return Account.restore({
     id: row.id,
     workspaceId: row.workspace_id,
@@ -161,6 +199,7 @@ function toAccount(row: AccountRow & { tag_ids: string[] }): Account {
     notes: row.notes,
     tagIds: row.tag_ids ?? [],
     cryptoNetwork: row.crypto_network,
+    customFields: toCustomFieldValues(row.custom_fields),
     version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -210,6 +249,7 @@ export class PgAccountRepository implements AccountRepository {
       throw mapUnique(err);
     }
     await this.saveTags(account);
+    await this.saveCustomFields(account);
   }
 
   async update(account: Account): Promise<boolean> {
@@ -229,7 +269,56 @@ export class PgAccountRepository implements AccountRepository {
     }
     if (updated === 0n) return false;
     await this.saveTags(account);
+    await this.saveCustomFields(account);
     return true;
+  }
+
+  /** Valores de custom fields de la cuenta (tabla de enlace: se reescriben solo si cambiaron). Sin efecto en saldos. */
+  private async saveCustomFields(account: Account): Promise<void> {
+    const s = account.snapshot;
+    const current = await db()
+      .selectFrom('accounts.account_custom_field_value')
+      .select([
+        'field_id',
+        'value_text',
+        'value_bool',
+        sql<string | null>`value_number::text`.as('value_number'),
+        sql<string | null>`value_date::text`.as('value_date'),
+      ])
+      .where('workspace_id', '=', s.workspaceId)
+      .where('account_id', '=', s.id)
+      .execute();
+    const have = new Map(
+      current.map((r) => [
+        r.field_id,
+        r.value_text ??
+          (r.value_number !== null ? canonicalDecimal(r.value_number) : (r.value_date ?? r.value_bool)),
+      ]),
+    );
+    const want = new Map(s.customFields.map((v) => [v.fieldId, v]));
+    const remove = [...have.keys()].filter((id) => !want.has(id));
+    if (remove.length > 0) {
+      await db()
+        .deleteFrom('accounts.account_custom_field_value')
+        .where('workspace_id', '=', s.workspaceId)
+        .where('account_id', '=', s.id)
+        .where('field_id', 'in', remove)
+        .execute();
+    }
+    for (const v of s.customFields) {
+      if (have.has(v.fieldId) && have.get(v.fieldId) === v.value) continue;
+      const row = {
+        value_text: v.valueType === 'TEXT' ? (v.value as string) : null,
+        value_number: v.valueType === 'NUMBER' ? (v.value as string) : null,
+        value_date: v.valueType === 'DATE' ? (v.value as string) : null,
+        value_bool: v.valueType === 'BOOLEAN' ? (v.value as boolean) : null,
+      };
+      await db()
+        .insertInto('accounts.account_custom_field_value')
+        .values({ workspace_id: s.workspaceId, account_id: s.id, field_id: v.fieldId, ...row })
+        .onConflict((oc) => oc.columns(['workspace_id', 'account_id', 'field_id']).doUpdateSet(row))
+        .execute();
+    }
   }
 
   private async saveTags(account: Account): Promise<void> {

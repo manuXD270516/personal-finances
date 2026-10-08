@@ -21,6 +21,8 @@ import {
 } from '../common/ui';
 import { Tabs } from '../common/Tabs';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { useCustomFields } from '../custom-fields/CustomFieldInputs';
+import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { useCatalogs } from './catalogs';
@@ -129,6 +131,8 @@ function Detail({
   const lf = useFormat('Lifecycle', ctx);
   const { t, locale } = f;
   const catalogs = useCatalogs(ctx);
+  const cf = useFormat('CustomFields', ctx);
+  const customFields = useCustomFields(ctx);
   const [tx, setTx] = useState<Transaction | undefined>();
   const [history, setHistory] = useState<readonly AuditLogEntry[] | undefined>();
   const [revisions, setRevisions] = useState<readonly ConversionRevision[]>([]);
@@ -213,6 +217,7 @@ function Detail({
 
   const title = describe(tx, catalogs.names, f);
   const accountName = (id: string) => catalogs.names.account(id) ?? '…';
+  const hasCustomValues = tx.splits.some((x) => Object.keys(x.customFields ?? {}).length > 0);
 
   return (
     <section
@@ -341,6 +346,11 @@ function Detail({
                             <th scope="col" style={cellStyle}>
                               {t('detail.tags')}
                             </th>
+                            {hasCustomValues ? (
+                              <th scope="col" style={cellStyle}>
+                                {t('detail.customFields')}
+                              </th>
+                            ) : null}
                             <th scope="col" style={numCellStyle}>
                               {t('detail.amount')}
                             </th>
@@ -353,6 +363,16 @@ function Detail({
                               <td style={cellStyle}>
                                 {(s.tagIds ?? []).map((id) => catalogs.names.tag(id) ?? '…').join(', ')}
                               </td>
+                              {hasCustomValues ? (
+                                <td style={cellStyle}>
+                                  <CustomFieldValuesView
+                                    definitions={customFields.definitions}
+                                    values={s.customFields}
+                                    f={cf}
+                                    testId="split-custom-fields"
+                                  />
+                                </td>
+                              ) : null}
                               <td style={numCellStyle} data-testid="tx-split-amount">
                                 {formatMoney(s.amount, locale)}
                               </td>

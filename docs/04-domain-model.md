@@ -241,16 +241,16 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 - **AR `Category`**: `id, groupId, parentId? (un solo nivel de subcategoría), name, kind (EXPENSE|INCOME), isSystem, systemCode? (FEES|FX_FEES|INTEREST|LOAN_FEES|INSURANCE|TAXES|ADJUSTMENTS|UNCATEGORIZED|INTEREST_EARNED|ADJUSTMENTS_INCOME|UNCATEGORIZED_INCOME), status (ACTIVE|ARCHIVED), icon, color, mergedInto?`.
 - **AR `CategoryGroup`**: `id, name, kind, order, status`.
 - **AR `Tag`**: `id, name, color, status`.
-- **AR `CustomFieldDefinition`**: `id, key, label, type (TEXT|NUMBER|DATE|BOOLEAN|SELECT|MULTI_SELECT|MONEY), options?, appliesTo (TRANSACTION|SPLIT|ACCOUNT), required, status`.
+- **AR `CustomFieldDefinition`** (as-built `add-custom-fields`, rev. 2026-10-08): `id, key (snake_case ≤ 40, único entre las activas e inmutable), label, dataType (TEXT|NUMBER|DECIMAL|DATE|BOOLEAN|SELECT), target (TRANSACTION|ACCOUNT), options[{key, label, position}] (solo SELECT, clave estable), required, position, archivedAt, version`. `MULTI_SELECT` y `MONEY` quedan fuera de Phase 2 (docs/33 D96); `NUMBER` es entero (|n| < 10^15) y `DECIMAL` admite hasta 18 decimales (ambos viajan como string exacto, nunca punto flotante). El objetivo `TRANSACTION` se asigna **por split nominal** de ingresos, gastos y reembolsos (con un único split la UI lo presenta a nivel transacción); transferencias y conversiones no llevan custom fields (D97). Sin máquina de estados (solo archivado suave). Tipo y objetivo se bloquean mientras la definición tenga valores; una opción de `SELECT` en uso no se elimina.
 - **AR `Counterparty`**: `id, name, kind (MERCHANT|PERSON|EMPLOYER|BANK|SERVICE_PROVIDER|GOVERNMENT|OTHER), aliases: VO Alias[] (patrones de descripción para matching), defaultCategoryId?, status, mergedInto?`.
 - **DS**: `CounterpartyMatcher` (alias → counterparty), `CategoryMergeService`.
 - **Repos**: uno por AR. **Ports**: `AuditPort`.
-- **Comandos**: `CreateCategory`, `UpdateCategory`, `MoveCategory`, `ArchiveCategory`, `MergeCategories`, `Create/Update/ArchiveCategoryGroup`, `Create/Rename/Archive/MergeTags`, `Define/Update/ArchiveCustomField`, `Create/Update/Archive/MergeCounterparty`, `AddCounterpartyAlias`, `SeedSystemCategories` (al crear workspace).
-- **Queries**: `ListCategories`, `GetCategoryTree`, `ValidateClassification(categoryIds, tagIds, customFields)`, `ResolveCounterparty(description)`, `ListTags`, `ListCustomFields`, `ListCounterparties`.
+- **Comandos**: `CreateCategory`, `UpdateCategory`, `MoveCategory`, `ArchiveCategory`, `MergeCategories`, `Create/Update/ArchiveCategoryGroup`, `Create/Rename/Archive/MergeTags`, `Define/Update/Archive/UnarchiveCustomField`, `Create/Update/Archive/MergeCounterparty`, `AddCounterpartyAlias`, `SeedSystemCategories` (al crear workspace).
+- **Queries**: `ListCategories`, `GetCategoryTree`, `ValidateClassification(categoryIds, tagIds, counterpartyId)`, `ValidateCustomFieldValues(target, items[], requireMandatory)` (as-built `add-custom-fields`: valida y normaliza los valores de un split o de una cuenta; obligatoriedad no retroactiva), `ResolveCounterparty(description)`, `ListTags`, `ListCustomFields`, `ListCounterparties`.
 - **Eventos**: `CategoryArchived`, `CategoriesMerged`, `TagsMerged`, `CounterpartiesMerged`, `CustomFieldDefinitionChanged`.
 - **Invariantes**: INV-019 (nunca hard delete, solo archivar); las categorías de sistema no se archivan, renombran, cambian de tipo ni de jerarquía (`SYSTEM_CATEGORY_IMMUTABLE`); jerarquía de tres niveles grupo → categoría → subcategoría (una subcategoría no tiene hijas: `CATEGORY_DEPTH_EXCEEDED`), con nombre único entre activas del mismo padre; `kind` de la categoría compatible con el signo del split (gasto/ingreso; los refunds usan categoría de gasto).
 
-> Nota: los **valores** asignados (categoryId del split, tags del split, `CustomFieldValue`) son propiedad de Transactions; Classification es dueño de los **catálogos**.
+> Nota: los **valores** asignados (categoryId del split, tags del split, `CustomFieldValue`) son propiedad de Transactions (valores de custom fields de cuenta: de Accounts); Classification es dueño de los **catálogos** y de la validación (`ValidateCustomFieldValues`).
 
 ### 3.6 PLANNING — Planning & Budgeting (`planning`)
 
@@ -558,7 +558,7 @@ Decisiones: **Mantener**, **Renombrar**, **Fusionar** (absorbida en otro concept
 | Tag | Mantener | CLASSIFICATION | Catálogo. |
 | TransactionTag | **Renombrar** → `SplitTag` | TRANSACTIONS (`txn.split_tag`) | El tag se asigna a nivel split (etiquetar la transacción = todos sus splits); la asignación es un valor de Transactions. |
 | CustomFieldDefinition | Mantener | CLASSIFICATION | Catálogo de definiciones. |
-| CustomFieldValue | Mantener (dueño Transactions) | TRANSACTIONS | Valor sobre transacción/split validado contra la definición; almacenamiento (JSONB vs EAV) a decidir en docs/08. |
+| CustomFieldValue | Mantener (dueño Transactions / Accounts) | TRANSACTIONS, ACCOUNTS | Valor sobre el split (o la cuenta) validado contra la definición. Decidido en `add-custom-fields`: **EAV con columnas tipadas** (`value_text`, `value_number numeric(38,18)`, `value_date`, `value_bool`; `num_nonnulls = 1`), no JSONB: permite índices por tipo y el filtro del listado (docs/08 §5.4). |
 | Attachment | **Renombrar** → `Document` + `AttachmentLink` | DOCUMENTS | Un mismo archivo puede vincularse a varias entidades (transacción, préstamo, conversión); separar archivo de vínculo. |
 | FinancialPeriod | Mantener (+ `ledger.period_lock` como proyección síncrona) | PLANNING | Ciclo de vida del mes; el lock vive junto al ledger para reforzarlo en BD. |
 | Budget | Mantener | PLANNING | Por `(yearMonth, currency)`. |

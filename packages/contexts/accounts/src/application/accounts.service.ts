@@ -17,13 +17,14 @@ import {
   Account,
   natureOf,
   type AccountChanges,
+  type AccountCustomFieldValue,
   type AccountState,
   type AccountStatus,
   type AccountType,
   type Liquidity,
 } from '../domain/index.js';
 import { baseCurrencyBalanceOf, type BaseCurrencyBalanceDto } from './base-currency-valuation.js';
-import type { AccountListFilter, AccountsDeps, CurrencyInfo } from './ports/index.js';
+import type { AccountListFilter, AccountsDeps, CurrencyInfo, CustomFieldValueInput } from './ports/index.js';
 
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `account ${id} not found`);
 /** 412 con la versión vigente (`currentVersion`, docs/10 §6) cuando se conoce. */
@@ -53,7 +54,14 @@ export interface OpenAccountCommand {
   readonly tagIds?: readonly string[];
   readonly cryptoNetwork?: string | null;
   readonly notes?: string | null;
+  /** Valores de custom fields de cuenta (por `fieldId` o `key`; `null` quita): obligatorios en cuentas nuevas. */
+  readonly customFields?: readonly CustomFieldValueInput[];
 }
+
+/** Cambios de `AccountUpdate`: los custom fields llegan crudos y se validan en la aplicación. */
+export type AccountUpdateChanges = Omit<AccountChanges, 'customFields'> & {
+  readonly customFields?: readonly CustomFieldValueInput[];
+};
 
 /** Cuenta con su saldo derivado del ledger (nunca persistido en Accounts). */
 export interface AccountView {
@@ -113,6 +121,7 @@ export class AccountsService {
       if (cmd.tagIds && cmd.tagIds.length > 0) {
         await this.deps.tags.assertAssignable(cmd.workspaceId, cmd.tagIds);
       }
+      const customFields = await this.resolveCustomFields(cmd.workspaceId, cmd.customFields ?? [], [], true);
       const opening = cmd.openingBalance
         ? this.openingAmount(cmd.openingBalance.amount, ccy, cmd.currency)
         : null;
@@ -137,6 +146,7 @@ export class AccountsService {
         notes: cmd.notes ?? null,
         tagIds: cmd.tagIds ?? [],
         cryptoNetwork: cmd.cryptoNetwork ?? null,
+        customFields,
       });
       await accounts.insert(account);
       const s = account.snapshot;
@@ -173,6 +183,7 @@ export class AccountsService {
       if (s.accountNumberLast4)
         changes.push({ field: 'accountNumberLast4', before: null, after: s.accountNumberLast4 });
       if (opening) changes.push({ field: 'openingBalance', before: null, after: opening.toJSON() });
+      changes.push(...customFieldAudit([], s.customFields));
       await this.record(
         account,
         {
@@ -196,12 +207,13 @@ export class AccountsService {
     workspaceId: string,
     accountId: string,
     expectedVersion: number,
-    changes: AccountChanges,
+    input: AccountUpdateChanges,
   ): Promise<AccountView> {
     const { uow, accounts } = this.deps;
     return uow.run(workspaceId, async () => {
       const account = await this.load(workspaceId, accountId, expectedVersion);
       const before = account.snapshot;
+      let changes = input as unknown as AccountChanges;
       let currencyKind: string | undefined;
       let hasPostings = false;
       if (changes.currency !== undefined && changes.currency !== before.currency) {
@@ -213,6 +225,18 @@ export class AccountsService {
       }
       if (changes.tagIds && changes.tagIds.length > 0) {
         await this.deps.tags.assertAssignable(workspaceId, changes.tagIds);
+      }
+      // Los custom fields no dependen de periodos ni tocan saldos; la obligatoriedad solo se exige al editarlos.
+      if (input.customFields !== undefined) {
+        changes = {
+          ...changes,
+          customFields: await this.resolveCustomFields(
+            workspaceId,
+            input.customFields,
+            before.customFields,
+            true,
+          ),
+        };
       }
       const changed = account.update(changes, {
         hasPostings,
@@ -234,7 +258,11 @@ export class AccountsService {
           aggregateType: 'Account',
           aggregateId: accountId,
           aggregateVersion: after.version,
-          changes: changed.map((field) => ({ field, before: before[field], after: after[field] })),
+          changes: changed.flatMap((field): AuditChangeInput[] =>
+            field === 'customFields'
+              ? customFieldAudit(before.customFields, after.customFields)
+              : [{ field, before: before[field], after: after[field] }],
+          ),
         },
         [updated],
         null,
@@ -507,6 +535,28 @@ export class AccountsService {
   }
 
   /**
+   * Valida con CLASSIFICATION los custom fields de la cuenta y devuelve la lista FINAL: los valores actuales con los
+   * cambios aplicados (lo no mencionado se conserva; `null` quita). Sin cambios ni obligatorios ⇒ lista sin tocar.
+   */
+  private async resolveCustomFields(
+    workspaceId: string,
+    values: readonly CustomFieldValueInput[],
+    current: readonly AccountCustomFieldValue[],
+    requireMandatory: boolean,
+  ): Promise<AccountCustomFieldValue[]> {
+    const result = await this.deps.customFields.validate({
+      workspaceId,
+      requireMandatory,
+      values,
+      existingFieldIds: current.map((v) => v.fieldId),
+    });
+    const merged = new Map(current.map((v) => [v.fieldId, v]));
+    for (const id of result.removeFieldIds) merged.delete(id);
+    for (const v of result.set) merged.set(v.fieldId, v);
+    return [...merged.values()];
+  }
+
+  /**
    * Moneda activa en el catálogo global Y habilitada en el workspace (docs/31 D45; FR-ACCOUNTS-002). Si no,
    * `CURRENCY_NOT_ENABLED` (422) apuntando al campo.
    */
@@ -683,6 +733,21 @@ export class AccountsService {
     }
     return out;
   }
+}
+
+/** Un campo `customFields.<clave>` de auditoría por cada clave cuyo valor cambió (antes/después). */
+function customFieldAudit(
+  before: readonly AccountCustomFieldValue[],
+  after: readonly AccountCustomFieldValue[],
+): AuditChangeInput[] {
+  const keys = [...new Set([...before, ...after].map((v) => v.key))].sort();
+  const valueOf = (list: readonly AccountCustomFieldValue[], key: string) =>
+    list.find((v) => v.key === key)?.value ?? null;
+  return keys.flatMap((key) => {
+    const b = valueOf(before, key);
+    const a = valueOf(after, key);
+    return b === a ? [] : [{ field: `customFields.${key}`, before: b, after: a }];
+  });
 }
 
 function sortAccounts(accounts: Account[], sort: AccountSort = 'displayOrder'): Account[] {

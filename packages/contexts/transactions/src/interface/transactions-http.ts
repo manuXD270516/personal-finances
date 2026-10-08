@@ -12,7 +12,7 @@ import {
 } from '@pf/platform/nest';
 import type { AuditLogEntryDto } from '@pf/audit/contracts';
 import type { ConversionCostDto } from '@pf/fx/contracts';
-import type { TransactionSort } from '../application/ports/index.js';
+import type { CustomFieldFilter, TransactionSort } from '../application/ports/index.js';
 import type {
   MoneyDto,
   RecordTransactionCommand,
@@ -40,6 +40,26 @@ const list = (q: Json, k: string): string[] | undefined => {
   if (v === undefined) return undefined;
   return (Array.isArray(v) ? v : String(v).split(',')).map(String);
 };
+
+/**
+ * `customField[<clave>]=v` (igualdad) y `customField[<clave>][gte|lte]=v` (rango) ya anidados por el contrato
+ * (`style: deepObject`) ⇒ filtros por clave, ordenados para que el cursor firmado sea estable.
+ */
+function customFieldFilters(q: Json): CustomFieldFilter[] {
+  const raw = q['customField'];
+  if (typeof raw !== 'object' || raw === null) return [];
+  return Object.entries(raw as Record<string, unknown>)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, v]) =>
+      typeof v === 'string'
+        ? { key, eq: v }
+        : {
+            key,
+            ...(typeof (v as Json)['gte'] === 'string' ? { gte: (v as Json)['gte'] as string } : {}),
+            ...(typeof (v as Json)['lte'] === 'string' ? { lte: (v as Json)['lte'] as string } : {}),
+          },
+    );
+}
 
 function limitOf(q: Json): number {
   const raw = Number(q['limit'] ?? DEFAULT_PAGE_LIMIT);
@@ -77,6 +97,7 @@ export function toTransactionDto(s: TransactionState, totalCost?: ConversionCost
       counterpartyId: x.counterpartyId,
       tagIds: [...x.tagIds],
       memo: x.memo,
+      customFields: Object.fromEntries(x.customFields.map((v) => [v.key, v.value])),
     })),
     conversion: s.conversion ? conversionDetailDto(s.conversion, totalCost) : null,
     source: s.source,
@@ -93,8 +114,23 @@ export function toTransactionDto(s: TransactionState, totalCost?: ConversionCost
 
 const auditEntryDto = (e: AuditLogEntryDto) => ({ ...e, changes: [...e.changes] });
 
+/**
+ * `splits[]` del cuerpo. `customFields` viaja como mapa `clave → valor` (`null` quita); el caso de uso lo recibe como
+ * lista de cambios por clave.
+ */
 const splitsOf = (body: Json): SplitDto[] | undefined =>
-  Array.isArray(body['splits']) ? (body['splits'] as SplitDto[]) : undefined;
+  Array.isArray(body['splits'])
+    ? (
+        body['splits'] as (Omit<SplitDto, 'customFields'> & {
+          customFields?: Record<string, string | boolean | null>;
+        })[]
+      ).map(({ customFields, ...rest }) => ({
+        ...rest,
+        ...(customFields
+          ? { customFields: Object.entries(customFields).map(([key, value]) => ({ key, value })) }
+          : {}),
+      }))
+    : undefined;
 
 /**
  * `/api/v1/workspaces/{workspaceId}/transactions*` (design.md § Contratos + D27/D28). Autenticación y
@@ -126,6 +162,7 @@ export class TransactionsController {
       dateTo: str(query, 'dateTo') ?? null,
       amountMin: str(query, 'amountMin') ?? null,
       amountMax: str(query, 'amountMax') ?? null,
+      customField: customFieldFilters(query),
       sort: str(query, 'sort') ?? '-transactionDate',
     };
     const scope = { resource: 'transactions', workspaceId, filters };
@@ -157,6 +194,7 @@ export class TransactionsController {
       ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
       ...(filters.amountMin ? { amountMin: filters.amountMin } : {}),
       ...(filters.amountMax ? { amountMax: filters.amountMax } : {}),
+      ...(filters.customField.length > 0 ? { customFields: filters.customField } : {}),
     });
     const rows = found.map((s, i) => ({ s, at: offset + i + 1 }));
     const page = buildPage(

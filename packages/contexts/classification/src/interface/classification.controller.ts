@@ -23,9 +23,13 @@ import {
 } from '@pf/platform/nest';
 import type { ClassificationQueries } from '../application/classification.queries.js';
 import type { ClassificationService } from '../application/classification.service.js';
+import type { CustomFieldsQueries } from '../application/custom-fields.queries.js';
+import type { CustomFieldsService } from '../application/custom-fields.service.js';
 import type { LocaleResolver } from '../application/ports/index.js';
 import type { Category, CategoryGroup } from '../domain/category.js';
 import { isCounterpartyKind, type Counterparty } from '../domain/counterparty.js';
+import type { CustomFieldDefinition, CustomFieldOptionInput } from '../domain/custom-field.js';
+import { isCustomFieldTarget } from '../domain/custom-field-value.js';
 import { NameTakenError } from '../domain/errors.js';
 import { isCategoryKind, systemCategoryName } from '../domain/system-categories.js';
 import type { Tag } from '../domain/tag.js';
@@ -33,6 +37,8 @@ import type { Tag } from '../domain/tag.js';
 export const CLASSIFICATION_SERVICE = Symbol('CLASSIFICATION_SERVICE');
 export const CLASSIFICATION_QUERIES = Symbol('CLASSIFICATION_QUERIES');
 export const CLASSIFICATION_LOCALES = Symbol('CLASSIFICATION_LOCALES');
+export const CUSTOM_FIELDS_SERVICE = Symbol('CUSTOM_FIELDS_SERVICE');
+export const CUSTOM_FIELDS_QUERIES = Symbol('CUSTOM_FIELDS_QUERIES');
 
 type Json = Record<string, unknown>;
 const WS = 'workspaces/:workspaceId';
@@ -105,6 +111,22 @@ export function tagDto(t: Tag) {
   return { id: t.id, name: t.name, color: t.color, archivedAt: t.archivedAt, version: t.version };
 }
 
+/** `CustomFieldDefinition` del contrato OpenAPI. */
+export function customFieldDto(f: CustomFieldDefinition) {
+  return {
+    id: f.id,
+    key: f.key,
+    label: f.label,
+    dataType: f.dataType,
+    target: f.target,
+    required: f.required,
+    options: f.options.map((o) => ({ key: o.key, label: o.label, position: o.position })),
+    position: f.position,
+    archivedAt: f.archivedAt,
+    version: f.version,
+  };
+}
+
 export function counterpartyDto(c: Counterparty) {
   return {
     id: c.id,
@@ -132,6 +154,8 @@ export class ClassificationController {
     @Inject(CLASSIFICATION_SERVICE) private readonly service: ClassificationService,
     @Inject(CLASSIFICATION_QUERIES) private readonly queries: ClassificationQueries,
     @Inject(CLASSIFICATION_LOCALES) private readonly locales: LocaleResolver,
+    @Inject(CUSTOM_FIELDS_SERVICE) private readonly customFields: CustomFieldsService,
+    @Inject(CUSTOM_FIELDS_QUERIES) private readonly customFieldQueries: CustomFieldsQueries,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
   ) {}
 
@@ -466,6 +490,97 @@ export class ClassificationController {
 
   @Delete(`${WS}/tags/:tagId`)
   deleteTag(): never {
+    return methodNotAllowed('GET, PATCH');
+  }
+
+  // ------------------------------------------------------------------ custom fields (add-custom-fields)
+
+  @Get(`${WS}/custom-fields`)
+  async listCustomFields(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @ValidatedQuery() query: Json,
+  ) {
+    const target = isCustomFieldTarget(query['target']) ? query['target'] : undefined;
+    const rows = await this.customFieldQueries.list(userId(req), ws, {
+      includeArchived: query['includeArchived'] === true || query['includeArchived'] === 'true',
+      ...(target ? { target } : {}),
+    });
+    return this.page('custom-fields', ws, query, rows, customFieldDto);
+  }
+
+  @Post(`${WS}/custom-fields`)
+  @HttpCode(201)
+  async createCustomField(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Body() body: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const f = await this.customFields.define(userId(req), ws, {
+      ...pick(body, ['id', 'required', 'position']),
+      key: String(body['key']),
+      label: String(body['label']),
+      dataType: String(body['dataType']),
+      target: String(body['target']),
+      ...(Array.isArray(body['options']) ? { options: body['options'] as CustomFieldOptionInput[] } : {}),
+    });
+    res.setHeader('location', `/api/v1/workspaces/${ws}/custom-fields/${f.id}`);
+    return customFieldDto(f);
+  }
+
+  @Get(`${WS}/custom-fields/:fieldId`)
+  async getCustomField(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('fieldId') id: string,
+  ) {
+    return customFieldDto(await this.customFieldQueries.get(userId(req), ws, id));
+  }
+
+  @Patch(`${WS}/custom-fields/:fieldId`)
+  async updateCustomField(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('fieldId') id: string,
+    @ExpectedVersion() v: number,
+    @Body() body: Json,
+  ) {
+    return customFieldDto(
+      await this.customFields.update(
+        userId(req),
+        ws,
+        id,
+        v,
+        pick(body, ['label', 'required', 'position', 'dataType', 'target', 'options']),
+      ),
+    );
+  }
+
+  @Post(`${WS}/custom-fields/:fieldId/archive`)
+  @HttpCode(200)
+  async archiveCustomField(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('fieldId') id: string,
+    @ExpectedVersion() v: number,
+  ) {
+    return customFieldDto(await this.customFields.archive(userId(req), ws, id, v));
+  }
+
+  @Post(`${WS}/custom-fields/:fieldId/unarchive`)
+  @HttpCode(200)
+  async unarchiveCustomField(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') ws: string,
+    @Param('fieldId') id: string,
+    @ExpectedVersion() v: number,
+  ) {
+    return customFieldDto(await this.customFields.unarchive(userId(req), ws, id, v));
+  }
+
+  @Delete(`${WS}/custom-fields/:fieldId`)
+  deleteCustomField(): never {
     return methodNotAllowed('GET, PATCH');
   }
 

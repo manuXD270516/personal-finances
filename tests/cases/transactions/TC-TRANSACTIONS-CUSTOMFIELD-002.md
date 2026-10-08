@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/custom-fields.api.test.ts
+  - tests/e2e/specs/custom-fields.spec.ts
+  - apps/web/src/ui/custom-fields/custom-fields.test.tsx
+status: automated
 regression_suite: false
 phase: 2
 tags: ["custom-fields", "list", "modified"]

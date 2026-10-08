@@ -15,6 +15,8 @@ import {
 } from '../common/types';
 import { Field, formStyle, inputStyle, mutedStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
+import { CustomFieldInputs, useCustomFields } from '../custom-fields/CustomFieldInputs';
+import { buildFieldsPayload, type CustomFieldError } from '../custom-fields/logic';
 import { accountCurrencyOptions, defaultLiquidity, lastFourOf, maskedIdentifier, natureOf } from './logic';
 
 interface FormState {
@@ -32,6 +34,8 @@ interface FormState {
   cryptoNetwork: string;
   color: string;
   notes: string;
+  /** Texto de cada custom field de cuenta por clave (add-custom-fields); solo los activos se editan. */
+  customFields: Record<string, string>;
 }
 
 const initialState = (ctx: WorkspaceContext, account?: Account): FormState => ({
@@ -48,6 +52,7 @@ const initialState = (ctx: WorkspaceContext, account?: Account): FormState => ({
   cryptoNetwork: account?.cryptoNetwork ?? '',
   color: account?.color ?? '',
   notes: account?.notes ?? '',
+  customFields: {},
 });
 
 /**
@@ -69,6 +74,10 @@ export function AccountForm({
   onCancel?: () => void;
 }) {
   const f = useFormat('Accounts', ctx);
+  const cf = useFormat('CustomFields', ctx);
+  const customFields = useCustomFields(ctx);
+  const accountFields = customFields.active('ACCOUNT');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, CustomFieldError>>({});
   const { t } = f;
   const editing = Boolean(account);
   const [s, setS] = useState<FormState>(() => initialState(ctx, account));
@@ -90,7 +99,12 @@ export function AccountForm({
     set({ type, ...(s.liquidityTouched ? {} : { liquidity: defaultLiquidity(type) }) });
   }
 
-  function validate(): { ok: boolean; opening?: string; last4?: string | null } {
+  function validate(): {
+    ok: boolean;
+    opening?: string;
+    last4?: string | null;
+    customFields?: Record<string, string | boolean | null>;
+  } {
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!s.name.trim()) next.name = t('errors.nameRequired');
     let last4: string | null | undefined;
@@ -114,9 +128,16 @@ export function AccountForm({
         });
       if (!s.openingDate) next.openingDate = t('errors.dateRequired');
     }
+    // Custom fields de cuenta: al crear se exigen los obligatorios; al editar viajan solo los cambios.
+    const cfPayload = buildFieldsPayload(accountFields, s.customFields, ctx.formatLocale, {
+      original: account?.customFields,
+      requireMandatory: !editing,
+    });
+    setFieldErrors(cfPayload.errors);
     setErrors(next);
     return {
-      ok: Object.keys(next).length === 0,
+      ok: Object.keys(next).length === 0 && Object.keys(cfPayload.errors).length === 0,
+      ...(cfPayload.values ? { customFields: cfPayload.values } : {}),
       ...(opening !== undefined ? { opening } : {}),
       ...(last4 !== undefined ? { last4 } : {}),
     };
@@ -148,6 +169,7 @@ export function AccountForm({
             : {}),
           ...(s.color.trim() ? { color: s.color.trim() } : {}),
           ...(s.notes.trim() ? { notes: s.notes.trim() } : {}),
+          ...(v.customFields ? { customFields: v.customFields } : {}),
         };
         const r = await ctx.api.command<Account>('POST', `${ctx.base}/accounts`, body, {
           idempotencyKey: attemptKey.current,
@@ -172,6 +194,7 @@ export function AccountForm({
           patch['cryptoNetwork'] = s.cryptoNetwork.trim() || null;
         if ((s.color.trim() || null) !== (account.color ?? null)) patch['color'] = s.color.trim() || null;
         if ((s.notes.trim() || null) !== (account.notes ?? null)) patch['notes'] = s.notes.trim() || null;
+        if (v.customFields) patch['customFields'] = v.customFields;
         if (Object.keys(patch).length === 0) {
           onSaved(account);
           return;
@@ -394,6 +417,23 @@ export function AccountForm({
           )}
         </Field>
       </div>
+      {accountFields.length > 0 ? (
+        <fieldset
+          style={{ ...rowStyle, border: '1px solid var(--pf-border)', padding: '0.5rem' }}
+          data-testid="account-custom-fields"
+        >
+          <legend>{cf.t('title')}</legend>
+          <CustomFieldInputs
+            fields={accountFields}
+            draft={s.customFields}
+            errors={fieldErrors}
+            f={cf}
+            idPrefix="account-cf"
+            original={account?.customFields}
+            onChange={(key, value) => set({ customFields: { ...s.customFields, [key]: value } })}
+          />
+        </fieldset>
+      ) : null}
       <p style={mutedStyle}>{liability ? t('form.liabilityNote') : t('form.assetNote')}</p>
       <div style={rowStyle}>
         <button type="submit" disabled={busy}>
