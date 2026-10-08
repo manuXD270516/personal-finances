@@ -234,7 +234,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 
 | Contexto | Capabilities |
 |----------|--------------|
-| identity | `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` |
+| identity | `identity/authentication`, `identity/workspace-membership`, `identity/demo-data`, `identity/workspace-portability` (Phase 2, `add-workspace-export`; aceptada por el owner, docs/33 D108) |
 | accounts | `accounts/account-management`, `accounts/institutions` |
 | ledger | `ledger/journal-posting`, `ledger/balances` |
 | transactions | `transactions/transaction-recording`, `transactions/transfers`, `transactions/conversions`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection`, `transactions/bulk-edit` |

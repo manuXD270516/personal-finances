@@ -28,7 +28,7 @@ flowchart LR
 
 | Contexto | Código | Capabilities | # FR | Must | Should | Could | Won't | Fase de inicio |
 |----------|--------|--------------|-----:|-----:|-------:|------:|------:|----------------|
-| Identity & Workspace | IDENTITY | identity/authentication, identity/workspace-membership, identity/demo-data | 16 | 10 | 4 | 1 | 1 | 1 |
+| Identity & Workspace | IDENTITY | identity/authentication, identity/workspace-membership, identity/demo-data, identity/workspace-portability | 17 | 11 | 4 | 1 | 1 | 1 |
 | Accounts | ACCOUNTS | accounts/account-management, accounts/institutions | 16 | 13 | 2 | 1 | 0 | 1 |
 | Ledger | LEDGER | ledger/journal-posting, ledger/balances (+ reporting/cash-flow-calendar para FR-LEDGER-013) | 16 | 15 | 0 | 1 | 0 | 1 |
 | Transactions | TRANSACTIONS | transactions/* (7) | 36 | 30 | 5 | 1 | 0 | 1 |
@@ -46,7 +46,7 @@ flowchart LR
 | Notifications | NOTIFY | notifications/alerts | 9 | 4 | 3 | 1 | 1 | 2 |
 | Audit | AUDIT | audit/audit-trail, audit/lifecycle-timeline | 13 | 8 | 4 | 1 | 0 | 1 |
 | AI Assistant | ASSISTANT | assistant/read-only-assistant | 11 | 8 | 1 | 0 | 2 | 10 |
-| **Total** | | | **282** | **193** | **63** | **21** | **4** | |
+| **Total** | | | **283** | **194** | **63** | **21** | **4** | |
 
 > FRs con prioridad mixta (p.ej. FR-REPORTING-008) se cuentan por su prioridad más alta. Los conteos son orientativos y se recalculan al cerrar el DESIGN GATE.
 
@@ -54,7 +54,7 @@ flowchart LR
 
 ## 3. IDENTITY — Identity & Workspace
 
-Capabilities: `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` (docs/31 D36). Ver también `security/access-control` y el documento 12 (seguridad, `docs/12-*`).
+Capabilities: `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` (docs/31 D36), `identity/workspace-portability` (Phase 2, `add-workspace-export`; aceptada por el owner, docs/33 D108). Ver también `security/access-control` y el documento 12 (seguridad, `docs/12-*`).
 
 | ID | Requerimiento | Prioridad | Fase | Capability |
 |----|---------------|-----------|------|------------|
@@ -67,13 +67,14 @@ Capabilities: `identity/authentication`, `identity/workspace-membership`, `ident
 | FR-IDENTITY-007 | Un usuario DEBE poder pertenecer a varios workspaces y seleccionar el workspace activo; toda ruta de negocio DEBE incluir el `workspaceId` explícito. | Should | 1 | identity/workspace-membership |
 | FR-IDENTITY-008 | El `OWNER` DEBE poder invitar miembros por email con un rol, y revocar o cambiar roles; las invitaciones expiran (default 7 días) y todos los cambios se auditan. | Should | 11 | identity/workspace-membership |
 | FR-IDENTITY-009 | El sistema DEBE soportar MFA delegada al IdP y DEBE poder exigirla por workspace para roles `OWNER`. | Should | 9 | identity/authentication |
-| FR-IDENTITY-010 | El `OWNER` DEBE poder exportar todos los datos del workspace (cuentas, transacciones con splits, ledger, catálogos, planes, metas, deudas, tasas, audit) en formato JSON versionado y CSV, como job asíncrono con descarga temporal. | Must | 2 | identity/workspace-membership |
+| FR-IDENTITY-010 | El `OWNER` DEBE poder exportar todos los datos del workspace (cuentas, transacciones con splits, ledger, catálogos, planes, metas, deudas, tasas, audit) en formato JSON versionado y CSV, como job asíncrono con descarga temporal. *(rev. 2026-10-05, propuesta `add-workspace-export`: capability `identity/workspace-portability`; archivo cifrado en reposo, expiración configurable y auditoría.)* | Must | 2 | identity/workspace-portability |
 | FR-IDENTITY-011 | El sistema DEBE permitir transferir la propiedad (`OWNER`) del workspace a otro miembro. | Could | 11 | identity/workspace-membership |
 | FR-IDENTITY-012 | Borrado definitivo de workspace y de cuenta de usuario (derecho al olvido) con periodo de gracia. | Won't (now) | — | identity/workspace-membership |
 | FR-IDENTITY-013 | Los datos de demostración DEBEN cargarse **solo por una acción explícita del `OWNER` en la app** ("Cargar datos de demostración"), nunca automáticamente (arranque, migración, login); la carga crea un **workspace de demostración dedicado**, marcado como demo de forma inmutable desde su creación, y nunca escribe datos demo en un workspace real. (docs/31 D36, 2026-10-03) | Must | 1 | identity/demo-data |
 | FR-IDENTITY-014 | Todo dato de demostración DEBE identificarse como tal en la UI (indicador persistente) y en la API (`isDemo` del workspace), usar solo entidades ficticias con apariencia real (bancos, comercios, personas) y generarse de forma determinista desde el dataset versionado (docs/29). (docs/31 D36) | Must | 1 | identity/demo-data |
 | FR-IDENTITY-015 | El `OWNER` del workspace demo DEBE poder **limpiar** los datos de demostración ("Limpiar datos de demostración"): el workspace demo se archiva al instante y luego se **purga por completo** de forma asíncrona y auditada, sin afectar ningún workspace real (ADR-0026). (docs/31 D36) | Must | 1 | identity/demo-data |
 | FR-IDENTITY-016 | La acción de carga de datos demo DEBE poder deshabilitarse por entorno (habilitada por defecto en local/dev; deshabilitada por defecto en producción hasta decisión del owner) y DEBE limitarse a un workspace demo activo por usuario. (docs/31 D36) | Should | 1 | identity/demo-data |
+| FR-IDENTITY-017 | Un usuario DEBE poder importar un export válido del workspace (FR-IDENTITY-010) en un **workspace nuevo** del que queda como `OWNER`, con identificadores nuevos, reproduciendo exactamente saldos por cuenta y moneda, balance de comprobación, asientos, revisiones, auditoría y recorridos; la importación se verifica contra el manifiesto, es atómica y nunca escribe en un workspace existente. (nuevo 2026-10-05, propuesta `add-workspace-export`; criterio de salida de Phase 2, NFR-REL-014) | Must | 2 | identity/workspace-portability |
 
 ## 4. ACCOUNTS — Accounts & Institutions
 

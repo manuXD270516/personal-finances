@@ -5,8 +5,13 @@ title = "pfos gitleaks"
 useDefault = true
 
 [allowlist]
-description = "Los UUID (claves de idempotencia e IDs de prueba) no son secretos"
+description = "Falsos positivos conocidos: UUID y nombres versionados de eventos/esquemas"
 regexTarget = "match"
 regexes = [
+  # Los UUID (claves de idempotencia e IDs de prueba) no son secretos.
   '''(?i)['"=:\s][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['"]?$''',
+  # Nombres versionados de eventos o esquemas entre backticks en la documentación
+  # (p. ej. `MonthClosed.v1` tras "OpenAPI,"): generic-api-key los toma por claves.
+  # Anclado al final del match para no ocultar una clave real en la misma línea.
+  '''`[A-Z][A-Za-z]+\.v[0-9]+`$''',
 ]
