@@ -1,9 +1,9 @@
 /**
  * Navegación principal del marco autenticado (docs/28 §2.1): secciones habilitadas en Phase 1, en el orden de la
- * sidebar. Lógica pura (sin React) para poder probar qué sección queda activa en cada ruta.
+ * sidebar (más Planificación, Phase 2). Lógica pura (sin React) para poder probar qué sección queda activa en cada ruta.
  */
 
-export type NavKey = 'home' | 'transactions' | 'accounts' | 'fx' | 'classification' | 'settings';
+export type NavKey = 'home' | 'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'settings';
 
 export interface NavItem {
   readonly key: NavKey;
@@ -19,6 +19,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'accounts', path: '/cuentas', also: ['/instituciones'] },
   { key: 'fx', path: '/fx' },
   { key: 'classification', path: '/clasificacion' },
+  // Phase 2 (add-financial-periods): calendario financiero; pf-p2b agrega presupuestos bajo /planificacion.
+  { key: 'planning', path: '/planificacion/periodos', also: ['/planificacion'] },
   { key: 'settings', path: '/configuracion' },
 ];
 

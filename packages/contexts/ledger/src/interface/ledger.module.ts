@@ -9,9 +9,11 @@ import type { LedgerInvariantViolation, MetricsPort } from '../application/ports
 import type {
   AccountBalancesQuery,
   BalanceQuery,
+  LedgerActivityRangeQuery,
   LedgerPeriodLockPort,
   LedgerPostingPort,
 } from '../contracts/index.js';
+import { PgLedgerActivityRangeQuery } from '../infrastructure/pg-activity-range.queries.js';
 import { PgBalanceQuery } from '../infrastructure/pg-balance.queries.js';
 import { PgLedgerMaintenanceRepository } from '../infrastructure/pg-ledger-maintenance.js';
 import {
@@ -41,6 +43,8 @@ export interface LedgerRuntime {
   readonly balances: BalanceQuery;
   /** Saldos por cuenta en lote (Reporting, add-basic-dashboard). */
   readonly accountBalances: AccountBalancesQuery;
+  /** Rango de fechas con asientos (Planning, add-financial-periods: cobertura retroactiva de periodos). */
+  readonly activityRange: LedgerActivityRangeQuery;
 }
 
 /**
@@ -65,7 +69,21 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     options.audit,
   );
   const balances = new PgBalanceQuery(uow, options.clock);
-  return { posting: service, periodLock: service, balances, accountBalances: balances };
+  return {
+    posting: service,
+    periodLock: service,
+    balances,
+    accountBalances: balances,
+    activityRange: ledgerActivityRange(),
+  };
+}
+
+/**
+ * `LedgerActivityRangeQuery` sin pool propio: corre en la unidad de trabajo del llamador (la API o el consumidor del
+ * worker de PLANNING, con el RLS del workspace ya fijado).
+ */
+export function ledgerActivityRange(): LedgerActivityRangeQuery {
+  return new PgLedgerActivityRangeQuery();
 }
 
 export interface LedgerMaintenanceOptions {
@@ -98,6 +116,7 @@ export {
 } from '../application/ledger-maintenance.js';
 export type {
   BalanceQuery,
+  LedgerActivityRangeQuery,
   LedgerInvariantViolation,
   LedgerMaintenance,
   LedgerMetrics,

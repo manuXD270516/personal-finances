@@ -19,6 +19,8 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/instituciones')).toBe('accounts');
     expect(activeNav('/fx/conversiones/nueva')).toBe('fx');
     expect(activeNav('/clasificacion')).toBe('classification');
+    expect(activeNav('/planificacion/periodos')).toBe('planning');
+    expect(activeNav('/en/planificacion')).toBe('planning');
     expect(activeNav('/pt/configuracion')).toBe('settings');
   });
 

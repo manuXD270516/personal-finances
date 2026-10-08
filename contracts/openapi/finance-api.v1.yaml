@@ -59,7 +59,7 @@ tags:
   - name: CustomFields
     description: "LATER (Phase 2): custom field definitions and values on splits."
   - name: Planning
-    description: "LATER (Phase 2): financial periods, budgets, versioned budget templates, month closing."
+    description: "Phase 2: financial periods, monthly plan, budgets, templates and month closing."
   - name: Notifications
     description: "LATER (Phase 2): in-app/email notifications and preferences."
   - name: Commitments
@@ -3342,6 +3342,155 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ───────────────────────────── Planning (Phase 2) ─────────────────────────────
+  /workspaces/{workspaceId}/periods:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Planning]
+      operationId: listPeriods
+      summary: List the financial periods of the workspace (newest first)
+      description: |
+        Monthly financial periods computed from the workspace financial month start day (1–28): inclusive business
+        date ranges labelled `YYYY-MM` after their start month. `pendingClosure` is derived from today in the workspace
+        time zone (ended and not closed). With `containsDate` the page holds the single period that contains that
+        business date, or the answer is 404 `RESOURCE_NOT_FOUND` when no period covers it.
+      x-openspec-capability: [planning/financial-periods]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          description: Filter by status (repeatable). Mutually exclusive with `containsDate`.
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/FinancialPeriodStatus' }
+          style: form
+          explode: true
+        - name: containsDate
+          in: query
+          description: Business date (`YYYY-MM-DD`) whose period is requested. Mutually exclusive with `status`.
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          description: Page size (default 24 periods)
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+      responses:
+        '200':
+          description: Periods page, ordered by `periodStart` descending
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialPeriodPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: 'RESOURCE_NOT_FOUND (no period contains `containsDate`).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Planning]
+      operationId: ensurePeriods
+      summary: Ensure that the financial periods up to a date exist (idempotent)
+      description: |
+        Creates the missing periods up to the one that contains `through` (at most today + 24 months in the workspace
+        time zone) with the same idempotent result as the automatic hourly process: periods that already started are
+        created `ACTIVE`, future ones `DRAFT`. Repeating the request creates nothing. Returns the periods from the one
+        that contains today up to the one that contains `through`.
+      x-openspec-capability: [planning/financial-periods]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnsurePeriodsRequest' }
+      responses:
+        '200':
+          description: Periods of the requested range
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialPeriodList' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (`through` later than today + 24 months).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: getPeriod
+      summary: Get a financial period
+      x-openspec-capability: [planning/financial-periods]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Financial period
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialPeriod' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/activate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    post:
+      tags: [Planning]
+      operationId: activatePeriod
+      summary: Activate a DRAFT period whose start date has arrived in the workspace time zone
+      description: |
+        Manual activation (the hourly process activates periods automatically). A period whose start date is after
+        today in the workspace time zone → 409 `PERIOD_NOT_STARTED`; a period that is not `DRAFT` → 409
+        `INVALID_STATUS_TRANSITION`. Publishes `planning.PeriodActivated.v1` (`activation = MANUAL`).
+      x-openspec-capability: [planning/financial-periods]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Activated period
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialPeriod' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'PERIOD_NOT_STARTED (start date after today) or INVALID_STATUS_TRANSITION (not DRAFT).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Platform ─────────────────────────────
   /workspaces/{workspaceId}/operations/{operationId}:
     parameters:
@@ -3395,6 +3544,12 @@ components:
       in: path
       required: true
       description: Workspace UUIDv7. Caller must be an active member.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    PeriodId:
+      name: periodId
+      in: path
+      required: true
+      description: Financial period UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
     AccountId:
       name: accountId
@@ -3806,6 +3961,8 @@ components:
         - FX_RATE_ANOMALY_ALREADY_REVIEWED  # 409
         - FX_RATE_NOT_ANOMALOUS             # 422
         - CURRENCY_NOT_ENABLED              # 422
+        # planning (Phase 2)
+        - PERIOD_NOT_STARTED                # 409 (add-financial-periods: activating a period that has not started)
 
     # ── Identity ──
     WorkspaceRole:
@@ -5392,6 +5549,89 @@ components:
           items: { $ref: '#/components/schemas/AuditLogEntry' }
         page: { $ref: '#/components/schemas/PageInfo' }
 
+    # ── Planning: periodos financieros (add-financial-periods, Phase 2) ──
+    FinancialPeriodStatus:
+      type: string
+      description: DRAFT (future), ACTIVE (started; may be pending closure), CLOSED, REOPENED. No terminal state.
+      enum: [DRAFT, ACTIVE, CLOSED, REOPENED]
+    FinancialPeriod:
+      type: object
+      description: >-
+        Monthly financial period: inclusive business-date range from the financial month start day (1–28) to the day
+        before that day of the next month, labelled with the year and month of its start date. `closeCount`,
+        `reopenCount` and `latestCloseNo` are fed by month closing (0/0/null until then).
+      additionalProperties: false
+      required:
+        - id
+        - label
+        - periodStart
+        - periodEnd
+        - status
+        - startDay
+        - isTransition
+        - pendingClosure
+        - closeCount
+        - reopenCount
+        - latestCloseNo
+        - version
+        - createdAt
+        - activatedAt
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        label:
+          type: string
+          description: Year and month of the start date (`YYYY-MM`)
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+          examples: ['2026-10']
+        periodStart: { $ref: '#/components/schemas/LocalDate' }
+        periodEnd: { $ref: '#/components/schemas/LocalDate' }
+        status: { $ref: '#/components/schemas/FinancialPeriodStatus' }
+        startDay:
+          type: integer
+          minimum: 1
+          maximum: 28
+          description: Financial month start day used to compute the range
+        isTransition:
+          type: boolean
+          description: Transition period that absorbs a change of the start day
+        pendingClosure:
+          type: boolean
+          description: Ended (end before today in the workspace time zone) and not closed. Derived, never stored.
+        closeCount: { type: integer, minimum: 0 }
+        reopenCount: { type: integer, minimum: 0 }
+        latestCloseNo: { type: [integer, 'null'], minimum: 1 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        activatedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+    FinancialPeriodPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FinancialPeriod' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    FinancialPeriodList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FinancialPeriod' }
+    EnsurePeriodsRequest:
+      type: object
+      additionalProperties: false
+      required: [through]
+      properties:
+        through:
+          $ref: '#/components/schemas/LocalDate'
+          description: Last business date that must be covered by a period (at most today + 24 months)
+
     # ── Recorrido del ciclo de vida (add-lifecycle-timeline, docs/31 D37) ──
     LifecycleAggregateType:
       type: string
@@ -5400,12 +5640,12 @@ components:
         clients must handle unknown values.
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
-      # aditiva (Category y Counterparty, decisión del owner D52).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty]
+      # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).

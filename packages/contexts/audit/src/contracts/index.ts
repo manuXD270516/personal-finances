@@ -101,13 +101,17 @@ export interface AuditHistoryQuery {
 
 // ───────────────────────────────────────────── add-lifecycle-timeline (docs/31 D37)
 
-/** Tipos de agregado con máquina de estados declarada en Phase 1 (docs/31 D37; catálogos de CLASSIFICATION: D52). */
+/**
+ * Tipos de agregado con máquina de estados declarada (docs/31 D37; catálogos de CLASSIFICATION: D52; periodo
+ * financiero de PLANNING: openspec add-financial-periods, Phase 2).
+ */
 export const LIFECYCLE_AGGREGATE_TYPES = [
   'Transaction',
   'Account',
   'ExchangeRate',
   'Category',
   'Counterparty',
+  'FinancialPeriod',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

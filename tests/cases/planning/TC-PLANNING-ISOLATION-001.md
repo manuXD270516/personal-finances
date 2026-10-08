@@ -15,9 +15,10 @@ invariants: []
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/test/integration/pg-planning.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:

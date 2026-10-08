@@ -762,6 +762,30 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     expect(before).toBe(3);
   });
 
+  it('LedgerActivityRangeQuery (add-financial-periods 4.3): fecha mínima y máxima de asientos del workspace; null sin asientos', async () => {
+    const w3 = randomUUID();
+    const w4 = randomUUID();
+    await createWorkspace(w3);
+    await createWorkspace(w4);
+    const bank = randomUUID();
+    for (const entryDate of ['2026-07-01', '2027-06-10', '2026-09-15']) {
+      await post(w3, [userLine(bank, '-10.00'), sysLine('EXPENSE', '10.00', 'BOB', randomUUID())], {
+        entryDate,
+      });
+    }
+    const uow = new PgUnitOfWork(app);
+    const range = (ws: string) =>
+      asUser(() => uow.run({ userId: u1, workspaceId: ws }, () => ledger.activityRange.getActivityRange(ws)));
+    expect(await range(w3)).toEqual({ minEntryDate: '2026-07-01', maxEntryDate: '2027-06-10' });
+    expect(await range(w4)).toBeNull();
+    // RLS: con el contexto de w4, los asientos de w3 no existen.
+    expect(
+      await asUser(() =>
+        uow.run({ userId: u1, workspaceId: w4 }, () => ledger.activityRange.getActivityRange(w3)),
+      ),
+    ).toBeNull();
+  });
+
   it('mapeo de SQLSTATE: PF001 → LEDGER_UNBALANCED_ENTRY y 42501 → INTERNAL_ERROR conservando la causa', async () => {
     const uow = new PgLedgerUnitOfWork(app);
     const run = (fn: () => Promise<unknown>) => asUser(() => uow.run(w1, fn).catch((e: unknown) => e));

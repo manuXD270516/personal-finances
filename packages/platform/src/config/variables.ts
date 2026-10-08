@@ -575,6 +575,31 @@ export const VARIABLES = {
     },
   ),
 
+  // ── Planning: periodos financieros (openspec add-financial-periods, design.md decisiones 5 y 6; docs/33 D63) ──
+  PLANNING_PERIOD_LOOKAHEAD: variable(
+    positiveInt.refine((n) => n <= 24, 'entre 1 y 24 periodos'),
+    {
+      group: 'Planning',
+      description:
+        'Periodos financieros futuros (en `DRAFT`) que la creación automática mantiene después del periodo que contiene hoy en la zona horaria del workspace (mínimo 1, máximo 24; docs/33 D63). Por entorno, no por workspace.',
+      default: '3',
+    },
+  ),
+  PLANNING_PERIODS_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `5 * * * *`) u `off`',
+      ),
+    {
+      group: 'Worker',
+      description:
+        'Cron (5 campos, UTC) del job `planning.ensure-periods`: activa los periodos `DRAFT` cuya fecha de inicio llegó en la zona horaria de cada workspace, recalcula los `DRAFT` tras un cambio del día de inicio y crea los periodos que falten. También corre al arrancar el worker. `off` desactiva el cron.',
+      default: '5 * * * *',
+    },
+  ),
+
   // ── OpenTelemetry ──
   OTEL_ENABLED: variable(bool, {
     group: 'OpenTelemetry',
@@ -670,6 +695,7 @@ export const APP_VARIABLES = {
     'DEMO_DATA_ENABLED',
     ...FX_PROVIDERS,
     'REPORTING_RATE_VALIDITY_WINDOW',
+    'PLANNING_PERIOD_LOOKAHEAD',
   ],
   // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
   worker: [
@@ -685,6 +711,8 @@ export const APP_VARIABLES = {
     'WORKER_HEALTH_BIND_ADDRESS',
     'LEDGER_INTEGRITY_CRON',
     'LEDGER_INTEGRITY_CRON_TZ',
+    'PLANNING_PERIOD_LOOKAHEAD',
+    'PLANNING_PERIODS_CRON',
     ...FX_PROVIDERS,
     'FX_PROVIDER_PARALELO_BO_URL',
     'FX_PROVIDER_DOLARAPI_BO_URL',

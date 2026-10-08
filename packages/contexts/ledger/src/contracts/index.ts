@@ -169,6 +169,15 @@ export interface AccountBalancesQuery {
   }): Promise<AccountBalancesDto>;
 }
 
+/**
+ * Rango de fechas de negocio con asientos del workspace (openspec add-financial-periods: cobertura retroactiva de los
+ * periodos). Lee `ledger.journal_entry` por el índice `(workspace_id, entry_date)` en la unidad de trabajo en curso
+ * (RLS del workspace). `null` si el workspace no tiene asientos. Sin efectos.
+ */
+export interface LedgerActivityRangeQuery {
+  getActivityRange(workspaceId: string): Promise<{ readonly minEntryDate: string; readonly maxEntryDate: string } | null>;
+}
+
 export const LEDGER_POSTING_PORT = Symbol.for('pf.ledger.LedgerPostingPort');
 export const LEDGER_PERIOD_LOCK_PORT = Symbol.for('pf.ledger.LedgerPeriodLockPort');
 export const BALANCE_QUERY = Symbol.for('pf.ledger.BalanceQuery');

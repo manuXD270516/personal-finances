@@ -25,11 +25,18 @@ import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
 import {
   IdentityModule,
   identityUserLocales,
+  identityWorkspaceCalendar,
   identityWorkspaceSettings,
   identityWorkspaceTimeZones,
   type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
+import { PLANNING_AUDIT_POLICY } from '@pf/planning/contracts';
+import {
+  createPlanningRuntime,
+  FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
+  PlanningModule,
+} from '@pf/planning/interface/planning.module';
 import { JWKS_METRICS, type JwksObserver, type JwtVerifierOptions } from '@pf/platform/api';
 import { otelCounters, type CounterMetrics } from '@pf/platform/otel';
 import { demoDataEnabled, type ApiConfig } from '@pf/platform/config';
@@ -142,6 +149,8 @@ export const LIFECYCLE_MACHINES = [
   // docs/31 D52: catálogos de CLASSIFICATION.
   CATEGORY_LIFECYCLE_MACHINE,
   COUNTERPARTY_LIFECYCLE_MACHINE,
+  // add-financial-periods (Phase 2): periodo financiero de PLANNING.
+  FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -151,6 +160,7 @@ export const AUDIT_POLICIES = [
   ACCOUNTS_AUDIT_POLICY,
   TRANSACTIONS_AUDIT_POLICY,
   FX_AUDIT_POLICY,
+  PLANNING_AUDIT_POLICY,
 ];
 
 /**
@@ -194,7 +204,7 @@ export function financeRuntimes(input: {
   readonly history: AuditHistoryQuery;
   readonly logger: Logger;
   readonly config: Pick<ApiConfig, 'APP_TIMEZONE'> &
-    Partial<Pick<ApiConfig, 'REPORTING_RATE_VALIDITY_WINDOW'>> &
+    Partial<Pick<ApiConfig, 'REPORTING_RATE_VALIDITY_WINDOW' | 'PLANNING_PERIOD_LOOKAHEAD'>> &
     Parameters<typeof parseFxProviderSettings>[0];
   readonly outbox?: OutboxWriter;
 }) {
@@ -275,7 +285,19 @@ export function financeRuntimes(input: {
     rates: fx.valuation,
     rateValidityWindowDays,
   });
-  return { classification, fx, accounts, ledger, transactions, reporting };
+  // PLANNING (add-financial-periods): periodos financieros; calendario del workspace (IDENTITY, membresía del usuario)
+  // y rango de actividad del ledger en la unidad de trabajo del comando.
+  const planning = createPlanningRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    outbox: classificationOutbox(writer),
+    calendar: identityWorkspaceCalendar(input.pool),
+    activity: ledger.activityRange,
+    ...(input.config.PLANNING_PERIOD_LOOKAHEAD ? { lookahead: input.config.PLANNING_PERIOD_LOOKAHEAD } : {}),
+  });
+  return { classification, fx, accounts, ledger, transactions, reporting, planning };
 }
 
 /**
@@ -308,7 +330,7 @@ export function identityImports(input: {
   const lifecyclePort = input.lifecycle
     ? input.lifecycle(audit.lifecycleFor(auditPort))
     : audit.lifecycleFor(auditPort);
-  const { classification, fx, accounts, ledger, transactions, reporting } = financeRuntimes({
+  const { classification, fx, accounts, ledger, transactions, reporting, planning } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
     audit: auditPort,
@@ -351,6 +373,8 @@ export function identityImports(input: {
     TransactionsModule.register({ runtime: transactions, conventions: input.conventions }),
     FxModule.register({ runtime: fx, conventions: input.conventions }),
     ReportingModule.register({ runtime: reporting, conventions: input.conventions }),
+    // PLANNING — openspec add-financial-periods (Phase 2).
+    PlanningModule.register({ runtime: planning, conventions: input.conventions }),
   ];
 }
 

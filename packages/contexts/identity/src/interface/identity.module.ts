@@ -7,6 +7,7 @@ import { currentRequestContext, PgUnitOfWork } from '@pf/platform/api';
 import type { Pool } from 'pg';
 import { DemoDataService } from '../application/demo-data.service.js';
 import { IdentityService } from '../application/identity.service.js';
+import type { WorkspaceCalendarQuery } from '../contracts/index.js';
 import type {
   AuditPort,
   DemoDataSettings,
@@ -145,6 +146,57 @@ export function identityWorkspaceSettings(pool: Pool): {
         if (!ws) throw new DomainError('RESOURCE_NOT_FOUND', `workspace ${workspaceId} not found`);
         return { baseCurrency: ws.settings.baseCurrency.code, timeZone: ws.settings.timeZone.value };
       });
+    },
+  };
+}
+
+/**
+ * `WorkspaceCalendarQuery` de la API (openspec add-financial-periods): zona horaria y día de inicio del mes financiero
+ * con el contexto RLS del usuario de la petición (membresía). Reutiliza la unidad de trabajo del llamador si existe.
+ */
+export function identityWorkspaceCalendar(pool: Pool): WorkspaceCalendarQuery {
+  const uow = new PgUnitOfWork(pool);
+  const workspaces = new PgWorkspaceRepository();
+  return {
+    calendarOf: (workspaceId) => {
+      const actor = currentRequestContext()?.actor;
+      const userId = actor && actor.type === 'USER' ? actor.userId : null;
+      return uow.run({ userId, workspaceId }, async () => {
+        const ws = await workspaces.findById(workspaceId);
+        if (!ws) throw new DomainError('RESOURCE_NOT_FOUND', `workspace ${workspaceId} not found`);
+        return { timeZone: ws.settings.timeZone.value, fiscalMonthStartDay: ws.settings.fiscalMonthStartDay };
+      });
+    },
+  };
+}
+
+/**
+ * `WorkspaceCalendarQuery` del worker (jobs y consumidores de PLANNING): `pf_worker` no ve `iam.workspace` (RLS por
+ * membresía), así que lee en una conexión PROPIA con el rol de directorio (`SET LOCAL ROLE pf_workspace_directory`,
+ * columnas `time_zone` y `fiscal_month_start_day`; migración 20261008120000). Nunca dentro de la transacción del
+ * llamador (el `SET LOCAL ROLE` cambiaría su rol).
+ */
+export function identityWorkspaceCalendarDirectory(pool: Pool): WorkspaceCalendarQuery {
+  return {
+    async calendarOf(workspaceId) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN READ ONLY');
+        await client.query('SET LOCAL ROLE pf_workspace_directory');
+        const { rows } = await client.query<{ time_zone: string; fiscal_month_start_day: number }>(
+          `SELECT time_zone, fiscal_month_start_day FROM iam.workspace WHERE id = $1`,
+          [workspaceId],
+        );
+        await client.query('COMMIT');
+        const row = rows[0];
+        if (!row) throw new DomainError('RESOURCE_NOT_FOUND', `workspace ${workspaceId} not found`);
+        return { timeZone: row.time_zone, fiscalMonthStartDay: Number(row.fiscal_month_start_day) };
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw err;
+      } finally {
+        client.release();
+      }
     },
   };
 }

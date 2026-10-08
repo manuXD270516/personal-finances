@@ -55,3 +55,12 @@ export const IDENTITY_AUDIT_POLICY = {
   },
   User: { displayName: 'plain', locale: 'plain', timeZone: 'plain' },
 } as const satisfies AuditFieldPoliciesDto;
+
+/**
+ * Calendario del workspace para otros contextos (openspec add-financial-periods: PLANNING calcula "hoy" y los rangos
+ * de periodos). `fiscalMonthStartDay` 1..28 (FR-IDENTITY-005, docs/31 D23). La implementación de la API lee con el
+ * contexto RLS del usuario de la petición; la del worker, con el rol de directorio (`pf_workspace_directory`).
+ */
+export interface WorkspaceCalendarQuery {
+  calendarOf(workspaceId: string): Promise<{ readonly timeZone: string; readonly fiscalMonthStartDay: number }>;
+}

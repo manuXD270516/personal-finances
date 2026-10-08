@@ -15,9 +15,11 @@ invariants:
 priority: high
 type: integration
 level: event-contract
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/events.contract.test.ts
+  - apps/api/test/api/periods.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:

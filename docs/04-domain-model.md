@@ -255,12 +255,13 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 ### 3.6 PLANNING — Planning & Budgeting (`planning`)
 
 - **AR `FinancialPeriod`**: `id, yearMonth, status (draft|active|closed|reopened), dateRange, closedAt?, closedBy?, closeSummary?: VO (saldos por cuenta, totales ingreso/gasto por moneda, conteos), reopenings: VO[] (at, by, reason)`.
+  - *add-financial-periods (Phase 2):* `label` = `YYYY-MM` del **inicio** (docs/33 D59), `dateRange` inclusivo calculado por el DS `PeriodCalendar` desde el día de inicio del mes financiero (1..28), `startDay`, `isTransition` (absorbe un cambio del día de inicio), `closeCount`/`reopenCount`/`latestCloseNo` (los alimenta `add-month-closing`), `version`. Un periodo se **crea `active`** si ya empezó en la zona del workspace (contiene hoy o terminó) y `draft` si es futuro; un periodo terminado y no cerrado sigue `active` con la marca derivada *pendiente de cierre* (D60). Cambiar el día de inicio recalcula solo los `draft`, conservando `id` y `label`; el primero pasa a ser el periodo de transición (D61).
 - **AR `Budget`**: `id, yearMonth, currency, templateVersionId?, items: E BudgetItem[] (id, target: CategoryRef|GroupRef, planned: Money, rolloverPolicy (NONE|CARRY_POSITIVE|CARRY_ALL), alertThresholds: Percentage[]), status (DRAFT|ACTIVE|CLOSED)`.
 - **AR `BudgetTemplate`**: `id, name, currentVersionNo, versions: E BudgetTemplateVersion[] (versionNo, items, createdAt, effectiveFrom) — inmutables`.
 - **Read model**: `BudgetActuals` (Σ splits posteados por categoría/mes/moneda, proyección desde eventos de Transactions, INV-034).
 - **DS**: `MonthCloser` (checklist: pendientes, conciliaciones, duplicados abiertos; genera `closeSummary`; bloquea ledger), `BudgetFromTemplateFactory`, `RolloverCalculator`, `ThresholdEvaluator`.
 - **Repos**: uno por AR + `BudgetActualsRepository`. **Ports**: `LedgerPeriodLockPort` (sync), `TransactionsQuery` (pendientes), `BalanceQuery` (Ledger), `AuditPort`, `Clock`.
-- **Comandos**: `OpenPeriod`, `ActivatePeriod`, `CloseMonth`, `ReopenPeriod(reason)`, `CreateBudget`, `CreateBudgetFromTemplate`, `SetBudgetItem`, `RemoveBudgetItem`, `CreateTemplate`, `PublishTemplateVersion`.
+- **Comandos**: `EnsurePeriods(through?)` (job/consumidores/comando; reemplaza a `OpenPeriod`), `ActivatePeriod`, `CloseMonth`, `ReopenPeriod(reason)`, `CreateBudget`, `CreateBudgetFromTemplate`, `SetBudgetItem`, `RemoveBudgetItem`, `CreateTemplate`, `PublishTemplateVersion`.
 - **Queries**: `GetPeriod`, `ListPeriods`, `GetBudgetVsActual(yearMonth)`, `GetCloseChecklist(yearMonth)`, `ListTemplates`.
 - **Eventos**: `PeriodActivated`, `MonthClosed`, `PeriodReopened`, `BudgetCreated`, `BudgetThresholdReached`.
 - **Invariantes**: INV-015; un periodo por `(workspace, yearMonth)`; sólo se cierra en orden (no se cierra M si M−1 está abierto); una versión de plantilla publicada nunca cambia; un presupuesto por `(yearMonth, currency)`.
@@ -427,13 +428,15 @@ La edición de una transacción `PENDING` y las ediciones descriptivas son anota
 
 ```mermaid
 stateDiagram-v2
-  [*] --> draft: OpenPeriod (mes futuro / planificación)
-  draft --> active: ActivatePeriod (inicio de mes o manual)
+  [*] --> draft: EnsurePeriods (periodo futuro)
+  [*] --> active: EnsurePeriods (periodo ya iniciado)
+  draft --> active: ActivatePeriod (fecha de inicio en la zona del workspace o manual)
   active --> closed: CloseMonth / LockPeriod en Ledger, closeSummary
   closed --> reopened: ReopenPeriod(reason) / UnlockPeriod, auditado
   reopened --> closed: CloseMonth / nuevo closeSummary
-  closed --> [*]
 ```
+
+Sin estado terminal (máquina declarada `FINANCIAL_PERIOD_LIFECYCLE`, docs/31 D37; transiciones `CREATE`, `ACTIVATE`, `CLOSE`, `REOPEN`). El recálculo de rango de un `draft` es una anotación del recorrido, no una transición (add-financial-periods).
 
 Restricciones: `CloseMonth(M)` exige `M−1` cerrado (o primer mes); `ReopenPeriod(M)` exige que `M+1` no esté cerrado (o se reabren en cascada, ver Preguntas abiertas).
 

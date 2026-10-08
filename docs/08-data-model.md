@@ -747,10 +747,14 @@ erDiagram
     uuid workspace_id FK
     date period_start
     date period_end "inclusive"
-    text label "2026-10"
-    text status "OPEN CLOSING CLOSED"
-    timestamptz closed_at
+    char label "YYYY-MM del inicio"
+    smallint start_day "1..28"
+    boolean is_transition
+    text status "DRAFT ACTIVE CLOSED REOPENED"
+    int close_count
     int reopen_count
+    int latest_close_no
+    timestamptz activated_at
     int version
   }
   BUDGET_TEMPLATE {
@@ -820,7 +824,7 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `financial_period` | `(workspace_id, period_start)`; **EXCLUDE USING gist** `(workspace_id WITH =, daterange(period_start, period_end, '[]') WITH &&)` — sin solapamientos (`btree_gist`) | `period_end >= period_start` | `(workspace_id, status)` | WS | `version` |
+| `financial_period` | `(workspace_id, label)` (árbitro de `ON CONFLICT DO NOTHING`); `(workspace_id, period_start)`; **EXCLUDE USING gist** `(workspace_id WITH =, daterange(period_start, period_end, '[]') WITH &&)` **DEFERRABLE INITIALLY DEFERRED** — sin solapamientos (`btree_gist`; diferible para recalcular DRAFT en sitio) | `period_end >= period_start`; `label = to_char(period_start,'YYYY-MM')`; `start_day` 1..28; `status IN (DRAFT, ACTIVE, CLOSED, REOPENED)`; trigger `planning.assert_period_range_frozen()` (rango inmutable fuera de `DRAFT`, `23514`) | `(workspace_id, status)`, `(workspace_id, period_start DESC)` | WS (`pf_app` sin `DELETE`) | `version` |
 | `budget_template` | `(workspace_id, lower(name)) WHERE archived_at IS NULL`; `(workspace_id) WHERE is_default AND archived_at IS NULL` | — | — | WS | `version`, `archived_at` |
 | `budget_template_version` | `(template_id, version_no)` | `version_no >= 1` | — | **WS-RO** (versiones inmutables; cambiar template = nueva versión) | Inmutable |
 | `budget_template_line` | `(template_version_id, category_id, currency)` | `amount >= 0` | — | **WS-RO** | Inmutable |
