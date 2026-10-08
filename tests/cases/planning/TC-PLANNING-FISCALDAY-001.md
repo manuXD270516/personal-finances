@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Cambio del día de inicio solo hacia adelante
 scenario: Cambio de día 1 a día 25
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-IDENTITY-005
@@ -42,7 +42,7 @@ expected_result:
   - '"2027-01" = 2027-01-25..2027-02-24, mismo id'
   - La auditoría de cada periodo recalculado registra el rango anterior y el nuevo
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-FISCALDAY-001 — Cambiar el día de inicio de 1 a 25 recalcula solo los periodos en borrador conservando su identidad

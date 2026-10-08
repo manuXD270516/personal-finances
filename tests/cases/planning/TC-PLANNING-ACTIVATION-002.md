@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Activación manual de un periodo iniciado
 scenario: Activación de un periodo futuro
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
 nfr: []
@@ -36,7 +36,7 @@ expected_result:
   - '"2026-11" pasa a active una sola vez; el proceso posterior no lo modifica ni publica otro evento'
   - '"2026-12" responde 409 PERIOD_NOT_STARTED y sigue en draft'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTIVATION-002 — El EDITOR activa manualmente un periodo iniciado pero no uno futuro

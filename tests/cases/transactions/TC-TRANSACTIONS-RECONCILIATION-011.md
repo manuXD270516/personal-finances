@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["platform/event-delivery"]
 requirement: "Evento dedicado de transacción confirmada"
 scenario: "Confirmar un gasto publica el hecho dedicado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-029, FR-TRANSACTIONS-030]
 nfr: []
 invariants: [INV-028]
@@ -33,7 +33,7 @@ expected_result:
   - "El payload valida contra contracts/events/transactions/TransactionCleared.v1.schema.json"
   - "El consumidor aplica el efecto una sola vez (inbox)"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-011 — Cada cambio cleared publica una vez el evento TransactionCleared

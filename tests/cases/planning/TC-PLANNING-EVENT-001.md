@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Auditoría y evento de los cambios de periodo
 scenario: Activación automática auditada
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-AUDIT-001
 nfr:
@@ -35,7 +35,7 @@ expected_result:
   - Existe un único evento planning.PeriodActivated.v1 con label "2026-11", periodStart 2026-11-01, periodEnd 2026-11-30 y activation AUTOMATIC
   - El payload valida contra contracts/events/planning/PeriodActivated.v1.schema.json
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-EVENT-001 — Cada activación publica exactamente un evento PeriodActivated válido

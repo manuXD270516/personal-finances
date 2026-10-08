@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Enlace al recurso de origen'
 scenario: 'Enlace a la línea de presupuesto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-001']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Caso A: el plan de "2026-11" con "Restaurantes" resaltada'
   - 'Caso B: el plan de "2026-11" con el aviso de que la línea ya no existe'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-005 — La notificación enlaza a la línea de presupuesto o al plan si la línea ya no existe

@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: ["identity/workspace-portability"]
 requirement: "Vista de eventos de seguridad"
 scenario: "Eventos de seguridad de una semana"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-005, FR-AUDIT-006]
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - "Ningún registro de transacciones"
   - "El test de catálogo pasa"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-006 — La vista de seguridad muestra solo eventos de seguridad

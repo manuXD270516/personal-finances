@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["planning/financial-periods", "planning/month-closing", "planning/budgets", "planning/budget-templates", "notifications/alerts"]
 requirement: "Datos de Phase 2 en el export"
 scenario: "Ida y vuelta de un mes cerrado con presupuesto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010, FR-IDENTITY-017, FR-PLANNING-004]
 nfr: [NFR-REL-014]
 invariants: [INV-015]
@@ -38,7 +38,7 @@ expected_result:
   - "El gasto del 2026-10-15 se rechaza con PERIOD_CLOSED"
   - "El gasto del 2026-11-20 no emite un nuevo umbral de 90 %"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-012 — La ida y vuelta conserva periodos cerrados, snapshots, planes, templates y cruces de umbral

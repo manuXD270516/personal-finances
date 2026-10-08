@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Cierre atómico del periodo
 scenario: Falla al escribir el snapshot
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
   - FR-PLANNING-005
@@ -41,7 +41,7 @@ expected_result:
   - 'Con falla: "2026-10" sigue active, sin lock, sin auditoría ni evento; el gasto de 30.00 BOB se acepta'
   - "Sin falla: periodo closed con closeCount 1, lock 2026-10-01..2026-10-31, snapshot 1, auditoría, transición active -> closed y un evento MonthClosed"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CLOSE-001 — El cierre es atómico: estado, bloqueo, snapshot, auditoría, transición y evento juntos o nada

@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Reapertura auditada solo por el OWNER
 scenario: OWNER reabre octubre
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-006
 nfr: []
@@ -40,7 +40,7 @@ expected_result:
   - El gasto de 15.00 BOB se acepta
   - La auditoría registra el motivo; el snapshot 1 sigue con 5200.00 BOB
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-REOPEN-001 — El OWNER reabre un mes con motivo, se quita el bloqueo y el snapshot no cambia

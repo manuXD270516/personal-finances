@@ -5,7 +5,7 @@ spec: reporting/net-worth
 related_specs: ["fx/market-rates"]
 requirement: "Punto incompleto por falta de tasa histórica"
 scenario: "Diciembre sin tasa USDT"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-REPORTING-006, FR-FX-004]
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - "unconverted: 100.000000 USDT"
   - "Variación de enero marcada no comparable"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-REPORTING-NETWORTH-008 — Sin tasa vigente a fin de mes el punto queda incompleto y sin 1:1

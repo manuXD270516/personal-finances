@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Una sola notificación por hecho de origen'
 scenario: 'Mismo hecho con otro identificador de evento'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-005']
 nfr: []
 invariants: ['INV-028']
@@ -29,7 +29,7 @@ expected_result:
   - 'No se crea otra notificación (dedupe_key budget-threshold:<periodo>:CATEGORY:<Restaurantes>:90)'
   - 'No se crea otra entrega por email'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-DEDUP-002 — El mismo hecho con otro identificador de evento no duplica la notificación

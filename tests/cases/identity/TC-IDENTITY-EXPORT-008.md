@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Eliminar un export antes de su expiración"
 scenario: "Eliminar el export de hoy"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-COMP-002]
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - "Objeto eliminado; estado DISCARDED; auditoría de la eliminación"
   - "Descarga: 410 EXPORT_EXPIRED"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-008 — El OWNER elimina un export antes de su expiración

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Umbrales de alerta por línea'
 scenario: 'Umbral fuera de rango rechazado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - 'La línea queda con exactamente 80 y 110 %'
   - 'Cada lista inválida se rechaza con BUDGET_THRESHOLD_INVALID y los umbrales no cambian'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-002 — Los umbrales personalizados se aceptan y los inválidos se rechazan

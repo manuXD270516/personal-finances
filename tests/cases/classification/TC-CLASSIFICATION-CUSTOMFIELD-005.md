@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["accounts/account-management"]
 requirement: "Custom fields de cuenta"
 scenario: "Sucursal de una cuenta bancaria"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009, FR-ACCOUNTS-001]
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - "\"sucursal\" = \"Sucursal Centro\""
   - "Saldo 1000.00 BOB y sin asientos nuevos"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-005 — Una cuenta guarda sus custom fields sin cambiar su saldo

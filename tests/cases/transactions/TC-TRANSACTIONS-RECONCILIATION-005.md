@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: []
 requirement: "Confirmar transacciones dentro de la sesión"
 scenario: "Confirmar el gasto pendiente de confirmar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-029, FR-TRANSACTIONS-030]
 nfr: []
 invariants: [INV-033, INV-023]
@@ -37,7 +37,7 @@ expected_result:
   - "G4: 400 VALIDATION_FAILED; sigue posted"
   - "Se publica TransactionCleared.v1 para G2"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-005 — Confirmar dentro de la sesión cambia el saldo confirmado sin tocar el ledger

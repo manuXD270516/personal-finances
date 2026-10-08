@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["ledger/balances", "reporting/net-worth"]
 requirement: "La ida y vuelta reproduce saldos e historia"
 scenario: "Saldos idénticos tras la ida y vuelta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-017, FR-IDENTITY-010]
 nfr: [NFR-REL-014]
 invariants: [INV-004, INV-022, INV-031]
@@ -35,7 +35,7 @@ expected_result:
   - "Patrimonio 3180.10 BOB en ambos (3099.10 + 601.00 − 520.00)"
   - "VerifyLedgerIntegrity sin violaciones"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-RESTORE-002 — La ida y vuelta export e import reproduce saldos, balance y patrimonio

@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Entrega por email'
 scenario: 'Email capturado en local'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'La entrega queda SENT con provider_message_id'
   - 'Message-ID = <deliveryId@dominio de EMAIL_FROM>'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-004 — En local el email de alerta se captura en Mailpit con el asunto en español

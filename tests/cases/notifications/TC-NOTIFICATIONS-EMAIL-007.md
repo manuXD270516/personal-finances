@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Canal email deshabilitado por entorno'
 scenario: 'Email deshabilitado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - 'Notificación in-app UNREAD'
   - 'Entrega por email SUPPRESSED con motivo CHANNEL_DISABLED, sin reintentos'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-007 — Con el canal email deshabilitado la entrega queda suprimida sin error

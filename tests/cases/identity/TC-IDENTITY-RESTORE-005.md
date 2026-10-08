@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["audit/lifecycle-timeline", "ledger/journal-posting"]
 requirement: "La ida y vuelta reproduce saldos e historia"
 scenario: "Revisiones y reversas preservadas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-017]
 nfr: [NFR-REL-014]
 invariants: [INV-007, INV-008]
@@ -31,7 +31,7 @@ expected_result:
   - "Recorrido: RECORD y REVISE en el mismo orden con los asientos remapeados"
   - "Diffs de auditoría con ids remapeados de forma consistente"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-RESTORE-005 — La importación preserva revisiones, reversas y recorridos de las transacciones

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['classification/categories']
 requirement: 'Sin solapamiento de objetivos en un plan'
 scenario: 'Subcategoría de una categoría presupuestada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-015', 'FR-PLANNING-016', 'FR-PLANNING-024']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - 'Ambos intentos se rechazan con BUDGET_TARGET_OVERLAP'
   - 'Ningún gasto cuenta en dos líneas del mismo plan'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-008 — Un plan no admite objetivos solapados entre categoría, subcategoría y grupo

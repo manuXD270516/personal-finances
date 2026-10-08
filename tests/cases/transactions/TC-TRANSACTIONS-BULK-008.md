@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["classification/categories"]
 requirement: "Edición masiva y periodos cerrados"
 scenario: "Recategorizar en lote incluyendo un gasto de un mes cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-PLANNING-005]
 nfr: []
 invariants: [INV-015]
@@ -30,7 +30,7 @@ expected_result:
   - "409 PERIOD_CLOSED con errors[] para el gasto del 2026-03-15"
   - "Ninguno cambia de categoría; sin auditoría ni eventos"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-008 — Una transacción de un mes cerrado bloquea toda la edición masiva

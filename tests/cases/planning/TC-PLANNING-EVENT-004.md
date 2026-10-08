@@ -6,7 +6,7 @@ related_specs:
   - notifications/alerts
 requirement: Aviso de cierre pendiente
 scenario: Octubre sin cerrar tres días después
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
   - FR-NOTIFY-004
@@ -45,7 +45,7 @@ expected_result:
   - Ninguna ejecución posterior publica otro para "2026-10"
   - El periodo cerrado antes del plazo no genera el hecho
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-EVENT-004 — El hecho de cierre pendiente se publica una sola vez por periodo tres días después de su fin

@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["security/access-control"]
 requirement: "Edición masiva restringida por rol"
 scenario: "VIEWER intenta una edición masiva"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-IDENTITY-006]
 nfr: [NFR-SEC-003]
 invariants: [INV-025]
@@ -35,7 +35,7 @@ expected_result:
   - "403 INSUFFICIENT_ROLE; nada cambia"
   - "404 RESOURCE_NOT_FOUND para X, idéntico a un id inexistente; nada cambia en \"W1\" ni en \"W2\""
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-011 — Solo EDITOR u OWNER ejecutan ediciones masivas y nunca sobre otro workspace

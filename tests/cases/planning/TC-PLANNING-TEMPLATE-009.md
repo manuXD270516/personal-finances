@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Crear el plan clonando el plan del periodo anterior'
 scenario: 'Periodo anterior sin plan'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-011']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - '422 REFERENCE_NOT_FOUND'
   - '"2027-01" sigue sin plan'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-009 — Clonar cuando el periodo anterior no tiene plan se rechaza

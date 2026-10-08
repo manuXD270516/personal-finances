@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Activación automática según la zona horaria del workspace
 scenario: Medianoche en La Paz
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-PLANNING-002
@@ -43,7 +43,7 @@ expected_result:
   - A las 04:05Z "2026-11" pasa a active y "2026-10" sigue active pendiente de cierre
   - En W2 (UTC) "2026-11" se activa a las 00:05Z
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTIVATION-001 — Un periodo se activa al llegar su fecha de inicio en la zona horaria del workspace

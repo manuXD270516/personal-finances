@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["ledger/journal-posting", "audit/audit-trail"]
 requirement: "Asignar custom fields no modifica el ledger"
 scenario: "Cambiar el centro de costo de un gasto posteado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009, FR-TRANSACTIONS-008, FR-AUDIT-001]
 nfr: []
 invariants: [INV-033, INV-029]
@@ -34,7 +34,7 @@ expected_result:
   - "Auditoría con customFields.centro_costo antes \"casa\" y después \"oficina\""
   - "TransactionUpdated.v1 con changedFields [customFields]"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-007 — Asignar custom fields no toca el ledger y queda auditado

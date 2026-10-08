@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Notificación in-app por umbral de presupuesto alcanzado'
 scenario: 'Miembro que desactivó el tipo in-app'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-003']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Solo el OWNER tiene la notificación'
   - 'El VIEWER no tiene notificación ni entrega por email'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-002 — Un miembro que desactivó el tipo in-app no recibe la notificación

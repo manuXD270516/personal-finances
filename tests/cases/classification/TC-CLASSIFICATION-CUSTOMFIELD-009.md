@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: []
 requirement: "Cambios protegidos de una definición con valores"
 scenario: "Cambiar el tipo de un campo con valores"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009]
 nfr: []
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - "Quitar \"oficina\": 409 CUSTOM_FIELD_OPTION_IN_USE"
   - "Agregar \"taller\": aceptado"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-009 — Tipo, objetivo y opciones en uso de un custom field con valores no cambian

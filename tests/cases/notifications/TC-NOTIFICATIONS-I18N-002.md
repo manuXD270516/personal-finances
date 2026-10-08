@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Idioma de la notificación según el usuario'
 scenario: 'Locale sin traducción'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002']
 nfr: ['NFR-USAB-001']
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - 'Con fr-FR el texto está en español'
   - 'Con en-US la misma notificación se muestra en inglés'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-I18N-002 — Un locale sin traducción usa español y cambiar el locale traduce las existentes

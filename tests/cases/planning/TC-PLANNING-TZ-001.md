@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Periodo determinado por la fecha de negocio
 scenario: Gasto registrado a las 23:30 del último día del mes
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
 nfr:
@@ -46,7 +46,7 @@ expected_result:
   - 'Con día 25: 2026-11-24 pertenece a "2026-10" y 2026-11-25 a "2026-11"'
   - Tras cambiar a UTC los rangos y las pertenencias no cambian
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TZ-001 — El periodo de un hecho lo determina su fecha de negocio y no el instante UTC

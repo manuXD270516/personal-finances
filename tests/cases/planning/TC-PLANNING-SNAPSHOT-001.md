@@ -7,7 +7,7 @@ related_specs:
   - reporting/dashboard
 requirement: Contenido del snapshot de cierre
 scenario: Snapshot de octubre de 2026
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
 nfr:
@@ -48,7 +48,7 @@ expected_result:
   - "Sin tasa USDT/BOB: patrimonio incompleto con 800.000000 USDT sin convertir"
   - Montos como string decimal a la escala de su moneda, sin pérdida al releer
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-SNAPSHOT-001 — El snapshot de cierre registra saldos, patrimonio, flujos y tasa de ahorro exactos

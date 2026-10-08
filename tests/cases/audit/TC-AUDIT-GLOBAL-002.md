@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: ["security/access-control"]
 requirement: "Consulta global del log de auditoría con filtros"
 scenario: "VIEWER consulta el log global"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-006]
 nfr: [NFR-SEC-003]
 invariants: []
@@ -28,7 +28,7 @@ steps:
 expected_result:
   - "403 INSUFFICIENT_ROLE"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-002 — Un VIEWER no accede al log de auditoría global

@@ -5,7 +5,7 @@ spec: audit/lifecycle-timeline
 related_specs: ["transactions/reconciliation"]
 requirement: "Recorrido de una sesión de reconciliación"
 scenario: "Recorrido de una sesión finalizada con ajuste"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-009, FR-AUDIT-010, FR-TRANSACTIONS-030]
 nfr: []
 invariants: [INV-029]
@@ -40,7 +40,7 @@ expected_result:
   - "Máquina: IN_PROGRESS, COMPLETED y CANCELLED (terminales)"
   - "Sesión CANCELLED: 409 INVALID_STATUS_TRANSITION sin transición registrada"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-LIFECYCLE-025 — El recorrido de una sesión de reconciliación muestra sus transiciones y anotaciones

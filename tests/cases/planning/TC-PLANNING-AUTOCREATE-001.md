@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Creación automática e idempotente con anticipación
 scenario: Primera creación en un workspace nuevo
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-002
 nfr: []
@@ -39,7 +39,7 @@ expected_result:
   - La segunda ejecución no crea ni modifica periodos (mismos ids y versiones)
   - El 2026-11-02 se crea "2027-02" en draft y solo cambia "2026-11" (activación)
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-AUTOCREATE-001 — La creación automática asegura el periodo actual y los siguientes de forma idempotente

@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Cierre solo de periodos terminados en la zona horaria del workspace
 scenario: Último día del mes por la noche en La Paz
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
 nfr:
@@ -39,7 +39,7 @@ expected_result:
   - A las 03:30Z se rechaza con PERIOD_NOT_ENDED
   - A las 04:10Z el cierre se acepta
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CLOSE-005 — Solo se cierra un periodo terminado según la fecha de hoy en La Paz

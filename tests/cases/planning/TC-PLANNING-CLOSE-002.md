@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Cierre impedido por ítems bloqueantes
 scenario: Cierre con pendientes
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
 nfr: []
@@ -36,7 +36,7 @@ expected_result:
   - 409 MONTH_CLOSING_BLOCKED con blockingItems = [PENDING_TRANSACTIONS]
   - '"2026-10" sigue active, sin snapshot ni lock; el gasto se acepta'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CLOSE-002 — Un ítem bloqueante impide el cierre con MONTH_CLOSING_BLOCKED

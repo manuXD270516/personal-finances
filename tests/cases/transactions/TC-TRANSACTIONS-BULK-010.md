@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["classification/custom-fields"]
 requirement: "Custom fields en la edición masiva"
 scenario: "Fijar el centro de costo en lote"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-CLASSIFICATION-009]
 nfr: []
 invariants: [INV-033]
@@ -34,7 +34,7 @@ expected_result:
   - "T1 y T2 con centro_costo = \"oficina\"; \"Bank A\" sigue en 2000.00 BOB"
   - "\"taller\": 422 CUSTOM_FIELD_VALUE_INVALID; nada cambia"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-010 — La edición masiva fija valores de custom fields validados

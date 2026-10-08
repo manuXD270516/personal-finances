@@ -6,7 +6,7 @@ related_specs:
   - ledger/journal-posting
 requirement: Bloqueo del ledger en periodos cerrados
 scenario: Cierre concurrente con un posteo
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-005
   - FR-LEDGER-011
@@ -41,7 +41,7 @@ expected_result:
   - "En cada repetición: o el gasto existe y el snapshot lo incluye, o el gasto se rechazó con PERIOD_CLOSED"
   - Nunca existe un asiento con fecha en "2026-10" no reflejado en el snapshot vigente (saldos del snapshot = suma de postings a 2026-10-31)
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-LOCK-002 — Un cierre concurrente con un posteo nunca deja asientos del periodo fuera del snapshot

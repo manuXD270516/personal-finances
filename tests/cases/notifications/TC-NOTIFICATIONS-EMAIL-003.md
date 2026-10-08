@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets', 'identity/authentication']
 requirement: 'Emails enlazan a la app autenticada'
 scenario: 'Enlace sin sesión'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-006']
 nfr: ['NFR-SEC-001']
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - 'La app pide iniciar sesión y luego muestra la notificación'
   - 'El enlace solo contiene la ruta y el id opaco (sin query de tokens, montos ni nombres)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-003 — El enlace del email exige sesión y no lleva tokens ni datos financieros

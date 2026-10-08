@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/month-closing']
 requirement: 'Aviso de cierre de mes pendiente'
 scenario: 'Octubre sin cerrar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'El VIEWER no la recibe'
   - 'La segunda entrega no duplica'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-007 — El hecho de cierre pendiente notifica solo a OWNER y EDITOR

@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Notificación in-app por umbral de presupuesto alcanzado'
 scenario: 'Dos miembros notificados'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-001']
 nfr: ['NFR-PERF-008']
 invariants: ['INV-025']
@@ -32,7 +32,7 @@ expected_result:
   - 'OWNER y VIEWER tienen una notificación UNREAD de tipo BUDGET_THRESHOLD'
   - 'El contenido indica "Restaurantes", "2026-11", 90 % (también 50 y 75 %), 550.00 de 600.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-001 — Un umbral alcanzado crea una notificación no leída para cada miembro activo

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['fx/market-rate-providers', 'reporting/dashboard']
 requirement: 'Gasto en otra moneda convertido con la tasa de su fecha'
 scenario: 'Gasto en USD y en BOB'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023', 'FR-REPORTING-002']
 nfr: []
 invariants: ['INV-012', 'INV-020']
@@ -34,7 +34,7 @@ expected_result:
   - 'La respuesta informa la tasa 12.05 PARALLEL con su fuente y vigencia'
   - 'Coincide con el monto de "Restaurantes" en /reports/summary para el mismo rango'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-004 — Un gasto en USD se convierte con la tasa PARALLEL vigente al cierre de su día

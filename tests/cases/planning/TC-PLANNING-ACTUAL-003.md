@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Gasto real derivado de transacciones posteadas'
 scenario: 'Gasto de medianoche asignado por fecha de negocio'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023']
 nfr: ['NFR-USAB-004']
 invariants: ['INV-034']
@@ -31,7 +31,7 @@ expected_result:
   - 'Cuenta en "2026-11"'
   - 'No cuenta en "2026-12"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-003 — Un gasto se asigna al periodo por su fecha de negocio en la zona del workspace

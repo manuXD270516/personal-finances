@@ -5,7 +5,7 @@ spec: audit/lifecycle-timeline
 related_specs: ["transactions/reconciliation"]
 requirement: "Reconciliación en el recorrido de una transacción"
 scenario: "Recorrido de un gasto reconciliado en sesión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-010, FR-TRANSACTIONS-030]
 nfr: []
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - "G1: RECORD, CLEAR, RECONCILE; RECONCILE con reconciliationId, statementDate 2026-03-31 y statementBalance \"3350.00\""
   - "Ajuste: RECORD (con asiento) y RECONCILE referenciando la sesión"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-LIFECYCLE-026 — La transición reconciliar de una transacción enlaza su sesión y extracto

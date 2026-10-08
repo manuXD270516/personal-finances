@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: []
 requirement: "Ejecución todo o nada de la edición masiva"
 scenario: "Un ítem con versión obsoleta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-TRANSACTIONS-011]
 nfr: [NFR-DATA-014]
 invariants: [INV-029]
@@ -35,7 +35,7 @@ expected_result:
   - "T1, T2 y T3 conservan \"Supermercado\" y su versión"
   - "Segundo lote: 404 RESOURCE_NOT_FOUND para el ítem inexistente; T1 sin cambios"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-003 — Una versión obsoleta o un ítem inexistente anulan toda la edición masiva

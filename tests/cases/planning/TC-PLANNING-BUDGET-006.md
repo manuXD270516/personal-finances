@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Presupuesto de tipo máximo'
 scenario: 'Restaurantes excedido'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-018']
 nfr: ['NFR-USAB-104']
 invariants: ['INV-020']
@@ -30,7 +30,7 @@ expected_result:
   - 'Estado excedido, restante −50.00 BOB y 108.3 % (650/600 con HALF_EVEN a 1 decimal)'
   - 'La UI muestra el estado con texto e icono además del color'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-006 — Un presupuesto máximo excedido muestra restante negativo y estado con texto e icono

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Cambio del planificado reevalúa los umbrales'
 scenario: 'Bajar el máximo cruza el 90 %'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: []
 invariants: []
@@ -29,7 +29,7 @@ expected_result:
   - 'En la misma operación se emite un único hecho de umbral 90 % con reference 500.00 BOB y actual 470.00 BOB (94.0 %)'
   - 'No se re-emiten 50 ni 75 %'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-007 — Bajar el máximo de una línea reevalúa y emite el umbral recién cruzado

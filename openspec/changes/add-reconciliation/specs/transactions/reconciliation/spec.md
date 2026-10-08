@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Completa la reconciliación de Phase 2 (FR-TRANSACTIONS-030): sesiones por cuenta contra la fecha y el saldo de un extracto, diferencia en vivo que debe llegar a cero para finalizar, ajuste auditado cuando hace falta, evento dedicado de transacción confirmada (docs/31 D47), estado de reconciliación por cuenta para el cierre de mes y respeto de los periodos cerrados.
+Completa la reconciliación de Phase 2 (FR-TRANSACTIONS-030): sesiones por cuenta contra la fecha y el saldo de un extracto, diferencia en vivo que debe llegar a cero para finalizar, ajuste auditado cuando hace falta, evento dedicado de transacción confirmada (docs/31 D47), estado de reconciliación por cuenta para el cierre de mes, respeto de los periodos cerrados y el modo explícito "conciliada sin extracto" con su marca de seguimiento (docs/33 D74, D77, D111).
 
 ## ADDED Requirements
 
@@ -61,12 +61,12 @@ Trace: FR-TRANSACTIONS-029, FR-TRANSACTIONS-030, INV-033 · Priority: Must
 - **ENTONCES** se rechaza con `VALIDATION_FAILED` y el gasto sigue `posted`
 
 ### Requirement: Finalizar una sesión con diferencia cero
-Con diferencia 0, finalizar la sesión DEBE (MUST) pasar a `reconciled` todas las transacciones `cleared` de la cuenta con fecha de negocio menor o igual a la fecha del extracto, registrar cuáles se reconciliaron en esa sesión, guardar el saldo confirmado y dejar la sesión `COMPLETED`, en una sola transacción de base de datos junto con la auditoría, los registros de transición y los eventos; NO DEBE (MUST NOT) crear, modificar ni revertir asientos.
+Con diferencia 0, finalizar la sesión DEBE (MUST) pasar a `reconciled` en modo contra extracto todas las transacciones `cleared` de la cuenta con fecha de negocio menor o igual a la fecha del extracto, registrar cuáles se reconciliaron en esa sesión, guardar el saldo confirmado y dejar la sesión `COMPLETED`, en una sola transacción de base de datos junto con la auditoría, los registros de transición y los eventos; NO DEBE (MUST NOT) crear, modificar ni revertir asientos.
 Trace: FR-TRANSACTIONS-030, FR-AUDIT-001, INV-023, INV-029 · Priority: Must
 
 #### Scenario: Finalizar la reconciliación de marzo
 - **CUANDO** la sesión de "Bank A" al 2026-03-31 por 3350.00 BOB tiene diferencia 0.00 BOB y el usuario la finaliza
-- **ENTONCES** el gasto de 150.00 BOB y el ingreso de 2500.00 BOB quedan `reconciled` y vinculados a la sesión, que queda `COMPLETED` con saldo confirmado 3350.00 BOB
+- **ENTONCES** el gasto de 150.00 BOB y el ingreso de 2500.00 BOB quedan `reconciled` en modo contra extracto y vinculados a la sesión, que queda `COMPLETED` con saldo confirmado 3350.00 BOB
 - **Y** el gasto `posted` de 45.90 BOB y el gasto `cleared` de 200.00 BOB del 2026-04-02 no cambian de estado
 - **Y** el número de asientos y el saldo contable de "Bank A" (3104.10 BOB) no cambian
 
@@ -105,7 +105,7 @@ Trace: FR-TRANSACTIONS-030 · Priority: Should
 - **ENTONCES** se rechaza con `INVALID_STATUS_TRANSITION`
 
 ### Requirement: Estado de reconciliación por cuenta
-El sistema DEBE (MUST) informar, para una o varias cuentas y una fecha de corte, la fecha y el saldo del extracto de la última sesión completada de cada cuenta, si tiene una sesión en curso, cuántas transacciones `posted` o `cleared` con fecha de negocio menor o igual al corte siguen sin reconciliar y si la cuenta está reconciliada al corte (extracto completado con fecha igual o posterior al corte y ninguna sin reconciliar); es la fuente del ítem "cuentas sin conciliar" del checklist de cierre.
+El sistema DEBE (MUST) informar, para una o varias cuentas, una fecha de corte y opcionalmente una fecha de inicio, la fecha y el saldo del extracto de la última sesión completada de cada cuenta, si tiene una sesión en curso, cuántas transacciones `posted` o `cleared` con fecha de negocio menor o igual al corte siguen sin reconciliar, cuántas transacciones conciliadas sin extracto tiene entre la fecha de inicio y el corte, si la cuenta está reconciliada al corte y con qué base. Una cuenta DEBE (MUST) considerarse reconciliada al corte solo si no le quedan transacciones `posted` ni `cleared` con fecha hasta el corte y, además, tiene un extracto completado con fecha igual o posterior al corte o alguna transacción conciliada sin extracto con fecha posterior a su último extracto completado (o sin extracto previo); la base DEBE (MUST) ser "sin extracto" cuando la cuenta reconciliada tiene conciliadas sin extracto en el rango consultado y "extracto" en otro caso. Es la fuente de los ítems "cuentas sin conciliar" y "conciliada sin extracto — pendiente de revisión" del checklist de cierre.
 Trace: FR-TRANSACTIONS-030, FR-PLANNING-003 · Priority: Must
 
 #### Scenario: Estado de "Bank A" al cierre de marzo
@@ -115,6 +115,14 @@ Trace: FR-TRANSACTIONS-030, FR-PLANNING-003 · Priority: Must
 #### Scenario: Cuenta nunca reconciliada
 - **CUANDO** se consulta el estado de "Caja BOB", que nunca tuvo una sesión completada
 - **ENTONCES** se informa sin reconciliación previa y el número de transacciones sin reconciliar hasta el corte
+
+#### Scenario: Cuenta conciliada sin extracto
+- **CUANDO** "Caja BOB", sin sesiones completadas, tiene saldo inicial 500.00 BOB y como única transacción hasta el 2026-03-31 un gasto de 80.00 BOB del 2026-03-12 conciliado sin extracto, y se consulta el estado del 2026-03-01 al 2026-03-31
+- **ENTONCES** se informa la cuenta reconciliada al corte con base "sin extracto", 1 transacción conciliada sin extracto en el rango y 0 sin reconciliar
+
+#### Scenario: Extracto completado con una conciliada sin extracto posterior
+- **CUANDO** "Bank A" completó una sesión al 2026-03-31, después se registró, confirmó y concilió sin extracto un gasto de 12.00 BOB del 2026-03-30 y no le quedan transacciones `posted` ni `cleared` hasta el 2026-03-31
+- **ENTONCES** con corte 2026-03-31 e inicio 2026-03-01 la cuenta se informa reconciliada al corte con base "sin extracto" y 1 conciliada sin extracto en el rango
 
 ### Requirement: Evento dedicado de transacción confirmada
 Cada transición `posted` → `cleared` y `cleared` → `posted` de una transacción, sea individual, en lote, dentro de una sesión o desde una edición masiva, DEBE (MUST) publicar exactamente un hecho "transacción confirmada" con el nuevo estado de confirmación, el estado anterior, la revisión y la sesión de reconciliación si la hay, además del hecho de transacción actualizada; los consumidores DEBEN (MUST) poder aplicarlo una sola vez ante reentregas.
@@ -129,7 +137,7 @@ Trace: FR-TRANSACTIONS-029, FR-TRANSACTIONS-030 · Priority: Must
 - **ENTONCES** el consumidor aplica su efecto una sola vez
 
 ### Requirement: Reconciliación y periodos cerrados
-Ninguna operación de reconciliación DEBE (MUST) cambiar en silencio un periodo cerrado (alcance de la edición en periodos cerrados de `planning/month-closing`): confirmar o desconfirmar una transacción, reconciliarla al finalizar una sesión o des-reconciliarla DEBE (MUST) rechazarse con `PERIOD_CLOSED` cuando su fecha de negocio cae en un periodo cerrado, y el ajuste de una sesión cuya fecha de extracto cae en un periodo cerrado también; el rechazo DEBE (MUST) dejar todo sin cambios.
+Ninguna operación de reconciliación DEBE (MUST) cambiar en silencio un periodo cerrado (alcance de la edición en periodos cerrados de `planning/month-closing`): confirmar o desconfirmar una transacción, reconciliarla al finalizar una sesión, conciliarla sin extracto o des-reconciliarla DEBE (MUST) rechazarse con `PERIOD_CLOSED` cuando su fecha de negocio cae en un periodo cerrado, y el ajuste de una sesión cuya fecha de extracto cae en un periodo cerrado también; el rechazo DEBE (MUST) dejar todo sin cambios.
 Trace: FR-TRANSACTIONS-030, FR-PLANNING-005, INV-015 · Priority: Must
 
 #### Scenario: Finalizar con una transacción de un mes cerrado
@@ -139,6 +147,10 @@ Trace: FR-TRANSACTIONS-030, FR-PLANNING-005, INV-015 · Priority: Must
 #### Scenario: Ajuste fechado en un mes cerrado
 - **CUANDO** marzo de 2026 está cerrado y el usuario finaliza con ajuste una sesión al 2026-03-31 con diferencia −5.00 BOB
 - **ENTONCES** se rechaza con `PERIOD_CLOSED` y no se crea el ajuste ni se reconcilia ninguna transacción
+
+#### Scenario: Conciliar sin extracto en un mes cerrado
+- **CUANDO** marzo de 2026 está cerrado y el usuario intenta conciliar sin extracto un gasto `cleared` de 80.00 BOB del 2026-03-12 en "Caja BOB"
+- **ENTONCES** se rechaza con `PERIOD_CLOSED` y el gasto sigue `cleared`, sin marca de seguimiento
 
 ### Requirement: Bloqueo optimista de la sesión
 Las operaciones que modifican una sesión (confirmar o desconfirmar en la sesión, finalizar y cancelar) DEBERÍAN exigir la versión vigente de la sesión; cuando se exige, una versión obsoleta DEBE (MUST) rechazarse con `PRECONDITION_FAILED` sin efectos, y finalizar DEBE (MUST) evaluar el estado vigente de las transacciones incluidas en el momento de la finalización.
@@ -151,6 +163,48 @@ Trace: FR-TRANSACTIONS-011, FR-TRANSACTIONS-030, NFR-DATA-014 · Priority: Shoul
 #### Scenario: Gasto incluido editado antes de finalizar
 - **CUANDO** el gasto `cleared` de 150.00 BOB se corrige a 155.00 BOB (vuelve a `posted`) antes de finalizar la sesión con extracto 3350.00 BOB
 - **ENTONCES** al finalizar el saldo confirmado es 3500.00 BOB, la diferencia −150.00 BOB y la finalización sin ajuste se rechaza con `RECONCILIATION_DIFFERENCE_NOT_ZERO`
+
+### Requirement: Conciliación sin extracto
+Un miembro EDITOR u OWNER DEBE (MUST) poder pasar una transacción `cleared` a `reconciled` fuera de una sesión solo indicando explícitamente el modo "conciliada sin extracto"; la transacción DEBE (MUST) quedar `reconciled` en ese modo sin crear, modificar ni revertir asientos, con auditoría y con su propia transición del recorrido, y DEBE (MUST) distinguirse en la API y en la UI de una transacción conciliada contra un extracto. Un marcado directo sin el modo explícito DEBE (MUST) rechazarse con `VALIDATION_FAILED`, uno sobre una transacción que no está `cleared` con `INVALID_STATUS_TRANSITION` y uno de un VIEWER con `INSUFFICIENT_ROLE`, en todos los casos sin cambios.
+Trace: FR-TRANSACTIONS-006, FR-TRANSACTIONS-030, FR-AUDIT-001, INV-033 · Priority: Must
+
+#### Scenario: Conciliar sin extracto un gasto en efectivo
+- **CUANDO** el usuario marca como conciliado sin extracto un gasto `cleared` de 80.00 BOB del 2026-03-12 en "Caja BOB" (saldo 420.00 BOB)
+- **ENTONCES** el gasto queda `reconciled` en modo sin extracto, con su mismo único asiento activo, y "Caja BOB" sigue en 420.00 BOB
+- **Y** la auditoría registra el cambio de estado y el modo con el actor, y la respuesta lo muestra como "conciliada sin extracto"
+
+#### Scenario: Marcado directo sin indicar el modo
+- **CUANDO** el usuario intenta marcar directamente como `reconciled` ese gasto `cleared` sin indicar el modo sin extracto
+- **ENTONCES** se rechaza con `VALIDATION_FAILED` y el gasto sigue `cleared`
+
+#### Scenario: Conciliar sin extracto un gasto solo posteado
+- **CUANDO** el usuario intenta conciliar sin extracto un gasto `posted` de 45.90 BOB
+- **ENTONCES** se rechaza con `INVALID_STATUS_TRANSITION` y el gasto sigue `posted`
+
+### Requirement: Marca de seguimiento de las conciliadas sin extracto
+Toda transacción conciliada sin extracto DEBE (MUST) exponer la marca de sistema `RECONCILED_WITHOUT_STATEMENT` ("conciliada sin extracto — pendiente de revisión"), derivada de su modo de conciliación, que el usuario NO DEBE (MUST NOT) poder agregar ni quitar a mano, con tags ni con una edición masiva; el listado de transacciones DEBE (MUST) permitir filtrar por esa marca combinada con cuenta y rango de fechas, y la marca DEBE (MUST) desaparecer solo cuando la transacción se des-reconcilia o cuando una sesión posterior la coteja contra un extracto.
+Trace: FR-TRANSACTIONS-030, FR-TRANSACTIONS-012 · Priority: Must
+
+#### Scenario: Listar las conciliadas sin extracto pendientes de revisión
+- **CUANDO** "Caja BOB" tiene el gasto de 80.00 BOB conciliado sin extracto, "Bank A" tiene el gasto de 150.00 BOB reconciliado en la sesión al 2026-03-31 y el usuario filtra el listado por la marca "conciliada sin extracto"
+- **ENTONCES** obtiene solo el gasto de 80.00 BOB de "Caja BOB", con la marca visible
+
+#### Scenario: Intento de quitar la marca a mano
+- **CUANDO** el usuario intenta quitar la marca "conciliada sin extracto" del gasto de 80.00 BOB editando la transacción
+- **ENTONCES** se rechaza con `VALIDATION_FAILED` y el gasto conserva la marca y su modo
+
+### Requirement: Cotejo posterior de las conciliadas sin extracto
+Al finalizar una sesión, las transacciones de la cuenta conciliadas sin extracto con fecha de negocio menor o igual a la fecha del extracto y fuera de periodos cerrados DEBEN (MUST) pasar a modo contra extracto vinculadas a esa sesión, en la misma transacción de base de datos, sin cambiar de estado ni crear asientos y con una anotación en su recorrido; las que caen en un periodo cerrado DEBEN (MUST) conservar su modo y su marca sin impedir la finalización.
+Trace: FR-TRANSACTIONS-030, FR-AUDIT-010, INV-015 · Priority: Must
+
+#### Scenario: Sesión que coteja un gasto conciliado sin extracto
+- **CUANDO** el gasto de 45.90 BOB del 2026-03-20 de "Bank A" está conciliado sin extracto y el usuario finaliza la sesión de "Bank A" al 2026-03-31 por 3304.10 BOB con diferencia 0.00 BOB
+- **ENTONCES** ese gasto sigue `reconciled`, ahora en modo contra extracto, vinculado a la sesión y sin la marca de seguimiento
+- **Y** el número de asientos y el saldo contable de "Bank A" no cambian
+
+#### Scenario: Conciliada sin extracto en un mes cerrado
+- **CUANDO** marzo de 2026 está cerrado, "Bank A" tiene un gasto de 30.00 BOB del 2026-03-28 conciliado sin extracto y ninguna transacción `cleared` de marzo, y el usuario finaliza con diferencia 0.00 BOB una sesión de "Bank A" al 2026-04-30
+- **ENTONCES** la sesión queda `COMPLETED` y el gasto de 30.00 BOB conserva el modo sin extracto y la marca de seguimiento
 
 ## MODIFIED Requirements
 
@@ -172,20 +226,24 @@ Trace: FR-TRANSACTIONS-029, FR-TRANSACTIONS-006, INV-015 · Priority: Must
 - **ENTONCES** se rechaza con `PERIOD_CLOSED` y el gasto sigue `posted`
 
 ### Requirement: Marcar una transacción como reconciliada
-Una transacción DEBE (MUST) pasar a `reconciled` solo al finalizar una sesión de reconciliación de su cuenta, y solo desde `cleared`, sin cambios en el ledger; el marcado directo de una transacción como `reconciled` fuera de una sesión DEBE (MUST) rechazarse con `RECONCILIATION_SESSION_REQUIRED`.
+Una transacción DEBE (MUST) pasar a `reconciled` solo desde `cleared` y sin cambios en el ledger, por una de dos vías explícitas: al finalizar una sesión de reconciliación de su cuenta (modo contra extracto) o por el marcado directo que indica el modo "conciliada sin extracto"; toda transacción `reconciled` DEBE (MUST) informar su modo de conciliación, y las reconciliadas antes de existir las sesiones DEBEN (MUST) informarse como conciliadas sin extracto.
 Trace: FR-TRANSACTIONS-006, FR-TRANSACTIONS-030 · Priority: Must
 
 #### Scenario: Reconciliar un gasto confirmado
 - **CUANDO** un gasto `cleared` de 150.00 BOB está incluido en una sesión que se finaliza con diferencia 0.00 BOB
-- **ENTONCES** la transacción queda `reconciled` y el saldo de la cuenta no cambia
+- **ENTONCES** la transacción queda `reconciled` en modo contra extracto y el saldo de la cuenta no cambia
 
 #### Scenario: Reconciliar un gasto solo posteado
 - **CUANDO** una sesión con diferencia 0.00 BOB se finaliza y la cuenta tiene un gasto `posted` de 150.00 BOB con fecha anterior al extracto
 - **ENTONCES** ese gasto sigue `posted`
 
-#### Scenario: Marcado directo como reconciliada
-- **CUANDO** el usuario intenta marcar directamente como `reconciled` un gasto `cleared` de 150.00 BOB sin finalizar una sesión
-- **ENTONCES** se rechaza con `RECONCILIATION_SESSION_REQUIRED` y el gasto sigue `cleared`
+#### Scenario: Marcado directo como conciliada sin extracto
+- **CUANDO** el usuario marca directamente como `reconciled` un gasto `cleared` de 150.00 BOB indicando el modo "conciliada sin extracto", sin una sesión
+- **ENTONCES** la transacción queda `reconciled` en modo sin extracto, con la marca de seguimiento, y el saldo de la cuenta no cambia
+
+#### Scenario: Reconciliada antes de las sesiones
+- **CUANDO** un gasto de 60.00 BOB quedó `reconciled` por marcado directo antes de existir las sesiones de reconciliación
+- **ENTONCES** se informa como conciliado sin extracto, con la marca de seguimiento, sin cambiar su estado ni su historia
 
 ### Requirement: Des-reconciliación explícita y auditada
 El usuario DEBE (MUST) poder devolver una transacción `reconciled` a `cleared` solo mediante una acción explícita de des-reconciliación con motivo obligatorio, que DEBE (MUST) quedar auditada; si la transacción fue reconciliada en una sesión, la sesión DEBE (MUST) conservar su resultado y registrar la des-reconciliación posterior, y la acción DEBE (MUST) rechazarse con `PERIOD_CLOSED` si la fecha de negocio cae en un periodo cerrado.
@@ -204,6 +262,10 @@ Trace: FR-TRANSACTIONS-006, FR-AUDIT-001, INV-015 · Priority: Must
 - **CUANDO** el gasto de 150.00 BOB fue reconciliado en la sesión de "Bank A" al 2026-03-31 y el usuario lo des-reconcilia con motivo "duplicado en extracto"
 - **ENTONCES** la sesión sigue `COMPLETED` con saldo confirmado 3350.00 BOB y muestra ese gasto como des-reconciliado después de completarse
 - **Y** el estado de reconciliación de "Bank A" con corte 2026-03-31 cuenta ese gasto como no reconciliado
+
+#### Scenario: Des-reconciliar una conciliada sin extracto
+- **CUANDO** el usuario des-reconcilia con motivo "falta el comprobante" el gasto de 80.00 BOB de "Caja BOB" conciliado sin extracto
+- **ENTONCES** el gasto queda `cleared`, sin modo de conciliación ni marca de seguimiento, y el historial registra la acción con el actor y el motivo
 
 #### Scenario: Des-reconciliar en un mes cerrado
 - **CUANDO** marzo de 2026 está cerrado y el usuario intenta des-reconciliar un gasto `reconciled` del 2026-03-05

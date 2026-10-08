@@ -7,7 +7,7 @@ related_specs:
   - planning/financial-periods
 requirement: Recorrido de un periodo financiero
 scenario: Recorrido completo de octubre
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-AUDIT-009
   - FR-AUDIT-010
@@ -40,7 +40,7 @@ expected_result:
   - '"2026-10": crear (draft), activar (draft -> active), cerrar (active -> closed, snapshot 1), reabrir (closed -> reopened, motivo), cerrar (reopened -> closed, snapshot 2); estado actual closed'
   - '"2026-12": anotación con rango anterior y nuevo, sin transición de estado'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-PERIODLIFECYCLE-001 — El recorrido del periodo muestra crear, activar, cerrar, reabrir y re-cerrar

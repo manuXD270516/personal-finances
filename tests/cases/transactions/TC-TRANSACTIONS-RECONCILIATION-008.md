@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["ledger/journal-posting", "transactions/transaction-recording"]
 requirement: "Diferencia distinta de cero y ajuste de reconciliación"
 scenario: "Finalizar con ajuste confirmado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-TRANSACTIONS-017]
 nfr: []
 invariants: [INV-004, INV-005, INV-023, INV-029]
@@ -38,7 +38,7 @@ expected_result:
   - "Saldo contable de \"Bank A\" 3099.10 BOB"
   - "Motivo vacío: 400 VALIDATION_FAILED y no se crea ninguna transacción"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-008 — El ajuste de reconciliación cuadra la diferencia con un asiento balanceado

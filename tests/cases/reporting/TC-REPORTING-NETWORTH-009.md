@@ -5,7 +5,7 @@ spec: reporting/net-worth
 related_specs: ["planning/month-closing"]
 requirement: "Meses cerrados desde el snapshot de cierre"
 scenario: "Tasa registrada después del cierre de marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-REPORTING-006, FR-PLANNING-004]
 nfr: [NFR-DATA-006]
 invariants: []
@@ -35,7 +35,7 @@ steps:
 expected_result:
   - "Marzo 3570.00 BOB con source SNAPSHOT y closed true"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-REPORTING-NETWORTH-009 — Un mes cerrado muestra el patrimonio del snapshot de cierre

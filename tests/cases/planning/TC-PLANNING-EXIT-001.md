@@ -6,7 +6,7 @@ related_specs:
   - transactions/reconciliation
 requirement: Cierre de un mes real con todas las cuentas conciliadas
 scenario: Cierre de octubre con cuatro cuentas conciliadas
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
   - FR-PLANNING-004
@@ -40,7 +40,7 @@ expected_result:
   - '"2026-10" closed con snapshot 1'
   - Cada saldo del snapshot es igual al saldo de extracto de su conciliación y referencia esa conciliación
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-EXIT-001 — El owner cierra un mes real con las cuatro cuentas conciliadas a diferencia cero

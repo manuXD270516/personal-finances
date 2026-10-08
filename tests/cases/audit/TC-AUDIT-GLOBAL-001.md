@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: []
 requirement: "Consulta global del log de auditoría con filtros"
 scenario: "Cambios de un actor sobre transacciones en marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-006, FR-AUDIT-004]
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ steps:
 expected_result:
   - "Exactamente los 3 registros de \"U1\" sobre transacciones, del más reciente al más antiguo, con cursor estable"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-001 — La consulta global del log combina filtros por actor, entidad y rango

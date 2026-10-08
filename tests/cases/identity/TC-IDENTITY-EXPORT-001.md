@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["security/access-control", "platform/api-conventions"]
 requirement: "Solicitar la exportación del workspace"
 scenario: "El OWNER solicita la exportación"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010, FR-IDENTITY-006]
 nfr: [NFR-SEC-003]
 invariants: [INV-027]
@@ -37,7 +37,7 @@ expected_result:
   - "Segunda en curso con otra clave: 409 EXPORT_IN_PROGRESS"
   - "Reenvío con la misma clave: misma operación"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-001 — Solo el OWNER con autenticación reciente solicita la exportación

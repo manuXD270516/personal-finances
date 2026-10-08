@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["audit/audit-trail"]
 requirement: "Descarga del export"
 scenario: "Descargar el export terminado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010, FR-AUDIT-005]
 nfr: []
 invariants: [INV-029]
@@ -38,7 +38,7 @@ expected_result:
   - "E2: 409 EXPORT_NOT_READY"
   - "U2: 403 INSUFFICIENT_ROLE"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-006 — El OWNER descarga el export terminado con su suma SHA-256 y queda auditado

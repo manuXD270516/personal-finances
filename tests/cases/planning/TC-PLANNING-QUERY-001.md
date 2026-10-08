@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Consulta de periodos
 scenario: Periodo de una fecha
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
 nfr: []
@@ -39,7 +39,7 @@ expected_result:
   - La fecha sin periodo responde 404 REFERENCE_NOT_FOUND
   - Las respuestas validan contra el contrato OpenAPI
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-QUERY-001 — Cualquier miembro lista periodos y obtiene el periodo de una fecha

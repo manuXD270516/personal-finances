@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Rechazo de archivos de export inválidos"
 scenario: "Archivo modificado a mano"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-017]
 nfr: [NFR-PORT-009]
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "Sin manifiesto: 422 EXPORT_FILE_CORRUPTED"
   - "Ningún workspace creado"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-RESTORE-004 — La importación rechaza archivos alterados o de una versión no soportada

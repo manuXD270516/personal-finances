@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Crear el plan de un periodo desde un template'
 scenario: 'Plan desde la última versión'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-010', 'FR-PLANNING-009']
 nfr: []
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - 'El plan tiene "Supermercado" 1600.00, "Alquiler" 2800.00 y "Salario" esperado 8000.00 BOB'
   - 'El plan indica origen "Mes estándar" versión 2, también después de existir la versión 3'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-004 — El plan creado desde un template sin versión usa la última y guarda su origen

@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["transactions/reconciliation"]
 requirement: "Confirmación cleared en lote desde la edición masiva"
 scenario: "Desconfirmar un gasto reconciliado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-TRANSACTIONS-029]
 nfr: []
 invariants: [INV-033]
@@ -32,7 +32,7 @@ expected_result:
   - "Ambos cleared con tag \"revisado\"; dos TransactionCleared.v1 con bulkOperationId"
   - "Segundo lote: 409 TRANSACTION_RECONCILED para R; C sigue cleared"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-006 — El estado cleared en lote sigue las reglas del marcado cleared

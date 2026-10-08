@@ -4,8 +4,8 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner `identity/workspace-portability`, la reasignación de FR-IDENTITY-010, el nuevo FR-IDENTITY-017 y las preguntas abiertas 1–6 de design.md; verificar con `openspec validate add-workspace-export --strict`
-- [ ] 1.2 Revisar TC-IDENTITY-EXPORT-001..012 y TC-IDENTITY-RESTORE-001..005 (cifras: 3099.10 + 50.000000 × 12.02 − 520.00 = 3180.10 BOB); pasar a `ready` y `requirement_status: confirmed` al aprobar
+- [ ] 1.1 Revisar con el owner `identity/workspace-portability`, la reasignación de FR-IDENTITY-010, el nuevo FR-IDENTITY-017 y las preguntas abiertas 1–6 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-workspace-export --strict`
+- [ ] 1.2 Revisar TC-IDENTITY-EXPORT-001..012 y TC-IDENTITY-RESTORE-001..007 (cifras: 3099.10 + 50.000000 × 12.02 − 520.00 = 3180.10 BOB); pasar a `ready` y `requirement_status: confirmed` al aprobar
 
 ## 2. DOMAIN (TDD)
 
@@ -19,7 +19,7 @@
 - [ ] 3.2 Exporters/importers por contexto (`WorkspaceDataExporter`/`WorkspaceDataImporter`) en accounts, classification, transactions, ledger, fx, audit, planning y notifications (preferencias), con todas las tablas de design.md § "Datos de Phase 2 cubiertos", sin secretos (TC-IDENTITY-EXPORT-002, TC-IDENTITY-EXPORT-012)
 - [ ] 3.3 `DownloadWorkspaceExport` (descifrado en streaming con verificación por bloque), `DiscardWorkspaceExport`, `ExpireWorkspaceExports` (job) (TC-IDENTITY-EXPORT-006, -007, -008)
 - [ ] 3.4 Auditoría del ciclo y evento `WorkspaceExportCompleted.v1`; aviso in-app si NOTIFY existe (TC-IDENTITY-EXPORT-009, -011)
-- [ ] 3.5 `RequestWorkspaceImport` (validación previa del archivo) y `RunWorkspaceImport` (importers por contexto en orden topológico, una transacción, `RebuildBalanceSnapshots`, `VerifyLedgerIntegrity`, verificación contra el manifiesto, auditoría `identity.workspace.restored`, `WorkspaceRestored.v1`) (TC-IDENTITY-RESTORE-001..005)
+- [ ] 3.5 `RequestWorkspaceImport` (validación previa del archivo) y `RunWorkspaceImport` (importers por contexto en orden topológico, una transacción, `RebuildBalanceSnapshots`, `VerifyLedgerIntegrity`, verificación contra el manifiesto, auditoría `identity.workspace.restored`, `WorkspaceRestored.v1`) (TC-IDENTITY-RESTORE-001..005); rechazo del export demo con `EXPORT_FORMAT_UNSUPPORTED` y de archivos > 200 MB con 413 `UPLOAD_TOO_LARGE` (docs/33 D99, D100; TC-IDENTITY-RESTORE-006, TC-IDENTITY-RESTORE-007)
 
 ## 4. INFRASTRUCTURE
 

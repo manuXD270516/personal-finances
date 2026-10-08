@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Advertencias reconocidas explícitamente
 scenario: Advertencias reconocidas
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
   - FR-PLANNING-004
@@ -38,7 +38,7 @@ expected_result:
   - "Con reconocimiento: periodo closed"
   - El snapshot registra la advertencia de 3 porciones sin categoría por 210.00 BOB reconocida por ese EDITOR
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CLOSE-003 — Las advertencias deben reconocerse y quedan registradas en el snapshot

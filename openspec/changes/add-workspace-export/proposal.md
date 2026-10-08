@@ -41,7 +41,7 @@ El owner necesita poder llevarse **todos** sus datos financieros en un formato a
 
 **Invariantes afectadas:** INV-001/INV-003 (montos exactos con escala en el archivo), INV-004/INV-022 (saldos y balance reproducidos), INV-007/INV-011 (el import inserta historia inmutable; no actualiza nada), INV-025 (todo lo importado pertenece al workspace nuevo), INV-027 (idempotencia de la solicitud), INV-029 (auditoría).
 
-**Test cases:** AÑADIDOS — TC-IDENTITY-EXPORT-001..012 y TC-IDENTITY-RESTORE-001..005 (`draft`/`ready`, `not_automated`). MODIFICADOS — ninguno. DEPRECADOS — ninguno.
+**Test cases:** AÑADIDOS — TC-IDENTITY-EXPORT-001..012 y TC-IDENTITY-RESTORE-001..007 (`draft`/`ready`, `not_automated`). MODIFICADOS — ninguno. DEPRECADOS — ninguno.
 
 **Impacto de regresión:** cada change futuro que agregue una tabla de negocio DEBE agregar su sección al export/import y su esquema (regla en docs/03 §4 y test de arquitectura que compara `platform.workspace_scoped_table` con las secciones exportadas). El test nightly de ida y vuelta (NFR-REL-014) entra a la Financial Regression Suite.
 

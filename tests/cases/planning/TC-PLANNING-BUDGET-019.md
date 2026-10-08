@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Presupuesto como porcentaje de ingresos'
 scenario: 'Redondeo del porcentaje'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-020']
 nfr: []
 invariants: ['INV-020']
@@ -32,7 +32,7 @@ expected_result:
   - '10 % de reales 6500.00 ⇒ 650.00 BOB'
   - '12.5 % de 8000.50 ⇒ 1000.06 BOB (1000.0625 HALF_EVEN)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-019 — Un presupuesto por porcentaje de ingresos calcula su planificado con HALF_EVEN

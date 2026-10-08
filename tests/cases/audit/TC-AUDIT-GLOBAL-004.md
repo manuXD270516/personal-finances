@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: ["security/access-control"]
 requirement: "Auditoría de fallos de autorización"
 scenario: "VIEWER intenta registrar un gasto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-005]
 nfr: [NFR-SEC-003]
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - "El registro no contiene \"45.90\" ni \"Compra\""
   - "Si la escritura de auditoría falla, la respuesta sigue siendo 403"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-004 — Un rechazo por rol insuficiente queda auditado como evento de seguridad

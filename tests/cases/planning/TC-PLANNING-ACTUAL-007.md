@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Gasto real derivado de transacciones posteadas'
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023', 'FR-PLANNING-024']
 nfr: []
 invariants: ['INV-034', 'INV-028']
@@ -29,7 +29,7 @@ steps:
 expected_result:
   - 'Para toda secuencia: gastado(categoría) == Σ splits vigentes posteados de la categoría y sus subcategorías en el rango del periodo'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-007 — El gastado es igual a la suma de splits posteados para cualquier historia de eventos

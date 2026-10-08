@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["transactions/transaction-recording"]
 requirement: "Vista previa del alcance de la edición masiva"
 scenario: "Vista previa por filtro"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-TRANSACTIONS-012]
 nfr: []
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - "total 4; T1–T3 aplicables con su versión; T4 no aplicable con BULK_EDIT_NOT_APPLICABLE"
   - "Ninguna versión cambia y no hay auditoría nueva"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-002 — La vista previa informa alcance y aplicabilidad sin modificar nada

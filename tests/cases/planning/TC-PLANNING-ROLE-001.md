@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Autorización de comandos de periodos
 scenario: VIEWER intenta activar
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
 nfr:
@@ -38,7 +38,7 @@ expected_result:
   - VIEWER recibe 403 INSUFFICIENT_ROLE y "2026-11" sigue en draft
   - U3 recibe 403 WORKSPACE_ACCESS_DENIED sin datos
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ROLE-001 — Solo EDITOR u OWNER ejecutan comandos de periodos; el no miembro no ve periodos

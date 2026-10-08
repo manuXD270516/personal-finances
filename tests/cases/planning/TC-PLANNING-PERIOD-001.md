@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Periodo financiero mensual según el día de inicio
 scenario: Día de inicio 25 por fecha de cobro del salario
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-IDENTITY-005
@@ -48,7 +48,7 @@ expected_result:
   - "Día 28: 2027-01 = 2027-01-28..2027-02-27; 2027-02 = 2027-02-28..2027-03-27"
   - La etiqueta es el año y mes de la fecha de inicio
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-PERIOD-001 — El rango y la etiqueta del periodo se calculan según el día de inicio del mes financiero

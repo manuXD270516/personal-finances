@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['planning/financial-periods']
 requirement: 'Un plan mensual por periodo financiero'
 scenario: 'Segundo plan para el mismo periodo rechazado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-008', 'FR-PLANNING-015']
 nfr: []
 invariants: ['INV-025']
@@ -34,7 +34,7 @@ expected_result:
   - 'El segundo POST responde 409 BUDGET_ALREADY_EXISTS'
   - 'Sigue existiendo un único plan para "2026-11", sin cambios'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-001 — Se crea un único plan vacío por periodo y un segundo plan se rechaza

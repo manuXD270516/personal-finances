@@ -7,7 +7,7 @@ related_specs:
   - ledger/journal-posting
 requirement: Bloqueo del ledger en periodos cerrados
 scenario: Fechas anteriores al primer periodo cerrado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-005
   - FR-PLANNING-002
@@ -40,7 +40,7 @@ expected_result:
   - Se rechaza con PERIOD_CLOSED
   - No existe ningún periodo anterior a "2026-07"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-LOCK-003 — Tras cerrar el primer periodo se rechazan fechas anteriores y no se crean periodos hacia atrás

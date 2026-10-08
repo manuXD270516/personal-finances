@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['transactions/transaction-recording']
 requirement: 'Gasto real derivado de transacciones posteadas'
 scenario: 'Reembolso, pendiente y anulada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023', 'FR-PLANNING-024']
 nfr: []
 invariants: ['INV-023', 'INV-034']
@@ -34,7 +34,7 @@ steps:
 expected_result:
   - 'Gastado de "Restaurantes" 250.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-001 — El gastado neto incluye reembolsos y excluye pendientes y anuladas

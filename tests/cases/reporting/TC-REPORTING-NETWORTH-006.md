@@ -5,7 +5,7 @@ spec: reporting/net-worth
 related_specs: ["ledger/balances"]
 requirement: "Serie mensual del patrimonio neto"
 scenario: "Tres meses de patrimonio"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-REPORTING-006, FR-REPORTING-005]
 nfr: []
 invariants: [INV-022, INV-031]
@@ -36,7 +36,7 @@ expected_result:
   - "Marzo: activos 3720.00 y pasivos 150.00 BOB"
   - "Abril calculado al 2026-04-12 con partial true"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-REPORTING-NETWORTH-006 — La serie mensual informa el patrimonio de cada fin de mes

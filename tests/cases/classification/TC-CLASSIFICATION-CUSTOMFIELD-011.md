@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["security/access-control"]
 requirement: "Gestión de custom fields restringida por rol"
 scenario: "VIEWER intenta definir un custom field"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009, FR-IDENTITY-006]
 nfr: [NFR-SEC-003]
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - "Listar: 200 con \"centro_costo\""
   - "Definir y archivar: 403 INSUFFICIENT_ROLE"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-011 — Un VIEWER ve custom fields pero no puede gestionarlos

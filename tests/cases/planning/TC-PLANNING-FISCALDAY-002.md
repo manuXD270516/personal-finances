@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Cambio del día de inicio solo hacia adelante
 scenario: Cambio de día 25 a día 1
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-IDENTITY-005
@@ -37,7 +37,7 @@ expected_result:
   - '"2026-12" = 2026-12-01..2026-12-31'
   - Las etiquetas siguen siendo únicas y los periodos contiguos
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-FISCALDAY-002 — Cambiar el día de inicio de 25 a 1 crea un periodo de transición corto

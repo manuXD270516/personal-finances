@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["audit/audit-trail", "audit/lifecycle-timeline"]
 requirement: "Finalizar una sesión con diferencia cero"
 scenario: "Finalizar la reconciliación de marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-AUDIT-001]
 nfr: []
 invariants: [INV-023, INV-029, INV-033]
@@ -38,7 +38,7 @@ expected_result:
   - "ReconciliationCompleted.v1 publicado una vez"
   - "Con falla de auditoría: sesión IN_PROGRESS y nadie reconciled"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-006 — Finalizar con diferencia cero reconcilia lo confirmado de forma atómica

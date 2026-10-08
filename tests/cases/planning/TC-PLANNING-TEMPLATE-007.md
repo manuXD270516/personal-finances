@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets', 'classification/categories']
 requirement: 'Líneas con objetivos archivados se omiten al aplicar'
 scenario: 'Categoría Gimnasio archivada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-010', 'FR-PLANNING-011']
 nfr: []
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - 'omittedLines informa "Gimnasio" con motivo TARGET_ARCHIVED'
   - 'La versión 2 sigue incluyendo "Gimnasio"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-007 — Al aplicar un template se omiten e informan las líneas con categorías archivadas

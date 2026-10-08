@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Modificar solo el plan actual'
 scenario: 'Ajuste local de noviembre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-013']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - '"Mes estándar" versión 2 y "2026-12" siguen con 1600.00 BOB'
   - 'No se crea versión nueva del template'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-013 — Editar el plan actual no modifica el template ni otros periodos

@@ -7,7 +7,7 @@ related_specs:
   - audit/lifecycle-timeline
 requirement: Auditoría y evento de los cambios de periodo
 scenario: Recálculo auditado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-AUDIT-001
   - FR-AUDIT-009
@@ -40,7 +40,7 @@ expected_result:
   - La segunda ejecución no escribe auditoría ni transición
   - El recálculo de "2026-12" se audita con el rango anterior 2026-12-01..2026-12-31 y el nuevo 2026-12-25..2027-01-24
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-AUDIT-001 — La activación y el recálculo de periodos se auditan una sola vez

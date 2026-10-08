@@ -143,7 +143,7 @@ Trace: FR-PLANNING-023, FR-REPORTING-002 · Priority: Must
 - **Y** el gastado no es 346.00 BOB
 
 ### Requirement: Progreso por línea con restante, porcentaje y proyección
-Para cada línea el sistema DEBE (MUST) mostrar planificado efectivo, gastado, restante, porcentaje de uso (gastado / planificado × 100, un decimal HALF_EVEN) y proyección lineal al fin del periodo (gastado / días transcurridos × días del periodo, en la zona del workspace); con planificado 0.00 el porcentaje DEBE (MUST) quedar sin definir y la línea marcarse "sin presupuesto".
+Para cada línea el sistema DEBE (MUST) mostrar planificado efectivo, gastado, restante y porcentaje de uso (gastado / planificado × 100, un decimal HALF_EVEN); las líneas de máximo, rango y porcentaje de ingresos DEBEN (MUST) mostrar además la proyección lineal al fin del periodo (gastado / días transcurridos × días del periodo, en la zona del workspace), y las líneas fijas y de mínimo NO DEBEN (MUST NOT) proyectar: DEBEN (MUST) mostrarse como pendientes mientras el gastado no alcance su monto de referencia y como cumplidas cuando lo alcance; con planificado 0.00 el porcentaje DEBE (MUST) quedar sin definir y la línea marcarse "sin presupuesto".
 Trace: FR-PLANNING-024 · Priority: Must
 
 #### Scenario: Proyección a mitad de mes
@@ -154,6 +154,11 @@ Trace: FR-PLANNING-024 · Priority: Must
 #### Scenario: Periodo terminado
 - **CUANDO** se consulta "Supermercado" de "2026-10" el 2026-11-10 con gastado 1320.00 BOB
 - **ENTONCES** la proyección es igual al gastado, 1320.00 BOB
+
+#### Scenario: Línea fija sin proyección
+- **CUANDO** "Alquiler" tiene un fijo de 2800.00 BOB, se pagaron 2800.00 BOB el 2026-11-01 y se consulta el 2026-11-02 (2 de 30 días transcurridos)
+- **ENTONCES** la línea no muestra proyección (y no 42000.00 BOB) y se muestra cumplida, con restante 0.00 BOB y 100.0 %
+- **Y** el 2026-11-01, antes del pago, la misma línea se mostraba pendiente, sin proyección
 
 #### Scenario: Línea sin presupuesto con gasto
 - **CUANDO** "Regalos" tiene planificado 0.00 BOB y gastado 40.00 BOB

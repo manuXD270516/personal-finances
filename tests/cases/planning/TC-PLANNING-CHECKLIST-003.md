@@ -6,7 +6,7 @@ related_specs:
   - transactions/reconciliation
 requirement: Cuentas conciliadas a diferencia cero
 scenario: Cuentas conciliadas, pendientes y exentas
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
   - FR-TRANSACTIONS-030
@@ -45,7 +45,7 @@ expected_result:
   - '"Bank A" conciliada, "USD Savings" sin conciliar, "Caja chica" no exigida'
   - Tras el gasto retroactivo, "Bank A" vuelve a aparecer sin conciliar
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CHECKLIST-003 — Una cuenta cuenta como conciliada solo con conciliación a diferencia cero hasta el fin del periodo

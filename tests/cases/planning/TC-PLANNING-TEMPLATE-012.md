@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Template por defecto aplicado a los periodos nuevos'
 scenario: 'Un solo predeterminado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-010']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - '"Mes de vacaciones" es el predeterminado y "Mes estándar" deja de serlo'
   - 'Nunca hay dos predeterminados (índice único parcial)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-012 — Solo un template activo puede ser el predeterminado

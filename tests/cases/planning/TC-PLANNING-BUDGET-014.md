@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['classification/categories']
 requirement: 'Presupuesto por grupo de categorías'
 scenario: 'Grupo Vivienda'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-016']
 nfr: []
 invariants: ['INV-034']
@@ -31,7 +31,7 @@ expected_result:
   - 'Gastado del grupo "Vivienda" 3110.00 BOB'
   - 'Restante 90.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-014 — El presupuesto de un grupo suma sus categorías y subcategorías

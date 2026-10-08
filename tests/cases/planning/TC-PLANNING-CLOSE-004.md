@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Cierre en orden cronológico
 scenario: Cerrar noviembre con octubre abierto
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-PLANNING-004
@@ -38,7 +38,7 @@ expected_result:
   - '"2026-11" se rechaza con PERIOD_PREVIOUS_NOT_CLOSED y sigue active'
   - '"2026-07" se cierra sin periodo anterior'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CLOSE-004 — Los periodos se cierran en orden cronológico

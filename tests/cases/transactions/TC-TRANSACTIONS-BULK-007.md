@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["audit/audit-trail"]
 requirement: "Auditoría de la edición masiva con identificador común"
 scenario: "Auditoría de tres recategorizaciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-AUDIT-001, FR-AUDIT-002]
 nfr: []
 invariants: [INV-029]
@@ -36,7 +36,7 @@ expected_result:
   - "Los 4 comparten correlation_id"
   - "Con falla: ninguna transacción cambia"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-007 — Cada transacción editada en lote se audita con el identificador de operación común

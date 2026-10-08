@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["audit/audit-trail"]
 requirement: "Auditoría de exportaciones e importaciones"
 scenario: "Ciclo auditado de un export"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-005, FR-AUDIT-001, FR-IDENTITY-010]
 nfr: []
 invariants: [INV-029]
@@ -32,7 +32,7 @@ expected_result:
   - "Cinco registros en orden: identity.export.requested, identity.export.completed, identity.export.downloaded ×2, identity.export.expired"
   - "Ninguno contiene contenido exportado"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-009 — Todo el ciclo de un export queda auditado en orden

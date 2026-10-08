@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Umbrales de alerta por línea'
 scenario: 'Umbrales por defecto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: []
 invariants: []
@@ -28,7 +28,7 @@ steps:
 expected_result:
   - 'La línea tiene los umbrales 50, 75, 90 y 100 %'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-001 — Una línea nueva de gasto recibe los umbrales 50, 75, 90 y 100 por defecto

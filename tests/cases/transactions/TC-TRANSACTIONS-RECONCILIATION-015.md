@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["audit/lifecycle-timeline"]
 requirement: "Des-reconciliación explícita y auditada"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-006, FR-AUDIT-001]
 nfr: []
 invariants: [INV-015, INV-029]
@@ -37,7 +37,7 @@ expected_result:
   - "Estado de \"Bank A\": G1 cuenta como no reconciliado"
   - "I1: 409 PERIOD_CLOSED y sigue reconciled"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-015 — Des-reconciliar tras completar anota la sesión y respeta periodos cerrados

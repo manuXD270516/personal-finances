@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Exportación del reporte de cierre
 scenario: Exportar el snapshot 1 de octubre en CSV
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
 nfr: []
@@ -41,7 +41,7 @@ expected_result:
   - PDF con KPIs, saldos por cuenta y aviso de versión anterior
   - Content-Type text/csv y application/pdf con Content-Disposition
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-REPORT-003 — El reporte de cierre se exporta en CSV y PDF con montos decimales y su moneda

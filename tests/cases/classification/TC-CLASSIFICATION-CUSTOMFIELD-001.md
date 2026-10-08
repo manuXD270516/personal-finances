@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: []
 requirement: "Definir un custom field"
 scenario: "Definir el centro de costo de las transacciones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009]
 nfr: []
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "Aparece en el listado de transacciones"
   - "Segunda: 400 VALIDATION_FAILED"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-001 — Definir un custom field de selección para transacciones

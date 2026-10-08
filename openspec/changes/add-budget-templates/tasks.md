@@ -4,7 +4,7 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner la spec `planning/budget-templates` y las preguntas abiertas 1–6 de design.md; registrar decisiones en docs/31 (Phase 2) y verificar con `openspec validate add-budget-templates --strict`
+- [ ] 1.1 Revisar con el owner la spec `planning/budget-templates` y las preguntas abiertas 1–6 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-budget-templates --strict`
 - [ ] 1.2 Revisar TC-PLANNING-TEMPLATE-001..019 contra los scenarios (fechas fijas, `FixedClock`); pasar a `ready`/`confirmed` tras la revisión; `pnpm traceability:check` sin requirements Must sin TC
 - [ ] 1.3 Verificar contra `add-financial-periods` (contrato consolidado el 2026-10-05: declara e invoca `PeriodCreatedHook` en la Unit of Work de `EnsurePeriods`, expone `PeriodQuery.getPrevious` y `listPeriods(status=DRAFT)`) que el participante de este change cumple el contrato
 

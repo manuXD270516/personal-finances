@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['planning/financial-periods']
 requirement: 'Un plan mensual por periodo financiero'
 scenario: 'Periodo cerrado no admite plan nuevo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-008', 'FR-PLANNING-005']
 nfr: []
 invariants: ['INV-015']
@@ -31,7 +31,7 @@ expected_result:
   - 'Responde 409 PERIOD_CLOSED'
   - 'No existe plan para "2026-09"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-002 — No se crea un plan para un periodo cerrado

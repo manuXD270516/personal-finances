@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Extiende el recorrido trazable (docs/31 D37) a la sesión de reconciliación, nuevo agregado con ciclo de vida de Phase 2, y hace visible en el recorrido de cada transacción en qué sesión y contra qué extracto se reconcilió.
+Extiende el recorrido trazable (docs/31 D37) a la sesión de reconciliación, nuevo agregado con ciclo de vida de Phase 2, y hace visible en el recorrido de cada transacción en qué sesión y contra qué extracto se reconcilió, o si se concilió sin extracto (docs/33 D74).
 
 ## ADDED Requirements
 
@@ -30,3 +30,15 @@ Trace: FR-AUDIT-010, FR-TRANSACTIONS-030, FR-TRANSACTIONS-006 · Priority: Must
 #### Scenario: Recorrido del ajuste de una sesión
 - **CUANDO** se consulta el recorrido del ajuste de 5.00 BOB creado al finalizar la sesión al 2026-03-31
 - **ENTONCES** muestra registrar (con su asiento) y reconciliar, ambas referenciando esa sesión
+
+### Requirement: Conciliación sin extracto en el recorrido de una transacción
+La máquina de estados de las transacciones DEBE (MUST) declarar la transición "conciliar sin extracto" (`cleared` a `reconciled`, con guarda de modo explícito y periodo abierto), distinta de "reconciliar" (que exige una sesión), y el recorrido de una transacción conciliada sin extracto DEBE (MUST) mostrarla con actor, instante y modo; un cotejo posterior por una sesión DEBE (MUST) aparecer como anotación que referencia esa sesión, sin una transición nueva, y des-reconciliar DEBE (MUST) mostrarse como la transición des-reconciliar con su motivo.
+Trace: FR-AUDIT-009, FR-AUDIT-010, FR-TRANSACTIONS-006, FR-TRANSACTIONS-030 · Priority: Must
+
+#### Scenario: Definición de la máquina con la conciliación sin extracto
+- **CUANDO** el usuario consulta la definición de la máquina de estados de las transacciones
+- **ENTONCES** la transición "conciliar sin extracto" figura de `cleared` a `reconciled` con su guarda, separada de "reconciliar"
+
+#### Scenario: Recorrido de un gasto conciliado sin extracto y cotejado después
+- **CUANDO** el gasto de 45.90 BOB del 2026-03-20 de "Bank A" se registró posteado, se confirmó, se concilió sin extracto y luego lo cotejó la sesión de "Bank A" al 2026-03-31 por 3304.10 BOB
+- **ENTONCES** su recorrido muestra registrar, confirmar y conciliar sin extracto en orden, y una anotación de cotejo que enlaza la sesión al 2026-03-31

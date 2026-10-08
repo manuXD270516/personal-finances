@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["identity/workspace-membership"]
 requirement: "Importar un export en un workspace nuevo"
 scenario: "Importar el export de \"W1\""
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-017]
 nfr: [NFR-REL-014]
 invariants: [INV-025]
@@ -36,7 +36,7 @@ expected_result:
   - "Mismas cuentas, categorías, transacciones y asientos; ningún id coincide con los de \"W1\""
   - "\"W1\" sin cambios (conteos y versión de datos iguales)"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-RESTORE-001 — Importar un export crea un workspace nuevo con identificadores nuevos

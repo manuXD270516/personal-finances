@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: []
 requirement: "Iniciar una sesión de reconciliación"
 scenario: "Segunda sesión en curso para la misma cuenta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-IDENTITY-006]
 nfr: [NFR-SEC-003]
 invariants: []
@@ -42,7 +42,7 @@ expected_result:
   - "403 INSUFFICIENT_ROLE"
   - "En ningún caso se crea una sesión"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-002 — La sesión rechaza duplicados, fechas inválidas, escala excedida y rol VIEWER

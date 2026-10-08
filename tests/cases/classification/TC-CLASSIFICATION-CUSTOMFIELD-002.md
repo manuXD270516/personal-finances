@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: []
 requirement: "Clave única e inmutable del custom field"
 scenario: "Clave repetida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009]
 nfr: []
 invariants: []
@@ -38,7 +38,7 @@ expected_result:
   - "Etiqueta cambiada; el gasto sigue con \"oficina\""
   - "Clave inválida: 400 VALIDATION_FAILED"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-002 — La clave del custom field es única entre las activas e inmutable

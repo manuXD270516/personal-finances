@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Email entregado una sola vez'
 scenario: 'Reintento tras envío aceptado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002', 'FR-NOTIFY-005']
 nfr: ['NFR-REL-007']
 invariants: ['INV-028']
@@ -30,7 +30,7 @@ expected_result:
   - 'Mailpit contiene un solo email para esa notificación'
   - 'La entrega sigue SENT con attempts = 1'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-005 — Repetir el despacho de un email ya aceptado no envía un segundo email

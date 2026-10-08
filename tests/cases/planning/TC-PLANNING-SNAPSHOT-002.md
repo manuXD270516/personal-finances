@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Snapshot de cierre inmutable
 scenario: Intento de modificar un snapshot en la base de datos
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
 nfr:
@@ -43,7 +43,7 @@ expected_result:
   - Ambas sentencias se rechazan (42501 por grants o PF003 por trigger)
   - El snapshot sigue con 5200.00 BOB
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-SNAPSHOT-002 — La base de datos rechaza modificar o eliminar un snapshot de cierre

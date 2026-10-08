@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Horario de silencio difiere los emails'
 scenario: 'Silencio de 22:00 a 07:00'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-003']
 nfr: ['NFR-USAB-004']
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'La entrega por email queda PENDING con not_before 2026-11-13T11:00:00Z'
   - 'El email se envía a partir de las 07:00 del 13 (hora de La Paz)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-PREFS-002 — El horario de silencio difiere el email hasta su fin sin demorar el in-app

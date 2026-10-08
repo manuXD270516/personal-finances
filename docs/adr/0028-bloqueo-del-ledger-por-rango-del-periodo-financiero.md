@@ -1,9 +1,9 @@
 # ADR-0028: Bloqueo del ledger por el rango del periodo financiero
 
-- Estado: Propuesto
+- Estado: Aceptado (2026-10-08, decisión del owner D107; propuesto el 2026-10-05)
 - Fecha: 2026-10-05
 - Decisores: Owner (Product/Tech Lead)
-- Relacionado: docs/31-phase-1-consolidation-decisions.md (D10, D19, D23, D49); docs/09-ledger-design.md §10 e INV-015; docs/08-data-model.md §5.3 (`ledger.period_lock`) y §5.6; docs/14-reporting.md §2; ADR-0004, ADR-0023; OpenSpec changes `add-financial-periods` (`planning/financial-periods`) y `add-month-closing` (`planning/month-closing`, modifica `ledger/journal-posting`)
+- Relacionado: docs/31-phase-1-consolidation-decisions.md (D10, D19, D23, D49); docs/33-phase-2-consolidation-decisions.md (D107); docs/09-ledger-design.md §10 e INV-015; docs/08-data-model.md §5.3 (`ledger.period_lock`) y §5.6; docs/14-reporting.md §2; ADR-0004, ADR-0023; OpenSpec changes `add-financial-periods` (`planning/financial-periods`) y `add-month-closing` (`planning/month-closing`, modifica `ledger/journal-posting`)
 
 ## Contexto y problema
 
@@ -26,7 +26,7 @@ Desde Phase 1 el workspace también tiene un **día de inicio del mes financiero
 
 ## Decisión
 
-Opción 1 (propuesta). `ledger.period_lock` pasa a representar el **rango inclusivo de un periodo financiero cerrado**: columnas nuevas `period_start date NOT NULL` y `period_end date NOT NULL`, exclusión gist `(workspace_id WITH =, daterange(period_start, period_end, '[]') WITH &&)`, y la clave primaria `(workspace_id, year_month)` se mantiene con `year_month` = etiqueta del periodo. El primer periodo cerrado de un workspace se bloquea con `period_start = '-infinity'` (todo lo anterior al primer periodo queda protegido: el cierre es en orden). `ledger.assert_period_open()` y `PeriodLockRepository.isLocked(workspaceId, date)` pasan a comparar por rango. `LedgerPeriodLockPort.lockPeriod` recibe `periodStart`/`periodEnd` (opcionales: si faltan, el rango es el mes calendario de `yearMonth`, que es exactamente el comportamiento de Phase 1).
+Opción 1 (aceptada por el owner el 2026-10-08, docs/33 D107). `ledger.period_lock` pasa a representar el **rango inclusivo de un periodo financiero cerrado**: columnas nuevas `period_start date NOT NULL` y `period_end date NOT NULL`, exclusión gist `(workspace_id WITH =, daterange(period_start, period_end, '[]') WITH &&)`, y la clave primaria `(workspace_id, year_month)` se mantiene con `year_month` = etiqueta del periodo. El primer periodo cerrado de un workspace se bloquea con `period_start = '-infinity'` (todo lo anterior al primer periodo queda protegido: el cierre es en orden). `ledger.assert_period_open()` y `PeriodLockRepository.isLocked(workspaceId, date)` pasan a comparar por rango. `LedgerPeriodLockPort.lockPeriod` recibe `periodStart`/`periodEnd` (opcionales: si faltan, el rango es el mes calendario de `yearMonth`, que es exactamente el comportamiento de Phase 1).
 
 Con día de inicio 1 el comportamiento observable es **idéntico** al de D10. Esta decisión **enmienda D10** (el bloqueo sigue siendo "uno por periodo mensual", pero el periodo es el financiero, no el calendario).
 
@@ -66,3 +66,4 @@ Con día de inicio 1 el comportamiento observable es **idéntico** al de D10. Es
 
 - 2026-10-05: propuesto por el bloque pf-p2a de specs de Phase 2 (`add-month-closing`). Requiere confirmación del owner (pregunta P-A7 de `add-month-closing`). Si se rechaza, se aplica la Opción 2 y `add-month-closing` agrega el rechazo del cierre con día de inicio ≠ 1.
 - El número 0028 es el siguiente libre a la fecha; si otro change de Phase 2 propone un ADR en paralelo, el lead renumera al consolidar.
+- 2026-10-08: **aceptado** por el owner (docs/33 D107, pregunta 49 de docs/32). Se descarta la Opción 2; `add-month-closing` implementa la Opción 1.

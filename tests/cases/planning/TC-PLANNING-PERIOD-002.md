@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Periodos contiguos y sin solapamiento
 scenario: Secuencia de periodos con día de inicio 25
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-PLANNING-002
@@ -40,7 +40,7 @@ expected_result:
   - Las etiquetas son únicas
   - La inserción solapada se rechaza en la BD y los periodos no cambian
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-PERIOD-002 — Los periodos son contiguos, sin solapamiento y cada fecha pertenece a exactamente uno

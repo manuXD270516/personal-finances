@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Emails sin montos salvo opt-in explícito'
 scenario: 'Email sin detalles por defecto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-006']
 nfr: ['NFR-COMP-001']
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Ni asunto ni cuerpos contienen "Restaurantes", "550", "600" ni "BOB"'
   - 'El in-app sí muestra los detalles'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-001 — El email por defecto no contiene montos, categorías ni moneda

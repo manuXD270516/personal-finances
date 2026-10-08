@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Crear el plan clonando el plan del periodo anterior'
 scenario: 'Noviembre clonado a diciembre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-011']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Sin cruces registrados en "2026-12"'
   - 'Origen: plan de "2026-11"; conserva el template de origen'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-008 — Clonar el plan anterior copia líneas y umbrales pero no cruces ni gastado

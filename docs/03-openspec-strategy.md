@@ -113,7 +113,7 @@ Definida en [ARCHITECTURE.md §14](ARCHITECTURE.md). Organización por bounded c
 
 Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, docs/31 D29, y el 2b `add-event-outbox`, agregado el 2026-10-03, docs/31 D30; los 11 `add-lifecycle-timeline` y 12 `add-demo-data` se agregaron el 2026-10-03 por decisión del owner, docs/31 D37 y D36) se redactaron **después** de aprobar el DESIGN GATE (sección 56 del brief), reutilizando FR, invariantes y TCs ya diseñados en Phase 0. La columna **Orden** es el orden de **implementación** (cada change se aplica sobre los anteriores), fijado en [31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md) (D24).
 
-**Phase 2 (consolidado el 2026-10-05).** Los 11 changes de Phase 2 se redactaron en paralelo en tres hilos y se consolidaron en un único orden de implementación; las preguntas abiertas al owner están en [32-phase-2-consolidation-questions.md](32-phase-2-consolidation-questions.md).
+**Phase 2 (consolidado el 2026-10-05).** Los 11 changes de Phase 2 se redactaron en paralelo en tres hilos y se consolidaron en un único orden de implementación; las preguntas abiertas al owner están en [32-phase-2-consolidation-questions.md](32-phase-2-consolidation-questions.md) y el owner las resolvió el 2026-10-08 (decisiones D59–D111 en [33-phase-2-consolidation-decisions.md](33-phase-2-consolidation-decisions.md)).
 
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|

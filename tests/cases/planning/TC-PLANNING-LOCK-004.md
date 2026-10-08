@@ -9,7 +9,7 @@ related_specs:
   - classification/custom-fields
 requirement: Alcance de la edición en periodos cerrados
 scenario: Clasificación de un gasto de un mes cerrado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-005
   - FR-TRANSACTIONS-033
@@ -49,7 +49,7 @@ expected_result:
   - El cambio de notas y descripción se acepta y queda auditado
   - 'El saldo de "Bank A" al 2026-10-31 y el snapshot vigente de "2026-10" no cambian'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-LOCK-004 — En un periodo cerrado se rechazan las ediciones de clasificación y estado y se permiten las descriptivas

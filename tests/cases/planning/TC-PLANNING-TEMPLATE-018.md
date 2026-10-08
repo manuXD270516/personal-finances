@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Archivar un template'
 scenario: 'Template archivado no aplicable'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-009']
 nfr: []
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - 'DELETE responde 405 METHOD_NOT_ALLOWED'
   - 'Los planes previos siguen indicando "Mes de vacaciones" versión 1'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-018 — Un template archivado no se aplica y sus planes conservan el origen

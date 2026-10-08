@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: []
 requirement: "Cancelar una sesión de reconciliación"
 scenario: "Cancelar y empezar de nuevo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030]
 nfr: []
 invariants: []
@@ -37,7 +37,7 @@ expected_result:
   - "Nueva sesión creada"
   - "S0: 409 INVALID_STATUS_TRANSITION"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-009 — Cancelar una sesión conserva las marcas cleared y permite empezar otra

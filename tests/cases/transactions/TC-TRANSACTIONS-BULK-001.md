@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["classification/categories", "classification/tags"]
 requirement: "Edición masiva de clasificación"
 scenario: "Recategorizar y etiquetar tres gastos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-CLASSIFICATION-008]
 nfr: []
 invariants: [INV-033, INV-019]
@@ -36,7 +36,7 @@ expected_result:
   - "Marzo: \"Supermercado\" −395.90 BOB y \"Hogar\" +395.90 BOB"
   - "\"Mascotas\": 409 CATEGORY_ARCHIVED; \"Sueldo\": 422 CATEGORY_KIND_MISMATCH; nada cambia"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-001 — La edición masiva recategoriza y etiqueta varias transacciones a la vez

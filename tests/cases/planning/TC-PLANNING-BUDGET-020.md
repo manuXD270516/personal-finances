@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Plan base cero con monto por asignar'
 scenario: 'Por asignar hasta cero'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-021']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - 'Por asignar 500.00 BOB'
   - 'Tras agregar la línea, por asignar 0.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-020 — Un plan base cero muestra el monto por asignar hasta llegar a cero

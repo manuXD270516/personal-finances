@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['classification/categories', 'transactions/transaction-recording']
 requirement: 'Presupuesto por categoría con sus subcategorías'
 scenario: 'Gasto de la subcategoría incluido'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-015', 'FR-PLANNING-024']
 nfr: []
 invariants: ['INV-034']
@@ -33,7 +33,7 @@ expected_result:
   - 'El gastado de "Supermercado" es 550.00 BOB (400.00 + 150.00)'
   - 'El gasto de "Restaurantes" y el del 2026-10-31 no cuentan'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-003 — El presupuesto de una categoría incluye sus subcategorías y solo el gasto del periodo

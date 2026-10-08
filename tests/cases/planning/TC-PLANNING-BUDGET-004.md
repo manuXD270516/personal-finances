@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Ingresos esperados en el plan'
 scenario: 'Salario esperado y recibido parcialmente'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-008']
 nfr: []
 invariants: ['INV-034']
@@ -34,7 +34,7 @@ expected_result:
   - 'La línea muestra esperado 8000.00 BOB, real 6500.00 BOB y diferencia −1500.00 BOB'
   - 'La línea de ingreso con tipo máximo se rechaza con BUDGET_INVALID_LINE_KIND'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-004 — Las líneas de ingreso esperado comparan real y esperado y solo admiten tipo fijo

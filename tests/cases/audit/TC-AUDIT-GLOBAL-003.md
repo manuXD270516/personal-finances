@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: ["audit/lifecycle-timeline"]
 requirement: "Exportación CSV del log de auditoría"
 scenario: "El OWNER exporta los cambios de marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-006, FR-AUDIT-005]
 nfr: [NFR-SEC-015]
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - "EDITOR: 403 INSUFFICIENT_ROLE"
   - "50001 registros: 400 VALIDATION_FAILED"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-003 — El OWNER exporta el log a CSV con zona horaria y celdas neutralizadas

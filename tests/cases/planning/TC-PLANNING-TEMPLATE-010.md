@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets', 'planning/financial-periods']
 requirement: 'Template por defecto aplicado a los periodos nuevos'
 scenario: 'Diciembre creado automáticamente con el predeterminado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-010', 'FR-PLANNING-002']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Origen "Mes estándar" versión 2'
   - 'Sin predeterminado, el periodo se crea sin plan'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-010 — Un periodo creado automáticamente recibe el plan del template predeterminado

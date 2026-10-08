@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Preferencias por tipo y canal'
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-003', 'FR-NOTIFY-006']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - 'includeDetailsInEmail false'
   - 'quietHours null'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-PREFS-003 — Las preferencias por defecto activan ambos canales sin detalles en el email

@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Retención y expiración del export"
 scenario: "Descargar un export vencido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-COMP-005]
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "Descarga: 410 EXPORT_EXPIRED"
   - "El registro conserva fechas, tamaño y sha256"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-007 — Un export vencido no se descarga y su archivo se elimina del almacenamiento

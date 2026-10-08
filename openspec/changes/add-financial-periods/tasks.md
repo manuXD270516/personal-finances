@@ -4,7 +4,7 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar `specs/planning/financial-periods/spec.md` con el owner y cerrar P-A1..P-A6; verificar con `pnpm spec:validate`
+- [ ] 1.1 Revisar `specs/planning/financial-periods/spec.md` con el owner (P-A1..P-A6 resueltas el 2026-10-08, docs/33 D59–D64); verificar con `pnpm spec:validate`
 - [ ] 1.2 Confirmar los 19 TC AÑADIDOS de proposal.md en `tests/cases/planning/` (`requirement_status: confirmed`, `status: ready`); verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC no deprecado
 - [ ] 1.3 Consolidar en `contracts/` los cambios de design.md §Contratos (OpenAPI y `contracts/events/planning/PeriodActivated.v1.schema.json`); verificar Spectral y `oasdiff` sin cambios incompatibles
 

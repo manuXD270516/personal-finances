@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["ledger/balances"]
 requirement: "Instantánea consistente del export"
 scenario: "Gasto registrado durante la exportación"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-REL-014]
 invariants: [INV-022]
@@ -34,7 +34,7 @@ expected_result:
   - "manifest.verification informa \"Bank A\" 3099.10 BOB"
   - "El balance de comprobación del manifiesto suma 0 por moneda"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-004 — El export refleja una instantánea consistente aunque haya escrituras concurrentes

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['classification/tags']
 requirement: 'Presupuesto por tag'
 scenario: 'Tag de viaje'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-017']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - 'Gastado del tag 1500.00 BOB'
   - 'El disponible para gastar no incluye la línea del tag'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-021 — Un presupuesto por tag suma gastos de varias categorías y no entra al disponible

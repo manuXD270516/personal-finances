@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Creación anticipada a pedido
 scenario: Planificar el año siguiente
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-002
 nfr: []
@@ -37,7 +37,7 @@ expected_result:
   - La repetición no crea periodos nuevos
   - El pedido hasta 2029-01-01 responde 400 VALIDATION_FAILED sin crear periodos
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-AUTOCREATE-003 — El EDITOR puede pedir periodos hasta una fecha dentro de 24 meses

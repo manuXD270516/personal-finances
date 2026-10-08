@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Comparación entre versiones del snapshot
 scenario: Diferencias entre el snapshot 1 y el 2 de octubre
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-006
   - FR-PLANNING-004
@@ -33,7 +33,7 @@ steps:
 expected_result:
   - Bank A -15.00 BOB; gastos consolidados +15.00 BOB; ahorro -15.00 BOB; patrimonio neto -15.00 BOB
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-RECLOSE-002 — La comparación entre versiones muestra las diferencias exactas

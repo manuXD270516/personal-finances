@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Severidad configurable de los ítems del checklist
 scenario: OWNER endurece la política
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
 nfr: []
@@ -44,7 +44,7 @@ expected_result:
   - Tras el cambio del OWNER el ítem UNCATEGORIZED aparece bloqueante y la auditoría registra WARNING -> BLOCKING
   - El EDITOR recibe 403 INSUFFICIENT_ROLE y la política no cambia
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CHECKLIST-002 — La política de cierre por defecto y su cambio solo por el OWNER

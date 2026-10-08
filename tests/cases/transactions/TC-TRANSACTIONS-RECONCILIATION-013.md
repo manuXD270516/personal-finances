@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: []
 requirement: "Bloqueo optimista de la sesión"
 scenario: "Finalizar con una versión obsoleta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-011, FR-TRANSACTIONS-030]
 nfr: [NFR-DATA-014]
 invariants: []
@@ -36,7 +36,7 @@ expected_result:
   - "412 PRECONDITION_FAILED; sesión IN_PROGRESS"
   - "Tras la corrección: saldo confirmado 3500.00 BOB y 422 RECONCILIATION_DIFFERENCE_NOT_ZERO con difference \"-150.00\""
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-013 — Finalizar con una versión obsoleta de la sesión se rechaza

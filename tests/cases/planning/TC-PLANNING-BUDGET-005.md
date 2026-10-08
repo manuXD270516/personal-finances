@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Presupuesto de tipo fijo'
 scenario: 'Alquiler pagado exacto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-018']
 nfr: []
 invariants: ['INV-020']
@@ -31,7 +31,7 @@ expected_result:
   - 'Con 2800.00 BOB: en el objetivo, restante 0.00 BOB, 100.0 %'
   - 'Con 2700.00 BOB: por debajo del objetivo, restante 100.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-005 — Un presupuesto fijo informa objetivo cumplido o por debajo con su restante

@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Autorización del cierre
 scenario: VIEWER intenta cerrar
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
   - FR-PLANNING-004
@@ -36,7 +36,7 @@ expected_result:
   - 'Cierre: 403 INSUFFICIENT_ROLE y "2026-10" sigue active'
   - "Checklist: 200"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ROLE-002 — El VIEWER consulta el checklist pero no puede cerrar

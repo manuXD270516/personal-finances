@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["planning/month-closing"]
 requirement: "Custom fields de transacciones en periodos cerrados"
 scenario: "Cambiar el centro de costo en marzo cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009, FR-PLANNING-005]
 nfr: []
 invariants: [INV-015]
@@ -30,7 +30,7 @@ steps:
 expected_result:
   - "409 PERIOD_CLOSED; valor \"casa\"; sin auditoría"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-010 — No se cambian custom fields de transacciones de un mes cerrado

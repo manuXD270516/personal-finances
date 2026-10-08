@@ -4,7 +4,7 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner los requirements añadidos a `audit/audit-trail` y las preguntas abiertas 1–2 de design.md; verificar con `openspec validate add-global-audit-view --strict`
+- [ ] 1.1 Revisar con el owner los requirements añadidos a `audit/audit-trail` y las preguntas abiertas 1–2 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-global-audit-view --strict`
 - [ ] 1.2 Revisar TC-AUDIT-GLOBAL-001..007; pasar a `ready` y `requirement_status: confirmed` al aprobar
 
 ## 2. DOMAIN (TDD)

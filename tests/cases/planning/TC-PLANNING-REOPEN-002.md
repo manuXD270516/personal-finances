@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Reapertura auditada solo por el OWNER
 scenario: EDITOR intenta reabrir
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-006
 nfr:
@@ -40,7 +40,7 @@ expected_result:
   - "OWNER sin motivo: 400 VALIDATION_FAILED"
   - '"2026-10" sigue closed en ambos casos'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-REOPEN-002 — La reapertura exige rol OWNER y motivo

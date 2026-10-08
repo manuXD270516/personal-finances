@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: []
 requirement: "Diferencia distinta de cero y ajuste de reconciliación"
 scenario: "Finalizar con diferencia sin ajuste"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030]
 nfr: []
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "422 RECONCILIATION_DIFFERENCE_NOT_ZERO con difference \"-5.00\""
   - "Sesión IN_PROGRESS; ninguna transacción reconciled; sin auditoría nueva"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-007 — Finalizar con diferencia distinta de cero sin ajuste se rechaza

@@ -6,7 +6,7 @@ related_specs:
   - audit/lifecycle-timeline
 requirement: Ciclo de vida declarado del periodo
 scenario: Cerrar un periodo en borrador
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
   - FR-AUDIT-009
@@ -41,7 +41,7 @@ expected_result:
   - Cada comando se rechaza con INVALID_STATUS_TRANSITION
   - Los estados no cambian y no se registra ninguna transición
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-STATE-001 — Las transiciones no declaradas del periodo se rechazan con INVALID_STATUS_TRANSITION

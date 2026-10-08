@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "La ida y vuelta reproduce saldos e historia"
 scenario: "Verificación fallida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-017]
 nfr: [NFR-REL-014]
 invariants: [INV-022]
@@ -31,7 +31,7 @@ expected_result:
   - "La importación termina FAILED con EXPORT_VERIFICATION_FAILED"
   - "No hay workspace nuevo visible ni filas con su workspace_id (rollback)"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-RESTORE-003 — Una verificación fallida de la importación no deja ningún workspace visible

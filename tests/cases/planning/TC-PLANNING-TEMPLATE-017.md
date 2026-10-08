@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets', 'planning/financial-periods']
 requirement: 'Propagación limitada a periodos futuros en borrador'
 scenario: 'Octubre cerrado y noviembre activo intactos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-014']
 nfr: []
 invariants: ['INV-015']
@@ -31,7 +31,7 @@ expected_result:
   - '"2026-10" y "2026-11" conservan 2800.00 BOB'
   - 'Para toda secuencia, ningún plan de periodo no borrador cambia'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-017 — La propagación nunca toca periodos cerrados, reabiertos ni activos

@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Crear el plan de un periodo desde un template'
 scenario: 'El periodo ya tiene plan'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-010']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - '409 BUDGET_ALREADY_EXISTS'
   - 'El plan existente sigue vacío'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-006 — Aplicar un template a un periodo con plan se rechaza sin tocar el plan

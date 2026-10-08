@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['platform/event-delivery']
 requirement: 'Cruce de umbral emitido una sola vez por umbral y periodo'
 scenario: 'Evento de transacción reprocesado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: ['NFR-REL-007']
 invariants: ['INV-028']
@@ -33,7 +33,7 @@ expected_result:
   - 'Un solo planning.BudgetThresholdReached.v1 en el outbox'
   - 'La segunda entrega queda como duplicada en platform.inbox'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-005 — Reentregas y evaluaciones concurrentes producen un solo cruce y un solo hecho

@@ -5,7 +5,7 @@ spec: reporting/net-worth
 related_specs: ["fx/market-rate-providers"]
 requirement: "Valoración histórica con la tasa de cada fin de mes"
 scenario: "Revaluación sin movimientos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-REPORTING-006, FR-REPORTING-011, FR-FX-006]
 nfr: []
 invariants: [INV-012]
@@ -32,7 +32,7 @@ expected_result:
   - "Wallet 1000.00 BOB en enero y 1050.00 BOB en febrero"
   - "Ningún punto usa 12.02; cada tasa informada con fuente y vigencia"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-REPORTING-NETWORTH-007 — Cada punto de la serie usa la tasa de su fin de mes y no la de hoy

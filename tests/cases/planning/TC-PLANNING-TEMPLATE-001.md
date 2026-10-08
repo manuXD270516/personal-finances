@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Crear un template con su primera versión'
 scenario: 'Template "Mes estándar"'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-009']
 nfr: []
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - '201 con template activo, versión 1 y las tres líneas'
   - 'El segundo intento responde 409 NAME_TAKEN'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-001 — Se crea un template con su versión 1 y se rechaza un nombre repetido

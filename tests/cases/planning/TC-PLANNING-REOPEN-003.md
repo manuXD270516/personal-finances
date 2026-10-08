@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Reapertura en orden inverso
 scenario: Reabrir octubre con noviembre cerrado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-006
 nfr: []
@@ -39,7 +39,7 @@ expected_result:
   - El primer intento se rechaza con PERIOD_NEXT_CLOSED y ambos siguen closed
   - Después se puede reabrir "2026-11" y luego "2026-10"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-REOPEN-003 — Los periodos se reabren en orden inverso, sin cascada

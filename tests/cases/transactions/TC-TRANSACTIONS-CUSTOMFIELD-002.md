@@ -5,7 +5,7 @@ spec: transactions/transaction-recording
 related_specs: ["classification/custom-fields"]
 requirement: "Listado y filtrado de transacciones"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-012, FR-CLASSIFICATION-009]
 nfr: [NFR-PERF-001]
 invariants: []
@@ -29,7 +29,7 @@ steps:
 expected_result:
   - "Devuelve solo los gastos de 45.90 y 150.00 BOB"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-CUSTOMFIELD-002 — El listado de transacciones filtra por valor de custom field

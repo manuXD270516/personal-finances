@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Progreso por línea con restante, porcentaje y proyección'
 scenario: 'Proyección a mitad de mes'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-024']
 nfr: ['NFR-USAB-004']
 invariants: ['INV-020']
@@ -32,7 +32,7 @@ expected_result:
   - '"2026-11": restante 950.00 BOB, 36.7 %, proyección 1650.00 BOB (550/10×30) con aviso de que supera el máximo'
   - '"2026-10": proyección igual al gastado, 1320.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-009 — El progreso muestra restante, porcentaje y proyección lineal a mitad y al final del periodo

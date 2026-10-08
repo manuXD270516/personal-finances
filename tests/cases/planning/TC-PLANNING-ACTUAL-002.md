@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['transactions/transfers']
 requirement: 'Gasto real derivado de transacciones posteadas'
 scenario: 'Transferencia sin efecto en el plan'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023']
 nfr: []
 invariants: ['INV-009', 'INV-034']
@@ -31,7 +31,7 @@ steps:
 expected_result:
   - 'Ninguna línea cambia salvo la de comisiones, que suma 2.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-002 — Una transferencia solo afecta el presupuesto por su comisión

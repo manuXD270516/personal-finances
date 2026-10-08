@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["audit/audit-trail"]
 requirement: "Contenido completo del export"
 scenario: "Sin secretos en el export"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-COMP-002, NFR-SEC-015]
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - "Ninguna coincidencia"
   - "Las secciones de auditoría no incluyen client_ip_hash"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-002 — El export no contiene secretos, sesiones, claves de idempotencia ni hashes de IP

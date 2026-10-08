@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Archivo de export cifrado en reposo"
 scenario: "Objeto almacenado cifrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-SEC-006]
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - "iam.workspace_export guarda keyId y wrappedKey; el bucket no contiene la clave"
   - "Alterado: 422 EXPORT_FILE_CORRUPTED sin bytes de contenido entregados"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-005 — El archivo de export se guarda cifrado y se detecta cualquier alteración

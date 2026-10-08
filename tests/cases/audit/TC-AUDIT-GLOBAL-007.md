@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: ["transactions/bulk-edit"]
 requirement: "Registros agrupados por operación"
 scenario: "Registros de una edición masiva"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-006, FR-TRANSACTIONS-033]
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - "Los 3 registros por transacción y el registro agregado de B1"
   - "Ningún registro de B2"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-007 — Filtrar por correlación devuelve todos los registros de una edición masiva

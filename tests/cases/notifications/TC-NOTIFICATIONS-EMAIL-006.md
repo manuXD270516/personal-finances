@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Reintentos de email sin afectar el in-app'
 scenario: 'Proveedor caído'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002']
 nfr: ['NFR-REL-008']
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - 'La notificación in-app existe UNREAD desde el primer intento'
   - 'Los logs no contienen la dirección de email'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-006 — Con el proveedor caído se reintenta 5 veces sin afectar la notificación in-app

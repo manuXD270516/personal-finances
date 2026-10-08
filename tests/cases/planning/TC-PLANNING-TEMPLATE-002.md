@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Cada modificación del template crea una versión inmutable'
 scenario: 'Subir el máximo de supermercado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-009']
 nfr: []
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - 'Versión 1 con "Supermercado" 1500.00 BOB'
   - 'UPDATE/DELETE fallan (PF003, append-only)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-002 — Modificar un template crea la versión 2 y la versión 1 no cambia

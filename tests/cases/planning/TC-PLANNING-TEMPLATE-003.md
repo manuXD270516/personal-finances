@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Cada modificación del template crea una versión inmutable'
 scenario: 'Modificación sobre una versión vieja'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-009']
 nfr: []
 invariants: []
@@ -29,7 +29,7 @@ expected_result:
   - '409 CONCURRENCY_CONFLICT'
   - 'No existe la versión 3'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-003 — Una modificación basada en una versión vieja se rechaza por concurrencia

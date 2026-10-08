@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Idioma de la notificación según el usuario'
 scenario: 'Usuario en inglés'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002']
 nfr: ['NFR-USAB-001', 'NFR-USAB-002']
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - 'Asunto del OWNER: "You have a budget alert"; in-app en inglés'
   - 'Asunto del EDITOR: "Você tem um alerta de orçamento"; in-app en portugués'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-I18N-001 — Las notificaciones usan el idioma del locale en inglés y portugués

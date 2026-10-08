@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Aislamiento de workspace en los periodos
 scenario: Calendarios independientes
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-001
 nfr:
@@ -38,7 +38,7 @@ expected_result:
   - W1 ve solo su "2026-10" (2026-10-01..2026-10-31); W2 tiene "2026-10" (2026-10-25..2026-11-24)
   - La consulta sin contexto falla con PF002 en lugar de devolver 0 filas
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ISOLATION-001 — Los periodos están aislados por workspace y la consulta sin contexto falla

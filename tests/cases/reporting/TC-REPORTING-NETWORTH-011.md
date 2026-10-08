@@ -5,7 +5,7 @@ spec: reporting/net-worth
 related_specs: []
 requirement: "Variación mensual del patrimonio"
 scenario: "Variación de febrero y marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-REPORTING-006, FR-REPORTING-018]
 nfr: []
 invariants: []
@@ -34,7 +34,7 @@ expected_result:
   - "Enero sin variación (primer punto)"
   - "Febrero +850.00 BOB y marzo +20.00 BOB, comparables"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-REPORTING-NETWORTH-011 — La serie informa la variación mensual del patrimonio

@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Eventos de cierre y reapertura
 scenario: Cierre rechazado sin evento
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
 nfr:
@@ -38,7 +38,7 @@ expected_result:
   - El cierre aceptado publica un único planning.MonthClosed.v1 con closeNo 1, rango y totales con montos como string decimal
   - El payload valida contra contracts/events/planning/MonthClosed.v1.schema.json
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-EVENT-002 — Cada cierre publica un evento MonthClosed con su versión y ninguno si se rechaza

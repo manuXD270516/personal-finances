@@ -7,7 +7,7 @@ Cierra los periodos financieros del workspace: verifica un checklist previo, con
 ## ADDED Requirements
 
 ### Requirement: Checklist previo al cierre
-El sistema DEBE (MUST) ofrecer, sin modificar nada, el checklist de cierre de un periodo con, para cada ítem, su conteo, su detalle y su severidad: transacciones `pending` con fecha en el periodo, cuentas sin conciliar a diferencia cero al fin del periodo, duplicados sin resolver del periodo, transacciones del periodo sin categoría y ocurrencias recurrentes sin resolver, este último informado como no disponible mientras no exista el motor de recurrencia.
+El sistema DEBE (MUST) ofrecer, sin modificar nada, el checklist de cierre de un periodo con, para cada ítem, su conteo, su detalle y su severidad: transacciones `pending` con fecha en el periodo, cuentas sin conciliar a diferencia cero al fin del periodo, duplicados sin resolver del periodo, transacciones del periodo sin categoría y ocurrencias recurrentes sin resolver, este último informado como no disponible mientras no exista el motor de recurrencia; DEBE (MUST) además informar, como ítem informativo, las cuentas conciliadas sin extracto ("conciliada sin extracto — pendiente de revisión").
 Trace: FR-PLANNING-003 · Priority: Must
 
 #### Scenario: Checklist de octubre con observaciones
@@ -20,7 +20,7 @@ Trace: FR-PLANNING-003 · Priority: Must
 - **ENTONCES** todos los ítems del checklist tienen conteo 0 y el periodo puede cerrarse sin advertencias
 
 ### Requirement: Severidad configurable de los ítems del checklist
-Cada ítem del checklist DEBE (MUST) ser bloqueante o de advertencia según la política de cierre del workspace, que por defecto marca como bloqueantes las transacciones pendientes y las cuentas sin conciliar y como advertencia los demás; solo el OWNER DEBE (MUST) poder cambiar la política y cada cambio DEBE (MUST) auditarse.
+Cada ítem del checklist DEBE (MUST) ser bloqueante o de advertencia según la política de cierre del workspace, que por defecto marca como bloqueantes las transacciones pendientes y las cuentas sin conciliar y como advertencia los demás; solo el OWNER DEBE (MUST) poder cambiar la política, incluso bajar a advertencia las transacciones pendientes y las cuentas sin conciliar, y cada cambio DEBE (MUST) auditarse. El ítem informativo de cuentas conciliadas sin extracto NO DEBE (MUST NOT) formar parte de la política.
 Trace: FR-PLANNING-003 · Priority: Must
 
 #### Scenario: Política por defecto
@@ -31,21 +31,42 @@ Trace: FR-PLANNING-003 · Priority: Must
 - **CUANDO** el OWNER marca como bloqueante el ítem de porciones sin categoría y el periodo "2026-10" tiene 3 porciones sin categoría por 210.00 BOB
 - **ENTONCES** el checklist muestra ese ítem como bloqueante y el cambio de política queda auditado con el valor anterior y el nuevo
 
+#### Scenario: OWNER relaja las cuentas sin conciliar
+- **CUANDO** el OWNER marca como advertencia el ítem de cuentas sin conciliar y "USD Savings" sigue sin conciliar en "2026-10"
+- **ENTONCES** el checklist muestra ese ítem como advertencia y el cierre exige reconocerlo en lugar de impedirlo
+
 #### Scenario: EDITOR intenta cambiar la política
 - **CUANDO** un EDITOR intenta marcar como advertencia el ítem de cuentas sin conciliar
 - **ENTONCES** la respuesta es 403 con código `INSUFFICIENT_ROLE` y la política no cambia
 
 ### Requirement: Cuentas conciliadas a diferencia cero
-Una cuenta DEBE (MUST) considerarse conciliada para el cierre solo si tiene una conciliación finalizada con diferencia 0 cuya fecha de extracto es igual o posterior al fin del periodo y no le quedan transacciones posteadas sin conciliar con fecha hasta el fin del periodo; DEBEN (MUST) exigirse todas las cuentas no archivadas con saldo distinto de cero al fin del periodo o con movimientos en él.
+Una cuenta DEBE (MUST) considerarse conciliada para el cierre solo si no le quedan transacciones posteadas o confirmadas sin conciliar con fecha hasta el fin del periodo y, además, tiene una conciliación finalizada con diferencia 0 cuya fecha de extracto es igual o posterior al fin del periodo o tiene transacciones conciliadas sin extracto posteriores a su último extracto; una cuenta conciliada sin extracto DEBE (MUST) contar como conciliada; DEBEN (MUST) exigirse todas las cuentas no archivadas con saldo distinto de cero al fin del periodo o con movimientos en él.
 Trace: FR-PLANNING-003, FR-TRANSACTIONS-030 · Priority: Must
 
 #### Scenario: Cuentas conciliadas, pendientes y exentas
 - **CUANDO** al cerrar "2026-10" "Bank A" tiene una conciliación finalizada al 2026-10-31 con saldo de extracto 5200.00 BOB y diferencia 0.00 BOB, "USD Savings" tiene su última conciliación al 2026-09-30 y "Caja chica" tiene saldo 0.00 BOB sin movimientos en octubre
 - **ENTONCES** "Bank A" cuenta como conciliada, "USD Savings" aparece sin conciliar y "Caja chica" no se exige
 
+#### Scenario: Cuenta conciliada sin extracto
+- **CUANDO** al cerrar "2026-10" "Caja BOB" nunca tuvo una sesión y su único movimiento de octubre, un gasto de 80.00 BOB del 2026-10-12, está conciliado sin extracto
+- **ENTONCES** "Caja BOB" cuenta como conciliada y no aparece en el ítem de cuentas sin conciliar
+
 #### Scenario: Gasto retroactivo después de conciliar
 - **CUANDO** después de conciliar "Bank A" al 2026-10-31 se registra en "Bank A" un gasto posteado de 50.00 BOB con fecha 2026-10-15
 - **ENTONCES** "Bank A" vuelve a aparecer sin conciliar en el checklist de "2026-10"
+
+### Requirement: Cuentas conciliadas sin extracto en el cierre
+El checklist DEBE (MUST) mostrar cada cuenta exigida que cuenta como conciliada gracias a transacciones conciliadas sin extracto del periodo en un ítem informativo "conciliada sin extracto — pendiente de revisión", con la cuenta y sus transacciones; ese ítem NO DEBE (MUST NOT) bloquear el cierre ni exigir reconocimiento. El snapshot DEBE (MUST) registrar, por cuenta, si su conciliación se basa en un extracto o es sin extracto y qué transacciones del periodo estaban conciliadas sin extracto al cerrar, y esas transacciones DEBEN (MUST) seguir pudiendo listarse después por su marca de seguimiento.
+Trace: FR-PLANNING-003, FR-PLANNING-004, FR-TRANSACTIONS-030 · Priority: Must
+
+#### Scenario: Cierre con una cuenta conciliada sin extracto
+- **CUANDO** el EDITOR cierra "2026-10" con "Bank A" conciliada contra el extracto al 2026-10-31, "Caja BOB" conciliada solo sin extracto con el gasto de 80.00 BOB del 2026-10-12 y ningún otro ítem con observaciones
+- **ENTONCES** el checklist muestra "Caja BOB" como "conciliada sin extracto — pendiente de revisión" sin bloquear ni pedir reconocimiento y "2026-10" queda `closed`
+- **Y** el snapshot registra "Bank A" con base "extracto" y su conciliación, y "Caja BOB" con base "sin extracto" y el gasto de 80.00 BOB
+
+#### Scenario: Seguimiento después del cierre
+- **CUANDO** tras cerrar "2026-10" el usuario filtra las transacciones de octubre por la marca "conciliada sin extracto"
+- **ENTONCES** obtiene el gasto de 80.00 BOB de "Caja BOB", el mismo que lista el snapshot 1 de "2026-10"
 
 ### Requirement: Cierre impedido por ítems bloqueantes
 El sistema DEBE (MUST) rechazar el cierre de un periodo con algún ítem bloqueante con conteo mayor que cero con `MONTH_CLOSING_BLOCKED`, informando los ítems que lo impiden, sin cambiar el estado, sin bloquear el ledger y sin generar snapshot.
@@ -141,7 +162,7 @@ Trace: FR-PLANNING-005, FR-TRANSACTIONS-033, FR-CLASSIFICATION-009, INV-015 · P
 - **Y** el saldo al 2026-10-31 y el snapshot vigente de "2026-10" no cambian
 
 ### Requirement: Contenido del snapshot de cierre
-El snapshot de cierre DEBE (MUST) registrar al fin del periodo los saldos por cuenta y moneda, el patrimonio neto en la moneda base con cada tasa usada y si está completo, los ingresos, gastos, ahorro y tasa de ahorro por moneda y consolidados en la moneda base con la tasa de cada transacción, el presupuesto contra lo real por línea del plan cuando exista plan, los aportes a metas cuando existan y el resultado del checklist.
+El snapshot de cierre DEBE (MUST) registrar al fin del periodo los saldos por cuenta y moneda, el patrimonio neto en la moneda base con cada tasa usada y si está completo, los ingresos, gastos, ahorro y tasa de ahorro por moneda y consolidados en la moneda base con la tasa de cada transacción, el presupuesto contra lo real por línea del plan cuando exista plan, los aportes a metas cuando existan, el resultado del checklist y, por cuenta, la base de su conciliación (extracto o sin extracto).
 Trace: FR-PLANNING-004, INV-022, INV-031 · Priority: Must
 
 #### Scenario: Snapshot de octubre de 2026

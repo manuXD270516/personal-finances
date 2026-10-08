@@ -6,7 +6,7 @@ related_specs:
   - planning/budget-templates
 requirement: Participantes de la creación de periodos en la misma transacción
 scenario: Participante notificado una sola vez por periodo
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-002
   - FR-PLANNING-010
@@ -42,7 +42,7 @@ expected_result:
   - 'Segunda ejecución: "2027-02" existe en draft y el participante lo registró una vez, en la misma transacción'
   - 'Tercera ejecución: ningún periodo nuevo y el participante sigue con un solo registro de "2027-02"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-AUTOCREATE-004 — La creación de un periodo notifica a los participantes registrados en su misma transacción

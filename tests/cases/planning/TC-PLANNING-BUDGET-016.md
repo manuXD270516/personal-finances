@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Presupuesto de tipo rango'
 scenario: 'Rango de supermercado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-019']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - '1350.00 BOB ⇒ dentro (90.0 % del máximo)'
   - '1550.00 BOB ⇒ por encima con exceso 50.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-016 — Un presupuesto de rango informa debajo, dentro o encima con umbrales sobre el máximo

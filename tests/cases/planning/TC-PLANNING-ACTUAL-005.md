@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['fx/market-rates']
 requirement: 'Gasto en otra moneda convertido con la tasa de su fecha'
 scenario: 'Tasa posterior no recalcula'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023']
 nfr: []
 invariants: ['INV-012']
@@ -29,7 +29,7 @@ steps:
 expected_result:
   - 'El gastado de "Restaurantes" sigue siendo 341.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-005 — Una tasa registrada después no recalcula el gastado convertido

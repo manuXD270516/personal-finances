@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["ledger/balances"]
 requirement: "Saldo confirmado y diferencia de la sesión"
 scenario: "Diferencia cero en una cuenta de activo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-LEDGER-012]
 nfr: []
 invariants: [INV-023, INV-033]
@@ -38,7 +38,7 @@ expected_result:
   - "Saldo contable de \"Bank A\" 3104.10 BOB sin cambios"
   - "El saldo inicial se cuenta una sola vez"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-003 — El saldo confirmado suma saldo inicial y cleared hasta la fecha del extracto

@@ -4,7 +4,7 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner `classification/custom-fields`, los MODIFIED de `transactions/transaction-recording` y las preguntas abiertas 1–3 de design.md; verificar con `openspec validate add-custom-fields --strict`
+- [ ] 1.1 Revisar con el owner `classification/custom-fields`, los MODIFIED de `transactions/transaction-recording` y las preguntas abiertas 1–3 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-custom-fields --strict`
 - [ ] 1.2 Revisar TC-CLASSIFICATION-CUSTOMFIELD-001..011 y TC-TRANSACTIONS-CUSTOMFIELD-001..002; pasar a `ready` y `requirement_status: confirmed` al aprobar
 
 ## 2. DOMAIN (TDD)

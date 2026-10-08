@@ -126,7 +126,7 @@ Trace: FR-IDENTITY-017, NFR-REL-014 · Priority: Must
 - **Y** "W1" no cambia
 
 ### Requirement: La ida y vuelta reproduce saldos e historia
-Tras importar, el workspace nuevo DEBE (MUST) tener exactamente los mismos saldos por cuenta y moneda, el mismo balance de comprobación, los mismos asientos y reversas con sus fechas, las mismas revisiones de transacciones y la misma auditoría y recorridos que el export; el sistema DEBE (MUST) verificarlo contra el manifiesto antes de hacer visible el workspace y, si algo no coincide, la importación DEBE (MUST) fallar sin dejar ningún dato visible.
+Tras importar, el workspace nuevo DEBE (MUST) tener exactamente los mismos saldos por cuenta y moneda, el mismo balance de comprobación, los mismos asientos y reversas con sus fechas, las mismas revisiones de transacciones y la misma auditoría y recorridos que el export; el sistema DEBE (MUST) verificarlo contra el manifiesto antes de hacer visible el workspace y, si algo no coincide o cualquier paso falla, la importación DEBE (MUST) fallar sin dejar ningún dato persistido, porque todas las inserciones y la verificación ocurren en una única transacción de base de datos.
 Trace: FR-IDENTITY-017, NFR-REL-014, INV-004, INV-022 · Priority: Must
 
 #### Scenario: Saldos idénticos tras la ida y vuelta
@@ -141,9 +141,10 @@ Trace: FR-IDENTITY-017, NFR-REL-014, INV-004, INV-022 · Priority: Must
 #### Scenario: Verificación fallida
 - **CUANDO** durante la importación el saldo calculado de una cuenta no coincide con el del manifiesto
 - **ENTONCES** la importación termina con error `EXPORT_VERIFICATION_FAILED` y no queda ningún workspace nuevo visible para el usuario
+- **Y** no queda persistida ninguna fila del workspace parcial, porque la importación se revierte completa
 
 ### Requirement: Rechazo de archivos de export inválidos
-La importación DEBE (MUST) rechazar sin crear nada un archivo cuyo manifiesto falte o cuya suma SHA-256 de algún archivo no coincida (`EXPORT_FILE_CORRUPTED`), cuya versión de formato no sea soportada (`EXPORT_FORMAT_UNSUPPORTED`) o cuyos datos no validen contra el esquema de su versión (`EXPORT_FILE_CORRUPTED`).
+La importación DEBE (MUST) rechazar sin crear nada un archivo cuyo manifiesto falte o cuya suma SHA-256 de algún archivo no coincida (`EXPORT_FILE_CORRUPTED`), cuya versión de formato no sea soportada (`EXPORT_FORMAT_UNSUPPORTED`), cuyos datos no validen contra el esquema de su versión (`EXPORT_FILE_CORRUPTED`), que provenga de un workspace de demostración (`EXPORT_FORMAT_UNSUPPORTED`; los datos demo NUNCA DEBEN (MUST NOT) entrar a un workspace real) o que supere el tamaño máximo de 200 MB (`UPLOAD_TOO_LARGE`).
 Trace: FR-IDENTITY-017, NFR-PORT-009 · Priority: Must
 
 #### Scenario: Archivo modificado a mano
@@ -153,6 +154,14 @@ Trace: FR-IDENTITY-017, NFR-PORT-009 · Priority: Must
 #### Scenario: Versión de formato futura
 - **CUANDO** el usuario importa un export con versión de formato 99
 - **ENTONCES** se rechaza con `EXPORT_FORMAT_UNSUPPORTED`
+
+#### Scenario: Export de un workspace de demostración
+- **CUANDO** el usuario importa el export del workspace demo "Demo" de "U1", cuyo manifiesto lo marca como demostración
+- **ENTONCES** se rechaza con `EXPORT_FORMAT_UNSUPPORTED`, no se crea ningún workspace y no se ofrece importarlo como workspace real
+
+#### Scenario: Archivo mayor que el límite
+- **CUANDO** el usuario importa un archivo de export de 210 MB
+- **ENTONCES** se rechaza con `UPLOAD_TOO_LARGE` sin crear ningún workspace
 
 ### Requirement: Aviso de export terminado
 Cuando un export termina o falla, el sistema DEBERÍA avisar al OWNER dentro de la app; cuando avisa, el aviso NO DEBE (MUST NOT) contener montos, nombres de cuentas ni el contenido del export.

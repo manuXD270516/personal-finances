@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["identity/workspace-membership"]
 requirement: "Iniciar una sesión de reconciliación"
 scenario: "Iniciar la reconciliación de marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-IDENTITY-006]
 nfr: []
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - "Ninguna transacción cambia de estado"
   - "Auditoría y transición START registradas"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-001 — Iniciar una sesión de reconciliación con fecha y saldo del extracto

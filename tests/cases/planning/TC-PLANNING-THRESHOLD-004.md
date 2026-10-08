@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Cruce de umbral emitido una sola vez por umbral y periodo'
 scenario: 'Sin re-emisión tras bajar y volver a subir'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - 'No se emite ningún hecho nuevo del 50 %'
   - 'Sigue habiendo un solo cruce del 50 % para "Restaurantes" en "2026-11"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-004 — Bajar y volver a subir del umbral no re-emite el hecho

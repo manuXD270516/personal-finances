@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Aplicar a futuro con vista previa'
 scenario: 'Vista previa desactualizada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-014']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - '409 BUDGET_PROPAGATION_STALE'
   - 'No se crea versión nueva ni cambia ningún plan'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-016 — Confirmar una vista previa desactualizada se rechaza sin cambios

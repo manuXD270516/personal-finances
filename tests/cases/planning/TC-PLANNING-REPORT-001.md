@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Reporte de cierre consultable
 scenario: Reporte vigente tras el re-cierre
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
 nfr: []
@@ -37,7 +37,7 @@ expected_result:
   - '"2026-12" responde 404 REFERENCE_NOT_FOUND'
   - La respuesta valida contra el contrato OpenAPI
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-REPORT-001 — El reporte de cierre muestra la versión vigente y sus versiones; un periodo nunca cerrado da 404

@@ -1,14 +1,14 @@
 ---
 id: TC-TRANSACTIONS-RECONCILIATION-014
-title: "Marcar reconciled fuera de una sesión se rechaza"
+title: "El marcado directo con modo explícito deja la transacción conciliada sin extracto"
 spec: transactions/reconciliation
 related_specs: []
 requirement: "Marcar una transacción como reconciliada"
-scenario: null
-requirement_status: provisional
+scenario: "Marcado directo como conciliada sin extracto"
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-006, FR-TRANSACTIONS-030]
 nfr: []
-invariants: [INV-023]
+invariants: [INV-023, INV-033]
 priority: high
 type: api
 level: api
@@ -17,36 +17,38 @@ automated_tests: []
 status: ready
 regression_suite: false
 phase: 2
-tags: ["reconciled", "modified"]
-error_code: "RECONCILIATION_SESSION_REQUIRED"
+tags: ["reconciled", "modified", "without-statement"]
+error_code: null
 preconditions:
-  - "Gasto cleared de 150.00 BOB en \"Bank A\""
+  - "Gasto G1 cleared de 150.00 BOB en \"Bank A\" (saldo contable 850.00 BOB), versión vigente conocida"
 input:
-  patch: {"status":"RECONCILED"}
+  patch: {"status": "RECONCILED", "reconciliationMode": "WITHOUT_STATEMENT"}
 steps:
-  - "PATCH W/transactions/{id} con status RECONCILED e If-Match vigente"
+  - "PATCH W/transactions/{id} con status RECONCILED, reconciliationMode WITHOUT_STATEMENT e If-Match vigente"
+  - "GET W/transactions/{id}"
 expected_result:
-  - "409 RECONCILIATION_SESSION_REQUIRED"
-  - "El gasto sigue cleared"
-created: 2026-10-05
-updated: 2026-10-05
+  - "200: status RECONCILED, reconciliationMode WITHOUT_STATEMENT, systemFlags [RECONCILED_WITHOUT_STATEMENT]"
+  - "Mismo único asiento activo; saldo de \"Bank A\" 850.00 BOB"
+  - "No existe el código RECONCILIATION_SESSION_REQUIRED en la respuesta ni en el catálogo"
+created: 2026-10-08
+updated: 2026-10-08
 ---
 
-# TC-TRANSACTIONS-RECONCILIATION-014 — Marcar reconciled fuera de una sesión se rechaza
+# TC-TRANSACTIONS-RECONCILIATION-014 — El marcado directo con modo explícito deja la transacción conciliada sin extracto
 
 ## Intención
 
-Requirement MODIFIED: reconciled solo se alcanza finalizando una sesión (pregunta abierta 2 de add-reconciliation). Reemplaza la expectativa de TC-TRANSACTIONS-RECONCILED-001 al implementarse.
+Requirement MODIFIED por la decisión del owner docs/33 D74 (cambia la recomendación original): el marcado directo se conserva como modo explícito "conciliada sin extracto". Reemplaza la expectativa de TC-TRANSACTIONS-RECONCILED-001 al implementarse (el request agrega el modo).
 
 ## Escenario
 
 ```gherkin
 Dado un gasto cleared de 150.00 BOB
-Cuando el usuario lo marca directamente como reconciled
-Entonces se rechaza con "RECONCILIATION_SESSION_REQUIRED"
-  Y el gasto sigue cleared
+Cuando el usuario lo marca directamente como reconciled indicando el modo "conciliada sin extracto"
+Entonces queda reconciled en modo sin extracto con la marca de seguimiento
+  Y el saldo de la cuenta no cambia
 ```
 
 ## Notas
 
-- scenario: null porque el scenario nuevo vive en el delta MODIFIED; al archivar, enlazar "Marcado directo como reconciliada".
+- Datos ficticios; montos como strings decimales; fechas fijas con `FixedClock` en America/La_Paz.

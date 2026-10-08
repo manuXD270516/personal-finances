@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Eventos de cierre y reapertura
 scenario: Eventos del ciclo de octubre
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-004
   - FR-PLANNING-006
@@ -39,7 +39,7 @@ expected_result:
   - MonthClosed closeNo 1, luego PeriodReopened reopenNo 1 con el motivo, luego MonthClosed closeNo 2
   - Ambos payloads validan contra sus schemas y los montos son string decimal con moneda
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-EVENT-003 — El ciclo cerrar, reabrir y re-cerrar publica tres eventos en orden

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['classification/categories']
 requirement: 'Montos y objetivos válidos en las líneas del plan'
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-015', 'FR-PLANNING-018']
 nfr: []
 invariants: ['INV-001', 'INV-002', 'INV-003']
@@ -40,7 +40,7 @@ expected_result:
   - 'Supermercado repetido ⇒ 409 BUDGET_LINE_DUPLICATE_TARGET'
   - 'El plan no cambia y no hay registros de auditoría'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-007 — Las líneas con montos, moneda, escala u objetivo inválidos se rechazan sin cambios

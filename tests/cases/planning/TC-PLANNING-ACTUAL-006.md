@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['reporting/dashboard']
 requirement: 'Gasto sin tasa disponible informado sin convertir'
 scenario: 'Gasto en EUR sin tasa'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-023', 'FR-REPORTING-002']
 nfr: []
 invariants: ['INV-002']
@@ -31,7 +31,7 @@ expected_result:
   - 'Gastado 341.00 BOB marcado incompleto con 5.00 EUR sin convertir'
   - 'Nunca 346.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-ACTUAL-006 — Un gasto sin tasa se informa sin convertir y el gastado queda incompleto

@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["platform/api-conventions"]
 requirement: "Límite e idempotencia de la edición masiva"
 scenario: "Reenvío de la misma edición masiva"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-TRANSACTIONS-010]
 nfr: []
 invariants: [INV-027]
@@ -38,7 +38,7 @@ expected_result:
   - "Contenido distinto: 422 IDEMPOTENCY_KEY_REUSED"
   - "501 ítems: 400 VALIDATION_FAILED"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-009 — La edición masiva es idempotente y limita el lote a 500 transacciones

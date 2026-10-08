@@ -4,15 +4,15 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner la spec `planning/budgets` y las preguntas abiertas 1–8 de design.md; registrar las decisiones en docs/31 (sección Phase 2) y verificar con `openspec validate add-budgets --strict`
-- [ ] 1.2 Revisar TC-PLANNING-BUDGET-001..021, TC-PLANNING-ACTUAL-001..007 y TC-PLANNING-THRESHOLD-001..007 contra los scenarios (cifras a mano, fechas fijas, `FixedClock` en America/La_Paz); pasar a `ready` y `requirement_status: confirmed` tras la revisión; verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC
+- [ ] 1.1 Revisar con el owner la spec `planning/budgets` y las preguntas abiertas 1–8 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-budgets --strict`
+- [ ] 1.2 Revisar TC-PLANNING-BUDGET-001..022, TC-PLANNING-ACTUAL-001..007 y TC-PLANNING-THRESHOLD-001..007 contra los scenarios (cifras a mano, fechas fijas, `FixedClock` en America/La_Paz); pasar a `ready` y `requirement_status: confirmed` tras la revisión; verificar con `pnpm traceability:check` que todo requirement Must tiene ≥ 1 TC
 - [ ] 1.3 Coordinar con `add-financial-periods` y `add-month-closing` (pf-p2a): estados no cerrados, `PeriodQuery`, payloads de `planning.MonthClosed.v1`/`PeriodReopened.v1` y el uso de `BudgetVsActualQuery` en el snapshot
 
 ## 2. DOMAIN (TDD, lógica financiera crítica)
 
 - [ ] 2.1 Extraer `FlowValuation` de `ConsolidationService.consolidateFlows` (Reporting) a `@pf/shared-kernel` sin cambio de comportamiento: TC-REPORTING-KPI-001..010 y TC-REPORTING-DASHBOARD-* siguen en verde; `pnpm arch:check` sin ciclos
 - [ ] 2.2 `Budget`/`BudgetLine` con validaciones (montos, moneda, escala, tipo por naturaleza, objetivo duplicado) y `TargetOverlapPolicy`: tests primero de TC-PLANNING-BUDGET-001, -004, -007, -008
-- [ ] 2.3 `BudgetProgressCalculator` (planificado efectivo, restante, % con HALF_EVEN a 1 decimal, proyección lineal en TZ del workspace, estados, disponible para gastar): tests primero de TC-PLANNING-BUDGET-005, -006, -009, -010, -011; PBT: `availableToSpend ≥ 0` y Σ de líneas sin doble conteo
+- [ ] 2.3 `BudgetProgressCalculator` (planificado efectivo, restante, % con HALF_EVEN a 1 decimal, proyección lineal en TZ del workspace solo en `MAXIMUM`/`RANGE`/`PERCENT_OF_INCOME` y pendiente/cumplido sin proyección en `FIXED`/`MINIMUM` (docs/33 D83), estados, disponible para gastar): tests primero de TC-PLANNING-BUDGET-005, -006, -009, -010, -011, -022; PBT: `availableToSpend ≥ 0` y Σ de líneas sin doble conteo
 - [ ] 2.4 `ThresholdEvaluator` (umbrales válidos, cruce `actual ≥ t × ref`, máximo + `alsoCrossed`, sin re-emisión): tests primero de TC-PLANNING-THRESHOLD-001, -002, -003, -004, -006, -007; PBT: para toda secuencia de gastados, cada umbral se emite a lo sumo una vez
 - [ ] 2.5 Tipos Should/Could: `MINIMUM`, `RANGE`, `PERCENT_OF_INCOME` (redondeo HALF_EVEN), `RolloverCalculator` (políticas, tope, piso 0, encadenado) y modo base cero: tests primero de TC-PLANNING-BUDGET-015, -016, -017, -019, -020
 

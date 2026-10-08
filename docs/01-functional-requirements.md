@@ -54,7 +54,7 @@ flowchart LR
 
 ## 3. IDENTITY — Identity & Workspace
 
-Capabilities: `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` (docs/31 D36), `identity/workspace-portability` (Phase 2, propuesta en `add-workspace-export`). Ver también `security/access-control` y el documento 12 (seguridad, `docs/12-*`).
+Capabilities: `identity/authentication`, `identity/workspace-membership`, `identity/demo-data` (docs/31 D36), `identity/workspace-portability` (Phase 2, `add-workspace-export`; aceptada por el owner, docs/33 D108). Ver también `security/access-control` y el documento 12 (seguridad, `docs/12-*`).
 
 | ID | Requerimiento | Prioridad | Fase | Capability |
 |----|---------------|-----------|------|------------|

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['notifications/alerts']
 requirement: 'Cruce de umbral emitido una sola vez por umbral y periodo'
 scenario: 'Cruce del 50 %'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: []
 invariants: ['INV-034']
@@ -32,7 +32,7 @@ expected_result:
   - 'El outbox contiene un único planning.BudgetThresholdReached.v1 con threshold "50", reference 600.00 BOB y actual 310.00 BOB'
   - 'El payload valida contra su JSON Schema'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-003 — Cruzar el 50 % emite un único hecho de umbral alcanzado

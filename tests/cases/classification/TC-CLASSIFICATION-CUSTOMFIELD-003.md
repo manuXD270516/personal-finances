@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["transactions/transaction-recording"]
 requirement: "Validación de valores según el tipo"
 scenario: "Decimal exacto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009]
 nfr: [NFR-DATA-001, NFR-DATA-010]
 invariants: [INV-001]
@@ -35,7 +35,7 @@ expected_result:
   - "\"3.5\" en NUMBER, \"2026-02-30\", texto vacío y \"si\" en BOOLEAN: 422 CUSTOM_FIELD_VALUE_INVALID sin registrar el gasto"
   - "PBT: string → Decimal → numeric → string sin pérdida"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-003 — Los valores se validan por tipo y los decimales se conservan exactos

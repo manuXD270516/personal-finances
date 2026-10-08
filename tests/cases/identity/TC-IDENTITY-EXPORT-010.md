@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Contenido completo del export"
 scenario: "Conteos del export"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-REL-014]
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - "Conteos exactos en manifiesto y archivos"
   - "Ninguna tabla acotada por workspace queda sin sección ni exclusión declarada"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-010 — El manifiesto informa conteos exactos de cada sección exportada

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Progreso por línea con restante, porcentaje y proyección'
 scenario: 'Línea sin presupuesto con gasto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-024']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - 'Restante −40.00 BOB'
   - 'No se evalúan umbrales'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-010 — Una línea con planificado cero y gasto se marca sin presupuesto y sin porcentaje

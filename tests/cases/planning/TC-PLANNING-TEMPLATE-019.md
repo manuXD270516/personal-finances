@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets', 'security/access-control', 'audit/audit-trail']
 requirement: 'Permisos y auditoría de templates'
 scenario: 'VIEWER no versiona'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-IDENTITY-006', 'FR-AUDIT-001']
 nfr: []
 invariants: ['INV-029']
@@ -33,7 +33,7 @@ expected_result:
   - 'Lectura 200; publicación 403 INSUFFICIENT_ROLE'
   - 'El historial registra al EDITOR, el plan creado, template y versión de origen y las omitidas'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-019 — VIEWER lee templates sin versionarlos y la aplicación queda auditada

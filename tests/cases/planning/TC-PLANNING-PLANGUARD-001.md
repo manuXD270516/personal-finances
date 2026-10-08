@@ -7,7 +7,7 @@ related_specs:
   - planning/month-closing
 requirement: Planificación de solo lectura en periodos cerrados
 scenario: Editar el plan de un mes cerrado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-008
   - FR-PLANNING-014
@@ -50,7 +50,7 @@ expected_result:
   - Tras reabrir, el cambio se acepta y el plan queda en 1800.00 BOB
   - El cambio en "2026-12" se acepta
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-PLANGUARD-001 — El plan mensual de un periodo cerrado es de solo lectura

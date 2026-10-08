@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Checklist previo al cierre
 scenario: Checklist de octubre con observaciones
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-003
 nfr: []
@@ -41,7 +41,7 @@ expected_result:
   - "UNRESOLVED_RECURRING: NOT_AVAILABLE"
   - El periodo no cambia y no se escribe auditoría
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-CHECKLIST-001 — El checklist de cierre informa pendientes, cuentas sin conciliar, duplicados y porciones sin categoría del periodo

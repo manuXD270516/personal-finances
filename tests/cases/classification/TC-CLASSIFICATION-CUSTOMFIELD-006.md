@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["transactions/transaction-recording"]
 requirement: "Custom field obligatorio en registros nuevos"
 scenario: "Gasto nuevo sin el campo obligatorio"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009]
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - "422 CUSTOM_FIELD_REQUIRED; no se registra"
   - "G0 editado; sigue sin centro_costo"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-006 — Un custom field obligatorio se exige en registros nuevos y no es retroactivo

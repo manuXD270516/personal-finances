@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: ["notifications/alerts"]
 requirement: "Aviso de export terminado"
 scenario: "Export listo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-COMP-001]
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - "Aviso \"Tu exportación está lista\" con enlace"
   - "Sin montos, nombres de cuentas ni contenido"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-011 — El aviso de export terminado no contiene cifras ni nombres de cuentas

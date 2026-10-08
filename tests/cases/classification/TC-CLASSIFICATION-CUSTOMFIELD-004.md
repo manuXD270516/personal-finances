@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: ["transactions/splits"]
 requirement: "Custom fields de transacción por split"
 scenario: "Valores distintos por split"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009, FR-TRANSACTIONS-026]
 nfr: []
 invariants: [INV-021]
@@ -32,7 +32,7 @@ expected_result:
   - "Splits con \"casa\" y \"oficina\"; Σ splits = 300.00 BOB"
   - "\"sucursal\" en transacción: 422 CUSTOM_FIELD_TARGET_MISMATCH"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-004 — Cada split guarda su propio valor y los campos de cuenta no aplican a transacciones

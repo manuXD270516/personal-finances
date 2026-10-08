@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["planning/month-closing"]
 requirement: "Estado de reconciliación por cuenta"
 scenario: "Estado de \"Bank A\" al cierre de marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-PLANNING-003]
 nfr: []
 invariants: []
@@ -35,7 +35,7 @@ expected_result:
   - "\"Bank A\": lastCompleted 2026-03-31 / \"3350.00\", inProgress null, unreconciledCount 1 (G2)"
   - "\"Caja BOB\": lastCompleted null, unreconciledCount 2"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-010 — El estado de reconciliación por cuenta informa último extracto y pendientes

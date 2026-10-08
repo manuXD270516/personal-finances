@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['planning/financial-periods']
 requirement: 'Plan de un periodo cerrado inmutable'
 scenario: 'Editar una línea de octubre cerrado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-005', 'FR-PLANNING-022']
 nfr: []
 invariants: ['INV-015']
@@ -31,7 +31,7 @@ expected_result:
   - 'La línea conserva 600.00 BOB'
   - 'No se registran cruces nuevos para "2026-10"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-012 — Las líneas del plan de un periodo cerrado no se modifican

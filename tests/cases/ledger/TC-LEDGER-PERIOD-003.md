@@ -7,7 +7,7 @@ related_specs:
   - planning/financial-periods
 requirement: Los periodos bloqueados rechazan asientos
 scenario: Periodo financiero con día de inicio 25
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-LEDGER-011
   - FR-PLANNING-005
@@ -52,7 +52,7 @@ expected_result:
   - 2026-10-24 y 2026-11-25 se aceptan; Bank A queda en 960.00 BOB
   - El saldo inicial del 2026-06-15 se rechaza con PERIOD_CLOSED
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-LEDGER-PERIOD-003 — El bloqueo cubre el rango del periodo financiero y lo anterior al primer periodo bloqueado

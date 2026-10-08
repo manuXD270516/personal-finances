@@ -33,6 +33,7 @@ Puertos: `ClassificationValidator` (categorías/tags/contrapartes activas y tipo
 8. **Idempotencia**: `Idempotency-Key` obligatorio en ejecución (no en la vista previa); la respuesta almacenada incluye `bulkOperationId` y versiones resultantes.
 9. **Rendimiento**: objetivo p95 ≤ 2 s para 500 ítems con 3 cambios (una transacción BD, `FOR UPDATE` ordenado, inserts multi-row). `lock_timeout` 5 s ⇒ 409 `CONCURRENCY_CONFLICT` reintentable.
 10. **Rate limit**: cuenta como escritura costosa (bucket de exports/imports, 10/min, docs/10 §10) para evitar abuso.
+11. **Marcas de sistema** (docs/33 D111): la edición masiva no puede agregar ni quitar `systemFlags` (p. ej. `RECONCILED_WITHOUT_STATEMENT`, derivada del modo de conciliación de `add-reconciliation`); un request que las incluya se rechaza completo con `VALIDATION_FAILED`. Tampoco concilia ni des-reconcilia (no objetivos).
 
 ### Contratos (OpenAPI)
 
@@ -55,9 +56,11 @@ Sin migraciones de schema. Contrato: dos operaciones nuevas y un código (MINOR)
 
 ## Preguntas abiertas
 
-1. **Alcance de D49.** ¿El rechazo `PERIOD_CLOSED` en periodo cerrado aplica también a tags, contraparte y custom fields (no solo a la categoría)? **Recomendación:** sí, porque alimentan reportes y presupuestos por tag/contraparte (pf-p2b); notas libres permitidas. Debe aplicarse igual en la edición individual (`ApplyClassification`).
-2. **Modo `BEST_EFFORT` y asíncrono > 500.** ¿Se necesitan en Phase 2? **Recomendación:** no; se evaluará con imports (Phase 6), donde los lotes grandes son reales.
-3. **Deshacer una operación masiva.** ¿Se ofrece "deshacer" (aplicar el diff inverso por `bulkOperationId`)? **Recomendación:** no en Phase 2; la auditoría filtrada por operación permite revertir con otra edición masiva.
+**Todas resueltas por el owner el 2026-10-08** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md), decisiones D59–D111); cada pregunta indica su decisión. Se conserva el texto original.
+
+1. **Alcance de D49.** ¿El rechazo `PERIOD_CLOSED` en periodo cerrado aplica también a tags, contraparte y custom fields (no solo a la categoría)? **Recomendación:** sí, porque alimentan reportes y presupuestos por tag/contraparte (pf-p2b); notas libres permitidas. Debe aplicarse igual en la edición individual (`ApplyClassification`). → **Resuelta por el owner (2026-10-08): D65** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
+2. **Modo `BEST_EFFORT` y asíncrono > 500.** ¿Se necesitan en Phase 2? **Recomendación:** no; se evaluará con imports (Phase 6), donde los lotes grandes son reales. → **Resuelta por el owner (2026-10-08): D94** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
+3. **Deshacer una operación masiva.** ¿Se ofrece "deshacer" (aplicar el diff inverso por `bulkOperationId`)? **Recomendación:** no en Phase 2; la auditoría filtrada por operación permite revertir con otra edición masiva. → **Resuelta por el owner (2026-10-08): D95** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
 
 ## Dependencias entre changes
 

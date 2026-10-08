@@ -4,7 +4,7 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner la spec `transactions/bulk-edit` y las preguntas abiertas 1–3 de design.md; verificar con `openspec validate add-bulk-edit --strict`
+- [ ] 1.1 Revisar con el owner la spec `transactions/bulk-edit` y las preguntas abiertas 1–3 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-bulk-edit --strict`
 - [ ] 1.2 Revisar TC-TRANSACTIONS-BULK-001..011 contra los scenarios (45.90 + 150.00 + 200.00 = 395.90 BOB); pasar a `ready` y `requirement_status: confirmed` al aprobar
 
 ## 2. DOMAIN (TDD)

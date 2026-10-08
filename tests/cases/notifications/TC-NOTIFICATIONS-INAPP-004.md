@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: []
 requirement: 'Centro de notificaciones con estados y contador'
 scenario: 'Marcar todas como leídas'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-001']
 nfr: []
 invariants: []
@@ -30,7 +30,7 @@ expected_result:
   - 'unread = 0'
   - 'La respuesta informa updated = 1'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-004 — Marcar todas como leídas deja el contador en cero

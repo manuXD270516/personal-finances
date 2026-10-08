@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: []
 requirement: "Auditoría de fallos de autorización"
 scenario: "Reintentos repetidos en un minuto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-AUDIT-005]
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - "Un solo evento de seguridad en el primer minuto"
   - "Un segundo evento tras el minuto"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-AUDIT-GLOBAL-005 — Los rechazos repetidos se auditan una vez por minuto

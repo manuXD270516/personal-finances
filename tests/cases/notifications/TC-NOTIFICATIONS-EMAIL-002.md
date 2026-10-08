@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Emails sin montos salvo opt-in explícito'
 scenario: 'Email con detalles por opt-in'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-006']
 nfr: []
 invariants: []
@@ -29,7 +29,7 @@ steps:
 expected_result:
   - 'El email indica "Restaurantes", 90 % y 550,00 de 600,00 BOB en formato es-BO'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-EMAIL-002 — Con opt-in de detalles el email incluye categoría y montos

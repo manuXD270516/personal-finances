@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: ["planning/month-closing"]
 requirement: "Reconciliación y periodos cerrados"
 scenario: "Finalizar con una transacción de un mes cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030, FR-PLANNING-005]
 nfr: []
 invariants: [INV-015]
@@ -38,7 +38,7 @@ expected_result:
   - "409 PERIOD_CLOSED; el gasto sigue posted"
   - "Sin auditoría ni eventos en los tres casos"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-012 — La reconciliación no cambia transacciones ni ajustes de un periodo cerrado

@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['security/access-control', 'audit/audit-trail']
 requirement: 'Permisos y auditoría del plan'
 scenario: 'Cambio auditado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-IDENTITY-006', 'FR-AUDIT-001']
 nfr: []
 invariants: ['INV-029']
@@ -36,7 +36,7 @@ expected_result:
   - 'La escritura del VIEWER responde 403 INSUFFICIENT_ROLE'
   - 'El historial registra al EDITOR, la línea, antes 1500.00 BOB y después 1400.00 BOB, en la misma transacción que el cambio'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-013 — VIEWER lee el plan sin poder editarlo y cada cambio queda auditado

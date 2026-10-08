@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets', 'platform/event-delivery']
 requirement: 'Una sola notificación por hecho de origen'
 scenario: 'Evento reentregado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-005']
 nfr: ['NFR-REL-007']
 invariants: ['INV-028']
@@ -32,7 +32,7 @@ expected_result:
   - 'Una sola entrega por email'
   - 'platform.inbox registra el duplicado'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-DEDUP-001 — Un evento reentregado o procesado en paralelo crea una sola notificación

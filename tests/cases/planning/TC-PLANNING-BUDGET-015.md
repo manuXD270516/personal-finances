@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Presupuesto de tipo mínimo'
 scenario: 'Mínimo pendiente y cumplido'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-019']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Con 450.00 BOB: mínimo cumplido'
   - 'La línea no tiene umbrales'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-015 — Un presupuesto mínimo informa cuánto falta y cuándo se cumple

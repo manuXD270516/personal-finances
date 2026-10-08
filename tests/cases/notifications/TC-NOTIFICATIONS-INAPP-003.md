@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: []
 requirement: 'Centro de notificaciones con estados y contador'
 scenario: 'Leer y archivar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-001']
 nfr: []
 invariants: []
@@ -36,7 +36,7 @@ expected_result:
   - 'B aparece solo con status=ARCHIVED'
   - 'Repetir "leer" sobre A responde igual (idempotente)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-003 — Leer y archivar actualizan la bandeja y el contador de no leídas

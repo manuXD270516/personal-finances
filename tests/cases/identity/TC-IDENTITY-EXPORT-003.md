@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Formato abierto y versionado del export"
 scenario: "Montos exactos en JSON y CSV"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-IDENTITY-010]
 nfr: [NFR-PORT-009, NFR-DATA-010]
 invariants: [INV-001, INV-003]
@@ -37,7 +37,7 @@ expected_result:
   - "Todo registro valida contra su esquema"
   - "La descripción aparece neutralizada en el CSV (prefijo de comilla simple)"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-IDENTITY-EXPORT-003 — El export usa montos decimales exactos, JSON Schema y CSV neutralizado

@@ -8,7 +8,7 @@ related_specs:
   - classification/categories
 requirement: Bloqueo del ledger en periodos cerrados
 scenario: Operaciones sobre un mes cerrado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-005
   - FR-LEDGER-011
@@ -59,7 +59,7 @@ expected_result:
   - El gasto del 2026-11-01 se acepta
   - La anulación con correctInCurrentPeriod registra la reversa con fecha 2026-11-01 y el saldo al 2026-10-31 no cambia
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-LOCK-001 — Un periodo cerrado rechaza registrar, revisar y recategorizar, y la anulación se corrige en el periodo abierto

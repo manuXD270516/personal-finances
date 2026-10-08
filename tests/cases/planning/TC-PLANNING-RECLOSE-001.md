@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Re-cierre con nuevo snapshot versionado
 scenario: Re-cierre con la comisión agregada
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-006
   - FR-PLANNING-004
@@ -48,7 +48,7 @@ expected_result:
   - "Snapshot 1 sin cambios: 5200.00 BOB y 8450.50 BOB"
   - El periodo tiene closeCount 2, reopenCount 1 y latestCloseNo 2
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-RECLOSE-001 — Re-cerrar genera el snapshot 2 enlazado al 1 sin alterar el 1

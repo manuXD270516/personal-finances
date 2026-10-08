@@ -23,7 +23,7 @@ Motivación y alcance: ver proposal.md. Fuentes: FR-REPORTING-006, docs/14 §4 (
 2. **Saldo a la fecha** = Σ postings de la cuenta con `entry_date ≤ corte` (fecha de negocio, decisión 1 de `add-transaction-recording`), incluidas reversas: una corrección posterior fechada en el pasado cambia los puntos pasados abiertos (correcto: la serie refleja el ledger vigente), salvo meses cerrados (decisión 4).
 3. **Valoración** con `ValuationRateSelector` de FX en la fecha de corte y `windowDays` del setting `REPORTING_RATE_VALIDITY_WINDOW` (D53), mismos niveles que el patrimonio actual (`PRIMARY → FALLBACK → LAST_KNOWN_STALE/MANUAL`, D34/D38) pero **evaluados a esa fecha** (solo tasas con vigencia ≤ corte). Sin tasa ⇒ punto incompleto (`complete: false`, `unconverted[]`), nunca 1:1.
 4. **Periodos cerrados**: `ClosingSnapshotQuery.listCurrent({workspaceId, periodIds})` (contrato de `add-month-closing`, §Contratos internos) devuelve el snapshot vigente de cada periodo cerrado con patrimonio, activos y pasivos en la moneda base; si la moneda de reporte pedida es la del snapshot, el punto usa sus valores (`source: SNAPSHOT`, `closed: true`); si difiere, se calcula (`COMPUTED`) y se marca `closed: true` con aviso. En el orden consolidado `add-month-closing` (18) se aplica antes que este change (22).
-5. **Cuentas por fecha**: entran las cuentas con `includeInNetWorth = true` (valor vigente; no hay historia del flag, pregunta abierta 2) cuyo saldo a la fecha sea ≠ 0 o que existían a esa fecha (`opened_on ≤ corte`); el estado actual (`ARCHIVED`/`CLOSED`) no excluye fechas pasadas.
+5. **Cuentas por fecha**: entran las cuentas con `includeInNetWorth = true` (valor vigente; no hay historia del flag; confirmado por el owner, docs/33 D103) cuyo saldo a la fecha sea ≠ 0 o que existían a esa fecha (`opened_on ≤ corte`); el estado actual (`ARCHIVED`/`CLOSED`) no excluye fechas pasadas.
 6. **Variación** = neto(n) − neto(n−1) en la moneda de reporte; `comparable: false` si alguno es incompleto.
 7. **Rango**: por etiquetas de periodo (`from`/`to` = `YYYY-MM`); por defecto 12 periodos terminando en el actual; máximo 120; `from ≤ to ≤ periodo actual`.
 8. **Caché**: `ETag` = hash(versión de datos del workspace, rango, moneda, setting de ventana, último instante de tasas usado); `304` con `If-None-Match`.
@@ -44,9 +44,11 @@ Sin migraciones. Contrato: operación nueva (MINOR). La spec principal `reportin
 
 ## Preguntas abiertas
 
-1. **Mes calendario vs mes financiero.** *(Resuelta en la consolidación del 2026-10-05: la serie sigue los periodos financieros de `add-financial-periods` y el bloqueo por rango de ADR-0028; decisión 1.)*
-2. **Historia de `includeInNetWorth`.** ¿Un cambio del flag debe afectar solo desde la fecha del cambio? **Recomendación:** no en Phase 2 (se aplica el valor vigente a toda la serie y la UI lo advierte); la historia exacta llega con los snapshots de cierre, que congelan el valor.
-3. **Ubicación en la UI.** ¿Gráfico en el Home (Q1 "¿cuánto tengo?") o solo en una vista de patrimonio? **Recomendación:** tarjeta compacta en el Home (últimos 6 meses) con enlace a la vista completa (12 meses), aplicando la jerarquía visual de D50.
+**Todas resueltas por el owner el 2026-10-08** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md), decisiones D59–D111); cada pregunta indica su decisión. Se conserva el texto original.
+
+1. **Mes calendario vs mes financiero.** *(Resuelta en la consolidación del 2026-10-05: la serie sigue los periodos financieros de `add-financial-periods` y el bloqueo por rango de ADR-0028; decisión 1.)* **Resuelta** en la consolidación del 2026-10-05 (sin decisión adicional del owner).
+2. **Historia de `includeInNetWorth`.** ¿Un cambio del flag debe afectar solo desde la fecha del cambio? **Recomendación:** no en Phase 2 (se aplica el valor vigente a toda la serie y la UI lo advierte); la historia exacta llega con los snapshots de cierre, que congelan el valor. → **Resuelta por el owner (2026-10-08): D103** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
+3. **Ubicación en la UI.** ¿Gráfico en el Home (Q1 "¿cuánto tengo?") o solo en una vista de patrimonio? **Recomendación:** tarjeta compacta en el Home (últimos 6 meses) con enlace a la vista completa (12 meses), aplicando la jerarquía visual de D50. → **Resuelta por el owner (2026-10-08): D104** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
 
 ## Dependencias entre changes
 

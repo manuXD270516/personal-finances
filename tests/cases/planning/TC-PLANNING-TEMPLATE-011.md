@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets', 'planning/financial-periods']
 requirement: 'Template por defecto aplicado a los periodos nuevos'
 scenario: 'Creación del periodo reintentada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-010', 'FR-PLANNING-002']
 nfr: []
 invariants: []
@@ -28,7 +28,7 @@ steps:
 expected_result:
   - '"2026-12" tiene un solo plan'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-011 — La creación automática del periodo reintentada no duplica el plan

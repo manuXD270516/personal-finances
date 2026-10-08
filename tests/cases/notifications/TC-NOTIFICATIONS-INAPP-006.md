@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['security/access-control']
 requirement: 'Notificaciones privadas de cada usuario'
 scenario: 'Notificación de otro miembro'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-001']
 nfr: ['NFR-SEC-003', 'NFR-SEC-004']
 invariants: ['INV-025']
@@ -34,7 +34,7 @@ expected_result:
   - 'N sigue UNREAD'
   - 'La consulta SQL no devuelve N; sin app.user_id falla con PF002'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-INAPP-006 — Un usuario no puede ver ni modificar notificaciones de otro usuario o workspace

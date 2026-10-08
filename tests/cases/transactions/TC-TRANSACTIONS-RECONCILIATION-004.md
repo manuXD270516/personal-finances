@@ -5,7 +5,7 @@ spec: transactions/reconciliation
 related_specs: []
 requirement: "Saldo confirmado y diferencia de la sesión"
 scenario: "Tarjeta de crédito expresada como deuda"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-030]
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - "Saldo confirmado: deuda 520.00 BOB"
   - "Diferencia 0.00 BOB"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-RECONCILIATION-004 — En una tarjeta de crédito el saldo confirmado se expresa como deuda positiva

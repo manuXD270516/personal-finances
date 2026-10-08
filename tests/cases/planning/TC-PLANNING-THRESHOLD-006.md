@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Cruce simultáneo de varios umbrales'
 scenario: 'Del 46.7 % al 91.7 %'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-022']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Se registran cruces de 50, 75 y 90 %'
   - 'Al llegar a 600.00 BOB solo se emite el hecho del 100 %'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-THRESHOLD-006 — Cruzar varios umbrales a la vez emite un solo hecho con el más alto

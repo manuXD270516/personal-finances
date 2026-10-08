@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Disponible para gastar agregado'
 scenario: 'Disponible con una línea excedida'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-024']
 nfr: []
 invariants: ['INV-020']
@@ -30,7 +30,7 @@ steps:
 expected_result:
   - 'Disponible para gastar 3750.00 BOB (950.00 + 0.00 + 2800.00)'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-011 — El disponible para gastar suma los restantes positivos sin restar los excesos

@@ -5,7 +5,7 @@ spec: notifications/alerts
 related_specs: ['planning/budgets']
 requirement: 'Preferencias por tipo y canal'
 scenario: 'Solo in-app para umbrales'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-003']
 nfr: []
 invariants: ['INV-029']
@@ -33,7 +33,7 @@ expected_result:
   - 'Mailpit no recibe email'
   - 'El cambio de preferencias queda auditado'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-NOTIFICATIONS-PREFS-001 — Desactivar el email de umbrales deja solo la notificación in-app

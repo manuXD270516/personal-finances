@@ -5,7 +5,7 @@ spec: reporting/net-worth
 related_specs: ["accounts/account-management"]
 requirement: "Cuentas consideradas en cada fecha"
 scenario: "Cuenta archivada con saldo histórico"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-REPORTING-006, FR-ACCOUNTS-011]
 nfr: []
 invariants: [INV-022]
@@ -31,7 +31,7 @@ expected_result:
   - "Enero incluye 300.00 BOB de \"Caja vieja\" y nada de \"Banco nuevo\""
   - "Febrero incluye 500.00 BOB de \"Banco nuevo\" y nada de \"Caja vieja\""
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-REPORTING-NETWORTH-010 — Cada punto considera las cuentas con saldo en esa fecha

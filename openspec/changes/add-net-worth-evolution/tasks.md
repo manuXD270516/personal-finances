@@ -4,7 +4,7 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner los requirements añadidos a `reporting/net-worth` y las preguntas abiertas 1–3 de design.md; verificar con `openspec validate add-net-worth-evolution --strict`
+- [ ] 1.1 Revisar con el owner los requirements añadidos a `reporting/net-worth` y las preguntas abiertas 1–3 de design.md (resueltas por el owner el 2026-10-08, docs/33); verificar con `openspec validate add-net-worth-evolution --strict`
 - [ ] 1.2 Revisar TC-REPORTING-NETWORTH-006..012 (cifras: 2000.00 + 100.000000 × 10.00 − 300.00 = 2700.00; 2500.00 + 1050.00 = 3550.00; 2400.00 + 120.000000 × 11.00 − 150.00 = 3570.00); pasar a `ready` al aprobar
 
 ## 2. DOMAIN (TDD)

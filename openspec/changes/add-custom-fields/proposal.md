@@ -12,7 +12,7 @@ Categorías, tags y contrapartes no cubren todos los atributos que el owner quie
 - **Sin efecto en el ledger** (INV-033) y **periodos cerrados** respetados (`PERIOD_CLOSED`, extensión de D49 para custom fields de transacción).
 - **Listado de transacciones** filtrable por valor de custom field (igualdad; rango para número/decimal/fecha).
 - Evento `classification.CustomFieldDefinitionChanged.v1`; cambios de valores en `transactions.TransactionUpdated.v1` (`changedFields=[customFields]`) y `accounts.AccountUpdated.v1`.
-- **Fuera de alcance:** tipos `MULTI_SELECT` y `MONEY` (docs/04 los menciona; quedan como pregunta abierta), custom fields en transferencias y conversiones (no tienen split nominal), en categorías/contrapartes/metas/préstamos, reglas que fijan custom fields (Phase 6, `SET_CUSTOM_FIELD`), reportes por custom field (Phase 7), recorrido (máquina de estados) de las definiciones.
+- **Fuera de alcance:** tipos `MULTI_SELECT` y `MONEY` (docs/04 los menciona; fuera de Phase 2 por decisión del owner, docs/33 D96), custom fields en transferencias y conversiones (no tienen split nominal), en categorías/contrapartes/metas/préstamos, reglas que fijan custom fields (Phase 6, `SET_CUSTOM_FIELD`), reportes por custom field (Phase 7), recorrido (máquina de estados) de las definiciones.
 
 ## Capabilities
 

@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Aplicar a futuro con vista previa'
 scenario: 'Propagar el nuevo máximo de restaurantes'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-014']
 nfr: []
 invariants: []
@@ -32,7 +32,7 @@ expected_result:
   - 'Vista previa: "2026-12" de 600.00 a 650.00 BOB; "2027-01" en conflicto'
   - 'Tras confirmar: "Mes estándar" versión 3; "2026-12" con 650.00 BOB; "2027-01" conserva 700.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-015 — La propagación a futuro muestra cambios y conflictos y respeta ediciones manuales

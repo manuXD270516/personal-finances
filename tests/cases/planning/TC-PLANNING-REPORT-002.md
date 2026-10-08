@@ -5,7 +5,7 @@ spec: planning/month-closing
 related_specs: []
 requirement: Variaciones respecto al periodo anterior
 scenario: Octubre contra septiembre
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-007
 nfr: []
@@ -37,7 +37,7 @@ expected_result:
   - 'Variación de gastos de "2026-10": +550.50 BOB (+7.0 %)'
   - '"2026-07" indica que no hay periodo anterior, sin variaciones'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-REPORT-002 — El reporte de cierre muestra variaciones contra el periodo anterior

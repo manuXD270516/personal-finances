@@ -5,7 +5,7 @@ spec: planning/budget-templates
 related_specs: ['planning/budgets']
 requirement: 'Clonar un template como template independiente'
 scenario: 'Mes de vacaciones desde Mes estándar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-012']
 nfr: []
 invariants: []
@@ -31,7 +31,7 @@ expected_result:
   - '"Mes de vacaciones" versión 1 con las líneas de "Mes estándar" versión 2'
   - 'La versión 3 de "Mes estándar" no cambia "Mes de vacaciones"'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-TEMPLATE-014 — Clonar un template crea uno independiente con su propia versión 1

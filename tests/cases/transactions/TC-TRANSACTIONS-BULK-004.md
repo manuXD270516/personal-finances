@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["ledger/journal-posting"]
 requirement: "La edición masiva no cambia montos, cuentas, fechas ni el ledger"
 scenario: "Saldos intactos tras recategorizar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-TRANSACTIONS-008]
 nfr: []
 invariants: [INV-033]
@@ -36,7 +36,7 @@ expected_result:
   - "Tras recategorizar: mismo número de asientos y \"Bank A\" en 2000.00 BOB"
   - "Lotes con campos financieros: 400 VALIDATION_FAILED; nada cambia"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-004 — La edición masiva no acepta cambios financieros ni toca el ledger

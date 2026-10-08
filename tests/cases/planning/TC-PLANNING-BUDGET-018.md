@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: ['planning/month-closing']
 requirement: 'Rollover provisional hasta el cierre del periodo anterior'
 scenario: 'Reapertura con gasto adicional'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-020', 'FR-PLANNING-006']
 nfr: []
 invariants: ['INV-015', 'INV-028']
@@ -34,7 +34,7 @@ expected_result:
   - 'Tras re-cerrar, el remanente es 50.00 BOB definitivo y el planificado efectivo 650.00 BOB'
   - 'Reentregar MonthClosed no cambia el resultado'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-018 — El rollover es provisional hasta cerrar el periodo anterior y se recalcula al reabrir

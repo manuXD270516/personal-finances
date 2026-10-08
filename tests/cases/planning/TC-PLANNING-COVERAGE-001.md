@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Cobertura retroactiva desde la primera actividad
 scenario: Saldo inicial anterior a los periodos existentes
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-002
   - FR-LEDGER-011
@@ -48,7 +48,7 @@ expected_result:
   - Existen en draft todos los periodos de "2027-02" a "2027-06", sin huecos
   - El gasto del 2029-01-15 se registra y no se crean periodos posteriores a "2028-10"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-COVERAGE-001 — Los asientos fuera del rango cubierto crean los periodos necesarios mientras no haya cierres

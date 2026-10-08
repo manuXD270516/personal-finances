@@ -42,8 +42,10 @@ Expand: índices nuevos (creación en la tabla padre particionada; en local es i
 
 ## Preguntas abiertas
 
-1. **¿EDITOR puede usar la vista global?** FR-AUDIT-006 dice "(solo `OWNER`)" para la consulta global y el export; D28 y docs/10 §14 permiten leer el audit log a EDITOR. **Recomendación:** consulta global para OWNER y EDITOR (coherente con D28), export CSV solo OWNER.
-2. **Auditar fallos de autorización de no miembros** (`WORKSPACE_ACCESS_DENIED`) en el workspace objetivo: revela al OWNER que un usuario ajeno intentó acceder (útil) pero escribe en un workspace por acción de un no miembro. **Recomendación:** sí, con el límite por minuto; en Phase 2 (un usuario) el caso es casi inexistente.
+**Todas resueltas por el owner el 2026-10-08** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md), decisiones D59–D111); cada pregunta indica su decisión. Se conserva el texto original.
+
+1. **¿EDITOR puede usar la vista global?** FR-AUDIT-006 dice "(solo `OWNER`)" para la consulta global y el export; D28 y docs/10 §14 permiten leer el audit log a EDITOR. **Recomendación:** consulta global para OWNER y EDITOR (coherente con D28), export CSV solo OWNER. → **Resuelta por el owner (2026-10-08): D105** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
+2. **Auditar fallos de autorización de no miembros** (`WORKSPACE_ACCESS_DENIED`) en el workspace objetivo: revela al OWNER que un usuario ajeno intentó acceder (útil) pero escribe en un workspace por acción de un no miembro. **Recomendación:** sí, con el límite por minuto; en Phase 2 (un usuario) el caso es casi inexistente. → **Resuelta por el owner (2026-10-08): D106** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md)).
 
 ## Dependencias entre changes
 

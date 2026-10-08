@@ -5,7 +5,7 @@ spec: transactions/bulk-edit
 related_specs: ["transactions/splits"]
 requirement: "Aplicabilidad de los cambios masivos"
 scenario: "Categoría sobre un gasto con dos splits"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-033, FR-TRANSACTIONS-026]
 nfr: []
 invariants: [INV-021]
@@ -36,7 +36,7 @@ expected_result:
   - "TR1: 422 BULK_EDIT_NOT_APPLICABLE"
   - "Tag \"viaje\": los dos splits de T4 y el split de T1 quedan etiquetados; Σ splits de T4 sigue 300.00 BOB"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-BULK-005 — La categoría en lote solo aplica a transacciones de un único split nominal

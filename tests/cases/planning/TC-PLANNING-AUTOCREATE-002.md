@@ -5,7 +5,7 @@ spec: planning/financial-periods
 related_specs: []
 requirement: Creación automática e idempotente con anticipación
 scenario: Creación repetida
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - FR-PLANNING-002
 nfr: []
@@ -34,7 +34,7 @@ expected_result:
   - Existen exactamente cuatro periodos ("2026-10" a "2027-01")
   - Ninguna ejecución falla con error no controlado
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-AUTOCREATE-002 — Dos creaciones automáticas concurrentes no duplican periodos

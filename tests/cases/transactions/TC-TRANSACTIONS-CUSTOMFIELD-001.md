@@ -5,7 +5,7 @@ spec: transactions/transaction-recording
 related_specs: ["classification/custom-fields"]
 requirement: "Datos de la transacción"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-TRANSACTIONS-002, FR-TRANSACTIONS-003, FR-TRANSACTIONS-026]
 nfr: []
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "El split devuelve centro_costo = \"casa\" y factura = \"F-001234\""
   - "El resto de los campos de \"Ida y vuelta de todos los campos\" se conserva"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-TRANSACTIONS-CUSTOMFIELD-001 — La transacción devuelve exactamente los custom fields de cada split

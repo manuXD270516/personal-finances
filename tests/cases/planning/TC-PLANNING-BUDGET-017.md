@@ -5,7 +5,7 @@ spec: planning/budgets
 related_specs: []
 requirement: 'Rollover del remanente al periodo siguiente'
 scenario: 'Remanente positivo trasladado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-PLANNING-020']
 nfr: []
 invariants: ['INV-020']
@@ -34,7 +34,7 @@ expected_result:
   - 'Completa con 650.00 ⇒ 550.00 BOB'
   - 'Solo positivo con 650.00 ⇒ 600.00 BOB'
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-PLANNING-BUDGET-017 — El rollover traslada el remanente o el exceso con tope y sin planificado negativo

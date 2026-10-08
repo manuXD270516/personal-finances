@@ -5,7 +5,7 @@ spec: classification/custom-fields
 related_specs: []
 requirement: "Archivar y desarchivar un custom field"
 scenario: "Archivar el centro de costo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: [FR-CLASSIFICATION-009]
 nfr: []
 invariants: [INV-019]
@@ -37,7 +37,7 @@ expected_result:
   - "409 CUSTOM_FIELD_ARCHIVED"
   - "La nueva definición con la misma clave se acepta"
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # TC-CLASSIFICATION-CUSTOMFIELD-008 — Archivar un custom field conserva sus valores y bloquea valores nuevos
