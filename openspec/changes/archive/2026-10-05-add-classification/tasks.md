@@ -72,7 +72,8 @@
 
 ## 9. AUTOMATED TESTS y E2E
 
-- [ ] 9.1 Completar los tests automatizados de todos los TC de este change y marcar `automation_status: automated`; verificar que el chequeo de trazabilidad no reporta TC sin test
+- [x] 9.1 Completar los tests automatizados de todos los TC de este change y marcar `automation_status: automated`; verificar que el chequeo de trazabilidad no reporta TC sin test
+  > Cerrada 2026-10-05: todos los TC de Phase 1 del change están automatizados; TC-CLASSIFICATION-GROUP-001 pasa a Phase 7 por decisión del owner (docs/31 D58).
   > Nota 2026-10-04: todos los TC del change están `automated` salvo TC-CLASSIFICATION-GROUP-001 (sin reporte por grupo en Phase 1).
   > Revisado 2026-10-05 (sigue abierta): único TC sin automatizar TC-CLASSIFICATION-GROUP-001 (`not_automated`, `ready`); requiere que REPORTING agregue por grupo, que Phase 1 no expone. Opciones para el lead: automatizarlo por la API de categorías (total por grupo) o moverlo a la fase del reporte por grupo.
 - [x] 9.2 E2E (Playwright): crear workspace con catálogo, crear subcategoría, archivarla y comprobar que desaparece del selector pero sigue en el historial; crear counterparty inline; verificar en CI

@@ -14,9 +14,9 @@ type: api
 level: api
 automation_status: not_automated
 automated_tests: []
-status: ready
+status: draft
 regression_suite: false
-phase: 1
+phase: 7
 tags: [categories, groups, reporting]
 error_code: null
 preconditions:
@@ -49,3 +49,4 @@ Entonces es 3,110.00 BOB
 ## Notas
 
 - Redactado 2026-10-04 (add-classification 1.3). Se mantiene `not_automated`: Phase 1 no expone un reporte por grupo (el requirement dice que los reportes PUEDEN agregar por grupo; `reports/summary` agrega por categoría). Se automatiza cuando Reporting agregue por grupo.
+- 2026-10-05 (docs/31 D58): el owner mueve este TC a **Phase 7** (reportes avanzados con agregación por grupo); `add-classification` se archiva sin él.
