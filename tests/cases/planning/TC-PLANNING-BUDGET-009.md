@@ -12,9 +12,12 @@ invariants: ['INV-020']
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - apps/web/src/ui/planning/budgets.test.tsx
+  - packages/contexts/planning/src/domain/budget-progress-calculator.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'progress', 'projection', 'timezone']
@@ -55,4 +58,4 @@ Entonces la proyección es 1320.00 BOB
 ## Notas
 
 - Cubre también el scenario "Periodo terminado".
-- draft: la proyección para líneas fijas depende de la pregunta abierta 8 de add-budgets.
+- La proyección de líneas fijas y de mínimo quedó resuelta por el owner (docs/33 D83): solo MAXIMUM, RANGE y PERCENT_OF_INCOME proyectan (TC-PLANNING-BUDGET-022).

@@ -12,9 +12,12 @@ invariants: ['INV-029']
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - apps/web/src/ui/planning/budgets.test.tsx
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['budgets', 'rbac', 'audit']

@@ -742,6 +742,7 @@ erDiagram
   BUDGET_TEMPLATE_VERSION ||--o{ BUDGET : "usada por"
   BUDGET ||--|{ BUDGET_LINE : "lineas"
   BUDGET_TEMPLATE_LINE ||--o{ BUDGET_LINE : "origen"
+  FINANCIAL_PERIOD ||--o{ BUDGET_THRESHOLD_CROSSING : "cruces"
   FINANCIAL_PERIOD ||--o{ MONTH_CLOSING : "cierres"
   FINANCIAL_PERIOD {
     uuid id PK
@@ -790,23 +791,50 @@ erDiagram
   BUDGET {
     uuid id PK
     uuid workspace_id FK
-    uuid period_id FK
-    uuid template_version_id FK "nullable: manual"
-    ccy currency FK
-    text status "DRAFT ACTIVE CLOSED"
+    uuid period_id FK "UNIQUE con workspace"
+    ccy currency FK "moneda base al crear"
+    text origin "EMPTY TEMPLATE CLONE"
+    uuid template_version_id "nullable (FK la agrega add-budget-templates)"
+    uuid cloned_from_budget_id FK
+    boolean zero_based
     int version
   }
   BUDGET_LINE {
     uuid id PK
     uuid workspace_id FK
     uuid budget_id FK
-    uuid category_id "ref classification.category"
+    text target_kind "CATEGORY GROUP TAG"
+    uuid target_id "ref classification"
+    text nature "EXPENSE INCOME"
+    text kind "FIXED MAXIMUM MINIMUM RANGE PERCENT_OF_INCOME"
     money planned_amount
+    money min_amount
+    money max_amount
+    numeric percent
+    text income_basis "EXPECTED ACTUAL"
+    text rollover_policy "NONE CARRY_POSITIVE CARRY_ALL"
+    money rollover_cap
     money rollover_in_amount
-    ccy currency FK
-    text source "TEMPLATE MANUAL"
-    uuid template_line_id FK
+    text rollover_status "NONE PROVISIONAL FINAL"
+    numeric_array thresholds
+    text source "MANUAL TEMPLATE CLONE"
+    uuid template_line_id
+    boolean overridden
     int version
+  }
+  BUDGET_THRESHOLD_CROSSING {
+    uuid workspace_id PK
+    uuid period_id PK
+    text target_kind PK
+    uuid target_id PK
+    numeric threshold PK
+    uuid budget_id FK
+    uuid budget_line_id
+    money reference_amount
+    money actual_amount
+    ccy currency FK
+    timestamptz crossed_at
+    uuid event_id
   }
   MONTH_CLOSING {
     uuid id PK
@@ -829,11 +857,12 @@ erDiagram
 | `budget_template` | `(workspace_id, lower(name)) WHERE archived_at IS NULL`; `(workspace_id) WHERE is_default AND archived_at IS NULL` | — | — | WS | `version`, `archived_at` |
 | `budget_template_version` | `(template_id, version_no)` | `version_no >= 1` | — | **WS-RO** (versiones inmutables; cambiar template = nueva versión) | Inmutable |
 | `budget_template_line` | `(template_version_id, category_id, currency)` | `amount >= 0` | — | **WS-RO** | Inmutable |
-| `budget` | `(workspace_id, period_id, currency)` | — | — | WS | `version` |
-| `budget_line` | `(budget_id, category_id, currency)` | `planned_amount >= 0` | `(workspace_id, category_id)` | WS | `version` |
+| `budget` | `(workspace_id, period_id)` — **un plan por periodo en la moneda base** (as-built de `add-budgets`, docs/33 D78; relajable a `(period, currency)` con un *expand*); `(workspace_id, id)` | `origin IN (EMPTY, TEMPLATE, CLONE)` | FK `(workspace_id, period_id)` → `financial_period` | WS (`pf_app` sin `DELETE`) | `version` |
+| `budget_line` | `(budget_id, target_kind, target_id)` — sin objetivos repetidos; los solapados (categoría↔subcategoría, grupo↔categoría) los rechaza `TargetOverlapPolicy` | montos `>= 0`; `min <= max`; forma por tipo (`FIXED`/`MAXIMUM` ⇒ `planned_amount`; `MINIMUM` ⇒ `min_amount`; `RANGE` ⇒ ambos; `PERCENT_OF_INCOME` ⇒ `percent` en (0, 100] + `income_basis`); `cardinality(thresholds) <= 10`; ingresos solo `FIXED` sin umbrales ni rollover; `MINIMUM` sin umbrales; tags solo de gasto | `(workspace_id, target_kind, target_id)` | WS (con `DELETE`: las líneas son configuración, su historia está en el audit log) | `version` |
+| `budget_threshold_crossing` | PK `(workspace_id, period_id, target_kind, target_id, threshold)` — el dedupe de "una sola vez" es por **objetivo**, no por línea | `0 < threshold <= 1000` | — | **WS-RO** (append-only, `forbid_mutation`; el hecho de umbral se emite en la misma transacción) | Inmutable |
 | `month_closing` | `(period_id, attempt_no)`; `(period_id) WHERE status='IN_PROGRESS'` | — | — | WS | Append-only por intento |
 
-Los **actuals** del presupuesto no se guardan en `planning`: se leen de `reporting.monthly_category_agg` / `reporting.budget_snapshot` (derivados, [14-reporting.md](14-reporting.md)) vía `@pf/reporting/contracts`; el `summary` del cierre congela los valores al cerrar.
+Los **actuals** del presupuesto no se guardan en `planning`. **As-built (Phase 2, `add-budgets`):** se derivan en cada lectura de la fuente de verdad (`SummarizeNominalFlows` de Transactions + `FlowValuation` del shared-kernel); `reporting.monthly_category_agg` / `reporting.budget_snapshot` (derivados, [14-reporting.md](14-reporting.md)) llegan con Phase 7. El `summary` del cierre congela los valores al cerrar (`BudgetVsActualQuery.getForPeriod`).
 
 ### 5.7 `commitments` — Recurrence engine & Subscriptions (Phase 3)
 
@@ -1647,6 +1676,7 @@ erDiagram
 | `fx.exchange_rate`, `fx.rate_anomaly_review` | SELECT, INSERT | SELECT, INSERT | No (append-only por grants; sin UPDATE/DELETE) |
 | `fx.provider_run` (instalación) | SELECT | SELECT, INSERT, DELETE (purga) | No |
 | `planning.budget_template_version`, `budget_template_line` | SELECT, INSERT | SELECT | Sí |
+| `planning.budget_threshold_crossing` | SELECT, INSERT | SELECT, INSERT (hereda de `pf_app`) | Sí (la purga del workspace demo sigue permitida, ADR-0026) |
 | `audit.audit_log`, `audit.lifecycle_transition` | SELECT, INSERT | SELECT, INSERT | Sí |
 | `goals.goal_contribution`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |
 | `reporting.*` | SELECT | SELECT, INSERT, UPDATE, DELETE, TRUNCATE | No |

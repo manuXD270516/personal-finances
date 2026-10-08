@@ -12,9 +12,13 @@ invariants: ['INV-002']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - apps/web/src/ui/planning/budgets.test.tsx
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+  - packages/shared-kernel/src/valuation/flow-valuation.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'actual', 'multi-currency', 'missing-rate']

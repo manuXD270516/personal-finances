@@ -4,6 +4,7 @@ import {
   currency as makeCurrency,
   dec,
   DomainError,
+  FlowValuation,
   LocalDate,
   Money,
   type Currency,
@@ -19,7 +20,6 @@ import type {
 } from '../contracts/index.js';
 import {
   ConsolidationService,
-  endOfDayInstant,
   homeQuestions,
   KpiCalculator,
   NetWorthValuator,
@@ -163,24 +163,18 @@ export class ReportSummaryQueries {
     const stockCodes = [...new Set(lines.map((l) => l.balance.currency.code))].filter(
       (c) => c !== reporting.code,
     );
-    const flowKeys = [
-      ...new Set(
-        flows
-          .filter((f) => f.amount.currency.code !== reporting.code)
-          .map((f) => `${f.amount.currency.code}|${f.businessDate}`),
-      ),
-    ].sort();
     const nowText = now.toString();
-    const atClose = (date: string) => {
-      const close = endOfDayInstant(date, timeZone);
-      return close.epochMillis > now.epochMillis ? nowText : close.toString();
-    };
+    // Pedidos de tasa de los flujos: `FlowValuation` (shared-kernel, docs/33 D109) comparte las reglas con Planning.
+    const flowRequests = FlowValuation.rateRequests(
+      flows.map((f) => ({ date: f.businessDate, amount: f.amount })),
+      reporting,
+      timeZone,
+      now,
+    );
+    const flowKeys = flowRequests.map((r) => r.key);
     const requests = [
       ...stockCodes.map((code) => ({ base: code, quote: reporting.code, at: nowText })),
-      ...flowKeys.map((key) => {
-        const [code, date] = key.split('|') as [string, string];
-        return { base: code, quote: reporting.code, at: atClose(date) };
-      }),
+      ...flowRequests.map(({ base, quote, at }) => ({ base, quote, at })),
     ];
     const windowDays = deps.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
     const resolved = requests.length

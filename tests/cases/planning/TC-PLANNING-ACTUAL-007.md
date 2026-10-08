@@ -12,9 +12,10 @@ invariants: ['INV-034', 'INV-028']
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/budgets.actual.properties.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'actual', 'pbt']

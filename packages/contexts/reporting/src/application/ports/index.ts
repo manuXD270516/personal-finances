@@ -40,7 +40,7 @@ export interface ReportingDeps {
   readonly accounts: AccountCatalogQuery;
   readonly balances: AccountBalancesQuery;
   readonly flows: NominalFlowQuery;
-  readonly categories: CategoryCatalogQuery;
+  readonly categories: Pick<CategoryCatalogQuery, 'categoriesByIds'>;
   readonly rates: FxValuationPort;
   readonly versions: DataVersionStore;
   readonly clock: Clock;

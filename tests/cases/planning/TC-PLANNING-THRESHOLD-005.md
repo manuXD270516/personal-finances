@@ -12,9 +12,11 @@ invariants: ['INV-028']
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/test/integration/pg-budgets.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'thresholds', 'idempotency', 'concurrency']

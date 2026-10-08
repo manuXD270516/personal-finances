@@ -12,9 +12,11 @@ invariants: ['INV-012']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'actual', 'multi-currency', 'immutability']

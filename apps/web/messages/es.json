@@ -142,7 +142,14 @@
       "accounts_account_archived": "Cuenta archivada",
       "accounts_account_closed": "Cuenta cerrada",
       "accounts_account_reactivated": "Cuenta reactivada",
-      "accounts_account_reordered": "Orden de cuentas modificado"
+      "accounts_account_reordered": "Orden de cuentas modificado",
+      "planning_budget_created": "Plan creado",
+      "planning_budget_updated": "Plan modificado",
+      "planning_budget_line_added": "Línea agregada",
+      "planning_budget_line_updated": "Línea modificada",
+      "planning_budget_line_removed": "Línea quitada",
+      "planning_budget_threshold_reached": "Umbral alcanzado",
+      "planning_budget_rollover_updated": "Remanente actualizado"
     },
     "fields": {
       "name": "Nombre",
@@ -171,7 +178,29 @@
       "color": "Color",
       "icon": "Icono",
       "notes": "Notas",
-      "cryptoNetwork": "Red"
+      "cryptoNetwork": "Red",
+      "periodId": "Periodo",
+      "zeroBased": "Base cero",
+      "line": "Línea",
+      "target": "Objetivo",
+      "nature": "Naturaleza",
+      "kind": "Tipo",
+      "planned": "Planificado",
+      "min": "Mínimo",
+      "max": "Máximo",
+      "percent": "Porcentaje",
+      "incomeBasis": "Base de ingresos",
+      "rolloverPolicy": "Política de remanente",
+      "rolloverCap": "Tope del remanente",
+      "rolloverIn": "Remanente recibido",
+      "rolloverStatus": "Estado del remanente",
+      "thresholds": "Umbrales",
+      "source": "Origen de la línea",
+      "threshold": "Umbral",
+      "alsoCrossed": "También cruzados",
+      "reference": "Referencia",
+      "actual": "Gastado",
+      "utilization": "Uso (%)"
     }
   },
   "Dashboard": {
@@ -1515,6 +1544,157 @@
       "start": "Extracto del {date} por {balance}.",
       "complete": "Saldo confirmado {cleared} · diferencia {difference}",
       "adjustment": "ver el ajuste"
+    }
+  },
+  "Budgets": {
+    "title": "Presupuestos",
+    "intro": "Planifica cada periodo con ingresos esperados y presupuestos por categoría, grupo o tag. Lo gastado se calcula siempre desde tus transacciones; nunca se edita a mano.",
+    "loading": "Cargando periodos…",
+    "loadingPlan": "Cargando el plan…",
+    "noPeriods": "Todavía no hay periodos: se crean automáticamente. Revisa la sección de periodos.",
+    "periodSummary": "{name}: del {from} al {to} ({status}).",
+    "periodClosed": "Este periodo está cerrado: su plan es de solo lectura. Un propietario puede reabrirlo para corregirlo.",
+    "noPlan": "Este periodo todavía no tiene plan.",
+    "createPlan": "Crear el plan del periodo",
+    "planCreated": "Plan creado.",
+    "lineAdded": "Línea agregada.",
+    "lineSaved": "Línea guardada.",
+    "lineRemoved": "Línea quitada.",
+    "nav": {
+      "label": "Planificación",
+      "periods": "Periodos",
+      "budgets": "Presupuestos"
+    },
+    "totals": {
+      "title": "Resumen del plan",
+      "planned": "Planificado",
+      "actual": "Gastado",
+      "remaining": "Restante",
+      "available": "Disponible para gastar",
+      "availableHint": "Suma lo que queda en cada presupuesto de categoría o grupo; un exceso no resta a los demás.",
+      "expectedIncome": "Ingreso esperado",
+      "actualIncome": "Ingreso real",
+      "toAssign": "Por asignar",
+      "toAssignOver": "Asignado de más",
+      "zeroBased": "Plan base cero (asignar todo el ingreso esperado)",
+      "incomplete": "Gastado incompleto: hay montos sin tasa de cambio vigente.",
+      "unconverted": "Sin convertir: {amounts}. No se estiman a 1:1.",
+      "rates": "Tasas usadas",
+      "rate": "1 {base} = {value} {quote} · {type} · vigente al {asOf}",
+      "window": "Ventana de vigencia de las tasas: {days} días."
+    },
+    "lines": {
+      "title": "Líneas del plan",
+      "caption": "Líneas del plan con lo planificado, lo gastado y su estado",
+      "empty": "El plan no tiene líneas todavía. Agrega un presupuesto por categoría, grupo o tag.",
+      "columns": {
+        "target": "Presupuesto",
+        "planned": "Planificado",
+        "actual": "Gastado",
+        "remaining": "Restante",
+        "usage": "Uso",
+        "projection": "Proyección",
+        "status": "Estado",
+        "thresholds": "Umbrales",
+        "actions": "Acciones"
+      },
+      "income": "ingreso esperado",
+      "range": "{min} a {max}",
+      "percentOf": "{percent} % de ingresos ({basis})",
+      "rolloverIn": "Incluye {amount} de remanente ({status})",
+      "incomplete": "Sin convertir: {amounts}",
+      "difference": "Diferencia con lo esperado",
+      "usage": "{percent} %",
+      "usageLabel": "Uso del presupuesto {name}",
+      "noProjection": "Sin proyección",
+      "projectionExceeds": "La proyección supera el máximo",
+      "settlement": {
+        "PENDING": "Pendiente",
+        "MET": "Cumplido"
+      },
+      "noThresholds": "Sin umbrales",
+      "crossed": "cruzado",
+      "add": "Agregar línea",
+      "edit": "Editar",
+      "editLabel": "Editar la línea {name}",
+      "remove": "Quitar",
+      "removeLabel": "Quitar la línea {name}",
+      "confirmRemoveTitle": "¿Quitar la línea {name}?",
+      "confirmRemoveBody": "El gasto no se pierde: solo deja de medirse en este plan. Los umbrales ya avisados no se vuelven a avisar si la agregas otra vez."
+    },
+    "status": {
+      "UNDER": "Por debajo del objetivo",
+      "ON_TARGET": "En el objetivo",
+      "OVER": "Excedido",
+      "WITHIN": "Dentro del límite",
+      "BELOW": "Por debajo del rango",
+      "ABOVE": "Por encima del rango",
+      "PENDING": "Mínimo pendiente",
+      "MET": "Mínimo cumplido",
+      "NO_BUDGET": "Sin presupuesto"
+    },
+    "kind": {
+      "FIXED": "Fijo",
+      "MAXIMUM": "Máximo",
+      "MINIMUM": "Mínimo",
+      "RANGE": "Rango",
+      "PERCENT_OF_INCOME": "% de ingresos"
+    },
+    "targetKind": {
+      "CATEGORY": "Categoría",
+      "GROUP": "Grupo",
+      "TAG": "Tag"
+    },
+    "basis": {
+      "EXPECTED": "esperados",
+      "ACTUAL": "reales"
+    },
+    "rollover": {
+      "NONE": "sin remanente",
+      "PROVISIONAL": "provisional",
+      "FINAL": "definitivo"
+    },
+    "rolloverPolicy": {
+      "NONE": "Sin remanente",
+      "CARRY_POSITIVE": "Trasladar solo el sobrante",
+      "CARRY_ALL": "Trasladar sobrante y exceso"
+    },
+    "form": {
+      "titleAdd": "Agregar una línea al plan",
+      "titleEdit": "Editar la línea",
+      "targetKind": "Tipo de objetivo",
+      "target": "Objetivo",
+      "targetPlaceholder": "Elige un objetivo",
+      "kind": "Tipo de presupuesto",
+      "incomeFixedOnly": "Los ingresos esperados solo admiten un monto fijo y no tienen umbrales.",
+      "planned": "Monto ({currency})",
+      "min": "Mínimo ({currency})",
+      "max": "Máximo ({currency})",
+      "percent": "Porcentaje de ingresos",
+      "percentHint": "Mayor que 0 y hasta 100, con hasta 4 decimales.",
+      "incomeBasis": "Base del porcentaje",
+      "rolloverPolicy": "Remanente al periodo siguiente",
+      "rolloverCap": "Tope del remanente ({currency})",
+      "thresholds": "Umbrales de alerta (%)",
+      "thresholdsHint": "Separados por coma, hasta 10 valores entre 0 y 1000. Vacío usa 50, 75, 90 y 100.",
+      "currencyNote": "Todos los montos del plan van en {currency}.",
+      "add": "Agregar línea",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "required": "Este campo es obligatorio.",
+        "invalid": "El valor no es válido.",
+        "scale": "Tiene más decimales de los que admite la moneda."
+      }
+    },
+    "widget": {
+      "title": "Presupuesto del mes",
+      "available": "Disponible para gastar",
+      "detail": "De {planned} planificados llevas gastados {actual}.",
+      "incomplete": "Hay gastos sin tasa de cambio: el gastado puede ser mayor.",
+      "goToBudgets": "Ver presupuestos",
+      "noPlan": "Este periodo todavía no tiene un plan: no hay un disponible para gastar que mostrar.",
+      "createPlan": "Crear el plan del mes"
     }
   }
 }

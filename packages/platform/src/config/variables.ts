@@ -570,7 +570,7 @@ export const VARIABLES = {
     {
       group: 'Reporting',
       description:
-        'Ventana de vigencia (días, `1d`–`90d`) de las tasas de valoración y de referencia: una tasa más antigua que el instante valorado menos esta ventana no se usa (el monto queda sin convertir, nunca 1:1). La define Reporting (docs/31 D53) y la composición de la API la entrega a FX, que resuelve con ella la valoración del Home, el equivalente de cuentas y la tasa de referencia de las conversiones; se informa en `meta.rateWindowDays` del resumen.',
+        'Ventana de vigencia (días, `1d`–`90d`) de las tasas de valoración y de referencia: una tasa más antigua que el instante valorado menos esta ventana no se usa (el monto queda sin convertir, nunca 1:1). La define Reporting (docs/31 D53) y la composición de la API la entrega a FX, que resuelve con ella la valoración del Home, el equivalente de cuentas y la tasa de referencia de las conversiones; se informa en `meta.rateWindowDays` del resumen. También la lee el worker (add-budgets): el consumidor de umbrales valora el gastado de los presupuestos con la misma ventana que el Home y la API (presupuesto vs real, `meta.rateWindowDays` del plan).',
       default: '7d',
     },
   ),
@@ -713,6 +713,8 @@ export const APP_VARIABLES = {
     'LEDGER_INTEGRITY_CRON_TZ',
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_PERIODS_CRON',
+    // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
+    'REPORTING_RATE_VALIDITY_WINDOW',
     ...FX_PROVIDERS,
     'FX_PROVIDER_PARALELO_BO_URL',
     'FX_PROVIDER_DOLARAPI_BO_URL',

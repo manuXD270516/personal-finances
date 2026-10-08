@@ -12,9 +12,13 @@ invariants: []
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+  - packages/contexts/planning/src/domain/threshold-evaluator.test.ts
+  - tests/e2e/specs/budgets.spec.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'thresholds']

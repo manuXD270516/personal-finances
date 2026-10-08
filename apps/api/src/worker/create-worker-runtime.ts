@@ -20,10 +20,14 @@ import {
 import type { Logger } from '@pf/platform/logging';
 import {
   createFxMarketRateJobs,
+  createFxValuation,
   parseFxProviderSettings,
   type FxMarketRateJobsOptions,
 } from '@pf/fx/interface/fx.module';
+import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS } from '@pf/reporting/interface/reporting.module';
+import { createNominalFlowQuery } from '@pf/transactions/interface/transactions.module';
 import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface/audit.module';
+import { createCategoryCatalogQuery } from '@pf/classification/interface/classification.module';
 import {
   createDemoDataRuntime,
   identityActiveWorkspaces,
@@ -207,6 +211,7 @@ export async function createWorkerRuntime(
     }),
   });
 
+  const rateValidityWindowDays = config.REPORTING_RATE_VALIDITY_WINDOW ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
   // PLANNING (add-financial-periods): job horario `planning.ensure-periods` + consumidores de IDENTITY y LEDGER. El
   // calendario de cada workspace se lee con el rol de directorio (pf_worker no ve iam.workspace por membresía).
   const planning = createPlanningRuntime({
@@ -218,6 +223,20 @@ export async function createWorkerRuntime(
     calendar: identityWorkspaceCalendarDirectory(pool),
     activity: ledgerActivityRange(),
     lookahead: config.PLANNING_PERIOD_LOOKAHEAD,
+    // add-budgets: el consumidor de umbrales lee la fuente de verdad con la MISMA valoración y ventana de vigencia que
+    // el Home (`REPORTING_RATE_VALIDITY_WINDOW`, docs/31 D53 y docs/33 D109).
+    budgets: {
+      flows: createNominalFlowQuery(pool),
+      catalog: createCategoryCatalogQuery({ pool, clock: options.clock ?? systemClock }),
+      rates: createFxValuation({
+        pool,
+        clock: options.clock ?? systemClock,
+        windowDays: rateValidityWindowDays,
+        providers: parseFxProviderSettings(config),
+      }),
+      rateValidityWindowDays,
+      calendarCacheMs: 60_000,
+    },
   });
   await registerPlanningPeriodsJob(queue, planning.service, activeWorkspaces, logger, {
     cron: config.PLANNING_PERIODS_CRON,

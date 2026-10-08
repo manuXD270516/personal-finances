@@ -309,6 +309,15 @@ export function financeRuntimes(input: {
     calendar: identityWorkspaceCalendar(input.pool),
     activity: ledger.activityRange,
     ...(input.config.PLANNING_PERIOD_LOOKAHEAD ? { lookahead: input.config.PLANNING_PERIOD_LOOKAHEAD } : {}),
+    // add-budgets: presupuesto vs real desde la fuente de verdad, con la misma valoración y ventana que el Home.
+    budgets: {
+      flows: transactions.flows,
+      catalog: classification.categories,
+      rates: fx.valuation,
+      rateValidityWindowDays,
+      settings: identityWorkspaceSettings(input.pool),
+      history: input.history,
+    },
   });
   return { classification, fx, accounts, ledger, transactions, reporting, planning };
 }

@@ -123,6 +123,39 @@ export interface CategorySummaryDto {
   readonly archived: boolean;
 }
 
+/** Grupo de categorías del árbol (add-budgets). */
+export interface CategoryGroupNodeDto {
+  readonly groupId: string;
+  readonly name: string;
+  readonly kind: CategoryKindDto;
+  readonly archived: boolean;
+}
+
+/** Categoría o subcategoría del árbol: `parentId` no nulo ⇒ subcategoría (add-budgets). */
+export interface CategoryNodeDto {
+  readonly categoryId: string;
+  readonly name: string;
+  readonly kind: CategoryKindDto;
+  readonly groupId: string;
+  readonly parentId: string | null;
+  readonly systemCode: string | null;
+  readonly archived: boolean;
+}
+
+/** Tag del catálogo (add-budgets: presupuestos por tag). */
+export interface TagNodeDto {
+  readonly tagId: string;
+  readonly name: string;
+  readonly archived: boolean;
+}
+
+/** Catálogo completo del workspace: grupo → categoría → subcategoría (con `kind` y estado) y tags. */
+export interface CategoryTreeDto {
+  readonly groups: readonly CategoryGroupNodeDto[];
+  readonly categories: readonly CategoryNodeDto[];
+  readonly tags: readonly TagNodeDto[];
+}
+
 /** Nombres de categorías por id (incluye archivadas: los históricos las siguen mostrando). Sin efectos. */
 export interface CategoryCatalogQuery {
   categoriesByIds(input: {
@@ -130,6 +163,11 @@ export interface CategoryCatalogQuery {
     readonly workspaceId: string;
     readonly categoryIds: readonly string[];
   }): Promise<readonly CategorySummaryDto[]>;
+  /**
+   * Árbol completo (activas y archivadas) para validar objetivos y resolver jerarquías sin joins cross-schema
+   * (add-budgets: categoría + subcategorías, grupo → categorías). Ampliación aditiva; sin efectos.
+   */
+  categoryTree(input: { readonly userId: string; readonly workspaceId: string }): Promise<CategoryTreeDto>;
 }
 
 export const CATEGORY_CATALOG_QUERY = Symbol.for('pf.classification.CategoryCatalogQuery');

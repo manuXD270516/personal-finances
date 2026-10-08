@@ -142,7 +142,14 @@
       "accounts_account_archived": "Conta arquivada",
       "accounts_account_closed": "Conta encerrada",
       "accounts_account_reactivated": "Conta reativada",
-      "accounts_account_reordered": "Ordem das contas alterada"
+      "accounts_account_reordered": "Ordem das contas alterada",
+      "planning_budget_created": "Plano criado",
+      "planning_budget_updated": "Plano alterado",
+      "planning_budget_line_added": "Linha adicionada",
+      "planning_budget_line_updated": "Linha alterada",
+      "planning_budget_line_removed": "Linha removida",
+      "planning_budget_threshold_reached": "Limite atingido",
+      "planning_budget_rollover_updated": "Saldo transferido atualizado"
     },
     "fields": {
       "name": "Nome",
@@ -171,7 +178,29 @@
       "color": "Cor",
       "icon": "Ícone",
       "notes": "Notas",
-      "cryptoNetwork": "Rede"
+      "cryptoNetwork": "Rede",
+      "periodId": "Período",
+      "zeroBased": "Base zero",
+      "line": "Linha",
+      "target": "Alvo",
+      "nature": "Natureza",
+      "kind": "Tipo",
+      "planned": "Planejado",
+      "min": "Mínimo",
+      "max": "Máximo",
+      "percent": "Porcentagem",
+      "incomeBasis": "Base da receita",
+      "rolloverPolicy": "Política de transferência",
+      "rolloverCap": "Teto da transferência",
+      "rolloverIn": "Saldo transferido recebido",
+      "rolloverStatus": "Estado da transferência",
+      "thresholds": "Limites",
+      "source": "Origem da linha",
+      "threshold": "Limite",
+      "alsoCrossed": "Também atingidos",
+      "reference": "Referência",
+      "actual": "Gasto",
+      "utilization": "Uso (%)"
     }
   },
   "Dashboard": {
@@ -1515,6 +1544,157 @@
       "start": "Extrato de {date} por {balance}.",
       "complete": "Saldo confirmado {cleared} · diferença {difference}",
       "adjustment": "ver o ajuste"
+    }
+  },
+  "Budgets": {
+    "title": "Orçamentos",
+    "intro": "Planeje cada período com receitas esperadas e orçamentos por categoria, grupo ou tag. O gasto é sempre calculado a partir das suas transações; nunca é editado à mão.",
+    "loading": "Carregando períodos…",
+    "loadingPlan": "Carregando o plano…",
+    "noPeriods": "Ainda não há períodos: eles são criados automaticamente. Confira a seção de períodos.",
+    "periodSummary": "{name}: de {from} a {to} ({status}).",
+    "periodClosed": "Este período está fechado: o plano é somente leitura. Um proprietário pode reabri-lo para corrigi-lo.",
+    "noPlan": "Este período ainda não tem plano.",
+    "createPlan": "Criar o plano do período",
+    "planCreated": "Plano criado.",
+    "lineAdded": "Linha adicionada.",
+    "lineSaved": "Linha salva.",
+    "lineRemoved": "Linha removida.",
+    "nav": {
+      "label": "Planejamento",
+      "periods": "Períodos",
+      "budgets": "Orçamentos"
+    },
+    "totals": {
+      "title": "Resumo do plano",
+      "planned": "Planejado",
+      "actual": "Gasto",
+      "remaining": "Restante",
+      "available": "Disponível para gastar",
+      "availableHint": "Soma o que sobra em cada orçamento de categoria ou grupo; um excesso não reduz os demais.",
+      "expectedIncome": "Receita esperada",
+      "actualIncome": "Receita real",
+      "toAssign": "A alocar",
+      "toAssignOver": "Alocado a mais",
+      "zeroBased": "Plano base zero (alocar toda a receita esperada)",
+      "incomplete": "Gasto incompleto: há valores sem taxa de câmbio vigente.",
+      "unconverted": "Sem converter: {amounts}. Nunca são estimados a 1:1.",
+      "rates": "Taxas usadas",
+      "rate": "1 {base} = {value} {quote} · {type} · vigente em {asOf}",
+      "window": "Janela de vigência das taxas: {days} dias."
+    },
+    "lines": {
+      "title": "Linhas do plano",
+      "caption": "Linhas do plano com o planejado, o gasto e seu estado",
+      "empty": "O plano ainda não tem linhas. Adicione um orçamento por categoria, grupo ou tag.",
+      "columns": {
+        "target": "Orçamento",
+        "planned": "Planejado",
+        "actual": "Gasto",
+        "remaining": "Restante",
+        "usage": "Uso",
+        "projection": "Projeção",
+        "status": "Estado",
+        "thresholds": "Limites",
+        "actions": "Ações"
+      },
+      "income": "receita esperada",
+      "range": "{min} a {max}",
+      "percentOf": "{percent} % da receita ({basis})",
+      "rolloverIn": "Inclui {amount} de saldo transferido ({status})",
+      "incomplete": "Sem converter: {amounts}",
+      "difference": "Diferença em relação ao esperado",
+      "usage": "{percent} %",
+      "usageLabel": "Uso do orçamento {name}",
+      "noProjection": "Sem projeção",
+      "projectionExceeds": "A projeção supera o máximo",
+      "settlement": {
+        "PENDING": "Pendente",
+        "MET": "Cumprido"
+      },
+      "noThresholds": "Sem limites",
+      "crossed": "atingido",
+      "add": "Adicionar linha",
+      "edit": "Editar",
+      "editLabel": "Editar a linha {name}",
+      "remove": "Remover",
+      "removeLabel": "Remover a linha {name}",
+      "confirmRemoveTitle": "Remover a linha {name}?",
+      "confirmRemoveBody": "O gasto não se perde: apenas deixa de ser medido neste plano. Os limites já avisados não são avisados de novo se você adicionar a linha outra vez."
+    },
+    "status": {
+      "UNDER": "Abaixo da meta",
+      "ON_TARGET": "Na meta",
+      "OVER": "Excedido",
+      "WITHIN": "Dentro do limite",
+      "BELOW": "Abaixo da faixa",
+      "ABOVE": "Acima da faixa",
+      "PENDING": "Mínimo pendente",
+      "MET": "Mínimo cumprido",
+      "NO_BUDGET": "Sem orçamento"
+    },
+    "kind": {
+      "FIXED": "Fixo",
+      "MAXIMUM": "Máximo",
+      "MINIMUM": "Mínimo",
+      "RANGE": "Faixa",
+      "PERCENT_OF_INCOME": "% da receita"
+    },
+    "targetKind": {
+      "CATEGORY": "Categoria",
+      "GROUP": "Grupo",
+      "TAG": "Tag"
+    },
+    "basis": {
+      "EXPECTED": "esperada",
+      "ACTUAL": "real"
+    },
+    "rollover": {
+      "NONE": "sem transferência",
+      "PROVISIONAL": "provisório",
+      "FINAL": "definitivo"
+    },
+    "rolloverPolicy": {
+      "NONE": "Sem transferência",
+      "CARRY_POSITIVE": "Transferir apenas a sobra",
+      "CARRY_ALL": "Transferir sobra e excesso"
+    },
+    "form": {
+      "titleAdd": "Adicionar uma linha ao plano",
+      "titleEdit": "Editar a linha",
+      "targetKind": "Tipo de alvo",
+      "target": "Alvo",
+      "targetPlaceholder": "Escolha um alvo",
+      "kind": "Tipo de orçamento",
+      "incomeFixedOnly": "A receita esperada só admite um valor fixo e não tem limites.",
+      "planned": "Valor ({currency})",
+      "min": "Mínimo ({currency})",
+      "max": "Máximo ({currency})",
+      "percent": "Porcentagem da receita",
+      "percentHint": "Maior que 0 e até 100, com até 4 casas decimais.",
+      "incomeBasis": "Base da porcentagem",
+      "rolloverPolicy": "Transferência para o período seguinte",
+      "rolloverCap": "Teto da transferência ({currency})",
+      "thresholds": "Limites de alerta (%)",
+      "thresholdsHint": "Separados por vírgula, até 10 valores entre 0 e 1000. Vazio usa 50, 75, 90 e 100.",
+      "currencyNote": "Todos os valores do plano estão em {currency}.",
+      "add": "Adicionar linha",
+      "save": "Salvar alterações",
+      "cancel": "Cancelar",
+      "errors": {
+        "required": "Este campo é obrigatório.",
+        "invalid": "O valor não é válido.",
+        "scale": "Tem mais casas decimais do que a moeda admite."
+      }
+    },
+    "widget": {
+      "title": "Orçamento do mês",
+      "available": "Disponível para gastar",
+      "detail": "Dos {planned} planejados você gastou {actual}.",
+      "incomplete": "Há despesas sem taxa de câmbio: o gasto pode ser maior.",
+      "goToBudgets": "Ver orçamentos",
+      "noPlan": "Este período ainda não tem plano: não há valor disponível para gastar a mostrar.",
+      "createPlan": "Criar o plano do mês"
     }
   }
 }

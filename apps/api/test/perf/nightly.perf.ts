@@ -477,6 +477,42 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
   });
 
+  it('NFR-PERF-004 (referencia, add-budgets 5.2): GET /budgets/{id} con 30 líneas y el historial del Large Seed', async () => {
+    // Periodos hasta hoy (cobertura desde el asiento más antiguo) y plan del periodo con más historia reciente.
+    await ok('POST', `${W}/periods`, { through: new Date().toISOString().slice(0, 10) });
+    const periods = dataOf(await ok('GET', `${W}/periods?limit=100`));
+    const period =
+      periods.find((p) => p['label'] === '2026-09') ?? periods.find((p) => p['status'] === 'ACTIVE');
+    if (!period) throw new Error('el Large Seed no dejó periodos para el benchmark de presupuestos');
+    const budget = await ok('POST', `${W}/budgets`, { periodId: period['id'] });
+    const expense = dataOf(await ok('GET', `${W}/categories?kind=EXPENSE&limit=200`)).filter(
+      (c) => c['systemCode'] === null && !c['parentId'],
+    );
+    for (const c of expense.slice(0, 30)) {
+      await ok('POST', `${W}/budgets/${String(budget['id'])}/lines`, {
+        target: { kind: 'CATEGORY', id: c['id'] },
+        kind: 'MAXIMUM',
+        planned: { amount: '1000.00', currency: 'BOB' },
+      });
+    }
+    const detail = await ok('GET', `${W}/budgets/${String(budget['id'])}`);
+    const lineCount = (detail['lines'] as unknown[]).length;
+    dataset['líneas del plan del benchmark'] = lineCount;
+    const samples = await timed(ITERATIONS, async () => {
+      const r = await call('GET', `${W}/budgets/${String(budget['id'])}`);
+      if (r.status !== 200) throw new Error(`budget: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id: 'budget-vs-actual',
+        nfr: 'NFR-PERF-004',
+        title: `GET /budgets/{id} (${lineCount} líneas, periodo ${String(period['label'])})`,
+        samples,
+        limitMs: PERF_THRESHOLDS['NFR-PERF-004'].limitMs,
+      }),
+    );
+  });
+
   it('RLS: overhead < 10 % en la consulta real de saldos (PgBalanceQuery) y las de índice; agregado sintético informativo (docs/31 D43)', async () => {
     const card = ids.accounts.get('Tarjeta Andina Demo')!;
     const { rows } = await superuser.query<{ id: string }>(

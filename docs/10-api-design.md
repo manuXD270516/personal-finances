@@ -277,7 +277,13 @@ Content-Type: application/json
 | fx | `FX_RATE_NOT_ANOMALOUS` | 422 | Se pidió revisar una tasa que no está marcada como anómala |
 | fx | `CURRENCY_NOT_ENABLED` | 422 | Moneda no habilitada en el workspace (también `reportingCurrency` de `/reports/summary`) |
 | planning (P2) | `PERIOD_NOT_STARTED` | 409 | Activar un periodo cuya fecha de inicio es posterior a hoy en la zona del workspace (`activatePeriod`, add-financial-periods) |
-| planning (P2) | `BUDGET_ALREADY_EXISTS`, `PERIOD_OVERLAP`, `MONTH_CLOSING_IN_PROGRESS` | 409 | — |
+| planning (P2) | `BUDGET_ALREADY_EXISTS` | 409 | El periodo ya tiene plan (`createBudget`, add-budgets) |
+| planning (P2) | `BUDGET_LINE_DUPLICATE_TARGET` | 409 | El plan ya tiene una línea para esa categoría, grupo o tag (`addBudgetLine`) |
+| planning (P2) | `BUDGET_TARGET_OVERLAP` | 409 | Categoría con su subcategoría, o grupo con una de sus categorías, en el mismo plan (el gasto contaría dos veces) |
+| planning (P2) | `BUDGET_INVALID_AMOUNTS` | 422 | Monto negativo, mínimo mayor que el máximo o porcentaje fuera de (0, 100] |
+| planning (P2) | `BUDGET_INVALID_LINE_KIND` | 422 | Un ingreso esperado solo admite `FIXED` sin umbrales ni rollover; `MINIMUM` no tiene umbrales |
+| planning (P2) | `BUDGET_THRESHOLD_INVALID` | 422 | Umbrales fuera de (0, 1000], repetidos, con más de 2 decimales o más de 10 |
+| planning (P2) | `PERIOD_OVERLAP`, `MONTH_CLOSING_IN_PROGRESS` | 409 | — |
 | commitments (P3) | `INVALID_RRULE`, `OCCURRENCE_ALREADY_MATERIALIZED` | 422 / 409 | — |
 | debt (P4) | `INSTALLMENT_ALREADY_PAID`, `PAYMENT_BREAKDOWN_MISMATCH` | 409 / 422 | — |
 | goals (P4) | `EARMARK_EXCEEDS_BALANCE` | 422 | INV-018 |
@@ -356,7 +362,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | fx-rate-preferences | `GET/PUT W/fx-rate-preferences` (`listFxRatePreferences` VIEWER, `replaceFxRatePreferences` EDITOR; tipo de tasa preferido por par, sembrado `PARALLEL` para USD/BOB y USDT/BOB al crear el workspace) | `fx/market-rates` | 1 |
 | ledger | `GET W/ledger/trial-balance` (`getLedgerTrialBalance`, solo lectura) | `ledger/balances` | 1 |
 | periods | `GET/POST W/periods` (`listPeriods` VIEWER con `status`/`containsDate`, `ensurePeriods` EDITOR con `through` ≤ hoy + 24 meses), `GET …/{id}` (`getPeriod`, ETag), `POST …/{id}/activate` (`activatePeriod` EDITOR, `If-Match`; add-financial-periods), `POST …/{id}/close`, `POST …/{id}/reopen` (add-month-closing) | `planning/financial-periods`, `planning/month-closing` | 2 |
-| budgets | `GET/POST W/budgets`, `GET/PATCH …/{id}`, `PATCH …/{id}/lines/{lineId}` | `planning/budgets` | 2 |
+| budgets | `GET/POST W/budgets` (`listBudgets` VIEWER con `periodFrom`/`periodTo`, `createBudget` EDITOR con `Idempotency-Key`), `GET/PATCH …/{id}` (`getBudget` con el progreso de cada línea y `ETag`, `updateBudget` base cero con `If-Match`), `GET …/{id}/history` (`getBudgetHistory`, VIEWER), `GET W/periods/{periodId}/budget` (`getBudgetByPeriod`), `POST …/{id}/lines` (`addBudgetLine`, `Idempotency-Key`), `PATCH|DELETE …/{id}/lines/{lineId}` (`updateBudgetLine` con `If-Match`, `removeBudgetLine`); add-budgets. El gastado se deriva en cada lectura y se informa con las tasas usadas y los montos sin convertir (`actualComplete`, `unconverted`) | `planning/budgets` | 2 |
 | templates | `GET/POST W/templates`, `GET …/{id}`, `POST …/{id}/versions`, `POST …/{id}/apply` | `planning/budget-templates` | 2 |
 | recurring | `GET/POST W/recurring`, `GET/PATCH …/{id}`, `POST …/{id}/pause|resume|end`, `GET …/{id}/occurrences`, `POST …/occurrences/{occId}/materialize|skip` | `commitments/recurrence-engine` | 3 |
 | subscriptions | `GET/POST W/subscriptions`, `PATCH …/{id}`, `POST …/{id}/cancel` | `commitments/subscriptions` | 3 |

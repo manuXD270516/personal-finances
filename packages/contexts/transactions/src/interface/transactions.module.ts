@@ -71,6 +71,14 @@ export interface TransactionsRuntime {
   readonly categoryUsage: CounterpartyCategoryUsageQuery;
 }
 
+/**
+ * `SummarizeNominalFlows` para procesos sin comandos (el worker de PLANNING; openspec add-budgets): solo lee los
+ * splits vigentes en la unidad de trabajo del llamador, sin puertos de escritura.
+ */
+export function createNominalFlowQuery(pool: Pool): NominalFlowQuery {
+  return new PgNominalFlowQuery(new PgTransactionsUnitOfWork(pool), pgCurrencyCatalog);
+}
+
 /** Composición de TRANSACTIONS sobre PostgreSQL. */
 export function createTransactionsRuntime(options: TransactionsRuntimeOptions): TransactionsRuntime {
   const transactionsRepository = new PgTransactionRepository();

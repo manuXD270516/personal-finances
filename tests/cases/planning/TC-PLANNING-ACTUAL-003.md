@@ -12,9 +12,11 @@ invariants: ['INV-034']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['budgets', 'actual', 'timezone']

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/planning/BudgetCreated.v1.schema.json",
+  "title": "planning.BudgetCreated.v1",
+  "description": "Se creó el plan mensual de un periodo financiero (openspec add-budgets): vacío, desde un template o clonado del periodo anterior (los dos últimos orígenes los agrega add-budget-templates). Productor: PLANNING (comando CreateBudget). Consumidores: REPORTING (opcional), NOTIFY (opcional). Idempotencia natural: (periodId) — un periodo tiene a lo sumo un plan. El payload no contiene montos ni nombres. Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "planning.BudgetCreated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Budget"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budgetId",
+        "periodId",
+        "periodLabel",
+        "currency",
+        "origin",
+        "templateId",
+        "templateVersionNo",
+        "clonedFromBudgetId",
+        "lineCount"
+      ],
+      "properties": {
+        "budgetId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodLabel": {
+          "description": "Año y mes de la fecha de inicio del periodo (YYYY-MM, docs/33 D59).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        },
+        "currency": {
+          "description": "Moneda del plan = moneda base del workspace al crearlo (docs/33 D78).",
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "origin": {
+          "enum": ["EMPTY", "TEMPLATE", "CLONE"]
+        },
+        "templateId": {
+          "oneOf": [{ "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" }]
+        },
+        "templateVersionNo": {
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+        },
+        "clonedFromBudgetId": {
+          "oneOf": [{ "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" }]
+        },
+        "lineCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000311",
+      "eventType": "planning.BudgetCreated",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-01T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Budget",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fb001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c5",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-0000000ea001"
+      },
+      "payload": {
+        "budgetId": "01928c4e-0000-7000-8000-0000000fb001",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa011",
+        "periodLabel": "2026-11",
+        "currency": "BOB",
+        "origin": "EMPTY",
+        "templateId": null,
+        "templateVersionNo": null,
+        "clonedFromBudgetId": null,
+        "lineCount": 0
+      }
+    }
+  ]
+}
