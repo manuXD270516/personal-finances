@@ -190,3 +190,40 @@ Trace: FR-AUDIT-011, FR-AUDIT-013, NFR-USAB-001 · Priority: Should
 - **CUANDO** el usuario abre el recorrido de la categoría "Supermercado", que se creó, se archivó y se desarchivó
 - **ENTONCES** el diagrama destaca `ACTIVE` y `ARCHIVED` con archivar (1) y desarchivar (2) numeradas en el orden en que ocurrieron, y `ACTIVE` como estado actual
 - **Y** la línea de tiempo lista crear, archivar y desarchivar con actor y fecha en la zona horaria del workspace, y el reporte ofrece exportar el recorrido en CSV y en PDF
+
+### Requirement: Recorrido de una sesión de reconciliación
+La sesión de reconciliación DEBE (MUST) declarar su máquina de estados —`IN_PROGRESS`, `COMPLETED` y `CANCELLED`, estos dos terminales, con las transiciones iniciar (a `IN_PROGRESS`), finalizar (`IN_PROGRESS` a `COMPLETED`, publica el hecho "reconciliación completada") y cancelar (`IN_PROGRESS` a `CANCELLED`)— y su recorrido DEBE (MUST) mostrar cada transición con actor, instante, motivo si lo hay, saldo del extracto, saldo confirmado, diferencia y, si hubo ajuste, la transacción de ajuste; los confirmados y desconfirmados dentro de la sesión y las des-reconciliaciones posteriores DEBEN (MUST) aparecer como anotaciones.
+Trace: FR-AUDIT-009, FR-AUDIT-010, FR-TRANSACTIONS-030 · Priority: Must
+
+#### Scenario: Recorrido de una sesión finalizada con ajuste
+- **CUANDO** el usuario inicia la sesión de "Bank A" al 2026-03-31 por 3345.00 BOB, confirma el gasto de 45.90 BOB dentro de ella y la finaliza con un ajuste de 5.00 BOB
+- **ENTONCES** el recorrido muestra iniciar y finalizar en orden, con saldo del extracto 3345.00 BOB, diferencia final 0.00 BOB y el ajuste de 5.00 BOB enlazado
+- **Y** muestra la confirmación del gasto de 45.90 BOB como anotación
+
+#### Scenario: Transición no declarada de una sesión
+- **CUANDO** el usuario intenta finalizar una sesión `CANCELLED`
+- **ENTONCES** se rechaza con `INVALID_STATUS_TRANSITION` y no se registra ninguna transición
+
+### Requirement: Reconciliación en el recorrido de una transacción
+La transición reconciliar de una transacción DEBE (MUST) registrar la sesión que la originó con su fecha y saldo de extracto, y la transacción de ajuste creada por una sesión DEBE (MUST) mostrar en su recorrido el registro y la reconciliación referenciando esa sesión.
+Trace: FR-AUDIT-010, FR-TRANSACTIONS-030, FR-TRANSACTIONS-006 · Priority: Must
+
+#### Scenario: Recorrido de un gasto reconciliado en sesión
+- **CUANDO** el gasto de 150.00 BOB del 2026-03-05 se registró posteado, se confirmó y se reconcilió al finalizar la sesión de "Bank A" al 2026-03-31
+- **ENTONCES** su recorrido muestra registrar, confirmar y reconciliar en orden, y la transición reconciliar enlaza la sesión al 2026-03-31 por 3350.00 BOB
+
+#### Scenario: Recorrido del ajuste de una sesión
+- **CUANDO** se consulta el recorrido del ajuste de 5.00 BOB creado al finalizar la sesión al 2026-03-31
+- **ENTONCES** muestra registrar (con su asiento) y reconciliar, ambas referenciando esa sesión
+
+### Requirement: Conciliación sin extracto en el recorrido de una transacción
+La máquina de estados de las transacciones DEBE (MUST) declarar la transición "conciliar sin extracto" (`cleared` a `reconciled`, con guarda de modo explícito y periodo abierto), distinta de "reconciliar" (que exige una sesión), y el recorrido de una transacción conciliada sin extracto DEBE (MUST) mostrarla con actor, instante y modo; un cotejo posterior por una sesión DEBE (MUST) aparecer como anotación que referencia esa sesión, sin una transición nueva, y des-reconciliar DEBE (MUST) mostrarse como la transición des-reconciliar con su motivo.
+Trace: FR-AUDIT-009, FR-AUDIT-010, FR-TRANSACTIONS-006, FR-TRANSACTIONS-030 · Priority: Must
+
+#### Scenario: Definición de la máquina con la conciliación sin extracto
+- **CUANDO** el usuario consulta la definición de la máquina de estados de las transacciones
+- **ENTONCES** la transición "conciliar sin extracto" figura de `cleared` a `reconciled` con su guarda, separada de "reconciliar"
+
+#### Scenario: Recorrido de un gasto conciliado sin extracto y cotejado después
+- **CUANDO** el gasto de 45.90 BOB del 2026-03-20 de "Bank A" se registró posteado, se confirmó, se concilió sin extracto y luego lo cotejó la sesión de "Bank A" al 2026-03-31 por 3304.10 BOB
+- **ENTONCES** su recorrido muestra registrar, confirmar y conciliar sin extracto en orden, y una anotación de cotejo que enlaza la sesión al 2026-03-31
