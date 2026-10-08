@@ -6,9 +6,11 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { Tabs } from '../common/Tabs';
 import type { Category, CategoryGroup, Counterparty, Tag } from '../common/types';
 import { pageStyle } from '../common/ui';
+import type { CustomFieldDefinition } from '../custom-fields/logic';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { CategoriesPanel } from './CategoriesPanel';
 import { CounterpartiesPanel } from './CounterpartiesPanel';
+import { CustomFieldsPanel } from './CustomFieldsPanel';
 import { TagsPanel } from './TagsPanel';
 import type { ClassificationData, Run } from './types';
 
@@ -20,12 +22,13 @@ const VIEWS: Record<string, string> = {
   categorias: 'categories',
   etiquetas: 'tags',
   contrapartes: 'counterparties',
+  campos: 'customFields',
 };
 
 /**
  * `/clasificacion` (add-classification 8.1–8.3): pestañas Categorías (árbol grupo → categoría → subcategoría con icono,
  * color y orden persistente: subir/bajar por teclado o arrastrar; archivar/desarchivar; sistema protegidas; catálogo
- * sugerido), Etiquetas y Contrapartes (alias y categoría por defecto). La API decide la autorización: la UI solo oculta
+ * sugerido), Etiquetas, Contrapartes (alias y categoría por defecto) y Campos personalizados (add-custom-fields 6.1). La API decide la autorización: la UI solo oculta
  * las acciones a un VIEWER.
  */
 function Classification({ ctx, view }: { ctx: WorkspaceContext; view?: string }) {
@@ -37,6 +40,7 @@ function Classification({ ctx, view }: { ctx: WorkspaceContext; view?: string })
     categories: [],
     tags: [],
     counterparties: [],
+    customFields: [],
   });
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [status, setStatus] = useState<string | undefined>();
@@ -48,9 +52,10 @@ function Classification({ ctx, view }: { ctx: WorkspaceContext; view?: string })
       listAll<Category>(ctx.api, `${ctx.base}/categories`, q),
       listAll<Tag>(ctx.api, `${ctx.base}/tags`, q),
       listAll<Counterparty>(ctx.api, `${ctx.base}/counterparties`, q),
+      listAll<CustomFieldDefinition>(ctx.api, `${ctx.base}/custom-fields`, q),
     ])
-      .then(([groups, categories, tags, counterparties]) =>
-        setData({ groups, categories, tags, counterparties }),
+      .then(([groups, categories, tags, counterparties, customFields]) =>
+        setData({ groups, categories, tags, counterparties, customFields }),
       )
       .catch((err: unknown) => setProblem(problemOf(err)));
   }, [ctx.api, ctx.base, showArchived]);
@@ -98,6 +103,11 @@ function Classification({ ctx, view }: { ctx: WorkspaceContext; view?: string })
             id: 'counterparties',
             label: t('counterparties'),
             content: <CounterpartiesPanel ctx={ctx} f={f} data={data} run={run} />,
+          },
+          {
+            id: 'customFields',
+            label: t('customFields'),
+            content: <CustomFieldsPanel ctx={ctx} definitions={data.customFields} run={run} />,
           },
         ]}
       />

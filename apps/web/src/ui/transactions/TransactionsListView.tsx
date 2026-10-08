@@ -2,6 +2,7 @@ import { formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import type { Transaction } from '../common/types';
 import { badgeStyle, mutedStyle } from '../common/ui';
+import { displayValue, valuesOf, type CustomFieldDefinition } from '../custom-fields/logic';
 import { amountFor } from './logic';
 import type { NameResolver } from './TransactionTimeline';
 
@@ -59,6 +60,7 @@ export function TransactionsListView({
   selected,
   onToggle,
   selectable,
+  customFields,
 }: {
   transactions: readonly Transaction[];
   names: NameResolver;
@@ -68,6 +70,8 @@ export function TransactionsListView({
   selected: ReadonlySet<string>;
   onToggle?: (id: string) => void;
   selectable: boolean;
+  /** Definiciones (activas y archivadas) para mostrar los custom fields de los splits; `cf` es del namespace `CustomFields`. */
+  customFields?: { readonly definitions: readonly CustomFieldDefinition[]; readonly cf: FormatContext };
 }) {
   const { t, locale } = f;
   if (transactions.length === 0) return <p data-testid="transactions-empty">{t('list.empty')}</p>;
@@ -79,6 +83,9 @@ export function TransactionsListView({
           Boolean,
         );
         const canSelect = selectable && (tx.status === 'POSTED' || tx.status === 'CLEARED');
+        const fieldTexts = customFields
+          ? customFieldTexts(tx, customFields.definitions, customFields.cf)
+          : [];
         const title = describe(tx, names, f);
         return (
           <li
@@ -132,9 +139,34 @@ export function TransactionsListView({
                 </>
               ) : null}
             </span>
+            {fieldTexts.length > 0 ? (
+              <span style={{ ...mutedStyle, flexBasis: '100%' }} data-testid="tx-custom-fields">
+                {fieldTexts.join(' · ')}
+              </span>
+            ) : null}
           </li>
         );
       })}
     </ul>
   );
+}
+
+/** "Centro de costo: Oficina" por cada valor distinto de los splits (opcional en el registro). */
+export function customFieldTexts(
+  tx: Transaction,
+  definitions: readonly CustomFieldDefinition[],
+  cf: FormatContext,
+): string[] {
+  const labels = {
+    yes: cf.t('yes'),
+    no: cf.t('no'),
+    date: (iso: string) => formatLocalDate(iso, cf.locale),
+  };
+  const out = new Set<string>();
+  for (const s of tx.splits) {
+    for (const { def, key, value } of valuesOf(definitions, s.customFields)) {
+      out.add(`${def?.label ?? key}: ${displayValue(def, value, labels)}`);
+    }
+  }
+  return [...out];
 }

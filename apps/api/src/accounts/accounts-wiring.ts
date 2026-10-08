@@ -5,9 +5,11 @@ import {
   createAccountsRuntime,
   type AccountsRuntime,
   type BaseCurrencyValuationDeps,
+  type CustomFieldCatalogPort,
   type WorkspaceCalendar,
   type WorkspaceCurrenciesPort,
 } from '@pf/accounts/interface/accounts.module';
+import type { ClassificationValidator } from '@pf/classification/contracts';
 import { identityWorkspaceTimeZones } from '@pf/identity/interface/identity.module';
 import { createLedgerRuntime, type LedgerRuntime } from '@pf/ledger/interface/ledger.module';
 import { currentRequestContext } from '@pf/platform/api';
@@ -40,6 +42,26 @@ export function workspaceCalendar(pool: Pool, clock: Clock, defaultTimeZone: str
 }
 
 /**
+ * Puerto de custom fields de cuenta de ACCOUNTS sobre `ValidateCustomFieldValues` de CLASSIFICATION (API pública,
+ * misma unidad de trabajo; openspec add-custom-fields). El usuario sale del contexto de la petición.
+ */
+export function accountCustomFields(validator: ClassificationValidator): CustomFieldCatalogPort {
+  return {
+    async validate({ workspaceId, requireMandatory, values, existingFieldIds }) {
+      const actor = currentRequestContext()?.actor;
+      const [result] = await validator.validateCustomFieldValues({
+        userId: actor && actor.type === 'USER' ? actor.userId : '',
+        workspaceId,
+        target: 'ACCOUNT',
+        requireMandatory,
+        items: [{ pointer: '/customFields', values, existingFieldIds }],
+      });
+      return result ?? { set: [], removeFieldIds: [] };
+    },
+  };
+}
+
+/**
  * Composición de LEDGER + ACCOUNTS (openspec add-accounts-management): el ledger no tiene HTTP; ACCOUNTS usa sus
  * saldos (`BalanceQuery`) y su puerto de registro a través de la orquestación `OpenAccountWithOpeningBalance`.
  */
@@ -57,6 +79,8 @@ export function accountsRuntime(input: {
   readonly valuation?: BaseCurrencyValuationDeps;
   /** Monedas habilitadas del workspace (FX, docs/31 D45). */
   readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
+  /** Validación de custom fields de cuenta (CLASSIFICATION `ValidateCustomFieldValues`). */
+  readonly customFields?: CustomFieldCatalogPort;
 }): { readonly ledger: LedgerRuntime; readonly accounts: AccountsRuntime } {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   const ledger = createLedgerRuntime({
@@ -78,6 +102,7 @@ export function accountsRuntime(input: {
     calendar: workspaceCalendar(input.pool, input.clock, input.defaultTimeZone),
     ...(input.valuation ? { valuation: input.valuation } : {}),
     ...(input.workspaceCurrencies ? { workspaceCurrencies: input.workspaceCurrencies } : {}),
+    ...(input.customFields ? { customFields: input.customFields } : {}),
   });
   return { ledger, accounts };
 }

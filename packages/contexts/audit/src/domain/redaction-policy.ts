@@ -35,6 +35,19 @@ function applyRule(rule: AuditFieldRule, value: unknown): AuditValue {
 }
 
 /**
+ * Regla de un campo: exacta o, para campos dinámicos (custom fields: `customFields.<clave>`), la del comodín de
+ * prefijo `<prefijo>.*` declarado en la política del agregado (openspec add-custom-fields). Sin comodín ni regla
+ * exacta el campo se omite.
+ */
+function ruleFor(fields: AggregateFieldPolicy, field: string): AuditFieldRule | undefined {
+  if (Object.hasOwn(fields, field)) return fields[field];
+  const dot = field.indexOf('.');
+  if (dot <= 0) return undefined;
+  const wildcard = `${field.slice(0, dot)}.*`;
+  return Object.hasOwn(fields, wildcard) ? fields[wildcard] : undefined;
+}
+
+/**
  * `RedactionPolicy` por allow-list (design §1): los campos desconocidos —incluido cualquier token, cookie, secreto o
  * campo nuevo no revisado— se omiten; nunca se copian. Un agregado sin política no aporta ningún campo.
  */
@@ -71,7 +84,7 @@ export class RedactionPolicy {
     const fields = this.policies.get(aggregateType) ?? {};
     const kept: AuditChange[] = [];
     for (const c of changes) {
-      const rule = Object.hasOwn(fields, c.field) ? fields[c.field] : undefined;
+      const rule = ruleFor(fields, c.field);
       if (!rule) continue;
       kept.push(auditChange(c.field, applyRule(rule, c.before), applyRule(rule, c.after)));
     }

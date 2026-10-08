@@ -28,6 +28,9 @@ export const ACCOUNT_TYPES: readonly AccountType[] = [
   'MANUAL_LIABILITY',
 ];
 
+/** Valores de custom fields por clave; decimales y números como string exacto (nunca `number`, INV-001). */
+export type CustomFieldValues = Readonly<Record<string, string | boolean | null>>;
+
 export type AccountLiquidity = 'LIQUID' | 'SEMI_LIQUID' | 'ILLIQUID';
 export type AccountStatus = 'ACTIVE' | 'CLOSED' | 'ARCHIVED';
 export const LIQUIDITIES: readonly AccountLiquidity[] = ['LIQUID', 'SEMI_LIQUID', 'ILLIQUID'];
@@ -66,6 +69,8 @@ export interface Account {
   readonly color?: string | null;
   readonly icon?: string | null;
   readonly tagIds?: readonly string[];
+  /** Valores de custom fields de cuenta por clave de campo (add-custom-fields); incluye los de campos archivados. */
+  readonly customFields?: CustomFieldValues;
   readonly cryptoNetwork?: string | null;
   readonly notes?: string | null;
   readonly archivedAt?: string | null;
@@ -143,6 +148,8 @@ export interface TransactionSplit {
   readonly counterpartyId?: string | null;
   readonly tagIds?: readonly string[];
   readonly memo?: string | null;
+  /** Valores de custom fields del split por clave de campo (add-custom-fields). */
+  readonly customFields?: CustomFieldValues;
 }
 
 export interface Rate {

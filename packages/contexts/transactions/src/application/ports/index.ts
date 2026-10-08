@@ -23,10 +23,19 @@ export interface UnitOfWork {
 export type TransactionSort =
   'transactionDate' | '-transactionDate' | 'amount' | '-amount' | 'createdAt' | '-createdAt';
 
+/** Filtro por valor de custom field (`customField[<key>]`, `[gte]`, `[lte]`): igualdad o rango (decimal, número, fecha). */
+export interface CustomFieldFilter {
+  readonly key: string;
+  readonly eq?: string;
+  readonly gte?: string;
+  readonly lte?: string;
+}
+
 export interface TransactionListFilter {
   readonly accountIds?: readonly string[];
   readonly categoryIds?: readonly string[];
   readonly tagIds?: readonly string[];
+  readonly customFields?: readonly CustomFieldFilter[];
   readonly counterpartyIds?: readonly string[];
   readonly kinds?: readonly TransactionKind[];
   readonly statuses?: readonly TransactionStatus[];

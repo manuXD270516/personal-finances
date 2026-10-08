@@ -59,6 +59,22 @@ function assertCurrencyKind(type: AccountType, kind: CurrencyKind): void {
   }
 }
 
+/**
+ * Valor de custom field de una cuenta (openspec add-custom-fields, FR-CLASSIFICATION-009): ya validado y normalizado
+ * por CLASSIFICATION. `valueType` es la clase de almacenamiento (`SELECT` es `TEXT`; `NUMBER` y `DECIMAL` son `NUMBER`
+ * con el string decimal canónico, nunca punto flotante). `key` es de solo lectura (derivada de la definición). No
+ * afectan saldos ni movimientos.
+ */
+export interface AccountCustomFieldValue {
+  readonly fieldId: string;
+  readonly key: string;
+  readonly valueType: 'TEXT' | 'NUMBER' | 'DATE' | 'BOOLEAN';
+  readonly value: string | boolean;
+}
+
+const sortedValues = (values: readonly AccountCustomFieldValue[] | undefined): AccountCustomFieldValue[] =>
+  [...(values ?? [])].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+
 export interface AccountState {
   readonly id: string;
   readonly workspaceId: string;
@@ -81,6 +97,8 @@ export interface AccountState {
   readonly notes: string | null;
   readonly tagIds: readonly string[];
   readonly cryptoNetwork: string | null;
+  /** Ordenados por clave. */
+  readonly customFields: readonly AccountCustomFieldValue[];
   readonly version: number;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
@@ -105,6 +123,8 @@ export interface OpenAccountInput {
   readonly notes?: string | null;
   readonly tagIds?: readonly string[];
   readonly cryptoNetwork?: string | null;
+  /** Valores finales ya resueltos por la aplicación (existentes ⊕ cambios validados). */
+  readonly customFields?: readonly AccountCustomFieldValue[];
 }
 
 /** Campos editables (`AccountUpdate`): `type` NO está (inmutable, TC-ACCOUNTS-TYPES-002). */
@@ -122,6 +142,8 @@ export interface AccountChanges {
   readonly notes?: string | null;
   readonly tagIds?: readonly string[];
   readonly cryptoNetwork?: string | null;
+  /** Lista FINAL de valores de custom fields (ya validada); los valores no mencionados por el usuario se conservan. */
+  readonly customFields?: readonly AccountCustomFieldValue[];
 }
 
 export type AccountField = keyof AccountChanges;
@@ -189,6 +211,7 @@ export class Account {
         notes: optionalText(input.notes, 2000, '/notes'),
         tagIds: [...new Set(input.tagIds ?? [])],
         cryptoNetwork: optionalText(input.cryptoNetwork, 20, '/cryptoNetwork'),
+        customFields: sortedValues(input.customFields),
         version: 1,
         createdAt: null,
         updatedAt: null,
@@ -273,6 +296,13 @@ export class Account {
     if (changes.tagIds !== undefined) set('tagIds', [...new Set(changes.tagIds)]);
     if (changes.cryptoNetwork !== undefined) {
       set('cryptoNetwork', optionalText(changes.cryptoNetwork, 20, '/cryptoNetwork'));
+    }
+    if (changes.customFields !== undefined) {
+      const values = sortedValues(changes.customFields);
+      if (JSON.stringify(values) !== JSON.stringify(s.customFields)) {
+        next.customFields = values;
+        changed.push('customFields');
+      }
     }
     if (changed.length > 0) this.state = { ...next, version: s.version + 1 };
     return changed;

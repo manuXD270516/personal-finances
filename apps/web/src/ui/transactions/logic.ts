@@ -1,4 +1,10 @@
 import { isZeroAmount, sumAmounts } from '../common/money';
+import {
+  customFieldParams,
+  EMPTY_CUSTOM_FIELD_FILTER,
+  type CustomFieldDefinition,
+  type CustomFieldFilter,
+} from '../custom-fields/logic';
 import type {
   AuditLogEntry,
   Money,
@@ -48,6 +54,8 @@ export interface TransactionFilters {
   readonly categoryId: string;
   readonly dateFrom: string;
   readonly dateTo: string;
+  /** Filtro por valor de custom field de los splits (`customField[<clave>]`, add-custom-fields). */
+  readonly customField: CustomFieldFilter;
 }
 
 export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
@@ -59,10 +67,18 @@ export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
   categoryId: '',
   dateFrom: '',
   dateTo: '',
+  customField: EMPTY_CUSTOM_FIELD_FILTER,
 };
 
-/** Query de `listTransactions` a partir de los filtros de la pantalla (vacíos se omiten). */
-export function transactionsQuery(f: TransactionFilters, cursor?: string | null): URLSearchParams {
+/**
+ * Query de `listTransactions` a partir de los filtros de la pantalla (vacíos se omiten). El filtro por custom field
+ * necesita la definición elegida (tipo) y el locale de formato (lo escrito se normaliza al punto decimal).
+ */
+export function transactionsQuery(
+  f: TransactionFilters,
+  cursor?: string | null,
+  custom?: { readonly definition: CustomFieldDefinition | undefined; readonly locale: string },
+): URLSearchParams {
   const q = new URLSearchParams();
   if (f.q.trim()) q.set('q', f.q.trim());
   if (f.accountId) q.append('accountId', f.accountId);
@@ -72,6 +88,8 @@ export function transactionsQuery(f: TransactionFilters, cursor?: string | null)
   if (f.categoryId) q.append('categoryId', f.categoryId);
   if (f.dateFrom) q.set('dateFrom', f.dateFrom);
   if (f.dateTo) q.set('dateTo', f.dateTo);
+  if (custom)
+    for (const [k, v] of customFieldParams(custom.definition, f.customField, custom.locale)) q.set(k, v);
   q.set('limit', '50');
   if (cursor) q.set('cursor', cursor);
   return q;

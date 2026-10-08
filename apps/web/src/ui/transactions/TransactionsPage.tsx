@@ -14,6 +14,8 @@ import {
 } from '../common/types';
 import { Field, inputStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { useCustomFields } from '../custom-fields/CustomFieldInputs';
+import { supportsRange } from '../custom-fields/logic';
 import { categoryOptions, useCatalogs } from './catalogs';
 import { EMPTY_TRANSACTION_FILTERS, transactionsQuery, type TransactionFilters } from './logic';
 import { TransactionsListView } from './TransactionsListView';
@@ -53,6 +55,9 @@ function Register({
   const f = useFormat('Transactions', ctx);
   const { t } = f;
   const catalogs = useCatalogs(ctx);
+  const cf = useFormat('CustomFields', ctx);
+  const customFields = useCustomFields(ctx);
+  const filterable = customFields.active('TRANSACTION');
   const [filters, setFilters] = useState<TransactionFilters>({
     ...EMPTY_TRANSACTION_FILTERS,
     accountId: accountId ?? '',
@@ -69,14 +74,23 @@ function Register({
   const [shownQuery, setShownQuery] = useState<string | undefined>();
   // Solo la última petición escribe la lista: una respuesta tardía de filtros anteriores se descarta.
   const latest = useRef(0);
-  const query = transactionsQuery(filters).toString();
+  const customDef = customFields.definitions.find(
+    (d) => d.key === filters.customField.key && d.target === 'TRANSACTION' && !d.archivedAt,
+  );
+  const custom = { definition: customDef, locale: ctx.formatLocale };
+  const query = transactionsQuery(filters, undefined, custom).toString();
 
   const load = useCallback(
     (append?: string | null) => {
       const seq = (latest.current += 1);
-      const shown = transactionsQuery(filters).toString();
+      const shown = transactionsQuery(filters, undefined, {
+        definition: customDef,
+        locale: ctx.formatLocale,
+      }).toString();
       ctx.api
-        .get<Page<Transaction>>(`${ctx.base}/transactions?${transactionsQuery(filters, append).toString()}`)
+        .get<Page<Transaction>>(
+          `${ctx.base}/transactions?${transactionsQuery(filters, append, { definition: customDef, locale: ctx.formatLocale }).toString()}`,
+        )
         .then((r) => {
           if (seq !== latest.current) return;
           const data = r.data?.data ?? [];
@@ -89,7 +103,7 @@ function Register({
           if (seq === latest.current) setProblem(problemOf(err));
         });
     },
-    [ctx.api, ctx.base, filters],
+    [ctx.api, ctx.base, ctx.formatLocale, filters, customDef],
   );
 
   useEffect(() => {
@@ -289,6 +303,104 @@ function Register({
             />
           )}
         </Field>
+        {filterable.length > 0 ? (
+          <>
+            <Field label={cf.t('filter.field')}>
+              {(p) => (
+                <select
+                  {...p}
+                  name="customFieldKey"
+                  style={inputStyle}
+                  value={filters.customField.key}
+                  onChange={(e) =>
+                    setFilter({ customField: { key: e.target.value, eq: '', from: '', to: '' } })
+                  }
+                >
+                  <option value="">{t('filters.any')}</option>
+                  {filterable.map((d) => (
+                    <option key={d.id} value={d.key}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            {customDef && supportsRange(customDef.dataType) ? (
+              <>
+                <Field label={cf.t('filter.from', { name: customDef.label })}>
+                  {(p) => (
+                    <input
+                      {...p}
+                      name="customFieldFrom"
+                      type={customDef.dataType === 'DATE' ? 'date' : 'text'}
+                      inputMode={customDef.dataType === 'DECIMAL' ? 'decimal' : 'numeric'}
+                      style={inputStyle}
+                      value={filters.customField.from}
+                      onChange={(e) =>
+                        setFilter({ customField: { ...filters.customField, from: e.target.value } })
+                      }
+                    />
+                  )}
+                </Field>
+                <Field label={cf.t('filter.to', { name: customDef.label })}>
+                  {(p) => (
+                    <input
+                      {...p}
+                      name="customFieldTo"
+                      type={customDef.dataType === 'DATE' ? 'date' : 'text'}
+                      inputMode={customDef.dataType === 'DECIMAL' ? 'decimal' : 'numeric'}
+                      style={inputStyle}
+                      value={filters.customField.to}
+                      onChange={(e) =>
+                        setFilter({ customField: { ...filters.customField, to: e.target.value } })
+                      }
+                    />
+                  )}
+                </Field>
+              </>
+            ) : customDef ? (
+              <Field label={cf.t('filter.value', { name: customDef.label })}>
+                {(p) =>
+                  customDef.dataType === 'SELECT' || customDef.dataType === 'BOOLEAN' ? (
+                    <select
+                      {...p}
+                      name="customFieldValue"
+                      style={inputStyle}
+                      value={filters.customField.eq}
+                      onChange={(e) =>
+                        setFilter({ customField: { ...filters.customField, eq: e.target.value } })
+                      }
+                    >
+                      <option value="">{t('filters.any')}</option>
+                      {customDef.dataType === 'SELECT' ? (
+                        customDef.options.map((o) => (
+                          <option key={o.key} value={o.key}>
+                            {o.label}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="true">{cf.t('yes')}</option>
+                          <option value="false">{cf.t('no')}</option>
+                        </>
+                      )}
+                    </select>
+                  ) : (
+                    <input
+                      {...p}
+                      name="customFieldValue"
+                      style={inputStyle}
+                      value={filters.customField.eq}
+                      onChange={(e) =>
+                        setFilter({ customField: { ...filters.customField, eq: e.target.value } })
+                      }
+                    />
+                  )
+                }
+              </Field>
+            ) : null}
+          </>
+        ) : null}
       </form>
       {ctx.canEdit ? (
         <div style={rowStyle} aria-label={t('list.bulk')} role="group">
@@ -314,6 +426,7 @@ function Register({
           href={ctx.href}
           {...(filters.accountId ? { accountId: filters.accountId } : {})}
           selectable={ctx.canEdit}
+          customFields={{ definitions: customFields.definitions, cf }}
           selected={selected}
           onToggle={(id) =>
             setSelected((prev) => {

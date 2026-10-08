@@ -25,7 +25,7 @@ export type AmountError = 'EMPTY' | 'INVALID' | 'SCALE' | 'NOT_POSITIVE';
 export type AmountResult =
   { readonly ok: true; readonly value: string } | { readonly ok: false; readonly error: AmountError };
 
-function separatorsOf(locale: string): { decimal: string; group: string } {
+export function separatorsOf(locale: string): { decimal: string; group: string } {
   const parts = new Intl.NumberFormat(locale, { useGrouping: true }).formatToParts(12345.6);
   return {
     decimal: parts.find((p) => p.type === 'decimal')?.value ?? '.',

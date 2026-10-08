@@ -14,6 +14,8 @@ import {
 } from '../common/types';
 import { errorStyle, Field, formStyle, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
+import { useCustomFields } from '../custom-fields/CustomFieldInputs';
+import { buildFieldsPayload, type CustomFieldError } from '../custom-fields/logic';
 import { categoryOptions, type Catalogs } from './catalogs';
 import { CounterpartyPicker } from './CounterpartyPicker';
 import { newSplitRow, summarizeSplits, type SplitRow } from './splits';
@@ -99,6 +101,10 @@ export function TransactionForm({
   onCancel?: () => void;
 }) {
   const f = useFormat('Transactions', ctx);
+  const cf = useFormat('CustomFields', ctx);
+  const customFields = useCustomFields(ctx);
+  const txFields = customFields.active('TRANSACTION');
+  const [fieldErrors, setFieldErrors] = useState<Record<number, Record<string, CustomFieldError>>>({});
   const { t, locale } = f;
   const editing = Boolean(original);
   const today = todayIn(ctx.timeZone);
@@ -207,11 +213,34 @@ export function TransactionForm({
     return catalogs.categories.find((c) => c.systemCode === code)?.id;
   }
 
-  function buildSplits(): { splits?: unknown[]; error?: string } {
+  function buildSplits(): {
+    splits?: unknown[];
+    error?: string;
+    fieldErrors?: Record<number, Record<string, CustomFieldError>>;
+  } {
     if (!usesSplits || !total) return {};
     const rows = s.splits;
+    // Custom fields por split (add-custom-fields): al crear se exigen los obligatorios; al editar viajan solo los
+    // cambios respecto del split de la misma posición (la API los combina con lo guardado).
+    const payloads = rows.map((r, i) =>
+      buildFieldsPayload(txFields, r.customFields, locale, {
+        original: original?.splits[i]?.customFields,
+        requireMandatory: !editing,
+      }),
+    );
+    const failed = payloads.flatMap((p, i) =>
+      Object.keys(p.errors).length > 0 ? [[i, p.errors] as const] : [],
+    );
+    if (failed.length > 0) return { fieldErrors: Object.fromEntries(failed) };
     const only = rows.length === 1 ? rows[0]! : undefined;
-    if (only && !only.categoryId && only.tagIds.length === 0 && only.amount.trim() === '') return {};
+    if (
+      only &&
+      !only.categoryId &&
+      only.tagIds.length === 0 &&
+      only.amount.trim() === '' &&
+      !payloads[0]?.values
+    )
+      return {};
     const summary = summarizeSplits(rows, total, money);
     if (!summary.balanced) return { error: t('errors.splitsNotBalanced') };
     const fallback = uncategorizedId();
@@ -219,6 +248,7 @@ export function TransactionForm({
       amount: { amount: summary.amounts[i]!, currency },
       categoryId: r.categoryId || fallback,
       ...(r.tagIds.length ? { tagIds: [...r.tagIds] } : {}),
+      ...(payloads[i]?.values ? { customFields: payloads[i]!.values } : {}),
     }));
     if (splits.some((x) => !x.categoryId)) return { error: t('errors.categoryRequired') };
     return { splits };
@@ -232,6 +262,8 @@ export function TransactionForm({
     if (s.kind === 'ADJUSTMENT' && !s.reason.trim()) next['reason'] = t('errors.reasonRequired');
     const sp = buildSplits();
     if (sp.error) next['splits'] = sp.error;
+    setFieldErrors(sp.fieldErrors ?? {});
+    if (sp.fieldErrors) next['splits'] = t('errors.customFields');
     setErrors(next);
     return { ok: Object.keys(next).length === 0, ...(sp.splits ? { splits: sp.splits } : {}) };
   }
@@ -528,6 +560,12 @@ export function TransactionForm({
           categories={cats}
           tags={catalogs.tags}
           f={f}
+          customFields={{
+            fields: txFields,
+            cf,
+            errors: fieldErrors,
+            originals: original?.splits.map((x) => x.customFields),
+          }}
         />
       ) : null}
       {errors['splits'] ? (

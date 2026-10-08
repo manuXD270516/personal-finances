@@ -18,9 +18,20 @@ import type {
   InstitutionRepository,
   LedgerAccountBalance,
   OutboxPort,
+  ValidatedCustomFieldValue,
 } from '../ports/index.js';
 
 type Event = Parameters<OutboxPort['append']>[0];
+
+/** Definición de custom field de prueba (CLASSIFICATION en memoria). */
+export interface FakeCustomField {
+  readonly fieldId: string;
+  readonly key: string;
+  readonly dataType: 'TEXT' | 'DECIMAL' | 'BOOLEAN';
+  readonly target: 'TRANSACTION' | 'ACCOUNT';
+  readonly required?: boolean;
+  readonly archived?: boolean;
+}
 
 /**
  * Dobles en memoria para los tests de aplicación. La "transacción" se simula con snapshots: si el caso de uso lanza,
@@ -39,6 +50,8 @@ export class InMemoryAccounts {
   })[] = [];
   /** Saldo contable (Σ postings) por cuenta; presencia = la cuenta tiene ledger account / movimientos. */
   readonly ledger = new Map<string, MoneyDto & { nature: 'ASSET' | 'LIABILITY' }>();
+  /** Definiciones de custom fields disponibles para `validate`. */
+  readonly customFieldDefs: FakeCustomField[] = [];
   readonly openingEntries: { accountId: string; amount: MoneyDto; nature: string; date: string }[] = [];
   readonly clock = new FixedClock(Instant.parse('2026-03-15T14:00:00Z'));
   private seq = 0;
@@ -180,6 +193,51 @@ export class InMemoryAccounts {
         },
       },
       tags: { assertAssignable: async () => undefined },
+      customFields: {
+        /** Réplica mínima del contrato `ValidateCustomFieldValues` (la lógica real se prueba en CLASSIFICATION). */
+        validate: async (input) => {
+          const set: ValidatedCustomFieldValue[] = [];
+          const removeFieldIds: string[] = [];
+          for (const [i, v] of input.values.entries()) {
+            const ptr = `/customFields/${i}`;
+            const def = this.customFieldDefs.find((f) =>
+              v.fieldId ? f.fieldId === v.fieldId : f.key === v.key,
+            );
+            if (!def) throw new DomainError('REFERENCE_NOT_FOUND', 'custom field not found').at(ptr);
+            if (def.target !== 'ACCOUNT') {
+              throw new DomainError('CUSTOM_FIELD_TARGET_MISMATCH', 'wrong target').at(ptr);
+            }
+            if (def.archived) throw new DomainError('CUSTOM_FIELD_ARCHIVED', 'archived').at(ptr);
+            if (v.value === null) {
+              removeFieldIds.push(def.fieldId);
+              continue;
+            }
+            const ok =
+              def.dataType === 'BOOLEAN'
+                ? typeof v.value === 'boolean'
+                : typeof v.value === 'string' &&
+                  (def.dataType === 'DECIMAL' ? /^-?\d+(\.\d{1,18})?$/u.test(v.value) : v.value.length > 0);
+            if (!ok) throw new DomainError('CUSTOM_FIELD_VALUE_INVALID', 'invalid value').at(`${ptr}/value`);
+            set.push({
+              fieldId: def.fieldId,
+              key: def.key,
+              valueType:
+                def.dataType === 'BOOLEAN' ? 'BOOLEAN' : def.dataType === 'DECIMAL' ? 'NUMBER' : 'TEXT',
+              value: v.value,
+            });
+          }
+          if (input.requireMandatory) {
+            const final = new Set(input.existingFieldIds);
+            for (const v of set) final.add(v.fieldId);
+            for (const id of removeFieldIds) final.delete(id);
+            const missing = this.customFieldDefs.find(
+              (f) => f.target === 'ACCOUNT' && f.required && !f.archived && !final.has(f.fieldId),
+            );
+            if (missing) throw new DomainError('CUSTOM_FIELD_REQUIRED', 'required').at('/customFields');
+          }
+          return { set, removeFieldIds };
+        },
+      },
       openingBalance: opening,
       outbox: { append: async (e) => void this.events.push(e) },
       audit: this.audit,

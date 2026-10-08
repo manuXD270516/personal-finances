@@ -583,7 +583,8 @@
       "dateRequired": "Ingresa una fecha.",
       "reasonRequired": "El ajuste necesita un motivo.",
       "refundExceeds": "El reembolso supera lo pendiente de la compra original: confírmalo para registrarlo.",
-      "sameAccount": "El origen y el destino deben ser distintos."
+      "sameAccount": "El origen y el destino deben ser distintos.",
+      "customFields": "Revisa los campos personalizados marcados."
     },
     "splits": {
       "title": "Categorías (splits)",
@@ -684,7 +685,8 @@
         "unreconcile": "Transacción des-reconciliada.",
         "amended": "Cambios guardados: reversa y nuevo asiento (revisión {revision}).",
         "edited": "Cambios guardados."
-      }
+      },
+      "customFields": "Campos personalizados"
     },
     "history": {
       "title": "Historial (ciclo de vida)",
@@ -1142,7 +1144,8 @@
       "notes": "Notas",
       "website": "Sitio web",
       "systemCode": "Código de sistema"
-    }
+    },
+    "customFields": "Campos personalizados"
   },
   "Lifecycle": {
     "tabs": {
@@ -1295,6 +1298,79 @@
       "label": "Periodo",
       "option": "{name} · {from} – {to} · {status}",
       "current": "(actual)"
+    }
+  },
+  "CustomFields": {
+    "title": "Campos personalizados",
+    "intro": "Define datos propios para tus transacciones (por división) y tus cuentas: número de factura, centro de costo, sucursal… No afectan saldos ni asientos contables.",
+    "required": "Obligatorio",
+    "none": "Sin valor",
+    "yes": "Sí",
+    "no": "No",
+    "archivedBadge": "archivado",
+    "empty": "Aún no hay campos personalizados.",
+    "new": "Nuevo campo personalizado",
+    "label": "Etiqueta",
+    "key": "Clave",
+    "keyHint": "Identificador estable en minúsculas (letras, números y guion bajo). No cambia después.",
+    "keyImmutable": "La clave no se puede cambiar.",
+    "dataType": "Tipo",
+    "dataTypes": {
+      "TEXT": "Texto",
+      "NUMBER": "Número entero",
+      "DECIMAL": "Decimal",
+      "DATE": "Fecha",
+      "BOOLEAN": "Sí / No",
+      "SELECT": "Selección"
+    },
+    "target": "Se aplica a",
+    "targets": {
+      "TRANSACTION": "Transacciones",
+      "ACCOUNT": "Cuentas"
+    },
+    "requiredField": "Obligatorio en registros nuevos",
+    "requiredBadge": "obligatorio",
+    "lockedHint": "El tipo y la entidad no cambian cuando el campo ya tiene valores.",
+    "options": "Opciones",
+    "optionLabel": "Etiqueta de la opción {n}",
+    "optionKey": "Clave de la opción {n}",
+    "addOption": "Agregar opción",
+    "removeOption": "Quitar la opción {n}",
+    "removeOptionShort": "Quitar",
+    "create": "Crear campo",
+    "created": "Campo «{name}» creado.",
+    "updated": "Campo «{name}» actualizado.",
+    "archivedDone": "Campo «{name}» archivado.",
+    "unarchived": "Campo «{name}» desarchivado.",
+    "reordered": "Orden actualizado.",
+    "edit": "Editar",
+    "editNamed": "Editar {name}",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "archive": "Archivar",
+    "unarchive": "Desarchivar",
+    "archiveNamed": "Archivar {name}",
+    "unarchiveNamed": "Desarchivar {name}",
+    "moveUpNamed": "Subir {name}",
+    "moveDownNamed": "Bajar {name}",
+    "errors": {
+      "labelRequired": "Escribe la etiqueta del campo.",
+      "keyRequired": "Escribe la clave del campo.",
+      "optionsRequired": "Una selección necesita al menos una opción.",
+      "optionKeyInvalid": "La clave de una opción usa minúsculas, números y guion bajo (hasta 40 caracteres).",
+      "optionKeyDuplicated": "Las opciones no pueden repetir clave ni etiqueta.",
+      "optionLabelRequired": "Cada opción necesita una etiqueta.",
+      "INVALID_INTEGER": "Escribe un número entero de hasta 15 dígitos.",
+      "INVALID_DECIMAL": "Escribe un decimal válido (hasta 18 decimales).",
+      "INVALID_DATE": "Escribe una fecha válida.",
+      "TOO_LONG": "Máximo 500 caracteres.",
+      "REQUIRED": "Este campo es obligatorio."
+    },
+    "filter": {
+      "field": "Campo personalizado",
+      "value": "{name}",
+      "from": "{name}: desde",
+      "to": "{name}: hasta"
     }
   }
 }

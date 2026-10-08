@@ -45,6 +45,19 @@ export interface ExternalRef {
   readonly id: string;
 }
 
+/**
+ * Valor de custom field de un split (openspec add-custom-fields, FR-TRANSACTIONS-026): ya validado y normalizado por
+ * CLASSIFICATION (`ValidateCustomFieldValues`). `valueType` es la clase de almacenamiento (`SELECT` es `TEXT`; `NUMBER`
+ * y `DECIMAL` son `NUMBER` con el string decimal canónico: nunca punto flotante). `key` es de solo lectura (derivada de
+ * la definición al hidratar). El ledger nunca los ve (INV-033).
+ */
+export interface CustomFieldValue {
+  readonly fieldId: string;
+  readonly key: string;
+  readonly valueType: 'TEXT' | 'NUMBER' | 'DATE' | 'BOOLEAN';
+  readonly value: string | boolean;
+}
+
 /** Porción nominal de la transacción (FR-TRANSACTIONS-026): magnitud positiva; la dirección la da `kind`. */
 export interface Split {
   readonly id: string;
@@ -53,6 +66,8 @@ export interface Split {
   readonly counterpartyId: string | null;
   readonly tagIds: readonly string[];
   readonly memo: string | null;
+  /** Ordenados por clave. Solo las porciones de ingresos, gastos y reembolsos los llevan (D97). */
+  readonly customFields: readonly CustomFieldValue[];
 }
 
 export interface SplitInput {
@@ -62,6 +77,39 @@ export interface SplitInput {
   readonly counterpartyId?: string | null;
   readonly tagIds?: readonly string[];
   readonly memo?: string | null;
+  /**
+   * Valores finales del split ya resueltos por la aplicación (existentes ⊕ cambios validados). `undefined` en una
+   * edición ⇒ se conservan los del split actual en la misma posición (copia al regenerar, design decisión 2).
+   */
+  readonly customFields?: readonly CustomFieldValue[];
+}
+
+const byKey = (a: CustomFieldValue, b: CustomFieldValue) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+const sortedValues = (values: readonly CustomFieldValue[] | undefined): readonly CustomFieldValue[] =>
+  [...(values ?? [])].sort(byKey);
+
+/** Cambio de un custom field entre dos listas de splits: valor por posición (`null` si el split no lo tiene). */
+export interface CustomFieldChange {
+  readonly fieldId: string;
+  readonly key: string;
+  readonly before: readonly (string | boolean | null)[];
+  readonly after: readonly (string | boolean | null)[];
+}
+
+/** Diferencias de custom fields por split (posición a posición) entre dos listas de splits. */
+export function diffCustomFields(before: readonly Split[], after: readonly Split[]): CustomFieldChange[] {
+  const fields = new Map<string, string>();
+  for (const s of [...before, ...after]) for (const v of s.customFields) fields.set(v.fieldId, v.key);
+  const valueOf = (s: Split | undefined, fieldId: string): string | boolean | null =>
+    s?.customFields.find((v) => v.fieldId === fieldId)?.value ?? null;
+  const out: CustomFieldChange[] = [];
+  for (const [fieldId, key] of [...fields].sort((a, b) => (a[1] < b[1] ? -1 : 1))) {
+    const length = Math.max(before.length, after.length);
+    const b = Array.from({ length }, (_, i) => valueOf(before[i], fieldId));
+    const a = Array.from({ length }, (_, i) => valueOf(after[i], fieldId));
+    if (JSON.stringify(b) !== JSON.stringify(a)) out.push({ fieldId, key, before: b, after: a });
+  }
+  return out;
 }
 
 /** Movimiento sobre una cuenta del usuario con signo contable (débito +, crédito −; docs/09 §3). */
@@ -169,7 +217,8 @@ export type ChangedField =
   | 'businessDate'
   | 'accountId'
   | 'toAccountId'
-  | 'splits';
+  | 'splits'
+  | 'customFields';
 
 /** Cambio de clasificación de un split (payload de `TransactionCategorized.v1`). */
 export interface SplitClassificationChange {
@@ -183,6 +232,8 @@ export interface SplitClassificationChange {
 
 export interface AmendResult {
   readonly changedFields: readonly ChangedField[];
+  /** Cambios de valores de custom fields (INV-033: sin efecto en el ledger); vacío si no cambió ninguno. */
+  readonly customFieldChanges: readonly CustomFieldChange[];
   /** `true` ⇒ la aplicación debe revertir el asiento activo y postear la revisión nueva (docs/09 §11). */
   readonly ledgerImpact: boolean;
   readonly classificationChanges: readonly SplitClassificationChange[];
@@ -248,6 +299,7 @@ function buildSplits(
         counterpartyId: null,
         tagIds: [],
         memo: null,
+        customFields: [],
       },
     ];
   }
@@ -273,6 +325,7 @@ function buildSplits(
       counterpartyId: s.counterpartyId ?? null,
       tagIds: [...new Set(s.tagIds ?? [])],
       memo: s.memo ?? null,
+      customFields: sortedValues(s.customFields),
     };
   });
   assertSplitsSum(amount, splits);
@@ -489,6 +542,7 @@ export function buildConversion(
     counterpartyId: null,
     tagIds: [],
     memo: null,
+    customFields: [],
   }));
   const conversion = freezeDetail({
     revision,
@@ -656,6 +710,7 @@ export class Transaction {
         counterpartyId: null,
         tagIds: [],
         memo: null,
+        customFields: [],
       });
     }
     return new Transaction(
@@ -774,6 +829,7 @@ export class Transaction {
     if (this.state.status !== previousStatus) changed.push('status');
     return {
       changedFields: changed,
+      customFieldChanges: [],
       ledgerImpact,
       classificationChanges: [],
       previousStatus,
@@ -967,6 +1023,7 @@ export class Transaction {
             counterpartyId: n.counterpartyId ?? null,
             tagIds: [...new Set(n.tagIds ?? [])],
             memo: n.memo ?? null,
+            customFields: n.customFields === undefined ? old.customFields : sortedValues(n.customFields),
           };
         });
         classificationChanges = reclassified.flatMap((n, i) => {
@@ -998,9 +1055,19 @@ export class Transaction {
           '/splits',
         );
       } else {
+        // Al regenerar los splits, los valores de custom fields se copian a los nuevos que conservan su posición
+        // (design decisión 2); los splits reemplazados conservan los suyos como historia.
         next = {
           ...next,
-          splits: buildSplits(s.kind, amount, changes.splits, { categoryId: null, splitId: undefined }),
+          splits: buildSplits(
+            s.kind,
+            amount,
+            changes.splits.map((n, i) => ({
+              ...n,
+              customFields: n.customFields === undefined ? (s.splits[i]?.customFields ?? []) : n.customFields,
+            })),
+            { categoryId: null, splitId: undefined },
+          ),
         };
         changed.push('splits');
         financial = true;
@@ -1014,9 +1081,13 @@ export class Transaction {
       const only = s.splits[0] as Split;
       next = { ...next, splits: [{ ...only, amount }] };
     }
+    // Custom fields: metadatos sin impacto contable (INV-033); un cambio es una edición descriptiva.
+    const customFieldChanges = diffCustomFields(s.splits, next.splits);
+    if (customFieldChanges.length > 0) changed.push('customFields');
     if (changed.length === 0) {
       return {
         changedFields: [],
+        customFieldChanges: [],
         ledgerImpact: false,
         classificationChanges: [],
         previousStatus,
@@ -1063,7 +1134,14 @@ export class Transaction {
     this.state = { ...next, version: s.version + 1 };
     if (ledgerImpact) this.mark('REVISE', previousStatus, this.state.status, s.revision, this.state.revision);
     if (this.state.status !== previousStatus) changed.push('status');
-    return { changedFields: changed, ledgerImpact, classificationChanges, previousStatus, previousEntryId };
+    return {
+      changedFields: changed,
+      customFieldChanges,
+      ledgerImpact,
+      classificationChanges,
+      previousStatus,
+      previousEntryId,
+    };
   }
 
   /** Valida el paso contra la máquina declarada y lo deja como `lastTransition` (una sola fuente de reglas). */

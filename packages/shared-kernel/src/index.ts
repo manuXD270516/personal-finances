@@ -23,6 +23,7 @@ export {
   type Currency,
 } from './money/currency.js';
 export { MoneyDecimal, dec, type Decimal } from './money/decimal.js';
+export { canonicalDecimal } from './money/canonical-decimal.js';
 export { Money, MAX_INTEGER_DIGITS, type MoneyJson, type Weight } from './money/money.js';
 export { Rate, RATE_PERSIST_SCALE } from './money/rate.js';
 export { type RoundingMode } from './money/rounding.js';

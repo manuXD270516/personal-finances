@@ -12,9 +12,13 @@ invariants: [INV-021]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/custom-fields.service.test.ts
+  - packages/contexts/classification/src/application/custom-fields.service.test.ts
+  - packages/contexts/accounts/src/application/custom-fields.service.test.ts
+  - apps/api/test/api/custom-fields.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["custom-fields", "splits"]

@@ -14,6 +14,8 @@ export interface SplitRow {
   readonly amount: string;
   readonly percent: string;
   readonly tagIds: readonly string[];
+  /** Texto de cada custom field del split por clave (add-custom-fields); solo los activos se editan. */
+  readonly customFields: Readonly<Record<string, string>>;
 }
 
 export interface SplitMoney {
@@ -38,6 +40,7 @@ export const newSplitRow = (over: Partial<SplitRow> = {}): SplitRow => ({
   amount: '',
   percent: '',
   tagIds: [],
+  customFields: {},
   ...over,
 });
 

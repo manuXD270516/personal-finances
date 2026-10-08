@@ -9,10 +9,15 @@ import {
   type ApiRequest,
   type ApiResponse,
 } from '@pf/platform/nest';
-import type { AccountsService, AccountSort, AccountView } from '../application/accounts.service.js';
-import type { InstitutionsService } from '../application/institutions.service.js';
 import type {
-  AccountChanges,
+  AccountsService,
+  AccountSort,
+  AccountUpdateChanges,
+  AccountView,
+} from '../application/accounts.service.js';
+import type { InstitutionsService } from '../application/institutions.service.js';
+import type { CustomFieldValueInput } from '../application/ports/index.js';
+import type {
   AccountStatus,
   AccountType,
   InstitutionFields,
@@ -46,6 +51,21 @@ function pick<T>(body: Json, keys: readonly string[]): T {
   return out as T;
 }
 
+/**
+ * `customFields` del cuerpo: mapa `clave → valor` (`null` quita) ⇒ lista de cambios por clave para el caso de uso.
+ * Ausente ⇒ sin cambios en los custom fields.
+ */
+function customFieldInputs(body: Json): { customFields?: CustomFieldValueInput[] } {
+  const raw = body['customFields'];
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  return {
+    customFields: Object.entries(raw as Record<string, string | boolean | null>).map(([key, value]) => ({
+      key,
+      value,
+    })),
+  };
+}
+
 /** `Account` del contrato OpenAPI (dinero como string decimal; equivalente en moneda base valorado con FX). */
 export function toAccountDto(v: AccountView) {
   const a = v.account;
@@ -69,6 +89,7 @@ export function toAccountDto(v: AccountView) {
     color: a.color,
     icon: a.icon,
     tagIds: [...a.tagIds],
+    customFields: Object.fromEntries(a.customFields.map((v) => [v.key, v.value])),
     cryptoNetwork: a.cryptoNetwork,
     notes: a.notes,
     archivedAt: a.archivedAt,
@@ -203,6 +224,7 @@ export class AccountsController {
         'cryptoNetwork',
         'notes',
       ]),
+      ...customFieldInputs(body),
       name: str(body, 'name') ?? '',
       type: str(body, 'type') ?? '',
       currency: str(body, 'currency') ?? '',
@@ -246,7 +268,10 @@ export class AccountsController {
     @ExpectedVersion() expected: number,
     @Body() body: Json,
   ) {
-    const changes = pick<AccountChanges>(body, ACCOUNT_UPDATE_KEYS);
+    const changes: AccountUpdateChanges = {
+      ...pick<AccountUpdateChanges>(body, ACCOUNT_UPDATE_KEYS),
+      ...customFieldInputs(body),
+    };
     return toAccountDto(await this.service.updateAccount(workspaceId, accountId, expected, changes));
   }
 

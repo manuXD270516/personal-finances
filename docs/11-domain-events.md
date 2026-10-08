@@ -53,6 +53,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `accounts.AccountOpened` / `AccountArchived` | **Mantener** (Phase 1) | Proyecciones (lista de cuentas en dashboard, net worth), réplicas locales futuras. Ledger **no** los necesita (get-or-create). |
 | `accounts.AccountUpdated` / `AccountClosed` / `AccountReactivated` | **Agregar** (Phase 1, docs/31) | Ciclo de vida completo de la cuenta (`ACTIVE`/`CLOSED`/`ARCHIVED`) para proyecciones del dashboard. |
 | `classification.CategoryArchived` | **Agregar** (Phase 1, `add-classification`) | Reporting marca categorías archivadas; Planning y Rules lo consumen desde sus fases. |
+| `classification.CustomFieldDefinitionChanged` | **Agregar** (Phase 2, `add-custom-fields`) | Una definición de custom field se definió, modificó, archivó o desarchivó; invalida cachés de definiciones. Los valores no viajan en eventos: sus cambios van en `transactions.TransactionUpdated` / `accounts.AccountUpdated` con `customFields` en `changedFields`. |
 | `fx.RateRecorded` | **Adelantar** a Phase 1 (`add-manual-conversions`, `add-market-rate-providers`) | Tasas manuales y de providers (D29) invalidan el resumen valorizado. |
 | `identity.WorkspaceCreated` / `WorkspaceSettingsChanged` | **Mantener** (Phase 1) | Siembra de categorías (Classification) y de preferencias/histórico de tasas (FX); Reporting reacciona a moneda base, zona horaria y mes fiscal. Planning (Phase 2, `add-financial-periods`) crea los periodos iniciales de forma asíncrona y recalcula los `DRAFT` ante `fiscalMonthStartDay` (y activa ante `timeZone`); también consume `ledger.JournalEntryPosted` para cubrir fechas fuera de los periodos existentes. |
 | `commitments.RecurringOccurrenceGenerated` | **Reemplazar** por `commitments.OccurrencesGenerated` (batch por definición y ventana) | Un evento por ocurrencia genera ruido (cientos por ventana). El calendario de flujo de caja sólo necesita el lote. `RecurringOccurrenceDue` (uno por ocurrencia) sí es útil para recordatorios. |
@@ -168,6 +169,12 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 - **Trigger:** `POST …/categories/{id}/archive`. Archivar una categoría padre archiva sus subcategorías activas en la misma transacción y emite **un evento por categoría** archivada (`add-classification`).
 - **Payload:** `categoryId`, `parentId|null`, `groupId`, `kind: EXPENSE|INCOME`, `archivedAt: instant`, `cascadedFromCategoryId|null` (la categoría padre cuando se archivó en cascada); opcional aditivo `transition: ARCHIVE` (transición de la máquina `Category`, docs/31 D52; los consumidores lo ignoran).
 - **Idem.:** natural `(categoryId, aggregateVersion)`. **Ord.:** por `Category`. **PII:** N.
+
+#### `classification.CustomFieldDefinitionChanged.v1`
+- **Productor:** CLASSIFICATION. **Consumidores:** ninguno en Phase 2 (invalidación de cachés de definiciones; futuros export y reglas).
+- **Trigger:** `POST/PATCH/archive/unarchive` de `W/custom-fields` con efecto (un parche sin cambios no emite).
+- **Payload:** `fieldId`, `key`, `change: DEFINED|UPDATED|ARCHIVED|UNARCHIVED`, `dataType: TEXT|NUMBER|DECIMAL|DATE|BOOLEAN|SELECT`, `target: TRANSACTION|ACCOUNT`. Sin etiqueta ni opciones; los valores asignados a los registros nunca viajan en eventos (`TransactionUpdated.v1` y `AccountUpdated.v1` agregan `customFields` a `changedFields`, aditivo).
+- **Idem.:** natural `(fieldId, aggregateVersion)`. **Ord.:** por `CustomFieldDefinition`. **PII:** N.
 
 #### `fx.RateRecorded.v1`
 - **Productor:** FX. **Consumidores:** REPORTING (invalida el resumen).

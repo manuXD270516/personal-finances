@@ -6,10 +6,12 @@ import type {
   LifecycleDto,
   LifecycleEventRefDto,
 } from '@pf/audit/contracts';
+import type { CustomFieldValueInputDto } from '@pf/classification/contracts';
 import { currency as makeCurrency, DomainError, Money, type FieldViolation } from '@pf/shared-kernel';
 import { TRANSACTION_EVENTS } from '../contracts/index.js';
 import {
   assertRefundAllowed,
+  diffCustomFields,
   DUPLICATE_WINDOW_DAYS,
   findDuplicates,
   normalizeText,
@@ -18,6 +20,9 @@ import {
   type AdjustmentDirection,
   type ChangedField,
   type ConversionDetail,
+  type CustomFieldChange,
+  type CustomFieldValue,
+  type Split,
   type LegRole,
   type ExternalRef,
   type PaymentMethod,
@@ -53,6 +58,11 @@ export interface SplitDto {
   readonly counterpartyId?: string | null;
   readonly tagIds?: readonly string[];
   readonly memo?: string | null;
+  /**
+   * Cambios de custom fields del split (por `fieldId` o `key`; `value: null` quita): fijan o quitan SOLO los campos
+   * mencionados; los demás conservan su valor (en una edición, el del split actual en la misma posición).
+   */
+  readonly customFields?: readonly CustomFieldValueInputDto[];
 }
 
 export interface RecordTransactionCommand {
@@ -167,6 +177,7 @@ const preconditionFailed = (currentVersion: number) =>
 const concurrencyConflict = () =>
   new DomainError('CONCURRENCY_CONFLICT', 'the transaction was modified concurrently');
 const UPDATED_EVENT_FIELDS: ReadonlySet<ChangedField> = new Set([
+  'customFields',
   'description',
   'notes',
   'counterpartyId',
@@ -206,7 +217,7 @@ export class TransactionsService {
       });
       if (!eligibility) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/accountId');
       const amount = await this.parseMoney(cmd.amount, '/amount');
-      const splits = cmd.splits ? await this.parseSplits(cmd.splits) : undefined;
+      let splits = cmd.splits ? await this.parseSplits(cmd.splits) : undefined;
       await this.validateClassification(
         cmd.userId,
         cmd.workspaceId,
@@ -214,6 +225,17 @@ export class TransactionsService {
         cmd.splits,
         cmd.counterpartyId,
       );
+      // Custom fields por split (FR-TRANSACTIONS-026): obligatorios en cada split de una transacción nueva.
+      const customFields = await this.resolveCustomFields({
+        userId: cmd.userId,
+        workspaceId: cmd.workspaceId,
+        kind: cmd.kind,
+        splits: cmd.splits,
+        current: null,
+        requireMandatory: true,
+      });
+      if (splits && customFields)
+        splits = splits.map((x, i) => ({ ...x, customFields: customFields[i] ?? [] }));
       let confirmedExcess = false;
       let defaultCategoryId: string | null = null;
       if (cmd.kind === 'REFUND' && cmd.refundOfTransactionId) {
@@ -303,6 +325,7 @@ export class TransactionsService {
       for (const f of ['description', 'notes', 'counterpartyId', 'paymentMethod', 'postingDate'] as const) {
         if (s[f] !== null) changes.push({ field: f, before: null, after: s[f] });
       }
+      changes.push(...customFieldAudit(diffCustomFields([], s.splits)));
       if (s.refundOfTransactionId) {
         changes.push({ field: 'refundOfTransactionId', before: null, after: s.refundOfTransactionId });
         if (s.confirmedRefundExcess)
@@ -528,6 +551,25 @@ export class TransactionsService {
       if (cmd.amount !== undefined) changes.amount = await this.parseMoney(cmd.amount, '/amount');
       if (cmd.splits !== undefined) changes.splits = await this.parseSplits(cmd.splits);
       await this.validateClassification(cmd.userId, workspaceId, before.kind, cmd.splits, cmd.counterpartyId);
+      if (cmd.splits !== undefined && changes.splits !== undefined) {
+        // La obligatoriedad no es retroactiva (decisión 6): solo se exige al editar custom fields o al regenerar los
+        // splits (cambia su cantidad o sus montos); una edición descriptiva o de clasificación no la dispara.
+        const parsed = changes.splits;
+        const reshaped =
+          parsed.length !== before.splits.length ||
+          parsed.some((x, i) => !x.amount.equals((before.splits[i] as Split).amount));
+        const customFields = await this.resolveCustomFields({
+          userId: cmd.userId,
+          workspaceId,
+          kind: before.kind,
+          splits: cmd.splits,
+          current: before.splits,
+          requireMandatory: cmd.splits.some((x) => x.customFields !== undefined) || reshaped,
+        });
+        if (customFields) {
+          changes.splits = parsed.map((x, i) => ({ ...x, customFields: customFields[i] ?? [] }));
+        }
+      }
       // INV-026: las cuentas de los legs deben estar activas antes de revertir/repostear.
       if (tx.needsEntry && financialKeys.some((k) => cmd[k] !== undefined)) {
         await this.assertAccounts(workspaceId, [
@@ -539,7 +581,12 @@ export class TransactionsService {
       const result = tx.amend(changes);
       // INV-015 (docs/31 D49): recategorizar no genera asiento, pero cambia lo reportado del mes; en un periodo cerrado
       // se rechaza con PERIOD_CLOSED (los cambios con asiento ya los rechaza el ledger, PF004).
-      if (result.classificationChanges.some((c) => c.previousCategoryId !== c.newCategoryId)) {
+      // Los custom fields de transacción siguen la misma regla (docs/33 D65, extensión de D49): un cambio en un periodo
+      // cerrado se rechaza con PERIOD_CLOSED sin escribir valor ni auditoría (la UoW hace rollback).
+      if (
+        result.classificationChanges.some((c) => c.previousCategoryId !== c.newCategoryId) ||
+        result.customFieldChanges.length > 0
+      ) {
         await this.deps.ledger.assertPeriodOpen({ workspaceId, date: before.businessDate });
       }
       let previousStatus: TransactionStatus | null = result.changedFields.includes('status')
@@ -617,7 +664,7 @@ export class TransactionsService {
           aggregateType: 'Transaction',
           aggregateId: after.id,
           aggregateVersion: after.version,
-          changes: diff(before, after, changedFields, newEntryId),
+          changes: diff(before, after, changedFields, newEntryId, result.customFieldChanges),
         },
         {
           events,
@@ -984,6 +1031,56 @@ export class TransactionsService {
     return out;
   }
 
+  /**
+   * Valida con CLASSIFICATION (`ValidateCustomFieldValues`) los custom fields de los splits y devuelve la lista FINAL
+   * de cada split: los valores actuales del split en la misma posición (`current`) con los cambios aplicados.
+   * `undefined` ⇒ no hay nada que resolver (los splits conservan lo que tienen). Solo ingresos, gastos y reembolsos
+   * llevan custom fields (docs/33 D97): en transferencias, conversiones y ajustes se rechazan.
+   */
+  private async resolveCustomFields(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly kind: TransactionKind;
+    readonly splits: readonly SplitDto[] | undefined;
+    readonly current: readonly Split[] | null;
+    readonly requireMandatory: boolean;
+  }): Promise<(readonly CustomFieldValue[])[] | undefined> {
+    const { kind, splits, current } = input;
+    const supported = kind === 'INCOME' || kind === 'EXPENSE' || kind === 'REFUND';
+    if (!supported) {
+      const offending = splits?.findIndex((x) => x.customFields !== undefined && x.customFields.length > 0);
+      if (offending !== undefined && offending >= 0) {
+        throw new DomainError(
+          'CUSTOM_FIELD_TARGET_MISMATCH',
+          `custom fields do not apply to ${kind} transactions`,
+        ).at(`/splits/${offending}/customFields`);
+      }
+      return undefined;
+    }
+    const given = splits?.some((x) => x.customFields !== undefined) ?? false;
+    if (!given && !input.requireMandatory) return undefined;
+    const count = splits?.length ?? 1;
+    const items = Array.from({ length: count }, (_, i) => ({
+      pointer: `/splits/${i}/customFields`,
+      values: splits?.[i]?.customFields ?? [],
+      existingFieldIds: (current?.[i]?.customFields ?? []).map((v) => v.fieldId),
+    }));
+    const validated = await this.deps.classification.validateCustomFieldValues({
+      userId: input.userId,
+      workspaceId: input.workspaceId,
+      target: 'TRANSACTION',
+      requireMandatory: input.requireMandatory,
+      items,
+    });
+    return items.map((_, i): readonly CustomFieldValue[] => {
+      const result = validated[i];
+      const merged = new Map((current?.[i]?.customFields ?? []).map((v) => [v.fieldId, v]));
+      for (const id of result?.removeFieldIds ?? []) merged.delete(id);
+      for (const v of result?.set ?? []) merged.set(v.fieldId, v);
+      return [...merged.values()];
+    });
+  }
+
   private async validateClassification(
     userId: string,
     workspaceId: string,
@@ -1132,15 +1229,31 @@ function auditActionForStatus(
   return null;
 }
 
+/**
+ * Cambios de custom fields para la auditoría: un campo `customFields.<clave>` por cada clave que cambió, con el valor
+ * antes/después (un split ⇒ el valor; varios ⇒ texto JSON con el valor de cada split, `null` si no lo tiene).
+ */
+function customFieldAudit(changes: readonly CustomFieldChange[]): AuditChangeInput[] {
+  const scalar = (values: readonly (string | boolean | null)[]): string | boolean | null =>
+    values.length === 1 ? (values[0] ?? null) : JSON.stringify(values);
+  return changes.map((c) => ({
+    field: `customFields.${c.key}`,
+    before: c.before.every((v) => v === null) ? null : scalar(c.before),
+    after: c.after.every((v) => v === null) ? null : scalar(c.after),
+  }));
+}
+
 function diff(
   before: TransactionState,
   after: TransactionState,
   fields: readonly ChangedField[],
   newEntryId: string | null,
+  customFieldChanges: readonly CustomFieldChange[] = [],
 ): AuditChangeInput[] {
   const out: AuditChangeInput[] = [];
   for (const f of new Set(fields)) {
-    if (f === 'businessDate')
+    if (f === 'customFields') out.push(...customFieldAudit(customFieldChanges));
+    else if (f === 'businessDate')
       out.push({ field: 'transactionDate', before: before.businessDate, after: after.businessDate });
     else if (f === 'toAccountId')
       out.push({

@@ -390,8 +390,30 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
       const page = await ok('GET', `${W}/transactions?limit=50&cursor=${encodeURIComponent(cursor)}`);
       cursor = (page['page'] as { nextCursor: string | null }).nextCursor;
     }
+    // add-custom-fields 4.2 (TC-TRANSACTIONS-CUSTOMFIELD-002): hasta 10 000 valores de "centro_costo" en splits vigentes.
+    const field = randomUUID();
+    await superuser.query(
+      `INSERT INTO classification.custom_field_definition (id, workspace_id, key, label, data_type, target, options)
+       VALUES ($1, $2, 'centro_costo', 'Centro de costo', 'SELECT', 'TRANSACTION',
+               '[{"key":"casa","label":"Casa","position":0},{"key":"oficina","label":"Oficina","position":1}]'::jsonb)`,
+      [field, WS],
+    );
+    const { rowCount: valueCount } = await superuser.query(
+      `INSERT INTO txn.split_custom_field_value (workspace_id, split_id, field_id, value_text)
+       SELECT s.workspace_id, s.id, $2::uuid, CASE WHEN row_number() OVER (ORDER BY s.id) % 2 = 0 THEN 'casa' ELSE 'oficina' END
+         FROM txn.transaction_split s
+        WHERE s.workspace_id = $1 AND s.superseded_in_revision IS NULL
+        ORDER BY s.id LIMIT 10000`,
+      [WS, field],
+    );
+    dataset['valores de custom field'] = valueCount ?? 0;
+    await superuser.query('VACUUM (ANALYZE) txn.split_custom_field_value');
     const scenarios: Record<string, (i: number) => string> = {
       'sin filtros': () => '?limit=50',
+      'custom field (igualdad)': (i) =>
+        `?limit=50&customField[centro_costo]=${i % 2 === 0 ? 'oficina' : 'casa'}`,
+      'custom field + año': () =>
+        `?limit=50&customField[centro_costo]=oficina&dateFrom=2025-01-01&dateTo=2025-12-31`,
       'rango de fechas (1 mes)': (i) => {
         const { y, m } = monthAt(
           LARGE_MANIFEST.startYear,

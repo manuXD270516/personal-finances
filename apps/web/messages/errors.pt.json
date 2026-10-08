@@ -65,5 +65,12 @@
   "FX_RATE_ANOMALY_ALREADY_REVIEWED": "Essa anomalia da taxa de câmbio já foi revisada.",
   "FX_RATE_NOT_ANOMALOUS": "Essa taxa de câmbio não está marcada como anômala.",
   "CURRENCY_NOT_ENABLED": "Essa moeda não está habilitada neste espaço de trabalho.",
-  "PERIOD_NOT_STARTED": "Esse período ainda não começou no fuso horário do espaço de trabalho. Você poderá ativá-lo a partir da data de início."
+  "PERIOD_NOT_STARTED": "Esse período ainda não começou no fuso horário do espaço de trabalho. Você poderá ativá-lo a partir da data de início.",
+  "CUSTOM_FIELD_KEY_TAKEN": "Já existe um campo personalizado ativo com essa chave. Escolha outra ou arquive o existente.",
+  "CUSTOM_FIELD_ARCHIVED": "Esse campo personalizado está arquivado e não aceita novos valores.",
+  "CUSTOM_FIELD_TYPE_LOCKED": "O tipo e a entidade de um campo com valores não podem ser alterados.",
+  "CUSTOM_FIELD_OPTION_IN_USE": "Você não pode remover uma opção que já está em uso. Pode renomeá-la ou adicionar outras.",
+  "CUSTOM_FIELD_VALUE_INVALID": "O valor de um campo personalizado não é válido para o seu tipo.",
+  "CUSTOM_FIELD_REQUIRED": "Falta um campo personalizado obrigatório.",
+  "CUSTOM_FIELD_TARGET_MISMATCH": "Esse campo personalizado não se aplica a este registro."
 }

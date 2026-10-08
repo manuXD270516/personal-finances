@@ -61,7 +61,7 @@ import type { AuditHistoryQuery, LifecycleExportLoaders } from '@pf/audit/contra
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
-import { accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
+import { accountCustomFields, accountsImports, accountsRuntime } from '../accounts/accounts-wiring.js';
 import { LedgerHttpModule } from '../ledger/ledger-http.js';
 import { workspaceCreatedHook } from './workspace-provisioning.js';
 
@@ -256,6 +256,8 @@ export function financeRuntimes(input: {
     valuation: { rates: fx.valuation, workspaces: identityWorkspaceSettings(input.pool) },
     // docs/31 D45: la moneda de una cuenta debe estar habilitada en el workspace (`fx.workspace_currency`).
     workspaceCurrencies: fx.valuation,
+    // add-custom-fields: valores de custom fields de cuenta validados por CLASSIFICATION.
+    customFields: accountCustomFields(classification.validator),
   });
   // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({

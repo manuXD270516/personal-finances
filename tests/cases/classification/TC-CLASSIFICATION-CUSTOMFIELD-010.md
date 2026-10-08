@@ -12,9 +12,11 @@ invariants: [INV-015]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/custom-fields.service.test.ts
+  - apps/api/test/api/custom-fields.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["custom-fields", "period-closed"]

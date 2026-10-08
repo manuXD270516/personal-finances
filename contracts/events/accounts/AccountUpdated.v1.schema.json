@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/accounts/AccountUpdated.v1.schema.json",
   "title": "accounts.AccountUpdated.v1",
-  "description": "Cambiaron metadatos, liquidez, inclusión en patrimonio o la moneda (solo sin movimientos) de una cuenta. Solo viajan los valores nuevos no sensibles (nunca notes ni identificadores de cuenta). Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: (accountId, aggregateVersion). PII baja: name.",
+  "description": "Cambiaron metadatos, liquidez, inclusión en patrimonio o la moneda (solo sin movimientos) de una cuenta. Solo viajan los valores nuevos no sensibles (nunca notes ni identificadores de cuenta). `customFields` en changedFields (openspec add-custom-fields, aditivo): cambió el valor de algún custom field de la cuenta; los valores no viajan en el evento. Productor: ACCOUNTS. Consumidores: REPORTING. Idempotencia natural: (accountId, aggregateVersion). PII baja: name.",
   "type": "object",
   "allOf": [
     {
@@ -53,7 +53,8 @@
               "tagIds",
               "cryptoNetwork",
               "currency",
-              "accountNumberLast4"
+              "accountNumberLast4",
+              "customFields"
             ]
           }
         },

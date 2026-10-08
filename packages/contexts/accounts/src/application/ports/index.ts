@@ -92,6 +92,37 @@ export interface TagCatalogPort {
   assertAssignable(workspaceId: string, tagIds: readonly string[]): Promise<void>;
 }
 
+/** Valor de custom field de cuenta pedido por el usuario: por `fieldId` o `key`; `null` lo quita. */
+export interface CustomFieldValueInput {
+  readonly fieldId?: string;
+  readonly key?: string;
+  readonly value: string | boolean | null;
+}
+
+export interface ValidatedCustomFieldValue {
+  readonly fieldId: string;
+  readonly key: string;
+  readonly valueType: 'TEXT' | 'NUMBER' | 'DATE' | 'BOOLEAN';
+  readonly value: string | boolean;
+}
+
+/**
+ * Validación de custom fields de cuenta (CLASSIFICATION, `ValidateCustomFieldValues` vía `@pf/classification/contracts`,
+ * adaptada en el composition root): `CUSTOM_FIELD_TARGET_MISMATCH`, `CUSTOM_FIELD_ARCHIVED`,
+ * `CUSTOM_FIELD_VALUE_INVALID`, `CUSTOM_FIELD_REQUIRED` o `REFERENCE_NOT_FOUND`. Corre en la unidad de trabajo del llamador.
+ */
+export interface CustomFieldCatalogPort {
+  validate(input: {
+    readonly workspaceId: string;
+    readonly requireMandatory: boolean;
+    readonly values: readonly CustomFieldValueInput[];
+    readonly existingFieldIds: readonly string[];
+  }): Promise<{
+    readonly set: readonly ValidatedCustomFieldValue[];
+    readonly removeFieldIds: readonly string[];
+  }>;
+}
+
 export interface OutboxPort {
   append(event: {
     readonly eventId: string;
@@ -142,6 +173,7 @@ export interface AccountsDeps {
   readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
   readonly balances: LedgerBalancesPort;
   readonly tags: TagCatalogPort;
+  readonly customFields: CustomFieldCatalogPort;
   readonly openingBalance: AccountOpeningBalancePort;
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/classification/CustomFieldDefinitionChanged.v1.schema.json",
+  "title": "classification.CustomFieldDefinitionChanged.v1",
+  "description": "Una definición de custom field fue definida, modificada, archivada o desarchivada (nunca se elimina, INV-019). Sirve para invalidar cachés de definiciones; los valores de los registros NO viajan en eventos (cambios de valores: transactions.TransactionUpdated.v1 y accounts.AccountUpdated.v1 con `customFields` en changedFields). Productor: CLASSIFICATION. Consumidores: ninguno en Phase 2 (invalidación de cachés; futuras reglas y export). Idempotencia natural: (fieldId, aggregateVersion). Sin PII: no incluye la etiqueta ni las opciones.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "classification.CustomFieldDefinitionChanged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "CustomFieldDefinition"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fieldId",
+        "key",
+        "change",
+        "dataType",
+        "target"
+      ],
+      "properties": {
+        "fieldId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,39}$"
+        },
+        "change": {
+          "enum": [
+            "DEFINED",
+            "UPDATED",
+            "ARCHIVED",
+            "UNARCHIVED"
+          ]
+        },
+        "dataType": {
+          "enum": [
+            "TEXT",
+            "NUMBER",
+            "DECIMAL",
+            "DATE",
+            "BOOLEAN",
+            "SELECT"
+          ]
+        },
+        "target": {
+          "enum": [
+            "TRANSACTION",
+            "ACCOUNT"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000140",
+      "eventType": "classification.CustomFieldDefinitionChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-08T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CustomFieldDefinition",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000cf001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "fieldId": "01928c4e-0000-7000-8000-0000000cf001",
+        "key": "centro_costo",
+        "change": "DEFINED",
+        "dataType": "SELECT",
+        "target": "TRANSACTION"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000141",
+      "eventType": "classification.CustomFieldDefinitionChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-08T15:10:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CustomFieldDefinition",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000cf001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c2",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "fieldId": "01928c4e-0000-7000-8000-0000000cf001",
+        "key": "centro_costo",
+        "change": "ARCHIVED",
+        "dataType": "SELECT",
+        "target": "TRANSACTION"
+      }
+    }
+  ]
+}

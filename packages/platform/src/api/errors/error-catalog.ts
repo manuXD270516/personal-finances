@@ -77,6 +77,17 @@ export const ERROR_CATALOG = {
   SYSTEM_CATEGORY_IMMUTABLE: { status: 409, title: 'System categories are immutable' },
   COUNTERPARTY_ALIAS_TAKEN: { status: 409, title: 'Counterparty alias already in use' },
   NAME_TAKEN: { status: 409, title: 'Name already in use' },
+  // classification: custom fields (Phase 2, add-custom-fields)
+  CUSTOM_FIELD_KEY_TAKEN: { status: 409, title: 'Custom field key already in use' },
+  CUSTOM_FIELD_ARCHIVED: { status: 409, title: 'Custom field is archived' },
+  CUSTOM_FIELD_TYPE_LOCKED: {
+    status: 409,
+    title: 'Custom field type or target is locked by existing values',
+  },
+  CUSTOM_FIELD_OPTION_IN_USE: { status: 409, title: 'Custom field option is in use' },
+  CUSTOM_FIELD_VALUE_INVALID: { status: 422, title: 'Custom field value is invalid' },
+  CUSTOM_FIELD_REQUIRED: { status: 422, title: 'A required custom field has no value' },
+  CUSTOM_FIELD_TARGET_MISMATCH: { status: 422, title: 'Custom field does not apply to this entity' },
   // fx
   FX_RATE_NOT_FOUND: { status: 422, title: 'No exchange rate for the pair and date' },
   FX_RATE_ALREADY_SUPERSEDED: { status: 409, title: 'Exchange rate already superseded' },

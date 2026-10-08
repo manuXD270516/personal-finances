@@ -14,6 +14,9 @@ const JSON_MEDIA = /^application\/([a-z0-9.+-]+\+)?json$/;
 
 type Json = Record<string, unknown>;
 
+/** `nombre[clave]` o `nombre[clave][op]` (parámetros de consulta `style: deepObject`). */
+const DEEP_OBJECT_KEY = /^([^[\]]+)\[([^[\]]+)\](?:\[([^[\]]+)\])?$/u;
+
 export type ParameterLocation = 'path' | 'query' | 'header' | 'cookie';
 
 export interface ContractParameter {
@@ -21,6 +24,8 @@ export interface ContractParameter {
   readonly in: ParameterLocation;
   readonly required: boolean;
   readonly explode: boolean;
+  /** `style` del contrato (`form` por defecto; `deepObject` para `name[clave]=valor`, p. ej. `customField[centro_costo]`). */
+  readonly style: string;
   /** `$ref` original (p. ej. `#/components/parameters/IdempotencyKey`), si el parámetro era una referencia. */
   readonly ref?: string;
   readonly schema: Json;
@@ -239,6 +244,7 @@ export class ApiContract {
       name: String(param['name']),
       in: location,
       required: param['required'] === true || location === 'path',
+      style: style ?? 'form',
       explode:
         typeof param['explode'] === 'boolean' ? (param['explode'] as boolean) : (style ?? 'form') === 'form',
       ...(ref ? { ref } : {}),
@@ -309,6 +315,9 @@ export class ApiContract {
     );
     const headerPointer = (pointer: string) => `/${headerNames.get(pointer.slice(1)) ?? pointer.slice(1)}`;
     const explodeFalse = parameters.filter((p) => p.in === 'query' && !p.explode).map((p) => p.name);
+    const deepObjects = new Set(
+      parameters.filter((p) => p.in === 'query' && p.style === 'deepObject').map((p) => p.name),
+    );
 
     return {
       operationId: String(operation['operationId']),
@@ -330,6 +339,18 @@ export class ApiContract {
         const fields: ProblemField[] = [];
         const query: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(input.query)) {
+          // `style: deepObject`: el parser simple de Express deja la clave plana `name[clave]` / `name[clave][op]`.
+          const nested = DEEP_OBJECT_KEY.exec(k);
+          if (nested && deepObjects.has(nested[1] as string)) {
+            const [, name, sub, op] = nested as unknown as [string, string, string, string | undefined];
+            const bucket = (query[name] ??= {}) as Record<string, unknown>;
+            if (op === undefined) bucket[sub] = v;
+            else {
+              const current = bucket[sub];
+              bucket[sub] = { ...(typeof current === 'object' && current !== null ? current : {}), [op]: v };
+            }
+            continue;
+          }
           query[k] = explodeFalse.includes(k) && typeof v === 'string' ? v.split(',') : v;
         }
         const params = { ...input.params };

@@ -106,5 +106,7 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     provider: 'plain',
     executedAt: 'plain',
     externalRef: 'plain',
+    // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
+    'customFields.*': 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
