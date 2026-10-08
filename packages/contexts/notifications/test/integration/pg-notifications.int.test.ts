@@ -449,7 +449,8 @@ describe('PgPreferencesRepository', () => {
 
   it('bloqueo optimista: dos guardados con la misma versión, solo uno gana', async () => {
     const ws = await newWorkspace();
-    // Ambos leen la versión 1 y luego guardan a la vez.
+    // Ambos leen la misma versión y luego guardan a la vez. Esa versión depende de si el workspace ya tenía
+    // fila de ajustes (0 = valores por defecto sin persistir), así que el test no la fija.
     const loaded = await Promise.all(
       [true, false].map(async (email) => {
         const prefs = await asUser(owner, ws, () => preferences.load(ws, owner));
@@ -461,11 +462,15 @@ describe('PgPreferencesRepository', () => {
         return prefs;
       }),
     );
+    const readVersion = loaded[0]!.persistedVersion;
+    expect(loaded[1]!.persistedVersion).toBe(readVersion);
     const results = await Promise.all(
       loaded.map((prefs) => asUser(owner, ws, () => preferences.save(prefs))),
     );
     expect(results.filter(Boolean)).toHaveLength(1);
-    expect((await asUser(owner, ws, () => preferences.load(ws, owner))).version).toBe(2);
+    const winner = loaded[results.indexOf(true)]!;
+    expect(winner.version).toBeGreaterThan(readVersion);
+    expect((await asUser(owner, ws, () => preferences.load(ws, owner))).version).toBe(winner.version);
     // El perdedor, con la versión desactualizada, se rechaza también en un segundo intento.
     const stale = NotificationPreferences.restore({
       userId: owner,
@@ -473,7 +478,7 @@ describe('PgPreferencesRepository', () => {
       byType: {},
       quietHours: null,
       includeDetailsInEmail: true,
-      version: 1,
+      version: readVersion,
     });
     stale.update({ types: [], quietHours: null, includeDetailsInEmail: false });
     expect(await asUser(owner, ws, () => preferences.save(stale))).toBe(false);
