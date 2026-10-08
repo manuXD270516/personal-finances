@@ -3789,9 +3789,11 @@ paths:
       summary: Create the monthly plan of a financial period
       description: |
         At most one plan per period (`BUDGET_ALREADY_EXISTS`), in the workspace base currency. A closed period does not
-        admit a new plan (`PERIOD_CLOSED`). Publishes `planning.BudgetCreated.v1`. Only `source.kind = EMPTY` exists in
-        this release (templates and cloning arrive with `add-budget-templates`).
-      x-openspec-capability: [planning/budgets]
+        admit a new plan (`PERIOD_CLOSED`). Publishes `planning.BudgetCreated.v1`. `source.kind` is `EMPTY`, `TEMPLATE`
+        (a version of a template; archived template => `BUDGET_TEMPLATE_ARCHIVED`) or `CLONE_PREVIOUS` (the plan of the
+        previous period; none => `REFERENCE_NOT_FOUND`). New periods get their plan automatically from the default
+        template, if any.
+      x-openspec-capability: [planning/budgets, planning/budget-templates]
       x-required-role: EDITOR
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -3814,10 +3816,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           $ref: '#/components/responses/Conflict'
-          description: 'BUDGET_ALREADY_EXISTS (the period already has a plan) or PERIOD_CLOSED.'
+          description: 'BUDGET_ALREADY_EXISTS (the period already has a plan), PERIOD_CLOSED or BUDGET_TEMPLATE_ARCHIVED.'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-          description: 'REFERENCE_NOT_FOUND (periodId) or IDEMPOTENCY_KEY_REUSED.'
+          description: 'REFERENCE_NOT_FOUND (periodId, templateId, versionNo or no plan to clone) or IDEMPOTENCY_KEY_REUSED.'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
@@ -4068,6 +4070,422 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: 'PERIOD_CLOSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ───────────────────────────── Planning: templates de presupuesto (Phase 2, add-budget-templates) ─────────────────────────────
+  /workspaces/{workspaceId}/templates:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Planning]
+      operationId: listTemplates
+      summary: List the budget templates of the workspace (default first, then by name)
+      description: |
+        Templates are never deleted: archived ones stay listed under `status=ARCHIVED`. Each item carries its current
+        version number and line count; `getTemplate` returns the lines and the version history.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          description: Only templates in this status (default all).
+          schema: { $ref: '#/components/schemas/TemplateStatus' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          description: Page size (default 50)
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Templates page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplatePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Planning]
+      operationId: createTemplate
+      summary: Create a budget template with its version 1
+      description: |
+        Same line format and rules as the lines of a plan (amounts in the workspace base currency, kinds, thresholds,
+        unique and non-overlapping targets; archived targets are rejected). The name is unique among the active templates
+        of the workspace, ignoring case (`NAME_TAKEN`).
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemplateCreate' }
+      responses:
+        '201':
+          description: Template created (version 1)
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN, BUDGET_LINE_DUPLICATE_TARGET, BUDGET_TARGET_OVERLAP or CATEGORY_ARCHIVED / TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_INVALID_AMOUNTS, BUDGET_INVALID_LINE_KIND, BUDGET_THRESHOLD_INVALID, CURRENCY_MISMATCH, AMOUNT_SCALE_EXCEEDED, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    get:
+      tags: [Planning]
+      operationId: getTemplate
+      summary: Get a template with its current version and its version history
+      description: |
+        `DELETE` is not allowed (`METHOD_NOT_ALLOWED`): templates are archived, never deleted.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/versions/{versionNo}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+      - $ref: '#/components/parameters/TemplateVersionNo'
+    get:
+      tags: [Planning]
+      operationId: getTemplateVersion
+      summary: Get the lines of one (immutable) version of a template
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Template version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplateVersion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/versions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    post:
+      tags: [Planning]
+      operationId: publishTemplateVersion
+      summary: Publish a new version of a template (full snapshot of its lines)
+      description: |
+        Every version is an immutable, complete snapshot. `baseVersionNo` must be the current version
+        (`CONCURRENCY_CONFLICT` otherwise, nothing is created). Lines identical to those of the base version are kept
+        even if their target was archived meanwhile; new or changed lines on archived targets are rejected.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemplateVersionCreate' }
+      responses:
+        '201':
+          description: Template with its new current version
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CONCURRENCY_CONFLICT (baseVersionNo is not the current version), BUDGET_TEMPLATE_ARCHIVED, BUDGET_LINE_DUPLICATE_TARGET, BUDGET_TARGET_OVERLAP or CATEGORY_ARCHIVED / TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_INVALID_AMOUNTS, BUDGET_INVALID_LINE_KIND, BUDGET_THRESHOLD_INVALID, CURRENCY_MISMATCH, AMOUNT_SCALE_EXCEEDED, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/clone:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    post:
+      tags: [Planning]
+      operationId: cloneTemplate
+      summary: Clone a version of a template as a new independent template
+      description: |
+        The clone has its own version 1 with the lines of the chosen version (default: the current one) and no link to
+        the original afterwards.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemplateClone' }
+      responses:
+        '201':
+          description: New template (version 1)
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND (versionNo) or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    post:
+      tags: [Planning]
+      operationId: archiveTemplate
+      summary: Archive a template (it stops being the default and cannot be applied)
+      description: Idempotent. Versions and the origin recorded by existing plans are kept.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      responses:
+        '200':
+          description: Archived template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    post:
+      tags: [Planning]
+      operationId: unarchiveTemplate
+      summary: Unarchive a template
+      description: Idempotent. The name must still be free among the active templates (`NAME_TAKEN`).
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      responses:
+        '200':
+          description: Active template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/set-default:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    post:
+      tags: [Planning]
+      operationId: setDefaultTemplate
+      summary: Make a template the default one applied to every new period
+      description: |
+        At most one active template is the default; the previous one is unmarked in the same transaction. An archived
+        template cannot be the default (`BUDGET_TEMPLATE_ARCHIVED`).
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      responses:
+        '200':
+          description: Default template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Template' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'BUDGET_TEMPLATE_ARCHIVED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/templates/{templateId}/apply:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/TemplateId'
+    post:
+      tags: [Planning]
+      operationId: applyTemplate
+      summary: Create the plan of a period from a version of the template
+      description: |
+        Shortcut of `createBudget` with `source.kind = TEMPLATE`. Lines whose target is archived or whose currency is not
+        the plan currency are omitted and reported in `omittedLines` (the operation does not fail). The plan keeps the
+        template and the version it came from.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TemplateApply' }
+      responses:
+        '201':
+          description: Plan created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'BUDGET_ALREADY_EXISTS, BUDGET_TEMPLATE_ARCHIVED or PERIOD_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND (periodId or versionNo) or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budget-propagations/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Planning]
+      operationId: previewBudgetPropagation
+      summary: Preview propagating a change to the plans of future draft periods (no effects)
+      description: |
+        Stateless: nothing is stored. The source is either a full new snapshot of a template (`TEMPLATE`) or lines of a
+        plan that came from a template (`BUDGET`; a plan without template origin is rejected with
+        `BUDGET_NO_TEMPLATE_ORIGIN`: create a template from its lines instead). Reaches only the plans of that template
+        whose periods are `DRAFT` and start after today in the workspace time zone (and after the source plan period).
+        Lines edited by hand are reported as conflicts and never overwritten; lines removed from the template are
+        removed only where they were not edited. The `token` hashes what the preview saw.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetPropagationRequest' }
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetPropagationPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CONCURRENCY_CONFLICT (baseVersionNo is not the current version), BUDGET_TEMPLATE_ARCHIVED or CATEGORY_ARCHIVED / TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_NO_TEMPLATE_ORIGIN, REFERENCE_NOT_FOUND, BUDGET_INVALID_AMOUNTS or the line validation errors of createTemplate.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budget-propagations/confirm:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Planning]
+      operationId: confirmBudgetPropagation
+      summary: 'Confirm a propagation (publish the new template version and update the reached plans)'
+      description: |
+        Recomputes the preview in one transaction. If the `token` differs (a plan, the template or the scope changed)
+        it answers `BUDGET_PROPAGATION_STALE` and changes nothing; otherwise it publishes version N+1 of the template
+        and updates only the reached plans (`DRAFT` periods after today), leaving the conflicting lines untouched.
+      x-openspec-capability: [planning/budget-templates]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetPropagationConfirm' }
+      responses:
+        '200':
+          description: Template with its new version and the plans that were updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetPropagationResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'BUDGET_PROPAGATION_STALE, CONCURRENCY_CONFLICT, BUDGET_TEMPLATE_ARCHIVED or CATEGORY_ARCHIVED / TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_NO_TEMPLATE_ORIGIN, REFERENCE_NOT_FOUND, VALIDATION_FAILED (nothing to propagate) or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -4481,6 +4899,18 @@ components:
       required: true
       description: Budget line UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    TemplateId:
+      name: templateId
+      in: path
+      required: true
+      description: Budget template UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    TemplateVersionNo:
+      name: versionNo
+      in: path
+      required: true
+      description: Template version number (1, 2, ...).
+      schema: { type: integer, minimum: 1 }
     ReconciliationId:
       name: reconciliationId
       in: path
@@ -4919,6 +5349,9 @@ components:
         - BUDGET_INVALID_AMOUNTS            # 422 (add-budgets: negative amount, min greater than max, bad percent)
         - BUDGET_INVALID_LINE_KIND          # 422 (add-budgets: income lines only admit FIXED; MINIMUM and income have no thresholds)
         - BUDGET_THRESHOLD_INVALID          # 422 (add-budgets: out of range, repeated or more than 10 thresholds)
+        - BUDGET_TEMPLATE_ARCHIVED          # 409 (add-budget-templates: applying, versioning or defaulting an archived template)
+        - BUDGET_PROPAGATION_STALE          # 409 (add-budget-templates: the plans or the template changed since the preview)
+        - BUDGET_NO_TEMPLATE_ORIGIN         # 422 (add-budget-templates: propagating from a plan that did not come from a template)
         - RECONCILIATION_IN_PROGRESS        # 409 (add-reconciliation: the account already has a session in progress)
         - RECONCILIATION_STATEMENT_DATE_INVALID  # 422 (add-reconciliation: future date or not after the last completed session)
         - RECONCILIATION_DIFFERENCE_NOT_ZERO     # 422 (add-reconciliation: completing with a non-zero difference and no adjustment)
@@ -6769,9 +7202,16 @@ components:
         source:
           type: object
           additionalProperties: false
-          description: Only `EMPTY` in this release (TEMPLATE and CLONE_PREVIOUS arrive with add-budget-templates).
+          description: >-
+            Where the lines come from: `EMPTY` (default), `TEMPLATE` (a version of `templateId`, the current one if
+            `versionNo` is absent) or `CLONE_PREVIOUS` (the plan of the period right before). Archived targets and lines
+            in another currency are omitted and reported in `omittedLines`.
           properties:
-            kind: { type: string, enum: [EMPTY], default: EMPTY }
+            kind: { type: string, enum: [EMPTY, TEMPLATE, CLONE_PREVIOUS], default: EMPTY }
+            templateId:
+              description: Required when `kind` is TEMPLATE.
+              $ref: '#/components/schemas/Uuid'
+            versionNo: { type: integer, minimum: 1 }
         zeroBased: { type: boolean, default: false }
     BudgetUpdate:
       type: object
@@ -7063,6 +7503,20 @@ components:
           description: Workspace base currency when the plan was created (docs/33 D78/D79).
           $ref: '#/components/schemas/CurrencyCode'
         origin: { type: string, enum: [EMPTY, TEMPLATE, CLONE] }
+        templateVersion:
+          description: Template and version the plan came from (inherited when cloning); null for manual plans.
+          oneOf:
+            - $ref: '#/components/schemas/BudgetTemplateRef'
+            - type: 'null'
+        clonedFromBudgetId:
+          description: Plan this one was cloned from (origin CLONE).
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        omittedLines:
+          type: array
+          description: Only in the response of the creation. Lines of the origin that were not copied.
+          items: { $ref: '#/components/schemas/BudgetOmittedLine' }
         zeroBased: { type: boolean }
         lines:
           type: array
@@ -7105,6 +7559,398 @@ components:
           type: array
           items: { $ref: '#/components/schemas/BudgetSummary' }
         page: { $ref: '#/components/schemas/PageInfo' }
+
+    # ── Planning: templates de presupuesto (add-budget-templates, Phase 2) ──
+    TemplateStatus:
+      type: string
+      enum: [ACTIVE, ARCHIVED]
+    BudgetOmittedReason:
+      type: string
+      description: >-
+        TARGET_ARCHIVED (the category, group or tag is archived) or CURRENCY_MISMATCH (the line is not in the plan
+        currency; planned amounts are never converted). Open set — clients must handle unknown values.
+      x-extensible-enum: [TARGET_ARCHIVED, CURRENCY_MISMATCH]
+    BudgetOmittedLine:
+      type: object
+      additionalProperties: false
+      required: [target, reason]
+      properties:
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        reason: { $ref: '#/components/schemas/BudgetOmittedReason' }
+    BudgetTemplateRef:
+      type: object
+      description: Template version a plan came from (or inherited when cloning the previous plan).
+      additionalProperties: false
+      required: [templateId, versionNo, name]
+      properties:
+        templateId: { $ref: '#/components/schemas/Uuid' }
+        versionNo: { type: integer, minimum: 1 }
+        name: { type: string }
+    TemplateLine:
+      type: object
+      description: Line of an immutable template version; same shape and rules as a plan line, without spent or rollover received.
+      additionalProperties: false
+      required:
+        - id
+        - target
+        - nature
+        - kind
+        - planned
+        - min
+        - max
+        - percent
+        - incomeBasis
+        - rolloverPolicy
+        - rolloverCap
+        - thresholds
+        - currency
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        nature: { $ref: '#/components/schemas/BudgetNature' }
+        kind: { $ref: '#/components/schemas/BudgetLineKind' }
+        planned:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        min:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        max:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        percent:
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        incomeBasis:
+          oneOf:
+            - $ref: '#/components/schemas/BudgetIncomeBasis'
+            - type: 'null'
+        rolloverPolicy: { $ref: '#/components/schemas/BudgetRolloverPolicy' }
+        rolloverCap:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        thresholds:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetThreshold' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+    TemplateVersionHeader:
+      type: object
+      additionalProperties: false
+      required: [versionNo, basedOnVersionNo, changeNote, createdAt, createdBy, lineCount]
+      properties:
+        versionNo: { type: integer, minimum: 1 }
+        basedOnVersionNo:
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - type: 'null'
+        changeNote:
+          oneOf:
+            - { type: string }
+            - type: 'null'
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        createdBy:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        lineCount: { type: integer, minimum: 0 }
+    TemplateVersion:
+      type: object
+      additionalProperties: false
+      required: [versionNo, basedOnVersionNo, changeNote, createdAt, createdBy, lines]
+      properties:
+        versionNo: { type: integer, minimum: 1 }
+        basedOnVersionNo:
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - type: 'null'
+        changeNote:
+          oneOf:
+            - { type: string }
+            - type: 'null'
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        createdBy:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateLine' }
+    TemplateSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, isDefault, status, currentVersionNo, lineCount, version, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        description:
+          oneOf:
+            - { type: string }
+            - type: 'null'
+        isDefault: { type: boolean }
+        status: { $ref: '#/components/schemas/TemplateStatus' }
+        currentVersionNo: { type: integer, minimum: 1 }
+        lineCount: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    Template:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - isDefault
+        - status
+        - currentVersionNo
+        - lineCount
+        - version
+        - createdAt
+        - currentVersion
+        - versions
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        description:
+          oneOf:
+            - { type: string }
+            - type: 'null'
+        isDefault: { type: boolean }
+        status: { $ref: '#/components/schemas/TemplateStatus' }
+        currentVersionNo: { type: integer, minimum: 1 }
+        lineCount: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        currentVersion: { $ref: '#/components/schemas/TemplateVersion' }
+        versions:
+          type: array
+          description: Version history, newest first.
+          items: { $ref: '#/components/schemas/TemplateVersionHeader' }
+    TemplatePage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateSummary' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    TemplateCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetLineCreate' }
+    TemplateVersionCreate:
+      type: object
+      additionalProperties: false
+      required: [baseVersionNo, lines]
+      properties:
+        baseVersionNo:
+          description: Version the change is based on; it must be the current one.
+          type: integer
+          minimum: 1
+        lines:
+          description: Full set of lines of the new version.
+          type: array
+          items: { $ref: '#/components/schemas/BudgetLineCreate' }
+        changeNote: { type: string, maxLength: 500 }
+    TemplateClone:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        versionNo: { type: integer, minimum: 1 }
+    TemplateApply:
+      type: object
+      additionalProperties: false
+      required: [periodId]
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        versionNo:
+          description: Version to copy; absent = the current one.
+          type: integer
+          minimum: 1
+    PropagationLineSpec:
+      type: object
+      additionalProperties: false
+      required: [kind, planned, min, max, percent, incomeBasis, rolloverPolicy, rolloverCap, thresholds]
+      properties:
+        kind: { $ref: '#/components/schemas/BudgetLineKind' }
+        planned:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        min:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        max:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        percent:
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        incomeBasis:
+          oneOf:
+            - $ref: '#/components/schemas/BudgetIncomeBasis'
+            - type: 'null'
+        rolloverPolicy: { $ref: '#/components/schemas/BudgetRolloverPolicy' }
+        rolloverCap:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        thresholds:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetThreshold' }
+    BudgetPropagationSource:
+      description: >-
+        TEMPLATE: the new full snapshot of the lines of a template (`baseVersionNo` = its current version). BUDGET: lines
+        of a plan that came from a template; those lines replace or add to the current version of that template.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, templateId, baseVersionNo, lines]
+          properties:
+            kind: { type: string, enum: [TEMPLATE] }
+            templateId: { $ref: '#/components/schemas/Uuid' }
+            baseVersionNo: { type: integer, minimum: 1 }
+            lines:
+              type: array
+              items: { $ref: '#/components/schemas/BudgetLineCreate' }
+        - type: object
+          additionalProperties: false
+          required: [kind, budgetId, lineIds]
+          properties:
+            kind: { type: string, enum: [BUDGET] }
+            budgetId: { $ref: '#/components/schemas/Uuid' }
+            lineIds:
+              type: array
+              minItems: 1
+              items: { $ref: '#/components/schemas/Uuid' }
+    BudgetPropagationRequest:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        source: { $ref: '#/components/schemas/BudgetPropagationSource' }
+    BudgetPropagationConfirm:
+      type: object
+      additionalProperties: false
+      required: [source, token]
+      properties:
+        source: { $ref: '#/components/schemas/BudgetPropagationSource' }
+        token: { type: string, description: Token returned by the preview. }
+        changeNote: { type: string, maxLength: 500 }
+    BudgetPropagationPeriod:
+      type: object
+      additionalProperties: false
+      required: [budgetId, periodId, periodLabel]
+      properties:
+        budgetId: { $ref: '#/components/schemas/Uuid' }
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+    BudgetPropagationChange:
+      type: object
+      additionalProperties: false
+      required: [budgetId, periodId, periodLabel, action, target, from, to]
+      properties:
+        budgetId: { $ref: '#/components/schemas/Uuid' }
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        action: { type: string, enum: [ADD, UPDATE, REMOVE] }
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        from:
+          oneOf:
+            - $ref: '#/components/schemas/PropagationLineSpec'
+            - type: 'null'
+        to:
+          oneOf:
+            - $ref: '#/components/schemas/PropagationLineSpec'
+            - type: 'null'
+    BudgetPropagationConflict:
+      type: object
+      additionalProperties: false
+      required: [budgetId, periodId, periodLabel, action, reason, target, current, proposed]
+      properties:
+        budgetId: { $ref: '#/components/schemas/Uuid' }
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        action: { type: string, enum: [ADD, UPDATE, REMOVE] }
+        reason:
+          type: string
+          description: >-
+            OVERRIDDEN (line edited by hand), MANUAL_LINE (line that is not the template's), TARGET_OVERLAP or
+            CURRENCY_MISMATCH. Open set — clients must handle unknown values.
+          x-extensible-enum: [OVERRIDDEN, MANUAL_LINE, TARGET_OVERLAP, CURRENCY_MISMATCH]
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        current:
+          oneOf:
+            - $ref: '#/components/schemas/PropagationLineSpec'
+            - type: 'null'
+        proposed:
+          oneOf:
+            - $ref: '#/components/schemas/PropagationLineSpec'
+            - type: 'null'
+    BudgetPropagationPreview:
+      type: object
+      additionalProperties: false
+      required: [templateId, baseVersionNo, newVersionPreview, periods, changes, conflicts, token]
+      properties:
+        templateId: { $ref: '#/components/schemas/Uuid' }
+        baseVersionNo: { type: integer, minimum: 1 }
+        newVersionPreview:
+          type: object
+          additionalProperties: false
+          required: [versionNo, added, updated, removed, lines]
+          properties:
+            versionNo: { type: integer, minimum: 2 }
+            added: { type: integer, minimum: 0 }
+            updated: { type: integer, minimum: 0 }
+            removed: { type: integer, minimum: 0 }
+            lines:
+              type: array
+              items: { $ref: '#/components/schemas/TemplateLine' }
+        periods:
+          type: array
+          description: Plans reached (periods in DRAFT starting after today), by period start.
+          items: { $ref: '#/components/schemas/BudgetPropagationPeriod' }
+        changes:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetPropagationChange' }
+        conflicts:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetPropagationConflict' }
+        token: { type: string }
+    BudgetPropagationResult:
+      type: object
+      additionalProperties: false
+      required: [template, applied]
+      properties:
+        template: { $ref: '#/components/schemas/Template' }
+        applied:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [budgetId, periodId, periodLabel, changes, conflicts]
+            properties:
+              budgetId: { $ref: '#/components/schemas/Uuid' }
+              periodId: { $ref: '#/components/schemas/Uuid' }
+              periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+              changes: { type: integer, minimum: 0 }
+              conflicts: { type: integer, minimum: 0 }
 
     # ── Recorrido del ciclo de vida (add-lifecycle-timeline, docs/31 D37) ──
     LifecycleAggregateType:

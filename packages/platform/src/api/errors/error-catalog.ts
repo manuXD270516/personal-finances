@@ -102,6 +102,9 @@ export const ERROR_CATALOG = {
   BUDGET_INVALID_AMOUNTS: { status: 422, title: 'Budget line amounts are not valid' },
   BUDGET_INVALID_LINE_KIND: { status: 422, title: 'Budget line kind is not allowed for this target' },
   BUDGET_THRESHOLD_INVALID: { status: 422, title: 'Alert thresholds are not valid' },
+  BUDGET_TEMPLATE_ARCHIVED: { status: 409, title: 'The budget template is archived' },
+  BUDGET_PROPAGATION_STALE: { status: 409, title: 'The plans or the template changed since the preview' },
+  BUDGET_NO_TEMPLATE_ORIGIN: { status: 422, title: 'The plan does not come from a template' },
   // transactions / reconciliation (Phase 2)
   RECONCILIATION_IN_PROGRESS: { status: 409, title: 'The account already has a reconciliation in progress' },
   RECONCILIATION_STATEMENT_DATE_INVALID: {

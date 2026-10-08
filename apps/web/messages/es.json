@@ -1563,7 +1563,8 @@
     "nav": {
       "label": "Planificación",
       "periods": "Periodos",
-      "budgets": "Presupuestos"
+      "budgets": "Presupuestos",
+      "templates": "Templates"
     },
     "totals": {
       "title": "Resumen del plan",
@@ -1695,6 +1696,180 @@
       "goToBudgets": "Ver presupuestos",
       "noPlan": "Este periodo todavía no tiene un plan: no hay un disponible para gastar que mostrar.",
       "createPlan": "Crear el plan del mes"
+    },
+    "origin": {
+      "title": "Origen del plan",
+      "EMPTY": "Plan vacío",
+      "TEMPLATE": "Desde un template",
+      "CLONE_PREVIOUS": "Clonar el plan del mes anterior",
+      "template": "Template",
+      "version": "Versión",
+      "latest": "Última versión",
+      "versionOption": "Versión {versionNo}",
+      "default": "predeterminado",
+      "noTemplates": "No hay templates activos.",
+      "cloneHint": "Se copian las líneas del mes anterior, sin lo gastado ni los umbrales ya avisados."
+    },
+    "omitted": {
+      "title": "Algunas líneas no se copiaron",
+      "TARGET_ARCHIVED": "{name}: su categoría, grupo o tag está archivado.",
+      "CURRENCY_MISMATCH": "{name}: está en otra moneda que el plan."
+    },
+    "originInfo": {
+      "EMPTY": "Origen: plan creado vacío.",
+      "TEMPLATE": "Origen: template {name}, versión {versionNo}.",
+      "CLONE": "Origen: clonado del plan del mes anterior.",
+      "CLONE_TEMPLATE": "Origen: clonado del plan del mes anterior (template {name}, versión {versionNo})."
+    },
+    "propagate": {
+      "open": "Aplicar a meses futuros…",
+      "createTemplate": "Crear template con estas líneas",
+      "noOrigin": "Este plan no viene de un template, así que no se puede propagar.",
+      "selectTitle": "Líneas a propagar",
+      "selectHint": "Elige las líneas que quieres llevar al template y a los meses futuros en borrador.",
+      "edited": "modificada",
+      "preview": "Ver vista previa",
+      "createHint": "Se creará un template con las {count} líneas de este plan. Luego podrás aplicarlo a otros meses.",
+      "templateName": "Nombre del template",
+      "createSubmit": "Crear template",
+      "templateCreated": "Template {name} creado con {count} líneas.",
+      "applied": "Cambios propagados a los meses futuros."
+    }
+  },
+  "Templates": {
+    "title": "Templates de presupuesto",
+    "intro": "Un template guarda las líneas de un plan mensual en versiones inmutables. Aplícalo al crear el plan de un periodo o márcalo como predeterminado para que cada periodo nuevo nazca con su plan.",
+    "loading": "Cargando templates…",
+    "empty": "Todavía no hay templates. Crea uno para reutilizar tu planificación mes a mes.",
+    "list": {
+      "caption": "Templates del espacio de trabajo",
+      "columns": {
+        "name": "Nombre",
+        "status": "Estado",
+        "version": "Versión vigente",
+        "lines": "Líneas",
+        "actions": "Acciones"
+      },
+      "default": "Predeterminado",
+      "status": {
+        "ACTIVE": "Activo",
+        "ARCHIVED": "Archivado"
+      },
+      "open": "Abrir",
+      "openLabel": "Abrir el template {name}"
+    },
+    "create": {
+      "title": "Nuevo template",
+      "name": "Nombre",
+      "nameRequired": "El nombre es obligatorio.",
+      "description": "Descripción (opcional)",
+      "submit": "Crear template",
+      "done": "Template creado. Agrega sus líneas y publica la siguiente versión."
+    },
+    "detail": {
+      "title": "Template {name}",
+      "currentVersion": "Versión vigente: {versionNo}"
+    },
+    "actions": {
+      "edit": "Editar líneas",
+      "setDefault": "Marcar como predeterminado",
+      "archive": "Archivar",
+      "unarchive": "Desarchivar",
+      "cancel": "Cancelar",
+      "defaultDone": "Template marcado como predeterminado.",
+      "archiveDone": "Template archivado.",
+      "unarchiveDone": "Template desarchivado."
+    },
+    "archive": {
+      "title": "¿Archivar el template {name}?",
+      "body": "Deja de ser predeterminado y no se podrá aplicar. Sus versiones y los planes ya creados no cambian."
+    },
+    "lines": {
+      "caption": "Líneas de la versión {versionNo}",
+      "empty": "Esta versión no tiene líneas.",
+      "columns": {
+        "target": "Presupuesto",
+        "spec": "Tipo y monto",
+        "thresholds": "Umbrales",
+        "rollover": "Remanente",
+        "actions": "Acciones"
+      }
+    },
+    "versions": {
+      "caption": "Versiones del template (inmutables)",
+      "columns": {
+        "version": "Versión",
+        "note": "Nota de cambio",
+        "date": "Publicada",
+        "lines": "Líneas",
+        "actions": "Acciones"
+      },
+      "version": "Versión {versionNo}",
+      "current": "vigente",
+      "view": "Ver",
+      "viewLabel": "Ver la versión {versionNo}"
+    },
+    "compare": {
+      "title": "Comparar versiones",
+      "from": "Desde",
+      "to": "Hasta",
+      "run": "Comparar",
+      "caption": "Cambios de la versión {a} a la versión {b}",
+      "none": "Sin diferencias.",
+      "change": "Cambio",
+      "before": "Antes",
+      "after": "Después",
+      "ADDED": "Agregada",
+      "CHANGED": "Cambiada",
+      "REMOVED": "Quitada"
+    },
+    "draft": {
+      "title": "Versión {versionNo} (borrador)",
+      "intro": "Edita las líneas y publica: se crea una versión nueva y completa; la versión {versionNo} no cambia.",
+      "linesCaption": "Líneas del borrador",
+      "addLine": "Agregar línea",
+      "changesTitle": "Cambios respecto de la versión {versionNo}",
+      "note": "Nota de cambio (opcional)",
+      "noteHint": "Por ejemplo: Inflación.",
+      "publish": "Publicar versión",
+      "propagate": "Aplicar a meses futuros…",
+      "discard": "Descartar borrador",
+      "published": "Versión {versionNo} publicada."
+    },
+    "clone": {
+      "title": "Clonar como template nuevo",
+      "intro": "Se copia la versión {versionNo} como un template independiente con su propia versión 1.",
+      "name": "Nombre del clon",
+      "submit": "Clonar",
+      "done": "Template clonado."
+    },
+    "propagation": {
+      "title": "Aplicar a meses futuros",
+      "intro": "Solo se actualizan los planes de periodos futuros en borrador. Las líneas que modificaste a mano no se tocan. Nada cambia hasta que confirmes.",
+      "loading": "Calculando la vista previa…",
+      "newVersion": "Se publicará la versión {versionNo} del template: {added} líneas agregadas, {updated} cambiadas y {removed} quitadas.",
+      "noPeriods": "No hay planes de periodos futuros en borrador que sigan este template.",
+      "noChangesInPeriod": "Sin cambios en este periodo.",
+      "changesLabel": "Cambios en {period}",
+      "conflictsLabel": "Líneas que no se tocan en {period}",
+      "action": {
+        "ADD": "se agrega",
+        "UPDATE": "cambia",
+        "REMOVE": "se quita"
+      },
+      "to": "a",
+      "keeps": "se conserva",
+      "reason": {
+        "OVERRIDDEN": "la modificaste a mano",
+        "MANUAL_LINE": "es una línea propia del plan",
+        "TARGET_OVERLAP": "se solaparía con otra línea del plan",
+        "CURRENCY_MISMATCH": "el plan está en otra moneda"
+      },
+      "confirm": "Confirmar y publicar",
+      "cancel": "Cancelar",
+      "close": "Cerrar",
+      "reload": "Actualizar la vista previa",
+      "done": "Propagación aplicada: se publicó la versión nueva del template y se actualizaron los planes."
     }
   }
 }

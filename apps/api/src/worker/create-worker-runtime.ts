@@ -32,6 +32,7 @@ import {
   createDemoDataRuntime,
   identityActiveWorkspaces,
   identityWorkspaceCalendarDirectory,
+  identityWorkspaceSettingsDirectory,
   identityWorkspaceTimeZones,
 } from '@pf/identity/interface/identity.module';
 import { createLedgerMaintenance, ledgerActivityRange } from '@pf/ledger/interface/ledger.module';
@@ -235,6 +236,8 @@ export async function createWorkerRuntime(
         providers: parseFxProviderSettings(config),
       }),
       rateValidityWindowDays,
+      // add-budget-templates: el hook de creación de periodos crea el plan del predeterminado en la moneda base.
+      settings: identityWorkspaceSettingsDirectory(pool),
       calendarCacheMs: 60_000,
     },
   });

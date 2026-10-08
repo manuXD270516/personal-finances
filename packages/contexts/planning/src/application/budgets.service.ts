@@ -3,17 +3,22 @@ import { DomainError } from '@pf/shared-kernel';
 import { BUDGET_CREATED, type BudgetCreatedV1 } from '../contracts/index.js';
 import {
   Budget,
+  BudgetCloner,
+  BudgetFromTemplateFactory,
   type BudgetLine,
   type BudgetLineInput,
   type BudgetLineState,
   type BudgetTarget,
+  type CopiedLines,
   type FinancialPeriod,
   isTargetKind,
 } from '../domain/index.js';
 import { BudgetCalculator, loadTargetTree, planCurrency, type BudgetView } from './budget-calculator.js';
+import { originOf } from './budget-origin.js';
 import { BudgetThresholdService } from './budget-thresholds.service.js';
 import { toBudgetDto, toLineDto, type BudgetDto, type BudgetLineDto } from './budget-view.js';
 import type { BudgetsDeps } from './ports/index.js';
+import { toOmittedDto } from './template-view.js';
 
 const AGGREGATE = 'Budget';
 
@@ -26,9 +31,49 @@ const preconditionFailed = (currentVersion?: number) =>
 export interface CreateBudgetInput {
   readonly workspaceId: string;
   readonly periodId: string;
-  /** Solo `EMPTY` en este change; `TEMPLATE` y `CLONE_PREVIOUS` los agrega `add-budget-templates`. */
-  readonly source?: { readonly kind?: unknown } | undefined;
+  /** `EMPTY` (por defecto), `TEMPLATE {templateId, versionNo?}` o `CLONE_PREVIOUS` (add-budget-templates). */
+  readonly source?: unknown;
   readonly zeroBased?: boolean | undefined;
+}
+
+export type BudgetSource =
+  | { readonly kind: 'EMPTY' }
+  | { readonly kind: 'TEMPLATE'; readonly templateId: string; readonly versionNo: number | undefined }
+  | { readonly kind: 'CLONE_PREVIOUS' };
+
+/** Respuesta de `createBudget`: el plan más las líneas del origen que no se copiaron (`omittedLines`). */
+export type CreatedBudgetDto = BudgetDto;
+
+function parseSource(raw: unknown): BudgetSource {
+  if (raw === undefined || raw === null) return { kind: 'EMPTY' };
+  const source = raw as { kind?: unknown; templateId?: unknown; versionNo?: unknown };
+  const kind = source.kind ?? 'EMPTY';
+  if (kind === 'EMPTY') return { kind: 'EMPTY' };
+  if (kind === 'CLONE_PREVIOUS') return { kind: 'CLONE_PREVIOUS' };
+  if (kind === 'TEMPLATE') {
+    if (typeof source.templateId !== 'string' || source.templateId === '') {
+      throw new DomainError('VALIDATION_FAILED', 'source.templateId is required for TEMPLATE').at(
+        '/source/templateId',
+      );
+    }
+    let versionNo: number | undefined;
+    if (source.versionNo !== undefined && source.versionNo !== null) {
+      if (
+        typeof source.versionNo !== 'number' ||
+        !Number.isInteger(source.versionNo) ||
+        source.versionNo < 1
+      ) {
+        throw new DomainError('VALIDATION_FAILED', 'source.versionNo must be a positive integer').at(
+          '/source/versionNo',
+        );
+      }
+      versionNo = source.versionNo;
+    }
+    return { kind: 'TEMPLATE', templateId: source.templateId, versionNo };
+  }
+  throw new DomainError('VALIDATION_FAILED', 'source.kind must be EMPTY, TEMPLATE or CLONE_PREVIOUS').at(
+    '/source/kind',
+  );
 }
 
 export interface AddBudgetLineInput {
@@ -116,82 +161,227 @@ export class BudgetsService {
     this.thresholds = new BudgetThresholdService(deps, this.calculator);
   }
 
-  /** `CreateBudget`: un plan por periodo, en la moneda base del workspace (docs/33 D78). */
-  async createBudget(input: CreateBudgetInput): Promise<BudgetDto> {
+  /**
+   * `CreateBudget`: un plan por periodo, en la moneda base del workspace (docs/33 D78), vacío (`EMPTY`), desde una
+   * versión de template (`TEMPLATE`) o clonando el plan del periodo anterior (`CLONE_PREVIOUS`); add-budget-templates
+   * decisiones 2-4.
+   */
+  async createBudget(input: CreateBudgetInput): Promise<CreatedBudgetDto> {
     const { deps } = this;
     const { workspaceId, periodId } = input;
-    const kind = input.source?.kind ?? 'EMPTY';
-    if (kind !== 'EMPTY') {
-      throw new DomainError('VALIDATION_FAILED', 'only source.kind EMPTY is supported by this release').at(
-        '/source/kind',
-      );
-    }
+    const source = parseSource(input.source);
     if (!deps.settings) throw new Error('BudgetsDeps.settings is required to create budgets');
     const settings = await deps.settings.settingsOf(workspaceId);
-    return deps.uow.run(workspaceId, async () => {
-      await deps.guard.assertPlanEditable({ workspaceId, periodId });
-      const period = await deps.periods.findById(workspaceId, periodId);
-      if (!period) throw new DomainError('REFERENCE_NOT_FOUND', `financial period ${periodId} not found`);
-      const existing = await deps.budgets.findByPeriod(workspaceId, periodId);
-      if (existing) {
-        throw new DomainError('BUDGET_ALREADY_EXISTS', `period ${period.label} already has a budget plan`).at(
-          '/periodId',
-        );
-      }
-      const currency = await planCurrency(deps, workspaceId, settings.baseCurrency);
-      const now = deps.clock.now().toString();
-      const budget = Budget.create({
-        id: deps.ids.next(),
+    return deps.uow.run(workspaceId, () =>
+      this.createIn({
         workspaceId,
         periodId,
-        currency,
+        source,
         zeroBased: input.zeroBased === true,
-        origin: 'EMPTY',
-        at: now,
+        baseCurrency: settings.baseCurrency,
+      }),
+    );
+  }
+
+  /**
+   * `PeriodCreatedHook` (add-budget-templates decisión 5): invocado de forma síncrona por la creación de periodos en
+   * SU unidad de trabajo. Con template predeterminado activo y el periodo sin plan, crea el plan desde su última
+   * versión; sin predeterminado o con plan existente no hace nada (idempotente ante reintentos).
+   */
+  async applyDefaultTemplate(input: {
+    readonly workspaceId: string;
+    readonly periodId: string;
+  }): Promise<boolean> {
+    const { deps } = this;
+    const { workspaceId, periodId } = input;
+    return deps.uow.run(workspaceId, async () => {
+      const template = await deps.templates.findDefault(workspaceId);
+      if (!template) return false;
+      if (await deps.budgets.findByPeriod(workspaceId, periodId)) return false;
+      if (!deps.settings) throw new Error('BudgetsDeps.settings is required to apply the default template');
+      const settings = await deps.settings.settingsOf(workspaceId);
+      await this.createIn({
+        workspaceId,
+        periodId,
+        source: { kind: 'TEMPLATE', templateId: template.id, versionNo: undefined },
+        zeroBased: false,
+        baseCurrency: settings.baseCurrency,
       });
-      if (!(await deps.budgets.insertIfAbsent(budget))) {
-        throw new DomainError('BUDGET_ALREADY_EXISTS', `period ${period.label} already has a budget plan`).at(
-          '/periodId',
+      return true;
+    });
+  }
+
+  /** Núcleo de `CreateBudget` en la unidad de trabajo en curso. */
+  private async createIn(input: {
+    readonly workspaceId: string;
+    readonly periodId: string;
+    readonly source: BudgetSource;
+    readonly zeroBased: boolean;
+    readonly baseCurrency: string;
+  }): Promise<CreatedBudgetDto> {
+    const { deps } = this;
+    const { workspaceId, periodId, source } = input;
+    await deps.guard.assertPlanEditable({ workspaceId, periodId });
+    const period = await deps.periods.findById(workspaceId, periodId);
+    if (!period) throw new DomainError('REFERENCE_NOT_FOUND', `financial period ${periodId} not found`);
+    const currency = await planCurrency(deps, workspaceId, input.baseCurrency);
+    const now = deps.clock.now().toString();
+    const budgetId = deps.ids.next();
+    const nextId = () => deps.ids.next();
+
+    let origin: 'EMPTY' | 'TEMPLATE' | 'CLONE' = 'EMPTY';
+    let templateVersionId: string | null = null;
+    let clonedFromBudgetId: string | null = null;
+    let copied: CopiedLines = { lines: [], omitted: [] };
+    if (source.kind === 'TEMPLATE') {
+      origin = 'TEMPLATE';
+      const template = await deps.templates.findById(workspaceId, source.templateId);
+      if (!template) {
+        throw new DomainError('REFERENCE_NOT_FOUND', `budget template ${source.templateId} not found`).at(
+          '/source/templateId',
         );
       }
-      const s = budget.snapshot;
-      await deps.audit.append({
+      template.assertActive();
+      const version =
+        source.versionNo === undefined || source.versionNo === template.currentVersionNo
+          ? template.currentVersion
+          : await deps.templates.findVersion(workspaceId, template.id, source.versionNo);
+      if (!version) {
+        throw new DomainError(
+          'REFERENCE_NOT_FOUND',
+          `version ${source.versionNo} of template ${template.name} not found`,
+        ).at('/source/versionNo');
+      }
+      templateVersionId = version.id;
+      const tree = await loadTargetTree(deps, workspaceId);
+      copied = BudgetFromTemplateFactory.build({
+        version,
         workspaceId,
-        action: 'planning.budget.created',
-        aggregateType: AGGREGATE,
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        changes: [
-          { field: 'periodId', before: null, after: s.periodId },
-          { field: 'currency', before: null, after: s.currency },
-          { field: 'origin', before: null, after: s.origin },
-          { field: 'zeroBased', before: null, after: s.zeroBased },
-        ],
+        budgetId,
+        currency: currency.code,
+        tree,
+        nextId,
       });
-      const payload: BudgetCreatedV1 = {
-        budgetId: s.id,
-        periodId: s.periodId,
-        periodLabel: period.label,
-        currency: s.currency,
-        origin: s.origin,
-        templateId: null,
-        templateVersionNo: null,
-        clonedFromBudgetId: null,
-        lineCount: 0,
-      };
-      await deps.outbox.append({
-        eventId: deps.ids.next(),
-        eventType: BUDGET_CREATED.eventType,
-        eventVersion: BUDGET_CREATED.eventVersion,
-        occurredAt: now,
+    } else if (source.kind === 'CLONE_PREVIOUS') {
+      origin = 'CLONE';
+      const previousPeriod = (await deps.periods.list(workspaceId))
+        .filter((p) => p.snapshot.periodStart < period.snapshot.periodStart)
+        .at(-1);
+      const previous = previousPeriod
+        ? await deps.budgets.findByPeriod(workspaceId, previousPeriod.id)
+        : null;
+      if (!previous) {
+        throw new DomainError(
+          'REFERENCE_NOT_FOUND',
+          `the period before ${period.label} has no budget plan to clone`,
+        ).at('/periodId');
+      }
+      clonedFromBudgetId = previous.id;
+      templateVersionId = previous.snapshot.templateVersionId;
+      const tree = await loadTargetTree(deps, workspaceId);
+      copied = BudgetCloner.build({
+        previous,
         workspaceId,
-        aggregateType: AGGREGATE,
-        aggregateId: s.id,
-        aggregateVersion: s.version,
-        payload,
+        budgetId,
+        currency: currency.code,
+        tree,
+        nextId,
       });
-      return toBudgetDto(await this.calculator.view({ workspaceId, budget, period, now: deps.clock.now() }));
+    }
+
+    // Un template archivado o una versión inexistente se informan antes que un plan ya existente.
+    const existing = await deps.budgets.findByPeriod(workspaceId, periodId);
+    if (existing) {
+      throw new DomainError('BUDGET_ALREADY_EXISTS', `period ${period.label} already has a budget plan`).at(
+        '/periodId',
+      );
+    }
+
+    const budget = Budget.create({
+      id: budgetId,
+      workspaceId,
+      periodId,
+      currency,
+      zeroBased: input.zeroBased,
+      origin,
+      templateVersionId,
+      clonedFromBudgetId,
+      at: now,
     });
+    budget.seedLines(copied.lines);
+    if (!(await deps.budgets.insertIfAbsent(budget))) {
+      throw new DomainError('BUDGET_ALREADY_EXISTS', `period ${period.label} already has a budget plan`).at(
+        '/periodId',
+      );
+    }
+    for (const line of copied.lines) await deps.budgets.insertLine(line);
+    const s = budget.snapshot;
+    const ref = templateVersionId ? await deps.templates.versionRef(workspaceId, templateVersionId) : null;
+    const omittedJson = copied.omitted.length
+      ? JSON.stringify(
+          copied.omitted.map((o) => ({ target: `${o.target.kind}:${o.target.id}`, reason: o.reason })),
+        )
+      : null;
+    await deps.audit.append({
+      workspaceId,
+      action: 'planning.budget.created',
+      aggregateType: AGGREGATE,
+      aggregateId: s.id,
+      aggregateVersion: s.version,
+      changes: [
+        { field: 'periodId', before: null, after: s.periodId },
+        { field: 'currency', before: null, after: s.currency },
+        { field: 'origin', before: null, after: s.origin },
+        { field: 'zeroBased', before: null, after: s.zeroBased },
+        ...(ref
+          ? [
+              { field: 'templateId', before: null, after: ref.templateId },
+              { field: 'templateVersionNo', before: null, after: ref.versionNo },
+            ]
+          : []),
+        ...(clonedFromBudgetId
+          ? [{ field: 'clonedFromBudgetId', before: null, after: clonedFromBudgetId }]
+          : []),
+        ...(origin === 'EMPTY' ? [] : [{ field: 'lineCount', before: null, after: copied.lines.length }]),
+        ...(omittedJson ? [{ field: 'omittedLines', before: null, after: omittedJson }] : []),
+      ],
+    });
+    const payload: BudgetCreatedV1 = {
+      budgetId: s.id,
+      periodId: s.periodId,
+      periodLabel: period.label,
+      currency: s.currency,
+      origin: s.origin,
+      templateId: ref?.templateId ?? null,
+      templateVersionNo: ref?.versionNo ?? null,
+      clonedFromBudgetId,
+      lineCount: copied.lines.length,
+    };
+    await deps.outbox.append({
+      eventId: deps.ids.next(),
+      eventType: BUDGET_CREATED.eventType,
+      eventVersion: BUDGET_CREATED.eventVersion,
+      occurredAt: now,
+      workspaceId,
+      aggregateType: AGGREGATE,
+      aggregateId: s.id,
+      aggregateVersion: s.version,
+      payload,
+    });
+    const view = await this.calculator.view({ workspaceId, budget, period, now: deps.clock.now() });
+    if (copied.lines.length > 0) {
+      await this.thresholds.evaluateView(view, new Set(copied.lines.map((l) => l.id)));
+    }
+    const dto = toBudgetDto(
+      await this.calculator.view({ workspaceId, budget, period, now: deps.clock.now() }),
+      {
+        templateVersion: ref
+          ? { templateId: ref.templateId, versionNo: ref.versionNo, name: ref.templateName }
+          : null,
+        clonedFromBudgetId,
+      },
+    );
+    return origin === 'EMPTY' ? dto : { ...dto, omittedLines: copied.omitted.map(toOmittedDto) };
   }
 
   /** `AddBudgetLine`: valida, persiste, audita y evalúa los umbrales de la línea nueva en la misma transacción. */
@@ -300,7 +490,10 @@ export class BudgetsService {
           changes: [{ field: 'zeroBased', before, after: input.zeroBased }],
         });
       }
-      return toBudgetDto(await this.calculator.view({ workspaceId, budget, period, now: deps.clock.now() }));
+      return toBudgetDto(
+        await this.calculator.view({ workspaceId, budget, period, now: deps.clock.now() }),
+        await originOf(deps, budget),
+      );
     });
   }
 

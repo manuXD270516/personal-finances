@@ -7,8 +7,7 @@ import { AuditHistory } from '../AuditHistory';
 import { scaleFor } from '../common/money';
 import { todayIn } from '../common/dates';
 import { cardStyle, ConfirmPanel, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
-import type { Category, CategoryGroup, Tag } from '../common/types';
-import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import {
   buildLineBody,
@@ -21,40 +20,16 @@ import {
   type LineFormValues,
 } from './budget-logic';
 import { BudgetLineForm, natureOf, type TargetOptions } from './BudgetLineForm';
+import { loadCatalog, type Catalog } from './catalog';
 import { BudgetLinesTable, targetName, type TargetNames } from './BudgetLinesTable';
 import { BudgetTotalsView } from './BudgetTotalsView';
 import { defaultPeriodId, formatBusinessDate, periodName, type FinancialPeriod } from './logic';
 import { loadPeriods } from './PeriodsPage';
 import { PeriodSelector } from './PeriodSelector';
+import { PlanOriginInfo, PlanOriginPanel, OmittedLinesNotice, type PlanSource } from './PlanOriginPanel';
+import { PlanTemplateActions } from './PlanTemplateActions';
 import { PlanningNav } from './PlanningNav';
-
-interface Catalog {
-  readonly names: TargetNames;
-  readonly options: TargetOptions;
-}
-
-async function loadCatalog(ctx: WorkspaceContext): Promise<Catalog> {
-  const withArchived = new URLSearchParams({ includeArchived: 'true' });
-  const [groups, categories, tags] = await Promise.all([
-    listAll<CategoryGroup>(ctx.api, `${ctx.base}/category-groups`, withArchived),
-    listAll<Category>(ctx.api, `${ctx.base}/categories`, withArchived),
-    listAll<Tag>(ctx.api, `${ctx.base}/tags`, withArchived),
-  ]);
-  const active = <T extends { archivedAt?: string | null }>(items: readonly T[]) =>
-    items.filter((i) => !i.archivedAt);
-  return {
-    names: {
-      CATEGORY: new Map(categories.map((c) => [c.id, c.name])),
-      GROUP: new Map(groups.map((g) => [g.id, g.name])),
-      TAG: new Map(tags.map((t) => [t.id, t.name])),
-    },
-    options: {
-      CATEGORY: active(categories).map((c) => ({ id: c.id, name: c.name, nature: c.kind })),
-      GROUP: active(groups).map((g) => ({ id: g.id, name: g.name, nature: g.kind })),
-      TAG: active(tags).map((t) => ({ id: t.id, name: t.name, nature: 'EXPENSE' as const })),
-    },
-  };
-}
+import type { OmittedLine } from './template-logic';
 
 /** Cuerpo de un POST: sin campos nulos (el contrato no los admite en la creación). */
 function createBody(values: LineFormValues, body: LineBody) {
@@ -104,6 +79,7 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
   const [form, setForm] = useState<LineFormValues>(emptyLineForm());
   const [errors, setErrors] = useState<LineFormErrors>({});
   const [removing, setRemoving] = useState<BudgetLine | undefined>();
+  const [omitted, setOmitted] = useState<readonly OmittedLine[]>([]);
 
   useEffect(() => {
     loadPeriods(ctx)
@@ -158,13 +134,16 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
     }
   }
 
-  async function createPlan() {
+  async function createPlan(source: PlanSource) {
     if (!periodId) return;
     const created = await run(
-      () => ctx.api.command<Budget>('POST', `${ctx.base}/budgets`, { periodId, source: { kind: 'EMPTY' } }),
+      () => ctx.api.command<Budget>('POST', `${ctx.base}/budgets`, { periodId, source }),
       f.t('planCreated'),
     );
-    if (created) loadBudget();
+    if (created) {
+      setOmitted(created.data?.omittedLines ?? []);
+      loadBudget();
+    }
   }
 
   async function toggleZeroBased() {
@@ -260,6 +239,7 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
                 setSelected(id);
                 setPanel(undefined);
                 setRemoving(undefined);
+                setOmitted([]);
               }}
               f={pf}
             />
@@ -288,16 +268,7 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
             >
               <p style={{ margin: 0 }}>{f.t('noPlan')}</p>
               {canWrite ? (
-                <div style={rowStyle}>
-                  <button
-                    type="button"
-                    onClick={() => void createPlan()}
-                    disabled={busy}
-                    data-testid="create-plan"
-                  >
-                    {f.t('createPlan')}
-                  </button>
-                </div>
+                <PlanOriginPanel ctx={ctx} f={f} busy={busy} onCreate={(source) => void createPlan(source)} />
               ) : null}
             </div>
           ) : (
@@ -333,6 +304,8 @@ function Budgets({ ctx }: { ctx: WorkspaceContext }) {
               onSubmit={() => void submit()}
               onAskRemove={setRemoving}
               onConfirmRemove={(line) => void remove(line)}
+              omitted={omitted}
+              onChanged={loadBudget}
             />
           )}
         </>
@@ -362,6 +335,8 @@ function PlanView({
   onSubmit,
   onAskRemove,
   onConfirmRemove,
+  omitted,
+  onChanged,
 }: {
   ctx: WorkspaceContext;
   f: FormatContext;
@@ -383,9 +358,13 @@ function PlanView({
   onSubmit: () => void;
   onAskRemove: (line: BudgetLine | undefined) => void;
   onConfirmRemove: (line: BudgetLine) => void;
+  omitted: readonly OmittedLine[];
+  onChanged: () => void;
 }) {
   return (
     <>
+      <PlanOriginInfo origin={budget.origin} templateVersion={budget.templateVersion} f={f} />
+      <OmittedLinesNotice omitted={omitted} names={names} f={f} />
       <BudgetTotalsView budget={budget} f={f} />
       {canWrite ? (
         <div style={rowStyle}>
@@ -439,6 +418,9 @@ function PlanView({
               {f.t('lines.add')}
             </button>
           </div>
+        ) : null}
+        {canWrite && !panel ? (
+          <PlanTemplateActions ctx={ctx} f={f} budget={budget} names={names} onChanged={onChanged} />
         ) : null}
         {canWrite && panel ? (
           <BudgetLineForm

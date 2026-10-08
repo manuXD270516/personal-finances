@@ -12,9 +12,10 @@ invariants: ['INV-015']
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/propagation.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'propagation', 'period-closed', 'pbt']

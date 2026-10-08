@@ -18,6 +18,10 @@ import { BudgetsService } from '../application/budgets.service.js';
 import { PeriodQueries } from '../application/period.queries.js';
 import { RolloverService } from '../application/rollover.service.js';
 import { PeriodsService } from '../application/periods.service.js';
+import { PropagationService } from '../application/propagation.service.js';
+import { TemplatePeriodHook } from '../application/period-created.hook.js';
+import { TemplateQueries } from '../application/template.queries.js';
+import { TemplatesService } from '../application/templates.service.js';
 import type {
   BudgetsDeps,
   OutboxPort,
@@ -42,6 +46,7 @@ import {
   PgThresholdCrossingRepository,
   requestActor,
 } from '../infrastructure/pg-budgets.js';
+import { PgBudgetTemplateRepository } from '../infrastructure/pg-templates.js';
 import {
   PgFinancialPeriodRepository,
   PgPlanningUnitOfWork,
@@ -49,6 +54,12 @@ import {
 } from '../infrastructure/pg-planning.js';
 import { BUDGET_QUERIES, BUDGETS_SERVICE, BudgetsController } from './budgets-http.js';
 import { PERIOD_QUERIES, PERIODS_SERVICE, PeriodsController } from './periods-http.js';
+import {
+  PROPAGATION_SERVICE,
+  TEMPLATE_QUERIES,
+  TEMPLATES_SERVICE,
+  TemplatesController,
+} from './templates-http.js';
 
 /** Anticipación por defecto (`PLANNING_PERIOD_LOOKAHEAD`, docs/33 D63). */
 export const DEFAULT_PERIOD_LOOKAHEAD = 3;
@@ -95,6 +106,10 @@ export interface PlanningRuntimeOptions {
 
 export interface BudgetsRuntime {
   readonly service: BudgetsService;
+  /** Templates versionados y su propagación (add-budget-templates). */
+  readonly templates: TemplatesService;
+  readonly templateQueries: TemplateQueries;
+  readonly propagation: PropagationService;
   readonly queries: BudgetQueries;
   readonly thresholds: BudgetThresholdService;
   readonly rollover: RolloverService;
@@ -113,6 +128,9 @@ export interface PlanningRuntime {
 
 /** Composición de PLANNING sobre PostgreSQL (misma transacción que la `PgUnitOfWork` de cada comando). */
 export function createPlanningRuntime(options: PlanningRuntimeOptions): PlanningRuntime {
+  // Participantes síncronos de la creación de periodos (decisión 15): el de templates se agrega al componer los
+  // presupuestos (misma lista, mismo arreglo).
+  const periodHooks: PeriodCreatedHook[] = [...(options.onPeriodCreated ?? [])];
   const deps: PlanningDeps = {
     uow: new PgPlanningUnitOfWork(options.pool),
     periods: new PgFinancialPeriodRepository(),
@@ -124,7 +142,7 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
     ids: uuidV7Ids,
     clock: options.clock,
     lookahead: options.lookahead ?? DEFAULT_PERIOD_LOOKAHEAD,
-    onPeriodCreated: options.onPeriodCreated ?? [],
+    onPeriodCreated: periodHooks,
   };
   const queries = new PeriodQueries(deps);
   const b = options.budgets;
@@ -134,6 +152,7 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
       uow: deps.uow,
       periods: deps.periods,
       budgets: new PgBudgetRepository(),
+      templates: new PgBudgetTemplateRepository(),
       crossings: new PgThresholdCrossingRepository(),
       calendar: b.calendarCacheMs ? cachedCalendar(options.calendar, b.calendarCacheMs) : options.calendar,
       ...(b.settings ? { settings: b.settings } : {}),
@@ -150,8 +169,13 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
       rateValidityWindowDays: b.rateValidityWindowDays,
     };
     const budgetQueries = new BudgetQueries(budgetsDeps);
+    const budgetsService = new BudgetsService(budgetsDeps);
+    periodHooks.push(new TemplatePeriodHook(budgetsService));
     budgets = {
-      service: new BudgetsService(budgetsDeps),
+      service: budgetsService,
+      templates: new TemplatesService(budgetsDeps),
+      templateQueries: new TemplateQueries(budgetsDeps),
+      propagation: new PropagationService(budgetsDeps),
       queries: budgetQueries,
       thresholds: new BudgetThresholdService(budgetsDeps, new BudgetCalculator(budgetsDeps)),
       rollover: new RolloverService(budgetsDeps),
@@ -178,12 +202,17 @@ export class PlanningModule {
   static register(options: PlanningModuleOptions): DynamicModule {
     return {
       module: PlanningModule,
-      controllers: options.runtime.budgets ? [PeriodsController, BudgetsController] : [PeriodsController],
+      controllers: options.runtime.budgets
+        ? [PeriodsController, BudgetsController, TemplatesController]
+        : [PeriodsController],
       providers: [
         ...(options.runtime.budgets
           ? [
               { provide: BUDGETS_SERVICE, useValue: options.runtime.budgets.service },
               { provide: BUDGET_QUERIES, useValue: options.runtime.budgets.queries },
+              { provide: TEMPLATES_SERVICE, useValue: options.runtime.budgets.templates },
+              { provide: TEMPLATE_QUERIES, useValue: options.runtime.budgets.templateQueries },
+              { provide: PROPAGATION_SERVICE, useValue: options.runtime.budgets.propagation },
               { provide: BUDGET_VS_ACTUAL_QUERY, useValue: options.runtime.budgets.vsActual },
             ]
           : []),

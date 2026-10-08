@@ -12,9 +12,11 @@ invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/templates.service.test.ts
+  - tests/e2e/specs/templates.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'override']

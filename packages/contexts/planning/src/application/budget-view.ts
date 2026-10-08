@@ -9,6 +9,7 @@ import type {
   BudgetVsActual,
 } from '../contracts/index.js';
 import type { BudgetView, LineView } from './budget-calculator.js';
+import type { OmittedLineDto } from './template-view.js';
 
 const money = (m: Money): BudgetMoneyDto => m.toJSON();
 const moneyOrNull = (m: Money | null): BudgetMoneyDto | null => (m === null ? null : money(m));
@@ -69,7 +70,22 @@ export interface BudgetMetaDto {
   readonly attributions: readonly RateAttributionDto[];
 }
 
-export interface BudgetDto {
+/** Versión de template de la que nació el plan (o que heredó al clonar), con el nombre del template. */
+export interface BudgetTemplateRefDto {
+  readonly templateId: string;
+  readonly versionNo: number;
+  readonly name: string;
+}
+
+/** Origen del plan más allá de `origin` (add-budget-templates decisiones 2 y 4). */
+export interface BudgetOriginDto {
+  readonly templateVersion: BudgetTemplateRefDto | null;
+  readonly clonedFromBudgetId: string | null;
+}
+
+export const NO_ORIGIN: BudgetOriginDto = { templateVersion: null, clonedFromBudgetId: null };
+
+export interface BudgetDto extends BudgetOriginDto {
   readonly id: string;
   readonly periodId: string;
   readonly periodLabel: string;
@@ -84,6 +100,8 @@ export interface BudgetDto {
   readonly meta: BudgetMetaDto;
   readonly version: number;
   readonly createdAt: string | null;
+  /** Solo en la respuesta de creación: líneas del origen que no se copiaron. */
+  readonly omittedLines?: readonly OmittedLineDto[];
 }
 
 export interface BudgetSummaryDto {
@@ -141,7 +159,7 @@ export function toLineDto(view: LineView, currency: string): BudgetLineDto {
   };
 }
 
-export function toBudgetDto(view: BudgetView): BudgetDto {
+export function toBudgetDto(view: BudgetView, origin: BudgetOriginDto = NO_ORIGIN): BudgetDto {
   const code = view.currency.code;
   const snapshot = view.budget.snapshot;
   const attributions = new Map<string, RateAttributionDto>();
@@ -156,6 +174,8 @@ export function toBudgetDto(view: BudgetView): BudgetDto {
     periodStatus: view.period.status,
     currency: code,
     origin: snapshot.origin,
+    templateVersion: origin.templateVersion,
+    clonedFromBudgetId: origin.clonedFromBudgetId,
     zeroBased: snapshot.zeroBased,
     lines: view.lines.map((l) => toLineDto(l, code)),
     totals: {

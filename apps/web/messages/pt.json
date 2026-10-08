@@ -1563,7 +1563,8 @@
     "nav": {
       "label": "Planejamento",
       "periods": "Períodos",
-      "budgets": "Orçamentos"
+      "budgets": "Orçamentos",
+      "templates": "Templates"
     },
     "totals": {
       "title": "Resumo do plano",
@@ -1695,6 +1696,180 @@
       "goToBudgets": "Ver orçamentos",
       "noPlan": "Este período ainda não tem plano: não há valor disponível para gastar a mostrar.",
       "createPlan": "Criar o plano do mês"
+    },
+    "origin": {
+      "title": "Origem do plano",
+      "EMPTY": "Plano vazio",
+      "TEMPLATE": "A partir de um template",
+      "CLONE_PREVIOUS": "Clonar o plano do mês anterior",
+      "template": "Template",
+      "version": "Versão",
+      "latest": "Última versão",
+      "versionOption": "Versão {versionNo}",
+      "default": "padrão",
+      "noTemplates": "Não há templates ativos.",
+      "cloneHint": "As linhas do mês anterior são copiadas, sem o gasto nem os limites já avisados."
+    },
+    "omitted": {
+      "title": "Algumas linhas não foram copiadas",
+      "TARGET_ARCHIVED": "{name}: a categoria, grupo ou tag está arquivado.",
+      "CURRENCY_MISMATCH": "{name}: está em outra moeda que o plano."
+    },
+    "originInfo": {
+      "EMPTY": "Origem: plano criado vazio.",
+      "TEMPLATE": "Origem: template {name}, versão {versionNo}.",
+      "CLONE": "Origem: clonado do plano do mês anterior.",
+      "CLONE_TEMPLATE": "Origem: clonado do plano do mês anterior (template {name}, versão {versionNo})."
+    },
+    "propagate": {
+      "open": "Aplicar a meses futuros…",
+      "createTemplate": "Criar template com estas linhas",
+      "noOrigin": "Este plano não vem de um template, então não pode ser propagado.",
+      "selectTitle": "Linhas a propagar",
+      "selectHint": "Escolha as linhas que quer levar ao template e aos meses futuros em rascunho.",
+      "edited": "alterada",
+      "preview": "Ver pré-visualização",
+      "createHint": "Será criado um template com as {count} linhas deste plano. Depois você poderá aplicá-lo a outros meses.",
+      "templateName": "Nome do template",
+      "createSubmit": "Criar template",
+      "templateCreated": "Template {name} criado com {count} linhas.",
+      "applied": "Alterações propagadas aos meses futuros."
+    }
+  },
+  "Templates": {
+    "title": "Templates de orçamento",
+    "intro": "Um template guarda as linhas de um plano mensal em versões imutáveis. Aplique-o ao criar o plano de um período ou defina-o como padrão para que cada período novo já nasça com o plano.",
+    "loading": "Carregando templates…",
+    "empty": "Ainda não há templates. Crie um para reutilizar seu planejamento mês a mês.",
+    "list": {
+      "caption": "Templates do espaço de trabalho",
+      "columns": {
+        "name": "Nome",
+        "status": "Estado",
+        "version": "Versão atual",
+        "lines": "Linhas",
+        "actions": "Ações"
+      },
+      "default": "Padrão",
+      "status": {
+        "ACTIVE": "Ativo",
+        "ARCHIVED": "Arquivado"
+      },
+      "open": "Abrir",
+      "openLabel": "Abrir o template {name}"
+    },
+    "create": {
+      "title": "Novo template",
+      "name": "Nome",
+      "nameRequired": "O nome é obrigatório.",
+      "description": "Descrição (opcional)",
+      "submit": "Criar template",
+      "done": "Template criado. Adicione suas linhas e publique a próxima versão."
+    },
+    "detail": {
+      "title": "Template {name}",
+      "currentVersion": "Versão atual: {versionNo}"
+    },
+    "actions": {
+      "edit": "Editar linhas",
+      "setDefault": "Definir como padrão",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "cancel": "Cancelar",
+      "defaultDone": "Template definido como padrão.",
+      "archiveDone": "Template arquivado.",
+      "unarchiveDone": "Template desarquivado."
+    },
+    "archive": {
+      "title": "Arquivar o template {name}?",
+      "body": "Ele deixa de ser o padrão e não poderá ser aplicado. Suas versões e os planos já criados não mudam."
+    },
+    "lines": {
+      "caption": "Linhas da versão {versionNo}",
+      "empty": "Esta versão não tem linhas.",
+      "columns": {
+        "target": "Orçamento",
+        "spec": "Tipo e valor",
+        "thresholds": "Limites de alerta",
+        "rollover": "Saldo transferido",
+        "actions": "Ações"
+      }
+    },
+    "versions": {
+      "caption": "Versões do template (imutáveis)",
+      "columns": {
+        "version": "Versão",
+        "note": "Nota de alteração",
+        "date": "Publicada",
+        "lines": "Linhas",
+        "actions": "Ações"
+      },
+      "version": "Versão {versionNo}",
+      "current": "atual",
+      "view": "Ver",
+      "viewLabel": "Ver a versão {versionNo}"
+    },
+    "compare": {
+      "title": "Comparar versões",
+      "from": "De",
+      "to": "Até",
+      "run": "Comparar",
+      "caption": "Alterações da versão {a} para a versão {b}",
+      "none": "Sem diferenças.",
+      "change": "Alteração",
+      "before": "Antes",
+      "after": "Depois",
+      "ADDED": "Adicionada",
+      "CHANGED": "Alterada",
+      "REMOVED": "Removida"
+    },
+    "draft": {
+      "title": "Versão {versionNo} (rascunho)",
+      "intro": "Edite as linhas e publique: cria-se uma versão nova e completa; a versão {versionNo} não muda.",
+      "linesCaption": "Linhas do rascunho",
+      "addLine": "Adicionar linha",
+      "changesTitle": "Alterações em relação à versão {versionNo}",
+      "note": "Nota de alteração (opcional)",
+      "noteHint": "Por exemplo: Inflação.",
+      "publish": "Publicar versão",
+      "propagate": "Aplicar a meses futuros…",
+      "discard": "Descartar rascunho",
+      "published": "Versão {versionNo} publicada."
+    },
+    "clone": {
+      "title": "Clonar como template novo",
+      "intro": "A versão {versionNo} é copiada como um template independente, com sua própria versão 1.",
+      "name": "Nome do clone",
+      "submit": "Clonar",
+      "done": "Template clonado."
+    },
+    "propagation": {
+      "title": "Aplicar a meses futuros",
+      "intro": "Só são atualizados os planos de períodos futuros em rascunho. As linhas que você alterou à mão não são tocadas. Nada muda até você confirmar.",
+      "loading": "Calculando a pré-visualização…",
+      "newVersion": "A versão {versionNo} do template será publicada: {added} linhas adicionadas, {updated} alteradas e {removed} removidas.",
+      "noPeriods": "Não há planos de períodos futuros em rascunho que sigam este template.",
+      "noChangesInPeriod": "Sem alterações neste período.",
+      "changesLabel": "Alterações em {period}",
+      "conflictsLabel": "Linhas que não são tocadas em {period}",
+      "action": {
+        "ADD": "é adicionada",
+        "UPDATE": "muda",
+        "REMOVE": "é removida"
+      },
+      "to": "para",
+      "keeps": "mantida",
+      "reason": {
+        "OVERRIDDEN": "você a alterou à mão",
+        "MANUAL_LINE": "é uma linha própria do plano",
+        "TARGET_OVERLAP": "se sobreporia a outra linha do plano",
+        "CURRENCY_MISMATCH": "o plano está em outra moeda"
+      },
+      "confirm": "Confirmar e publicar",
+      "cancel": "Cancelar",
+      "close": "Fechar",
+      "reload": "Atualizar a pré-visualização",
+      "done": "Propagação aplicada: a nova versão do template foi publicada e os planos foram atualizados."
     }
   }
 }

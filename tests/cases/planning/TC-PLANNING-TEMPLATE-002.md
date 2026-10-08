@@ -12,9 +12,13 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/templates.service.test.ts
+  - packages/contexts/planning/test/integration/pg-templates.int.test.ts
+  - apps/web/src/ui/planning/templates.test.tsx
+  - tests/e2e/specs/templates.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['templates', 'versioning', 'immutability']
@@ -33,7 +37,7 @@ steps:
 expected_result:
   - 'Versión 2 con "Supermercado" 1600.00 BOB y nota "Inflación"'
   - 'Versión 1 con "Supermercado" 1500.00 BOB'
-  - 'UPDATE/DELETE fallan (PF003, append-only)'
+  - 'UPDATE/DELETE fallan: sin privilegio para el rol de la app (42501) y PF003 (forbid_mutation) para el owner; TRUNCATE también PF003'
 created: 2026-10-05
 updated: 2026-10-08
 ---

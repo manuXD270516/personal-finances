@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/planning/BudgetCreated.v1.schema.json",
   "title": "planning.BudgetCreated.v1",
-  "description": "Se creó el plan mensual de un periodo financiero (openspec add-budgets): vacío, desde un template o clonado del periodo anterior (los dos últimos orígenes los agrega add-budget-templates). Productor: PLANNING (comando CreateBudget). Consumidores: REPORTING (opcional), NOTIFY (opcional). Idempotencia natural: (periodId) — un periodo tiene a lo sumo un plan. El payload no contiene montos ni nombres. Sin PII.",
+  "description": "Se creó el plan mensual de un periodo financiero (openspec add-budgets, add-budget-templates): vacío, desde una versión de template (incluido el template predeterminado de un periodo nuevo, con actor de sistema) o clonado del periodo anterior. Productor: PLANNING (comando CreateBudget y participante PeriodCreatedHook). Consumidores: REPORTING (opcional), NOTIFY (opcional). Idempotencia natural: (periodId) — un periodo tiene a lo sumo un plan. El payload no contiene montos ni nombres. Sin PII.",
   "type": "object",
   "allOf": [
     {
@@ -55,16 +55,42 @@
           "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
         },
         "origin": {
-          "enum": ["EMPTY", "TEMPLATE", "CLONE"]
+          "enum": [
+            "EMPTY",
+            "TEMPLATE",
+            "CLONE"
+          ]
         },
         "templateId": {
-          "oneOf": [{ "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "templateVersionNo": {
-          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "clonedFromBudgetId": {
-          "oneOf": [{ "$ref": "../envelope.v1.schema.json#/$defs/Uuid" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "lineCount": {
           "type": "integer",
@@ -99,6 +125,60 @@
         "templateVersionNo": null,
         "clonedFromBudgetId": null,
         "lineCount": 0
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000312",
+      "eventType": "planning.BudgetCreated",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-01T14:05:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Budget",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fb002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c5",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "budgetId": "01928c4e-0000-7000-8000-0000000fb002",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa012",
+        "periodLabel": "2026-12",
+        "currency": "BOB",
+        "origin": "TEMPLATE",
+        "templateId": "01928c4e-0000-7000-8000-0000000fc001",
+        "templateVersionNo": 2,
+        "clonedFromBudgetId": null,
+        "lineCount": 3
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000313",
+      "eventType": "planning.BudgetCreated",
+      "eventVersion": 1,
+      "occurredAt": "2026-12-01T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Budget",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fb003",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c5",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-0000000ea001"
+      },
+      "payload": {
+        "budgetId": "01928c4e-0000-7000-8000-0000000fb003",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa013",
+        "periodLabel": "2027-01",
+        "currency": "BOB",
+        "origin": "CLONE",
+        "templateId": "01928c4e-0000-7000-8000-0000000fc001",
+        "templateVersionNo": 2,
+        "clonedFromBudgetId": "01928c4e-0000-7000-8000-0000000fb002",
+        "lineCount": 3
       }
     }
   ]
