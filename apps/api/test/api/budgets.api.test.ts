@@ -13,7 +13,7 @@ import {
   planningEventConsumers,
   type PlanningRuntime,
 } from '@pf/planning/interface/planning.module';
-import { ApiContract, PgUnitOfWork } from '@pf/platform/api';
+import { ApiContract, PgUnitOfWork, runWithRequestContext } from '@pf/platform/api';
 import {
   EventConsumerRuntime,
   EventSubscriptions,
@@ -165,6 +165,16 @@ async function outboxOf(ws: string, eventType: string) {
   );
   return rows.map((r) => r.envelope);
 }
+
+/**
+ * Evaluación de umbrales como lo hace el barrido del worker (atribución WORKER): quien gana la carrera contra la
+ * entrega del consumidor emite el hecho y la auditoría exige actor.
+ */
+const evaluateAsWorker = (ws: string) =>
+  runWithRequestContext(
+    { actor: { type: 'WORKER', process: 'planning.budget-thresholds' }, origin: 'system' },
+    () => planning.budgets!.thresholds.evaluateWorkspace(ws),
+  );
 
 const deliver = (consumer: string, envelope: EventEnvelope) =>
   consumers.deliver(definitions.get(consumer)!, envelope);
@@ -753,8 +763,8 @@ describe('Umbrales: emisión única (worker, pf_worker)', () => {
     const posted = (await outboxOf(owner.ws, 'transactions.TransactionPosted')).at(-1)!;
     const outcomes = await Promise.all([
       deliver('planning.budget-thresholds', posted),
-      planning.budgets!.thresholds.evaluateWorkspace(owner.ws),
-      planning.budgets!.thresholds.evaluateWorkspace(owner.ws),
+      evaluateAsWorker(owner.ws),
+      evaluateAsWorker(owner.ws),
     ]);
     expect(outcomes[0]).toBe('applied');
     expect(await deliver('planning.budget-thresholds', posted)).toBe('duplicate');

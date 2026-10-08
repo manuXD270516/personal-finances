@@ -21,5 +21,17 @@ export default defineConfig({
     locale: 'es-BO',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  // `alerts` corre PRIMERO y sobre el stack recién sembrado: su cadena asíncrona (transacción → umbral → NOTIFY → SMTP)
+  // atraviesa colas de eventos que consumen ~2 trabajos/s por cola (concurrencia 1, polling 0,5 s). Las demás specs
+  // dejan miles de trabajos pendientes en esas colas (un test de la suite generaba >1 000 en minutos) y, detrás de ese
+  // atraso, el hecho del test llegaba tras el timeout de 90 s (add-alerts, CI run 37826960722).
+  projects: [
+    { name: 'alerts', testMatch: /notifications\.spec\.ts$/, use: { browserName: 'chromium' } },
+    {
+      name: 'chromium',
+      testIgnore: /notifications\.spec\.ts$/,
+      dependencies: ['alerts'],
+      use: { browserName: 'chromium' },
+    },
+  ],
 });

@@ -24,6 +24,16 @@ const forUser = (env: NotificationsTestEnv, userId: string) =>
   [...env.notifications.rows.values()].filter((n) => n.userId === userId);
 
 describe('NotifyFromEvent: umbral de presupuesto', () => {
+  it('un workspace sin miembros activos (inexistente o retirado) es un no-op: ni notificaciones ni entregas ni jobs', async () => {
+    const { env, notify } = setup();
+    env.recipients.members = [];
+    const outcome = await notify.handle(event(thresholdPayload()), threshold);
+    expect(outcome).toEqual({ created: 0, deliveries: 0 });
+    expect(env.notifications.rows.size).toBe(0);
+    expect(env.deliveries.rows.size).toBe(0);
+    expect(env.scheduler.jobs).toHaveLength(0);
+  });
+
   it('[TC-NOTIFICATIONS-INAPP-001] cada miembro activo recibe una notificación UNREAD con el contenido del hecho', async () => {
     const { env, notify } = setup();
     const outcome = await notify.handle(event(thresholdPayload()), threshold);

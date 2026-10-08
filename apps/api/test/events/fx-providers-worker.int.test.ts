@@ -13,7 +13,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { createWorkerRuntime, type WorkerRuntime } from '../../src/worker/create-worker-runtime.js';
-import { baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
+import { baseEnv, capturingLogger, discardStaleEventBacklog, workerConfig } from '../support/harness.js';
 
 // Worker completo con pg-boss real (add-market-rate-providers, tarea 4.4): el consumidor FX de
 // identity.WorkspaceCreated.v1 siembra preferencias PARALLEL y encola la carga histórica en su transacción; el job
@@ -59,6 +59,10 @@ async function asWorker<R>(workspaceId: string, text: string, values: unknown[] 
 }
 
 beforeAll(async () => {
+  // Las suites de API no tienen relay: sus WorkspaceCreated sin publicar se publicarían ahora y cada uno encolaría una
+  // carga histórica antes de la de este test (FIFO); agotan el límite local de 60 solicitudes/min del provider y la de
+  // este workspace termina FAILED/PROVIDER_RATE_LIMITED sin escribir nada.
+  await discardStaleEventBacklog(deps, ['identity.WorkspaceCreated']);
   appPool = new Pool({ connectionString: deps.databaseUrl, max: 2 });
   workerPool = new Pool({ connectionString: deps.workerDatabaseUrl, max: 2 });
   migratorPool = new Pool({ connectionString: deps.migratorUrl, max: 1 });

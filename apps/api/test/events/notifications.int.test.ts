@@ -15,7 +15,7 @@ import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { createEmailSender, type EmailSender } from '@pf/notifications/interface/notifications.module';
 import { createWorkerRuntime, type WorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { startMailpit, type Mailpit, type MailpitMessage } from '../support/mailpit.js';
-import { baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
+import { baseEnv, capturingLogger, discardStaleEventBacklog, workerConfig } from '../support/harness.js';
 
 // Notificaciones de punta a punta contra PostgreSQL real, pg-boss real y Mailpit (openspec add-alerts, tareas 4.2, 4.4
 // y 7.2): outbox → relay → consumidores `notifications.*` → entrega por email → job `notifications.email-dispatch` →
@@ -263,6 +263,7 @@ beforeAll(async () => {
   appPool = new Pool({ connectionString: deps.databaseUrl, max: 6 });
   workerPool = new Pool({ connectionString: deps.workerDatabaseUrl, max: 8 });
   migratorPool = new Pool({ connectionString: deps.migratorUrl, max: 2 });
+  await discardStaleEventBacklog(deps);
   mailpit = await startMailpit();
 });
 

@@ -19,7 +19,13 @@ import { seedWorkspaceProvisioning } from '../../src/identity/workspace-provisio
 import { createWorkerRuntime, type WorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { connect, inTx } from '../support/db.js';
 import { rowsByTable, unbalancedEntries } from '../support/demo-db.js';
-import { apiConfig, baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
+import {
+  apiConfig,
+  baseEnv,
+  capturingLogger,
+  discardStaleEventBacklog,
+  workerConfig,
+} from '../support/harness.js';
 
 // Datos de demostración de extremo a extremo (openspec add-demo-data, tareas 3.x/5.1/7.1): API real (JWT de prueba),
 // worker real (jobs `demo.load`/`demo.purge` sobre pg-boss) y PostgreSQL real con RLS.
@@ -117,6 +123,24 @@ async function auditActions(workspaceId: string): Promise<{ action: string; acto
   }
 }
 
+/**
+ * Conteos del workspace una vez que terminó el trabajo asíncrono de su alta (el worker del archivo reacciona a
+ * `identity.WorkspaceCreated`: periodos, preferencias, auditoría). Medir "antes" sin esperar compite con ese trabajo y
+ * lo cuenta como cambio causado por la carga demo.
+ */
+async function settledCountsOf(workspaceId: string, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  let previous = JSON.stringify(await countsOf(workspaceId));
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 1_500));
+    const current = await countsOf(workspaceId);
+    const serialized = JSON.stringify(current);
+    if (serialized === previous && Number(current['planning.financial_period']) > 0) return current;
+    if (Date.now() > deadline) throw new Error('settledCountsOf: el alta del workspace no se estabilizó');
+    previous = serialized;
+  }
+}
+
 /** Carga en proceso con un ancla fija (como `pnpm db:seed -- --profile=demo`, rol de la app). */
 async function loadInProcess(input: {
   readonly ownerId: string;
@@ -199,6 +223,7 @@ const GOLDEN_BY_NAME: Record<string, string> = {
 };
 
 beforeAll(async () => {
+  await discardStaleEventBacklog(deps);
   const pair = await generateKeyPair('RS256', { extractable: true });
   signingKey = pair.privateKey;
   jwks = { keys: [{ ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' }] };
@@ -246,7 +271,7 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
   it('[TC-IDENTITY-DEMO-001] [TC-IDENTITY-DEMO-014] [TC-IDENTITY-DEMO-010] [TC-IDENTITY-DEMO-011] [TC-IDENTITY-DEMO-013] carga por la app, el real no cambia, limpieza inmediata y purga completa', async () => {
     const owner = await user(`kc-demo-owner-${randomUUID()}`);
     const w1 = owner.personal;
-    const before = await countsOf(w1);
+    const before = await settledCountsOf(w1);
 
     const requested = await call(baseUrl, 'POST', `/api/v1/workspaces/${w1}/demo-data`, owner.token);
     expect(requested.status).toBe(202);
