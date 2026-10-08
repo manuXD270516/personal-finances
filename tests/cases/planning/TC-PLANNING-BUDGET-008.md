@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/domain/budget.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['budgets', 'overlap']

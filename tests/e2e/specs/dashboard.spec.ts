@@ -183,6 +183,8 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     await expect(dash.locator('h2')).toHaveText([
       '¿Cuánto dinero tengo?',
       'Este mes',
+      // add-budgets 6.2: widget del plan del mes (disponible para gastar), entre "Este mes" y el patrimonio.
+      'Presupuesto del mes',
       'Patrimonio y cuentas',
       'Próximamente',
     ]);

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AccountBalancesList } from './AccountBalancesList';
 import { ExpenseCard, IncomeCard, SavingsCard } from './FlowCards';
 import { formatInstant, formatLocalDate } from './format';
@@ -16,6 +17,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly registerRateHref?: string | undefined;
   /** Destino de la acción "registrar un gasto" del estado vacío de categorías. */
   readonly registerExpenseHref?: string | undefined;
+  /** Widget de presupuestos (add-budgets 6.2: disponible para gastar), entre "Este mes" y el patrimonio. */
+  readonly budgetWidget?: ReactNode;
 }
 
 /** Hoja de estilos del Home (tokens de docs/28 §5). */
@@ -35,6 +38,7 @@ export function DashboardView({
   createAccountHref,
   registerRateHref,
   registerExpenseHref,
+  budgetWidget,
   ...ctx
 }: DashboardViewProps) {
   const { t, locale } = ctx;
@@ -101,6 +105,8 @@ export function DashboardView({
           </div>
         )}
       </section>
+
+      {budgetWidget ?? null}
 
       <section data-testid="wealth" aria-labelledby="wealth-title" className="pf-home-group">
         <h2 id="wealth-title">{t('sections.wealth')}</h2>

@@ -142,7 +142,14 @@
       "accounts_account_archived": "Account archived",
       "accounts_account_closed": "Account closed",
       "accounts_account_reactivated": "Account reactivated",
-      "accounts_account_reordered": "Account order changed"
+      "accounts_account_reordered": "Account order changed",
+      "planning_budget_created": "Plan created",
+      "planning_budget_updated": "Plan changed",
+      "planning_budget_line_added": "Line added",
+      "planning_budget_line_updated": "Line changed",
+      "planning_budget_line_removed": "Line removed",
+      "planning_budget_threshold_reached": "Threshold reached",
+      "planning_budget_rollover_updated": "Carry-over updated"
     },
     "fields": {
       "name": "Name",
@@ -171,7 +178,29 @@
       "color": "Color",
       "icon": "Icon",
       "notes": "Notes",
-      "cryptoNetwork": "Network"
+      "cryptoNetwork": "Network",
+      "periodId": "Period",
+      "zeroBased": "Zero-based",
+      "line": "Line",
+      "target": "Target",
+      "nature": "Nature",
+      "kind": "Type",
+      "planned": "Planned",
+      "min": "Minimum",
+      "max": "Maximum",
+      "percent": "Percentage",
+      "incomeBasis": "Income basis",
+      "rolloverPolicy": "Carry-over policy",
+      "rolloverCap": "Carry-over cap",
+      "rolloverIn": "Carry-over received",
+      "rolloverStatus": "Carry-over status",
+      "thresholds": "Thresholds",
+      "source": "Line source",
+      "threshold": "Threshold",
+      "alsoCrossed": "Also crossed",
+      "reference": "Reference",
+      "actual": "Spent",
+      "utilization": "Usage (%)"
     }
   },
   "Dashboard": {
@@ -1515,6 +1544,157 @@
       "start": "Statement of {date} for {balance}.",
       "complete": "Cleared balance {cleared} · difference {difference}",
       "adjustment": "see the adjustment"
+    }
+  },
+  "Budgets": {
+    "title": "Budgets",
+    "intro": "Plan each period with expected income and budgets by category, group or tag. Spending is always computed from your transactions; it is never edited by hand.",
+    "loading": "Loading periods…",
+    "loadingPlan": "Loading the plan…",
+    "noPeriods": "There are no periods yet: they are created automatically. Check the periods section.",
+    "periodSummary": "{name}: from {from} to {to} ({status}).",
+    "periodClosed": "This period is closed: its plan is read-only. An owner can reopen it to correct it.",
+    "noPlan": "This period does not have a plan yet.",
+    "createPlan": "Create the period plan",
+    "planCreated": "Plan created.",
+    "lineAdded": "Line added.",
+    "lineSaved": "Line saved.",
+    "lineRemoved": "Line removed.",
+    "nav": {
+      "label": "Planning",
+      "periods": "Periods",
+      "budgets": "Budgets"
+    },
+    "totals": {
+      "title": "Plan summary",
+      "planned": "Planned",
+      "actual": "Spent",
+      "remaining": "Remaining",
+      "available": "Available to spend",
+      "availableHint": "Adds up what is left in each category or group budget; an overspend does not reduce the others.",
+      "expectedIncome": "Expected income",
+      "actualIncome": "Actual income",
+      "toAssign": "To assign",
+      "toAssignOver": "Over-assigned",
+      "zeroBased": "Zero-based plan (assign all expected income)",
+      "incomplete": "Spending is incomplete: some amounts have no valid exchange rate.",
+      "unconverted": "Not converted: {amounts}. They are never estimated at 1:1.",
+      "rates": "Rates used",
+      "rate": "1 {base} = {value} {quote} · {type} · valid at {asOf}",
+      "window": "Rate validity window: {days} days."
+    },
+    "lines": {
+      "title": "Plan lines",
+      "caption": "Plan lines with planned and spent amounts and their status",
+      "empty": "The plan has no lines yet. Add a budget by category, group or tag.",
+      "columns": {
+        "target": "Budget",
+        "planned": "Planned",
+        "actual": "Spent",
+        "remaining": "Remaining",
+        "usage": "Usage",
+        "projection": "Projection",
+        "status": "Status",
+        "thresholds": "Thresholds",
+        "actions": "Actions"
+      },
+      "income": "expected income",
+      "range": "{min} to {max}",
+      "percentOf": "{percent} % of {basis} income",
+      "rolloverIn": "Includes {amount} carried over ({status})",
+      "incomplete": "Not converted: {amounts}",
+      "difference": "Difference from expected",
+      "usage": "{percent} %",
+      "usageLabel": "Usage of the {name} budget",
+      "noProjection": "No projection",
+      "projectionExceeds": "The projection exceeds the maximum",
+      "settlement": {
+        "PENDING": "Pending",
+        "MET": "Met"
+      },
+      "noThresholds": "No thresholds",
+      "crossed": "crossed",
+      "add": "Add line",
+      "edit": "Edit",
+      "editLabel": "Edit the {name} line",
+      "remove": "Remove",
+      "removeLabel": "Remove the {name} line",
+      "confirmRemoveTitle": "Remove the {name} line?",
+      "confirmRemoveBody": "The spending is not lost: it just stops being measured in this plan. Thresholds already notified are not notified again if you add the line back."
+    },
+    "status": {
+      "UNDER": "Below target",
+      "ON_TARGET": "On target",
+      "OVER": "Over budget",
+      "WITHIN": "Within limit",
+      "BELOW": "Below range",
+      "ABOVE": "Above range",
+      "PENDING": "Minimum pending",
+      "MET": "Minimum met",
+      "NO_BUDGET": "No budget"
+    },
+    "kind": {
+      "FIXED": "Fixed",
+      "MAXIMUM": "Maximum",
+      "MINIMUM": "Minimum",
+      "RANGE": "Range",
+      "PERCENT_OF_INCOME": "% of income"
+    },
+    "targetKind": {
+      "CATEGORY": "Category",
+      "GROUP": "Group",
+      "TAG": "Tag"
+    },
+    "basis": {
+      "EXPECTED": "expected",
+      "ACTUAL": "actual"
+    },
+    "rollover": {
+      "NONE": "no carry-over",
+      "PROVISIONAL": "provisional",
+      "FINAL": "final"
+    },
+    "rolloverPolicy": {
+      "NONE": "No carry-over",
+      "CARRY_POSITIVE": "Carry over only the surplus",
+      "CARRY_ALL": "Carry over surplus and overspend"
+    },
+    "form": {
+      "titleAdd": "Add a line to the plan",
+      "titleEdit": "Edit the line",
+      "targetKind": "Target type",
+      "target": "Target",
+      "targetPlaceholder": "Choose a target",
+      "kind": "Budget type",
+      "incomeFixedOnly": "Expected income only admits a fixed amount and has no thresholds.",
+      "planned": "Amount ({currency})",
+      "min": "Minimum ({currency})",
+      "max": "Maximum ({currency})",
+      "percent": "Percentage of income",
+      "percentHint": "Greater than 0 and up to 100, with up to 4 decimals.",
+      "incomeBasis": "Percentage base",
+      "rolloverPolicy": "Carry-over to the next period",
+      "rolloverCap": "Carry-over cap ({currency})",
+      "thresholds": "Alert thresholds (%)",
+      "thresholdsHint": "Comma separated, up to 10 values between 0 and 1000. Empty uses 50, 75, 90 and 100.",
+      "currencyNote": "All plan amounts are in {currency}.",
+      "add": "Add line",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "required": "This field is required.",
+        "invalid": "The value is not valid.",
+        "scale": "It has more decimals than the currency allows."
+      }
+    },
+    "widget": {
+      "title": "Budget of the month",
+      "available": "Available to spend",
+      "detail": "Of {planned} planned you have spent {actual}.",
+      "incomplete": "Some expenses have no exchange rate: the spent amount may be higher.",
+      "goToBudgets": "View budgets",
+      "noPlan": "This period does not have a plan yet: there is no available-to-spend amount to show.",
+      "createPlan": "Create this month's plan"
     }
   }
 }

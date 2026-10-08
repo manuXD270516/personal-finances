@@ -62,6 +62,70 @@ export interface ClassificationRuntime {
   readonly categories: CategoryCatalogQuery;
 }
 
+/** `CategoryCatalogQuery` sobre las consultas de CLASSIFICATION (nombres por id y árbol completo). */
+function categoryCatalogOf(queries: ClassificationQueries): CategoryCatalogQuery {
+  return {
+    categoriesByIds: async ({ userId, workspaceId, categoryIds }) =>
+      (await queries.categoriesByIds(userId, workspaceId, categoryIds)).map((c) => ({
+        categoryId: c.id,
+        name: c.name,
+        kind: c.kind,
+        parentId: c.parentId,
+        systemCode: c.systemCode,
+        archived: c.isArchived,
+      })),
+    categoryTree: async ({ userId, workspaceId }) => {
+      const tree = await queries.categoryTree(userId, workspaceId);
+      return {
+        groups: tree.groups.map((g) => ({
+          groupId: g.id,
+          name: g.name,
+          kind: g.kind,
+          archived: g.isArchived,
+        })),
+        categories: tree.categories.map((c) => ({
+          categoryId: c.id,
+          name: c.name,
+          kind: c.kind,
+          groupId: c.groupId,
+          parentId: c.parentId,
+          systemCode: c.systemCode,
+          archived: c.isArchived,
+        })),
+        tags: tree.tags.map((t) => ({ tagId: t.id, name: t.name, archived: t.isArchived })),
+      };
+    },
+  };
+}
+
+/**
+ * Catálogo de solo lectura para procesos sin comandos (el worker de PLANNING; openspec add-budgets): no necesita
+ * auditoría, outbox ni recorrido, que fallan fuerte si se usan por error.
+ */
+export function createCategoryCatalogQuery(options: {
+  readonly pool: Pool;
+  readonly clock: Clock;
+}): CategoryCatalogQuery {
+  const unavailable = <T>(what: string): T =>
+    new Proxy(
+      {},
+      {
+        get: () => () => {
+          throw new Error(`${what} is not available in the read-only category catalog`);
+        },
+      },
+    ) as T;
+  const deps = pgClassificationDeps({
+    pool: options.pool,
+    clock: options.clock,
+    outbox: unavailable('outbox'),
+    audit: unavailable('audit'),
+    lifecycle: unavailable('lifecycle'),
+    lifecycleQuery: unavailable('lifecycle query'),
+  });
+  return categoryCatalogOf(new ClassificationQueries(deps));
+}
+
 export function createClassificationRuntime(options: ClassificationRuntimeOptions): ClassificationRuntime {
   const deps = pgClassificationDeps({
     pool: options.pool,
@@ -95,17 +159,7 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
       categoryIdsWithDescendants: ({ userId, workspaceId, categoryIds }) =>
         queries.categoryIdsWithDescendants(userId, workspaceId, categoryIds),
     },
-    categories: {
-      categoriesByIds: async ({ userId, workspaceId, categoryIds }) =>
-        (await queries.categoriesByIds(userId, workspaceId, categoryIds)).map((c) => ({
-          categoryId: c.id,
-          name: c.name,
-          kind: c.kind,
-          parentId: c.parentId,
-          systemCode: c.systemCode,
-          archived: c.isArchived,
-        })),
-    },
+    categories: categoryCatalogOf(queries),
   };
 }
 

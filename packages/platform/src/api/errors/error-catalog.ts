@@ -96,6 +96,12 @@ export const ERROR_CATALOG = {
   CURRENCY_NOT_ENABLED: { status: 422, title: 'Currency not enabled in this workspace' },
   // planning (Phase 2)
   PERIOD_NOT_STARTED: { status: 409, title: 'Financial period has not started yet' },
+  BUDGET_ALREADY_EXISTS: { status: 409, title: 'The period already has a budget plan' },
+  BUDGET_LINE_DUPLICATE_TARGET: { status: 409, title: 'The plan already has a line for this target' },
+  BUDGET_TARGET_OVERLAP: { status: 409, title: 'The target overlaps another line of the plan' },
+  BUDGET_INVALID_AMOUNTS: { status: 422, title: 'Budget line amounts are not valid' },
+  BUDGET_INVALID_LINE_KIND: { status: 422, title: 'Budget line kind is not allowed for this target' },
+  BUDGET_THRESHOLD_INVALID: { status: 422, title: 'Alert thresholds are not valid' },
   // transactions / reconciliation (Phase 2)
   RECONCILIATION_IN_PROGRESS: { status: 409, title: 'The account already has a reconciliation in progress' },
   RECONCILIATION_STATEMENT_DATE_INVALID: {

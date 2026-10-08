@@ -116,6 +116,49 @@ function valuationPort(queries: FxQueries): FxValuationPort {
   };
 }
 
+/** Puerto que un proceso de solo lectura nunca debe invocar (falla fuerte si se usa por error). */
+const unavailable = <T>(what: string): T =>
+  new Proxy(
+    {},
+    {
+      get: () => () => {
+        throw new Error(`${what} is not available in the read-only FX valuation runtime`);
+      },
+    },
+  ) as T;
+
+/**
+ * Valoración de FX para procesos SIN comandos (el worker de PLANNING evalúa umbrales con las mismas reglas que el
+ * Home; openspec add-budgets, docs/33 D109): solo lee tasas y monedas con la ventana de vigencia indicada. Los puertos
+ * de escritura (auditoría, outbox, workspaces) no existen aquí.
+ */
+export function createFxValuation(options: {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  readonly windowDays?: number;
+  readonly providers?: FxProviderSettings;
+}): FxValuationPort {
+  const settings = options.providers ?? DEFAULT_FX_PROVIDER_SETTINGS;
+  const deps: FxDeps = {
+    uow: new PgFxUnitOfWork(options.pool),
+    rates: new PgExchangeRateRepository(),
+    currencies: new PgCurrencyRepository(),
+    preferences: new PgRatePreferenceRepository(),
+    reviews: new PgRateAnomalyReviewRepository(),
+    workspaces: unavailable('workspace settings'),
+    outbox: unavailable('outbox'),
+    audit: unavailable('audit'),
+    lifecycle: unavailable('lifecycle'),
+    lifecycleQuery: unavailable('lifecycle query'),
+    ids: uuidV7Ids,
+    clock: options.clock,
+    policy: valuationPolicyOf(settings),
+    anomalyThresholdPct: settings.anomalyThresholdPct,
+    ...(options.windowDays ? { windowDays: options.windowDays } : {}),
+  };
+  return valuationPort(new FxQueries(deps));
+}
+
 /** Composición de FX sobre PostgreSQL. */
 export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
   const settings = options.providers ?? DEFAULT_FX_PROVIDER_SETTINGS;

@@ -12,9 +12,11 @@ invariants: ['INV-020']
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/planning/budgets.test.tsx
+  - packages/contexts/planning/src/domain/budget-progress-calculator.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'available-to-spend', 'q5']

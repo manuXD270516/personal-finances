@@ -233,6 +233,18 @@ export class ClassificationQueries {
     });
   }
 
+  /** Catálogo completo (grupos, categorías con subcategorías y tags; activos y archivados) para PLANNING. */
+  categoryTree(
+    userId: string,
+    workspaceId: string,
+  ): Promise<{ groups: CategoryGroup[]; categories: Category[]; tags: Tag[] }> {
+    return this.run(userId, workspaceId, async () => ({
+      groups: await this.deps.groups.listAll(workspaceId),
+      categories: await this.deps.categories.listAll(workspaceId),
+      tags: await this.deps.tags.listAll(workspaceId),
+    }));
+  }
+
   /** Las categorías dadas más todas sus subcategorías (filtro `categoryId` de listTransactions). */
   categoryIdsWithDescendants(
     userId: string,

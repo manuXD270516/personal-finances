@@ -13,6 +13,7 @@ interface FlowRow {
   nature: 'INCOME' | 'EXPENSE';
   category_id: string;
   currency: string;
+  tag_ids: string[] | null;
   amount: string;
 }
 
@@ -36,24 +37,42 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
     readonly workspaceId: string;
     readonly dateFrom: string;
     readonly dateTo: string;
+    readonly categoryIds?: readonly string[];
+    readonly withTags?: boolean;
   }): Promise<readonly NominalFlowRowDto[]> {
     const from = LocalDate.parse(input.dateFrom).toString();
     const to = LocalDate.parse(input.dateTo).toString();
+    const withTags = input.withTags === true;
+    const categoryFilter =
+      input.categoryIds === undefined
+        ? sql``
+        : sql`AND s.category_id = ANY(${[...input.categoryIds]}::uuid[])`;
+    // Con `withTags` la porción se agrupa también por su conjunto de tags (subconsulta lateral, ids ordenados).
+    const tagJoin = withTags
+      ? sql`LEFT JOIN LATERAL (
+              SELECT array_agg(st.tag_id::text ORDER BY st.tag_id) AS ids
+                FROM txn.split_tag st
+               WHERE st.workspace_id = s.workspace_id AND st.split_id = s.id
+            ) tg ON true`
+      : sql``;
+    const tagColumn = withTags ? sql`COALESCE(tg.ids, ARRAY[]::text[])` : sql`NULL::text[]`;
     return this.uow.run(input.workspaceId, async () => {
       const { rows } = await sql<FlowRow>`
         SELECT t.transaction_date::text AS business_date,
                CASE WHEN t.kind = 'INCOME' THEN 'INCOME' ELSE 'EXPENSE' END AS nature,
-               s.category_id, s.currency,
+               s.category_id, s.currency, ${tagColumn} AS tag_ids,
                (SUM(CASE WHEN t.kind = 'REFUND' THEN -s.amount ELSE s.amount END))::text AS amount
           FROM txn.transaction t
           JOIN txn.transaction_split s
             ON s.workspace_id = t.workspace_id AND s.transaction_id = t.id AND s.superseded_in_revision IS NULL
+          ${tagJoin}
          WHERE t.workspace_id = ${input.workspaceId}
            AND t.status IN ('POSTED', 'CLEARED', 'RECONCILED')
            AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND', 'TRANSFER', 'CONVERSION')
            AND t.transaction_date BETWEEN ${from}::date AND ${to}::date
-         GROUP BY 1, 2, 3, 4
-         ORDER BY 1, 2, 4, 3`.execute(unitOfWorkKysely());
+           ${categoryFilter}
+         GROUP BY 1, 2, 3, 4, 5
+         ORDER BY 1, 2, 4, 3, 5`.execute(unitOfWorkKysely());
       const scales = new Map<string, number>();
       const out: NominalFlowRowDto[] = [];
       for (const r of rows) {
@@ -67,6 +86,7 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
           nature: r.nature,
           categoryId: r.category_id,
           amount: Money.parse(r.amount, makeCurrency(r.currency, scale)).toJSON(),
+          ...(withTags ? { tagIds: r.tag_ids ?? [] } : {}),
         });
       }
       return out;

@@ -12,9 +12,10 @@ invariants: ['INV-023', 'INV-034']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags: ['budgets', 'actual', 'refund']

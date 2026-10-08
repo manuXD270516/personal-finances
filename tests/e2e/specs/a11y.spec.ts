@@ -32,6 +32,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/workspaces/nuevo', name: 'Nuevo espacio de trabajo' },
   // add-financial-periods 7.3: calendario financiero (lista, marcas y selector de periodo).
   { path: '/planificacion/periodos', name: 'Periodos financieros' },
+  // add-budgets 7.3: presupuestos del periodo (la versión con plan y línea la analiza budgets.spec.ts).
+  { path: '/planificacion/presupuestos', name: 'Presupuestos' },
 ];
 
 async function seriousViolations(page: Page) {

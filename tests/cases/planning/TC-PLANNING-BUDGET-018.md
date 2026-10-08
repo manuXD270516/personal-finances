@@ -12,9 +12,11 @@ invariants: ['INV-015', 'INV-028']
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['budgets', 'rollover', 'events']

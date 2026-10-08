@@ -3743,6 +3743,335 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ───────────────────────────── Planning: presupuestos (Phase 2, add-budgets) ─────────────────────────────
+  /workspaces/{workspaceId}/budgets:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Planning]
+      operationId: listBudgets
+      summary: List the monthly plans of the workspace (newest period first) with their summaries
+      description: |
+        One plan per financial period, in the workspace base currency. The summary computes planned, spent, remaining and
+        available-to-spend on every read from the posted transactions (never stored, INV-034). `periodFrom` / `periodTo`
+        are inclusive period labels (`YYYY-MM`).
+      x-openspec-capability: [planning/budgets]
+      x-required-role: VIEWER
+      parameters:
+        - name: periodFrom
+          in: query
+          description: First period label to include (`YYYY-MM`).
+          schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        - name: periodTo
+          in: query
+          description: Last period label to include (`YYYY-MM`).
+          schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          description: Page size (default 24 plans)
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+      responses:
+        '200':
+          description: Plans page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Planning]
+      operationId: createBudget
+      summary: Create the monthly plan of a financial period
+      description: |
+        At most one plan per period (`BUDGET_ALREADY_EXISTS`), in the workspace base currency. A closed period does not
+        admit a new plan (`PERIOD_CLOSED`). Publishes `planning.BudgetCreated.v1`. Only `source.kind = EMPTY` exists in
+        this release (templates and cloning arrive with `add-budget-templates`).
+      x-openspec-capability: [planning/budgets]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetCreate' }
+      responses:
+        '201':
+          description: Plan created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'BUDGET_ALREADY_EXISTS (the period already has a plan) or PERIOD_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'REFERENCE_NOT_FOUND (periodId) or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budgets/{budgetId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/BudgetId'
+    get:
+      tags: [Planning]
+      operationId: getBudget
+      summary: Get a plan with the progress of each line
+      description: |
+        Planned (effective, with rollover), spent, remaining, usage %, linear projection (only `MAXIMUM`, `RANGE` and
+        `PERCENT_OF_INCOME`; `FIXED` and `MINIMUM` show pending/met without projection), status, crossed thresholds and
+        the available-to-spend total. The spent amount is derived on every read from the posted, cleared and reconciled
+        transactions of the period (net of refunds, by business date in the workspace time zone) and converted to the
+        plan currency with the same valuation rules as `/reports/summary`; a movement without a rate in the window is
+        reported unconverted (`actualComplete = false`), never 1:1.
+      x-openspec-capability: [planning/budgets]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Plan
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Planning]
+      operationId: updateBudget
+      summary: Switch the zero-based mode of a plan
+      x-openspec-capability: [planning/budgets]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/BudgetUpdate' }
+      responses:
+        '200':
+          description: Updated plan
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'PERIOD_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budgets/{budgetId}/history:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/BudgetId'
+    get:
+      tags: [Planning]
+      operationId: getBudgetHistory
+      summary: Change history of a plan and its lines (visible for VIEWER)
+      description: |
+        Audit entries of the plan and of every line change (actor, line, before and after values), oldest first. Unlike
+        `/audit-log` (EDITOR+), any member who can see the plan can read it, VIEWER included. Budgets have no
+        lifecycle state machine (docs/33 D110): the history lives in the audit log.
+      x-openspec-capability: [planning/budgets]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Plan history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/periods/{periodId}/budget:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/PeriodId'
+    get:
+      tags: [Planning]
+      operationId: getBudgetByPeriod
+      summary: Get the plan of a financial period
+      description: 404 `RESOURCE_NOT_FOUND` when the period does not exist or has no plan.
+      x-openspec-capability: [planning/budgets]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Plan of the period
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budgets/{budgetId}/lines:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/BudgetId'
+    post:
+      tags: [Planning]
+      operationId: addBudgetLine
+      summary: Add a line to a plan
+      description: |
+        Expense lines target a category (with its subcategories), a group or a tag; income lines target an income
+        category and only admit the `FIXED` kind, without thresholds. A plan cannot repeat a target
+        (`BUDGET_LINE_DUPLICATE_TARGET`) nor overlap a category with its subcategory or a group with one of its
+        categories (`BUDGET_TARGET_OVERLAP`). Expense lines of kind `FIXED`, `MAXIMUM`, `RANGE` and `PERCENT_OF_INCOME`
+        get the default thresholds 50, 75, 90 and 100 % unless `thresholds` is given; `MINIMUM` lines have none. The
+        thresholds of the new line are evaluated in the same transaction. Per kind: `FIXED` and `MAXIMUM` need `planned`,
+        `MINIMUM` needs `min`, `RANGE` needs `min` and `max`, `PERCENT_OF_INCOME` needs `percent` (and optionally
+        `incomeBasis`).
+      x-openspec-capability: [planning/budgets]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetLineCreate' }
+      responses:
+        '201':
+          description: Line created
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetLine' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'BUDGET_LINE_DUPLICATE_TARGET, BUDGET_TARGET_OVERLAP, PERIOD_CLOSED or CATEGORY_ARCHIVED / TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_INVALID_AMOUNTS, BUDGET_INVALID_LINE_KIND, BUDGET_THRESHOLD_INVALID, CURRENCY_MISMATCH, AMOUNT_SCALE_EXCEEDED or REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/budgets/{budgetId}/lines/{lineId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/BudgetId'
+      - $ref: '#/components/parameters/BudgetLineId'
+    patch:
+      tags: [Planning]
+      operationId: updateBudgetLine
+      summary: Change the amounts, kind, thresholds or rollover of a line
+      description: |
+        Merge patch over the current line, validated as a whole. A `null` removes a value (for example `thresholds: null`
+        restores the defaults). Changing the planned amount or the thresholds re-evaluates the thresholds with the current
+        spent amount in the same transaction and publishes `planning.BudgetThresholdReached.v1` for the thresholds that
+        end up crossed for the first time. The plan of a closed period is read-only (`PERIOD_CLOSED`).
+      x-openspec-capability: [planning/budgets]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/BudgetLineUpdate' }
+      responses:
+        '200':
+          description: Updated line
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetLine' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'PERIOD_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BUDGET_INVALID_AMOUNTS, BUDGET_INVALID_LINE_KIND, BUDGET_THRESHOLD_INVALID, CURRENCY_MISMATCH or AMOUNT_SCALE_EXCEEDED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Planning]
+      operationId: removeBudgetLine
+      summary: Remove a line from a plan
+      description: |
+        Removing and re-adding the line of the same target does not re-alert: the crossed thresholds are recorded per
+        period and target. The plan of a closed period is read-only (`PERIOD_CLOSED`).
+      x-openspec-capability: [planning/budgets]
+      x-required-role: EDITOR
+      responses:
+        '204':
+          description: Line removed
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'PERIOD_CLOSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Reconciliation (Phase 2, add-reconciliation) ─────────────────────────────
   /workspaces/{workspaceId}/reconciliations:
     parameters:
@@ -4139,6 +4468,18 @@ components:
       in: path
       required: true
       description: Financial period UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    BudgetId:
+      name: budgetId
+      in: path
+      required: true
+      description: Monthly plan UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    BudgetLineId:
+      name: lineId
+      in: path
+      required: true
+      description: Budget line UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
     ReconciliationId:
       name: reconciliationId
@@ -4572,6 +4913,12 @@ components:
         - CURRENCY_NOT_ENABLED              # 422
         # planning (Phase 2)
         - PERIOD_NOT_STARTED                # 409 (add-financial-periods: activating a period that has not started)
+        - BUDGET_ALREADY_EXISTS             # 409 (add-budgets: the period already has a plan)
+        - BUDGET_LINE_DUPLICATE_TARGET      # 409 (add-budgets: the plan already has a line for the target)
+        - BUDGET_TARGET_OVERLAP             # 409 (add-budgets: category with its subcategory, or group with one of its categories)
+        - BUDGET_INVALID_AMOUNTS            # 422 (add-budgets: negative amount, min greater than max, bad percent)
+        - BUDGET_INVALID_LINE_KIND          # 422 (add-budgets: income lines only admit FIXED; MINIMUM and income have no thresholds)
+        - BUDGET_THRESHOLD_INVALID          # 422 (add-budgets: out of range, repeated or more than 10 thresholds)
         - RECONCILIATION_IN_PROGRESS        # 409 (add-reconciliation: the account already has a session in progress)
         - RECONCILIATION_STATEMENT_DATE_INVALID  # 422 (add-reconciliation: future date or not after the last completed session)
         - RECONCILIATION_DIFFERENCE_NOT_ZERO     # 422 (add-reconciliation: completing with a non-zero difference and no adjustment)
@@ -6369,6 +6716,395 @@ components:
         through:
           $ref: '#/components/schemas/LocalDate'
           description: Last business date that must be covered by a period (at most today + 24 months)
+
+    # ── Planning: presupuestos (add-budgets, Phase 2) ──
+    BudgetLineKind:
+      type: string
+      description: >-
+        FIXED (exact planned amount), MAXIMUM (spending cap), MINIMUM (minimum expected), RANGE (min and max) and
+        PERCENT_OF_INCOME (percentage of the expected or actual income). Open set — clients must handle unknown values.
+      x-extensible-enum: [FIXED, MAXIMUM, MINIMUM, RANGE, PERCENT_OF_INCOME]
+    BudgetTargetKind:
+      type: string
+      enum: [CATEGORY, GROUP, TAG]
+    BudgetNature:
+      type: string
+      description: Derived from the kind of the category or group (tags are always expense).
+      enum: [EXPENSE, INCOME]
+    BudgetLineStatus:
+      type: string
+      description: >-
+        Progress status, always rendered with text and icon (never only colour): UNDER, ON_TARGET, OVER (FIXED);
+        WITHIN, OVER (MAXIMUM, PERCENT_OF_INCOME); BELOW, WITHIN, ABOVE (RANGE); PENDING, MET (MINIMUM); NO_BUDGET
+        (reference 0.00). Open set — clients must handle unknown values.
+      x-extensible-enum: [UNDER, ON_TARGET, OVER, WITHIN, BELOW, ABOVE, PENDING, MET, NO_BUDGET]
+    BudgetRolloverPolicy:
+      type: string
+      enum: [NONE, CARRY_POSITIVE, CARRY_ALL]
+    BudgetRolloverStatus:
+      type: string
+      description: PROVISIONAL until the previous period is closed (recomputed on every read), FINAL afterwards.
+      enum: [NONE, PROVISIONAL, FINAL]
+    BudgetIncomeBasis:
+      type: string
+      enum: [EXPECTED, ACTUAL]
+    BudgetThreshold:
+      type: string
+      description: Alert threshold in percent (> 0 and <= 1000, at most two decimals), as a canonical decimal string.
+      pattern: '^(0|[1-9][0-9]{0,3})(\.[0-9]{1,2})?$'
+      examples: ['50', '90', '75.5']
+    BudgetLineTarget:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: { $ref: '#/components/schemas/BudgetTargetKind' }
+        id: { $ref: '#/components/schemas/Uuid' }
+    BudgetCreate:
+      type: object
+      additionalProperties: false
+      required: [periodId]
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        source:
+          type: object
+          additionalProperties: false
+          description: Only `EMPTY` in this release (TEMPLATE and CLONE_PREVIOUS arrive with add-budget-templates).
+          properties:
+            kind: { type: string, enum: [EMPTY], default: EMPTY }
+        zeroBased: { type: boolean, default: false }
+    BudgetUpdate:
+      type: object
+      additionalProperties: false
+      required: [zeroBased]
+      properties:
+        zeroBased: { type: boolean }
+    BudgetLineCreate:
+      type: object
+      additionalProperties: false
+      required: [target, kind]
+      properties:
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        kind: { $ref: '#/components/schemas/BudgetLineKind' }
+        planned:
+          description: Required for FIXED and MAXIMUM. In the plan currency, non negative.
+          $ref: '#/components/schemas/Money'
+        min:
+          description: Required for MINIMUM and RANGE.
+          $ref: '#/components/schemas/Money'
+        max:
+          description: Required for RANGE (min <= max).
+          $ref: '#/components/schemas/Money'
+        percent:
+          description: Required for PERCENT_OF_INCOME (> 0 and <= 100, at most 4 decimals).
+          $ref: '#/components/schemas/DecimalString'
+        incomeBasis:
+          description: PERCENT_OF_INCOME only; defaults to EXPECTED.
+          $ref: '#/components/schemas/BudgetIncomeBasis'
+        rolloverPolicy:
+          description: Remainder carried to the next period (FIXED, MAXIMUM, RANGE, PERCENT_OF_INCOME expense lines).
+          $ref: '#/components/schemas/BudgetRolloverPolicy'
+        rolloverCap:
+          description: Optional cap (absolute value) of the carried remainder.
+          $ref: '#/components/schemas/Money'
+        thresholds:
+          type: array
+          description: >-
+            Custom alert thresholds (1 to 10 distinct values). Absent: 50, 75, 90 and 100 for expense lines that admit
+            them. Income and MINIMUM lines admit none (BUDGET_INVALID_LINE_KIND).
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/BudgetThreshold' }
+    BudgetLineUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: Merge patch; a `null` removes the value.
+      properties:
+        kind: { $ref: '#/components/schemas/BudgetLineKind' }
+        planned:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        min:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        max:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        percent:
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        incomeBasis:
+          oneOf:
+            - $ref: '#/components/schemas/BudgetIncomeBasis'
+            - type: 'null'
+        rolloverPolicy: { $ref: '#/components/schemas/BudgetRolloverPolicy' }
+        rolloverCap:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        thresholds:
+          oneOf:
+            - type: array
+              minItems: 1
+              maxItems: 10
+              items: { $ref: '#/components/schemas/BudgetThreshold' }
+            - type: 'null'
+    BudgetLineProgress:
+      type: object
+      description: >-
+        Derived on every read from the transactions (INV-034); nothing here is stored. Amounts are in the plan
+        currency at its canonical scale.
+      additionalProperties: false
+      required:
+        - reference
+        - effectivePlanned
+        - minimum
+        - rolloverIn
+        - rolloverStatus
+        - actual
+        - actualComplete
+        - unconverted
+        - remaining
+        - difference
+        - utilization
+        - projection
+        - status
+        - crossedThresholds
+      properties:
+        reference:
+          description: Amount the line is measured against (effective planned, range max or minimum).
+          $ref: '#/components/schemas/Money'
+        effectivePlanned:
+          description: Planned amount plus the rollover received, never below 0.00.
+          $ref: '#/components/schemas/Money'
+        minimum:
+          description: Minimum of a RANGE or MINIMUM line.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        rolloverIn:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        rolloverStatus: { $ref: '#/components/schemas/BudgetRolloverStatus' }
+        actual:
+          description: Net of refunds, converted to the plan currency; the part without a rate is in `unconverted`.
+          $ref: '#/components/schemas/Money'
+        actualComplete:
+          type: boolean
+          description: False when part of the spent amount has no valuation rate in the window (never converted 1:1).
+        unconverted:
+          type: array
+          description: Native amounts left out for lack of a rate.
+          items: { $ref: '#/components/schemas/Money' }
+        remaining:
+          description: reference − actual (negative when exceeded).
+          $ref: '#/components/schemas/Money'
+        difference:
+          description: actual − reference (income lines show how much is missing, e.g. −1500.00).
+          $ref: '#/components/schemas/Money'
+        utilization:
+          description: actual / reference × 100 with one decimal (HALF_EVEN); null when the reference is 0.00.
+          type: [string, 'null']
+          pattern: '^-?[0-9]+\.[0-9]$'
+        projection:
+          description: >-
+            Linear projection to the end of the period (spent / elapsed days × period days); only MAXIMUM, RANGE and
+            PERCENT_OF_INCOME expense lines (docs/33 D83); null for FIXED, MINIMUM and income lines and before the
+            period starts; equals the spent amount once the period ended.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        status: { $ref: '#/components/schemas/BudgetLineStatus' }
+        crossedThresholds:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetThreshold' }
+    BudgetLine:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - target
+        - nature
+        - kind
+        - planned
+        - min
+        - max
+        - percent
+        - incomeBasis
+        - rolloverPolicy
+        - rolloverCap
+        - thresholds
+        - source
+        - overridden
+        - version
+        - progress
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        target: { $ref: '#/components/schemas/BudgetLineTarget' }
+        nature: { $ref: '#/components/schemas/BudgetNature' }
+        kind: { $ref: '#/components/schemas/BudgetLineKind' }
+        planned:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        min:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        max:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        percent:
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        incomeBasis:
+          oneOf:
+            - $ref: '#/components/schemas/BudgetIncomeBasis'
+            - type: 'null'
+        rolloverPolicy: { $ref: '#/components/schemas/BudgetRolloverPolicy' }
+        rolloverCap:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        thresholds:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetThreshold' }
+        source:
+          type: string
+          enum: [MANUAL, TEMPLATE, CLONE]
+        overridden: { type: boolean }
+        version: { type: integer, minimum: 1 }
+        progress: { $ref: '#/components/schemas/BudgetLineProgress' }
+    BudgetTotals:
+      type: object
+      description: >-
+        Plan totals without double counting (targets never overlap; tag lines are cross-cutting and excluded from the
+        expense totals and from the available-to-spend amount).
+      additionalProperties: false
+      required:
+        - planned
+        - actual
+        - remaining
+        - availableToSpend
+        - expectedIncome
+        - actualIncome
+        - toAssign
+        - complete
+        - unconverted
+      properties:
+        planned: { $ref: '#/components/schemas/Money' }
+        actual: { $ref: '#/components/schemas/Money' }
+        remaining: { $ref: '#/components/schemas/Money' }
+        availableToSpend:
+          description: Σ max(0, reference − actual) over the expense category and group lines.
+          $ref: '#/components/schemas/Money'
+        expectedIncome: { $ref: '#/components/schemas/Money' }
+        actualIncome: { $ref: '#/components/schemas/Money' }
+        toAssign:
+          description: >-
+            Zero-based plans only. Expected income minus planned expense (negative if over-allocated).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        complete: { type: boolean }
+        unconverted:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
+    BudgetMeta:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, timeZone, rateWindowDays, ratesUsed, attributions]
+      properties:
+        generatedAt: { $ref: '#/components/schemas/Instant' }
+        timeZone: { type: string }
+        rateWindowDays:
+          type: integer
+          description: Rate validity window (REPORTING_RATE_VALIDITY_WINDOW), the same as `/reports/summary`.
+        ratesUsed:
+          type: array
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+        attributions:
+          type: array
+          items: { $ref: '#/components/schemas/RateAttribution' }
+    Budget:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - periodId
+        - periodLabel
+        - periodStart
+        - periodEnd
+        - periodStatus
+        - currency
+        - origin
+        - zeroBased
+        - lines
+        - totals
+        - meta
+        - version
+        - createdAt
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        periodStart: { $ref: '#/components/schemas/LocalDate' }
+        periodEnd: { $ref: '#/components/schemas/LocalDate' }
+        periodStatus: { $ref: '#/components/schemas/FinancialPeriodStatus' }
+        currency:
+          description: Workspace base currency when the plan was created (docs/33 D78/D79).
+          $ref: '#/components/schemas/CurrencyCode'
+        origin: { type: string, enum: [EMPTY, TEMPLATE, CLONE] }
+        zeroBased: { type: boolean }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetLine' }
+        totals: { $ref: '#/components/schemas/BudgetTotals' }
+        meta: { $ref: '#/components/schemas/BudgetMeta' }
+        version: { type: integer, minimum: 1 }
+        createdAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+    BudgetSummary:
+      type: object
+      additionalProperties: false
+      required: [id, periodId, periodLabel, currency, zeroBased, lineCount, totals, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        zeroBased: { type: boolean }
+        lineCount: { type: integer, minimum: 0 }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [planned, actual, remaining, availableToSpend, complete]
+          properties:
+            planned: { $ref: '#/components/schemas/Money' }
+            actual: { $ref: '#/components/schemas/Money' }
+            remaining: { $ref: '#/components/schemas/Money' }
+            availableToSpend: { $ref: '#/components/schemas/Money' }
+            complete: { type: boolean }
+        version: { type: integer, minimum: 1 }
+    BudgetPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/BudgetSummary' }
+        page: { $ref: '#/components/schemas/PageInfo' }
 
     # ── Recorrido del ciclo de vida (add-lifecycle-timeline, docs/31 D37) ──
     LifecycleAggregateType:

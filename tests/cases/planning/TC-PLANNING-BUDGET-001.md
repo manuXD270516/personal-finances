@@ -12,9 +12,14 @@ invariants: ['INV-025']
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+  - packages/contexts/planning/src/domain/budget.test.ts
+  - packages/contexts/planning/test/integration/pg-budgets.int.test.ts
+  - tests/e2e/specs/budgets.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ['budgets', 'plan', 'idempotency']

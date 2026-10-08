@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/planning/BudgetThresholdReached.v1.schema.json",
+  "title": "planning.BudgetThresholdReached.v1",
+  "description": "El gastado de una línea de gasto del plan mensual alcanzó o superó un umbral de alerta (gastado >= umbral x referencia / 100), openspec add-budgets. Productor: PLANNING (consumidor planning.budget-thresholds ante cambios del gastado, o la edición síncrona del planificado/umbrales de la línea). Consumidores: NOTIFY (add-alerts: aviso in-app/email), REPORTING (opcional). Se emite UNA sola vez por objetivo, umbral y periodo (tabla de cruces append-only + outbox en la misma transacción): bajar y volver a subir, reentregas y evaluaciones concurrentes no lo repiten. Si un mismo cambio cruza varios umbrales, un solo hecho lleva el más alto en `threshold` y los menores en `alsoCrossed` (docs/33 D80). `actualComplete` es false si parte del gastado no tiene tasa de valoración (se evalúa con la parte convertida y se reevalúa con fx.RateRecorded.v1, docs/33 D82). Clave de deduplicación de negocio: (periodId, target.kind, target.id, threshold). Sin nombres ni descripciones: NOTIFY resuelve lo que muestra.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "planning.BudgetThresholdReached"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Budget"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Threshold": {
+      "description": "Umbral en porcentaje como string decimal canónico (\"90\", \"75.5\"): mayor que 0 y de hasta 1000, con a lo sumo dos decimales.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,3})([.][0-9]{1,2})?$"
+    },
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budgetId",
+        "budgetLineId",
+        "periodId",
+        "periodLabel",
+        "periodStart",
+        "periodEnd",
+        "target",
+        "threshold",
+        "alsoCrossed",
+        "reference",
+        "actual",
+        "utilization",
+        "actualComplete",
+        "crossedAt"
+      ],
+      "properties": {
+        "budgetId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "budgetLineId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "periodLabel": {
+          "description": "Año y mes de la fecha de inicio del periodo (YYYY-MM, docs/33 D59).",
+          "type": "string",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        },
+        "periodStart": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "periodEnd": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": {
+              "enum": ["CATEGORY", "GROUP", "TAG"]
+            },
+            "id": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            }
+          }
+        },
+        "threshold": {
+          "$ref": "#/$defs/Threshold",
+          "description": "Umbral más alto cruzado por este cambio."
+        },
+        "alsoCrossed": {
+          "description": "Umbrales menores cruzados a la vez (ascendentes); vacío si fue uno solo.",
+          "type": "array",
+          "maxItems": 9,
+          "items": {
+            "$ref": "#/$defs/Threshold"
+          }
+        },
+        "reference": {
+          "description": "Monto de referencia de la línea (planificado efectivo, máximo del rango) en la moneda del plan.",
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "actual": {
+          "description": "Gastado derivado de las transacciones, convertido a la moneda del plan (parte convertida si es incompleto).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "utilization": {
+          "description": "Porcentaje de uso gastado / referencia x 100 con un decimal (HALF_EVEN).",
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,6})[.][0-9]$"
+        },
+        "actualComplete": {
+          "type": "boolean"
+        },
+        "crossedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000301",
+      "eventType": "planning.BudgetThresholdReached",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T15:20:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Budget",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fb001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": "01928c4e-7a3b-7c11-8f00-0000000000a3",
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "budgetId": "01928c4e-0000-7000-8000-0000000fb001",
+        "budgetLineId": "01928c4e-0000-7000-8000-0000000fb101",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa011",
+        "periodLabel": "2026-11",
+        "periodStart": "2026-11-01",
+        "periodEnd": "2026-11-30",
+        "target": {
+          "kind": "CATEGORY",
+          "id": "01928c4e-0000-7000-8000-0000000ca003"
+        },
+        "threshold": "90",
+        "alsoCrossed": ["50", "75"],
+        "reference": {
+          "amount": "600.00",
+          "currency": "BOB"
+        },
+        "actual": {
+          "amount": "550.00",
+          "currency": "BOB"
+        },
+        "utilization": "91.7",
+        "actualComplete": true,
+        "crossedAt": "2026-11-12T15:20:00.000Z"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000302",
+      "eventType": "planning.BudgetThresholdReached",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-20T10:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Budget",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fb001",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c4",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-0000000ea001"
+      },
+      "payload": {
+        "budgetId": "01928c4e-0000-7000-8000-0000000fb001",
+        "budgetLineId": "01928c4e-0000-7000-8000-0000000fb101",
+        "periodId": "01928c4e-0000-7000-8000-0000000fa011",
+        "periodLabel": "2026-11",
+        "periodStart": "2026-11-01",
+        "periodEnd": "2026-11-30",
+        "target": {
+          "kind": "CATEGORY",
+          "id": "01928c4e-0000-7000-8000-0000000ca003"
+        },
+        "threshold": "50",
+        "alsoCrossed": [],
+        "reference": {
+          "amount": "600.00",
+          "currency": "BOB"
+        },
+        "actual": {
+          "amount": "310.00",
+          "currency": "BOB"
+        },
+        "utilization": "51.7",
+        "actualComplete": false,
+        "crossedAt": "2026-11-20T10:00:00.000Z"
+      }
+    }
+  ]
+}

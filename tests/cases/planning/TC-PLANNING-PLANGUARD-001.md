@@ -21,6 +21,8 @@ automation_status: automated
 automated_tests:
   - packages/contexts/planning/src/application/periods.service.test.ts
   - packages/contexts/planning/test/integration/pg-planning.int.test.ts
+  - apps/api/test/api/budgets.api.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
 status: automated
 regression_suite: true
 phase: 2

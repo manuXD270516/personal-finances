@@ -10,9 +10,10 @@ import type { Page } from '../common/types';
 import { defaultPeriodId, formatBusinessDate, periodName, type FinancialPeriod } from './logic';
 import { PeriodSelector } from './PeriodSelector';
 import { PeriodsListView } from './PeriodsListView';
+import { PlanningNav } from './PlanningNav';
 
 /** Todas las páginas de periodos (la API admite `limit` ≤ 100; `listAll` usa 200). */
-async function loadPeriods(ctx: WorkspaceContext): Promise<FinancialPeriod[]> {
+export async function loadPeriods(ctx: WorkspaceContext): Promise<FinancialPeriod[]> {
   const out: FinancialPeriod[] = [];
   let cursor: string | null = null;
   for (let i = 0; i < 20; i += 1) {
@@ -37,6 +38,7 @@ export function PeriodsPage() {
  */
 function Periods({ ctx }: { ctx: WorkspaceContext }) {
   const f = useFormat('Planning', ctx);
+  const nav = useFormat('Budgets', ctx);
   const today = todayIn(ctx.timeZone);
   const [periods, setPeriods] = useState<readonly FinancialPeriod[] | undefined>();
   const [selected, setSelected] = useState<string | undefined>();
@@ -89,6 +91,7 @@ function Periods({ ctx }: { ctx: WorkspaceContext }) {
   const current = periods?.find((p) => p.id === currentId);
   return (
     <section aria-labelledby="periods-title" style={pageStyle}>
+      <PlanningNav f={nav} current="periods" />
       <h1 id="periods-title">{f.t('title')}</h1>
       <p style={mutedStyle}>{f.t('intro', { today: formatBusinessDate(today) })}</p>
       {status ? <p role="status">{status}</p> : null}

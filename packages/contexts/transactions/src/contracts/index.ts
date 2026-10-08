@@ -89,6 +89,11 @@ export interface NominalFlowRowDto {
   readonly categoryId: string;
   /** En la escala canónica de la moneda. */
   readonly amount: FlowMoneyDto;
+  /**
+   * Tags de la porción (ids ordenados). Solo viaja con `withTags: true` (add-budgets, presupuestos por tag): sin él,
+   * ausente (las filas no se parten por tags y las demás consultas conservan su agrupación).
+   */
+  readonly tagIds?: readonly string[];
 }
 
 /** Query pública `SummarizeNominalFlows` (sin efectos; en la unidad de trabajo del llamador si existe). */
@@ -98,6 +103,10 @@ export interface NominalFlowQuery {
     /** Rango inclusivo de fechas de negocio `YYYY-MM-DD`. */
     readonly dateFrom: string;
     readonly dateTo: string;
+    /** Solo las porciones de estas categorías (ids exactos; add-budgets). Ausente: todas. */
+    readonly categoryIds?: readonly string[];
+    /** Agrega además por el conjunto de tags de la porción y lo informa en `tagIds` (add-budgets). */
+    readonly withTags?: boolean;
   }): Promise<readonly NominalFlowRowDto[]>;
 }
 

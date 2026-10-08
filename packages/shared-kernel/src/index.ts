@@ -29,6 +29,17 @@ export { Rate, RATE_PERSIST_SCALE } from './money/rate.js';
 export { type RoundingMode } from './money/rounding.js';
 export { Instant, FixedClock, systemClock, type Clock } from './time/instant.js';
 export { LocalDate } from './time/local-date.js';
+export { endOfDayInstant } from './time/end-of-day.js';
+export { convertExact, present, sumByCurrency, type ExactRate } from './valuation/exact-rate.js';
+export {
+  FlowValuation,
+  type Consolidated,
+  type DatedAmount,
+  type FlowRateRequest,
+  type FlowRateResolverInput,
+  type FlowRates,
+  type FlowResolvedRate,
+} from './valuation/flow-valuation.js';
 export {
   LifecycleMachine,
   type LifecycleMachineDefinition,
