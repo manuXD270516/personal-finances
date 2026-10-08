@@ -31,6 +31,7 @@
     "accounts": "Cuentas",
     "fx": "Cripto y FX",
     "classification": "Clasificación",
+    "planning": "Planificación",
     "demoIndicator": "Datos de demostración — este espacio contiene datos ficticios y se puede limpiar por completo.",
     "demoOption": "{name} (demostración)",
     "workspaceSwitched": "Espacio de trabajo activo: {name}.",
@@ -1261,5 +1262,39 @@
     "es-BO": "Español (Bolivia)",
     "en-US": "English (United States)",
     "pt-BR": "Português (Brasil)"
+  },
+  "Planning": {
+    "title": "Periodos financieros",
+    "intro": "Cada periodo va del día de inicio del mes financiero al día anterior de ese día en el mes siguiente, y se crea automáticamente con anticipación. Hoy en tu espacio de trabajo: {today}.",
+    "loading": "Cargando periodos…",
+    "caption": "Periodos del espacio de trabajo, del más reciente al más antiguo",
+    "columns": {
+      "period": "Periodo",
+      "range": "Fechas",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "range": "{from} – {to}",
+    "status": {
+      "DRAFT": "Borrador",
+      "ACTIVE": "Activo",
+      "CLOSED": "Cerrado",
+      "REOPENED": "Reabierto"
+    },
+    "current": "Actual",
+    "pendingClosure": "Pendiente de cierre",
+    "transition": "Transición",
+    "activate": "Activar",
+    "activateLabel": "Activar el periodo {name}",
+    "activated": "Periodo {name} activado.",
+    "empty": "Todavía no hay periodos: se crean automáticamente en unos minutos.",
+    "create": "Crear periodos ahora",
+    "created": "Periodos actualizados.",
+    "summary": "{name}: del {from} al {to} ({status}).",
+    "selector": {
+      "label": "Periodo",
+      "option": "{name} · {from} – {to} · {status}",
+      "current": "(actual)"
+    }
   }
 }

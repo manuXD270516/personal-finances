@@ -31,6 +31,7 @@
     "accounts": "Accounts",
     "fx": "Crypto & FX",
     "classification": "Classification",
+    "planning": "Planning",
     "demoIndicator": "Demo data — this workspace contains fictitious data and can be fully cleaned up.",
     "demoOption": "{name} (demo)",
     "workspaceSwitched": "Active workspace: {name}.",
@@ -1261,5 +1262,39 @@
     "es-BO": "Español (Bolivia)",
     "en-US": "English (United States)",
     "pt-BR": "Português (Brasil)"
+  },
+  "Planning": {
+    "title": "Financial periods",
+    "intro": "Each period runs from the financial month start day to the day before that day in the next month, and is created automatically in advance. Today in your workspace: {today}.",
+    "loading": "Loading periods…",
+    "caption": "Workspace periods, newest first",
+    "columns": {
+      "period": "Period",
+      "range": "Dates",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "range": "{from} – {to}",
+    "status": {
+      "DRAFT": "Draft",
+      "ACTIVE": "Active",
+      "CLOSED": "Closed",
+      "REOPENED": "Reopened"
+    },
+    "current": "Current",
+    "pendingClosure": "Pending closure",
+    "transition": "Transition",
+    "activate": "Activate",
+    "activateLabel": "Activate the period {name}",
+    "activated": "Period {name} activated.",
+    "empty": "There are no periods yet: they are created automatically within a few minutes.",
+    "create": "Create periods now",
+    "created": "Periods updated.",
+    "summary": "{name}: from {from} to {to} ({status}).",
+    "selector": {
+      "label": "Period",
+      "option": "{name} · {from} – {to} · {status}",
+      "current": "(current)"
+    }
   }
 }

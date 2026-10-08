@@ -28,6 +28,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   // add-workspace-identity 8.4: preferencias personales y alta de workspace.
   { path: '/preferencias', name: 'Mis preferencias' },
   { path: '/workspaces/nuevo', name: 'Nuevo espacio de trabajo' },
+  // add-financial-periods 7.3: calendario financiero (lista, marcas y selector de periodo).
+  { path: '/planificacion/periodos', name: 'Periodos financieros' },
 ];
 
 async function seriousViolations(page: Page) {

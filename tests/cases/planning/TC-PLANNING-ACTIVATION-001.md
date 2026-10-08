@@ -15,9 +15,11 @@ invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/periods.service.test.ts
+  - packages/contexts/planning/test/integration/pg-planning.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:

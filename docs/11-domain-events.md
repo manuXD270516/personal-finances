@@ -54,7 +54,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `accounts.AccountUpdated` / `AccountClosed` / `AccountReactivated` | **Agregar** (Phase 1, docs/31) | Ciclo de vida completo de la cuenta (`ACTIVE`/`CLOSED`/`ARCHIVED`) para proyecciones del dashboard. |
 | `classification.CategoryArchived` | **Agregar** (Phase 1, `add-classification`) | Reporting marca categorías archivadas; Planning y Rules lo consumen desde sus fases. |
 | `fx.RateRecorded` | **Adelantar** a Phase 1 (`add-manual-conversions`, `add-market-rate-providers`) | Tasas manuales y de providers (D29) invalidan el resumen valorizado. |
-| `identity.WorkspaceCreated` / `WorkspaceSettingsChanged` | **Mantener** (Phase 1) | Siembra de categorías (Classification) y de preferencias/histórico de tasas (FX); Reporting reacciona a moneda base, zona horaria y mes fiscal. |
+| `identity.WorkspaceCreated` / `WorkspaceSettingsChanged` | **Mantener** (Phase 1) | Siembra de categorías (Classification) y de preferencias/histórico de tasas (FX); Reporting reacciona a moneda base, zona horaria y mes fiscal. Planning (Phase 2, `add-financial-periods`) crea los periodos iniciales de forma asíncrona y recalcula los `DRAFT` ante `fiscalMonthStartDay` (y activa ante `timeZone`); también consume `ledger.JournalEntryPosted` para cubrir fechas fuera de los periodos existentes. |
 | `commitments.RecurringOccurrenceGenerated` | **Reemplazar** por `commitments.OccurrencesGenerated` (batch por definición y ventana) | Un evento por ocurrencia genera ruido (cientos por ventana). El calendario de flujo de caja sólo necesita el lote. `RecurringOccurrenceDue` (uno por ocurrencia) sí es útil para recordatorios. |
 | `planning.BudgetThresholdReached` | **Mantener** (Phase 2) | Hecho de negocio para Notify; dedup por (item, umbral, mes). |
 | `goals.SavingsContributionRecorded` | **Mantener** (Phase 4) | Reporting/Notify. |
@@ -63,6 +63,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `debt.LoanPaymentRecorded` | **Mantener** (Phase 4) | Reporting (deuda), Notify. |
 | `documents.AttachmentUploaded` | **Mantener** (Phase 6) | Imports (archivo listo), escaneo completado. |
 | `imports.ImportCompleted` | **Mantener** (Phase 6) | Notify, Reporting (refrescar), métricas. |
+| `planning.PeriodActivated` | **Mantener** (Phase 2, `add-financial-periods`) | Un periodo `DRAFT` pasa a `ACTIVE` (automático por fecha en la zona del workspace o manual). Reporting (rótulo del periodo en curso) y Notify ("empezó el mes"), ambos opcionales. Los periodos creados ya iniciados nacen `ACTIVE` sin evento. |
 | `planning.MonthClosed` | **Mantener** (Phase 2) | Reporting (congelar series), Forecast (recalcular), Notify. |
 | `planning.PeriodReopened` | **Mantener** (Phase 2) | Reporting (invalidar), Audit visible, Forecast. |
 | `forecast.ForecastRequested` | **Descartar como evento de integración** | Es un comando/job interno de Forecast (cola BullMQ), no un hecho que interese a otros contextos. |
@@ -200,6 +201,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 | `commitments.RecurringOccurrenceDue.v1` | COMMITMENTS | NOTIFY | Ocurrencia pasa a `due` | `occurrenceId, definitionId, dueDate, expectedAmount, name` | `occurrenceId` | B |
 | `commitments.RecurringOccurrenceMaterialized.v1` | COMMITMENTS | REPORTING | Confirm/match | `occurrenceId, transactionId, mode: CREATED\|MATCHED` | `occurrenceId` | N |
 | `commitments.SubscriptionPriceChanged.v1` | COMMITMENTS | NOTIFY, REPORTING | `ChangeSubscriptionPrice` | `subscriptionId, counterpartyId, previousPrice: Money, newPrice: Money, effectiveFrom, changePercentage: string` | `(subscriptionId, effectiveFrom)` | N |
+| `planning.PeriodActivated.v1` (**schema publicado**: `contracts/events/planning/PeriodActivated.v1.schema.json`, add-financial-periods) | PLANNING | REPORTING, NOTIFY (opcionales) | `ActivateDuePeriods` (job `planning.ensure-periods`) o `ActivatePeriod` | `workspaceId, periodId, label, periodStart, periodEnd, startDay, isTransition, activatedAt, activation: AUTOMATIC\|MANUAL` | `(periodId, 'ACTIVATED')` | N |
 | `planning.BudgetThresholdReached.v1` | PLANNING | NOTIFY | Actual cruza umbral | `budgetId, budgetItemId, yearMonth, categoryId\|groupId, threshold: string, planned: Money, actual: Money` | `(budgetItemId, threshold, yearMonth)` | N |
 | `planning.MonthClosed.v1` | PLANNING | REPORTING, FORECAST, NOTIFY | `CloseMonth` | `periodId, yearMonth, closedAt, closeSummary: {totalsByCurrency[], balances[]}` | `(periodId, closeNo)` | N |
 | `planning.PeriodReopened.v1` | PLANNING | REPORTING, FORECAST | `ReopenPeriod` | `periodId, yearMonth, reason, reopenedBy` | `(periodId, reopenNo)` | B |

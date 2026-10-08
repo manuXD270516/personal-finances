@@ -1,4 +1,6 @@
+import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import { runWithRequestContext } from '@pf/platform/api';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -6,10 +8,14 @@ import { IdentityService } from '../../src/application/identity.service.js';
 import type { AuditEntry } from '@pf/audit/contracts';
 import type { OutboxEvent, VerifiedIdentity } from '../../src/application/ports/index.js';
 import { pgIdentityDeps } from '../../src/infrastructure/pg-identity.js';
+import {
+  identityWorkspaceCalendar,
+  identityWorkspaceCalendarDirectory,
+} from '../../src/interface/identity.module.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {
-    deps: { readonly databaseUrl: string; readonly migratorUrl: string };
+    deps: { readonly databaseUrl: string; readonly migratorUrl: string; readonly workerDatabaseUrl: string };
   }
 }
 
@@ -198,5 +204,31 @@ describe('Repositorios PostgreSQL de IDENTITY (tareas 6.1 y 6.2)', () => {
     } finally {
       client.release();
     }
+  });
+  it('WorkspaceCalendarQuery (add-financial-periods 4.3): zona y día de inicio por membresía (API) y por el rol de directorio (worker)', async () => {
+    const { userId, createdWorkspaceId } = await svc.provision(identity(`kc-cal-${randomUUID()}`));
+    const ws = createdWorkspaceId as string;
+    await asApp(
+      { userId, workspaceId: ws },
+      'UPDATE iam.workspace SET fiscal_month_start_day = 25 WHERE id = $1',
+      [ws],
+    );
+    const member = await runWithRequestContext({ actor: { type: 'USER', userId }, origin: 'api' }, () =>
+      identityWorkspaceCalendar(pool).calendarOf(ws),
+    );
+    expect(member).toEqual({ timeZone: 'America/La_Paz', fiscalMonthStartDay: 25 });
+    const worker = new Pool({ connectionString: deps.workerDatabaseUrl, max: 1 });
+    try {
+      expect(await identityWorkspaceCalendarDirectory(worker).calendarOf(ws)).toEqual({
+        timeZone: 'America/La_Paz',
+        fiscalMonthStartDay: 25,
+      });
+    } finally {
+      await worker.end();
+    }
+    // pf_app no puede asumir el rol de directorio (solo pf_worker, SET TRUE).
+    await expect(identityWorkspaceCalendarDirectory(pool).calendarOf(ws)).rejects.toMatchObject({
+      code: '42501',
+    });
   });
 });

@@ -181,7 +181,7 @@ Trace: FR-PLANNING-001 · Priority: Must
 
 #### Scenario: Fecha sin periodo
 - **CUANDO** se consulta el periodo que contiene la fecha 2031-01-01, posterior a todos los periodos
-- **ENTONCES** la respuesta es 404 con código `REFERENCE_NOT_FOUND`
+- **ENTONCES** la respuesta es 404 con código `RESOURCE_NOT_FOUND`
 
 ### Requirement: Planificación de solo lectura en periodos cerrados
 Ninguna modificación del plan mensual de un periodo ni de sus presupuestos DEBE (MUST) aceptarse mientras el periodo esté `closed`, rechazándose con `PERIOD_CLOSED` sin cambios; en periodos `draft`, `active` o `reopened` el plan DEBE (MUST) poder modificarse.

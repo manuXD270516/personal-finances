@@ -358,6 +358,9 @@ importers:
       '@pf/ledger':
         specifier: workspace:*
         version: link:../../packages/contexts/ledger
+      '@pf/planning':
+        specifier: workspace:*
+        version: link:../../packages/contexts/planning
       '@pf/platform':
         specifier: workspace:*
         version: link:../../packages/platform
@@ -735,6 +738,61 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/contexts/planning:
+    dependencies:
+      '@nestjs/common':
+        specifier: 'catalog:'
+        version: 12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
+      '@pf/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@pf/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@pf/ledger':
+        specifier: workspace:*
+        version: link:../ledger
+      '@pf/platform':
+        specifier: workspace:*
+        version: link:../../platform
+      '@pf/shared-kernel':
+        specifier: workspace:*
+        version: link:../../shared-kernel
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.6
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
+      fast-check:
+        specifier: 4.10.2
+        version: 4.10.2
+      reflect-metadata:
+        specifier: 'catalog:'
+        version: 0.2.2
+      rxjs:
+        specifier: 'catalog:'
+        version: 7.8.2
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

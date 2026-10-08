@@ -61,6 +61,19 @@ Capas afectadas:
 
 15. **`PeriodCreatedHook`** (contrato con `add-budget-templates`, consolidación 2026-10-05): `EnsurePeriods` invoca `PeriodCreatedHook.onPeriodCreated(period, uow)` de forma **síncrona**, dentro de su misma Unit of Work, por cada fila efectivamente insertada (las que `ON CONFLICT DO NOTHING` descarta no se notifican). Los participantes se registran en la composición del módulo PLANNING (lista vacía por defecto; `add-budget-templates` registra la aplicación del template predeterminado). Una excepción de un participante revierte la creación (la ejecución siguiente la reintenta); los participantes deben ser idempotentes. Alternativa descartada: evento `planning.PeriodCreated.v1` + consumidor (eventual; un periodo podría quedar visible sin su plan). Requirement "Participantes de la creación de periodos en la misma transacción".
 
+### Decisiones de implementación (2026-10-08)
+
+16. **`containsDate` sin periodo ⇒ `404 RESOURCE_NOT_FOUND`** (no `REFERENCE_NOT_FOUND`): el catálogo de errores fija un estado HTTP por código (docs/10 §9.1, `ErrorCatalog`, TC-PLATFORM-API-005) y `REFERENCE_NOT_FOUND` es 422 (referencia inválida en un cuerpo). Se ajustaron el scenario "Fecha sin periodo" y TC-PLANNING-QUERY-001. `PlanningEditGuard` sí usa `REFERENCE_NOT_FOUND` (el `periodId` llega en el cuerpo del comando de pf-p2b).
+17. **Forma de las colecciones**: `listPeriods` responde `FinancialPeriodPage` (`{data, page}` con `PageInfo` y cursor firmado, igual que el resto del contrato); `ensurePeriods` responde `FinancialPeriodList` (`{data}`).
+18. **Tipo de agregado `FinancialPeriod`** (PascalCase): `audit.lifecycle_transition.aggregate_type` exige `^[A-Z][A-Za-z]*$`, así que el "FINANCIAL_PERIOD" del borrador se publica como `FinancialPeriod` en `LifecycleAggregateType`/`LifecycleAggregateTypeInput` del contrato, `LIFECYCLE_AGGREGATE_TYPES` de AUDIT (con textos es/en/pt del recorrido) y `audit.lifecycle_state_divergences()`. `GET …/lifecycle-machines/FinancialPeriod` ya responde; el `GET …/periods/{id}/lifecycle` y su exportación los agrega `add-month-closing`.
+19. **Orden de `EnsurePeriods`** en una transacción con el candado consultivo del workspace: (1) activar los `DRAFT` iniciados, (2) recalcular los `DRAFT` si cambió el día de inicio, (3) crear los que falten. Activar antes de recalcular evita mover un periodo que ya empezó pero que el job aún no había activado (D61: solo cambian los periodos futuros). El job, los tres consumidores y el comando `ensurePeriods` ejecutan exactamente este caso de uso.
+20. **Cobertura hacia atrás sin transiciones retroactivas**: los periodos anteriores al primero existente repiten el día en que empieza ese primer periodo (no el día de inicio vigente), así lo anterior conserva el calendario con el que ocurrió; hacia adelante, un periodo que no empieza en el día vigente es de transición (`PeriodCalendar.next`).
+21. **Calendario del workspace en el worker**: `pf_worker` no ve `iam.workspace` (RLS por membresía); `WorkspaceCalendarQuery` del worker lee `time_zone` y `fiscal_month_start_day` con el rol de directorio `pf_workspace_directory` en una conexión propia (la migración le concede la columna `fiscal_month_start_day`). En la API se lee con la membresía del usuario de la petición.
+22. **`btree_gist`**: no estaba instalada (docs/08 la preveía en el bootstrap); la migración la instala (`CREATE EXTENSION IF NOT EXISTS`, extensión de confianza, dueño `pf_migrator`).
+23. **Barreras adicionales de BD**: `CHECK (label = to_char(period_start, 'YYYY-MM'))` (D59), `CHECK (status = 'DRAFT' OR activated_at IS NOT NULL)` y el trigger de rango congelado también congela `label`.
+24. **Lookahead y cron**: `PLANNING_PERIOD_LOOKAHEAD` (1..24, defecto 3; API y worker) y `PLANNING_PERIODS_CRON` (defecto `5 * * * *` en UTC, `off` lo desactiva; worker). El job se encola también al arrancar el worker.
+25. **ADR-0028 (bloqueo del ledger por rango del periodo)**: no forma parte de las tareas de este change; lo implementa `add-month-closing` (que modifica `ledger/journal-posting` y `LedgerPeriodLockPort`). Este change deja la precondición: cada fecha cubierta pertenece a exactamente un periodo.
+
 ## Contratos
 
 Cambios EXACTOS requeridos (este change no edita `contracts/`; los consolida el lead):
@@ -69,14 +82,14 @@ Cambios EXACTOS requeridos (este change no edita `contracts/`; los consolida el 
 
 1. Tag `planning` (ya existe como "LATER (Phase 2)"): cambiar la descripción a "Phase 2: financial periods, monthly plan, budgets, templates and month closing."
 2. Operaciones nuevas (todas con `x-openspec-capability: [planning/financial-periods]`, seguridad estándar, parámetro `workspaceId`):
-   - `GET /workspaces/{workspaceId}/periods` — `operationId: listPeriods`, `x-required-role: VIEWER`; query `status` (`FinancialPeriodStatus`, opcional, repetible), `containsDate` (`LocalDate`, opcional; excluyente con `status`), `cursor`, `limit` (1–100, default 24). Orden por `periodStart` descendente. `200` → `FinancialPeriodList`; con `containsDate` sin periodo ⇒ `404 REFERENCE_NOT_FOUND`. `401`, `403` (`WORKSPACE_ACCESS_DENIED`), `400` (`VALIDATION_FAILED`).
+   - `GET /workspaces/{workspaceId}/periods` — `operationId: listPeriods`, `x-required-role: VIEWER`; query `status` (`FinancialPeriodStatus`, opcional, repetible), `containsDate` (`LocalDate`, opcional; excluyente con `status`), `cursor`, `limit` (1–100, default 24). Orden por `periodStart` descendente. `200` → `FinancialPeriodPage` (`{data, page}`, decisión 17); con `containsDate` sin periodo ⇒ `404 RESOURCE_NOT_FOUND` (decisión 16). `401`, `403` (`WORKSPACE_ACCESS_DENIED`), `400` (`VALIDATION_FAILED`).
    - `POST /workspaces/{workspaceId}/periods` — `operationId: ensurePeriods`, `x-required-role: EDITOR`; `Idempotency-Key` opcional (la operación es idempotente por naturaleza); body `EnsurePeriodsRequest`; `200` → `FinancialPeriodList` (periodos del rango pedido); `400 VALIDATION_FAILED` (`through` > hoy + 24 meses), `403 INSUFFICIENT_ROLE`.
    - `GET /workspaces/{workspaceId}/periods/{periodId}` — `operationId: getPeriod`, `VIEWER`; `200` → `FinancialPeriod` con `ETag`; `404`.
    - `POST /workspaces/{workspaceId}/periods/{periodId}/activate` — `operationId: activatePeriod`, `EDITOR`; `If-Match` obligatorio; sin body; `200` → `FinancialPeriod`; `409` (`PERIOD_NOT_STARTED`, `INVALID_STATUS_TRANSITION`), `412`, `428`, `403`, `404`.
 3. Schemas nuevos:
    - `FinancialPeriodStatus`: `enum [DRAFT, ACTIVE, CLOSED, REOPENED]`.
    - `FinancialPeriod`: `{ id: Uuid, label: string (pattern ^[0-9]{4}-(0[1-9]|1[0-2])$), periodStart: LocalDate, periodEnd: LocalDate, status: FinancialPeriodStatus, startDay: integer 1..28, isTransition: boolean, pendingClosure: boolean, closeCount: integer ≥ 0, reopenCount: integer ≥ 0, latestCloseNo: integer|null, version: integer, createdAt: Instant, activatedAt: Instant|null }` (todos required salvo los `|null`, que son required y nullable). `closeCount`, `reopenCount` y `latestCloseNo` los alimenta `add-month-closing` (en este change siempre 0/0/null).
-   - `FinancialPeriodList`: `{ items: FinancialPeriod[], nextCursor: string|null }`.
+   - `FinancialPeriodList`: `{ data: FinancialPeriod[] }` (respuesta de `ensurePeriods`) y `FinancialPeriodPage`: `{ data: FinancialPeriod[], page: PageInfo }` (respuesta de `listPeriods`) — convención de colecciones del contrato (decisión 17; el borrador decía `{ items, nextCursor }`).
    - `EnsurePeriodsRequest`: `{ through: LocalDate }` (required).
 4. `ErrorCode` — agregar `PERIOD_NOT_STARTED` (409). Se usan existentes: `INVALID_STATUS_TRANSITION`, `PERIOD_CLOSED`, `REFERENCE_NOT_FOUND`, `VALIDATION_FAILED`, `INSUFFICIENT_ROLE`, `WORKSPACE_ACCESS_DENIED`, `PRECONDITION_FAILED`, `PRECONDITION_REQUIRED`.
 5. `AuditEntityType`/`LifecycleAggregateType` (si el contrato de `audit/lifecycle-timeline` enumera agregados): agregar `FINANCIAL_PERIOD` (lo usa `add-month-closing` para `GET …/periods/{id}/lifecycle`).
@@ -102,7 +115,8 @@ Cambios EXACTOS requeridos (este change no edita `contracts/`; los consolida el 
 | `status` | `text` NOT NULL | `DRAFT \| ACTIVE \| CLOSED \| REOPENED` |
 | `close_count`, `reopen_count` | `int` NOT NULL DEFAULT 0 | los incrementa `add-month-closing` |
 | `latest_close_no` | `int` NULL | idem |
-| `created_at`, `activated_at` | `timestamptz` | |
+| `created_at`, `activated_at` | `timestamptz` | `activated_at` no nulo fuera de `DRAFT` (CHECK) |
+| `updated_at` | `timestamptz` NOT NULL | última modificación (implementación, 2026-10-08) |
 | `version` | `int` NOT NULL | optimistic locking (`If-Match`) |
 
 Índices: `(workspace_id, status)`, `(workspace_id, period_start DESC)`. RLS **WS**; grants `pf_app` `SELECT, INSERT, UPDATE`.

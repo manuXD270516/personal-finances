@@ -27,9 +27,11 @@ import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface
 import {
   createDemoDataRuntime,
   identityActiveWorkspaces,
+  identityWorkspaceCalendarDirectory,
   identityWorkspaceTimeZones,
 } from '@pf/identity/interface/identity.module';
-import { createLedgerMaintenance } from '@pf/ledger/interface/ledger.module';
+import { createLedgerMaintenance, ledgerActivityRange } from '@pf/ledger/interface/ledger.module';
+import { createPlanningRuntime, planningEventConsumers } from '@pf/planning/interface/planning.module';
 import { PinoNestLogger } from '@pf/platform/nest';
 import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.module';
 import { otelCounters, shutdownTelemetry } from '@pf/platform/otel';
@@ -42,6 +44,7 @@ import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
+import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
 import { AUDIT_POLICIES, demoDataOptions, outboxPort } from '../identity/identity-wiring.js';
@@ -81,6 +84,8 @@ export interface WorkerRuntimeOptions {
   readonly lifecycleBackfillOnStart?: boolean;
   /** Tests (add-demo-data): falla inyectada del cargador demo (`<módulo>/<YYYY-MM>`). */
   readonly demoFailAt?: string;
+  /** Encola `planning.ensure-periods` al arrancar (por defecto sí; add-financial-periods). */
+  readonly planningPeriodsOnStart?: boolean;
 }
 
 export async function createWorkerRuntime(
@@ -202,12 +207,30 @@ export async function createWorkerRuntime(
     }),
   });
 
+  // PLANNING (add-financial-periods): job horario `planning.ensure-periods` + consumidores de IDENTITY y LEDGER. El
+  // calendario de cada workspace se lee con el rol de directorio (pf_worker no ve iam.workspace por membresía).
+  const planning = createPlanningRuntime({
+    pool,
+    clock: options.clock ?? systemClock,
+    audit: demoAudit.port,
+    lifecycle: demoAudit.lifecycle,
+    outbox: outboxPort(fxOutbox),
+    calendar: identityWorkspaceCalendarDirectory(pool),
+    activity: ledgerActivityRange(),
+    lookahead: config.PLANNING_PERIOD_LOOKAHEAD,
+  });
+  await registerPlanningPeriodsJob(queue, planning.service, activeWorkspaces, logger, {
+    cron: config.PLANNING_PERIODS_CRON,
+    runOnStart: options.planningPeriodsOnStart ?? true,
+  });
+
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
   // REPORTING (add-basic-dashboard): versión derivada de los datos por workspace (ETag del resumen del Home).
   const subscriptions = new EventSubscriptions([
     ...(options.eventConsumers ?? []),
     ...fxConsumers,
     reportingDataVersionConsumer(),
+    ...planningEventConsumers(planning),
   ]);
   const consumers = new EventConsumerRuntime({ pool, queue, subscriptions, logger, metrics });
   const relay = new OutboxRelay({

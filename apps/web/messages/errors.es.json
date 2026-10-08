@@ -64,5 +64,6 @@
   "FX_RATE_ALREADY_SUPERSEDED": "Ese tipo de cambio ya fue reemplazado.",
   "FX_RATE_ANOMALY_ALREADY_REVIEWED": "Esa anomalía del tipo de cambio ya fue revisada.",
   "FX_RATE_NOT_ANOMALOUS": "Ese tipo de cambio no está marcado como anómalo.",
-  "CURRENCY_NOT_ENABLED": "Esa moneda no está habilitada en este espacio de trabajo."
+  "CURRENCY_NOT_ENABLED": "Esa moneda no está habilitada en este espacio de trabajo.",
+  "PERIOD_NOT_STARTED": "Ese periodo todavía no empezó en la zona horaria del espacio de trabajo. Podrás activarlo desde su fecha de inicio."
 }

@@ -273,6 +273,7 @@ Content-Type: application/json
 | fx | `FX_RATE_ANOMALY_ALREADY_REVIEWED` | 409 | La anomalía de la tasa de provider ya fue revisada (`POST …/anomaly-review`) |
 | fx | `FX_RATE_NOT_ANOMALOUS` | 422 | Se pidió revisar una tasa que no está marcada como anómala |
 | fx | `CURRENCY_NOT_ENABLED` | 422 | Moneda no habilitada en el workspace (también `reportingCurrency` de `/reports/summary`) |
+| planning (P2) | `PERIOD_NOT_STARTED` | 409 | Activar un periodo cuya fecha de inicio es posterior a hoy en la zona del workspace (`activatePeriod`, add-financial-periods) |
 | planning (P2) | `BUDGET_ALREADY_EXISTS`, `PERIOD_OVERLAP`, `MONTH_CLOSING_IN_PROGRESS` | 409 | — |
 | commitments (P3) | `INVALID_RRULE`, `OCCURRENCE_ALREADY_MATERIALIZED` | 422 / 409 | — |
 | debt (P4) | `INSTALLMENT_ALREADY_PAID`, `PAYMENT_BREAKDOWN_MISMATCH` | 409 / 422 | — |
@@ -351,7 +352,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | fx-providers | `GET W/fx-providers/status` (VIEWER; salud, feeds, fallas, próximo intento, carga histórica, atribución; nunca llama a un provider) | `fx/market-rate-providers` | 1 |
 | fx-rate-preferences | `GET/PUT W/fx-rate-preferences` (`listFxRatePreferences` VIEWER, `replaceFxRatePreferences` EDITOR; tipo de tasa preferido por par, sembrado `PARALLEL` para USD/BOB y USDT/BOB al crear el workspace) | `fx/market-rates` | 1 |
 | ledger | `GET W/ledger/trial-balance` (`getLedgerTrialBalance`, solo lectura) | `ledger/balances` | 1 |
-| periods | `GET/POST W/periods`, `POST …/{id}/close`, `POST …/{id}/reopen` | `planning/financial-periods`, `planning/month-closing` | 2 |
+| periods | `GET/POST W/periods` (`listPeriods` VIEWER con `status`/`containsDate`, `ensurePeriods` EDITOR con `through` ≤ hoy + 24 meses), `GET …/{id}` (`getPeriod`, ETag), `POST …/{id}/activate` (`activatePeriod` EDITOR, `If-Match`; add-financial-periods), `POST …/{id}/close`, `POST …/{id}/reopen` (add-month-closing) | `planning/financial-periods`, `planning/month-closing` | 2 |
 | budgets | `GET/POST W/budgets`, `GET/PATCH …/{id}`, `PATCH …/{id}/lines/{lineId}` | `planning/budgets` | 2 |
 | templates | `GET/POST W/templates`, `GET …/{id}`, `POST …/{id}/versions`, `POST …/{id}/apply` | `planning/budget-templates` | 2 |
 | recurring | `GET/POST W/recurring`, `GET/PATCH …/{id}`, `POST …/{id}/pause|resume|end`, `GET …/{id}/occurrences`, `POST …/occurrences/{occId}/materialize|skip` | `commitments/recurrence-engine` | 3 |

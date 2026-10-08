@@ -228,6 +228,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: 'Tasa de cambio',
       Category: 'Categoría',
       Counterparty: 'Contraparte',
+      FinancialPeriod: 'Periodo financiero',
     },
     states: {
       Transaction: {
@@ -241,6 +242,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: { RECORDED: 'Registrada', SUPERSEDED: 'Reemplazada' },
       Category: CLASSIFICATION.es.states,
       Counterparty: CLASSIFICATION.es.states,
+      FinancialPeriod: { DRAFT: 'Borrador', ACTIVE: 'Activo', CLOSED: 'Cerrado', REOPENED: 'Reabierto' },
     },
     transitions: {
       Transaction: {
@@ -257,6 +259,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: { RECORD: 'Registrar', SUPERSEDE: 'Reemplazar' },
       Category: CLASSIFICATION.es.transitions,
       Counterparty: CLASSIFICATION.es.transitions,
+      FinancialPeriod: { CREATE: 'Crear', ACTIVATE: 'Activar', CLOSE: 'Cerrar', REOPEN: 'Reabrir' },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -293,6 +296,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: 'Exchange rate',
       Category: 'Category',
       Counterparty: 'Counterparty',
+      FinancialPeriod: 'Financial period',
     },
     states: {
       Transaction: {
@@ -306,6 +310,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: { RECORDED: 'Recorded', SUPERSEDED: 'Superseded' },
       Category: CLASSIFICATION.en.states,
       Counterparty: CLASSIFICATION.en.states,
+      FinancialPeriod: { DRAFT: 'Draft', ACTIVE: 'Active', CLOSED: 'Closed', REOPENED: 'Reopened' },
     },
     transitions: {
       Transaction: {
@@ -322,6 +327,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: { RECORD: 'Record', SUPERSEDE: 'Supersede' },
       Category: CLASSIFICATION.en.transitions,
       Counterparty: CLASSIFICATION.en.transitions,
+      FinancialPeriod: { CREATE: 'Create', ACTIVATE: 'Activate', CLOSE: 'Close', REOPEN: 'Reopen' },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -358,6 +364,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: 'Taxa de câmbio',
       Category: 'Categoria',
       Counterparty: 'Contraparte',
+      FinancialPeriod: 'Período financeiro',
     },
     states: {
       Transaction: {
@@ -371,6 +378,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: { RECORDED: 'Registrada', SUPERSEDED: 'Substituída' },
       Category: CLASSIFICATION.pt.states,
       Counterparty: CLASSIFICATION.pt.states,
+      FinancialPeriod: { DRAFT: 'Rascunho', ACTIVE: 'Ativo', CLOSED: 'Fechado', REOPENED: 'Reaberto' },
     },
     transitions: {
       Transaction: {
@@ -387,6 +395,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       ExchangeRate: { RECORD: 'Registrar', SUPERSEDE: 'Substituir' },
       Category: CLASSIFICATION.pt.transitions,
       Counterparty: CLASSIFICATION.pt.transitions,
+      FinancialPeriod: { CREATE: 'Criar', ACTIVATE: 'Ativar', CLOSE: 'Fechar', REOPEN: 'Reabrir' },
     },
     element: 'Item',
     currentState: 'Estado atual',

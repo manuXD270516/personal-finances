@@ -17,9 +17,11 @@ invariants:
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/application/periods.service.test.ts
+  - packages/contexts/planning/test/integration/pg-planning.int.test.ts
+status: automated
 regression_suite: true
 phase: 2
 tags:
@@ -71,3 +73,4 @@ Entonces se rechaza con "PERIOD_CLOSED"
 ## Notas
 
 - Se automatiza primero contra PlanningEditGuard; de punta a punta cuando exista el plan mensual de pf-p2b (add-budgets).
+- 2026-10-08: automatizado contra `PlanningEditGuard` (dominio, aplicación y `FOR SHARE` en PostgreSQL) con un doble del plan mensual; se re-verifica de punta a punta en `add-budgets` (pf-p2b) cuando exista el plan mensual real (tarea 7.1).

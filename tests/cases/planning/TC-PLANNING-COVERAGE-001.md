@@ -15,9 +15,12 @@ invariants:
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/planning/src/domain/period-calendar.test.ts
+  - packages/contexts/planning/src/application/periods.service.test.ts
+  - apps/api/test/api/periods.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:
