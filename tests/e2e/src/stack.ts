@@ -30,8 +30,8 @@ const PORT_PREFIX = /^[35]$/.test(process.env['PF_E2E_PORT_PREFIX'] ?? '')
   ? process.env['PF_E2E_PORT_PREFIX']!
   : '4';
 
-/** Puerto del servidor de providers simulados en el host (`<prefijo>9090`; `PF_E2E_FX_SIM_PORT` lo cambia). */
-export const FX_SIM_PORT = Number.parseInt(process.env['PF_E2E_FX_SIM_PORT'] ?? `${PORT_PREFIX}9090`, 10);
+/** Puerto del servidor de providers simulados en el host (`2<prefijo>090`, fuera del rango efímero de Linux 32768–60999 para no chocar con conexiones salientes del runner; `PF_E2E_FX_SIM_PORT` lo cambia). */
+export const FX_SIM_PORT = Number.parseInt(process.env['PF_E2E_FX_SIM_PORT'] ?? `2${PORT_PREFIX}090`, 10);
 
 /** Variables que comparten global setup y workers (Playwright hereda `process.env` del proceso principal). */
 export const ENV_FILE_VAR = 'PF_E2E_ENV_FILE';
