@@ -106,4 +106,10 @@ Los 11 changes de Phase 2 se alinearon en el mismo commit: cada pregunta de la s
 | D109 | Q51 Ubicación de la valoración de flujos | Extraer **`FlowValuation` al shared-kernel** (evita el ciclo Planning ↔ Reporting de Phase 7). |
 | D110 | Q52 Recorrido de ciclo de vida para planes y templates | **Sin máquina** para `Budget` (sigue al periodo) ni para templates en Phase 2; historia en el audit log; un change pequeño de `audit/lifecycle-timeline` si el owner lo pide. |
 
+## Decisiones posteriores
+
+| ID | Pregunta | Decisión |
+|---|---|---|
+| D112 | Throughput de los consumidores de eventos (~2 eventos/s por cola, medido en Phase 2) | **Change nuevo `improve-event-throughput`** (orden 24, docs/03 §7), agregado por el owner el 2026-10-09: va después de `add-workspace-export` y antes de cualquier change de Phase 6. |
+
 No quedan preguntas del owner abiertas en los changes de Phase 2 tras esta ronda.
