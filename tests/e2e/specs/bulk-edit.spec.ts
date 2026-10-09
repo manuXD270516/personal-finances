@@ -56,7 +56,7 @@ const row = (page: Page, description: string) =>
   page.getByTestId('transaction-row').filter({ hasText: description });
 
 test.describe('Edición masiva de transacciones', () => {
-  test('[TC-TRANSACTIONS-BULK-001] [TC-TRANSACTIONS-BULK-002] [TC-TRANSACTIONS-BULK-005] recategorizar y etiquetar tres gastos con vista previa; un gasto dividido se quita de la selección', async ({
+  test('[TC-TRANSACTIONS-BULK-001] [TC-TRANSACTIONS-BULK-002] [TC-TRANSACTIONS-BULK-005] [TC-AUDIT-GLOBAL-007] recategorizar y etiquetar tres gastos con vista previa; un gasto dividido se quita de la selección y la operación se ve en la auditoría', async ({
     browser,
   }) => {
     const { context, page, W } = await newFinanceUser(browser, 'bulk');
@@ -126,6 +126,9 @@ test.describe('Edición masiva de transacciones', () => {
     await expect(done).toContainText('3 transacciones actualizadas');
     const bulkOperationId = await done.getAttribute('data-bulk-operation-id');
     expect(bulkOperationId).toMatch(/^[0-9a-f-]{36}$/);
+    // add-global-audit-view: el resultado enlaza a la auditoría de esa operación (la correlación es el bulkOperationId).
+    const auditHref = await done.getByTestId('bulk-audit-link').getAttribute('href');
+    expect(auditHref).toBe(`/configuracion/auditoria?correlationId=${String(bulkOperationId)}`);
     expect(await seriousViolations(page)).toEqual([]);
 
     // Las tres quedaron en "Hogar" con la etiqueta (versión 2) y la dividida no cambió.
@@ -146,6 +149,17 @@ test.describe('Edición masiva de transacciones', () => {
     // La lista refleja la categoría nueva y la selección se limpió.
     await expect(page.getByTestId('bulk-selected')).toHaveText('0 seleccionadas');
     await expect(row(page, 'Compra uno')).toContainText('Hogar');
+
+    // La auditoría de la operación: un registro por transacción editada más el agregado, y ninguno más.
+    await go(page, auditHref!);
+    await expect(page.getByLabel('Operación (identificador)')).toHaveValue(String(bulkOperationId));
+    await expect(page.getByTestId('audit-row')).toHaveCount(4);
+    await expect(
+      page.locator('[data-testid="audit-row"][data-action="transactions.transaction.updated"]'),
+    ).toHaveCount(3);
+    await expect(
+      page.locator('[data-testid="audit-row"][data-action="transactions.transaction.bulk_edited"]'),
+    ).toHaveCount(1);
     await context.close();
   });
 

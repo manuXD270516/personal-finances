@@ -97,7 +97,14 @@ describe('[TC-SECURITY-RBAC-001] VIEWER puede leer pero no puede modificar datos
         transactions: await n('SELECT count(*)::int AS n FROM txn.transaction WHERE workspace_id = $1'),
         entries: await n('SELECT count(*)::int AS n FROM ledger.journal_entry WHERE workspace_id = $1'),
         categories: await n('SELECT count(*)::int AS n FROM classification.category WHERE workspace_id = $1'),
-        audit: await n('SELECT count(*)::int AS n FROM audit.audit_log WHERE workspace_id = $1'),
+        // Los rechazos sí quedan auditados como eventos de seguridad (add-global-audit-view, FR-AUDIT-005): no cuentan
+        // como "escritura" de datos; se verifican aparte.
+        audit: await n(
+          `SELECT count(*)::int AS n FROM audit.audit_log WHERE workspace_id = $1 AND action <> 'security.authorization.denied'`,
+        ),
+        denials: await n(
+          `SELECT count(*)::int AS n FROM audit.audit_log WHERE workspace_id = $1 AND action = 'security.authorization.denied'`,
+        ),
       };
     };
     try {
@@ -176,7 +183,10 @@ describe('[TC-SECURITY-RBAC-001] VIEWER puede leer pero no puede modificar datos
       expect(denied.map((r) => [r.status, r.body['code']])).toEqual(
         denied.map(() => [403, 'INSUFFICIENT_ROLE']),
       );
-      expect(await inTx(app, { userId: owner.id, workspaceId: w1 }, () => counts(app))).toEqual(before);
+      const after = await inTx(app, { userId: owner.id, workspaceId: w1 }, () => counts(app));
+      // Nada se escribió salvo los 4 eventos de seguridad (uno por operación rechazada; límite de 1 por minuto).
+      expect({ ...after, denials: 0 }).toEqual({ ...before, denials: 0 });
+      expect(after.denials - before.denials).toBe(4);
     } finally {
       await app.end();
     }

@@ -66,6 +66,12 @@ test.describe('Recorrido del ciclo de vida (audit/lifecycle-timeline)', () => {
 
     const report = await openLifecycleTab(page);
 
+    // add-global-audit-view: el recorrido enlaza a la auditoría del elemento (OWNER/EDITOR).
+    await expect(page.getByTestId('tx-lifecycle-audit-link')).toHaveAttribute(
+      'href',
+      /\/configuracion\/auditoria\?aggregateType=Transaction&aggregateId=[0-9a-f-]{36}$/,
+    );
+
     // Diagrama (escritorio: orientación horizontal; la vertical queda oculta).
     const svg = report.locator('svg[data-orientation="horizontal"]');
     await expect(svg).toBeVisible();
@@ -193,6 +199,8 @@ test.describe('Recorrido del ciclo de vida (audit/lifecycle-timeline)', () => {
     const page = viewer.page;
     await expect(page.getByTestId('transaction-detail')).toBeVisible();
     const report = await openLifecycleTab(page);
+    // El VIEWER ve el recorrido pero no la auditoría global (docs/33 D105): sin enlace.
+    await expect(page.getByTestId('tx-lifecycle-audit-link')).toHaveCount(0);
     const entries = report.getByTestId('lifecycle-entry');
     await expect(entries).toHaveCount(2);
     const revised = entries.nth(1);

@@ -693,7 +693,8 @@
       "errorsTitle": "Nenhuma alteração foi aplicada",
       "errorsHint": "A operação é tudo ou nada: corrija ou remova estas transações e volte à pré-visualização.",
       "moreErrors": "e mais {n}",
-      "unknownItem": "Transação {id}"
+      "unknownItem": "Transação {id}",
+      "auditLink": "Ver os registros desta operação na auditoria"
     },
     "filters": {
       "title": "Filtros de transações",
@@ -1346,7 +1347,8 @@
       "label": "Exportar o percurso",
       "csv": "Exportar CSV",
       "pdf": "Exportar PDF"
-    }
+    },
+    "auditLink": "Ver este item na auditoria"
   },
   "Demo": {
     "title": "Dados de demonstração",
@@ -2215,6 +2217,141 @@
         "same": "A hora de início e a de fim devem ser diferentes.",
         "server": "O horário de silêncio não é válido. Revise as horas."
       }
+    }
+  },
+  "AuditLog": {
+    "title": "Auditoria",
+    "subtitle": "Quem alterou o quê e quando neste espaço de trabalho. Combine os filtros para encontrar uma alteração ou revisar uma operação inteira.",
+    "noAccess": "Somente um proprietário ou editor do espaço pode consultar a auditoria.",
+    "loading": "Carregando registros…",
+    "loadingMore": "Carregando…",
+    "loadMore": "Carregar mais",
+    "empty": "Nenhum registro corresponde aos filtros.",
+    "category": {
+      "ALL": "Todos",
+      "SECURITY": "Segurança",
+      "DATA": "Dados"
+    },
+    "filters": {
+      "label": "Filtros de auditoria",
+      "category": "Tipo de evento",
+      "actorUserId": "Usuário (identificador)",
+      "onlyMine": "Somente minhas alterações",
+      "action": "Ação",
+      "aggregateType": "Tipo de item",
+      "aggregateId": "Item (identificador)",
+      "correlationId": "Operação (identificador)",
+      "origin": "Origem",
+      "anyOrigin": "Qualquer",
+      "from": "De",
+      "to": "Até",
+      "apply": "Aplicar filtros",
+      "reset": "Limpar filtros"
+    },
+    "hints": {
+      "actorUserId": "Identificador UUID do usuário.",
+      "action": "Uma ou mais ações exatas separadas por vírgulas.",
+      "aggregateId": "Requer o tipo de item.",
+      "correlationId": "Agrupa todos os registros de uma operação, como uma edição em massa.",
+      "range": "Datas no fuso horário do espaço. Até 366 dias, exceto ao escolher um item ou uma operação."
+    },
+    "errors": {
+      "uuid": "Digite um identificador válido (UUID).",
+      "action": "Use ações no formato contexto.entidade.verbo, separadas por vírgulas (até 20).",
+      "aggregateType": "Use somente letras, por exemplo Transaction.",
+      "needsType": "Informe também o tipo de item.",
+      "date": "Digite uma data válida.",
+      "order": "A data final não pode ser anterior à inicial.",
+      "range": "O intervalo não pode exceder 366 dias sem escolher um item ou uma operação."
+    },
+    "export": {
+      "csv": "Exportar CSV",
+      "hint": "Com os filtros aplicados, até {max} registros. Cada exportação fica auditada.",
+      "ownerOnly": "Somente o proprietário do espaço pode exportar a auditoria para CSV."
+    },
+    "table": {
+      "caption": "Registros de auditoria, do mais recente ao mais antigo",
+      "when": "Data e hora",
+      "action": "Ação",
+      "actor": "Quem",
+      "entity": "Item",
+      "detail": "Detalhe",
+      "show": "Ver detalhe",
+      "hide": "Ocultar detalhe"
+    },
+    "actor": {
+      "you": "Você",
+      "user": "Usuário …{id}",
+      "system": "Processo {process}"
+    },
+    "detail": {
+      "origin": "Origem",
+      "version": "Versão",
+      "reason": "Motivo",
+      "correlation": "Operação",
+      "changes": "Alterações deste registro",
+      "field": "Campo",
+      "before": "Antes",
+      "after": "Depois",
+      "none": "—",
+      "noChanges": "Este registro não tem alterações de campos.",
+      "links": "Links do registro",
+      "sameOperation": "Ver a operação inteira",
+      "entityLog": "Ver o histórico do item",
+      "openEntity": "Abrir o item",
+      "byActor": "Filtrar por este usuário"
+    },
+    "origin": {
+      "ui": "Tela",
+      "api": "API",
+      "import": "Importação",
+      "rule": "Regra",
+      "recurring": "Recorrente",
+      "system": "Sistema"
+    },
+    "entityTypes": {
+      "Transaction": "Transação",
+      "Account": "Conta",
+      "Workspace": "Espaço de trabalho",
+      "User": "Usuário",
+      "Category": "Categoria",
+      "Counterparty": "Contraparte",
+      "ExchangeRate": "Taxa de câmbio",
+      "FinancialPeriod": "Período",
+      "Budget": "Plano",
+      "Reconciliation": "Conciliação",
+      "BulkOperation": "Edição em massa",
+      "AuditLogExport": "Exportação da auditoria",
+      "LifecycleExport": "Exportação do percurso"
+    },
+    "actions": {
+      "security_authorization_denied": "Acesso negado",
+      "audit_log_exported": "Auditoria exportada",
+      "audit_lifecycle_exported": "Percurso exportado",
+      "transactions_transaction_created": "Transação registrada",
+      "transactions_transaction_updated": "Transação alterada",
+      "transactions_transaction_voided": "Transação anulada",
+      "transactions_transaction_bulk_edited": "Edição em massa",
+      "planning_period_reopened": "Período reaberto"
+    },
+    "fields": {
+      "operationId": "Operação tentada",
+      "code": "Motivo da recusa",
+      "format": "Formato",
+      "rowCount": "Registros exportados",
+      "actorUserId": "Usuário filtrado",
+      "action": "Ação filtrada",
+      "aggregateType": "Tipo filtrado",
+      "aggregateId": "Item filtrado",
+      "correlationId": "Operação filtrada",
+      "category": "Tipo de evento filtrado",
+      "from": "De",
+      "to": "Até",
+      "description": "Descrição",
+      "amount": "Valor"
+    },
+    "link": {
+      "settings": "Ver a auditoria do espaço de trabalho"
     }
   }
 }

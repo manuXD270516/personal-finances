@@ -78,6 +78,8 @@ export interface AuditLogEntryDto {
     readonly process: string | null;
   };
   readonly action: string;
+  /** Categoría derivada de la acción (add-global-audit-view): `SECURITY` si es un evento de seguridad; si no, `DATA`. */
+  readonly category: AuditActionCategoryDto;
   readonly aggregateType: string;
   readonly aggregateId: string;
   readonly aggregateVersion: number | null;
@@ -335,4 +337,48 @@ export type LifecycleExportLoaders = Readonly<Partial<Record<LifecycleAggregateT
 /** Allow-list de auditoría de la exportación del recorrido (evento auditado, docs/12 §13.2). */
 export const LIFECYCLE_EXPORT_AUDIT_POLICY = {
   LifecycleExport: { aggregateType: 'plain', format: 'plain' },
+} as const satisfies AuditFieldPoliciesDto;
+
+// ───────────────────────────────────────────── add-global-audit-view (FR-AUDIT-005/006)
+
+/** Categoría de una acción de auditoría para la vista de eventos de seguridad (derivada de la acción). */
+export type AuditActionCategoryDto = 'SECURITY' | 'DATA';
+
+/** Códigos de rechazo de autorización que se auditan como evento de seguridad (`security.authorization.denied`). */
+export type AuthorizationDenialCode = 'INSUFFICIENT_ROLE' | 'WORKSPACE_ACCESS_DENIED';
+
+/**
+ * Registrador de fallos de autorización (openspec add-global-audit-view, design decisión 4; docs/33 D106). Lo invoca el
+ * guard de roles/membresía de IDENTITY al rechazar una petición con `INSUFFICIENT_ROLE` o `WORKSPACE_ACCESS_DENIED`.
+ * Escribe en el workspace OBJETIVO en una transacción propia (el request rechazado no tiene unidad de trabajo; es la
+ * excepción documentada a INV-029: no hay mutación), como máximo un registro por (usuario, workspace, operación) por
+ * minuto, sin el cuerpo de la solicitud. Un workspace inexistente no se audita. NUNCA lanza: una falla de escritura se
+ * registra en logs y métricas y el rechazo sigue siendo un 403.
+ */
+export interface AuthorizationDenialPort {
+  record(input: {
+    readonly userId: string;
+    readonly workspaceId: string;
+    readonly operationId: string;
+    readonly code: AuthorizationDenialCode;
+  }): Promise<void>;
+}
+
+export const AUTHORIZATION_DENIAL_PORT = Symbol.for('pf.audit.AuthorizationDenialPort');
+
+/** Allow-list de auditoría de la exportación CSV del log (`audit.log.exported`, categoría SECURITY). */
+export const AUDIT_LOG_EXPORT_AUDIT_POLICY = {
+  AuditLogExport: {
+    format: 'plain',
+    rowCount: 'plain',
+    actorUserId: 'plain',
+    action: 'plain',
+    aggregateType: 'plain',
+    aggregateId: 'plain',
+    origin: 'plain',
+    correlationId: 'plain',
+    category: 'plain',
+    from: 'plain',
+    to: 'plain',
+  },
 } as const satisfies AuditFieldPoliciesDto;

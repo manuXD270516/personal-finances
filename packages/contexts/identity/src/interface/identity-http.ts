@@ -5,6 +5,7 @@ import {
   HttpCode,
   Inject,
   Injectable,
+  Optional,
   Param,
   Patch,
   Post,
@@ -13,6 +14,11 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
+import {
+  AUTHORIZATION_DENIAL_PORT,
+  type AuthorizationDenialCode,
+  type AuthorizationDenialPort,
+} from '@pf/audit/contracts';
 import {
   ApiProblem,
   DEFAULT_PAGE_LIMIT,
@@ -53,6 +59,8 @@ const RETIRED_WORKSPACE_OPERATIONS: ReadonlySet<string> = new Set(['getDemoDataS
 /** Jerarquía de roles para `x-required-role` (OWNER ⊃ EDITOR ⊃ VIEWER). */
 const RANK: Record<Role, number> = { VIEWER: 1, EDITOR: 2, OWNER: 3 };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 const routeOf = (req: ApiRequest): string | undefined =>
   typeof req.route?.path === 'string' ? req.route.path : undefined;
 
@@ -71,7 +79,27 @@ export class IdentityAccessGuard implements CanActivate {
     @Inject(JWT_VERIFIER) private readonly verifier: JwtVerifier,
     @Inject(IDENTITY_SERVICE) private readonly service: IdentityService,
     @Inject(IDENTITY_DEPS) private readonly deps: IdentityDeps,
+    /** Auditoría de los rechazos de autorización (openspec add-global-audit-view); ausente en composiciones sin AUDIT. */
+    @Optional() @Inject(AUTHORIZATION_DENIAL_PORT) private readonly denials?: AuthorizationDenialPort,
   ) {}
+
+  /**
+   * Audita el rechazo como evento de seguridad en el workspace objetivo (docs/33 D106). Best-effort: el puerto nunca
+   * lanza y el rechazo siempre responde 403; solo se audita con un id de workspace bien formado.
+   */
+  private async audited(
+    userId: string,
+    workspaceId: string,
+    operationId: string,
+    code: AuthorizationDenialCode,
+  ): Promise<void> {
+    if (!this.denials || !UUID.test(workspaceId)) return;
+    try {
+      await this.denials.record({ userId, workspaceId, operationId, code });
+    } catch {
+      // El puerto no debe lanzar; si lo hiciera, el rechazo sigue siendo un 403 (nunca un 500).
+    }
+  }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     if (ctx.getType() !== 'http') return true;
@@ -102,12 +130,16 @@ export class IdentityAccessGuard implements CanActivate {
         if (active) return { role: active, retired: false };
         return { role: await this.deps.memberships.retiredRole(userId, workspaceId), retired: true };
       });
-      if (!role) throw new ApiProblem('WORKSPACE_ACCESS_DENIED', 'not an active member of the workspace');
+      if (!role) {
+        await this.audited(userId, workspaceId, op.operationId, 'WORKSPACE_ACCESS_DENIED');
+        throw new ApiProblem('WORKSPACE_ACCESS_DENIED', 'not an active member of the workspace');
+      }
       // Demo limpiado (add-demo-data): deja de existir para toda ruta salvo su estado y la limpieza idempotente.
       if (retired && !RETIRED_WORKSPACE_OPERATIONS.has(op.operationId)) {
         throw new ApiProblem('RESOURCE_NOT_FOUND', 'workspace not found');
       }
       if (RANK[role] < RANK[required]) {
+        await this.audited(userId, workspaceId, op.operationId, 'INSUFFICIENT_ROLE');
         throw new ApiProblem('INSUFFICIENT_ROLE', `role ${role} does not satisfy ${required}`);
       }
     }

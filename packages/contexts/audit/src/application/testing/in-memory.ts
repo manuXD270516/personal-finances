@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isSecurityAction } from '../../domain/audit-action-category.js';
 import type { AuditRecord } from '../../domain/audit-record.js';
 import { lifecycleEntry, type LifecycleEntry } from '../../domain/lifecycle-entry.js';
 import type {
@@ -77,6 +78,13 @@ export class InMemoryAudit
           q.entities.some((e) => e.aggregateType === r.aggregateType && e.aggregateId === r.aggregateId),
       )
       .filter((r) => q.aggregateType === undefined || r.aggregateType === q.aggregateType)
+      .filter((r) => q.actorUserId === undefined || r.actor.userId === q.actorUserId)
+      .filter((r) => q.actions === undefined || q.actions.includes(r.action))
+      .filter((r) => q.origin === undefined || r.origin === q.origin)
+      .filter((r) => q.correlationId === undefined || r.correlationId === q.correlationId)
+      .filter(
+        (r) => q.category === undefined || isSecurityAction(r.action) === (q.category.kind === 'SECURITY'),
+      )
       .filter((r) => !q.from || r.occurredAt.epochMillis >= q.from.getTime())
       .filter((r) => !q.to || r.occurredAt.epochMillis < q.to.getTime())
       .filter((r) => !after || (q.ascending ? key(r) > after : key(r) < after))

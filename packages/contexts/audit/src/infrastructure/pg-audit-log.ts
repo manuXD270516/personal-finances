@@ -19,6 +19,7 @@ import type {
   IdGenerator,
   IpHasher,
   ReadUnitOfWork,
+  WorkspaceExistence,
 } from '../application/ports/index.js';
 import { AuditRecord } from '../domain/audit-record.js';
 import { isAuditOrigin } from '../domain/audit-origin.js';
@@ -120,6 +121,19 @@ export class PgAuditLogStore implements AuditLogStore {
       );
     }
     if (q.aggregateType !== undefined) query = query.where('aggregate_type', '=', q.aggregateType);
+    if (q.actorUserId !== undefined) query = query.where('actor_user_id', '=', q.actorUserId);
+    if (q.actions !== undefined) query = query.where('action', 'in', [...q.actions]);
+    if (q.origin !== undefined) query = query.where('origin', '=', q.origin);
+    if (q.correlationId !== undefined) query = query.where('correlation_id', '=', q.correlationId);
+    if (q.category) {
+      // SECURITY = acción del catálogo (índice `(workspace_id, action, occurred_at DESC)`); DATA = el resto.
+      const exact = [...q.category.security.exact];
+      query = query.where(
+        q.category.kind === 'SECURITY'
+          ? sql<boolean>`action = ANY(${exact}::text[])`
+          : sql<boolean>`action <> ALL(${exact}::text[])`,
+      );
+    }
     if (q.from) query = query.where('occurred_at', '>=', q.from);
     if (q.to) query = query.where('occurred_at', '<', q.to);
     if (q.after) {
@@ -215,4 +229,14 @@ export async function ensureAuditPartitions(
   const created = await pool.query<{ n: number }>('SELECT audit.ensure_partitions($1) AS n', [monthsAhead]);
   const rows = await pool.query<{ n: string }>('SELECT audit.default_partition_rows()::text AS n');
   return { created: created.rows[0]?.n ?? 0, defaultRows: Number(rows.rows[0]?.n ?? 0) };
+}
+
+// ───────────────────────────────────────────── add-global-audit-view: fallos de autorización
+
+/** ¿Existe un workspace activo con ese id? `iam.workspace_exists` (SECURITY DEFINER): solo un booleano, nunca filas. */
+export class PgWorkspaceExistence implements WorkspaceExistence {
+  async exists(workspaceId: string): Promise<boolean> {
+    const r = await sql<{ e: boolean }>`SELECT iam.workspace_exists(${workspaceId}::uuid) AS e`.execute(db());
+    return r.rows[0]?.e === true;
+  }
 }

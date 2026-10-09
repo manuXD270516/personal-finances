@@ -6,6 +6,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemMessage } from '../../errors/error-messages';
 import type { Transaction } from '../common/types';
 import { Field, formStyle, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
+import { auditHref } from '../audit/logic';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
 import { categoryOptions, type Catalogs } from './catalogs';
@@ -193,6 +194,16 @@ export function BulkEditPanel({
           <h3>{t('bulk.resultTitle')}</h3>
           <p>{t('bulk.result', { n: applied.count, id: applied.bulkOperationId })}</p>
           <p style={mutedStyle}>{t('bulk.resultHint')}</p>
+          {applied.bulkOperationId ? (
+            <p>
+              <a
+                href={ctx.href(auditHref({ correlationId: applied.bulkOperationId }))}
+                data-testid="bulk-audit-link"
+              >
+                {t('bulk.auditLink')}
+              </a>
+            </p>
+          ) : null}
           <button type="button" onClick={onClose} data-testid="bulk-close">
             {t('bulk.close')}
           </button>

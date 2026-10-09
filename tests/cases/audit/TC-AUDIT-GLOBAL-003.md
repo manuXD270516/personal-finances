@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/audit/src/application/audit-global-view.test.ts
+  - apps/api/test/api/audit-global.api.test.ts
+  - apps/web/src/ui/audit/audit.test.tsx
+  - tests/e2e/specs/audit-global.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["audit", "export", "csv"]

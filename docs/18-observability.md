@@ -161,6 +161,8 @@ Rate = conteo del histograma; Errors = status ≥ 500 (4xx contabilizados aparte
 | `pf.ml.forecast.mase` | Gauge | `scope_type` (total/category/account), agregado sin ids |
 | `pf.auth.login_failures.total` | Counter | `reason` |
 | `pf.audit.write_failures.total` | Counter | **Debe ser 0** |
+| `pf.authz.denied` | Counter | `code` (`INSUFFICIENT_ROLE`/`WORKSPACE_ACCESS_DENIED`; Prometheus: `pf_authz_denied_total`). Cada rechazo de autorización, se audite o no (nunca usuario ni workspace) |
+| `pf.authz.denial_audit_failures` | Counter | Falló la escritura de auditoría de un rechazo (el rechazo sigue siendo 403; Prometheus: `pf_authz_denial_audit_failures_total`). **Debe ser 0** |
 
 ## 6. Health checks
 

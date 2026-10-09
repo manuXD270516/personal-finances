@@ -50,19 +50,30 @@ interface LocalParts {
   readonly offset: string;
 }
 
+/** Un `Intl.DateTimeFormat` por zona: construirlo por fila costaba ~0,2 ms (50 000 filas del export del log ≈ 9 s). */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatterOf(timeZone: string): Intl.DateTimeFormat {
+  let f = formatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+      timeZoneName: 'longOffset',
+    });
+    formatters.set(timeZone, f);
+  }
+  return f;
+}
+
 /** Partes locales de un instante en `timeZone` (IANA), con su desfase. */
 function localParts(iso: string, timeZone: string): LocalParts {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-    timeZoneName: 'longOffset',
-  }).formatToParts(new Date(iso));
+  const parts = formatterOf(timeZone).formatToParts(new Date(iso));
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
   const gmt = get('timeZoneName'); // "GMT-04:00" o "GMT" (UTC)
   const offset = /^GMT[+-]\d{2}:\d{2}$/u.test(gmt) ? gmt.slice(3) : '+00:00';
@@ -152,8 +163,13 @@ const NEEDS_QUOTES = /[",\r\n]/u;
  * entrecomilla si contiene comillas, comas o saltos de línea, duplicando las comillas internas.
  */
 export function csvCell(value: string): string {
-  const safe = FORMULA_START.test(value) && !DECIMAL.test(value) ? `'${value}` : value;
+  const safe = neutralizeFormula(value);
   return NEEDS_QUOTES.test(safe) ? `"${safe.replace(/"/gu, '""')}"` : safe;
+}
+
+/** Neutraliza un texto que una hoja de cálculo evaluaría como fórmula (prefijo `'`), salvo un decimal exacto. */
+export function neutralizeFormula(value: string): string {
+  return FORMULA_START.test(value) && !DECIMAL.test(value) ? `'${value}` : value;
 }
 
 /** BOM UTF-8: Excel reconoce la codificación (tildes, ñ). */

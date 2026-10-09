@@ -12,6 +12,7 @@ import {
   type TransactionKind,
   type TransactionStatus,
 } from '../common/types';
+import { auditHref } from '../audit/logic';
 import { Field, inputStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
@@ -89,6 +90,7 @@ function Register({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [status, setStatus] = useState<string | undefined>();
+  const [bulkAudit, setBulkAudit] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   // Panel de edición masiva (add-bulk-edit): sobre lo seleccionado o sobre todo lo filtrado (≤ 500).
   const [bulk, setBulk] = useState<{ target: BulkTarget; focus: BulkFocus } | undefined>();
@@ -504,12 +506,20 @@ function Register({
           onTargetChange={(ids) => setSelected(new Set(ids))}
           onApplied={(result) => {
             setStatus(t('bulk.result', { n: result.count, id: result.bulkOperationId }));
+            setBulkAudit(result.bulkOperationId || undefined);
             setSelected(new Set());
             load();
           }}
         />
       ) : null}
       {status ? <p role="status">{status}</p> : null}
+      {bulkAudit ? (
+        <p>
+          <a href={ctx.href(auditHref({ correlationId: bulkAudit }))} data-testid="bulk-audit-link-list">
+            {t('bulk.auditLink')}
+          </a>
+        </p>
+      ) : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {items ? (
         <TransactionsListView
