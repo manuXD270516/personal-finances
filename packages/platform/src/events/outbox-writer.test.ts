@@ -102,6 +102,32 @@ describe('PgOutboxWriter y EventSchemaRegistry (platform/event-delivery)', () =>
     expect(statements.filter((s) => s.text === 'ROLLBACK')).toHaveLength(2);
   });
 
+  it('appendMany valida todos los eventos y los inserta con sentencias multi-fila; uno inválido no escribe ninguno', async () => {
+    const { pool, statements } = fakePool();
+    const writer = new PgOutboxWriter(registry);
+    const uow = new PgUnitOfWork(pool);
+    const correlationId = uuidv7();
+    const envelopes = await uow.run({ userId: USER, workspaceId: WORKSPACE }, () =>
+      writer.appendMany([
+        { ...workspaceCreated(validPayload), correlationId },
+        { ...workspaceCreated(validPayload), correlationId },
+        { ...workspaceCreated(validPayload), correlationId },
+      ]),
+    );
+    expect(envelopes.map((e) => e.correlationId)).toEqual([correlationId, correlationId, correlationId]);
+    const inserts = statements.filter((s) => s.text.startsWith('insert into "platform"."outbox"'));
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]?.values).toEqual(expect.arrayContaining(envelopes.map((e) => e.eventId)));
+    const { baseCurrency: _omitted, ...withoutCurrency } = validPayload;
+    statements.length = 0;
+    await expect(
+      uow.run({ userId: USER, workspaceId: WORKSPACE }, () =>
+        writer.appendMany([workspaceCreated(validPayload), workspaceCreated(withoutCurrency)]),
+      ),
+    ).rejects.toBeInstanceOf(EventContractError);
+    expect(statements.some((s) => s.text.includes('outbox'))).toBe(false);
+  });
+
   it('rechaza escribir fuera de una unidad de trabajo', async () => {
     await expect(new PgOutboxWriter(registry).append(workspaceCreated(validPayload))).rejects.toThrow(
       /unidad de trabajo/,

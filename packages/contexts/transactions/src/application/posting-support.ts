@@ -12,7 +12,7 @@ import {
   type TransactionStatus,
   type TransactionTransitionRecord,
 } from '../domain/index.js';
-import type { TransactionsDeps } from './ports/index.js';
+import type { OutboxEvent, TransactionsDeps } from './ports/index.js';
 
 /**
  * Pasos compartidos por los casos de uso de TRANSACTIONS (transacciones, transferencias y conversiones), siempre
@@ -58,26 +58,48 @@ export function linkEntry(
   });
 }
 
+/**
+ * Arma el registro del outbox y la referencia del evento para el registro de transición (add-lifecycle-timeline) sin
+ * escribirlo: las operaciones masivas (add-bulk-edit) reúnen los eventos de todas las transacciones y los escriben con una
+ * sola sentencia multi-fila.
+ */
+export function buildEvent(
+  deps: Deps,
+  tx: Transaction,
+  event: { readonly eventType: string; readonly eventVersion: number },
+  payload: object,
+  /** Correlación explícita (operaciones masivas: `bulkOperationId`); por defecto la de la petición. */
+  correlationId?: string,
+): { readonly record: OutboxEvent; readonly ref: LifecycleEventRefDto } {
+  const eventId = deps.ids.next();
+  return {
+    record: {
+      eventId,
+      eventType: event.eventType,
+      eventVersion: event.eventVersion,
+      occurredAt: deps.clock.now().toString(),
+      workspaceId: tx.workspaceId,
+      aggregateType: 'Transaction',
+      aggregateId: tx.id,
+      aggregateVersion: tx.version,
+      payload,
+      ...(correlationId ? { correlationId } : {}),
+    },
+    ref: { eventId, eventType: `${event.eventType}.v${event.eventVersion}` },
+  };
+}
+
 /** Publica en el outbox y devuelve la referencia del evento para el registro de transición (add-lifecycle-timeline). */
 export async function publishEvent(
   deps: Deps,
   tx: Transaction,
   event: { readonly eventType: string; readonly eventVersion: number },
   payload: object,
+  correlationId?: string,
 ): Promise<LifecycleEventRefDto> {
-  const eventId = deps.ids.next();
-  await deps.outbox.append({
-    eventId,
-    eventType: event.eventType,
-    eventVersion: event.eventVersion,
-    occurredAt: deps.clock.now().toString(),
-    workspaceId: tx.workspaceId,
-    aggregateType: 'Transaction',
-    aggregateId: tx.id,
-    aggregateVersion: tx.version,
-    payload,
-  });
-  return { eventId, eventType: `${event.eventType}.v${event.eventVersion}` };
+  const { record, ref } = buildEvent(deps, tx, event, payload, correlationId);
+  await deps.outbox.append(record);
+  return ref;
 }
 
 export const legsPayload = (s: TransactionState) =>

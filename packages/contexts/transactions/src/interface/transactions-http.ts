@@ -14,6 +14,7 @@ import type { AuditLogEntryDto } from '@pf/audit/contracts';
 import type { ConversionCostDto } from '@pf/fx/contracts';
 import type { CustomFieldFilter, TransactionSort } from '../application/ports/index.js';
 import type {
+  ListTransactionsQuery,
   MoneyDto,
   RecordTransactionCommand,
   RecordTransferCommand,
@@ -61,6 +62,54 @@ function customFieldFilters(q: Json): CustomFieldFilter[] {
             ...(typeof (v as Json)['lte'] === 'string' ? { lte: (v as Json)['lte'] as string } : {}),
           },
     );
+}
+
+/** Filtros del listado tal como firman el cursor (`null` = ausente), a partir de los parámetros de consulta. */
+export function listFiltersOf(query: Json) {
+  return {
+    q: str(query, 'q') ?? null,
+    accountId: list(query, 'accountId') ?? null,
+    source: list(query, 'source') ?? null,
+    categoryId: list(query, 'categoryId') ?? null,
+    tagId: list(query, 'tagId') ?? null,
+    paymentMethod: list(query, 'paymentMethod') ?? null,
+    counterpartyId: list(query, 'counterpartyId') ?? null,
+    kind: list(query, 'kind') ?? null,
+    status: list(query, 'status') ?? null,
+    systemFlag: list(query, 'systemFlag') ?? null,
+    currency: str(query, 'currency') ?? null,
+    dateFrom: str(query, 'dateFrom') ?? null,
+    dateTo: str(query, 'dateTo') ?? null,
+    amountMin: str(query, 'amountMin') ?? null,
+    amountMax: str(query, 'amountMax') ?? null,
+    customField: customFieldFilters(query),
+    sort: str(query, 'sort') ?? '-transactionDate',
+  };
+}
+
+/** Filtros del listado en la forma del caso de uso (compartidos con la vista previa de la edición masiva). */
+export function listQueryOf(
+  filters: ReturnType<typeof listFiltersOf>,
+): Omit<ListTransactionsQuery, 'workspaceId' | 'offset' | 'limit'> {
+  return {
+    sort: filters.sort as TransactionSort,
+    ...(filters.q ? { q: filters.q } : {}),
+    ...(filters.accountId ? { accountIds: filters.accountId } : {}),
+    ...(filters.source ? { sources: filters.source as TransactionSource[] } : {}),
+    ...(filters.categoryId ? { categoryIds: filters.categoryId } : {}),
+    ...(filters.tagId ? { tagIds: filters.tagId } : {}),
+    ...(filters.paymentMethod ? { paymentMethods: filters.paymentMethod as PaymentMethod[] } : {}),
+    ...(filters.counterpartyId ? { counterpartyIds: filters.counterpartyId } : {}),
+    ...(filters.kind ? { kinds: filters.kind as TransactionKind[] } : {}),
+    ...(filters.status ? { statuses: filters.status as TransactionStatus[] } : {}),
+    ...(filters.systemFlag ? { systemFlags: filters.systemFlag as SystemFlag[] } : {}),
+    ...(filters.currency ? { currency: filters.currency } : {}),
+    ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
+    ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
+    ...(filters.amountMin ? { amountMin: filters.amountMin } : {}),
+    ...(filters.amountMax ? { amountMax: filters.amountMax } : {}),
+    ...(filters.customField.length > 0 ? { customFields: filters.customField } : {}),
+  };
 }
 
 export function limitOf(q: Json): number {
@@ -152,25 +201,7 @@ export class TransactionsController {
   @Get('workspaces/:workspaceId/transactions')
   async listTransactions(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
     const limit = limitOf(query);
-    const filters = {
-      q: str(query, 'q') ?? null,
-      accountId: list(query, 'accountId') ?? null,
-      source: list(query, 'source') ?? null,
-      categoryId: list(query, 'categoryId') ?? null,
-      tagId: list(query, 'tagId') ?? null,
-      paymentMethod: list(query, 'paymentMethod') ?? null,
-      counterpartyId: list(query, 'counterpartyId') ?? null,
-      kind: list(query, 'kind') ?? null,
-      status: list(query, 'status') ?? null,
-      systemFlag: list(query, 'systemFlag') ?? null,
-      currency: str(query, 'currency') ?? null,
-      dateFrom: str(query, 'dateFrom') ?? null,
-      dateTo: str(query, 'dateTo') ?? null,
-      amountMin: str(query, 'amountMin') ?? null,
-      amountMax: str(query, 'amountMax') ?? null,
-      customField: customFieldFilters(query),
-      sort: str(query, 'sort') ?? '-transactionDate',
-    };
+    const filters = listFiltersOf(query);
     const scope = { resource: 'transactions', workspaceId, filters };
     const cursor = str(query, 'cursor');
     let offset = 0;
@@ -185,23 +216,7 @@ export class TransactionsController {
       workspaceId,
       offset,
       limit: limit + 1,
-      sort: filters.sort as TransactionSort,
-      ...(filters.q ? { q: filters.q } : {}),
-      ...(filters.accountId ? { accountIds: filters.accountId } : {}),
-      ...(filters.source ? { sources: filters.source as TransactionSource[] } : {}),
-      ...(filters.categoryId ? { categoryIds: filters.categoryId } : {}),
-      ...(filters.tagId ? { tagIds: filters.tagId } : {}),
-      ...(filters.paymentMethod ? { paymentMethods: filters.paymentMethod as PaymentMethod[] } : {}),
-      ...(filters.counterpartyId ? { counterpartyIds: filters.counterpartyId } : {}),
-      ...(filters.kind ? { kinds: filters.kind as TransactionKind[] } : {}),
-      ...(filters.status ? { statuses: filters.status as TransactionStatus[] } : {}),
-      ...(filters.systemFlag ? { systemFlags: filters.systemFlag as SystemFlag[] } : {}),
-      ...(filters.currency ? { currency: filters.currency } : {}),
-      ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
-      ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
-      ...(filters.amountMin ? { amountMin: filters.amountMin } : {}),
-      ...(filters.amountMax ? { amountMax: filters.amountMax } : {}),
-      ...(filters.customField.length > 0 ? { customFields: filters.customField } : {}),
+      ...listQueryOf(filters),
     });
     const rows = found.map((s, i) => ({ s, at: offset + i + 1 }));
     const page = buildPage(

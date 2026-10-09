@@ -10,6 +10,11 @@ import type { EventSchemaRegistry } from './schema-registry.js';
 /** Puerto: registra eventos de dominio en la transacción del comando en curso. */
 export interface OutboxWriter {
   append<P extends object>(draft: DomainEventDraft<P>): Promise<EventEnvelope<P>>;
+  /**
+   * Varios eventos con una sola sentencia multi-fila (operaciones masivas, openspec add-bulk-edit): cada uno se valida
+   * igual que con `append` y, si alguno es inválido, no se escribe ninguno. Opcional: sin ella el llamador usa `append`.
+   */
+  appendMany?(drafts: readonly DomainEventDraft[]): Promise<EventEnvelope[]>;
 }
 
 /** Columnas de `platform.outbox` que escribe el productor (rol `pf_app`, solo INSERT). */
@@ -67,6 +72,9 @@ export function buildEnvelope<P extends object>(draft: DomainEventDraft<P>): Eve
   };
 }
 
+/** Filas por sentencia en la inserción masiva. */
+const INSERT_CHUNK = 500;
+
 /**
  * Escritor del outbox sobre PostgreSQL (openspec add-event-outbox, design §2). Inserta con Kysely sobre la conexión
  * de la `PgUnitOfWork` en curso: misma transacción y mismo contexto RLS que el cambio de estado; si el comando se
@@ -80,24 +88,44 @@ export class PgOutboxWriter implements OutboxWriter {
     requireSqlExecutor();
     const envelope = buildEnvelope(draft);
     this.schemas.validate(envelope as EventEnvelope);
-    const traceContext: Record<string, string> = {};
-    propagation.inject(context.active(), traceContext);
     await unitOfWorkKysely<OutboxDb>()
       .insertInto('platform.outbox')
-      .values({
-        id: envelope.eventId,
-        workspace_id: envelope.workspaceId,
-        event_type: envelope.eventType,
-        event_version: envelope.eventVersion,
-        aggregate_type: envelope.aggregateType,
-        aggregate_id: envelope.aggregateId,
-        aggregate_version: envelope.aggregateVersion,
-        occurred_at: envelope.occurredAt,
-        correlation_id: envelope.correlationId,
-        envelope: JSON.stringify(envelope),
-        trace_context: JSON.stringify(traceContext),
-      })
+      .values(this.row(envelope as EventEnvelope))
       .execute();
     return envelope;
+  }
+
+  /** Valida todos los eventos y los inserta en sentencias multi-fila (misma transacción que `append`). */
+  async appendMany(drafts: readonly DomainEventDraft[]): Promise<EventEnvelope[]> {
+    requireSqlExecutor();
+    if (drafts.length === 0) return [];
+    const envelopes = drafts.map((d) => buildEnvelope(d));
+    for (const e of envelopes) this.schemas.validate(e as EventEnvelope);
+    const rows = envelopes.map((e) => this.row(e));
+    for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+      await unitOfWorkKysely<OutboxDb>()
+        .insertInto('platform.outbox')
+        .values(rows.slice(i, i + INSERT_CHUNK))
+        .execute();
+    }
+    return envelopes;
+  }
+
+  private row(envelope: EventEnvelope) {
+    const traceContext: Record<string, string> = {};
+    propagation.inject(context.active(), traceContext);
+    return {
+      id: envelope.eventId,
+      workspace_id: envelope.workspaceId,
+      event_type: envelope.eventType,
+      event_version: envelope.eventVersion,
+      aggregate_type: envelope.aggregateType,
+      aggregate_id: envelope.aggregateId,
+      aggregate_version: envelope.aggregateVersion,
+      occurred_at: envelope.occurredAt,
+      correlation_id: envelope.correlationId,
+      envelope: JSON.stringify(envelope),
+      trace_context: JSON.stringify(traceContext),
+    };
   }
 }

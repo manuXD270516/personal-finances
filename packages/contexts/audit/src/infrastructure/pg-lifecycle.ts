@@ -47,6 +47,39 @@ interface LifecycleDb {
 
 const db = (): Kysely<LifecycleDb> => unitOfWorkKysely<LifecycleDb>();
 
+const lifecycleRow = (e: LifecycleEntry) => ({
+  id: e.id,
+  workspace_id: e.workspaceId,
+  aggregate_type: e.aggregateType,
+  aggregate_id: e.aggregateId,
+  sequence: e.sequence,
+  kind: e.kind,
+  transition: e.transition,
+  from_state: e.fromState,
+  to_state: e.toState,
+  machine_version: e.machineVersion,
+  revision_from: e.revisionFrom,
+  revision_to: e.revisionTo,
+  aggregate_version: e.aggregateVersion,
+  occurred_at: e.occurredAt.toDate(),
+  actor_type: e.actor.type,
+  actor_id: e.actor.userId,
+  actor_process: e.actor.process,
+  origin: e.origin,
+  reason: e.reason,
+  correlation_id: e.correlationId,
+  audit_log_id: e.auditLogId,
+  event_ids: sql<string[]>`${[...e.eventIds]}::uuid[]`,
+  event_types: sql<string[]>`${[...e.eventTypes]}::text[]`,
+  journal_entries: sql<LifecycleTable['journal_entries']>`${JSON.stringify(e.journalEntries)}::jsonb`,
+  detail_refs: sql<LifecycleTable['detail_refs']>`${JSON.stringify(e.detailRefs)}::jsonb`,
+  changed_fields: sql<string[]>`${[...e.changedFields]}::text[]`,
+  derived: e.derived,
+});
+
+/** Filas por sentencia en la inserción masiva (27 columnas ⇒ muy por debajo del límite de parámetros). */
+const INSERT_CHUNK = 500;
+
 /**
  * Almacén de `audit.lifecycle_transition` sobre la `PgUnitOfWork` en curso (misma transacción que el comando, INV-029;
  * RLS del workspace). Solo INSERT/SELECT: la tabla rechaza UPDATE/DELETE/TRUNCATE (grants + PF003).
@@ -63,39 +96,36 @@ export class PgLifecycleStore implements LifecycleStore {
     return Number(row.next);
   }
 
+  /** Siguiente `sequence` de cada agregado (una consulta para todos; misma semántica que `nextSequence`). */
+  async nextSequences(
+    workspaceId: string,
+    aggregates: readonly { readonly aggregateType: string; readonly aggregateId: string }[],
+  ): Promise<readonly number[]> {
+    if (aggregates.length === 0) return [];
+    const rows = await sql<{ aggregate_type: string; aggregate_id: string; last: number }>`
+      SELECT aggregate_type, aggregate_id::text AS aggregate_id, max(sequence) AS last
+        FROM audit.lifecycle_transition
+       WHERE workspace_id = ${workspaceId}
+         AND (aggregate_type, aggregate_id) IN (
+           SELECT * FROM unnest(${aggregates.map((a) => a.aggregateType)}::text[],
+                                ${aggregates.map((a) => a.aggregateId)}::uuid[]))
+       GROUP BY aggregate_type, aggregate_id`.execute(db());
+    const last = new Map(rows.rows.map((r) => [`${r.aggregate_type}|${r.aggregate_id}`, Number(r.last)]));
+    return aggregates.map((a) => (last.get(`${a.aggregateType}|${a.aggregateId}`) ?? 0) + 1);
+  }
+
   async insert(e: LifecycleEntry): Promise<void> {
-    await db()
-      .insertInto('audit.lifecycle_transition')
-      .values({
-        id: e.id,
-        workspace_id: e.workspaceId,
-        aggregate_type: e.aggregateType,
-        aggregate_id: e.aggregateId,
-        sequence: e.sequence,
-        kind: e.kind,
-        transition: e.transition,
-        from_state: e.fromState,
-        to_state: e.toState,
-        machine_version: e.machineVersion,
-        revision_from: e.revisionFrom,
-        revision_to: e.revisionTo,
-        aggregate_version: e.aggregateVersion,
-        occurred_at: e.occurredAt.toDate(),
-        actor_type: e.actor.type,
-        actor_id: e.actor.userId,
-        actor_process: e.actor.process,
-        origin: e.origin,
-        reason: e.reason,
-        correlation_id: e.correlationId,
-        audit_log_id: e.auditLogId,
-        event_ids: sql<string[]>`${[...e.eventIds]}::uuid[]`,
-        event_types: sql<string[]>`${[...e.eventTypes]}::text[]`,
-        journal_entries: sql<LifecycleTable['journal_entries']>`${JSON.stringify(e.journalEntries)}::jsonb`,
-        detail_refs: sql<LifecycleTable['detail_refs']>`${JSON.stringify(e.detailRefs)}::jsonb`,
-        changed_fields: sql<string[]>`${[...e.changedFields]}::text[]`,
-        derived: e.derived,
-      })
-      .execute();
+    await db().insertInto('audit.lifecycle_transition').values(lifecycleRow(e)).execute();
+  }
+
+  /** Inserción multi-fila de los pasos de una operación masiva. */
+  async insertMany(entries: readonly LifecycleEntry[]): Promise<void> {
+    for (let i = 0; i < entries.length; i += INSERT_CHUNK) {
+      await db()
+        .insertInto('audit.lifecycle_transition')
+        .values(entries.slice(i, i + INSERT_CHUNK).map(lifecycleRow))
+        .execute();
+    }
   }
 
   async entriesOf(

@@ -68,6 +68,7 @@
   "RECONCILIATION_IN_PROGRESS": "Esta conta já tem uma conciliação em andamento. Conclua ou cancele antes de iniciar outra.",
   "RECONCILIATION_STATEMENT_DATE_INVALID": "A data do extrato não pode ser futura nem anterior ou igual à da última conciliação concluída.",
   "RECONCILIATION_DIFFERENCE_NOT_ZERO": "A diferença em relação ao extrato não é zero. Revise as transações ou confirme um ajuste com motivo.",
+  "BULK_EDIT_NOT_APPLICABLE": "A alteração não pode ser aplicada a uma das transações (por exemplo, mudar a categoria de uma despesa dividida em várias partes).",
   "PERIOD_NOT_STARTED": "Esse período ainda não começou no fuso horário do espaço de trabalho. Você poderá ativá-lo a partir da data de início.",
   "PERIOD_NOT_ENDED": "Esse período ainda não terminou no fuso horário do espaço de trabalho. Você poderá fechá-lo a partir do dia seguinte.",
   "PERIOD_PREVIOUS_NOT_CLOSED": "Feche primeiro o período anterior: os períodos são fechados em ordem cronológica.",

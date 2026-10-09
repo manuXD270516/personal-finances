@@ -255,6 +255,7 @@ Content-Type: application/json
 | transactions (P2) | `RECONCILIATION_IN_PROGRESS` | 409 | La cuenta ya tiene una sesión de reconciliación en curso (`startReconciliation`, `add-reconciliation`) |
 | transactions (P2) | `RECONCILIATION_STATEMENT_DATE_INVALID` | 422 | Fecha del extracto futura (hoy en la zona del workspace) o no posterior a la de la última sesión completada |
 | transactions (P2) | `RECONCILIATION_DIFFERENCE_NOT_ZERO` | 422 | Finalizar con diferencia ≠ 0 sin ajuste confirmado; el problem incluye la extensión `difference` (`Money`) |
+| transactions (P2) | `BULK_EDIT_NOT_APPLICABLE` | 422 | Edición masiva: el cambio no aplica a la transacción (categoría sobre una transacción con varios splits, transferencia o conversión; tags o custom fields sobre una sin splits clasificables); `errors[]` indica cada ítem |
 | transactions | `REFUND_EXCEEDS_ORIGINAL` | 422 | Σ reembolsos vigentes + nuevo > monto del gasto original (salvo `confirmRefundExceedsOriginal: true`, auditado) |
 | transactions | `TRANSFER_SAME_ACCOUNT` | 422 | Origen = destino |
 | transactions | `TRANSFER_CURRENCY_MISMATCH` | 422 | Cuentas (o comisión) en otra moneda: la transferencia es de una sola moneda; el problem incluye `suggestedOperationId` (`createConversion`). Una comisión en otra moneda o desde otra cuenta se registra como conversión o gasto aparte (docs/31 D37, D40) |
@@ -319,20 +320,22 @@ El catálogo vive en `components.schemas.ErrorCode` del contrato (enum abierto) 
 
 ## 12. Bulk endpoints
 
-`POST /workspaces/{ws}/transactions/bulk-edit` (capability `transactions/bulk-edit`, Phase 2):
+`POST /workspaces/{ws}/transactions/bulk-edit` (`bulkEditTransactions`, capability `transactions/bulk-edit`, Phase 2; EDITOR u OWNER):
 
 ```json
 {
   "items": [ { "id": "0192...", "version": 4 }, { "id": "0192...", "version": 2 } ],
-  "changes": { "categoryId": "0192...", "addTagIds": ["0192..."], "removeTagIds": [], "counterpartyId": null },
-  "mode": "ALL_OR_NOTHING"
+  "changes": { "categoryId": "0192...", "addTagIds": ["0192..."], "removeTagIds": [], "counterpartyId": null, "cleared": true }
 }
 ```
 
-- Solo cambios de **clasificación** (categoría de split único, tags, counterparty, notas): no tocan el ledger (INV-033), por eso son baratos y seguros en lote.
-- Máximo 500 items síncronos; `mode`: `ALL_OR_NOTHING` (una transacción BD; cualquier conflicto ⇒ `409` con detalle por item) o `BEST_EFFORT` (`207`-like: `200` con `results[]` por item: `UPDATED | CONFLICT | NOT_FOUND | INVALID`).
-- Por encima de 500 o con selección por filtro (`"filter": {...}` en lugar de `items`) ⇒ `202` + operation.
-- `Idempotency-Key` obligatorio; un audit log por item + uno agregado con `correlationId` común.
+- Solo cambios de **clasificación** (categoría de split único, tags, counterparty, notas, custom fields) y el estado `cleared` (`POSTED ↔ CLEARED`): no tocan el ledger (INV-033), por eso son baratos y seguros en lote. `changes` es `additionalProperties: false`: monto, cuenta, fecha, moneda, splits, otro estado o `systemFlags` (docs/33 D111) ⇒ `400 VALIDATION_FAILED` y no cambia nada.
+- **Modo único `ALL_OR_NOTHING`** (docs/33 D94): una transacción BD con `SELECT … FOR UPDATE` ordenado por id (`lock_timeout` 5 s ⇒ `409 CONCURRENCY_CONFLICT` reintentable). Se evalúan **todos** los ítems y la respuesta lista todos los fallos en `errors[]` (`pointer: /items/<i>`, `code` por ítem); el estado HTTP es el del error de mayor prioridad: `404` > `403` > `412` (`PRECONDITION_FAILED`, versión obsoleta) > `409` (`PERIOD_CLOSED`, `TRANSACTION_RECONCILED`, `INVALID_STATUS_TRANSITION`, `CATEGORY_ARCHIVED`…) > `422` (`BULK_EDIT_NOT_APPLICABLE`, `CATEGORY_KIND_MISMATCH`, `CUSTOM_FIELD_VALUE_INVALID`…). No existe `BEST_EFFORT` ni ejecución asíncrona (`202`) en Phase 2; se evalúan con imports (Phase 6).
+- Máximo **500** ítems (`maxItems`; 501 ⇒ `400 VALIDATION_FAILED`), cada uno con su `version` (el equivalente por ítem de `If-Match`). `Idempotency-Key` obligatorio: el reenvío devuelve la respuesta original (`Idempotent-Replayed: true`), la misma clave con otro contenido `422 IDEMPOTENCY_KEY_REUSED`.
+- Periodos cerrados con el alcance único de D65: categoría, tags, contraparte, custom fields y `cleared` ⇒ `409 PERIOD_CLOSED` por ítem; las notas se permiten.
+- Auditoría: un `AuditLog` por transacción cambiada (`changes` incluye `bulkOperationId`) más uno agregado (`transactions.transaction.bulk_edited`, agregado `TransactionBulkOperation`); el `bulkOperationId` (UUIDv7) es el `correlation_id` de la auditoría, del recorrido y del outbox de toda la operación. No hay "deshacer" (D95): se revierte con otra edición masiva a partir de la auditoría filtrada por `bulkOperationId`.
+- **Vista previa** `POST /workspaces/{ws}/transactions/bulk-edit/preview` (`previewBulkEditTransactions`, sin efectos ni `Idempotency-Key`): `selection` es `{ "items": [{ "id" }] }` o `{ "filter": {…los filtros de listTransactions…} }` y devuelve `{ count, truncated, items: [{ id, version, applicable, reasons: [código] }] }` (hasta 500; `truncated` si el filtro devuelve más). La ejecución envía las transacciones y versiones que la vista previa mostró.
+- Rate limit: cuenta como una escritura más (120/min). El bucket de 10/min de exports/imports (§10) no existe todavía en la plataforma; queda pendiente para cuando se implementen.
 - Bulk `void` **no** se ofrece en v1 (riesgo alto; se hace uno por uno o vía revert de import).
 
 ---
@@ -349,7 +352,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | accounts | `GET/POST W/accounts`, `PUT W/accounts/order` (`reorderAccounts`), `GET/PATCH W/accounts/{id}`, `POST …/archive`, `POST …/close` (saldo cero, si no `409 ACCOUNT_BALANCE_NOT_ZERO`), `POST …/reactivate` (estados `ACTIVE`/`CLOSED`/`ARCHIVED`), `GET …/balance-history` (P7) | `accounts/account-management` | 1 |
 | institutions | `GET/POST W/institutions`, `GET/PATCH …/{id}`, `POST …/archive` | `accounts/institutions` | 1 |
 | transactions | `GET/POST W/transactions`, `GET/PATCH …/{id}`, `POST …/{id}/post` (pending → posted), `POST …/{id}/void`, `GET …/{id}/history` (`getTransactionHistory`, revisiones), `POST W/transactions/duplicate-check` (`checkTransactionDuplicates`, EDITOR, sin efectos), `POST W/transactions/mark-cleared` (`markTransactionsCleared`, en lote), `POST …/{id}/unreconcile` (`unreconcileTransaction`) | `transactions/transaction-recording`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection` | 1 |
-| transactions bulk | `POST W/transactions/bulk-edit` | `transactions/bulk-edit` | 2 |
+| transactions bulk | `POST W/transactions/bulk-edit` (`bulkEditTransactions`), `POST W/transactions/bulk-edit/preview` (`previewBulkEditTransactions`, sin efectos); EDITOR | `transactions/bulk-edit` | 2 |
 | transfers | `POST W/transfers` (fachada: crea transacción `TRANSFER`) | `transactions/transfers` | 1 |
 | conversions | `GET/POST W/conversions`, `POST W/conversions/preview` (`previewConversion`, VIEWER, sin efectos), `GET …/{transactionId}`, `PUT …/{transactionId}` (`amendConversion`, nueva revisión de `ConversionDetail`), `GET …/{transactionId}/revisions` (`listConversionRevisions`) | `transactions/conversions`, `fx/conversion-pricing` | 1 |
 | reconciliations | `GET/POST W/reconciliations` (`listReconciliations`, `startReconciliation`), `GET …/{id}` (`getReconciliation`, saldo confirmado y diferencia en vivo), `POST …/{id}/cleared` (`toggleReconciliationCleared`), `POST …/{id}/complete` (`completeReconciliation`, con ajuste opcional), `POST …/{id}/cancel` (`cancelReconciliation`), `GET …/{id}/lifecycle` (`getReconciliationLifecycle`) y `GET …/{id}/lifecycle/export` (`exportReconciliationLifecycle`, CSV/PDF, D52), `GET W/accounts/{id}/reconciliation-status` (`getReconciliationStatus`); `PATCH …/transactions/{id}` con `status=RECONCILED` exige `reconciliationMode: WITHOUT_STATEMENT`; filtro `systemFlag` en `listTransactions` | `transactions/reconciliation`, `audit/lifecycle-timeline` | 2 |

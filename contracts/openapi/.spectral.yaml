@@ -210,5 +210,6 @@ overrides:
   - files:
       - 'finance-api.v1.yaml#/paths/~1workspaces~1%7BworkspaceId%7D~1conversions~1preview/post'
       - 'finance-api.v1.yaml#/paths/~1workspaces~1%7BworkspaceId%7D~1transactions~1duplicate-check/post'
+      - 'finance-api.v1.yaml#/paths/~1workspaces~1%7BworkspaceId%7D~1transactions~1bulk-edit~1preview/post'
     rules:
       pfos-idempotency-key-financial-post: off

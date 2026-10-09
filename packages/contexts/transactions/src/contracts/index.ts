@@ -241,6 +241,14 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
     'customFields.*': 'plain',
   },
+  // Operación de edición masiva (add-bulk-edit): registro agregado; `requestedChanges` viaja como texto JSON.
+  TransactionBulkOperation: {
+    bulkOperationId: 'plain',
+    count: 'plain',
+    requestedCount: 'plain',
+    requestedChanges: 'plain',
+    transactionIds: 'plain',
+  },
   // Sesión de reconciliación (add-reconciliation): montos exactos; sin texto libre salvo el motivo del ajuste.
   Reconciliation: {
     accountId: 'plain',

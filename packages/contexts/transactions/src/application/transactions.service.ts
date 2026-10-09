@@ -15,6 +15,7 @@ import {
   DUPLICATE_WINDOW_DAYS,
   findDuplicates,
   normalizeText,
+  splitKindOf,
   Transaction,
   transferFee,
   type AdjustmentDirection,
@@ -198,7 +199,7 @@ const preconditionFailed = (currentVersion: number) =>
   });
 const concurrencyConflict = () =>
   new DomainError('CONCURRENCY_CONFLICT', 'the transaction was modified concurrently');
-const UPDATED_EVENT_FIELDS: ReadonlySet<ChangedField> = new Set([
+export const UPDATED_EVENT_FIELDS: ReadonlySet<ChangedField> = new Set([
   'customFields',
   'description',
   'notes',
@@ -211,8 +212,6 @@ const UPDATED_EVENT_FIELDS: ReadonlySet<ChangedField> = new Set([
   'splits',
   'reconciliationMode',
 ]);
-const splitKindOf = (kind: TransactionKind) =>
-  kind === 'INCOME' ? 'INCOME' : kind === 'REFUND' ? 'REFUND' : 'EXPENSE';
 
 /**
  * Casos de uso de TRANSACTIONS (design.md decisiones 1–13). Cada comando corre en UNA unidad de trabajo:
@@ -1413,7 +1412,7 @@ function revisionAmounts(
 }
 
 /** Nombre de campo del contrato en las anotaciones (`businessDate` se expone como `transactionDate`). */
-const changedFieldName = (f: ChangedField): string => (f === 'businessDate' ? 'transactionDate' : f);
+export const changedFieldName = (f: ChangedField): string => (f === 'businessDate' ? 'transactionDate' : f);
 
 function auditActionForStatus(
   requested: string | undefined,
@@ -1441,7 +1440,7 @@ function customFieldAudit(changes: readonly CustomFieldChange[]): AuditChangeInp
   }));
 }
 
-function diff(
+export function diff(
   before: TransactionState,
   after: TransactionState,
   fields: readonly ChangedField[],

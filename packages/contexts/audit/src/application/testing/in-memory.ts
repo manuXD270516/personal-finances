@@ -99,6 +99,26 @@ export class InMemoryAudit
     return this.insertAudit(entry);
   }
 
+  /** Inserciones multi-fila: todo o nada, como una sola sentencia SQL. */
+  async insertMany(entries: readonly (AuditRecord | LifecycleEntry)[]): Promise<void> {
+    const audit = this.rows.length;
+    const lifecycle = this.lifecycle.length;
+    try {
+      for (const e of entries) await this.insert(e);
+    } catch (err) {
+      this.rows.length = audit;
+      this.lifecycle.length = lifecycle;
+      throw err;
+    }
+  }
+
+  async nextSequences(
+    workspaceId: string,
+    aggregates: readonly { readonly aggregateType: string; readonly aggregateId: string }[],
+  ): Promise<readonly number[]> {
+    return Promise.all(aggregates.map((a) => this.nextSequence(workspaceId, a.aggregateType, a.aggregateId)));
+  }
+
   private async insertLifecycle(entry: LifecycleEntry): Promise<void> {
     if (this.failLifecycleInserts) throw new Error('lifecycle store unavailable (fault injected)');
     if (entry.workspaceId !== this.rlsWorkspace) throw new Error('RLS: workspace mismatch');

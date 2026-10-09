@@ -1145,6 +1145,101 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/transactions/bulk-edit/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Transactions]
+      operationId: previewBulkEditTransactions
+      summary: Preview a bulk edit (no side effects)
+      description: |
+        Resolves the selection (explicit ids or the same filters as `listTransactions`, at most 500 transactions) and
+        reports, per transaction, its current `version` (the one the execution must send), whether the requested
+        changes are applicable and, when not, the error codes that would reject it (`BULK_EDIT_NOT_APPLICABLE`,
+        `PERIOD_CLOSED`, `TRANSACTION_RECONCILED`, `INVALID_STATUS_TRANSITION`, `CATEGORY_ARCHIVED`,
+        `CATEGORY_KIND_MISMATCH`, `CUSTOM_FIELD_VALUE_INVALID`, `RESOURCE_NOT_FOUND`…). `truncated` is true when the
+        filter matches more than 500 transactions (only the first 500 are reported). Safe to repeat, so no
+        `Idempotency-Key`; writes nothing, not even audit.
+      x-openspec-capability: transactions/bulk-edit
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkEditPreviewRequest' }
+      responses:
+        '200':
+          description: Scope of the bulk edit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkEditPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/transactions/bulk-edit:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Transactions]
+      operationId: bulkEditTransactions
+      summary: Edit the classification and cleared state of up to 500 transactions in one atomic operation
+      description: |
+        ALL_OR_NOTHING (the only mode in Phase 2, docs/33 D94). Every item carries the expected `version` (the
+        per-item equivalent of `If-Match`); every item is evaluated and the response lists **all** the failures in
+        `errors[]` (`pointer: /items/<i>`, `code` per item). The HTTP status is the one of the highest-priority
+        error: 404 > 403 > 412 > 409 > 422. Nothing changes if any item fails.
+
+        Never accepts amounts, accounts, dates, currency, splits, statuses other than `cleared` or `systemFlags`
+        (unknown `changes` properties → 400 `VALIDATION_FAILED`) and never touches the ledger (INV-033). `categoryId`
+        applies only to income/expense/refund transactions with exactly one split; tags and custom fields apply to
+        every split. In a closed period category, tags, counterparty, custom fields and `cleared` are rejected with
+        `PERIOD_CLOSED` (docs/33 D65); `notes` are allowed.
+
+        Each changed transaction gets its own audit record plus one aggregate record
+        (`transactions.transaction.bulk_edited`, aggregate `TransactionBulkOperation`); all of them, the lifecycle
+        records and the events carry `bulkOperationId` as their `correlationId`. There is no automatic undo: revert
+        with another bulk edit using the audit trail filtered by `bulkOperationId` (docs/33 D95).
+      x-openspec-capability: transactions/bulk-edit
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkEditRequest' }
+      responses:
+        '200':
+          description: Updated transactions, in the order of the request
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkEditResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: 'RESOURCE_NOT_FOUND for an item that does not exist in the workspace (same as one of another workspace).'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'PERIOD_CLOSED, TRANSACTION_RECONCILED, INVALID_STATUS_TRANSITION, CATEGORY_ARCHIVED, TAG_ARCHIVED, COUNTERPARTY_ARCHIVED, CUSTOM_FIELD_ARCHIVED, CONCURRENCY_CONFLICT, IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+          description: 'PRECONDITION_FAILED, with one `errors[]` entry per stale item.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'BULK_EDIT_NOT_APPLICABLE, CATEGORY_KIND_MISMATCH, CUSTOM_FIELD_VALUE_INVALID, CUSTOM_FIELD_REQUIRED, IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/transactions/duplicate-check:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -5973,6 +6068,7 @@ components:
         - RECONCILIATION_IN_PROGRESS        # 409 (add-reconciliation: the account already has a session in progress)
         - RECONCILIATION_STATEMENT_DATE_INVALID  # 422 (add-reconciliation: future date or not after the last completed session)
         - RECONCILIATION_DIFFERENCE_NOT_ZERO     # 422 (add-reconciliation: completing with a non-zero difference and no adjustment)
+        - BULK_EDIT_NOT_APPLICABLE               # 422 (add-bulk-edit: the change does not apply to the transaction, e.g. category on a multi-split expense)
 
     # ── Identity ──
     WorkspaceRole:
@@ -6845,6 +6941,177 @@ components:
         bulkOperationId:
           $ref: '#/components/schemas/Uuid'
           description: Common correlation of the per-item audit records
+    BulkEditChanges:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: |
+        What to change on every selected transaction. Any other property (amount, accountId, transactionDate,
+        currency, splits, status, systemFlags…) is a 400 `VALIDATION_FAILED`. A tag cannot be both added and removed.
+      properties:
+        categoryId:
+          $ref: '#/components/schemas/Uuid'
+        addTagIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+        removeTagIds:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId:
+          description: Counterparty of the transaction header; `null` removes it.
+          oneOf:
+            - { $ref: '#/components/schemas/Uuid' }
+            - { type: 'null' }
+        notes:
+          description: Replaces the notes; `null` removes them (allowed in closed periods).
+          type: [string, 'null']
+          maxLength: 4000
+        cleared:
+          type: boolean
+          description: true ⇒ POSTED→CLEARED; false ⇒ CLEARED→POSTED (same rules as `markTransactionsCleared`).
+        customFields:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [value]
+            properties:
+              fieldId: { $ref: '#/components/schemas/Uuid' }
+              key:
+                type: string
+                pattern: '^[a-z][a-z0-9_]{0,39}$'
+              value:
+                type: [string, boolean, 'null']
+                description: Sets the value; `null` removes it. Exactly one of `fieldId` or `key` identifies the field.
+            oneOf:
+              - required: [fieldId]
+              - required: [key]
+    BulkEditRequest:
+      type: object
+      additionalProperties: false
+      required: [items, changes]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, version]
+            properties:
+              id: { $ref: '#/components/schemas/Uuid' }
+              version: { $ref: '#/components/schemas/Version' }
+        changes: { $ref: '#/components/schemas/BulkEditChanges' }
+    BulkEditFilter:
+      type: object
+      additionalProperties: false
+      description: The same filters as `listTransactions` (all optional, combined with AND).
+      properties:
+        q: { type: string, maxLength: 200 }
+        accountId: { type: array, items: { $ref: '#/components/schemas/Uuid' } }
+        source: { type: array, items: { $ref: '#/components/schemas/TransactionSource' } }
+        categoryId: { type: array, items: { $ref: '#/components/schemas/Uuid' } }
+        tagId: { type: array, items: { $ref: '#/components/schemas/Uuid' } }
+        paymentMethod: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } }
+        counterpartyId: { type: array, items: { $ref: '#/components/schemas/Uuid' } }
+        kind: { type: array, items: { $ref: '#/components/schemas/TransactionKind' } }
+        status: { type: array, items: { $ref: '#/components/schemas/TransactionStatus' } }
+        systemFlag: { type: array, items: { $ref: '#/components/schemas/SystemFlag' } }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        dateFrom: { $ref: '#/components/schemas/LocalDate' }
+        dateTo: { $ref: '#/components/schemas/LocalDate' }
+        amountMin: { $ref: '#/components/schemas/PositiveDecimalString' }
+        amountMax: { $ref: '#/components/schemas/PositiveDecimalString' }
+        customField:
+          type: object
+          description: 'Custom field value filters by key, as in `listTransactions` (`{ "centro_costo": "oficina" }` or `{ "litros": { "gte": "10" } }`).'
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: object
+                additionalProperties: false
+                properties:
+                  gte: { type: string }
+                  lte: { type: string }
+        sort:
+          type: string
+          enum: [transactionDate, -transactionDate, amount, -amount, createdAt, -createdAt]
+          default: -transactionDate
+    BulkEditPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [selection, changes]
+      properties:
+        selection:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  uniqueItems: true
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [id]
+                    properties:
+                      id: { $ref: '#/components/schemas/Uuid' }
+            - type: object
+              additionalProperties: false
+              required: [filter]
+              properties:
+                filter: { $ref: '#/components/schemas/BulkEditFilter' }
+        changes: { $ref: '#/components/schemas/BulkEditChanges' }
+    BulkEditPreview:
+      type: object
+      required: [count, truncated, items]
+      properties:
+        count:
+          type: integer
+          minimum: 0
+          maximum: 500
+          description: Number of transactions reported in `items` (the affected transactions; at most 500).
+        truncated:
+          type: boolean
+          description: The filter matched more than 500 transactions; only the first 500 are reported.
+        items:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [id, version, applicable, reasons]
+            properties:
+              id: { $ref: '#/components/schemas/Uuid' }
+              version:
+                description: Current version, to send when executing; `null` if the transaction does not exist.
+                type: [integer, 'null']
+                minimum: 1
+              applicable: { type: boolean }
+              reasons:
+                type: array
+                description: Error codes that would reject the item (empty when applicable).
+                items: { $ref: '#/components/schemas/ErrorCode' }
+    BulkEditResult:
+      type: object
+      required: [bulkOperationId, data]
+      properties:
+        bulkOperationId:
+          $ref: '#/components/schemas/Uuid'
+          description: Correlation of the audit records, lifecycle records and events of the operation.
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
     UnreconcileRequest:
       type: object
       additionalProperties: false

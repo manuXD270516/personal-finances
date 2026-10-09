@@ -16,6 +16,8 @@ import { Field, inputStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { supportsRange } from '../custom-fields/logic';
+import { BULK_EDIT_MAX_ITEMS } from './bulk-edit-logic';
+import { BulkEditPanel, type BulkFocus, type BulkTarget } from './BulkEditPanel';
 import { categoryOptions, useCatalogs } from './catalogs';
 import { EMPTY_TRANSACTION_FILTERS, transactionsQuery, type TransactionFilters } from './logic';
 import { TransactionsListView } from './TransactionsListView';
@@ -88,6 +90,8 @@ function Register({
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [status, setStatus] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  // Panel de edición masiva (add-bulk-edit): sobre lo seleccionado o sobre todo lo filtrado (≤ 500).
+  const [bulk, setBulk] = useState<{ target: BulkTarget; focus: BulkFocus } | undefined>();
   // Consulta (sin cursor) cuyos resultados se muestran; difiere de `query` mientras la recarga está en curso.
   const [shownQuery, setShownQuery] = useState<string | undefined>();
   // Solo la última petición escribe la lista: una respuesta tardía de filtros anteriores se descarta.
@@ -156,6 +160,13 @@ function Register({
       setBusy(false);
     }
   }
+
+  const known = useMemo(() => new Map((items ?? []).map((x) => [x.id, x] as const)), [items]);
+  const openBulk = (focus: BulkFocus, scope: 'selection' | 'filter' = 'selection') =>
+    setBulk({
+      focus,
+      target: scope === 'filter' ? { kind: 'filter' } : { kind: 'items', ids: [...selected] },
+    });
 
   const setFilter = (patch: Partial<TransactionFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
 
@@ -435,7 +446,37 @@ function Register({
         ) : null}
       </form>
       {ctx.canEdit ? (
-        <div style={rowStyle} aria-label={t('list.bulk')} role="group">
+        <div style={rowStyle} aria-label={t('list.bulk')} role="group" data-testid="bulk-bar">
+          <span data-testid="bulk-selected">{t('bulk.selected', { n: selected.size })}</span>
+          <button type="button" disabled={busy || selected.size === 0} onClick={() => openBulk('category')}>
+            {t('bulk.recategorize')}
+          </button>
+          <button type="button" disabled={busy || selected.size === 0} onClick={() => openBulk('tags')}>
+            {t('bulk.tag')}
+          </button>
+          <button
+            type="button"
+            disabled={busy || selected.size === 0}
+            onClick={() => openBulk('counterparty')}
+          >
+            {t('bulk.counterpartyAction')}
+          </button>
+          <button type="button" disabled={busy || selected.size === 0} onClick={() => openBulk('state')}>
+            {t('bulk.stateAction')}
+          </button>
+          <button
+            type="button"
+            disabled={busy || !items || items.length === 0}
+            onClick={() => openBulk('category', 'filter')}
+            data-testid="bulk-select-filtered"
+          >
+            {t('bulk.selectFiltered', { max: BULK_EDIT_MAX_ITEMS })}
+          </button>
+          {selected.size > 0 ? (
+            <button type="button" onClick={() => setSelected(new Set())}>
+              {t('bulk.clearSelection')}
+            </button>
+          ) : null}
           <button type="button" disabled={busy || selected.size === 0} onClick={() => void markCleared(true)}>
             {t('list.markCleared', { n: selected.size })}
           </button>
@@ -447,6 +488,26 @@ function Register({
             {t('list.markUncleared', { n: selected.size })}
           </button>
         </div>
+      ) : null}
+      {bulk && ctx.canEdit ? (
+        <BulkEditPanel
+          key={`${bulk.target.kind}-${bulk.focus}`}
+          ctx={ctx}
+          f={f}
+          catalogs={catalogs}
+          target={bulk.target}
+          filters={filters}
+          customFilter={custom}
+          known={known}
+          focus={bulk.focus}
+          onClose={() => setBulk(undefined)}
+          onTargetChange={(ids) => setSelected(new Set(ids))}
+          onApplied={(result) => {
+            setStatus(t('bulk.result', { n: result.count, id: result.bulkOperationId }));
+            setSelected(new Set());
+            load();
+          }}
+        />
       ) : null}
       {status ? <p role="status">{status}</p> : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}

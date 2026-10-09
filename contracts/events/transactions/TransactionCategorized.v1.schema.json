@@ -73,6 +73,10 @@
           "items": {
             "$ref": "#/$defs/SplitClassificationChange"
           }
+        },
+        "bulkOperationId": {
+          "description": "Correlación común de una edición masiva (openspec add-bulk-edit; igual al correlation_id de los registros de auditoría y al de la operación). Ausente en las ediciones individuales. Aditivo (sin versión nueva).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
         }
       }
     },
@@ -166,6 +170,43 @@
             "removedTagIds": []
           }
         ]
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-0000000009b1",
+      "eventType": "transactions.TransactionCategorized",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-01T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000b1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "status": "POSTED",
+        "businessDate": "2026-10-01",
+        "appliedBy": "USER",
+        "ruleId": null,
+        "changes": [
+          {
+            "splitId": "01928c4e-0000-7000-8000-0000000005a1",
+            "amount": {
+              "amount": "300.00",
+              "currency": "BOB"
+            },
+            "previousCategoryId": null,
+            "newCategoryId": "01928c4e-0000-7000-8000-0000000ca001",
+            "addedTagIds": [],
+            "removedTagIds": []
+          }
+        ],
+        "bulkOperationId": "01928c4e-7a3b-7c11-8f00-0000000000b1"
       }
     }
   ]

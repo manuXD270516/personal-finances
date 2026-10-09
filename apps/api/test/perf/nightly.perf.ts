@@ -674,6 +674,50 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     }
   });
 
+  it('add-bulk-edit: edición masiva de 500 transacciones (recategorizar y etiquetar; p95 ≤ 2 s, design decisión 9)', async () => {
+    const bank = ids.accounts.get('Banco Andino Demo — Cuenta corriente')!;
+    const from = ids.categories.get('Supermercado y minimarket')!;
+    const to = ids.categories.get('Restaurantes')!;
+    let batch: { id: string; version: number }[] = [];
+    for (let i = 0; i < 500; i += 1) {
+      const created = await ok('POST', `${W}/transactions`, {
+        kind: 'EXPENSE',
+        transactionDate: '2026-09-30',
+        accountId: bank,
+        amount: { amount: '10.00', currency: 'BOB' },
+        description: 'Compra edición masiva',
+        splits: [{ amount: { amount: '10.00', currency: 'BOB' }, categoryId: from }],
+      });
+      batch.push({ id: created['id'] as string, version: created['version'] as number });
+    }
+    // Cada iteración alterna la categoría con las versiones que devolvió la anterior (una operación = 500 ítems).
+    const samples: number[] = [];
+    for (let i = 0; i < 7; i += 1) {
+      const t = performance.now();
+      const r = await call('POST', `${W}/transactions/bulk-edit`, {
+        items: batch,
+        changes: { categoryId: i % 2 === 0 ? to : from },
+      });
+      samples.push(performance.now() - t);
+      if (r.status !== 200) throw new Error(`bulkEditTransactions: ${r.status} ${JSON.stringify(r.body)}`);
+      batch = (r.body as { data: { id: string; version: number }[] }).data.map((d) => ({
+        id: d.id,
+        version: d.version,
+      }));
+    }
+    results.push(
+      latencyResult({
+        id: 'bulk-edit-500',
+        nfr: 'NFR-PERF-003',
+        title: 'POST /transactions/bulk-edit (500 ítems, una categoría; una transacción de BD)',
+        samples: samples.slice(1),
+        limitMs: 2_000,
+        notes:
+          'Umbral propio de add-bulk-edit (design decisión 9), no de docs/02; la primera iteración es calentamiento.',
+      }),
+    );
+  });
+
   it('NFR-PERF-003: saldo confirmado y diferencia en vivo de una sesión de reconciliación (consulta agregada, add-reconciliation 4.2)', async () => {
     const bank = ids.accounts.get('Banco Andino Demo — Cuenta corriente')!;
     const started = await call('POST', `${W}/reconciliations`, {

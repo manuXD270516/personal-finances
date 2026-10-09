@@ -93,8 +93,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 #### `transactions.TransactionCategorized.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** PLANNING, REPORTING.
-- **Trigger:** `ApplyClassification` cambia la categoría o tags de ≥1 split.
-- **Payload:** `transactionId`, `status`, `businessDate`, `appliedBy: USER|RULE|IMPORT`, `ruleId: uuid|null`, `changes: [{splitId, amount: Money, previousCategoryId|null, newCategoryId|null, addedTagIds[], removedTagIds[]}]`.
+- **Trigger:** `ApplyClassification` cambia la categoría o tags de ≥1 split, individualmente o en una edición masiva (`transactions/bulk-edit`: un hecho por transacción, hasta 500 por operación; los consumidores son idempotentes por `(transactionId, aggregateVersion)` y toleran la ráfaga).
+- **Payload:** `transactionId`, `status`, `businessDate`, `appliedBy: USER|RULE|IMPORT`, `ruleId: uuid|null`, `changes: [{splitId, amount: Money, previousCategoryId|null, newCategoryId|null, addedTagIds[], removedTagIds[]}]`; opcional aditivo `bulkOperationId: uuid` (edición masiva, `add-bulk-edit`; igual al `correlationId` del evento y de la auditoría de la operación).
 - **Idem.:** natural `(transactionId, aggregateVersion)`. **Ord.:** por `Transaction`. **PII:** N.
 
 #### `transactions.TransferCompleted.v1`
@@ -142,7 +142,7 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 #### `transactions.TransactionUpdated.v1`
 - **Productor:** TRANSACTIONS. **Consumidores:** REPORTING (Phase 1); PLANNING y COMMITMENTS desde sus fases.
 - **Trigger:** edición descriptiva, cambio `cleared`/`reconciled` (`POST …/mark-cleared`, `PATCH` de reconciliación), des-reconciliación (`POST …/{id}/unreconcile`) o amend financiero; en el amend se emite **junto** a `TransactionPosted.v1` con `ledgerImpact = true` (`add-transaction-recording`).
-- **Payload:** `transactionId`, `revision: int`, `status: PENDING|POSTED|CLEARED|RECONCILED`, `previousStatus|null`, `changedFields: string[]` (aditivo `add-reconciliation`: `reconciliationMode` en la conciliación sin extracto, la des-reconciliación y el cotejo posterior), `ledgerImpact: boolean`, `reason: string|null`; opcionales aditivos `paymentMethod` y `transition`. **Sin** montos ni valores `before/after` (los consumidores que los necesitan leen `TransactionPosted`).
+- **Payload:** `transactionId`, `revision: int`, `status: PENDING|POSTED|CLEARED|RECONCILED`, `previousStatus|null`, `changedFields: string[]` (aditivo `add-reconciliation`: `reconciliationMode` en la conciliación sin extracto, la des-reconciliación y el cotejo posterior), `ledgerImpact: boolean`, `reason: string|null`; opcionales aditivos `paymentMethod`, `transition` y `bulkOperationId` (edición masiva, `add-bulk-edit`: contraparte, notas, custom fields o estado; la categoría y los tags van en `TransactionCategorized`). **Sin** montos ni valores `before/after` (los consumidores que los necesitan leen `TransactionPosted`).
 - **Idem.:** natural `(transactionId, aggregateVersion)`. **Ord.:** por `Transaction`. **PII:** B (`reason`).
 
 #### `transactions.TransactionCleared.v1`

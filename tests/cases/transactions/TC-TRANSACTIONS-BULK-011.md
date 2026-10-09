@@ -12,9 +12,10 @@ invariants: [INV-025]
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-edit.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["bulk-edit", "rbac", "rls"]

@@ -42,6 +42,11 @@ export interface AuditEntry {
   readonly actor?: AuditActorDto;
   /** Por defecto, el origen del contexto de la petición/job. */
   readonly origin?: AuditOriginDto;
+  /**
+   * Correlación explícita del registro (UUID). Por defecto, la del contexto de la petición/job. Una operación masiva
+   * (openspec add-bulk-edit) fija su `bulkOperationId` para poder filtrar todos sus registros.
+   */
+  readonly correlationId?: string;
 }
 
 /**
@@ -51,6 +56,11 @@ export interface AuditEntry {
  */
 export interface AuditPort {
   append(entry: AuditEntry): Promise<void>;
+  /**
+   * Varias entradas en una sola sentencia multi-fila (operaciones masivas, openspec add-bulk-edit): mismas
+   * validaciones, redacción y unidad de trabajo que `append`. Opcional: sin ella el llamador usa `append` en bucle.
+   */
+  appendMany?(entries: readonly AuditEntry[]): Promise<void>;
 }
 
 /** Regla de un campo permitido (`plain`, `money` exacto o `last4` enmascarado). */
@@ -190,6 +200,14 @@ export type LifecycleStepInput = LifecycleTransitionInput | LifecycleAnnotationI
  */
 export interface LifecyclePort {
   record(entry: AuditEntry, steps: readonly LifecycleStepInput[]): Promise<void>;
+  /**
+   * Lo mismo para varios agregados a la vez (operaciones masivas, openspec add-bulk-edit): escribe todas las entradas de
+   * auditoría y todos los pasos con sentencias multi-fila; las secuencias de un mismo agregado se asignan en orden.
+   * Opcional: sin ella el llamador usa `record` en bucle.
+   */
+  recordMany?(
+    items: readonly { readonly entry: AuditEntry; readonly steps: readonly LifecycleStepInput[] }[],
+  ): Promise<void>;
 }
 
 export interface LifecycleActorDto {

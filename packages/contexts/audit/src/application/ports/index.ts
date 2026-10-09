@@ -40,6 +40,8 @@ export interface AuditLogPageQuery {
 /** Almacén append-only de la auditoría: escribe y lee SIEMPRE sobre la transacción de la unidad de trabajo. */
 export interface AuditLogStore {
   insert(record: AuditRecord): Promise<void>;
+  /** Inserción multi-fila (operaciones masivas). Opcional: sin ella se usa `insert` en bucle. */
+  insertMany?(records: readonly AuditRecord[]): Promise<void>;
   page(query: AuditLogPageQuery): Promise<readonly AuditRecord[]>;
 }
 
@@ -70,7 +72,14 @@ export interface ReadUnitOfWork {
 export interface LifecycleStore {
   /** Siguiente `sequence` del agregado (1 si no tiene filas); la serializa el bloqueo del agregado del comando. */
   nextSequence(workspaceId: string, aggregateType: string, aggregateId: string): Promise<number>;
+  /** Siguiente `sequence` de cada agregado en una sola consulta (mismo orden que `aggregates`). Opcional. */
+  nextSequences?(
+    workspaceId: string,
+    aggregates: readonly { readonly aggregateType: string; readonly aggregateId: string }[],
+  ): Promise<readonly number[]>;
   insert(entry: LifecycleEntry): Promise<void>;
+  /** Inserción multi-fila (operaciones masivas). Opcional: sin ella se usa `insert` en bucle. */
+  insertMany?(entries: readonly LifecycleEntry[]): Promise<void>;
   /** Filas del agregado ordenadas por `sequence`. */
   entriesOf(
     workspaceId: string,

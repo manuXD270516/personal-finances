@@ -1232,6 +1232,40 @@ export class Transaction {
     };
   }
 
+  /**
+   * Edición masiva de UNA transacción (openspec add-bulk-edit): cambios descriptivos/de clasificación (`amend` sin
+   * efecto financiero, INV-033) y, opcionalmente, `cleared` (`POSTED ↔ CLEARED`, mismas reglas que
+   * `SetClearedStatus`). Combina ambos en UNA sola versión nueva. `statusChanged` y `previousStatus` informan la
+   * transición; si nada cambió la transacción queda intacta (sin versión nueva).
+   */
+  bulkEdit(
+    changes: TransactionChanges,
+    cleared?: boolean,
+  ): AmendResult & { readonly statusChanged: boolean; readonly statusPrevious: TransactionStatus | null } {
+    const startVersion = this.state.version;
+    const from = this.state.status;
+    if (cleared !== undefined) {
+      if (from === 'RECONCILED') {
+        throw new DomainError('TRANSACTION_RECONCILED', `transaction ${this.state.id} is reconciled`);
+      }
+      const target = cleared ? 'CLEARED' : 'POSTED';
+      if (from !== (cleared ? 'POSTED' : 'CLEARED')) {
+        throw new DomainError(
+          'INVALID_STATUS_TRANSITION',
+          `transaction ${this.state.id} is ${from}, cannot become ${target}`,
+        );
+      }
+    }
+    const result = this.amend(changes);
+    let statusPrevious: TransactionStatus | null = null;
+    if (cleared !== undefined) statusPrevious = this.changeStatus(cleared ? 'CLEARED' : 'POSTED');
+    const statusChanged = statusPrevious !== null;
+    if (result.changedFields.length > 0 || statusChanged) {
+      this.state = { ...this.state, version: startVersion + 1 };
+    }
+    return { ...result, statusChanged, statusPrevious };
+  }
+
   /** Valida el paso contra la máquina declarada y lo deja como `lastTransition` (una sola fuente de reglas). */
   private mark(
     code: TransactionTransition,

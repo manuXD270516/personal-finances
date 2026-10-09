@@ -123,6 +123,8 @@ export const ERROR_CATALOG = {
     status: 422,
     title: 'Reconciliation difference must be zero or adjusted',
   },
+  // transactions / bulk edit (Phase 2)
+  BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

@@ -164,3 +164,27 @@ describe('[TC-AUDIT-ACTOR-001] una mutación automática se atribuye al proceso 
     expect(mem.rows[0]?.correlationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
+
+describe('[TC-TRANSACTIONS-BULK-007] correlación explícita de la entrada', () => {
+  it('la correlación de la entrada (bulkOperationId) prevalece sobre la de la solicitud', async () => {
+    mem.ambientContext = { actor: { type: 'USER', userId: U1 }, correlationId: C1 };
+    await mem.run({ workspaceId: W1 }, () => recorder.append({ ...amend, correlationId: C7 }));
+    expect(mem.rows[0]?.correlationId).toBe(C7);
+  });
+});
+
+describe('[TC-TRANSACTIONS-BULK-007] appendMany', () => {
+  it('escribe todas las entradas con una sola inserción y las valida todas antes de escribir', async () => {
+    mem.ambientContext = { actor: { type: 'USER', userId: U1 }, correlationId: C1 };
+    await mem.run({ workspaceId: W1 }, () =>
+      recorder.appendMany([amend, { ...amend, correlationId: C7 }, { ...amend, aggregateVersion: 3 }]),
+    );
+    expect(mem.rows.map((r) => r.correlationId)).toEqual([C1, C7, C1]);
+    // Una entrada inválida (versión no positiva) rechaza el lote completo.
+    await expect(
+      mem.run({ workspaceId: W1 }, () => recorder.appendMany([amend, { ...amend, aggregateVersion: 0 }])),
+    ).rejects.toThrow();
+    expect(mem.rows).toHaveLength(3);
+    await expect(recorder.appendMany([amend])).rejects.toBeInstanceOf(AuditError);
+  });
+});

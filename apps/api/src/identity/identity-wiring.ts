@@ -49,7 +49,7 @@ import { demoDataEnabled, type ApiConfig } from '@pf/platform/config';
 import type { JobQueue } from '@pf/platform/queue';
 import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
 import { demoJobsPort } from '../demo/demo-jobs-port.js';
-import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
+import { PgOutboxWriter, type DomainEventDraft, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { ApiConventionsOptions } from '@pf/platform/nest';
 import {
@@ -145,11 +145,20 @@ export function outboxPort(writer: OutboxWriter = new PgOutboxWriter(eventSchema
 /** `OutboxPort` de CLASSIFICATION (`classification.CategoryArchived.v1`) sobre el outbox transaccional real. */
 export function classificationOutbox(writer: OutboxWriter = new PgOutboxWriter(eventSchemaRegistry())): {
   append(event: Parameters<OutboxWriter['append']>[0]): Promise<void>;
+  appendMany?(events: readonly Parameters<OutboxWriter['append']>[0][]): Promise<void>;
 } {
   return {
     append: async (event) => {
       await writer.append(event);
     },
+    // Operaciones masivas (add-bulk-edit): sentencia multi-fila si el escritor la ofrece.
+    ...(writer.appendMany
+      ? {
+          appendMany: async (events: readonly Parameters<OutboxWriter['append']>[0][]) => {
+            await writer.appendMany!(events as readonly DomainEventDraft[]);
+          },
+        }
+      : {}),
   };
 }
 

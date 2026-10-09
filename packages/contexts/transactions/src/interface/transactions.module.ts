@@ -14,6 +14,7 @@ import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import type { OutboxPort, TransactionsDeps, WorkspaceCalendar } from '../application/ports/index.js';
+import { BulkEditService } from '../application/bulk-edit.service.js';
 import { ConversionsService } from '../application/conversions.service.js';
 import { ReconciliationsService } from '../application/reconciliations.service.js';
 import { TransactionsService } from '../application/transactions.service.js';
@@ -34,6 +35,7 @@ import type {
   ReconciliationStatusQuery,
   TransactionsClosingQuery,
 } from '../contracts/index.js';
+import { BULK_EDIT_SERVICE, BulkEditController } from './bulk-edit-http.js';
 import { CONVERSIONS_SERVICE, ConversionsController } from './conversions-http.js';
 import { RECONCILIATIONS_SERVICE, ReconciliationsController } from './reconciliations-http.js';
 import { TRANSACTIONS_SERVICE, TransactionsController } from './transactions-http.js';
@@ -62,6 +64,8 @@ export interface TransactionsRuntimeOptions {
 
 export interface TransactionsRuntime {
   readonly service: TransactionsService;
+  /** Edición masiva de clasificación y `cleared` (add-bulk-edit). */
+  readonly bulkEdit: BulkEditService;
   readonly conversions: ConversionsService;
   /** Sesiones de reconciliación (add-reconciliation). */
   readonly reconciliations: ReconciliationsService;
@@ -117,6 +121,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
   const reconciliations = new ReconciliationsService(deps, service);
   return {
     service,
+    bulkEdit: new BulkEditService(deps, service),
     conversions: new ConversionsService(deps),
     reconciliations,
     reconciliationStatus: reconciliations,
@@ -138,10 +143,16 @@ export class TransactionsModule {
     return {
       module: TransactionsModule,
       // ConversionsController primero: `/conversions/preview` antes que `/conversions/:transactionId`.
-      controllers: [ConversionsController, ReconciliationsController, TransactionsController],
+      controllers: [
+        ConversionsController,
+        ReconciliationsController,
+        BulkEditController,
+        TransactionsController,
+      ],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: TRANSACTIONS_SERVICE, useValue: options.runtime.service },
+        { provide: BULK_EDIT_SERVICE, useValue: options.runtime.bulkEdit },
         { provide: CONVERSIONS_SERVICE, useValue: options.runtime.conversions },
         { provide: RECONCILIATIONS_SERVICE, useValue: options.runtime.reconciliations },
       ],

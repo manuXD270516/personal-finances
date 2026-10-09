@@ -463,3 +463,68 @@ describe('Reconstrucción de categorías y contrapartes (docs/31 D52, tarea 9.3)
     expect(cat.historyComplete).toBe(false);
   });
 });
+
+describe('LifecyclePort.recordMany (operaciones masivas, add-bulk-edit)', () => {
+  it('[TC-TRANSACTIONS-BULK-007] escribe auditoría y pasos de varios agregados con la correlación explícita y secuencias en orden', async () => {
+    const CORR = '0190a000-0000-7000-8000-0000000000c9';
+    await mem.run({ workspaceId: W1 }, () =>
+      lifecycle.record(entry('transactions.transaction.posted'), [step('POST', 'PENDING', 'POSTED')]),
+    );
+    await mem.run({ workspaceId: W1 }, () =>
+      lifecycle.recordMany([
+        {
+          entry: entry('transactions.transaction.updated', { correlationId: CORR }),
+          steps: [{ kind: 'ANNOTATION', changedFields: ['notes'] }],
+        },
+        {
+          entry: entry('transactions.transaction.updated', { aggregateId: T2, correlationId: CORR }),
+          steps: [step('CLEAR', 'POSTED', 'CLEARED')],
+        },
+        {
+          // Segundo paso del mismo agregado T1 dentro de la misma llamada: la secuencia sigue en orden.
+          entry: entry('transactions.transaction.updated', { correlationId: CORR }),
+          steps: [{ kind: 'ANNOTATION', changedFields: ['counterpartyId'] }],
+        },
+      ]),
+    );
+    const t1 = mem.lifecycle.filter((l) => l.aggregateId === T1).map((l) => [l.sequence, l.correlationId]);
+    expect(t1).toEqual([
+      [1, expect.any(String)],
+      [2, CORR],
+      [3, CORR],
+    ]);
+    expect(mem.lifecycle.filter((l) => l.aggregateId === T2).map((l) => [l.sequence, l.toState])).toEqual([
+      [1, 'CLEARED'],
+    ]);
+    const bulk = mem.rows.filter((r) => r.correlationId === CORR);
+    expect(bulk).toHaveLength(3);
+    // Cada paso referencia su propia entrada de auditoría.
+    expect(new Set(mem.lifecycle.filter((l) => l.correlationId === CORR).map((l) => l.auditLogId))).toEqual(
+      new Set(bulk.map((r) => r.id)),
+    );
+  });
+
+  it('[TC-TRANSACTIONS-BULK-007] si falla la escritura de los pasos, no queda ninguna entrada; fuera de una unidad de trabajo no escribe', async () => {
+    mem.failLifecycleInserts = true;
+    await expect(
+      mem.run({ workspaceId: W1 }, () =>
+        lifecycle.recordMany([
+          {
+            entry: entry('transactions.transaction.updated'),
+            steps: [{ kind: 'ANNOTATION', changedFields: ['notes'] }],
+          },
+          {
+            entry: entry('transactions.transaction.updated', { aggregateId: T2 }),
+            steps: [{ kind: 'ANNOTATION', changedFields: ['notes'] }],
+          },
+        ]),
+      ),
+    ).rejects.toThrow('fault injected');
+    expect(mem.rows).toHaveLength(0);
+    expect(mem.lifecycle).toHaveLength(0);
+    mem.failLifecycleInserts = false;
+    await expect(
+      lifecycle.recordMany([{ entry: entry('transactions.transaction.updated'), steps: [] }]),
+    ).rejects.toMatchObject({ code: 'AUDIT_OUTSIDE_UNIT_OF_WORK' });
+  });
+});

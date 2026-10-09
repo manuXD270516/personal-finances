@@ -76,6 +76,22 @@ export interface TransactionRepository {
     id: string,
     options?: { readonly forUpdate?: boolean },
   ): Promise<Transaction | null>;
+  /**
+   * Varias transacciones por id (add-bulk-edit). Con `forUpdate` las bloquea `FOR UPDATE` ordenadas por id (sin
+   * deadlocks entre operaciones masivas concurrentes) con `lock_timeout` de 5 s ⇒ `CONCURRENCY_CONFLICT`
+   * reintentable. Devuelve un mapa por id; las inexistentes (o de otro workspace, RLS) no aparecen.
+   */
+  findMany(
+    workspaceId: string,
+    ids: readonly string[],
+    options?: { readonly forUpdate?: boolean },
+  ): Promise<ReadonlyMap<string, Transaction>>;
+  /**
+   * Persiste en lote los cambios de una edición masiva (add-bulk-edit): cabecera descriptiva (notas, contraparte,
+   * estado), categoría, tags y custom fields de los splits; nunca legs, montos ni revisión (INV-033). Optimistic
+   * locking por `persistedVersion` de cada una; `false` si alguna otra escritura ganó. Sentencias multi-fila.
+   */
+  updateClassificationBatch(txs: readonly Transaction[]): Promise<boolean>;
   /** Página por offset (el cursor opaco lo firma la capa HTTP). */
   list(
     workspaceId: string,
@@ -245,18 +261,25 @@ export interface CategoryLookupPort {
   withDescendants(workspaceId: string, categoryIds: readonly string[]): Promise<string[]>;
 }
 
+/** Evento de dominio a escribir en el outbox de la unidad de trabajo en curso. */
+export interface OutboxEvent {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly eventVersion: number;
+  readonly occurredAt: string;
+  readonly workspaceId: string;
+  readonly aggregateType: string;
+  readonly aggregateId: string;
+  readonly aggregateVersion: number;
+  readonly payload: object;
+  /** Correlación explícita del evento (UUID); por defecto la de la petición. Operaciones masivas: `bulkOperationId`. */
+  readonly correlationId?: string;
+}
+
 export interface OutboxPort {
-  append(event: {
-    readonly eventId: string;
-    readonly eventType: string;
-    readonly eventVersion: number;
-    readonly occurredAt: string;
-    readonly workspaceId: string;
-    readonly aggregateType: string;
-    readonly aggregateId: string;
-    readonly aggregateVersion: number;
-    readonly payload: object;
-  }): Promise<void>;
+  append(event: OutboxEvent): Promise<void>;
+  /** Varios eventos con una sola sentencia multi-fila (operaciones masivas). Opcional: sin ella se usa `append`. */
+  appendMany?(events: readonly OutboxEvent[]): Promise<void>;
 }
 
 export interface IdGenerator {
