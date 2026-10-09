@@ -5,7 +5,7 @@
 ## 1. SPEC y TEST CASES
 
 - [ ] 1.1 Revisar con el owner el requirement nuevo y la modificación de métricas de `platform/event-delivery`; verificar con `openspec validate improve-event-throughput --strict`
-- [ ] 1.2 Redactar TC-PLATFORM-EVENTS-014 (backlog de 5 000 eventos drenado en ≤ 120 s), TC-PLATFORM-EVENTS-015 (orden por agregado con concurrencia 4 y lotes de 10, incluido un evento en reintento dentro del lote), TC-PLATFORM-EVENTS-016 (fallo de un trabajo no reintenta los demás del lote), TC-PLATFORM-EVENTS-017 (métricas de backlog y duración por consumidor) y TC-PLATFORM-EVENTS-018 (configuración que excede el pool rechazada al arrancar); pasar a `ready` al aprobar
+- [ ] 1.2 Revisar TC-PLATFORM-EVENTS-014 (backlog de 5 000 eventos drenado en ≤ 120 s), TC-PLATFORM-EVENTS-015 (orden por agregado con concurrencia 4 y lotes de 10, incluido un evento en reintento dentro del lote), TC-PLATFORM-EVENTS-016 (fallo de un trabajo no reintenta los demás del lote), TC-PLATFORM-EVENTS-017 (métricas de backlog y duración por consumidor) y TC-PLATFORM-EVENTS-018 (configuración que excede el pool rechazada al arrancar); pasar a `ready` al aprobar
 
 ## 2. INFRASTRUCTURE
 
