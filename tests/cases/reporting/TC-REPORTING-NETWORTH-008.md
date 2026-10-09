@@ -12,10 +12,14 @@ invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - apps/web/src/ui/networth/networth.test.tsx
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+status: automated
+regression_suite: true
 phase: 2
 tags: ["net-worth", "fx", "incomplete"]
 error_code: null
@@ -32,7 +36,7 @@ expected_result:
   - "unconverted: 100.000000 USDT"
   - "Variación de enero marcada no comparable"
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-008 — Sin tasa vigente a fin de mes el punto queda incompleto y sin 1:1

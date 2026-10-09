@@ -43,6 +43,9 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/notificaciones', name: 'Notificaciones' },
   // add-global-audit-view 6.1: auditoría global del workspace (filtros, tabla y exportación para el OWNER).
   { path: '/configuracion/auditoria', name: 'Auditoría' },
+  // add-net-worth-evolution 7.2: vista completa de la evolución del patrimonio (la tarjeta del Home se analiza en `/`;
+  // la versión con serie la analiza net-worth-evolution.spec.ts).
+  { path: '/patrimonio', name: 'Evolución del patrimonio' },
 ];
 
 async function seriousViolations(page: Page) {

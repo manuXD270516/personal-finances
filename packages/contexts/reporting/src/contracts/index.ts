@@ -23,6 +23,9 @@ export const REPORTING_INVALIDATING_EVENTS = [
   { type: 'accounts.AccountOpened', version: 1 },
   { type: 'accounts.AccountArchived', version: 1 },
   { type: 'fx.RateRecorded', version: 1 },
+  // add-net-worth-evolution: un cierre o una reapertura cambia la fuente (snapshot o cálculo) de un punto de la serie.
+  { type: 'planning.MonthClosed', version: 1 },
+  { type: 'planning.PeriodReopened', version: 1 },
   // add-demo-data: el workspace demo terminó de cargarse (invalida la caché del resumen del Home).
   { type: 'identity.DemoDataLoaded', version: 1 },
 ] as const;
@@ -197,4 +200,42 @@ export interface NetWorthQuery {
     readonly asOf: string;
     readonly reportingCurrency?: string;
   }): Promise<NetWorthAtDto>;
+}
+
+/** Punto de la evolución del patrimonio (`NetWorthPoint` del contrato; add-net-worth-evolution). */
+export interface NetWorthPointDto {
+  /** Etiqueta del periodo financiero (`YYYY-MM` del inicio, docs/33 D59). */
+  readonly period: string;
+  readonly periodId: string;
+  /** Fecha de corte: fin del periodo, u hoy si es el periodo en curso. */
+  readonly asOf: string;
+  readonly assets: string;
+  readonly liabilities: string;
+  readonly netWorth: string;
+  /** Variación del neto respecto al punto anterior; `null` en el primer punto del rango. */
+  readonly change: string | null;
+  /** `false` si no hay variación comparable (primer punto o algún punto incompleto). */
+  readonly comparable: boolean;
+  readonly complete: boolean;
+  /** Saldos nativos sin tasa vigente a la fecha (excluidos de los totales, nunca 1:1). */
+  readonly unconverted: readonly MoneyDto[];
+  readonly source: 'COMPUTED' | 'SNAPSHOT';
+  readonly closed: boolean;
+  readonly partial: boolean;
+  /** Tasas efectivamente usadas para valorar este punto (vacío en puntos de snapshot). */
+  readonly ratesUsed: readonly ResolvedRateDto[];
+}
+
+/** `NetWorthHistory` del contrato (`GET /workspaces/{workspaceId}/reports/net-worth/history`). */
+export interface NetWorthHistoryDto {
+  readonly reportingCurrency: string;
+  readonly points: readonly NetWorthPointDto[];
+  readonly meta: {
+    readonly generatedAt: string;
+    readonly timeZone: string;
+    readonly rateWindowDays: number;
+    readonly dataFreshness?: string;
+    readonly ratesUsed: readonly ResolvedRateDto[];
+    readonly attributions: readonly RateAttributionDto[];
+  };
 }

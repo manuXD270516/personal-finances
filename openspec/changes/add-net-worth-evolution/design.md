@@ -33,6 +33,8 @@ Motivación y alcance: ver proposal.md. Fuentes: FR-REPORTING-006, docs/14 §4 (
 
 `getNetWorthHistory` — `GET W/reports/net-worth/history?from=2026-01&to=2026-03&reportingCurrency=BOB` (VIEWER) ⇒ `NetWorthHistory { reportingCurrency, points: NetWorthPoint[], meta { ratesUsed[], attributions[], rateWindowDays, dataFreshness } }`; `NetWorthPoint { period (label), periodId, asOf (fecha de corte = periodEnd u hoy), assets, liabilities, netWorth (DecimalString), change|null, comparable, complete, unconverted[{ currency, amount }], source: COMPUTED|SNAPSHOT, closed, partial }`.
 
+_Consolidado en `contracts/openapi/finance-api.v1.yaml` (2026-10-09):_ cada punto añade `ratesUsed[]` (las tasas con las que se valoró; vacío en los puntos de snapshot, requerido por «cada punto informa las tasas usadas») y `meta` añade `generatedAt` y `timeZone`; `comparable` es `false` en el primer punto y `change` se informa aunque el punto no sea comparable (la UI lo muestra como no comparable). PLANNING depende de REPORTING, así que REPORTING consume `PeriodQuery` y `ClosingSnapshotQuery` por puertos estructurales (`FinancialPeriodsPort`, `ClosingSnapshotsPort`) que `apps/api` enlaza tras componer PLANNING; los saldos por fecha salen de `AccountBalanceHistoryQuery` de `@pf/ledger/contracts`.
+
 ## Riesgos / Trade-offs
 
 - **Coste de cálculo** sin read models: acotado por `balance_snapshot` y por el máximo de 120 meses; si no alcanza, se adelanta `reporting.net_worth_snapshot` (docs/14) como caché reconstruible.

@@ -39,7 +39,7 @@ import {
   createNotificationsApiRuntime,
   NotificationsModule,
 } from '@pf/notifications/interface/notifications.module';
-import { PLANNING_AUDIT_POLICY } from '@pf/planning/contracts';
+import { PLANNING_AUDIT_POLICY, type ClosingSnapshotQuery, type PeriodQuery } from '@pf/planning/contracts';
 import {
   createPlanningRuntime,
   FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
@@ -267,7 +267,11 @@ export function financeRuntimes(input: {
   // CLASSIFICATION (add-classification): provisión síncrona de categorías al crear workspaces (design §6) + API.
   // La sugerencia `LAST_USED` lee el historial de TRANSACTIONS, que se compone después (depende del validador de
   // CLASSIFICATION): referencia diferida a su query pública.
-  const deferred: { categoryUsage?: CounterpartyCategoryUsageQuery } = {};
+  const deferred: {
+    categoryUsage?: CounterpartyCategoryUsageQuery;
+    periods?: PeriodQuery;
+    closingSnapshots?: ClosingSnapshotQuery;
+  } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
     clock: input.clock,
@@ -339,6 +343,15 @@ export function financeRuntimes(input: {
     flows: transactions.flows,
     categories: classification.categories,
     rates: fx.valuation,
+    balanceHistory: ledger.accountBalanceHistory,
+    // add-net-worth-evolution: PLANNING depende de REPORTING (cifras de cierre), así que sus consultas públicas
+    // (`PeriodQuery`, `ClosingSnapshotQuery`) se enlazan tras componerlo.
+    periods: {
+      listPeriods: (query) => deferred.periods?.listPeriods(query) ?? Promise.resolve([]),
+    },
+    snapshots: {
+      listCurrent: (query) => deferred.closingSnapshots?.listCurrent(query) ?? Promise.resolve([]),
+    },
     rateValidityWindowDays,
   });
   // PLANNING (add-financial-periods): periodos financieros; calendario del workspace (IDENTITY, membresía del usuario)
@@ -384,6 +397,8 @@ export function financeRuntimes(input: {
     catalog: classification.categories,
     locales: identityUserLocaleTags(input.pool),
   });
+  deferred.periods = planning.periodQuery;
+  if (planning.closing) deferred.closingSnapshots = planning.closing.snapshots;
   return { classification, fx, accounts, ledger, transactions, reporting, planning, notifications };
 }
 

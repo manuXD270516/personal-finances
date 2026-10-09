@@ -513,6 +513,32 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
   });
 
+  it('NFR-PERF-006 (add-net-worth-evolution 4.1): GET /reports/net-worth/history con 24 meses del Large Seed', async () => {
+    // Periodos hasta hoy (cobertura desde el asiento más antiguo); el rango pedido son los 24 meses que terminan hoy.
+    await ok('POST', `${W}/periods`, { through: new Date().toISOString().slice(0, 10) });
+    const now = new Date();
+    const end = now.getUTCFullYear() * 12 + now.getUTCMonth();
+    const label = (index: number) =>
+      `${String(Math.floor(index / 12))}-${String((index % 12) + 1).padStart(2, '0')}`;
+    const query = `?from=${label(end - 23)}&to=${label(end)}`;
+    const first = await ok('GET', `${W}/reports/net-worth/history${query}`);
+    const pointCount = (first['points'] as unknown[]).length;
+    dataset['puntos de la evolución del patrimonio'] = pointCount;
+    const samples = await timed(Math.max(20, Math.round(ITERATIONS / 4)), async () => {
+      const r = await call('GET', `${W}/reports/net-worth/history${query}`);
+      if (r.status !== 200) throw new Error(`net-worth-history: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id: 'net-worth-history',
+        nfr: 'NFR-PERF-006',
+        title: `GET /reports/net-worth/history (24 meses, ${pointCount} puntos)`,
+        samples,
+        limitMs: PERF_THRESHOLDS['NFR-PERF-006'].limitMs,
+      }),
+    );
+  });
+
   it('RLS: overhead < 10 % en la consulta real de saldos (PgBalanceQuery) y las de índice; agregado sintético informativo (docs/31 D43)', async () => {
     const card = ids.accounts.get('Tarjeta Andina Demo')!;
     const { rows } = await superuser.query<{ id: string }>(

@@ -7,6 +7,7 @@ import { LedgerMaintenance } from '../application/ledger-maintenance.js';
 import { LedgerService } from '../application/ledger.service.js';
 import type { LedgerInvariantViolation, MetricsPort } from '../application/ports/index.js';
 import type {
+  AccountBalanceHistoryQuery,
   AccountBalancesQuery,
   BalanceQuery,
   LedgerActivityRangeQuery,
@@ -45,6 +46,8 @@ export interface LedgerRuntime {
   readonly balances: BalanceQuery;
   /** Saldos por cuenta en lote (Reporting, add-basic-dashboard). */
   readonly accountBalances: AccountBalancesQuery;
+  /** Saldos por cuenta a varias fechas (Reporting, add-net-worth-evolution). */
+  readonly accountBalanceHistory: AccountBalanceHistoryQuery;
   /** Rango de fechas con asientos (Planning, add-financial-periods: cobertura retroactiva de periodos). */
   readonly activityRange: LedgerActivityRangeQuery;
   /** Saldo inicial de una cuenta (Transactions, add-reconciliation: base del saldo confirmado). */
@@ -78,6 +81,7 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     periodLock: service,
     balances,
     accountBalances: balances,
+    accountBalanceHistory: balances,
     activityRange: ledgerActivityRange(),
     openingBalance: ledgerOpeningBalance(),
   };

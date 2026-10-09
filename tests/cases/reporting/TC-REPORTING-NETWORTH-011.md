@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - apps/web/src/ui/networth/networth.test.tsx
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["net-worth", "variation"]
@@ -34,7 +38,7 @@ expected_result:
   - "Enero sin variación (primer punto)"
   - "Febrero +850.00 BOB y marzo +20.00 BOB, comparables"
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-011 — La serie informa la variación mensual del patrimonio

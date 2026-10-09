@@ -29,3 +29,13 @@ export {
   type HomeQuestionStatus,
 } from './home-questions.js';
 export { convertExact, present, sumByCurrency, type ExactRate } from './valuation.js';
+export {
+  DEFAULT_SERIES_MONTHS,
+  MAX_SERIES_MONTHS,
+  NetWorthSeriesBuilder,
+  type ClosedFigures,
+  type SeriesCutoff,
+  type SeriesPeriod,
+  type SeriesPoint,
+  type SeriesPointInput,
+} from './net-worth-series.js';

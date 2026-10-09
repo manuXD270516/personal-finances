@@ -1,7 +1,7 @@
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
-import type { AccountBalancesQuery } from '@pf/ledger/contracts';
+import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { NominalFlowQuery } from '@pf/transactions/contracts';
 
@@ -55,4 +55,44 @@ export interface ReportingDeps {
    * Por defecto `DEFAULT_RATE_VALIDITY_WINDOW_DAYS` (7).
    */
   readonly rateValidityWindowDays?: number;
+}
+
+/**
+ * Periodos financieros del workspace (PLANNING, `PeriodQuery.listPeriods`; add-financial-periods). REPORTING no importa
+ * `@pf/planning` (PLANNING ya depende de REPORTING): el contrato se declara aquí y la composición entrega el adapter.
+ */
+export interface FinancialPeriodsPort {
+  listPeriods(input: { readonly workspaceId: string }): Promise<
+    readonly {
+      readonly id: string;
+      readonly label: string;
+      readonly periodStart: string;
+      readonly periodEnd: string;
+      readonly status: string;
+    }[]
+  >;
+}
+
+/** Snapshot de cierre vigente por periodo (PLANNING, `ClosingSnapshotQuery.listCurrent`; add-month-closing). */
+export interface ClosingSnapshotsPort {
+  listCurrent(input: { readonly workspaceId: string; readonly periodIds: readonly string[] }): Promise<
+    readonly {
+      readonly periodId: string;
+      readonly baseCurrency: string;
+      readonly netWorth: {
+        readonly amount: { readonly amount: string; readonly currency: string };
+        readonly complete: boolean;
+        readonly unconverted: readonly { readonly amount: string; readonly currency: string }[];
+      };
+      readonly assets: { readonly amount: string; readonly currency: string };
+      readonly liabilities: { readonly amount: string; readonly currency: string };
+    }[]
+  >;
+}
+
+/** Puertos de `GetNetWorthHistory` (add-net-worth-evolution): los de `ReportingDeps` más periodos, snapshots y saldos por fecha. */
+export interface NetWorthHistoryDeps extends ReportingDeps {
+  readonly periods: FinancialPeriodsPort;
+  readonly snapshots: ClosingSnapshotsPort;
+  readonly balanceHistory: AccountBalanceHistoryQuery;
 }

@@ -2,7 +2,7 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
-import type { AccountBalancesQuery } from '@pf/ledger/contracts';
+import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
@@ -10,7 +10,13 @@ import type { NominalFlowQuery } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { DataVersionProjector } from '../application/data-version-projector.js';
 import { NetWorthAtQueries, PeriodFlowsQueries } from '../application/closing-figures.queries.js';
-import type { ReportingDeps, WorkspaceSettingsPort } from '../application/ports/index.js';
+import { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
+import type {
+  ClosingSnapshotsPort,
+  FinancialPeriodsPort,
+  NetWorthHistoryDeps,
+  WorkspaceSettingsPort,
+} from '../application/ports/index.js';
 import {
   DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
   ReportSummaryQueries,
@@ -24,7 +30,7 @@ import {
   type PeriodFlowsQuery,
 } from '../contracts/index.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
-import { REPORT_SUMMARY_QUERIES, ReportingController } from './reporting-http.js';
+import { NET_WORTH_HISTORY_QUERIES, REPORT_SUMMARY_QUERIES, ReportingController } from './reporting-http.js';
 
 export interface ReportingRuntimeOptions {
   readonly pool: Pool;
@@ -37,6 +43,14 @@ export interface ReportingRuntimeOptions {
   readonly flows: NominalFlowQuery;
   readonly categories: CategoryCatalogQuery;
   readonly rates: FxValuationPort;
+  /** Saldos por cuenta a varias fechas (LEDGER, add-net-worth-evolution). */
+  readonly balanceHistory: AccountBalanceHistoryQuery;
+  /**
+   * Periodos financieros (PLANNING, `PeriodQuery`) y snapshots de cierre vigentes (`ClosingSnapshotQuery`). PLANNING
+   * depende de REPORTING (cifras de cierre), así que la composición los entrega como puertos con resolución tardía.
+   */
+  readonly periods: FinancialPeriodsPort;
+  readonly snapshots: ClosingSnapshotsPort;
   /**
    * Ventana de vigencia (días) de las tasas de valoración y de referencia (`REPORTING_RATE_VALIDITY_WINDOW`, docs/31
    * D53). La composición entrega el MISMO valor a FX (`createFxRuntime({ windowDays })`).
@@ -46,6 +60,8 @@ export interface ReportingRuntimeOptions {
 
 export interface ReportingRuntime {
   readonly summary: ReportSummaryQueries;
+  /** Evolución del patrimonio por periodo financiero (`GET /reports/net-worth/history`, add-net-worth-evolution). */
+  readonly history: NetWorthHistoryQueries;
   /** Flujos del periodo para el cierre de mes (contrato público `PeriodFlowsQuery`; sin ruta HTTP). */
   readonly periodFlows: PeriodFlowsQuery;
   /** Patrimonio a una fecha de corte para el cierre de mes (contrato público `NetWorthQuery`; sin ruta HTTP). */
@@ -57,7 +73,7 @@ export interface ReportingRuntime {
 /** Composición de REPORTING (solo lectura) sobre PostgreSQL. */
 export function createReportingRuntime(options: ReportingRuntimeOptions): ReportingRuntime {
   const rateValidityWindowDays = options.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
-  const deps: ReportingDeps = {
+  const deps: NetWorthHistoryDeps = {
     uow: new PgReportingUnitOfWork(options.pool),
     workspaces: options.workspaces,
     accounts: options.accounts,
@@ -68,10 +84,14 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     versions: new PgDataVersionStore(),
     clock: options.clock,
     rateValidityWindowDays,
+    periods: options.periods,
+    snapshots: options.snapshots,
+    balanceHistory: options.balanceHistory,
   };
   return {
     rateValidityWindowDays,
     summary: new ReportSummaryQueries(deps),
+    history: new NetWorthHistoryQueries(deps),
     periodFlows: new PeriodFlowsQueries(deps),
     netWorth: new NetWorthAtQueries(deps),
   };
@@ -95,7 +115,7 @@ export interface ReportingModuleOptions {
   readonly conventions: ApiConventionsOptions;
 }
 
-/** Módulo HTTP de REPORTING (`/reports/summary`). */
+/** Módulo HTTP de REPORTING (`/reports/summary` y `/reports/net-worth/history`). */
 @Module({})
 export class ReportingModule {
   static register(options: ReportingModuleOptions): DynamicModule {
@@ -105,6 +125,7 @@ export class ReportingModule {
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: REPORT_SUMMARY_QUERIES, useValue: options.runtime.summary },
+        { provide: NET_WORTH_HISTORY_QUERIES, useValue: options.runtime.history },
       ],
     };
   }

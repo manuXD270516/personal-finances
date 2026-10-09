@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - apps/web/src/ui/networth/networth.test.tsx
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["net-worth", "month-closing"]
@@ -35,7 +39,7 @@ steps:
 expected_result:
   - "Marzo 3570.00 BOB con source SNAPSHOT y closed true"
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-009 — Un mes cerrado muestra el patrimonio del snapshot de cierre

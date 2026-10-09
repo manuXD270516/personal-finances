@@ -19,6 +19,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly registerExpenseHref?: string | undefined;
   /** Widget de presupuestos (add-budgets 6.2: disponible para gastar), entre "Este mes" y el patrimonio. */
   readonly budgetWidget?: ReactNode;
+  /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
+  readonly evolutionCard?: ReactNode;
 }
 
 /** Hoja de estilos del Home (tokens de docs/28 §5). */
@@ -39,6 +41,7 @@ export function DashboardView({
   registerRateHref,
   registerExpenseHref,
   budgetWidget,
+  evolutionCard,
   ...ctx
 }: DashboardViewProps) {
   const { t, locale } = ctx;
@@ -114,6 +117,7 @@ export function DashboardView({
           <NetWorthCard summary={summary} ctx={fctx} />
           <AccountBalancesList summary={summary} ctx={fctx} />
         </div>
+        {evolutionCard ?? null}
       </section>
 
       {unavailable.length > 0 ? (
