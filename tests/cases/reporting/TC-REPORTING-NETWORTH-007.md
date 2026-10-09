@@ -12,10 +12,14 @@ invariants: [INV-012]
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+  - tests/e2e/specs/net-worth-evolution.spec.ts
+status: automated
+regression_suite: true
 phase: 2
 tags: ["net-worth", "fx"]
 error_code: null
@@ -32,7 +36,7 @@ expected_result:
   - "Wallet 1000.00 BOB en enero y 1050.00 BOB en febrero"
   - "Ningún punto usa 12.02; cada tasa informada con fuente y vigencia"
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-007 — Cada punto de la serie usa la tasa de su fin de mes y no la de hoy

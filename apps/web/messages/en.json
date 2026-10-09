@@ -203,6 +203,66 @@
       "utilization": "Usage (%)"
     }
   },
+  "NetWorthEvolution": {
+    "title": "Net worth evolution",
+    "subtitle": {
+      "compact": "{n, plural, one {Latest period} other {Latest # periods}}",
+      "full": "{n, plural, one {# financial period} other {# financial periods}}"
+    },
+    "loading": "Loading the net worth evolution…",
+    "error": "The net worth evolution could not be loaded. The rest of the Home is not affected.",
+    "empty": "There are no periods with history yet to show the evolution. Record transactions or open accounts with an opening balance to start.",
+    "incomplete": "{n, plural, one {One period is incomplete} other {# periods are incomplete}}: no rate was in force at its date, so those balances are not added up (nor converted 1:1). They are listed in the table.",
+    "flagNotice": "Accounts are considered according to their current “Include in net worth” setting; closed periods use the setting frozen at their closing.",
+    "viewFull": "See the full evolution (12 periods)",
+    "backHome": "Back to Home",
+    "meta": "Computed on {date} · rates in force at the date of each period ({window}-day window)",
+    "chart": {
+      "title": "Net worth evolution in {currency}",
+      "desc": "From {from} to {to}: net worth went from {first} to {last} ({change}). The table below has every figure.",
+      "descSingle": "A single period, {from}: net worth {last}. The table below has every figure.",
+      "descIncomplete": "{n, plural, one {One period is incomplete.} other {# periods are incomplete.}}",
+      "descEmpty": "No periods to show.",
+      "point": "{period} (as of {date}): net worth {net}, assets {assets}, liabilities {liabilities}. Status: {flags}."
+    },
+    "legend": {
+      "assets": "Assets (solid bar)",
+      "liabilities": "Liabilities (hatched bar)",
+      "net": "Net worth (line)",
+      "incomplete": "Incomplete period (hollow circle, dashed segment)",
+      "partial": "Period in progress (square)",
+      "closed": "Closed period (padlock)"
+    },
+    "table": {
+      "caption": "Net worth by financial period, in {currency}",
+      "period": "Period",
+      "asOf": "As of",
+      "assets": "Assets",
+      "liabilities": "Liabilities",
+      "net": "Net worth",
+      "change": "Change",
+      "status": "Status",
+      "noChange": "—",
+      "notComparable": "not comparable",
+      "unconverted": "No rate: {amounts}"
+    },
+    "state": {
+      "closed": "Closed",
+      "partial": "In progress (partial)",
+      "incomplete": "Incomplete",
+      "computed": "Computed"
+    },
+    "rates": {
+      "title": "Rates used",
+      "intro": "Each period is valued with the rate in force at its own date, not the rate of today.",
+      "item": "{base}/{quote} {value} · {type} · {source} · {date}",
+      "source": {
+        "MANUAL": "Manual",
+        "PROVIDER": "Provider",
+        "USER_CONVERSION": "Own conversion"
+      }
+    }
+  },
   "Dashboard": {
     "loading": "Loading your summary…",
     "noWorkspace": "Select or create a workspace to see your summary.",

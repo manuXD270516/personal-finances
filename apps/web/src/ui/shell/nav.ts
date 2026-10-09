@@ -35,7 +35,8 @@ const within = (path: string, base: string): boolean => path === base || path.st
 /** Sección activa para la ruta actual (`aria-current="page"`); `undefined` fuera de la navegación principal. */
 export function activeNav(pathname: string): NavKey | undefined {
   const path = stripLocale(pathname);
-  if (path === '/') return 'home';
+  // La evolución del patrimonio (/patrimonio) cuelga del Home: no es una sección propia de la sidebar.
+  if (path === '/' || within(path, '/patrimonio')) return 'home';
   return NAV_ITEMS.find(
     (item) => item.path !== '/' && [item.path, ...(item.also ?? [])].some((base) => within(path, base)),
   )?.key;

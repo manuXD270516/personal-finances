@@ -13,6 +13,8 @@ export const PERF_THRESHOLDS = {
   'NFR-PERF-003': { metric: 'p95', limitMs: 150, docText: 'p95 ≤ **150 ms** server time' },
   /** NFR-PERF-004: API del dashboard (Home) `GET /reports/summary`. */
   'NFR-PERF-004': { metric: 'p95', limitMs: 300, docText: 'API de dashboard p95 ≤ **300 ms**' },
+  /** NFR-PERF-006: reportes agregados (add-net-worth-evolution: evolución del patrimonio, 24 meses, dataset `large`). */
+  'NFR-PERF-006': { metric: 'p95', limitMs: 800, docText: 'p95 ≤ 800 ms' },
   /** NFR-PERF-005: saldo de cuenta as-of con snapshots: por cuenta ≤ 50 ms; todas las cuentas ≤ 150 ms. */
   'NFR-PERF-005': {
     metric: 'p95',

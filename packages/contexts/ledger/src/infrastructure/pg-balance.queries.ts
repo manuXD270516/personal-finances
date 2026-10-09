@@ -12,6 +12,7 @@ import type { LedgerUnitOfWork } from '../application/ports/index.js';
 import type {
   AccountBalanceDto,
   AccountBalancesDto,
+  AccountBalanceHistoryQuery,
   AccountBalancesQuery,
   BalanceQuery,
   EntrySummaryDto,
@@ -40,7 +41,7 @@ interface BalanceRow {
  * en la zona horaria del workspace (FR-LEDGER-012). El ledger no conoce estados de transacción: los pendientes los
  * aporta Transactions (FR-LEDGER-013).
  */
-export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
+export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery, AccountBalanceHistoryQuery {
   constructor(
     private readonly uow: LedgerUnitOfWork,
     private readonly clock?: Clock,
@@ -118,6 +119,35 @@ export class PgBalanceQuery implements BalanceQuery, AccountBalancesQuery {
         latestEntryAt: at === undefined ? null : new Date(at).toISOString(),
         balances,
       };
+    });
+  }
+
+  /**
+   * Saldos de las cuentas del usuario a varias fechas (evolución del patrimonio): UNA transacción y una lectura de
+   * frescura; cada fecha reutiliza la consulta de saldo con snapshot (coste proporcional a lo posterior al snapshot).
+   */
+  getAccountBalancesAtDates(input: {
+    workspaceId: string;
+    accountIds?: readonly string[];
+    dates: readonly string[];
+  }): Promise<{
+    latestEntryAt: string | null;
+    byDate: { asOf: string; balances: AccountBalanceDto[] }[];
+  }> {
+    return this.uow.run(input.workspaceId, async () => {
+      const byDate: { asOf: string; balances: AccountBalanceDto[] }[] = [];
+      for (const date of input.dates) {
+        const asOf = LocalDate.parse(date).toString();
+        const rows = await this.balances(input.workspaceId, asOf, null, {
+          accountIds: input.accountIds ?? null,
+        });
+        byDate.push({ asOf, balances: rows.map((row) => this.toDto(row)) });
+      }
+      const { rows: latest } = await sql<{ created_at: Date | string }>`
+        SELECT created_at FROM ledger.journal_entry WHERE workspace_id = ${input.workspaceId}
+         ORDER BY sequence DESC LIMIT 1`.execute(unitOfWorkKysely());
+      const at = latest[0]?.created_at;
+      return { latestEntryAt: at === undefined ? null : new Date(at).toISOString(), byDate };
     });
   }
 

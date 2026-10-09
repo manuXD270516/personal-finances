@@ -9,7 +9,7 @@ import type {
 import type { AccountBalanceDto } from '@pf/ledger/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import type { NominalFlowRowDto } from '@pf/transactions/contracts';
-import type { ReportingDeps } from '../ports/index.js';
+import type { ClosingSnapshotsPort, NetWorthHistoryDeps, ReportingDeps } from '../ports/index.js';
 
 export interface FakeRate {
   readonly base: string;
@@ -72,6 +72,23 @@ export class InMemoryReporting {
   rateValidityWindowDays: number | undefined;
   /** Ventanas recibidas por el puerto de FX en cada llamada. */
   readonly windowRequests: (number | undefined)[] = [];
+
+  /** Periodos financieros del workspace (add-net-worth-evolution). */
+  readonly periods: { id: string; label: string; periodStart: string; periodEnd: string; status: string }[] =
+    [];
+  /** Snapshots de cierre vigentes por periodo (`ClosingSnapshotQuery.listCurrent`). */
+  readonly snapshots: Awaited<ReturnType<ClosingSnapshotsPort['listCurrent']>>[number][] = [];
+  /** Saldo PRESENTADO por cuenta a cada fecha de corte (`asOf` → cuenta → saldo); sin entrada = cuenta sin saldo. */
+  readonly balancesByDate = new Map<string, Map<string, { amount: string; currency: string }>>();
+
+  addPeriod(label: string, periodStart: string, periodEnd: string, status = 'CLOSED') {
+    this.periods.push({ id: `period-${label}`, label, periodStart, periodEnd, status });
+  }
+
+  /** Fija los saldos presentados de las cuentas a una fecha de corte. */
+  setBalances(asOf: string, balances: Record<string, { amount: string; currency: string }>) {
+    this.balancesByDate.set(asOf, new Map(Object.entries(balances)));
+  }
 
   addAccount(
     over: Partial<AccountSummaryDto> & Pick<AccountSummaryDto, 'name' | 'type' | 'currency'>,
@@ -188,6 +205,36 @@ export class InMemoryReporting {
       ...(this.rateValidityWindowDays === undefined
         ? {}
         : { rateValidityWindowDays: this.rateValidityWindowDays }),
+    };
+  }
+
+  /** Puertos de `GetNetWorthHistory`: los de `deps()` más periodos, snapshots y saldos por fecha. */
+  historyDeps(): NetWorthHistoryDeps {
+    return {
+      ...this.deps(),
+      accounts: { listAccounts: async () => [...this.accounts] },
+      periods: { listPeriods: async () => [...this.periods] },
+      snapshots: {
+        listCurrent: async ({ periodIds }) => this.snapshots.filter((s) => periodIds.includes(s.periodId)),
+      },
+      balanceHistory: {
+        getAccountBalancesAtDates: async ({ dates }) => ({
+          latestEntryAt: this.latestEntryAt,
+          byDate: dates.map((asOf) => ({
+            asOf,
+            balances: [...(this.balancesByDate.get(asOf)?.entries() ?? [])].map(
+              ([id, presented]): AccountBalanceDto => ({
+                ledgerAccountId: `la-${id}`,
+                code: `USER:${id}`,
+                nature: this.accounts.find((a) => a.accountId === id)?.nature ?? 'ASSET',
+                accountId: id,
+                balance: presented,
+                presented,
+              }),
+            ),
+          })),
+        }),
+      },
     };
   }
 }

@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["net-worth", "validation"]
@@ -34,7 +37,7 @@ expected_result:
   - "Sin rango: 12 puntos de 2025-05 a 2026-04"
   - "EUR no habilitada: 422 CURRENCY_NOT_ENABLED"
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-012 — El rango de la serie se valida y por defecto cubre doce meses

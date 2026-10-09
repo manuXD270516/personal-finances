@@ -1,8 +1,9 @@
 import fc from 'fast-check';
 import { currency, dec, Money, type Currency } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
+import { NetWorthSeriesBuilder } from './net-worth-series.js';
 import { NetWorthValuator, type ValuedAccount } from './net-worth-valuator.js';
-import type { ExactRate } from './valuation.js';
+import { present, type ExactRate } from './valuation.js';
 
 const BOB = currency('BOB', 2);
 const USD = currency('USD', 2);
@@ -176,6 +177,39 @@ describe('Propiedades del patrimonio neto (INV-009, INV-031, INV-010)', () => {
           expect(nw(after).minus(nw(list)).eq(expected)).toBe(true);
         },
       ),
+      { numRuns: NUM_RUNS },
+    );
+  });
+});
+
+describe('Propiedades de la serie de patrimonio (INV-031)', () => {
+  it('[TC-REPORTING-NETWORTH-006] ∀ saldos y tasas: el punto del mes en curso a hoy coincide con el patrimonio actual de Phase 1', () => {
+    const period = {
+      id: 'p',
+      label: '2026-04',
+      periodStart: '2026-04-01',
+      periodEnd: '2026-04-30',
+      status: 'ACTIVE',
+    };
+    fc.assert(
+      fc.property(accounts, (list) => {
+        const [point] = NetWorthSeriesBuilder.build(
+          [
+            {
+              cutoff: { period, asOf: '2026-04-12', partial: true },
+              accounts: list,
+              rateFor,
+              closed: false,
+            },
+          ],
+          BOB,
+        );
+        const current = NetWorthValuator.value(list, BOB, rateFor);
+        expect(point?.netWorth.equals(present(current.netWorth, BOB))).toBe(true);
+        expect(point?.assets.equals(present(current.assets, BOB))).toBe(true);
+        expect(point?.liabilities.equals(present(current.liabilities, BOB))).toBe(true);
+        expect(point?.complete).toBe(current.complete);
+      }),
       { numRuns: NUM_RUNS },
     );
   });

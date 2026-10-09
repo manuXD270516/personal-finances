@@ -12,10 +12,16 @@ invariants: [INV-022, INV-031]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - apps/web/src/ui/networth/networth.test.tsx
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+  - packages/contexts/reporting/src/domain/net-worth.properties.test.ts
+  - tests/e2e/specs/net-worth-evolution.spec.ts
+status: automated
+regression_suite: true
 phase: 2
 tags: ["net-worth", "history"]
 error_code: null
@@ -36,7 +42,7 @@ expected_result:
   - "Marzo: activos 3720.00 y pasivos 150.00 BOB"
   - "Abril calculado al 2026-04-12 con partial true"
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-006 — La serie mensual informa el patrimonio de cada fin de mes

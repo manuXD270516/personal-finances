@@ -3742,6 +3742,68 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/reports/net-worth/history:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getNetWorthHistory
+      summary: Net worth evolution by financial period (assets, liabilities and net worth at the end of each period)
+      description: |
+        One point per monthly financial period (`planning/financial-periods`) of the requested range, cut at the end
+        of the period (with start day 1, the last day of the month); the period containing today is computed at
+        today's date in the workspace time zone and flagged `partial`. Balances are the ledger balances at each cut
+        date (including accounts archived or closed since) of the accounts included in net worth (the CURRENT
+        `includeInNetWorth` flag applies to every computed point; closed periods use the value frozen in their
+        closing snapshot). Each point is valued with the rate in force at its own cut date, with the same selector
+        and validity window as `/reports/summary` (REPORTING_RATE_VALIDITY_WINDOW), never with today's rate; a
+        currency without a rate in the window leaves the point `complete=false` and its native amount in
+        `unconverted[]` (never 1:1). A closed period with a closing snapshot in `reportingCurrency` reports the
+        snapshot figures (`source=SNAPSHOT`, `closed=true`); otherwise the point is `COMPUTED`. `change` is the
+        difference of the net worth with the previous point of the series (`null` on the first one) and
+        `comparable=false` when either point is incomplete. Defaults to the last 12 periods ending at the current
+        one; at most 120 months.
+      x-openspec-capability: [reporting/net-worth]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          description: First period label `YYYY-MM` (start month of the period). Defaults to 11 months before `to`.
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        - name: to
+          in: query
+          description: Last period label `YYYY-MM`; not after the current period. Defaults to the current period.
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        - name: reportingCurrency
+          in: query
+          description: Defaults to the workspace base currency
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Series
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetWorthHistory' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (future periods, inverted range or more than 120 months).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Planning (Phase 2) ─────────────────────────────
   /workspaces/{workspaceId}/periods:
     parameters:
@@ -9859,6 +9921,81 @@ components:
           type: array
           description: Native amounts that could not be valued (no rate)
           items: { $ref: '#/components/schemas/Money' }
+    NetWorthPoint:
+      type: object
+      additionalProperties: false
+      required:
+        [period, periodId, asOf, assets, liabilities, netWorth, change, comparable, complete, unconverted, source, closed, partial, ratesUsed]
+      properties:
+        period:
+          type: string
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+          description: Financial period label (`YYYY-MM` of its start, docs/33 D59)
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        asOf:
+          $ref: '#/components/schemas/LocalDate'
+          description: Cut date, the end of the period (today for the period in progress)
+        assets:
+          $ref: '#/components/schemas/DecimalString'
+          description: In `reportingCurrency`
+        liabilities:
+          $ref: '#/components/schemas/DecimalString'
+          description: In `reportingCurrency`, positive when owed
+        netWorth:
+          $ref: '#/components/schemas/DecimalString'
+          description: In `reportingCurrency` (assets − liabilities)
+        change:
+          description: Net worth difference with the previous point of the series; null on the first point
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        comparable:
+          type: boolean
+          description: False on the first point or when this or the previous point is incomplete
+        complete: { type: boolean }
+        unconverted:
+          type: array
+          description: Native amounts without a rate in force at the cut date (excluded from the totals)
+          items: { $ref: '#/components/schemas/Money' }
+        source:
+          type: string
+          enum: [COMPUTED, SNAPSHOT]
+        closed:
+          type: boolean
+          description: The period is closed and has a closing snapshot
+        partial:
+          type: boolean
+          description: The period is in progress and the point is computed at today's date
+        ratesUsed:
+          type: array
+          description: Rates used to value this point (empty for snapshot points)
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+    NetWorthHistory:
+      type: object
+      additionalProperties: false
+      required: [reportingCurrency, points, meta]
+      properties:
+        reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/NetWorthPoint' }
+        meta:
+          type: object
+          additionalProperties: false
+          required: [generatedAt, timeZone, rateWindowDays, ratesUsed, attributions]
+          properties:
+            generatedAt: { $ref: '#/components/schemas/Instant' }
+            timeZone: { type: string }
+            rateWindowDays:
+              type: integer
+              description: Rate validity window (REPORTING_RATE_VALIDITY_WINDOW), the same as `/reports/summary`.
+            dataFreshness: { $ref: '#/components/schemas/Instant' }
+            ratesUsed:
+              type: array
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            attributions:
+              type: array
+              items: { $ref: '#/components/schemas/RateAttribution' }
     HomeQuestionStatus:
       type: object
       required: [question, status, actionHint]

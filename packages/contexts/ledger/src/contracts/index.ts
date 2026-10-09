@@ -186,6 +186,24 @@ export interface AccountBalancesQuery {
 }
 
 /**
+ * Saldos por lote de cuentas del usuario a VARIAS fechas de corte (openspec add-net-worth-evolution, tarea 4.1): una
+ * sola unidad de trabajo y una sola lectura de frescura para toda la serie (`balance_snapshot` más cercano ≤ fecha +
+ * Σ postings posteriores hasta la fecha, INV-022). Incluye cuentas archivadas/cerradas con saldo. Sin efectos.
+ */
+export interface AccountBalanceHistoryQuery {
+  getAccountBalancesAtDates(input: {
+    readonly workspaceId: string;
+    /** Ids de cuentas del usuario (Accounts); sin filtro = todas. */
+    readonly accountIds?: readonly string[];
+    /** Fechas de corte `YYYY-MM-DD` (se devuelven en el mismo orden). */
+    readonly dates: readonly string[];
+  }): Promise<{
+    readonly latestEntryAt: string | null;
+    readonly byDate: readonly { readonly asOf: string; readonly balances: readonly AccountBalanceDto[] }[];
+  }>;
+}
+
+/**
  * Rango de fechas de negocio con asientos del workspace (openspec add-financial-periods: cobertura retroactiva de los
  * periodos). Lee `ledger.journal_entry` por el índice `(workspace_id, entry_date)` en la unidad de trabajo en curso
  * (RLS del workspace). `null` si el workspace no tiene asientos. Sin efectos.

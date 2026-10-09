@@ -203,6 +203,66 @@
       "utilization": "Uso (%)"
     }
   },
+  "NetWorthEvolution": {
+    "title": "Evolución del patrimonio",
+    "subtitle": {
+      "compact": "{n, plural, one {Último periodo} other {Últimos # periodos}}",
+      "full": "{n, plural, one {# periodo financiero} other {# periodos financieros}}"
+    },
+    "loading": "Cargando la evolución del patrimonio…",
+    "error": "No se pudo cargar la evolución del patrimonio. El resto del Home no se ve afectado.",
+    "empty": "Aún no hay periodos con historial para mostrar la evolución. Registra movimientos o abre cuentas con saldo inicial para empezar.",
+    "incomplete": "{n, plural, one {Un periodo está incompleto} other {# periodos están incompletos}}: faltó una tasa vigente a su fecha y esos saldos no se suman (ni se convierten 1:1). Se listan en la tabla.",
+    "flagNotice": "Se consideran las cuentas según su configuración actual «Incluir en el patrimonio»; los periodos cerrados usan la configuración congelada en su cierre.",
+    "viewFull": "Ver la evolución completa (12 periodos)",
+    "backHome": "Volver al inicio",
+    "meta": "Calculado el {date} · tasas vigentes a la fecha de cada periodo (ventana de {window} días)",
+    "chart": {
+      "title": "Evolución del patrimonio neto en {currency}",
+      "desc": "De {from} a {to}: el patrimonio neto pasó de {first} a {last} ({change}). La tabla siguiente tiene todas las cifras.",
+      "descSingle": "Un solo periodo, {from}: patrimonio neto {last}. La tabla siguiente tiene todas las cifras.",
+      "descIncomplete": "{n, plural, one {Un periodo está incompleto.} other {# periodos están incompletos.}}",
+      "descEmpty": "Sin periodos para mostrar.",
+      "point": "{period} (al {date}): patrimonio {net}, activos {assets}, pasivos {liabilities}. Estado: {flags}."
+    },
+    "legend": {
+      "assets": "Activos (barra sólida)",
+      "liabilities": "Pasivos (barra rayada)",
+      "net": "Patrimonio neto (línea)",
+      "incomplete": "Periodo incompleto (círculo hueco, tramo discontinuo)",
+      "partial": "Periodo en curso (cuadrado)",
+      "closed": "Periodo cerrado (candado)"
+    },
+    "table": {
+      "caption": "Patrimonio por periodo financiero, en {currency}",
+      "period": "Periodo",
+      "asOf": "Al",
+      "assets": "Activos",
+      "liabilities": "Pasivos",
+      "net": "Patrimonio",
+      "change": "Variación",
+      "status": "Estado",
+      "noChange": "—",
+      "notComparable": "no comparable",
+      "unconverted": "Sin tasa: {amounts}"
+    },
+    "state": {
+      "closed": "Cerrado",
+      "partial": "En curso (parcial)",
+      "incomplete": "Incompleto",
+      "computed": "Calculado"
+    },
+    "rates": {
+      "title": "Tasas usadas",
+      "intro": "Cada periodo se valora con la tasa vigente a su propia fecha, no con la de hoy.",
+      "item": "{base}/{quote} {value} · {type} · {source} · {date}",
+      "source": {
+        "MANUAL": "Manual",
+        "PROVIDER": "Proveedor",
+        "USER_CONVERSION": "Conversión propia"
+      }
+    }
+  },
   "Dashboard": {
     "loading": "Cargando el resumen…",
     "noWorkspace": "Selecciona o crea un espacio de trabajo para ver tu resumen.",

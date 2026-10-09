@@ -12,9 +12,12 @@ invariants: [INV-022]
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/net-worth-history.api.test.ts
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/reporting/src/domain/net-worth-series.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["net-worth", "accounts"]
@@ -31,7 +34,7 @@ expected_result:
   - "Enero incluye 300.00 BOB de \"Caja vieja\" y nada de \"Banco nuevo\""
   - "Febrero incluye 500.00 BOB de \"Banco nuevo\" y nada de \"Caja vieja\""
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # TC-REPORTING-NETWORTH-010 — Cada punto considera las cuentas con saldo en esa fecha

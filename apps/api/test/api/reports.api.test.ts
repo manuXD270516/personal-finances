@@ -692,6 +692,9 @@ describe('Consumidor reporting.data-version (platform.inbox)', () => {
       'accounts.AccountOpened.v1',
       'accounts.AccountArchived.v1',
       'fx.RateRecorded.v1',
+      // add-net-worth-evolution: un cierre o una reapertura cambia la fuente de un punto de la serie.
+      'planning.MonthClosed.v1',
+      'planning.PeriodReopened.v1',
       'identity.DemoDataLoaded.v1',
     ]);
     const consumers = new EventConsumerRuntime({

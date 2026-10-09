@@ -22,6 +22,9 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/planificacion/periodos')).toBe('planning');
     expect(activeNav('/en/planificacion')).toBe('planning');
     expect(activeNav('/pt/configuracion')).toBe('settings');
+    // La evolución del patrimonio cuelga del Home (add-net-worth-evolution).
+    expect(activeNav('/patrimonio')).toBe('home');
+    expect(activeNav('/en/patrimonio')).toBe('home');
   });
 
   it('no marca nada fuera de la navegación principal ni por prefijo parcial', () => {
