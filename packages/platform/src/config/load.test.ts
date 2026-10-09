@@ -173,7 +173,13 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     const mailpit = { ...worker, SMTP_HOST: 'mailpit', APP_PUBLIC_URL: 'http://localhost:23000' };
     expect(loadConfig('worker', mailpit).EMAIL_DRIVER).toBe('smtp');
     // Producción nunca activa el email sin pedirlo, aunque haya SMTP_HOST.
-    expect(loadConfig('worker', { ...mailpit, PFOS_ENV: 'production' }).EMAIL_DRIVER).toBe('none');
+    expect(
+      loadConfig('worker', {
+        ...mailpit,
+        PFOS_ENV: 'production',
+        EXPORT_ENCRYPTION_KEYS: `k1:${'0'.repeat(64)}`,
+      }).EMAIL_DRIVER,
+    ).toBe('none');
     // smtp explícito exige servidor y URL pública.
     const missing = captureError(() => loadConfig('worker', { ...worker, EMAIL_DRIVER: 'smtp' }));
     expect(missing.problems.map((p) => p.variable).sort()).toEqual(['APP_PUBLIC_URL', 'SMTP_HOST']);
@@ -268,5 +274,43 @@ describe('contrato de configuración (docs/19 §0.3)', () => {
     expect(
       captureError(() => loadConfig('api', { ...API_ENV, DEMO_DATA_ENABLED: 'quizas' })).problems,
     ).toEqual([expect.objectContaining({ variable: 'DEMO_DATA_ENABLED' })]);
+  });
+});
+
+describe('exportación del workspace (add-workspace-export, docs/33 D98-D102)', () => {
+  const KEY = `k1:${'0'.repeat(64)}`;
+
+  it('defaults: retención 7 días, reautenticación 10 min, límite de importación 200 MB; sin llavero en local/ci', () => {
+    const config = loadConfig('api', API_ENV);
+    expect(config.EXPORT_RETENTION).toBe(7 * 24 * 3_600_000);
+    expect(config.WORKSPACE_IMPORT_MAX_BYTES).toBe(200 * 1024 * 1024);
+    expect(config.EXPORT_ENCRYPTION_KEYS).toBeUndefined();
+  });
+
+  it('el llavero es obligatorio en staging/production y la clave vigente debe figurar en él', () => {
+    const cloud = {
+      ...API_ENV,
+      PFOS_ENV: 'production',
+      CURSOR_SIGNING_KEY: 'k1:abcdefabcdefabcdefabcdefabcdefabcdefabcdef',
+      AUDIT_IP_HMAC_KEY: 'k1:abcdefabcdefabcdefabcdefabcdefabcdefabcdef',
+      OIDC_ISSUER_URL: 'https://idp.example.com/realms/pfos',
+    };
+    expect(captureError(() => loadConfig('api', cloud)).problems.map((p) => p.variable)).toContain(
+      'EXPORT_ENCRYPTION_KEYS',
+    );
+    expect(
+      captureError(() =>
+        loadConfig('api', { ...API_ENV, EXPORT_ENCRYPTION_KEYS: KEY, EXPORT_ENCRYPTION_ACTIVE_KEY_ID: 'k9' }),
+      ).problems.map((p) => p.variable),
+    ).toEqual(['EXPORT_ENCRYPTION_ACTIVE_KEY_ID']);
+    expect(
+      captureError(() => loadConfig('api', { ...API_ENV, EXPORT_ENCRYPTION_KEYS: `${KEY},${KEY}` })).problems,
+    ).toEqual([expect.objectContaining({ variable: 'EXPORT_ENCRYPTION_KEYS' })]);
+    expect(loadConfig('api', { ...API_ENV, EXPORT_ENCRYPTION_KEYS: KEY }).EXPORT_ENCRYPTION_KEYS).toBe(KEY);
+  });
+
+  it('la retención admite horas o días dentro de 1h–30d', () => {
+    expect(loadConfig('api', { ...API_ENV, EXPORT_RETENTION: '24h' }).EXPORT_RETENTION).toBe(86_400_000);
+    expect(() => loadConfig('api', { ...API_ENV, EXPORT_RETENTION: '90d' })).toThrow(ConfigError);
   });
 });

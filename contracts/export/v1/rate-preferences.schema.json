@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/rate-preferences.schema.json",
+  "title": "pfos-export v1 — rate-preferences",
+  "description": "Registro de la sección «rate-preferences» (tabla fx.rate_preference, contexto fx). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "base_currency",
+    "quote_currency",
+    "rate_type",
+    "version",
+    "updated_at"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "base_currency": {
+      "type": "string"
+    },
+    "quote_currency": {
+      "type": "string"
+    },
+    "rate_type": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "fx.rate_preference",
+  "x-pfos-context": "fx"
+}

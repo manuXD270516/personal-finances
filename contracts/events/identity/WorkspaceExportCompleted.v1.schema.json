@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/identity/WorkspaceExportCompleted.v1.schema.json",
+  "title": "identity.WorkspaceExportCompleted.v1",
+  "description": "La exportación del workspace terminó (status = READY) o falló (status = FAILED); openspec add-workspace-export, identity/workspace-portability. Productor: IDENTITY (job identity.workspace-export del worker), en la misma transacción que el estado del export y su auditoría. Consumidor: NOTIFY (aviso in-app «Tu exportación está lista»). Idempotencia natural: exportId. SIN cifras, nombres de cuentas ni contenido exportado (requirement «Aviso de export terminado»).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "identity.WorkspaceExportCompleted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "WorkspaceExport"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "exportId",
+        "status",
+        "expiresAt",
+        "requestedBy"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "exportId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Identificador del export (aggregateId)."
+        },
+        "status": {
+          "enum": [
+            "READY",
+            "FAILED"
+          ]
+        },
+        "expiresAt": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Vencimiento del archivo (solo READY)."
+        },
+        "requestedBy": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Usuario OWNER que pidió el export."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a01",
+      "eventType": "identity.WorkspaceExportCompleted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "WorkspaceExport",
+      "aggregateId": "01928c4e-0000-7000-8000-00000000e001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "identity.workspace-export"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "exportId": "01928c4e-0000-7000-8000-00000000e001",
+        "status": "READY",
+        "expiresAt": "2026-10-16T14:03:22.120Z",
+        "requestedBy": "01928c4e-0000-7000-8000-00000000b001"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a02",
+      "eventType": "identity.WorkspaceExportCompleted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T14:05:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "WorkspaceExport",
+      "aggregateId": "01928c4e-0000-7000-8000-00000000e002",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c2",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "identity.workspace-export"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "exportId": "01928c4e-0000-7000-8000-00000000e002",
+        "status": "FAILED",
+        "expiresAt": null,
+        "requestedBy": "01928c4e-0000-7000-8000-00000000b001"
+      }
+    }
+  ]
+}

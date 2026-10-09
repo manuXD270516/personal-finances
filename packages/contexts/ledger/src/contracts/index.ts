@@ -236,3 +236,5 @@ export const ACCOUNT_BALANCES_QUERY = Symbol.for('pf.ledger.AccountBalancesQuery
 
 /** Nombre del evento publicado por el outbox (contracts/events/ledger/JournalEntryPosted.v1.schema.json). */
 export const JOURNAL_ENTRY_POSTED = { eventType: 'ledger.JournalEntryPosted', eventVersion: 1 } as const;
+
+export * from './portability.js';

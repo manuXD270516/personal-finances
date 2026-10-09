@@ -1431,6 +1431,62 @@
     "cancel": "Cancel",
     "disabled": "Loading demo data is disabled in this environment."
   },
+  "Portability": {
+    "cancel": "Cancel",
+    "reauthBody": "For security, this operation requires that you signed in less than 10 minutes ago. Confirm your identity and come back here.",
+    "reauthAction": "Confirm my identity",
+    "export": {
+      "title": "Export the workspace",
+      "description": "Download a complete copy of this workspace (accounts, transactions with every revision, ledger, periods, budgets, reconciliations and audit trail) in an open, documented file.",
+      "security": "The downloaded file contains ALL your financial data and is not password-protected: keep it somewhere safe. While on our servers it is stored encrypted and deleted after 7 days.",
+      "request": "Export this workspace",
+      "confirmTitle": "Export the whole workspace?",
+      "confirmBody": "Only the owner can do this and it is recorded in the audit trail. We will ask you to confirm your identity if your last sign-in is not recent.",
+      "confirm": "Yes, export",
+      "readyNotice": "Your export is ready. Download it from the list below.",
+      "running": "Exporting…",
+      "failed": "The export failed. Try again.",
+      "expires": "Available until {date}",
+      "download": "Download",
+      "discard": "Delete file",
+      "discardTitle": "Delete the exported file?",
+      "discardBody": "The file is removed from storage immediately. You can export again whenever you want.",
+      "discardConfirm": "Yes, delete",
+      "status": {
+        "REQUESTED": "Requested",
+        "RUNNING": "In progress",
+        "READY": "Ready",
+        "FAILED": "Failed",
+        "EXPIRED": "Expired",
+        "DISCARDED": "Deleted"
+      }
+    },
+    "import": {
+      "title": "Import an exported file",
+      "description": "Creates a NEW workspace from an exported file. It never modifies an existing workspace nor keeps the original identifiers.",
+      "security": "The file is fully validated; if anything does not match its summary (balances and trial balance), nothing is created. Maximum size: 200 MB.",
+      "file": "Exported file (.zip)",
+      "submit": "Import",
+      "progress": "Import progress",
+      "open": "Open the new workspace",
+      "succeeded": "Import complete: {rows} records in a new workspace.",
+      "failedNothing": "No workspace was created.",
+      "fileCheck": {
+        "none": "Choose a file.",
+        "empty": "The file is empty.",
+        "tooLarge": "The file exceeds 200 MB.",
+        "notZip": "The file must be a .zip exported from the application."
+      },
+      "status": {
+        "RECEIVED": "File received…",
+        "VALIDATING": "Validating the file…",
+        "IMPORTING": "Importing the data…",
+        "VERIFYING": "Verifying balances and trial balance…",
+        "SUCCEEDED": "Completed",
+        "FAILED": "Failed"
+      }
+    }
+  },
   "Locales": {
     "es-BO": "Español (Bolivia)",
     "en-US": "English (United States)",

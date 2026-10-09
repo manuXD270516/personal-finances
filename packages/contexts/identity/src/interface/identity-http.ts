@@ -120,7 +120,8 @@ export class IdentityAccessGuard implements CanActivate {
       throw err;
     }
     const { userId } = await this.service.provision(toIdentity(token));
-    setPrincipal(req, { userId });
+    const authTime = token.claims['auth_time'];
+    setPrincipal(req, { userId, ...(typeof authTime === 'number' ? { authTime } : {}) });
 
     const required = op.requiredRole;
     if (op.hasWorkspaceScope && required !== undefined && isRole(required)) {

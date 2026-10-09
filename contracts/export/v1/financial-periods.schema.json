@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/financial-periods.schema.json",
+  "title": "pfos-export v1 — financial-periods",
+  "description": "Registro de la sección «financial-periods» (tabla planning.financial_period, contexto planning). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "label",
+    "period_start",
+    "period_end",
+    "start_day",
+    "is_transition",
+    "status",
+    "close_count",
+    "reopen_count",
+    "latest_close_no",
+    "created_at",
+    "activated_at",
+    "updated_at",
+    "version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "label": {
+      "type": "string"
+    },
+    "period_start": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "period_end": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "start_day": {
+      "type": "integer"
+    },
+    "is_transition": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string"
+    },
+    "close_count": {
+      "type": "integer"
+    },
+    "reopen_count": {
+      "type": "integer"
+    },
+    "latest_close_no": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "activated_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "version": {
+      "type": "integer"
+    }
+  },
+  "x-pfos-table": "planning.financial_period",
+  "x-pfos-context": "planning"
+}

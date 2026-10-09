@@ -355,6 +355,245 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ──────────────── Identity: portabilidad del workspace (add-workspace-export, identity/workspace-portability) ────────────────
+  /workspaces/{workspaceId}/exports:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Identity]
+      operationId: requestWorkspaceExport
+      summary: Request the full export of the workspace (OWNER, recent authentication, asynchronous)
+      description: |
+        Starts the asynchronous export of ALL the workspace data (configuration, accounts, catalogs, transactions with every
+        revision, ledger, periods and closings, budgets, reconciliations, audit trail and timelines; never secrets) into a
+        single open `pfos-export` v1 archive (ZIP with `manifest.json`, JSON Lines validated by the JSON Schemas of
+        `contracts/export/v1` and flat CSV views). The snapshot is consistent (one `REPEATABLE READ` read-only transaction).
+        The archive is stored ENCRYPTED (envelope encryption, master key `keyId`), expires after `EXPORT_RETENTION`
+        (7 days by default) and is downloaded through the API.
+
+        Only the OWNER (EDITOR/VIEWER ⇒ 403 `INSUFFICIENT_ROLE`) whose authentication (`auth_time` claim) is at most
+        `REAUTH_MAX_AGE` (10 min) old; otherwise 403 `REAUTHENTICATION_REQUIRED` and nothing is created. One export in
+        progress per workspace (409 `EXPORT_IN_PROGRESS`). At most 10 requests per user and minute (429). The `Location`
+        header points to the `EXPORT` operation (`getOperation`). Every step is audited (`identity.export.*`).
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Export accepted; poll the operation or the export.
+          headers:
+            Location:
+              description: URL of the `EXPORT` operation (`/api/v1/workspaces/{workspaceId}/operations/{operationId}`).
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspaceExport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409': { $ref: '#/components/responses/Conflict' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Identity]
+      operationId: listWorkspaceExports
+      summary: List the exports of the workspace (OWNER), most recent first
+      description: |
+        Up to the 50 most recent exports with their status, size, SHA-256 and expiry. Never returns the archive or a
+        download URL: the file is downloaded through `downloadWorkspaceExport`.
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: OWNER
+      responses:
+        '200':
+          description: Exports
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/WorkspaceExport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/exports/{exportId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ExportId'
+    get:
+      tags: [Identity]
+      operationId: getWorkspaceExport
+      summary: Read an export (OWNER)
+      description: Status, counts per section, size, SHA-256 of the plain archive, retention and failure code.
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: OWNER
+      responses:
+        '200':
+          description: The export
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspaceExport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/exports/{exportId}/download:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ExportId'
+    get:
+      tags: [Identity]
+      operationId: downloadWorkspaceExport
+      summary: Download a finished export (OWNER, recent authentication)
+      description: |
+        Streams the DECRYPTED `application/zip` archive. Before sending a single byte the API authenticates the whole
+        encrypted object (every block) and checks the SHA-256 recorded at export time: any alteration ⇒ 422
+        `EXPORT_FILE_CORRUPTED` with no content delivered. `Repr-Digest: sha-256=:<base64>:` carries the SHA-256 of the
+        archive. Not finished ⇒ 409 `EXPORT_NOT_READY`; expired or discarded ⇒ 410 `EXPORT_EXPIRED`. Requires the OWNER role and a
+        recent authentication (403 `REAUTHENTICATION_REQUIRED`). Every download is audited (`identity.export.downloaded`).
+        There is NO presigned URL: the object is encrypted at application level.
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: OWNER
+      responses:
+        '200':
+          description: >-
+            The export archive as an attachment (`Content-Disposition: attachment; filename="pfos-export-<workspace>-<date>.zip"`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+            Repr-Digest:
+              description: 'RFC 9530: SHA-256 of the plain archive, `sha-256=:<base64>:`.'
+              schema: { type: string }
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/exports/{exportId}/discard:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ExportId'
+    post:
+      tags: [Identity]
+      operationId: discardWorkspaceExport
+      summary: Delete the file of a finished export before it expires (OWNER)
+      description: |
+        Deletes the encrypted object from storage and keeps the export record (dates, size, SHA-256, actor). Later
+        downloads answer 410 `EXPORT_EXPIRED`. Idempotent. An export still running or failed ⇒ 409 `EXPORT_NOT_READY`. Audited
+        (`identity.export.discarded`).
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: OWNER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: The export (status `DISCARDED`)
+          headers:
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspaceExport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspace-imports:
+    post:
+      tags: [Identity]
+      operationId: requestWorkspaceImport
+      summary: Import an export into a NEW workspace (recent authentication, asynchronous)
+      description: |
+        Uploads a `pfos-export` archive (`multipart/form-data`, field `file`, at most `WORKSPACE_IMPORT_MAX_BYTES` =
+        200 MB ⇒ 413 `UPLOAD_TOO_LARGE`) and creates a NEW workspace owned by the caller with all the data under NEW
+        identifiers; it never writes into an existing workspace and the source workspace is untouched. The synchronous
+        validation (no write on failure) rejects a missing or altered manifest or file (422 `EXPORT_FILE_CORRUPTED`), an
+        unsupported format version and the export of a demo workspace (422 `EXPORT_FORMAT_UNSUPPORTED`). The import runs as
+        ONE database transaction: balances and the trial balance are verified against the manifest before the workspace
+        becomes visible (`EXPORT_VERIFICATION_FAILED` ⇒ nothing is persisted). Requires a recent authentication
+        (403 `REAUTHENTICATION_REQUIRED`). One import in progress per user (409 `IMPORT_IN_PROGRESS`). Audited.
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: AUTHENTICATED
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The `pfos-export` ZIP archive (`application/zip`).
+      responses:
+        '202':
+          description: Import accepted; poll `getWorkspaceImport`.
+          headers:
+            Location:
+              description: URL of the import (`/api/v1/workspace-imports/{importId}`).
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspaceImport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspace-imports/{importId}:
+    parameters:
+      - name: importId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/Uuid' }
+    get:
+      tags: [Identity]
+      operationId: getWorkspaceImport
+      summary: State of an import (the requester only)
+      description: |
+        `RECEIVED → VALIDATING → IMPORTING → SUCCEEDED | FAILED`. `workspaceId` is the new workspace once `SUCCEEDED`;
+        on `FAILED`, `errorCode` is `EXPORT_VERIFICATION_FAILED`, `EXPORT_FILE_CORRUPTED` or `IMPORT_FAILED` and no
+        workspace was created.
+      x-openspec-capability: identity/workspace-portability
+      x-required-role: AUTHENTICATED
+      responses:
+        '200':
+          description: The import
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspaceImport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Accounts ─────────────────────────────
   /workspaces/{workspaceId}/accounts:
     parameters:
@@ -5645,8 +5884,13 @@ paths:
       tags: [Platform]
       operationId: getOperation
       summary: Poll a long-running operation (202 + operation pattern)
-      x-openspec-capability: platform/api-conventions
-      x-required-role: VIEWER
+      description: |
+        Asynchronous operations (`202 + Location`, docs/10 §8). Phase 2 has a single kind, `EXPORT` (the workspace
+        export of `identity/workspace-portability`, created by `requestWorkspaceExport`): `PENDING → RUNNING → SUCCEEDED |
+        FAILED`, with `progressPct`, the `result` (`exportId`, `expiresAt`) or the failure as a problem. OWNER only
+        (the same role that requests and downloads the export).
+      x-openspec-capability: [platform/api-conventions, identity/workspace-portability]
+      x-required-role: OWNER
       responses:
         '200':
           description: Operation status
@@ -5857,6 +6101,11 @@ components:
         (`Idempotent-Replayed: true`); same key + different payload → 422 IDEMPOTENCY_KEY_REUSED;
         key still in progress → 409 IDEMPOTENCY_REQUEST_IN_PROGRESS.
       schema: { $ref: '#/components/schemas/IdempotencyKeyValue' }
+    ExportId:
+      name: exportId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
     IdempotencyKeyOptional:
       name: Idempotency-Key
       in: header
@@ -5950,6 +6199,16 @@ components:
       description: Domain state conflict (e.g. PERIOD_CLOSED, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED, INVALID_STATUS_TRANSITION, CONCURRENCY_CONFLICT, NAME_TAKEN, LEDGER_ENTRY_ALREADY_REVERSED, IDEMPOTENCY_REQUEST_IN_PROGRESS — the latter with Retry-After)
       headers:
         Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Gone:
+      description: The resource existed but is no longer available (EXPORT_EXPIRED)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PayloadTooLarge:
+      description: The uploaded file exceeds the maximum size (UPLOAD_TOO_LARGE)
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -6230,6 +6489,15 @@ components:
         - RECONCILIATION_STATEMENT_DATE_INVALID  # 422 (add-reconciliation: future date or not after the last completed session)
         - RECONCILIATION_DIFFERENCE_NOT_ZERO     # 422 (add-reconciliation: completing with a non-zero difference and no adjustment)
         - BULK_EDIT_NOT_APPLICABLE               # 422 (add-bulk-edit: the change does not apply to the transaction, e.g. category on a multi-split expense)
+        - REAUTHENTICATION_REQUIRED              # 403 (add-workspace-export: the authentication (auth_time) is older than REAUTH_MAX_AGE)
+        - EXPORT_IN_PROGRESS                     # 409 (add-workspace-export: the workspace already has an export in progress)
+        - IMPORT_IN_PROGRESS                     # 409 (add-workspace-export: the user already has an import in progress)
+        - EXPORT_NOT_READY                       # 409 (add-workspace-export: downloading or discarding an export that is not finished)
+        - EXPORT_EXPIRED                         # 410 (add-workspace-export: the export expired or was discarded)
+        - EXPORT_FILE_CORRUPTED                  # 422 (add-workspace-export: altered, truncated or invalid export file)
+        - EXPORT_FORMAT_UNSUPPORTED              # 422 (add-workspace-export: unknown format version or the export of a demo workspace)
+        - EXPORT_VERIFICATION_FAILED             # 422 (add-workspace-export: imported balances do not match the manifest; nothing persisted)
+        - UPLOAD_TOO_LARGE                       # 413 (add-workspace-export: the uploaded file exceeds WORKSPACE_IMPORT_MAX_BYTES)
 
     # ── Identity ──
     WorkspaceRole:
@@ -6356,6 +6624,94 @@ components:
             - $ref: '#/components/schemas/Instant'
             - type: 'null'
         purgedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+    ExportStatus:
+      type: string
+      enum: [REQUESTED, RUNNING, READY, FAILED, EXPIRED, DISCARDED]
+    WorkspaceExport:
+      type: object
+      required:
+        [id, workspaceId, operationId, status, formatVersion, sizeBytes, sha256, counts, requestedBy, requestedAt,
+         completedAt, expiresAt, discardedAt, expiredAt, errorCode]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        workspaceId: { $ref: '#/components/schemas/Uuid' }
+        operationId: { $ref: '#/components/schemas/Uuid' }
+        status: { $ref: '#/components/schemas/ExportStatus' }
+        formatVersion: { type: integer, minimum: 1, examples: [1] }
+        sizeBytes:
+          description: Size of the plain archive in bytes (READY and after)
+          oneOf:
+            - type: integer
+              minimum: 0
+            - type: 'null'
+        sha256:
+          description: SHA-256 (hex) of the plain archive; kept after the file expires
+          oneOf:
+            - type: string
+              pattern: '^[0-9a-f]{64}$'
+            - type: 'null'
+        counts:
+          description: Rows per section of the archive
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        requestedBy: { $ref: '#/components/schemas/Uuid' }
+        requestedAt: { $ref: '#/components/schemas/Instant' }
+        completedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        expiresAt:
+          description: When the file expires (READY)
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        discardedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        expiredAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        errorCode:
+          description: Failure code when status = FAILED
+          oneOf:
+            - type: string
+            - type: 'null'
+    ImportStatus:
+      type: string
+      enum: [RECEIVED, VALIDATING, IMPORTING, VERIFYING, SUCCEEDED, FAILED]
+    WorkspaceImport:
+      type: object
+      required:
+        [id, status, sourceWorkspaceId, sourceExportedAt, formatVersion, sizeBytes, workspaceId, counts, errorCode,
+         createdAt, completedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        status: { $ref: '#/components/schemas/ImportStatus' }
+        sourceWorkspaceId: { $ref: '#/components/schemas/Uuid' }
+        sourceExportedAt: { $ref: '#/components/schemas/Instant' }
+        formatVersion: { type: integer, minimum: 1 }
+        sizeBytes: { type: integer, minimum: 0 }
+        workspaceId:
+          description: The NEW workspace (SUCCEEDED only)
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counts:
+          description: Rows imported per section (SUCCEEDED)
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        errorCode:
+          description: Failure code when status = FAILED
+          oneOf:
+            - type: string
+            - type: 'null'
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        completedAt:
           oneOf:
             - $ref: '#/components/schemas/Instant'
             - type: 'null'

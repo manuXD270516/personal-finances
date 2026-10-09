@@ -148,3 +148,5 @@ export const ACCOUNTS_AUDIT_POLICY = {
     archivedAt: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
+
+export * from './portability.js';

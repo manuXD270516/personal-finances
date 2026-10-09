@@ -142,6 +142,15 @@ export class PgUnitOfWork {
     }
   }
 
+  /**
+   * Ejecuta `fn` en una transacción NUEVA e independiente aunque haya una unidad de trabajo en curso: lo que escribe
+   * sobrevive al rollback de la transacción del comando (p. ej. auditar una solicitud RECHAZADA, que lanza y revierte el
+   * comando). No usar para efectos que deban ser atómicos con el comando.
+   */
+  runDetached<T>(ctx: AuthContext, fn: () => Promise<T>): Promise<T> {
+    return current.exit(() => this.run(ctx, fn));
+  }
+
   /** Re-fija el contexto dentro de la transacción en curso (p. ej. tras dar de alta la identidad). */
   async bind(ctx: AuthContext): Promise<void> {
     await setRlsContext(requireSqlExecutor(), ctx);

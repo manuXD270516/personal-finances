@@ -30,6 +30,7 @@ import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface
 import { createCategoryCatalogQuery } from '@pf/classification/interface/classification.module';
 import {
   createDemoDataRuntime,
+  createPortabilityRuntime,
   identityActiveWorkspaces,
   identityWorkspaceRecipients,
   identityWorkspaceCalendarDirectory,
@@ -68,6 +69,8 @@ import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
+import { registerPortabilityJobs } from './portability-jobs.js';
+import { portabilityOptions } from '../portability/portability-wiring.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
 import { AUDIT_POLICIES, demoDataOptions, outboxPort } from '../identity/identity-wiring.js';
 import { WorkerModule } from './platform-jobs.js';
@@ -106,6 +109,11 @@ export interface WorkerRuntimeOptions {
   readonly lifecycleBackfillOnStart?: boolean;
   /** Tests (add-demo-data): falla inyectada del cargador demo (`<módulo>/<YYYY-MM>`). */
   readonly demoFailAt?: string;
+  /** add-workspace-export: ganchos de prueba (pausa tras tomar la instantánea) y barrido programado de retención. */
+  readonly portability?: {
+    readonly afterSnapshot?: () => Promise<void>;
+    readonly scheduleCrons?: boolean;
+  };
   /** Encola `planning.ensure-periods` al arrancar (por defecto sí; add-financial-periods). */
   readonly planningPeriodsOnStart?: boolean;
   /** Tests (add-alerts): sustituye el adaptador de email (por defecto, el de `EMAIL_DRIVER`). */
@@ -244,6 +252,48 @@ export async function createWorkerRuntime(
       ...(options.demoFailAt ? { failAt: options.demoFailAt } : {}),
     }),
   });
+
+  // Exportación/importación del workspace (add-workspace-export): sin llavero de claves maestras no se registran los jobs.
+  const portability = portabilityOptions({
+    storage,
+    bucket: config.OBJECT_STORAGE_EXPORTS_BUCKET,
+    keys: config.EXPORT_ENCRYPTION_KEYS,
+    activeKeyId: config.EXPORT_ENCRYPTION_ACTIVE_KEY_ID,
+    retentionMs: config.EXPORT_RETENTION,
+    // Solo la API aplica la re-autenticación y el tope de subida; el worker no los usa.
+    reauthMaxAgeMs: 600_000,
+    maxImportBytes: 209_715_200,
+    queue,
+    pool,
+    ...(options.portability?.afterSnapshot
+      ? { builderOverride: { afterSnapshot: options.portability.afterSnapshot } }
+      : {}),
+  });
+  if (portability) {
+    const runtime = createPortabilityRuntime({
+      pool,
+      clock: options.clock ?? systemClock,
+      outbox: outboxPort(fxOutbox),
+      audit: demoAudit.port,
+      defaults: {
+        baseCurrency: config.APP_REPORTING_CURRENCY,
+        timeZone: config.APP_TIMEZONE,
+        locale: config.APP_DEFAULT_LOCALE,
+        personalWorkspaceName: 'Personal',
+      },
+      portability,
+    });
+    await registerPortabilityJobs(queue, {
+      exports: runtime.exports,
+      imports: runtime.imports,
+      logger,
+      ...(options.portability?.scheduleCrons !== undefined
+        ? { scheduleCrons: options.portability.scheduleCrons }
+        : {}),
+    });
+  } else {
+    logger.warn('EXPORT_ENCRYPTION_KEYS ausente: exportar e importar el workspace está deshabilitado');
+  }
 
   const rateValidityWindowDays = config.REPORTING_RATE_VALIDITY_WINDOW ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
   // PLANNING (add-financial-periods): job horario `planning.ensure-periods` + consumidores de IDENTITY y LEDGER. El

@@ -166,6 +166,33 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
       });
     }
   }
+  if (names.includes('EXPORT_ENCRYPTION_KEYS')) {
+    const rawKeys = values['EXPORT_ENCRYPTION_KEYS'];
+    if (cloud && rawKeys === undefined && !problems.some((p) => p.variable === 'EXPORT_ENCRYPTION_KEYS')) {
+      problems.push({
+        variable: 'EXPORT_ENCRYPTION_KEYS',
+        reason: 'falta (obligatoria con PFOS_ENV=staging|production)',
+      });
+    }
+    if (typeof rawKeys === 'string') {
+      const ids = rawKeys.split(',').map((entry) => entry.slice(0, entry.indexOf(':')));
+      if (new Set(ids).size !== ids.length) {
+        problems.push({ variable: 'EXPORT_ENCRYPTION_KEYS', reason: 'identificadores de clave repetidos' });
+      }
+      const active = values['EXPORT_ENCRYPTION_ACTIVE_KEY_ID'];
+      if (typeof active === 'string' && !ids.includes(active)) {
+        problems.push({
+          variable: 'EXPORT_ENCRYPTION_ACTIVE_KEY_ID',
+          reason: 'no figura en EXPORT_ENCRYPTION_KEYS',
+        });
+      }
+    } else if (values['EXPORT_ENCRYPTION_ACTIVE_KEY_ID'] !== undefined) {
+      problems.push({
+        variable: 'EXPORT_ENCRYPTION_ACTIVE_KEY_ID',
+        reason: 'requiere EXPORT_ENCRYPTION_KEYS',
+      });
+    }
+  }
   if (names.includes('CURSOR_SIGNING_KEY') && cloud && values['CURSOR_SIGNING_KEY'] === undefined) {
     if (!problems.some((p) => p.variable === 'CURSOR_SIGNING_KEY')) {
       problems.push({

@@ -180,6 +180,69 @@ export const VARIABLES = {
     },
   ),
 
+  // ── Exportación / importación del workspace (openspec add-workspace-export, docs/33 D98–D102) ──
+  OBJECT_STORAGE_EXPORTS_BUCKET: variable(
+    z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'nombre de bucket S3 inválido'),
+    {
+      group: 'Exportación del workspace',
+      description:
+        'Bucket de los archivos de export cifrados y de los archivos de import en tránsito (sin versioning: al expirar se elimina el objeto de verdad; lifecycle de 8 días como red de seguridad en la IaC). Distinto del bucket de documentos. En local/CI lo crea `migrate` con `OBJECT_STORAGE_ENSURE_BUCKET=true`.',
+      default: 'pfos-exports',
+      example: 'pfos-local-exports',
+    },
+  ),
+  EXPORT_ENCRYPTION_KEYS: variable(
+    z
+      .string()
+      .regex(
+        /^[A-Za-z0-9_-]{1,32}:([A-Za-z0-9_-]{43}|[0-9a-f]{64})(,[A-Za-z0-9_-]{1,32}:([A-Za-z0-9_-]{43}|[0-9a-f]{64}))*$/,
+        'formato kid:clave[,kid:clave…] con claves de 32 bytes en base64url (43 caracteres) o hexadecimal (64)',
+      ),
+    {
+      group: 'Exportación del workspace',
+      description:
+        'Llavero de CLAVES MAESTRAS que envuelven la clave de datos de cada archivo de export (cifrado de sobre AES-256-GCM): `kid:clave` separadas por coma, con la clave de 32 bytes en base64url (43 caracteres) o hexadecimal (64; `openssl rand -hex 32`). La vigente es `EXPORT_ENCRYPTION_ACTIVE_KEY_ID`; las anteriores siguen en el llavero hasta que expiren sus exports (rotación). Nunca en el repositorio; en cloud viene del secrets manager o de KMS. Sin ella la exportación e importación están deshabilitadas (503); obligatoria en staging/production.',
+      optional: true,
+      requiredWhen: '`PFOS_ENV=staging|production`',
+      secret: true,
+    },
+  ),
+  EXPORT_ENCRYPTION_ACTIVE_KEY_ID: variable(
+    z.string().regex(/^[A-Za-z0-9_-]{1,32}$/, 'identificador de clave inválido'),
+    {
+      group: 'Exportación del workspace',
+      description:
+        'Identificador (`kid`) de la clave maestra vigente de `EXPORT_ENCRYPTION_KEYS` con la que se envuelven los exports NUEVOS. Sin valor: la primera del llavero.',
+      optional: true,
+      example: 'k1',
+    },
+  ),
+  EXPORT_RETENTION: variable(
+    z
+      .string()
+      .regex(/^\d+[hd]$/, 'duración en horas (`24h`) o días (`7d`)')
+      .transform((v) => Number(v.slice(0, -1)) * (v.endsWith('d') ? 24 : 1) * 3_600_000)
+      .refine((ms) => ms >= 3_600_000 && ms <= 30 * 24 * 3_600_000, 'entre 1h y 30d'),
+    {
+      group: 'Exportación del workspace',
+      description:
+        'Retención del archivo de export desde que termina (docs/33 D102): pasada, la descarga responde 410 `EXPORT_EXPIRED` y el job horario `identity.export-retention` elimina el objeto del bucket (el registro con fechas, tamaño y suma se conserva).',
+      default: '7d',
+    },
+  ),
+  REAUTH_MAX_AGE: variable(duration, {
+    group: 'Exportación del workspace',
+    description:
+      'Antigüedad máxima de la autenticación (claim `auth_time` del access token) para exportar, descargar un export e importar (docs/12 §4): pasada, 403 `REAUTHENTICATION_REQUIRED` y el BFF reinicia el login con `prompt=login`.',
+    default: '10m',
+  }),
+  WORKSPACE_IMPORT_MAX_BYTES: variable(positiveInt, {
+    group: 'Exportación del workspace',
+    description:
+      'Tamaño máximo en bytes del archivo de export que se puede importar (docs/33 D100, 200 MB): mayor ⇒ 413 `UPLOAD_TOO_LARGE` sin crear nada.',
+    default: '209715200',
+  }),
+
   // ── Cola y sesiones ──
   JOB_QUEUE_DRIVER: variable(z.enum(['pgboss', 'bullmq']), {
     group: 'Cola y sesiones',
@@ -740,6 +803,12 @@ const OBJECT_STORAGE = [
   'OBJECT_STORAGE_SECRET_KEY',
   'OBJECT_STORAGE_FORCE_PATH_STYLE',
 ] as const;
+const EXPORT_PORTABILITY = [
+  'OBJECT_STORAGE_EXPORTS_BUCKET',
+  'EXPORT_ENCRYPTION_KEYS',
+  'EXPORT_ENCRYPTION_ACTIVE_KEY_ID',
+  'EXPORT_RETENTION',
+] as const;
 const FX_PROVIDERS = [
   'FX_PROVIDER_PRIMARY',
   'FX_PROVIDER_FALLBACK',
@@ -792,6 +861,10 @@ export const APP_VARIABLES = {
     ...FX_PROVIDERS,
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
+    // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
+    ...EXPORT_PORTABILITY,
+    'REAUTH_MAX_AGE',
+    'WORKSPACE_IMPORT_MAX_BYTES',
   ],
   // El worker se conecta como pf_worker (relay del outbox entre workspaces, add-event-outbox design §4).
   worker: [
@@ -823,6 +896,8 @@ export const APP_VARIABLES = {
     'APP_PUBLIC_URL',
     'NOTIFY_EMAIL_MAX_ATTEMPTS',
     'NOTIFY_RETENTION',
+    // add-workspace-export: el worker genera el export, importa y expira los archivos vencidos.
+    ...EXPORT_PORTABILITY,
     ...FX_PROVIDERS,
     'FX_PROVIDER_PARALELO_BO_URL',
     'FX_PROVIDER_DOLARAPI_BO_URL',
@@ -840,6 +915,7 @@ export const APP_VARIABLES = {
     ...OBJECT_STORAGE,
     'OBJECT_STORAGE_ENSURE_BUCKET',
     'OBJECT_STORAGE_CORS_ORIGINS',
+    'OBJECT_STORAGE_EXPORTS_BUCKET',
   ],
   // `seed` lee OIDC_ISSUER_URL para sembrar las identidades de la Minimal Seed (usuarios del realm de desarrollo).
   seed: [...GENERAL, ...PRODUCT, ...DATABASE, 'OIDC_ISSUER_URL', 'DEMO_DATA_ENABLED'],

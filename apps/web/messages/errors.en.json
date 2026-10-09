@@ -90,5 +90,14 @@
   "CUSTOM_FIELD_OPTION_IN_USE": "You cannot remove an option that is already in use. You can rename it or add others.",
   "CUSTOM_FIELD_VALUE_INVALID": "The value of a custom field is not valid for its type.",
   "CUSTOM_FIELD_REQUIRED": "A required custom field is missing.",
-  "CUSTOM_FIELD_TARGET_MISMATCH": "That custom field does not apply to this record."
+  "CUSTOM_FIELD_TARGET_MISMATCH": "That custom field does not apply to this record.",
+  "REAUTHENTICATION_REQUIRED": "For security you must sign in again for this operation.",
+  "EXPORT_IN_PROGRESS": "An export is already in progress for this workspace. Wait for it to finish.",
+  "IMPORT_IN_PROGRESS": "You already have an import in progress. Wait for it to finish.",
+  "EXPORT_NOT_READY": "The export is not ready yet. Try again in a moment.",
+  "EXPORT_EXPIRED": "The export expired or was deleted. Request a new one.",
+  "EXPORT_FILE_CORRUPTED": "The file is damaged or was modified. Nothing was imported.",
+  "EXPORT_FORMAT_UNSUPPORTED": "The file format is not supported (for example, demo data exports). Nothing was imported.",
+  "EXPORT_VERIFICATION_FAILED": "The imported data does not match the file summary. No workspace was created.",
+  "UPLOAD_TOO_LARGE": "The file exceeds the maximum allowed size."
 }

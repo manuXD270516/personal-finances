@@ -7,6 +7,19 @@ import { DomainError, type Clock } from '@pf/shared-kernel';
 import { currentRequestContext, PgUnitOfWork, requireSqlExecutor } from '@pf/platform/api';
 import type { Pool, PoolClient } from 'pg';
 import { DemoDataService } from '../application/demo-data.service.js';
+import type {
+  ArchiveInspector,
+  EnvelopeCipher,
+  ExportArchiveBuilder,
+  ExportObjectStore,
+  PortabilityDeps,
+  PortabilityJobPort,
+  PortabilitySettings,
+  WorkspaceImporter,
+} from '../application/portability/ports.js';
+import { RecentAuthPolicy } from '../application/portability/reauth.js';
+import { WorkspaceExportService } from '../application/portability/workspace-export.service.js';
+import { WorkspaceImportService } from '../application/portability/workspace-import.service.js';
 import { IdentityService } from '../application/identity.service.js';
 import type {
   WorkspaceCalendarQuery,
@@ -30,6 +43,17 @@ import {
   pgDemoPurge,
   pgIdentityDeps,
 } from '../infrastructure/pg-identity.js';
+import {
+  PgExportRepository,
+  PgImportRepository,
+  PgOperationRepository,
+} from '../infrastructure/portability/pg-portability.js';
+import {
+  PORTABILITY_SETTINGS,
+  PortabilityController,
+  WORKSPACE_EXPORT_SERVICE,
+  WORKSPACE_IMPORT_SERVICE,
+} from './portability-http.js';
 import {
   DEMO_DATA_SERVICE,
   IDENTITY_DEFAULTS,
@@ -60,6 +84,44 @@ export interface IdentityModuleOptions {
   readonly onWorkspaceCreated?: WorkspaceCreatedHook;
   /** Datos de demostración (add-demo-data): habilitación, dataset y cola de jobs. Ausente ⇒ carga deshabilitada. */
   readonly demo?: DemoDataOptions;
+  /** Exportación/importación del workspace (add-workspace-export). Ausente ⇒ las operaciones responden 503. */
+  readonly portability?: PortabilityOptions;
+}
+
+/** Piezas de la portabilidad que cablea el composition root (la clave maestra y las secciones viven fuera de IDENTITY). */
+export interface PortabilityOptions {
+  readonly store: ExportObjectStore;
+  readonly cipher: EnvelopeCipher;
+  readonly builder: ExportArchiveBuilder;
+  readonly importer: WorkspaceImporter;
+  readonly inspector: ArchiveInspector;
+  readonly jobs: PortabilityJobPort;
+  readonly settings: PortabilitySettings;
+  /** Antigüedad máxima de la autenticación (`REAUTH_MAX_AGE`, ms). */
+  readonly reauthMaxAgeMs: number;
+}
+
+/** Dependencias de los casos de uso de portabilidad sobre PostgreSQL. */
+export function portabilityDeps(deps: IdentityDeps, options: PortabilityOptions): PortabilityDeps {
+  return {
+    ...deps,
+    exports: new PgExportRepository(),
+    imports: new PgImportRepository(),
+    operations: new PgOperationRepository(),
+    store: options.store,
+    cipher: options.cipher,
+    builder: options.builder,
+    inspector: options.inspector,
+    importer: options.importer,
+    reauth: new RecentAuthPolicy(options.reauthMaxAgeMs),
+    jobs: options.jobs,
+    settings: options.settings,
+  };
+}
+
+export function portabilityServices(deps: IdentityDeps, options: PortabilityOptions) {
+  const full = portabilityDeps(deps, options);
+  return { exports: new WorkspaceExportService(full), imports: new WorkspaceImportService(full) };
 }
 
 export interface DemoDataOptions {
@@ -103,14 +165,24 @@ export class IdentityModule {
       defaults: options.defaults,
       ...(options.onWorkspaceCreated ? { onWorkspaceCreated: options.onWorkspaceCreated } : {}),
     });
+    const portability = options.portability ? portabilityServices(deps, options.portability) : undefined;
     return {
       module: IdentityModule,
-      controllers: [IdentityController],
+      controllers: [IdentityController, PortabilityController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: IDENTITY_DEPS, useValue: deps },
         { provide: IDENTITY_SERVICE, useValue: new IdentityService(deps) },
         { provide: DEMO_DATA_SERVICE, useValue: demoDataService(deps, options.demo) },
+        { provide: WORKSPACE_EXPORT_SERVICE, useValue: portability?.exports ?? {} },
+        { provide: WORKSPACE_IMPORT_SERVICE, useValue: portability?.imports ?? {} },
+        {
+          provide: PORTABILITY_SETTINGS,
+          useValue: {
+            enabled: portability !== undefined,
+            maxImportBytes: options.portability?.settings.maxImportBytes ?? 0,
+          },
+        },
         { provide: IDENTITY_DEFAULTS, useValue: options.defaults },
         { provide: JWT_VERIFIER, useValue: new JwtVerifier(options.jwt) },
         ...(options.denials ? [{ provide: AUTHORIZATION_DENIAL_PORT, useValue: options.denials }] : []),
@@ -417,3 +489,64 @@ export type {
   DemoProgress,
   DemoPurgeJob,
 } from '../application/ports/index.js';
+
+/**
+ * Composición de los casos de uso de portabilidad para el worker (jobs `identity.workspace-export`,
+ * `identity.workspace-import` e `identity.export-retention`; add-workspace-export). El `pool` es el del worker
+ * (`pf_worker`): el constructor del archivo asume `pf_workspace_directory` solo para leer los nombres de los miembros.
+ */
+export function createPortabilityRuntime(input: {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  readonly outbox: OutboxPort;
+  readonly audit: AuditPort;
+  readonly defaults: WorkspaceDefaults;
+  readonly portability: PortabilityOptions;
+}): { readonly exports: WorkspaceExportService; readonly imports: WorkspaceImportService } {
+  const deps = pgIdentityDeps({
+    pool: input.pool,
+    outbox: input.outbox,
+    audit: input.audit,
+    clock: input.clock,
+    defaults: input.defaults,
+  });
+  return portabilityServices(deps, input.portability);
+}
+
+export { WorkspaceExportService } from '../application/portability/workspace-export.service.js';
+export { WorkspaceImportService } from '../application/portability/workspace-import.service.js';
+export type { ExportView } from '../application/portability/workspace-export.service.js';
+export type { ImportView } from '../application/portability/workspace-import.service.js';
+export type {
+  ArchiveInspector,
+  EnvelopeCipher,
+  ExportArchiveBuilder,
+  ExportJob,
+  ExportKeyProvider,
+  ExportObjectStore,
+  ImportJob,
+  PortabilityJobPort,
+  PortabilitySettings,
+  WorkspaceImporter,
+} from '../application/portability/ports.js';
+export {
+  KeyringEnvelopeCipher,
+  S3ExportObjectStore,
+} from '../infrastructure/portability/s3-store-and-cipher.js';
+export { LocalKeyringProvider } from '../infrastructure/portability/key-provider.js';
+export { PgExportArchiveBuilder } from '../infrastructure/portability/pg-archive-builder.js';
+export {
+  PgWorkspaceImporter,
+  type ImportHook,
+  type ImportHookContext,
+} from '../infrastructure/portability/pg-importer.js';
+export { archiveInspector } from '../infrastructure/portability/archive-inspector.js';
+export {
+  buildSectionSchema,
+  exportSchemaId,
+  renderSchema,
+} from '../infrastructure/portability/json-schema.js';
+export { loadColumns, type ColumnInfo, type SqlExec } from '../infrastructure/portability/section-sql.js';
+export { ZipReader, ZipWriter } from '../infrastructure/portability/zip.js';
+export { RecordValidators, inspectArchive } from '../infrastructure/portability/archive-inspector.js';
+export { DATA_KEY_BYTES, decryptEnvelope, encryptEnvelope } from '../infrastructure/portability/envelope.js';

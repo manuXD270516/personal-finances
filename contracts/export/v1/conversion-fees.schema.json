@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/conversion-fees.schema.json",
+  "title": "pfos-export v1 — conversion-fees",
+  "description": "Registro de la sección «conversion-fees» (tabla txn.conversion_fee, contexto transactions). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "transaction_id",
+    "revision",
+    "fee_no",
+    "fee_type",
+    "amount",
+    "currency",
+    "paid_from_account_id",
+    "split_id"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "fee_no": {
+      "type": "integer"
+    },
+    "fee_type": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "paid_from_account_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "split_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "txn.conversion_fee",
+  "x-pfos-context": "transactions"
+}

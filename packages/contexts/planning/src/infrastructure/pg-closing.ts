@@ -119,6 +119,132 @@ const toHeader = (r: HeaderRow): SnapshotHeader => ({
 const amountAt = (column: string, scale: string) =>
   sql<string>`round(${sql.ref(column)}, ${sql.ref(scale)})::text`;
 
+/** Fila de `planning.close_snapshot_balance` con las cifras ya en texto a su escala. */
+export interface SnapshotBalanceRow {
+  readonly account_id: string;
+  readonly ledger_account_id: string | null;
+  readonly account_name: string;
+  readonly currency: string;
+  readonly balance: string;
+  readonly presented: string;
+  readonly reconciliation_id: string | null;
+  readonly statement_date: string | null;
+  readonly statement_balance: string | null;
+  readonly reconciliation_basis: 'STATEMENT' | 'WITHOUT_STATEMENT' | null;
+}
+
+/** Fila de `planning.close_snapshot_without_statement` con el monto en texto a su escala. */
+export interface SnapshotWithoutRow {
+  readonly transaction_id: string;
+  readonly account_id: string;
+  readonly business_date: string;
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/** Saldos del snapshot en el orden canónico (nombre y, a igualdad, id de cuenta). */
+export function mapBalanceRows(
+  rows: readonly SnapshotBalanceRow[],
+): Omit<SnapshotBalance, 'reconciledWithoutStatementTransactionIds'>[] {
+  return rows
+    .map((r) => ({
+      accountId: r.account_id,
+      accountName: r.account_name,
+      ledgerAccountId: r.ledger_account_id,
+      currency: r.currency,
+      balance: { amount: r.balance, currency: r.currency },
+      presented: { amount: r.presented, currency: r.currency },
+      reconciliation:
+        r.reconciliation_id && r.statement_date && r.statement_balance
+          ? {
+              reconciliationId: r.reconciliation_id,
+              statementDate: r.statement_date,
+              statementBalance: { amount: r.statement_balance, currency: r.currency } as MoneyValue,
+            }
+          : null,
+      reconciliationBasis: r.reconciliation_basis,
+    }))
+    .sort((a, b) =>
+      a.accountName === b.accountName
+        ? a.accountId.localeCompare(b.accountId)
+        : a.accountName.localeCompare(b.accountName),
+    );
+}
+
+/** Transacciones conciliadas sin extracto en el orden canónico (fecha y, a igualdad, id). */
+export function mapWithoutRows(rows: readonly SnapshotWithoutRow[]): SnapshotWithoutStatementRow[] {
+  return rows
+    .map((r) => ({
+      transactionId: r.transaction_id,
+      accountId: r.account_id,
+      businessDate: r.business_date,
+      amount: { amount: r.amount, currency: r.currency },
+    }))
+    .sort((a, b) =>
+      a.businessDate === b.businessDate
+        ? a.transactionId.localeCompare(b.transactionId)
+        : a.businessDate.localeCompare(b.businessDate),
+    );
+}
+
+/** Cabecera del snapshot (las columnas que forman parte del contenido hasheado). */
+export interface SnapshotContentHeader {
+  readonly periodId: string;
+  readonly label: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly startDay: number;
+  readonly baseCurrency: string;
+  readonly schemaVersion: number;
+  readonly flows: CloseSnapshotContent['flows'];
+  readonly netWorth: CloseSnapshotContent['netWorth'];
+  readonly budgetVsActual: CloseSnapshotContent['budgetVsActual'];
+  readonly checklist: CloseSnapshotContent['checklist'];
+  readonly acknowledgedWarnings: CloseSnapshotContent['acknowledgedWarnings'];
+}
+
+/**
+ * Contenido canónico del snapshot a partir de sus filas (cabecera, saldos y conciliadas sin extracto). Es la ÚNICA forma
+ * de armarlo: la lectura (`load`) y el recálculo del hash al restaurar un export (add-workspace-export: el hash cubre
+ * los ids y la importación los remapea) la comparten, así que no pueden divergir.
+ */
+export function assembleSnapshotContent(
+  header: SnapshotContentHeader,
+  balances: readonly Omit<SnapshotBalance, 'reconciledWithoutStatementTransactionIds'>[],
+  withoutStatement: readonly SnapshotWithoutStatementRow[],
+): CloseSnapshotContent {
+  const byAccount = new Map<string, string[]>();
+  for (const w of withoutStatement)
+    byAccount.set(w.accountId, [...(byAccount.get(w.accountId) ?? []), w.transactionId]);
+  return {
+    schemaVersion: header.schemaVersion,
+    period: {
+      periodId: header.periodId,
+      label: header.label,
+      periodStart: header.periodStart,
+      periodEnd: header.periodEnd,
+      startDay: header.startDay,
+    },
+    baseCurrency: header.baseCurrency,
+    balances: balances.map((b) => ({
+      ...b,
+      reconciledWithoutStatementTransactionIds:
+        b.reconciliationBasis === 'WITHOUT_STATEMENT' ? [...(byAccount.get(b.accountId) ?? [])].sort() : [],
+    })),
+    reconciledWithoutStatement: [...withoutStatement],
+    flows: header.flows,
+    netWorth: header.netWorth,
+    budgetVsActual: header.budgetVsActual,
+    goalContributions: null,
+    checklist: header.checklist,
+    acknowledgedWarnings: header.acknowledgedWarnings,
+  };
+}
+
+/** `content_sha256` del contenido armado por `assembleSnapshotContent`. */
+export const snapshotContentSha256 = (content: CloseSnapshotContent): string =>
+  sha256Hex(canonicalJson(content));
+
 export class PgCloseSnapshotRepository implements CloseSnapshotRepository {
   async insert(snapshot: SnapshotHeader & { readonly content: CloseSnapshotContent }): Promise<string> {
     const c = snapshot.content;
@@ -219,34 +345,24 @@ export class PgCloseSnapshotRepository implements CloseSnapshotRepository {
     for (const r of rows) {
       const balances = await this.balances(r.id);
       const withoutStatement = await this.withoutStatement(r.id);
-      const byAccount = new Map<string, string[]>();
-      for (const w of withoutStatement)
-        byAccount.set(w.accountId, [...(byAccount.get(w.accountId) ?? []), w.transactionId]);
-      const content: CloseSnapshotContent = {
-        schemaVersion: Number(r.content_schema_version),
-        period: {
+      const content = assembleSnapshotContent(
+        {
           periodId: r.period_id,
           label: r.label,
           periodStart: r.period_start,
           periodEnd: r.period_end,
           startDay: Number(r.start_day),
+          baseCurrency: r.base_currency,
+          schemaVersion: Number(r.content_schema_version),
+          flows: r.flows,
+          netWorth: r.net_worth,
+          budgetVsActual: r.budget_vs_actual,
+          checklist: r.checklist,
+          acknowledgedWarnings: r.acknowledged_warnings,
         },
-        baseCurrency: r.base_currency,
-        balances: balances.map((b) => ({
-          ...b,
-          reconciledWithoutStatementTransactionIds:
-            b.reconciliationBasis === 'WITHOUT_STATEMENT'
-              ? [...(byAccount.get(b.accountId) ?? [])].sort()
-              : [],
-        })),
-        reconciledWithoutStatement: withoutStatement,
-        flows: r.flows,
-        netWorth: r.net_worth,
-        budgetVsActual: r.budget_vs_actual,
-        goalContributions: null,
-        checklist: r.checklist,
-        acknowledgedWarnings: r.acknowledged_warnings,
-      };
+        balances,
+        withoutStatement,
+      );
       out.push({ ...toHeader(r), contentSha256: r.content_sha256, content });
     }
     return out;
@@ -272,29 +388,7 @@ export class PgCloseSnapshotRepository implements CloseSnapshotRepository {
              CASE WHEN statement_balance IS NULL THEN NULL ELSE ${amountAt('statement_balance', 'scale')} END AS statement_balance,
              reconciliation_basis
         FROM planning.close_snapshot_balance WHERE snapshot_id = ${snapshotId}`.execute(db());
-    return rows
-      .map((r) => ({
-        accountId: r.account_id,
-        accountName: r.account_name,
-        ledgerAccountId: r.ledger_account_id,
-        currency: r.currency,
-        balance: { amount: r.balance, currency: r.currency },
-        presented: { amount: r.presented, currency: r.currency },
-        reconciliation:
-          r.reconciliation_id && r.statement_date && r.statement_balance
-            ? {
-                reconciliationId: r.reconciliation_id,
-                statementDate: r.statement_date,
-                statementBalance: { amount: r.statement_balance, currency: r.currency } as MoneyValue,
-              }
-            : null,
-        reconciliationBasis: r.reconciliation_basis,
-      }))
-      .sort((a, b) =>
-        a.accountName === b.accountName
-          ? a.accountId.localeCompare(b.accountId)
-          : a.accountName.localeCompare(b.accountName),
-      );
+    return mapBalanceRows(rows);
   }
 
   private async withoutStatement(snapshotId: string): Promise<SnapshotWithoutStatementRow[]> {
@@ -308,18 +402,7 @@ export class PgCloseSnapshotRepository implements CloseSnapshotRepository {
       SELECT transaction_id, account_id, business_date::text AS business_date, ${amountAt('amount', 'scale')} AS amount,
              currency
         FROM planning.close_snapshot_without_statement WHERE snapshot_id = ${snapshotId}`.execute(db());
-    return rows
-      .map((r) => ({
-        transactionId: r.transaction_id,
-        accountId: r.account_id,
-        businessDate: r.business_date,
-        amount: { amount: r.amount, currency: r.currency },
-      }))
-      .sort((a, b) =>
-        a.businessDate === b.businessDate
-          ? a.transactionId.localeCompare(b.transactionId)
-          : a.businessDate.localeCompare(b.businessDate),
-      );
+    return mapWithoutRows(rows);
   }
 }
 

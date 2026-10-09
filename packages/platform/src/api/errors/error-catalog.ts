@@ -123,6 +123,16 @@ export const ERROR_CATALOG = {
     status: 422,
     title: 'Reconciliation difference must be zero or adjusted',
   },
+  // identity / workspace portability (Phase 2, add-workspace-export)
+  REAUTHENTICATION_REQUIRED: { status: 403, title: 'A recent authentication is required for this operation' },
+  EXPORT_IN_PROGRESS: { status: 409, title: 'The workspace already has an export in progress' },
+  IMPORT_IN_PROGRESS: { status: 409, title: 'The user already has an import in progress' },
+  EXPORT_NOT_READY: { status: 409, title: 'The export is not ready yet' },
+  EXPORT_EXPIRED: { status: 410, title: 'The export has expired or was discarded' },
+  EXPORT_FILE_CORRUPTED: { status: 422, title: 'The export file is corrupted or was altered' },
+  EXPORT_FORMAT_UNSUPPORTED: { status: 422, title: 'The export format is not supported' },
+  EXPORT_VERIFICATION_FAILED: { status: 422, title: 'The imported data does not match the export manifest' },
+  UPLOAD_TOO_LARGE: { status: 413, title: 'The uploaded file exceeds the maximum size' },
   // transactions / bulk edit (Phase 2)
   BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;

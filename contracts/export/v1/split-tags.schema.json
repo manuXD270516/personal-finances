@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/split-tags.schema.json",
+  "title": "pfos-export v1 — split-tags",
+  "description": "Registro de la sección «split-tags» (tabla txn.split_tag, contexto transactions). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "split_id",
+    "tag_id"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "split_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tag_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "txn.split_tag",
+  "x-pfos-context": "transactions"
+}

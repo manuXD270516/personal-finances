@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/close-snapshots.schema.json",
+  "title": "pfos-export v1 — close-snapshots",
+  "description": "Registro de la sección «close-snapshots» (tabla planning.close_snapshot, contexto planning). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "period_id",
+    "close_no",
+    "label",
+    "period_start",
+    "period_end",
+    "start_day",
+    "base_currency",
+    "closed_at",
+    "closed_by",
+    "previous_snapshot_id",
+    "checklist",
+    "acknowledged_warnings",
+    "flows",
+    "net_worth",
+    "budget_vs_actual",
+    "goal_contributions",
+    "content_schema_version",
+    "content_sha256"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "close_no": {
+      "type": "integer"
+    },
+    "label": {
+      "type": "string"
+    },
+    "period_start": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "period_end": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "start_day": {
+      "type": "integer"
+    },
+    "base_currency": {
+      "type": "string"
+    },
+    "closed_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "closed_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "previous_snapshot_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "checklist": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "acknowledged_warnings": {},
+    "flows": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "net_worth": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "budget_vs_actual": {},
+    "goal_contributions": {},
+    "content_schema_version": {
+      "type": "integer"
+    },
+    "content_sha256": {
+      "type": "string"
+    }
+  },
+  "x-pfos-table": "planning.close_snapshot",
+  "x-pfos-context": "planning"
+}

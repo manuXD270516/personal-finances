@@ -130,6 +130,9 @@ export class InMemoryIdentity {
             self.current = previous;
           }
         },
+        async runDetached(ctx, fn) {
+          return this.run(ctx, fn);
+        },
         async bind(ctx) {
           self.contexts.push(ctx);
           self.current = ctx;

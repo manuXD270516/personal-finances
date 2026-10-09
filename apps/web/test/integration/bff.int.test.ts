@@ -50,6 +50,7 @@ class FakeIdp implements OidcClient {
       nonce: input.nonce,
       code_challenge: input.codeChallenge,
       code_challenge_method: 'S256',
+      ...(input.reauth ? { prompt: 'login', max_age: '0' } : {}),
     }).toString();
     return url;
   }
@@ -265,6 +266,24 @@ describe('[TC-IDENTITY-AUTH-002] el login OIDC vía BFF usa PKCE y crea una cook
     expect(header.toLowerCase()).not.toContain('domain=');
     expect(cb.headers.get('location')).toBe(`${APP}/`);
     expect(setCookieHeader(cb, LOGIN_COOKIE)).toContain('Max-Age=0');
+  });
+
+  it('[TC-IDENTITY-EXPORT-001] reauth=1 fuerza credenciales de nuevo (prompt=login, max_age=0); el login normal no', async () => {
+    const { bff } = setup();
+    const normal = new URL(
+      (await bff.login(new Request(`${APP}/api/bff/auth/login?returnTo=/configuracion`))).headers.get(
+        'location',
+      )!,
+    );
+    expect(normal.searchParams.has('prompt')).toBe(false);
+    expect(normal.searchParams.has('max_age')).toBe(false);
+    const forced = new URL(
+      (
+        await bff.login(new Request(`${APP}/api/bff/auth/login?reauth=1&returnTo=/configuracion`))
+      ).headers.get('location')!,
+    );
+    expect(forced.searchParams.get('prompt')).toBe('login');
+    expect(forced.searchParams.get('max_age')).toBe('0');
   });
 
   it('un state reutilizado o nunca emitido no crea sesión y lleva a la página de error en español', async () => {

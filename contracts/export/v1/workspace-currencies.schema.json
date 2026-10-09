@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/workspace-currencies.schema.json",
+  "title": "pfos-export v1 — workspace-currencies",
+  "description": "Registro de la sección «workspace-currencies» (tabla fx.workspace_currency, contexto fx). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "currency_code",
+    "display_symbol",
+    "sort_order",
+    "enabled_at"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "currency_code": {
+      "type": "string"
+    },
+    "display_symbol": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sort_order": {
+      "type": "integer"
+    },
+    "enabled_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "fx.workspace_currency",
+  "x-pfos-context": "fx"
+}

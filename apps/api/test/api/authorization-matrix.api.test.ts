@@ -36,6 +36,8 @@ async function tokenFor(sub: string): Promise<string> {
     sub,
     iat: now - 5,
     exp: now + 300,
+    // Autenticación reciente: la descarga del export la exige además del rol (add-workspace-export).
+    auth_time: now - 5,
     typ: 'Bearer',
     scope: 'openid pfos.api',
     email: `${sub}@pfos.test`,

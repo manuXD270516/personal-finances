@@ -50,6 +50,10 @@ export interface Dependencies {
   readonly s3AccessKey: string;
   readonly s3SecretKey: string;
   readonly bucket: string;
+  /** Bucket de los exports del workspace (add-workspace-export). */
+  readonly exportsBucket: string;
+  /** Llavero de claves maestras de PRUEBA (generado por corrida, nunca en el repo): `k1:<base64url 32 bytes>`. */
+  readonly exportKeys: string;
 }
 
 declare module 'vitest' {
@@ -63,6 +67,8 @@ export default async function setup(project: TestProject) {
   const s3AccessKey = `pftest${randomBytes(6).toString('hex')}`;
   const s3SecretKey = randomBytes(24).toString('hex');
   const bucket = 'pfos-test-documents';
+  const exportsBucket = 'pfos-test-exports';
+  const exportKeys = `k1:${randomBytes(32).toString('base64url')}`;
 
   const [pg, s3]: [StartedPostgreSqlContainer, StartedTestContainer] = await Promise.all([
     new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('pfos').start(),
@@ -119,6 +125,7 @@ export default async function setup(project: TestProject) {
       WORKER_DATABASE_URL: workerDatabaseUrl,
       OBJECT_STORAGE_ENDPOINT: s3Endpoint,
       OBJECT_STORAGE_BUCKET: bucket,
+      OBJECT_STORAGE_EXPORTS_BUCKET: exportsBucket,
       OBJECT_STORAGE_ACCESS_KEY: s3AccessKey,
       OBJECT_STORAGE_SECRET_KEY: s3SecretKey,
       OBJECT_STORAGE_ENSURE_BUCKET: 'true',
@@ -140,6 +147,8 @@ export default async function setup(project: TestProject) {
     s3AccessKey,
     s3SecretKey,
     bucket,
+    exportsBucket,
+    exportKeys,
   });
 
   return async () => {

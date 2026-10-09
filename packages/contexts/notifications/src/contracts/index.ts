@@ -47,3 +47,5 @@ export const NOTIFICATIONS_AUDIT_POLICY = {
     includeDetailsInEmail: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
+
+export * from './portability.js';

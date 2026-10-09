@@ -2009,7 +2009,7 @@ Las purgas las ejecuta un job del worker con rol `pf_maintenance` (DELETE acotad
 
 ### 13.2 Exportación del workspace (portabilidad)
 
-Operación asíncrona (`POST /workspaces/{id}/exports` → `202` + `operation`): genera un ZIP en object storage (`exports/{ws}/{opId}.zip`, SSE-KMS, expira en 7 días) con JSON por agregado + CSV de transacciones/splits + documentos + `manifest.json` (versión de esquema, hashes). Exportar es acción `OWNER`, auditada.
+As-built (`add-workspace-export`): operación asíncrona (`POST /workspaces/{id}/exports` → `202` + `platform.operation` de tipo `EXPORT`, tablas `iam.workspace_export` e `iam.workspace_import`, `iam.workspace.restored_from_export`, estado `RESTORING` mientras se importa). El ZIP `pfos-export` v1 (manifiesto + JSON Lines validado con `contracts/export/v1/*.schema.json` + CSV neutralizado) se guarda cifrado en el bucket `exports` (`exports/{ws}/{exportId}.pfxe`, cifrado de sobre) y expira en 7 días. Cubre TODAS las tablas de `platform.workspace_scoped_table` (o una exclusión declarada con motivo). Exportar e importar son acciones auditadas; importar crea siempre un workspace nuevo.
 
 ### 13.3 Eliminación del workspace (derecho al olvido)
 

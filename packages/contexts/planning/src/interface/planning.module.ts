@@ -20,7 +20,7 @@ import { runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
-import type { Clock } from '@pf/shared-kernel';
+import { dec, type Clock } from '@pf/shared-kernel';
 import type { NetWorthQuery, PeriodFlowsQuery } from '@pf/reporting/contracts';
 import type {
   NominalFlowQuery,
@@ -28,6 +28,12 @@ import type {
   TransactionsClosingQuery,
 } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
+import {
+  assembleSnapshotContent,
+  mapBalanceRows,
+  mapWithoutRows,
+  snapshotContentSha256,
+} from '../infrastructure/pg-closing.js';
 import { BudgetQueries } from '../application/budget.queries.js';
 import { BudgetCalculator } from '../application/budget-calculator.js';
 import { BudgetThresholdService } from '../application/budget-thresholds.service.js';
@@ -572,3 +578,69 @@ export type {
 export type { ClosingVerifier } from '../application/closing-verifier.js';
 export type { ClosePendingService } from '../application/close-pending-publisher.js';
 export type { PeriodsService } from '../application/periods.service.js';
+
+// ───────────────────────────── add-workspace-export: restauración de snapshots de cierre
+
+type RestoreRow = Record<string, unknown>;
+
+/**
+ * Gancho de importación de `planning.close_snapshot` (openspec add-workspace-export): el `content_sha256` cubre el contenido
+ * canónico del snapshot, que incluye los identificadores de cuentas, periodo y conciliaciones. Al importar, la
+ * importación remapea esos ids, así que el hash se RECALCULA con el contenido restaurado (mismo armado que la lectura:
+ * `assembleSnapshotContent`) para que el verificador diario de cierres (`planning.verify-closings`) siga validando la
+ * integridad. Recibe las filas del lote YA remapeadas y las de las secciones hijas.
+ */
+export function closeSnapshotRestoreHook(ctx: {
+  readonly rows: RestoreRow[];
+  related(sectionName: string): RestoreRow[];
+}): void {
+  const group = (rows: RestoreRow[]) => {
+    const by = new Map<string, RestoreRow[]>();
+    for (const r of rows) by.set(String(r['snapshot_id']), [...(by.get(String(r['snapshot_id'])) ?? []), r]);
+    return by;
+  };
+  const balances = group(ctx.related('close-snapshot-balances'));
+  const withoutStatement = group(ctx.related('close-snapshot-without-statement'));
+  const fixed = (value: unknown, scale: unknown): string => dec(String(value)).toFixed(Number(scale));
+  for (const row of ctx.rows) {
+    const id = String(row['id']);
+    const balanceRows = (balances.get(id) ?? []).map((b) => ({
+      account_id: String(b['account_id']),
+      ledger_account_id: b['ledger_account_id'] === null ? null : String(b['ledger_account_id']),
+      account_name: String(b['account_name']),
+      currency: String(b['currency']),
+      balance: fixed(b['balance'], b['scale']),
+      presented: fixed(b['presented'], b['scale']),
+      reconciliation_id: b['reconciliation_id'] === null ? null : String(b['reconciliation_id']),
+      statement_date: b['statement_date'] === null ? null : String(b['statement_date']),
+      statement_balance: b['statement_balance'] === null ? null : fixed(b['statement_balance'], b['scale']),
+      reconciliation_basis: b['reconciliation_basis'] as 'STATEMENT' | 'WITHOUT_STATEMENT' | null,
+    }));
+    const withoutRows = (withoutStatement.get(id) ?? []).map((w) => ({
+      transaction_id: String(w['transaction_id']),
+      account_id: String(w['account_id']),
+      business_date: String(w['business_date']),
+      amount: fixed(w['amount'], w['scale']),
+      currency: String(w['currency']),
+    }));
+    const content = assembleSnapshotContent(
+      {
+        periodId: String(row['period_id']),
+        label: String(row['label']),
+        periodStart: String(row['period_start']),
+        periodEnd: String(row['period_end']),
+        startDay: Number(row['start_day']),
+        baseCurrency: String(row['base_currency']),
+        schemaVersion: Number(row['content_schema_version']),
+        flows: row['flows'] as never,
+        netWorth: row['net_worth'] as never,
+        budgetVsActual: row['budget_vs_actual'] as never,
+        checklist: row['checklist'] as never,
+        acknowledgedWarnings: row['acknowledged_warnings'] as never,
+      },
+      mapBalanceRows(balanceRows),
+      mapWithoutRows(withoutRows),
+    );
+    row['content_sha256'] = snapshotContentSha256(content);
+  }
+}

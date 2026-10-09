@@ -263,3 +263,5 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     transactionId: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
+
+export * from './portability.js';

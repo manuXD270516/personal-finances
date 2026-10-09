@@ -74,3 +74,39 @@ export async function ensureBucket(s3: S3Client, options: EnsureBucketOptions): 
     }
   }
 }
+
+/**
+ * Solo local/CI: bucket de los exports del workspace (openspec add-workspace-export). SIN versioning (al expirar o
+ * eliminarse un export el objeto debe desaparecer de verdad) y SIN CORS (la descarga pasa por la API, descifrada). El
+ * lifecycle de 8 días como red de seguridad y el SSE los define la IaC en cloud.
+ */
+export async function ensureExportsBucket(
+  s3: S3Client,
+  options: {
+    readonly bucket: string;
+    readonly logger: Logger;
+    readonly attempts?: number;
+    readonly delayMs?: number;
+  },
+): Promise<void> {
+  const attempts = options.attempts ?? 30;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      let created = false;
+      try {
+        await s3.send(new HeadBucketCommand({ Bucket: options.bucket }));
+      } catch (err) {
+        if (httpStatus(err) !== 404) throw err;
+        await s3.send(new CreateBucketCommand({ Bucket: options.bucket }));
+        created = true;
+      }
+      options.logger.info({ bucket: options.bucket, created }, 'exports bucket ready');
+      return;
+    } catch (err) {
+      const status = httpStatus(err);
+      if ((status === 400 || status === 403) && attempt > 3) throw err;
+      if (attempt >= attempts) throw err;
+      await new Promise((r) => setTimeout(r, options.delayMs ?? 1000));
+    }
+  }
+}

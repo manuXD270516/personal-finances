@@ -33,4 +33,11 @@ describe('protección CSRF del BFF', () => {
     );
     expect(contentTypeAllowed(req('DELETE'))).toBe(true);
   });
+
+  it('multipart solo se admite en la subida del import del workspace', () => {
+    const mp = { 'content-type': 'multipart/form-data; boundary=x' };
+    const at = (path: string) => new Request(`https://app.test${path}`, { method: 'POST', headers: mp });
+    expect(contentTypeAllowed(at('/api/bff/v1/workspace-imports'))).toBe(true);
+    expect(contentTypeAllowed(at('/api/bff/v1/workspaces'))).toBe(false);
+  });
 });

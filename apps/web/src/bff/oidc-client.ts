@@ -25,6 +25,8 @@ export interface OidcClient {
     readonly state: string;
     readonly nonce: string;
     readonly codeChallenge: string;
+    /** Reautenticación explícita (`prompt=login`, `max_age=0`): exigida por el export del workspace. */
+    readonly reauth?: boolean;
   }): Promise<URL>;
   /** Canjea el `code` validando `state`, `nonce`, PKCE y el id token (firma, `iss`, `aud`, `exp`). */
   exchangeCode(
@@ -109,6 +111,7 @@ export function createOpenIdClient(options: OpenIdClientOptions): OidcClient {
         code_challenge_method: 'S256',
         state: input.state,
         nonce: input.nonce,
+        ...(input.reauth ? { prompt: 'login', max_age: '0' } : {}),
       });
     },
     async exchangeCode(callbackUrl, checks) {

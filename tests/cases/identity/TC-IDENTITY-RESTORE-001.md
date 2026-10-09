@@ -12,9 +12,9 @@ invariants: [INV-025]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-export.api.test.ts","apps/api/test/api/workspace-import.api.test.ts","packages/contexts/identity/src/application/portability/workspace-import.service.test.ts","packages/contexts/identity/src/domain/id-remap.test.ts","packages/contexts/identity/src/domain/workspace-export.test.ts","tests/e2e/specs/workspace-export.spec.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["restore", "import"]

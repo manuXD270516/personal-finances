@@ -12,9 +12,9 @@ invariants: [INV-004, INV-022, INV-031]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-export.api.test.ts","apps/api/test/db/workspace-roundtrip-large.int.test.ts","tests/e2e/specs/workspace-export.spec.ts"]
+status: automated
 regression_suite: true
 phase: 2
 tags: ["restore", "round-trip", "money", "exit-criteria"]

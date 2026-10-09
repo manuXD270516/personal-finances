@@ -12,9 +12,9 @@ invariants: [INV-001, INV-003]
 priority: critical
 type: integration
 level: contract
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-export.api.test.ts","apps/api/test/db/workspace-export-contract.int.test.ts","packages/contexts/identity/src/domain/export-manifest.test.ts","packages/contexts/identity/src/infrastructure/portability/zip-csv.test.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["export", "format", "money"]
