@@ -26,7 +26,20 @@ export class AuditRecorder implements AuditPort {
   constructor(private readonly deps: AuditRecorderDeps) {}
 
   async append(entry: AuditEntry): Promise<void> {
-    const { env, ids, clock, policy, ipHasher, store } = this.deps;
+    await this.deps.store.insert(this.build(entry));
+  }
+
+  /** Varias entradas en una sola sentencia multi-fila (mismas validaciones que `append`, todo o nada). */
+  async appendMany(entries: readonly AuditEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const records = entries.map((e) => this.build(e));
+    const { store } = this.deps;
+    if (store.insertMany) await store.insertMany(records);
+    else for (const r of records) await store.insert(r);
+  }
+
+  private build(entry: AuditEntry): AuditRecord {
+    const { env, ids, clock, policy, ipHasher } = this.deps;
     if (!env.inUnitOfWork()) {
       throw new AuditError(
         'AUDIT_OUTSIDE_UNIT_OF_WORK',
@@ -39,7 +52,7 @@ export class AuditRecorder implements AuditPort {
     const origin: AuditOrigin =
       entry.origin ??
       (isAuditOrigin(ambient.origin) ? ambient.origin : actor.type === 'USER' ? 'api' : 'system');
-    const record = AuditRecord.create({
+    return AuditRecord.create({
       id: entry.id ?? ids.next(),
       workspaceId: entry.workspaceId,
       occurredAt: clock.now(),
@@ -52,12 +65,11 @@ export class AuditRecorder implements AuditPort {
       reason: entry.reason ?? null,
       origin,
       // Un trabajo sin correlación ambiental (p. ej. un script) recibe una propia: nunca queda vacía.
-      correlationId: ambient.correlationId ?? ids.next(),
+      correlationId: entry.correlationId ?? ambient.correlationId ?? ids.next(),
       requestId: ambient.requestId ?? null,
       idempotencyKey: ambient.idempotencyKey ?? null,
       clientIpHash: ambient.clientIp ? ipHasher.hash(ambient.clientIp) : null,
       userAgent: ambient.userAgent ?? null,
     });
-    await store.insert(record);
   }
 }

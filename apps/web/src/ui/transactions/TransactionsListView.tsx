@@ -105,7 +105,7 @@ export function TransactionsListView({
         const categories = [...new Set(tx.splits.map((s) => names.category(s.categoryId) ?? ''))].filter(
           Boolean,
         );
-        const canSelect = selectable && (tx.status === 'POSTED' || tx.status === 'CLEARED');
+        const canSelect = selectable && tx.status !== 'VOIDED';
         const fieldTexts = customFields
           ? customFieldTexts(tx, customFields.definitions, customFields.cf)
           : [];

@@ -118,6 +118,10 @@
             "REVISE",
             "VOID"
           ]
+        },
+        "bulkOperationId": {
+          "description": "Correlación común de una edición masiva (openspec add-bulk-edit; igual al correlation_id de los registros de auditoría y al de la operación). Ausente en las ediciones individuales. Aditivo (sin versión nueva).",
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
         }
       }
     }
@@ -232,6 +236,35 @@
         "ledgerImpact": false,
         "reason": null,
         "transition": "RECONCILE_WITHOUT_STATEMENT"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-0000000009b1",
+      "eventType": "transactions.TransactionUpdated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-02T14:03:22.120Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Transaction",
+      "aggregateId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000b1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "transactionId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+        "revision": 1,
+        "status": "POSTED",
+        "previousStatus": null,
+        "changedFields": [
+          "notes",
+          "counterpartyId"
+        ],
+        "ledgerImpact": false,
+        "reason": null,
+        "bulkOperationId": "01928c4e-7a3b-7c11-8f00-0000000000b1"
       }
     }
   ]

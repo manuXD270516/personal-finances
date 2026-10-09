@@ -66,32 +66,46 @@ function assertNoFractionalNumbers(value: unknown): void {
  * el INSERT viaja en la misma transacción que la mutación auditada (INV-029) y con su contexto RLS (WS-RO). Nunca abre
  * una conexión propia; fuera de una unidad de trabajo falla.
  */
+const auditRow = (r: AuditRecord) => {
+  assertNoFractionalNumbers(r.changes);
+  return {
+    id: r.id,
+    occurred_at: r.occurredAt.toDate(),
+    workspace_id: r.workspaceId,
+    actor_type: r.actor.type,
+    actor_user_id: r.actor.userId,
+    actor_process: r.actor.process,
+    action: r.action,
+    aggregate_type: r.aggregateType,
+    aggregate_id: r.aggregateId,
+    aggregate_version: r.aggregateVersion,
+    changes: sql<AuditChange[]>`${JSON.stringify(r.changes)}::jsonb`,
+    reason: r.reason,
+    origin: r.origin,
+    correlation_id: r.correlationId,
+    request_id: r.requestId,
+    idempotency_key: r.idempotencyKey,
+    client_ip_hash: r.clientIpHash ? Buffer.from(r.clientIpHash) : null,
+    user_agent: r.userAgent,
+  };
+};
+
+/** Filas por sentencia en la inserción masiva (19 columnas ⇒ muy por debajo del límite de 65 535 parámetros). */
+const INSERT_CHUNK = 500;
+
 export class PgAuditLogStore implements AuditLogStore {
   async insert(r: AuditRecord): Promise<void> {
-    assertNoFractionalNumbers(r.changes);
-    await db()
-      .insertInto('audit.audit_log')
-      .values({
-        id: r.id,
-        occurred_at: r.occurredAt.toDate(),
-        workspace_id: r.workspaceId,
-        actor_type: r.actor.type,
-        actor_user_id: r.actor.userId,
-        actor_process: r.actor.process,
-        action: r.action,
-        aggregate_type: r.aggregateType,
-        aggregate_id: r.aggregateId,
-        aggregate_version: r.aggregateVersion,
-        changes: sql<AuditChange[]>`${JSON.stringify(r.changes)}::jsonb`,
-        reason: r.reason,
-        origin: r.origin,
-        correlation_id: r.correlationId,
-        request_id: r.requestId,
-        idempotency_key: r.idempotencyKey,
-        client_ip_hash: r.clientIpHash ? Buffer.from(r.clientIpHash) : null,
-        user_agent: r.userAgent,
-      })
-      .execute();
+    await db().insertInto('audit.audit_log').values(auditRow(r)).execute();
+  }
+
+  /** Inserción multi-fila de una operación masiva (misma transacción y mismo contexto RLS que `insert`). */
+  async insertMany(records: readonly AuditRecord[]): Promise<void> {
+    for (let i = 0; i < records.length; i += INSERT_CHUNK) {
+      await db()
+        .insertInto('audit.audit_log')
+        .values(records.slice(i, i + INSERT_CHUNK).map(auditRow))
+        .execute();
+    }
   }
 
   async page(q: AuditLogPageQuery): Promise<readonly AuditRecord[]> {

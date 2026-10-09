@@ -68,6 +68,7 @@
   "RECONCILIATION_IN_PROGRESS": "Esta cuenta ya tiene una conciliación en curso. Termínala o cancélala antes de iniciar otra.",
   "RECONCILIATION_STATEMENT_DATE_INVALID": "La fecha del extracto no puede ser futura ni anterior o igual a la de la última conciliación completada.",
   "RECONCILIATION_DIFFERENCE_NOT_ZERO": "La diferencia con el extracto no es cero. Revisa las transacciones o confirma un ajuste con motivo.",
+  "BULK_EDIT_NOT_APPLICABLE": "El cambio no se puede aplicar a una de las transacciones (por ejemplo, cambiar la categoría de una compra dividida en varias porciones).",
   "PERIOD_NOT_STARTED": "Ese periodo todavía no empezó en la zona horaria del espacio de trabajo. Podrás activarlo desde su fecha de inicio.",
   "PERIOD_NOT_ENDED": "Ese periodo todavía no terminó en la zona horaria del espacio de trabajo. Podrás cerrarlo desde el día siguiente.",
   "PERIOD_PREVIOUS_NOT_CLOSED": "Cierra primero el periodo anterior: los periodos se cierran en orden cronológico.",

@@ -449,6 +449,102 @@ export class PgTransactionRepository implements TransactionRepository {
     return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
+  /**
+   * Carga en lote para la edición masiva (add-bulk-edit). Con `forUpdate`: `lock_timeout` de 5 s y bloqueo ordenado por
+   * id (`ORDER BY t.id FOR UPDATE OF t`), de modo que dos operaciones masivas concurrentes nunca se bloquean en
+   * ciclo; un tiempo agotado (`55P03`) se informa como `CONCURRENCY_CONFLICT` reintentable.
+   */
+  async findMany(
+    workspaceId: string,
+    ids: readonly string[],
+    options: { readonly forUpdate?: boolean } = {},
+  ): Promise<ReadonlyMap<string, Transaction>> {
+    if (ids.length === 0) return new Map();
+    const k = db();
+    if (options.forUpdate) await sql`SET LOCAL lock_timeout = '5s'`.execute(k);
+    let q = k
+      .selectFrom('txn.transaction as t')
+      .innerJoin('fx.currency as c', 'c.code', 't.currency')
+      .select(txColumns)
+      .where('t.workspace_id', '=', workspaceId)
+      .where('t.id', 'in', [...ids])
+      .orderBy('t.id');
+    if (options.forUpdate) q = q.forUpdate('t');
+    let rows: unknown[];
+    try {
+      rows = await q.execute();
+    } catch (err) {
+      if ((err as { code?: string }).code === '55P03') {
+        throw new DomainError(
+          'CONCURRENCY_CONFLICT',
+          'the transactions are being modified by another operation',
+        );
+      }
+      throw err;
+    }
+    return new Map((await this.hydrate(workspaceId, rows as TxRow[])).map((t) => [t.id, t]));
+  }
+
+  /**
+   * Escritura en lote de una edición masiva (add-bulk-edit): una sentencia multi-fila por tabla (cabecera, categoría
+   * de los splits, tags y valores de custom fields) en lugar de ~8 por transacción. No toca legs ni montos (INV-033).
+   */
+  async updateClassificationBatch(txs: readonly Transaction[]): Promise<boolean> {
+    if (txs.length === 0) return true;
+    const k = db();
+    const workspaceId = (txs[0] as Transaction).workspaceId;
+    const states = txs.map((t) => ({ tx: t, s: t.snapshot }));
+    const header = await sql`
+      UPDATE txn.transaction t
+         SET status = v.status, notes = v.notes, counterparty_id = v.counterparty_id,
+             search_text = v.search_text, version = v.version, updated_at = now()
+        FROM unnest(${states.map((x) => x.s.id)}::uuid[], ${states.map((x) => x.s.status)}::text[],
+                    ${states.map((x) => x.s.notes)}::text[], ${states.map((x) => x.s.counterpartyId)}::uuid[],
+                    ${states.map((x) => searchText(x.s))}::text[], ${states.map((x) => x.s.version)}::int[],
+                    ${states.map((x) => x.tx.persistedVersion ?? -1)}::int[])
+             AS v(id, status, notes, counterparty_id, search_text, version, persisted)
+       WHERE t.workspace_id = ${workspaceId} AND t.id = v.id AND t.version = v.persisted`.execute(k);
+    if (Number(header.numAffectedRows ?? 0) !== txs.length) return false;
+    const splits = states.flatMap((x) => x.s.splits);
+    if (splits.length === 0) return true;
+    await sql`
+      UPDATE txn.transaction_split s
+         SET category_id = v.category_id
+        FROM unnest(${splits.map((x) => x.id)}::uuid[], ${splits.map((x) => x.categoryId)}::uuid[])
+             AS v(id, category_id)
+       WHERE s.workspace_id = ${workspaceId} AND s.id = v.id AND s.category_id IS DISTINCT FROM v.category_id`.execute(
+      k,
+    );
+    const splitIds = splits.map((x) => x.id);
+    await k
+      .deleteFrom('txn.split_tag')
+      .where('workspace_id', '=', workspaceId)
+      .where('split_id', 'in', splitIds)
+      .execute();
+    const tags = splits.flatMap((x) =>
+      x.tagIds.map((tag_id) => ({ workspace_id: workspaceId, split_id: x.id, tag_id })),
+    );
+    if (tags.length > 0) await k.insertInto('txn.split_tag').values(tags).execute();
+    await k
+      .deleteFrom('txn.split_custom_field_value')
+      .where('workspace_id', '=', workspaceId)
+      .where('split_id', 'in', splitIds)
+      .execute();
+    const values = splits.flatMap((x) =>
+      x.customFields.map((v) => ({
+        workspace_id: workspaceId,
+        split_id: x.id,
+        field_id: v.fieldId,
+        value_text: v.valueType === 'TEXT' ? (v.value as string) : null,
+        value_number: v.valueType === 'NUMBER' ? (v.value as string) : null,
+        value_date: v.valueType === 'DATE' ? (v.value as string) : null,
+        value_bool: v.valueType === 'BOOLEAN' ? (v.value as boolean) : null,
+      })),
+    );
+    if (values.length > 0) await k.insertInto('txn.split_custom_field_value').values(values).execute();
+    return true;
+  }
+
   async list(
     workspaceId: string,
     filter: TransactionListFilter,

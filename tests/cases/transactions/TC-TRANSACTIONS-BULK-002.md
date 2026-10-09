@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-edit.api.test.ts
+  - apps/web/src/ui/transactions/bulk-edit.test.tsx
+  - packages/contexts/transactions/src/application/bulk-edit.service.test.ts
+  - tests/e2e/specs/bulk-edit.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["bulk-edit", "preview"]
@@ -31,7 +35,7 @@ steps:
   - "POST W/transactions/bulk-edit/preview"
   - "Contar registros de auditoría y versiones antes y después"
 expected_result:
-  - "total 4; T1–T3 aplicables con su versión; T4 no aplicable con BULK_EDIT_NOT_APPLICABLE"
+  - "count 4; T1–T3 aplicables con su versión; T4 no aplicable con BULK_EDIT_NOT_APPLICABLE"
   - "Ninguna versión cambia y no hay auditoría nueva"
 created: 2026-10-05
 updated: 2026-10-08

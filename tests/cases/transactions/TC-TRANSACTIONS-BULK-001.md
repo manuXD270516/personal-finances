@@ -12,9 +12,14 @@ invariants: [INV-033, INV-019]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/bulk-edit.api.test.ts
+  - apps/web/src/ui/transactions/bulk-edit.test.tsx
+  - packages/contexts/transactions/src/application/bulk-edit.service.test.ts
+  - packages/contexts/transactions/src/domain/bulk-edit.test.ts
+  - tests/e2e/specs/bulk-edit.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["bulk-edit", "classification"]

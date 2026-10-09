@@ -68,6 +68,7 @@
   "RECONCILIATION_IN_PROGRESS": "This account already has a reconciliation in progress. Finish or cancel it before starting another.",
   "RECONCILIATION_STATEMENT_DATE_INVALID": "The statement date cannot be in the future or on or before the last completed reconciliation.",
   "RECONCILIATION_DIFFERENCE_NOT_ZERO": "The difference from the statement is not zero. Review the transactions or confirm an adjustment with a reason.",
+  "BULK_EDIT_NOT_APPLICABLE": "The change cannot be applied to one of the transactions (for example, changing the category of an expense split into several parts).",
   "PERIOD_NOT_STARTED": "That period has not started yet in the workspace time zone. You can activate it from its start date.",
   "PERIOD_NOT_ENDED": "That period has not ended yet in the workspace time zone. You can close it from the next day.",
   "PERIOD_PREVIOUS_NOT_CLOSED": "Close the previous period first: periods are closed in chronological order.",

@@ -102,7 +102,12 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     txs: new Map<string, TransactionState>(),
     links: [] as { transactionId: string; revision: number; journalEntryId: string; linkType: string }[],
     entries: [] as Entry[],
-    outbox: [] as { eventType: string; aggregateId: string; payload: Record<string, unknown> }[],
+    outbox: [] as {
+      eventType: string;
+      aggregateId: string;
+      payload: Record<string, unknown>;
+      correlationId?: string;
+    }[],
     audit: [] as AuditEntry[],
     lifecycle: [] as LifecycleRow[],
     legHistory: new Map<string, Map<number, { accountId: string; role: LegRole; amount: Money }[]>>(),
@@ -121,7 +126,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     /** Fecha de hoy en la zona del workspace; `null` ⇒ la del reloj fijo. */
     today: null as string | null,
   };
-  const faults: { ledger?: Error; audit?: Error; lifecycle?: Error } = {};
+  const faults: { ledger?: Error; audit?: Error; lifecycle?: Error; auditAction?: string } = {};
   let depth = 0;
 
   const snapshot = () => ({
@@ -216,6 +221,23 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       async findById(_ws, id) {
         const s = state.txs.get(id);
         return s ? Transaction.rehydrate(s) : null;
+      },
+      async findMany(_ws, ids) {
+        return new Map(
+          [...ids].flatMap((id) => {
+            const s = state.txs.get(id);
+            return s ? [[id, Transaction.rehydrate(s)] as const] : [];
+          }),
+        );
+      },
+      async updateClassificationBatch(txs) {
+        // Valida todas antes de escribir (atomicidad de la operación masiva).
+        for (const tx of txs) {
+          const current = state.txs.get(tx.id);
+          if (!current || current.version !== tx.persistedVersion) return false;
+        }
+        for (const tx of txs) state.txs.set(tx.id, tx.snapshot);
+        return true;
       },
       async list(_ws, filter, page) {
         return [...state.txs.values()]
@@ -517,6 +539,16 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
           if (c.categoryId === 'archived') {
             throw new DomainError('CATEGORY_ARCHIVED', 'archived').at(`/splits/${i}/categoryId`);
           }
+          // Categoría de ingreso aplicada a un gasto (y viceversa): `income-*` solo admite splits de ingreso.
+          if (c.categoryId.startsWith('income-') && c.splitKind !== 'INCOME') {
+            throw new DomainError('CATEGORY_KIND_MISMATCH', 'kind mismatch').at(`/splits/${i}/categoryId`);
+          }
+        }
+        for (const [i, t] of (input.tagIds ?? []).entries()) {
+          if (t === 'archived-tag') throw new DomainError('TAG_ARCHIVED', 'archived').at(`/tagIds/${i}`);
+        }
+        if (input.counterpartyId === 'archived-cp') {
+          throw new DomainError('COUNTERPARTY_ARCHIVED', 'archived').at('/counterpartyId');
         }
       },
       /** Réplica mínima del contrato `ValidateCustomFieldValues` (la lógica real se prueba en CLASSIFICATION). */
@@ -601,12 +633,20 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
           eventType: event.eventType,
           aggregateId: event.aggregateId,
           payload: event.payload as Record<string, unknown>,
+          ...(event.correlationId ? { correlationId: event.correlationId } : {}),
         });
+      },
+      async appendMany(events) {
+        for (const event of events) await deps.outbox.append(event);
       },
     },
     audit: {
+      async appendMany(entries) {
+        for (const entry of entries) await deps.audit.append(entry);
+      },
       async append(entry) {
         if (faults.audit) throw faults.audit;
+        if (faults.auditAction === entry.action) throw new Error(`injected audit fault: ${entry.action}`);
         for (const c of entry.changes ?? []) {
           if (!auditable(c.before) || !auditable(c.after)) {
             throw new Error(`AUDIT_INVALID_VALUE: ${entry.action}.${c.field}`);
@@ -618,6 +658,9 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
     // Doble de `LifecyclePort`: valida como el adaptador real (auditoría + pasos con sequence 1..n por agregado,
     // estados en código de máquina y eventos `<ctx>.<Name>.vN`) y comparte el rollback de la unidad de trabajo.
     lifecycle: {
+      async recordMany(items) {
+        for (const item of items) await deps.lifecycle.record(item.entry, item.steps);
+      },
       async record(entry, steps) {
         await deps.audit.append(entry);
         if (faults.lifecycle) throw faults.lifecycle;
