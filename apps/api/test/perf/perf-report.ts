@@ -25,13 +25,20 @@ export const PERF_THRESHOLDS = {
 } as const;
 
 /**
+ * NFR-PERF-008 / improve-event-throughput (docs/33 D112): cada consumidor drena ≥ 42 eventos/s sostenidos (backlog de
+ * 5 000 eventos en ≤ 120 s con un handler trivial, TC-PLATFORM-EVENTS-014). Con los consumidores reales sobre el dataset
+ * `large` el valor se mide y se reporta (informativo): el costo por evento depende de cada handler.
+ */
+export const PERF_THROUGHPUT = { minEventsPerSecond: 42, docText: '≥ 42 eventos/s por consumidor' } as const;
+
+/**
  * add-ledger-core 5.5 (criterio docs/31 D43): overhead de RLS < 10 % (EXPLAIN ANALYZE) medido sobre las consultas REALES
  * de la aplicación (las sentencias que emite `PgBalanceQuery`, con sus parámetros) y las de índice; el agregado
  * sintético de todo el workspace se reporta como informativo (no falla). Bajo `noiseFloorMs` la diferencia es ruido.
  */
 export const RLS_OVERHEAD = { maxRatio: 0.1, noiseFloorMs: 0.5 } as const;
 
-export type NfrId = keyof typeof PERF_THRESHOLDS | 'RLS-OVERHEAD';
+export type NfrId = keyof typeof PERF_THRESHOLDS | 'RLS-OVERHEAD' | 'NFR-PERF-008';
 
 export interface LatencyStats {
   readonly n: number;
@@ -72,7 +79,7 @@ export interface BenchResult {
   /** Valor comparado contra el umbral (p95 en ms, o ratio para RLS). */
   readonly value: number;
   readonly limit: number;
-  readonly unit: 'ms' | 'ratio';
+  readonly unit: 'ms' | 'ratio' | 'ev/s';
   readonly gate: boolean;
   readonly passed: boolean;
   readonly notes?: string;
@@ -112,6 +119,38 @@ export function latencyResult(input: {
   };
 }
 
+/**
+ * Throughput de un consumidor: `value` = eventos/s sostenidos en su ventana de proceso (primer a último evento) y `limit`
+ * el mínimo (`passed` = `value ≥ limit`). Las estadísticas son las de los eventos/s por segundo de reloj de la ventana.
+ */
+export function throughputResult(input: {
+  id: string;
+  title: string;
+  /** Eventos procesados en cada segundo de la ventana. */
+  perSecond: readonly number[];
+  events: number;
+  seconds: number;
+  minEventsPerSecond: number;
+  gate?: boolean;
+  notes?: string;
+}): BenchResult {
+  const rate = input.seconds > 0 ? Math.round((input.events / input.seconds) * 100) / 100 : 0;
+  return {
+    id: input.id,
+    nfr: 'NFR-PERF-008',
+    title: input.title,
+    stats: stats(input.perSecond.length > 0 ? input.perSecond : [0]),
+    value: rate,
+    limit: input.minEventsPerSecond,
+    unit: 'ev/s',
+    gate: input.gate ?? false,
+    passed: rate >= input.minEventsPerSecond,
+    notes: `${input.events} eventos en ${Math.round(input.seconds * 10) / 10} s; p50/p95/p99 = eventos/s por segundo${
+      input.notes ? `; ${input.notes}` : ''
+    }`,
+  };
+}
+
 /** Overhead de RLS: medianas de `Execution Time` (EXPLAIN ANALYZE) con RLS (pf_app) vs sin RLS (superusuario). */
 export function rlsResult(input: {
   id: string;
@@ -148,16 +187,23 @@ export function rlsResult(input: {
 export function buildReport(input: Omit<PerfReport, 'version' | 'breaches'>): PerfReport {
   const breaches = input.results
     .filter((r) => r.gate && !r.passed)
-    .map(
-      (r) =>
-        `${r.nfr} ${r.id}: ${r.value}${r.unit === 'ms' ? ' ms' : ''} > ${r.limit}${r.unit === 'ms' ? ' ms' : ''}`,
+    .map((r) =>
+      r.unit === 'ev/s'
+        ? `${r.nfr} ${r.id}: ${r.value} ev/s < ${r.limit} ev/s`
+        : `${r.nfr} ${r.id}: ${r.value}${r.unit === 'ms' ? ' ms' : ''} > ${r.limit}${r.unit === 'ms' ? ' ms' : ''}`,
     );
   return { version: 1, ...input, breaches };
 }
 
 export function renderMarkdown(report: PerfReport): string {
-  const fmt = (r: BenchResult) => (r.unit === 'ms' ? `${r.value} ms` : `${(r.value * 100).toFixed(1)} %`);
-  const lim = (r: BenchResult) => (r.unit === 'ms' ? `≤ ${r.limit} ms` : `< ${r.limit * 100} %`);
+  const fmt = (r: BenchResult) =>
+    r.unit === 'ms'
+      ? `${r.value} ms`
+      : r.unit === 'ev/s'
+        ? `${r.value} ev/s`
+        : `${(r.value * 100).toFixed(1)} %`;
+  const lim = (r: BenchResult) =>
+    r.unit === 'ms' ? `≤ ${r.limit} ms` : r.unit === 'ev/s' ? `≥ ${r.limit} ev/s` : `< ${r.limit * 100} %`;
   const lines = [
     '# Benchmarks nightly (PFOS)',
     '',

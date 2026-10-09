@@ -6,6 +6,7 @@ import {
   EventDeliveryMetrics,
   EventSubscriptions,
   OutboxRelay,
+  assertConsumerConnectionBudget,
   PgOutboxWriter,
   type EventConsumerDefinition,
   type OutboxRelayOptions,
@@ -140,7 +141,7 @@ export async function createWorkerRuntime(
   const queue = createJobQueue(config, databaseUrl, logger, 'consumer');
   const pool = new Pool({
     connectionString: databaseUrl,
-    max: Math.min(config.DATABASE_POOL_MAX, 6),
+    max: config.DATABASE_POOL_MAX,
     connectionTimeoutMillis: config.HEALTH_CHECK_TIMEOUT_MS,
     application_name: 'finance-worker',
   });
@@ -404,7 +405,33 @@ export async function createWorkerRuntime(
     ...planningEventConsumers(planning),
     ...notificationEventConsumers(notifications),
   ]);
-  const consumers = new EventConsumerRuntime({ pool, queue, subscriptions, logger, metrics });
+  // Presupuesto de conexiones (improve-event-throughput, TC-PLATFORM-EVENTS-018): la concurrencia sumada de los
+  // consumidores cabe en el pool del worker; si no, el arranque falla antes de tomar un solo evento.
+  const consumerDefaults = {
+    concurrency: config.EVENT_CONSUMER_CONCURRENCY,
+    batchSize: config.EVENT_CONSUMER_BATCH_SIZE,
+  };
+  try {
+    assertConsumerConnectionBudget({
+      consumers: subscriptions.definitions(),
+      defaults: consumerDefaults,
+      poolMax: config.DATABASE_POOL_MAX,
+    });
+  } catch (err) {
+    await queue.stop().catch(() => undefined);
+    await context.close().catch(() => undefined);
+    await pool.end().catch(() => undefined);
+    storage.destroy();
+    throw err;
+  }
+  const consumers = new EventConsumerRuntime({
+    pool,
+    queue,
+    subscriptions,
+    logger,
+    metrics,
+    ...consumerDefaults,
+  });
   const relay = new OutboxRelay({
     pool,
     queue,

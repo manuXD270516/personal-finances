@@ -5,7 +5,7 @@ spec: platform/event-delivery
 related_specs: []
 requirement: Métricas de pendientes y retraso del outbox
 scenario: Pendientes y duración por consumidor
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-OBS-004
@@ -13,10 +13,12 @@ invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+- apps/api/test/events/event-throughput.int.test.ts
+- packages/platform/src/events/metrics.test.ts
+status: automated
+regression_suite: true
 phase: 2
 tags:
 - metrics
@@ -45,4 +47,4 @@ Change `improve-event-throughput` (docs/33 D112): verificar el requirement "Mét
 
 ## Notas
 
-- Borrador; pasa a `ready` cuando el owner apruebe el change (tarea 1.2).
+- Aprobado por el owner el 2026-10-09 (requirement confirmado). Automatizado en `event-throughput.int.test.ts` (PostgreSQL real, meter falso) y en `metrics.test.ts` (lectura del backlog por consumidor y etiquetas). Nombres Prometheus: `pf_events_consumer_backlog` y `pf_events_consumer_duration_seconds`.

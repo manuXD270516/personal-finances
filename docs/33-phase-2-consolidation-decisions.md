@@ -110,6 +110,6 @@ Los 11 changes de Phase 2 se alinearon en el mismo commit: cada pregunta de la s
 
 | ID | Pregunta | Decisión |
 |---|---|---|
-| D112 | Throughput de los consumidores de eventos (~2 eventos/s por cola, medido en Phase 2) | **Change nuevo `improve-event-throughput`** (orden 24, docs/03 §7), agregado por el owner el 2026-10-09: va después de `add-workspace-export` y antes de cualquier change de Phase 6. |
+| D112 | Throughput de los consumidores de eventos (~2 eventos/s por cola, medido en Phase 2) | **Change nuevo `improve-event-throughput`** (orden 24, docs/03 §7), agregado por el owner el 2026-10-09: va después de `add-workspace-export` y antes de cualquier change de Phase 6. **Nota 2026-10-09:** el owner confirmó la meta: backlog de 5 000 eventos en 500 agregados drenado en ≤ 120 s por consumidor con handler trivial (≥ 42 eventos/s); se revisa con el benchmark de imports de Phase 6. Medición y decisión (lotes de 10 + concurrencia 4, no solo concurrencia) en `openspec/changes/improve-event-throughput/design.md`. |
 
 No quedan preguntas del owner abiertas en los changes de Phase 2 tras esta ronda.

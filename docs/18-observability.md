@@ -131,6 +131,8 @@ Rate = conteo del histograma; Errors = status ≥ 500 (4xx contabilizados aparte
 | `pf.outbox.publish_failures` | Counter | lotes del relay fallidos |
 | `pf.inbox.duplicates` | Counter | `consumer` — eventos duplicados descartados (sano si > 0, alarmante si se dispara) |
 | `pf.events.dead_lettered` | Counter | `consumer` — eventos que agotaron sus reintentos |
+| `pf.events.consumer.backlog` | Gauge | `consumer` — eventos publicados aún sin procesar (en la cola, en reintento o en curso) por consumidor, leídos de PostgreSQL (`pgboss.job`); 0 sin pendientes (NFR-OBS-004 `event_consumer_backlog`; Prometheus: `pf_events_consumer_backlog`). Sin etiquetas de workspace, usuario ni agregado |
+| `pf.events.consumer.duration` (s) | Histogram | `consumer` — duración del procesamiento de un evento (transacción con inbox y efecto del handler) con cualquier resultado (NFR-OBS-004 `event_consumer_duration_seconds`; Prometheus: `pf_events_consumer_duration_seconds`) |
 | `pf.queue.depth` | Gauge | `queue`, `state` (waiting/active/delayed/failed) |
 | `pf.queue.job.wait_time` (s) | Histogram | `queue` — de encolado a inicio |
 | `pf.queue.job.duration` (s) | Histogram | `queue`, `outcome` (completed/failed/retried) |

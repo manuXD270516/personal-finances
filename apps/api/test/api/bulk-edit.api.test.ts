@@ -28,7 +28,7 @@ import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runt
 import { AUDIT_POLICIES, outboxPort } from '../../src/identity/identity-wiring.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { connect, inTx } from '../support/db.js';
-import { apiConfig, baseEnv, capturingLogger, discardStaleEventBacklog } from '../support/harness.js';
+import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
 
 // Edición masiva por HTTP contra PostgreSQL real (openspec add-bulk-edit, tareas 3.x, 5.2 y 7.1): recategorizar y
 // etiquetar con versión por ítem, vista previa por filtro sin efectos, todo o nada con errores por ítem y prioridad de
@@ -975,21 +975,4 @@ describe('Ráfaga de 500 recategorizaciones', () => {
       await pool.end();
     }
   }, 600_000);
-});
-
-describe('Limpieza del outbox de la suite', () => {
-  it('descarta los hechos sin publicar de esta suite (no hay relay) para no retrasar a los tests de eventos siguientes', async () => {
-    const worker = await connect(deps.workerDatabaseUrl);
-    try {
-      const { rows } = await worker.query<{ event_type: string }>(
-        'SELECT DISTINCT event_type FROM platform.outbox WHERE published_at IS NULL',
-      );
-      await discardStaleEventBacklog(
-        deps,
-        rows.map((r) => r.event_type),
-      );
-    } finally {
-      await worker.end();
-    }
-  });
 });

@@ -22,7 +22,13 @@ export {
   type OutboxRelayOptions,
 } from './relay.js';
 export {
+  DEFAULT_EVENT_CONSUMER_BATCH_SIZE,
+  DEFAULT_EVENT_CONSUMER_CONCURRENCY,
   DEFAULT_EVENT_RETRY_LIMIT,
+  RESERVED_WORKER_CONNECTIONS,
+  assertConsumerConnectionBudget,
+  consumerWorkOptions,
+  totalConsumerConcurrency,
   EventConsumerRuntime,
   EventSubscriptions,
   deadLetterQueueName,
@@ -38,6 +44,7 @@ export {
   EVENT_METRICS,
   EventDeliveryMetrics,
   countOpenDeadLetters,
+  readConsumerBacklog,
   readOutboxBacklog,
   type OutboxBacklog,
   type Queryable,

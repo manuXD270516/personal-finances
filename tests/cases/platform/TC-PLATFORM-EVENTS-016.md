@@ -5,7 +5,7 @@ spec: platform/event-delivery
 related_specs: []
 requirement: Rendimiento sostenido de los consumidores
 scenario: Un fallo dentro del lote no reintenta a los demás
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-REL-008
@@ -14,10 +14,11 @@ invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+- apps/api/test/events/event-throughput.int.test.ts
+status: automated
+regression_suite: true
 phase: 2
 tags:
 - batch
@@ -45,4 +46,4 @@ Change `improve-event-throughput` (docs/33 D112): verificar el requirement "Rend
 
 ## Notas
 
-- Borrador; pasa a `ready` cuando el owner apruebe el change (tarea 1.2).
+- Aprobado por el owner el 2026-10-09 (requirement confirmado). Automatizado en `event-throughput.int.test.ts`: lote de 10 trabajos de agregados distintos, `perJobResults` de pg-boss; solo el trabajo de A pasa por reintento.

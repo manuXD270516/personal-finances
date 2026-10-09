@@ -1,5 +1,5 @@
 import { context, propagation, ROOT_CONTEXT, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
-import { PgBoss } from 'pg-boss';
+import { PgBoss, type JobResult, type JobWithMetadata } from 'pg-boss';
 import { currentCorrelation, runWithCorrelation, uuidv7, type Logger } from '../logging/index.js';
 import {
   isJobEnvelope,
@@ -126,59 +126,77 @@ export class PgBossJobQueue implements JobQueue {
   async work<P extends object>(queue: string, options: WorkOptions, handler: JobHandler<P>): Promise<void> {
     await this.ensureQueue(queue);
     const interval = this.options.pollingIntervalSeconds;
-    await this.boss.work<JobEnvelope<P>>(
-      queue,
-      {
-        localConcurrency: options.concurrency,
-        batchSize: 1,
-        pollingIntervalSeconds: interval,
-        notifyPollingIntervalSeconds: interval,
-        includeMetadata: true,
-      },
-      async ([job]) => {
-        if (!job) return;
-        const data: unknown = job.data;
-        if (!isJobEnvelope(data)) {
-          this.options.logger.error(
-            { 'job.queue': queue, 'job.id': job.id },
-            'job without envelope rejected',
-          );
-          throw new Error('job without envelope');
+    const batchSize = Math.max(1, Math.floor(options.batchSize ?? 1));
+    const workOptions = {
+      localConcurrency: options.concurrency,
+      batchSize,
+      // Con lotes llenos el worker vuelve a consultar de inmediato (sin esperar el polling): sin esto un worker
+      // procesaría a lo sumo un lote por intervalo (improve-event-throughput, design.md decisión 2).
+      burstWhenBatchFull: batchSize > 1,
+      // Cada trabajo del lote se confirma o falla por separado: el fallo de uno no reintenta a los demás.
+      perJobResults: true,
+      pollingIntervalSeconds: interval,
+      notifyPollingIntervalSeconds: interval,
+      includeMetadata: true,
+    } as const;
+    await this.boss.work<JobEnvelope<P>, unknown, typeof workOptions>(queue, workOptions, async (jobs) => {
+      // En serie dentro del lote: la concurrencia de la cola (conexiones del pool) es `localConcurrency`, no
+      // `localConcurrency × batchSize`. Un lote trae a lo sumo un trabajo por clave (`key_strict_fifo`).
+      const results: JobResult[] = [];
+      for (const job of jobs) {
+        try {
+          await this.runJob(queue, job, handler);
+          results.push({ id: job.id, status: 'completed' });
+        } catch (err) {
+          results.push({ id: job.id, status: 'failed', output: sanitizeError(err) });
         }
-        const parent = propagation.extract(ROOT_CONTEXT, data.traceContext);
-        await runWithCorrelation({ correlationId: data.correlationId }, () =>
-          context.with(parent, () =>
-            tracer.startActiveSpan(`job.process ${queue}`, { kind: SpanKind.CONSUMER }, async (span) => {
-              const fields = { 'job.queue': queue, 'job.id': job.id, 'job.attempt': job.retryCount + 1 };
-              const started = Date.now();
-              this.options.logger.info(fields, 'job started');
-              try {
-                await handler({
-                  id: job.id,
-                  queue,
-                  attempt: job.retryCount + 1,
-                  payload: data.payload as P,
-                  correlationId: data.correlationId,
-                  signal: job.signal,
-                });
-                this.options.logger.info({ ...fields, duration_ms: Date.now() - started }, 'job completed');
-              } catch (err) {
-                span.recordException(err as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
-                this.options.logger.error(
-                  { ...fields, duration_ms: Date.now() - started, err: sanitizeError(err) },
-                  'job failed',
-                );
-                throw err;
-              } finally {
-                span.end();
-              }
-            }),
-          ),
-        );
-      },
-    );
+      }
+      return results;
+    });
     this.working.add(queue);
+  }
+
+  private async runJob<P extends object>(
+    queue: string,
+    job: JobWithMetadata<JobEnvelope<P>>,
+    handler: JobHandler<P>,
+  ): Promise<void> {
+    const data: unknown = job.data;
+    if (!isJobEnvelope(data)) {
+      this.options.logger.error({ 'job.queue': queue, 'job.id': job.id }, 'job without envelope rejected');
+      throw new Error('job without envelope');
+    }
+    const parent = propagation.extract(ROOT_CONTEXT, data.traceContext);
+    await runWithCorrelation({ correlationId: data.correlationId }, () =>
+      context.with(parent, () =>
+        tracer.startActiveSpan(`job.process ${queue}`, { kind: SpanKind.CONSUMER }, async (span) => {
+          const fields = { 'job.queue': queue, 'job.id': job.id, 'job.attempt': job.retryCount + 1 };
+          const started = Date.now();
+          this.options.logger.info(fields, 'job started');
+          try {
+            await handler({
+              id: job.id,
+              queue,
+              attempt: job.retryCount + 1,
+              payload: data.payload as P,
+              correlationId: data.correlationId,
+              signal: job.signal,
+            });
+            this.options.logger.info({ ...fields, duration_ms: Date.now() - started }, 'job completed');
+          } catch (err) {
+            span.recordException(err as Error);
+            span.setStatus({ code: SpanStatusCode.ERROR });
+            this.options.logger.error(
+              { ...fields, duration_ms: Date.now() - started, err: sanitizeError(err) },
+              'job failed',
+            );
+            throw err;
+          } finally {
+            span.end();
+          }
+        }),
+      ),
+    );
   }
 
   async schedule<P extends object>(

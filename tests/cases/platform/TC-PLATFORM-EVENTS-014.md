@@ -5,7 +5,7 @@ spec: platform/event-delivery
 related_specs: []
 requirement: Rendimiento sostenido de los consumidores
 scenario: Backlog grande drenado a tiempo
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-PERF-008
@@ -14,10 +14,12 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+- apps/api/test/events/event-throughput.int.test.ts
+- apps/api/test/perf/perf-report.test.ts
+status: automated
+regression_suite: true
 phase: 2
 tags:
 - throughput
@@ -46,4 +48,4 @@ Change `improve-event-throughput` (docs/33 D112): verificar el requirement "Rend
 
 ## Notas
 
-- Borrador; pasa a `ready` cuando el owner apruebe el change (tarea 1.2).
+- Aprobado por el owner el 2026-10-09 (requirement confirmado). Automatizado en `event-throughput.int.test.ts` (backlog encolado directo en la cola del consumidor, como lo deja el relay; handler trivial; configuración por defecto 4/10). Medición del 2026-10-09: ver design.md de `improve-event-throughput`. El umbral de 42 eventos/s por consumidor también lo verifica `perf-report.test.ts` contra docs/02.

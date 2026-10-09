@@ -116,6 +116,8 @@ export async function registerFxMarketRateJobs(
   return [
     {
       consumer: FX_WORKSPACE_PROVISIONING_CONSUMER,
+      // Baja frecuencia (una vez por workspace): no reserva conexiones del pool del worker.
+      concurrency: 1,
       events: [{ type: 'identity.WorkspaceCreated', version: 1 }],
       // En la transacción del consumidor (inbox + RLS del workspace): siembra preferencias PARALLEL y encola la carga
       // histórica con el id del evento como id del job (una re-entrega no duplica el job).

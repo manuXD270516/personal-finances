@@ -19,13 +19,7 @@ import { seedWorkspaceProvisioning } from '../../src/identity/workspace-provisio
 import { createWorkerRuntime, type WorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { connect, inTx } from '../support/db.js';
 import { rowsByTable, unbalancedEntries } from '../support/demo-db.js';
-import {
-  apiConfig,
-  baseEnv,
-  capturingLogger,
-  discardStaleEventBacklog,
-  workerConfig,
-} from '../support/harness.js';
+import { apiConfig, baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
 
 // Datos de demostración de extremo a extremo (openspec add-demo-data, tareas 3.x/5.1/7.1): API real (JWT de prueba),
 // worker real (jobs `demo.load`/`demo.purge` sobre pg-boss) y PostgreSQL real con RLS.
@@ -223,7 +217,6 @@ const GOLDEN_BY_NAME: Record<string, string> = {
 };
 
 beforeAll(async () => {
-  await discardStaleEventBacklog(deps);
   const pair = await generateKeyPair('RS256', { extractable: true });
   signingKey = pair.privateKey;
   jwks = { keys: [{ ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' }] };

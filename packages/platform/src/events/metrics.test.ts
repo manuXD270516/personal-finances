@@ -1,6 +1,12 @@
 import type { BatchObservableCallback, Meter, Observable } from '@opentelemetry/api';
 import { describe, expect, it } from 'vitest';
-import { EVENT_METRICS, EventDeliveryMetrics, readOutboxBacklog, type Queryable } from './metrics.js';
+import {
+  EVENT_METRICS,
+  EventDeliveryMetrics,
+  readConsumerBacklog,
+  readOutboxBacklog,
+  type Queryable,
+} from './metrics.js';
 
 /** Meter falso: guarda contadores (con sus atributos) y el callback de los gauges observables. */
 function fakeMeter() {
@@ -12,6 +18,7 @@ function fakeMeter() {
       add: (value: number, attributes?: Record<string, unknown>) =>
         adds.push({ name, value, ...(attributes ? { attributes } : {}) }),
     }),
+    createHistogram: () => ({ record: () => undefined }),
     createObservableGauge: (name: string) => {
       const g = {} as Observable;
       gauges.set(g, name);
@@ -81,5 +88,38 @@ describe('métricas de entrega de eventos (docs/18 §5.3)', () => {
 
   it('readOutboxBacklog nunca reporta retraso negativo', async () => {
     expect(await readOutboxBacklog(fakeDb(0, -0.2))).toEqual({ pending: 0, lagSeconds: 0 });
+  });
+
+  it('[TC-PLATFORM-EVENTS-017] readConsumerBacklog reporta 0 para los consumidores sin pendientes', async () => {
+    const db: Queryable = {
+      query: async (_text: string, values?: unknown[]) => {
+        expect(values).toEqual([['events.a.x', 'events.b.y']]);
+        return { rows: [{ name: 'events.a.x', pending: 7 }] };
+      },
+    };
+    const backlog = await readConsumerBacklog(db, ['a.x', 'b.y'], (c) => `events.${c}`);
+    expect([...backlog]).toEqual([
+      ['a.x', 7],
+      ['b.y', 0],
+    ]);
+  });
+
+  it('[TC-PLATFORM-EVENTS-017] event_consumer_duration_seconds usa solo el label consumer', () => {
+    const records: { name: string; value: number; attributes: Record<string, unknown> }[] = [];
+    const meter = {
+      createCounter: () => ({ add: () => undefined }),
+      createHistogram: (name: string) => ({
+        record: (value: number, attributes: Record<string, unknown>) =>
+          records.push({ name, value, attributes }),
+      }),
+    } as unknown as Meter;
+    new EventDeliveryMetrics(undefined, meter).consumed('planning.budget-thresholds', 0.04);
+    expect(records).toEqual([
+      {
+        name: EVENT_METRICS.consumerDuration,
+        value: 0.04,
+        attributes: { consumer: 'planning.budget-thresholds' },
+      },
+    ]);
   });
 });

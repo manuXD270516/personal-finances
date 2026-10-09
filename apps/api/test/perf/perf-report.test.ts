@@ -5,9 +5,11 @@ import {
   latencyResult,
   percentile,
   PERF_THRESHOLDS,
+  PERF_THROUGHPUT,
   renderMarkdown,
   rlsResult,
   stats,
+  throughputResult,
 } from './perf-report.js';
 
 // Los umbrales del benchmark nightly se leen de docs/02 (§PERF): si el NFR cambia, este test obliga a actualizar
@@ -21,6 +23,32 @@ const rowOf = (id: string) => NFR_DOC.split('\n').find((l) => l.startsWith(`| ${
 describe('benchmarks nightly: umbrales y estadísticas', () => {
   it.each(Object.entries(PERF_THRESHOLDS))('%s coincide con docs/02', (id, t) => {
     expect(rowOf(id)).toContain(t.docText);
+  });
+
+  it('[TC-PLATFORM-EVENTS-014] el umbral de throughput por consumidor coincide con docs/02 (NFR-PERF-008)', () => {
+    expect(rowOf('NFR-PERF-008')).toContain(PERF_THROUGHPUT.docText);
+  });
+
+  it('el throughput bajo el mínimo es informativo por defecto y brecha solo si es gate', () => {
+    const slow = throughputResult({
+      id: 't',
+      title: 'consumidor',
+      perSecond: [30, 32],
+      events: 62,
+      seconds: 2,
+      minEventsPerSecond: 42,
+    });
+    expect([slow.value, slow.passed, slow.gate]).toEqual([31, false, false]);
+    expect(buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [slow] }).breaches).toEqual(
+      [],
+    );
+    const gated = { ...slow, gate: true };
+    expect(
+      buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [gated] }).breaches,
+    ).toEqual(['NFR-PERF-008 t: 31 ev/s < 42 ev/s']);
+    expect(
+      renderMarkdown(buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [slow] })),
+    ).toContain('| 31 ev/s | ≥ 42 ev/s | informativo | FALLA |');
   });
 
   it('percentiles por rango más cercano', () => {
