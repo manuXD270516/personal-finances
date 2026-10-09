@@ -233,6 +233,7 @@ Trabajo de plataforma que avanza en paralelo, en pequeños incrementos, para no 
 | Phase 0 | Compose, CI, migraciones, observabilidad local (SPIKE-08/10); ver [19-local-development.md](./19-local-development.md), [20-container-strategy.md](./20-container-strategy.md), [23-ci-cd.md](./23-ci-cd.md) |
 | Phase 1 | Backup/restore local automatizado + invariant checker; rate limiting básico; CSP |
 | Fin Phase 2 *(opcional, decisión del owner tras SPIKE-09)* | **Despliegue personal mínimo** en cloud (staging = prod de bajo costo) con backups diarios, para acceder desde el teléfono; o continuar local-only |
+| Fin Phase 2, antes de Phase 6 | **Rendimiento de las colas de eventos** (`improve-event-throughput`, docs/33 D112): concurrencia entre agregados y lotes en los consumidores, objetivo ≥ 42 eventos/s por consumidor para que los imports cumplan NFR-PERF-008 |
 | Phase 5–7 | Nightly de rendimiento con seed `large`; Renovate; SBOM |
 | Hito H (paralelo a Phases 8–9) | Hardening completo, DR drills, SLOs |
 
