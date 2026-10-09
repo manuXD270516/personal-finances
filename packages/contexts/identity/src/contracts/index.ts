@@ -52,6 +52,9 @@ export const IDENTITY_AUDIT_POLICY = {
     anchorDate: 'plain',
     demoStatus: 'plain',
     rowsDeleted: 'plain',
+    // add-global-audit-view: `security.authorization.denied` (operación del contrato y código de rechazo; nunca el cuerpo).
+    operationId: 'plain',
+    code: 'plain',
   },
   User: { displayName: 'plain', locale: 'plain', timeZone: 'plain' },
 } as const satisfies AuditFieldPoliciesDto;

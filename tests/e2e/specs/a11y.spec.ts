@@ -41,6 +41,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   { path: '/planificacion/cierre', name: 'Cierre de mes' },
   // add-alerts 7.1: bandeja de notificaciones (la versión con datos y el detalle los analiza notifications.spec.ts).
   { path: '/notificaciones', name: 'Notificaciones' },
+  // add-global-audit-view 6.1: auditoría global del workspace (filtros, tabla y exportación para el OWNER).
+  { path: '/configuracion/auditoria', name: 'Auditoría' },
 ];
 
 async function seriousViolations(page: Page) {

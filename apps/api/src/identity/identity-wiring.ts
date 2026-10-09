@@ -3,6 +3,8 @@ import {
   AuditModule,
   createAuditRuntime,
   type AuditPort,
+  type AuthorizationDenialPort,
+  type DenialObserver,
   type LifecyclePort,
 } from '@pf/audit/interface/audit.module';
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
@@ -189,6 +191,27 @@ export const AUDIT_POLICIES = [
 ];
 
 /**
+ * Observador de los fallos de autorización auditados (add-global-audit-view): `pf.authz.denied` por código de rechazo
+ * (baja cardinalidad: nunca usuario ni workspace; el exportador Prometheus lo publica como `pf_authz_denied_total`) y
+ * `warn` cuando la escritura de auditoría del rechazo falla (el rechazo sigue siendo un 403).
+ */
+export function authzDenialObserver(
+  logger: Pick<Logger, 'warn'>,
+  counters: CounterMetrics = otelCounters('@pf/audit'),
+): DenialObserver {
+  return {
+    denied: (code) => counters.increment('pf.authz.denied', { code }),
+    writeFailed: (error) => {
+      counters.increment('pf.authz.denial_audit_failures', {});
+      logger.warn(
+        { err: error },
+        'no se pudo auditar un fallo de autorización (el rechazo sigue siendo 403)',
+      );
+    },
+  };
+}
+
+/**
  * Composición de AUDIT (openspec add-audit-trail): `AuditPort` sobre `audit.audit_log` en la misma transacción que
  * cada comando, con las allow-lists de redacción de cada contexto y la zona horaria del workspace de IDENTITY.
  */
@@ -207,6 +230,9 @@ export function auditRuntime(input: {
     ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
     policies: AUDIT_POLICIES,
     timeZones: identityWorkspaceTimeZones(input.pool),
+    // add-global-audit-view: los fallos de autorización se limitan con el RATE_LIMIT_STORE de la API y se observan.
+    ...(input.conventions.rateLimit ? { denialLimiter: input.conventions.rateLimit.limiter } : {}),
+    denialObserver: authzDenialObserver(input.logger),
     // add-lifecycle-timeline: máquinas de estado declaradas por cada contexto dueño (dato puro, una sola fuente).
     machines: LIFECYCLE_MACHINES,
   });
@@ -375,6 +401,8 @@ export function identityImports(input: {
   readonly audit?: (port: AuditPort) => AuditPort;
   /** Sustituye el `LifecyclePort` (tests de atomicidad del registro de transición, TC-AUDIT-LIFECYCLE-002). */
   readonly lifecycle?: (port: LifecyclePort) => LifecyclePort;
+  /** Sustituye el registrador de fallos de autorización (tests de que una falla de auditoría no cambia el 403). */
+  readonly denials?: (port: AuthorizationDenialPort) => AuthorizationDenialPort;
   /** Cola de jobs (add-demo-data: `demo.load`/`demo.purge` encolados en la transacción del comando). */
   readonly queue?: JobQueue;
 }): NonNullable<ModuleMetadata['imports']> {
@@ -416,6 +444,8 @@ export function identityImports(input: {
       },
       outbox: outboxPort(),
       audit: auditPort,
+      // add-global-audit-view: el guard audita INSUFFICIENT_ROLE / WORKSPACE_ACCESS_DENIED (docs/33 D106).
+      denials: input.denials ? input.denials(audit.denials) : audit.denials,
       // Provisión síncrona en la transacción de CreateWorkspace: categorías (classification) y monedas (fx).
       onWorkspaceCreated: workspaceCreatedHook({ classification, fx }),
       // add-demo-data: "Cargar/Limpiar datos de demostración" (DEMO_DATA_ENABLED, docs/31 D41).

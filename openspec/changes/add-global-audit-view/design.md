@@ -40,6 +40,17 @@ Motivación y alcance: ver proposal.md. Fuentes: FR-AUDIT-005/006, docs/12 §13.
 
 Expand: índices nuevos (creación en la tabla padre particionada; en local es inmediata; en cloud se evalúa `CREATE INDEX` por partición `CONCURRENTLY` + `ATTACH` si el volumen lo requiere). Contrato: parámetros y operación nuevos (MINOR).
 
+## Notas de implementación (2026-10-08)
+
+Precisiones que no cambian las decisiones de arriba:
+
+- **Catálogo de seguridad explícito.** `SECURITY_ACTIONS` lista cada acción exacta (sin prefijos): el filtro es `action = ANY(lista)` sobre el índice `(workspace_id, action, occurred_at DESC)` (un `LIKE 'identity.export.%'` no usa el índice btree). `add-workspace-export` agrega ahí los nombres de sus acciones; el test de catálogo (recorre el código de todos los contextos) falla mientras una acción emitida no esté catalogada.
+- **`category` también en cada entrada** (campo aditivo de `AuditLogEntry`): la pantalla rotula los eventos de seguridad con el dato de la API, sin duplicar el catálogo en el cliente.
+- **Existencia del workspace en un rechazo de no miembro:** `iam.workspace_exists(uuid)` (SECURITY DEFINER, solo un booleano; el dueño ve únicamente la fila fijada en la GUC local `pf.workspace_probe`, el mismo patrón que la GUC de purga). Evita sembrar filas en workspaces inventados.
+- **Limitador:** se reutiliza el `RateLimiter` de `RATE_LIMIT_STORE` de la API (hoy solo `memory`; Valkey cuando exista su adapter) con la política `authz-denied` (1 por clave y minuto, ventana deslizante); las exportaciones usan la política `audit-export` (10 por minuto y usuario) en el controller.
+- **Actor en el CSV:** tipo e identificador (como el CSV del recorrido, D52); no hay nombre visible porque AUDIT no consulta IDENTITY.
+- **Métricas:** `pf.authz.denied` (por código; Prometheus `pf_authz_denied_total`) y `pf.authz.denial_audit_failures`.
+
 ## Preguntas abiertas
 
 **Todas resueltas por el owner el 2026-10-08** ([docs/33](../../../docs/33-phase-2-consolidation-decisions.md), decisiones D59–D111); cada pregunta indica su decisión. Se conserva el texto original.

@@ -50,7 +50,7 @@ export function formatDecimal(amount: string, locale: string): string {
   return `${negative ? '-' : ''}${grouped}${frac === undefined ? '' : `${decimal}${frac}`}`;
 }
 
-function formatValue(value: unknown, locale: string, empty: string): string {
+export function formatValue(value: unknown, locale: string, empty: string): string {
   if (value === null || value === undefined || value === '') return empty;
   if (isMoney(value)) return `${formatDecimal(value.amount, locale)} ${value.currency}`;
   if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string')

@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/audit-global.api.test.ts
+  - apps/web/src/ui/audit/audit.test.tsx
+  - tests/e2e/specs/audit-global.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags: ["audit", "rbac"]

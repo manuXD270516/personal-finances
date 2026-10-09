@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
+import { auditHref, canQuery } from '../audit/logic';
 import { BFF_API } from '../session-context';
 import type { ReactNode } from 'react';
 import { LifecycleReport } from './LifecycleReport';
@@ -67,6 +68,18 @@ export function LifecycleTab({
         pdf={f.t('export.pdf')}
         idPrefix={idPrefix}
       />
+      {canQuery(ctx.ws.role) ? (
+        <p>
+          <a
+            href={ctx.href(
+              auditHref({ aggregateType: lifecycle.aggregateType, aggregateId: lifecycle.aggregateId }),
+            )}
+            data-testid={`${idPrefix}-audit-link`}
+          >
+            {f.t('auditLink')}
+          </a>
+        </p>
+      ) : null}
       <LifecycleReport
         lifecycle={lifecycle}
         f={f}

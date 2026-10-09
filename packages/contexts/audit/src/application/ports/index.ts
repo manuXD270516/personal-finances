@@ -1,3 +1,4 @@
+import type { AuditActionCategory, SecurityActionRules } from '../../domain/audit-action-category.js';
 import type { AuditActorInput } from '../../domain/audit-actor.js';
 import type { AuditOrigin } from '../../domain/audit-origin.js';
 import type { AuditRecord } from '../../domain/audit-record.js';
@@ -29,6 +30,15 @@ export interface AuditLogPageQuery {
   readonly entities: readonly { readonly aggregateType: string; readonly aggregateId: string }[];
   /** Solo un tipo de agregado (búsqueda por rango acotada a un tipo). */
   readonly aggregateType?: string;
+  /** Solo registros de este actor USER (vista global, openspec add-global-audit-view). */
+  readonly actorUserId?: string;
+  /** Solo estas acciones exactas (`contexto.entidad.verbo`). */
+  readonly actions?: readonly string[];
+  readonly origin?: string;
+  /** Solo la operación con esta correlación (en una edición masiva, su `bulkOperationId`). */
+  readonly correlationId?: string;
+  /** Solo eventos de seguridad, o solo cambios de datos (el resto), según el catálogo de acciones. */
+  readonly category?: { readonly kind: AuditActionCategory; readonly security: SecurityActionRules };
   /** Rango `[from, to)` en UTC. */
   readonly from?: Date;
   readonly to?: Date;
@@ -99,4 +109,27 @@ export interface LifecycleBackfillSource {
   }): Promise<readonly { readonly aggregateType: string; readonly aggregateId: string }[]>;
   /** Registros de auditoría del agregado en orden cronológico. */
   auditOf(workspaceId: string, aggregateType: string, aggregateId: string): Promise<readonly AuditRecord[]>;
+}
+
+// ───────────────────────────────────────────── add-global-audit-view: fallos de autorización
+
+/** Directorio mínimo de workspaces para auditar un rechazo de un NO miembro: ¿existe un workspace activo con ese id? */
+export interface WorkspaceExistence {
+  exists(workspaceId: string): Promise<boolean>;
+}
+
+/**
+ * Limitador del registro de fallos de autorización: concede a lo sumo UN registro por clave
+ * (usuario + workspace + operación) por minuto. Sobre `RATE_LIMIT_STORE` (memoria hoy; Valkey cuando exista su adapter).
+ */
+export interface DenialThrottle {
+  tryAcquire(key: string, now: Date): Promise<boolean>;
+}
+
+/** Métricas (baja cardinalidad: solo el código de rechazo) y registro de la falla de escritura. */
+export interface DenialObserver {
+  /** Cada rechazo, se audite o no (`authz_denied_total`). */
+  denied(code: string): void;
+  /** La escritura de auditoría del rechazo falló (se traga: el rechazo sigue siendo un 403). */
+  writeFailed(error: unknown): void;
 }

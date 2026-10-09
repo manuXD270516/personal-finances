@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
+import { AUTHORIZATION_DENIAL_PORT, type AuthorizationDenialPort } from '@pf/audit/contracts';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtVerifier, type JwtVerifierOptions } from '@pf/platform/api';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -50,6 +51,11 @@ export interface IdentityModuleOptions {
   /** Outbox transaccional (add-event-outbox) y auditoría síncrona (`@pf/audit`, add-audit-trail). */
   readonly outbox: OutboxPort;
   readonly audit: AuditPort;
+  /**
+   * Registrador de rechazos de autorización (openspec add-global-audit-view, docs/33 D106): el guard audita
+   * `INSUFFICIENT_ROLE` y `WORKSPACE_ACCESS_DENIED` como evento de seguridad. Ausente ⇒ no se auditan.
+   */
+  readonly denials?: AuthorizationDenialPort;
   /** Provisión síncrona de otros contextos al crear un workspace (add-classification). */
   readonly onWorkspaceCreated?: WorkspaceCreatedHook;
   /** Datos de demostración (add-demo-data): habilitación, dataset y cola de jobs. Ausente ⇒ carga deshabilitada. */
@@ -107,6 +113,7 @@ export class IdentityModule {
         { provide: DEMO_DATA_SERVICE, useValue: demoDataService(deps, options.demo) },
         { provide: IDENTITY_DEFAULTS, useValue: options.defaults },
         { provide: JWT_VERIFIER, useValue: new JwtVerifier(options.jwt) },
+        ...(options.denials ? [{ provide: AUTHORIZATION_DENIAL_PORT, useValue: options.denials }] : []),
         { provide: APP_GUARD, useClass: IdentityAccessGuard },
       ],
     };

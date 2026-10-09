@@ -759,6 +759,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
             occurredAt: '2026-10-01T00:00:00.000Z',
             actor: { type: 'USER', userId: input.userId, process: null },
             action: a.action,
+            category: 'DATA' as const,
             aggregateType: a.aggregateType,
             aggregateId: a.aggregateId,
             aggregateVersion: a.aggregateVersion ?? null,

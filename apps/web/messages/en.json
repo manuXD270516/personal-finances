@@ -693,7 +693,8 @@
       "errorsTitle": "No change was applied",
       "errorsHint": "The operation is all or nothing: fix or remove these transactions and go back to the preview.",
       "moreErrors": "and {n} more",
-      "unknownItem": "Transaction {id}"
+      "unknownItem": "Transaction {id}",
+      "auditLink": "View the records of this operation in the audit log"
     },
     "filters": {
       "title": "Transaction filters",
@@ -1346,7 +1347,8 @@
       "label": "Export the lifecycle",
       "csv": "Export CSV",
       "pdf": "Export PDF"
-    }
+    },
+    "auditLink": "View this item in the audit log"
   },
   "Demo": {
     "title": "Demo data",
@@ -2215,6 +2217,141 @@
         "same": "The start and end times must be different.",
         "server": "The quiet hours are not valid. Check the times."
       }
+    }
+  },
+  "AuditLog": {
+    "title": "Audit",
+    "subtitle": "Who changed what and when in this workspace. Combine the filters to find a change or to review a whole operation.",
+    "noAccess": "Only a workspace owner or editor can view the audit log.",
+    "loading": "Loading records…",
+    "loadingMore": "Loading…",
+    "loadMore": "Load more",
+    "empty": "No records match the filters.",
+    "category": {
+      "ALL": "All",
+      "SECURITY": "Security",
+      "DATA": "Data"
+    },
+    "filters": {
+      "label": "Audit filters",
+      "category": "Event type",
+      "actorUserId": "User (identifier)",
+      "onlyMine": "Only my changes",
+      "action": "Action",
+      "aggregateType": "Item type",
+      "aggregateId": "Item (identifier)",
+      "correlationId": "Operation (identifier)",
+      "origin": "Origin",
+      "anyOrigin": "Any",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply filters",
+      "reset": "Clear filters"
+    },
+    "hints": {
+      "actorUserId": "UUID identifier of the user.",
+      "action": "One or more exact actions separated by commas.",
+      "aggregateId": "Requires the item type.",
+      "correlationId": "Groups every record of one operation, such as a bulk edit.",
+      "range": "Dates in the workspace time zone. Up to 366 days, unless an item or an operation is chosen."
+    },
+    "errors": {
+      "uuid": "Enter a valid identifier (UUID).",
+      "action": "Use actions shaped context.entity.verb, separated by commas (up to 20).",
+      "aggregateType": "Use letters only, for example Transaction.",
+      "needsType": "Also enter the item type.",
+      "date": "Enter a valid date.",
+      "order": "The end date cannot be before the start date.",
+      "range": "The range cannot exceed 366 days unless an item or an operation is chosen."
+    },
+    "export": {
+      "csv": "Export CSV",
+      "hint": "With the applied filters, up to {max} records. Every export is audited.",
+      "ownerOnly": "Only the workspace owner can export the audit log to CSV."
+    },
+    "table": {
+      "caption": "Audit records, most recent first",
+      "when": "Date and time",
+      "action": "Action",
+      "actor": "Who",
+      "entity": "Item",
+      "detail": "Detail",
+      "show": "Show detail",
+      "hide": "Hide detail"
+    },
+    "actor": {
+      "you": "You",
+      "user": "User …{id}",
+      "system": "Process {process}"
+    },
+    "detail": {
+      "origin": "Origin",
+      "version": "Version",
+      "reason": "Reason",
+      "correlation": "Operation",
+      "changes": "Changes in this record",
+      "field": "Field",
+      "before": "Before",
+      "after": "After",
+      "none": "—",
+      "noChanges": "This record has no field changes.",
+      "links": "Record links",
+      "sameOperation": "View the whole operation",
+      "entityLog": "View the item history",
+      "openEntity": "Open the item",
+      "byActor": "Filter by this user"
+    },
+    "origin": {
+      "ui": "Screen",
+      "api": "API",
+      "import": "Import",
+      "rule": "Rule",
+      "recurring": "Recurring",
+      "system": "System"
+    },
+    "entityTypes": {
+      "Transaction": "Transaction",
+      "Account": "Account",
+      "Workspace": "Workspace",
+      "User": "User",
+      "Category": "Category",
+      "Counterparty": "Counterparty",
+      "ExchangeRate": "Exchange rate",
+      "FinancialPeriod": "Period",
+      "Budget": "Plan",
+      "Reconciliation": "Reconciliation",
+      "BulkOperation": "Bulk edit",
+      "AuditLogExport": "Audit export",
+      "LifecycleExport": "Journey export"
+    },
+    "actions": {
+      "security_authorization_denied": "Access denied",
+      "audit_log_exported": "Audit log exported",
+      "audit_lifecycle_exported": "Journey exported",
+      "transactions_transaction_created": "Transaction recorded",
+      "transactions_transaction_updated": "Transaction changed",
+      "transactions_transaction_voided": "Transaction voided",
+      "transactions_transaction_bulk_edited": "Bulk edit",
+      "planning_period_reopened": "Period reopened"
+    },
+    "fields": {
+      "operationId": "Attempted operation",
+      "code": "Rejection reason",
+      "format": "Format",
+      "rowCount": "Exported records",
+      "actorUserId": "Filtered user",
+      "action": "Filtered action",
+      "aggregateType": "Filtered type",
+      "aggregateId": "Filtered item",
+      "correlationId": "Filtered operation",
+      "category": "Filtered event type",
+      "from": "From",
+      "to": "To",
+      "description": "Description",
+      "amount": "Amount"
+    },
+    "link": {
+      "settings": "View the workspace audit log"
     }
   }
 }

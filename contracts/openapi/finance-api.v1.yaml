@@ -3552,30 +3552,31 @@ paths:
     get:
       tags: [Audit]
       operationId: listAuditLog
-      summary: Read the audit log (history of an entity or search by date range)
+      summary: Read the audit log (entity history or global search with combinable filters)
       description: |
         Default sort: `occurredAt` (chronological) when `aggregateId` is given (entity history), otherwise
         `-occurredAt` (most recent first). `from`/`to` are business dates in the workspace timezone (inclusive).
-        Readable by OWNER and EDITOR only (VIEWER → 403 INSUFFICIENT_ROLE).
+        Readable by OWNER and EDITOR only (VIEWER → 403 INSUFFICIENT_ROLE; docs/33 D105).
         VIEWER sees the history of a single transaction through `getTransactionHistory` (D28).
+        Global view (add-global-audit-view, FR-AUDIT-006): the filters `actorUserId`, `action`, `aggregateType`,
+        `aggregateId`, `origin`, `correlationId`, `category`, `from` and `to` combine with AND. `correlationId` groups
+        every record of one operation; in a bulk edit it is the `bulkOperationId`. `category=SECURITY` returns security
+        events (sessions, authorization failures, settings changes, exports, period reopenings); `DATA` the rest.
+        Without `aggregateId` nor `correlationId` a `from`–`to` range cannot exceed 366 days (VALIDATION_FAILED).
       x-openspec-capability: audit/audit-trail
       x-required-role: EDITOR
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
-        - name: aggregateType
-          in: query
-          schema: { type: string, pattern: '^[A-Za-z]+$', maxLength: 64, examples: [Transaction] }
-        - name: aggregateId
-          in: query
-          description: Requires `aggregateType`
-          schema: { $ref: '#/components/schemas/Uuid' }
-        - name: from
-          in: query
-          schema: { $ref: '#/components/schemas/LocalDate' }
-        - name: to
-          in: query
-          schema: { $ref: '#/components/schemas/LocalDate' }
+        - $ref: '#/components/parameters/AuditAggregateType'
+        - $ref: '#/components/parameters/AuditAggregateId'
+        - $ref: '#/components/parameters/AuditActorUserId'
+        - $ref: '#/components/parameters/AuditAction'
+        - $ref: '#/components/parameters/AuditOriginFilter'
+        - $ref: '#/components/parameters/AuditCorrelationId'
+        - $ref: '#/components/parameters/AuditCategory'
+        - $ref: '#/components/parameters/AuditFrom'
+        - $ref: '#/components/parameters/AuditTo'
         - name: sort
           in: query
           schema:
@@ -3590,6 +3591,58 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
           description: 'VALIDATION_FAILED, INVALID_CURSOR, INVALID_FILTER (aggregateId without aggregateType, from > to).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /workspaces/{workspaceId}/audit-log/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Audit]
+      operationId: exportAuditLog
+      summary: Export the audit log query to CSV (OWNER only)
+      description: |
+        Synchronous CSV of the same query as `listAuditLog` (same filters, most recent first), up to 50000 records
+        (more → 400 VALIDATION_FAILED: narrow the filters). `format=csv`: RFC 4180, UTF-8 with BOM, comma separator,
+        instants in the workspace timezone with their offset (e.g. `2026-03-15T23:30:00-04:00`), amounts as decimal
+        strings, sensitive fields kept masked and cells that start with `=`, `+`, `-`, `@`, tab or CR neutralized
+        against CSV injection. OWNER only (EDITOR → 403 INSUFFICIENT_ROLE; docs/33 D105). Every export is audited
+        (`audit.log.exported`, a security event) with the actor and the filters used. At most 10 exports per user and
+        minute (429 RATE_LIMITED).
+      x-openspec-capability: audit/audit-trail
+      x-required-role: OWNER
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [csv] }
+        - $ref: '#/components/parameters/AuditAggregateType'
+        - $ref: '#/components/parameters/AuditAggregateId'
+        - $ref: '#/components/parameters/AuditActorUserId'
+        - $ref: '#/components/parameters/AuditAction'
+        - $ref: '#/components/parameters/AuditOriginFilter'
+        - $ref: '#/components/parameters/AuditCorrelationId'
+        - $ref: '#/components/parameters/AuditCategory'
+        - $ref: '#/components/parameters/AuditFrom'
+        - $ref: '#/components/parameters/AuditTo'
+      responses:
+        '200':
+          description: >-
+            Audit log CSV as an attachment (`Content-Disposition: attachment; filename="audit-<workspace>-<from>-<to>.csv"`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (invalid filter, more than 50000 records), INVALID_FILTER.'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -5561,6 +5614,52 @@ components:
         talks to the API directly (BFF pattern, ADR-0010/ADR-0019).
 
   parameters:
+    AuditAggregateType:
+      name: aggregateType
+      in: query
+      schema: { type: string, pattern: '^[A-Za-z]+$', maxLength: 64, examples: [Transaction] }
+    AuditAggregateId:
+      name: aggregateId
+      in: query
+      description: Requires `aggregateType`
+      schema: { $ref: '#/components/schemas/Uuid' }
+    AuditActorUserId:
+      name: actorUserId
+      in: query
+      description: Only records written by this user.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    AuditAction:
+      name: action
+      in: query
+      description: One or more exact actions (`context.entity.verb`), comma separated (at most 20).
+      schema:
+        type: string
+        maxLength: 1500
+        examples: ['transactions.transaction.bulk_edited,transactions.transaction.voided']
+    AuditOriginFilter:
+      name: origin
+      in: query
+      schema: { $ref: '#/components/schemas/AuditOrigin' }
+    AuditCorrelationId:
+      name: correlationId
+      in: query
+      description: All records of one operation; in a bulk edit it is the `bulkOperationId`.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    AuditCategory:
+      name: category
+      in: query
+      description: >-
+        `SECURITY` = security events (sessions, authorization failures, settings, exports, period reopenings);
+        `DATA` = the rest.
+      schema: { type: string, enum: [SECURITY, DATA] }
+    AuditFrom:
+      name: from
+      in: query
+      schema: { $ref: '#/components/schemas/LocalDate' }
+    AuditTo:
+      name: to
+      in: query
+      schema: { $ref: '#/components/schemas/LocalDate' }
     LifecycleExportFormat:
       name: format
       in: query
@@ -7933,6 +8032,12 @@ components:
         occurredAt: { $ref: '#/components/schemas/Instant' }
         actor: { $ref: '#/components/schemas/AuditActor' }
         action: { type: string, examples: [transactions.transaction.amended] }
+        category:
+          type: string
+          enum: [SECURITY, DATA]
+          description: >-
+            Derived from `action` (add-global-audit-view): `SECURITY` for security events (sessions, authorization
+            failures, settings changes, exports, period reopenings), `DATA` otherwise.
         aggregateType: { type: string, examples: [Transaction] }
         aggregateId: { $ref: '#/components/schemas/Uuid' }
         aggregateVersion: { type: [integer, 'null'], minimum: 1 }
