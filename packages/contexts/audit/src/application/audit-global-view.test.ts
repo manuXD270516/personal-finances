@@ -314,7 +314,7 @@ describe('[TC-AUDIT-GLOBAL-003] exportación CSV del log', () => {
       mem.run({ workspaceId: W1 }, () => exporter.export({ userId: OWNER, workspaceId: W1 })),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     expect(mem.rows.some((r) => r.action === 'audit.log.exported')).toBe(false);
-  });
+  }, 30_000);
 
   it('exactamente 50000 registros sí se exportan', async () => {
     await txEvent(1, U1);
@@ -324,7 +324,8 @@ describe('[TC-AUDIT-GLOBAL-003] exportación CSV del log', () => {
       exporter.export({ userId: OWNER, workspaceId: W1 }),
     );
     expect(file.rowCount).toBe(MAX_EXPORT_ROWS);
-  });
+    // Genera 50 000 filas CSV: en CI tarda ~9 s, por encima del timeout por defecto de 5 s.
+  }, 30_000);
 
   it('si la auditoría de la exportación falla, no hay descarga', async () => {
     await txEvent(1, U1);
