@@ -234,6 +234,8 @@ export function notificationEventConsumers(runtime: NotificationsWorkerRuntime):
   return NOTIFICATION_TYPE_CATALOG.map((definition) => ({
     consumer: definition.consumer,
     events: [{ type: definition.event.type, version: definition.event.version }],
+    // Baja frecuencia (un hecho por cruce de umbral o cierre pendiente): no reserva conexiones del pool del worker.
+    concurrency: 1,
     handler: async (event) => {
       await runtime.notify.handle(
         {

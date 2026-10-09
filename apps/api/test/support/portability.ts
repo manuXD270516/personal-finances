@@ -13,19 +13,13 @@ import type { Dependencies } from './global-setup.js';
 import { apiConfig, baseEnv, capturingLogger, discardStaleEventBacklog, workerConfig } from './harness.js';
 
 /**
- * La base de la suite es compartida: los eventos sin publicar de otros archivos (miles de asientos) harían esperar al
- * worker de esta suite más de lo razonable. Se descartan TODOS los pendientes antes de arrancarlo.
+ * La base de la suite es compartida: los jobs pendientes que dejaron otros archivos (también los de los exports/imports
+ * de tests anteriores de este archivo) se descartan antes de arrancar el worker para que no corran contra el estado de
+ * este test. Los hechos sin publicar del outbox ya NO se descartan: con consumidores de ≥ 42 eventos/s
+ * (improve-event-throughput) el worker los procesa sin retrasar a los de esta suite.
  */
-async function discardAllEventBacklog(deps: Dependencies): Promise<void> {
+async function discardStaleJobs(deps: Dependencies): Promise<void> {
   await discardStaleEventBacklog(deps);
-  const worker = await connect(deps.workerDatabaseUrl);
-  try {
-    await worker.query(
-      `UPDATE platform.outbox SET published_at = clock_timestamp() WHERE published_at IS NULL`,
-    );
-  } finally {
-    await worker.end();
-  }
 }
 
 /**
@@ -151,7 +145,7 @@ export async function startHarness(options: {
     worker: undefined,
     async startWorker(extra, flags) {
       if (h.worker) return h.worker;
-      if (flags?.discardBacklog !== false) await discardAllEventBacklog(deps);
+      if (flags?.discardBacklog !== false) await discardStaleJobs(deps);
       h.worker = await createWorkerRuntime(
         workerConfig(baseEnv(deps)),
         capturingLogger('finance-worker', 'worker').logger,

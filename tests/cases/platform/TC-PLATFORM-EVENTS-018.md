@@ -5,7 +5,7 @@ spec: platform/event-delivery
 related_specs: []
 requirement: Rendimiento sostenido de los consumidores
 scenario: Configuración que excede el pool de conexiones
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-REL-008
@@ -13,10 +13,12 @@ invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+- apps/api/test/events/event-throughput.int.test.ts
+- packages/platform/src/events/consumers.test.ts
+status: automated
+regression_suite: true
 phase: 2
 tags:
 - config
@@ -43,4 +45,4 @@ Change `improve-event-throughput` (docs/33 D112): verificar el requirement "Rend
 
 ## Notas
 
-- Borrador; pasa a `ready` cuando el owner apruebe el change (tarea 1.2).
+- Aprobado por el owner el 2026-10-09 (requirement confirmado). Automatizado en `consumers.test.ts` (cálculo del presupuesto) y en `event-throughput.int.test.ts` (`createWorkerRuntime` rechaza el arranque y libera sus recursos).

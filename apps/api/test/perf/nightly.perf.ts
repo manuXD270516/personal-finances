@@ -11,15 +11,18 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client, Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
+import { createWorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { daysInMonth, monthAt, ymd } from '../../src/demo/dataset/calendar.js';
 import { buildLargePlan, LARGE_MAIN_WORKSPACE_ID, LARGE_MANIFEST } from '../../src/seed/large/large-plan.js';
 import { MINIMAL_USERS, runSeed } from '../../src/seed/run-seed.js';
-import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { apiConfig, baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
 import {
   buildReport,
   latencyResult,
   PERF_THRESHOLDS,
+  PERF_THROUGHPUT,
   rlsResult,
+  throughputResult,
   writeReport,
   type BenchResult,
 } from './perf-report.js';
@@ -767,6 +770,86 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
         limitMs: PERF_THRESHOLDS['NFR-PERF-003'].limitMs,
       }),
     );
+  });
+
+  it('NFR-PERF-008: throughput de cada consumidor real al drenar el backlog del dataset large (informativo)', async () => {
+    // Los eventos que dejó la carga del seed (y los comandos anteriores) siguen sin publicar: el worker real (relay +
+    // todos los consumidores de los contextos) los publica y procesa. Se mide, por consumidor, cuántos eventos
+    // registra su inbox por segundo mientras tiene trabajo (improve-event-throughput, tarea 3.3; docs/02 NFR-PERF-008).
+    const maxSeconds = Number(env['PF_PERF_THROUGHPUT_SECONDS'] ?? '600');
+    const pendingBefore = (
+      await worker.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM platform.outbox WHERE published_at IS NULL',
+      )
+    ).rows[0]!.n;
+    dataset['eventos pendientes en el outbox (antes del worker)'] = pendingBefore;
+    if (pendingBefore === 0) return;
+
+    const runtimeWorker = await createWorkerRuntime(
+      workerConfig(baseEnv(deps, { LOG_LEVEL: 'warn' })),
+      capturingLogger('finance-worker', 'worker', 'warn').logger,
+      {
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+        lifecycleBackfillOnStart: false,
+        planningPeriodsOnStart: false,
+        notifications: { scheduleCrons: false, sweepOnStart: false },
+        portability: { scheduleCrons: false },
+      },
+    );
+    const since = new Date();
+    const perConsumer = new Map<
+      string,
+      { handled: number; buckets: number[]; first: number; last: number }
+    >();
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const t0 = performance.now();
+    let idle = 0;
+    try {
+      while ((performance.now() - t0) / 1000 < maxSeconds && idle < 5) {
+        await sleep(1_000);
+        const second = Math.round((performance.now() - t0) / 1000);
+        const counts = await worker.query<{ consumer: string; n: number }>(
+          `SELECT consumer, count(*)::int AS n FROM platform.inbox WHERE processed_at >= $1 GROUP BY consumer`,
+          [since],
+        );
+        let progressed = false;
+        for (const { consumer, n } of counts.rows) {
+          const entry = perConsumer.get(consumer) ?? { handled: 0, buckets: [], first: second, last: second };
+          const delta = n - entry.handled;
+          if (delta > 0) {
+            progressed = true;
+            entry.buckets.push(delta);
+            entry.handled = n;
+            entry.last = second;
+          }
+          perConsumer.set(consumer, entry);
+        }
+        const open = await worker.query<{ n: number }>(
+          `SELECT (SELECT count(*) FROM platform.outbox WHERE published_at IS NULL)
+                + (SELECT count(*) FROM pgboss.job WHERE name LIKE 'events.%' AND name NOT LIKE '%.dlq'
+                     AND state IN ('created', 'retry', 'active')) AS n`,
+        );
+        // Termina tras 5 muestras seguidas sin avance y sin pendientes (outbox + colas de consumidores).
+        idle = !progressed && Number(open.rows[0]!.n) === 0 ? idle + 1 : 0;
+      }
+    } finally {
+      await runtimeWorker.close();
+    }
+    dataset['duración de la medición de throughput (s)'] = Math.round((performance.now() - t0) / 1000);
+    for (const [consumer, e] of [...perConsumer].sort(([a], [b]) => a.localeCompare(b))) {
+      if (e.handled === 0) continue;
+      results.push(
+        throughputResult({
+          id: `consumer-throughput-${consumer}`,
+          title: `Throughput del consumidor ${consumer} (handler real, dataset large)`,
+          perSecond: e.buckets,
+          events: e.handled,
+          seconds: Math.max(1, e.last - e.first + 1),
+          minEventsPerSecond: PERF_THROUGHPUT.minEventsPerSecond,
+        }),
+      );
+    }
   });
 
   it('ningún p95 supera su umbral (docs/02 §PERF) ni el overhead de RLS (add-ledger-core 5.5)', () => {

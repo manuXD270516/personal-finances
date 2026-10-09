@@ -1,5 +1,5 @@
 import { Instant } from '@pf/shared-kernel';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BudgetQueries } from './budget.queries.js';
 import { BudgetThresholdService } from './budget-thresholds.service.js';
 import { BudgetCalculator } from './budget-calculator.js';
@@ -699,5 +699,40 @@ describe('BudgetVsActualQuery (contrato público para add-month-closing)', () =>
       status: 'WITHIN',
       target: { kind: 'CATEGORY', id: SUPER },
     });
+  });
+});
+
+describe('Costo por evento del cálculo de presupuesto (improve-event-throughput 2.5)', () => {
+  it('con varias líneas de rollover lee los periodos y el plan anterior una sola vez por cálculo y el resultado no cambia', async () => {
+    const ctx = setup();
+    const spec = { kind: 'MAXIMUM', planned: money('600.00'), rolloverPolicy: 'CARRY_POSITIVE' };
+    const octB = await plan(ctx, ctx.oct.id);
+    const novB = await plan(ctx, ctx.nov.id);
+    for (const target of [REST, ALQ, SUPER]) {
+      await ctx.service.addLine({ workspaceId: W, budgetId: octB.id, target: cat(target), spec });
+      await ctx.service.addLine({ workspaceId: W, budgetId: novB.id, target: cat(target), spec });
+    }
+    ctx.env.flow('2026-10-10', 'EXPENSE', REST, '520.00');
+    const expected = line(await ctx.queries.getBudget(W, novB.id), REST).progress.rolloverIn?.amount;
+    expect(expected).toBe('80.00');
+
+    const deps = ctx.env.deps();
+    const periodsList = vi.spyOn(deps.periods, 'list');
+    const byPeriod = vi.spyOn(deps.budgets, 'findByPeriod');
+    const catalog = vi.spyOn(deps.catalog, 'categoryTree');
+    const budget = (await deps.budgets.findById(W, novB.id))!;
+    const period = (await deps.periods.list(W)).find((p) => p.id === ctx.nov.id)!;
+    periodsList.mockClear();
+    const view = await new BudgetCalculator(deps).view({
+      workspaceId: W,
+      budget,
+      period,
+      now: ctx.env.mem.clock.now(),
+    });
+    expect(view.lines.find((v) => v.line.target.id === REST)?.rolloverIn?.toJSON().amount).toBe(expected);
+    // Antes: una lectura de periodos y de plan anterior por línea con rollover (3 y 6) y el árbol por periodo encadenado.
+    expect(periodsList).toHaveBeenCalledTimes(1);
+    expect(byPeriod).toHaveBeenCalledTimes(2); // octubre y septiembre (uno por periodo encadenado)
+    expect(catalog).toHaveBeenCalledTimes(1);
   });
 });

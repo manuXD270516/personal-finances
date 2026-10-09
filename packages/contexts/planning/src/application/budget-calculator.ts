@@ -104,6 +104,30 @@ export async function planCurrency(deps: BudgetsDeps, workspaceId: string, code:
 export class BudgetCalculator {
   constructor(private readonly deps: BudgetsDeps) {}
 
+  /**
+   * Lecturas del workspace que no cambian dentro de un mismo cálculo (calendario, monedas, árbol de categorías, periodos
+   * y planes anteriores del rollover). El rollover encadena hasta 12 periodos y repite esas lecturas por periodo y por
+   * línea: se consultan una vez por `memo` (improve-event-throughput 2.5; mismo resultado, menos consultas por evento).
+   * La clave es el `memo` del cálculo: un cálculo nuevo (`memo` nuevo) vuelve a leer.
+   */
+  private readonly scopes = new WeakMap<Map<string, BudgetView>, Map<string, Promise<unknown>>>();
+
+  private once<T>(memo: Map<string, BudgetView>, key: string, load: () => Promise<T>): Promise<T> {
+    let scope = this.scopes.get(memo);
+    if (!scope) {
+      scope = new Map();
+      this.scopes.set(memo, scope);
+    }
+    let hit = scope.get(key) as Promise<T> | undefined;
+    if (!hit) {
+      hit = load();
+      scope.set(key, hit);
+      // Un fallo no se conserva: la siguiente lectura del mismo cálculo vuelve a intentarlo.
+      hit.catch(() => scope.delete(key));
+    }
+    return hit;
+  }
+
   async view(input: {
     readonly workspaceId: string;
     readonly budget: Budget;
@@ -120,16 +144,16 @@ export class BudgetCalculator {
     const cached = memo.get(budget.id);
     if (cached) return cached;
 
-    const calendar = await deps.calendar.calendarOf(workspaceId);
+    const calendar = await this.once(memo, 'calendar', () => deps.calendar.calendarOf(workspaceId));
     const timeZone = calendar.timeZone;
     const today = LocalDate.ofInstant(now, timeZone);
-    const catalog = await deps.rates.workspaceCurrencies(workspaceId);
+    const catalog = await this.once(memo, 'currencies', () => deps.rates.workspaceCurrencies(workspaceId));
     const known = new Map<string, Currency>(catalog.map((c) => [c.code, makeCurrency(c.code, c.scale)]));
     const planCode = budget.snapshot.currency;
     const currency = known.get(planCode);
     if (!currency)
       throw new DomainError('CURRENCY_NOT_ENABLED', `currency ${planCode} is not in the catalog`);
-    const tree = await loadTargetTree(deps, workspaceId);
+    const tree = await this.once(memo, 'tree', () => loadTargetTree(deps, workspaceId));
 
     const lines = budget.lines;
     const range = {
@@ -284,11 +308,13 @@ export class BudgetCalculator {
     const { workspaceId, line } = input;
     if (line.nature !== 'EXPENSE' || !ROLLOVER_KINDS.includes(line.kind)) return null;
     if (input.depth >= MAX_ROLLOVER_DEPTH) return null;
-    const all = await deps.periods.list(workspaceId);
+    const all = await this.once(input.memo, 'periods', () => deps.periods.list(workspaceId));
     const index = all.findIndex((p) => p.id === input.period.id);
     const previous = index > 0 ? all[index - 1] : undefined;
     if (!previous) return null;
-    const previousBudget = await deps.budgets.findByPeriod(workspaceId, previous.id);
+    const previousBudget = await this.once(input.memo, `budget:${previous.id}`, () =>
+      deps.budgets.findByPeriod(workspaceId, previous.id),
+    );
     const previousLine = previousBudget?.lines.find(
       (l) => l.target.kind === line.target.kind && l.target.id === line.target.id,
     );

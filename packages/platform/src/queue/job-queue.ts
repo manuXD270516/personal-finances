@@ -24,7 +24,14 @@ export interface JobContext<P extends object> {
 export type JobHandler<P extends object> = (job: JobContext<P>) => Promise<void>;
 
 export interface WorkOptions {
+  /** Workers en paralelo sobre la cola (cada uno trae su propio lote). */
   readonly concurrency: number;
+  /**
+   * Trabajos por consulta a la cola (por defecto 1). Cada trabajo del lote se procesa y se confirma o falla por
+   * separado: el fallo de uno no reintenta a los demás. En colas `orderedByKey` un lote trae a lo sumo un trabajo por
+   * clave, así que procesarlo en serie conserva el orden por clave.
+   */
+  readonly batchSize?: number;
 }
 
 /**

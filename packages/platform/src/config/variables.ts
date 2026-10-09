@@ -117,8 +117,9 @@ export const VARIABLES = {
   }),
   DATABASE_POOL_MAX: variable(positiveInt, {
     group: 'PostgreSQL',
-    description: 'Tamaño máximo del pool de conexiones por proceso.',
-    default: '10',
+    description:
+      'Tamaño máximo del pool de conexiones por proceso. En el worker debe cubrir la concurrencia sumada de los consumidores de eventos (`EVENT_CONSUMER_CONCURRENCY`) más 4 conexiones reservadas; las conexiones se abren bajo demanda.',
+    default: '30',
   }),
 
   // ── Object storage (API S3) ──
@@ -503,6 +504,18 @@ export const VARIABLES = {
     description: 'Jobs procesados en paralelo por cola en cada proceso worker.',
     default: '4',
   }),
+  EVENT_CONSUMER_CONCURRENCY: variable(positiveInt, {
+    group: 'Worker',
+    description:
+      'Eventos de agregados distintos que cada consumidor de eventos procesa en paralelo (el orden por agregado se conserva). Cada consumidor puede fijar la suya. La suma de todos los consumidores más 4 conexiones reservadas no puede exceder `DATABASE_POOL_MAX`: si la excede, el worker no arranca.',
+    default: '4',
+  }),
+  EVENT_CONSUMER_BATCH_SIZE: variable(positiveInt, {
+    group: 'Worker',
+    description:
+      'Eventos que cada consumidor trae por consulta a la cola; cada uno se confirma o falla por separado. Con 1 vuelve al ritmo previo (~2 eventos/s por worker).',
+    default: '10',
+  }),
   WORKER_HEALTH_PORT: variable(port, {
     group: 'Worker',
     description:
@@ -876,6 +889,8 @@ export const APP_VARIABLES = {
     ...OBJECT_STORAGE,
     ...QUEUE,
     'WORKER_CONCURRENCY',
+    'EVENT_CONSUMER_CONCURRENCY',
+    'EVENT_CONSUMER_BATCH_SIZE',
     'WORKER_HEALTH_PORT',
     'WORKER_HEALTH_BIND_ADDRESS',
     'LEDGER_INTEGRITY_CRON',

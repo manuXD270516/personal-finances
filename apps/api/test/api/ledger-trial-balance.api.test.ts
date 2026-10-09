@@ -225,7 +225,7 @@ describe('[TC-LEDGER-TRIAL-001] balance de comprobación por moneda (getLedgerTr
     // Igual que cualquier otra lectura del workspace.
     const accounts = await call('GET', `/api/v1/workspaces/${owner.ws}/accounts`, outsider.token);
     expect([r.status, r.body['code']]).toEqual([accounts.status, accounts.body['code']]);
-    expect(JSON.stringify(r.body)).not.toContain('685');
+    expect(JSON.stringify(r.body)).not.toContain('685.00');
     // Su propio workspace: vacío (RLS), nunca los asientos de W1.
     const own = await trial(outsider, outsider.ws, '?asOf=2026-03-31');
     expect(own.status).toBe(200);

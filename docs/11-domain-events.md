@@ -30,6 +30,7 @@ Convenciones de payload: camelCase; dinero `{amount: string, currency: string}` 
 - **Producción**: el evento se inserta en `platform.outbox` en la **misma transacción** que el cambio de estado. Si no hay commit, no hay evento.
 - **Relay**: proceso en `worker` (rol `pf_worker`, una sola réplica activa por advisory lock) lee outbox (orden por `sequence`, `FOR UPDATE SKIP LOCKED`), encola en **pg-boss** dentro de la misma transacción (una cola `events.<consumer>` por consumidor, `key_strict_fifo` por `aggregateId`, job `id = eventId`) y marca `published_at`. At-least-once (ADR-0008 con enmienda; as-built en `openspec/changes/add-event-outbox`).
 - **Consumo**: handler idempotente; `platform.inbox(consumer, event_id)` insertado en la misma transacción que el efecto del handler; duplicado ⇒ no-op.
+- **Rendimiento del consumo** (`improve-event-throughput`, docs/33 D112): cada consumidor procesa en paralelo eventos de **agregados distintos** (`EVENT_CONSUMER_CONCURRENCY`, por defecto 4; el orden por agregado lo da la cola `key_strict_fifo`, no el número de workers) y trae `EVENT_CONSUMER_BATCH_SIZE` trabajos por consulta (por defecto 10). Cada trabajo del lote se confirma o falla por separado (un fallo no reintenta a los demás) y el lote se procesa en serie, por lo que una unidad de concurrencia equivale a una conexión del pool. Meta: ≥ 42 eventos/s por consumidor (backlog de 5 000 eventos en 500 agregados en ≤ 120 s con handler trivial). Un consumidor fija su `concurrency`/`batchSize`; la suma de concurrencias más 4 conexiones reservadas no puede exceder `DATABASE_POOL_MAX` (el worker no arranca si la excede).
 - **Orden**: garantizado **sólo por agregado** (`aggregateId` + `aggregateVersion`). Los consumidores que necesiten orden detectan huecos (`aggregateVersion` esperado) y reintentan/aplazan; no se asume orden entre agregados.
 - **Reintentos**: backoff exponencial (p. ej. 5 intentos: 1 s, 10 s, 1 min, 10 min, 1 h); luego **dead-letter** (§6).
 
@@ -274,7 +275,8 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 
 - **Dead-letter**: el evento problemático no bloquea otros agregados; para el mismo agregado, el consumidor que exige orden **pausa** ese agregado hasta resolución. Operación: comando admin `ReplayDeadLetter(id)` / `DiscardDeadLetter(id, reason)` (auditados).
 - **Replay**: proyecciones (Reporting, actuals de Planning) se reconstruyen (a) desde `outbox` retenido, o (b) — preferido — desde las tablas fuente vía `RebuildProjection` (las proyecciones son funciones de los datos). Replay = reprocesar con un `consumer` nuevo/limpiado; la idempotencia del inbox garantiza seguridad.
-- **Observabilidad**: el `traceparent` se guarda en `outbox.trace_context` y viaja en los datos del job de pg-boss (no en el envelope); `correlationId` en logs. Métricas `pf.outbox.pending`, `pf.outbox.lag`, `pf.inbox.duplicates`, `pf.events.dead_lettered`, `pf.queue.dead_letter` (docs/18 §5.3).
+- **Observabilidad**: el `traceparent` se guarda en `outbox.trace_context` y viaja en los datos del job de pg-boss (no en el envelope); `correlationId` en logs. Métricas `pf.outbox.pending`, `pf.outbox.lag`, `pf.inbox.duplicates`, `pf.events.dead_lettered`, `pf.queue.dead_letter`, `pf.events.consumer.backlog` y `pf.events.consumer.duration` (docs/18 §5.3).
+- **Concurrencia y lotes**: §2 (garantías de entrega) fija el modelo; el presupuesto de conexiones se valida al arrancar el worker (`assertConsumerConnectionBudget`, TC-PLATFORM-EVENTS-018).
 
 ## 7. PII
 

@@ -5,7 +5,7 @@ spec: platform/event-delivery
 related_specs: []
 requirement: Orden de entrega por agregado
 scenario: Un evento anterior en reintento retiene a los siguientes del mismo agregado
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-REL-008
@@ -13,10 +13,11 @@ invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
-regression_suite: false
+automation_status: automated
+automated_tests:
+- apps/api/test/events/event-throughput.int.test.ts
+status: automated
+regression_suite: true
 phase: 2
 tags:
 - ordering
@@ -45,4 +46,4 @@ Change `improve-event-throughput` (docs/33 D112): verificar el requirement "Orde
 
 ## Notas
 
-- Borrador; pasa a `ready` cuando el owner apruebe el change (tarea 1.2).
+- Aprobado por el owner el 2026-10-09 (requirement confirmado). Automatizado en `event-throughput.int.test.ts`: v1 del agregado A falla una vez y v2..v5 esperan; los otros 9 agregados terminan antes del reintento.

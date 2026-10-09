@@ -411,6 +411,8 @@ export function planningEventConsumers(runtime: PlanningRuntime): EventConsumerD
     ...(budgets ? budgetEventConsumers(budgets) : []),
     {
       consumer: PLANNING_CONSUMERS.workspaceCreated,
+      // Baja frecuencia (una vez por workspace o cambio de ajustes): no reserva conexiones del pool del worker.
+      concurrency: 1,
       events: [{ type: 'identity.WorkspaceCreated', version: 1 }],
       handler: async (event) => {
         await runtime.service.ensurePeriods({ workspaceId: event.workspaceId });
@@ -418,6 +420,8 @@ export function planningEventConsumers(runtime: PlanningRuntime): EventConsumerD
     },
     {
       consumer: PLANNING_CONSUMERS.settingsChanged,
+      // Baja frecuencia (una vez por workspace o cambio de ajustes): no reserva conexiones del pool del worker.
+      concurrency: 1,
       events: [{ type: 'identity.WorkspaceSettingsChanged', version: 1 }],
       handler: async (event) => {
         const changes = payloadOf(event)['changes'];
@@ -467,6 +471,8 @@ export function budgetEventConsumers(budgets: BudgetsRuntime): EventConsumerDefi
     },
     {
       consumer: PLANNING_CONSUMERS.rolloverFinalizer,
+      // Baja frecuencia (cierre o reapertura de mes): no reserva conexiones del pool del worker.
+      concurrency: 1,
       events: [
         { type: 'planning.MonthClosed', version: 1 },
         { type: 'planning.PeriodReopened', version: 1 },

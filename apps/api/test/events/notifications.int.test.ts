@@ -263,6 +263,8 @@ beforeAll(async () => {
   appPool = new Pool({ connectionString: deps.databaseUrl, max: 6 });
   workerPool = new Pool({ connectionString: deps.workerDatabaseUrl, max: 8 });
   migratorPool = new Pool({ connectionString: deps.migratorUrl, max: 2 });
+  // Aislamiento, no lentitud: los hechos de cierre/umbral que dejaron otros archivos (sin relay) generarían
+  // notificaciones y emails ajenos que compiten por el despacho SMTP (cola aparte, concurrencia 2) con los de este test.
   await discardStaleEventBacklog(deps);
   mailpit = await startMailpit();
 });

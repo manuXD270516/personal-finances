@@ -25,8 +25,13 @@ export interface EventConsumerDefinition {
   readonly consumer: string;
   readonly events: readonly { readonly type: string; readonly version: number }[];
   readonly handler: EventHandler;
-  /** Jobs en paralelo de este consumidor (distintos agregados; el orden por agregado lo da la cola). */
+  /**
+   * Jobs en paralelo de este consumidor (distintos agregados; el orden por agregado lo da la cola). Por defecto,
+   * `EVENT_CONSUMER_CONCURRENCY`. Cada unidad de concurrencia puede ocupar una conexión del pool mientras entrega.
+   */
   readonly concurrency?: number;
+  /** Eventos por consulta a la cola (por defecto `EVENT_CONSUMER_BATCH_SIZE`); cada uno se confirma o falla aparte. */
+  readonly batchSize?: number;
   /** Reintentos tras el primer intento (por defecto 5, NFR-REL-012). */
   readonly retryLimit?: number;
   /** Retardo base del backoff exponencial (s, por defecto 1). */
@@ -38,6 +43,64 @@ export interface EventConsumerDefinition {
 const CONSUMER_NAME = /^[a-z][a-z0-9_.-]{0,99}$/;
 const MAX_ERROR_LENGTH = 1000;
 export const DEFAULT_EVENT_RETRY_LIMIT = 5;
+/** Defaults de `EVENT_CONSUMER_CONCURRENCY` / `EVENT_CONSUMER_BATCH_SIZE` (improve-event-throughput, design.md decisiones 1 y 2). */
+export const DEFAULT_EVENT_CONSUMER_CONCURRENCY = 4;
+export const DEFAULT_EVENT_CONSUMER_BATCH_SIZE = 10;
+/**
+ * Conexiones del pool del worker que NO son entregas de consumidores: el lote del relay, el readiness, la
+ * dead-letter y los jobs periódicos. Se descuentan del pool antes de repartir la concurrencia (TC-PLATFORM-EVENTS-018).
+ */
+export const RESERVED_WORKER_CONNECTIONS = 4;
+
+export interface ConsumerDefaults {
+  readonly concurrency?: number;
+  readonly batchSize?: number;
+}
+
+/** Concurrencia y tamaño de lote efectivos de un consumidor (su definición manda sobre los defaults). */
+export function consumerWorkOptions(
+  def: Pick<EventConsumerDefinition, 'concurrency' | 'batchSize'>,
+  defaults: ConsumerDefaults = {},
+): { concurrency: number; batchSize: number } {
+  const positive = (value: number | undefined, fallback: number): number =>
+    value !== undefined && Number.isInteger(value) && value >= 1 ? value : fallback;
+  return {
+    concurrency: positive(
+      def.concurrency,
+      positive(defaults.concurrency, DEFAULT_EVENT_CONSUMER_CONCURRENCY),
+    ),
+    batchSize: positive(def.batchSize, positive(defaults.batchSize, DEFAULT_EVENT_CONSUMER_BATCH_SIZE)),
+  };
+}
+
+/** Σ de la concurrencia efectiva de todos los consumidores. */
+export function totalConsumerConcurrency(
+  defs: readonly Pick<EventConsumerDefinition, 'concurrency' | 'batchSize'>[],
+  defaults: ConsumerDefaults = {},
+): number {
+  return defs.reduce((sum, def) => sum + consumerWorkOptions(def, defaults).concurrency, 0);
+}
+
+/**
+ * Presupuesto de conexiones (improve-event-throughput, design.md decisión 3): la concurrencia sumada de los
+ * consumidores más las conexiones reservadas no puede exceder el pool del worker. Falla con un mensaje que indica la
+ * concurrencia total y el tamaño del pool.
+ */
+export function assertConsumerConnectionBudget(options: {
+  readonly consumers: readonly Pick<EventConsumerDefinition, 'consumer' | 'concurrency' | 'batchSize'>[];
+  readonly defaults?: ConsumerDefaults;
+  readonly poolMax: number;
+  readonly reserved?: number;
+}): void {
+  const reserved = options.reserved ?? RESERVED_WORKER_CONNECTIONS;
+  const total = totalConsumerConcurrency(options.consumers, options.defaults);
+  if (total + reserved <= options.poolMax) return;
+  throw new Error(
+    `Configuración de consumidores inválida: la concurrencia total de ${options.consumers.length} consumidores ` +
+      `de eventos es ${total} (+ ${reserved} conexiones reservadas) y excede el pool de conexiones del worker ` +
+      `(DATABASE_POOL_MAX=${options.poolMax}). Reduce EVENT_CONSUMER_CONCURRENCY o sube DATABASE_POOL_MAX.`,
+  );
+}
 
 export const eventQueueName = (consumer: string): string => `events.${consumer}`;
 export const deadLetterQueueName = (consumer: string): string => `events.${consumer}.dlq`;
@@ -91,6 +154,10 @@ export interface EventConsumerRuntimeOptions {
   readonly subscriptions: EventSubscriptions;
   readonly logger: Logger;
   readonly metrics?: EventDeliveryMetrics;
+  /** Concurrencia por defecto de los consumidores sin `concurrency` propia (`EVENT_CONSUMER_CONCURRENCY`). */
+  readonly concurrency?: number;
+  /** Tamaño de lote por defecto de los consumidores sin `batchSize` propio (`EVENT_CONSUMER_BATCH_SIZE`). */
+  readonly batchSize?: number;
 }
 
 /**
@@ -105,6 +172,10 @@ export class EventConsumerRuntime {
 
   constructor(private readonly options: EventConsumerRuntimeOptions) {
     this.uow = new PgUnitOfWork(options.pool);
+    options.metrics?.trackConsumers(
+      options.subscriptions.definitions().map((d) => d.consumer),
+      eventQueueName,
+    );
   }
 
   async start(): Promise<void> {
@@ -116,7 +187,7 @@ export class EventConsumerRuntime {
       await this.options.queue.ensureQueue(eventQueueName(def.consumer), queueOptions(def));
       await this.options.queue.work<EventEnvelope>(
         eventQueueName(def.consumer),
-        { concurrency: def.concurrency ?? 1 },
+        consumerWorkOptions(def, this.options),
         (job) => this.process(def, job),
       );
       await this.options.queue.work<EventEnvelope>(dlq, { concurrency: 1 }, (job) =>
@@ -164,10 +235,16 @@ export class EventConsumerRuntime {
         this.apply(def, event, meta),
       );
     const ambient = currentCorrelation();
-    const outcome =
-      correlationId && ambient?.correlationId !== correlationId
-        ? await runWithCorrelation({ correlationId }, run)
-        : await run();
+    const started = performance.now();
+    let outcome: DeliveryOutcome;
+    try {
+      outcome =
+        correlationId && ambient?.correlationId !== correlationId
+          ? await runWithCorrelation({ correlationId }, run)
+          : await run();
+    } finally {
+      this.options.metrics?.consumed(def.consumer, (performance.now() - started) / 1000);
+    }
     if (outcome === 'skipped') {
       this.options.logger.info(
         { consumer: def.consumer, event: fullEventName(event), event_id: event.eventId },

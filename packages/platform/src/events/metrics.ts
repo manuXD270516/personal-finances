@@ -1,4 +1,5 @@
-import { metrics, type Counter, type Meter } from '@opentelemetry/api';
+import { metrics, type Counter, type Histogram, type Meter } from '@opentelemetry/api';
+import { PGBOSS_SCHEMA } from '../queue/pgboss-job-queue.js';
 
 /** Ejecutor mínimo de consultas (`pg.Pool`, `pg.Client` o la conexión de una transacción). */
 export interface Queryable {
@@ -37,6 +38,37 @@ export async function countOpenDeadLetters(db: Queryable): Promise<number> {
   return (rows[0] as { open: number } | undefined)?.open ?? 0;
 }
 
+/**
+ * Trabajos pendientes por cola de consumidor, leídos de PostgreSQL (`pgboss.job`): publicados y aún sin procesar
+ * (`created`), en reintento (`retry`) o en curso (`active`). Los consumidores sin pendientes reportan 0. Los
+ * agotados (`failed`, ya copiados a la dead-letter) no cuentan: tienen su propia métrica (`pf.queue.dead_letter`).
+ * `queueOf` mapea el nombre del consumidor al de su cola.
+ */
+export async function readConsumerBacklog(
+  db: Queryable,
+  consumers: readonly string[],
+  queueOf: (consumer: string) => string,
+  schema = PGBOSS_SCHEMA,
+): Promise<ReadonlyMap<string, number>> {
+  const result = new Map<string, number>(consumers.map((c) => [c, 0]));
+  if (consumers.length === 0) return result;
+  const byQueue = new Map(consumers.map((c) => [queueOf(c), c]));
+  const { rows } = await db.query(
+    `SELECT name, count(*)::int AS pending
+       FROM ${quoteIdentifier(schema)}.job
+      WHERE name = ANY($1::text[]) AND state IN ('created', 'retry', 'active')
+      GROUP BY name`,
+    [[...byQueue.keys()]],
+  );
+  for (const row of rows as { name: string; pending: number }[]) {
+    const consumer = byQueue.get(row.name);
+    if (consumer) result.set(consumer, row.pending);
+  }
+  return result;
+}
+
+const quoteIdentifier = (id: string): string => `"${id.replace(/"/g, '""')}"`;
+
 /** Nombres de los instrumentos (docs/18 §5.3; el exportador Prometheus agrega unidad y `_total`). */
 export const EVENT_METRICS = {
   outboxPending: 'pf.outbox.pending',
@@ -46,6 +78,10 @@ export const EVENT_METRICS = {
   inboxDuplicates: 'pf.inbox.duplicates',
   deadLettered: 'pf.events.dead_lettered',
   deadLetterOpen: 'pf.queue.dead_letter',
+  /** NFR-OBS-004 `event_consumer_backlog` (Prometheus: `pf_events_consumer_backlog`). */
+  consumerBacklog: 'pf.events.consumer.backlog',
+  /** NFR-OBS-004 `event_consumer_duration_seconds` (Prometheus: `pf_events_consumer_duration_seconds`). */
+  consumerDuration: 'pf.events.consumer.duration',
 } as const;
 
 /**
@@ -57,6 +93,9 @@ export class EventDeliveryMetrics {
   private readonly failuresCounter: Counter;
   private readonly duplicatesCounter: Counter;
   private readonly deadLetteredCounter: Counter;
+  private readonly durationHistogram: Histogram;
+  private consumers:
+    { readonly names: readonly string[]; readonly queueOf: (c: string) => string } | undefined;
 
   constructor(
     private readonly db: Queryable | undefined,
@@ -74,7 +113,15 @@ export class EventDeliveryMetrics {
     this.deadLetteredCounter = meter.createCounter(EVENT_METRICS.deadLettered, {
       description: 'Eventos que agotaron sus reintentos y quedaron en dead-letter',
     });
+    this.durationHistogram = meter.createHistogram(EVENT_METRICS.consumerDuration, {
+      description:
+        'Duración del procesamiento de un evento por un consumidor (transacción con inbox y efecto)',
+      unit: 's',
+    });
     if (db) {
+      const backlogGauge = meter.createObservableGauge(EVENT_METRICS.consumerBacklog, {
+        description: 'Eventos pendientes de procesar por consumidor (publicados, en reintento o en curso)',
+      });
       const pending = meter.createObservableGauge(EVENT_METRICS.outboxPending, {
         description: 'Eventos del outbox pendientes de publicación',
       });
@@ -95,10 +142,31 @@ export class EventDeliveryMetrics {
           } catch {
             // Sin base de datos no se reporta valor (el gauge queda sin muestra); readiness ya lo señala.
           }
+          const tracked = this.consumers;
+          if (!tracked) return;
+          try {
+            const perConsumer = await readConsumerBacklog(db, tracked.names, tracked.queueOf);
+            for (const [consumer, count] of perConsumer) result.observe(backlogGauge, count, { consumer });
+          } catch {
+            // Igual que arriba: sin muestra si la base no responde.
+          }
         },
-        [pending, lag, open],
+        [pending, lag, open, backlogGauge],
       );
     }
+  }
+
+  /**
+   * Registra los consumidores cuyo backlog se reporta (`consumer` = nombre estable, baja cardinalidad). Lo llama el
+   * runtime de consumidores al arrancar; sin base de datos no hace nada.
+   */
+  trackConsumers(names: readonly string[], queueOf: (consumer: string) => string): void {
+    this.consumers = { names, queueOf };
+  }
+
+  /** Duración (s) del procesamiento de un evento por un consumidor, con cualquier resultado. */
+  consumed(consumer: string, seconds: number): void {
+    this.durationHistogram.record(seconds, { consumer });
   }
 
   published(eventType: string): void {
