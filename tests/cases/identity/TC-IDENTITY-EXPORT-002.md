@@ -12,9 +12,9 @@ invariants: []
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-export.api.test.ts","packages/contexts/identity/src/application/portability/workspace-export.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["export", "privacy"]

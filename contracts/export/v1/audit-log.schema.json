@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/audit-log.schema.json",
+  "title": "pfos-export v1 — audit-log",
+  "description": "Registro de la sección «audit-log» (tabla audit.audit_log, contexto audit). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "occurred_at",
+    "workspace_id",
+    "actor_type",
+    "actor_user_id",
+    "actor_process",
+    "action",
+    "aggregate_type",
+    "aggregate_id",
+    "aggregate_version",
+    "changes",
+    "reason",
+    "origin",
+    "correlation_id"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurred_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "actor_type": {
+      "type": "string"
+    },
+    "actor_user_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "actor_process": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "action": {
+      "type": "string"
+    },
+    "aggregate_type": {
+      "type": "string"
+    },
+    "aggregate_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregate_version": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "changes": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "origin": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "audit.audit_log",
+  "x-pfos-context": "audit"
+}

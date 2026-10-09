@@ -39,5 +39,10 @@ export function contentTypeAllowed(req: Request): boolean {
   const type = req.headers.get('content-type');
   if (type === null)
     return req.headers.get('content-length') === null || req.headers.get('content-length') === '0';
-  return JSON_TYPES.has(type.split(';')[0]!.trim().toLowerCase());
+  const base = type.split(';')[0]!.trim().toLowerCase();
+  if (JSON_TYPES.has(base)) return true;
+  // `multipart/form-data` SÍ lo puede producir un <form> ajeno sin preflight: por eso solo se admite en la subida del
+  // import del workspace y, como en todo POST, siguen exigidos el Origin propio y el X-CSRF-Token (capas 2 y 3), que un
+  // <form> no puede fijar.
+  return base === 'multipart/form-data' && new URL(req.url).pathname.endsWith('/v1/workspace-imports');
 }

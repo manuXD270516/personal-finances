@@ -12,9 +12,9 @@ invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/src/portability/portability-coverage.test.ts","apps/api/test/api/workspace-export.api.test.ts","apps/api/test/db/workspace-export-contract.int.test.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["export", "coverage"]

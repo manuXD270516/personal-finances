@@ -90,5 +90,14 @@
   "CUSTOM_FIELD_OPTION_IN_USE": "Você não pode remover uma opção que já está em uso. Pode renomeá-la ou adicionar outras.",
   "CUSTOM_FIELD_VALUE_INVALID": "O valor de um campo personalizado não é válido para o seu tipo.",
   "CUSTOM_FIELD_REQUIRED": "Falta um campo personalizado obrigatório.",
-  "CUSTOM_FIELD_TARGET_MISMATCH": "Esse campo personalizado não se aplica a este registro."
+  "CUSTOM_FIELD_TARGET_MISMATCH": "Esse campo personalizado não se aplica a este registro.",
+  "REAUTHENTICATION_REQUIRED": "Por segurança, você precisa entrar novamente para esta operação.",
+  "EXPORT_IN_PROGRESS": "Já há uma exportação em andamento para este espaço de trabalho. Aguarde o término.",
+  "IMPORT_IN_PROGRESS": "Você já tem uma importação em andamento. Aguarde o término.",
+  "EXPORT_NOT_READY": "A exportação ainda não está pronta. Tente novamente em instantes.",
+  "EXPORT_EXPIRED": "A exportação expirou ou foi excluída. Solicite uma nova.",
+  "EXPORT_FILE_CORRUPTED": "O arquivo está danificado ou foi modificado. Nada foi importado.",
+  "EXPORT_FORMAT_UNSUPPORTED": "O formato do arquivo não é compatível (por exemplo, exportações de dados de demonstração). Nada foi importado.",
+  "EXPORT_VERIFICATION_FAILED": "Os dados importados não coincidem com o resumo do arquivo. Nenhum espaço de trabalho foi criado.",
+  "UPLOAD_TOO_LARGE": "O arquivo excede o tamanho máximo permitido."
 }

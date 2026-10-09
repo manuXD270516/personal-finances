@@ -1431,6 +1431,62 @@
     "cancel": "Cancelar",
     "disabled": "O carregamento de dados de demonstração está desativado neste ambiente."
   },
+  "Portability": {
+    "cancel": "Cancelar",
+    "reauthBody": "Por segurança, esta operação exige que você tenha entrado há menos de 10 minutos. Confirme sua identidade e volte aqui.",
+    "reauthAction": "Confirmar minha identidade",
+    "export": {
+      "title": "Exportar o espaço de trabalho",
+      "description": "Baixe uma cópia completa deste espaço de trabalho (contas, lançamentos com todas as versões, contabilidade, períodos, orçamentos, conciliações e auditoria) em um arquivo aberto e documentado.",
+      "security": "O arquivo baixado contém TODOS os seus dados financeiros e não é protegido por senha: guarde-o em um lugar seguro. Enquanto está em nossos servidores, é armazenado cifrado e excluído após 7 dias.",
+      "request": "Exportar este espaço de trabalho",
+      "confirmTitle": "Exportar todo o espaço de trabalho?",
+      "confirmBody": "Somente o proprietário pode fazer isso e fica registrado na auditoria. Pediremos que você confirme sua identidade se o último login não for recente.",
+      "confirm": "Sim, exportar",
+      "readyNotice": "Sua exportação está pronta. Baixe-a na lista abaixo.",
+      "running": "Exportando…",
+      "failed": "A exportação falhou. Tente novamente.",
+      "expires": "Disponível até {date}",
+      "download": "Baixar",
+      "discard": "Excluir arquivo",
+      "discardTitle": "Excluir o arquivo exportado?",
+      "discardBody": "O arquivo é removido do armazenamento imediatamente. Você pode exportar de novo quando quiser.",
+      "discardConfirm": "Sim, excluir",
+      "status": {
+        "REQUESTED": "Solicitada",
+        "RUNNING": "Em andamento",
+        "READY": "Pronta",
+        "FAILED": "Falhou",
+        "EXPIRED": "Expirada",
+        "DISCARDED": "Excluída"
+      }
+    },
+    "import": {
+      "title": "Importar um arquivo exportado",
+      "description": "Cria um espaço de trabalho NOVO a partir de um arquivo exportado. Nunca modifica um espaço de trabalho existente nem mantém os identificadores originais.",
+      "security": "O arquivo é validado por completo; se algo não coincidir com o resumo (saldos e balancete), nada é criado. Tamanho máximo: 200 MB.",
+      "file": "Arquivo exportado (.zip)",
+      "submit": "Importar",
+      "progress": "Progresso da importação",
+      "open": "Abrir o novo espaço de trabalho",
+      "succeeded": "Importação concluída: {rows} registros em um novo espaço de trabalho.",
+      "failedNothing": "Nenhum espaço de trabalho foi criado.",
+      "fileCheck": {
+        "none": "Escolha um arquivo.",
+        "empty": "O arquivo está vazio.",
+        "tooLarge": "O arquivo excede 200 MB.",
+        "notZip": "O arquivo deve ser um .zip exportado pelo aplicativo."
+      },
+      "status": {
+        "RECEIVED": "Arquivo recebido…",
+        "VALIDATING": "Validando o arquivo…",
+        "IMPORTING": "Importando os dados…",
+        "VERIFYING": "Verificando saldos e balancete…",
+        "SUCCEEDED": "Concluída",
+        "FAILED": "Falhou"
+      }
+    }
+  },
   "Locales": {
     "es-BO": "Español (Bolivia)",
     "en-US": "English (United States)",

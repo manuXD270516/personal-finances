@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/account-tags.schema.json",
+  "title": "pfos-export v1 — account-tags",
+  "description": "Registro de la sección «account-tags» (tabla accounts.account_tag, contexto accounts). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "account_id",
+    "tag_id"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "account_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tag_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "accounts.account_tag",
+  "x-pfos-context": "accounts"
+}

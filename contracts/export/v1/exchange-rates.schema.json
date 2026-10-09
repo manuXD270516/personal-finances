@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/exchange-rates.schema.json",
+  "title": "pfos-export v1 — exchange-rates",
+  "description": "Registro de la sección «exchange-rates» (tabla fx.exchange_rate, contexto fx). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "base_currency",
+    "quote_currency",
+    "rate",
+    "rate_type",
+    "as_of",
+    "as_of_date",
+    "source",
+    "source_label",
+    "provider",
+    "supersedes_id",
+    "supersede_reason",
+    "created_at",
+    "created_by",
+    "fetched_at",
+    "raw_payload",
+    "anomaly_flagged",
+    "anomaly_baseline_rate_id",
+    "anomaly_variation_pct"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "base_currency": {
+      "type": "string"
+    },
+    "quote_currency": {
+      "type": "string"
+    },
+    "rate": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "rate_type": {
+      "type": "string"
+    },
+    "as_of": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "as_of_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "source": {
+      "type": "string"
+    },
+    "source_label": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "supersedes_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "supersede_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "created_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "fetched_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "raw_payload": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "anomaly_flagged": {
+      "type": "boolean"
+    },
+    "anomaly_baseline_rate_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "anomaly_variation_pct": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    }
+  },
+  "x-pfos-table": "fx.exchange_rate",
+  "x-pfos-context": "fx"
+}

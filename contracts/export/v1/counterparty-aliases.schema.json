@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/counterparty-aliases.schema.json",
+  "title": "pfos-export v1 — counterparty-aliases",
+  "description": "Registro de la sección «counterparty-aliases» (tabla classification.counterparty_alias, contexto classification). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "counterparty_id",
+    "alias",
+    "alias_normalized",
+    "active"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "counterparty_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "alias": {
+      "type": "string"
+    },
+    "alias_normalized": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean"
+    }
+  },
+  "x-pfos-table": "classification.counterparty_alias",
+  "x-pfos-context": "classification"
+}

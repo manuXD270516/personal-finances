@@ -172,9 +172,9 @@ Función de producto (user-facing), complementaria a los backups de plataforma y
   - `json/` — un fichero por agregado (accounts, institutions, transactions + splits + conversion details, ledger journal entries + postings, categories, tags, custom fields, counterparties, budgets, templates, recurring, goals, loans, fx-rates usadas, rules, audit-log), montos como **string decimal** y fechas según ARCHITECTURE §8.
   - `csv/` — vistas planas legibles (transacciones con categoría/moneda, saldos por cuenta y fecha) para hojas de cálculo.
   - `documents/` — adjuntos (opcional, puede ser grande).
-- **Cómo**: comando `POST /api/v1/workspaces/{id}/exports` (con `Idempotency-Key`) → job del worker → objeto en bucket `exports` (cifrado) → notificación → descarga por **presigned URL** de vida corta (p. ej. 15 min), expiración del objeto a 7 días. Solo rol `OWNER` (decisión de permisos en [12-security.md](12-security.md)); queda en `AuditLog`.
+- **Cómo** (as-built, `add-workspace-export`, D98–D102/D108): `POST /api/v1/workspaces/{id}/exports` (con `Idempotency-Key`, solo `OWNER` con autenticación reciente: `auth_time` ≤ 10 min, `REAUTH_MAX_AGE`; si no, 403 `REAUTHENTICATION_REQUIRED` y no se crea nada) → `platform.operation` + job del worker → objeto en el bucket `exports` **cifrado a nivel de aplicación (cifrado de sobre AES-256-GCM, clave maestra rotable, formato en `contracts/export/v1/ENCRYPTION.md`)**; la **descarga pasa por la API** (`GET …/exports/{id}/download`, sin presigned URL): autentica todo el objeto, compara el SHA-256 y solo entonces descifra en streaming (`Repr-Digest`). Retención 7 días (`EXPORT_RETENTION`), eliminación anticipada (`…/discard`) y purga del objeto; cada paso queda en `AuditLog` (`identity.export.*`) y el aviso al usuario no contiene cifras.
 - **Consistencia**: export dentro de una transacción `REPEATABLE READ` (snapshot consistente) con RLS del workspace.
-- **Import/restauración de workspace** desde export: fuera de alcance inicial (Phase 6+ junto al pipeline de imports); el formato se diseña desde ya para ser re-importable (IDs UUIDv7 preservados).
+- **Import/restauración** (Phase 2, FR-IDENTITY-017): `POST /api/v1/workspace-imports` (multipart, ≤ 200 MB ⇒ 413 `UPLOAD_TOO_LARGE`, autenticación reciente) **siempre crea un workspace NUEVO** con identificadores nuevos (jamás escribe en uno existente ni conserva ids); inserta la historia sin reejecutar comandos y verifica saldos y balance de comprobación contra el manifiesto en **una sola transacción** (si no coinciden, no queda nada: `EXPORT_VERIFICATION_FAILED`). Se rechazan archivos alterados (MAC/manifiesto), versiones no soportadas y exports de workspaces demo (`EXPORT_FORMAT_UNSUPPORTED`). Runbook: [restaurar-workspace-desde-export](runbooks/restaurar-workspace-desde-export.md). Contenido del export: toda tabla del registro `platform.workspace_scoped_table` (regla de cobertura con test).
 - Programación opcional: export automático mensual al email/almacenamiento del usuario (Phase 7+).
 
 ## 11. Cifrado de backups
@@ -186,7 +186,7 @@ Función de producto (user-facing), complementaria a los backups de plataforma y
 | `pg_dump` lógicos en S3 | SSE-KMS + Object Lock | TLS | `pfos-prod-backups` |
 | S3 documentos/réplicas | SSE-KMS | TLS (política `aws:SecureTransport`) | `pfos-prod-s3` |
 | Backups locales | `age` opcional (recomendado con datos reales) | n/a | Clave del owner (fuera del repo) |
-| Exports de workspace | SSE-KMS en bucket; ZIP opcionalmente con contraseña definida por el usuario (Phase 7+) | HTTPS (presigned) | — |
+| Exports de workspace | Cifrado de sobre AES-256-GCM en la aplicación (clave de datos por archivo envuelta con la clave maestra `EXPORT_ENCRYPTION_KEYS`, rotable; KMS en cloud) + SSE del bucket donde exista; el ZIP descargado va en claro (cifrarlo con una frase del usuario es Phase 7+, D98) | HTTPS (descarga por la API) | Clave maestra fuera del repositorio |
 
 Acceso a backups restringido por políticas de vault/bucket (solo roles de backup/restore); toda acción de restore queda en CloudTrail.
 

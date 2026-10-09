@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/transaction-splits.schema.json",
+  "title": "pfos-export v1 — transaction-splits",
+  "description": "Registro de la sección «transaction-splits» (tabla txn.transaction_split, contexto transactions). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "transaction_id",
+    "position",
+    "amount",
+    "currency",
+    "category_id",
+    "counterparty_id",
+    "memo",
+    "revision",
+    "superseded_in_revision"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "position": {
+      "type": "integer"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "category_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "counterparty_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "memo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "superseded_in_revision": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  },
+  "x-pfos-table": "txn.transaction_split",
+  "x-pfos-context": "transactions"
+}

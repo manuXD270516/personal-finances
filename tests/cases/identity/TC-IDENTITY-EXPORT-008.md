@@ -12,9 +12,9 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-export-lifecycle.api.test.ts","packages/contexts/identity/src/application/portability/workspace-export.service.test.ts","packages/contexts/identity/src/domain/workspace-export.test.ts","tests/e2e/specs/workspace-export.spec.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["export", "retention"]

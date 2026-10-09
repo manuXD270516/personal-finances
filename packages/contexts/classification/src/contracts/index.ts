@@ -226,3 +226,5 @@ export const CLASSIFICATION_AUDIT_POLICY = {
     skipped: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
+
+export * from './portability.js';

@@ -78,6 +78,8 @@ import {
 } from '../accounts/accounts-wiring.js';
 import { LedgerHttpModule } from '../ledger/ledger-http.js';
 import { workspaceCreatedHook } from './workspace-provisioning.js';
+import { portabilityOptions } from '../portability/portability-wiring.js';
+import type { S3Client } from '@aws-sdk/client-s3';
 
 /**
  * Logs y métricas del JWKS remoto (add-workspace-identity design §3): refetch fallido ⇒ `warn` (o `error` si ya no
@@ -420,6 +422,8 @@ export function identityImports(input: {
   readonly denials?: (port: AuthorizationDenialPort) => AuthorizationDenialPort;
   /** Cola de jobs (add-demo-data: `demo.load`/`demo.purge` encolados en la transacción del comando). */
   readonly queue?: JobQueue;
+  /** Cliente S3 del proceso (add-workspace-export: bucket de exports). */
+  readonly storage?: S3Client;
 }): NonNullable<ModuleMetadata['imports']> {
   const jwt = input.jwt ?? jwtOptionsFromConfig(input.config, input.logger);
   if (!jwt) {
@@ -465,6 +469,22 @@ export function identityImports(input: {
       onWorkspaceCreated: workspaceCreatedHook({ classification, fx }),
       // add-demo-data: "Cargar/Limpiar datos de demostración" (DEMO_DATA_ENABLED, docs/31 D41).
       ...(input.queue ? { demo: demoDataOptions(input.config, input.queue) } : {}),
+      // add-workspace-export: exportar/importar el workspace (sin EXPORT_ENCRYPTION_KEYS ⇒ deshabilitado, 503).
+      ...(input.queue && input.storage
+        ? (() => {
+            const portability = portabilityOptions({
+              storage: input.storage,
+              bucket: input.config.OBJECT_STORAGE_EXPORTS_BUCKET,
+              keys: input.config.EXPORT_ENCRYPTION_KEYS,
+              activeKeyId: input.config.EXPORT_ENCRYPTION_ACTIVE_KEY_ID,
+              retentionMs: input.config.EXPORT_RETENTION,
+              reauthMaxAgeMs: input.config.REAUTH_MAX_AGE,
+              maxImportBytes: input.config.WORKSPACE_IMPORT_MAX_BYTES,
+              queue: input.queue,
+            });
+            return portability ? { portability } : {};
+          })()
+        : {}),
     }),
     AuditModule.register({
       runtime: audit,

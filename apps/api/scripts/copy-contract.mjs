@@ -16,3 +16,9 @@ cpSync(fileURLToPath(new URL('events/', contracts)), `${targetDir}events`, {
   recursive: true,
   filter: (src) => !src.endsWith('.md'),
 });
+// Esquemas JSON del export del workspace (openspec add-workspace-export): el importador valida cada registro contra ellos.
+rmSync(`${targetDir}export`, { recursive: true, force: true });
+cpSync(fileURLToPath(new URL('export/', contracts)), `${targetDir}export`, {
+  recursive: true,
+  filter: (src) => !src.endsWith('.md'),
+});

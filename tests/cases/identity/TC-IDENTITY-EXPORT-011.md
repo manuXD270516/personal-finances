@@ -12,9 +12,9 @@ invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/identity/src/application/portability/workspace-export.service.test.ts","tests/e2e/specs/workspace-export.spec.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["export", "notifications"]

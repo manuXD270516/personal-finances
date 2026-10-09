@@ -213,6 +213,11 @@ Leyenda: **Ord.** = ámbito de orden; **Idem.** = clave de idempotencia del cons
 - **Idem.:** natural `workspaceId`. **Ord.:** por `Workspace`. **PII:** ninguna.
 - **Workspaces retirados:** los consumidores ignoran (no-op, sin fila de inbox) los eventos de un workspace demo archivado o purgado (`platform.workspace_is_retired`).
 
+#### `identity.WorkspaceExportCompleted.v1` / `identity.WorkspaceRestored.v1` (add-workspace-export, Phase 2)
+- **Productor:** IDENTITY (job `identity.workspace-export` del worker, actor `SYSTEM`; la importación se publica desde el job `identity.workspace-import`, en el workspace NUEVO). **Consumidores:** ninguno obligatorio (informativo; el aviso al usuario lo muestra la UI, no un consumidor de NOTIFY).
+- **Payload:** `WorkspaceExportCompleted`: `workspaceId`, `exportId`, `status`, `expiresAt`, `requestedBy`. `WorkspaceRestored`: `workspaceId` (nuevo), `importId`, `sourceWorkspaceId`, `sourceExportedAt`. Sin datos financieros ni nombres.
+- **Idem.:** natural `exportId` / `importId`. **Ord.:** por `Workspace`. **PII:** ninguna. Esquemas en `contracts/events/identity/`.
+
 #### Consumidores de NOTIFY (add-alerts, Phase 2)
 - **`notifications.budget-threshold`** (cola `events.notifications.budget-threshold`): consume `planning.BudgetThresholdReached.v1`; destinatarios: todo miembro activo (OWNER, EDITOR, VIEWER; docs/33 D89). Clave de deduplicación de negocio por destinatario: `budget-threshold:<periodId>:<targetKind>:<targetId>:<threshold>`.
 - **`notifications.month-close-pending`** (cola `events.notifications.month-close-pending`): consume `planning.MonthClosePending.v1`; destinatarios: OWNER y EDITOR. Clave: `month-close-pending:<periodId>`.

@@ -55,6 +55,28 @@ export const IDENTITY_AUDIT_POLICY = {
     // add-global-audit-view: `security.authorization.denied` (operación del contrato y código de rechazo; nunca el cuerpo).
     operationId: 'plain',
     code: 'plain',
+    // add-workspace-export: `identity.workspace.restored` (origen de la restauración; nunca contenido).
+    sourceWorkspaceId: 'plain',
+    importId: 'plain',
+    formatVersion: 'plain',
+  },
+  // add-workspace-export: ciclo del export (estado, tamaño y suma; NUNCA el contenido ni la clave).
+  WorkspaceExport: {
+    status: 'plain',
+    formatVersion: 'plain',
+    sizeBytes: 'plain',
+    sha256: 'plain',
+    expiresAt: 'plain',
+    errorCode: 'plain',
+  },
+  // add-workspace-export: solicitud/resultado de una importación (workspace de origen y destino, sin contenido).
+  WorkspaceImport: {
+    status: 'plain',
+    sourceWorkspaceId: 'plain',
+    targetWorkspaceId: 'plain',
+    sizeBytes: 'plain',
+    formatVersion: 'plain',
+    errorCode: 'plain',
   },
   User: { displayName: 'plain', locale: 'plain', timeZone: 'plain' },
 } as const satisfies AuditFieldPoliciesDto;
@@ -89,3 +111,5 @@ export interface WorkspaceRecipientsQuery {
   activeMembers(workspaceId: string): Promise<readonly WorkspaceRecipientDto[]>;
   emailFor(userId: string): Promise<string | null>;
 }
+
+export * from './portability.js';

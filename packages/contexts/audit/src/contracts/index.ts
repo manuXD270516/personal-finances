@@ -382,3 +382,5 @@ export const AUDIT_LOG_EXPORT_AUDIT_POLICY = {
     to: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
+
+export * from './portability.js';

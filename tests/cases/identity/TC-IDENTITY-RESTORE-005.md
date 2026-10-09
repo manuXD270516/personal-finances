@@ -12,9 +12,9 @@ invariants: [INV-007, INV-008]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-export.api.test.ts","packages/contexts/identity/src/domain/id-remap.test.ts"]
+status: automated
 regression_suite: true
 phase: 2
 tags: ["restore", "history"]

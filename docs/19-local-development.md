@@ -47,7 +47,7 @@ Regla: **todo PR debe pasar en modo B** (CI lo ejecuta). Un desarrollador puede 
    ```
 5. **Modo B sobrescribe solo las direcciones** en el bloque `environment:` de cada servicio de `compose.yaml` (nombres de servicio y puertos internos canónicos): `DATABASE_URL=postgres://pf_app:${PF_DEV_DB_APP_PASSWORD}@postgres:5432/pfos?sslmode=disable`, `OBJECT_STORAGE_ENDPOINT=http://object-storage:8333`. El resto de variables se hereda del mismo `.env` → no hay dos configuraciones que mantener.
 6. **Toggles de dependencias**, no ramas de código: `JOB_QUEUE_DRIVER=pgboss|bullmq`, `SESSION_STORE=postgres|valkey`, `OTEL_ENABLED=true|false`, `OTEL_NODE_RESOURCE_DETECTORS=env,os,serviceinstance` (obligatorio, SPIKE-10). El adapter se elige en el composition root; el dominio no se entera.
-7. **Secretos:** `.env.example` solo contiene placeholders de desarrollo marcados `PF_DEV_*` (generados por `pnpm setup:env` con valores aleatorios en el primer arranque). Nunca en imágenes, nunca en el repo; en cloud se inyectan desde el secrets manager como variables con el **mismo nombre**.
+7. **Secretos:** `.env.example` solo contiene placeholders de desarrollo marcados `PF_DEV_*` (generados por `pnpm setup:env` con valores aleatorios en el primer arranque). Nunca en imágenes, nunca en el repo; en cloud se inyectan desde el secrets manager como variables con el **mismo nombre**. Incluye `PF_DEV_EXPORT_MASTER_KEY`, la clave maestra de prueba del cifrado de exports (`EXPORT_ENCRYPTION_KEYS=dev1:…`); en cloud viene del secrets manager o KMS.
 8. **Sin `localhost` en el código:** toda dirección viene del esquema. `localhost`/`127.0.0.1` solo aparece como *valor* en `.env.example` (modo A).
 
 ### 0.4 Dockerización

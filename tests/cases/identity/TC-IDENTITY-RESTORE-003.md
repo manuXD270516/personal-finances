@@ -12,9 +12,9 @@ invariants: [INV-022]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/api/workspace-import.api.test.ts","packages/contexts/identity/src/application/portability/workspace-import.service.test.ts","packages/contexts/identity/src/domain/export-manifest.test.ts","packages/contexts/identity/src/domain/workspace-export.test.ts"]
+status: automated
 regression_suite: false
 phase: 2
 tags: ["restore", "atomic"]

@@ -3,7 +3,7 @@ import type { Logger } from '@pf/platform/logging';
 import { createObjectStorageClient } from '@pf/platform/storage';
 import { Client } from 'pg';
 import { ensureAppRolePassword, ensureBffRolePassword, ensureWorkerRolePassword } from './app-role.js';
-import { ensureBucket } from './bucket.js';
+import { ensureBucket, ensureExportsBucket } from './bucket.js';
 import { runDbmateUp } from './dbmate.js';
 import { installJobQueueSchema } from './pgboss.js';
 
@@ -17,7 +17,7 @@ export interface MigrateOptions {
  *  2. Contraseña de `pf_app` alineada con DATABASE_URL (y las de `pf_bff`/`pf_worker` con BFF_DATABASE_URL/
  *     WORKER_DATABASE_URL, si están).
  *  3. Schema de pg-boss (DDL fuera de la app) + grants para pf_app.
- *  4. Solo local/CI: bucket con CORS y versioning.
+ *  4. Solo local/CI: bucket con CORS y versioning, y el bucket de exports (add-workspace-export; sin versioning).
  * Compose condiciona api/worker a que este proceso termine con 0 (`service_completed_successfully`).
  */
 export async function runMigrate(
@@ -57,6 +57,7 @@ export async function runMigrate(
           .filter(Boolean),
         logger,
       });
+      await ensureExportsBucket(s3, { bucket: config.OBJECT_STORAGE_EXPORTS_BUCKET, logger });
     } finally {
       s3.destroy();
     }

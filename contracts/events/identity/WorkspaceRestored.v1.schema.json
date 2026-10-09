@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/identity/WorkspaceRestored.v1.schema.json",
+  "title": "identity.WorkspaceRestored.v1",
+  "description": "Se creó un workspace nuevo a partir de un export (importación SUCCEEDED; openspec add-workspace-export, FR-IDENTITY-017). Productor: IDENTITY (job identity.workspace-import), en la misma transacción que los datos importados. Se publica en el workspace NUEVO. Ningún hecho de negocio se re-publica al importar: los consumidores reconstruyen sus proyecciones con RebuildProjection. Idempotencia natural: importId. Sin datos financieros.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "identity.WorkspaceRestored"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Workspace"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "importId",
+        "sourceWorkspaceId",
+        "sourceExportedAt"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Workspace nuevo (restaurado)."
+        },
+        "importId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "sourceWorkspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid",
+          "description": "Workspace del que se exportó el archivo (puede ya no existir)."
+        },
+        "sourceExportedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000b01",
+      "eventType": "identity.WorkspaceRestored",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T15:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a002",
+      "aggregateType": "Workspace",
+      "aggregateId": "01928c4e-0000-7000-8000-00000000a002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a002",
+        "importId": "01928c4e-0000-7000-8000-00000000f001",
+        "sourceWorkspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "sourceExportedAt": "2026-10-09T14:03:22.120Z"
+      }
+    }
+  ]
+}

@@ -1431,6 +1431,62 @@
     "cancel": "Cancelar",
     "disabled": "La carga de datos de demostración está deshabilitada en este entorno."
   },
+  "Portability": {
+    "cancel": "Cancelar",
+    "reauthBody": "Por seguridad, esta operación exige haber iniciado sesión hace menos de 10 minutos. Confirma tu identidad y vuelve aquí.",
+    "reauthAction": "Confirmar mi identidad",
+    "export": {
+      "title": "Exportar el espacio de trabajo",
+      "description": "Descarga una copia completa de este espacio de trabajo (cuentas, movimientos con todas sus versiones, contabilidad, periodos, presupuestos, conciliaciones y auditoría) en un archivo abierto y documentado.",
+      "security": "El archivo descargado contiene TODOS tus datos financieros y no está cifrado con contraseña: guárdalo en un lugar seguro. Mientras esté en nuestros servidores se guarda cifrado y se elimina a los 7 días.",
+      "request": "Exportar este espacio de trabajo",
+      "confirmTitle": "¿Exportar todo el espacio de trabajo?",
+      "confirmBody": "Solo el propietario puede hacerlo y se registra en la auditoría. Te pediremos confirmar tu identidad si tu último inicio de sesión no es reciente.",
+      "confirm": "Sí, exportar",
+      "readyNotice": "Tu exportación está lista. Descárgala desde la lista de abajo.",
+      "running": "Exportando…",
+      "failed": "La exportación falló. Inténtalo de nuevo.",
+      "expires": "Disponible hasta {date}",
+      "download": "Descargar",
+      "discard": "Eliminar archivo",
+      "discardTitle": "¿Eliminar el archivo exportado?",
+      "discardBody": "El archivo se borra del almacenamiento de inmediato. Podrás exportar de nuevo cuando quieras.",
+      "discardConfirm": "Sí, eliminar",
+      "status": {
+        "REQUESTED": "Solicitada",
+        "RUNNING": "En curso",
+        "READY": "Lista",
+        "FAILED": "Fallida",
+        "EXPIRED": "Vencida",
+        "DISCARDED": "Eliminada"
+      }
+    },
+    "import": {
+      "title": "Importar un archivo exportado",
+      "description": "Crea un espacio de trabajo NUEVO a partir de un archivo exportado. Nunca modifica un espacio de trabajo existente ni conserva los identificadores originales.",
+      "security": "El archivo se valida por completo; si algo no coincide con su resumen (saldos y balance), no se crea nada. Tamaño máximo: 200 MB.",
+      "file": "Archivo exportado (.zip)",
+      "submit": "Importar",
+      "progress": "Progreso de la importación",
+      "open": "Abrir el espacio de trabajo nuevo",
+      "succeeded": "Importación completada: {rows} registros en un espacio de trabajo nuevo.",
+      "failedNothing": "No se creó ningún espacio de trabajo.",
+      "fileCheck": {
+        "none": "Elige un archivo.",
+        "empty": "El archivo está vacío.",
+        "tooLarge": "El archivo supera los 200 MB.",
+        "notZip": "El archivo debe ser un .zip exportado desde la aplicación."
+      },
+      "status": {
+        "RECEIVED": "Archivo recibido…",
+        "VALIDATING": "Validando el archivo…",
+        "IMPORTING": "Importando los datos…",
+        "VERIFYING": "Verificando saldos y balance…",
+        "SUCCEEDED": "Completada",
+        "FAILED": "Fallida"
+      }
+    }
+  },
   "Locales": {
     "es-BO": "Español (Bolivia)",
     "en-US": "English (United States)",

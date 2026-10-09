@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/closing-policy.schema.json",
+  "title": "pfos-export v1 — closing-policy",
+  "description": "Registro de la sección «closing-policy» (tabla planning.closing_policy, contexto planning). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "pending_transactions",
+    "unreconciled_accounts",
+    "unresolved_duplicates",
+    "uncategorized",
+    "unresolved_recurring",
+    "version",
+    "updated_at",
+    "updated_by"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "pending_transactions": {
+      "type": "string"
+    },
+    "unreconciled_accounts": {
+      "type": "string"
+    },
+    "unresolved_duplicates": {
+      "type": "string"
+    },
+    "uncategorized": {
+      "type": "string"
+    },
+    "unresolved_recurring": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "updated_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "planning.closing_policy",
+  "x-pfos-context": "planning"
+}

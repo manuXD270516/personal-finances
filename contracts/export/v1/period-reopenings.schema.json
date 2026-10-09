@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/period-reopenings.schema.json",
+  "title": "pfos-export v1 — period-reopenings",
+  "description": "Registro de la sección «period-reopenings» (tabla planning.period_reopening, contexto planning). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "period_id",
+    "reopen_no",
+    "reason",
+    "reopened_by",
+    "reopened_at",
+    "closed_snapshot_id"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reopen_no": {
+      "type": "integer"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "reopened_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "reopened_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "closed_snapshot_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "planning.period_reopening",
+  "x-pfos-context": "planning"
+}

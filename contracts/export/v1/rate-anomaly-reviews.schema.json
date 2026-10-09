@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/rate-anomaly-reviews.schema.json",
+  "title": "pfos-export v1 — rate-anomaly-reviews",
+  "description": "Registro de la sección «rate-anomaly-reviews» (tabla fx.rate_anomaly_review, contexto fx). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "exchange_rate_id",
+    "workspace_id",
+    "decision",
+    "reason",
+    "decided_by",
+    "decided_at"
+  ],
+  "properties": {
+    "exchange_rate_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "decided_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "decided_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "fx.rate_anomaly_review",
+  "x-pfos-context": "fx"
+}

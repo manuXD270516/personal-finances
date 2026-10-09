@@ -47,3 +47,4 @@ export {
   type LifecycleTransitionDefinition,
   type StateTransition,
 } from './lifecycle/lifecycle-machine.js';
+export type { PortabilityExclusion, PortabilitySection } from './portability/section.js';

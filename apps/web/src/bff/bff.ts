@@ -155,7 +155,10 @@ export class Bff {
 
   /** `GET /api/bff/auth/login?returnTo=/…`: inicia Code + PKCE; state/nonce/verifier quedan server-side. */
   async login(req: Request): Promise<Response> {
-    const returnTo = safeReturnTo(new URL(req.url).searchParams.get('returnTo'));
+    const params = new URL(req.url).searchParams;
+    const returnTo = safeReturnTo(params.get('returnTo'));
+    // `reauth=1`: fuerza credenciales de nuevo (openspec add-workspace-export: export/import exigen auth_time reciente).
+    const reauth = params.get('reauth') === '1';
     const loginSid = newOpaqueId();
     const codeVerifier = pkce.verifier();
     const state = pkce.state();
@@ -172,6 +175,7 @@ export class Bff {
       state,
       nonce,
       codeChallenge: await pkce.challenge(codeVerifier),
+      ...(reauth ? { reauth: true } : {}),
     });
     const headers = new Headers({ location: url.href, 'cache-control': 'no-store' });
     headers.append('set-cookie', cookie(LOGIN_COOKIE, loginSid, LOGIN_TTL_MS / 1000));

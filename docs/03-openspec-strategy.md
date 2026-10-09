@@ -72,6 +72,8 @@ Lo exigido por el proyecto (qué cambia, por qué, specs/componentes/APIs/tablas
 
 - **Specs impactadas** · **Componentes/contextos impactados** · **APIs impactadas** · **Tablas impactadas** · **Eventos impactados** · **Migraciones requeridas** · **Test cases** (AÑADIDOS / MODIFICADOS / DEPRECADOS por TC-id) · **Impacto de regresión** · **Riesgos introducidos** · y, si toca dinero/ledger/FX/periodos/redondeo, **Invariantes afectadas (INV-NNN)**.
 
+**Regla de cobertura del export (`add-workspace-export`):** todo change que cree una tabla de negocio con `workspace_id` DEBE, en el mismo PR, registrarla en `platform.workspace_scoped_table` y agregar su sección de portabilidad (`PortabilitySection` en `contracts/portability.ts` de su contexto, con su esquema en `contracts/export/v1/`) o una exclusión declarada con motivo; un test estático (`apps/api/src/portability/portability-coverage.test.ts`) y uno de integración contra la base real lo hacen cumplir.
+
 Para features significativas, la spec debe permitir derivar: propósito, contexto, requerimientos, casos de uso, reglas de negocio, invariantes, escenarios, criterios de aceptación (= scenarios), contratos, modelo de datos, eventos, test cases, riesgos e impacto arquitectónico — repartidos así: *proposal* (por qué, alcance, impacto), *specs* (requerimientos, reglas, invariantes observables, escenarios), *design* (modelo, contratos, eventos, migraciones, riesgos técnicos), *tasks* (plan verificable).
 
 ## 5. Convenciones de autoría

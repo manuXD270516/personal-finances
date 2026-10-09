@@ -16,6 +16,8 @@ export interface RlsContext {
  */
 export interface UnitOfWork {
   run<T>(ctx: RlsContext, fn: () => Promise<T>): Promise<T>;
+  /** Transacción independiente de la del comando en curso (sobrevive a su rollback): auditoría de solicitudes rechazadas. */
+  runDetached<T>(ctx: RlsContext, fn: () => Promise<T>): Promise<T>;
   bind(ctx: RlsContext): Promise<void>;
 }
 
@@ -88,9 +90,11 @@ export interface OutboxEvent {
     | 'identity.WorkspaceCreated'
     | 'identity.WorkspaceSettingsChanged'
     | 'identity.DemoDataLoaded'
-    | 'identity.DemoDataCleaned';
+    | 'identity.DemoDataCleaned'
+    | 'identity.WorkspaceExportCompleted'
+    | 'identity.WorkspaceRestored';
   readonly eventVersion: 1;
-  readonly aggregateType: 'Workspace';
+  readonly aggregateType: 'Workspace' | 'WorkspaceExport';
   readonly aggregateId: string;
   readonly aggregateVersion: number;
   readonly workspaceId: string;

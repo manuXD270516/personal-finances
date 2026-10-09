@@ -10,6 +10,12 @@ import {
 /** Usuario autenticado del request. Lo fija el guard de autenticación (`add-workspace-identity`). */
 export interface Principal {
   readonly userId: string;
+  /**
+   * Instante de la autenticación del usuario (claim `auth_time` del access token, segundos desde la época) para exigir
+   * re-autenticación reciente en operaciones sensibles (docs/12 §4; openspec add-workspace-export). Ausente si el IdP no
+   * lo emite: tratarlo como no reciente.
+   */
+  readonly authTime?: number;
 }
 
 /** Estado de las convenciones de API adjunto al request. */
