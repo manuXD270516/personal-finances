@@ -45,4 +45,10 @@ El owner respondió las 9 bloqueantes y aceptó en bloque las recomendaciones de
 | D150 | Q37 Transferencias propias en el extracto | Se acepta la recomendación: detectarlas como posible duplicado y advertir; no convertir filas en transferencias. |
 | D151 | Q38 Límites, mapeo y recorrido | Se acepta la recomendación: 2 MiB y 5 000 filas; mapeo síncrono (plan B en el worker); solo auditoría del job en Phase 3, máquina de estados en Phase 6. |
 
+## Decisiones posteriores
+
+| ID | Pregunta | Decisión |
+|---|---|---|
+| D152 | Persistencia del import CSV de 5 000 filas (~120 s frente a 20 s de NFR-PERF-007) | **Diferida a Phase 6** (2026-10-10): NFR-PERF-007 es de Phase 6 y requiere la escritura masiva de `RecordImportedTransactions`; `add-basic-csv-import` se archiva con la medición actual, techo de regresión de 300 s y `PF_PERF_STRICT_IMPORT=1` para exigir los 20 s. |
+
 No quedan preguntas del owner abiertas en los changes de Phase 3.
