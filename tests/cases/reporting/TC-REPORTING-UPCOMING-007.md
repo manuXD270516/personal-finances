@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Ocurrencia registrada como pendiente sin doble conteo"
 scenario: "Luz creada como pendiente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: critical
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-payments.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","q8"]
@@ -32,7 +34,7 @@ expected_result:
   - "Total = 3184.40 BOB"
   - "PBT: para cualquier combinación de ocurrencias y pendientes, cada occurrenceId aparece a lo sumo una vez"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-007 — Una ocurrencia materializada como pendiente se cuenta una sola vez con su monto real

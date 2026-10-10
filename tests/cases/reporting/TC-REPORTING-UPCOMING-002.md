@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Lista de próximos pagos"
 scenario: "Ocurrencias resueltas excluidas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-COMMITMENTS-011"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/domain/upcoming-payments.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","q8"]
@@ -33,7 +34,7 @@ expected_result:
   - "Total = 2980.00 BOB"
   - "Internet y Agua no aparecen"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-002 — Las ocurrencias aprobadas con transacción posteada y las omitidas no se listan

@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Total comprometido del periodo en el Home"
 scenario: "Comprometido de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/upcoming-payments.api.test.ts
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/committed-period.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["committed","q4"]
@@ -32,7 +35,7 @@ expected_result:
   - "fromCommitments = 699.88 BOB; fromPending = 300.00 BOB"
   - "withoutAmountCount = 1; Alquiler no suma"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-013 — El total comprometido de octubre suma compromisos y pendientes del periodo y excluye noviembre

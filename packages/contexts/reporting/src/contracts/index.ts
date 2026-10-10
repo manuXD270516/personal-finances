@@ -28,6 +28,14 @@ export const REPORTING_INVALIDATING_EVENTS = [
   { type: 'planning.PeriodReopened', version: 1 },
   // add-demo-data: el workspace demo terminó de cargarse (invalida la caché del resumen del Home).
   { type: 'identity.DemoDataLoaded', version: 1 },
+  // add-upcoming-payments: los próximos pagos se leen de la fuente de verdad (sin proyección); estos eventos solo
+  // versionan los datos del workspace para el ETag y la frescura (docs/35 D117).
+  { type: 'commitments.OccurrencesGenerated', version: 1 },
+  { type: 'commitments.RecurringOccurrenceMaterialized', version: 1 },
+  { type: 'commitments.RecurringOccurrenceChanged', version: 1 },
+  { type: 'commitments.RecurringDefinitionChanged', version: 1 },
+  // Una transacción pendiente nueva cambia la lista de próximos pagos y el saldo proyectado.
+  { type: 'transactions.TransactionCreated', version: 1 },
 ] as const;
 
 export interface MoneyDto {
@@ -238,4 +246,112 @@ export interface NetWorthHistoryDto {
     readonly ratesUsed: readonly ResolvedRateDto[];
     readonly attributions: readonly RateAttributionDto[];
   };
+}
+
+// ───────────────────────────────────────────── reporting/cash-flow-calendar (add-upcoming-payments)
+
+/** Totales por moneda original y consolidado en la moneda de reporte (HALF_EVEN solo al presentar). */
+export interface ValuedTotalDto {
+  readonly byCurrency: readonly MoneyDto[];
+  readonly consolidated: {
+    readonly amount: MoneyDto;
+    /** `false` si algún agregado quedó sin tasa vigente (nunca convertido 1:1). */
+    readonly complete: boolean;
+    readonly unconverted: readonly MoneyDto[];
+  };
+}
+
+export type UpcomingItemKindDto = 'OCCURRENCE' | 'PENDING_TRANSACTION';
+export type UpcomingItemStatusDto = 'SCHEDULED' | 'DUE' | 'OVERDUE' | 'PENDING_APPROVAL' | 'PENDING';
+export type UpcomingAmountTypeDto = 'FIXED' | 'ESTIMATED' | 'MIN_MAX' | 'VARIABLE' | 'ACTUAL';
+
+export interface UpcomingPaymentItemDto {
+  readonly kind: UpcomingItemKindDto;
+  readonly occurrenceId?: string;
+  readonly definitionId?: string;
+  readonly transactionId?: string;
+  readonly name: string;
+  readonly accountId: string;
+  readonly accountName: string;
+  /** Vencimiento (ocurrencia, ya ajustado por fin de semana) o fecha de negocio (pendiente). */
+  readonly date: string;
+  readonly status: UpcomingItemStatusDto;
+  readonly daysOverdue?: number;
+  readonly amountType: UpcomingAmountTypeDto;
+  /** `null` en `VARIABLE` y en `MIN_MAX` (ver `range`). */
+  readonly amount: MoneyDto | null;
+  readonly range?: { readonly min: MoneyDto; readonly max: MoneyDto };
+  readonly estimated: boolean;
+  readonly withoutAmount: boolean;
+  /** Monto que suma, en la moneda de reporte (solo para mostrar); `null` sin monto o sin tasa vigente. */
+  readonly converted: MoneyDto | null;
+}
+
+export interface CommittedBlockDto {
+  readonly periodId: string;
+  readonly label: string;
+  readonly from: string;
+  readonly to: string;
+  readonly total: ValuedTotalDto;
+  readonly fromCommitments: ValuedTotalDto;
+  readonly fromPending: ValuedTotalDto;
+  readonly withoutAmountCount: number;
+  /** Ocurrencias de egreso vencidas de periodos anteriores: aparte, no suman al total (D146). */
+  readonly overdueFromPreviousPeriods: ValuedTotalDto & { readonly count: number };
+}
+
+export interface ProjectedBalanceDto {
+  readonly accountId: string;
+  readonly accountName: string;
+  readonly currency: string;
+  readonly booked: MoneyDto;
+  readonly pendingIn: MoneyDto;
+  readonly pendingOut: MoneyDto;
+  readonly projected: MoneyDto;
+}
+
+/** `UpcomingPayments` del contrato (`GET /workspaces/{workspaceId}/reports/upcoming-payments`). */
+export interface UpcomingPaymentsDto {
+  readonly window: { readonly from: string; readonly to: string; readonly days: number };
+  readonly items: readonly UpcomingPaymentItemDto[];
+  readonly totals: ValuedTotalDto & { readonly withoutAmountCount: number };
+  /** `null` si ningún periodo financiero cubre hoy. */
+  readonly committed: CommittedBlockDto | null;
+  readonly projectedBalances: readonly ProjectedBalanceDto[];
+  /** ≥ 1 definición recurrente activa o ≥ 1 pendiente de egreso (Q4/Q8 disponibles). */
+  readonly hasCommitments: boolean;
+  readonly meta: {
+    readonly generatedAt: string;
+    readonly reportingCurrency: string;
+    readonly timeZone: string;
+    readonly rateWindowDays: number;
+    readonly dataFreshness?: string;
+    readonly approx: boolean;
+    /** Tasas efectivamente usadas (valoración con la tasa vigente al consultar, no la de cada vencimiento). */
+    readonly rates: readonly ResolvedRateDto[];
+    readonly attributions: readonly RateAttributionDto[];
+  };
+}
+
+export interface SurprisePaymentItemDto {
+  readonly transactionId: string;
+  readonly date: string;
+  readonly name: string;
+  readonly amount: MoneyDto;
+  readonly occurrenceId: string;
+  readonly definitionId: string;
+  readonly generatedOn: string;
+}
+
+/** `SurprisePayments` del contrato (`GET /workspaces/{workspaceId}/reports/surprise-payments`, SM-07). */
+export interface SurprisePaymentsDto {
+  readonly periodId: string;
+  readonly label: string;
+  readonly from: string;
+  readonly to: string;
+  readonly partial: boolean;
+  readonly count: number;
+  readonly items: readonly SurprisePaymentItemDto[];
+  /** Los pagos no vinculados a ningún compromiso no se detectan. */
+  readonly note: 'UNLINKED_PAYMENTS_NOT_DETECTED';
 }

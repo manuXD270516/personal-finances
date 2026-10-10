@@ -15,8 +15,13 @@ import type {
   ClosingSnapshotsPort,
   FinancialPeriodsPort,
   NetWorthHistoryDeps,
+  PendingTransactionsPort,
+  ReportingMetricsPort,
+  UpcomingCommitmentsPort,
+  UpcomingPaymentsDeps,
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
+import { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import {
   DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
   ReportSummaryQueries,
@@ -30,7 +35,12 @@ import {
   type PeriodFlowsQuery,
 } from '../contracts/index.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
-import { NET_WORTH_HISTORY_QUERIES, REPORT_SUMMARY_QUERIES, ReportingController } from './reporting-http.js';
+import {
+  NET_WORTH_HISTORY_QUERIES,
+  REPORT_SUMMARY_QUERIES,
+  ReportingController,
+  UPCOMING_PAYMENTS_QUERIES,
+} from './reporting-http.js';
 
 export interface ReportingRuntimeOptions {
   readonly pool: Pool;
@@ -52,6 +62,16 @@ export interface ReportingRuntimeOptions {
   readonly periods: FinancialPeriodsPort;
   readonly snapshots: ClosingSnapshotsPort;
   /**
+   * COMMITMENTS (add-upcoming-payments): `UpcomingPaymentsQuery`, `CommittedQuery`, `ResolvedOccurrencesQuery` y
+   * `DefinitionStatsQuery`. COMMITMENTS se compone después de REPORTING, así que la composición los entrega con
+   * resolución tardía (como `periods`).
+   */
+  readonly commitments: UpcomingCommitmentsPort;
+  /** Transacciones pendientes (TRANSACTIONS, `PendingFlowQuery`). */
+  readonly pending: PendingTransactionsPort;
+  /** Histogramas de la consulta de próximos pagos (docs/35 D117); opcional. */
+  readonly metrics?: ReportingMetricsPort;
+  /**
    * Ventana de vigencia (días) de las tasas de valoración y de referencia (`REPORTING_RATE_VALIDITY_WINDOW`, docs/31
    * D53). La composición entrega el MISMO valor a FX (`createFxRuntime({ windowDays })`).
    */
@@ -62,6 +82,8 @@ export interface ReportingRuntime {
   readonly summary: ReportSummaryQueries;
   /** Evolución del patrimonio por periodo financiero (`GET /reports/net-worth/history`, add-net-worth-evolution). */
   readonly history: NetWorthHistoryQueries;
+  /** Próximos pagos, comprometido del periodo, saldo proyectado y pagos sorpresa (add-upcoming-payments). */
+  readonly upcoming: UpcomingPaymentsQueries;
   /** Flujos del periodo para el cierre de mes (contrato público `PeriodFlowsQuery`; sin ruta HTTP). */
   readonly periodFlows: PeriodFlowsQuery;
   /** Patrimonio a una fecha de corte para el cierre de mes (contrato público `NetWorthQuery`; sin ruta HTTP). */
@@ -73,7 +95,7 @@ export interface ReportingRuntime {
 /** Composición de REPORTING (solo lectura) sobre PostgreSQL. */
 export function createReportingRuntime(options: ReportingRuntimeOptions): ReportingRuntime {
   const rateValidityWindowDays = options.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS;
-  const deps: NetWorthHistoryDeps = {
+  const deps: NetWorthHistoryDeps & UpcomingPaymentsDeps = {
     uow: new PgReportingUnitOfWork(options.pool),
     workspaces: options.workspaces,
     accounts: options.accounts,
@@ -87,11 +109,15 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     periods: options.periods,
     snapshots: options.snapshots,
     balanceHistory: options.balanceHistory,
+    commitments: options.commitments,
+    pending: options.pending,
+    ...(options.metrics ? { metrics: options.metrics } : {}),
   };
   return {
     rateValidityWindowDays,
     summary: new ReportSummaryQueries(deps),
     history: new NetWorthHistoryQueries(deps),
+    upcoming: new UpcomingPaymentsQueries(deps),
     periodFlows: new PeriodFlowsQueries(deps),
     netWorth: new NetWorthAtQueries(deps),
   };
@@ -115,7 +141,7 @@ export interface ReportingModuleOptions {
   readonly conventions: ApiConventionsOptions;
 }
 
-/** Módulo HTTP de REPORTING (`/reports/summary` y `/reports/net-worth/history`). */
+/** Módulo HTTP de REPORTING (`/reports/summary`, `/reports/net-worth/history`, próximos pagos y pagos sorpresa). */
 @Module({})
 export class ReportingModule {
   static register(options: ReportingModuleOptions): DynamicModule {
@@ -126,6 +152,7 @@ export class ReportingModule {
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: REPORT_SUMMARY_QUERIES, useValue: options.runtime.summary },
         { provide: NET_WORTH_HISTORY_QUERIES, useValue: options.runtime.history },
+        { provide: UPCOMING_PAYMENTS_QUERIES, useValue: options.runtime.upcoming },
       ],
     };
   }

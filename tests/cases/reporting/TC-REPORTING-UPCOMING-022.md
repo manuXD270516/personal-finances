@@ -5,7 +5,7 @@ spec: reporting/cash-flow-calendar
 related_specs: []
 requirement: Métricas y alerta para evolucionar a un read model
 scenario: Consulta lenta sostenida
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-PERF-004
@@ -14,9 +14,11 @@ invariants: []
 priority: medium
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-read-model-alert.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags:

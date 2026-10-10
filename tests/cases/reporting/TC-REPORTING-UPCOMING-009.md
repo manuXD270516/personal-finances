@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Valoración de los próximos pagos en la moneda de reporte"
 scenario: "Pago en USD consolidado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-FX-006","FR-REPORTING-001"]
 nfr: []
 invariants: ["INV-001","INV-002"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-valuation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","q8"]
@@ -32,7 +34,7 @@ expected_result:
   - "Consolidado = 270.88 BOB, complete = true"
   - "meta.rates incluye USD/BOB 12.00 PARALLEL con fuente paralelo.bo, vigencia y antigüedad"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-009 — Un pago en USD se consolida en BOB con la tasa paralela vigente al consultar y se informa su fuente

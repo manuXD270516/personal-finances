@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Ventana según la fecha en la zona del workspace"
 scenario: "Consulta de noche en La Paz"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016"]
 nfr: ["NFR-USAB-004"]
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-payments.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","timezone","RISK-020"]
@@ -30,7 +32,7 @@ expected_result:
   - "Ventana 2026-10-20 a 2026-10-27"
   - "Agua aparece; Luz no aparece"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-012 — La ventana de próximos pagos usa la fecha local de La Paz y no la fecha UTC

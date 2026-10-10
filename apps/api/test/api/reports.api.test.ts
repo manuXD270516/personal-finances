@@ -655,7 +655,7 @@ describe('GET /reports/summary — flujos del mes (PG real)', () => {
 });
 
 describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
-  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1 NO_DATA; Q4, Q5, Q8 y Q9 NOT_AVAILABLE_IN_PHASE', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1, Q4 y Q8 NO_DATA; Q5 y Q9 NOT_AVAILABLE_IN_PHASE', async () => {
     const r = await summary(empty);
     expect(r.status).toBe(200);
     const q = Object.fromEntries(
@@ -663,12 +663,28 @@ describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
     );
     expect(q).toMatchObject({
       Q1: 'NO_DATA',
-      Q4: 'NOT_AVAILABLE_IN_PHASE',
+      Q4: 'NO_DATA',
       Q5: 'NOT_AVAILABLE_IN_PHASE',
-      Q8: 'NOT_AVAILABLE_IN_PHASE',
+      Q8: 'NO_DATA',
       Q9: 'NOT_AVAILABLE_IN_PHASE',
     });
     expect(r.body['accounts']).toEqual([]);
+  });
+
+  it('[TC-REPORTING-DASHBOARD-005] con una transacción pendiente de egreso Q4 y Q8 están disponibles; Q5 y Q9 siguen sin estarlo', async () => {
+    // El workspace canónico tiene un gasto PENDING (INV-023): basta una pendiente para habilitar Q4/Q8.
+    const r = await summary(canonical);
+    expect(r.status).toBe(200);
+    const q = Object.fromEntries(
+      (r.body['questions'] as { question: string; status: string; actionHint: string | null }[]).map((x) => [
+        x.question,
+        x,
+      ]),
+    );
+    expect(q['Q4']).toEqual({ question: 'Q4', status: 'AVAILABLE', actionHint: null });
+    expect(q['Q8']).toEqual({ question: 'Q8', status: 'AVAILABLE', actionHint: null });
+    expect(q['Q5']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
+    expect(q['Q9']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
   });
 
   it('aislamiento: un workspace no ve cuentas ni flujos de otro y no puede leer su resumen', async () => {
@@ -696,6 +712,12 @@ describe('Consumidor reporting.data-version (platform.inbox)', () => {
       'planning.MonthClosed.v1',
       'planning.PeriodReopened.v1',
       'identity.DemoDataLoaded.v1',
+      // add-upcoming-payments: los próximos pagos se leen de la fuente de verdad; estos hechos solo versionan los datos.
+      'commitments.OccurrencesGenerated.v1',
+      'commitments.RecurringOccurrenceMaterialized.v1',
+      'commitments.RecurringOccurrenceChanged.v1',
+      'commitments.RecurringDefinitionChanged.v1',
+      'transactions.TransactionCreated.v1',
     ]);
     const consumers = new EventConsumerRuntime({
       pool: worker,
@@ -740,5 +762,59 @@ describe('Consumidor reporting.data-version (platform.inbox)', () => {
     const after = await summary(empty, '', { 'if-none-match': before! });
     expect(after.status).toBe(200);
     expect(after.headers.get('etag')).toMatch(/^W\/"1-/);
+  });
+  it('[TC-REPORTING-UPCOMING-019] los hechos de COMMITMENTS y TransactionCreated versionan los datos del workspace; un duplicado no incrementa', async () => {
+    const def = reportingDataVersionConsumer();
+    const consumers = new EventConsumerRuntime({
+      pool: worker,
+      queue: {} as JobQueue,
+      subscriptions: new EventSubscriptions([def]),
+      logger: apiLog.logger,
+    });
+    const versionOf = async () => {
+      const client = await worker.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `SELECT set_config('app.user_id', '', true), set_config('app.workspace_id', $1, true)`,
+          [lifecycle.ws],
+        );
+        const { rows } = await client.query<{ version: string }>(
+          'SELECT version::text AS version FROM reporting.workspace_data_version WHERE workspace_id = $1',
+          [lifecycle.ws],
+        );
+        await client.query('COMMIT');
+        return Number(rows[0]?.version ?? '0');
+      } finally {
+        client.release();
+      }
+    };
+    const envelope = (eventType: string) => ({
+      eventId: uuidv7(),
+      eventType,
+      eventVersion: 1,
+      occurredAt: '2026-10-02T09:07:00.000Z',
+      workspaceId: lifecycle.ws,
+      aggregateType: 'RecurringOccurrence',
+      aggregateId: randomUUID(),
+      aggregateVersion: 1,
+      correlationId: randomUUID(),
+      causationId: null,
+      actor: { type: 'USER' as const, id: lifecycle.id },
+      payload: {},
+    });
+    const start = await versionOf();
+    for (const [i, type] of [
+      'commitments.OccurrencesGenerated',
+      'commitments.RecurringOccurrenceMaterialized',
+      'commitments.RecurringOccurrenceChanged',
+      'commitments.RecurringDefinitionChanged',
+      'transactions.TransactionCreated',
+    ].entries()) {
+      const event = envelope(type);
+      expect(await consumers.deliver(def, event)).toBe('applied');
+      expect(await consumers.deliver(def, event)).toBe('duplicate');
+      expect(await versionOf()).toBe(start + i + 1);
+    }
   });
 });

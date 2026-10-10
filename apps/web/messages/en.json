@@ -280,7 +280,8 @@
     "sections": {
       "wealth": "Net worth and accounts",
       "upcoming": "Coming soon",
-      "upcomingCaption": "Questions enabled in upcoming phases."
+      "upcomingCaption": "Questions enabled in upcoming phases.",
+      "commitments": "Payments and commitments"
     },
     "questions": {
       "Q1": "How much money do I have?",
@@ -303,7 +304,8 @@
       "AVAILABLE_IN_PHASE_2": "Will be enabled with budgets (phase 2).",
       "AVAILABLE_IN_PHASE_3": "Will be enabled with recurring payments and commitments (phase 3).",
       "AVAILABLE_IN_PHASE_4": "Will be enabled with savings goals (phase 4).",
-      "UNKNOWN": "This question will be enabled later."
+      "UNKNOWN": "This question will be enabled later.",
+      "CREATE_COMMITMENT": "Create a recurring commitment to anticipate your payments."
     },
     "liquid": {
       "caption": "Money available in liquid accounts, consolidated in {currency}",
@@ -2878,6 +2880,100 @@
     },
     "link": {
       "settings": "View the workspace audit log"
+    }
+  },
+  "Upcoming": {
+    "loading": "Loading upcoming payments…",
+    "incomplete": "Incomplete total",
+    "unconverted": "A current rate is missing: these amounts are not added or converted 1:1: {amounts}",
+    "withoutAmount": "{count, plural, one {# payment without an amount (not in the total)} other {# payments without an amount (not in the total)}}",
+    "fromCommitment": "from a commitment",
+    "status": {
+      "OVERDUE": "Overdue",
+      "OVERDUE_DAYS": "{days, plural, one {Overdue by # day} other {Overdue by # days}}",
+      "DUE": "Due soon",
+      "PENDING_APPROVAL": "Awaiting approval",
+      "PENDING": "Pending",
+      "SCHEDULED": "Scheduled"
+    },
+    "amount": {
+      "range": "{min} to {max}",
+      "variable": "Variable amount",
+      "estimated": "{amount} (estimated)"
+    },
+    "home": {
+      "title": "Payments and commitments",
+      "caption": "What we already know you will pay.",
+      "q4Title": "How much is committed?",
+      "q8Title": "Which payments are coming?",
+      "loading": "Loading…",
+      "error": "This card could not be loaded. The rest of the Home is not affected.",
+      "noData": "There are no commitments or pending payments yet.",
+      "createCommitment": "Create a recurring commitment to anticipate your payments.",
+      "emptyWeek": "There are no payments in the next {days} days.",
+      "more": "{count, plural, one {and # more payment} other {and # more payments}}",
+      "viewAll": "View all upcoming payments",
+      "noAccounts": "There are no accounts yet, so there are no commitments or payments to anticipate.",
+      "createAccount": "Create your first account to get started."
+    },
+    "committed": {
+      "period": "{name} ({from} to {to})",
+      "breakdown": "Commitments {commitments} · Pending {pending}",
+      "byCurrency": "By currency: {amounts}",
+      "overduePrevious": "{count, plural, one {# overdue payment} other {# overdue payments}} from previous periods ({amount}); not added to the period total.",
+      "noPeriod": "No financial period covers today; periods are created in Planning."
+    },
+    "totals": {
+      "title": "List total",
+      "byCurrency": "By currency: {amounts}",
+      "valuedToday": "Valued at today's rate in {currency}: future payments have no rate of their own."
+    },
+    "rates": {
+      "item": "{base}/{quote} {value} · {type} · {source} · as of {date}",
+      "source": {
+        "MANUAL": "manual entry",
+        "PROVIDER": "provider",
+        "USER_CONVERSION": "own conversion"
+      }
+    },
+    "table": {
+      "empty": "There are no known payments in the next {days} days.",
+      "caption": "Known payments from {from} to {to}",
+      "date": "Date",
+      "payment": "Payment",
+      "account": "Account",
+      "status": "Status",
+      "amount": "Amount",
+      "converted": "In {currency}",
+      "noAmount": "No amount",
+      "noRate": "No rate"
+    },
+    "projected": {
+      "title": "Projected balance by account",
+      "note": "Projection: booked balance plus pending income minus pending expenses. It does not subtract recurring payments not yet recorded and does not change the booked balance.",
+      "caption": "Booked and projected balance by account",
+      "account": "Account",
+      "booked": "Booked balance",
+      "pendingIn": "Pending income",
+      "pendingOut": "Pending expenses",
+      "projected": "Projected balance"
+    },
+    "surprise": {
+      "title": "Surprise payments of the period",
+      "error": "The surprise payments indicator could not be loaded.",
+      "count": "{count, plural, =0 {No surprise payments in {period}} one {# surprise payment in {period}} other {# surprise payments in {period}}}",
+      "partial": "period in progress (partial)",
+      "item": "{name}: {amount} on {date} (the commitment was created on {generated})",
+      "limitation": "Only payments linked to a commitment are detected: a recurring payment you never modeled as a commitment does not appear here."
+    },
+    "page": {
+      "title": "Upcoming payments",
+      "manage": "Approve, skip or link payments in Recurring payments",
+      "window": "Window:",
+      "days": "{days} days",
+      "meta": "Computed on {date} · reporting currency {currency}",
+      "freshness": "latest activity {date}",
+      "listTitle": "Known payments"
     }
   }
 }

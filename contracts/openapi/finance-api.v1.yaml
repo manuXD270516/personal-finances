@@ -4051,6 +4051,100 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/reports/upcoming-payments:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getUpcomingPayments
+      summary: Upcoming payments (simple Phase 3 cash-flow view) with the committed total of the period and projected balances
+      description: |
+        Answers Home questions Q8 ("which payments are coming?") and Q4 ("how much is committed?") from the source of
+        truth, without read models (read-your-writes): the unresolved expense occurrences that Commitments reports
+        (`SCHEDULED`, `DUE`, `OVERDUE`; also transfers from a liquid account to a non-liquid one) plus the `PENDING`
+        expense transactions, ordered by date and name, without double counting (an occurrence materialized as a pending
+        transaction is listed once, as the transaction with its real amount). `days` (default 30, 1 to 90, both ends
+        included) counts from today in the workspace time zone; unresolved occurrences older than today are always
+        listed first, marked `OVERDUE` with `daysOverdue`. Amounts follow the amount type: `FIXED` exact, `ESTIMATED`
+        flagged, `MIN_MAX` with the range and the maximum in the totals, `VARIABLE` without amount and excluded from the
+        totals (`withoutAmountCount`; never 0). Totals are reported per currency and consolidated in
+        `reportingCurrency` with the rate in force when the query runs (one conversion per currency; no rate within
+        `REPORTING_RATE_VALIDITY_WINDOW` means `complete=false`, never 1:1); HALF_EVEN only when presenting.
+        `committed` is the committed total of the financial period that contains today (Commitments plus pending
+        expenses), with unresolved occurrences overdue from previous periods reported apart (they do not add up);
+        `null` when no period covers today. `projectedBalances` is each non-archived account booked balance plus
+        pending income minus pending expenses (FR-LEDGER-013); it does not subtract unmaterialized occurrences.
+      x-openspec-capability: [reporting/cash-flow-calendar]
+      x-required-role: VIEWER
+      parameters:
+        - name: days
+          in: query
+          description: Window in days from today, 1 to 90 (otherwise `INVALID_FILTER`). Defaults to 30.
+          schema: { type: integer, default: 30 }
+        - name: reportingCurrency
+          in: query
+          description: Defaults to the workspace base currency
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Upcoming payments
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpcomingPayments' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED, INVALID_FILTER (days outside 1 to 90).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/surprise-payments:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getSurprisePayments
+      summary: Surprise payments of a financial period (SM-07)
+      description: |
+        Non-voided expense transactions dated in the period that resolved a recurring occurrence (materialized or linked)
+        whose generation happened on the same day as the transaction or later, in the workspace time zone: they were not
+        in the upcoming list before being paid. Skipped occurrences do not count; a voided transaction frees its
+        occurrence and stops counting. A period that has not ended is `partial`. Payments not linked to any commitment
+        are not detected (`note`).
+      x-openspec-capability: [reporting/cash-flow-calendar]
+      x-required-role: VIEWER
+      parameters:
+        - name: period
+          in: query
+          description: Financial period label `YYYY-MM` (start month). Defaults to the period that contains today.
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: Surprise payments
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SurprisePayments' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+          description: 'RESOURCE_NOT_FOUND (the period does not exist).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ───────────────────────────── Planning (Phase 2) ─────────────────────────────
   /workspaces/{workspaceId}/periods:
     parameters:
@@ -11083,6 +11177,213 @@ components:
             attributions:
               type: array
               items: { $ref: '#/components/schemas/RateAttribution' }
+    ValuedTotal:
+      type: object
+      additionalProperties: false
+      required: [byCurrency, consolidated]
+      properties:
+        byCurrency:
+          type: array
+          description: Sum per original currency, not converted.
+          items: { $ref: '#/components/schemas/Money' }
+        consolidated:
+          type: object
+          additionalProperties: false
+          required: [amount, complete, unconverted]
+          properties:
+            amount: { $ref: '#/components/schemas/Money' }
+            complete:
+              type: boolean
+              description: false when some aggregate has no rate within the validity window (never converted 1:1).
+            unconverted:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+    UpcomingPaymentItem:
+      type: object
+      additionalProperties: false
+      required: [kind, name, accountId, accountName, date, status, amountType, amount, estimated, withoutAmount, converted]
+      properties:
+        kind: { type: string, enum: [OCCURRENCE, PENDING_TRANSACTION] }
+        occurrenceId: { type: string, format: uuid }
+        definitionId: { type: string, format: uuid }
+        transactionId: { type: string, format: uuid }
+        name: { type: string }
+        accountId: { type: string, format: uuid }
+        accountName: { type: string }
+        date: { $ref: '#/components/schemas/LocalDate' }
+        status:
+          type: string
+          enum: [SCHEDULED, DUE, OVERDUE, PENDING_APPROVAL, PENDING]
+        daysOverdue:
+          type: integer
+          minimum: 1
+          description: Days between the due date and today; only on overdue occurrences.
+        amountType:
+          type: string
+          enum: [FIXED, ESTIMATED, MIN_MAX, VARIABLE, ACTUAL]
+          description: '`ACTUAL` is the real amount of a pending transaction.'
+        amount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Null for `VARIABLE` (no amount) and `MIN_MAX` (see `range`).
+        range:
+          type: object
+          additionalProperties: false
+          required: [min, max]
+          properties:
+            min: { $ref: '#/components/schemas/Money' }
+            max: { $ref: '#/components/schemas/Money' }
+        estimated: { type: boolean }
+        withoutAmount: { type: boolean }
+        converted:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Amount that adds to the totals, in the reporting currency; null without amount or without rate.
+    CommittedBlock:
+      type: object
+      additionalProperties: false
+      required: [periodId, label, from, to, total, fromCommitments, fromPending, withoutAmountCount, overdueFromPreviousPeriods]
+      properties:
+        periodId: { type: string, format: uuid }
+        label: { type: string, description: 'Financial period label YYYY-MM (start month).' }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        total: { $ref: '#/components/schemas/ValuedTotal' }
+        fromCommitments: { $ref: '#/components/schemas/ValuedTotal' }
+        fromPending: { $ref: '#/components/schemas/ValuedTotal' }
+        withoutAmountCount: { type: integer, minimum: 0 }
+        overdueFromPreviousPeriods:
+          type: object
+          additionalProperties: false
+          description: Unresolved occurrences overdue from previous periods; reported apart, not added to `total`.
+          required: [count, byCurrency, consolidated]
+          properties:
+            count: { type: integer, minimum: 0 }
+            byCurrency:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+            consolidated:
+              type: object
+              additionalProperties: false
+              required: [amount, complete, unconverted]
+              properties:
+                amount: { $ref: '#/components/schemas/Money' }
+                complete: { type: boolean }
+                unconverted:
+                  type: array
+                  items: { $ref: '#/components/schemas/Money' }
+    ProjectedBalance:
+      type: object
+      additionalProperties: false
+      required: [accountId, accountName, currency, booked, pendingIn, pendingOut, projected]
+      properties:
+        accountId: { type: string, format: uuid }
+        accountName: { type: string }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        booked: { $ref: '#/components/schemas/Money' }
+        pendingIn: { $ref: '#/components/schemas/Money' }
+        pendingOut: { $ref: '#/components/schemas/Money' }
+        projected: { $ref: '#/components/schemas/Money' }
+    UpcomingPayments:
+      type: object
+      additionalProperties: false
+      required: [window, items, totals, committed, projectedBalances, hasCommitments, meta]
+      properties:
+        window:
+          type: object
+          additionalProperties: false
+          required: [from, to, days]
+          properties:
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
+            days: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/UpcomingPaymentItem' }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [byCurrency, consolidated, withoutAmountCount]
+          properties:
+            byCurrency:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+            consolidated:
+              type: object
+              additionalProperties: false
+              required: [amount, complete, unconverted]
+              properties:
+                amount: { $ref: '#/components/schemas/Money' }
+                complete: { type: boolean }
+                unconverted:
+                  type: array
+                  items: { $ref: '#/components/schemas/Money' }
+            withoutAmountCount: { type: integer, minimum: 0 }
+        committed:
+          oneOf:
+            - $ref: '#/components/schemas/CommittedBlock'
+            - type: 'null'
+          description: Null when no financial period covers today.
+        projectedBalances:
+          type: array
+          description: booked + pendingIn - pendingOut per account (FR-LEDGER-013); a projection, never the booked balance.
+          items: { $ref: '#/components/schemas/ProjectedBalance' }
+        hasCommitments:
+          type: boolean
+          description: At least one active recurring definition or one pending expense (Home Q4/Q8 available).
+        meta:
+          type: object
+          additionalProperties: false
+          required: [generatedAt, reportingCurrency, timeZone, rateWindowDays, approx, rates, attributions]
+          properties:
+            generatedAt: { $ref: '#/components/schemas/Instant' }
+            reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+            timeZone: { type: string }
+            rateWindowDays:
+              type: integer
+              description: Rate validity window (REPORTING_RATE_VALIDITY_WINDOW), the same as `/reports/summary`.
+            dataFreshness: { $ref: '#/components/schemas/Instant' }
+            approx: { type: boolean }
+            rates:
+              type: array
+              description: Rates in force when the query ran (future payments are valued with the rate of today).
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            attributions:
+              type: array
+              items: { $ref: '#/components/schemas/RateAttribution' }
+    SurprisePayments:
+      type: object
+      additionalProperties: false
+      required: [periodId, label, from, to, partial, count, items, note]
+      properties:
+        periodId: { type: string, format: uuid }
+        label: { type: string }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        partial:
+          type: boolean
+          description: True while the period has not ended.
+        count: { type: integer, minimum: 0 }
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [transactionId, date, name, amount, occurrenceId, definitionId, generatedOn]
+            properties:
+              transactionId: { type: string, format: uuid }
+              date: { $ref: '#/components/schemas/LocalDate' }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
+              occurrenceId: { type: string, format: uuid }
+              definitionId: { type: string, format: uuid }
+              generatedOn: { $ref: '#/components/schemas/LocalDate' }
+        note:
+          type: string
+          enum: [UNLINKED_PAYMENTS_NOT_DETECTED]
+          description: Payments not linked to any commitment are not detected.
     HomeQuestionStatus:
       type: object
       required: [question, status, actionHint]
@@ -11094,7 +11395,11 @@ components:
         status:
           type: string
           enum: [AVAILABLE, NO_DATA, NOT_AVAILABLE_IN_PHASE]
-        actionHint: { type: [string, 'null'] }
+        actionHint:
+          type: [string, 'null']
+          description: |
+            Suggested action code (open set): `CREATE_ACCOUNT`, `CREATE_COMMITMENT` (Q4/Q8 without active recurring
+            definitions or pending expenses), `AVAILABLE_IN_PHASE_n`...
     ReportSummary:
       type: object
       required: [period, byCurrency, consolidated, accounts, topExpenseCategories, netWorth, questions, meta]

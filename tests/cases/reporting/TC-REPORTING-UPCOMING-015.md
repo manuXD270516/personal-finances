@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Total comprometido del periodo en el Home"
 scenario: "Periodo financiero con día de inicio 25"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011","FR-REPORTING-016","FR-PLANNING-001"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/committed-period.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["committed","q4","financial-period"]
@@ -31,7 +33,7 @@ expected_result:
   - "Periodo \"2026-09\"; total = 668.00 BOB"
   - "Spotify no suma (periodo siguiente)"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-015 — Con día de inicio 25 el comprometido usa el periodo financiero y no el mes calendario

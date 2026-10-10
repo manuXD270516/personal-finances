@@ -5,16 +5,17 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Consulta de próximos pagos para todos los miembros"
 scenario: "VIEWER consulta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-IDENTITY-006"]
 nfr: []
 invariants: ["INV-025"]
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/upcoming-payments.api.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["rbac","rls"]
@@ -29,7 +30,7 @@ expected_result:
   - "Ambos reciben la misma lista y los mismos totales"
   - "\"Hosting\" de \"W2\" no aparece (RLS)"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-020 — Un VIEWER consulta los próximos pagos y nunca ve datos de otro workspace

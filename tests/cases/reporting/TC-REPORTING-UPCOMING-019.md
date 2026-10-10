@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Frescura y lectura inmediata de los próximos pagos"
 scenario: "Ocurrencia omitida y consulta inmediata"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-007","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/reports.api.test.ts
+  - apps/api/test/api/upcoming-payments.api.test.ts
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - tests/e2e/specs/upcoming-payments.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["freshness","etag"]
@@ -31,7 +35,7 @@ expected_result:
   - "200 (no 304) con solo Internet y total 199.00 BOB"
   - "meta: ventana 2026-10-20..2026-11-19, reportingCurrency BOB, generatedAt y dataFreshness"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-019 — Omitir una ocurrencia se refleja en la siguiente consulta con ventana, moneda y frescura declaradas
