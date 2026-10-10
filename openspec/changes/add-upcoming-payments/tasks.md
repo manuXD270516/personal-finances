@@ -51,3 +51,8 @@
 ## 8. DOCUMENTATION
 
 - [ ] 8.1 Actualizar los docs de design.md § "Cambios a docs compartidos" (docs/01, 03, 10, 11, 14, 24, 28, ARCHITECTURE §14) y la matriz de trazabilidad; ejecutar `pnpm spec:validate` y `pnpm traceability:check`
+
+## 9. OBSERVABILIDAD (docs/35 D117)
+
+- [ ] 9.1 Métricas `reporting_upcoming_payments_duration_seconds` y `reporting_upcoming_payments_rows` y alerta `UpcomingPaymentsReadModelRecommended` (p95 > 300 ms 15 min o > 5 000 ocurrencias) en la configuración de alertas de docs/18; enlace a design.md § "Evolución a read model" (TC-REPORTING-UPCOMING-022)
+

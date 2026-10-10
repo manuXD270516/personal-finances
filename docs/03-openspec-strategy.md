@@ -133,7 +133,7 @@ Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, 
 | 24 | `improve-event-throughput` | MODIFIED `platform/event-delivery` (rendimiento sostenido de los consumidores: concurrencia entre agregados y lotes configurables sin relajar el orden por agregado, backlog de 5 000 eventos drenado en ≤ 120 s, presupuesto de conexiones validado al arrancar, métricas de backlog y duración por consumidor; NFR-PERF-008; agregado el 2026-10-09, docs/33 D112) | 2 (plataforma, antes de Phase 6) |
 | 25 | `fix-phase-2-gaps` | MODIFIED `identity/authentication` (`/me` tolera un locale guardado no soportado), `platform/api-conventions` (cuota de operaciones costosas 10/min; el archivo forma parte del payload idempotente en multipart), `audit/audit-trail` (nombre del actor en el CSV); agregado el 2026-10-09, docs/33 D113 | 2 (correcciones, antes de Phase 3) |
 
-**Phase 3 (consolidado el 2026-10-09).** Los 5 changes se redactaron en paralelo en tres hilos; las preguntas abiertas al owner están en [34-phase-3-consolidation-questions.md](34-phase-3-consolidation-questions.md).
+**Phase 3 (consolidado el 2026-10-09).** Los 5 changes se redactaron en paralelo en tres hilos; las preguntas abiertas al owner están en [34-phase-3-consolidation-questions.md](34-phase-3-consolidation-questions.md) y el owner las resolvió el 2026-10-10 (decisiones D114–D151 en [35-phase-3-consolidation-decisions.md](35-phase-3-consolidation-decisions.md)).
 
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|
