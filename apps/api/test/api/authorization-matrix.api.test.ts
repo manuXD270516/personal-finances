@@ -92,7 +92,11 @@ beforeAll(async () => {
   runtime = await createApiRuntime(
     apiConfig(
       // La matriz recorre todas las operaciones con el mismo usuario: el rate limit (120 escrituras/min) no es lo que se prueba aquí.
-      baseEnv(deps, { RATE_LIMIT_READS_PER_MIN: '100000', RATE_LIMIT_WRITES_PER_MIN: '100000' }),
+      baseEnv(deps, {
+        RATE_LIMIT_READS_PER_MIN: '100000',
+        RATE_LIMIT_WRITES_PER_MIN: '100000',
+        RATE_LIMIT_COSTLY_PER_MIN: '100000',
+      }),
     ),
     logs.logger,
     {

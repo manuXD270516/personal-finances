@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ApiContract, ApiProblem, InMemoryRateLimiter } from '../../api/index.js';
 import {
   chargeFailedAuthentication,
+  chargeCostlyOperation,
   RateLimitGuard,
   RateLimitInterceptor,
   rateLimitSubject,
@@ -168,5 +169,110 @@ describe('límite de tasa por usuario (platform/api-conventions, NFR-SEC-011)', 
     expect(await anon()).toBe('UNAUTHENTICATED');
     expect(await anon()).toBe('UNAUTHENTICATED');
     expect(await anon()).toBe('RATE_LIMITED');
+  });
+});
+
+const costlyContract = ApiContract.fromDocument({
+  openapi: '3.1.0',
+  info: { title: 't', version: '1' },
+  paths: {
+    '/workspaces/{workspaceId}/bulk': {
+      post: {
+        operationId: 'bulkThings',
+        'x-rate-limit': 'costly',
+        parameters: [{ name: 'workspaceId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'ok' } },
+      },
+    },
+    '/workspaces/{workspaceId}/bulk-preview': {
+      post: {
+        operationId: 'previewBulkThings',
+        parameters: [{ name: 'workspaceId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'ok' } },
+      },
+    },
+  },
+});
+
+function costlyOptions(costlyQuota: number): ApiConventionsOptions {
+  const base = options(100);
+  return {
+    ...base,
+    contract: costlyContract,
+    rateLimit: {
+      ...base.rateLimit!,
+      costly: { name: 'costly', quota: costlyQuota, windowSeconds: 60 },
+    },
+  };
+}
+
+function postRequest(route: string, userId: string, workspaceId = WS): Fake {
+  const fake = request({ authorization: 'Bearer x', workspaceId });
+  (fake.req as { method: string }).method = 'POST';
+  (fake.req as { route: unknown }).route = { path: `/api/v1/workspaces/:workspaceId/${route}` };
+  setPrincipal(fake.req, { userId });
+  return fake;
+}
+
+describe('cuota de operaciones costosas (platform/api-conventions, NFR-SEC-011)', () => {
+  it('[TC-PLATFORM-API-021] la operación 11 con cuota costosa de 10 responde RATE_LIMITED y no ejecuta el handler', async () => {
+    const opts = costlyOptions(10);
+    let executed = 0;
+    const counting: CallHandler = {
+      handle: () => {
+        executed += 1;
+        return of('ok');
+      },
+    };
+    const run = async () => {
+      const fake = postRequest('bulk', 'user-a');
+      try {
+        await lastValueFrom(new RateLimitInterceptor(opts).intercept(fake.ctx, counting));
+        return { code: 'ok', fake };
+      } catch (err) {
+        if (err instanceof ApiProblem) return { code: err.code, fake };
+        throw err;
+      }
+    };
+    for (let i = 0; i < 10; i += 1) expect((await run()).code).toBe('ok');
+    const eleventh = await run();
+    expect(eleventh.code).toBe('RATE_LIMITED');
+    expect(executed).toBe(10);
+  });
+
+  it('la vista previa (sin x-rate-limit) no consume la cuota costosa', async () => {
+    const opts = costlyOptions(1);
+    for (let i = 0; i < 5; i += 1) {
+      const fake = postRequest('bulk-preview', 'user-a');
+      await lastValueFrom(new RateLimitInterceptor(opts).intercept(fake.ctx, handler));
+    }
+    const bulk = postRequest('bulk', 'user-a');
+    await expect(lastValueFrom(new RateLimitInterceptor(opts).intercept(bulk.ctx, handler))).resolves.toBe(
+      'ok',
+    );
+  });
+
+  it('la cuota costosa es por usuario: otro usuario conserva la suya; las cabeceras describen la política costly', async () => {
+    const opts = costlyOptions(1);
+    const a = postRequest('bulk', 'user-a');
+    await lastValueFrom(new RateLimitInterceptor(opts).intercept(a.ctx, handler));
+    expect(a.res.headers['ratelimit-policy']).toBe('"costly";q=1;w=60');
+    const again = postRequest('bulk', 'user-a');
+    await expect(
+      lastValueFrom(new RateLimitInterceptor(opts).intercept(again.ctx, handler)),
+    ).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    const b = postRequest('bulk', 'user-b', '0192f3c4-7b2e-7c1a-9d8e-3f2a1b0c9e98');
+    await expect(lastValueFrom(new RateLimitInterceptor(opts).intercept(b.ctx, handler))).resolves.toBe('ok');
+  });
+
+  it('`chargeCostlyOperation` (usado por la idempotencia tras descartar la reproducción) cobra la cuota una sola vez por petición', async () => {
+    const opts = costlyOptions(1);
+    const fake = postRequest('bulk', 'user-a');
+    await chargeCostlyOperation(opts, fake.req, fake.res);
+    await chargeCostlyOperation(opts, fake.req, fake.res); // idempotente por petición
+    const next = postRequest('bulk', 'user-a');
+    await expect(chargeCostlyOperation(opts, next.req, next.res)).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+    });
   });
 });

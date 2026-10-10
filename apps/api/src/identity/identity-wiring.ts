@@ -30,6 +30,7 @@ import {
   identityUserLocaleTags,
   identityWorkspaceCalendar,
   identityWorkspaceSettings,
+  identityUserDisplayNames,
   identityWorkspaceTimeZones,
   type DemoDataOptions,
   type OutboxPort,
@@ -232,6 +233,8 @@ export function auditRuntime(input: {
     ...(input.config.AUDIT_IP_HMAC_KEY ? { ipHmacKeys: input.config.AUDIT_IP_HMAC_KEY } : {}),
     policies: AUDIT_POLICIES,
     timeZones: identityWorkspaceTimeZones(input.pool),
+    // fix-phase-2-gaps: nombre visible de los actores en el CSV global del log.
+    userNames: identityUserDisplayNames(),
     // add-global-audit-view: los fallos de autorización se limitan con el RATE_LIMIT_STORE de la API y se observan.
     ...(input.conventions.rateLimit ? { denialLimiter: input.conventions.rateLimit.limiter } : {}),
     denialObserver: authzDenialObserver(input.logger),

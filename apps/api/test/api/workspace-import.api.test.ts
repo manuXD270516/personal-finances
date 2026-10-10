@@ -464,3 +464,73 @@ describe('Importación con worker', () => {
     expect(original.status).toBe(403);
   }, 120_000);
 });
+
+describe('Locale del workspace importado', () => {
+  it('[TC-IDENTITY-AUTH-009] un locale no soportado en el archivo (fr-FR) se normaliza a APP_DEFAULT_LOCALE al importar', async () => {
+    const frFR = rebuild(
+      zip,
+      (files) => {
+        const key = 'json/workspace.jsonl';
+        const text = files.get(key)!.toString('utf8');
+        expect(text).toContain('"locale":"es-BO"');
+        files.set(key, Buffer.from(text.replace('"locale":"es-BO"', '"locale":"fr-FR"'), 'utf8'));
+      },
+      { consistent: true },
+    );
+    const other = await h.user(`kc-ex-imp-locale-${randomUUID()}`);
+    await h.startWorker();
+    try {
+      const done = await importAndWait(h, other, frFR);
+      expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
+      const locale = await asAdmin(
+        h,
+        async (c) =>
+          (
+            await c.query<{ locale: string }>(`SELECT locale FROM iam.workspace WHERE id = $1`, [
+              done['workspaceId'],
+            ])
+          ).rows[0]?.locale,
+      );
+      expect(locale).toBe('es-BO');
+    } finally {
+      await h.stopWorker();
+    }
+  }, 120_000);
+});
+
+describe('Idempotencia de la importación con archivo', () => {
+  it('[TC-PLATFORM-API-022] la misma clave con otro archivo ⇒ 422 IDEMPOTENCY_KEY_REUSED y solo existe la importación de A; repetir A reproduce la primera respuesta', async () => {
+    const other = await h.user(`kc-ex-imp-idem-${randomUUID()}`);
+    const exportB = rebuild(
+      zip,
+      (files) => {
+        const key = 'json/workspace.jsonl';
+        files.set(
+          key,
+          Buffer.from(
+            files.get(key)!.toString('utf8').replace('"locale":"es-BO"', '"locale":"en-US"'),
+            'utf8',
+          ),
+        );
+      },
+      { consistent: true },
+    );
+    expect(sha256(exportB)).not.toBe(sha256(zip));
+    const key = 'K-IMP-0001-0001-0001';
+    const first = await importZip(h, other, zip, key);
+    expect(first.status, JSON.stringify(first.body)).toBe(202);
+
+    const reused = await importZip(h, other, exportB, key);
+    expect([reused.status, reused.body['code']], JSON.stringify(reused.body)).toEqual([
+      422,
+      'IDEMPOTENCY_KEY_REUSED',
+    ]);
+    expect(await importRows(other)).toBe(1);
+
+    const replay = await importZip(h, other, zip, key);
+    expect(replay.status).toBe(202);
+    expect(replay.headers.get('idempotent-replayed')).toBe('true');
+    expect(replay.body['id']).toBe(first.body['id']);
+    expect(await importRows(other)).toBe(1);
+  }, 120_000);
+});

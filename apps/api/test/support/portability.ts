@@ -85,17 +85,21 @@ export async function startHarness(options: {
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
   const apiLog = capturingLogger('finance-api', 'api');
-  const api = await createApiRuntime(apiConfig(baseEnv(deps, options.apiEnv)), apiLog.logger, {
-    ...(options.realClock ? {} : { clock }),
-    identity: {
-      jwt: {
-        issuer: options.issuer ?? ISSUER,
-        audience: AUDIENCE,
-        requiredScope: 'pfos.api',
-        jwks: { keys: [jwk] },
+  const api = await createApiRuntime(
+    apiConfig(baseEnv(deps, { RATE_LIMIT_COSTLY_PER_MIN: '100000', ...options.apiEnv })),
+    apiLog.logger,
+    {
+      ...(options.realClock ? {} : { clock }),
+      identity: {
+        jwt: {
+          issuer: options.issuer ?? ISSUER,
+          audience: AUDIENCE,
+          requiredScope: 'pfos.api',
+          jwks: { keys: [jwk] },
+        },
       },
     },
-  });
+  );
   const baseUrl = await api.listen(0, '127.0.0.1');
 
   const token = async (sub: string, authAgeSeconds = 60): Promise<string> => {

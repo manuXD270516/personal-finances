@@ -5,7 +5,7 @@ spec: identity/authentication
 related_specs: []
 requirement: Perfil del usuario autenticado
 scenario: Locale guardado no soportado
-requirement_status: provisional
+requirement_status: confirmed
 fr:
 - FR-IDENTITY-003
 nfr: []
@@ -13,9 +13,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+- apps/api/test/api/identity.api.test.ts
+- apps/api/test/api/workspace-import.api.test.ts
+- packages/contexts/identity/src/domain/workspace.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:
@@ -44,4 +47,4 @@ Change `fix-phase-2-gaps`: verificar el escenario "Locale guardado no soportado"
 
 ## Notas
 
-- Borrador; pasa a `ready` al aprobar el change (tarea 1.2).
+- Automatizado en el change `fix-phase-2-gaps` (2026-10-09); requisito confirmado.

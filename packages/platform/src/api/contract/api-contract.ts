@@ -77,6 +77,8 @@ export interface ContractOperation {
   readonly requiredRole?: string;
   /** `x-isolation: SERIALIZABLE`: la transacción del comando se abre SERIALIZABLE con reintento (add-reconciliation). */
   readonly isolation?: 'SERIALIZABLE';
+  /** `x-rate-limit: costly`: además de lecturas/escrituras consume la cuota de operaciones costosas (docs/10 §10). */
+  readonly rateLimit?: 'costly';
   readonly deprecation?: DeprecationInfo;
   readonly requestBody?: { readonly required: boolean; readonly mediaTypes: readonly string[] };
   validateRequest(input: RequestInput): RequestValidation;
@@ -336,6 +338,7 @@ export class ApiContract {
         ? { requiredRole: operation['x-required-role'] }
         : {}),
       ...(operation['x-isolation'] === 'SERIALIZABLE' ? { isolation: 'SERIALIZABLE' as const } : {}),
+      ...(operation['x-rate-limit'] === 'costly' ? { rateLimit: 'costly' as const } : {}),
       ...(deprecation ? { deprecation } : {}),
       ...(requestBody ? { requestBody: { required: requestBody['required'] === true, mediaTypes } } : {}),
       validateRequest: (input) => {

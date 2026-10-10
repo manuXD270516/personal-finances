@@ -1,8 +1,24 @@
+import { createHash } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
-import { Controller, Get, HttpCode, Inject, Param, Post, Req, Res, StreamableFile } from '@nestjs/common';
-import { ApiProblem, ErrorCatalog, rateLimitHeaders, type RateLimitPolicy } from '@pf/platform/api';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Injectable,
+  Param,
+  Post,
+  Req,
+  Res,
+  StreamableFile,
+  UseGuards,
+  type CanActivate,
+  type ExecutionContext,
+} from '@nestjs/common';
+import { ApiProblem, ErrorCatalog } from '@pf/platform/api';
 import {
   API_CONVENTIONS,
+  apiState,
   principalOf,
   type ApiConventionsOptions,
   type ApiRequest,
@@ -27,12 +43,34 @@ export interface PortabilityHttpSettings {
   readonly maxImportBytes: number;
 }
 
-/** Exportaciones por usuario y minuto (docs/10 §10). */
-export const EXPORT_REQUEST_POLICY: RateLimitPolicy = {
-  name: 'workspace-export',
-  quota: 10,
-  windowSeconds: 60,
-};
+/**
+ * Guard de `requestWorkspaceImport`: lee el archivo ANTES de la idempotencia para que `request_hash` incluya su SHA-256
+ * (misma clave con otro archivo ⇒ 422 `IDEMPOTENCY_KEY_REUSED`). Corre tras los guards globales (límite de tasa,
+ * identidad) y antes de los interceptores. Deja el archivo en el estado de la petición para que el handler no relea
+ * el stream. Sin `Idempotency-Key` no lee nada (el contrato responde 428) y sin multipart tampoco (lo valida el contrato).
+ */
+@Injectable()
+export class ImportUploadGuard implements CanActivate {
+  constructor(@Inject(PORTABILITY_SETTINGS) private readonly settings: PortabilityHttpSettings) {}
+
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    if (ctx.getType() !== 'http' || !this.settings.enabled) return true;
+    const req = ctx.switchToHttp().getRequest<ApiRequest>();
+    if (!principalOf(req) || !req.headers['idempotency-key']) return true;
+    if (!/^multipart\/form-data/i.test(String(req.headers['content-type'] ?? ''))) return true;
+    const declared = Number(req.headers['content-length']);
+    // Rechazo temprano por tamaño declarado (con margen para los límites del multipart): no se lee el cuerpo.
+    if (Number.isFinite(declared) && declared > this.settings.maxImportBytes + 64 * 1024) {
+      req.resume();
+      throw new ApiProblem('UPLOAD_TOO_LARGE', `the file exceeds ${this.settings.maxImportBytes} bytes`);
+    }
+    const file = await readUploadedFile(req, this.settings.maxImportBytes);
+    const state = apiState(req);
+    state.upload = file;
+    state.idempotencyPayload = { fileSha256: createHash('sha256').update(file).digest('hex') };
+    return true;
+  }
+}
 
 type ExportService = Pick<
   WorkspaceExportService,
@@ -186,7 +224,6 @@ export class PortabilityController {
     @Param('workspaceId') workspaceId: string,
   ) {
     const p = this.principal(req);
-    await this.limit(p.userId, workspaceId);
     const view = await this.exports.requestExport({
       userId: p.userId,
       workspaceId,
@@ -262,16 +299,11 @@ export class PortabilityController {
   }
 
   @Post('workspace-imports')
+  @UseGuards(ImportUploadGuard)
   @HttpCode(202)
   async requestImport(@Req() req: ApiRequest, @Res({ passthrough: true }) res: ApiResponse) {
     const p = this.principal(req);
-    const declared = Number(req.headers['content-length']);
-    // Rechazo temprano por tamaño declarado (con margen para los límites del multipart): no se lee el cuerpo.
-    if (Number.isFinite(declared) && declared > this.settings.maxImportBytes + 64 * 1024) {
-      req.resume();
-      throw new ApiProblem('UPLOAD_TOO_LARGE', `the file exceeds ${this.settings.maxImportBytes} bytes`);
-    }
-    const file = await readUploadedFile(req, this.settings.maxImportBytes);
+    const file = apiState(req).upload ?? (await readUploadedFile(req, this.settings.maxImportBytes));
     const view = await this.imports.requestImport({ userId: p.userId, file, authTimeSeconds: p.authTime });
     res.setHeader('location', `/api/v1/workspace-imports/${view.id}`);
     return importDto(view);
@@ -281,24 +313,5 @@ export class PortabilityController {
   async getImport(@Req() req: ApiRequest, @Param('importId') importId: string) {
     const p = this.principal(req);
     return importDto(await this.imports.getImport(p.userId, importId));
-  }
-
-  /** 10 exportaciones por usuario y minuto sobre el `RateLimiter` de la API (429 `RATE_LIMITED` + `Retry-After`). */
-  private async limit(userId: string, workspaceId: string): Promise<void> {
-    const limiter = this.options.rateLimit?.limiter;
-    if (!limiter) return;
-    const decision = await limiter.consume(
-      `${userId}:${workspaceId}`,
-      EXPORT_REQUEST_POLICY,
-      this.options.clock.now().toDate(),
-    );
-    if (!decision.allowed) {
-      throw new ApiProblem('RATE_LIMITED', `quota "${EXPORT_REQUEST_POLICY.name}" exceeded`, {
-        headers: {
-          ...rateLimitHeaders(EXPORT_REQUEST_POLICY, decision),
-          'retry-after': String(decision.retryAfterSeconds),
-        },
-      });
-    }
   }
 }

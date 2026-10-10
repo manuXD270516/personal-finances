@@ -46,6 +46,7 @@ export function createApiConventions(
     | 'RATE_LIMIT_STORE'
     | 'RATE_LIMIT_READS_PER_MIN'
     | 'RATE_LIMIT_WRITES_PER_MIN'
+    | 'RATE_LIMIT_COSTLY_PER_MIN'
   >,
   pool: Pool,
   logger: Logger,
@@ -78,6 +79,7 @@ export function createApiConventions(
       limiter: new InMemoryRateLimiter(),
       reads: { name: 'reads', quota: config.RATE_LIMIT_READS_PER_MIN, windowSeconds: 60 },
       writes: { name: 'writes', quota: config.RATE_LIMIT_WRITES_PER_MIN, windowSeconds: 60 },
+      costly: { name: 'costly', quota: config.RATE_LIMIT_COSTLY_PER_MIN, windowSeconds: 60 },
     },
   };
 }

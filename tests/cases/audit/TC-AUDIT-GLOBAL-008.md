@@ -5,7 +5,7 @@ spec: audit/audit-trail
 related_specs: []
 requirement: Exportación CSV del log de auditoría
 scenario: El OWNER exporta los cambios de marzo
-requirement_status: provisional
+requirement_status: confirmed
 fr:
 - FR-AUDIT-006
 nfr: []
@@ -13,9 +13,13 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+- apps/api/test/api/audit-global.api.test.ts
+- apps/api/test/db/audit-global-view.int.test.ts
+- packages/contexts/audit/src/application/audit-global-view.test.ts
+- tests/e2e/specs/audit-global.spec.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:
@@ -45,4 +49,4 @@ Change `fix-phase-2-gaps`: verificar el escenario "El OWNER exporta los cambios 
 
 ## Notas
 
-- Borrador; pasa a `ready` al aprobar el change (tarea 1.2).
+- Automatizado en el change `fix-phase-2-gaps` (2026-10-09); requisito confirmado.

@@ -5,7 +5,7 @@ spec: platform/api-conventions
 related_specs: []
 requirement: Límite de tasa por usuario
 scenario: Ráfaga de ediciones masivas
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-SEC-011
@@ -13,9 +13,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+- apps/api/test/api/costly-rate-limit.api.test.ts
+- packages/platform/src/nest/api/rate-limit.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:
@@ -46,4 +48,4 @@ Change `fix-phase-2-gaps`: verificar el escenario "Ráfaga de ediciones masivas"
 
 ## Notas
 
-- Borrador; pasa a `ready` al aprobar el change (tarea 1.2).
+- Automatizado en el change `fix-phase-2-gaps` (2026-10-09); requisito confirmado.

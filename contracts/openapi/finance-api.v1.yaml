@@ -377,6 +377,7 @@ paths:
         header points to the `EXPORT` operation (`getOperation`). Every step is audited (`identity.export.*`).
       x-openspec-capability: identity/workspace-portability
       x-required-role: OWNER
+      x-rate-limit: costly
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
@@ -529,9 +530,12 @@ paths:
         unsupported format version and the export of a demo workspace (422 `EXPORT_FORMAT_UNSUPPORTED`). The import runs as
         ONE database transaction: balances and the trial balance are verified against the manifest before the workspace
         becomes visible (`EXPORT_VERIFICATION_FAILED` ⇒ nothing is persisted). Requires a recent authentication
-        (403 `REAUTHENTICATION_REQUIRED`). One import in progress per user (409 `IMPORT_IN_PROGRESS`). Audited.
+        (403 `REAUTHENTICATION_REQUIRED`). One import in progress per user (409 `IMPORT_IN_PROGRESS`). Audited. Costly operation (`x-rate-limit: costly`): at most 10 per user and minute
+        (429 `RATE_LIMITED`); an idempotent replay does not consume the quota. The uploaded file is part of the
+        idempotency payload (same key with another file ⇒ 422 `IDEMPOTENCY_KEY_REUSED`).
       x-openspec-capability: identity/workspace-portability
       x-required-role: AUTHENTICATED
+      x-rate-limit: costly
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -1442,8 +1446,11 @@ paths:
         (`transactions.transaction.bulk_edited`, aggregate `TransactionBulkOperation`); all of them, the lifecycle
         records and the events carry `bulkOperationId` as their `correlationId`. There is no automatic undo: revert
         with another bulk edit using the audit trail filtered by `bulkOperationId` (docs/33 D95).
+        Costly operation (`x-rate-limit: costly`): at most 10 per user and minute (429 `RATE_LIMITED`); an idempotent
+        replay does not consume the quota.
       x-openspec-capability: transactions/bulk-edit
       x-required-role: EDITOR
+      x-rate-limit: costly
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -3852,6 +3859,7 @@ paths:
         minute (429 RATE_LIMITED).
       x-openspec-capability: audit/audit-trail
       x-required-role: OWNER
+      x-rate-limit: costly
       parameters:
         - name: format
           in: query

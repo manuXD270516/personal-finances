@@ -86,6 +86,37 @@ async function enforceRateLimit(
   if (tightest) for (const [k, v] of Object.entries(rateLimitHeaders(policy, tightest))) res.setHeader(k, v);
 }
 
+/**
+ * Cuota de operaciones costosas (`x-rate-limit: costly`, docs/10 §10): se consume ADEMÁS de la de lecturas/escrituras,
+ * por usuario y por workspace. 429 `RATE_LIMITED` + `Retry-After` sin ejecutar la operación. Una vez por petición.
+ * Las operaciones con `Idempotency-Key` la cobran el `IdempotencyInterceptor` tras descartar la reproducción (un
+ * replay no consume cuota costosa); el resto, `RateLimitInterceptor`.
+ */
+export async function chargeCostlyOperation(
+  options: ApiConventionsOptions,
+  req: ApiRequest,
+  res: ApiResponse,
+): Promise<void> {
+  const rate = options.rateLimit;
+  const costly = rate?.costly;
+  const state = apiState(req);
+  if (!rate || !costly || state.costlyCharged) return;
+  const route = routeOf(req);
+  const op = state.operation ?? (route ? options.contract.find(req.method ?? 'GET', route) : undefined);
+  if (op?.rateLimit !== 'costly') return;
+  state.costlyCharged = true;
+  const keys = [rateLimitSubject(req)];
+  const workspaceId = op.hasWorkspaceScope ? req.params?.['workspaceId'] : undefined;
+  if (workspaceId) keys.push(`workspace:${workspaceId}`);
+  let tightest: RateLimitDecision | undefined;
+  for (const key of keys) {
+    const decision = await rate.limiter.consume(key, costly, options.clock.now().toDate());
+    if (!decision.allowed) throw rateLimited(costly, decision);
+    if (!tightest || decision.remaining < tightest.remaining) tightest = decision;
+  }
+  if (tightest) for (const [k, v] of Object.entries(rateLimitHeaders(costly, tightest))) res.setHeader(k, v);
+}
+
 /** Política (lecturas/escrituras) de la operación del contrato; `undefined` fuera de la API o sin límite. */
 function policyOf(options: ApiConventionsOptions, req: ApiRequest): RateLimitPolicy | undefined {
   const rate = options.rateLimit;
@@ -149,7 +180,16 @@ export class RateLimitInterceptor implements NestInterceptor {
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (!this.options.rateLimit || ctx.getType() !== 'http') return next.handle();
     const { req, res } = http(ctx);
-    return from(enforceRateLimit(this.options, req, res)).pipe(mergeMap(() => next.handle()));
+    return from(this.charge(req, res)).pipe(mergeMap(() => next.handle()));
+  }
+
+  private async charge(req: ApiRequest, res: ApiResponse): Promise<void> {
+    await enforceRateLimit(this.options, req, res);
+    // Con Idempotency-Key la cuota costosa la cobra la idempotencia (un replay no la consume).
+    const route = routeOf(req);
+    const op = route ? this.options.contract.find(req.method ?? 'GET', route) : undefined;
+    const deferred = op !== undefined && op.idempotency !== 'none' && headerValue(req, 'idempotency-key');
+    if (!deferred) await chargeCostlyOperation(this.options, req, res);
   }
 }
 
@@ -246,6 +286,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
     let handlerBody: unknown;
     const run = async (command: CommandContext): Promise<HttpResponseSnapshot> => {
+      // Solo las ejecuciones reales (no las reproducciones) consumen la cuota costosa; un 429 libera la reserva.
+      await chargeCostlyOperation(this.options, req, res);
       if (transaction) {
         return transaction.run(
           scope,
@@ -264,7 +306,13 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
     return from(
       policy.execute(
-        { scope, key, method: op.method, route: op.path, body: state.validated?.body ?? req.body },
+        {
+          scope,
+          key,
+          method: op.method,
+          route: op.path,
+          body: state.idempotencyPayload ?? state.validated?.body ?? req.body,
+        },
         run,
         (err) => renderException(err, req, res, this.options).response,
       ),

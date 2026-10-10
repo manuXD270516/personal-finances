@@ -229,6 +229,7 @@ beforeAll(async () => {
         LOG_LEVEL: 'warn',
         RATE_LIMIT_READS_PER_MIN: '1000000',
         RATE_LIMIT_WRITES_PER_MIN: '1000000',
+        RATE_LIMIT_COSTLY_PER_MIN: '1000000',
       }),
     ),
     capturingLogger('finance-api', 'api', 'warn').logger,

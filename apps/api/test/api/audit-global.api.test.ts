@@ -79,13 +79,13 @@ const expectProblem = (r: Reply, status: number, code: string) => {
   expect(r.body['code']).toBe(code);
 };
 
-type Member = { token: string; id: string; personal: string };
+type Member = { token: string; id: string; personal: string; name: string };
 async function user(sub: string): Promise<Member> {
   const token = await tokenFor(sub);
   const me = await call('GET', '/api/v1/me', { token });
   expect(me.status).toBe(200);
   const memberships = me.body['memberships'] as { workspaceId: string }[];
-  return { token, id: me.body['id'] as string, personal: memberships[0]!.workspaceId };
+  return { token, id: me.body['id'] as string, personal: memberships[0]!.workspaceId, name: sub };
 }
 
 /** Un workspace con OWNER, EDITOR, VIEWER y un usuario ajeno. */
@@ -203,7 +203,13 @@ beforeAll(async () => {
   signingKey = pair.privateKey;
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
   runtime = await createApiRuntime(
-    apiConfig(baseEnv(deps, { RATE_LIMIT_READS_PER_MIN: '100000', RATE_LIMIT_WRITES_PER_MIN: '100000' })),
+    apiConfig(
+      baseEnv(deps, {
+        RATE_LIMIT_READS_PER_MIN: '100000',
+        RATE_LIMIT_WRITES_PER_MIN: '100000',
+        RATE_LIMIT_COSTLY_PER_MIN: '100000',
+      }),
+    ),
     capturingLogger('finance-api', 'api').logger,
     {
       clock,
@@ -423,6 +429,74 @@ describe('[TC-AUDIT-GLOBAL-003] el OWNER exporta el log a CSV con zona horaria y
       400,
       'VALIDATION_FAILED',
     );
+  });
+
+  it('[TC-AUDIT-GLOBAL-008] la columna actorName sigue a actorId: nombre visible del usuario (también ex-miembro), vacía para procesos y usuarios sin resolver', async () => {
+    const t = await team();
+    const unknown = randomUUID();
+    await seed(t.owner, t.ws, [
+      {
+        at: '2026-03-16T03:30:00Z',
+        actor: t.editor.id,
+        action: 'transactions.transaction.updated',
+        aggregateType: 'Transaction',
+        aggregateId: tx(),
+        changes: [{ field: 'description', before: 'a', after: 'b' }],
+      },
+      {
+        at: '2026-03-17T03:30:00Z',
+        actor: unknown,
+        action: 'transactions.transaction.created',
+        aggregateType: 'Transaction',
+        aggregateId: tx(),
+      },
+    ]);
+    const app = await connect(deps.databaseUrl);
+    try {
+      await inTx(
+        app,
+        { userId: t.owner.id, workspaceId: t.ws },
+        async () => {
+          await app.query(
+            `INSERT INTO audit.audit_log (id, occurred_at, workspace_id, actor_type, actor_process, action,
+               aggregate_type, aggregate_id, origin, correlation_id)
+             VALUES ($1, '2026-03-18T03:30:00Z', $2, 'WORKER', 'recurring-generator', 'transactions.transaction.created',
+                     'Transaction', $3, 'recurring', $4)`,
+            [randomUUID(), t.ws, tx(), randomUUID()],
+          );
+        },
+        true,
+      );
+    } finally {
+      await app.end();
+    }
+    // El editor deja de ser miembro: su id sigue en el log y su nombre se sigue resolviendo.
+    const admin = await connect(deps.superuserUrl);
+    try {
+      await admin.query(
+        `UPDATE iam.workspace_membership SET status = 'REVOKED', revoked_at = now() WHERE workspace_id = $1 AND user_id = $2`,
+        [t.ws, t.editor.id],
+      );
+    } finally {
+      await admin.end();
+    }
+    const r = await call(
+      'GET',
+      `/api/v1/workspaces/${t.ws}/audit-log/export?format=csv&from=2026-03-01&to=2026-03-31`,
+      {
+        token: t.owner.token,
+      },
+    );
+    expect(r.status, r.text).toBe(200);
+    const [header, ...rows] = r.text.slice(1).trimEnd().split('\r\n');
+    const cols = header!.split(',');
+    const idCol = cols.indexOf('actorId');
+    expect(cols[idCol + 1]).toBe('actorName');
+    const cells = (line: string) => line.split(',');
+    const byActor = new Map(rows.map((line) => [cells(line)[idCol], cells(line)[idCol + 1]]));
+    expect(byActor.get(t.editor.id)).toBe(t.editor.name);
+    expect(byActor.get(unknown)).toBe('');
+    expect(byActor.get('recurring-generator')).toBe('');
   });
 
   it('50001 registros: 400 VALIDATION_FAILED y la exportación fallida no se audita; 50000 sí se exportan', async () => {

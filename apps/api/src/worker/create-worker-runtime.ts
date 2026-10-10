@@ -264,6 +264,7 @@ export async function createWorkerRuntime(
     // Solo la API aplica la re-autenticación y el tope de subida; el worker no los usa.
     reauthMaxAgeMs: 600_000,
     maxImportBytes: 209_715_200,
+    defaultLocale: config.APP_DEFAULT_LOCALE,
     queue,
     pool,
     ...(options.portability?.afterSnapshot

@@ -14,7 +14,7 @@ import { LIFECYCLE_BACKFILL_JOB, LifecycleBackfill } from '../application/lifecy
 import { LifecycleExporter } from '../application/lifecycle-export.js';
 import { LifecycleQueries } from '../application/lifecycle-queries.js';
 import { LifecycleRecorder } from '../application/lifecycle-recorder.js';
-import type { DenialObserver, WorkspaceTimeZones } from '../application/ports/index.js';
+import type { DenialObserver, UserDisplayNames, WorkspaceTimeZones } from '../application/ports/index.js';
 import {
   AUDIT_HISTORY_QUERY,
   AUDIT_LOG_EXPORT_AUDIT_POLICY,
@@ -63,6 +63,11 @@ export interface AuditRuntimeOptions {
   readonly policies: readonly AuditFieldPoliciesDto[];
   /** Zona horaria del workspace (la aporta IDENTITY en el composition root). */
   readonly timeZones: WorkspaceTimeZones;
+  /**
+   * Nombre visible de los usuarios que figuran como actores (la aporta IDENTITY en el composition root de la API, que es
+   * la única que sirve la exportación CSV del log); sin él, `actorName` sale vacío.
+   */
+  readonly userNames?: UserDisplayNames;
   /**
    * Máquinas de estado declaradas por los contextos dueños (add-lifecycle-timeline; las exporta el módulo de cada
    * contexto: `TRANSACTION_LIFECYCLE_MACHINE`, `ACCOUNT_LIFECYCLE_MACHINE`, `EXCHANGE_RATE_LIFECYCLE_MACHINE`).
@@ -124,6 +129,7 @@ export function createAuditRuntime(options: AuditRuntimeOptions): AuditRuntime {
     uow: pgReadUnitOfWork(options.pool),
     store,
     timeZones: options.timeZones,
+    userNames: options.userNames ?? { namesOf: async () => new Map() },
     audit: port,
   });
   const denials = new AuthorizationDenialRecorder({
@@ -243,5 +249,6 @@ export type {
   LifecycleMachineDto,
   LifecyclePort,
   LifecycleQuery,
+  UserDisplayNames,
   WorkspaceTimeZones,
 };

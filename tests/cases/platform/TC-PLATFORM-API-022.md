@@ -5,7 +5,7 @@ spec: platform/api-conventions
 related_specs: []
 requirement: Rechazo de Idempotency-Key reutilizada con otro payload
 scenario: Misma clave, archivo de importación distinto
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
 - NFR-REL-007
@@ -13,9 +13,10 @@ invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+- apps/api/test/api/workspace-import.api.test.ts
+status: automated
 regression_suite: false
 phase: 2
 tags:
@@ -45,4 +46,4 @@ Change `fix-phase-2-gaps`: verificar el escenario "Misma clave, archivo de impor
 
 ## Notas
 
-- Borrador; pasa a `ready` al aprobar el change (tarea 1.2).
+- Automatizado en el change `fix-phase-2-gaps` (2026-10-09); requisito confirmado.
