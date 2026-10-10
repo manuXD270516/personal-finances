@@ -1,7 +1,13 @@
 /** Tipos del dominio NOTIFY (openspec add-alerts, design.md § Contexto). Sin dependencias de frameworks. */
 
-/** Tipos de notificación de Phase 2; el catálogo crece por fase (FR-NOTIFY-004). */
-export const NOTIFICATION_TYPES = ['BUDGET_THRESHOLD', 'MONTH_CLOSE_PENDING'] as const;
+/** Tipos de notificación; el catálogo crece por fase (FR-NOTIFY-004). */
+export const NOTIFICATION_TYPES = [
+  'BUDGET_THRESHOLD',
+  'MONTH_CLOSE_PENDING',
+  // Phase 3 (add-recurrence-engine, FR-NOTIFY-004): una ocurrencia recurrente pasó a próxima.
+  'RECURRING_PAYMENT_UPCOMING',
+  'RECURRING_APPROVAL_REQUIRED',
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export const isNotificationType = (value: unknown): value is NotificationType =>
@@ -51,7 +57,18 @@ export type NotificationLink =
       readonly targetKind: BudgetTargetKind;
       readonly targetId: string;
     }
-  | { readonly kind: 'PERIOD_CLOSE'; readonly periodId: string; readonly periodLabel: string };
+  | { readonly kind: 'PERIOD_CLOSE'; readonly periodId: string; readonly periodLabel: string }
+  /**
+   * Ocurrencia recurrente (add-recurrence-engine): la web la traduce a `/recurring/occurrences/<occurrenceId>`.
+   * `periodId` es el periodo financiero del vencimiento (el id de la ocurrencia si ninguno lo cubre) y `periodLabel`
+   * el mes del vencimiento: el contrato HTTP del enlace los exige en todos sus tipos.
+   */
+  | {
+      readonly kind: 'RECURRING_OCCURRENCE';
+      readonly occurrenceId: string;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    };
 
 export type JsonValue =
   string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };

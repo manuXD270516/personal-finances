@@ -5,16 +5,21 @@ spec: notifications/alerts
 related_specs: [commitments/recurrence-engine]
 requirement: 'Aviso de pago próximo u ocurrencia por aprobar'
 scenario: 'Alquiler por aprobar notificado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-006']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/notifications/notifications.test.tsx
+  - packages/contexts/notifications/src/application/dispatch-email-delivery.test.ts
+  - packages/contexts/notifications/src/application/notify-from-event.test.ts
+  - packages/contexts/notifications/src/domain/render.test.ts
+  - packages/contexts/notifications/src/domain/type-catalog.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'recurrence']
@@ -30,7 +35,7 @@ expected_result:
   - 'El VIEWER no recibe'
   - 'El email no contiene 3500.00'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-043 — Una ocurrencia por aprobar notifica a OWNER y EDITOR sin monto en el email

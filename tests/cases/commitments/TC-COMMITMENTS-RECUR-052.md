@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Total comprometido del periodo financiero'
 scenario: 'Comprometido multi-moneda'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-011']
 nfr: []
 invariants: ['INV-001', 'INV-012']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/committed.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'committed', 'fx']
@@ -30,7 +33,7 @@ expected_result:
   - 'consolidated 820.69 BOB complete true (5.99 × 6.96 = 41.6904 → 41.69 HALF_EVEN al presentar)'
   - 'ratesUsed con la tasa usada'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-052 — El comprometido multi-moneda se consolida en BOB con la tasa de valoración del Home

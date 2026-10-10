@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Definición recurrente con tipo, cuentas y plantilla'
 scenario: 'Moneda distinta a la de la cuenta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-001']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'validation']
@@ -33,7 +36,7 @@ expected_result:
   - 'b: 409 CATEGORY_ARCHIVED'
   - 'No se crea ninguna definición, ocurrencia, auditoría ni evento'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-002 — Una definición con moneda distinta a la de la cuenta o categoría archivada se rechaza sin crear nada

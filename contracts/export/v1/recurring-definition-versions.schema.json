@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/recurring-definition-versions.schema.json",
+  "title": "pfos-export v1 — recurring-definition-versions",
+  "description": "Registro de la sección «recurring-definition-versions» (tabla commitments.recurring_definition_version, contexto commitments). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "definition_id",
+    "version_no",
+    "effective_from",
+    "account_id",
+    "to_account_id",
+    "currency",
+    "amount_type",
+    "amount",
+    "amount_min",
+    "amount_max",
+    "category_id",
+    "counterparty_id",
+    "tag_ids",
+    "payment_method",
+    "cadence",
+    "interval",
+    "month_days",
+    "rrule",
+    "dtstart",
+    "until_date",
+    "max_count",
+    "weekend_adjustment",
+    "materialization_mode",
+    "auto_create_status",
+    "lead_days",
+    "created_at",
+    "created_by"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "definition_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "version_no": {
+      "type": "integer"
+    },
+    "effective_from": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "account_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "to_account_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "amount_type": {
+      "type": "string"
+    },
+    "amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "amount_min": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "amount_max": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "category_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "counterparty_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "tag_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "payment_method": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cadence": {
+      "type": "string"
+    },
+    "interval": {
+      "type": "integer"
+    },
+    "month_days": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "rrule": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dtstart": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "until_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "max_count": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "weekend_adjustment": {
+      "type": "string"
+    },
+    "materialization_mode": {
+      "type": "string"
+    },
+    "auto_create_status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lead_days": {
+      "type": "integer"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "created_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "commitments.recurring_definition_version",
+  "x-pfos-context": "commitments"
+}

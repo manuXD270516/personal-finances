@@ -5,16 +5,18 @@ spec: audit/lifecycle-timeline
 related_specs: [commitments/recurrence-engine]
 requirement: 'Recorrido de una definición recurrente'
 scenario: 'Recorrido del alquiler revisado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-AUDIT-009', 'FR-COMMITMENTS-009']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['lifecycle', 'recurrence']
@@ -29,7 +31,7 @@ expected_result:
   - 'Transiciones CREATE, PAUSE, RESUME, REVISE en orden con actor e instante; REVISE con versión 2 y fecha efectiva 2027-01-05'
   - 'Reanudar ENDED ⇒ 409 INVALID_STATUS_TRANSITION sin transición registrada'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-041 — El recorrido de una definición muestra crear, pausar, reanudar y revisar con su versión

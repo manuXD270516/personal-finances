@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/RecurringOccurrenceMaterialized.v1.schema.json",
+  "title": "commitments.RecurringOccurrenceMaterialized.v1",
+  "description": "La ocurrencia quedó resuelta con una transacción: creada por el motor (CREATED, aprobar o creación automática) o vinculada a una existente (MATCHED, vínculo manual o sugerencia confirmada). Productor: COMMITMENTS. Consumidores: REPORTING, SUBSCRIPTIONS (cambio de precio). Idempotencia natural: (occurrenceId, transactionId). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.RecurringOccurrenceMaterialized"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "RecurringOccurrence"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "ManagedBy": {
+      "enum": [
+        "USER",
+        "SUBSCRIPTION",
+        "DEBT"
+      ]
+    },
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "occurrenceId",
+        "definitionId",
+        "occurrenceDate",
+        "managedBy",
+        "transactionId",
+        "mode",
+        "matchedBy",
+        "amount",
+        "businessDate"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "occurrenceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "occurrenceDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "managedBy": {
+          "$ref": "#/$defs/ManagedBy"
+        },
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "mode": {
+          "enum": [
+            "CREATED",
+            "MATCHED"
+          ]
+        },
+        "matchedBy": {
+          "oneOf": [
+            {
+              "enum": [
+                "USER_LINK",
+                "SUGGESTION"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "businessDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000412",
+      "eventType": "commitments.RecurringOccurrenceMaterialized",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T12:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RecurringOccurrence",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000cc001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "occurrenceId": "01928c4e-0000-7000-8000-0000000cc001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "occurrenceDate": "2026-11-05",
+        "managedBy": "USER",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7001",
+        "mode": "CREATED",
+        "matchedBy": null,
+        "amount": {
+          "amount": "3500.00",
+          "currency": "BOB"
+        },
+        "businessDate": "2026-11-05"
+      }
+    }
+  ]
+}

@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Marcar pagada vinculando una transacción existente'
 scenario: 'Cuenta distinta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'link']
@@ -29,7 +32,7 @@ expected_result:
   - '422 OCCURRENCE_LINK_MISMATCH con details.reasons [ACCOUNT]'
   - 'La ocurrencia no cambia'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-030 — Vincular con una transacción de otra cuenta se rechaza por incompatibilidad

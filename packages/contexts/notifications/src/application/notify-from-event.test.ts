@@ -1,12 +1,13 @@
 import { Instant } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import { definitionOf } from '../domain/index.js';
-import { closePendingPayload, thresholdPayload, WS } from '../domain/fixtures.js';
+import { closePendingPayload, occurrenceDuePayload, thresholdPayload, WS } from '../domain/fixtures.js';
 import { NotifyFromEvent } from './notify-from-event.js';
 import { EDITOR, NotificationsTestEnv, OWNER, VIEWER } from './testing/in-memory.js';
 
 const threshold = definitionOf('BUDGET_THRESHOLD');
 const closePending = definitionOf('MONTH_CLOSE_PENDING');
+const occurrenceDue = definitionOf('RECURRING_PAYMENT_UPCOMING');
 
 const event = (payload: Record<string, unknown>, eventId = '01928c4e-7a3b-7c11-8f00-000000000301') => ({
   eventId,
@@ -217,6 +218,86 @@ describe('NotifyFromEvent: cierre de mes pendiente', () => {
     });
     await env.preferences.save(owner);
     await notify.handle(event(closePendingPayload()), closePending);
+    expect(forUser(env, OWNER)).toHaveLength(1);
+  });
+});
+
+describe('NotifyFromEvent: ocurrencia recurrente próxima', () => {
+  it('[TC-COMMITMENTS-RECUR-043] OWNER y EDITOR reciben "por aprobar" enlazada a la ocurrencia; el VIEWER no', async () => {
+    const { env, notify } = setup();
+    const outcome = await notify.handle(event(occurrenceDuePayload()), occurrenceDue);
+    expect(outcome).toEqual({ created: 2, deliveries: 2 });
+    expect(forUser(env, VIEWER)).toHaveLength(0);
+    for (const userId of [OWNER, EDITOR]) {
+      const [n, ...rest] = forUser(env, userId);
+      expect(rest).toHaveLength(0);
+      expect(n).toMatchObject({
+        type: 'RECURRING_APPROVAL_REQUIRED',
+        status: 'UNREAD',
+        dedupeKey: 'occurrence-due:01928c4e-0000-7000-8000-0000000cc001',
+        link: {
+          kind: 'RECURRING_OCCURRENCE',
+          occurrenceId: '01928c4e-0000-7000-8000-0000000cc001',
+          periodId: '01928c4e-0000-7000-8000-0000000fa011',
+          periodLabel: '2026-11',
+        },
+      });
+      expect(n?.params).toMatchObject({ name: 'Alquiler', dueDate: '2026-11-05' });
+    }
+  });
+
+  it('[TC-COMMITMENTS-RECUR-044] el hecho entregado dos veces con eventId distinto deja una notificación y una entrega por destinatario', async () => {
+    const { env, notify } = setup();
+    await notify.handle(event(occurrenceDuePayload()), occurrenceDue);
+    const second = await notify.handle(
+      event(occurrenceDuePayload(), '01928c4e-7a3b-7c11-8f00-000000000777'),
+      occurrenceDue,
+    );
+    expect(second).toEqual({ created: 0, deliveries: 0 });
+    expect(env.notifications.rows.size).toBe(2);
+    expect(env.deliveries.rows.size).toBe(2);
+    expect(env.scheduler.jobs).toHaveLength(2);
+  });
+
+  it('sin aprobación crea RECURRING_PAYMENT_UPCOMING', async () => {
+    const { env, notify } = setup();
+    await notify.handle(
+      event(occurrenceDuePayload({ requiresApproval: false, mode: 'AUTO_CREATE' })),
+      occurrenceDue,
+    );
+    expect(forUser(env, OWNER)[0]?.type).toBe('RECURRING_PAYMENT_UPCOMING');
+  });
+
+  it('D119: gestionada por una suscripción y sin aprobación no genera aviso genérico', async () => {
+    const { env, notify } = setup();
+    const outcome = await notify.handle(
+      event(
+        occurrenceDuePayload({ managedBy: 'SUBSCRIPTION', requiresApproval: false, mode: 'AUTO_CREATE' }),
+      ),
+      occurrenceDue,
+    );
+    expect(outcome).toEqual({ created: 0, deliveries: 0 });
+    expect(env.notifications.rows.size).toBe(0);
+    expect(env.deliveries.rows.size).toBe(0);
+    // Con aprobación requerida sí se avisa aunque la gestione una suscripción.
+    const approval = await notify.handle(
+      event(occurrenceDuePayload({ managedBy: 'SUBSCRIPTION' }), '01928c4e-7a3b-7c11-8f00-000000000778'),
+      occurrenceDue,
+    );
+    expect(approval.created).toBe(2);
+  });
+
+  it('respeta las preferencias por tipo: con el tipo desactivado in-app no hay notificación', async () => {
+    const { env, notify } = setup();
+    const editor = await env.preferences.load(WS, EDITOR);
+    editor.update({
+      types: [{ type: 'RECURRING_APPROVAL_REQUIRED', inApp: false, email: true }],
+      quietHours: null,
+      includeDetailsInEmail: false,
+    });
+    await env.preferences.save(editor);
+    await notify.handle(event(occurrenceDuePayload()), occurrenceDue);
+    expect(forUser(env, EDITOR)).toHaveLength(0);
     expect(forUser(env, OWNER)).toHaveLength(1);
   });
 });

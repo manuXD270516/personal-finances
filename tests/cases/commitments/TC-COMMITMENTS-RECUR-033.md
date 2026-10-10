@@ -5,16 +5,21 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Fecha de fin o número máximo de ocurrencias'
 scenario: 'Doce cuotas de un curso'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-009']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/definition.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'count']
@@ -29,7 +34,7 @@ expected_result:
   - 'Última ocurrencia 2027-09-15; ninguna posterior'
   - 'La definición pasa a ENDED cuando no quedan fechas por generar y hoy supera la última'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-033 — Una definición con máximo de 12 ocurrencias termina tras la última

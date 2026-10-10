@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { closePendingPayload, PERIOD_ID, RESTAURANTS_ID, thresholdPayload } from './fixtures.js';
+import {
+  closePendingPayload,
+  OCCURRENCE_ID,
+  occurrenceDuePayload,
+  PERIOD_ID,
+  RESTAURANTS_ID,
+  thresholdPayload,
+} from './fixtures.js';
 import {
   definitionForConsumer,
   definitionOf,
@@ -76,6 +83,61 @@ describe('NotificationTypeCatalog: cierre de mes pendiente', () => {
     expect(definitionForConsumer('notifications.month-close-pending')?.type).toBe('MONTH_CLOSE_PENDING');
     expect(definitionForConsumer('notifications.budget-threshold')?.type).toBe('BUDGET_THRESHOLD');
     expect(definitionForConsumer('otro')).toBeUndefined();
-    expect(new Set(NOTIFICATION_TYPE_CATALOG.map((d) => d.consumer)).size).toBe(2);
+    expect(new Set(NOTIFICATION_TYPE_CATALOG.map((d) => d.consumer)).size).toBe(3);
+    expect(definitionForConsumer('notifications.occurrence-due')?.type).toBe('RECURRING_PAYMENT_UPCOMING');
+  });
+});
+
+describe('NotificationTypeCatalog: ocurrencia recurrente próxima', () => {
+  const due = definitionOf('RECURRING_PAYMENT_UPCOMING');
+
+  it('[TC-COMMITMENTS-RECUR-043] por aprobar => RECURRING_APPROVAL_REQUIRED, solo OWNER y EDITOR, enlace a la ocurrencia', () => {
+    expect(due.recipients).toEqual(['OWNER', 'EDITOR']);
+    expect(due.event).toEqual({ type: 'commitments.RecurringOccurrenceDue', version: 1 });
+    expect(definitionOf('RECURRING_APPROVAL_REQUIRED')).toBe(due);
+    const plan = due.plan(occurrenceDuePayload());
+    expect(plan.type).toBe('RECURRING_APPROVAL_REQUIRED');
+    expect(plan.link).toEqual({
+      kind: 'RECURRING_OCCURRENCE',
+      occurrenceId: OCCURRENCE_ID,
+      periodId: '01928c4e-0000-7000-8000-0000000fa011',
+      periodLabel: '2026-11',
+    });
+    expect(plan.params).toMatchObject({
+      name: 'Alquiler',
+      dueDate: '2026-11-05',
+      expected: { type: 'FIXED', amount: '3500.00', min: null, max: null },
+      currency: 'BOB',
+    });
+  });
+
+  it('sin aprobación => RECURRING_PAYMENT_UPCOMING', () => {
+    const plan = due.plan(occurrenceDuePayload({ requiresApproval: false, mode: 'NOTIFY_ONLY' }));
+    expect(plan.type).toBe('RECURRING_PAYMENT_UPCOMING');
+    expect(plan.severity).toBe('INFO');
+  });
+
+  it('[TC-COMMITMENTS-RECUR-044] la clave de deduplicación es la ocurrencia, no el evento', () => {
+    expect(due.plan(occurrenceDuePayload()).dedupeKey).toBe(`occurrence-due:${OCCURRENCE_ID}`);
+    expect(due.plan(occurrenceDuePayload({ requiresApproval: false, mode: 'AUTO_CREATE' })).dedupeKey).toBe(
+      `occurrence-due:${OCCURRENCE_ID}`,
+    );
+  });
+
+  it('D119: suprime el aviso solo si lo gestiona una suscripción y no requiere aprobación', () => {
+    const suppressed = (o: Record<string, unknown>) => due.suppressed?.(occurrenceDuePayload(o));
+    expect(suppressed({ managedBy: 'SUBSCRIPTION', requiresApproval: false })).toBe(true);
+    expect(suppressed({ managedBy: 'SUBSCRIPTION', requiresApproval: true })).toBe(false);
+    expect(suppressed({ managedBy: 'USER', requiresApproval: false })).toBe(false);
+    expect(suppressed({ managedBy: 'DEBT', requiresApproval: false })).toBe(false);
+  });
+
+  it('rechaza un payload mal formado', () => {
+    expect(() => due.plan(occurrenceDuePayload({ occurrenceId: 'x' }))).toThrow(/occurrenceId/);
+    expect(() => due.plan(occurrenceDuePayload({ dueDate: '05/11/2026' }))).toThrow(/dueDate/);
+    expect(() => due.plan(occurrenceDuePayload({ managedBy: 'OTHER' }))).toThrow(/managedBy/);
+    expect(() =>
+      due.plan(occurrenceDuePayload({ expected: { type: 'FIXED', amount: '3x', min: null, max: null } })),
+    ).toThrow(/amount/);
   });
 });

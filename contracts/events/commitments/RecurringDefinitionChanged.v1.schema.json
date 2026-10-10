@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/RecurringDefinitionChanged.v1.schema.json",
+  "title": "commitments.RecurringDefinitionChanged.v1",
+  "description": "La definición cambió de estado o de versión: crear (CREATE), revisar \"esta y las siguientes\" (REVISE), pausar, reanudar o terminar. Lista las ocurrencias canceladas, reinstauradas y reescritas. Productor: COMMITMENTS. Consumidores: REPORTING, MATCHING. Idempotencia natural: (definitionId, aggregateVersion). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.RecurringDefinitionChanged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "RecurringDefinition"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Kind": {
+      "enum": [
+        "INCOME",
+        "EXPENSE",
+        "TRANSFER"
+      ]
+    },
+    "ManagedBy": {
+      "enum": [
+        "USER",
+        "SUBSCRIPTION",
+        "DEBT"
+      ]
+    },
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "definitionId",
+        "managedBy",
+        "transition",
+        "status",
+        "kind",
+        "versionNo",
+        "effectiveFrom",
+        "cancelledOccurrenceIds",
+        "reinstatedOccurrenceIds",
+        "rewrittenOccurrenceIds"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "managedBy": {
+          "$ref": "#/$defs/ManagedBy"
+        },
+        "transition": {
+          "enum": [
+            "CREATE",
+            "REVISE",
+            "PAUSE",
+            "RESUME",
+            "END"
+          ]
+        },
+        "status": {
+          "enum": [
+            "ACTIVE",
+            "PAUSED",
+            "ENDED"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "versionNo": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "effectiveFrom": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cancelledOccurrenceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        },
+        "reinstatedOccurrenceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        },
+        "rewrittenOccurrenceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000414",
+      "eventType": "commitments.RecurringDefinitionChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T12:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RecurringDefinition",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000de001",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "managedBy": "USER",
+        "transition": "REVISE",
+        "status": "ACTIVE",
+        "kind": "EXPENSE",
+        "versionNo": 2,
+        "effectiveFrom": "2027-01-05",
+        "cancelledOccurrenceIds": [],
+        "reinstatedOccurrenceIds": [],
+        "rewrittenOccurrenceIds": [
+          "01928c4e-0000-7000-8000-0000000cc001"
+        ]
+      }
+    }
+  ]
+}

@@ -32,6 +32,7 @@
     "fx": "Cripto e câmbio",
     "classification": "Classificação",
     "planning": "Planejamento",
+    "recurring": "Recorrentes",
     "demoIndicator": "Dados de demonstração — este espaço contém dados fictícios e pode ser limpo por completo.",
     "demoOption": "{name} (demonstração)",
     "workspaceSwitched": "Espaço de trabalho ativo: {name}.",
@@ -39,7 +40,8 @@
     "skipToContent": "Pular para o conteúdo",
     "menu": "Menu de navegação",
     "userMenu": "Menu da conta",
-    "language": "Idioma"
+    "language": "Idioma",
+    "recurringPending": "{count, plural, one {# pagamento a aprovar} other {# pagamentos a aprovar}}"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -1401,6 +1403,24 @@
         "ACTIVATE": "Ativar",
         "CLOSE": "Fechar",
         "REOPEN": "Reabrir"
+      },
+      "RecurringDefinition": {
+        "CREATE": "Criar",
+        "PAUSE": "Pausar",
+        "RESUME": "Retomar",
+        "REVISE": "Alterar esta e as seguintes",
+        "END": "Encerrar"
+      },
+      "RecurringOccurrence": {
+        "GENERATE": "Gerar",
+        "BECOME_DUE": "Tornar-se próxima",
+        "MARK_OVERDUE": "Marcar como atrasada",
+        "MATERIALIZE": "Aprovar (criar transação)",
+        "LINK": "Vincular",
+        "SKIP": "Omitir",
+        "RELEASE": "Liberar",
+        "CANCEL": "Cancelar",
+        "REINSTATE": "Reinstaurar"
       }
     },
     "export": {
@@ -2292,7 +2312,8 @@
       "severity": "Severidade",
       "status": "Estado",
       "openBudgetLine": "Ver a linha no plano de {period}",
-      "openPeriodClose": "Ir ao fechamento de {period}"
+      "openPeriodClose": "Ir ao fechamento de {period}",
+      "openRecurringOccurrence": "Ver o pagamento recorrente de {period}"
     },
     "prefs": {
       "title": "Notificações",
@@ -2310,7 +2331,9 @@
       },
       "types": {
         "BUDGET_THRESHOLD": "Alertas de orçamento",
-        "MONTH_CLOSE_PENDING": "Fechamento do mês pendente"
+        "MONTH_CLOSE_PENDING": "Fechamento do mês pendente",
+        "RECURRING_PAYMENT_UPCOMING": "Pagamento recorrente próximo",
+        "RECURRING_APPROVAL_REQUIRED": "Pagamento recorrente a aprovar"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
@@ -2333,6 +2356,393 @@
         "same": "A hora de início e a de fim devem ser diferentes.",
         "server": "O horário de silêncio não é válido. Revise as horas."
       }
+    }
+  },
+  "Recurring": {
+    "title": "Pagamentos recorrentes",
+    "intro": "Suas receitas, despesas e transferências que se repetem: revise o que vem pela frente, aprove ou vincule cada pagamento e veja quanto está comprometido neste período.",
+    "loading": "Carregando…",
+    "cancel": "Cancelar",
+    "overridden": "editada",
+    "everyN": "{cadence} (a cada {interval})",
+    "autoCreateError": "Não foi possível criar automaticamente: {error}",
+    "truncated": "Mostrando os primeiros {limit} pagamentos; restrinja o intervalo para ver o restante.",
+    "tabs": {
+      "label": "Seções de pagamentos recorrentes",
+      "upcoming": "Próximos",
+      "approval": "A aprovar",
+      "approvalCount": "A aprovar ({count})",
+      "definitions": "Definições"
+    },
+    "status": {
+      "SCHEDULED": "Programada",
+      "DUE": "Próxima",
+      "OVERDUE": "Atrasada",
+      "MATERIALIZED": "Criada",
+      "MATCHED": "Vinculada",
+      "SKIPPED": "Omitida",
+      "CANCELLED": "Cancelada"
+    },
+    "definitionStatus": {
+      "ACTIVE": "Ativa",
+      "PAUSED": "Pausada",
+      "ENDED": "Encerrada"
+    },
+    "txStatus": {
+      "PENDING": "Pendente",
+      "POSTED": "Contabilizada",
+      "CLEARED": "Confirmada",
+      "RECONCILED": "Conciliada",
+      "VOIDED": "Anulada"
+    },
+    "kinds": {
+      "INCOME": "Receita",
+      "EXPENSE": "Despesa",
+      "TRANSFER": "Transferência",
+      "LOAN_PAYMENT": "Pagamento de empréstimo",
+      "CARD_PAYMENT": "Pagamento de cartão"
+    },
+    "modes": {
+      "AUTO_CREATE": "Criação automática",
+      "PENDING_APPROVAL": "Aprovação pendente",
+      "NOTIFY_ONLY": "Somente aviso"
+    },
+    "amountTypes": {
+      "FIXED": "Fixo",
+      "ESTIMATED": "Estimado",
+      "MIN_MAX": "Faixa (mínimo e máximo)",
+      "VARIABLE": "Variável (sem valor)"
+    },
+    "cadences": {
+      "DAILY": "Diária",
+      "WEEKLY": "Semanal",
+      "BIWEEKLY": "Quinzenal (a cada 2 semanas)",
+      "SEMIMONTHLY": "Duas vezes por mês",
+      "MONTHLY": "Mensal",
+      "BIMONTHLY": "Bimestral",
+      "QUARTERLY": "Trimestral",
+      "SEMIANNUAL": "Semestral",
+      "ANNUAL": "Anual",
+      "CUSTOM": "Personalizada (RRULE)"
+    },
+    "weekend": {
+      "NONE": "Sem ajuste",
+      "PREVIOUS": "Mover para a sexta-feira anterior",
+      "NEXT": "Mover para a segunda-feira seguinte"
+    },
+    "paymentMethods": {
+      "CASH": "Dinheiro",
+      "QR": "QR",
+      "DEBIT_CARD": "Cartão de débito",
+      "CREDIT_CARD": "Cartão de crédito",
+      "BANK_TRANSFER": "Transferência bancária",
+      "DIGITAL_WALLET": "Carteira digital",
+      "OTHER": "Outro"
+    },
+    "cancelReasons": {
+      "PAUSED": "A definição foi pausada",
+      "SUPERSEDED": "Substituída por uma alteração da definição",
+      "ENDED": "A definição foi encerrada"
+    },
+    "matchedBy": {
+      "USER_LINK": "Vinculada pelo usuário",
+      "SUGGESTION": "Sugestão confirmada"
+    },
+    "amount": {
+      "estimated": "≈ {amount}",
+      "range": "{min} – {max} {currency}",
+      "none": "Sem valor"
+    },
+    "columns": {
+      "payment": "Pagamento",
+      "due": "Vence",
+      "account": "Conta",
+      "amount": "Valor",
+      "status": "Estado",
+      "actions": "Ações",
+      "name": "Nome",
+      "next": "Próxima data",
+      "schedule": "Frequência",
+      "toApprove": "A aprovar",
+      "version": "Versão",
+      "effectiveFrom": "Vigente desde",
+      "mode": "Modo e conta"
+    },
+    "actions": {
+      "approve": "Aprovar",
+      "link": "Vincular",
+      "skip": "Omitir",
+      "edit": "Editar",
+      "approveLabel": "Aprovar {name} de {date}",
+      "linkLabel": "Vincular {name} de {date} a uma transação",
+      "skipLabel": "Omitir {name} de {date}",
+      "editLabel": "Editar o valor ou a data de {name} de {date}"
+    },
+    "upcoming": {
+      "range": "Próximos pagamentos",
+      "days": "{days} dias",
+      "caption": "Pagamentos dos próximos {days} dias, com os atrasados primeiro",
+      "empty": "Não há pagamentos pendentes nos próximos {days} dias."
+    },
+    "tray": {
+      "intro": "Pagamentos de definições no modo \"Aprovação pendente\" que já vencem ou estão atrasados. Aprovar cria a transação; você também pode vincular uma existente ou omitir o pagamento.",
+      "caption": "Pagamentos a aprovar",
+      "empty": "Você não tem pagamentos a aprovar."
+    },
+    "definitionOccurrences": {
+      "caption": "Ocorrências da definição",
+      "empty": "Esta definição não tem ocorrências com esse estado."
+    },
+    "definitions": {
+      "caption": "Definições de pagamentos recorrentes",
+      "empty": "Ainda não há definições. Crie a primeira para ver seus próximos pagamentos.",
+      "new": "Nova definição",
+      "all": "Todos",
+      "filterStatus": "Estado",
+      "filterKind": "Tipo",
+      "filterOccurrenceStatus": "Estado da ocorrência",
+      "noNext": "Sem pagamentos pendentes"
+    },
+    "committed": {
+      "title": "Comprometido do período",
+      "loading": "Calculando o que está comprometido…",
+      "period": "{name} ({from} – {to})",
+      "incomplete": "Total incompleto",
+      "unconverted": "Falta uma taxa de câmbio vigente para converter: {parts}. Essas partes não estão no total (nunca são convertidas 1:1); aparecem por moeda abaixo.",
+      "withoutAmount": "{count, plural, one {# pagamento sem valor} other {# pagamentos sem valor}}: não entram no total até você informar o valor ao aprová-los.",
+      "byCurrency": "Comprometido por moeda",
+      "currency": "Moeda",
+      "occurrences": "Pagamentos programados",
+      "pending": "Despesas pendentes",
+      "total": "Total",
+      "none": "Não há despesas comprometidas neste período.",
+      "expectedIncome": "Receita esperada (informativa, não é subtraída): {amounts}",
+      "rates": "Taxas usadas: {rates}",
+      "breakdown": "Ver o detalhamento ({count})",
+      "breakdownCaption": "Composição do total comprometido",
+      "item": "Item",
+      "source": "Origem",
+      "unnamed": "Despesa pendente",
+      "fromOccurrence": "Pagamento programado ({status})",
+      "fromPending": "Despesa pendente"
+    },
+    "approve": {
+      "title": "Aprovar {name} de {date}",
+      "description": "A transação é criada com os dados desta definição. Confirme o que você realmente pagou.",
+      "amount": "Valor real ({currency})",
+      "hintExpected": "Deixe vazio para usar o esperado: {expected}.",
+      "hintRange": "Entre {range}. Vazio usa o máximo.",
+      "hintVariable": "Obrigatório: este pagamento não tem valor esperado.",
+      "date": "Data da transação",
+      "status": "Estado da transação",
+      "statusPosted": "Contabilizada",
+      "statusPending": "Pendente",
+      "confirm": "Aprovar",
+      "busy": "Aprovando…",
+      "done": "Você aprovou {name}: a transação foi criada."
+    },
+    "skip": {
+      "title": "Omitir {name} de {date}",
+      "description": "A ocorrência fica como omitida e nenhuma transação é criada.",
+      "reason": "Motivo (opcional)",
+      "confirm": "Omitir",
+      "busy": "Omitindo…",
+      "done": "Você omitiu {name}."
+    },
+    "edit": {
+      "title": "Editar {name} de {date}",
+      "description": "A alteração afeta somente esta ocorrência; as demais e a definição não mudam.",
+      "amount": "Valor esperado ({currency})",
+      "min": "Mínimo ({currency})",
+      "max": "Máximo ({currency})",
+      "dueDate": "Data de vencimento",
+      "confirm": "Salvar",
+      "busy": "Salvando…",
+      "done": "{name} foi atualizada."
+    },
+    "link": {
+      "title": "Vincular {name} de {date}",
+      "description": "Escolha a transação que você já registrou para este pagamento: deve ser do mesmo tipo, conta e moeda e não estar anulada.",
+      "search": "Buscar por descrição",
+      "searchButton": "Buscar",
+      "filters": "Transações da mesma conta e tipo entre {from} e {to}.",
+      "searching": "Buscando transações…",
+      "empty": "Não há transações compatíveis nesse intervalo.",
+      "results": "Transações compatíveis",
+      "confirm": "Vincular",
+      "busy": "Vinculando…",
+      "done": "Você vinculou {name} à transação escolhida.",
+      "reasons": {
+        "ACCOUNT": "A conta não coincide.",
+        "KIND": "O tipo de movimento não coincide.",
+        "CURRENCY": "A moeda não coincide.",
+        "VOIDED": "A transação está anulada."
+      }
+    },
+    "form": {
+      "createTitle": "Nova definição",
+      "reviseTitle": "Alterar esta e as seguintes",
+      "reviseNote": "Uma nova versão é criada a partir da data escolhida. As ocorrências já resolvidas e suas transações não mudam; as edições individuais das ocorrências reescritas são descartadas.",
+      "effectiveFrom": "Aplicar a partir de",
+      "effectiveFromHint": "Deve ser posterior à última ocorrência já resolvida.",
+      "name": "Nome",
+      "description": "Descrição",
+      "notes": "Notas",
+      "kind": "Tipo",
+      "kindHint": "Para pagar um cartão, use uma transferência para a conta do cartão.",
+      "account": "Conta",
+      "fromAccount": "Conta de origem",
+      "toAccount": "Conta de destino",
+      "chooseAccount": "Escolha uma conta",
+      "category": "Categoria",
+      "noCategory": "Sem categoria",
+      "counterparty": "Contraparte",
+      "noCounterparty": "Sem contraparte",
+      "tags": "Etiquetas",
+      "paymentMethod": "Meio de pagamento",
+      "noPaymentMethod": "Não especificado",
+      "amountLegend": "Valor esperado",
+      "amountType": "Tipo de valor",
+      "amount": "Valor ({currency})",
+      "min": "Mínimo ({currency})",
+      "max": "Máximo ({currency})",
+      "amountHint": {
+        "FIXED": "O mesmo valor em cada pagamento.",
+        "ESTIMATED": "Um valor aproximado; ao aprovar você informa o real.",
+        "MIN_MAX": "Uma faixa; os totais contam o máximo.",
+        "VARIABLE": "Sem valor esperado: você o informa ao aprovar cada pagamento."
+      },
+      "scheduleLegend": "Frequência",
+      "cadence": "Repetir",
+      "interval": "A cada quantas",
+      "intervalHint": "Por exemplo, 2 com \"Mensal\" = a cada 2 meses.",
+      "monthDay": "Dia do mês",
+      "sameAsStart": "Igual à data de início",
+      "chooseDay": "Escolha um dia",
+      "firstDay": "Primeiro dia do mês",
+      "secondDay": "Segundo dia do mês",
+      "lastDay": "Último dia do mês",
+      "weekendAdjustment": "Se cair em fim de semana",
+      "rrule": "Regra personalizada (RRULE)",
+      "rruleHint": "Subconjunto da RFC 5545: FREQ, INTERVAL, BYDAY, BYMONTHDAY, BYSETPOS, COUNT e UNTIL.",
+      "startDate": "Data de início",
+      "endMode": "Fim",
+      "endNone": "Sem fim",
+      "endDateOption": "Em uma data",
+      "endCountOption": "Após N pagamentos",
+      "endDate": "Data de fim",
+      "maxOccurrences": "Número de pagamentos",
+      "modeLegend": "O que fazer ao vencer",
+      "modeHint": {
+        "AUTO_CREATE": "Cria a transação sozinho ao vencer.",
+        "PENDING_APPROVAL": "Avisa você e aparece em \"A aprovar\" até você aprová-lo.",
+        "NOTIFY_ONLY": "Somente avisa; resolva aprovando, vinculando ou omitindo."
+      },
+      "autoNeedsAmount": "Precisa de um valor fixo ou estimado.",
+      "autoCreateStatus": "Estado da transação criada",
+      "statusPending": "Pendente",
+      "statusPosted": "Contabilizada",
+      "leadDays": "Avisar com antecedência (dias)",
+      "leadDaysHint": "De 0 a 60 dias antes do vencimento.",
+      "create": "Criar definição",
+      "reviseSubmit": "Aplicar a alteração",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "created": "Você criou \"{name}\": {count, plural, one {foi gerada # ocorrência} other {foram geradas # ocorrências}}."
+    },
+    "errors": {
+      "REQUIRED": "Este dado é obrigatório.",
+      "AMOUNT_INVALID": "Digite um valor válido, por exemplo 1.234,50.",
+      "AMOUNT_SCALE": "O valor tem mais casas decimais do que a moeda da conta admite.",
+      "AMOUNT_NOT_POSITIVE": "O valor deve ser maior que zero.",
+      "RANGE": "O valor deve estar dentro da faixa e o máximo não pode ser menor que o mínimo.",
+      "INTERVAL": "O intervalo deve ser um inteiro entre 1 e 120.",
+      "DAYS": "Escolha dois dias do mês diferentes.",
+      "RRULE": "A regra não é compatível ou não produz nenhuma data.",
+      "SCHEDULE": "A programação não é válida. Revise a frequência, o intervalo e os dias.",
+      "DATE": "Escolha uma data válida.",
+      "END_BEFORE_START": "A data de fim não pode ser anterior à de início.",
+      "COUNT": "O número de pagamentos deve ser um inteiro entre 1 e 1000.",
+      "LEAD_DAYS": "A antecedência deve estar entre 0 e 60 dias.",
+      "AUTO_AMOUNT": "A criação automática precisa de um valor fixo ou estimado.",
+      "SAME_ACCOUNT": "A conta de destino deve ser diferente da de origem.",
+      "CURRENCY": "As duas contas devem ter a mesma moeda.",
+      "NO_CHANGES": "Não há alterações para salvar."
+    },
+    "preview": {
+      "title": "Próximas datas",
+      "unavailable": "Complete a frequência e a data de início para ver as próximas datas.",
+      "none": "A regra não produz mais datas.",
+      "adjusted": "data original {date}, movida pelo fim de semana",
+      "monthEnd": "último dia do mês",
+      "monthEndWarning": "Fim de mês: nos meses sem dia {day} o pagamento cai no último dia do mês (por exemplo, 28 ou 29 de fevereiro)."
+    },
+    "detail": {
+      "back": "Voltar aos pagamentos recorrentes",
+      "notFound": "Esta definição não existe ou você não tem acesso.",
+      "actions": "Ações da definição",
+      "pause": "Pausar",
+      "resume": "Retomar",
+      "end": "Encerrar",
+      "revise": "Alterar esta e as seguintes",
+      "annotate": "Editar nome e notas",
+      "pauseTitle": "Pausar {name}",
+      "pauseDescription": "As ocorrências não resolvidas a partir de hoje são canceladas. As atrasadas anteriores continuam disponíveis para resolver.",
+      "resumeTitle": "Retomar {name}",
+      "resumeDescription": "As ocorrências canceladas pela pausa a partir de hoje são reinstauradas e as que faltam são geradas.",
+      "endTitle": "Encerrar {name}",
+      "endDescription": "As ocorrências não resolvidas posteriores à data de fim são canceladas. As anteriores continuam disponíveis para resolver.",
+      "endDate": "Data de fim (opcional)",
+      "endDateHint": "Se ficar vazia, encerra hoje.",
+      "done": {
+        "pause": "Você pausou {name}.",
+        "resume": "Você retomou {name}.",
+        "end": "Você encerrou {name}."
+      },
+      "annotateTitle": "Editar nome, descrição e notas",
+      "annotateNote": "São anotações: não criam uma nova versão nem alteram as ocorrências.",
+      "annotated": "Os dados da definição foram salvos.",
+      "current": "Versão vigente (v{version})",
+      "currentTag": "vigente",
+      "versions": "Versões",
+      "versionsCaption": "Versões da definição, a mais recente primeiro",
+      "occurrences": "Ocorrências"
+    },
+    "summary": {
+      "account": "Conta",
+      "amount": "Valor esperado",
+      "category": "Categoria",
+      "counterparty": "Contraparte",
+      "tags": "Etiquetas",
+      "paymentMethod": "Meio de pagamento",
+      "schedule": "Frequência",
+      "every": "a cada {interval}",
+      "start": "Início",
+      "end": "Fim",
+      "noEnd": "Sem fim",
+      "afterCount": "Após {count} pagamentos",
+      "weekend": "Fim de semana",
+      "mode": "Modo",
+      "leadDays": "Antecedência do aviso (dias)"
+    },
+    "revision": {
+      "done": "A definição passou para a versão {version}.",
+      "counts": "Ocorrências reescritas: {rewritten}; canceladas: {cancelled}; criadas: {created}; reinstauradas: {reinstated}.",
+      "resetOverrides": "{count, plural, one {Foi descartada # edição individual} other {Foram descartadas # edições individuais}} das ocorrências reescritas."
+    },
+    "occurrence": {
+      "notFound": "Este pagamento não existe ou você não tem acesso.",
+      "viewDefinition": "Ver a definição",
+      "viewTransaction": "Ver a transação",
+      "dueDate": "Vencimento",
+      "nominalDate": "Data original",
+      "mode": "Modo",
+      "version": "Versão da definição",
+      "edited": "Edição",
+      "editedValue": "O valor ou o vencimento desta ocorrência foi editado",
+      "cancelReason": "Motivo do cancelamento",
+      "skipReason": "Motivo da omissão",
+      "matchedBy": "Vinculada por"
     }
   },
   "AuditLog": {

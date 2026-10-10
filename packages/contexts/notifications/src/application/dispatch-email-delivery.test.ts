@@ -1,7 +1,7 @@
 import { Instant } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import { definitionOf } from '../domain/index.js';
-import { closePendingPayload, thresholdPayload, WS } from '../domain/fixtures.js';
+import { closePendingPayload, occurrenceDuePayload, thresholdPayload, WS } from '../domain/fixtures.js';
 import { DispatchEmailDelivery } from './dispatch-email-delivery.js';
 import { NotifyFromEvent } from './notify-from-event.js';
 import { RetryableEmailError } from './ports/index.js';
@@ -9,7 +9,7 @@ import { EDITOR, NotificationsTestEnv, OWNER, VIEWER } from './testing/in-memory
 
 const event = (
   payload: Record<string, unknown>,
-  definition: 'BUDGET_THRESHOLD' | 'MONTH_CLOSE_PENDING' = 'BUDGET_THRESHOLD',
+  definition: 'BUDGET_THRESHOLD' | 'MONTH_CLOSE_PENDING' | 'RECURRING_PAYMENT_UPCOMING' = 'BUDGET_THRESHOLD',
 ) => ({
   payload,
   definition: definitionOf(definition),
@@ -132,6 +132,41 @@ describe('DispatchEmailDelivery: envío', () => {
     expect(env.sender.sent.find((m) => m.to === 'editor@pfos.test')?.subject).toBe(
       'Você tem um mês pendente de fechamento',
     );
+  });
+});
+
+describe('DispatchEmailDelivery: ocurrencia recurrente', () => {
+  it('[TC-COMMITMENTS-RECUR-043] el email de "por aprobar" va a OWNER y EDITOR y no contiene el monto ni el nombre', async () => {
+    const env = new NotificationsTestEnv();
+    const e = event(occurrenceDuePayload(), 'RECURRING_PAYMENT_UPCOMING');
+    await new NotifyFromEvent(env.notifyDeps()).handle(e.source, e.definition);
+    const dispatch = new DispatchEmailDelivery(env.dispatchDeps());
+    for (const delivery of [...env.deliveries.rows.values()]) await run(dispatch, delivery.id);
+    expect(env.sender.sent.map((m) => m.to).sort()).toEqual(['editor@pfos.test', 'owner@pfos.test']);
+    for (const mail of env.sender.sent) {
+      expect(mail.subject).not.toContain('3500');
+      expect(mail.text).not.toContain('3500');
+      expect(mail.text).not.toContain('Alquiler');
+      expect(mail.text).toContain('05/11/2026');
+    }
+    expect(env.sender.sent.find((m) => m.to === 'owner@pfos.test')?.subject).toBe(
+      'Tienes una ocurrencia por aprobar',
+    );
+  });
+
+  it('con el opt-in de detalles el email incluye nombre y monto', async () => {
+    const env = new NotificationsTestEnv();
+    const owner = await env.preferences.load(WS, OWNER);
+    owner.update({ types: [], quietHours: null, includeDetailsInEmail: true });
+    await env.preferences.save(owner);
+    const e = event(occurrenceDuePayload(), 'RECURRING_PAYMENT_UPCOMING');
+    await new NotifyFromEvent(env.notifyDeps()).handle(e.source, e.definition);
+    const dispatch = new DispatchEmailDelivery(env.dispatchDeps());
+    for (const delivery of [...env.deliveries.rows.values()]) await run(dispatch, delivery.id);
+    const ownerMail = env.sender.sent.find((m) => m.to === 'owner@pfos.test');
+    expect(ownerMail?.text).toContain('Alquiler');
+    expect(ownerMail?.text).toContain('3.500,00 BOB');
+    expect(env.sender.sent.find((m) => m.to === 'editor@pfos.test')?.text).not.toContain('3.500,00');
   });
 });
 

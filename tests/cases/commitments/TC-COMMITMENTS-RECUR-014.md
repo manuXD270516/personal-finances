@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Generación idempotente de ocurrencias'
 scenario: 'Re-ejecutar la generación'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-006']
 nfr: []
 invariants: ['INV-013']
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/domain/generation.test.ts
+  - packages/shared-kernel/src/recurrence/recurrence.properties.test.ts
+status: automated
 regression_suite: true
 phase: 3
 tags: ['recurrence', 'idempotency', 'pbt']
@@ -31,7 +33,7 @@ expected_result:
   - 'generate(w1) ∪ generate(w2) = generate(w1 ∪ w2)'
   - 'Caso fijo: Alquiler mensual desde 2026-10-05 hasta 2027-01-07 ejecutado 5 veces ⇒ 4 ocurrencias'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-014 — Propiedad: re-ejecutar o solapar ventanas de generación nunca duplica ocurrencias

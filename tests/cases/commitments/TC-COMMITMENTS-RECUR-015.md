@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Generación idempotente de ocurrencias'
 scenario: 'Dos workers en paralelo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-006']
 nfr: []
 invariants: ['INV-013']
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/test/integration/pg-commitments.int.test.ts
+status: automated
 regression_suite: true
 phase: 3
 tags: ['recurrence', 'concurrency']
@@ -31,7 +33,7 @@ expected_result:
   - 'Un solo OccurrencesGenerated.v1 en el outbox que las incluye una vez'
   - 'UNIQUE (definition_id, occurrence_date) nunca violado como error al cliente'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-015 — Dos generaciones concurrentes de la misma ventana producen una ocurrencia y un hecho por fecha

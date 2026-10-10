@@ -130,6 +130,22 @@ describe('Notificaciones: lógica pura', () => {
     ).toBeUndefined();
   });
 
+  it('[TC-COMMITMENTS-RECUR-043] el enlace RECURRING_OCCURRENCE abre el detalle de la ocurrencia', () => {
+    const occurrenceId = '0198f0aa-0000-7000-8000-00000000c0de';
+    expect(
+      resourcePath({
+        kind: 'RECURRING_OCCURRENCE',
+        periodId: PERIOD_ID,
+        periodLabel: '2026-10',
+        occurrenceId,
+      }),
+    ).toBe(`/recurring/occurrences/${occurrenceId}`);
+    // Sin occurrenceId no hay destino (el enum de enlaces es abierto).
+    expect(
+      resourcePath({ kind: 'RECURRING_OCCURRENCE', periodId: PERIOD_ID, periodLabel: '2026-10' }),
+    ).toBeUndefined();
+  });
+
   it('[TC-NOTIFICATIONS-EMAIL-003] la ruta del detalle lleva solo el id opaco (sin query, montos ni nombres)', () => {
     expect(detailPath(NOTE_A)).toBe(`/notificaciones/${NOTE_A}`);
     expect(detailPath(NOTE_A)).not.toMatch(/[?=&]/);
@@ -197,6 +213,8 @@ describe('Notificaciones: lógica pura', () => {
     expect(draft.types).toEqual([
       { type: 'BUDGET_THRESHOLD', inApp: true, email: false },
       { type: 'MONTH_CLOSE_PENDING', inApp: true, email: true },
+      { type: 'RECURRING_PAYMENT_UPCOMING', inApp: true, email: true },
+      { type: 'RECURRING_APPROVAL_REQUIRED', inApp: true, email: true },
     ]);
     expect(preferencesChanged(DEFAULT_PREFS, draft)).toBe(true);
   });
@@ -234,6 +252,8 @@ const DEFAULT_PREFS: NotificationPreferences = {
   types: [
     { type: 'BUDGET_THRESHOLD', inApp: true, email: true },
     { type: 'MONTH_CLOSE_PENDING', inApp: true, email: true },
+    { type: 'RECURRING_PAYMENT_UPCOMING', inApp: true, email: true },
+    { type: 'RECURRING_APPROVAL_REQUIRED', inApp: true, email: true },
   ],
   quietHours: null,
   includeDetailsInEmail: false,
@@ -577,6 +597,20 @@ describe('Detalle', () => {
     expect(textOf(html)).toContain('Ir al cierre de octubre de 2026');
   });
 
+  it('[TC-COMMITMENTS-RECUR-043] RECURRING_OCCURRENCE enlaza al detalle de la ocurrencia', () => {
+    const occurrenceId = '0198f0aa-0000-7000-8000-00000000c0de';
+    const due = note({
+      id: uuid(1022),
+      type: 'RECURRING_APPROVAL_REQUIRED',
+      link: { kind: 'RECURRING_OCCURRENCE', periodId: PERIOD_ID, periodLabel: '2026-10', occurrenceId },
+    });
+    const html = render({ status: 'ready', notification: due });
+    expect(tagOf(html, 'notification-open-resource')).toContain(
+      `href="/es/recurring/occurrences/${occurrenceId}"`,
+    );
+    expect(textOf(html)).toContain('Ver el pago recurrente de octubre de 2026');
+  });
+
   it('un tipo de enlace desconocido no ofrece destino y la notificación sigue visible', () => {
     const unknown = note({
       id: uuid(1021),
@@ -611,7 +645,12 @@ describe('Preferencias', () => {
 
   it('[TC-NOTIFICATIONS-PREFS-003] por defecto tiene ambos canales activados y los detalles desactivados', () => {
     const html = view();
-    for (const type of ['BUDGET_THRESHOLD', 'MONTH_CLOSE_PENDING']) {
+    for (const type of [
+      'BUDGET_THRESHOLD',
+      'MONTH_CLOSE_PENDING',
+      'RECURRING_PAYMENT_UPCOMING',
+      'RECURRING_APPROVAL_REQUIRED',
+    ]) {
       for (const channel of ['inApp', 'email']) {
         expect(tagOf(html, `pref-${type}-${channel}`)).toContain('checked=""');
       }
@@ -628,6 +667,12 @@ describe('Preferencias', () => {
     );
     expect(tagOf(html, 'pref-MONTH_CLOSE_PENDING-inApp')).toContain(
       'aria-label="Cierre de mes pendiente · En la app"',
+    );
+    expect(tagOf(html, 'pref-RECURRING_PAYMENT_UPCOMING-email')).toContain(
+      'aria-label="Pago recurrente próximo · Email"',
+    );
+    expect(tagOf(html, 'pref-RECURRING_APPROVAL_REQUIRED-inApp')).toContain(
+      'aria-label="Pago recurrente por aprobar · En la app"',
     );
     expect(html).toContain('data-testid="notification-preferences"');
     expect(html).toContain('<caption');

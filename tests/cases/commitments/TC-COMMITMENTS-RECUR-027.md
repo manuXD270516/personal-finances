@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Editar una ocurrencia'
 scenario: 'Alquiler de noviembre con recargo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'edit']
@@ -32,7 +36,7 @@ expected_result:
   - 'La de 2026-12-05 sigue en 3500.00 BOB'
   - 'Anotación EDIT en el recorrido'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-027 — Editar monto y fecha de una ocurrencia no afecta a la definición ni a las demás

@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Ocurrencias próximas y atrasadas'
 scenario: 'Ocurrencia próxima con anticipación'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-007']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'status']
@@ -31,7 +35,7 @@ expected_result:
   - '2026-10-20: DUE'
   - '2026-10-21: OVERDUE (un solo RecurringOccurrenceChanged.v1 OVERDUE)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-018 — Una ocurrencia pasa a próxima según la anticipación y a atrasada tras su vencimiento, una sola vez

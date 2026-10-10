@@ -28,6 +28,7 @@
     "@pf/identity": "workspace:*",
     "@pf/ledger": "workspace:*",
     "@pf/notifications": "workspace:*",
+    "@pf/commitments": "workspace:*",
     "@pf/planning": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/reporting": "workspace:*",

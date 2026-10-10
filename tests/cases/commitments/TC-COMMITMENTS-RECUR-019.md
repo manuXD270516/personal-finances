@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Modo creación automática'
 scenario: 'Internet creado como pendiente'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-007']
 nfr: []
 invariants: ['INV-013', 'INV-029']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'auto-create']
@@ -30,7 +33,7 @@ expected_result:
   - 'Ocurrencia MATERIALIZED con ese transactionId'
   - 'TransactionCreated.v1 con origin.refId = occurrenceId y RecurringOccurrenceMaterialized.v1 mode CREATED en el mismo commit'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-019 — La creación automática crea un gasto pendiente en la fecha de vencimiento y materializa la ocurrencia

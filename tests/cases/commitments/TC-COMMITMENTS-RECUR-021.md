@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Modo aprobación pendiente'
 scenario: 'Alquiler por aprobar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-007']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - tests/e2e/specs/recurring.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'approval']
@@ -31,7 +35,7 @@ expected_result:
   - 'No existe transacción para ella'
   - 'Aparece en la bandeja por aprobar'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-021 — En aprobación pendiente la ocurrencia próxima aparece por aprobar y no crea transacción

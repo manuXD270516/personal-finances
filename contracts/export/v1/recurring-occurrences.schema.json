@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/recurring-occurrences.schema.json",
+  "title": "pfos-export v1 — recurring-occurrences",
+  "description": "Registro de la sección «recurring-occurrences» (tabla commitments.recurring_occurrence, contexto commitments). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "definition_id",
+    "occurrence_date",
+    "due_date",
+    "definition_version_no",
+    "expected_type",
+    "expected_amount",
+    "expected_min",
+    "expected_max",
+    "currency",
+    "amount_overridden",
+    "date_overridden",
+    "status",
+    "cancel_reason",
+    "transaction_id",
+    "resolution",
+    "matched_by",
+    "skip_reason",
+    "resolved_at",
+    "resolved_by",
+    "last_auto_create_error",
+    "last_auto_create_on",
+    "version",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "definition_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurrence_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "due_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "definition_version_no": {
+      "type": "integer"
+    },
+    "expected_type": {
+      "type": "string"
+    },
+    "expected_amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "expected_min": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "expected_max": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "amount_overridden": {
+      "type": "boolean"
+    },
+    "date_overridden": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string"
+    },
+    "cancel_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "transaction_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "resolution": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "matched_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "skip_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "resolved_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "resolved_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "last_auto_create_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_auto_create_on": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "commitments.recurring_occurrence",
+  "x-pfos-context": "commitments"
+}

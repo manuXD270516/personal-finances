@@ -3,7 +3,8 @@
  * sidebar (más Planificación, Phase 2). Lógica pura (sin React) para poder probar qué sección queda activa en cada ruta.
  */
 
-export type NavKey = 'home' | 'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'settings';
+export type NavKey =
+  'home' | 'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'recurring' | 'settings';
 
 export interface NavItem {
   readonly key: NavKey;
@@ -21,6 +22,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'classification', path: '/clasificacion' },
   // Phase 2 (add-financial-periods): calendario financiero; pf-p2b agrega presupuestos bajo /planificacion.
   { key: 'planning', path: '/planificacion/periodos', also: ['/planificacion'] },
+  // Phase 3 (add-recurrence-engine): pagos recurrentes (Próximos, Por aprobar con contador, Definiciones).
+  { key: 'recurring', path: '/recurring' },
   { key: 'settings', path: '/configuracion' },
 ];
 

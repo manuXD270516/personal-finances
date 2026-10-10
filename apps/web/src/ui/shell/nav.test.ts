@@ -22,6 +22,10 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/planificacion/periodos')).toBe('planning');
     expect(activeNav('/en/planificacion')).toBe('planning');
     expect(activeNav('/pt/configuracion')).toBe('settings');
+    // Phase 3 (add-recurrence-engine): detalle de definición y de ocurrencia (enlace de las notificaciones).
+    expect(activeNav('/recurring')).toBe('recurring');
+    expect(activeNav('/en/recurring/0198f0aa')).toBe('recurring');
+    expect(activeNav('/recurring/occurrences/0198f0bb')).toBe('recurring');
     // La evolución del patrimonio cuelga del Home (add-net-worth-evolution).
     expect(activeNav('/patrimonio')).toBe('home');
     expect(activeNav('/en/patrimonio')).toBe('home');
@@ -31,6 +35,7 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/preferencias')).toBeUndefined();
     expect(activeNav('/workspaces/nuevo')).toBeUndefined();
     expect(activeNav('/cuentasx')).toBeUndefined();
+    expect(activeNav('/recurringx')).toBeUndefined();
   });
 
   it('usa la primera letra del nombre visible para el avatar', () => {

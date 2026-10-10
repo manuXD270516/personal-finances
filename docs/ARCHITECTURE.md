@@ -198,6 +198,7 @@ Servicios Compose (nombres canónicos) y profiles:
 
 - `deps` = solo dependencias (para correr apps en el host con hot reload). `core` = todo el producto.
 - **Estrategia de dockerización y parametrización (aceptada 2026-10-02):** un solo contrato de configuración validado al arrancar, modo A (deps en contenedores + apps en Windows) y modo B (todo en contenedores, misma imagen que prod); ver [19 §0](19-local-development.md).
+- **Variables de Commitments (`add-recurrence-engine`, docs/35 D125):** `COMMITMENTS_HORIZON_DAYS` (14..366, por omisión 90; la leen `api` y `worker`, por entorno y no por workspace) y `COMMITMENTS_SCHEDULER_CRON` (cron de 5 campos u `off`, por omisión `10 * * * *`; solo `worker`). Referencia completa en [config-reference.md](config-reference.md).
 - **Puertos (SPIKE-08):** todos los puertos de host son configurables (`PF_<SVC>_PORT`) con defaults "2 + puerto canónico" y se publican en `PF_BIND_ADDR=127.0.0.1`; dentro de la red Compose se usan los puertos canónicos. **Modo de desarrollo principal:** `deps` en contenedores + apps en el host Windows con `node --watch`. Contenedores de app con `init: true`, entrypoint exec y handler de SIGTERM. `db:seed` = `compose run --rm seed`.
 - `finance-api` healthy solo si PG, Redis y storage responden (`/health/ready`); `/health/live` separado.
 - Volúmenes nombrados: `pg-data`, `object-storage-data`, `redis-data` (opcional); Keycloak usa una base `keycloak` dentro del mismo `postgres` (no volumen propio).

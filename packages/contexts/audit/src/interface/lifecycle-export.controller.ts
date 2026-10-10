@@ -107,6 +107,28 @@ export class LifecycleExportController {
     return this.download(req, res, workspaceId, 'Reconciliation', id, format);
   }
 
+  @Get(`${WS}/recurring/occurrences/:occurrenceId/lifecycle/export`)
+  recurringOccurrence(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: ApiResponse,
+    @Param('workspaceId') workspaceId: string,
+    @Param('occurrenceId') id: string,
+    @Query('format') format: unknown,
+  ) {
+    return this.download(req, res, workspaceId, 'RecurringOccurrence', id, format);
+  }
+
+  @Get(`${WS}/recurring/:definitionId/lifecycle/export`)
+  recurringDefinition(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: ApiResponse,
+    @Param('workspaceId') workspaceId: string,
+    @Param('definitionId') id: string,
+    @Query('format') format: unknown,
+  ) {
+    return this.download(req, res, workspaceId, 'RecurringDefinition', id, format);
+  }
+
   private async download(
     req: ApiRequest,
     res: ApiResponse,

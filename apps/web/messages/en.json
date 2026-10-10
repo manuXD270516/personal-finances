@@ -32,6 +32,7 @@
     "fx": "Crypto & FX",
     "classification": "Classification",
     "planning": "Planning",
+    "recurring": "Recurring",
     "demoIndicator": "Demo data — this workspace contains fictitious data and can be fully cleaned up.",
     "demoOption": "{name} (demo)",
     "workspaceSwitched": "Active workspace: {name}.",
@@ -39,7 +40,8 @@
     "skipToContent": "Skip to content",
     "menu": "Navigation menu",
     "userMenu": "Account menu",
-    "language": "Language"
+    "language": "Language",
+    "recurringPending": "{count, plural, one {# payment to approve} other {# payments to approve}}"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -1401,6 +1403,24 @@
         "ACTIVATE": "Activate",
         "CLOSE": "Close",
         "REOPEN": "Reopen"
+      },
+      "RecurringDefinition": {
+        "CREATE": "Create",
+        "PAUSE": "Pause",
+        "RESUME": "Resume",
+        "REVISE": "Change this and the following",
+        "END": "End"
+      },
+      "RecurringOccurrence": {
+        "GENERATE": "Generate",
+        "BECOME_DUE": "Become due",
+        "MARK_OVERDUE": "Mark overdue",
+        "MATERIALIZE": "Approve (create transaction)",
+        "LINK": "Link",
+        "SKIP": "Skip",
+        "RELEASE": "Release",
+        "CANCEL": "Cancel",
+        "REINSTATE": "Reinstate"
       }
     },
     "export": {
@@ -2292,7 +2312,8 @@
       "severity": "Severity",
       "status": "Status",
       "openBudgetLine": "View the line in the {period} plan",
-      "openPeriodClose": "Go to the {period} close"
+      "openPeriodClose": "Go to the {period} close",
+      "openRecurringOccurrence": "View the recurring payment of {period}"
     },
     "prefs": {
       "title": "Notifications",
@@ -2310,7 +2331,9 @@
       },
       "types": {
         "BUDGET_THRESHOLD": "Budget alerts",
-        "MONTH_CLOSE_PENDING": "Month close pending"
+        "MONTH_CLOSE_PENDING": "Month close pending",
+        "RECURRING_PAYMENT_UPCOMING": "Upcoming recurring payment",
+        "RECURRING_APPROVAL_REQUIRED": "Recurring payment to approve"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -2333,6 +2356,393 @@
         "same": "The start and end times must be different.",
         "server": "The quiet hours are not valid. Check the times."
       }
+    }
+  },
+  "Recurring": {
+    "title": "Recurring payments",
+    "intro": "Your recurring income, expenses and transfers: review what is coming, approve or link each payment and see how much is committed this period.",
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "overridden": "edited",
+    "everyN": "{cadence} (every {interval})",
+    "autoCreateError": "Automatic creation failed: {error}",
+    "truncated": "Showing the first {limit} payments; narrow the range to see the rest.",
+    "tabs": {
+      "label": "Recurring payment sections",
+      "upcoming": "Upcoming",
+      "approval": "To approve",
+      "approvalCount": "To approve ({count})",
+      "definitions": "Definitions"
+    },
+    "status": {
+      "SCHEDULED": "Scheduled",
+      "DUE": "Due soon",
+      "OVERDUE": "Overdue",
+      "MATERIALIZED": "Created",
+      "MATCHED": "Linked",
+      "SKIPPED": "Skipped",
+      "CANCELLED": "Cancelled"
+    },
+    "definitionStatus": {
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "ENDED": "Ended"
+    },
+    "txStatus": {
+      "PENDING": "Pending",
+      "POSTED": "Posted",
+      "CLEARED": "Cleared",
+      "RECONCILED": "Reconciled",
+      "VOIDED": "Voided"
+    },
+    "kinds": {
+      "INCOME": "Income",
+      "EXPENSE": "Expense",
+      "TRANSFER": "Transfer",
+      "LOAN_PAYMENT": "Loan payment",
+      "CARD_PAYMENT": "Card payment"
+    },
+    "modes": {
+      "AUTO_CREATE": "Automatic creation",
+      "PENDING_APPROVAL": "Pending approval",
+      "NOTIFY_ONLY": "Notify only"
+    },
+    "amountTypes": {
+      "FIXED": "Fixed",
+      "ESTIMATED": "Estimated",
+      "MIN_MAX": "Range (minimum and maximum)",
+      "VARIABLE": "Variable (no amount)"
+    },
+    "cadences": {
+      "DAILY": "Daily",
+      "WEEKLY": "Weekly",
+      "BIWEEKLY": "Biweekly (every 2 weeks)",
+      "SEMIMONTHLY": "Twice a month",
+      "MONTHLY": "Monthly",
+      "BIMONTHLY": "Every 2 months",
+      "QUARTERLY": "Quarterly",
+      "SEMIANNUAL": "Every 6 months",
+      "ANNUAL": "Yearly",
+      "CUSTOM": "Custom (RRULE)"
+    },
+    "weekend": {
+      "NONE": "No adjustment",
+      "PREVIOUS": "Move to the previous Friday",
+      "NEXT": "Move to the next Monday"
+    },
+    "paymentMethods": {
+      "CASH": "Cash",
+      "QR": "QR",
+      "DEBIT_CARD": "Debit card",
+      "CREDIT_CARD": "Credit card",
+      "BANK_TRANSFER": "Bank transfer",
+      "DIGITAL_WALLET": "Digital wallet",
+      "OTHER": "Other"
+    },
+    "cancelReasons": {
+      "PAUSED": "The definition was paused",
+      "SUPERSEDED": "Replaced by a change to the definition",
+      "ENDED": "The definition ended"
+    },
+    "matchedBy": {
+      "USER_LINK": "Linked by the user",
+      "SUGGESTION": "Confirmed suggestion"
+    },
+    "amount": {
+      "estimated": "≈ {amount}",
+      "range": "{min} – {max} {currency}",
+      "none": "No amount"
+    },
+    "columns": {
+      "payment": "Payment",
+      "due": "Due",
+      "account": "Account",
+      "amount": "Amount",
+      "status": "Status",
+      "actions": "Actions",
+      "name": "Name",
+      "next": "Next date",
+      "schedule": "Frequency",
+      "toApprove": "To approve",
+      "version": "Version",
+      "effectiveFrom": "Effective from",
+      "mode": "Mode and account"
+    },
+    "actions": {
+      "approve": "Approve",
+      "link": "Link",
+      "skip": "Skip",
+      "edit": "Edit",
+      "approveLabel": "Approve {name} due {date}",
+      "linkLabel": "Link {name} due {date} to a transaction",
+      "skipLabel": "Skip {name} due {date}",
+      "editLabel": "Edit the amount or date of {name} due {date}"
+    },
+    "upcoming": {
+      "range": "Upcoming payments",
+      "days": "{days} days",
+      "caption": "Payments in the next {days} days, overdue first",
+      "empty": "There are no pending payments in the next {days} days."
+    },
+    "tray": {
+      "intro": "Payments from definitions in \"Pending approval\" mode that are due or overdue. Approving creates the transaction; you can also link an existing one or skip the payment.",
+      "caption": "Payments to approve",
+      "empty": "You have no payments to approve."
+    },
+    "definitionOccurrences": {
+      "caption": "Occurrences of the definition",
+      "empty": "This definition has no occurrences with that status."
+    },
+    "definitions": {
+      "caption": "Recurring payment definitions",
+      "empty": "There are no definitions yet. Create the first one to see your upcoming payments.",
+      "new": "New definition",
+      "all": "All",
+      "filterStatus": "Status",
+      "filterKind": "Type",
+      "filterOccurrenceStatus": "Occurrence status",
+      "noNext": "No pending payments"
+    },
+    "committed": {
+      "title": "Committed this period",
+      "loading": "Calculating what is committed…",
+      "period": "{name} ({from} – {to})",
+      "incomplete": "Incomplete total",
+      "unconverted": "A current exchange rate is missing to convert: {parts}. Those parts are not in the total (they are never converted 1:1); they appear by currency below.",
+      "withoutAmount": "{count, plural, one {# payment without an amount} other {# payments without an amount}}: they are not added to the total until you enter the amount when approving them.",
+      "byCurrency": "Committed by currency",
+      "currency": "Currency",
+      "occurrences": "Scheduled payments",
+      "pending": "Pending expenses",
+      "total": "Total",
+      "none": "There are no committed expenses in this period.",
+      "expectedIncome": "Expected income (informational, not subtracted): {amounts}",
+      "rates": "Rates used: {rates}",
+      "breakdown": "View the breakdown ({count})",
+      "breakdownCaption": "Composition of the committed total",
+      "item": "Item",
+      "source": "Source",
+      "unnamed": "Pending expense",
+      "fromOccurrence": "Scheduled payment ({status})",
+      "fromPending": "Pending expense"
+    },
+    "approve": {
+      "title": "Approve {name} due {date}",
+      "description": "The transaction is created with the data of this definition. Confirm what you actually paid.",
+      "amount": "Actual amount ({currency})",
+      "hintExpected": "Leave it empty to use the expected one: {expected}.",
+      "hintRange": "Between {range}. Empty uses the maximum.",
+      "hintVariable": "Required: this payment has no expected amount.",
+      "date": "Transaction date",
+      "status": "Transaction status",
+      "statusPosted": "Posted",
+      "statusPending": "Pending",
+      "confirm": "Approve",
+      "busy": "Approving…",
+      "done": "You approved {name}: its transaction was created."
+    },
+    "skip": {
+      "title": "Skip {name} due {date}",
+      "description": "The occurrence is marked as skipped and no transaction is created.",
+      "reason": "Reason (optional)",
+      "confirm": "Skip",
+      "busy": "Skipping…",
+      "done": "You skipped {name}."
+    },
+    "edit": {
+      "title": "Edit {name} due {date}",
+      "description": "The change affects only this occurrence; the others and the definition do not change.",
+      "amount": "Expected amount ({currency})",
+      "min": "Minimum ({currency})",
+      "max": "Maximum ({currency})",
+      "dueDate": "Due date",
+      "confirm": "Save",
+      "busy": "Saving…",
+      "done": "{name} was updated."
+    },
+    "link": {
+      "title": "Link {name} due {date}",
+      "description": "Choose the transaction you already recorded for this payment: it must have the same type, account and currency and must not be voided.",
+      "search": "Search by description",
+      "searchButton": "Search",
+      "filters": "Transactions of the same account and type between {from} and {to}.",
+      "searching": "Searching transactions…",
+      "empty": "There are no compatible transactions in that range.",
+      "results": "Compatible transactions",
+      "confirm": "Link",
+      "busy": "Linking…",
+      "done": "You linked {name} to the chosen transaction.",
+      "reasons": {
+        "ACCOUNT": "The account does not match.",
+        "KIND": "The type of movement does not match.",
+        "CURRENCY": "The currency does not match.",
+        "VOIDED": "The transaction is voided."
+      }
+    },
+    "form": {
+      "createTitle": "New definition",
+      "reviseTitle": "Change this and the following",
+      "reviseNote": "A new version is created from the chosen date. Occurrences already resolved and their transactions do not change; individual edits of rewritten occurrences are discarded.",
+      "effectiveFrom": "Apply from",
+      "effectiveFromHint": "It must be after the last occurrence already resolved.",
+      "name": "Name",
+      "description": "Description",
+      "notes": "Notes",
+      "kind": "Type",
+      "kindHint": "To pay a card, use a transfer to the card account.",
+      "account": "Account",
+      "fromAccount": "Source account",
+      "toAccount": "Destination account",
+      "chooseAccount": "Choose an account",
+      "category": "Category",
+      "noCategory": "No category",
+      "counterparty": "Counterparty",
+      "noCounterparty": "No counterparty",
+      "tags": "Tags",
+      "paymentMethod": "Payment method",
+      "noPaymentMethod": "Not specified",
+      "amountLegend": "Expected amount",
+      "amountType": "Amount type",
+      "amount": "Amount ({currency})",
+      "min": "Minimum ({currency})",
+      "max": "Maximum ({currency})",
+      "amountHint": {
+        "FIXED": "The same amount on every payment.",
+        "ESTIMATED": "An approximate amount; you enter the real one when approving.",
+        "MIN_MAX": "A range; totals count the maximum.",
+        "VARIABLE": "No expected amount: you enter it when approving each payment."
+      },
+      "scheduleLegend": "Frequency",
+      "cadence": "Repeat",
+      "interval": "Every how many",
+      "intervalHint": "For example, 2 with \"Monthly\" = every 2 months.",
+      "monthDay": "Day of the month",
+      "sameAsStart": "Same as the start date",
+      "chooseDay": "Choose a day",
+      "firstDay": "First day of the month",
+      "secondDay": "Second day of the month",
+      "lastDay": "Last day of the month",
+      "weekendAdjustment": "If it falls on a weekend",
+      "rrule": "Custom rule (RRULE)",
+      "rruleHint": "Subset of RFC 5545: FREQ, INTERVAL, BYDAY, BYMONTHDAY, BYSETPOS, COUNT and UNTIL.",
+      "startDate": "Start date",
+      "endMode": "End",
+      "endNone": "No end",
+      "endDateOption": "On a date",
+      "endCountOption": "After N payments",
+      "endDate": "End date",
+      "maxOccurrences": "Number of payments",
+      "modeLegend": "What to do when it falls due",
+      "modeHint": {
+        "AUTO_CREATE": "Creates the transaction by itself when due.",
+        "PENDING_APPROVAL": "Notifies you and appears in \"To approve\" until you approve it.",
+        "NOTIFY_ONLY": "Only notifies you; resolve it by approving, linking or skipping."
+      },
+      "autoNeedsAmount": "It needs a fixed or estimated amount.",
+      "autoCreateStatus": "Status of the created transaction",
+      "statusPending": "Pending",
+      "statusPosted": "Posted",
+      "leadDays": "Notify in advance (days)",
+      "leadDaysHint": "From 0 to 60 days before the due date.",
+      "create": "Create definition",
+      "reviseSubmit": "Apply the change",
+      "save": "Save",
+      "saving": "Saving…",
+      "created": "You created \"{name}\": {count, plural, one {# occurrence was generated} other {# occurrences were generated}}."
+    },
+    "errors": {
+      "REQUIRED": "This field is required.",
+      "AMOUNT_INVALID": "Enter a valid amount, for example 1,234.50.",
+      "AMOUNT_SCALE": "The amount has more decimals than the account currency allows.",
+      "AMOUNT_NOT_POSITIVE": "The amount must be greater than zero.",
+      "RANGE": "The amount must be inside the range and the maximum cannot be lower than the minimum.",
+      "INTERVAL": "The interval must be an integer between 1 and 120.",
+      "DAYS": "Choose two different days of the month.",
+      "RRULE": "The rule is not supported or produces no dates.",
+      "SCHEDULE": "The schedule is not valid. Check the frequency, the interval and the days.",
+      "DATE": "Choose a valid date.",
+      "END_BEFORE_START": "The end date cannot be before the start date.",
+      "COUNT": "The number of payments must be an integer between 1 and 1000.",
+      "LEAD_DAYS": "The advance notice must be between 0 and 60 days.",
+      "AUTO_AMOUNT": "Automatic creation needs a fixed or estimated amount.",
+      "SAME_ACCOUNT": "The destination account must be different from the source.",
+      "CURRENCY": "Both accounts must have the same currency.",
+      "NO_CHANGES": "There are no changes to save."
+    },
+    "preview": {
+      "title": "Next dates",
+      "unavailable": "Complete the frequency and the start date to see the next dates.",
+      "none": "The rule produces no more dates.",
+      "adjusted": "original date {date}, moved because of the weekend",
+      "monthEnd": "last day of the month",
+      "monthEndWarning": "Month end: in months without a day {day} the payment falls on the last day of the month (for example, February 28 or 29)."
+    },
+    "detail": {
+      "back": "Back to recurring payments",
+      "notFound": "This definition does not exist or you do not have access.",
+      "actions": "Definition actions",
+      "pause": "Pause",
+      "resume": "Resume",
+      "end": "End",
+      "revise": "Change this and the following",
+      "annotate": "Edit name and notes",
+      "pauseTitle": "Pause {name}",
+      "pauseDescription": "Unresolved occurrences from today are cancelled. Earlier overdue ones stay available to resolve.",
+      "resumeTitle": "Resume {name}",
+      "resumeDescription": "Occurrences cancelled by the pause from today are reinstated and any missing ones are generated.",
+      "endTitle": "End {name}",
+      "endDescription": "Unresolved occurrences after the end date are cancelled. Earlier ones stay available to resolve.",
+      "endDate": "End date (optional)",
+      "endDateHint": "If left empty, it ends today.",
+      "done": {
+        "pause": "You paused {name}.",
+        "resume": "You resumed {name}.",
+        "end": "You ended {name}."
+      },
+      "annotateTitle": "Edit name, description and notes",
+      "annotateNote": "These are annotations: they do not create a new version or change the occurrences.",
+      "annotated": "The definition details were saved.",
+      "current": "Current version (v{version})",
+      "currentTag": "current",
+      "versions": "Versions",
+      "versionsCaption": "Versions of the definition, most recent first",
+      "occurrences": "Occurrences"
+    },
+    "summary": {
+      "account": "Account",
+      "amount": "Expected amount",
+      "category": "Category",
+      "counterparty": "Counterparty",
+      "tags": "Tags",
+      "paymentMethod": "Payment method",
+      "schedule": "Frequency",
+      "every": "every {interval}",
+      "start": "Start",
+      "end": "End",
+      "noEnd": "No end",
+      "afterCount": "After {count} payments",
+      "weekend": "Weekend",
+      "mode": "Mode",
+      "leadDays": "Advance notice (days)"
+    },
+    "revision": {
+      "done": "The definition moved to version {version}.",
+      "counts": "Occurrences rewritten: {rewritten}; cancelled: {cancelled}; created: {created}; reinstated: {reinstated}.",
+      "resetOverrides": "{count, plural, one {# individual edit was discarded} other {# individual edits were discarded}} from the rewritten occurrences."
+    },
+    "occurrence": {
+      "notFound": "This payment does not exist or you do not have access.",
+      "viewDefinition": "View the definition",
+      "viewTransaction": "View the transaction",
+      "dueDate": "Due date",
+      "nominalDate": "Original date",
+      "mode": "Mode",
+      "version": "Definition version",
+      "edited": "Edit",
+      "editedValue": "The amount or the due date of this occurrence was edited",
+      "cancelReason": "Reason for the cancellation",
+      "skipReason": "Reason for skipping",
+      "matchedBy": "Linked by"
     }
   },
   "AuditLog": {

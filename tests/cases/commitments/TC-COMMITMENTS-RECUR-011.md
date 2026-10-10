@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Tipos de monto'
 scenario: 'Rango invertido'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-004']
 nfr: []
 invariants: ['INV-001', 'INV-002']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/domain/definition.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'amount']
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - 'Todos se rechazan con RECURRING_INVALID_AMOUNT'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-011 — Montos inconsistentes con el tipo o con escala excedida se rechazan

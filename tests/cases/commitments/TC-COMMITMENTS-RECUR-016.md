@@ -5,16 +5,17 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Horizonte de generación por el worker'
 scenario: 'Ventana deslizante diaria'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-006']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'worker']
@@ -33,7 +34,7 @@ expected_result:
   - 'Ninguna ocurrencia nueva del Gimnasio'
   - 'generated_through avanza a 2027-02-07'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-016 — El worker desliza la ventana hasta hoy más 90 días y no genera para definiciones pausadas

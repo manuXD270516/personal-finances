@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Cadencias predefinidas con intervalo'
 scenario: 'Quincenal'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-002', 'FR-COMMITMENTS-005']
 nfr: []
 invariants: []
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/shared-kernel/src/recurrence/recurrence.properties.test.ts
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'pbt']
@@ -32,7 +34,7 @@ expected_result:
   - 'Con PREVIOUS/NEXT ningún vencimiento en sábado/domingo y |vencimiento − nominal| ≤ 2 días'
   - 'Caso fijo: 2026-10-02, 2026-10-16, 2026-10-30, 2026-11-13, 2026-11-27'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-045 — Propiedad: la expansión es ordenada, dentro de la ventana y el ajuste de fin de semana nunca cae en sábado o domingo

@@ -48,3 +48,25 @@ export {
   type StateTransition,
 } from './lifecycle/lifecycle-machine.js';
 export type { PortabilityExclusion, PortabilitySection } from './portability/section.js';
+export {
+  CADENCES,
+  MAX_COUNT as RECURRENCE_MAX_COUNT,
+  MAX_INTERVAL as RECURRENCE_MAX_INTERVAL,
+  RECURRENCE_FREQUENCIES,
+  RRULE_LOOKAHEAD_YEARS,
+  RRuleSubset,
+  WEEKEND_ADJUSTMENTS,
+  WeekendAdjustment,
+  createRule as createRecurrenceRule,
+  expand as expandRecurrence,
+  nextDates as nextRecurrenceDates,
+  ruleFromCadence,
+  type Cadence,
+  type CadenceInput,
+  type DateWindow,
+  type RecurrenceFreq,
+  type RecurrenceRule,
+  type RuleInput,
+  type WeekdaySpec,
+  type WeekendAdjustmentMode,
+} from './recurrence/index.js';

@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Omitir una ocurrencia'
 scenario: 'Gimnasio omitido en vacaciones'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: ['INV-013']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'skip']
@@ -32,7 +34,7 @@ expected_result:
   - 'No suma al comprometido'
   - 'Sigue existiendo una sola fila SKIPPED para 2026-12-28'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-028 — Una ocurrencia omitida no crea transacción, no cuenta como comprometida y no se regenera

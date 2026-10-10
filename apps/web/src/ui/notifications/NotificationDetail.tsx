@@ -148,7 +148,9 @@ export function NotificationDetailView({
           <a href={href(target)} data-testid="notification-open-resource" data-link-kind={n.link.kind}>
             {n.link.kind === 'PERIOD_CLOSE'
               ? f.t('detail.openPeriodClose', { period })
-              : f.t('detail.openBudgetLine', { period })}
+              : n.link.kind === 'RECURRING_OCCURRENCE'
+                ? f.t('detail.openRecurringOccurrence', { period })
+                : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

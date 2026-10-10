@@ -163,13 +163,13 @@ interface RecurrenceRule {          // Subconjunto de RFC 5545 RRULE + ajustes d
   byMonthDay?: number[];            // 1..31, -1 = último día
   byWeekday?: Weekday[]; bySetPos?: number;  // "último viernes"
   start: LocalDate; until?: LocalDate; count?: number;
-  businessDayAdjustment: 'NONE' | 'PREVIOUS' | 'NEXT' | 'MODIFIED_FOLLOWING';
+  businessDayAdjustment: 'NONE' | 'PREVIOUS' | 'NEXT';   // Phase 3: solo fin de semana; 'MODIFIED_FOLLOWING' y feriados fuera de Phase 3 (D130)
   timeZone: TimeZone;
 }
 // expand(rule, window: DateRange, holidays?): LocalDate[]  — función pura y determinista
 ```
 
-Reglas: día 31 en meses cortos → último día del mes; `until` y `count` mutuamente excluyentes; la clave de ocurrencia es la **fecha nominal** (antes del ajuste por día hábil) para que la generación sea estable (INV-013).
+Reglas: día 29–31 en meses sin ese día → último día del mes (**desviación deliberada de RFC 5545**, que omitiría el mes; la UI lo explica; FR-COMMITMENTS-005); `until` y `count` mutuamente excluyentes; la clave de ocurrencia es la **fecha nominal** (antes del ajuste por día hábil) para que la generación sea estable (INV-013).
 
 ### 2.8 Otros
 
@@ -270,15 +270,15 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.7 COMMITMENTS — Recurrence & Subscriptions (`commitments`)
 
-- **AR `RecurringDefinition`**: `id, name, kind (INCOME|EXPENSE|TRANSFER), template: VO (accountId, toAccountId?, amount: Money | AmountEstimate{min,max}, categoryId?, counterpartyId?, tagIds), rule: RecurrenceRule, materialization (MANUAL_CONFIRM|AUTO_PENDING|AUTO_POST), leadDays, status (ACTIVE|PAUSED|ENDED), version`.
-- **AR `RecurringOccurrence`**: `id, definitionId, occurrenceDate (nominal, clave), dueDate (ajustada), expectedAmount, status, transactionId?, definitionVersion`. Agregado separado (alto volumen, ciclo propio).
+- **AR `RecurringDefinition`** (nomenclatura canónica fijada por `add-recurrence-engine`, decisión 2): `id, workspaceId, name, description, kind (INCOME|EXPENSE|TRANSFER; reservados LOAN_PAYMENT|CARD_PAYMENT hasta Phase 4, D116), managedBy (USER|SUBSCRIPTION|DEBT; hoy solo USER), status (ACTIVE|PAUSED|ENDED), currentVersionNo, versions: DefinitionVersion[], generatedThrough, version`. **VO `DefinitionVersion`** (inmutable, append-only): `versionNo, effectiveFrom, template (accountId, toAccountId?, categoryId?, counterpartyId?, tagIds, paymentMethod?), schedule (RecurrenceRule + cadencia), amountSpec (FIXED|ESTIMATED|MIN_MAX|VARIABLE), materialization (AUTO_CREATE con autoCreateStatus PENDING|POSTED | PENDING_APPROVAL | NOTIFY_ONLY), leadDays`.
+- **AR `RecurringOccurrence`**: `id, definitionId, occurrenceDate (nominal, clave), dueDate (ajustada o editada), definitionVersionNo, expected: AmountSpec, overridden {amount, date}, status (SCHEDULED|DUE|OVERDUE|MATERIALIZED|MATCHED|SKIPPED|CANCELLED), cancelReason? (PAUSED|SUPERSEDED|ENDED), transactionId?, resolution? (CREATED|MATCHED|SKIPPED), version`. Agregado separado (alto volumen, ciclo propio).
 - **AR `Subscription`**: `id, counterpartyId, name, plan, price: Money, billingRule: RecurrenceRule, accountId, status, trialEndsOn?, nextRenewalOn, priceHistory: VO[] (effectiveFrom, price), recurringDefinitionId, cancellationNotes?`.
 - **DS**: `RecurrenceEngine` (expansión pura del `RecurrenceRule`), `OccurrenceGenerator` (ventana deslizante idempotente), `OccurrenceMatcher` (tolerancias de monto/fecha/contraparte), `SubscriptionDetector` (Phase 6+, sugerencias).
-- **Repos**: uno por AR. **Ports**: `TransactionsCommandPort` (sync), `Clock`, `JobScheduler`.
-- **Comandos**: `CreateRecurringDefinition`, `UpdateRecurringDefinition` (aplica a ocurrencias futuras no materializadas), `PauseDefinition`, `ResumeDefinition`, `EndDefinition`, `GenerateOccurrences(window)` (job), `ConfirmOccurrence` (materializa transacción), `SkipOccurrence`, `MatchOccurrence(transactionId)`, `CreateSubscription`, `ChangeSubscriptionPrice`, `PauseSubscription`, `CancelSubscription`.
+- **Repos**: uno por AR. **Ports**: `TransactionsCommandPort` (sync; en Phase 3 `RecurringTransactionPort` de `@pf/transactions/contracts`), `Clock`, `JobScheduler`.
+- **Comandos**: `CreateDefinition`, `UpdateDefinitionDetails` (anotación), `ReviseDefinition` ("esta y las siguientes": nueva versión inmutable), `PauseDefinition`, `ResumeDefinition`, `EndDefinition`, `GenerateOccurrences(workspace)` (job), `MaterializeOccurrence` ("Aprobar" en la UI; crea la transacción), `EditOccurrence`, `SkipOccurrence`, `LinkOccurrence(transactionId)`, `CreateSubscription`, `ChangeSubscriptionPrice`, `PauseSubscription`, `CancelSubscription`.
 - **Queries**: `ListUpcomingOccurrences(range)`, `GetDefinition`, `ListSubscriptions`, `GetSubscriptionCostSummary`.
-- **Eventos**: `RecurringOccurrenceGenerated` (batch, ver [11](11-domain-events.md)), `RecurringOccurrenceDue`, `RecurringOccurrenceMaterialized`, `SubscriptionPriceChanged`, `SubscriptionRenewalUpcoming`, `SubscriptionCancelled`.
-- **Invariantes**: INV-013; una ocurrencia materializada referencia exactamente una transacción; editar una definición no altera ocurrencias ya materializadas; `priceHistory` ordenada y sin solapes.
+- **Eventos**: `OccurrencesGenerated` (batch, ver [11](11-domain-events.md)), `RecurringOccurrenceDue`, `RecurringOccurrenceMaterialized`, `RecurringOccurrenceChanged`, `RecurringDefinitionChanged`, `SubscriptionPriceChanged`, `SubscriptionRenewalUpcoming`, `SubscriptionCancelled`.
+- **Invariantes**: INV-013; una ocurrencia materializada referencia exactamente una transacción; editar o revisar una definición no altera ocurrencias ya resueltas (`MATERIALIZED|MATCHED|SKIPPED`) ni sus transacciones; una transacción resuelve a lo sumo una ocurrencia; `priceHistory` ordenada y sin solapes.
 
 ### 3.8 GOALS — Savings Goals (`goals`)
 
@@ -471,22 +471,32 @@ Para `BANK_API`, `awaiting_review` puede saltarse si el workspace configura auto
 
 ### 4.4 RecurringOccurrence
 
+Nomenclatura canónica de `add-recurrence-engine` (decisión 2). La edición de monto o fecha es anotación (`EDIT`), no transición. `CANCELLED` **no es terminal**: `REINSTATE` evita que la clave nominal bloquee una fecha que una revisión o reanudación vuelve a producir. "Por aprobar" = `DUE`/`OVERDUE` de una definición en modo `PENDING_APPROVAL`.
+
 ```mermaid
 stateDiagram-v2
-  [*] --> scheduled: GenerateOccurrences (una vez por definitionId+occurrenceDate)
-  scheduled --> due: dueDate - leadDays alcanzado
-  scheduled --> cancelled: definición pausada/terminada/editada (futuras)
-  due --> materialized: ConfirmOccurrence / AUTO_* crea transacción
-  due --> matched: MatchOccurrence (transacción existente/importada)
-  due --> skipped: SkipOccurrence
-  due --> overdue: dueDate pasada sin acción
-  overdue --> materialized: ConfirmOccurrence
-  overdue --> matched: MatchOccurrence
-  overdue --> skipped: SkipOccurrence
-  materialized --> [*]
-  matched --> [*]
-  skipped --> [*]
-  cancelled --> [*]
+  [*] --> SCHEDULED: GENERATE (una vez por definitionId+occurrenceDate)
+  SCHEDULED --> DUE: BECOME_DUE (hoy >= dueDate - leadDays)
+  SCHEDULED --> OVERDUE: MARK_OVERDUE (hoy > dueDate)
+  DUE --> OVERDUE: MARK_OVERDUE (hoy > dueDate)
+  SCHEDULED --> MATERIALIZED: MATERIALIZE (crea transacción)
+  DUE --> MATERIALIZED: MATERIALIZE
+  OVERDUE --> MATERIALIZED: MATERIALIZE
+  SCHEDULED --> MATCHED: LINK (transacción existente)
+  DUE --> MATCHED: LINK
+  OVERDUE --> MATCHED: LINK
+  SCHEDULED --> SKIPPED: SKIP
+  DUE --> SKIPPED: SKIP
+  OVERDUE --> SKIPPED: SKIP
+  MATERIALIZED --> DUE: RELEASE (transacción anulada, hoy <= dueDate)
+  MATERIALIZED --> OVERDUE: RELEASE (transacción anulada, hoy > dueDate)
+  MATCHED --> DUE: RELEASE
+  MATCHED --> OVERDUE: RELEASE
+  SCHEDULED --> CANCELLED: CANCEL (pausa, revisión o fin)
+  DUE --> CANCELLED: CANCEL
+  OVERDUE --> CANCELLED: CANCEL
+  CANCELLED --> SCHEDULED: REINSTATE (reanudación o revisión)
+  SKIPPED --> [*]
 ```
 
 ### 4.5 SavingsGoal

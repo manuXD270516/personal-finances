@@ -99,5 +99,15 @@
   "EXPORT_FILE_CORRUPTED": "O arquivo está danificado ou foi modificado. Nada foi importado.",
   "EXPORT_FORMAT_UNSUPPORTED": "O formato do arquivo não é compatível (por exemplo, exportações de dados de demonstração). Nada foi importado.",
   "EXPORT_VERIFICATION_FAILED": "Os dados importados não coincidem com o resumo do arquivo. Nenhum espaço de trabalho foi criado.",
-  "UPLOAD_TOO_LARGE": "O arquivo excede o tamanho máximo permitido."
+  "UPLOAD_TOO_LARGE": "O arquivo excede o tamanho máximo permitido.",
+  "INVALID_RRULE": "A regra de repetição não é compatível ou não produz nenhuma data.",
+  "RECURRING_KIND_NOT_AVAILABLE": "Este tipo de pagamento recorrente ainda não está disponível. Para pagar um cartão use uma transferência para a conta do cartão.",
+  "RECURRING_INVALID_SCHEDULE": "A programação não é válida. Revise a frequência, o intervalo, os dias do mês e a data de término.",
+  "RECURRING_INVALID_AMOUNT": "O valor não é válido para esse tipo: deve ser maior que zero, respeitar as casas decimais da moeda e estar dentro da faixa.",
+  "RECURRING_MODE_NOT_ALLOWED": "A criação automática precisa de um valor fixo ou estimado. Escolha aprovação pendente ou apenas aviso.",
+  "RECURRING_REVISION_DATE_INVALID": "A data da alteração deve ser posterior à última ocorrência já resolvida.",
+  "OCCURRENCE_AMOUNT_REQUIRED": "Informe o valor para aprovar este pagamento: ele não tem um valor esperado.",
+  "OCCURRENCE_LINK_MISMATCH": "A transação não corresponde ao pagamento: deve ter o mesmo tipo, conta e moeda e não estar anulada.",
+  "OCCURRENCE_ALREADY_MATERIALIZED": "Este pagamento já tem a sua transação.",
+  "TRANSACTION_ALREADY_LINKED": "Essa transação já está vinculada a outro pagamento recorrente."
 }

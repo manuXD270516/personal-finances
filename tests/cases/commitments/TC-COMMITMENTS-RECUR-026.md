@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Ocurrencias en periodos cerrados'
 scenario: 'Aprobar en septiembre cerrado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: ['INV-015']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'closed-period']
@@ -31,7 +33,7 @@ expected_result:
   - 'Primera: PERIOD_CLOSED, ocurrencia sigue OVERDUE, sin transacción'
   - 'Segunda: gasto con fecha 2026-10-02 y ocurrencia MATERIALIZED'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-026 — Aprobar una ocurrencia en un periodo cerrado se rechaza y se puede aprobar tras mover su fecha

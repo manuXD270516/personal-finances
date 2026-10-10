@@ -542,6 +542,19 @@ body {
   font-weight: 500;
   text-decoration: none;
 }
+.pf-nav-count {
+  margin-left: auto;
+  min-width: 1.25rem;
+  padding: 0 var(--pf-space-1);
+  border-radius: var(--pf-radius-full);
+  background: var(--pf-primary);
+  color: var(--pf-primary-fg);
+  font-size: var(--pf-text-xs);
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .pf-nav-link:hover {
   background: var(--pf-surface-sunken);
   color: var(--pf-fg);

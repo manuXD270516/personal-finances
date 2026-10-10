@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Lista de próximos pagos'
 scenario: 'Próximos 7 días'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-011']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'upcoming', 'q8']
@@ -30,7 +32,7 @@ expected_result:
   - '[Luz (OVERDUE), Internet] en ese orden'
   - 'Sin Gimnasio'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-038 — Los próximos 7 días listan atrasadas primero y excluyen vencimientos posteriores

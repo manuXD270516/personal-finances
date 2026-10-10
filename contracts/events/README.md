@@ -39,6 +39,12 @@ contracts/events/
 │  ├─ MonthClosed.v1.schema.json         # add-month-closing: cierre aceptado (snapshot versión closeNo)
 │  ├─ PeriodReopened.v1.schema.json      # add-month-closing: reapertura por el OWNER con motivo
 │  └─ MonthClosePending.v1.schema.json   # add-month-closing: aviso único por periodo (consume NOTIFY)
+├─ commitments/                         # add-recurrence-engine (motor de recurrencia)
+│  ├─ OccurrencesGenerated.v1.schema.json    # lote por (definición, ventana efectiva insertada); reemplaza a RecurringOccurrenceGenerated
+│  ├─ RecurringOccurrenceDue.v1.schema.json  # BECOME_DUE; lo consume NOTIFY (notifications.occurrence-due)
+│  ├─ RecurringOccurrenceMaterialized.v1.schema.json  # MATERIALIZE y LINK (CREATED | MATCHED)
+│  ├─ RecurringOccurrenceChanged.v1.schema.json       # EDIT, SKIP, RELEASE, MARK_OVERDUE
+│  └─ RecurringDefinitionChanged.v1.schema.json       # CREATE, REVISE, PAUSE, RESUME, END
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/
@@ -76,6 +82,18 @@ Resumen de [docs/11-domain-events.md §4](../../docs/11-domain-events.md):
 2. Diff de compatibilidad contra `main` (cambio breaking sin nueva versión ⇒ fallo).
 3. Tests de contrato del productor por evento (`[TC-<CTX>-EVENTS-NNN]`), con Ajv (`strict`, `ajv-formats`).
 4. Test de cobertura: todo `eventType` emitido en código tiene schema.
+
+## Eventos Phase 3 — Commitments (`add-recurrence-engine`)
+
+| Evento | Productor | Consumidores |
+|---|---|---|
+| `commitments.OccurrencesGenerated.v1` | COMMITMENTS | REPORTING (calendario, Phase 7), MATCHING |
+| `commitments.RecurringOccurrenceDue.v1` | COMMITMENTS | NOTIFY |
+| `commitments.RecurringOccurrenceMaterialized.v1` | COMMITMENTS | REPORTING, SUBSCRIPTIONS |
+| `commitments.RecurringOccurrenceChanged.v1` | COMMITMENTS | REPORTING, MATCHING |
+| `commitments.RecurringDefinitionChanged.v1` | COMMITMENTS | REPORTING, MATCHING |
+
+Notas: el agregado de cada evento es `RecurringDefinition` (`OccurrencesGenerated`, `RecurringDefinitionChanged`) o `RecurringOccurrence` (el resto) y su `version` sube con cada evento del mismo agregado. Los montos esperados (`expected`) usan `{type, amount|null, min|null, max|null}` con decimal positivo como texto; `managedBy` (`USER|SUBSCRIPTION|DEBT`) permite a Subscriptions filtrar sus definiciones. `transactions.TransactionCreated.v1` lleva `origin.refId` = `occurrenceId` cuando `origin.type = RECURRING` (cambio compatible, sin nueva versión).
 
 ## Eventos Phase 1
 

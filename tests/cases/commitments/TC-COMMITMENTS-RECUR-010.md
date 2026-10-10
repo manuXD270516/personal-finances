@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Tipos de monto'
 scenario: 'Gimnasio con rango'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-004']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/definition.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'amount']
@@ -30,7 +33,7 @@ expected_result:
   - 'Cada ocurrencia del Gimnasio informa 100.00–180.00 BOB y projectedAmount 180.00 BOB'
   - 'Las ocurrencias de Compra mayorista no tienen monto esperado'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-010 — Un gasto MIN_MAX informa el rango y proyecta el máximo

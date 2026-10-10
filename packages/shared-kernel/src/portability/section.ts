@@ -18,7 +18,7 @@ export interface PortabilitySection {
   /**
    * Orden de exportación e importación (menor primero): las dependencias de FK van antes. Reservado por rangos:
    * 100 workspace · 200 fx · 300 classification · 400 accounts · 500 ledger · 600 transactions · 700 planning ·
-   * 800 notifications · 900 audit · 990 cierres de periodo del ledger (siempre al final: el trigger PF004 rechazaría
+   * 750 commitments (después de planning y antes de notifications) · 800 notifications · 900 audit · 990 cierres de periodo del ledger (siempre al final: el trigger PF004 rechazaría
    * asientos en meses cerrados).
    */
   readonly order: number;

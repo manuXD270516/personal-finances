@@ -31,6 +31,10 @@ export interface NotificationTypeDefinition {
   readonly recipients: readonly WorkspaceRoleName[];
   /** Traduce el payload del hecho (validado por contrato en el productor; se revalida su forma mínima aquí). */
   plan(payload: unknown): NotificationPlan;
+  /** Otros tipos que este mismo consumidor puede producir (el tipo concreto lo decide `plan`). */
+  readonly alsoTypes?: readonly NotificationType[];
+  /** `true` si el hecho NO debe generar aviso genérico (p. ej. D119); se evalúa tras validar con `plan`. */
+  suppressed?(payload: unknown): boolean;
 }
 
 // ──────────────────────────────────────────────────────────────────────────── lectura defensiva del payload
@@ -170,14 +174,102 @@ const MONTH_CLOSE_PENDING: NotificationTypeDefinition = {
   },
 };
 
+// ──────────────────────────────────────────────────────────────────────────── RECURRING_* (add-recurrence-engine)
+
+export const RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY = 'notifications.recurring_payment_upcoming.v1';
+export const RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY = 'notifications.recurring_approval_required.v1';
+
+const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const EXPECTED_TYPES = ['FIXED', 'ESTIMATED', 'MIN_MAX', 'VARIABLE'];
+const MANAGED_BY = ['USER', 'SUBSCRIPTION', 'DEBT'];
+
+function localDateOf(source: Record<string, unknown>, key: string): string {
+  const value = source[key];
+  return typeof value === 'string' && LOCAL_DATE.test(value) ? value : fail(key);
+}
+
+function nullableDecimalOf(source: Record<string, unknown>, key: string): string | null {
+  return source[key] === null ? null : decimalOf(source, key);
+}
+
+/**
+ * `commitments.RecurringOccurrenceDue.v1`: la ocurrencia pasó a próxima. Tipo `RECURRING_APPROVAL_REQUIRED` si requiere
+ * aprobación, si no `RECURRING_PAYMENT_UPCOMING`. La clave de negocio es la ocurrencia (INV-028 en dos capas).
+ */
+const OCCURRENCE_DUE: NotificationTypeDefinition = {
+  type: 'RECURRING_PAYMENT_UPCOMING',
+  alsoTypes: ['RECURRING_APPROVAL_REQUIRED'],
+  consumer: 'notifications.occurrence-due',
+  event: { type: 'commitments.RecurringOccurrenceDue', version: 1 },
+  // Solo quienes pueden aprobar/registrar (docs/33 D126): VIEWER no recibe.
+  recipients: ['OWNER', 'EDITOR'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const occurrenceId = uuidOf(p, 'occurrenceId');
+    const definitionId = uuidOf(p, 'definitionId');
+    const name = p['name'];
+    if (typeof name !== 'string' || name.length === 0) fail('name');
+    const expected = recordOf(p['expected'], 'expected');
+    const expectedType = expected['type'];
+    if (typeof expectedType !== 'string' || !EXPECTED_TYPES.includes(expectedType)) fail('expected.type');
+    const currency = p['currency'];
+    if (typeof currency !== 'string' || currency.length === 0) fail('currency');
+    if (typeof p['requiresApproval'] !== 'boolean') fail('requiresApproval');
+    const requiresApproval = p['requiresApproval'] as boolean;
+    const mode = p['mode'];
+    if (typeof mode !== 'string' || mode.length === 0) fail('mode');
+    const kind = p['kind'];
+    if (typeof kind !== 'string' || kind.length === 0) fail('kind');
+    if (!MANAGED_BY.includes(p['managedBy'] as string)) fail('managedBy');
+    return {
+      type: requiresApproval ? 'RECURRING_APPROVAL_REQUIRED' : 'RECURRING_PAYMENT_UPCOMING',
+      dedupeKey: `occurrence-due:${occurrenceId}`,
+      severity: requiresApproval ? 'WARNING' : 'INFO',
+      messageKey: requiresApproval
+        ? RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY
+        : RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY,
+      params: {
+        occurrenceId,
+        definitionId,
+        name: name as string,
+        kind: kind as string,
+        occurrenceDate: localDateOf(p, 'occurrenceDate'),
+        dueDate: localDateOf(p, 'dueDate'),
+        expected: {
+          type: expectedType as string,
+          amount: nullableDecimalOf(expected, 'amount'),
+          min: nullableDecimalOf(expected, 'min'),
+          max: nullableDecimalOf(expected, 'max'),
+        },
+        currency: currency as string,
+        requiresApproval,
+        mode: mode as string,
+        managedBy: p['managedBy'] as string,
+      },
+      link: {
+        kind: 'RECURRING_OCCURRENCE',
+        occurrenceId,
+        periodId: typeof p['periodId'] === 'string' ? uuidOf(p, 'periodId') : occurrenceId,
+        periodLabel: localDateOf(p, 'dueDate').slice(0, 7),
+      },
+    };
+  },
+  // D119: una ocurrencia que ya gestiona una suscripción y no requiere aprobación la avisa `add-subscriptions`.
+  suppressed(payload) {
+    const p = recordOf(payload, 'payload');
+    return p['managedBy'] === 'SUBSCRIPTION' && p['requiresApproval'] === false;
+  },
+};
+
 /** Registro de tipos por fase: una tabla en código, no un motor de reglas (RISK-005). */
 export const NOTIFICATION_TYPE_CATALOG: readonly NotificationTypeDefinition[] = [
   BUDGET_THRESHOLD,
   MONTH_CLOSE_PENDING,
+  OCCURRENCE_DUE,
 ];
 
 export function definitionOf(type: NotificationType): NotificationTypeDefinition {
-  const definition = NOTIFICATION_TYPE_CATALOG.find((d) => d.type === type);
+  const definition = NOTIFICATION_TYPE_CATALOG.find((d) => d.type === type || d.alsoTypes?.includes(type));
   if (!definition) throw new DomainError('VALIDATION_FAILED', `unknown notification type ${type}`);
   return definition;
 }

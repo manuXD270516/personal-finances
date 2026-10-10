@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: [commitments/recurrence-engine]
 requirement: 'Aviso de pago próximo u ocurrencia por aprobar'
 scenario: 'Hecho entregado dos veces'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-005']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/notify-from-event.test.ts
+  - packages/contexts/notifications/src/domain/type-catalog.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'idempotency']
@@ -29,7 +31,7 @@ expected_result:
   - 'Una notificación por destinatario (dedupe occurrence-due:<occurrenceId>)'
   - 'Un solo email por destinatario'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-044 — El mismo hecho de ocurrencia próxima entregado dos veces genera una sola notificación

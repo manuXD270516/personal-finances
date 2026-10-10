@@ -63,7 +63,7 @@ tags:
   - name: Notifications
     description: "Phase 2: in-app notification center, email channel and preferences (budget thresholds, month pending close)."
   - name: Commitments
-    description: "LATER (Phase 3): recurring definitions, occurrences and subscriptions."
+    description: "Phase 3: recurring definitions, occurrences, committed amount and upcoming payments (add-recurrence-engine). Subscriptions: LATER."
   - name: Goals
     description: "LATER (Phase 4): savings goals and contributions (transfer or earmark)."
   - name: Debt
@@ -5913,6 +5913,706 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ───────────────────────────── Commitments: motor de recurrencia (Phase 3, add-recurrence-engine) ─────────────────────────────
+  /workspaces/{workspaceId}/recurring:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Commitments]
+      operationId: listRecurringDefinitions
+      summary: List the recurring definitions of the workspace
+      description: |
+        Definitions ordered by name. Each item carries its current version, the next unresolved occurrence and the number
+        of occurrences waiting for approval (`pendingApprovalCount`).
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/RecurringStatus' }
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/RecurringKind' }
+        - $ref: '#/components/parameters/Query'
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Definitions page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinitionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Commitments]
+      operationId: createRecurringDefinition
+      summary: Create a recurring definition (income, expense or transfer)
+      description: |
+        Creates version 1 and generates synchronously the occurrences of the first window (from the start of the
+        financial period that contains today, or the start date if later, up to today + the generation horizon).
+        `LOAN_PAYMENT` and `CARD_PAYMENT` are reserved for Phase 4 → 422 `RECURRING_KIND_NOT_AVAILABLE` (a card payment
+        is a `TRANSFER` to the liability account today). The currency is the account currency; a transfer uses one
+        currency. `AUTO_CREATE` needs a `FIXED` or `ESTIMATED` amount.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringDefinitionInput' }
+      responses:
+        '201':
+          description: Created definition (with `generatedCount`)
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_CLOSED, ACCOUNT_ARCHIVED, CATEGORY_ARCHIVED, COUNTERPARTY_ARCHIVED or TAG_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            RECURRING_KIND_NOT_AVAILABLE, RECURRING_INVALID_SCHEDULE, INVALID_RRULE, RECURRING_INVALID_AMOUNT,
+            RECURRING_MODE_NOT_ALLOWED, CURRENCY_MISMATCH, TRANSFER_CURRENCY_MISMATCH, TRANSFER_SAME_ACCOUNT,
+            CATEGORY_KIND_MISMATCH or REFERENCE_NOT_FOUND.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/committed:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Commitments]
+      operationId: getCommittedAmount
+      summary: Committed amount of a financial period (Q4)
+      description: |
+        Unresolved expense occurrences (and transfers from a liquid to a non-liquid account) plus pending expense
+        transactions whose date falls in the period, without double counting; by currency and consolidated into the base
+        currency with the same valuation as the Home (never 1:1 without a rate: the result is then `complete = false`).
+        `VARIABLE` occurrences do not add up and are counted in `withoutAmountCount`; expected income is informative.
+        Defaults to the period that contains today in the workspace time zone.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: periodId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Committed amount
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommittedAmount' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Commitments]
+      operationId: listRecurringOccurrences
+      summary: List occurrences (upcoming payments and the approval tray)
+      description: |
+        Ordered by due date. With `days` (7, 30, 60 or 90) only unresolved occurrences due up to today + days are listed
+        (overdue ones first, of any age). With `requiresApproval = true` only the tray: `DUE` or `OVERDUE` occurrences of
+        definitions in `PENDING_APPROVAL` mode (`NOTIFY_ONLY` never enters the tray).
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: status
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/RecurringOccurrenceStatus' }
+          style: form
+          explode: true
+        - name: requiresApproval
+          in: query
+          schema: { type: boolean }
+        - name: days
+          in: query
+          schema: { type: integer, enum: [7, 30, 60, 90] }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Occurrences page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringOccurrencePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences/{occurrenceId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringOccurrenceId'
+    get:
+      tags: [Commitments]
+      operationId: getRecurringOccurrence
+      summary: Get a recurring occurrence
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Occurrence
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringOccurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Commitments]
+      operationId: updateRecurringOccurrence
+      summary: Edit the expected amount and/or the due date of one occurrence
+      description: |
+        Affects only this occurrence (the nominal date and the other occurrences are untouched). Only unresolved
+        occurrences can be edited → 409 `INVALID_STATUS_TRANSITION`. Editing is an annotation in the lifecycle.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringOccurrenceUpdate' }
+      responses:
+        '200':
+          description: Edited occurrence
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringOccurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences/{occurrenceId}/materialize:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringOccurrenceId'
+    post:
+      tags: [Commitments]
+      operationId: materializeRecurringOccurrence
+      summary: Approve an occurrence (creates its transaction)
+      description: |
+        Creates the transaction through the public port of Transactions (`source = RECURRING`, `externalRef =
+        commitments.occurrence/<id>`) in the same unit of work as the occurrence change. Amount: `FIXED` → the expected
+        one; `ESTIMATED` → the given or the expected; `MIN_MAX` → the given (inside the range) or the maximum;
+        `VARIABLE` → required (422 `OCCURRENCE_AMOUNT_REQUIRED`). Date: the given one or `min(due date, today)`. Status:
+        the given one or `POSTED`. A resolved occurrence → 409 `OCCURRENCE_ALREADY_MATERIALIZED`; a closed period →
+        409 `PERIOD_CLOSED` (edit the due date and approve again).
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringMaterializeRequest' }
+      responses:
+        '201':
+          description: Approved occurrence and the transaction created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringMaterializeResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'OCCURRENCE_ALREADY_MATERIALIZED, PERIOD_CLOSED, ACCOUNT_CLOSED, INVALID_STATUS_TRANSITION.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'OCCURRENCE_AMOUNT_REQUIRED, RECURRING_INVALID_AMOUNT or CURRENCY_MISMATCH.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences/{occurrenceId}/skip:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringOccurrenceId'
+    post:
+      tags: [Commitments]
+      operationId: skipRecurringOccurrence
+      summary: Skip an occurrence (definitive)
+      description: A skipped occurrence creates no transaction, does not count as committed and is never regenerated.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringSkipRequest' }
+      responses:
+        '200':
+          description: Skipped occurrence
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringOccurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already resolved, skipped or cancelled).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences/{occurrenceId}/link:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringOccurrenceId'
+    post:
+      tags: [Commitments]
+      operationId: linkRecurringOccurrence
+      summary: Mark an occurrence as paid by linking an existing transaction
+      description: |
+        Strict compatibility: same kind (a transfer also the same source and destination), same account and currency, not
+        voided; amount and date are the user's decision. Incompatible → 422 `OCCURRENCE_LINK_MISMATCH`
+        (`details.reasons`: `ACCOUNT`, `KIND`, `CURRENCY`, `VOIDED`). A transaction linked to another occurrence → 409
+        `TRANSACTION_ALREADY_LINKED`. Voiding the linked transaction releases the occurrence.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringLinkRequest' }
+      responses:
+        '200':
+          description: Linked occurrence
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringOccurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'TRANSACTION_ALREADY_LINKED, OCCURRENCE_ALREADY_MATERIALIZED or INVALID_STATUS_TRANSITION.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'OCCURRENCE_LINK_MISMATCH or REFERENCE_NOT_FOUND.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences/{occurrenceId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringOccurrenceId'
+    get:
+      tags: [Commitments]
+      operationId: getRecurringOccurrenceLifecycle
+      summary: Lifecycle of a recurring occurrence
+      description: |
+        Machine `RECURRING_OCCURRENCE_LIFECYCLE` (docs/31 D37): generate, become due, overdue, materialize, link, skip,
+        release, cancel and reinstate; editing the amount or the date is an annotation. Automatic steps carry the worker
+        process as actor.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Occurrence lifecycle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/occurrences/{occurrenceId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringOccurrenceId'
+    get:
+      tags: [Commitments]
+      operationId: exportRecurringOccurrenceLifecycle
+      summary: Export the lifecycle of a recurring occurrence (CSV or PDF)
+      description: Same synchronous download as the other lifecycles (docs/31 D52); the export is audited.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    get:
+      tags: [Commitments]
+      operationId: getRecurringDefinition
+      summary: Get a recurring definition with its versions
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Commitments]
+      operationId: updateRecurringDefinition
+      summary: Rename or annotate a definition (name, description, notes)
+      description: 'Annotation only: it does not create a version of the template.'
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringDefinitionUpdate' }
+      responses:
+        '200':
+          description: Updated definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    post:
+      tags: [Commitments]
+      operationId: reviseRecurringDefinition
+      summary: Change this and the following occurrences (new immutable version from a date)
+      description: |
+        Creates version n+1 effective from `effectiveFrom`, which must be after the nominal date of the last resolved
+        occurrence (422 `RECURRING_REVISION_DATE_INVALID`). Unresolved occurrences from that date are rewritten (their
+        individual edits are discarded and counted in `resetOverrides`), cancelled (`SUPERSEDED`), reinstated or
+        created; resolved occurrences and their transactions never change. The kind cannot change. Costly operation
+        (`x-rate-limit: costly`): it can rewrite every occurrence of the horizon.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringRevisionRequest' }
+      responses:
+        '200':
+          description: Revised definition and the effect on its occurrences
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringRevisionResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (ended definition) or the account/category/counterparty states of creation.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'RECURRING_REVISION_DATE_INVALID plus the validation codes of creation.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/pause:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    post:
+      tags: [Commitments]
+      operationId: pauseRecurringDefinition
+      summary: Pause a definition (cancels the unresolved occurrences from today)
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Paused definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/resume:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    post:
+      tags: [Commitments]
+      operationId: resumeRecurringDefinition
+      summary: Resume a paused definition (reinstates the later occurrences and generates the missing ones)
+      description: The occurrences of the paused interval stay cancelled; only dates from today on are reinstated or generated.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Resumed definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (not paused, or ended).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/end:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    post:
+      tags: [Commitments]
+      operationId: endRecurringDefinition
+      summary: End a definition (today or on an end date)
+      description: |
+        Without `endDate` (or with today) the definition becomes `ENDED` immediately; with a future date the series stops
+        there and the worker ends it afterwards. Unresolved occurrences after the date are cancelled (`ENDED`); earlier
+        ones stay resolvable.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurringEndRequest' }
+      responses:
+        '200':
+          description: Ended (or ending) definition
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringDefinition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/occurrences:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    get:
+      tags: [Commitments]
+      operationId: listDefinitionOccurrences
+      summary: List the occurrences of one definition
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: status
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/RecurringOccurrenceStatus' }
+          style: form
+          explode: true
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Occurrences page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecurringOccurrencePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    get:
+      tags: [Commitments]
+      operationId: getRecurringDefinitionLifecycle
+      summary: Lifecycle of a recurring definition
+      description: |
+        Machine `RECURRING_DEFINITION_LIFECYCLE` (docs/31 D37): create, pause, resume, revise (with the new version and
+        the effective date) and end. Renaming or changing the description is an annotation.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Definition lifecycle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/{definitionId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/RecurringDefinitionId'
+    get:
+      tags: [Commitments]
+      operationId: exportRecurringDefinitionLifecycle
+      summary: Export the lifecycle of a recurring definition (CSV or PDF)
+      description: Same synchronous download as the other lifecycles (docs/31 D52); the export is audited.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -6131,6 +6831,19 @@ components:
       in: header
       required: false
       schema: { type: string }
+
+    RecurringDefinitionId:
+      name: definitionId
+      in: path
+      required: true
+      description: Recurring definition UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    RecurringOccurrenceId:
+      name: occurrenceId
+      in: path
+      required: true
+      description: Recurring occurrence UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
 
   headers:
     ETag:
@@ -6506,6 +7219,16 @@ components:
         - EXPORT_FORMAT_UNSUPPORTED              # 422 (add-workspace-export: unknown format version or the export of a demo workspace)
         - EXPORT_VERIFICATION_FAILED             # 422 (add-workspace-export: imported balances do not match the manifest; nothing persisted)
         - UPLOAD_TOO_LARGE                       # 413 (add-workspace-export: the uploaded file exceeds WORKSPACE_IMPORT_MAX_BYTES)
+        - INVALID_RRULE                          # 422 (add-recurrence-engine: RRULE outside the supported subset, COUNT with UNTIL, or no dates in 5 years)
+        - RECURRING_KIND_NOT_AVAILABLE           # 422 (add-recurrence-engine: LOAN_PAYMENT and CARD_PAYMENT are reserved for Phase 4)
+        - RECURRING_INVALID_SCHEDULE             # 422 (add-recurrence-engine: inconsistent cadence, interval, month days or end)
+        - RECURRING_INVALID_AMOUNT               # 422 (add-recurrence-engine: amount inconsistent with its type, not positive, out of range or over the currency scale)
+        - RECURRING_MODE_NOT_ALLOWED             # 422 (add-recurrence-engine: AUTO_CREATE with a VARIABLE or MIN_MAX amount)
+        - RECURRING_REVISION_DATE_INVALID        # 422 (add-recurrence-engine: effective date not after the last resolved occurrence)
+        - OCCURRENCE_AMOUNT_REQUIRED             # 422 (add-recurrence-engine: approving a VARIABLE occurrence without an amount)
+        - OCCURRENCE_LINK_MISMATCH               # 422 (add-recurrence-engine: the transaction does not match the occurrence; details.reasons)
+        - OCCURRENCE_ALREADY_MATERIALIZED        # 409 (add-recurrence-engine: the occurrence already has its transaction)
+        - TRANSACTION_ALREADY_LINKED             # 409 (add-recurrence-engine: the transaction already resolves another occurrence)
 
     # ── Identity ──
     WorkspaceRole:
@@ -9377,11 +10100,11 @@ components:
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
       # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation]
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
@@ -10495,7 +11218,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -10520,7 +11243,13 @@ components:
       properties:
         kind:
           type: string
-          enum: [BUDGET_LINE, PERIOD_CLOSE]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE]
+        occurrenceId:
+          description: >-
+            Recurring occurrence (only `RECURRING_OCCURRENCE`, add-recurrence-engine): the app opens
+            `/recurring/occurrences/{occurrenceId}`. In that kind `periodId` is the financial period of the due date
+            (the occurrence id when no period covers it) and `periodLabel` the month of the due date.
+          $ref: '#/components/schemas/Uuid'
         periodId: { $ref: '#/components/schemas/Uuid' }
         periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
         budgetId: { $ref: '#/components/schemas/Uuid' }
@@ -10626,3 +11355,532 @@ components:
             - $ref: '#/components/schemas/QuietHours'
             - type: 'null'
         includeDetailsInEmail: { type: boolean }
+
+    # ── Commitments: motor de recurrencia (Phase 3, add-recurrence-engine) ──
+    RecurringKind:
+      type: string
+      description: >-
+        Kind of a recurring definition. `LOAN_PAYMENT` and `CARD_PAYMENT` are reserved for Phase 4 (`debt/*`) and are
+        rejected with 422 `RECURRING_KIND_NOT_AVAILABLE`; today a card payment is a `TRANSFER` to the liability account.
+      enum: [INCOME, EXPENSE, TRANSFER, LOAN_PAYMENT, CARD_PAYMENT]
+      x-reserved: [LOAN_PAYMENT, CARD_PAYMENT]
+    RecurringStatus:
+      type: string
+      enum: [ACTIVE, PAUSED, ENDED]
+    RecurringCadence:
+      type: string
+      description: Predefined cadences (with an interval N) or `CUSTOM` (a subset of RRULE).
+      enum: [DAILY, WEEKLY, BIWEEKLY, SEMIMONTHLY, MONTHLY, BIMONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL, CUSTOM]
+    RecurringWeekendAdjustment:
+      type: string
+      description: Moves only the due date of a weekend nominal date to the previous Friday or the next Monday.
+      enum: [NONE, PREVIOUS, NEXT]
+    RecurringAmountType:
+      type: string
+      enum: [FIXED, ESTIMATED, MIN_MAX, VARIABLE]
+    RecurringMaterializationMode:
+      type: string
+      enum: [AUTO_CREATE, PENDING_APPROVAL, NOTIFY_ONLY]
+    RecurringOccurrenceStatus:
+      type: string
+      description: 'UI labels: Programada, Próxima, Atrasada, Creada, Vinculada, Omitida, Cancelada.'
+      enum: [SCHEDULED, DUE, OVERDUE, MATERIALIZED, MATCHED, SKIPPED, CANCELLED]
+    RecurringSchedule:
+      type: object
+      additionalProperties: false
+      required: [cadence, startDate]
+      properties:
+        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        interval: { type: integer, minimum: 1, maximum: 120, default: 1 }
+        monthDays:
+          type: array
+          description: >-
+            Days of the month (1–31 or -1 for the last). `SEMIMONTHLY` needs exactly two; the monthly family accepts at
+            most one (it replaces the day of the start date). A day 29–31 in a shorter month falls on its last day.
+          items: { type: integer, minimum: -1, maximum: 31 }
+          maxItems: 2
+        rrule:
+          type: [string, 'null']
+          maxLength: 500
+          description: 'Subset of RFC 5545 (FREQ, INTERVAL, BYDAY, BYMONTHDAY, BYSETPOS, COUNT, UNTIL); only with `CUSTOM`.'
+        startDate: { $ref: '#/components/schemas/LocalDate' }
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        maxOccurrences:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 1000
+        weekendAdjustment: { $ref: '#/components/schemas/RecurringWeekendAdjustment' }
+    RecurringSchedulePatch:
+      type: object
+      description: Partial schedule of a revision; omitted fields keep their value (a new cadence or interval restarts the anchor at the effective date).
+      additionalProperties: false
+      properties:
+        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        interval: { type: integer, minimum: 1, maximum: 120 }
+        monthDays:
+          type: array
+          items: { type: integer, minimum: -1, maximum: 31 }
+          maxItems: 2
+        rrule: { type: [string, 'null'], maxLength: 500 }
+        startDate: { $ref: '#/components/schemas/LocalDate' }
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        maxOccurrences: { type: [integer, 'null'], minimum: 1, maximum: 1000 }
+        weekendAdjustment: { $ref: '#/components/schemas/RecurringWeekendAdjustment' }
+    RecurringAmount:
+      type: object
+      description: >-
+        Expected amount: `FIXED`/`ESTIMATED` carry `amount`; `MIN_MAX` carries `min` and `max` (projections use the
+        maximum); `VARIABLE` carries none (it is entered when approving). Amounts use the scale of the account currency.
+      additionalProperties: false
+      required: [type]
+      properties:
+        type: { $ref: '#/components/schemas/RecurringAmountType' }
+        amount: { $ref: '#/components/schemas/Money' }
+        min: { $ref: '#/components/schemas/Money' }
+        max: { $ref: '#/components/schemas/Money' }
+    RecurringMaterialization:
+      type: object
+      additionalProperties: false
+      properties:
+        mode: { $ref: '#/components/schemas/RecurringMaterializationMode' }
+        autoCreateStatus:
+          oneOf:
+            - type: string
+              enum: [PENDING, POSTED]
+            - type: 'null'
+          description: Only with `AUTO_CREATE` (default `PENDING`).
+        leadDays: { type: integer, minimum: 0, maximum: 60, default: 3 }
+    RecurringTemplate:
+      type: object
+      description: Template shared by every occurrence of a version.
+      additionalProperties: false
+      required: [accountId, amount, schedule]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+          description: Destination account (only `TRANSFER`, same currency, different account).
+        amount: { $ref: '#/components/schemas/RecurringAmount' }
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        tagIds:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/Uuid' }
+        paymentMethod:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentMethod'
+            - type: 'null'
+        schedule: { $ref: '#/components/schemas/RecurringSchedule' }
+        materialization: { $ref: '#/components/schemas/RecurringMaterialization' }
+    RecurringDefinitionInput:
+      type: object
+      additionalProperties: false
+      required: [name, kind, template]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: [string, 'null'], maxLength: 1000 }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+        kind: { $ref: '#/components/schemas/RecurringKind' }
+        template: { $ref: '#/components/schemas/RecurringTemplate' }
+    RecurringDefinitionUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: [string, 'null'], maxLength: 1000 }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+    RecurringTemplateChanges:
+      type: object
+      description: Fields of the template to change from the effective date; omitted fields keep the current value.
+      additionalProperties: false
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        amount: { $ref: '#/components/schemas/RecurringAmount' }
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        tagIds:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/Uuid' }
+        paymentMethod:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentMethod'
+            - type: 'null'
+        schedule: { $ref: '#/components/schemas/RecurringSchedulePatch' }
+        materialization: { $ref: '#/components/schemas/RecurringMaterialization' }
+    RecurringRevisionRequest:
+      type: object
+      additionalProperties: false
+      required: [effectiveFrom, changes]
+      properties:
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        changes: { $ref: '#/components/schemas/RecurringTemplateChanges' }
+    RecurringEndRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        endDate: { $ref: '#/components/schemas/LocalDate' }
+    RecurringDefinitionVersion:
+      type: object
+      additionalProperties: false
+      required: [versionNo, effectiveFrom, accountId, toAccountId, currency, amount, categoryId, counterpartyId, tagIds, paymentMethod, schedule, materialization]
+      properties:
+        versionNo: { type: integer, minimum: 1 }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        amount: { $ref: '#/components/schemas/RecurringAmount' }
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        tagIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        paymentMethod:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentMethod'
+            - type: 'null'
+        schedule:
+          type: object
+          additionalProperties: false
+          required: [cadence, interval, monthDays, rrule, startDate, endDate, maxOccurrences, weekendAdjustment]
+          properties:
+            cadence: { $ref: '#/components/schemas/RecurringCadence' }
+            interval: { type: integer, minimum: 1 }
+            monthDays:
+              type: array
+              items: { type: integer }
+            rrule: { type: [string, 'null'] }
+            startDate: { $ref: '#/components/schemas/LocalDate' }
+            endDate:
+              oneOf:
+                - $ref: '#/components/schemas/LocalDate'
+                - type: 'null'
+            maxOccurrences: { type: [integer, 'null'] }
+            weekendAdjustment: { $ref: '#/components/schemas/RecurringWeekendAdjustment' }
+        materialization:
+          type: object
+          additionalProperties: false
+          required: [mode, autoCreateStatus, leadDays]
+          properties:
+            mode: { $ref: '#/components/schemas/RecurringMaterializationMode' }
+            autoCreateStatus:
+              oneOf:
+                - type: string
+                  enum: [PENDING, POSTED]
+                - type: 'null'
+            leadDays: { type: integer, minimum: 0 }
+    RecurringDefinition:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, notes, kind, managedBy, managedRef, status, currentVersionNo, generatedThrough, endDate, version, createdAt, updatedAt, current]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        kind: { $ref: '#/components/schemas/RecurringKind' }
+        managedBy:
+          type: string
+          description: Who administers the definition. Only `USER` today; `SUBSCRIPTION` and `DEBT` are reserved.
+          enum: [USER, SUBSCRIPTION, DEBT]
+        managedRef:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        status: { $ref: '#/components/schemas/RecurringStatus' }
+        currentVersionNo: { type: integer, minimum: 1 }
+        generatedThrough:
+          description: Last nominal date generated (sliding window high-water mark).
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        endDate:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        current: { $ref: '#/components/schemas/RecurringDefinitionVersion' }
+        versions:
+          type: array
+          description: Every version, oldest first (only in the detail).
+          items: { $ref: '#/components/schemas/RecurringDefinitionVersion' }
+        nextOccurrence:
+          description: Next unresolved occurrence (only in the list).
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [occurrenceDate, dueDate]
+              properties:
+                occurrenceDate: { $ref: '#/components/schemas/LocalDate' }
+                dueDate: { $ref: '#/components/schemas/LocalDate' }
+            - type: 'null'
+        pendingApprovalCount:
+          type: integer
+          minimum: 0
+          description: Occurrences waiting for approval (only in the list).
+        generatedCount:
+          type: integer
+          minimum: 0
+          description: Occurrences generated by the request (create, resume).
+    RecurringDefinitionPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/RecurringDefinition' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    RecurringRevisionResult:
+      type: object
+      additionalProperties: false
+      required: [definition, rewritten, cancelled, created, reinstated, resetOverrides]
+      properties:
+        definition: { $ref: '#/components/schemas/RecurringDefinition' }
+        rewritten: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+        created: { type: integer, minimum: 0 }
+        reinstated: { type: integer, minimum: 0 }
+        resetOverrides:
+          type: integer
+          minimum: 0
+          description: Occurrences whose individual edits were discarded by the rewrite.
+    RecurringOccurrence:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - definitionId
+        - definitionName
+        - kind
+        - managedBy
+        - occurrenceDate
+        - dueDate
+        - definitionVersionNo
+        - expected
+        - projectedAmount
+        - status
+        - cancelReason
+        - requiresApproval
+        - mode
+        - overridden
+        - accountId
+        - toAccountId
+        - transactionId
+        - resolution
+        - matchedBy
+        - skipReason
+        - lastAutoCreateError
+        - version
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        definitionId: { $ref: '#/components/schemas/Uuid' }
+        definitionName: { type: string }
+        kind: { $ref: '#/components/schemas/RecurringKind' }
+        managedBy:
+          type: string
+          enum: [USER, SUBSCRIPTION, DEBT]
+        occurrenceDate:
+          description: 'Nominal date (before the weekend adjustment): the idempotency key of the occurrence.'
+          $ref: '#/components/schemas/LocalDate'
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        definitionVersionNo: { type: integer, minimum: 1 }
+        expected: { $ref: '#/components/schemas/RecurringAmount' }
+        projectedAmount:
+          description: Amount projections use (the maximum of a `MIN_MAX`); null for `VARIABLE`.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        status: { $ref: '#/components/schemas/RecurringOccurrenceStatus' }
+        cancelReason:
+          oneOf:
+            - type: string
+              enum: [PAUSED, SUPERSEDED, ENDED]
+            - type: 'null'
+        requiresApproval:
+          type: boolean
+          description: '`DUE`/`OVERDUE` in a definition with `PENDING_APPROVAL` mode (the approval tray).'
+        mode: { $ref: '#/components/schemas/RecurringMaterializationMode' }
+        overridden:
+          type: boolean
+          description: The amount or the due date of this occurrence was edited individually.
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        transactionId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        resolution:
+          oneOf:
+            - type: string
+              enum: [CREATED, MATCHED, SKIPPED]
+            - type: 'null'
+        matchedBy:
+          oneOf:
+            - type: string
+              enum: [USER_LINK, SUGGESTION]
+            - type: 'null'
+        skipReason: { type: [string, 'null'] }
+        lastAutoCreateError:
+          type: [string, 'null']
+          description: Error code of the last automatic creation that Transactions rejected (e.g. `PERIOD_CLOSED`).
+        version: { $ref: '#/components/schemas/Version' }
+    RecurringOccurrencePage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/RecurringOccurrence' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    RecurringOccurrenceUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        expectedAmount: { $ref: '#/components/schemas/Money' }
+        expectedMin: { $ref: '#/components/schemas/Money' }
+        expectedMax: { $ref: '#/components/schemas/Money' }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+    RecurringMaterializeRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        amount: { $ref: '#/components/schemas/Money' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        status:
+          type: string
+          enum: [PENDING, POSTED]
+    RecurringMaterializeResult:
+      type: object
+      additionalProperties: false
+      required: [occurrence, transactionId]
+      properties:
+        occurrence: { $ref: '#/components/schemas/RecurringOccurrence' }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+    RecurringSkipRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: [string, 'null'], maxLength: 500 }
+    RecurringLinkRequest:
+      type: object
+      additionalProperties: false
+      required: [transactionId]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+    CommittedItem:
+      type: object
+      additionalProperties: false
+      required: [source, id, definitionId, name, kind, date, amount, status]
+      properties:
+        source:
+          type: string
+          enum: [OCCURRENCE, PENDING]
+        id: { $ref: '#/components/schemas/Uuid' }
+        definitionId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        name: { type: [string, 'null'] }
+        kind: { type: string }
+        date: { $ref: '#/components/schemas/LocalDate' }
+        amount:
+          description: Amount that adds up (the maximum of a `MIN_MAX`); null for `VARIABLE`.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        status:
+          oneOf:
+            - $ref: '#/components/schemas/RecurringOccurrenceStatus'
+            - type: 'null'
+    CommittedAmount:
+      type: object
+      additionalProperties: false
+      required: [periodId, periodLabel, periodStart, periodEnd, byCurrency, consolidated, expectedIncome, withoutAmountCount, items, ratesUsed, generatedAt]
+      properties:
+        periodId: { $ref: '#/components/schemas/Uuid' }
+        periodLabel: { type: string }
+        periodStart: { $ref: '#/components/schemas/LocalDate' }
+        periodEnd: { $ref: '#/components/schemas/LocalDate' }
+        byCurrency:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [currency, occurrences, pending, total]
+            properties:
+              currency: { $ref: '#/components/schemas/CurrencyCode' }
+              occurrences: { $ref: '#/components/schemas/Money' }
+              pending: { $ref: '#/components/schemas/Money' }
+              total: { $ref: '#/components/schemas/Money' }
+        consolidated:
+          type: object
+          additionalProperties: false
+          required: [amount, complete, unconverted]
+          properties:
+            amount: { $ref: '#/components/schemas/Money' }
+            complete:
+              type: boolean
+              description: False when a part had no valuation rate (it is listed in `unconverted`, never converted 1:1).
+            unconverted:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+        expectedIncome:
+          type: array
+          description: Unresolved income occurrences of the period by currency (informative, not subtracted).
+          items: { $ref: '#/components/schemas/Money' }
+        withoutAmountCount:
+          type: integer
+          minimum: 0
+          description: '`VARIABLE` occurrences that do not add up ("N payments without amount").'
+        items:
+          type: array
+          description: Composition of the total (explainable).
+          items: { $ref: '#/components/schemas/CommittedItem' }
+        ratesUsed:
+          type: array
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+        generatedAt: { $ref: '#/components/schemas/Instant' }

@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/OccurrencesGenerated.v1.schema.json",
+  "title": "commitments.OccurrencesGenerated.v1",
+  "description": "La generación insertó o reinstauró al menos una ocurrencia de la definición en una ventana (job commitments.generate-occurrences o generación síncrona al crear/revisar/reanudar). Una vez por (definición, ventana efectiva insertada): re-ejecutar no inserta nada y no publica. Productor: COMMITMENTS. Consumidores: REPORTING (calendario, Phase 7), MATCHING. Idempotencia natural: (definitionId, window.from, window.to). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.OccurrencesGenerated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "RecurringDefinition"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "amount",
+        "min",
+        "max"
+      ],
+      "description": "Monto esperado según el tipo: FIXED/ESTIMATED llevan `amount`; MIN_MAX lleva `min` y `max`; VARIABLE ninguno. Texto decimal con la escala de la moneda.",
+      "properties": {
+        "type": {
+          "enum": [
+            "FIXED",
+            "ESTIMATED",
+            "MIN_MAX",
+            "VARIABLE"
+          ]
+        },
+        "amount": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Kind": {
+      "enum": [
+        "INCOME",
+        "EXPENSE",
+        "TRANSFER"
+      ]
+    },
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "definitionId",
+        "definitionVersionNo",
+        "window",
+        "occurrences"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionVersionNo": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from",
+            "to"
+          ],
+          "properties": {
+            "from": {
+              "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+            },
+            "to": {
+              "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+            }
+          }
+        },
+        "occurrences": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "occurrenceId",
+              "occurrenceDate",
+              "dueDate",
+              "expected",
+              "currency",
+              "kind"
+            ],
+            "properties": {
+              "occurrenceId": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+              },
+              "occurrenceDate": {
+                "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+              },
+              "dueDate": {
+                "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+              },
+              "expected": {
+                "$ref": "#/$defs/Expected"
+              },
+              "currency": {
+                "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+              },
+              "kind": {
+                "$ref": "#/$defs/Kind"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000410",
+      "eventType": "commitments.OccurrencesGenerated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T12:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RecurringDefinition",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000de001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "definitionVersionNo": 1,
+        "window": {
+          "from": "2026-10-09",
+          "to": "2027-01-07"
+        },
+        "occurrences": [
+          {
+            "occurrenceId": "01928c4e-0000-7000-8000-0000000cc001",
+            "occurrenceDate": "2026-10-20",
+            "dueDate": "2026-10-20",
+            "expected": {
+              "type": "FIXED",
+              "amount": "199.00",
+              "min": null,
+              "max": null
+            },
+            "currency": "BOB",
+            "kind": "EXPENSE"
+          }
+        ]
+      }
+    }
+  ]
+}

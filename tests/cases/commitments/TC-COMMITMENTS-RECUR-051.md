@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Modo creación automática'
 scenario: 'Worker re-ejecutado no duplica la transacción'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-007']
 nfr: []
 invariants: ['INV-013']
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'auto-create', 'idempotency']
@@ -28,7 +30,7 @@ expected_result:
   - 'Una sola transacción con externalRef commitments.occurrence/<occurrenceId>'
   - 'Un solo RecurringOccurrenceMaterialized.v1'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-051 — Reprocesar la creación automática de una ocurrencia no crea una segunda transacción

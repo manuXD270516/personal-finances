@@ -29,6 +29,24 @@ const es: MessageCatalog = {
   'email.month_close_pending.subject': 'Tienes un mes pendiente de cierre',
   'email.month_close_pending.basic': 'El mes {period} terminó y sigue pendiente de cierre.',
   'email.month_close_pending.detailed': 'El mes {period} terminó el {periodEnd} y sigue pendiente de cierre.',
+  // in-app: recurrencias
+  'inapp.recurring_payment_upcoming.title': 'Pago próximo: {name}',
+  'inapp.recurring_payment_upcoming.body': 'Vence el {dueDate}: {amount}.',
+  'inapp.recurring_payment_upcoming.body_variable': 'Vence el {dueDate}. El monto es variable.',
+  'inapp.recurring_approval_required.title': 'Por aprobar: {name}',
+  'inapp.recurring_approval_required.body': 'La ocurrencia del {dueDate} ({amount}) espera tu aprobación.',
+  'inapp.recurring_approval_required.body_variable':
+    'La ocurrencia del {dueDate} espera tu aprobación. El monto es variable.',
+  // email: recurrencias (basic sin nombre ni monto; detailed con ambos)
+  'email.recurring_payment_upcoming.subject': 'Tienes un pago próximo',
+  'email.recurring_payment_upcoming.basic': 'Un compromiso recurrente vence el {dueDate}.',
+  'email.recurring_payment_upcoming.detailed': '{name} vence el {dueDate}: {amount}.',
+  'email.recurring_payment_upcoming.detailed_variable': '{name} vence el {dueDate}. El monto es variable.',
+  'email.recurring_approval_required.subject': 'Tienes una ocurrencia por aprobar',
+  'email.recurring_approval_required.basic': 'Una ocurrencia recurrente del {dueDate} espera tu aprobación.',
+  'email.recurring_approval_required.detailed': '{name} del {dueDate} ({amount}) espera tu aprobación.',
+  'email.recurring_approval_required.detailed_variable':
+    '{name} del {dueDate} espera tu aprobación. El monto es variable.',
   // email: común
   'email.cta': 'Ver la notificación',
   'email.footer':
@@ -54,6 +72,25 @@ const en: MessageCatalog = {
   'email.month_close_pending.subject': 'You have a month pending close',
   'email.month_close_pending.basic': 'The month {period} has ended and is still pending close.',
   'email.month_close_pending.detailed': 'The month {period} ended on {periodEnd} and is still pending close.',
+  'inapp.recurring_payment_upcoming.title': 'Upcoming payment: {name}',
+  'inapp.recurring_payment_upcoming.body': 'Due on {dueDate}: {amount}.',
+  'inapp.recurring_payment_upcoming.body_variable': 'Due on {dueDate}. The amount is variable.',
+  'inapp.recurring_approval_required.title': 'Needs approval: {name}',
+  'inapp.recurring_approval_required.body':
+    'The occurrence of {dueDate} ({amount}) is waiting for your approval.',
+  'inapp.recurring_approval_required.body_variable':
+    'The occurrence of {dueDate} is waiting for your approval. The amount is variable.',
+  'email.recurring_payment_upcoming.subject': 'You have an upcoming payment',
+  'email.recurring_payment_upcoming.basic': 'A recurring commitment is due on {dueDate}.',
+  'email.recurring_payment_upcoming.detailed': '{name} is due on {dueDate}: {amount}.',
+  'email.recurring_payment_upcoming.detailed_variable': '{name} is due on {dueDate}. The amount is variable.',
+  'email.recurring_approval_required.subject': 'You have an occurrence to approve',
+  'email.recurring_approval_required.basic':
+    'A recurring occurrence of {dueDate} is waiting for your approval.',
+  'email.recurring_approval_required.detailed':
+    '{name} of {dueDate} ({amount}) is waiting for your approval.',
+  'email.recurring_approval_required.detailed_variable':
+    '{name} of {dueDate} is waiting for your approval. The amount is variable.',
   'email.cta': 'View the notification',
   'email.footer':
     'You receive this notice because email notifications are turned on. You can change it in your preferences.',
@@ -79,6 +116,22 @@ const pt: MessageCatalog = {
   'email.month_close_pending.basic': 'O mês {period} terminou e continua pendente de fechamento.',
   'email.month_close_pending.detailed':
     'O mês {period} terminou em {periodEnd} e continua pendente de fechamento.',
+  'inapp.recurring_payment_upcoming.title': 'Pagamento próximo: {name}',
+  'inapp.recurring_payment_upcoming.body': 'Vence em {dueDate}: {amount}.',
+  'inapp.recurring_payment_upcoming.body_variable': 'Vence em {dueDate}. O valor é variável.',
+  'inapp.recurring_approval_required.title': 'Para aprovar: {name}',
+  'inapp.recurring_approval_required.body': 'A ocorrência de {dueDate} ({amount}) aguarda sua aprovação.',
+  'inapp.recurring_approval_required.body_variable':
+    'A ocorrência de {dueDate} aguarda sua aprovação. O valor é variável.',
+  'email.recurring_payment_upcoming.subject': 'Você tem um pagamento próximo',
+  'email.recurring_payment_upcoming.basic': 'Um compromisso recorrente vence em {dueDate}.',
+  'email.recurring_payment_upcoming.detailed': '{name} vence em {dueDate}: {amount}.',
+  'email.recurring_payment_upcoming.detailed_variable': '{name} vence em {dueDate}. O valor é variável.',
+  'email.recurring_approval_required.subject': 'Você tem uma ocorrência para aprovar',
+  'email.recurring_approval_required.basic': 'Uma ocorrência recorrente de {dueDate} aguarda sua aprovação.',
+  'email.recurring_approval_required.detailed': '{name} de {dueDate} ({amount}) aguarda sua aprovação.',
+  'email.recurring_approval_required.detailed_variable':
+    '{name} de {dueDate} aguarda sua aprovação. O valor é variável.',
   'email.cta': 'Ver a notificação',
   'email.footer':
     'Você recebe este aviso porque as notificações por email estão ativadas. Você pode alterá-lo nas suas preferências.',

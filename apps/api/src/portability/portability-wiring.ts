@@ -5,6 +5,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import { ACCOUNTS_PORTABILITY_SECTIONS } from '@pf/accounts/contracts';
 import { AUDIT_PORTABILITY_SECTIONS } from '@pf/audit/contracts';
 import { CLASSIFICATION_PORTABILITY_SECTIONS } from '@pf/classification/contracts';
+import { COMMITMENTS_PORTABILITY_SECTIONS } from '@pf/commitments/contracts';
 import { FX_PORTABILITY_SECTIONS } from '@pf/fx/contracts';
 import {
   EXPORT_RETENTION_QUEUE,
@@ -52,6 +53,7 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...LEDGER_PORTABILITY_SECTIONS,
   ...TRANSACTIONS_PORTABILITY_SECTIONS,
   ...PLANNING_PORTABILITY_SECTIONS,
+  ...COMMITMENTS_PORTABILITY_SECTIONS,
   ...NOTIFICATIONS_PORTABILITY_SECTIONS,
   ...AUDIT_PORTABILITY_SECTIONS,
 ].sort((a, b) => a.order - b.order);

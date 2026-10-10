@@ -15,6 +15,8 @@ describe('PreferencesService', () => {
       types: [
         { type: 'BUDGET_THRESHOLD', inApp: true, email: true },
         { type: 'MONTH_CLOSE_PENDING', inApp: true, email: true },
+        { type: 'RECURRING_PAYMENT_UPCOMING', inApp: true, email: true },
+        { type: 'RECURRING_APPROVAL_REQUIRED', inApp: true, email: true },
       ],
       quietHours: null,
       includeDetailsInEmail: false,

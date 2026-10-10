@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Permisos y auditoría de los compromisos'
 scenario: 'VIEWER no aprueba'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008', 'FR-AUDIT-001']
 nfr: []
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'authz']
@@ -30,7 +32,7 @@ expected_result:
   - '403 INSUFFICIENT_ROLE sin transacción'
   - '200 con el comprometido'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-039 — Un VIEWER no puede aprobar ocurrencias pero sí consultar el comprometido
