@@ -70,8 +70,13 @@ export function WorkspaceSettingsForm() {
     setErrors({});
   }, []);
 
+  // `reload()` de la sesión crea un cliente `api` nuevo; si `load` dependiera de él, guardar un cambio de nombre
+  // (que recarga la sesión) volvería a pedir el workspace y borraría "Cambios guardados." (TC-PLATFORM-API-014).
+  const apiRef = useRef(api);
+  apiRef.current = api;
   const load = useCallback(
     async (after?: FormNotice) => {
+      const api = apiRef.current;
       if (!api || !workspaceId) return;
       try {
         const r = await api.get<Workspace>(`/workspaces/${workspaceId}`);
@@ -82,7 +87,7 @@ export function WorkspaceSettingsForm() {
         setProblem(problemOf(err));
       }
     },
-    [api, workspaceId, show],
+    [workspaceId, show],
   );
 
   useEffect(() => {

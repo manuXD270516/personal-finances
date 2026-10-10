@@ -49,6 +49,9 @@ test.describe('convenciones de API desde la UI (platform/api-conventions)', () =
     await tabA.locator('input[name="name"]').fill('Editado en A');
     await tabA.getByRole('button', { name: 'Guardar cambios' }).click();
     await expect(tabA.getByRole('status')).toHaveText('Cambios guardados.');
+    // Guardar un nombre nuevo recarga la sesión: la confirmación debe sobrevivir a esa recarga (no parpadear).
+    await tabA.waitForLoadState('networkidle');
+    await expect(tabA.getByRole('status')).toHaveText('Cambios guardados.');
 
     await tabB.locator('input[name="name"]').fill('Editado en B');
     await tabB.getByRole('button', { name: 'Guardar cambios' }).click();
