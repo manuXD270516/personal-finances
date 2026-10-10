@@ -13479,7 +13479,7 @@ components:
       additionalProperties: false
       required: [attempt, batchCount, batchesDone]
       properties:
-        attempt: { type: integer, minimum: 0, description: 0 before the approval, 1 for the first persistence, +1 per retry. }
+        attempt: { type: integer, minimum: 0, description: '0 before the approval, 1 for the first persistence, +1 per retry.' }
         batchCount: { type: integer, minimum: 0 }
         batchesDone: { type: integer, minimum: 0 }
     ImportErrorGroup:
