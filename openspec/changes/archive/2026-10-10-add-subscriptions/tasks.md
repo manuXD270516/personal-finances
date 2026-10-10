@@ -57,7 +57,7 @@
 
 - [x] 8.1 Aplicar los cambios de design.md § "Cambios a docs compartidos" (docs/01, 04, 05, 08, 10, 11, 14, 28, 03)
 - [x] 8.2 Actualizar la matriz de trazabilidad; ejecutar `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check`
-- [ ] 8.3 (Could) Generador de datos demo (docs/29): suscripciones con un `SUBSCRIPTION_PRICE_HIKE`
+- [x] 8.3 (Could) **Diferida, no implementada (2026-10-10):** queda para cuando se amplíe el dataset demo de commitments, junto con la 8.2 de add-recurrence-engine. Generador de datos demo (docs/29): suscripciones con un `SUBSCRIPTION_PRICE_HIKE`
 
 ## Notas de implementación (2026-10-10)
 
