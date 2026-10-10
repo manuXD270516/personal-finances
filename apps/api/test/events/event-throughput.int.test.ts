@@ -193,7 +193,10 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
       events: [{ type: TYPE, version: 1 }],
       concurrency: 4,
       batchSize: 10,
-      retryDelaySeconds: 1,
+      // Backoff largo (pg-boss lo aplica con jitter, ≥ la mitad): los demás agregados avanzan por polling (0,5 s por
+      // ronda de versión) y deben terminar sus 5 versiones antes de que v1 reintente; con 1 s la carrera era del
+      // orden del polling y la última aserción fallaba de forma intermitente.
+      retryDelaySeconds: 10,
       handler: async (event) => {
         await sleep(Math.random() * 10);
         if (event.aggregateId === slow && event.aggregateVersion === 1 && !failedOnce) {
