@@ -33,6 +33,8 @@ export class NotifyFromEvent {
     const { deps } = this;
     // Lanza ante un payload mal formado: el consumidor reintenta y termina en dead-letter (observable).
     const plan = definition.plan(event.payload);
+    // Hecho que otro contexto avisa por su cuenta (D119): se consume (inbox) sin crear notificaciones.
+    if (definition.suppressed?.(event.payload)) return { created: 0, deliveries: 0 };
     return deps.uow.run(event.workspaceId, async () => {
       const now = deps.clock.now();
       const members = (await deps.recipients.activeMembers(event.workspaceId)).filter((m) =>

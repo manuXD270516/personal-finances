@@ -89,7 +89,7 @@
 | NFR-PERF-006 | **Reportes** agregados (12 meses, 50k txn). | p95 ≤ 800 ms; drill-down ≤ 300 ms. | Benchmark nightly. | 7 | Must |
 | NFR-PERF-007 | **Imports**: archivo CSV de 5 000 filas hasta preview. | ≤ 30 s end-to-end (parse + normalize + validate + dedupe + rules); persistencia ≤ 20 s. | Integration test con fixture. | 6 | Must |
 | NFR-PERF-008 | **Eventual consistency** de read models y notificaciones. | p95 lag outbox → handler ≤ **5 s**; p99 ≤ 30 s; cada consumidor drena ≥ 42 eventos/s por consumidor (un backlog de 5 000 eventos en 500 agregados en ≤ 120 s con un handler trivial). | Métricas `outbox_lag_seconds`, `event_consumer_backlog` y `event_consumer_duration_seconds`; TC-PLATFORM-EVENTS-014 (integración, `improve-event-throughput`); benchmark nightly de throughput por consumidor con el dataset `large` (`pnpm perf:bench`). | 1 | Must |
-| NFR-PERF-009 | Generación de ocurrencias recurrentes (60 definiciones, horizonte 90 días). | ≤ 10 s por workspace. | Integration test. | 3 | Should |
+| NFR-PERF-009 | Generación de ocurrencias recurrentes (60 definiciones, horizonte 90 días). | ≤ 10 s por workspace. | Integration test (TC-COMMITMENTS-RECUR-017, suite `perf` nightly). | 3 | Should |
 | NFR-PERF-010 | Cash-flow calendar 90 días. | p95 ≤ 500 ms. | Benchmark. | 7 | Should |
 | NFR-PERF-011 | Bundle inicial de la web (JS comprimido de la ruta Home). | ≤ 250 KB gzip. | Bundle analyzer en CI con presupuesto. | 1 | Should |
 | NFR-PERF-012 | Forecast batch por workspace (todas las series, horizonte 12 meses). | ≤ 5 min; nunca bloquea requests online. | Benchmark del servicio ML. | 8 | Should |

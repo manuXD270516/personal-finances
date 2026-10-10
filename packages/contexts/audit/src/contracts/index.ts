@@ -126,6 +126,8 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'Counterparty',
   'FinancialPeriod',
   'Reconciliation',
+  'RecurringDefinition',
+  'RecurringOccurrence',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

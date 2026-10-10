@@ -99,5 +99,15 @@
   "EXPORT_FILE_CORRUPTED": "The file is damaged or was modified. Nothing was imported.",
   "EXPORT_FORMAT_UNSUPPORTED": "The file format is not supported (for example, demo data exports). Nothing was imported.",
   "EXPORT_VERIFICATION_FAILED": "The imported data does not match the file summary. No workspace was created.",
-  "UPLOAD_TOO_LARGE": "The file exceeds the maximum allowed size."
+  "UPLOAD_TOO_LARGE": "The file exceeds the maximum allowed size.",
+  "INVALID_RRULE": "The repeat rule is not supported or produces no dates.",
+  "RECURRING_KIND_NOT_AVAILABLE": "This kind of recurring payment is not available yet. To pay a card use a transfer to the card account.",
+  "RECURRING_INVALID_SCHEDULE": "The schedule is not valid. Check the frequency, interval, month days and end date.",
+  "RECURRING_INVALID_AMOUNT": "The amount is not valid for that type: it must be greater than zero, respect the currency decimals and be within the range.",
+  "RECURRING_MODE_NOT_ALLOWED": "Automatic creation needs a fixed or estimated amount. Choose pending approval or notify only.",
+  "RECURRING_REVISION_DATE_INVALID": "The change date must be after the last occurrence that is already resolved.",
+  "OCCURRENCE_AMOUNT_REQUIRED": "Enter the amount to approve this payment: it has no expected amount.",
+  "OCCURRENCE_LINK_MISMATCH": "The transaction does not match the payment: it must have the same kind, account and currency and not be voided.",
+  "OCCURRENCE_ALREADY_MATERIALIZED": "This payment already has its transaction.",
+  "TRANSACTION_ALREADY_LINKED": "That transaction is already linked to another recurring payment."
 }

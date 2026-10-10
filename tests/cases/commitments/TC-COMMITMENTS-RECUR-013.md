@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Ajuste de fin de semana'
 scenario: 'Sábado al viernes anterior'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-005']
 nfr: []
 invariants: ['INV-013']
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/domain/generation.test.ts
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'weekend']
@@ -30,7 +33,7 @@ expected_result:
   - 'Internet: nominal 2026-10-10, vencimiento 2026-10-09'
   - 'Sueldo: nominal 2026-10-25, vencimiento 2026-10-26'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-013 — El ajuste de fin de semana mueve solo el vencimiento y conserva la fecha nominal

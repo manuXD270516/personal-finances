@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Cadencia RRULE personalizada'
 scenario: 'Parte no soportada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-003']
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'rrule']
@@ -30,7 +33,7 @@ steps:
 expected_result:
   - 'Las tres se rechazan con INVALID_RRULE'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-008 — Una RRULE con partes fuera del subconjunto o con COUNT y UNTIL juntos se rechaza

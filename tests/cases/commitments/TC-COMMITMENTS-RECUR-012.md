@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Día 29 a 31 en meses cortos'
 scenario: 'Día 31 en febrero y abril'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-005']
 nfr: []
 invariants: []
 priority: critical
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'end-of-month']
@@ -31,7 +33,7 @@ expected_result:
   - '[2027-01-31, 2027-02-28, 2027-03-31, 2027-04-30]'
   - '[2028-02-29, 2029-02-28, 2030-02-28]'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-012 — El día 31 y el 29 de febrero producen el último día del mes en meses cortos

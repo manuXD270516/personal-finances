@@ -1,6 +1,6 @@
 /**
  * API pública de `@pf/notifications` (openspec add-alerts). Hoja: no importa capas internas. NOTIFY no produce eventos
- * de dominio en Phase 2 (solo consume `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`).
+ * de dominio en Phase 2 (solo consume `planning.BudgetThresholdReached.v1`, `planning.MonthClosePending.v1` y `commitments.RecurringOccurrenceDue.v1`).
  */
 import type { AuditFieldPoliciesDto } from '@pf/audit/contracts';
 
@@ -10,6 +10,7 @@ export const NOTIFICATIONS_CONTEXT = 'notifications' as const;
 export const NOTIFICATION_CONSUMERS = {
   budgetThreshold: 'notifications.budget-threshold',
   monthClosePending: 'notifications.month-close-pending',
+  occurrenceDue: 'notifications.occurrence-due',
 } as const;
 
 /** Colas de trabajos pg-boss del worker (design decisiones 7 y 11). */

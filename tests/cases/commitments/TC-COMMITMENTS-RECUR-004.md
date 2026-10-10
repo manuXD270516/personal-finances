@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Transferencia recurrente de una sola moneda'
 scenario: 'Aporte mensual a ahorro'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-001']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/definition.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'transfer']
@@ -35,7 +38,7 @@ expected_result:
   - 'La transferencia a la tarjeta queda activa con kind TRANSFER'
   - 'La transferencia entre monedas se rechaza con TRANSFER_CURRENCY_MISMATCH'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-004 — Una transferencia recurrente de misma moneda se materializa como una transferencia

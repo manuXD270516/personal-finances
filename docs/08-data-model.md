@@ -620,7 +620,7 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `transaction` | `(workspace_id, id)`. *Planificado (imports, Phase 3/6):* `(workspace_id, account_id, external_ref_namespace, external_ref_id) WHERE external_ref_id IS NOT NULL` (13 §7.3) — aún no creado | `kind IN (...)` (6 valores en Phase 1, ampliado por migración en cada change: transacciones → `TRANSFER` → `CONVERSION`); `status IN (...)`; `amount > 0`; `status='VOIDED'` ⇔ `voided_at IS NOT NULL`; `status IN ('PENDING','VOIDED')` ⇔ `active_entry_id IS NULL` (INV-023); `kind='ADJUSTMENT'` ⇔ `adjustment_reason` y `adjustment_direction IN ('INCREASE','DECREASE')` presentes; `refund_of_transaction_id IS NULL OR kind='REFUND'` (FK compuesta a la misma tabla); `payment_method IN (...)` o nulo (D27); `external_ref_namespace` y `external_ref_id` ambos nulos o ambos presentes | `(workspace_id, transaction_date DESC, id DESC)` (listado/cursor); `(workspace_id, account_id, transaction_date DESC, id DESC)`; `(workspace_id, refund_of_transaction_id) WHERE refund_of_transaction_id IS NOT NULL`. Búsqueda `q` por `LIKE` sobre `search_text` (sin `pg_trgm`/`unaccent` en Phase 1) | WS | `version` (no archivo: se **anula** con `void`) |
+| `transaction` | `(workspace_id, id)`. *Planificado (imports, Phase 3/6):* `(workspace_id, account_id, external_ref_namespace, external_ref_id) WHERE external_ref_id IS NOT NULL` (13 §7.3) — aún no creado | `kind IN (...)` (6 valores en Phase 1, ampliado por migración en cada change: transacciones → `TRANSFER` → `CONVERSION`); `status IN (...)`; `amount > 0`; `status='VOIDED'` ⇔ `voided_at IS NOT NULL`; `status IN ('PENDING','VOIDED')` ⇔ `active_entry_id IS NULL` (INV-023); `kind='ADJUSTMENT'` ⇔ `adjustment_reason` y `adjustment_direction IN ('INCREASE','DECREASE')` presentes; `refund_of_transaction_id IS NULL OR kind='REFUND'` (FK compuesta a la misma tabla); `payment_method IN (...)` o nulo (D27); `external_ref_namespace` y `external_ref_id` ambos nulos o ambos presentes | `(workspace_id, transaction_date DESC, id DESC)` (listado/cursor); `(workspace_id, account_id, transaction_date DESC, id DESC)`; `(workspace_id, refund_of_transaction_id) WHERE refund_of_transaction_id IS NOT NULL`; *as-built `add-recurrence-engine`:* único parcial `(workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace = 'commitments.occurrence'` (una transacción por ocurrencia). Búsqueda `q` por `LIKE` sobre `search_text` (sin `pg_trgm`/`unaccent` en Phase 1) | WS | `version` (no archivo: se **anula** con `void`) |
 | `transaction_leg` | — | `amount <> 0`; `role IN (...)`; `account_nature IN ('ASSET','LIABILITY')`; `superseded_in_revision IS NULL OR superseded_in_revision > revision` | `(workspace_id, transaction_id)`; `(workspace_id, account_id, transaction_date DESC, transaction_id DESC) WHERE superseded_in_revision IS NULL` (registro de cuenta) | WS | Reemplazados en cada revisión: las filas anteriores se conservan con `superseded_in_revision` |
 | `transaction_split` | `(workspace_id, id)` | `amount > 0` (el signo lo da el `kind`); `position >= 0`; `category_id NOT NULL` | `(workspace_id, transaction_id) WHERE superseded_in_revision IS NULL`; `(workspace_id, category_id) WHERE superseded_in_revision IS NULL` | WS | Nunca se borra (postings históricos lo referencian) |
 | `split_tag` | PK `(workspace_id, split_id, tag_id)` | — | — | WS (`pf_app`: `SELECT, INSERT, DELETE`, tabla de enlace) | — |
@@ -866,64 +866,87 @@ Los **actuals** del presupuesto no se guardan en `planning`. **As-built (Phase 2
 
 ### 5.7 `commitments` — Recurrence engine & Subscriptions (Phase 3)
 
+**Motor de recurrencia (`add-recurrence-engine`, expand-only).** Tres tablas en el schema `commitments`; nomenclatura canónica en [04](04-domain-model.md) §3.7/§4.4. Las suscripciones (`add-subscriptions`) se agregan después como subtipo de la definición (la tabla `subscription` no existe todavía). Ninguna tabla escribe en `ledger.*` ni en `txn.*`: la transacción de una ocurrencia la crea Transactions por su puerto público.
+
 ```mermaid
 erDiagram
+  RECURRING_DEFINITION ||--|{ RECURRING_DEFINITION_VERSION : "versiones inmutables"
   RECURRING_DEFINITION ||--o{ RECURRING_OCCURRENCE : "genera"
-  RECURRING_DEFINITION ||--o| SUBSCRIPTION : "subtipo"
   RECURRING_DEFINITION {
     uuid id PK
     uuid workspace_id FK
-    text kind "EXPENSE INCOME TRANSFER"
-    text name
-    uuid account_id "ref accounts.account"
-    uuid to_account_id "solo TRANSFER"
-    uuid counterparty_id
-    uuid category_id
-    money amount
-    ccy currency FK
-    text amount_type "FIXED ESTIMATED VARIABLE"
-    text rrule "RFC 5545 RRULE"
-    date dtstart
-    date until_date
-    text generation_mode "REMIND CREATE_PENDING AUTO_POST"
-    smallint lead_days
+    text name "1..120"
+    text description
+    text notes
+    text kind "INCOME EXPENSE TRANSFER"
+    text managed_by "USER (SUBSCRIPTION y DEBT con expand)"
+    uuid managed_ref
     text status "ACTIVE PAUSED ENDED"
+    int current_version_no
     date generated_through "high-water mark"
-    timestamptz archived_at
+    timestamptz ended_at
+    text last_auto_create_error
     int version
   }
-  SUBSCRIPTION {
+  RECURRING_DEFINITION_VERSION {
     uuid definition_id PK, FK
+    int version_no PK
     uuid workspace_id FK
-    text plan_name
-    text billing_cycle "MONTHLY YEARLY WEEKLY CUSTOM"
-    date trial_ends_on
-    date next_renewal_on
-    text cancellation_url
-    text status "TRIAL ACTIVE CANCELLED"
-    date cancelled_on
+    date effective_from
+    uuid account_id "ref accounts.account"
+    uuid to_account_id "solo TRANSFER"
+    ccy currency FK
+    text amount_type "FIXED ESTIMATED MIN_MAX VARIABLE"
+    numeric amount
+    numeric amount_min
+    numeric amount_max
+    uuid category_id
+    uuid counterparty_id
+    uuid_array tag_ids
+    text payment_method
+    text cadence "9 cadencias y CUSTOM"
+    smallint interval
+    text rrule "normalizada"
+    date dtstart
+    date until_date
+    int max_count
+    text weekend_adjustment "NONE PREVIOUS NEXT"
+    text materialization_mode "AUTO_CREATE PENDING_APPROVAL NOTIFY_ONLY"
+    text auto_create_status "PENDING POSTED"
+    smallint lead_days
   }
   RECURRING_OCCURRENCE {
     uuid id PK
     uuid workspace_id FK
     uuid definition_id FK
-    date occurrence_date
-    date due_date
-    money expected_amount
+    date occurrence_date "nominal, clave"
+    date due_date "ajustada o editada"
+    int definition_version_no
+    numeric expected_amount
+    numeric expected_min
+    numeric expected_max
     ccy currency FK
-    int definition_version "version usada al generar"
-    text status "SCHEDULED PENDING_CONFIRMATION MATERIALIZED SKIPPED MISSED"
-    uuid transaction_id "ref txn.transaction"
-    timestamptz materialized_at
-    timestamptz created_at
+    bool amount_overridden
+    bool date_overridden
+    text status "SCHEDULED DUE OVERDUE MATERIALIZED MATCHED SKIPPED CANCELLED"
+    text cancel_reason "PAUSED SUPERSEDED ENDED"
+    uuid transaction_id "ref txn.transaction, sin FK cruzada"
+    text resolution "CREATED MATCHED SKIPPED"
+    text matched_by "USER_LINK SUGGESTION"
+    text skip_reason
+    timestamptz resolved_at
+    text last_auto_create_error
+    int version
   }
 ```
 
-| Tabla | Unique | Check | Índices | RLS | version / archivo |
-|-------|--------|-------|---------|-----|-------------------|
-| `recurring_definition` | `(workspace_id, id)` | `kind='TRANSFER'` ⇔ `to_account_id IS NOT NULL`; `amount > 0`; `until_date IS NULL OR until_date >= dtstart`; `lead_days BETWEEN 0 AND 60` | `(workspace_id, status, generated_through) WHERE status='ACTIVE'` (scheduler) | WS | `version`, `archived_at` |
-| `subscription` | PK | — | `(workspace_id, next_renewal_on)` | WS | via definición |
-| `recurring_occurrence` | **`(definition_id, occurrence_date)`** — generación idempotente (`INSERT ... ON CONFLICT DO NOTHING`); `(transaction_id) WHERE transaction_id IS NOT NULL` | `status='MATERIALIZED'` ⇔ `transaction_id IS NOT NULL` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','PENDING_CONFIRMATION')` (cash-flow calendar) | WS | — |
+| Tabla | Unique | Check | Índices | RLS / grants | version / archivo |
+|-------|--------|-------|---------|--------------|-------------------|
+| `recurring_definition` | `(workspace_id, id)` | `kind IN ('INCOME','EXPENSE','TRANSFER')`; `managed_by = 'USER'` (se relaja con un expand cuando Subscriptions o Debt administren definiciones); `status IN ('ACTIVE','PAUSED','ENDED')`; `name` de 1 a 120 caracteres | `(workspace_id, status, generated_through) WHERE status = 'ACTIVE'` (scheduler) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version`; sin archivo en Phase 3 (se filtra por estado, D128) |
+| `recurring_definition_version` | PK `(definition_id, version_no)` | coherencia de `kind` (`to_account_id` presente ⇔ `TRANSFER`; en dominio y trigger liviano); montos según `amount_type` (> 0, `min <= max`); `until_date IS NULL OR max_count IS NULL`; `lead_days BETWEEN 0 AND 60`; `materialization_mode <> 'AUTO_CREATE' OR amount_type IN ('FIXED','ESTIMATED')` | PK | **WS-RO**: `pf_app`/`pf_worker` SELECT, INSERT; `platform.forbid_mutation()` (append-only) | Inmutable |
+| `recurring_occurrence` | **`(definition_id, occurrence_date)`** — generación idempotente (`INSERT ... ON CONFLICT DO NOTHING`, INV-013); parcial `(workspace_id, transaction_id) WHERE status IN ('MATERIALIZED','MATCHED')` (una transacción resuelve a lo sumo una ocurrencia) | `status IN ('MATERIALIZED','MATCHED')` ⇔ `transaction_id IS NOT NULL`; `status = 'CANCELLED'` ⇔ `cancel_reason IS NOT NULL` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','DUE','OVERDUE')` (comprometido y próximos pagos); `(workspace_id, status, due_date)` (job) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version` |
+
+Las tres tablas se registran en `platform.workspace_scoped_table` (purga demo, ADR-0026) y declaran sección de portabilidad (`recurring-definitions`, `recurring-definition-versions`, `recurring-occurrences`, orden 750). **Defensa en profundidad en `txn.transaction`** (§5.4): índice único parcial `(workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace = 'commitments.occurrence'`, creado con `CREATE UNIQUE INDEX CONCURRENTLY` en una migración separada: una transacción por ocurrencia aunque un bug reintente.
 
 ### 5.8 `goals` — Savings goals (Phase 4)
 

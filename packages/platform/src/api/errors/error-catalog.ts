@@ -135,6 +135,23 @@ export const ERROR_CATALOG = {
   UPLOAD_TOO_LARGE: { status: 413, title: 'The uploaded file exceeds the maximum size' },
   // transactions / bulk edit (Phase 2)
   BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
+  // commitments / recurrence engine (Phase 3)
+  INVALID_RRULE: { status: 422, title: 'The recurrence rule is not supported or produces no dates' },
+  RECURRING_KIND_NOT_AVAILABLE: {
+    status: 422,
+    title: 'This kind of recurring definition is not available yet',
+  },
+  RECURRING_INVALID_SCHEDULE: { status: 422, title: 'The recurring schedule is not valid' },
+  RECURRING_INVALID_AMOUNT: { status: 422, title: 'The recurring amount is not valid for its type' },
+  RECURRING_MODE_NOT_ALLOWED: { status: 422, title: 'Automatic creation needs a fixed or estimated amount' },
+  RECURRING_REVISION_DATE_INVALID: {
+    status: 422,
+    title: 'The effective date must be after the last resolved occurrence',
+  },
+  OCCURRENCE_AMOUNT_REQUIRED: { status: 422, title: 'An amount is required to approve this occurrence' },
+  OCCURRENCE_LINK_MISMATCH: { status: 422, title: 'The transaction does not match the occurrence' },
+  OCCURRENCE_ALREADY_MATERIALIZED: { status: 409, title: 'The occurrence already has its transaction' },
+  TRANSACTION_ALREADY_LINKED: { status: 409, title: 'The transaction already resolves another occurrence' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

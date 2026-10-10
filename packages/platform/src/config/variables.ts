@@ -691,6 +691,31 @@ export const VARIABLES = {
     },
   ),
 
+  // ── Commitments: motor de recurrencia (openspec add-recurrence-engine, design.md decisión 7; docs/35 D125) ──
+  COMMITMENTS_HORIZON_DAYS: variable(
+    positiveInt.refine((n) => n >= 14 && n <= 366, 'entre 14 y 366 días'),
+    {
+      group: 'Commitments',
+      description:
+        'Horizonte (días, 14–366) hasta el que el motor de recurrencia genera ocurrencias a partir de hoy en la zona horaria del workspace (docs/35 D125). Por entorno, no por workspace; lo leen la API (generación síncrona al crear, revisar o reanudar una definición) y el worker (job `commitments.generate-occurrences`).',
+      default: '90',
+    },
+  ),
+  COMMITMENTS_SCHEDULER_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `10 * * * *`) u `off`',
+      ),
+    {
+      group: 'Worker',
+      description:
+        'Cron (5 campos, UTC) del job `commitments.generate-occurrences`: extiende la generación de ocurrencias hasta el horizonte, pasa a `DUE`/`OVERDUE` las que corresponden por fecha y materializa las de modo `AUTO_CREATE` vencidas. También corre al arrancar el worker. `off` desactiva el cron.',
+      default: '10 * * * *',
+    },
+  ),
+
   // ── Notificaciones (openspec add-alerts, design decisiones 6, 7, 9 y 11; docs/33 D87–D93) ──
   EMAIL_DRIVER: variable(z.enum(['smtp', 'none']), {
     group: 'Notificaciones',
@@ -881,6 +906,7 @@ export const APP_VARIABLES = {
     ...FX_PROVIDERS,
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
+    'COMMITMENTS_HORIZON_DAYS',
     // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',
@@ -905,6 +931,8 @@ export const APP_VARIABLES = {
     'PLANNING_PERIOD_LOOKAHEAD',
     'PLANNING_CLOSE_PENDING_DELAY_DAYS',
     'PLANNING_PERIODS_CRON',
+    'COMMITMENTS_HORIZON_DAYS',
+    'COMMITMENTS_SCHEDULER_CRON',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).

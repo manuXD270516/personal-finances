@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Marcar pagada vinculando una transacción existente'
 scenario: 'Internet pagado a mano'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'link']
@@ -30,7 +33,7 @@ expected_result:
   - 'Ninguna transacción nueva'
   - 'RecurringOccurrenceMaterialized.v1 mode MATCHED'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-029 — Marcar pagada vinculando una transacción existente la resuelve sin crear transacciones

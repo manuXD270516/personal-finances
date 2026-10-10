@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Cadencias predefinidas con intervalo'
 scenario: 'Semimensual los días 15 y último'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-002']
 nfr: []
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'cadence']
@@ -31,7 +33,7 @@ expected_result:
   - '[2026-10-15, 2026-10-31, 2026-11-15, 2026-11-30]'
   - 'La regla con un solo día se rechaza con RECURRING_INVALID_SCHEDULE'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-006 — La cadencia semimensual exige dos días y produce el 15 y el último de cada mes

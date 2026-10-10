@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Aprobar una ocurrencia crea su transacción'
 scenario: 'Aprobar dos veces'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: ['INV-013']
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'materialize']
@@ -29,7 +31,7 @@ expected_result:
   - '409 OCCURRENCE_ALREADY_MATERIALIZED'
   - 'Una sola transacción con externalRef de la ocurrencia'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-025 — Aprobar dos veces la misma ocurrencia se rechaza y deja una sola transacción

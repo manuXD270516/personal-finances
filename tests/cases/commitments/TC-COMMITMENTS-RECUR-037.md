@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Total comprometido del periodo financiero'
 scenario: 'Sin tasa y con montos variables'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-011']
 nfr: []
 invariants: ['INV-012']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/committed.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'committed', 'fx']
@@ -30,7 +33,7 @@ expected_result:
   - 'unconverted [5.99 USD]'
   - 'withoutAmountCount 1'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-037 — Sin tasa el comprometido consolidado queda incompleto e informa las ocurrencias sin monto

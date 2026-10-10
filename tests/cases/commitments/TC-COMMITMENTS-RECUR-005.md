@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Cadencias predefinidas con intervalo'
 scenario: 'Trimestral con intervalo 2'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-002']
 nfr: []
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'cadence']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - '[2026-01-10, 2026-07-10, 2027-01-10]'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-005 — La cadencia trimestral con intervalo 2 produce una fecha cada seis meses

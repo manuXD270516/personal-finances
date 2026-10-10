@@ -99,8 +99,8 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 - **Responsabilidades:** motor de recurrencia; definiciones; generación idempotente de ocurrencias; materialización (crear transacción) o matching con transacciones existentes; suscripciones con historial de precios y renovaciones.
 - **NO responsabilidades:** cronogramas de amortización (Debt, aunque una cuota pueda verse en el calendario); persistir transacciones (Transactions); notificar (Notify).
 - **API pública:** ver 04 §3.7.
-- **Eventos publicados:** `commitments.RecurringOccurrenceGenerated` (batch), `RecurringOccurrenceDue`, `RecurringOccurrenceMaterialized`, `SubscriptionPriceChanged`, `SubscriptionRenewalUpcoming`, `SubscriptionCancelled`. **Consumidos:** `transactions.TransactionCreated` (auto-match), `TransactionVoided` (liberar ocurrencia).
-- **Dependencias:** Transactions (sync para materializar), Classification (query), Audit.
+- **Eventos publicados:** `commitments.OccurrencesGenerated` (batch), `RecurringOccurrenceDue`, `RecurringOccurrenceMaterialized`, `RecurringOccurrenceChanged`, `RecurringDefinitionChanged` (motor, `add-recurrence-engine`); `SubscriptionPriceChanged`, `SubscriptionRenewalUpcoming`, `SubscriptionCancelled` (suscripciones). **Consumidos:** `transactions.TransactionVoided` (liberar la ocurrencia, `commitments.transaction-voided`); `transactions.TransactionCreated` (matching sugerido) lo consume `add-commitment-matching`, no el motor.
+- **Dependencias:** Transactions (sync para materializar, solo por `@pf/transactions/contracts`: `RecurringTransactionPort`, `TransactionLinkQuery`, `PendingFlowQuery`), Accounts, Classification, FX, Identity (queries por `contracts`), Audit. **Planning** se consulta por un puerto propio (`FinancialPeriodPort`) cuyo adapter vive en la composición de `apps/api`: Planning consumirá compromisos para el plan mensual y una dependencia directa crearía un ciclo.
 - **Extracción:** Media.
 
 ### 2.8 GOALS — Savings Goals (`goals`, `@pf/goals`)

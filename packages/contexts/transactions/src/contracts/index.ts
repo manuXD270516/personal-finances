@@ -196,6 +196,102 @@ export interface ClosingRangeInput {
 
 export const TRANSACTIONS_CLOSING_QUERY = Symbol.for('pf.transactions.TransactionsClosingQuery');
 
+// ───────────────────────────────────────────── add-recurrence-engine (COMMITMENTS)
+
+/** Espacio de nombres de `externalRef` de las transacciones creadas por una ocurrencia recurrente. */
+export const RECURRING_OCCURRENCE_NAMESPACE = 'commitments.occurrence' as const;
+
+export type RecurringTransactionKindDto = 'INCOME' | 'EXPENSE' | 'TRANSFER';
+
+/**
+ * Puerto de escritura que usa COMMITMENTS para materializar una ocurrencia (design decisión 10; docs/06 relación 10):
+ * crea un ingreso, gasto o transferencia con `source = RECURRING` y `externalRef = {commitments.occurrence, id}` en la
+ * unidad de trabajo del llamador (transacción, ledger, outbox de Transactions, ocurrencia, auditoría y outbox de
+ * COMMITMENTS se confirman juntos). Los errores de dominio (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`,
+ * `TRANSFER_CURRENCY_MISMATCH`…) se propagan sin traducir.
+ */
+export interface RecurringTransactionPort {
+  record(input: {
+    readonly workspaceId: string;
+    /** Usuario que aprueba; vacío cuando la crea el worker (creación automática). */
+    readonly userId: string;
+    readonly kind: RecurringTransactionKindDto;
+    readonly status: 'PENDING' | 'POSTED';
+    readonly businessDate: string;
+    readonly accountId: string;
+    readonly toAccountId?: string | null;
+    readonly amount: { readonly amount: string; readonly currency: string };
+    readonly categoryId?: string | null;
+    readonly counterpartyId?: string | null;
+    readonly tagIds?: readonly string[];
+    readonly description: string;
+    readonly paymentMethod?: string | null;
+    readonly occurrenceRef: { readonly occurrenceId: string; readonly definitionId: string };
+  }): Promise<{
+    readonly transactionId: string;
+    readonly status: string;
+    readonly businessDate: string;
+  }>;
+}
+
+export const RECURRING_TRANSACTION_PORT = Symbol.for('pf.transactions.RecurringTransactionPort');
+
+/** Transacción tal como la necesita COMMITMENTS para vincularla a una ocurrencia (matching manual). */
+export interface TransactionLinkDto {
+  readonly transactionId: string;
+  readonly kind: string;
+  readonly status: string;
+  readonly businessDate: string;
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly accountId: string;
+  /** Cuenta destino de una transferencia; `null` en el resto. */
+  readonly toAccountId: string | null;
+  readonly counterpartyId: string | null;
+  readonly source: string;
+  readonly externalRef: { readonly namespace: string; readonly id: string } | null;
+}
+
+export interface TransactionLinkQuery {
+  /** `null` si no existe en el workspace. Toma `FOR SHARE` de la fila (anular toma `FOR UPDATE`). */
+  getForLink(input: {
+    readonly workspaceId: string;
+    readonly transactionId: string;
+  }): Promise<TransactionLinkDto | null>;
+  /** Varias transacciones por id, SIN bloqueo (lectura para reportes); las inexistentes no figuran. */
+  getManyForLink(input: {
+    readonly workspaceId: string;
+    readonly transactionIds: readonly string[];
+  }): Promise<readonly TransactionLinkDto[]>;
+}
+
+export const TRANSACTION_LINK_QUERY = Symbol.for('pf.transactions.TransactionLinkQuery');
+
+/** Transacción `PENDING` de egreso o ingreso (forma acordada con `add-upcoming-payments`). */
+export interface PendingFlowRowDto {
+  readonly transactionId: string;
+  readonly kind: string;
+  readonly businessDate: string;
+  readonly accountId: string;
+  readonly toAccountId: string | null;
+  readonly direction: 'IN' | 'OUT';
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly description: string | null;
+  readonly source: string;
+  readonly externalRef: { readonly namespace: string; readonly id: string } | null;
+}
+
+/** Solo transacciones `PENDING` (sin asiento); sin efectos; en la unidad de trabajo del llamador si existe. */
+export interface PendingFlowQuery {
+  listPending(input: {
+    readonly workspaceId: string;
+    readonly accountIds?: readonly string[];
+    readonly dateFrom?: string;
+    readonly dateTo?: string;
+  }): Promise<readonly PendingFlowRowDto[]>;
+}
+
+export const PENDING_FLOW_QUERY = Symbol.for('pf.transactions.PendingFlowQuery');
+
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.

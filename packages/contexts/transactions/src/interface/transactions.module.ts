@@ -28,9 +28,14 @@ import {
 } from '../infrastructure/pg-transactions.js';
 import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
+import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
+import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
 import type {
   CounterpartyCategoryUsageQuery,
+  PendingFlowQuery,
+  RecurringTransactionPort,
+  TransactionLinkQuery,
   NominalFlowQuery,
   ReconciliationStatusQuery,
   TransactionsClosingQuery,
@@ -77,6 +82,12 @@ export interface TransactionsRuntime {
   readonly categoryUsage: CounterpartyCategoryUsageQuery;
   /** Query pública `TransactionsClosingQuery` para el checklist y el snapshot del cierre de PLANNING (add-month-closing). */
   readonly closing: TransactionsClosingQuery;
+  /** Escritura para COMMITMENTS (add-recurrence-engine): crea la transacción de una ocurrencia en la UoW del llamador. */
+  readonly recurring: RecurringTransactionPort;
+  /** Lectura de una transacción para vincularla a una ocurrencia (add-recurrence-engine). */
+  readonly links: TransactionLinkQuery;
+  /** Transacciones `PENDING` (add-recurrence-engine, comprometido del periodo). */
+  readonly pending: PendingFlowQuery;
 }
 
 /**
@@ -128,7 +139,18 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
     categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
     closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),
+    recurring: new RecurringTransactionAdapter(service),
+    links: new PgTransactionLinkQuery(deps.uow, deps.currencies),
+    pending: new PgPendingFlowQuery(deps.uow, deps.currencies),
   };
+}
+
+/**
+ * Lecturas de COMMITMENTS para procesos sin comandos (el worker; add-recurrence-engine): vincular y pendientes leen
+ * solo en la unidad de trabajo del llamador, sin puertos de escritura.
+ */
+export function createPendingFlowQuery(pool: Pool): PendingFlowQuery {
+  return new PgPendingFlowQuery(new PgTransactionsUnitOfWork(pool), pgCurrencyCatalog);
 }
 
 export interface TransactionsModuleOptions {

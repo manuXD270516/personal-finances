@@ -246,6 +246,8 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: 'Contraparte',
       FinancialPeriod: 'Periodo financiero',
       Reconciliation: 'Reconciliación',
+      RecurringDefinition: 'Definición recurrente',
+      RecurringOccurrence: 'Ocurrencia recurrente',
     },
     states: {
       Transaction: {
@@ -261,6 +263,16 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: CLASSIFICATION.es.states,
       FinancialPeriod: { DRAFT: 'Borrador', ACTIVE: 'Activo', CLOSED: 'Cerrado', REOPENED: 'Reabierto' },
       Reconciliation: { IN_PROGRESS: 'En curso', COMPLETED: 'Completada', CANCELLED: 'Cancelada' },
+      RecurringDefinition: { ACTIVE: 'Activa', PAUSED: 'Pausada', ENDED: 'Terminada' },
+      RecurringOccurrence: {
+        SCHEDULED: 'Programada',
+        DUE: 'Próxima',
+        OVERDUE: 'Atrasada',
+        MATERIALIZED: 'Creada',
+        MATCHED: 'Vinculada',
+        SKIPPED: 'Omitida',
+        CANCELLED: 'Cancelada',
+      },
     },
     transitions: {
       Transaction: {
@@ -280,6 +292,24 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: CLASSIFICATION.es.transitions,
       FinancialPeriod: { CREATE: 'Crear', ACTIVATE: 'Activar', CLOSE: 'Cerrar', REOPEN: 'Reabrir' },
       Reconciliation: { START: 'Iniciar', COMPLETE: 'Finalizar', CANCEL: 'Cancelar' },
+      RecurringDefinition: {
+        CREATE: 'Crear',
+        PAUSE: 'Pausar',
+        RESUME: 'Reanudar',
+        REVISE: 'Revisar',
+        END: 'Terminar',
+      },
+      RecurringOccurrence: {
+        GENERATE: 'Generar',
+        BECOME_DUE: 'Pasar a próxima',
+        MARK_OVERDUE: 'Atrasar',
+        MATERIALIZE: 'Crear transacción',
+        LINK: 'Vincular',
+        SKIP: 'Omitir',
+        RELEASE: 'Liberar',
+        CANCEL: 'Cancelar',
+        REINSTATE: 'Reinstaurar',
+      },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -318,6 +348,8 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: 'Counterparty',
       FinancialPeriod: 'Financial period',
       Reconciliation: 'Reconciliation',
+      RecurringDefinition: 'Recurring definition',
+      RecurringOccurrence: 'Recurring occurrence',
     },
     states: {
       Transaction: {
@@ -333,6 +365,16 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: CLASSIFICATION.en.states,
       FinancialPeriod: { DRAFT: 'Draft', ACTIVE: 'Active', CLOSED: 'Closed', REOPENED: 'Reopened' },
       Reconciliation: { IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled' },
+      RecurringDefinition: { ACTIVE: 'Active', PAUSED: 'Paused', ENDED: 'Ended' },
+      RecurringOccurrence: {
+        SCHEDULED: 'Scheduled',
+        DUE: 'Upcoming',
+        OVERDUE: 'Overdue',
+        MATERIALIZED: 'Created',
+        MATCHED: 'Linked',
+        SKIPPED: 'Skipped',
+        CANCELLED: 'Cancelled',
+      },
     },
     transitions: {
       Transaction: {
@@ -352,6 +394,24 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: CLASSIFICATION.en.transitions,
       FinancialPeriod: { CREATE: 'Create', ACTIVATE: 'Activate', CLOSE: 'Close', REOPEN: 'Reopen' },
       Reconciliation: { START: 'Start', COMPLETE: 'Complete', CANCEL: 'Cancel' },
+      RecurringDefinition: {
+        CREATE: 'Create',
+        PAUSE: 'Pause',
+        RESUME: 'Resume',
+        REVISE: 'Revise',
+        END: 'End',
+      },
+      RecurringOccurrence: {
+        GENERATE: 'Generate',
+        BECOME_DUE: 'Become upcoming',
+        MARK_OVERDUE: 'Mark overdue',
+        MATERIALIZE: 'Create transaction',
+        LINK: 'Link',
+        SKIP: 'Skip',
+        RELEASE: 'Release',
+        CANCEL: 'Cancel',
+        REINSTATE: 'Reinstate',
+      },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -390,6 +450,8 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: 'Contraparte',
       FinancialPeriod: 'Período financeiro',
       Reconciliation: 'Conciliação',
+      RecurringDefinition: 'Definição recorrente',
+      RecurringOccurrence: 'Ocorrência recorrente',
     },
     states: {
       Transaction: {
@@ -405,6 +467,16 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: CLASSIFICATION.pt.states,
       FinancialPeriod: { DRAFT: 'Rascunho', ACTIVE: 'Ativo', CLOSED: 'Fechado', REOPENED: 'Reaberto' },
       Reconciliation: { IN_PROGRESS: 'Em andamento', COMPLETED: 'Concluída', CANCELLED: 'Cancelada' },
+      RecurringDefinition: { ACTIVE: 'Ativa', PAUSED: 'Pausada', ENDED: 'Encerrada' },
+      RecurringOccurrence: {
+        SCHEDULED: 'Programada',
+        DUE: 'Próxima',
+        OVERDUE: 'Atrasada',
+        MATERIALIZED: 'Criada',
+        MATCHED: 'Vinculada',
+        SKIPPED: 'Ignorada',
+        CANCELLED: 'Cancelada',
+      },
     },
     transitions: {
       Transaction: {
@@ -424,6 +496,24 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Counterparty: CLASSIFICATION.pt.transitions,
       FinancialPeriod: { CREATE: 'Criar', ACTIVATE: 'Ativar', CLOSE: 'Fechar', REOPEN: 'Reabrir' },
       Reconciliation: { START: 'Iniciar', COMPLETE: 'Concluir', CANCEL: 'Cancelar' },
+      RecurringDefinition: {
+        CREATE: 'Criar',
+        PAUSE: 'Pausar',
+        RESUME: 'Retomar',
+        REVISE: 'Revisar',
+        END: 'Encerrar',
+      },
+      RecurringOccurrence: {
+        GENERATE: 'Gerar',
+        BECOME_DUE: 'Passar a próxima',
+        MARK_OVERDUE: 'Atrasar',
+        MATERIALIZE: 'Criar transação',
+        LINK: 'Vincular',
+        SKIP: 'Ignorar',
+        RELEASE: 'Liberar',
+        CANCEL: 'Cancelar',
+        REINSTATE: 'Reinstaurar',
+      },
     },
     element: 'Item',
     currentState: 'Estado atual',

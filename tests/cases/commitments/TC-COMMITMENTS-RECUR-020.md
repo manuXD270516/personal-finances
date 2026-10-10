@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Modo creación automática'
 scenario: 'Variable en creación automática'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-007']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/definition.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'auto-create']
@@ -29,7 +33,7 @@ steps:
 expected_result:
   - 'Ambas se rechazan con RECURRING_MODE_NOT_ALLOWED'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-020 — La creación automática se rechaza para montos VARIABLE o MIN_MAX

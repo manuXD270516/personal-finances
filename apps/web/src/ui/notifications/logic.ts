@@ -10,9 +10,11 @@ export type NotificationStatus = 'UNREAD' | 'READ' | 'ARCHIVED';
 export type NotificationEmailStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SUPPRESSED';
 
 export interface NotificationLink {
-  readonly kind: 'BUDGET_LINE' | 'PERIOD_CLOSE' | (string & {});
+  readonly kind: 'BUDGET_LINE' | 'PERIOD_CLOSE' | 'RECURRING_OCCURRENCE' | (string & {});
   readonly periodId: string;
   readonly periodLabel: string;
+  /** Ocurrencia recurrente (solo `RECURRING_OCCURRENCE`, add-recurrence-engine): abre `/recurring/occurrences/{id}`. */
+  readonly occurrenceId?: string;
   readonly budgetId?: string;
   readonly budgetLineId?: string;
   readonly targetKind?: string;
@@ -84,7 +86,7 @@ export function severityPresentation(severity: string): SeverityPresentation {
 /**
  * Ruta (sin prefijo de locale) del recurso que originó la notificación; `undefined` si el tipo de enlace no se
  * conoce (el enum es abierto). `BUDGET_LINE` abre el plan del periodo con la línea resaltada; si la línea ya no
- * existe, el plan lo avisa (TC-NOTIFICATIONS-INAPP-005).
+ * existe, el plan lo avisa (TC-NOTIFICATIONS-INAPP-005). `RECURRING_OCCURRENCE` abre el detalle de la ocurrencia.
  */
 export function resourcePath(link: NotificationLink): string | undefined {
   if (link.kind === 'BUDGET_LINE') {
@@ -94,6 +96,9 @@ export function resourcePath(link: NotificationLink): string | undefined {
   }
   if (link.kind === 'PERIOD_CLOSE') {
     return `/planificacion/periodos/${encodeURIComponent(link.periodId)}/cierre`;
+  }
+  if (link.kind === 'RECURRING_OCCURRENCE' && link.occurrenceId) {
+    return `/recurring/occurrences/${encodeURIComponent(link.occurrenceId)}`;
   }
   return undefined;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closePendingPayload, thresholdPayload } from './fixtures.js';
+import { closePendingPayload, occurrenceDuePayload, thresholdPayload } from './fixtures.js';
 import { MESSAGE_CATALOGS, placeholdersOf } from './messages.js';
 import { formatDate, formatDecimal, renderEmail, renderInApp } from './render.js';
 import { definitionOf } from './type-catalog.js';
@@ -169,10 +169,66 @@ describe('Catálogo de mensajes', () => {
     for (const locale of NOTIFICATION_LOCALES) {
       for (const [key, template] of Object.entries(MESSAGE_CATALOGS[locale])) {
         if (!key.endsWith('.basic') && !key.endsWith('.subject')) continue;
-        for (const forbidden of ['target', 'actual', 'reference', 'currency', 'utilization', 'periodEnd']) {
+        for (const forbidden of [
+          'target',
+          'actual',
+          'reference',
+          'currency',
+          'utilization',
+          'periodEnd',
+          'name',
+          'amount',
+        ]) {
           expect(placeholdersOf(template), `${locale}:${key}`).not.toContain(forbidden);
         }
       }
     }
+  });
+});
+
+describe('Render: ocurrencia recurrente', () => {
+  const approval = definitionOf('RECURRING_APPROVAL_REQUIRED').plan(occurrenceDuePayload());
+  const upcoming = definitionOf('RECURRING_PAYMENT_UPCOMING').plan(
+    occurrenceDuePayload({
+      requiresApproval: false,
+      mode: 'NOTIFY_ONLY',
+      expected: { type: 'MIN_MAX', amount: null, min: '100.00', max: '250.50' },
+    }),
+  );
+  const variable = definitionOf('RECURRING_PAYMENT_UPCOMING').plan(
+    occurrenceDuePayload({
+      requiresApproval: false,
+      expected: { type: 'VARIABLE', amount: null, min: null, max: null },
+    }),
+  );
+
+  it('in-app muestra nombre, fecha y monto en el idioma del usuario', () => {
+    const es = renderInApp('es', approval.messageKey, approval.params, names);
+    expect(es.title).toBe('Por aprobar: Alquiler');
+    expect(es.body).toBe('La ocurrencia del 05/11/2026 (3.500,00 BOB) espera tu aprobación.');
+    expect(renderInApp('en', approval.messageKey, approval.params, names).body).toContain('11/05/2026');
+    expect(renderInApp('pt', upcoming.messageKey, upcoming.params, names).body).toContain(
+      '100,00 – 250,50 BOB',
+    );
+  });
+
+  it('un monto variable no muestra monto', () => {
+    expect(renderInApp('es', variable.messageKey, variable.params, names).body).toBe(
+      'Vence el 05/11/2026. El monto es variable.',
+    );
+    expect(email('es', 'detailed', variable).text).toContain(
+      'Alquiler vence el 05/11/2026. El monto es variable.',
+    );
+  });
+
+  it('[TC-COMMITMENTS-RECUR-043] el email basic no lleva monto ni nombre, solo la fecha; detailed sí', () => {
+    for (const locale of NOTIFICATION_LOCALES) {
+      const mail = email(locale, 'basic', approval);
+      const basic = withoutUrls(mail.text + mail.html);
+      expect(basic, locale).not.toMatch(/3[.,\s]?500/);
+      expect(basic, locale).not.toContain('Alquiler');
+    }
+    expect(email('es', 'basic', approval).text).toContain('05/11/2026');
+    expect(email('es', 'detailed', approval).text).toContain('Alquiler del 05/11/2026 (3.500,00 BOB)');
   });
 });

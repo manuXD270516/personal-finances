@@ -5,16 +5,17 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Fechas locales en la zona horaria del workspace'
 scenario: 'Atraso a medianoche de La Paz'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-003', 'FR-COMMITMENTS-005']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'timezone']
@@ -32,7 +33,7 @@ expected_result:
   - 'En t1 la ocurrencia sigue DUE'
   - 'En t2 pasa a OVERDUE'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-009 — Una ocurrencia pasa a atrasada al cambiar el día en America/La_Paz aunque el proceso corra en UTC

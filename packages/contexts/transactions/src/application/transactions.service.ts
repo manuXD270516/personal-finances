@@ -8,7 +8,7 @@ import type {
 } from '@pf/audit/contracts';
 import type { CustomFieldValueInputDto } from '@pf/classification/contracts';
 import { currency as makeCurrency, DomainError, Money, type FieldViolation } from '@pf/shared-kernel';
-import { TRANSACTION_EVENTS } from '../contracts/index.js';
+import { RECURRING_OCCURRENCE_NAMESPACE, TRANSACTION_EVENTS } from '../contracts/index.js';
 import {
   assertRefundAllowed,
   diffCustomFields,
@@ -191,6 +191,15 @@ export interface ListTransactionsQuery extends Omit<TransactionListFilter, 'q' |
 }
 
 const MAX_BULK = 500;
+/** `origin.refId` de `TransactionCreated.v1`: la ocurrencia recurrente que originó la transacción (add-recurrence-engine). */
+const recurringRefOf = (s: {
+  readonly source: string;
+  readonly externalRef: { readonly namespace: string; readonly id: string } | null;
+}): string | null =>
+  s.source === 'RECURRING' && s.externalRef?.namespace === RECURRING_OCCURRENCE_NAMESPACE
+    ? s.externalRef.id
+    : null;
+
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `transaction ${id} not found`);
 /** 412 con la versión vigente (`currentVersion`, docs/10 §6). */
 const preconditionFailed = (currentVersion: number) =>
@@ -334,7 +343,7 @@ export class TransactionsService {
           businessDate: s.businessDate,
           description: s.description,
           counterpartyId: s.counterpartyId,
-          origin: { type: s.source, refId: null },
+          origin: { type: s.source, refId: recurringRefOf(s) },
           legs: legsPayload(s),
           splits: splitsPayload(s),
           postingDate: s.postingDate,
@@ -463,7 +472,7 @@ export class TransactionsService {
           businessDate: s.businessDate,
           description: s.description,
           counterpartyId: s.counterpartyId,
-          origin: { type: s.source, refId: null },
+          origin: { type: s.source, refId: recurringRefOf(s) },
           legs: legsPayload(s),
           splits: splitsPayload(s),
           postingDate: s.postingDate,

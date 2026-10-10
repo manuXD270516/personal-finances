@@ -60,6 +60,52 @@ export class LocalDate {
     return LocalDate.of(get('year'), get('month'), get('day'));
   }
 
+  /** Días desde 1970-01-01 (algoritmo civil de Howard Hinnant; no depende de la zona ni del `Date` del proceso). */
+  toEpochDay(): number {
+    const y = this.month <= 2 ? this.year - 1 : this.year;
+    const era = Math.floor(y / 400);
+    const yoe = y - era * 400;
+    const mp = (this.month + 9) % 12;
+    const doy = Math.floor((153 * mp + 2) / 5) + this.day - 1;
+    const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+    return era * 146097 + doe - 719468;
+  }
+
+  static ofEpochDay(epochDay: number): LocalDate {
+    const z = epochDay + 719468;
+    const era = Math.floor(z / 146097);
+    const doe = z - era * 146097;
+    const yoe = Math.floor(
+      (doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365,
+    );
+    const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+    const mp = Math.floor((5 * doy + 2) / 153);
+    const day = doy - Math.floor((153 * mp + 2) / 5) + 1;
+    const month = mp < 10 ? mp + 3 : mp - 9;
+    const year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+    return LocalDate.of(year, month, day);
+  }
+
+  plusDays(days: number): LocalDate {
+    return LocalDate.ofEpochDay(this.toEpochDay() + days);
+  }
+
+  /** Día de la semana ISO: 1 = lunes … 7 = domingo. */
+  dayOfWeek(): number {
+    // 1970-01-01 fue jueves (4).
+    return ((((this.toEpochDay() + 3) % 7) + 7) % 7) + 1;
+  }
+
+  /** Último día del mes de esta fecha (28..31). */
+  lengthOfMonth(): number {
+    return daysIn(this.year, this.month);
+  }
+
+  /** Cantidad de días del mes `month` del año `year`. */
+  static daysInMonth(year: number, month: number): number {
+    return daysIn(year, month);
+  }
+
   compare(other: LocalDate): -1 | 0 | 1 {
     const a = this.toString();
     const b = other.toString();

@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/RecurringOccurrenceChanged.v1.schema.json",
+  "title": "commitments.RecurringOccurrenceChanged.v1",
+  "description": "La ocurrencia cambió sin resolverse con una transacción nueva: edición de monto o fecha (EDIT), omitida (SKIP), liberada al anularse su transacción (RELEASE) o atrasada (MARK_OVERDUE). Productor: COMMITMENTS. Consumidores: REPORTING, MATCHING. Idempotencia natural: (occurrenceId, aggregateVersion). PII baja: `reason`.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.RecurringOccurrenceChanged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "RecurringOccurrence"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "amount",
+        "min",
+        "max"
+      ],
+      "description": "Monto esperado según el tipo: FIXED/ESTIMATED llevan `amount`; MIN_MAX lleva `min` y `max`; VARIABLE ninguno. Texto decimal con la escala de la moneda.",
+      "properties": {
+        "type": {
+          "enum": [
+            "FIXED",
+            "ESTIMATED",
+            "MIN_MAX",
+            "VARIABLE"
+          ]
+        },
+        "amount": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/PositiveDecimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ManagedBy": {
+      "enum": [
+        "USER",
+        "SUBSCRIPTION",
+        "DEBT"
+      ]
+    },
+    "Status": {
+      "enum": [
+        "SCHEDULED",
+        "DUE",
+        "OVERDUE",
+        "MATERIALIZED",
+        "MATCHED",
+        "SKIPPED",
+        "CANCELLED"
+      ]
+    },
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "occurrenceId",
+        "definitionId",
+        "managedBy",
+        "transition",
+        "status",
+        "dueDate",
+        "expected",
+        "currency",
+        "releasedTransactionId",
+        "reason"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "occurrenceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "managedBy": {
+          "$ref": "#/$defs/ManagedBy"
+        },
+        "transition": {
+          "enum": [
+            "EDIT",
+            "SKIP",
+            "RELEASE",
+            "MARK_OVERDUE"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "dueDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "expected": {
+          "$ref": "#/$defs/Expected"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "releasedTransactionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000413",
+      "eventType": "commitments.RecurringOccurrenceChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T12:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RecurringOccurrence",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000cc001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "occurrenceId": "01928c4e-0000-7000-8000-0000000cc001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "managedBy": "USER",
+        "transition": "MARK_OVERDUE",
+        "status": "OVERDUE",
+        "dueDate": "2026-10-20",
+        "expected": {
+          "type": "FIXED",
+          "amount": "199.00",
+          "min": null,
+          "max": null
+        },
+        "currency": "BOB",
+        "releasedTransactionId": null,
+        "reason": null
+      }
+    }
+  ]
+}

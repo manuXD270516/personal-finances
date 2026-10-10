@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Tipos de préstamo y tarjeta reservados'
 scenario: 'Cuota de préstamo aún no disponible'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-001']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/definition.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'reserved-kinds']
@@ -31,7 +35,7 @@ expected_result:
   - 'Ambas 422 RECURRING_KIND_NOT_AVAILABLE'
   - 'No se crea nada'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-003 — Los tipos LOAN_PAYMENT y CARD_PAYMENT se rechazan como reservados hasta Phase 4

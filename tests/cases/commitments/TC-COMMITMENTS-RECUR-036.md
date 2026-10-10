@@ -5,16 +5,21 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Total comprometido del periodo financiero'
 scenario: 'Comprometido de octubre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-011']
 nfr: []
 invariants: ['INV-001']
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/committed.test.ts
+  - tests/e2e/specs/recurring.spec.ts
+status: automated
 regression_suite: true
 phase: 3
 tags: ['recurrence', 'committed', 'q4']
@@ -33,7 +38,7 @@ expected_result:
   - 'expectedIncome 9000.00 BOB'
   - 'El Alquiler no suma'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-036 — El comprometido de octubre suma ocurrencias no resueltas y pendientes sin doble conteo

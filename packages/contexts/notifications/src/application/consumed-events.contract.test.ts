@@ -6,6 +6,7 @@ import { definitionOf } from '../domain/index.js';
 
 const threshold = definitionOf('BUDGET_THRESHOLD');
 const closePending = definitionOf('MONTH_CLOSE_PENDING');
+const occurrenceDue = definitionOf('RECURRING_PAYMENT_UPCOMING');
 
 // ajv-formats es CJS: según el loader, el default llega envuelto.
 const addFormats = ((addFormatsModule as unknown as { default?: unknown }).default ??
@@ -18,6 +19,7 @@ describe('Contrato consumido: los ejemplos publicados por el productor son tradu
   for (const [file, definition] of [
     ['planning/BudgetThresholdReached.v1.schema.json', threshold],
     ['planning/MonthClosePending.v1.schema.json', closePending],
+    ['commitments/RecurringOccurrenceDue.v1.schema.json', occurrenceDue],
   ] as const) {
     it(`[TC-NOTIFICATIONS-INAPP-007] ${file}: sus examples validan el esquema y producen un plan`, () => {
       const ajv = new Ajv2020({ strict: true, allErrors: true });

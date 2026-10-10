@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Aprobar una ocurrencia crea su transacción'
 scenario: 'Aprobar la luz con el monto real'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008']
 nfr: []
 invariants: ['INV-029']
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - tests/e2e/specs/recurring.spec.ts
+status: automated
 regression_suite: true
 phase: 3
 tags: ['recurrence', 'materialize']
@@ -33,7 +37,7 @@ expected_result:
   - 'Ocurrencia MATERIALIZED'
   - 'Auditoría y transición MATERIALIZE en el mismo commit'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-023 — Aprobar una ocurrencia estimada con el monto real crea el gasto posteado y la materializa

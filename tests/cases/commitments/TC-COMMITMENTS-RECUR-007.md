@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Cadencia RRULE personalizada'
 scenario: 'Último viernes de cada mes'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-003']
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - apps/web/src/ui/recurring/recurring.test.tsx
+  - packages/shared-kernel/src/recurrence/recurrence.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'rrule']
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - '[2026-10-30, 2026-11-27, 2026-12-25]'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-007 — La RRULE del último viernes de cada mes se expande en la zona del workspace

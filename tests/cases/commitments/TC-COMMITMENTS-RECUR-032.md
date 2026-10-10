@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Pausar y reanudar una definición'
 scenario: 'Gimnasio pausado dos meses'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-009']
 nfr: []
 invariants: ['INV-013']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'pause']
@@ -32,7 +35,7 @@ expected_result:
   - '2026-12-28 y 2027-01-28 SCHEDULED (REINSTATE) y se generan las siguientes hasta 2027-03-01'
   - 'RecurringDefinitionChanged.v1 PAUSE y RESUME con los ids afectados'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-032 — Pausar cancela las ocurrencias futuras y reanudar reinstaura las posteriores sin recrear el intervalo pausado

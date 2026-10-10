@@ -10,6 +10,14 @@ import {
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
 import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
+import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
+import {
+  CommitmentsModule,
+  createCommitmentsRuntime,
+  RECURRING_DEFINITION_LIFECYCLE_MACHINE,
+  RECURRING_OCCURRENCE_LIFECYCLE_MACHINE,
+  type FinancialPeriodPort,
+} from '@pf/commitments/interface/commitments.module';
 import {
   CATEGORY_LIFECYCLE_MACHINE,
   ClassificationModule,
@@ -47,7 +55,7 @@ import {
   PlanningModule,
 } from '@pf/planning/interface/planning.module';
 import { JWKS_METRICS, type JwksObserver, type JwtVerifierOptions } from '@pf/platform/api';
-import { otelCounters, type CounterMetrics } from '@pf/platform/otel';
+import { otelCounters, otelHistograms, type CounterMetrics } from '@pf/platform/otel';
 import { demoDataEnabled, type ApiConfig } from '@pf/platform/config';
 import type { JobQueue } from '@pf/platform/queue';
 import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
@@ -179,6 +187,9 @@ export const LIFECYCLE_MACHINES = [
   FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
   // add-reconciliation (Phase 2): sesión de reconciliación de TRANSACTIONS.
   RECONCILIATION_LIFECYCLE_MACHINE,
+  // add-recurrence-engine (Phase 3): definición y ocurrencia recurrente de COMMITMENTS.
+  RECURRING_DEFINITION_LIFECYCLE_MACHINE,
+  RECURRING_OCCURRENCE_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -191,6 +202,8 @@ export const AUDIT_POLICIES = [
   PLANNING_AUDIT_POLICY,
   // add-alerts (Phase 2): los cambios de preferencias de notificaciones se auditan (docs/33 D92).
   NOTIFICATIONS_AUDIT_POLICY,
+  // add-recurrence-engine (Phase 3): definiciones y ocurrencias recurrentes.
+  COMMITMENTS_AUDIT_POLICY,
 ];
 
 /**
@@ -260,7 +273,12 @@ export function financeRuntimes(input: {
   readonly history: AuditHistoryQuery;
   readonly logger: Logger;
   readonly config: Pick<ApiConfig, 'APP_TIMEZONE'> &
-    Partial<Pick<ApiConfig, 'REPORTING_RATE_VALIDITY_WINDOW' | 'PLANNING_PERIOD_LOOKAHEAD'>> &
+    Partial<
+      Pick<
+        ApiConfig,
+        'REPORTING_RATE_VALIDITY_WINDOW' | 'PLANNING_PERIOD_LOOKAHEAD' | 'COMMITMENTS_HORIZON_DAYS'
+      >
+    > &
     Parameters<typeof parseFxProviderSettings>[0];
   readonly outbox?: OutboxWriter;
 }) {
@@ -404,7 +422,41 @@ export function financeRuntimes(input: {
   });
   deferred.periods = planning.periodQuery;
   if (planning.closing) deferred.closingSnapshots = planning.closing.snapshots;
-  return { classification, fx, accounts, ledger, transactions, reporting, planning, notifications };
+  // COMMITMENTS (add-recurrence-engine): no importa `@pf/planning/contracts` (evita un ciclo cuando Planning consuma
+  // compromisos); el adapter del periodo vive aquí, en la composición.
+  const commitments = createCommitmentsRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    outbox: classificationOutbox(writer),
+    calendar: identityWorkspaceCalendar(input.pool),
+    settings: identityWorkspaceSettings(input.pool),
+    periods: financialPeriodPort(planning.periodQuery),
+    accounts: accounts.query,
+    accountCatalog: accounts.catalog,
+    classification: classification.validator,
+    rates: fx.valuation,
+    transactions: transactions.recurring,
+    links: transactions.links,
+    pending: transactions.pending,
+    ...(input.config.COMMITMENTS_HORIZON_DAYS ? { horizonDays: input.config.COMMITMENTS_HORIZON_DAYS } : {}),
+    rateValidityWindowDays,
+    counters: otelCounters('@pf/commitments'),
+    histograms: otelHistograms('@pf/commitments'),
+  });
+  return {
+    classification,
+    fx,
+    accounts,
+    ledger,
+    transactions,
+    reporting,
+    planning,
+    notifications,
+    commitments,
+  };
 }
 
 /**
@@ -441,17 +493,26 @@ export function identityImports(input: {
   const lifecyclePort = input.lifecycle
     ? input.lifecycle(audit.lifecycleFor(auditPort))
     : audit.lifecycleFor(auditPort);
-  const { classification, fx, accounts, ledger, transactions, reporting, planning, notifications } =
-    financeRuntimes({
-      pool: input.pool,
-      clock: input.conventions.clock,
-      audit: auditPort,
-      lifecycle: lifecyclePort,
-      lifecycleQuery: audit.lifecycleQuery,
-      history: audit.history,
-      logger: input.logger,
-      config: input.config,
-    });
+  const {
+    classification,
+    fx,
+    accounts,
+    ledger,
+    transactions,
+    reporting,
+    planning,
+    notifications,
+    commitments,
+  } = financeRuntimes({
+    pool: input.pool,
+    clock: input.conventions.clock,
+    audit: auditPort,
+    lifecycle: lifecyclePort,
+    lifecycleQuery: audit.lifecycleQuery,
+    history: audit.history,
+    logger: input.logger,
+    config: input.config,
+  });
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -493,7 +554,14 @@ export function identityImports(input: {
       runtime: audit,
       conventions: input.conventions,
       // docs/31 D52: exportación CSV/PDF del recorrido con la consulta de cada contexto dueño.
-      lifecycleExport: lifecycleExportLoaders({ transactions, accounts, fx, classification, planning }),
+      lifecycleExport: lifecycleExportLoaders({
+        transactions,
+        accounts,
+        fx,
+        classification,
+        planning,
+        commitments,
+      }),
     }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
     // ACCOUNTS — openspec add-accounts-management.
@@ -507,6 +575,8 @@ export function identityImports(input: {
     PlanningModule.register({ runtime: planning, conventions: input.conventions }),
     // NOTIFY — openspec add-alerts (Phase 2): `/notifications*` y `/notification-preferences`.
     NotificationsModule.register({ runtime: notifications, conventions: input.conventions }),
+    // COMMITMENTS — openspec add-recurrence-engine (Phase 3): `/recurring*`.
+    CommitmentsModule.register({ runtime: commitments, conventions: input.conventions }),
   ];
 }
 
@@ -518,10 +588,10 @@ export function identityImports(input: {
 export function lifecycleExportLoaders(
   runtimes: Pick<
     ReturnType<typeof financeRuntimes>,
-    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning'
+    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'commitments'
   >,
 ): LifecycleExportLoaders {
-  const { transactions, accounts, fx, classification, planning } = runtimes;
+  const { transactions, accounts, fx, classification, planning, commitments } = runtimes;
   return {
     Transaction: async ({ userId, workspaceId, aggregateId }) => {
       const view = await transactions.service.transactionLifecycle({
@@ -557,6 +627,28 @@ export function lifecycleExportLoaders(
         label: period.label,
       };
     },
+    RecurringDefinition: async ({ userId, workspaceId, aggregateId }) => {
+      const definition = await commitments.queries.getDefinition(workspaceId, aggregateId);
+      return {
+        lifecycle: await commitments.queries.definitionLifecycle({
+          userId,
+          workspaceId,
+          definitionId: aggregateId,
+        }),
+        label: definition.name,
+      };
+    },
+    RecurringOccurrence: async ({ userId, workspaceId, aggregateId }) => {
+      const occurrence = await commitments.queries.getOccurrence(workspaceId, aggregateId);
+      return {
+        lifecycle: await commitments.queries.occurrenceLifecycle({
+          userId,
+          workspaceId,
+          occurrenceId: aggregateId,
+        }),
+        label: `${occurrence.definitionName} ${occurrence.occurrenceDate}`,
+      };
+    },
     Account: async ({ userId, workspaceId, aggregateId }) => {
       const lifecycle = await accounts.accounts.accountLifecycle({
         userId,
@@ -577,6 +669,21 @@ export function lifecycleExportLoaders(
       lifecycle: await classification.queries.lifecycleOf(userId, workspaceId, 'Counterparty', aggregateId),
       label: (await classification.queries.getCounterparty(userId, workspaceId, aggregateId)).name,
     }),
+  };
+}
+
+/**
+ * Adapter del puerto de periodos de COMMITMENTS sobre `PeriodQuery` de PLANNING (vive en la composición para que
+ * COMMITMENTS no dependa de `@pf/planning`, decisión 1 de add-recurrence-engine).
+ */
+export function financialPeriodPort(periods: PeriodQuery): FinancialPeriodPort {
+  const view = (p: Awaited<ReturnType<PeriodQuery['getPeriod']>>) =>
+    p
+      ? { id: p.id, label: p.label, periodStart: p.periodStart, periodEnd: p.periodEnd, status: p.status }
+      : null;
+  return {
+    getPeriod: async (input) => view(await periods.getPeriod(input)),
+    getPeriodContaining: async (input) => view(await periods.getPeriodContaining(input)),
   };
 }
 

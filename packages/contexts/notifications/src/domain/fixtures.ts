@@ -35,3 +35,24 @@ export const closePendingPayload = (overrides: Record<string, unknown> = {}): Re
   delayDays: 3,
   ...overrides,
 });
+
+export const OCCURRENCE_ID = '01928c4e-0000-7000-8000-0000000cc001';
+export const DEFINITION_ID = '01928c4e-0000-7000-8000-0000000de001';
+
+/** `commitments.RecurringOccurrenceDue.v1`: "Alquiler" 3500.00 BOB, vence el 2026-11-05, en aprobación pendiente. */
+export const occurrenceDuePayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  workspaceId: WS,
+  occurrenceId: OCCURRENCE_ID,
+  definitionId: DEFINITION_ID,
+  name: 'Alquiler',
+  kind: 'EXPENSE',
+  occurrenceDate: '2026-11-05',
+  dueDate: '2026-11-05',
+  expected: { type: 'FIXED', amount: '3500.00', min: null, max: null },
+  currency: 'BOB',
+  requiresApproval: true,
+  mode: 'PENDING_APPROVAL',
+  managedBy: 'USER',
+  periodId: '01928c4e-0000-7000-8000-0000000fa011',
+  ...overrides,
+});

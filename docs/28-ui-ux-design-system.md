@@ -25,7 +25,7 @@
 | **Transacciones** | `/transactions` | Lista, filtros, búsqueda, bulk edit, detalle | 1 |
 | **Cuentas** | `/accounts` | Cuentas por tipo/institución, saldos, historial, reconciliación | 1 |
 | **Plan** | `/plan` | Periodo actual, presupuesto, plantillas, cierre de mes | 2 |
-| **Recurrentes** | `/recurring` | Compromisos, suscripciones, calendario | 3 |
+| **Recurrentes** | `/recurring` | Pestañas **Próximos** (7/30/60/90 días), **Por aprobar** (bandeja; contador en la sidebar) y **Definiciones**; detalle de definición, tarjeta "Comprometido del periodo"; después suscripciones y calendario | 3 |
 | **Metas** | `/goals` | Savings goals | 4 |
 | **Deudas** | `/debts` | Préstamos, tarjetas, amortización | 4 |
 | **Cripto & FX** | `/fx` | Conversiones, tasas, wallets, costo de conversión | 1 (manual) / 5 |
@@ -38,6 +38,7 @@
 Las secciones de fases no habilitadas no se muestran (feature flags por fase). Imports vive dentro de **Cuentas** (importar extracto en una cuenta) y como entrada en **Transacciones** (botón "Importar").
 
 - **Desktop**: sidebar izquierda colapsable con grupos (Día a día: Inicio, Transacciones, Cuentas · Planificar: Plan, Recurrentes, Metas, Deudas · Analizar: Reportes, Pronóstico, Cripto & FX · Organizar: Documentos, Reglas · Ajustes). Selector de workspace arriba; búsqueda global / command palette `Ctrl+K`.
+- **Contador "por aprobar"** (Phase 3, `add-recurrence-engine`): el ítem **Recurrentes** de la sidebar muestra el número de ocurrencias `DUE`/`OVERDUE` de definiciones en modo `PENDING_APPROVAL`; los modos `AUTO_CREATE` y `NOTIFY_ONLY` no cuentan (D114).
 - **Mobile**: bottom navigation de 5 ítems: **Inicio · Transacciones · [＋] · Plan · Más**; el botón central abre el quick add. "Más" lista el resto.
 
 ### 2.2 Sitemap
@@ -59,6 +60,9 @@ flowchart TD
     PLAN --> TPL[Plantillas]
     PLAN --> CLOSE[Cierre de mes]
     ROOT --> RECU[Recurrentes]
+    RECU --> NEXT[Próximos]
+    RECU --> APPR[Por aprobar]
+    RECU --> DEFS[Definiciones]
     RECU --> SUBS[Suscripciones]
     RECU --> CAL[Calendario de flujo]
     ROOT --> GOALS[Metas]
@@ -205,6 +209,14 @@ Checklist guiado en Plan → "Cerrar septiembre":
 ```
 
 Pasos: 1 Archivo → 2 Mapeo de columnas (solo si no hay perfil; vista previa de 20 filas, selector de formato de fecha/decimal) → 3 Revisar → 4 Resultado (con reconciliación). Progreso con barra y etapa actual durante el procesamiento (polling).
+
+### 4.8 Recurrentes (`/recurring`, Phase 3, `add-recurrence-engine`)
+
+- **Próximos**: lista de pagos de 7/30/60/90 días (atrasados primero) con estado en texto + icono (Programada, Próxima, Atrasada, Creada, Vinculada, Omitida, Cancelada; NFR-USAB-104) y acciones **Aprobar** (en la API, `materialize`), **Vincular**, **Omitir** y **Editar** monto o fecha. **Vincular** abre un buscador de transacciones filtrado por cuenta, tipo y ±15 días.
+- **Por aprobar**: bandeja de las ocurrencias `DUE`/`OVERDUE` de definiciones en modo `PENDING_APPROVAL`, con el contador de la sidebar. Una ocurrencia de modo `NOTIFY_ONLY` no entra en la bandeja pero se puede aprobar o vincular igual (D114). Si la creación automática fue rechazada (periodo o cuenta cerrados), la ocurrencia queda atrasada con el código de error visible (D129).
+- **Definiciones**: lista con estado, próxima fecha y monto; crear/editar con selector de cadencia, **vista previa de las próximas 6 fechas** con el ajuste de fin de semana aplicado y aviso de fin de mes (día 29–31 → último día del mes). Cambiar "esta y las siguientes" informa cuántas ediciones individuales se descartan (D123).
+- **Detalle de definición**: versiones, ocurrencias y recorrido (patrón "Recorrido", §6.1). Tarjeta **Comprometido del periodo** con desglose por moneda y consolidado en la moneda base; los pagos `VARIABLE` se informan como "N pagos sin monto" (D115).
+- Accesible con teclado; montos con la escala de la moneda.
 
 ## 5. Design tokens
 

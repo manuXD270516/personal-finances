@@ -30,6 +30,10 @@ import { createNominalFlowQuery } from '@pf/transactions/interface/transactions.
 import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface/audit.module';
 import { createCategoryCatalogQuery } from '@pf/classification/interface/classification.module';
 import {
+  commitmentsEventConsumers,
+  createCommitmentsRuntime,
+} from '@pf/commitments/interface/commitments.module';
+import {
   createDemoDataRuntime,
   createPortabilityRuntime,
   identityActiveWorkspaces,
@@ -67,13 +71,20 @@ import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
+import { registerCommitmentsJob } from './commitments-jobs.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
 import { registerPortabilityJobs } from './portability-jobs.js';
 import { portabilityOptions } from '../portability/portability-wiring.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
-import { AUDIT_POLICIES, demoDataOptions, outboxPort } from '../identity/identity-wiring.js';
+import {
+  AUDIT_POLICIES,
+  demoDataOptions,
+  financeRuntimes,
+  financialPeriodPort,
+  outboxPort,
+} from '../identity/identity-wiring.js';
 import { WorkerModule } from './platform-jobs.js';
 
 export interface WorkerRuntime {
@@ -117,6 +128,8 @@ export interface WorkerRuntimeOptions {
   };
   /** Encola `planning.ensure-periods` al arrancar (por defecto sí; add-financial-periods). */
   readonly planningPeriodsOnStart?: boolean;
+  /** Encola `commitments.generate-occurrences` al arrancar (por defecto sí; add-recurrence-engine). */
+  readonly commitmentsOnStart?: boolean;
   /** Tests (add-alerts): sustituye el adaptador de email (por defecto, el de `EMAIL_DRIVER`). */
   readonly emailSender?: EmailSender;
   /** Tests (add-alerts): backoff y lease del despacho de email, y barridos periódicos. */
@@ -346,6 +359,47 @@ export async function createWorkerRuntime(
     runOnStart: options.planningPeriodsOnStart ?? true,
   });
 
+  // COMMITMENTS (add-recurrence-engine): job `commitments.generate-occurrences` y consumidor de transacciones anuladas.
+  // La creación automática usa los MISMOS casos de uso de TRANSACTIONS que la API (puertos públicos), compuestos con el
+  // pool del worker (`pf_worker`, miembro de `pf_app`).
+  const finance = financeRuntimes({
+    pool,
+    clock: options.clock ?? systemClock,
+    audit: demoAudit.port,
+    lifecycle: demoAudit.lifecycle,
+    lifecycleQuery: demoAudit.lifecycleQuery,
+    history: demoAudit.history,
+    logger,
+    config,
+    outbox: fxOutbox,
+  });
+  const commitments = createCommitmentsRuntime({
+    pool,
+    clock: options.clock ?? systemClock,
+    audit: demoAudit.port,
+    lifecycle: demoAudit.lifecycle,
+    lifecycleQuery: demoAudit.lifecycleQuery,
+    outbox: outboxPort(fxOutbox),
+    calendar: identityWorkspaceCalendarDirectory(pool),
+    settings: identityWorkspaceSettingsDirectory(pool),
+    periods: financialPeriodPort(planning.periodQuery),
+    accounts: finance.accounts.query,
+    accountCatalog: finance.accounts.catalog,
+    classification: finance.classification.validator,
+    rates: finance.fx.valuation,
+    transactions: finance.transactions.recurring,
+    links: finance.transactions.links,
+    pending: finance.transactions.pending,
+    horizonDays: config.COMMITMENTS_HORIZON_DAYS,
+    rateValidityWindowDays,
+    counters: otelCounters('@pf/commitments'),
+    histograms: otelHistograms('@pf/commitments'),
+  });
+  await registerCommitmentsJob(queue, commitments.generate, activeWorkspaces, logger, {
+    cron: config.COMMITMENTS_SCHEDULER_CRON,
+    runOnStart: options.commitmentsOnStart ?? true,
+  });
+
   // NOTIFY (add-alerts): consumidores de `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`, despacho
   // del email (adaptador por EMAIL_DRIVER: smtp → Mailpit en local/CI, none → solo in-app), barrido y purga. La cola de
   // despacho se crea antes de arrancar los consumidores: estos encolan en la transacción de la notificación.
@@ -404,6 +458,7 @@ export async function createWorkerRuntime(
     ...fxConsumers,
     reportingDataVersionConsumer(),
     ...planningEventConsumers(planning),
+    ...commitmentsEventConsumers(commitments),
     ...notificationEventConsumers(notifications),
   ]);
   // Presupuesto de conexiones (improve-event-throughput, TC-PLATFORM-EVENTS-018): la concurrencia sumada de los

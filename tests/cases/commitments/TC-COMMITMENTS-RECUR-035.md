@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Cambiar esta y las siguientes'
 scenario: 'Fecha efectiva anterior a una resuelta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-009']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'revision']
@@ -29,7 +32,7 @@ expected_result:
   - '422 RECURRING_REVISION_DATE_INVALID'
   - 'La definición sigue en su versión vigente'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-035 — Una revisión con fecha efectiva anterior a una ocurrencia resuelta se rechaza

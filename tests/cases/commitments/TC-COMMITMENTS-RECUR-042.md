@@ -5,16 +5,18 @@ spec: audit/lifecycle-timeline
 related_specs: [commitments/recurrence-engine]
 requirement: 'Recorrido de una ocurrencia recurrente'
 scenario: 'Recorrido del internet de octubre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-AUDIT-009', 'FR-COMMITMENTS-008']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['lifecycle', 'recurrence']
@@ -29,7 +31,7 @@ expected_result:
   - 'GENERATE (actor proceso), BECOME_DUE (proceso), MATERIALIZE (EDITOR) con el gasto enlazado; anotación EDIT 210.00 BOB'
   - 'Omitir ⇒ 409 INVALID_STATUS_TRANSITION'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-042 — El recorrido de una ocurrencia muestra generar, próxima y materializar con la edición como anotación

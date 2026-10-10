@@ -1,5 +1,10 @@
 import { DomainError } from '@pf/shared-kernel';
-import { BUDGET_THRESHOLD_MESSAGE_KEY, MONTH_CLOSE_PENDING_MESSAGE_KEY } from './type-catalog.js';
+import {
+  BUDGET_THRESHOLD_MESSAGE_KEY,
+  MONTH_CLOSE_PENDING_MESSAGE_KEY,
+  RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY,
+  RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY,
+} from './type-catalog.js';
 import { FORMAT_LOCALE, MESSAGE_CATALOGS } from './messages.js';
 import type { JsonValue, NotificationLocale, NotificationParams } from './types.js';
 
@@ -104,11 +109,34 @@ const message = (locale: NotificationLocale, key: string): string => {
   return text;
 };
 
-type MessageKind = 'budget_threshold' | 'month_close_pending';
+type MessageKind =
+  'budget_threshold' | 'month_close_pending' | 'recurring_payment_upcoming' | 'recurring_approval_required';
+
+const isRecurring = (kind: MessageKind): boolean =>
+  kind === 'recurring_payment_upcoming' || kind === 'recurring_approval_required';
+
+/** Monto esperado de la ocurrencia ya formateado; `null` si es VARIABLE (sin monto que mostrar). */
+function expectedAmountText(params: NotificationParams, locale: NotificationLocale): string | null {
+  const expected = params['expected'];
+  const currency = str(params, 'currency');
+  if (typeof expected !== 'object' || expected === null || Array.isArray(expected)) return null;
+  const record = expected as { readonly [k: string]: JsonValue };
+  const field = (key: string): string | null => {
+    const value = record[key];
+    return typeof value === 'string' ? formatDecimal(value, locale) : null;
+  };
+  const amount = field('amount');
+  if (amount !== null) return `${amount} ${currency}`;
+  const min = field('min');
+  const max = field('max');
+  return min !== null && max !== null ? `${min} – ${max} ${currency}` : null;
+}
 
 function kindOf(messageKey: string): MessageKind {
   if (messageKey === BUDGET_THRESHOLD_MESSAGE_KEY) return 'budget_threshold';
   if (messageKey === MONTH_CLOSE_PENDING_MESSAGE_KEY) return 'month_close_pending';
+  if (messageKey === RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY) return 'recurring_payment_upcoming';
+  if (messageKey === RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY) return 'recurring_approval_required';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
 
@@ -134,6 +162,13 @@ function valuesOf(
       also: listOf(also, locale),
     };
   }
+  if (isRecurring(kind)) {
+    return {
+      name: str(params, 'name'),
+      dueDate: formatDate(str(params, 'dueDate'), locale),
+      amount: expectedAmountText(params, locale) ?? '',
+    };
+  }
   return {
     period: str(params, 'periodLabel'),
     periodEnd: formatDate(str(params, 'periodEnd'), locale),
@@ -149,7 +184,8 @@ export function renderInApp(
   const kind = kindOf(messageKey);
   const values = valuesOf(kind, params, names, locale);
   const title = fill(message(locale, `inapp.${kind}.title`), values);
-  let body = fill(message(locale, `inapp.${kind}.body`), values);
+  const bodyKey = isRecurring(kind) && values['amount'] === '' ? 'body_variable' : 'body';
+  let body = fill(message(locale, `inapp.${kind}.${bodyKey}`), values);
   if (kind === 'budget_threshold') {
     if (strings(params, 'alsoCrossed').length > 0) {
       body += ` ${fill(message(locale, 'inapp.budget_threshold.also'), values)}`;
@@ -189,7 +225,10 @@ export function renderEmail(input: EmailRenderInput): RenderedEmail {
   const kind = kindOf(input.messageKey);
   const values = valuesOf(kind, input.params, input.names, locale);
   const subject = message(locale, `email.${kind}.subject`);
-  const line = fill(message(locale, `email.${kind}.${variant}`), values);
+  // Variante `basic`: sin montos ni nombres (FR-NOTIFY-006). Una ocurrencia de monto variable no tiene monto que mostrar.
+  const variantKey =
+    variant === 'detailed' && isRecurring(kind) && values['amount'] === '' ? 'detailed_variable' : variant;
+  const line = fill(message(locale, `email.${kind}.${variantKey}`), values);
   const cta = message(locale, 'email.cta');
   const footer = message(locale, 'email.footer');
   const preferences = message(locale, 'email.preferences');

@@ -9,6 +9,7 @@ import { WorkspaceSelector } from './identity/IdentityViews';
 import { switchLocalePath, type UiLocale } from './identity/logic';
 import { localized, useSession } from './session-context';
 import { NotificationBell } from './notifications/NotificationBell';
+import { RecurringNavCount } from './recurring/RecurringNavCount';
 import { activeNav, initialOf, isNotificationsRoute, NAV_ITEMS, type NavKey } from './shell/nav';
 
 /** Nombre de cada idioma de la UI en el catálogo `Locales`. */
@@ -137,6 +138,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
           >
             <NavIcon name={item.key} />
             <span>{t(item.key)}</span>
+            {item.key === 'recurring' ? <RecurringNavCount /> : null}
           </a>
         </li>
       ))}
@@ -283,6 +285,7 @@ const NAV_PATHS: Record<NavKey, string> = {
   fx: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15m0 5v-5h5',
   classification: 'M3 4h7l10 10-6 6L4 10zM7.5 7.5h.01',
   planning: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M8 14h3',
+  recurring: 'M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5',
   settings:
     'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4',
 };

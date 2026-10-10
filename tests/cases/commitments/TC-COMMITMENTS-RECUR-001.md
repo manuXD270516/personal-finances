@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Definición recurrente con tipo, cuentas y plantilla'
 scenario: 'Alquiler mensual creado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-001']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/recurring.api.test.ts
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/commitments/src/domain/definition.test.ts
+  - packages/contexts/commitments/src/domain/generation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['recurrence', 'definition']
@@ -32,7 +36,7 @@ expected_result:
   - 'Existen las ocurrencias 2026-10-05, 2026-11-05, 2026-12-05 y 2027-01-05 en SCHEDULED o DUE según la fecha'
   - 'Hay un registro de auditoría y una transición CREATE en el recorrido'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-RECUR-001 — Crear un gasto recurrente mensual deja la definición activa en versión 1 con ocurrencias generadas
