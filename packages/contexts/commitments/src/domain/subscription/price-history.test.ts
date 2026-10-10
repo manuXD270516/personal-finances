@@ -208,5 +208,5 @@ describe('Historial de precios', () => {
       ),
       { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
     );
-  });
+  }, 30_000);
 });
