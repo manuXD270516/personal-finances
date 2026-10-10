@@ -438,20 +438,79 @@ describe('GetReportSummary — patrimonio neto (reporting/net-worth)', () => {
 });
 
 describe('GetReportSummary — preguntas del Home y frescura', () => {
-  it('[TC-REPORTING-DASHBOARD-005] Q4, Q5, Q8 y Q9 no disponibles en Phase 1; con cuentas Q1..Q3, Q6 y Q7 disponibles', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] Q5 y Q9 siguen no disponibles; Q4 y Q8 sin compromisos ni pendientes son NO_DATA con CREATE_COMMITMENT', async () => {
     canonical();
     const s = await summary();
     const by = Object.fromEntries(s.questions.map((q) => [q.question, q]));
-    for (const q of ['Q4', 'Q5', 'Q8', 'Q9']) expect(by[q]?.status).toBe('NOT_AVAILABLE_IN_PHASE');
+    for (const q of ['Q5', 'Q9']) expect(by[q]?.status).toBe('NOT_AVAILABLE_IN_PHASE');
+    expect(by['Q5']?.actionHint).toBe('AVAILABLE_IN_PHASE_2');
+    for (const q of ['Q4', 'Q8'])
+      expect(by[q]).toMatchObject({ status: 'NO_DATA', actionHint: 'CREATE_COMMITMENT' });
     for (const q of ['Q1', 'Q2', 'Q3', 'Q6', 'Q7'])
       expect(by[q]).toMatchObject({ status: 'AVAILABLE', actionHint: null });
-    expect(by['Q4']?.actionHint).toBe('AVAILABLE_IN_PHASE_3');
   });
 
-  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1 NO_DATA con la acción de crear una cuenta', async () => {
+  it('[TC-REPORTING-UPCOMING-018] con una definición activa o una pendiente de egreso Q4 y Q8 están disponibles', async () => {
+    canonical();
+    mem.hasActiveDefinitions = true;
+    let by = Object.fromEntries((await summary()).questions.map((q) => [q.question, q]));
+    for (const q of ['Q4', 'Q8']) expect(by[q]).toMatchObject({ status: 'AVAILABLE', actionHint: null });
+
+    mem.hasActiveDefinitions = false;
+    mem.pendingTransactions.push({
+      transactionId: 't1',
+      kind: 'EXPENSE',
+      businessDate: '2026-09-29',
+      accountId: 'banco',
+      toAccountId: null,
+      direction: 'OUT',
+      amount: { amount: '300.00', currency: 'BOB' },
+      description: 'Cena',
+      externalRef: null,
+    });
+    by = Object.fromEntries((await summary()).questions.map((q) => [q.question, q]));
+    expect(by['Q8']).toMatchObject({ status: 'AVAILABLE' });
+  });
+
+  it('[TC-REPORTING-UPCOMING-018] un ingreso pendiente o una transferencia entre cuentas líquidas no habilitan Q4/Q8', async () => {
+    canonical();
+    mem.pendingTransactions.push(
+      {
+        transactionId: 'in',
+        kind: 'INCOME',
+        businessDate: '2026-09-29',
+        accountId: 'banco',
+        toAccountId: null,
+        direction: 'IN',
+        amount: { amount: '150.00', currency: 'BOB' },
+        description: 'Reembolso',
+        externalRef: null,
+      },
+      {
+        transactionId: 'tr',
+        kind: 'TRANSFER',
+        businessDate: '2026-09-29',
+        accountId: 'banco',
+        toAccountId: 'caja',
+        direction: 'OUT',
+        amount: { amount: '90.00', currency: 'BOB' },
+        description: 'Entre cajas',
+        externalRef: null,
+      },
+    );
+    const by = Object.fromEntries((await summary()).questions.map((q) => [q.question, q]));
+    expect(by['Q4']).toMatchObject({ status: 'NO_DATA', actionHint: 'CREATE_COMMITMENT' });
+  });
+
+  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1, Q4 y Q8 NO_DATA con la acción de crear una cuenta', async () => {
     const s = await summary();
-    const q1 = s.questions.find((q) => q.question === 'Q1');
-    expect(q1).toEqual({ question: 'Q1', status: 'NO_DATA', actionHint: 'CREATE_ACCOUNT' });
+    for (const question of ['Q1', 'Q4', 'Q8']) {
+      expect(s.questions.find((q) => q.question === question)).toEqual({
+        question,
+        status: 'NO_DATA',
+        actionHint: 'CREATE_ACCOUNT',
+      });
+    }
     expect(s.accounts).toEqual([]);
   });
 

@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Preguntas Q4 y Q8 habilitadas en el Home"
 scenario: "Seis pagos en la semana"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-REPORTING-001","FR-COMMITMENTS-011"]
 nfr: []
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/upcoming/upcoming.test.tsx
+  - tests/e2e/specs/upcoming-payments.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["home","q8"]
@@ -30,7 +32,7 @@ expected_result:
   - "Indica 1 pago más con enlace a /pagos-proximos"
   - "La tarjeta Q4 muestra el total comprometido del periodo"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-017 — La tarjeta Q8 muestra hasta 5 pagos de los próximos 7 días e indica cuántos más hay

@@ -126,6 +126,8 @@ Responde las 9 preguntas definidas en 14-reporting.md §9.1. Wireframe desktop (
 
 Mobile: una columna en orden Q2 → Q1 → Q4 → Q3 → Q5 → Q9 → Q6 → Q7 → Q8 (lo accionable primero); cada card colapsable; FAB/bottom-nav `＋`.
 
+**Phase 3 (`add-upcoming-payments`, docs/35 D148):** el Home agrega la sección "Pagos y compromisos" justo después del dinero disponible, con la tarjeta del total comprometido del periodo (Q4 de docs/00 §6) y la de próximos pagos (Q8 de docs/00 §6): 7 días y hasta 5 ítems (vencidos y pendientes primero, estado con texto y glifo, nunca solo color) con "y N más" y enlace a la vista completa `/pagos-proximos` (selector 7/14/30/60/90 días, por defecto 30; tabla accesible con totales por moneda y consolidado, "valorado con la tasa de hoy", comprometido del periodo, saldo proyectado por cuenta rotulado como proyección e indicador de pagos sorpresa con su limitación). Sin compromisos ni pendientes ambas tarjetas dicen que no hay datos y ofrecen crear un compromiso (sin 0,00). Aprobar, omitir y vincular se hacen en Pagos recurrentes.
+
 ## 4. Flujos clave
 
 ### 4.1 Quick add (gasto/ingreso)

@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Valoración de los próximos pagos en la moneda de reporte"
 scenario: "Redondeo solo al presentar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-FX-006"]
 nfr: ["NFR-DATA-002"]
 invariants: ["INV-001","INV-003"]
 priority: high
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-valuation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","q8"]
@@ -29,7 +31,7 @@ expected_result:
   - "Consolidado = 79.95 BOB (6.66 × 12.005 = 79.9533)"
   - "No 79.96 BOB (suma de 39.98 por ítem)"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-011 — El consolidado de los próximos pagos se redondea HALF_EVEN solo al presentar

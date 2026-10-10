@@ -101,6 +101,17 @@ Sin migraciones. Despliegue: (1) contratos de Commitments/Transactions disponibl
 - **Existente:** `add-basic-dashboard` (resumen, `homeQuestions`, valoración), `add-financial-periods`, `add-net-worth-evolution` (patrón de tarjeta compacta + vista), `improve-event-throughput` (consumidor por lotes).
 - **Phase 7:** el calendario completo amplía esta capability (FR-REPORTING-014/015, NFR-PERF-010) y puede reemplazar la lectura directa por la proyección `reporting.commitment_occurrence`.
 
+## Decisiones del owner y as-built (2026-10-10)
+
+Las siete preguntas abiertas de abajo se cerraron con docs/35: la 1 con variación (D117: lectura directa **más** read model documentado con métricas y alerta), la 2 (D115, **a**: Commitments une y totaliza en montos nativos; Reporting valora y presenta), la 3 (D145, sección de solo lectura del plan mensual en un change posterior de `planning/budgets`), la 4 (D146, vencidos aparte), la 5 (D147, saldo proyectado en Phase 3), la 6 (SM-07 con la definición de la decisión 10) y la 7 (D148, 7 días y hasta 5 ítems). D127 aplica a la lista: las transferencias solo cuentan de una cuenta líquida a una no líquida. Implementación (matices frente al texto original):
+
+- **Unión de ocurrencias y pendientes.** Commitments expone `UpcomingPaymentsQuery.listUpcoming` (ocurrencias de egreso no resueltas, ya con D127) y `CommittedQuery.getForRange` (totales nativos con `overdueBefore`); Transactions expone `PendingFlowQuery.listPending`. Reporting une y deduplica en `UpcomingPaymentsAssembler`. Si por una carrera aparecen una ocurrencia y su transacción pendiente a la vez, **gana la pendiente** (monto real, TC-REPORTING-UPCOMING-007): la decisión 3 original descartaba la pendiente, pero el requirement y el TC piden mostrar la transacción con su monto real.
+- **Pendientes.** El `name` de una pendiente es su descripción (la materialización copia el nombre de la definición) y su `occurrenceId` sale del `externalRef` (`commitments.occurrence`); `definitionId` solo viene en las ocurrencias. Las transferencias pendientes se filtran en Reporting con la misma regla D127 (`countsAsOutflow`).
+- **Saldo proyectado.** Una transferencia pendiente resta en el origen y suma en el destino solo si comparten moneda (el contrato `PendingFlowRowDto` informa el monto en la moneda del origen).
+- **Pagos sorpresa.** `ResolvedOccurrencesQuery.listResolvedOutflows` filtra por el vencimiento de la ocurrencia; Reporting lo pide con 62 días de holgura a cada lado del periodo y filtra por la fecha de la transacción.
+- **ETag.** Versión de datos + hash del contenido (sin `generatedAt`), como el resumen: el día local entra a través de la ventana y los días de atraso.
+- **Métricas y alerta (D117).** `reporting_upcoming_payments_duration_seconds` y `reporting_upcoming_payments_rows` (histogramas, sin etiquetas) y la regla `UpcomingPaymentsReadModelRecommended` (docs/18 §8) expresada y probada en `evaluateReadModelAlert`.
+
 ## Preguntas abiertas
 
 1. **Lectura directa o read model.** El pedido inicial hablaba de "leer el read model desde eventos de commitments". ¿Se acepta leer los contratos de Commitments en la transacción de lectura (decisión 1) y dejar la proyección `reporting.commitment_occurrence` para Phase 7?

@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Valoración de los próximos pagos en la moneda de reporte"
 scenario: "Sin tasa vigente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-FX-006","FR-REPORTING-001"]
 nfr: []
 invariants: ["INV-001"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/upcoming/upcoming.test.tsx
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-valuation.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","q8"]
@@ -32,7 +35,7 @@ expected_result:
   - "Consolidado = 199.00 BOB, complete = false, unconverted = [5.99 USD]"
   - "Nunca 5.99 BOB (1:1)"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-010 — Sin tasa vigente el pago en USD queda sin convertir y el consolidado se marca incompleto

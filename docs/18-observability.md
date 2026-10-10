@@ -157,6 +157,8 @@ Rate = conteo del histograma; Errors = status ≥ 500 (4xx contabilizados aparte
 | `pf.imports.reconciliation_difference.total` | Counter | `source` (solo conteo; nunca el monto) |
 | `pf.banking.sync.failures.total` | Counter | `provider`, `reason` |
 | `pf.fx.rate_missing.total` | Counter | `pair` — consultas sin tasa disponible |
+| `reporting_upcoming_payments_duration_seconds` | Histogram | Duración de la consulta de próximos pagos (`GET /reports/upcoming-payments`, lectura directa, Phase 3; docs/35 D117). Sin etiquetas de alta cardinalidad (ni workspace ni usuario) |
+| `reporting_upcoming_payments_rows` | Histogram | Ocurrencias y pendientes leídas por consulta de próximos pagos; sin etiquetas de alta cardinalidad |
 | `pf.ml.forecast.duration` (s) | Histogram | `outcome` |
 | `pf.ml.forecast.failures.total` | Counter | `reason` (timeout/unavailable/invalid_output) |
 | `pf.ml.forecast.insufficient_data.total` | Counter | |
@@ -207,6 +209,7 @@ Consistente con ARCHITECTURE §10.
 | Import fallido técnico | `outcome="failed"` | baja (notificación) | 6 |
 | ML forecast falla | 3 runs seguidos fallidos | baja | 8 |
 | Scheduler perdido | `last_run` > 2× intervalo | media | 2 |
+| **`UpcomingPaymentsReadModelRecommended`** | p95 de `reporting_upcoming_payments_duration_seconds` > 300 ms (presupuesto del Home, NFR-PERF-004) durante 15 min, **o** una consulta que lee > 5 000 ocurrencias (`reporting_upcoming_payments_rows`). Indica que conviene migrar a la proyección `reporting.upcoming_payment` alimentada por eventos; enlaza `openspec/changes/add-upcoming-payments/design.md` § "Evolución a read model" (regla evaluable en `evaluateReadModelAlert`, TC-REPORTING-UPCOMING-022) | media (notificación; sin paging) | 3 |
 | Disco/BD | uso storage > 80 %, conexiones > 80 % del pool | media | 1 (cloud) |
 | Certificados / backups | backup diario no completado | alta | 1 (prod), ver 22/23 |
 

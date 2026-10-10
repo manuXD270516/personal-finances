@@ -17,6 +17,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly registerRateHref?: string | undefined;
   /** Destino de la acción "registrar un gasto" del estado vacío de categorías. */
   readonly registerExpenseHref?: string | undefined;
+  /** Tarjetas Q4 (comprometido) y Q8 (próximos pagos) de `reporting/cash-flow-calendar`, tras el dinero disponible. */
+  readonly commitmentsSection?: ReactNode;
   /** Widget de presupuestos (add-budgets 6.2: disponible para gastar), entre "Este mes" y el patrimonio. */
   readonly budgetWidget?: ReactNode;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
@@ -42,6 +44,7 @@ export function DashboardView({
   registerExpenseHref,
   budgetWidget,
   evolutionCard,
+  commitmentsSection,
   ...ctx
 }: DashboardViewProps) {
   const { t, locale } = ctx;
@@ -62,6 +65,8 @@ export function DashboardView({
         createAccountHref={createAccountHref}
         registerRateHref={registerRateHref}
       />
+
+      {commitmentsSection ?? null}
 
       <section data-testid="month-overview" aria-labelledby="month-title" className="pf-home-group">
         <div className="pf-home-group-head">

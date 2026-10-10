@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Indicador de pagos sorpresa por periodo"
 scenario: "Seguro modelado después de pagarlo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/upcoming-payments.api.test.ts
+  - apps/web/src/ui/upcoming/upcoming.test.tsx
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/surprise-payments.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["SM-07","surprise-payments"]
@@ -32,7 +36,7 @@ expected_result:
   - "partial = true"
   - "note UNLINKED_PAYMENTS_NOT_DETECTED"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-021 — Un pago resuelto por una ocurrencia generada después de pagarlo cuenta como pago sorpresa

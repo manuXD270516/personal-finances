@@ -21,6 +21,7 @@ import type {
 } from '../contracts/index.js';
 import {
   ConsolidationService,
+  countsAsOutflow,
   homeQuestions,
   KpiCalculator,
   NetWorthValuator,
@@ -430,7 +431,10 @@ export class ReportSummaryQueries {
         byAccountType: nw.byAccountType.map((t) => ({ type: t.type, amount: show(t.amount) })),
         unvalued: nw.unvalued.map((m) => m.toJSON()),
       },
-      questions: homeQuestions({ hasAccounts: accounts.length > 0 }),
+      questions: homeQuestions({
+        hasAccounts: accounts.length > 0,
+        hasCommitments: await this.hasCommitments(ws, accounts.length > 0),
+      }),
       meta: {
         generatedAt: nowText,
         reportingCurrency: reporting.code,
@@ -457,6 +461,28 @@ export class ReportSummaryQueries {
         flowsComplete: income.complete && expense.complete,
       },
     };
+  }
+
+  /**
+   * Q4/Q8 (add-upcoming-payments, decisión 11): ≥ 1 definición recurrente activa o ≥ 1 transacción pendiente de egreso
+   * (un gasto, o una transferencia de una cuenta líquida a una que no lo es, D127).
+   */
+  private async hasCommitments(workspaceId: string, hasAccounts: boolean): Promise<boolean> {
+    const { deps } = this;
+    if (!hasAccounts) return false;
+    if (await deps.commitments.hasActiveDefinitions({ workspaceId })) return true;
+    const pending = await deps.pending.listPending({ workspaceId });
+    if (pending.length === 0) return false;
+    const all = await deps.accounts.listAccounts({ workspaceId, includeArchived: true });
+    const classes = new Map(all.map((a) => [a.accountId, { nature: a.nature, liquidity: a.liquidity }]));
+    return pending.some((p) =>
+      countsAsOutflow({
+        kind: p.kind,
+        direction: p.direction,
+        from: classes.get(p.accountId),
+        to: p.toAccountId ? classes.get(p.toAccountId) : undefined,
+      }),
+    );
   }
 
   private period(query: GetReportSummaryQuery, today: LocalDate): DateRange {

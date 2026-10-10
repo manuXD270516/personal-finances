@@ -9,7 +9,16 @@ import type {
 import type { AccountBalanceDto } from '@pf/ledger/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import type { NominalFlowRowDto } from '@pf/transactions/contracts';
-import type { ClosingSnapshotsPort, NetWorthHistoryDeps, ReportingDeps } from '../ports/index.js';
+import type {
+  ClosingSnapshotsPort,
+  CommittedRangeRow,
+  NetWorthHistoryDeps,
+  PendingTransactionRow,
+  ReportingDeps,
+  ResolvedOutflowRow,
+  UpcomingOccurrenceRow,
+  UpcomingPaymentsDeps,
+} from '../ports/index.js';
 
 export interface FakeRate {
   readonly base: string;
@@ -80,6 +89,24 @@ export class InMemoryReporting {
   readonly snapshots: Awaited<ReturnType<ClosingSnapshotsPort['listCurrent']>>[number][] = [];
   /** Saldo PRESENTADO por cuenta a cada fecha de corte (`asOf` → cuenta → saldo); sin entrada = cuenta sin saldo. */
   readonly balancesByDate = new Map<string, Map<string, { amount: string; currency: string }>>();
+
+  /** Definiciones recurrentes activas (COMMITMENTS, `DefinitionStatsQuery`). */
+  hasActiveDefinitions = false;
+  /** Ocurrencias de egreso no resueltas que informa COMMITMENTS (`UpcomingPaymentsQuery`). */
+  readonly occurrences: UpcomingOccurrenceRow[] = [];
+  /** Transacciones `PENDING` (TRANSACTIONS, `PendingFlowQuery`). */
+  readonly pendingTransactions: PendingTransactionRow[] = [];
+  /** Comprometido por rango en montos nativos (`CommittedQuery.getForRange`); por defecto vacío. */
+  committed: CommittedRangeRow = {
+    fromCommitments: [],
+    fromPending: [],
+    withoutAmountCount: 0,
+    overdueBefore: { count: 0, amounts: [] },
+  };
+  readonly committedRequests: { from: string; to: string }[] = [];
+  /** Egresos resueltos por transacciones no anuladas (`ResolvedOccurrencesQuery`). */
+  readonly resolvedOutflows: ResolvedOutflowRow[] = [];
+  readonly metricSamples: { name: string; value: number }[] = [];
 
   addPeriod(label: string, periodStart: string, periodEnd: string, status = 'CLOSED') {
     this.periods.push({ id: `period-${label}`, label, periodStart, periodEnd, status });
@@ -202,6 +229,16 @@ export class InMemoryReporting {
       rates: fx,
       versions: { versionOf: async () => this.version, bump: async () => undefined },
       clock: this.clock,
+      commitments: { hasActiveDefinitions: async () => this.hasActiveDefinitions },
+      pending: {
+        listPending: async (input) =>
+          this.pendingTransactions.filter(
+            (p) =>
+              (input.dateFrom === undefined || p.businessDate >= input.dateFrom) &&
+              (input.dateTo === undefined || p.businessDate <= input.dateTo) &&
+              (input.accountIds === undefined || input.accountIds.includes(p.accountId)),
+          ),
+      },
       ...(this.rateValidityWindowDays === undefined
         ? {}
         : { rateValidityWindowDays: this.rateValidityWindowDays }),
@@ -235,6 +272,25 @@ export class InMemoryReporting {
           })),
         }),
       },
+    };
+  }
+
+  /** Puertos de `GetUpcomingPayments`/`GetSurprisePayments`: los de `deps()` más periodos, COMMITMENTS y métricas. */
+  upcomingDeps(): UpcomingPaymentsDeps {
+    return {
+      ...this.deps(),
+      periods: { listPeriods: async () => [...this.periods] },
+      commitments: {
+        listUpcoming: async ({ through }) => this.occurrences.filter((o) => o.dueDate <= through),
+        getForRange: async ({ from, to }) => {
+          this.committedRequests.push({ from, to });
+          return this.committed;
+        },
+        listResolvedOutflows: async ({ from, to }) =>
+          this.resolvedOutflows.filter((r) => r.transactionDate >= from && r.transactionDate <= to),
+        hasActiveDefinitions: async () => this.hasActiveDefinitions,
+      },
+      metrics: { observe: (name, value) => void this.metricSamples.push({ name, value }) },
     };
   }
 }

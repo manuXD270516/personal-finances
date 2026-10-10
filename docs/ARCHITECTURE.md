@@ -248,7 +248,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | documents | `documents/attachments` |
 | imports | `imports/import-pipeline`, `imports/banking-providers` |
 | rules | `rules/rule-engine` |
-| reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` |
+| reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` (versión simple en Phase 3: `add-upcoming-payments`; calendario completo en Phase 7) |
 | forecast | `forecast/expense-forecasting` |
 | notify | `notifications/alerts` |
 | audit | `audit/audit-trail`, `audit/lifecycle-timeline` |

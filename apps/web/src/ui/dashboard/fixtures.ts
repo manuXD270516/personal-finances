@@ -208,11 +208,11 @@ export const SUMMARY: ReportSummary = {
     { question: 'Q1', status: 'AVAILABLE', actionHint: null },
     { question: 'Q2', status: 'AVAILABLE', actionHint: null },
     { question: 'Q3', status: 'AVAILABLE', actionHint: null },
-    { question: 'Q4', status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_3' },
+    { question: 'Q4', status: 'AVAILABLE', actionHint: null },
     { question: 'Q5', status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_2' },
     { question: 'Q6', status: 'AVAILABLE', actionHint: null },
     { question: 'Q7', status: 'AVAILABLE', actionHint: null },
-    { question: 'Q8', status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_3' },
+    { question: 'Q8', status: 'AVAILABLE', actionHint: null },
     { question: 'Q9', status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_4' },
   ],
   meta: {

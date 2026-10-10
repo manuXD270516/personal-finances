@@ -39,3 +39,39 @@ export {
   type SeriesPoint,
   type SeriesPointInput,
 } from './net-worth-series.js';
+export { CommittedPeriod, type CommittedValued, type PeriodRange } from './committed-period.js';
+export {
+  countsAsOutflow,
+  DEFAULT_UPCOMING_DAYS,
+  MAX_UPCOMING_DAYS,
+  OCCURRENCE_REF_NAMESPACE,
+  UpcomingPaymentsAssembler,
+  UpcomingWindow,
+  type AccountClass,
+  type OccurrenceInput,
+  type PendingInput,
+  type UpcomingAmountType,
+  type UpcomingItem,
+  type UpcomingItemStatus,
+  type UpcomingWindowValue,
+} from './upcoming-payments.js';
+export { UpcomingValuation, type ValuedTotal } from './upcoming-valuation.js';
+export {
+  ProjectedBalanceCalculator,
+  type ProjectedBalanceAccount,
+  type ProjectedBalanceLine,
+  type ProjectedPending,
+} from './projected-balance.js';
+export {
+  SurprisePaymentClassifier,
+  type ResolvedOutflowInput,
+  type SurprisePayment,
+} from './surprise-payments.js';
+export {
+  evaluateReadModelAlert,
+  UPCOMING_PAYMENTS_DURATION_METRIC,
+  UPCOMING_PAYMENTS_ROWS_METRIC,
+  UPCOMING_READ_MODEL_ALERT,
+  type ReadModelAlertState,
+  type UpcomingMetricSample,
+} from './upcoming-read-model-alert.js';

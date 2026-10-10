@@ -14,6 +14,7 @@ import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
 import {
   CommitmentsModule,
   createCommitmentsRuntime,
+  type CommitmentsRuntime,
   RECURRING_DEFINITION_LIFECYCLE_MACHINE,
   RECURRING_OCCURRENCE_LIFECYCLE_MACHINE,
   type FinancialPeriodPort,
@@ -294,6 +295,7 @@ export function financeRuntimes(input: {
     categoryUsage?: CounterpartyCategoryUsageQuery;
     periods?: PeriodQuery;
     closingSnapshots?: ClosingSnapshotQuery;
+    commitments?: CommitmentsRuntime;
   } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
@@ -357,6 +359,7 @@ export function financeRuntimes(input: {
   });
   deferred.categoryUsage = transactions.categoryUsage;
   // REPORTING (add-basic-dashboard): lectura directa de la fuente de verdad vía contratos públicos.
+  const reportingHistograms = otelHistograms('@pf/reporting');
   const reporting = createReportingRuntime({
     pool: input.pool,
     clock: input.clock,
@@ -375,6 +378,25 @@ export function financeRuntimes(input: {
     snapshots: {
       listCurrent: (query) => deferred.closingSnapshots?.listCurrent(query) ?? Promise.resolve([]),
     },
+    // add-upcoming-payments: COMMITMENTS se compone después de REPORTING (usa el catálogo de periodos de PLANNING), así
+    // que sus consultas públicas se enlazan tras componerlo. Lectura directa en la misma transacción (docs/35 D117).
+    commitments: {
+      listUpcoming: (query) => deferred.commitments?.upcoming.listUpcoming(query) ?? Promise.resolve([]),
+      getForRange: (query) =>
+        deferred.commitments?.committed.getForRange(query) ??
+        Promise.resolve({
+          fromCommitments: [],
+          fromPending: [],
+          withoutAmountCount: 0,
+          overdueBefore: { count: 0, amounts: [] },
+        }),
+      listResolvedOutflows: (query) =>
+        deferred.commitments?.resolved.listResolvedOutflows(query) ?? Promise.resolve([]),
+      hasActiveDefinitions: (query) =>
+        deferred.commitments?.stats.hasActiveDefinitions(query) ?? Promise.resolve(false),
+    },
+    pending: transactions.pending,
+    metrics: { observe: (name, value) => reportingHistograms.record(name, value, {}) },
     rateValidityWindowDays,
   });
   // PLANNING (add-financial-periods): periodos financieros; calendario del workspace (IDENTITY, membresía del usuario)
@@ -446,6 +468,7 @@ export function financeRuntimes(input: {
     counters: otelCounters('@pf/commitments'),
     histograms: otelHistograms('@pf/commitments'),
   });
+  deferred.commitments = commitments;
   return {
     classification,
     fx,

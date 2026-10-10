@@ -77,15 +77,22 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     const ws = (me.body?.['memberships'] as { workspaceId: string }[])[0]!.workspaceId;
     const W = `/workspaces/${ws}`;
 
-    // Workspace nuevo y sin cuentas: Q1 NO_DATA (sin 0.00 BOB) y Q4/Q5/Q8/Q9 no disponibles, sin montos.
+    // Workspace nuevo y sin cuentas: Q1, Q4 y Q8 NO_DATA (sin 0.00 BOB; piden crear la primera cuenta) y Q5/Q9 aún no
+    // disponibles, sin montos.
     await page.reload();
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('liquid-balance-no-accounts')).toBeVisible();
     await expect(page.getByTestId('liquid-balance-amount')).toHaveCount(0);
-    for (const q of ['Q4', 'Q5', 'Q8', 'Q9']) {
+    for (const q of ['Q5', 'Q9']) {
       const widget = page.getByTestId(`question-${q}`);
       await expect(widget).toHaveAttribute('data-status', 'NOT_AVAILABLE_IN_PHASE');
       await expect(widget).toContainText('Aún no disponible');
+      await expect(widget).not.toContainText(/\d+,\d{2}/);
+    }
+    for (const q of ['Q4', 'Q8']) {
+      const widget = page.getByTestId(`question-${q}`);
+      await expect(widget).toHaveAttribute('data-status', 'NO_DATA');
+      await expect(widget.getByTestId('action-hint')).toHaveAttribute('data-action', 'CREATE_ACCOUNT');
       await expect(widget).not.toContainText(/\d+,\d{2}/);
     }
 
@@ -182,12 +189,21 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Inicio');
     await expect(dash.locator('h2')).toHaveText([
       '¿Cuánto dinero tengo?',
+      // add-upcoming-payments: tarjetas Q4 y Q8 justo después del dinero disponible.
+      'Pagos y compromisos',
       'Este mes',
       // add-budgets 6.2: widget del plan del mes (disponible para gastar), entre "Este mes" y el patrimonio.
       'Presupuesto del mes',
       'Patrimonio y cuentas',
       'Próximamente',
     ]);
+    // Con cuentas pero sin definiciones recurrentes ni pendientes de egreso: Q4 y Q8 piden crear un compromiso.
+    for (const q of ['Q4', 'Q8']) {
+      const widget = page.getByTestId(`question-${q}`);
+      await expect(widget).toHaveAttribute('data-status', 'NO_DATA');
+      await expect(widget.getByTestId('action-hint')).toHaveAttribute('data-action', 'CREATE_COMMITMENT');
+      await expect(widget).not.toContainText(/\d+,\d{2}/);
+    }
     const month = page.getByTestId('month-overview');
     await expect(month.getByRole('heading', { level: 3 })).toHaveText([
       '¿Cuánto ingresó?',

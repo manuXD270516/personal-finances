@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Total comprometido del periodo en el Home"
 scenario: "Vencido de un periodo anterior mostrado aparte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011","FR-REPORTING-016"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/committed-period.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["committed","q4","overdue"]
@@ -32,7 +34,7 @@ expected_result:
   - "total del periodo 2026-10 = 999.88 BOB"
   - "overdueFromPreviousPeriods = 1 pago por 120.00 BOB"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-014 — Un pago vencido de un periodo anterior se muestra aparte y no suma al comprometido del periodo

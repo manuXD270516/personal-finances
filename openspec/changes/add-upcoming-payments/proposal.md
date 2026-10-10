@@ -21,14 +21,14 @@ El Home de PFOS declara desde Phase 1 que Q4 ("¿Cuánto está comprometido?") y
 ## Capabilities
 
 ### New Capabilities
-- `reporting/cash-flow-calendar` (versión simple, Phase 3): lista de próximos pagos, montos por tipo, valoración en moneda de reporte, total comprometido del periodo en el Home, saldo proyectado por cuenta, tarjetas Q4/Q8, frescura, acceso de lectura e indicador de pagos sorpresa (FR-REPORTING-016, FR-COMMITMENTS-011, FR-LEDGER-013; 12 requirements: 11 Must, 1 Should).
+- `reporting/cash-flow-calendar` (versión simple, Phase 3): lista de próximos pagos, montos por tipo, valoración en moneda de reporte, total comprometido del periodo en el Home, saldo proyectado por cuenta, tarjetas Q4/Q8, frescura, acceso de lectura e indicador de pagos sorpresa (FR-REPORTING-016, FR-COMMITMENTS-011, FR-LEDGER-013; 13 requirements: 12 Must, 1 Should).
 
 ### Modified Capabilities
-- Ninguna en este change. El requirement "Preguntas del Home sin datos o no disponibles" de `reporting/dashboard` (scenario de Phase 1 "Pagos próximos aún no disponibles") queda superado para Q4/Q8 por el requirement "Preguntas Q4 y Q8 habilitadas en el Home" de esta capability; la delta MODIFIED de `reporting/dashboard` y la actualización de TC-REPORTING-DASHBOARD-005 se proponen en design.md § "Cambios a docs compartidos" para que se consoliden juntas (el TC está `confirmed` y no lo edita este hilo).
+- `reporting/dashboard`: delta MODIFIED del requirement "Preguntas del Home sin datos o no disponibles" (Q4 y Q8 dejan de declararse no disponibles y las responde `reporting/cash-flow-calendar`; el scenario de Phase 1 "Pagos próximos aún no disponibles" conserva su nombre y pasa a cubrir solo las preguntas aún no habilitadas, Q5 y Q9) y actualización de TC-REPORTING-DASHBOARD-005 en el mismo cambio.
 
 ## Impact
 
-**Specs impactadas:** crea `reporting/cash-flow-calendar` (12 requirements: 11 Must, 1 Should). Lee comportamiento de `commitments/recurrence-engine` (estados de ocurrencia, tipos de monto, total comprometido, materialización como pendiente), `transactions/transaction-recording` (transacción pendiente sin asiento, anulación), `ledger/balances` (saldo contable), `planning/financial-periods` (periodo que contiene hoy, día de inicio), `reporting/dashboard` (valoración, ventana de vigencia, preguntas del Home), `fx/market-rates` (tasa preferida y fallback).
+**Specs impactadas:** crea `reporting/cash-flow-calendar` (13 requirements: 12 Must, 1 Should). Lee comportamiento de `commitments/recurrence-engine` (estados de ocurrencia, tipos de monto, total comprometido, materialización como pendiente), `transactions/transaction-recording` (transacción pendiente sin asiento, anulación), `ledger/balances` (saldo contable), `planning/financial-periods` (periodo que contiene hoy, día de inicio), `reporting/dashboard` (valoración, ventana de vigencia, preguntas del Home), `fx/market-rates` (tasa preferida y fallback).
 
 **Componentes/contextos impactados:** REPORTING (`@pf/reporting`): query `GetUpcomingPayments` y `GetSurprisePayments` (application), servicios de dominio puros `UpcomingPaymentsAssembler` (une ocurrencias y pendientes sin doble conteo, aplica tipo de monto) y `SurprisePaymentClassifier`; puertos nuevos `UpcomingCommitmentsPort` (adapter al contrato público de `@pf/commitments`) y `PendingTransactionsPort` (adapter a `@pf/transactions/contracts`); reutiliza `FinancialPeriodsPort`, `AccountBalancesQuery`, `FxValuationPort` y `FlowValuation`; `homeQuestions` habilita Q4/Q8; `REPORTING_INVALIDATING_EVENTS` + eventos de Commitments. `apps/api` (composición de los adapters, controller), `apps/web` (tarjetas Q4/Q8 del Home y vista `/pagos-proximos`, i18n es/en/pt).
 
@@ -40,7 +40,7 @@ El Home de PFOS declara desde Phase 1 que Q4 ("¿Cuánto está comprometido?") y
 
 **Migraciones requeridas:** ninguna (sin tablas). Sin cambio destructivo.
 
-**Test cases:** AÑADIDOS — TC-REPORTING-UPCOMING-001..021 (`draft`, `provisional`, `not_automated`). MODIFICADOS — TC-REPORTING-DASHBOARD-005 (propuesto, ver design.md § "Cambios a docs compartidos"; no se edita aquí). DEPRECADOS — ninguno.
+**Test cases:** AÑADIDOS — TC-REPORTING-UPCOMING-001..022 (001..021 del diseño inicial y 022 de la decisión D117; automatizados, `requirement_status: confirmed` tras las decisiones del owner de docs/35). MODIFICADOS — TC-REPORTING-DASHBOARD-005 (actualizado en este cambio: Q4 y Q8 ya no son "no disponibles"). DEPRECADOS — ninguno.
 
 **Impacto de regresión:** el resumen del Home (`getReportSummary`) cambia solo en `homeQuestions` para Q4/Q8; TC-REPORTING-DASHBOARD-005 y su E2E deben actualizarse en el mismo PR. El consumidor `reporting.data-version` recibe más tipos de evento (volumen bajo: un lote por definición y ventana). NFR-PERF-004 (Home p95 ≤ 300 ms) se mide con las tarjetas nuevas cargadas en paralelo al resumen.
 

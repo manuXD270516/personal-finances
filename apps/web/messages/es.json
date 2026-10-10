@@ -280,7 +280,8 @@
     "sections": {
       "wealth": "Patrimonio y cuentas",
       "upcoming": "Próximamente",
-      "upcomingCaption": "Preguntas que se habilitan en las siguientes fases."
+      "upcomingCaption": "Preguntas que se habilitan en las siguientes fases.",
+      "commitments": "Pagos y compromisos"
     },
     "questions": {
       "Q1": "¿Cuánto dinero tengo?",
@@ -303,7 +304,8 @@
       "AVAILABLE_IN_PHASE_2": "Se habilitará con los presupuestos (fase 2).",
       "AVAILABLE_IN_PHASE_3": "Se habilitará con los pagos recurrentes y compromisos (fase 3).",
       "AVAILABLE_IN_PHASE_4": "Se habilitará con las metas de ahorro (fase 4).",
-      "UNKNOWN": "Esta pregunta se habilitará más adelante."
+      "UNKNOWN": "Esta pregunta se habilitará más adelante.",
+      "CREATE_COMMITMENT": "Crea un compromiso recurrente para anticipar tus pagos."
     },
     "liquid": {
       "caption": "Dinero disponible en cuentas líquidas, consolidado en {currency}",
@@ -2878,6 +2880,100 @@
     },
     "link": {
       "settings": "Ver la auditoría del espacio de trabajo"
+    }
+  },
+  "Upcoming": {
+    "loading": "Cargando los próximos pagos…",
+    "incomplete": "Total incompleto",
+    "unconverted": "Falta una tasa vigente: estos montos no se suman ni se convierten 1:1: {amounts}",
+    "withoutAmount": "{count, plural, one {# pago sin monto (no suma al total)} other {# pagos sin monto (no suman al total)}}",
+    "fromCommitment": "de un compromiso",
+    "status": {
+      "OVERDUE": "Vencido",
+      "OVERDUE_DAYS": "{days, plural, one {Vencido hace # día} other {Vencido hace # días}}",
+      "DUE": "Por vencer",
+      "PENDING_APPROVAL": "Por aprobar",
+      "PENDING": "Pendiente",
+      "SCHEDULED": "Programado"
+    },
+    "amount": {
+      "range": "{min} a {max}",
+      "variable": "Monto variable",
+      "estimated": "{amount} (estimado)"
+    },
+    "home": {
+      "title": "Pagos y compromisos",
+      "caption": "Lo que ya sabemos que vas a pagar.",
+      "q4Title": "¿Cuánto está comprometido?",
+      "q8Title": "¿Qué pagos vienen?",
+      "loading": "Cargando…",
+      "error": "No se pudo cargar esta tarjeta. El resto del Home no se ve afectado.",
+      "noData": "Aún no hay compromisos ni pagos pendientes.",
+      "createCommitment": "Crea un compromiso recurrente para anticipar tus pagos.",
+      "emptyWeek": "No hay pagos en los próximos {days} días.",
+      "more": "{count, plural, one {y # pago más} other {y # pagos más}}",
+      "viewAll": "Ver todos los pagos próximos",
+      "noAccounts": "Aún no hay cuentas, así que no hay compromisos ni pagos que anticipar.",
+      "createAccount": "Crea tu primera cuenta para empezar."
+    },
+    "committed": {
+      "period": "{name} ({from} a {to})",
+      "breakdown": "Compromisos {commitments} · Pendientes {pending}",
+      "byCurrency": "Por moneda: {amounts}",
+      "overduePrevious": "{count, plural, one {# pago vencido} other {# pagos vencidos}} de periodos anteriores ({amount}); no suma al total del periodo.",
+      "noPeriod": "Ningún periodo financiero cubre hoy; los periodos se crean en Planificación."
+    },
+    "totals": {
+      "title": "Total de la lista",
+      "byCurrency": "Por moneda: {amounts}",
+      "valuedToday": "Valorado con la tasa de hoy en {currency}: los pagos futuros no tienen tasa propia."
+    },
+    "rates": {
+      "item": "{base}/{quote} {value} · {type} · {source} · vigencia {date}",
+      "source": {
+        "MANUAL": "origen manual",
+        "PROVIDER": "proveedor",
+        "USER_CONVERSION": "conversión propia"
+      }
+    },
+    "table": {
+      "empty": "No hay pagos conocidos en los próximos {days} días.",
+      "caption": "Pagos conocidos del {from} al {to}",
+      "date": "Fecha",
+      "payment": "Pago",
+      "account": "Cuenta",
+      "status": "Estado",
+      "amount": "Monto",
+      "converted": "En {currency}",
+      "noAmount": "Sin monto",
+      "noRate": "Sin tasa"
+    },
+    "projected": {
+      "title": "Saldo proyectado por cuenta",
+      "note": "Proyección: saldo contable más ingresos pendientes menos gastos pendientes. No descuenta pagos recurrentes aún no registrados y no cambia el saldo contable.",
+      "caption": "Saldo contable y saldo proyectado por cuenta",
+      "account": "Cuenta",
+      "booked": "Saldo contable",
+      "pendingIn": "Ingresos pendientes",
+      "pendingOut": "Gastos pendientes",
+      "projected": "Saldo proyectado"
+    },
+    "surprise": {
+      "title": "Pagos sorpresa del periodo",
+      "error": "No se pudo cargar el indicador de pagos sorpresa.",
+      "count": "{count, plural, =0 {Ningún pago sorpresa en {period}} one {# pago sorpresa en {period}} other {# pagos sorpresa en {period}}}",
+      "partial": "periodo en curso (parcial)",
+      "item": "{name}: {amount} del {date} (el compromiso se creó el {generated})",
+      "limitation": "Solo se detectan los pagos vinculados a un compromiso: un pago recurrente que nunca modelaste como compromiso no aparece aquí."
+    },
+    "page": {
+      "title": "Próximos pagos",
+      "manage": "Aprobar, omitir o vincular pagos en Pagos recurrentes",
+      "window": "Ventana:",
+      "days": "{days} días",
+      "meta": "Calculado el {date} · moneda de reporte {currency}",
+      "freshness": "último movimiento {date}",
+      "listTitle": "Pagos conocidos"
     }
   }
 }

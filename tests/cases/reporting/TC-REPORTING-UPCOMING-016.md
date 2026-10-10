@@ -5,16 +5,20 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Saldo proyectado por cuenta"
 scenario: "Banco con un gasto y un ingreso pendientes"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-LEDGER-013","FR-LEDGER-012"]
 nfr: []
 invariants: ["INV-001"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/upcoming-payments.api.test.ts
+  - apps/web/src/ui/upcoming/upcoming.test.tsx
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/projected-balance.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["projected-balance"]
@@ -32,7 +36,7 @@ expected_result:
   - "Internet no descuenta del proyectado"
   - "Wallet USDT: projected 50.000000 USDT"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-016 — El saldo proyectado suma ingresos pendientes, resta egresos pendientes y no toca el saldo contable

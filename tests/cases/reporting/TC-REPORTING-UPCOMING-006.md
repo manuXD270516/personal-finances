@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Montos según el tipo de monto"
 scenario: "Cuatro tipos de monto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-016","FR-COMMITMENTS-004"]
 nfr: []
 invariants: ["INV-001"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/upcoming/upcoming.test.tsx
+  - packages/contexts/reporting/src/application/upcoming-payments.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-payments.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["upcoming-payments","q8"]
@@ -32,7 +35,7 @@ expected_result:
   - "Total = 579.00 BOB con withoutAmountCount = 1"
   - "Tras editar Luz: total = 594.00 BOB con withoutAmountCount = 1"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-REPORTING-UPCOMING-006 — Cada tipo de monto se presenta según su regla y los pagos variables no suman con cero

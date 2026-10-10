@@ -7,6 +7,7 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { localized, useSession } from '../session-context';
 import { NetWorthEvolutionCard } from '../networth/NetWorthEvolution';
 import { BudgetProgressWidget } from '../planning/BudgetProgressWidget';
+import { HomeCommitments } from '../upcoming/UpcomingPage';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import type { ReportSummary } from './types';
 
@@ -77,6 +78,14 @@ export function Dashboard() {
       registerExpenseHref={localized(uiLocale, '/transacciones/nueva')}
       evolutionCard={
         <NetWorthEvolutionCard
+          locale={loaded.formatLocale}
+          timeZone={loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE}
+          uiLocale={uiLocale}
+        />
+      }
+      commitmentsSection={
+        <HomeCommitments
+          questions={loaded.summary.questions}
           locale={loaded.formatLocale}
           timeZone={loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE}
           uiLocale={uiLocale}

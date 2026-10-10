@@ -260,9 +260,7 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
       'h3 Patrimonio neto',
       'h3 Saldos por cuenta',
       'h2 Próximamente',
-      'h3 ¿Cuánto está comprometido?',
       'h3 ¿Cuánto puedo gastar?',
-      'h3 ¿Qué pagos vienen?',
       'h3 ¿Voy a cumplir mis metas?',
     ]);
     // "Este mes" va justo después del dinero disponible y antes del patrimonio.
@@ -411,12 +409,10 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
 });
 
 describe('Home: preguntas no disponibles y estados vacíos (tarea 6.2)', () => {
-  it('[TC-REPORTING-DASHBOARD-005] Q4, Q5, Q8 y Q9 dicen que aún no están disponibles, con acción sugerida y sin montos', () => {
+  it('[TC-REPORTING-DASHBOARD-005] Q5 y Q9 dicen que aún no están disponibles, con acción sugerida y sin montos', () => {
     const html = render(SUMMARY);
     const expected = {
-      Q4: ['¿Cuánto está comprometido?', 'fase 3'],
       Q5: ['¿Cuánto puedo gastar?', 'fase 2'],
-      Q8: ['¿Qué pagos vienen?', 'fase 3'],
       Q9: ['¿Voy a cumplir mis metas?', 'fase 4'],
     } as const;
     for (const [q, [title, phase]] of Object.entries(expected)) {
@@ -427,9 +423,25 @@ describe('Home: preguntas no disponibles y estados vacíos (tarea 6.2)', () => {
       expect(text(widget)).toContain(phase);
       expect(text(widget)).not.toMatch(/\d+[.,]\d{2}|BOB|USDT/);
     }
-    // Las preguntas habilitadas no se muestran como "no disponibles".
-    expect(html).not.toContain('data-testid="question-Q1"');
-    expect(html.match(/Aún no disponible/g)).toHaveLength(4);
+    // Las preguntas habilitadas (incluidas Q4 y Q8 desde Phase 3) no se muestran como "no disponibles".
+    for (const q of ['Q1', 'Q4', 'Q8']) expect(html).not.toContain(`data-testid="question-${q}" `);
+    expect(html.match(/Aún no disponible/g)).toHaveLength(2);
+  });
+
+  it('[TC-REPORTING-DASHBOARD-005] las tarjetas de Q4 y Q8 llegan por la sección de compromisos, entre el dinero disponible y el mes', () => {
+    const html = renderToStaticMarkup(
+      <DashboardView
+        summary={SUMMARY}
+        {...ctx}
+        commitmentsSection={<section data-testid="commitments">tarjetas Q4 y Q8</section>}
+      />,
+    );
+    const liquid = html.indexOf('data-testid="liquid-balance"');
+    const commitments = html.indexOf('data-testid="commitments"');
+    const month = html.indexOf('data-testid="month-overview"');
+    expect(liquid).toBeGreaterThanOrEqual(0);
+    expect(commitments).toBeGreaterThan(liquid);
+    expect(month).toBeGreaterThan(commitments);
   });
 
   it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: "¿Cuánto dinero tengo?" indica que no hay cuentas y ofrece crear una, sin 0.00 BOB', () => {

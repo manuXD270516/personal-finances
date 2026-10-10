@@ -4,10 +4,17 @@ import { ValidatedQuery, principalOf, type ApiRequest, type ApiResponse } from '
 import type { CompareMode } from '../domain/index.js';
 import type { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
 import type { ReportSummaryQueries } from '../application/report-summary.queries.js';
-import type { NetWorthHistoryDto, ReportSummaryDto } from '../contracts/index.js';
+import type { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
+import type {
+  NetWorthHistoryDto,
+  ReportSummaryDto,
+  SurprisePaymentsDto,
+  UpcomingPaymentsDto,
+} from '../contracts/index.js';
 
 export const REPORT_SUMMARY_QUERIES = Symbol('REPORT_SUMMARY_QUERIES');
 export const NET_WORTH_HISTORY_QUERIES = Symbol('NET_WORTH_HISTORY_QUERIES');
+export const UPCOMING_PAYMENTS_QUERIES = Symbol('UPCOMING_PAYMENTS_QUERIES');
 
 type Json = Record<string, unknown>;
 const str = (q: Json, k: string): string | undefined =>
@@ -44,6 +51,19 @@ export function historyEtag(history: NetWorthHistoryDto, dataVersion: string): s
 }
 
 /**
+ * ETag débil de los próximos pagos: versión de datos + hash del contenido (sin `generatedAt`). El día local entra en la
+ * clave a través del contenido (ventana y días de atraso cambian a medianoche aunque no haya eventos).
+ */
+export function upcomingEtag(upcoming: UpcomingPaymentsDto, dataVersion: string): string {
+  const { generatedAt: _generatedAt, ...meta } = upcoming.meta;
+  const hash = createHash('sha256')
+    .update(JSON.stringify({ ...upcoming, meta }))
+    .digest('base64url')
+    .slice(0, 22);
+  return `W/"${dataVersion}-${hash}"`;
+}
+
+/**
  * `GET /api/v1/workspaces/{workspaceId}/reports/summary` (`getReportSummary`, VIEWER). Autenticación, rol y validación
  * de contrato (incl. `topCategories` 0..20) los aplican las convenciones globales; `If-None-Match` ⇒ 304 lo resuelve
  * el interceptor condicional con el `ETag` que fija este handler.
@@ -53,6 +73,7 @@ export class ReportingController {
   constructor(
     @Inject(REPORT_SUMMARY_QUERIES) private readonly queries: ReportSummaryQueries,
     @Inject(NET_WORTH_HISTORY_QUERIES) private readonly history: NetWorthHistoryQueries,
+    @Inject(UPCOMING_PAYMENTS_QUERIES) private readonly upcoming: UpcomingPaymentsQueries,
   ) {}
 
   @Get('workspaces/:workspaceId/reports/summary')
@@ -103,5 +124,47 @@ export class ReportingController {
     res.setHeader('etag', historyEtag(history, dataVersion));
     res.setHeader('cache-control', 'private, no-cache');
     return history;
+  }
+
+  /**
+   * `GET /api/v1/workspaces/{workspaceId}/reports/upcoming-payments` (`getUpcomingPayments`, VIEWER): próximos pagos,
+   * comprometido del periodo y saldo proyectado (add-upcoming-payments). Mismo manejo de `ETag`/`If-None-Match`.
+   */
+  @Get('workspaces/:workspaceId/reports/upcoming-payments')
+  async getUpcomingPayments(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ValidatedQuery() query: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<UpcomingPaymentsDto> {
+    const days = int(query, 'days');
+    const { upcoming, dataVersion } = await this.upcoming.getUpcomingPayments({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      ...(days !== undefined ? { days } : {}),
+      ...(str(query, 'reportingCurrency')
+        ? { reportingCurrency: str(query, 'reportingCurrency') as string }
+        : {}),
+    });
+    res.setHeader('etag', upcomingEtag(upcoming, dataVersion));
+    res.setHeader('cache-control', 'private, no-cache');
+    return upcoming;
+  }
+
+  /** `GET /api/v1/workspaces/{workspaceId}/reports/surprise-payments` (`getSurprisePayments`, VIEWER, SM-07). */
+  @Get('workspaces/:workspaceId/reports/surprise-payments')
+  async getSurprisePayments(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ValidatedQuery() query: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<SurprisePaymentsDto> {
+    const result = await this.upcoming.getSurprisePayments({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      ...(str(query, 'period') ? { period: str(query, 'period') as string } : {}),
+    });
+    res.setHeader('cache-control', 'private, no-cache');
+    return result;
   }
 }
