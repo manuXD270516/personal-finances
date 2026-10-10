@@ -145,7 +145,7 @@ Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, 
 
 Dependencias que fijan el orden: el motor (26) crea el contexto y los contratos (`UpcomingPaymentsQuery`, `CommittedQuery`, `RecurringDefinitionPort`, `managedBy`) que usan los demás; `add-upcoming-payments` va segundo porque responde Q4/Q8 con solo el motor; `add-subscriptions` usa `RecurringDefinitionPort`; `add-commitment-matching` agrega requirements a la spec del motor ya archivada y alimenta SM-07; la importación CSV es independiente y opcional, al final.
 
-**Phase 4 (consolidado el 2026-10-10).** Los 6 changes se redactaron en paralelo en tres hilos; las preguntas abiertas al owner están en [36-phase-4-consolidation-questions.md](36-phase-4-consolidation-questions.md).
+**Phase 4 (consolidado el 2026-10-10).** Los 6 changes se redactaron en paralelo en tres hilos; las preguntas abiertas al owner están en [36-phase-4-consolidation-questions.md](36-phase-4-consolidation-questions.md) y el owner las resolvió el 2026-10-10 (decisiones D153–D218 en [37-phase-4-consolidation-decisions.md](37-phase-4-consolidation-decisions.md)).
 
 | Orden | Change | Capabilities | Fase |
 |---|---|---|---|
