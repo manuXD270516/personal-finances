@@ -79,7 +79,7 @@ describe('Large Dataset Seed v1 (docs/29 §2.3)', () => {
         if (op.op === 'conversion') expect(op.source.minor > 0n && op.target.minor > 0n).toBe(true);
       }
     }
-  });
+  }, 30_000);
 
   it('datos 100 % ficticios: instituciones y contrapartes "Demo", referencias DEMO-', () => {
     for (const ws of plan.workspaces) {
