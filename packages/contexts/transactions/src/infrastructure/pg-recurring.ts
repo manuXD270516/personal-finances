@@ -24,6 +24,13 @@ interface LinkRow {
   external_ref_id: string | null;
 }
 
+const LINK_COLUMNS = sql`
+  t.id, t.kind, t.status, t.transaction_date::text AS business_date, t.amount::text AS amount,
+  t.currency, t.account_id, t.counterparty_id, t.source, t.external_ref_namespace, t.external_ref_id,
+  (SELECT l.account_id FROM txn.transaction_leg l
+    WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
+      AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_account_id`;
+
 const ref = (r: { external_ref_namespace: string | null; external_ref_id: string | null }) =>
   r.external_ref_namespace !== null && r.external_ref_id !== null
     ? { namespace: r.external_ref_namespace, id: r.external_ref_id }
@@ -59,21 +66,44 @@ export class PgTransactionLinkQuery implements TransactionLinkQuery {
     });
   }
 
+  listLinkCandidates(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    readonly from: string;
+    readonly to: string;
+  }) {
+    const from = LocalDate.parse(input.from).toString();
+    const to = LocalDate.parse(input.to).toString();
+    return this.uow.run(input.workspaceId, async (): Promise<readonly TransactionLinkDto[]> => {
+      if (input.accountIds.length === 0) return [];
+      const { rows } = await sql<LinkRow>`
+        SELECT ${LINK_COLUMNS}
+          FROM txn.transaction t
+         WHERE t.workspace_id = ${input.workspaceId}
+           AND t.account_id = ANY(${[...input.accountIds]}::uuid[])
+           AND t.status <> 'VOIDED'
+           AND t.kind IN ('INCOME', 'EXPENSE', 'TRANSFER')
+           AND t.transaction_date BETWEEN ${from}::date AND ${to}::date
+         ORDER BY t.transaction_date, t.id`.execute(unitOfWorkKysely());
+      return this.toDtos(rows);
+    });
+  }
+
   private async read(
     workspaceId: string,
     ids: readonly string[],
     lock: boolean,
   ): Promise<TransactionLinkDto[]> {
     const { rows } = await sql<LinkRow>`
-      SELECT t.id, t.kind, t.status, t.transaction_date::text AS business_date, t.amount::text AS amount,
-             t.currency, t.account_id, t.counterparty_id, t.source, t.external_ref_namespace, t.external_ref_id,
-             (SELECT l.account_id FROM txn.transaction_leg l
-               WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
-                 AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_account_id
+      SELECT ${LINK_COLUMNS}
         FROM txn.transaction t
        WHERE t.workspace_id = ${workspaceId} AND t.id = ANY(${[...ids]}::uuid[])
        ORDER BY t.id
        ${lock ? sql`FOR SHARE OF t` : sql``}`.execute(unitOfWorkKysely());
+    return this.toDtos(rows);
+  }
+
+  private async toDtos(rows: readonly LinkRow[]): Promise<TransactionLinkDto[]> {
     const out: TransactionLinkDto[] = [];
     for (const r of rows) {
       out.push({

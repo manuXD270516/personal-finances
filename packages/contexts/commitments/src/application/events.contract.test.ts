@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { CommitmentsQueries } from './commitments.queries.js';
 import { DefinitionsService } from './definitions.service.js';
 import { GenerateOccurrencesService } from './generate-occurrences.service.js';
+import { MatchingService } from './matching.service.js';
 import { OccurrencesService } from './occurrences.service.js';
 import { SubscriptionDailyService } from './subscription-daily.service.js';
 import { SubscriptionsQueries } from './subscriptions.queries.js';
@@ -33,6 +34,11 @@ const SUBSCRIPTION_FILES: Record<string, string> = {
   'commitments.SubscriptionRenewalUpcoming': 'commitments/SubscriptionRenewalUpcoming.v1.schema.json',
   'commitments.SubscriptionTrialEnding': 'commitments/SubscriptionTrialEnding.v1.schema.json',
   'commitments.SubscriptionCancelled': 'commitments/SubscriptionCancelled.v1.schema.json',
+};
+
+/** Hecho de sugerencias de coincidencia (add-commitment-matching). */
+const MATCHING_FILES: Record<string, string> = {
+  'commitments.OccurrenceMatchSuggested': 'commitments/OccurrenceMatchSuggested.v1.schema.json',
 };
 
 function validators(files: Record<string, string> = FILES) {
@@ -230,5 +236,96 @@ describe('Contrato de los hechos de commitments', () => {
     expect(validate({ ...priceChanged.payload, extra: 1 })).toBe(false);
     expect(validate({ ...priceChanged.payload, origin: 'MAGIC' })).toBe(false);
     expect(validate({ ...priceChanged.payload, changePercentage: '18.2' })).toBe(false);
+  });
+
+  it('[TC-COMMITMENTS-MATCH-016] OccurrenceMatchSuggested cumple su JSON Schema con montos como texto decimal', async () => {
+    const mem = new InMemoryCommitments();
+    mem.setNow('2026-10-19T16:00:00Z');
+    const deps = mem.deps();
+    const defs = new DefinitionsService(deps);
+    const matching = new MatchingService(deps, new OccurrencesService(deps));
+    const internet = await defs.create({
+      workspaceId: WS,
+      userId: USER,
+      name: 'Internet',
+      kind: 'EXPENSE',
+      template: {
+        accountId: BANK,
+        amount: { type: 'FIXED', amount: { amount: '199.00', currency: 'BOB' } },
+        categoryId: CATEGORY,
+        schedule: { cadence: 'MONTHLY', startDate: '2026-10-20' },
+        materialization: { mode: 'PENDING_APPROVAL', leadDays: 3 },
+      },
+    });
+    await defs.create({
+      workspaceId: WS,
+      userId: USER,
+      name: 'Compra mayorista',
+      kind: 'EXPENSE',
+      template: {
+        accountId: BANK,
+        amount: { type: 'VARIABLE' },
+        categoryId: CATEGORY,
+        counterpartyId: '0190a000-0000-7000-8000-0000000c1001',
+        schedule: { cadence: 'MONTHLY', startDate: '2026-10-21' },
+        materialization: { mode: 'PENDING_APPROVAL', leadDays: 3 },
+      },
+    });
+    const tx = mem.addTransaction({
+      kind: 'EXPENSE',
+      accountId: BANK,
+      amount: { amount: '199.00', currency: 'BOB' },
+      businessDate: '2026-10-19',
+    });
+    const wholesale = mem.addTransaction({
+      kind: 'EXPENSE',
+      accountId: BANK,
+      amount: { amount: '812.30', currency: 'BOB' },
+      businessDate: '2026-10-21',
+      counterpartyId: '0190a000-0000-7000-8000-0000000c1001',
+      source: 'IMPORT',
+    });
+    await matching.onTransactionChanged({ workspaceId: WS, transactionId: tx, eventId: null });
+    await matching.onTransactionChanged({ workspaceId: WS, transactionId: wholesale, eventId: null });
+
+    const check = validators(MATCHING_FILES);
+    const validate = check.get('commitments.OccurrenceMatchSuggested')!;
+    const events = mem.eventsOf('commitments.OccurrenceMatchSuggested');
+    expect(events).toHaveLength(2);
+    for (const event of events) {
+      expect(validate(event.payload), JSON.stringify(validate.errors)).toBe(true);
+    }
+    const [first, second] = events;
+    expect(first?.payload).toMatchObject({
+      occurrenceId: mem.forDefinition(internet.id)[0]!.id,
+      transactionId: tx,
+      score: '85.00',
+      confidence: 'HIGH',
+      amountDelta: { amount: '0.00', currency: 'BOB' },
+      dateDeltaDays: 1,
+      ambiguous: false,
+      transactionOrigin: 'MANUAL',
+    });
+    // una ocurrencia VARIABLE no tiene diferencia de monto
+    expect(second?.payload).toMatchObject({ amountDelta: null, transactionOrigin: 'IMPORT', score: '75.00' });
+
+    // Los ejemplos del schema cumplen el envelope completo y su payload.
+    const ajv = new Ajv2020({ strict: true, allErrors: true });
+    addFormats(ajv);
+    ajv.addSchema(load('envelope.v1.schema.json'));
+    const schema = load(MATCHING_FILES['commitments.OccurrenceMatchSuggested'] as string);
+    ajv.addSchema(schema);
+    const full = ajv.compile({ $ref: String(schema['$id']) });
+    for (const example of schema['examples'] as unknown[]) {
+      expect(full(example), JSON.stringify(full.errors)).toBe(true);
+    }
+
+    // Un campo extra, un enum desconocido o un puntaje numérico no cumplen el contrato.
+    const payload = first?.payload as object;
+    expect(validate({ ...payload, extra: 1 })).toBe(false);
+    expect(validate({ ...payload, confidence: 'CERTAIN' })).toBe(false);
+    expect(validate({ ...payload, score: 85 })).toBe(false);
+    expect(validate({ ...payload, score: '85.5' })).toBe(false);
+    expect(validate({ ...payload, amountDelta: { amount: 0, currency: 'BOB' } })).toBe(false);
   });
 });

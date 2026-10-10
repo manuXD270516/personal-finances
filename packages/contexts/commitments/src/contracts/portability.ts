@@ -4,7 +4,9 @@ import type { PortabilitySection } from '@pf/shared-kernel';
  * Secciones de exportación/importación del workspace que pertenecen a COMMITMENTS (openspec add-workspace-export;
  * add-recurrence-engine decisión 21, rango de orden 750): definiciones, versiones inmutables de su plantilla y
  * ocurrencias; y (openspec add-subscriptions, decisión 17, órdenes 760–764, después de las del motor) las suscripciones,
- * su historial de precios, sus cargos, las propuestas de precio y los recordatorios emitidos. Los ids de cuentas,
+ * su historial de precios, sus cargos, las propuestas de precio y los recordatorios emitidos; y (openspec
+ * add-commitment-matching, decisión 11, orden 765, después de las anteriores) las sugerencias de coincidencia, con
+ * `occurrence_id`, `definition_id` y `transaction_id` remapeados. Los ids de cuentas,
  * categorías, contrapartes, definiciones, ocurrencias y transacciones se remapean al importar (columnas `uuid`), así
  * como `supersedes_id`, `proposal_id` y `charge_id`, que se resuelven con el mapa que siembra la primera pasada.
  */
@@ -84,5 +86,13 @@ export const COMMITMENTS_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     order: 764,
     orderBy: ['subscription_id', 'kind', 'target_date'],
     idColumns: [],
+  },
+  {
+    name: 'occurrence-match-suggestions',
+    context: 'commitments',
+    table: 'commitments.occurrence_match_suggestion',
+    order: 765,
+    orderBy: ['occurrence_id', 'transaction_id'],
+    money: { amount_delta: 't.currency' },
   },
 ];

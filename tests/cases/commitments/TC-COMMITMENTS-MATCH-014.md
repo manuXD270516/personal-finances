@@ -5,16 +5,17 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'El matching nunca vincula sin confirmación'
 scenario: 'Coincidencia exacta no se vincula sola'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/matching.property.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'pbt', 'safety']
@@ -30,7 +31,7 @@ expected_result:
   - 'Ningún par DISMISSED vuelve a PROPOSED'
   - 'A lo sumo una sugerencia por par'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-014 — Propiedad: ninguna secuencia de hechos hace que el matcher resuelva ocurrencias o reviva pares descartados

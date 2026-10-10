@@ -18,6 +18,9 @@ import type {
   OccurrenceStatus,
   RecurringKind,
 } from '../../domain/index.js';
+import type { MatchSuggestionRepository } from './matching.js';
+
+export * from './matching.js';
 
 /**
  * Transacción PG con `SET LOCAL app.workspace_id` (RLS, ADR-0023); reutiliza la del llamador si existe (consumidores
@@ -181,6 +184,8 @@ export interface CommitmentsDeps {
   readonly uow: UnitOfWork;
   readonly definitions: DefinitionRepository;
   readonly occurrences: OccurrenceRepository;
+  /** Sugerencias de coincidencia (openspec add-commitment-matching). */
+  readonly matching: MatchSuggestionRepository;
   readonly calendar: WorkspaceCalendarQuery;
   readonly settings: WorkspaceSettingsPort;
   readonly periods: FinancialPeriodPort;

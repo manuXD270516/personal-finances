@@ -112,6 +112,11 @@ export interface DefinitionDto {
   readonly nextOccurrence?: { readonly occurrenceDate: string; readonly dueDate: string } | null;
   readonly pendingApprovalCount?: number;
   readonly generatedCount?: number;
+  /** Tolerancias del matching sugerido; `null` = valor por omisión del tipo de monto (add-commitment-matching). */
+  readonly matching: {
+    readonly amountTolerancePercent: string | null;
+    readonly dateWindowDays: number | null;
+  };
 }
 
 export function definitionDto(
@@ -140,6 +145,10 @@ export function definitionDto(
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     current: versionDto(d.current),
+    matching: {
+      amountTolerancePercent: s.matchingAmountTolerancePct,
+      dateWindowDays: s.matchingDateWindowDays,
+    },
     ...(extra.withVersions ? { versions: d.versions.map(versionDto) } : {}),
     ...(extra.nextOccurrence !== undefined ? { nextOccurrence: extra.nextOccurrence } : {}),
     ...(extra.pendingApprovalCount !== undefined ? { pendingApprovalCount: extra.pendingApprovalCount } : {}),

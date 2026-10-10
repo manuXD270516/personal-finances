@@ -8,6 +8,7 @@ import { useFormat, WithWorkspace, type WorkspaceContext } from '../common/works
 import { useCatalogs } from '../transactions/catalogs';
 import { CommittedCard } from './CommittedCard';
 import { DefinitionsPanel } from './DefinitionsPanel';
+import { MatchSuggestionsPanel } from './MatchSuggestionsPanel';
 import { OccurrencesPanel } from './OccurrencesPanel';
 
 export function RecurringPage() {
@@ -16,7 +17,8 @@ export function RecurringPage() {
 
 /**
  * Pantalla `/recurring` (openspec add-recurrence-engine 7.1; docs/28 §4.8): tarjeta "Comprometido del periodo" y las
- * pestañas Próximos (7/30/60/90 días), Por aprobar (bandeja) y Definiciones. Las acciones recargan las listas y el
+ * pestañas Próximos (7/30/60/90 días), Por aprobar (bandeja), Coincidencias por revisar (add-commitment-matching: sugerencias
+ * de vincular una transacción con una ocurrencia, con contador) y Definiciones. Las acciones recargan las listas y el
  * comprometido (`refreshKey`) y avisan a la sidebar (evento de ventana).
  */
 function Recurring({ ctx }: { ctx: WorkspaceContext }) {
@@ -26,6 +28,7 @@ function Recurring({ ctx }: { ctx: WorkspaceContext }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [status, setStatus] = useState<string | undefined>();
   const [tray, setTray] = useState<number | undefined>();
+  const [matches, setMatches] = useState<number | undefined>();
   const statusRef = useRef<HTMLParagraphElement>(null);
 
   const changed = (message: string) => {
@@ -38,6 +41,7 @@ function Recurring({ ctx }: { ctx: WorkspaceContext }) {
   }, [status]);
 
   const approvalLabel = tray ? f.t('tabs.approvalCount', { count: tray }) : f.t('tabs.approval');
+  const matchesLabel = matches ? f.t('tabs.matchesCount', { count: matches }) : f.t('tabs.matches');
   return (
     <section aria-labelledby="recurring-title" style={pageStyle}>
       <h1 id="recurring-title">{f.t('title')}</h1>
@@ -85,6 +89,20 @@ function Recurring({ ctx }: { ctx: WorkspaceContext }) {
                 refreshKey={refreshKey}
                 onChanged={changed}
                 onCount={setTray}
+              />
+            ),
+          },
+          {
+            id: 'matches',
+            label: matchesLabel,
+            content: (
+              <MatchSuggestionsPanel
+                ctx={ctx}
+                f={f}
+                catalogs={catalogs}
+                refreshKey={refreshKey}
+                onChanged={changed}
+                onCount={setMatches}
               />
             ),
           },

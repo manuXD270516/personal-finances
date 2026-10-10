@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Sugerencia de coincidencia para una transacción registrada'
 scenario: 'Transacción sin ocurrencia compatible'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/occurrence-matcher.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching']
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - 'Lista vacía; ninguna sugerencia'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-002 — Una transacción sin ocurrencias compatibles en su cuenta no genera sugerencias

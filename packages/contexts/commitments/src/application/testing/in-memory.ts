@@ -8,6 +8,7 @@ import type {
   TransactionLinkDto,
 } from '@pf/transactions/contracts';
 import {
+  MatchSuggestion,
   RecurringDefinition,
   RecurringOccurrence,
   isUnresolved,
@@ -16,6 +17,7 @@ import {
   type ExistingOccurrence,
   type OccurrenceState,
   type OccurrenceStatus,
+  type SuggestionState,
 } from '../../domain/index.js';
 import type {
   CommitmentsDeps,
@@ -23,6 +25,8 @@ import type {
   DefinitionListRow,
   DefinitionRepository,
   FinancialPeriodView,
+  MatchOccurrenceRow,
+  MatchSuggestionRepository,
   OccurrenceFilter,
   OccurrenceRepository,
   OccurrenceView,
@@ -78,6 +82,7 @@ export class InMemoryCommitments {
   protected readonly extensions: (() => () => void)[] = [];
   protected definitionsMap = new Map<string, { state: DefinitionState; versions: DefinitionVersion[] }>();
   protected occurrencesMap = new Map<string, OccurrenceState>();
+  protected suggestionsMap = new Map<string, SuggestionState>();
   readonly accountList: AccountSummaryDto[] = [
     account(BANK, 'Banco BOB', 'BANK', 'ASSET', 'BOB', 'LIQUID'),
     account(CASH, 'Efectivo', 'CASH', 'ASSET', 'BOB', 'LIQUID'),
@@ -223,6 +228,111 @@ export class InMemoryCommitments {
         .at(-1)?.occurrenceDate ?? null,
   };
 
+  readonly matching: MatchSuggestionRepository = {
+    insertIfAbsent: async (suggestion) => {
+      const s = suggestion.snapshot;
+      const taken = [...this.suggestionsMap.values()].some(
+        (x) => x.occurrenceId === s.occurrenceId && x.transactionId === s.transactionId,
+      );
+      if (taken) return false;
+      this.suggestionsMap.set(s.id, s);
+      suggestion.markPersisted();
+      return true;
+    },
+    findById: async (workspaceId, id) => {
+      const s = this.suggestionsMap.get(id);
+      return s && s.workspaceId === workspaceId ? MatchSuggestion.restore(s) : null;
+    },
+    save: async (suggestion) => {
+      const stored = this.suggestionsMap.get(suggestion.id);
+      if (!stored || stored.version !== suggestion.persistedVersion) return false;
+      this.suggestionsMap.set(suggestion.id, suggestion.snapshot);
+      suggestion.markPersisted();
+      return true;
+    },
+    listByTransaction: async (workspaceId, transactionId) =>
+      [...this.suggestionsMap.values()]
+        .filter((s) => s.workspaceId === workspaceId && s.transactionId === transactionId)
+        .map((s) => MatchSuggestion.restore(s)),
+    listByOccurrences: async (workspaceId, occurrenceIds) =>
+      [...this.suggestionsMap.values()]
+        .filter((s) => s.workspaceId === workspaceId && occurrenceIds.includes(s.occurrenceId))
+        .map((s) => MatchSuggestion.restore(s)),
+    expireForOccurrences: async (workspaceId, occurrenceIds, reason, options = {}) =>
+      this.expireWhere(
+        (s) =>
+          s.workspaceId === workspaceId &&
+          occurrenceIds.includes(s.occurrenceId) &&
+          s.id !== options.exceptId,
+        reason,
+      ),
+    expireForTransaction: async (workspaceId, transactionId, reason, options = {}) =>
+      this.expireWhere(
+        (s) =>
+          s.workspaceId === workspaceId && s.transactionId === transactionId && s.id !== options.exceptId,
+        reason,
+      ),
+    list: async (workspaceId, filter) => {
+      let rows = [...this.suggestionsMap.values()].filter(
+        (s) =>
+          s.workspaceId === workspaceId &&
+          (!filter.statuses || filter.statuses.includes(s.status)) &&
+          (!filter.occurrenceId || s.occurrenceId === filter.occurrenceId) &&
+          (!filter.transactionId || s.transactionId === filter.transactionId) &&
+          (!filter.definitionId || s.definitionId === filter.definitionId),
+      );
+      rows.sort((a, b) => {
+        const byScore = Number(b.score) - Number(a.score);
+        return byScore !== 0 ? byScore : a.id < b.id ? -1 : 1;
+      });
+      if (filter.after) {
+        const [score, id] = filter.after;
+        rows = rows.filter(
+          (s) => Number(s.score) < Number(score) || (Number(s.score) === Number(score) && s.id > id),
+        );
+      }
+      return (filter.limit ? rows.slice(0, filter.limit) : rows).map((s) => MatchSuggestion.restore(s));
+    },
+    countProposed: async (workspaceId) =>
+      [...this.suggestionsMap.values()].filter(
+        (s) => s.workspaceId === workspaceId && s.status === 'PROPOSED',
+      ).length,
+    candidateOccurrences: async (workspaceId, input) =>
+      [...this.occurrencesMap.values()]
+        .filter(
+          (o) =>
+            o.workspaceId === workspaceId &&
+            ['SCHEDULED', 'DUE', 'OVERDUE'].includes(o.status) &&
+            o.dueDate >= input.from &&
+            o.dueDate <= input.to,
+        )
+        .map((o) => this.matchRowOf(o))
+        .filter(
+          (r) =>
+            r.occurrence.kind === input.kind &&
+            r.occurrence.accountId === input.accountId &&
+            (input.kind !== 'TRANSFER' || r.occurrence.toAccountId === input.toAccountId),
+        )
+        .sort((a, b) => a.occurrence.dueDate.localeCompare(b.occurrence.dueDate)),
+    occurrencesByIds: async (workspaceId, ids) =>
+      ids
+        .map((id) => this.occurrencesMap.get(id))
+        .filter((o): o is OccurrenceState => !!o && o.workspaceId === workspaceId)
+        .map((o) => this.matchRowOf(o)),
+    linkedTransactionIds: async (workspaceId, transactionIds) =>
+      new Set(
+        [...this.occurrencesMap.values()]
+          .filter(
+            (o) =>
+              o.workspaceId === workspaceId &&
+              (o.status === 'MATERIALIZED' || o.status === 'MATCHED') &&
+              o.transactionId !== null &&
+              transactionIds.includes(o.transactionId),
+          )
+          .map((o) => o.transactionId as string),
+      ),
+  };
+
   readonly transactions: RecurringTransactionPort = {
     record: async (input) => {
       this.recordAttempts += 1;
@@ -279,6 +389,30 @@ export class InMemoryCommitments {
       this.transactionsStore.get(transactionId) ?? null,
     getManyForLink: async ({ transactionIds }: { workspaceId: string; transactionIds: readonly string[] }) =>
       transactionIds.map((id) => this.transactionsStore.get(id)).filter((t): t is FakeTransaction => !!t),
+    listLinkCandidates: async (input: {
+      workspaceId: string;
+      accountIds: readonly string[];
+      from: string;
+      to: string;
+    }): Promise<readonly FakeTransaction[]> =>
+      [...this.transactionsStore.values()]
+        .filter(
+          (t) =>
+            t.status !== 'VOIDED' &&
+            ['INCOME', 'EXPENSE', 'TRANSFER'].includes(t.kind) &&
+            input.accountIds.includes(t.accountId) &&
+            t.businessDate >= input.from &&
+            t.businessDate <= input.to,
+        )
+        .sort((a, b) =>
+          a.businessDate === b.businessDate
+            ? a.transactionId < b.transactionId
+              ? -1
+              : 1
+            : a.businessDate < b.businessDate
+              ? -1
+              : 1,
+        ),
   };
 
   readonly pending = {
@@ -457,6 +591,7 @@ export class InMemoryCommitments {
         [...this.definitionsMap].map(([k, v]) => [k, { state: v.state, versions: [...v.versions] }]),
       );
       const occs = new Map(this.occurrencesMap);
+      const suggestions = new Map(this.suggestionsMap);
       const txns = new Map(this.transactionsStore);
       const counts = [this.events.length, this.recorded.length, this.recordCalls.length];
       const restores = this.extensions.map((snapshot) => snapshot());
@@ -466,6 +601,7 @@ export class InMemoryCommitments {
         for (const restore of restores) restore();
         this.definitionsMap = defs;
         this.occurrencesMap = occs;
+        this.suggestionsMap = suggestions;
         this.transactionsStore.clear();
         for (const [k, v] of txns) this.transactionsStore.set(k, v);
         this.events.length = counts[0] as number;
@@ -481,6 +617,7 @@ export class InMemoryCommitments {
       uow: this.uow,
       definitions: this.definitions,
       occurrences: this.occurrences,
+      matching: this.matching,
       calendar: this.calendar,
       settings: this.settings,
       periods: this.periods,
@@ -528,6 +665,62 @@ export class InMemoryCommitments {
 
   recordedFor(aggregateId: string): Recorded[] {
     return this.recorded.filter((r) => r.entry.aggregateId === aggregateId);
+  }
+
+  /** Sugerencias de la prueba (estados persistidos), por id. */
+  suggestions(): SuggestionState[] {
+    return [...this.suggestionsMap.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+
+  suggestionFor(occurrenceId: string, transactionId: string): SuggestionState | undefined {
+    return this.suggestions().find(
+      (s) => s.occurrenceId === occurrenceId && s.transactionId === transactionId,
+    );
+  }
+
+  private expireWhere(
+    match: (s: SuggestionState) => boolean,
+    reason: SuggestionState['expireReason'],
+  ): string[] {
+    const ids: string[] = [];
+    for (const s of [...this.suggestionsMap.values()]) {
+      if (s.status !== 'PROPOSED' || !match(s)) continue;
+      this.suggestionsMap.set(s.id, {
+        ...s,
+        status: 'EXPIRED',
+        expireReason: reason,
+        version: s.version + 1,
+      });
+      ids.push(s.id);
+    }
+    return ids;
+  }
+
+  private matchRowOf(s: OccurrenceState): MatchOccurrenceRow {
+    const row = this.definitionsMap.get(s.definitionId) as {
+      state: DefinitionState;
+      versions: DefinitionVersion[];
+    };
+    const v = row.versions.find((x) => x.versionNo === s.definitionVersionNo) as DefinitionVersion;
+    return {
+      definitionName: row.state.name,
+      occurrence: {
+        occurrenceId: s.id,
+        definitionId: s.definitionId,
+        kind: row.state.kind,
+        status: s.status,
+        dueDate: s.dueDate,
+        expected: s.expected,
+        currency: s.currency,
+        accountId: v.accountId,
+        toAccountId: v.toAccountId,
+        counterpartyId: v.counterpartyId,
+        tolerances: {
+          amountTolerancePct: row.state.matchingAmountTolerancePct,
+          dateWindowDays: row.state.matchingDateWindowDays,
+        },
+      },
+    };
   }
 
   protected id(): string {

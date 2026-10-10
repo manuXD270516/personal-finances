@@ -5,16 +5,22 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Sugerencia de coincidencia para una transacción registrada'
 scenario: 'Gasto manual sugerido para el internet'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - apps/web/src/ui/recurring/matching.test.tsx
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/occurrence-matcher.test.ts
+  - packages/contexts/commitments/test/integration/pg-matching.int.test.ts
+  - tests/e2e/specs/commitment-matching.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching']
@@ -33,7 +39,7 @@ expected_result:
   - 'La ocurrencia sigue DUE y la transacción sin vincular'
   - 'La reentrega no crea otra sugerencia (inbox + UNIQUE)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-001 — Un gasto manual compatible genera una sugerencia de confianza alta sin resolver la ocurrencia

@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   EventConsumerRuntime,
   EventDeliveryMetrics,
@@ -342,6 +344,42 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
     });
     await expect(rejection).rejects.toThrow(/concurrencia total .* es \d+ .*DATABASE_POOL_MAX=10/);
   }, 60_000);
+
+  it('[TC-COMMITMENTS-MATCH-012] con todos los consumidores reales (matcher y backfill incluidos) el worker arranca con el pool de cada plantilla de despliegue', async () => {
+    // Presupuesto de conexiones (D112): Σ concurrencia + 4 reservadas ≤ DATABASE_POOL_MAX con los valores de la plantilla
+    // de desarrollo (`.env.example`) y la del host (`deploy/host/etc-pfos/pfos.env.example`, 2 GB de RAM).
+    const templates = [
+      fileURLToPath(new URL('../../../../.env.example', import.meta.url)),
+      fileURLToPath(new URL('../../../../deploy/host/etc-pfos/pfos.env.example', import.meta.url)),
+    ];
+    for (const path of templates) {
+      const text = readFileSync(path, 'utf8');
+      const value = (name: string): string => {
+        const found = new RegExp(
+          `^${name}=([0-9]+)[ 
+]*$`,
+          'm',
+        ).exec(text);
+        if (!found) throw new Error(`${name} no está en ${path}`);
+        return found[1] as string;
+      };
+      const config = workerConfig(
+        baseEnv(deps, {
+          EVENT_CONSUMER_CONCURRENCY: value('EVENT_CONSUMER_CONCURRENCY'),
+          EVENT_CONSUMER_BATCH_SIZE: value('EVENT_CONSUMER_BATCH_SIZE'),
+          DATABASE_POOL_MAX: value('DATABASE_POOL_MAX'),
+        }),
+      );
+      const runtime = await createWorkerRuntime(config, quiet, {
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+        lifecycleBackfillOnStart: false,
+        planningPeriodsOnStart: false,
+        commitmentsOnStart: false,
+      });
+      await runtime.close();
+    }
+  }, 120_000);
 });
 
 type Meter = NonNullable<ConstructorParameters<typeof EventDeliveryMetrics>[1]>;

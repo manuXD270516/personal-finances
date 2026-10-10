@@ -2,6 +2,7 @@ export * from './amount-spec.js';
 export * from './committed-calculator.js';
 export * from './definition-version.js';
 export * from './lifecycle.js';
+export * from './matching/index.js';
 export * from './occurrence-clock.js';
 export * from './occurrence-generator.js';
 export * from './recurring-definition.js';

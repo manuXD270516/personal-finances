@@ -152,6 +152,7 @@ export const ERROR_CATALOG = {
   OCCURRENCE_LINK_MISMATCH: { status: 422, title: 'The transaction does not match the occurrence' },
   OCCURRENCE_ALREADY_MATERIALIZED: { status: 409, title: 'The occurrence already has its transaction' },
   TRANSACTION_ALREADY_LINKED: { status: 409, title: 'The transaction already resolves another occurrence' },
+  MATCH_SUGGESTION_NOT_PENDING: { status: 409, title: 'The match suggestion is no longer pending' },
   RECURRING_MANAGED_EXTERNALLY: {
     status: 409,
     title: 'The recurring definition is managed by another module; operate it from there',

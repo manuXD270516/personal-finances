@@ -5,16 +5,17 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Sugerencias para ocurrencias nuevas'
 scenario: 'Ocurrencia reinstaurada al reanudar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'backfill']
@@ -31,7 +32,7 @@ expected_result:
   - 'Sugerencia PROPOSED entre el gasto del 2026-12-01 y la ocurrencia del 2026-12-02 (dateDeltaDays 1)'
   - 'La ocurrencia sigue SCHEDULED o DUE hasta que el usuario confirme'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-013 — Una ocurrencia reinstaurada al reanudar recibe la sugerencia del pago ya registrado

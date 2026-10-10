@@ -255,6 +255,14 @@ export class RecurringController {
       ...(body['name'] !== undefined ? { name: str(body, 'name') as string } : {}),
       ...('description' in body ? { description: (body['description'] as string | null) ?? null } : {}),
       ...('notes' in body ? { notes: (body['notes'] as string | null) ?? null } : {}),
+      ...(body['matching'] !== undefined
+        ? {
+            matching: body['matching'] as {
+              amountTolerancePercent?: string | null;
+              dateWindowDays?: number | null;
+            },
+          }
+        : {}),
     });
   }
 

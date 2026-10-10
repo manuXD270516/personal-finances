@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'El matching nunca vincula sin confirmación'
 scenario: 'Coincidencia exacta no se vincula sola'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010', 'FR-COMMITMENTS-008']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/recurring/matching.test.tsx
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/occurrence-matcher.test.ts
+status: automated
 regression_suite: true
 phase: 3
 tags: ['matching', 'safety']
@@ -30,7 +33,7 @@ expected_result:
   - 'Ocurrencia sigue DUE sin transactionId'
   - 'Ningún RecurringOccurrenceMaterialized.v1 emitido'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-005 — Una coincidencia exacta de un gasto importado no vincula nada sin confirmación

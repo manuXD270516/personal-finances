@@ -5,16 +5,21 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Confirmar una sugerencia'
 scenario: 'Confirmar la sugerencia del internet'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010', 'FR-COMMITMENTS-008']
 nfr: []
 invariants: ['INV-029']
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/application/matching.subscriptions.test.ts
+  - packages/contexts/commitments/src/domain/matching/match-suggestion.test.ts
+  - tests/e2e/specs/commitment-matching.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'confirm']
@@ -32,7 +37,7 @@ expected_result:
   - 'RecurringOccurrenceMaterialized.v1 mode MATCHED matchedBy SUGGESTION'
   - 'El comprometido de octubre ya no incluye 199.00 BOB del Internet'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-006 — Confirmar una sugerencia vincula por sugerencia y saca la ocurrencia del comprometido

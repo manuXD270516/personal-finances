@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Sugerencias para ocurrencias nuevas'
 scenario: 'Definición creada después del pago'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'backfill']
@@ -30,7 +32,7 @@ steps:
 expected_result:
   - 'Sugerencia PROPOSED entre el gasto del 2026-10-10 y la ocurrencia del 2026-10-10'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-011 — Al crear una definición después del pago se sugiere la transacción ya registrada

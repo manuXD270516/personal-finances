@@ -23,7 +23,9 @@
     "created_at",
     "created_by",
     "updated_at",
-    "updated_by"
+    "updated_by",
+    "matching_amount_tolerance_pct",
+    "matching_date_window_days"
   ],
   "properties": {
     "id": {
@@ -113,6 +115,19 @@
         "null"
       ],
       "format": "uuid"
+    },
+    "matching_amount_tolerance_pct": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "matching_date_window_days": {
+      "type": [
+        "integer",
+        "null"
+      ]
     }
   },
   "x-pfos-table": "commitments.recurring_definition",
