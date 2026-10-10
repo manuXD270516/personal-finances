@@ -282,6 +282,17 @@ export interface OutboxPort {
   appendMany?(events: readonly OutboxEvent[]): Promise<void>;
 }
 
+/** Lectura de referencias externas de filas importadas (add-basic-csv-import): idempotencia del registro en lote. */
+export interface ImportedRefReader {
+  /** Transacciones NO anuladas de la cuenta con alguna de las referencias; mapa `externalRef.id → transactionId`. */
+  existingByRefs(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly namespace: string;
+    readonly ids: readonly string[];
+  }): Promise<ReadonlyMap<string, string>>;
+}
+
 export interface IdGenerator {
   /** UUIDv7. */
   next(): string;

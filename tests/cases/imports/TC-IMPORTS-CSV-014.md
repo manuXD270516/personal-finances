@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Validación de cada fila"
 scenario: "Fila en un periodo cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-006","FR-PLANNING-005"]
 nfr: []
 invariants: ["INV-015"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/row-validator.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -30,7 +33,7 @@ expected_result:
   - "Fila inválida con PERIOD_CLOSED y decisión EXCLUDE fija"
   - "Al aprobar no se crea"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-014 — Una fila con fecha en un periodo cerrado es inválida con PERIOD_CLOSED

@@ -5,16 +5,17 @@ spec: imports/import-pipeline
 related_specs: ["security/access-control","audit/audit-trail"]
 requirement: "Permisos y auditoría del import"
 scenario: "VIEWER intenta importar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-006","FR-AUDIT-002","FR-IMPORTS-003"]
 nfr: []
 invariants: ["INV-029"]
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","rbac","audit"]
@@ -34,7 +35,7 @@ expected_result:
   - "Audit: creación y aprobación del import con actor Ana"
   - "Cada transacción creada: registro con origin import y actor Ana"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-027 — Un VIEWER no puede importar y la aprobación queda auditada con el actor y origen import

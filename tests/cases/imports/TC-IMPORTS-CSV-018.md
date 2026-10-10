@@ -5,16 +5,20 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Idempotencia por fila"
 scenario: "Dos cafés idénticos el mismo día"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-010"]
 nfr: []
 invariants: ["INV-014"]
 priority: critical
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/duplicate-classifier.test.ts
+  - packages/contexts/imports/src/domain/row-fingerprint.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -33,7 +37,7 @@ expected_result:
   - "Primera importación: 2 gastos de 18.00 BOB (occurrenceIndex 0 y 1)"
   - "Re-subida: el café anulado es nuevo; las otras 3 filas ya importadas"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-018 — Dos compras idénticas del mismo día crean dos gastos y una anulada vuelve a ser importable

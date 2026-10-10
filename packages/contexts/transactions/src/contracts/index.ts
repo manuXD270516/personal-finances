@@ -303,6 +303,96 @@ export interface PendingFlowQuery {
 
 export const PENDING_FLOW_QUERY = Symbol.for('pf.transactions.PendingFlowQuery');
 
+// ───────────────────────────────────────────── add-basic-csv-import (IMPORTS)
+
+/** Espacio de nombres de `externalRef` de las transacciones creadas por una fila importada (huella de fila en hex). */
+export const IMPORT_ROW_NAMESPACE = 'imports.csv-row' as const;
+
+export interface ImportedTransactionRowDto {
+  /** Identificador de la fila en el llamador (el id del staging): se devuelve tal cual en el resultado. */
+  readonly rowRef: string;
+  /** Fecha de negocio `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly direction: 'IN' | 'OUT';
+  /** Monto positivo en la moneda de la cuenta. */
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly description: string | null;
+  readonly externalRef: { readonly namespace: string; readonly id: string };
+}
+
+/**
+ * Registro en lote de transacciones importadas (design decisión 9 y 10 de add-basic-csv-import; el mismo contrato que
+ * usará `RecordImportedTransactions` en Phase 6, docs/13 §1). Corre en la unidad de trabajo del llamador (UNA
+ * transacción de BD por lote): reutiliza el agregado, el traductor al ledger, la auditoría (`origin = import`, el actor
+ * del contexto de la petición), el recorrido y el outbox de Transactions. Cada fila se crea como gasto (`OUT`) o ingreso
+ * (`IN`) `POSTED` con la categoría de sistema "sin categoría" (D9), `source = IMPORT` e `import_job_id`. Las filas cuya
+ * referencia externa ya tiene una transacción no anulada en la cuenta NO se crean: se informan en `alreadyExisting`.
+ * Un error de dominio (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`, …) se propaga y revierte todo el lote.
+ */
+export interface ImportedTransactionsCommand {
+  recordBatch(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly importJobId: string;
+    readonly actorUserId: string;
+    readonly rows: readonly ImportedTransactionRowDto[];
+  }): Promise<{
+    readonly created: readonly { readonly rowRef: string; readonly transactionId: string }[];
+    readonly alreadyExisting: readonly { readonly rowRef: string; readonly transactionId: string }[];
+  }>;
+}
+
+export const IMPORTED_TRANSACTIONS_COMMAND = Symbol.for('pf.transactions.ImportedTransactionsCommand');
+
+export interface DuplicateCandidateDto {
+  readonly transactionId: string;
+  /** `INCOME`, `EXPENSE`, `REFUND`, `ADJUSTMENT`, `TRANSFER` o `CONVERSION`. */
+  readonly kind: string;
+  readonly status: string;
+  readonly date: string;
+  readonly amount: { readonly amount: string; readonly currency: string };
+  readonly description: string | null;
+  readonly counterpartyId: string | null;
+}
+
+/**
+ * Candidatos a duplicado para un lote de filas (docs/13 §8; ventana de `transactions/duplicate-detection`). Set-based:
+ * movimientos NO anulados de la cuenta —transacciones `INCOME/EXPENSE/REFUND/ADJUSTMENT` y PATAS de `TRANSFER` y
+ * `CONVERSION` sobre la cuenta— del mismo monto y moneda, en la misma dirección y con fecha a ±`windowDays`. No exige
+ * similitud de descripción. Sin efectos; en la unidad de trabajo del llamador si existe.
+ */
+export interface DuplicateCandidatesQuery {
+  findForImport(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+    readonly rows: readonly {
+      readonly rowRef: string;
+      readonly date: string;
+      readonly direction: 'IN' | 'OUT';
+      readonly amount: { readonly amount: string; readonly currency: string };
+    }[];
+    readonly windowDays: number;
+    readonly excludeTransactionIds?: readonly string[];
+  }): Promise<
+    readonly { readonly rowRef: string; readonly candidates: readonly DuplicateCandidateDto[] }[]
+  >;
+}
+
+export const DUPLICATE_CANDIDATES_QUERY = Symbol.for('pf.transactions.DuplicateCandidatesQuery');
+
+/** Estado actual de transacciones por id (vínculos superados de IMPORTS: una anulada libera su huella). */
+export interface TransactionStatusQuery {
+  statusOf(input: {
+    readonly workspaceId: string;
+    readonly transactionIds: readonly string[];
+  }): Promise<readonly { readonly transactionId: string; readonly status: string }[]>;
+}
+
+export const TRANSACTION_STATUS_QUERY = Symbol.for('pf.transactions.TransactionStatusQuery');
+
+/** Ventana de días de la detección de duplicados (`transactions/duplicate-detection`, ±3 días). */
+export const DUPLICATE_WINDOW_DAYS_DEFAULT = 3;
+
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.

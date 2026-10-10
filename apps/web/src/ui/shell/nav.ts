@@ -16,7 +16,8 @@ export interface NavItem {
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'home', path: '/' },
-  { key: 'transactions', path: '/transacciones', also: ['/transferencias'] },
+  // add-basic-csv-import: el asistente "Importar CSV" (/imports) cuelga de Transacciones.
+  { key: 'transactions', path: '/transacciones', also: ['/transferencias', '/imports'] },
   { key: 'accounts', path: '/cuentas', also: ['/instituciones'] },
   { key: 'fx', path: '/fx' },
   { key: 'classification', path: '/clasificacion' },

@@ -5,16 +5,17 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Cuota de operaciones costosas en el import"
 scenario: "Ráfaga de subidas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-SEC-011"]
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","rate-limit","D113"]
@@ -32,7 +33,7 @@ expected_result:
   - "Subida 11: 429 RATE_LIMITED con Retry-After, sin importación"
   - "Replay: respuesta original sin consumir cuota costosa"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-028 — La subida 11 en un minuto responde 429 y un replay de aprobación no consume cuota costosa

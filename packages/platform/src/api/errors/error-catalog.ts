@@ -133,6 +133,11 @@ export const ERROR_CATALOG = {
   EXPORT_FORMAT_UNSUPPORTED: { status: 422, title: 'The export format is not supported' },
   EXPORT_VERIFICATION_FAILED: { status: 422, title: 'The imported data does not match the export manifest' },
   UPLOAD_TOO_LARGE: { status: 413, title: 'The uploaded file exceeds the maximum size' },
+  // imports / basic CSV import (Phase 3)
+  IMPORT_UNSUPPORTED_FORMAT: { status: 422, title: 'The file is not readable delimited text' },
+  IMPORT_TOO_MANY_ROWS: { status: 422, title: 'The file has more data rows than allowed' },
+  IMPORT_MAPPING_INVALID: { status: 422, title: 'The column mapping is not valid for this file' },
+  IMPORT_REVIEW_INCOMPLETE: { status: 409, title: 'The import still has rows waiting for a decision' },
   // transactions / bulk edit (Phase 2)
   BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
   // commitments / recurrence engine (Phase 3)

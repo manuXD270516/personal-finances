@@ -9,3 +9,6 @@
 Dockerfile text eol=lf
 # Respuestas grabadas de providers de tasas: bytes exactos (add-market-rate-providers 1.3)
 packages/contexts/fx/test/fixtures/providers/** -text
+
+# Golden files de import CSV (add-basic-csv-import): bytes exactos (la codificacion windows-1252, el BOM y los saltos CRLF son parte del caso)
+tests/fixtures/imports/csv/**/*.csv -text

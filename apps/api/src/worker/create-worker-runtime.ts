@@ -33,6 +33,7 @@ import {
   commitmentsEventConsumers,
   createCommitmentsRuntime,
 } from '@pf/commitments/interface/commitments.module';
+import { createImportsRuntime, importsEventConsumers } from '@pf/imports/interface/imports.module';
 import {
   createDemoDataRuntime,
   createPortabilityRuntime,
@@ -72,6 +73,7 @@ import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audi
 import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-jobs.js';
+import { registerImportsJobs } from './imports-jobs.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
@@ -81,6 +83,7 @@ import { DemoDataLoader } from '../demo/demo-data-loader.js';
 import {
   AUDIT_POLICIES,
   counterpartyNamesOf,
+  importsSettingsFrom,
   demoDataOptions,
   financeRuntimes,
   financialPeriodPort,
@@ -131,6 +134,8 @@ export interface WorkerRuntimeOptions {
   readonly planningPeriodsOnStart?: boolean;
   /** Encola `commitments.generate-occurrences` al arrancar (por defecto sí; add-recurrence-engine). */
   readonly commitmentsOnStart?: boolean;
+  /** Encola `imports.expire-reviews` e `imports.purge-staging` al arrancar (por defecto sí; add-basic-csv-import). */
+  readonly importsOnStart?: boolean;
   /** Tests (add-alerts): sustituye el adaptador de email (por defecto, el de `EMAIL_DRIVER`). */
   readonly emailSender?: EmailSender;
   /** Tests (add-alerts): backoff y lease del despacho de email, y barridos periódicos. */
@@ -406,6 +411,29 @@ export async function createWorkerRuntime(
     runOnStart: options.commitmentsOnStart ?? true,
   });
 
+  // IMPORTS (add-basic-csv-import): consumidor `imports.persist` (crea las transacciones por lotes con los MISMOS casos
+  // de uso de TRANSACTIONS que la API, vía su contrato público) y jobs diarios de expiración y purga del staging.
+  const imports = createImportsRuntime({
+    pool,
+    clock: options.clock ?? systemClock,
+    audit: demoAudit.port,
+    outbox: outboxPort(fxOutbox),
+    calendar: identityWorkspaceCalendarDirectory(pool),
+    accounts: finance.accounts.query,
+    balances: finance.ledger.accountBalances,
+    periods: planning.periodQuery,
+    transactions: {
+      imported: finance.transactions.imported,
+      duplicateCandidates: finance.transactions.duplicateCandidates,
+      statuses: finance.transactions.statuses,
+    },
+    settings: importsSettingsFrom(config),
+  });
+  await registerImportsJobs(queue, imports.maintenance, activeWorkspaces, logger, {
+    cron: config.IMPORT_MAINTENANCE_CRON,
+    runOnStart: options.importsOnStart ?? true,
+  });
+
   // NOTIFY (add-alerts): consumidores de `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`, despacho
   // del email (adaptador por EMAIL_DRIVER: smtp → Mailpit en local/CI, none → solo in-app), barrido y purga. La cola de
   // despacho se crea antes de arrancar los consumidores: estos encolan en la transacción de la notificación.
@@ -465,6 +493,7 @@ export async function createWorkerRuntime(
     reportingDataVersionConsumer(),
     ...planningEventConsumers(planning),
     ...commitmentsEventConsumers(commitments),
+    ...importsEventConsumers(imports, logger),
     ...notificationEventConsumers(notifications),
   ]);
   // Presupuesto de conexiones (improve-event-throughput, TC-PLATFORM-EVENTS-018): la concurrencia sumada de los

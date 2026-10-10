@@ -225,6 +225,11 @@ function AccountDetail({
                   {ctx.canEdit && account.status === 'ACTIVE' ? (
                     <a href={ctx.href(`/transacciones/nueva?cuenta=${account.id}`)}>{t('recordMovement')}</a>
                   ) : null}
+                  {ctx.canEdit && account.status === 'ACTIVE' ? (
+                    <a href={ctx.href(`/imports/nueva?cuenta=${account.id}`)} data-testid="import-csv">
+                      {t('importCsv')}
+                    </a>
+                  ) : null}
                 </nav>
                 {status ? <p role="status">{status}</p> : null}
                 {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}

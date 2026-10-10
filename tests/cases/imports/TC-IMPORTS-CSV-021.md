@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Deduplicación básica con movimientos existentes"
 scenario: "Omitir recuerda el vínculo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-007","FR-IMPORTS-010"]
 nfr: []
 invariants: ["INV-014"]
 priority: high
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -32,7 +34,7 @@ expected_result:
   - "Primera importación: la fila no se crea; row_link SKIPPED_AS_DUPLICATE al gasto manual"
   - "Segunda: la fila es DUPLICATE_EXACT"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-021 — Omitir un posible duplicado lo vincula y una reimportación lo clasifica como ya importado

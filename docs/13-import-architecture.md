@@ -103,6 +103,8 @@ stateDiagram-v2
     ROLLED_BACK --> [*]
 ```
 
+> **Phase 3 (`add-basic-csv-import`):** el subconjunto implementado usa `AWAITING_MAPPING → AWAITING_REVIEW` (el mapeo se puede reenviar) `→ APPROVED → PERSISTING → COMPLETED | PARTIALLY_FAILED → COMPLETED_WITH_ERRORS`, más `CANCELLED` desde `AWAITING_*` (usuario o expiración a los 30 días). `AWAITING_MAPPING` es el estado nuevo que Phase 6 reutiliza cuando ningún perfil coincide (asistente de mapeo, §5.1); las fallas de subida son síncronas y no crean job (sin `PARSE_FAILED`). El mapeo y la clasificación se calculan de forma síncrona en la petición (≤ 5 000 filas) y no hay máquina `ImportJob` en `audit/lifecycle-timeline` (docs/35 D151): solo auditoría de creación, aprobación, reintento, aceptación de errores, cancelación y expiración.
+
 Reglas:
 
 - Transiciones de etapa técnica (`PARSING → … → AWAITING_REVIEW`) las ejecuta el **worker**; las de decisión (`APPROVED`, `CANCELLED`, `RevertImport`) las ejecuta un **usuario** con rol `OWNER` o `EDITOR`.
@@ -135,6 +137,8 @@ flowchart LR
 ```
 
 ### 4.1 Tabla de etapas
+
+> **Phase 3:** la etapa Upload recibe el CSV por `multipart/form-data` (≤ 2 MiB, el servidor deja de leer al superar el tope), calcula su SHA-256, lo decodifica (UTF-8 con o sin BOM, windows-1252), detecta el delimitador y deja sus celdas en `imports.staged_transaction`; el archivo NO se guarda (sin Object Storage ni DOCUMENTS, docs/24 A6). Las etapas Normalize, Validate y Duplicate detection corren juntas al aplicar el mapeo (síncronas; plan B: worker con estado `NORMALIZING` si el benchmark real excede el presupuesto de 10 s). Persist corre en el worker (`imports.persist`, lotes de 200, una transacción de base de datos por lote).
 
 | # | Etapa | Responsabilidad | Puertos (application) | Fallos y manejo |
 |---|---|---|---|---|
@@ -336,6 +340,8 @@ fingerprint = SHA-256( canonical_json([
 
 ### 7.3 Nivel proveedor — `external_id`
 
+> **Phase 3 (`add-basic-csv-import`):** el CSV básico no tiene id estable del banco; Transactions recibe `externalRef = ('imports.csv-row', hex(fingerprint))` y lo protege con el índice único parcial `transaction_import_ref_uk` (una transacción activa por cuenta y huella; anulada, deja de ocupar la huella). `fingerprint` incluye `workspaceId` y `accountId`: tras restaurar un export en un workspace nuevo, las huellas anteriores no coinciden con las recalculadas y un reimport del mismo archivo se clasifica como posible duplicado (nunca se crea en silencio).
+
 - Cuando la fuente provee id estable (OFX `FITID`, Plaid `transaction_id`, trade id del exchange, nº de documento bancario fiable): `UNIQUE (workspace_id, account_id, source_namespace, external_id)` en `txn` (propiedad de Transactions; Imports pasa `externalRef = {namespace, id}` en el comando).
 - `source_namespace` = `institutionId:format` o `providerId`, porque distintos bancos reutilizan ids.
 - Si el proveedor reemplaza un `pending` por un `posted` con otro id (`pending_transaction_id`), el adapter emite una **actualización** (Transactions: `ConfirmPendingTransaction`) en lugar de una nueva fila.
@@ -363,6 +369,8 @@ flowchart TD
 Implementada en **Transactions** (`transactions/duplicate-detection`); aquí se documenta el contrato que Imports consume.
 
 ### 8.1 Candidatos
+
+> **Phase 3 (docs/35 D150):** los candidatos incluyen las **patas de transferencias y conversiones** de la cuenta (mismo monto, moneda y dirección, ±3 días: `DuplicateCandidatesQuery.findForImport`, set-based). No se exige similitud de descripción (solo ordena) y no hay score; la asignación es 1:1 (cada movimiento existente se empareja con una sola fila). Una transferencia propia o el pago de una tarjeta que NO está registrado se importa como gasto/ingreso si el usuario no lo excluye: la UI lo advierte; convertir filas en transferencias llega con las reglas de Phase 6.
 
 Búsqueda en la **misma cuenta**, transacciones no anuladas con `|bookingDate − d| ≤ 3 días` (configurable; 5 para tarjetas de crédito por diferencia fecha de compra/fecha de proceso) y monto igual o dentro de tolerancia por FX (para cuentas multi-moneda/tarjeta en USD cobrada en BOB: ±2 %).
 
@@ -486,7 +494,7 @@ difference       = statement.closingBalance − expected_closing
 | GET/POST/PUT | `/imports/mapping-profiles[/{id}]` | Versionado |
 | GET/POST/DELETE | `/imports/connections[/{id}]` · POST `/{id}/sync` | DELETE = revocar (soft) |
 
-Errores RFC 9457 con códigos `IMPORT_*` (`IMPORT_UNSUPPORTED_FORMAT`, `IMPORT_FILE_TOO_LARGE`, `IMPORT_REVIEW_INCOMPLETE`, `IMPORT_INVALID_STATE_TRANSITION`, `IMPORT_REVERT_BLOCKED`, `IMPORT_AMBIGUOUS_NUMBER`, `IMPORT_AMBIGUOUS_DATE`, `IMPORT_CONNECTION_EXPIRED`).
+Errores RFC 9457 con códigos `IMPORT_*` (`IMPORT_UNSUPPORTED_FORMAT`, `IMPORT_FILE_TOO_LARGE` (en Phase 3: `UPLOAD_TOO_LARGE`), `IMPORT_REVIEW_INCOMPLETE`, `IMPORT_INVALID_STATE_TRANSITION` (en Phase 3: `INVALID_STATUS_TRANSITION`), `IMPORT_REVERT_BLOCKED`, `IMPORT_AMBIGUOUS_NUMBER`, `IMPORT_AMBIGUOUS_DATE`, `IMPORT_CONNECTION_EXPIRED`).
 
 ## 16. Estrategia de testing de imports
 
@@ -533,7 +541,7 @@ Ejemplos de TC: `TC-IMPORTS-CSV-001` (coma decimal y dd/mm/yyyy), `TC-IMPORTS-ID
 
 | Fase | Entregable |
 |---|---|
-| 3 (Could) | CSV básico: un perfil por institución, preview, duplicados exactos por fingerprint, persistencia. Sin reglas (Rules llega en 6), sin reconciliación automática. |
+| 3 (Could) | **Implementado** (`add-basic-csv-import`): CSV de una cuenta con mapeo manual (sin perfiles reutilizables), preview, duplicados exactos por huella y probables por candidato (sin score), persistencia asíncrona por lotes, fallo parcial con reintento. Sin reglas (Rules llega en 6), sin reconciliación automática, sin deshacer. |
 | 6 | Pipeline completo: CSV/XLSX/OFX/QIF/JSON, perfiles versionados, duplicados probables con score, rules dry-run, reconciliación, revert, workers con progreso, ExchangeProvider (Could). |
 | Futuro | Aggregators (Plaid/regionales), Bank APIs, PDF/OCR, auto-approve por conexión. |
 

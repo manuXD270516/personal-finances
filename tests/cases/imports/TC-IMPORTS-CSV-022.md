@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Aprobación y creación de las transacciones"
 scenario: "Decisión pendiente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-DATA-016"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -31,7 +33,7 @@ expected_result:
   - "409 IMPORT_REVIEW_INCOMPLETE con pendingDecisions = 1"
   - "Ninguna transacción creada; status AWAITING_REVIEW"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-022 — Aprobar con un posible duplicado sin decidir se rechaza con IMPORT_REVIEW_INCOMPLETE

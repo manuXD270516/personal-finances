@@ -30,12 +30,21 @@ import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructu
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
+import { ImportedTransactionsAdapter } from '../application/imported-transactions.adapter.js';
+import {
+  PgDuplicateCandidatesQuery,
+  PgImportedRefReader,
+  PgTransactionStatusQuery,
+} from '../infrastructure/pg-imported.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
 import type {
   CounterpartyCategoryUsageQuery,
+  DuplicateCandidatesQuery,
+  ImportedTransactionsCommand,
   PendingFlowQuery,
   RecurringTransactionPort,
   TransactionLinkQuery,
+  TransactionStatusQuery,
   NominalFlowQuery,
   ReconciliationStatusQuery,
   TransactionsClosingQuery,
@@ -88,6 +97,12 @@ export interface TransactionsRuntime {
   readonly links: TransactionLinkQuery;
   /** Transacciones `PENDING` (add-recurrence-engine, comprometido del periodo). */
   readonly pending: PendingFlowQuery;
+  /** Registro en lote de filas importadas, en la UoW del llamador (add-basic-csv-import). */
+  readonly imported: ImportedTransactionsCommand;
+  /** Candidatos a duplicado de un lote de filas de un extracto (add-basic-csv-import). */
+  readonly duplicateCandidates: DuplicateCandidatesQuery;
+  /** Estado actual de transacciones por id (add-basic-csv-import: vínculos superados). */
+  readonly statuses: TransactionStatusQuery;
 }
 
 /**
@@ -142,6 +157,9 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     recurring: new RecurringTransactionAdapter(service),
     links: new PgTransactionLinkQuery(deps.uow, deps.currencies),
     pending: new PgPendingFlowQuery(deps.uow, deps.currencies),
+    imported: new ImportedTransactionsAdapter(service, new PgImportedRefReader(), deps.uow),
+    duplicateCandidates: new PgDuplicateCandidatesQuery(deps.uow, deps.currencies),
+    statuses: new PgTransactionStatusQuery(deps.uow),
   };
 }
 

@@ -37,6 +37,7 @@ import {
 import { BudgetQueries } from '../application/budget.queries.js';
 import { BudgetCalculator } from '../application/budget-calculator.js';
 import { BudgetThresholdService } from '../application/budget-thresholds.service.js';
+import { WorkspaceCoalescer } from '../application/workspace-coalescer.js';
 import { BudgetsService } from '../application/budgets.service.js';
 import { ClosePendingService } from '../application/close-pending-publisher.js';
 import { ClosingQueries, type CloseReportPdfRenderer } from '../application/closing.queries.js';
@@ -461,12 +462,15 @@ export function budgetEventConsumers(budgets: BudgetsRuntime): EventConsumerDefi
     'transactions.ConversionRevised',
     'fx.RateRecorded',
   ];
+  // Coalescencia por workspace (add-basic-csv-import decisión 11): una ráfaga de hechos de gasto (un import de miles de
+  // filas) comparte la reevaluación de los planes en lugar de repetirla por cada hecho.
+  const coalescer = new WorkspaceCoalescer();
   return [
     {
       consumer: PLANNING_CONSUMERS.budgetThresholds,
       events: spendEvents.map((type) => ({ type, version: 1 })),
       handler: async (event) => {
-        await budgets.thresholds.evaluateWorkspace(event.workspaceId);
+        await coalescer.run(event.workspaceId, () => budgets.thresholds.evaluateWorkspace(event.workspaceId));
       },
     },
     {

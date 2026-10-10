@@ -113,5 +113,9 @@
   "OCCURRENCE_LINK_MISMATCH": "The transaction does not match the payment: it must have the same kind, account and currency and not be voided.",
   "OCCURRENCE_ALREADY_MATERIALIZED": "This payment already has its transaction.",
   "TRANSACTION_ALREADY_LINKED": "That transaction is already linked to another recurring payment.",
-  "MATCH_SUGGESTION_NOT_PENDING": "This match is no longer pending: it was resolved, dismissed or stopped applying."
+  "MATCH_SUGGESTION_NOT_PENDING": "This match is no longer pending: it was resolved, dismissed or stopped applying.",
+  "IMPORT_UNSUPPORTED_FORMAT": "We could not read the file as delimited text (CSV). Check that it is a CSV, that it is not empty and that it has at most 50 columns.",
+  "IMPORT_TOO_MANY_ROWS": "The file has more rows than allowed (5,000). Split it into several files and import them separately.",
+  "IMPORT_MAPPING_INVALID": "The column mapping is not valid for this file. Check the date, description and amount columns.",
+  "IMPORT_REVIEW_INCOMPLETE": "There are still possible duplicates without a decision. Decide each one (create, skip or exclude) before approving."
 }

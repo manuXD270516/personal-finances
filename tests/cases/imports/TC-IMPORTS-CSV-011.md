@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Formato de fecha y separador decimal explícitos"
 scenario: "Exceso de escala nunca se redondea"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-IMPORTS-006"]
 nfr: []
 invariants: ["INV-001","INV-003"]
 priority: critical
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/domain/row-normalizer.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -31,7 +33,7 @@ expected_result:
   - "Fila inválida con IMPORT_INVALID_AMOUNT (3 decimales, escala 2)"
   - "No se produce 1.23 BOB"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-011 — Un monto con más decimales que la escala de la moneda es inválido y nunca se redondea

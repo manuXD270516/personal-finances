@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Límites de tamaño y contenido del archivo"
 scenario: "Demasiadas filas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-SEC-012"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/csv-sniffer.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","limits"]
@@ -31,7 +34,7 @@ expected_result:
   - "422 IMPORT_TOO_MANY_ROWS"
   - "No existe ninguna importación nueva"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-004 — Un CSV con 5 001 filas de datos se rechaza con IMPORT_TOO_MANY_ROWS

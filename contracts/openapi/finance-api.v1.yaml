@@ -73,7 +73,7 @@ tags:
   - name: Documents
     description: "LATER (Phase 6): documents, presigned uploads/downloads and attachment links."
   - name: Imports
-    description: "LATER (Phase 6, basic CSV may move to Phase 3): import jobs, staged rows, mapping profiles, connections."
+    description: "Phase 3 (docs/35 D122, FR-IMPORTS-003): basic CSV import of one account (upload, manual column mapping, preview, approval, asynchronous persistence by batches). Phase 6 adds documents, presigned uploads, mapping profiles, rules, other formats and connections."
   - name: Rules
     description: "LATER (Phase 6): rules engine (conditions/actions)."
   - name: Forecasts
@@ -7491,6 +7491,432 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Imports: importación CSV básica (openspec add-basic-csv-import) ──
+  /workspaces/{workspaceId}/imports:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Imports]
+      operationId: createImport
+      summary: Upload a bank statement CSV for one account (creates an import waiting for its column mapping)
+      description: |
+        `multipart/form-data` with the `file` (CSV, at most `IMPORT_CSV_MAX_BYTES` = 2 MiB: the server stops reading when it
+        is exceeded → 413 `UPLOAD_TOO_LARGE`) and the `accountId` (an active account of the workspace: closed → 409
+        `ACCOUNT_CLOSED`, archived → 409 `ACCOUNT_ARCHIVED`). The server detects the encoding (UTF-8 with or without BOM, or
+        windows-1252) and the delimiter (`,` `;` tab `|`), reads the records (RFC 4180) and returns the import in
+        `AWAITING_MAPPING` with the `header` (first record) and up to 20 `sampleRows`; nothing financial is created
+        (NFR-DATA-016) and the file itself is NOT stored (only its cells, as untrusted data, until the retention elapses).
+        More than `IMPORT_CSV_MAX_ROWS` = 5 000 data rows → 422 `IMPORT_TOO_MANY_ROWS`; binary content, an empty file or
+        more than 50 columns → 422 `IMPORT_UNSUPPORTED_FORMAT`. If the exact file (SHA-256) was already imported into the
+        same account the import is created with the warning `IMPORT_FILE_ALREADY_IMPORTED` (the date and the previous
+        import); row-level idempotency still prevents duplicates. `suggestedMapping` is the mapping of the last import of
+        the account when it fits the new file. Costly operation (`x-rate-limit: costly`): at most 10 per user and minute
+        (429 `RATE_LIMITED`); an idempotent replay does not consume the quota. The file and the account are part of the
+        idempotency payload (same key with another file or account → 422 `IDEMPOTENCY_KEY_REUSED`). Audited.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, accountId]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The CSV file (`text/csv`; any name, sanitized before it is stored).
+                accountId:
+                  allOf:
+                    - $ref: '#/components/schemas/Uuid'
+                  description: The single target account of the import.
+      responses:
+        '201':
+          description: Import created, waiting for its mapping
+          headers:
+            Location:
+              description: URL of the import (`/api/v1/workspaces/{workspaceId}/imports/{importId}`).
+              schema: { type: string }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IMPORT_UNSUPPORTED_FORMAT, IMPORT_TOO_MANY_ROWS, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Imports]
+      operationId: listImports
+      summary: List the imports of the workspace (newest first)
+      description: |
+        Optionally filtered by target account and status. `GET …/imports?accountId=&limit=1` returns the last import of an
+        account (the wizard uses its `mapping` to preload the next one).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: VIEWER
+      parameters:
+        - name: accountId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ImportJobStatus' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Imports page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    get:
+      tags: [Imports]
+      operationId: getImport
+      summary: Get one import with its counters, progress and errors
+      description: |
+        While the import is `APPROVED` or `PERSISTING` the client polls this operation (with `If-None-Match`: 304 when
+        nothing changed). `progress` reports the batches done; `counters` the rows by outcome; `errors` the rows that a
+        rejected batch left out (a code, the count and the first 100 file lines).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The import
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/mapping:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    put:
+      tags: [Imports]
+      operationId: setImportMapping
+      summary: Apply (or replace) the column mapping and compute the preview
+      description: |
+        The user chooses the date, description and amount columns (one signed column with its sign convention, or a debit
+        and a credit column), whether the first record is a header and how many leading records to skip, the date format
+        and the decimal separator — always explicit, never guessed per row. The server normalizes and validates every row
+        (`IMPORT_INVALID_DATE`, `IMPORT_INVALID_AMOUNT`, `IMPORT_FUTURE_DATE`, `PERIOD_CLOSED`; an amount with more
+        decimals than the currency scale is invalid and never rounded), computes the row fingerprints and classifies them
+        against previous imports and the existing movements of the account, synchronously (at most 5 000 rows). It can be
+        sent again while the import is not approved: the preview is recomputed and the decisions of the rows whose
+        fingerprint did not change are kept. A mapping that references missing columns or leaves date, description or
+        amount unassigned → 422 `IMPORT_MAPPING_INVALID` and the import stays as it was. Nothing financial is created.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportMapping' }
+      responses:
+        '200':
+          description: The import in review with the summary of the preview
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportMapped' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is already approved, finished or cancelled).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'IMPORT_MAPPING_INVALID or IMPORT_TOO_MANY_ROWS.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    get:
+      tags: [Imports]
+      operationId: getImportPreview
+      summary: Preview of the import (rows, counts by classification, totals and resulting balance)
+      description: |
+        Paginated by cursor (50 rows by default) in file order; `classification` filters the rows. `summary` is computed
+        over the whole staging: the counts by classification and decision, the total of outflows and inflows of the rows
+        to create and the current and resulting ledger balance of the account in its currency (a liability is presented
+        with debt positive). A possible duplicate carries the `candidate` (the existing movement it would duplicate: an
+        expense, an income or a leg of a transfer or conversion). Until the approval no transaction, journal entry or
+        balance change derives from the file.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: VIEWER
+      parameters:
+        - name: classification
+          in: query
+          schema: { $ref: '#/components/schemas/ImportRowClassification' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: The preview page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/rows/{rowId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+      - $ref: '#/components/parameters/ImportRowId'
+    patch:
+      tags: [Imports]
+      operationId: decideImportRow
+      summary: Decide what to do with one row (create it, skip it as a duplicate or exclude it)
+      description: |
+        `CREATE` imports the row; `SKIP` (only for a possible duplicate) does not import it and links it with the existing
+        movement when the import is approved, so a later import recognizes it as already imported; `EXCLUDE` neither
+        imports nor links it. An invalid or already imported row has a fixed decision → 409
+        `INVALID_STATUS_TRANSITION`; `SKIP` on a new row → 422 `VALIDATION_FAILED`. `If-Match` is the version of the
+        IMPORT (every decision changes its counters); the response carries the new version in its ETag.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportRowDecisionRequest' }
+      responses:
+        '200':
+          description: The decided row and the new version of the import
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportRowDecisionResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the import is not in review or the decision of the row is fixed).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: approveImport
+      summary: Approve the import (the transactions are created asynchronously, in batches)
+      description: |
+        Rejected with 409 `IMPORT_REVIEW_INCOMPLETE` (`details.pendingDecisions`) while a possible duplicate has no
+        decision, and with `ACCOUNT_CLOSED` / `ACCOUNT_ARCHIVED` if the account is no longer active. Approving assigns the
+        rows to create to batches of `IMPORT_PERSIST_BATCH_SIZE` (200), links the skipped duplicates with their existing
+        movement, moves the import to `APPROVED`, audits it with the approver as actor and publishes
+        `imports.ImportApproved.v1` in the same transaction. The worker then creates one POSTED expense or income per row
+        (category "Uncategorized" / "Uncategorized income", `source = IMPORT`, its journal entry, audit with origin
+        `import` and creation lifecycle step) and the import ends `COMPLETED` or `PARTIALLY_FAILED`; poll `getImport`.
+        Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '202':
+          description: Approved; the persistence runs in the background
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'IMPORT_REVIEW_INCOMPLETE, INVALID_STATUS_TRANSITION, ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: cancelImport
+      summary: Cancel an import that is not approved yet
+      description: |
+        Only an import waiting for its mapping or in review; it creates no transaction, drops the raw cells of the file and
+        is audited. An approved or finished import → 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The cancelled import
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/retry:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: retryImport
+      summary: Retry the rows a rejected batch left out
+      description: |
+        Only a `PARTIALLY_FAILED` import (409 `INVALID_STATUS_TRANSITION` otherwise): the failed rows are persisted again;
+        the rows already created are never duplicated (idempotent per row). Publishes `imports.ImportApproved.v1` with the
+        next `attempt`. Costly operation (`x-rate-limit: costly`).
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Retrying; the persistence runs in the background
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION, ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/imports/{importId}/accept-errors:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ImportId'
+    post:
+      tags: [Imports]
+      operationId: acceptImportErrors
+      summary: Accept the partial result (the failed rows are not imported)
+      description: |
+        Only a `PARTIALLY_FAILED` import (409 `INVALID_STATUS_TRANSITION` otherwise): it ends `COMPLETED_WITH_ERRORS`
+        keeping the created transactions and the listed failed rows, publishes `imports.ImportCompleted.v1` and is audited.
+      x-openspec-capability: imports/import-pipeline
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The import ended with errors
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotent-Replayed: { $ref: '#/components/headers/IdempotentReplayed' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportJob' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -7727,6 +8153,18 @@ components:
       in: path
       required: true
       description: Match suggestion UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    ImportId:
+      name: importId
+      in: path
+      required: true
+      description: Import UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    ImportRowId:
+      name: rowId
+      in: path
+      required: true
+      description: Staged row UUIDv7 of an import.
       schema: { $ref: '#/components/schemas/Uuid' }
     SubscriptionId:
       name: subscriptionId
@@ -7978,6 +8416,10 @@ components:
         currentVersion:
           type: integer
           description: Present on PRECONDITION_FAILED / CONCURRENCY_CONFLICT
+        pendingDecisions:
+          type: integer
+          minimum: 1
+          description: Present on IMPORT_REVIEW_INCOMPLETE. Possible duplicates of the import still without a decision.
         suggestedOperationId:
           type: string
           description: RFC 9457 extension. Operation the client should use instead (e.g. `createConversion` on TRANSFER_CURRENCY_MISMATCH).
@@ -8141,6 +8583,10 @@ components:
         - SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL   # 422 (add-subscriptions: the price effective date must be after the last price entry)
         - SUBSCRIPTION_PROPOSAL_NOT_PENDING      # 409 (add-subscriptions: the price proposal was already decided, superseded or withdrawn)
         - MATCH_SUGGESTION_NOT_PENDING           # 409 (add-commitment-matching: the match suggestion was already confirmed, dismissed or expired)
+        - IMPORT_UNSUPPORTED_FORMAT              # 422 (add-basic-csv-import: binary, empty or too wide file; not readable delimited text)
+        - IMPORT_TOO_MANY_ROWS                   # 422 (add-basic-csv-import: more data rows than IMPORT_CSV_MAX_ROWS)
+        - IMPORT_MAPPING_INVALID                 # 422 (add-basic-csv-import: missing columns or unassigned date, description or amount)
+        - IMPORT_REVIEW_INCOMPLETE               # 409 (add-basic-csv-import: possible duplicates without a decision; details.pendingDecisions)
 
     # ── Identity ──
     WorkspaceRole:
@@ -8334,7 +8780,7 @@ components:
          createdAt, completedAt]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
-        status: { $ref: '#/components/schemas/ImportStatus' }
+        status: { $ref: '#/components/schemas/ImportJobStatus' }
         sourceWorkspaceId: { $ref: '#/components/schemas/Uuid' }
         sourceExportedAt: { $ref: '#/components/schemas/Instant' }
         formatVersion: { type: integer, minimum: 1 }
@@ -12953,6 +13399,435 @@ components:
       properties:
         suggestion: { $ref: '#/components/schemas/MatchSuggestion' }
         occurrence: { $ref: '#/components/schemas/RecurringOccurrence' }
+    # ── Imports: importación CSV básica (openspec add-basic-csv-import) ──
+    ImportJobStatus:
+      type: string
+      # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): Phase 6 agrega los estados del pipeline
+      # completo (CREATED, UPLOADED, PARSING, NORMALIZING, VALIDATING, MATCHING, CLASSIFYING, RECONCILING, …).
+      x-extensible-enum:
+        - AWAITING_MAPPING
+        - AWAITING_REVIEW
+        - APPROVED
+        - PERSISTING
+        - COMPLETED
+        - PARTIALLY_FAILED
+        - COMPLETED_WITH_ERRORS
+        - CANCELLED
+      description: |
+        `AWAITING_MAPPING → AWAITING_REVIEW` (the mapping can be sent again) `→ APPROVED → PERSISTING → COMPLETED |
+        PARTIALLY_FAILED`; `PARTIALLY_FAILED → PERSISTING` (retry) `| COMPLETED_WITH_ERRORS` (accept);
+        `AWAITING_* → CANCELLED` (user or expiration).
+    ImportRowClassification:
+      type: string
+      enum: [NEW, DUPLICATE_EXACT, DUPLICATE_PROBABLE, INVALID]
+      description: >-
+        `NEW` (will be created), `DUPLICATE_EXACT` (already imported: the fingerprint is linked to a live transaction),
+        `DUPLICATE_PROBABLE` (an existing movement of the account has the same amount, direction and a date within 3
+        days: the user decides) or `INVALID` (never imported).
+    ImportRowDecision:
+      type: string
+      enum: [CREATE, SKIP, EXCLUDE]
+    ImportRowIssueCode:
+      type: string
+      x-extensible-enum:
+        - IMPORT_INVALID_DATE
+        - IMPORT_INVALID_AMOUNT
+        - IMPORT_FUTURE_DATE
+        - PERIOD_CLOSED
+        - ACCOUNT_CLOSED
+        - IMPORT_DESCRIPTION_TRUNCATED
+    ImportRowIssue:
+      type: object
+      additionalProperties: false
+      required: [code, severity]
+      properties:
+        code: { $ref: '#/components/schemas/ImportRowIssueCode' }
+        severity:
+          type: string
+          enum: [ERROR, WARNING]
+          description: An `ERROR` makes the row invalid; a `WARNING` (truncated description) does not block it.
+    ImportWarning:
+      type: object
+      additionalProperties: false
+      required: [code, previousImportId, previousImportedAt]
+      properties:
+        code:
+          type: string
+          x-extensible-enum: [IMPORT_FILE_ALREADY_IMPORTED]
+        previousImportId: { $ref: '#/components/schemas/Uuid' }
+        previousImportedAt:
+          allOf:
+            - $ref: '#/components/schemas/LocalDate'
+          description: Business date (workspace timezone) on which the previous import ended.
+    ImportCounters:
+      type: object
+      additionalProperties: false
+      required: [rows, newRows, alreadyImported, probableDuplicates, invalid, toCreate, skipped, excluded, created, failed]
+      properties:
+        rows: { type: integer, minimum: 0, description: Data rows of the file (after the skipped records and the header). }
+        newRows: { type: integer, minimum: 0 }
+        alreadyImported: { type: integer, minimum: 0 }
+        probableDuplicates: { type: integer, minimum: 0 }
+        invalid: { type: integer, minimum: 0 }
+        toCreate: { type: integer, minimum: 0, description: Rows decided `CREATE`. }
+        skipped: { type: integer, minimum: 0, description: Possible duplicates skipped (linked with their existing movement). }
+        excluded: { type: integer, minimum: 0 }
+        created: { type: integer, minimum: 0, description: Transactions created by the persistence. }
+        failed: { type: integer, minimum: 0, description: Rows a rejected batch left out. }
+    ImportProgress:
+      type: object
+      additionalProperties: false
+      required: [attempt, batchCount, batchesDone]
+      properties:
+        attempt: { type: integer, minimum: 0, description: 0 before the approval, 1 for the first persistence, +1 per retry. }
+        batchCount: { type: integer, minimum: 0 }
+        batchesDone: { type: integer, minimum: 0 }
+    ImportErrorGroup:
+      type: object
+      additionalProperties: false
+      required: [code, count, lines]
+      properties:
+        code: { type: string, description: Domain error code of the rejected batch (e.g. `PERIOD_CLOSED`). }
+        count: { type: integer, minimum: 1 }
+        lines:
+          type: array
+          maxItems: 100
+          items: { type: integer, minimum: 1 }
+          description: First lines of the file affected.
+    ImportMapping:
+      type: object
+      additionalProperties: false
+      required: [hasHeader, columns, dateFormat, decimalSeparator]
+      description: >-
+        `imports.mapping.v1`: the shape of the mapping profiles of docs/13 §5.1 (Phase 6 can save it as a profile).
+        Column indexes are 0-based.
+      properties:
+        hasHeader: { type: boolean }
+        skipRows:
+          type: integer
+          minimum: 0
+          maximum: 50
+          default: 0
+          description: Leading records skipped BEFORE the header (bank preamble).
+        columns:
+          type: object
+          additionalProperties: false
+          required: [date, description, amount]
+          properties:
+            date: { $ref: '#/components/schemas/ImportColumnRef' }
+            description: { $ref: '#/components/schemas/ImportColumnRef' }
+            amount:
+              oneOf:
+                - $ref: '#/components/schemas/ImportSignedAmountColumn'
+                - $ref: '#/components/schemas/ImportDebitCreditColumns'
+              discriminator:
+                propertyName: mode
+                mapping:
+                  SIGNED: '#/components/schemas/ImportSignedAmountColumn'
+                  DEBIT_CREDIT: '#/components/schemas/ImportDebitCreditColumns'
+        dateFormat:
+          type: string
+          enum: [dd/MM/yyyy, dd-MM-yyyy, dd/MM/yy, yyyy-MM-dd, MM/dd/yyyy]
+          description: Strict format; `dd/MM/yy` uses the pivot 2000–2099.
+        decimalSeparator:
+          type: string
+          enum: [',', '.']
+          description: The other character is the optional thousands separator.
+    ImportColumnRef:
+      type: object
+      additionalProperties: false
+      required: [index]
+      properties:
+        index: { type: integer, minimum: 0, maximum: 199 }
+    ImportSignedAmountColumn:
+      type: object
+      additionalProperties: false
+      required: [mode, index, signConvention]
+      properties:
+        mode: { type: string, enum: [SIGNED] }
+        index: { type: integer, minimum: 0, maximum: 199 }
+        signConvention:
+          type: string
+          enum: [NEGATIVE_IS_OUTFLOW, POSITIVE_IS_OUTFLOW]
+    ImportDebitCreditColumns:
+      type: object
+      additionalProperties: false
+      required: [mode, debitIndex, creditIndex]
+      properties:
+        mode: { type: string, enum: [DEBIT_CREDIT] }
+        debitIndex: { type: integer, minimum: 0, maximum: 199, description: Outflow column. }
+        creditIndex: { type: integer, minimum: 0, maximum: 199, description: Inflow column. }
+    ImportJob:
+      type: object
+      required:
+        - id
+        - accountId
+        - status
+        - originalName
+        - fileSha256
+        - fileSizeBytes
+        - detected
+        - rowCount
+        - columnCount
+        - header
+        - mapping
+        - counters
+        - progress
+        - errors
+        - warnings
+        - approvedBy
+        - approvedAt
+        - completedAt
+        - cancelledAt
+        - cancelledBy
+        - expiresAt
+        - createdBy
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        status: { $ref: '#/components/schemas/ImportJobStatus' }
+        originalName:
+          type: [string, 'null']
+          maxLength: 255
+          description: Original file name, sanitized (no path, no control characters). Untrusted text.
+        fileSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        fileSizeBytes: { type: integer, minimum: 0 }
+        detected:
+          type: object
+          additionalProperties: false
+          required: [encoding, delimiter]
+          properties:
+            encoding: { type: string, enum: [utf-8, windows-1252] }
+            delimiter: { type: string, enum: [',', ';', "\t", '|'] }
+        rowCount:
+          type: integer
+          minimum: 0
+          description: Records of the file after the first one (informational; the data rows depend on the mapping).
+        columnCount: { type: integer, minimum: 1 }
+        header:
+          type: array
+          items: { type: string }
+          description: First record of the file. Untrusted text.
+        mapping:
+          oneOf:
+            - $ref: '#/components/schemas/ImportMapping'
+            - type: 'null'
+        counters: { $ref: '#/components/schemas/ImportCounters' }
+        progress: { $ref: '#/components/schemas/ImportProgress' }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ImportErrorGroup' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/ImportWarning' }
+        approvedBy:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        approvedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        completedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        cancelledAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        cancelledBy:
+          type: [string, 'null']
+          description: The user id, or `SYSTEM` when the review expired.
+        expiresAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        createdBy: { $ref: '#/components/schemas/Uuid' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        version: { $ref: '#/components/schemas/Version' }
+    ImportCreated:
+      description: The import just created, with the first rows of the file to build the mapping.
+      allOf:
+        - $ref: '#/components/schemas/ImportJob'
+        - type: object
+          required: [sampleRows, suggestedMapping]
+          properties:
+            sampleRows:
+              type: array
+              maxItems: 20
+              items:
+                type: array
+                items: { type: string }
+              description: Up to 20 records after the first one. Untrusted text, always escaped by the UI.
+            suggestedMapping:
+              oneOf:
+                - $ref: '#/components/schemas/ImportMapping'
+                - type: 'null'
+              description: Mapping of the last import of the account when it fits this file.
+    ImportMapped:
+      description: The import in review plus the summary of its preview.
+      allOf:
+        - $ref: '#/components/schemas/ImportJob'
+        - type: object
+          required: [previewSummary]
+          properties:
+            previewSummary: { $ref: '#/components/schemas/ImportPreviewSummary' }
+    ImportPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ImportJob' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    ImportPreviewSummary:
+      type: object
+      additionalProperties: false
+      required: [counts, outflows, inflows, currentBalance, resultingBalance]
+      properties:
+        counts:
+          type: object
+          additionalProperties: false
+          required:
+            [rows, new, alreadyImported, probableDuplicates, invalid, pendingDecisions, toCreate, skipped, excluded]
+          properties:
+            rows: { type: integer, minimum: 0 }
+            new: { type: integer, minimum: 0 }
+            alreadyImported: { type: integer, minimum: 0 }
+            probableDuplicates: { type: integer, minimum: 0 }
+            invalid: { type: integer, minimum: 0 }
+            pendingDecisions: { type: integer, minimum: 0, description: Possible duplicates without a decision. }
+            toCreate: { type: integer, minimum: 0 }
+            skipped: { type: integer, minimum: 0 }
+            excluded: { type: integer, minimum: 0 }
+        outflows:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Σ of the outflows of the rows to create, in the currency of the account.
+        inflows:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Σ of the inflows of the rows to create.
+        currentBalance:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Ledger balance of the account (presented; debt positive for a liability).
+        resultingBalance:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Current balance after the rows to create (assets add inflows and subtract outflows; liabilities the opposite).
+    ImportPreviewCandidate:
+      type: object
+      additionalProperties: false
+      required: [transactionId, kind, date, amount, description]
+      description: The existing movement of the account (or its leg) that the row would duplicate. Only the id when it can no longer be resolved.
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        kind:
+          type: [string, 'null']
+          description: INCOME, EXPENSE, REFUND, ADJUSTMENT, TRANSFER or CONVERSION.
+        date:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        amount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        description: { type: [string, 'null'] }
+    ImportPreviewRow:
+      type: object
+      required:
+        - id
+        - lineNumber
+        - date
+        - description
+        - amount
+        - direction
+        - classification
+        - decision
+        - issues
+        - candidate
+        - transactionId
+        - failure
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        lineNumber: { type: integer, minimum: 1, description: Line of the file where the record starts. }
+        date:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        description:
+          type: [string, 'null']
+          description: 'Normalized description (untrusted text, the UI always escapes it).'
+        amount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: Always positive; `direction` gives the sense.
+        direction:
+          type: [string, 'null']
+          enum: [IN, OUT, null]
+        classification: { $ref: '#/components/schemas/ImportRowClassification' }
+        decision:
+          oneOf:
+            - $ref: '#/components/schemas/ImportRowDecision'
+            - type: 'null'
+          description: '`null` for a possible duplicate without a decision.'
+        issues:
+          type: array
+          items: { $ref: '#/components/schemas/ImportRowIssue' }
+        candidate:
+          oneOf:
+            - $ref: '#/components/schemas/ImportPreviewCandidate'
+            - type: 'null'
+        transactionId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+          description: The transaction created for the row, once persisted.
+        failure:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string }
+            - type: 'null'
+          description: Why the batch of the row was rejected, if it was.
+    ImportPreview:
+      type: object
+      additionalProperties: false
+      required: [summary, rows, nextCursor]
+      properties:
+        summary: { $ref: '#/components/schemas/ImportPreviewSummary' }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/ImportPreviewRow' }
+        nextCursor: { type: [string, 'null'] }
+    ImportRowDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { $ref: '#/components/schemas/ImportRowDecision' }
+    ImportRowDecisionResult:
+      allOf:
+        - $ref: '#/components/schemas/ImportPreviewRow'
+        - type: object
+          required: [version, counters]
+          properties:
+            version:
+              allOf:
+                - $ref: '#/components/schemas/Version'
+              description: Version of the IMPORT after the decision (the ETag of the response).
+            counters: { $ref: '#/components/schemas/ImportCounters' }
     # ── Suscripciones (add-subscriptions) ──
     SubscriptionStatus:
       type: string
