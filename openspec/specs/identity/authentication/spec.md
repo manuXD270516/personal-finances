@@ -121,7 +121,7 @@ Trace: NFR-SEC-008 · Priority: Must
 - **ENTONCES** la respuesta es 403 y la petición no se reenvía a la API
 
 ### Requirement: Perfil del usuario autenticado
-La API DEBE (MUST) exponer en `/api/v1/me` el perfil del usuario autenticado: id, nombre visible, email, locale preferido, zona horaria preferida y la lista de workspaces donde tiene membresía activa con su rol.
+La API DEBE (MUST) exponer en `/api/v1/me` el perfil del usuario autenticado: id, nombre visible, email, locale preferido, zona horaria preferida y la lista de workspaces donde tiene membresía activa con su rol. Si el locale guardado no es uno de los idiomas soportados (es, en, pt), la consulta DEBE (MUST) responder igual, con el locale por defecto de la aplicación en su lugar.
 Trace: FR-IDENTITY-003 · Priority: Must
 
 #### Scenario: Consulta del perfil
@@ -132,6 +132,10 @@ Trace: FR-IDENTITY-003 · Priority: Must
 #### Scenario: Membresías revocadas no aparecen
 - **CUANDO** un usuario tiene una membresía revocada en un workspace y consulta su perfil
 - **ENTONCES** ese workspace no aparece en la lista de membresías
+
+#### Scenario: Locale guardado no soportado
+- **CUANDO** el locale guardado de un usuario es "fr-FR" y el locale por defecto de la aplicación es "es-BO"
+- **ENTONCES** la consulta de su perfil responde 200 con locale "es-BO"
 
 ### Requirement: Preferencias personales del usuario
 El usuario autenticado DEBE (MUST) poder actualizar su nombre visible, locale y zona horaria preferidos usando control de concurrencia optimista; una zona horaria que no sea un identificador IANA válido DEBE (MUST) rechazarse.
