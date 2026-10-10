@@ -73,6 +73,15 @@ Montos como string decimal con moneda (ADR-0006); `ACTUAL` = monto real de una t
 
 Sin tablas ni columnas nuevas; sin sección nueva en el export del workspace (no hay datos propios). `reporting.workspace_data_version` ya existe.
 
+## Evolución a read model (decisión del owner 2026-10-10, docs/35)
+
+Phase 3 lee directamente (read-your-writes, volumen pequeño). El diseño futuro, que se aplica cuando la alerta `UpcomingPaymentsReadModelRecommended` lo indique (p95 > 300 ms durante 15 min o > 5 000 ocurrencias por consulta):
+
+- **Proyección `reporting.upcoming_payment`** por workspace, alimentada por un consumidor idempotente (inbox) de `commitments.OccurrencesGenerated.v1`, `RecurringOccurrenceChanged.v1`, `RecurringOccurrenceMaterialized.v1`, `RecurringDefinitionChanged.v1` y de `transactions.TransactionCreated/Updated/Voided` (pendientes), con montos nativos; la valoración en moneda de reporte sigue al leer (`FlowValuation`), para no proyectar tasas.
+- **Read-your-writes:** la respuesta compara `reporting.workspace_data_version` con la versión aplicada por la proyección; si está atrasada, cae a la lectura directa (la ruta actual se conserva como fallback) y declara la frescura.
+- **Reconstrucción** con `RebuildProjection` (como el resto de proyecciones), y verificación nightly proyección = lectura directa sobre el dataset `large`.
+- **Throughput:** el consumidor entra en el presupuesto de conexiones y el benchmark de `improve-event-throughput` (D112).
+
 ## Riesgos / Trade-offs
 
 - **Dependencia fuerte de `add-recurrence-engine`**: nombres de estados, eventos y queries se tomaron de su proposal (2026-10-09); cualquier cambio allí se refleja en la tabla de contratos de arriba. Mitigación: el adapter es la única pieza acoplada; tests de contrato del adapter.

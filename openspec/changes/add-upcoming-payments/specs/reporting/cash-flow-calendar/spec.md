@@ -186,3 +186,16 @@ Trace: FR-COMMITMENTS-011, FR-REPORTING-016 · Priority: Should
 #### Scenario: Periodo en curso
 - **CUANDO** se consulta el indicador de "2026-10" el 2026-10-20
 - **ENTONCES** el resultado se marca como parcial hasta el fin del periodo
+
+### Requirement: Métricas y alerta para evolucionar a un read model
+La consulta de próximos pagos, total comprometido y saldo proyectado DEBE (MUST) leer directamente los contratos de Commitments, Transactions, Ledger y FX en Phase 3 y DEBE (MUST) exponer la métrica de duración de la consulta (`reporting_upcoming_payments_duration_seconds`) y la de ocurrencias leídas por consulta (`reporting_upcoming_payments_rows`), sin etiquetas de alta cardinalidad. Cuando el p95 de la duración supere 300 ms (presupuesto del Home, NFR-PERF-004) durante 15 minutos o una consulta lea más de 5 000 ocurrencias, el sistema DEBE (MUST) disparar la alerta `UpcomingPaymentsReadModelRecommended`, que indica que conviene migrar al read model alimentado por eventos descrito en el diseño.
+Trace: NFR-PERF-004, NFR-OBS-004, NFR-OBS-005 · Priority: Must
+
+#### Scenario: Consulta lenta sostenida
+- **CUANDO** el p95 de `reporting_upcoming_payments_duration_seconds` es 0.42 s durante 15 minutos
+- **ENTONCES** se dispara la alerta `UpcomingPaymentsReadModelRecommended`
+- **Y** la alerta enlaza la sección "Evolución a read model" del diseño
+
+#### Scenario: Volumen bajo
+- **CUANDO** el p95 es 0.08 s y ninguna consulta lee más de 5 000 ocurrencias
+- **ENTONCES** la alerta no se dispara
