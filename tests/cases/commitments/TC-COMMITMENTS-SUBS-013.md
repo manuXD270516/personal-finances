@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Cambio de precio manual aplicado a renovaciones futuras'
 scenario: 'Aumento anunciado por el provider'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-013', 'FR-COMMITMENTS-009']
 nfr: []
 invariants: ['INV-012']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/price-history.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-change', 'events']
@@ -33,7 +36,7 @@ expected_result:
   - 'Ocurrencia del 2027-03-15 de 12.99 USD; la transacción del 2026-11-15 sigue en 10.99 USD'
   - 'Outbox: commitments.SubscriptionPriceChanged.v1 origin MANUAL, previous 10.99 USD, new 12.99 USD, changePercentage "+18.20"'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-013 — Un cambio de precio manual aplica a renovaciones futuras y publica el hecho con origen manual

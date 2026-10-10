@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ['commitments/subscriptions']
 requirement: 'Notificación de fin de trial próximo'
 scenario: 'Trial de CloudDrive'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-001', 'FR-COMMITMENTS-016']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/subscription-notifications.test.ts
+  - packages/contexts/notifications/src/domain/subscription-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'subscriptions', 'trial']
@@ -32,7 +34,7 @@ steps:
 expected_result:
   - 'Notificación UNREAD SUBSCRIPTION_TRIAL_ENDING, severidad WARNING, texto "El trial de CloudDrive termina el 20/11/2026; primer cobro 99.99 USD"'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-031 — El fin de trial próximo crea una notificación con provider, fecha y primer cobro

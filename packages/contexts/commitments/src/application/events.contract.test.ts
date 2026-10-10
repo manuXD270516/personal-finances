@@ -6,7 +6,11 @@ import { CommitmentsQueries } from './commitments.queries.js';
 import { DefinitionsService } from './definitions.service.js';
 import { GenerateOccurrencesService } from './generate-occurrences.service.js';
 import { OccurrencesService } from './occurrences.service.js';
-import { BANK, CATEGORY, InMemoryCommitments, USER, WS } from './testing/in-memory.js';
+import { SubscriptionDailyService } from './subscription-daily.service.js';
+import { SubscriptionsQueries } from './subscriptions.queries.js';
+import { SubscriptionsService } from './subscriptions.service.js';
+import { BANK, CARD, CATEGORY, InMemoryCommitments, USER, VISA_USD, WS } from './testing/in-memory.js';
+import { InMemorySubscriptions, MUSICBOX, STREAMLY } from './testing/in-memory-subscriptions.js';
 
 // ajv-formats es CJS: según el loader, el default llega envuelto.
 const addFormats = ((addFormatsModule as unknown as { default?: unknown }).default ??
@@ -23,12 +27,20 @@ const FILES: Record<string, string> = {
   'commitments.RecurringDefinitionChanged': 'commitments/RecurringDefinitionChanged.v1.schema.json',
 };
 
-function validators() {
+/** Hechos de suscripciones (add-subscriptions). */
+const SUBSCRIPTION_FILES: Record<string, string> = {
+  'commitments.SubscriptionPriceChanged': 'commitments/SubscriptionPriceChanged.v1.schema.json',
+  'commitments.SubscriptionRenewalUpcoming': 'commitments/SubscriptionRenewalUpcoming.v1.schema.json',
+  'commitments.SubscriptionTrialEnding': 'commitments/SubscriptionTrialEnding.v1.schema.json',
+  'commitments.SubscriptionCancelled': 'commitments/SubscriptionCancelled.v1.schema.json',
+};
+
+function validators(files: Record<string, string> = FILES) {
   const ajv = new Ajv2020({ strict: true, allErrors: true });
   addFormats(ajv);
   ajv.addSchema(load('envelope.v1.schema.json'));
   const out = new Map<string, ReturnType<Ajv2020['compile']>>();
-  for (const [type, file] of Object.entries(FILES)) {
+  for (const [type, file] of Object.entries(files)) {
     const schema = load(file);
     ajv.addSchema(schema);
     out.set(type, ajv.compile({ $ref: `${String(schema['$id'])}#/$defs/Payload` }));
@@ -126,5 +138,97 @@ describe('Contrato de los hechos de commitments', () => {
     expect(
       validate({ ...(materialized?.payload as object), amount: { amount: 3500, currency: 'BOB' } }),
     ).toBe(false);
+  });
+
+  it('cada hecho de suscripciones cumple su JSON Schema y los ejemplos son válidos', async () => {
+    const mem = new InMemorySubscriptions();
+    mem.setNow('2026-11-01T16:00:00Z');
+    mem.rateTable.set('USD/BOB', '9.80');
+    const deps = mem.subscriptionDeps();
+    const subs = new SubscriptionsService(deps);
+    const daily = new SubscriptionDailyService(deps);
+    const base = {
+      workspaceId: WS,
+      userId: USER,
+      price: { amount: '10.99', currency: 'USD' },
+      billingCycle: { cadence: 'MONTHLY' },
+      materialization: { mode: 'PENDING_APPROVAL', leadDays: 3 },
+    };
+    const streamly = await subs.create({
+      ...base,
+      counterpartyId: STREAMLY,
+      name: 'Streamly',
+      planName: 'Premium',
+      paymentAccountId: CARD,
+      firstRenewalOn: '2026-11-15',
+    });
+    await subs.create({
+      ...base,
+      counterpartyId: MUSICBOX,
+      name: 'MusicBox',
+      paymentAccountId: VISA_USD,
+      firstRenewalOn: '2026-11-20',
+      trialEndsOn: '2026-11-20',
+    });
+    const queries = new SubscriptionsQueries(deps);
+    const ver = async (id: string) => (await queries.get(WS, id)).version;
+    mem.setNow('2026-11-13T16:00:00Z');
+    await daily.runWorkspace(WS);
+    mem.setNow('2026-11-17T16:00:00Z');
+    await daily.runWorkspace(WS);
+    await subs.changePrice({
+      workspaceId: WS,
+      userId: USER,
+      subscriptionId: streamly.id,
+      expectedVersion: await ver(streamly.id),
+      price: { amount: '12.99', currency: 'USD' },
+      effectiveFrom: '2027-03-15',
+    });
+    // cancelación programada que ejecuta el job
+    await subs.cancel({
+      workspaceId: WS,
+      userId: USER,
+      subscriptionId: streamly.id,
+      expectedVersion: await ver(streamly.id),
+      effectiveOn: '2026-11-20',
+      reason: 'ya no lo uso',
+    });
+    mem.setNow('2026-11-20T16:00:00Z');
+    await daily.runWorkspace(WS);
+
+    const check = validators(SUBSCRIPTION_FILES);
+    const seen = new Set<string>();
+    for (const event of mem.events.filter((e) => e.eventType.startsWith('commitments.Subscription'))) {
+      const validate = check.get(event.eventType);
+      expect(validate, event.eventType).toBeDefined();
+      expect(validate?.(event.payload), `${event.eventType}: ${JSON.stringify(validate?.errors)}`).toBe(true);
+      seen.add(event.eventType);
+    }
+    expect([...seen].sort()).toEqual([
+      'commitments.SubscriptionCancelled',
+      'commitments.SubscriptionPriceChanged',
+      'commitments.SubscriptionRenewalUpcoming',
+      'commitments.SubscriptionTrialEnding',
+    ]);
+
+    // Los ejemplos de cada schema cumplen el envelope completo y su payload.
+    const ajv = new Ajv2020({ strict: true, allErrors: true });
+    addFormats(ajv);
+    ajv.addSchema(load('envelope.v1.schema.json'));
+    for (const file of Object.values(SUBSCRIPTION_FILES)) {
+      const schema = load(file);
+      ajv.addSchema(schema);
+      const validate = ajv.compile({ $ref: String(schema['$id']) });
+      for (const example of schema['examples'] as unknown[]) {
+        expect(validate(example), `${file}: ${JSON.stringify(validate.errors)}`).toBe(true);
+      }
+    }
+
+    // Un campo extra o un enum desconocido no cumplen el contrato.
+    const priceChanged = mem.eventsOf('commitments.SubscriptionPriceChanged')[0]!;
+    const validate = check.get('commitments.SubscriptionPriceChanged')!;
+    expect(validate({ ...priceChanged.payload, extra: 1 })).toBe(false);
+    expect(validate({ ...priceChanged.payload, origin: 'MAGIC' })).toBe(false);
+    expect(validate({ ...priceChanged.payload, changePercentage: '18.2' })).toBe(false);
   });
 });

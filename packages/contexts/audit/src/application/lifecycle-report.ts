@@ -248,6 +248,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Reconciliation: 'Reconciliación',
       RecurringDefinition: 'Definición recurrente',
       RecurringOccurrence: 'Ocurrencia recurrente',
+      Subscription: 'Suscripción',
     },
     states: {
       Transaction: {
@@ -273,6 +274,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         SKIPPED: 'Omitida',
         CANCELLED: 'Cancelada',
       },
+      Subscription: { TRIAL: 'En prueba', ACTIVE: 'Activa', PAUSED: 'Pausada', CANCELLED: 'Cancelada' },
     },
     transitions: {
       Transaction: {
@@ -309,6 +311,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         RELEASE: 'Liberar',
         CANCEL: 'Cancelar',
         REINSTATE: 'Reinstaurar',
+      },
+      Subscription: {
+        CREATE: 'Crear',
+        END_TRIAL: 'Terminar la prueba',
+        PAUSE: 'Pausar',
+        RESUME: 'Reanudar',
+        SCHEDULE_CANCELLATION: 'Programar la cancelación',
+        UNDO_SCHEDULED_CANCELLATION: 'Deshacer la cancelación programada',
+        CANCEL: 'Cancelar',
       },
     },
     element: 'Elemento',
@@ -350,6 +361,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Reconciliation: 'Reconciliation',
       RecurringDefinition: 'Recurring definition',
       RecurringOccurrence: 'Recurring occurrence',
+      Subscription: 'Subscription',
     },
     states: {
       Transaction: {
@@ -375,6 +387,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         SKIPPED: 'Skipped',
         CANCELLED: 'Cancelled',
       },
+      Subscription: { TRIAL: 'Trial', ACTIVE: 'Active', PAUSED: 'Paused', CANCELLED: 'Cancelled' },
     },
     transitions: {
       Transaction: {
@@ -411,6 +424,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         RELEASE: 'Release',
         CANCEL: 'Cancel',
         REINSTATE: 'Reinstate',
+      },
+      Subscription: {
+        CREATE: 'Create',
+        END_TRIAL: 'End trial',
+        PAUSE: 'Pause',
+        RESUME: 'Resume',
+        SCHEDULE_CANCELLATION: 'Schedule cancellation',
+        UNDO_SCHEDULED_CANCELLATION: 'Undo scheduled cancellation',
+        CANCEL: 'Cancel',
       },
     },
     element: 'Item',
@@ -452,6 +474,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       Reconciliation: 'Conciliação',
       RecurringDefinition: 'Definição recorrente',
       RecurringOccurrence: 'Ocorrência recorrente',
+      Subscription: 'Assinatura',
     },
     states: {
       Transaction: {
@@ -477,6 +500,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         SKIPPED: 'Ignorada',
         CANCELLED: 'Cancelada',
       },
+      Subscription: { TRIAL: 'Em teste', ACTIVE: 'Ativa', PAUSED: 'Pausada', CANCELLED: 'Cancelada' },
     },
     transitions: {
       Transaction: {
@@ -513,6 +537,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         RELEASE: 'Liberar',
         CANCEL: 'Cancelar',
         REINSTATE: 'Reinstaurar',
+      },
+      Subscription: {
+        CREATE: 'Criar',
+        END_TRIAL: 'Encerrar o teste',
+        PAUSE: 'Pausar',
+        RESUME: 'Retomar',
+        SCHEDULE_CANCELLATION: 'Programar o cancelamento',
+        UNDO_SCHEDULED_CANCELLATION: 'Desfazer o cancelamento programado',
+        CANCEL: 'Cancelar',
       },
     },
     element: 'Item',

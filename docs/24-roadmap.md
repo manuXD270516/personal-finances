@@ -134,7 +134,7 @@ flowchart LR
 ### 5.3 Phase 3 — Compromisos recurrentes y suscripciones
 
 - **Objetivo:** anticipar todos los pagos conocidos (Q4, Q8) y detectar cambios de precio.
-- **Alcance:** motor de recurrencia (cadencias + RRULE subset, montos fixed/estimated/min-max/variable, idempotencia, auto-create/pending approval/notify-only, skip/pause/change future/end date), suscripciones con historial de precios y detección de cambios, próximos pagos en dashboard; **(Could)** CSV import básico.
+- **Alcance:** motor de recurrencia (cadencias + RRULE subset, montos fixed/estimated/min-max/variable, idempotencia, auto-create/pending approval/notify-only, skip/pause/change future/end date), suscripciones con historial de precios y detección de cambios (el exit criterion de suscripciones se verifica con el listado y la vista de costo de `/recurring/suscripciones`), próximos pagos en dashboard; **(Could)** CSV import básico.
 - **Capabilities:** `commitments/recurrence-engine`, `commitments/subscriptions`, `reporting/cash-flow-calendar` (lista simple), `imports/import-pipeline` (subconjunto CSV básico, Could).
 - **Exit criteria:** generación re-ejecutada N veces sin duplicados (PBT); todas las suscripciones reales del owner modeladas; 0 pagos recurrentes sorpresa en un mes (SM-07), medido con el indicador de pagos sorpresa de `GET /reports/surprise-payments` (`add-upcoming-payments`: pagos cuya ocurrencia se generó el mismo día o después; solo ve pagos vinculados a un compromiso) sobre un periodo cerrado del owner.
 - **Dependencias:** Phase 1 (TRANSACTIONS para materializar ocurrencias), Phase 2 (PLANNING para compromisos en plan mensual; NOTIFY para recordatorios).

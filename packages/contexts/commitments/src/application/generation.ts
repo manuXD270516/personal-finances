@@ -7,6 +7,7 @@ import {
   type Candidate,
   type RecurringDefinition,
 } from '../domain/index.js';
+import { indexCandidates } from './indexation.js';
 import type { CommitmentsDeps } from './ports/index.js';
 import {
   DEFINITION_AGGREGATE,
@@ -77,7 +78,11 @@ export async function generateOccurrences(
   const existing = new Set(
     (await deps.occurrences.listExisting(s.workspaceId, s.id, from.toString())).map((o) => o.occurrenceDate),
   );
-  const wanted: Candidate[] = OccurrenceGenerator.plan(def, { from, to }, existing);
+  const wanted: Candidate[] = await indexCandidates(
+    deps,
+    s.workspaceId,
+    OccurrenceGenerator.plan(def, { from, to }, existing),
+  );
   const created = wanted.map((c) =>
     RecurringOccurrence.generate({
       id: deps.ids.next(),

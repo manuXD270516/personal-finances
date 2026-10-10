@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/SubscriptionCancelled.v1.schema.json",
+  "title": "commitments.SubscriptionCancelled.v1",
+  "description": "La suscripción pasó a `CANCELLED`: inmediata (el EDITOR) o programada (el job al llegar la fecha). Su definición recurrente quedó finalizada; transacciones e historial de precios intactos. Productor: COMMITMENTS. Idempotencia natural: subscriptionId. Sin PII (el motivo es texto libre acotado).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.SubscriptionCancelled"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Subscription"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "subscriptionId",
+        "definitionId",
+        "counterpartyId",
+        "cancelledOn",
+        "scheduled",
+        "reason"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "subscriptionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "counterpartyId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "cancelledOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "scheduled": {
+          "type": "boolean",
+          "description": "`true` si la cancelación estaba programada y la ejecutó el job."
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000531",
+      "eventType": "commitments.SubscriptionCancelled",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T10:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Subscription",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000a5001",
+      "aggregateVersion": 8,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "subscriptionId": "01928c4e-0000-7000-8000-0000000a5001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "counterpartyId": "01928c4e-0000-7000-8000-0000000c0001",
+        "cancelledOn": "2026-12-15",
+        "scheduled": true,
+        "reason": null
+      }
+    }
+  ]
+}

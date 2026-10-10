@@ -118,6 +118,17 @@ export class LifecycleExportController {
     return this.download(req, res, workspaceId, 'RecurringOccurrence', id, format);
   }
 
+  @Get(`${WS}/subscriptions/:subscriptionId/lifecycle/export`)
+  subscription(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: ApiResponse,
+    @Param('workspaceId') workspaceId: string,
+    @Param('subscriptionId') id: string,
+    @Query('format') format: unknown,
+  ) {
+    return this.download(req, res, workspaceId, 'Subscription', id, format);
+  }
+
   @Get(`${WS}/recurring/:definitionId/lifecycle/export`)
   recurringDefinition(
     @Req() req: ApiRequest,

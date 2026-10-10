@@ -25,7 +25,7 @@
 | **Transacciones** | `/transactions` | Lista, filtros, búsqueda, bulk edit, detalle | 1 |
 | **Cuentas** | `/accounts` | Cuentas por tipo/institución, saldos, historial, reconciliación | 1 |
 | **Plan** | `/plan` | Periodo actual, presupuesto, plantillas, cierre de mes | 2 |
-| **Recurrentes** | `/recurring` | Pestañas **Próximos** (7/30/60/90 días), **Por aprobar** (bandeja; contador en la sidebar) y **Definiciones**; detalle de definición, tarjeta "Comprometido del periodo"; después suscripciones y calendario | 3 |
+| **Recurrentes** | `/recurring` | Pestañas **Próximos** (7/30/60/90 días), **Por aprobar** (bandeja; contador en la sidebar) y **Definiciones**; detalle de definición, tarjeta "Comprometido del periodo"; **Suscripciones** (`/recurring/suscripciones`, add-subscriptions: listado con estado y próxima renovación, alta con aviso de moneda distinta, detalle con historial de precios, propuesta de cambio de precio, cargos con tasa implícita, recorrido y cancelación ahora o al fin del ciclo, y vista de costo mensual/anual en moneda base con las tasas usadas); después calendario | 3 |
 | **Metas** | `/goals` | Savings goals | 4 |
 | **Deudas** | `/debts` | Préstamos, tarjetas, amortización | 4 |
 | **Cripto & FX** | `/fx` | Conversiones, tasas, wallets, costo de conversión | 1 (manual) / 5 |

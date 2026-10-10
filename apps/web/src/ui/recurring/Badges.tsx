@@ -17,7 +17,7 @@ const TONES: Record<Tone, CSSProperties> = {
   neutral: { color: 'var(--pf-fg)', borderColor: 'var(--pf-border-strong)' },
 };
 
-function Badge({
+export function Badge({
   presentation,
   label,
   status,

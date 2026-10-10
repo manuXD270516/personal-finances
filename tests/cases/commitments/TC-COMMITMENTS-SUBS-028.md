@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Recordatorio de fin de trial'
 scenario: 'Trial que termina en tres días'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-016', 'FR-NOTIFY-005']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/pricing.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'reminders', 'trial']
@@ -30,7 +33,7 @@ expected_result:
   - 'Un SubscriptionTrialEnding.v1 para 2026-11-20 con firstChargePrice 99.99 USD'
   - 'La corrida del 18 no publica otro'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-028 — El recordatorio de fin de trial se publica una sola vez con el precio del primer cobro

@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Período de prueba y su fin'
 scenario: 'Trial que termina'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/subscription.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'trial', 'timezone']
@@ -31,7 +34,7 @@ expected_result:
   - 'A las 00:05 del 20 pasa a ACTIVE con próxima renovación 2026-11-20 por 99.99 USD'
   - 'La corrida de las 01:05 no registra otra transición'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-008 — Una suscripción en trial pasa a activa una sola vez al llegar el fin de trial en La Paz

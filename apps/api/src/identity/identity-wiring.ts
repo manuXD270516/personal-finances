@@ -9,7 +9,7 @@ import {
 } from '@pf/audit/interface/audit.module';
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
-import { CLASSIFICATION_AUDIT_POLICY } from '@pf/classification/contracts';
+import { CLASSIFICATION_AUDIT_POLICY, type CounterpartyCatalogQuery } from '@pf/classification/contracts';
 import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
 import {
   CommitmentsModule,
@@ -17,6 +17,8 @@ import {
   type CommitmentsRuntime,
   RECURRING_DEFINITION_LIFECYCLE_MACHINE,
   RECURRING_OCCURRENCE_LIFECYCLE_MACHINE,
+  SUBSCRIPTION_LIFECYCLE_MACHINE,
+  type CounterpartyNames,
   type FinancialPeriodPort,
 } from '@pf/commitments/interface/commitments.module';
 import {
@@ -191,6 +193,8 @@ export const LIFECYCLE_MACHINES = [
   // add-recurrence-engine (Phase 3): definición y ocurrencia recurrente de COMMITMENTS.
   RECURRING_DEFINITION_LIFECYCLE_MACHINE,
   RECURRING_OCCURRENCE_LIFECYCLE_MACHINE,
+  // add-subscriptions (Phase 3): suscripción de COMMITMENTS (docs/35 D138).
+  SUBSCRIPTION_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -463,6 +467,7 @@ export function financeRuntimes(input: {
     transactions: transactions.recurring,
     links: transactions.links,
     pending: transactions.pending,
+    counterpartyNames: counterpartyNamesOf(classification.counterparties),
     ...(input.config.COMMITMENTS_HORIZON_DAYS ? { horizonDays: input.config.COMMITMENTS_HORIZON_DAYS } : {}),
     rateValidityWindowDays,
     counters: otelCounters('@pf/commitments'),
@@ -661,6 +666,17 @@ export function lifecycleExportLoaders(
         label: definition.name,
       };
     },
+    Subscription: async ({ userId, workspaceId, aggregateId }) => {
+      const subscription = await commitments.subscriptionQueries.get(workspaceId, aggregateId);
+      return {
+        lifecycle: await commitments.subscriptionQueries.lifecycle({
+          userId,
+          workspaceId,
+          subscriptionId: aggregateId,
+        }),
+        label: subscription.name,
+      };
+    },
     RecurringOccurrence: async ({ userId, workspaceId, aggregateId }) => {
       const occurrence = await commitments.queries.getOccurrence(workspaceId, aggregateId);
       return {
@@ -707,6 +723,21 @@ export function financialPeriodPort(periods: PeriodQuery): FinancialPeriodPort {
   return {
     getPeriod: async (input) => view(await periods.getPeriod(input)),
     getPeriodContaining: async (input) => view(await periods.getPeriodContaining(input)),
+  };
+}
+
+/**
+ * Adapter de los nombres de provider de COMMITMENTS sobre el catálogo de contrapartes de CLASSIFICATION (vive en la
+ * composición: los contextos solo se hablan por contratos; openspec add-subscriptions).
+ */
+export function counterpartyNamesOf(catalog: CounterpartyCatalogQuery): CounterpartyNames {
+  return {
+    namesOf: async ({ workspaceId, counterpartyIds }) =>
+      new Map(
+        (await catalog.counterpartiesByIds({ workspaceId, counterpartyIds })).map(
+          (c) => [c.counterpartyId, c.name] as const,
+        ),
+      ),
   };
 }
 

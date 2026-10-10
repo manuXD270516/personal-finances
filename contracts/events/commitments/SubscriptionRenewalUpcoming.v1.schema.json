@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/SubscriptionRenewalUpcoming.v1.schema.json",
+  "title": "commitments.SubscriptionRenewalUpcoming.v1",
+  "description": "Faltan como máximo `daysBefore` días (1–30, por omisión 3) para la próxima renovación de una suscripción activa con recordatorios activados, en la zona horaria del workspace. Lo emite el job `commitments.subscription-daily` a lo sumo una vez por (subscriptionId, renewalDate). Productor: COMMITMENTS. Consumidor: NOTIFY (`notifications.subscription-renewal`). PII baja: `providerName`, `planName`, `paymentAccountName`.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.SubscriptionRenewalUpcoming"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Subscription"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "subscriptionId",
+        "definitionId",
+        "providerName",
+        "planName",
+        "renewalDate",
+        "daysBefore",
+        "expectedPrice",
+        "expectedCharge",
+        "paymentAccountId",
+        "paymentAccountName",
+        "requiresApproval"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "subscriptionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "providerName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planName": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "renewalDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "daysBefore": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "expectedPrice": {
+          "allOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            }
+          ],
+          "description": "Precio vigente en la fecha de renovación, en la moneda del precio."
+        },
+        "expectedCharge": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cargo esperado en la moneda de la cuenta; `null` si el precio es indexado y no hay tasa."
+        },
+        "paymentAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "paymentAccountName": {
+          "type": "string"
+        },
+        "requiresApproval": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000511",
+      "eventType": "commitments.SubscriptionRenewalUpcoming",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T10:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Subscription",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000a5001",
+      "aggregateVersion": 6,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "subscriptionId": "01928c4e-0000-7000-8000-0000000a5001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "providerName": "Streamly",
+        "planName": "Premium",
+        "renewalDate": "2026-11-15",
+        "daysBefore": 3,
+        "expectedPrice": {
+          "amount": "10.99",
+          "currency": "USD"
+        },
+        "expectedCharge": {
+          "amount": "107.70",
+          "currency": "BOB"
+        },
+        "paymentAccountId": "01928c4e-0000-7000-8000-0000000acc01",
+        "paymentAccountName": "Visa BOB",
+        "requiresApproval": true
+      }
+    }
+  ]
+}

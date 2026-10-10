@@ -56,3 +56,56 @@ export const occurrenceDuePayload = (overrides: Record<string, unknown> = {}): R
   periodId: '01928c4e-0000-7000-8000-0000000fa011',
   ...overrides,
 });
+
+export const SUBSCRIPTION_ID = '01928c4e-0000-7000-8000-0000000a5001';
+export const SUBSCRIPTION_DEFINITION_ID = '01928c4e-0000-7000-8000-0000000de002';
+export const PROPOSAL_ID = '01928c4e-0000-7000-8000-0000000b0001';
+
+/** `commitments.SubscriptionRenewalUpcoming.v1`: "Streamly" Premium, 10.99 USD, renueva el 2026-11-15 con "Visa USD". */
+export const renewalPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  workspaceId: WS,
+  subscriptionId: SUBSCRIPTION_ID,
+  definitionId: SUBSCRIPTION_DEFINITION_ID,
+  providerName: 'Streamly',
+  planName: 'Premium',
+  renewalDate: '2026-11-15',
+  daysBefore: 3,
+  expectedPrice: { amount: '10.99', currency: 'USD' },
+  expectedCharge: { amount: '10.99', currency: 'USD' },
+  paymentAccountId: '01928c4e-0000-7000-8000-0000000acc01',
+  paymentAccountName: 'Visa USD',
+  requiresApproval: false,
+  ...overrides,
+});
+
+/** `commitments.SubscriptionTrialEnding.v1`: "CloudDrive", el trial termina el 2026-11-20; primer cobro 99.99 USD. */
+export const trialEndingPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  workspaceId: WS,
+  subscriptionId: SUBSCRIPTION_ID,
+  definitionId: SUBSCRIPTION_DEFINITION_ID,
+  providerName: 'CloudDrive',
+  trialEndsOn: '2026-11-20',
+  daysBefore: 3,
+  firstChargePrice: { amount: '99.99', currency: 'USD' },
+  paymentAccountId: '01928c4e-0000-7000-8000-0000000acc01',
+  paymentAccountName: 'Visa USD',
+  ...overrides,
+});
+
+/** `commitments.SubscriptionPriceChanged.v1`: "MusicBox" 9.99 → 11.99 USD desde 2026-11-05 (+20.02), detectado. */
+export const priceChangedPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  workspaceId: WS,
+  subscriptionId: SUBSCRIPTION_ID,
+  definitionId: SUBSCRIPTION_DEFINITION_ID,
+  counterpartyId: '01928c4e-0000-7000-8000-0000000c0001',
+  providerName: 'MusicBox',
+  previousPrice: { amount: '9.99', currency: 'USD' },
+  newPrice: { amount: '11.99', currency: 'USD' },
+  effectiveFrom: '2026-11-05',
+  changePercentage: '+20.02',
+  origin: 'DETECTED',
+  proposalId: PROPOSAL_ID,
+  chargeId: '01928c4e-0000-7000-8000-0000000c4001',
+  transactionId: '01928c4e-0000-7000-8000-0000000a7001',
+  ...overrides,
+});

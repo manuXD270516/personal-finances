@@ -29,6 +29,7 @@ const deps = inject('deps');
 let h: Harness;
 let m: Mini;
 let zip: Buffer;
+let subscriptionId: string;
 
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -106,6 +107,29 @@ beforeAll(async () => {
     description: 'Almuerzo',
   });
   expect(spent.status, JSON.stringify(spent.body)).toBe(201);
+  // Una suscripción con dos precios (openspec add-subscriptions): su definición administrada, el historial y la
+  // referencia `managed_ref` viajan en el export y se remapean al importar.
+  const provider = (await api.post(m.owner, '/counterparties', { name: 'Streamly (export)' })).body[
+    'id'
+  ] as string;
+  const subscribed = await api.post(m.owner, '/subscriptions', {
+    counterpartyId: provider,
+    name: 'Streamly',
+    planName: 'Premium',
+    price: money('59.90'),
+    billingCycle: { cadence: 'MONTHLY' },
+    firstRenewalOn: '2027-01-15',
+    paymentAccountId: m.bank,
+    materialization: { mode: 'PENDING_APPROVAL', leadDays: 3 },
+  });
+  expect(subscribed.status, JSON.stringify(subscribed.body)).toBe(201);
+  subscriptionId = subscribed.body['id'] as string;
+  const repriced = await h.call('POST', `${api.base}/subscriptions/${subscriptionId}/prices`, {
+    token: m.owner.token,
+    body: { price: money('69.90'), effectiveFrom: '2027-06-15' },
+    headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(subscribed.body['version'])}"` },
+  });
+  expect(repriced.status, JSON.stringify(repriced.body)).toBe(201);
   await h.startWorker();
   const exported = await exportAndWait(h, m.owner, m.ws);
   zip = (await downloadExport(h, m.owner, m.ws, exported['id'] as string)).raw;
@@ -462,6 +486,47 @@ describe('Importación con worker', () => {
     // El autor original no tiene acceso al workspace restaurado por otra persona.
     const original = await h.call('GET', `/api/v1/workspaces/${ws}`, { token: m.owner.token });
     expect(original.status).toBe(403);
+  }, 120_000);
+});
+
+describe('Suscripciones en el round-trip', () => {
+  it('[TC-IDENTITY-RESTORE-001] una suscripción con su historial de precios y su definición administrada se restaura con ids nuevos y referencias remapeadas', async () => {
+    const reader = ZipReader.open(zip);
+    expect(reader.names()).toEqual(
+      expect.arrayContaining(['json/subscriptions.jsonl', 'json/subscription-prices.jsonl']),
+    );
+    expect(lines(reader.read('json/subscription-prices.jsonl'))).toHaveLength(2);
+    const done = await importAndWait(h, m.owner, zip);
+    expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
+    const created = done['workspaceId'] as string;
+    const list = await h.call('GET', `/api/v1/workspaces/${created}/subscriptions`, { token: m.owner.token });
+    expect(list.status, JSON.stringify(list.body)).toBe(200);
+    const [imported] = list.body['data'] as { id: string; name: string; definitionId: string }[];
+    expect(imported).toMatchObject({ name: 'Streamly' });
+    expect(imported!.id).not.toBe(subscriptionId);
+    const detail = await h.call('GET', `/api/v1/workspaces/${created}/subscriptions/${imported!.id}`, {
+      token: m.owner.token,
+    });
+    expect(detail.status, JSON.stringify(detail.body)).toBe(200);
+    expect(
+      (
+        detail.body['priceHistory'] as { effectiveFrom: string; price: { amount: string }; origin: string }[]
+      ).map((p) => [p.effectiveFrom, p.price.amount, p.origin]),
+    ).toEqual([
+      ['2027-01-15', '59.90', 'INITIAL'],
+      ['2027-06-15', '69.90', 'MANUAL'],
+    ]);
+    const definition = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/recurring/${imported!.definitionId}`,
+      { token: m.owner.token },
+    );
+    expect(definition.body).toMatchObject({ managedBy: 'SUBSCRIPTION', managedRef: imported!.id });
+    // la suscripción de origen sigue intacta
+    const original = await h.call('GET', `/api/v1/workspaces/${m.ws}/subscriptions/${subscriptionId}`, {
+      token: m.owner.token,
+    });
+    expect(original.status).toBe(200);
   }, 120_000);
 });
 

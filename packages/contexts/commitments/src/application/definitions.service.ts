@@ -18,10 +18,12 @@ import {
   templateOf,
   type Candidate,
   type DefinitionVersion,
+  type ManagedBy,
   type ScheduleInput,
 } from '../domain/index.js';
 import { expandRecurrence } from '@pf/shared-kernel';
 import { generateOccurrences } from './generation.js';
+import { indexCandidates } from './indexation.js';
 import type { CommitmentsDeps } from './ports/index.js';
 import {
   DEFINITION_AGGREGATE,
@@ -53,6 +55,9 @@ export interface CreateDefinitionCommand {
   readonly notes?: string | null | undefined;
   readonly kind: string;
   readonly template: ApiTemplate;
+  /** Solo quien administra la definición (Subscriptions, Debt): `USER` por omisión. */
+  readonly managedBy?: Exclude<ManagedBy, 'USER'> | undefined;
+  readonly managedRef?: string | undefined;
 }
 
 /** Cambios de una revisión: reemplazan campos de la plantilla vigente; `schedule` y `materialization` son parciales. */
@@ -104,9 +109,27 @@ export class DefinitionsService {
     return { today: LocalDate.ofInstant(now, calendar.timeZone), at: now.toString() };
   }
 
-  private async load(workspaceId: string, id: string, expectedVersion: number): Promise<RecurringDefinition> {
+  /**
+   * Carga con `FOR UPDATE`. Una definición administrada (`managedBy ≠ USER`) solo la opera quien la administra
+   * (`manager`); los endpoints de usuario responden `RECURRING_MANAGED_EXTERNALLY` (409) y las acciones sobre sus
+   * ocurrencias siguen permitidas (openspec add-subscriptions, decisión 1, N2).
+   */
+  private async load(
+    workspaceId: string,
+    id: string,
+    expectedVersion: number,
+    manager?: Exclude<ManagedBy, 'USER'>,
+  ): Promise<RecurringDefinition> {
     const def = await this.deps.definitions.findById(workspaceId, id, { lock: 'update' });
     if (!def) throw notFound(id);
+    const managedBy = def.snapshot.managedBy;
+    if (managedBy !== 'USER' && managedBy !== manager) {
+      throw new DomainError(
+        'RECURRING_MANAGED_EXTERNALLY',
+        `the definition is managed by ${managedBy}; operate it from there`,
+        { details: { managedBy, managedRef: def.snapshot.managedRef } },
+      );
+    }
     if (def.version !== expectedVersion) throw preconditionFailed(def.version);
     return def;
   }
@@ -180,6 +203,7 @@ export class DefinitionsService {
         description: cmd.description,
         notes: cmd.notes,
         kind,
+        ...(cmd.managedBy ? { managedBy: cmd.managedBy, managedRef: cmd.managedRef ?? null } : {}),
         version1: v1,
         at,
         by: cmd.userId,
@@ -220,11 +244,12 @@ export class DefinitionsService {
     readonly name?: string | undefined;
     readonly description?: string | null | undefined;
     readonly notes?: string | null | undefined;
+    readonly manager?: Exclude<ManagedBy, 'USER'> | undefined;
   }): Promise<DefinitionDto> {
     const { deps } = this;
     const { at } = await this.todayOf(cmd.workspaceId);
     return deps.uow.run(cmd.workspaceId, async () => {
-      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion);
+      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion, cmd.manager);
       const before = def.snapshot;
       def.annotate(
         {
@@ -262,14 +287,18 @@ export class DefinitionsService {
     readonly expectedVersion: number;
     readonly effectiveFrom: string;
     readonly changes: TemplateChanges;
+    readonly manager?: Exclude<ManagedBy, 'USER'> | undefined;
+    /** Interno de `unscheduleEnd`: deshace la fecha de fin fijada y reinstaura las canceladas `ENDED`. */
+    readonly clearScheduledEnd?: boolean | undefined;
   }): Promise<RevisionResult> {
     const { deps } = this;
     const { workspaceId } = cmd;
     const { today, at } = await this.todayOf(workspaceId);
     return deps.uow.run(workspaceId, async () => {
-      const def = await this.load(workspaceId, cmd.definitionId, cmd.expectedVersion);
+      const def = await this.load(workspaceId, cmd.definitionId, cmd.expectedVersion, cmd.manager);
       // Estado terminal ⇒ INVALID_STATUS_TRANSITION antes de cualquier otra validación.
       RECURRING_DEFINITION_LIFECYCLE.transition('REVISE', def.status, def.status);
+      if (cmd.clearScheduledEnd) def.clearScheduledEnd(at, cmd.userId);
       let effectiveFrom: LocalDate;
       try {
         effectiveFrom = LocalDate.parse(cmd.effectiveFrom);
@@ -310,7 +339,27 @@ export class DefinitionsService {
       const generatedRows: RecurringOccurrence[] = [];
       if (def.status === 'ACTIVE') {
         const through = def.snapshot.generatedThrough ? LocalDate.parse(def.snapshot.generatedThrough) : null;
-        const plan = RevisionPlanner.planRevision({ source: def, effectiveFrom, through, existing });
+        const rawPlan = RevisionPlanner.planRevision({
+          source: def,
+          effectiveFrom,
+          through,
+          existing,
+          ...(cmd.clearScheduledEnd ? { reinstateReasons: ['SUPERSEDED', 'ENDED'] as const } : {}),
+        });
+        // Precio indexado (N3): el monto de las ocurrencias reescritas, reinstauradas o nuevas se estima con la tasa
+        // vigente al generar; sin tasa quedan sin monto.
+        const indexed = await indexCandidates(deps, workspaceId, [
+          ...rawPlan.rewrite.map((r) => r.candidate),
+          ...rawPlan.reinstate.map((r) => r.candidate),
+          ...rawPlan.insert,
+        ]);
+        let cursor = 0;
+        const plan = {
+          ...rawPlan,
+          rewrite: rawPlan.rewrite.map((r) => ({ id: r.id, candidate: indexed[cursor++] as Candidate })),
+          reinstate: rawPlan.reinstate.map((r) => ({ id: r.id, candidate: indexed[cursor++] as Candidate })),
+          insert: rawPlan.insert.map(() => indexed[cursor++] as Candidate),
+        };
         const loaded = new Map(
           (
             await deps.occurrences.listForDefinition(workspaceId, def.id, { from: effectiveFrom.toString() })
@@ -438,6 +487,21 @@ export class DefinitionsService {
         // La ventana futura (más allá de lo ya generado) la cubre el generador con la versión nueva.
         const extra = await generateOccurrences(deps, def, { today, by: cmd.userId });
         created += extra.inserted.length;
+      } else if (cmd.clearScheduledEnd) {
+        // Pausada: las canceladas por la fecha de fin vuelven a quedar canceladas por la pausa (la reanudación las
+        // reinstaura y la generación continúa desde hoy).
+        const endedIds = existing
+          .filter(
+            (o) =>
+              o.status === 'CANCELLED' &&
+              o.cancelReason === 'ENDED' &&
+              o.occurrenceDate >= effectiveFrom.toString(),
+          )
+          .map((o) => o.id);
+        await this.mutateOccurrences(workspaceId, def.id, endedIds, 'reinstated', (o) => {
+          o.reinstate();
+          o.cancel('PAUSED');
+        });
       }
       const changed = await this.definitionChanged(def, ids, effectiveFrom.toString());
       await this.persist(def);
@@ -510,12 +574,19 @@ export class DefinitionsService {
     return {
       accountId: changes.accountId ?? base.accountId,
       toAccountId: changes.toAccountId !== undefined ? changes.toAccountId : base.toAccountId,
-      amount: changes.amount ?? {
-        type: cur.amount.type,
-        amount: moneyOf(cur.amount.amount),
-        min: moneyOf(cur.amount.min),
-        max: moneyOf(cur.amount.max),
-      },
+      amount:
+        changes.amount ??
+        (cur.indexedPrice
+          ? {
+              type: 'ESTIMATED',
+              indexedTo: { amount: cur.indexedPrice.amount, currency: cur.indexedPrice.currency },
+            }
+          : {
+              type: cur.amount.type,
+              amount: moneyOf(cur.amount.amount),
+              min: moneyOf(cur.amount.min),
+              max: moneyOf(cur.amount.max),
+            }),
       categoryId: changes.categoryId !== undefined ? changes.categoryId : base.categoryId,
       counterpartyId: changes.counterpartyId !== undefined ? changes.counterpartyId : base.counterpartyId,
       tagIds: changes.tagIds ?? base.tagIds,
@@ -532,7 +603,7 @@ export class DefinitionsService {
     const { deps } = this;
     const { today, at } = await this.todayOf(cmd.workspaceId);
     return deps.uow.run(cmd.workspaceId, async () => {
-      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion);
+      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion, cmd.manager);
       def.pause(at, cmd.userId);
       const existing = await deps.occurrences.listExisting(cmd.workspaceId, def.id, today.toString());
       const cancelledIds = [...RevisionPlanner.planPause(existing, today)];
@@ -561,7 +632,7 @@ export class DefinitionsService {
     const { deps } = this;
     const { today, at } = await this.todayOf(cmd.workspaceId);
     return deps.uow.run(cmd.workspaceId, async () => {
-      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion);
+      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion, cmd.manager);
       def.resume(at, cmd.userId);
       const existing = await deps.occurrences.listExisting(cmd.workspaceId, def.id, today.toString());
       const toReinstate = [...RevisionPlanner.planResume(existing, today)];
@@ -577,7 +648,8 @@ export class DefinitionsService {
         const date = LocalDate.parse(occ.occurrenceDate);
         const version = def.versionAt(date);
         if (version.versionNo !== before.definitionVersionNo) {
-          const candidate = candidates(def, { from: date, to: date })[0];
+          const raw = candidates(def, { from: date, to: date })[0];
+          const [candidate] = raw ? await indexCandidates(deps, cmd.workspaceId, [raw]) : [];
           if (candidate) {
             occ.rewrite({
               dueDate: candidate.dueDate.toString(),
@@ -625,12 +697,19 @@ export class DefinitionsService {
    * fecha se cancelan (`ENDED`); las anteriores siguen siendo resolubles.
    */
   async end(
-    cmd: DefinitionActionCommand & { readonly endDate?: string | undefined },
+    cmd: DefinitionActionCommand & {
+      readonly endDate?: string | undefined;
+      /**
+       * Solo quien administra la definición: fija el cierre de la serie sin pasarla a `ENDED` aunque la fecha ya
+       * llegó (cancelación programada de una suscripción; la termina el administrador al ejecutarla).
+       */
+      readonly deferClose?: boolean | undefined;
+    },
   ): Promise<DefinitionDto> {
     const { deps } = this;
     const { today, at } = await this.todayOf(cmd.workspaceId);
     return deps.uow.run(cmd.workspaceId, async () => {
-      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion);
+      const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion, cmd.manager);
       RECURRING_DEFINITION_LIFECYCLE.transition('END', def.status, 'ENDED');
       let endDate: LocalDate;
       try {
@@ -638,7 +717,8 @@ export class DefinitionsService {
       } catch {
         throw new DomainError('VALIDATION_FAILED', 'endDate must be YYYY-MM-DD').at('/endDate');
       }
-      if (endDate.compare(today) < 0) {
+      // El administrador puede cerrar la serie el día anterior (la cancelación de hoy cancela también el cargo de hoy).
+      if (endDate.compare(today) < 0 && cmd.manager === undefined) {
         throw new DomainError('VALIDATION_FAILED', 'endDate must not be in the past').at('/endDate');
       }
       const existing = await deps.occurrences.listExisting(cmd.workspaceId, def.id, endDate.toString());
@@ -648,7 +728,7 @@ export class DefinitionsService {
       );
       const ids: ChangedIds = { cancelled: rows.map((r) => r.id), reinstated: [], rewritten: [] };
       const before = def.snapshot;
-      if (endDate.compare(today) <= 0) {
+      if (endDate.compare(today) <= 0 && !cmd.deferClose) {
         def.end({ endDate: endDate.toString(), at, by: cmd.userId });
       } else {
         def.scheduleEnd(endDate.toString(), at, cmd.userId);
@@ -664,6 +744,30 @@ export class DefinitionsService {
         definitionSteps(def, [changed]),
       );
       return definitionDto(def, { withVersions: true });
+    });
+  }
+
+  /**
+   * Deshace la fecha de fin fijada por `end` (solo quien administra la definición): la serie vuelve a ser abierta,
+   * las canceladas `ENDED` se reinstauran y se generan las faltantes (openspec add-subscriptions, N10).
+   */
+  async unscheduleEnd(cmd: DefinitionActionCommand): Promise<RevisionResult> {
+    const { deps } = this;
+    return deps.uow.run(cmd.workspaceId, async () => {
+      const def = await deps.definitions.findById(cmd.workspaceId, cmd.definitionId);
+      if (!def?.endDate) {
+        throw new DomainError('INVALID_STATUS_TRANSITION', 'the definition has no scheduled end to undo');
+      }
+      return this.revise({
+        workspaceId: cmd.workspaceId,
+        userId: cmd.userId ?? '',
+        definitionId: cmd.definitionId,
+        expectedVersion: cmd.expectedVersion,
+        effectiveFrom: LocalDate.parse(def.endDate).plusDays(1).toString(),
+        changes: {},
+        manager: cmd.manager,
+        clearScheduledEnd: true,
+      });
     });
   }
 
@@ -700,9 +804,12 @@ export class DefinitionsService {
 
 export interface DefinitionActionCommand {
   readonly workspaceId: string;
-  readonly userId: string;
+  /** `null` para el proceso (job de suscripciones). */
+  readonly userId: string | null;
   readonly definitionId: string;
   readonly expectedVersion: number;
+  /** Quien administra la definición; sin él, una definición administrada responde `RECURRING_MANAGED_EXTERNALLY`. */
+  readonly manager?: Exclude<ManagedBy, 'USER'> | undefined;
 }
 
 function stripUndefined<T extends object>(value: T): Partial<T> {

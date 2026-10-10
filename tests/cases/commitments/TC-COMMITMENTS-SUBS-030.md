@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ['commitments/subscriptions']
 requirement: 'Notificación de renovación próxima de una suscripción'
 scenario: 'Renovación de Streamly'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-001', 'FR-COMMITMENTS-016']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/subscription-notifications.test.ts
+  - packages/contexts/notifications/src/domain/subscription-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'subscriptions', 'dedup']
@@ -35,7 +37,7 @@ expected_result:
   - 'Cada miembro tiene una notificación UNREAD SUBSCRIPTION_RENEWAL de "Streamly" 2026-11-15 10.99 USD "Visa USD" con enlace a la suscripción'
   - 'Las reentregas no crean notificaciones nuevas (dedupe subscription-renewal:<id>:2026-11-15)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-030 — La renovación próxima crea una notificación por miembro y una sola aunque el hecho se reentregue

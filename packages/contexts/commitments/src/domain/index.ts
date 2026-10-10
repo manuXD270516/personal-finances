@@ -8,3 +8,4 @@ export * from './recurring-definition.js';
 export * from './recurring-occurrence.js';
 export * from './revision-planner.js';
 export * from './types.js';
+export * from './subscription/index.js';

@@ -56,6 +56,8 @@ export interface DefinitionVersionDto {
     readonly autoCreateStatus: string | null;
     readonly leadDays: number;
   };
+  /** Solo definiciones administradas con el precio en otra moneda que la cuenta (suscripciones en USD con tarjeta BOB). */
+  readonly indexedPrice?: MoneyDto;
 }
 
 export function versionDto(v: DefinitionVersion): DefinitionVersionDto {
@@ -85,6 +87,7 @@ export function versionDto(v: DefinitionVersion): DefinitionVersionDto {
       autoCreateStatus: v.materialization.autoCreateStatus,
       leadDays: v.materialization.leadDays,
     },
+    ...(v.indexedPrice ? { indexedPrice: money(v.indexedPrice.amount, v.indexedPrice.currency) } : {}),
   };
 }
 

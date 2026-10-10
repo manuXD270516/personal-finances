@@ -131,6 +131,9 @@ interface VersionRow {
   materialization_mode: DefinitionVersion['materialization']['mode'];
   auto_create_status: DefinitionVersion['materialization']['autoCreateStatus'];
   lead_days: number;
+  indexed_amount: string | null;
+  indexed_currency: string | null;
+  indexed_scale: number | null;
 }
 
 const VERSION_COLUMNS = sql`
@@ -138,7 +141,8 @@ const VERSION_COLUMNS = sql`
   c.scale, v.amount_type, v.amount::text AS amount, v.amount_min::text AS amount_min, v.amount_max::text AS amount_max,
   v.category_id, v.counterparty_id, v.tag_ids::text[] AS tag_ids, v.payment_method, v.cadence, v.interval,
   v.month_days AS month_days, v.rrule, v.dtstart::text AS dtstart, v.until_date::text AS until_date,
-  v.max_count, v.weekend_adjustment, v.materialization_mode, v.auto_create_status, v.lead_days`;
+  v.max_count, v.weekend_adjustment, v.materialization_mode, v.auto_create_status, v.lead_days,
+  v.indexed_amount::text AS indexed_amount, v.indexed_currency, ic.scale AS indexed_scale`;
 
 const toVersion = (r: VersionRow): DefinitionVersion => {
   const scale = Number(r.scale);
@@ -173,6 +177,14 @@ const toVersion = (r: VersionRow): DefinitionVersion => {
       autoCreateStatus: r.auto_create_status,
       leadDays: Number(r.lead_days),
     },
+    ...(r.indexed_amount !== null && r.indexed_currency !== null
+      ? {
+          indexedPrice: {
+            amount: canon(r.indexed_amount, Number(r.indexed_scale)) as string,
+            currency: r.indexed_currency,
+          },
+        }
+      : {}),
   };
 };
 
@@ -187,7 +199,7 @@ async function insertVersions(
         (workspace_id, definition_id, version_no, effective_from, account_id, to_account_id, currency, amount_type,
          amount, amount_min, amount_max, category_id, counterparty_id, tag_ids, payment_method, cadence, interval,
          month_days, rrule, dtstart, until_date, max_count, weekend_adjustment, materialization_mode,
-         auto_create_status, lead_days, created_by)
+         auto_create_status, lead_days, indexed_amount, indexed_currency, created_by)
       VALUES (${s.workspaceId}, ${s.id}, ${v.versionNo}, ${v.effectiveFrom}::date, ${v.accountId}::uuid,
               ${v.toAccountId}::uuid, ${v.currency}, ${v.amount.type}, ${v.amount.amount}::numeric,
               ${v.amount.min}::numeric, ${v.amount.max}::numeric, ${v.categoryId}::uuid, ${v.counterpartyId}::uuid,
@@ -195,7 +207,9 @@ async function insertVersions(
               ${JSON.stringify(v.schedule.monthDays)}::jsonb, ${v.schedule.rrule}, ${v.schedule.startDate}::date,
               ${v.schedule.endDate}::date, ${v.schedule.maxOccurrences}, ${v.schedule.weekendAdjustment},
               ${v.materialization.mode}, ${v.materialization.autoCreateStatus}, ${v.materialization.leadDays},
-              ${s.updatedBy}::uuid)`.execute(db());
+              ${v.indexedPrice?.amount ?? null}::numeric, ${v.indexedPrice?.currency ?? null}, ${s.updatedBy}::uuid)`.execute(
+      db(),
+    );
   }
 }
 
@@ -237,6 +251,7 @@ export class PgDefinitionRepository implements DefinitionRepository {
       SELECT ${VERSION_COLUMNS}
         FROM commitments.recurring_definition_version v
         JOIN fx.currency c ON c.code = v.currency
+        LEFT JOIN fx.currency ic ON ic.code = v.indexed_currency
        WHERE v.definition_id = ANY(${[...ids]}::uuid[])
        ORDER BY v.definition_id, v.version_no`.execute(db());
     for (const r of rows) {

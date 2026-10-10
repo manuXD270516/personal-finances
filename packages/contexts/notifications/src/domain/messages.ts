@@ -47,6 +47,31 @@ const es: MessageCatalog = {
   'email.recurring_approval_required.detailed': '{name} del {dueDate} ({amount}) espera tu aprobación.',
   'email.recurring_approval_required.detailed_variable':
     '{name} del {dueDate} espera tu aprobación. El monto es variable.',
+  // in-app: suscripciones
+  'inapp.subscription_renewal.title': 'Renovación próxima: {provider}',
+  'inapp.subscription_renewal.body': 'Se renueva el {renewalDate} por {price}. Cuenta de pago: {account}.',
+  'inapp.subscription_renewal.plan': 'Plan {plan}.',
+  'inapp.subscription_renewal.charge': 'Cargo estimado: {charge}.',
+  'inapp.subscription_renewal.approval': 'Requiere tu aprobación.',
+  'inapp.subscription_trial_ending.title':
+    'El trial de {provider} termina el {trialEndsOn}; primer cobro {price}',
+  'inapp.subscription_trial_ending.body':
+    'Cancélalo antes de esa fecha para evitar el cobro. Cuenta de pago: {account}.',
+  'inapp.subscription_price_change.title': 'Posible cambio de precio: {provider}',
+  'inapp.subscription_price_change.body':
+    'El precio pasó de {previous} a {next} ({percent} %) desde el {effectiveFrom}. Acepta o rechaza la propuesta.',
+  // email: suscripciones (basic sin nombre, plan, cuenta ni monto; detailed con ellos)
+  'email.subscription_renewal.subject': 'Tienes una renovación de suscripción próxima',
+  'email.subscription_renewal.basic': 'Una de tus suscripciones se renueva en {days} días.',
+  'email.subscription_renewal.detailed': '{provider} se renueva el {renewalDate}: {price} con {account}.',
+  'email.subscription_trial_ending.subject': 'Tienes un trial por terminar',
+  'email.subscription_trial_ending.basic': 'El trial de una de tus suscripciones termina en {days} días.',
+  'email.subscription_trial_ending.detailed':
+    'El trial de {provider} termina el {trialEndsOn}; primer cobro {price}.',
+  'email.subscription_price_change.subject': 'Detectamos un posible cambio de precio',
+  'email.subscription_price_change.basic': 'Una de tus suscripciones podría haber cambiado de precio.',
+  'email.subscription_price_change.detailed':
+    '{provider}: el precio pasó de {previous} a {next} ({percent} %) desde el {effectiveFrom}.',
   // email: común
   'email.cta': 'Ver la notificación',
   'email.footer':
@@ -91,6 +116,28 @@ const en: MessageCatalog = {
     '{name} of {dueDate} ({amount}) is waiting for your approval.',
   'email.recurring_approval_required.detailed_variable':
     '{name} of {dueDate} is waiting for your approval. The amount is variable.',
+  'inapp.subscription_renewal.title': 'Upcoming renewal: {provider}',
+  'inapp.subscription_renewal.body': 'Renews on {renewalDate} for {price}. Payment account: {account}.',
+  'inapp.subscription_renewal.plan': 'Plan {plan}.',
+  'inapp.subscription_renewal.charge': 'Estimated charge: {charge}.',
+  'inapp.subscription_renewal.approval': 'It needs your approval.',
+  'inapp.subscription_trial_ending.title': 'The {provider} trial ends on {trialEndsOn}; first charge {price}',
+  'inapp.subscription_trial_ending.body':
+    'Cancel before that date to avoid the charge. Payment account: {account}.',
+  'inapp.subscription_price_change.title': 'Possible price change: {provider}',
+  'inapp.subscription_price_change.body':
+    'The price went from {previous} to {next} ({percent} %) since {effectiveFrom}. Accept or reject the proposal.',
+  'email.subscription_renewal.subject': 'You have an upcoming subscription renewal',
+  'email.subscription_renewal.basic': 'One of your subscriptions renews in {days} days.',
+  'email.subscription_renewal.detailed': '{provider} renews on {renewalDate}: {price} with {account}.',
+  'email.subscription_trial_ending.subject': 'You have a trial about to end',
+  'email.subscription_trial_ending.basic': 'The trial of one of your subscriptions ends in {days} days.',
+  'email.subscription_trial_ending.detailed':
+    'The {provider} trial ends on {trialEndsOn}; first charge {price}.',
+  'email.subscription_price_change.subject': 'We detected a possible price change',
+  'email.subscription_price_change.basic': 'One of your subscriptions may have changed its price.',
+  'email.subscription_price_change.detailed':
+    '{provider}: the price went from {previous} to {next} ({percent} %) since {effectiveFrom}.',
   'email.cta': 'View the notification',
   'email.footer':
     'You receive this notice because email notifications are turned on. You can change it in your preferences.',
@@ -132,6 +179,29 @@ const pt: MessageCatalog = {
   'email.recurring_approval_required.detailed': '{name} de {dueDate} ({amount}) aguarda sua aprovação.',
   'email.recurring_approval_required.detailed_variable':
     '{name} de {dueDate} aguarda sua aprovação. O valor é variável.',
+  'inapp.subscription_renewal.title': 'Renovação próxima: {provider}',
+  'inapp.subscription_renewal.body': 'Renova em {renewalDate} por {price}. Conta de pagamento: {account}.',
+  'inapp.subscription_renewal.plan': 'Plano {plan}.',
+  'inapp.subscription_renewal.charge': 'Cobrança estimada: {charge}.',
+  'inapp.subscription_renewal.approval': 'Precisa da sua aprovação.',
+  'inapp.subscription_trial_ending.title':
+    'O teste de {provider} termina em {trialEndsOn}; primeira cobrança {price}',
+  'inapp.subscription_trial_ending.body':
+    'Cancele antes dessa data para evitar a cobrança. Conta de pagamento: {account}.',
+  'inapp.subscription_price_change.title': 'Possível mudança de preço: {provider}',
+  'inapp.subscription_price_change.body':
+    'O preço passou de {previous} para {next} ({percent} %) desde {effectiveFrom}. Aceite ou rejeite a proposta.',
+  'email.subscription_renewal.subject': 'Você tem uma renovação de assinatura próxima',
+  'email.subscription_renewal.basic': 'Uma das suas assinaturas renova em {days} dias.',
+  'email.subscription_renewal.detailed': '{provider} renova em {renewalDate}: {price} com {account}.',
+  'email.subscription_trial_ending.subject': 'Você tem um teste prestes a terminar',
+  'email.subscription_trial_ending.basic': 'O teste de uma das suas assinaturas termina em {days} dias.',
+  'email.subscription_trial_ending.detailed':
+    'O teste de {provider} termina em {trialEndsOn}; primeira cobrança {price}.',
+  'email.subscription_price_change.subject': 'Detectamos uma possível mudança de preço',
+  'email.subscription_price_change.basic': 'Uma das suas assinaturas pode ter mudado de preço.',
+  'email.subscription_price_change.detailed':
+    '{provider}: o preço passou de {previous} para {next} ({percent} %) desde {effectiveFrom}.',
   'email.cta': 'Ver a notificação',
   'email.footer':
     'Você recebe este aviso porque as notificações por email estão ativadas. Você pode alterá-lo nas suas preferências.',

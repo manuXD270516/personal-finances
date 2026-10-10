@@ -5,16 +5,17 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Editar una suscripción sin alterar el pasado'
 scenario: 'Cambio de tarjeta desde la próxima renovación'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012', 'FR-COMMITMENTS-009']
 nfr: []
 invariants: ['INV-012', 'INV-029']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'change-future']
@@ -34,7 +35,7 @@ expected_result:
   - 'La transacción del 2026-10-15 sigue en "Visa USD" por 10.99 USD'
   - 'Auditoría con diff de la cuenta de pago'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-006 — Cambiar la tarjeta de pago aplica desde la fecha de efecto sin tocar la transacción anterior

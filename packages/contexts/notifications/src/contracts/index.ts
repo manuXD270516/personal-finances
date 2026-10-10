@@ -11,6 +11,9 @@ export const NOTIFICATION_CONSUMERS = {
   budgetThreshold: 'notifications.budget-threshold',
   monthClosePending: 'notifications.month-close-pending',
   occurrenceDue: 'notifications.occurrence-due',
+  subscriptionRenewal: 'notifications.subscription-renewal',
+  subscriptionTrialEnding: 'notifications.subscription-trial-ending',
+  subscriptionPriceChange: 'notifications.subscription-price-change',
 } as const;
 
 /** Colas de trabajos pg-boss del worker (design decisiones 7 y 11). */

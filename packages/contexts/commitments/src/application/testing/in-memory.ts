@@ -36,6 +36,9 @@ export const CASH = '0190a000-0000-7000-8000-0000000acc02';
 export const SAVINGS = '0190a000-0000-7000-8000-0000000acc03';
 export const CARD = '0190a000-0000-7000-8000-0000000acc04';
 export const USD_BANK = '0190a000-0000-7000-8000-0000000acc05';
+/** add-subscriptions: tarjeta en USD y billetera USDT (la tarjeta en BOB es `CARD`). */
+export const VISA_USD = '0190a000-0000-7000-8000-0000000acc06';
+export const WALLET_USDT = '0190a000-0000-7000-8000-0000000acc07';
 export const CATEGORY = '0190a000-0000-7000-8000-0000000ca701';
 export const ARCHIVED_CATEGORY = '0190a000-0000-7000-8000-0000000ca702';
 
@@ -71,14 +74,18 @@ export class InMemoryCommitments {
   timeZone = 'America/La_Paz';
   baseCurrency = 'BOB';
   private seq = 0;
-  private definitionsMap = new Map<string, { state: DefinitionState; versions: DefinitionVersion[] }>();
-  private occurrencesMap = new Map<string, OccurrenceState>();
+  /** Ganchos de extensiones (suscripciones): cada uno toma su instantánea y devuelve cómo revertirla. */
+  protected readonly extensions: (() => () => void)[] = [];
+  protected definitionsMap = new Map<string, { state: DefinitionState; versions: DefinitionVersion[] }>();
+  protected occurrencesMap = new Map<string, OccurrenceState>();
   readonly accountList: AccountSummaryDto[] = [
     account(BANK, 'Banco BOB', 'BANK', 'ASSET', 'BOB', 'LIQUID'),
     account(CASH, 'Efectivo', 'CASH', 'ASSET', 'BOB', 'LIQUID'),
     account(SAVINGS, 'Ahorro BOB', 'SAVINGS', 'ASSET', 'BOB', 'SEMI_LIQUID'),
     account(CARD, 'Tarjeta X', 'CREDIT_CARD', 'LIABILITY', 'BOB', 'ILLIQUID'),
     account(USD_BANK, 'Banco USD', 'BANK', 'ASSET', 'USD', 'LIQUID'),
+    account(VISA_USD, 'Visa USD', 'CREDIT_CARD', 'LIABILITY', 'USD', 'ILLIQUID'),
+    account(WALLET_USDT, 'Wallet USDT', 'CRYPTO_WALLET', 'ASSET', 'USDT', 'LIQUID'),
   ];
 
   // ─────────────────────────────────────────────── puertos
@@ -361,6 +368,7 @@ export class InMemoryCommitments {
       [
         { code: 'BOB', scale: 2, kind: 'FIAT', enabled: true },
         { code: 'USD', scale: 2, kind: 'FIAT', enabled: true },
+        { code: 'USDT', scale: 6, kind: 'CRYPTO', enabled: true },
       ] as unknown as WorkspaceCurrencyDto[],
     enabledCurrencies: async () => [],
     resolveValuationRates: async (input: {
@@ -451,9 +459,11 @@ export class InMemoryCommitments {
       const occs = new Map(this.occurrencesMap);
       const txns = new Map(this.transactionsStore);
       const counts = [this.events.length, this.recorded.length, this.recordCalls.length];
+      const restores = this.extensions.map((snapshot) => snapshot());
       try {
         return await fn();
       } catch (err) {
+        for (const restore of restores) restore();
         this.definitionsMap = defs;
         this.occurrencesMap = occs;
         this.transactionsStore.clear();
@@ -520,7 +530,7 @@ export class InMemoryCommitments {
     return this.recorded.filter((r) => r.entry.aggregateId === aggregateId);
   }
 
-  private id(): string {
+  protected id(): string {
     this.seq += 1;
     return `0190a000-0000-7000-8000-${String(this.seq).padStart(12, '0')}`;
   }

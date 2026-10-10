@@ -240,6 +240,15 @@ export class RecurringDefinition {
     this.fieldsChanged = ['endDate'];
   }
 
+  /** Deshace la fecha de fin futura fijada por "terminar" (la serie vuelve a ser abierta). */
+  clearScheduledEnd(at: string, by: string | null): void {
+    if (this.state.status === 'ENDED' || this.state.endDate === null) {
+      throw new DomainError('INVALID_STATUS_TRANSITION', 'the definition has no scheduled end to undo');
+    }
+    this.apply({ endDate: null }, at, by);
+    this.fieldsChanged = ['endDate'];
+  }
+
   /** `REVISE`: agrega la versión `n+1` (inmutable) y la hace vigente. El estado no cambia. */
   revise(version: DefinitionVersion, at: string, by: string | null): void {
     const from = this.state.status;

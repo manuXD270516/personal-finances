@@ -178,6 +178,13 @@ describe('Catálogo de mensajes', () => {
           'periodEnd',
           'name',
           'amount',
+          'provider',
+          'price',
+          'account',
+          'plan',
+          'previous',
+          'next',
+          'charge',
         ]) {
           expect(placeholdersOf(template), `${locale}:${key}`).not.toContain(forbidden);
         }

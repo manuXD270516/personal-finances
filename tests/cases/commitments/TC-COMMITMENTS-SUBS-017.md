@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Permisos, auditoría y aislamiento de suscripciones'
 scenario: 'Suscripción de otro workspace'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012']
 nfr: ['NFR-SEC-003']
 invariants: ['INV-025']
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/test/integration/pg-subscriptions.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'rls', 'isolation']
@@ -31,7 +33,7 @@ expected_result:
   - '404 RESOURCE_NOT_FOUND'
   - 'Cero filas visibles en subscription, subscription_price, subscription_price_proposal, subscription_charge y subscription_reminder'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-017 — Una suscripción de otro workspace responde como inexistente

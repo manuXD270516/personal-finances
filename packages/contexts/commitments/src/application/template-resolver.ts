@@ -1,4 +1,4 @@
-import { DomainError, currency as makeCurrency, type Currency } from '@pf/shared-kernel';
+import { DomainError, Money, currency as makeCurrency, type Currency } from '@pf/shared-kernel';
 import type { TemplateInput, ScheduleInput, MaterializationInput, RecurringKind } from '../domain/index.js';
 import type { CommitmentsDeps } from './ports/index.js';
 import type { MoneyDto } from '../contracts/index.js';
@@ -9,6 +9,11 @@ export interface AmountInput {
   readonly amount?: MoneyDto | null | undefined;
   readonly min?: MoneyDto | null | undefined;
   readonly max?: MoneyDto | null | undefined;
+  /**
+   * Precio indexado (solo definiciones administradas, openspec add-subscriptions N3): precio en OTRA moneda que la de
+   * la cuenta. El motor estima cada ocurrencia con la tasa de valoración vigente al generarla.
+   */
+  readonly indexedTo?: MoneyDto | null | undefined;
 }
 
 /** Plantilla tal como llega por la API (creación y cambios de una revisión). */
@@ -52,6 +57,12 @@ export async function resolveTemplate(
   },
 ): Promise<ResolvedTemplate> {
   const { workspaceId, kind, template } = input;
+  const indexedTo = template.amount.indexedTo ?? null;
+  if (indexedTo !== null && template.amount.type !== 'ESTIMATED') {
+    throw new DomainError('RECURRING_INVALID_AMOUNT', 'an indexed amount is always ESTIMATED').at(
+      '/amount/type',
+    );
+  }
   const amountMoney = [template.amount.amount, template.amount.min, template.amount.max].filter(
     (m): m is MoneyDto => m !== null && m !== undefined,
   );
@@ -61,7 +72,7 @@ export async function resolveTemplate(
       '/amount',
     );
   }
-  const amountCurrency = amountMoney[0]?.currency;
+  const amountCurrency = indexedTo !== null ? undefined : amountMoney[0]?.currency;
 
   const accounts = [
     { accountId: template.accountId, ...(amountCurrency ? { currency: amountCurrency } : {}) },
@@ -89,6 +100,29 @@ export async function resolveTemplate(
     }
   }
   const currency = await currencyOf(deps, workspaceId, from.currency);
+  let indexedPrice: { amount: string; currency: string } | null = null;
+  if (indexedTo !== null) {
+    if (amountMoney.length > 0) {
+      throw new DomainError('RECURRING_INVALID_AMOUNT', 'an indexed amount takes no amount of its own').at(
+        '/amount',
+      );
+    }
+    const priceCurrency = await currencyOf(deps, workspaceId, indexedTo.currency);
+    let price: Money;
+    try {
+      price = Money.parse(indexedTo.amount, priceCurrency);
+    } catch (err) {
+      if (err instanceof DomainError)
+        throw new DomainError(err.code, err.message).at('/amount/indexedTo/amount');
+      throw err;
+    }
+    if (!price.isPositive()) {
+      throw new DomainError('AMOUNT_NOT_POSITIVE', 'the indexed price must be positive').at(
+        '/amount/indexedTo/amount',
+      );
+    }
+    indexedPrice = { amount: price.toFixed(), currency: priceCurrency.code };
+  }
 
   if (kind !== 'TRANSFER' && (template.categoryId || (template.tagIds?.length ?? 0) > 0)) {
     await deps.classification.validate({
@@ -117,18 +151,22 @@ export async function resolveTemplate(
     template: {
       accountId: template.accountId,
       toAccountId: template.toAccountId ?? null,
-      amount: {
-        type: template.amount.type,
-        amount: template.amount.amount?.amount ?? null,
-        min: template.amount.min?.amount ?? null,
-        max: template.amount.max?.amount ?? null,
-      },
+      amount:
+        indexedPrice !== null
+          ? { type: 'VARIABLE', amount: null, min: null, max: null }
+          : {
+              type: template.amount.type,
+              amount: template.amount.amount?.amount ?? null,
+              min: template.amount.min?.amount ?? null,
+              max: template.amount.max?.amount ?? null,
+            },
       categoryId: template.categoryId ?? null,
       counterpartyId: template.counterpartyId ?? null,
       tagIds: template.tagIds ?? [],
       paymentMethod: template.paymentMethod ?? null,
       schedule: template.schedule,
       ...(template.materialization ? { materialization: template.materialization } : {}),
+      ...(indexedPrice !== null ? { indexedPrice } : {}),
     },
   };
 }

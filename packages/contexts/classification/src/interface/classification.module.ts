@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
+import { currentRequestContext } from '@pf/platform/api';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
@@ -19,6 +20,7 @@ import type {
   CategoryCatalogQuery,
   ClassificationLookup,
   ClassificationValidator,
+  CounterpartyCatalogQuery,
   WorkspaceCatalogProvisioner,
 } from '../contracts/index.js';
 import { CATEGORY_LIFECYCLE, COUNTERPARTY_LIFECYCLE } from '../domain/classification-lifecycle.js';
@@ -60,6 +62,26 @@ export interface ClassificationRuntime {
   readonly lookup: ClassificationLookup;
   /** Nombres de categorías para Reporting (add-basic-dashboard). */
   readonly categories: CategoryCatalogQuery;
+  /** Nombres de contrapartes para Commitments (add-subscriptions). */
+  readonly counterparties: CounterpartyCatalogQuery;
+}
+
+/** Usuario del actor ambiente (los procesos de fondo no tienen usuario: RLS solo por workspace). */
+function ambientUserId(): string | null {
+  const actor = currentRequestContext()?.actor;
+  return actor && actor.type === 'USER' ? actor.userId : null;
+}
+
+/** `CounterpartyCatalogQuery` sobre las consultas de CLASSIFICATION. */
+function counterpartyCatalogOf(queries: ClassificationQueries): CounterpartyCatalogQuery {
+  return {
+    counterpartiesByIds: async ({ workspaceId, counterpartyIds }) =>
+      (await queries.counterpartiesByIds(ambientUserId(), workspaceId, counterpartyIds)).map((c) => ({
+        counterpartyId: c.id,
+        name: c.name,
+        archived: c.isArchived,
+      })),
+  };
 }
 
 /** `CategoryCatalogQuery` sobre las consultas de CLASSIFICATION (nombres por id y árbol completo). */
@@ -160,6 +182,7 @@ export function createClassificationRuntime(options: ClassificationRuntimeOption
         queries.categoryIdsWithDescendants(userId, workspaceId, categoryIds),
     },
     categories: categoryCatalogOf(queries),
+    counterparties: counterpartyCatalogOf(queries),
   };
 }
 

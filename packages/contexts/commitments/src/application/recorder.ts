@@ -107,6 +107,17 @@ export function versionChanges(
   diff('materializationMode', before?.materialization.mode, after.materialization.mode);
   diff('autoCreateStatus', before?.materialization.autoCreateStatus, after.materialization.autoCreateStatus);
   diff('leadDays', before?.materialization.leadDays, after.materialization.leadDays);
+  const indexedBefore = before?.indexedPrice ?? null;
+  const indexedAfter = after.indexedPrice ?? null;
+  if (before === null ? indexedAfter !== null : json(indexedBefore) !== json(indexedAfter)) {
+    out.push(
+      plain(
+        'indexedPrice',
+        indexedBefore === null ? null : json(indexedBefore),
+        indexedAfter === null ? null : json(indexedAfter),
+      ),
+    );
+  }
   return out;
 }
 

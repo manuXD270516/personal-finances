@@ -6,7 +6,7 @@ import {
   type RecurrenceRule,
 } from '@pf/shared-kernel';
 import type { AmountSpec } from './amount-spec.js';
-import { ruleOfSchedule, type DefinitionVersion } from './definition-version.js';
+import { ruleOfSchedule, type DefinitionVersion, type IndexedPrice } from './definition-version.js';
 import type { OccurrenceState } from './recurring-occurrence.js';
 
 /** Ocurrencia que la regla produce para una ventana (aún no persistida). */
@@ -16,6 +16,8 @@ export interface Candidate {
   readonly versionNo: number;
   readonly expected: AmountSpec;
   readonly currency: string;
+  /** Si la versión indexa el precio, la aplicación estima el monto con la tasa vigente al generar. */
+  readonly indexedPrice?: IndexedPrice;
 }
 
 export interface GeneratorSource {
@@ -67,6 +69,7 @@ export function candidates(source: GeneratorSource, window: DateWindow): Candida
         versionNo: version.versionNo,
         expected: version.amount,
         currency: version.currency,
+        ...(version.indexedPrice ? { indexedPrice: version.indexedPrice } : {}),
       });
     }
   }

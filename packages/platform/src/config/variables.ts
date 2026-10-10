@@ -119,7 +119,7 @@ export const VARIABLES = {
     group: 'PostgreSQL',
     description:
       'Tamaño máximo del pool de conexiones por proceso. En el worker debe cubrir la concurrencia sumada de los consumidores de eventos (`EVENT_CONSUMER_CONCURRENCY`) más 4 conexiones reservadas; las conexiones se abren bajo demanda.',
-    default: '30',
+    default: '40',
   }),
 
   // ── Object storage (API S3) ──
@@ -701,6 +701,20 @@ export const VARIABLES = {
       default: '90',
     },
   ),
+  COMMITMENTS_SUBSCRIPTIONS_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `20 * * * *`) u `off`',
+      ),
+    {
+      group: 'Worker',
+      description:
+        'Cron (5 campos, UTC) del job `commitments.subscription-daily`: pasa a activa la suscripción cuyo trial terminó, ejecuta las cancelaciones programadas vencidas y emite los recordatorios de renovación y de fin de trial (a lo sumo uno por suscripción y fecha). Evalúa con "hoy" en la zona horaria de cada workspace. También corre al arrancar el worker. `off` desactiva el cron.',
+      default: '20 * * * *',
+    },
+  ),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z
       .string()
@@ -933,6 +947,7 @@ export const APP_VARIABLES = {
     'PLANNING_PERIODS_CRON',
     'COMMITMENTS_HORIZON_DAYS',
     'COMMITMENTS_SCHEDULER_CRON',
+    'COMMITMENTS_SUBSCRIPTIONS_CRON',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).
