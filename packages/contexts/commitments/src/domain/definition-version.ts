@@ -64,6 +64,16 @@ export interface MaterializationInput {
   readonly leadDays?: number | undefined;
 }
 
+/**
+ * Precio indexado (openspec add-subscriptions, N3): el monto de la definición se expresa en OTRA moneda que la de la
+ * cuenta (USD cobrado en una tarjeta en BOB). Cada ocurrencia estima `precio × tasa de valoración vigente al
+ * generarla`, HALF_EVEN a la escala de la cuenta; sin tasa queda sin monto (`VARIABLE`), nunca 1:1.
+ */
+export interface IndexedPrice {
+  readonly amount: string;
+  readonly currency: string;
+}
+
 /** Plantilla inmutable de una versión de la definición (tabla `recurring_definition_version`, append-only). */
 export interface DefinitionVersion {
   readonly versionNo: number;
@@ -78,6 +88,8 @@ export interface DefinitionVersion {
   readonly paymentMethod: PaymentMethod | null;
   readonly schedule: ScheduleSpec;
   readonly materialization: MaterializationSpec;
+  /** Solo definiciones administradas con el precio en otra moneda; `amount` es entonces `VARIABLE`. */
+  readonly indexedPrice?: IndexedPrice | null;
 }
 
 export interface TemplateInput {
@@ -90,6 +102,8 @@ export interface TemplateInput {
   readonly paymentMethod?: string | null | undefined;
   readonly schedule: ScheduleInput;
   readonly materialization?: MaterializationInput | undefined;
+  /** Precio en otra moneda que la cuenta (ya validado y a la escala de su moneda por el llamador). */
+  readonly indexedPrice?: IndexedPrice | null | undefined;
 }
 
 const schedule422 = (message: string, pointer?: string) => {
@@ -199,6 +213,7 @@ export function buildSchedule(input: ScheduleInput): ScheduleSpec {
 export function buildMaterialization(
   input: MaterializationInput | undefined,
   amount: AmountSpec,
+  indexed = false,
 ): MaterializationSpec {
   const mode = input?.mode ?? 'PENDING_APPROVAL';
   if (!(MATERIALIZATION_MODES as readonly string[]).includes(mode)) {
@@ -213,7 +228,8 @@ export function buildMaterialization(
     );
   }
   if (mode === 'AUTO_CREATE') {
-    if (amount.type === 'VARIABLE' || amount.type === 'MIN_MAX') {
+    // Un precio indexado se estima al generar cada ocurrencia: sin tasa queda sin monto y el intento reintenta.
+    if ((amount.type === 'VARIABLE' && !indexed) || amount.type === 'MIN_MAX') {
       throw new DomainError(
         'RECURRING_MODE_NOT_ALLOWED',
         `AUTO_CREATE needs a FIXED or ESTIMATED amount, got ${amount.type}`,
@@ -271,9 +287,24 @@ export function buildDefinitionVersion(input: {
       '/paymentMethod',
     );
   }
+  const indexedPrice = template.indexedPrice ?? null;
+  if (indexedPrice !== null) {
+    if (indexedPrice.currency === currency.code) {
+      throw new DomainError(
+        'VALIDATION_FAILED',
+        'an indexed price must be in another currency than the account',
+      ).at('/amount/indexedTo/currency');
+    }
+    if (kind !== 'EXPENSE') {
+      throw new DomainError('VALIDATION_FAILED', 'only an EXPENSE can have an indexed price').at('/amount');
+    }
+  }
   const amount = buildAmountSpec(template.amount, currency);
+  if (indexedPrice !== null && amount.type !== 'VARIABLE') {
+    throw new DomainError('VALIDATION_FAILED', 'an indexed definition has no fixed amount').at('/amount');
+  }
   const schedule = buildSchedule(template.schedule);
-  const materialization = buildMaterialization(template.materialization, amount);
+  const materialization = buildMaterialization(template.materialization, amount, indexedPrice !== null);
   return {
     versionNo: input.versionNo,
     effectiveFrom: input.effectiveFrom,
@@ -287,6 +318,7 @@ export function buildDefinitionVersion(input: {
     paymentMethod: paymentMethod as PaymentMethod | null,
     schedule,
     materialization,
+    ...(indexedPrice !== null ? { indexedPrice } : {}),
   };
 }
 
@@ -315,5 +347,6 @@ export function templateOf(version: DefinitionVersion): TemplateInput {
       autoCreateStatus: version.materialization.autoCreateStatus,
       leadDays: version.materialization.leadDays,
     },
+    ...(version.indexedPrice ? { indexedPrice: version.indexedPrice } : {}),
   };
 }

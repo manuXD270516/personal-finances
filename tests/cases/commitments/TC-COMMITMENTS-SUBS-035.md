@@ -5,16 +5,17 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Precio en una moneda distinta de la cuenta de pago'
 scenario: 'Sin tasa al generar el cargo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012', 'FR-COMMITMENTS-004']
 nfr: []
 invariants: ['INV-002']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'fx', 'indexed-amount']
@@ -32,7 +33,7 @@ expected_result:
   - 'La ocurrencia del 2026-12-15 no tiene monto esperado y exige el monto real al confirmarla'
   - 'No existe una ocurrencia de 10.99 BOB'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-035 — Sin tasa al generar el cargo de una suscripción indexada el cargo queda sin monto, nunca 1:1

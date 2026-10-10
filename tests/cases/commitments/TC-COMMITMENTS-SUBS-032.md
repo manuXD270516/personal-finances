@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ['commitments/subscriptions']
 requirement: 'Notificación de posible cambio de precio de una suscripción'
 scenario: 'Aumento detectado de MusicBox'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-005', 'FR-COMMITMENTS-014']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/subscription-notifications.test.ts
+  - packages/contexts/notifications/src/domain/subscription-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'subscriptions', 'price-detection']
@@ -31,7 +33,7 @@ expected_result:
   - 'VIEWER: ninguna'
   - 'Hecho MANUAL: ninguna notificación (inbox registrado)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-032 — Un cambio de precio detectado notifica a OWNER y EDITOR y uno manual no notifica

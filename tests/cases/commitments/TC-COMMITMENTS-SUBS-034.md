@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ['commitments/subscriptions']
 requirement: 'Idioma de las notificaciones de suscripciones'
 scenario: 'Renovación en inglés'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002']
 nfr: ['NFR-USAB-001', 'NFR-USAB-002']
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/subscription-notifications.test.ts
+  - packages/contexts/notifications/src/domain/subscription-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'i18n', 'subscriptions']
@@ -31,7 +33,7 @@ expected_result:
   - 'fr-FR: texto en español (respaldo)'
   - 'Montos y fechas con el formato del locale'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-034 — Las notificaciones de suscripciones se presentan en inglés y portugués según el locale

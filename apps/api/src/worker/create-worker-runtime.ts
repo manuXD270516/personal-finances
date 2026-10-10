@@ -71,7 +71,7 @@ import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
-import { registerCommitmentsJob } from './commitments-jobs.js';
+import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-jobs.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
@@ -80,6 +80,7 @@ import { portabilityOptions } from '../portability/portability-wiring.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
 import {
   AUDIT_POLICIES,
+  counterpartyNamesOf,
   demoDataOptions,
   financeRuntimes,
   financialPeriodPort,
@@ -390,6 +391,7 @@ export async function createWorkerRuntime(
     transactions: finance.transactions.recurring,
     links: finance.transactions.links,
     pending: finance.transactions.pending,
+    counterpartyNames: counterpartyNamesOf(finance.classification.counterparties),
     horizonDays: config.COMMITMENTS_HORIZON_DAYS,
     rateValidityWindowDays,
     counters: otelCounters('@pf/commitments'),
@@ -397,6 +399,10 @@ export async function createWorkerRuntime(
   });
   await registerCommitmentsJob(queue, commitments.generate, activeWorkspaces, logger, {
     cron: config.COMMITMENTS_SCHEDULER_CRON,
+    runOnStart: options.commitmentsOnStart ?? true,
+  });
+  await registerSubscriptionsJob(queue, commitments.subscriptionDaily, activeWorkspaces, logger, {
+    cron: config.COMMITMENTS_SUBSCRIPTIONS_CRON,
     runOnStart: options.commitmentsOnStart ?? true,
   });
 

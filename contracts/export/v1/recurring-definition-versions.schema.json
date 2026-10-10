@@ -33,7 +33,9 @@
     "auto_create_status",
     "lead_days",
     "created_at",
-    "created_by"
+    "created_by",
+    "indexed_amount",
+    "indexed_currency"
   ],
   "properties": {
     "workspace_id": {
@@ -176,6 +178,19 @@
         "null"
       ],
       "format": "uuid"
+    },
+    "indexed_amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "indexed_currency": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "x-pfos-table": "commitments.recurring_definition_version",

@@ -152,6 +152,16 @@ export const ERROR_CATALOG = {
   OCCURRENCE_LINK_MISMATCH: { status: 422, title: 'The transaction does not match the occurrence' },
   OCCURRENCE_ALREADY_MATERIALIZED: { status: 409, title: 'The occurrence already has its transaction' },
   TRANSACTION_ALREADY_LINKED: { status: 409, title: 'The transaction already resolves another occurrence' },
+  RECURRING_MANAGED_EXTERNALLY: {
+    status: 409,
+    title: 'The recurring definition is managed by another module; operate it from there',
+  },
+  // commitments / subscriptions (Phase 3)
+  SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL: {
+    status: 422,
+    title: 'The price effective date must be after the last price entry',
+  },
+  SUBSCRIPTION_PROPOSAL_NOT_PENDING: { status: 409, title: 'The price proposal is no longer pending' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

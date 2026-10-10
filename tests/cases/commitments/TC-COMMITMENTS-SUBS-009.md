@@ -5,16 +5,17 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Período de prueba y su fin'
 scenario: 'Cancelación durante el trial'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012', 'FR-COMMITMENTS-017']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'trial', 'cancel']
@@ -33,7 +34,7 @@ expected_result:
   - 'La ocurrencia del 2026-11-20 queda CANCELLED (ENDED) y la definición está finalizada'
   - 'No hay transacciones de "CloudDrive"'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-009 — Cancelar durante el trial deja la suscripción sin ningún cargo esperado ni transacción

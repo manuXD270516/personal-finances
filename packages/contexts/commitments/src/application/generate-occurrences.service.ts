@@ -183,8 +183,9 @@ export class GenerateOccurrencesService {
       }
       await recordOccurrences(deps, items);
 
-      // (c) fin de la serie: sin fechas por generar y hoy supera la última
-      if (def.status === 'ACTIVE') {
+      // (c) fin de la serie: sin fechas por generar y hoy supera la última. Una definición administrada (suscripción)
+      // la termina quien la administra al ejecutar su cancelación programada, para poder deshacerla (N10).
+      if (def.status === 'ACTIVE' && def.snapshot.managedBy === 'USER') {
         const end = seriesEnd(def);
         if (end.finite && (end.last === null || today.compare(end.last) > 0)) {
           this.end(def, (end.last ?? today).toString(), at);

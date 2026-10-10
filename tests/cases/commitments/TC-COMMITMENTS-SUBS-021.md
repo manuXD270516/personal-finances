@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Detección de cambio de precio con tolerancia'
 scenario: 'Diferencia exactamente en el límite'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-014']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/pricing.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-detection', 'boundary']
@@ -32,7 +34,7 @@ expected_result:
   - '10.05 USD ⇒ WITHIN_TOLERANCE'
   - '252.51 BOB ⇒ PRICE_CHANGE_DETECTED (la comparación usa precisión completa, no el desvío redondeado)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-021 — Una diferencia igual o menor a la tolerancia no crea propuesta

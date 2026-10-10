@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Historial de precios inmutable con vigencia'
 scenario: 'Intento de editar una entrada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-013']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/domain/subscription/price-history.test.ts
+  - packages/contexts/commitments/test/integration/pg-subscriptions.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-history', 'immutability']
@@ -31,7 +33,7 @@ expected_result:
   - 'Ambos intentos fallan (forbid_mutation / sin grant)'
   - 'Precio vigente 10.99 USD el 2027-02-28 y 12.99 USD el 2027-03-15'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-012 — El historial de precios es append-only: una entrada no se modifica ni se borra

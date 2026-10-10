@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/SubscriptionPriceChanged.v1.schema.json",
+  "title": "commitments.SubscriptionPriceChanged.v1",
+  "description": "Hay evidencia de un precio distinto desde `effectiveFrom` (docs/35 D118): `DETECTED` (un cargo vinculado supera la tolerancia; crea una propuesta pendiente), `MANUAL` (el EDITOR registró un precio nuevo) o `CORRECTION` (reemplazo de una entrada del historial cuyo precio vigente hacia adelante cambia). Aceptar una propuesta NO lo vuelve a publicar. Productor: COMMITMENTS. Consumidor: NOTIFY (`notifications.subscription-price-change`, solo `DETECTED`). Idempotencia natural: (subscriptionId, effectiveFrom, origin). PII baja: `providerName`.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.SubscriptionPriceChanged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Subscription"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "subscriptionId",
+        "definitionId",
+        "counterpartyId",
+        "providerName",
+        "previousPrice",
+        "newPrice",
+        "effectiveFrom",
+        "changePercentage",
+        "origin",
+        "proposalId",
+        "chargeId",
+        "transactionId"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "subscriptionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "counterpartyId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "providerName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre del provider (PII B): NOTIFY no consulta otros contextos para renderizar."
+        },
+        "previousPrice": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "newPrice": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "effectiveFrom": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "changePercentage": {
+          "type": "string",
+          "pattern": "^[+-][0-9]+[.][0-9]{2}$",
+          "description": "Variación porcentual con signo y 2 decimales (HALF_EVEN), p. ej. `+20.02`."
+        },
+        "origin": {
+          "enum": [
+            "DETECTED",
+            "MANUAL",
+            "CORRECTION"
+          ]
+        },
+        "proposalId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "chargeId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transactionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000501",
+      "eventType": "commitments.SubscriptionPriceChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T10:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Subscription",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000a5001",
+      "aggregateVersion": 5,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "subscriptionId": "01928c4e-0000-7000-8000-0000000a5001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "counterpartyId": "01928c4e-0000-7000-8000-0000000c0001",
+        "providerName": "MusicBox",
+        "previousPrice": {
+          "amount": "9.99",
+          "currency": "USD"
+        },
+        "newPrice": {
+          "amount": "11.99",
+          "currency": "USD"
+        },
+        "effectiveFrom": "2026-11-05",
+        "changePercentage": "+20.02",
+        "origin": "DETECTED",
+        "proposalId": "01928c4e-0000-7000-8000-0000000b0001",
+        "chargeId": "01928c4e-0000-7000-8000-0000000c4001",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7001"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000502",
+      "eventType": "commitments.SubscriptionPriceChanged",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T10:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Subscription",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000a5001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "subscriptionId": "01928c4e-0000-7000-8000-0000000a5001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "counterpartyId": "01928c4e-0000-7000-8000-0000000c0001",
+        "providerName": "Streamly",
+        "previousPrice": {
+          "amount": "10.99",
+          "currency": "USD"
+        },
+        "newPrice": {
+          "amount": "12.99",
+          "currency": "USD"
+        },
+        "effectiveFrom": "2027-03-15",
+        "changePercentage": "+18.20",
+        "origin": "MANUAL",
+        "proposalId": null,
+        "chargeId": null,
+        "transactionId": null
+      }
+    }
+  ]
+}

@@ -19,6 +19,7 @@ import type { Pool } from 'pg';
 import { CommitmentsQueries } from '../application/commitments.queries.js';
 import { DefinitionsService } from '../application/definitions.service.js';
 import { GenerateOccurrencesService } from '../application/generate-occurrences.service.js';
+import { EngineManagedDefinitions } from '../application/managed-definitions.js';
 import { OccurrencesService } from '../application/occurrences.service.js';
 import type {
   CommitmentsDeps,
@@ -27,16 +28,27 @@ import type {
   OutboxPort,
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
+import type { CounterpartyNames, SubscriptionsDeps } from '../application/ports/subscriptions.js';
+import { SubscriptionChargesService } from '../application/subscription-charges.service.js';
+import { SubscriptionDailyService } from '../application/subscription-daily.service.js';
+import { SubscriptionsQueries } from '../application/subscriptions.queries.js';
+import { SubscriptionsService } from '../application/subscriptions.service.js';
 import {
   COMMITMENTS_CONSUMERS,
   COMMITMENTS_GENERATE_JOB,
+  COMMITMENTS_SUBSCRIPTION_JOB,
   type CommittedQuery,
   type DefinitionStatsQuery,
   type OccurrenceLinkPort,
   type ResolvedOccurrencesQuery,
+  type SubscriptionsQuery,
   type UpcomingPaymentsQuery,
 } from '../contracts/index.js';
-import { RECURRING_DEFINITION_LIFECYCLE, RECURRING_OCCURRENCE_LIFECYCLE } from '../domain/index.js';
+import {
+  RECURRING_DEFINITION_LIFECYCLE,
+  RECURRING_OCCURRENCE_LIFECYCLE,
+  SUBSCRIPTION_LIFECYCLE,
+} from '../domain/index.js';
 import {
   PgCommitmentsUnitOfWork,
   PgDefinitionRepository,
@@ -44,11 +56,23 @@ import {
   uuidV7Ids,
 } from '../infrastructure/pg-commitments.js';
 import {
+  PgChargeRepository,
+  PgProposalRepository,
+  PgReminderRepository,
+  PgSubscriptionRepository,
+} from '../infrastructure/pg-subscriptions.js';
+import {
   COMMITMENTS_QUERIES,
   DEFINITIONS_SERVICE,
   OCCURRENCES_SERVICE,
   RecurringController,
 } from './recurring-http.js';
+import {
+  SUBSCRIPTION_CHARGES_SERVICE,
+  SUBSCRIPTIONS_QUERIES,
+  SUBSCRIPTIONS_SERVICE,
+  SubscriptionsController,
+} from './subscriptions-http.js';
 
 /** Horizonte de generación por omisión (`COMMITMENTS_HORIZON_DAYS`, D125). */
 export const DEFAULT_HORIZON_DAYS = 90;
@@ -75,6 +99,8 @@ export interface CommitmentsRuntimeOptions {
   readonly transactions: RecurringTransactionPort;
   readonly links: TransactionLinkQuery;
   readonly pending: PendingFlowQuery;
+  /** Nombre del provider (contraparte) por id, para los hechos y las vistas de suscripciones (CLASSIFICATION). */
+  readonly counterpartyNames: CounterpartyNames;
   /** `COMMITMENTS_HORIZON_DAYS` (14..366). */
   readonly horizonDays?: number;
   /** `REPORTING_RATE_VALIDITY_WINDOW` en días (la misma ventana que el Home). */
@@ -94,6 +120,13 @@ export interface CommitmentsRuntime {
   readonly resolved: ResolvedOccurrencesQuery;
   readonly stats: DefinitionStatsQuery;
   readonly linkPort: OccurrenceLinkPort;
+  /** Suscripciones (openspec add-subscriptions). */
+  readonly subscriptions: SubscriptionsService;
+  readonly subscriptionQueries: SubscriptionsQueries;
+  readonly subscriptionCharges: SubscriptionChargesService;
+  readonly subscriptionDaily: SubscriptionDailyService;
+  /** Contrato público para lectores futuros (Reporting, Planning). */
+  readonly subscriptionsQuery: SubscriptionsQuery;
 }
 
 /**
@@ -136,9 +169,25 @@ export function createCommitmentsRuntime(options: CommitmentsRuntimeOptions): Co
   };
   const queries = new CommitmentsQueries(deps);
   const occurrences = new OccurrencesService(deps);
+  const definitions = new DefinitionsService(deps);
+  const subscriptionDeps: SubscriptionsDeps = {
+    ...deps,
+    subscriptions: new PgSubscriptionRepository(),
+    proposals: new PgProposalRepository(),
+    charges: new PgChargeRepository(),
+    reminders: new PgReminderRepository(),
+    managed: new EngineManagedDefinitions(deps, definitions),
+    counterpartyNames: options.counterpartyNames,
+  };
+  const subscriptionQueries = new SubscriptionsQueries(subscriptionDeps);
   return {
-    definitions: new DefinitionsService(deps),
+    definitions,
     occurrences,
+    subscriptions: new SubscriptionsService(subscriptionDeps),
+    subscriptionQueries,
+    subscriptionCharges: new SubscriptionChargesService(subscriptionDeps),
+    subscriptionDaily: new SubscriptionDailyService(subscriptionDeps),
+    subscriptionsQuery: subscriptionQueries,
     queries,
     generate: new GenerateOccurrencesService(deps, occurrences),
     committed: queries,
@@ -171,12 +220,15 @@ export class CommitmentsModule {
   static register(options: CommitmentsModuleOptions): DynamicModule {
     return {
       module: CommitmentsModule,
-      controllers: [RecurringController],
+      controllers: [RecurringController, SubscriptionsController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: DEFINITIONS_SERVICE, useValue: options.runtime.definitions },
         { provide: OCCURRENCES_SERVICE, useValue: options.runtime.occurrences },
         { provide: COMMITMENTS_QUERIES, useValue: options.runtime.queries },
+        { provide: SUBSCRIPTIONS_SERVICE, useValue: options.runtime.subscriptions },
+        { provide: SUBSCRIPTION_CHARGES_SERVICE, useValue: options.runtime.subscriptionCharges },
+        { provide: SUBSCRIPTIONS_QUERIES, useValue: options.runtime.subscriptionQueries },
       ],
     };
   }
@@ -187,6 +239,8 @@ export const RECURRING_DEFINITION_LIFECYCLE_MACHINE: LifecycleMachineDto =
   RECURRING_DEFINITION_LIFECYCLE.definition;
 export const RECURRING_OCCURRENCE_LIFECYCLE_MACHINE: LifecycleMachineDto =
   RECURRING_OCCURRENCE_LIFECYCLE.definition;
+/** add-subscriptions: máquina `Subscription` (docs/35 D138). */
+export const SUBSCRIPTION_LIFECYCLE_MACHINE: LifecycleMachineDto = SUBSCRIPTION_LIFECYCLE.definition;
 
 const payloadOf = (event: { readonly payload: unknown }): Record<string, unknown> =>
   typeof event.payload === 'object' && event.payload !== null
@@ -208,6 +262,40 @@ export function commitmentsEventConsumers(runtime: CommitmentsRuntime): EventCon
         const transactionId = payloadOf(event)['transactionId'];
         if (typeof transactionId !== 'string') return;
         await runtime.occurrences.onTransactionVoided({ workspaceId: event.workspaceId, transactionId });
+      },
+    },
+    // add-subscriptions: cargos de suscripciones (detección de cambios de precio) y próxima renovación.
+    {
+      consumer: COMMITMENTS_CONSUMERS.subscriptionCharges,
+      concurrency: 1,
+      events: [
+        { type: 'commitments.RecurringOccurrenceMaterialized', version: 1 },
+        { type: 'commitments.RecurringOccurrenceChanged', version: 1 },
+      ],
+      handler: async (event) => {
+        const p = payloadOf(event);
+        const str = (key: string): string => (typeof p[key] === 'string' ? (p[key] as string) : '');
+        if (event.eventType === 'commitments.RecurringOccurrenceMaterialized') {
+          const amount = p['amount'] as { amount?: unknown; currency?: unknown } | undefined;
+          if (typeof amount?.amount !== 'string' || typeof amount.currency !== 'string') return;
+          await runtime.subscriptionCharges.onOccurrenceMaterialized({
+            workspaceId: event.workspaceId,
+            occurrenceId: str('occurrenceId'),
+            definitionId: str('definitionId'),
+            occurrenceDate: str('occurrenceDate'),
+            managedBy: str('managedBy'),
+            transactionId: str('transactionId'),
+            amount: { amount: amount.amount, currency: amount.currency },
+          });
+          return;
+        }
+        await runtime.subscriptionCharges.onOccurrenceChanged({
+          workspaceId: event.workspaceId,
+          occurrenceId: str('occurrenceId'),
+          definitionId: str('definitionId'),
+          managedBy: str('managedBy'),
+          transition: str('transition'),
+        });
       },
     },
   ];
@@ -265,7 +353,75 @@ export async function runGenerateOccurrences(
   );
 }
 
-export { COMMITMENTS_CONSUMERS, COMMITMENTS_GENERATE_JOB };
+/**
+ * Job `commitments.subscription-daily` (openspec add-subscriptions, decisión 12): recorre los workspaces activos y, por
+ * cada uno, termina los trials vencidos, ejecuta las cancelaciones programadas y emite los recordatorios, con el actor
+ * de proceso. Un workspace que falla no detiene a los demás; la ejecución siguiente lo reintenta.
+ */
+export async function runSubscriptionDaily(
+  service: SubscriptionDailyService,
+  workspaces: ActiveWorkspaceDirectory,
+  logger: Pick<Logger, 'info' | 'error'>,
+  trigger: 'cron' | 'startup' | 'manual',
+): Promise<{
+  readonly workspaces: number;
+  readonly trialsEnded: number;
+  readonly cancelled: number;
+  readonly reminders: number;
+  readonly failed: number;
+}> {
+  return runWithRequestContext(
+    { actor: { type: 'WORKER', process: COMMITMENTS_SUBSCRIPTION_JOB }, origin: 'recurring' },
+    async () => {
+      let trialsEnded = 0;
+      let cancelled = 0;
+      let reminders = 0;
+      let failed = 0;
+      const all = await workspaces.list();
+      for (const { workspaceId } of all) {
+        try {
+          const result = await service.runWorkspace(workspaceId);
+          trialsEnded += result.trialsEnded;
+          cancelled += result.cancelled;
+          reminders += result.reminders;
+          for (const f of result.failed) {
+            failed += 1;
+            logger.error(
+              { workspaceId, subscriptionId: f.subscriptionId, error: f.error },
+              'subscription item failed',
+            );
+          }
+        } catch (err) {
+          failed += 1;
+          logger.error(
+            {
+              workspaceId,
+              err: { type: err instanceof Error ? err.name : typeof err, message: String(err) },
+            },
+            'subscription daily failed for workspace',
+          );
+        }
+      }
+      logger.info(
+        {
+          job: COMMITMENTS_SUBSCRIPTION_JOB,
+          trigger,
+          workspaces: all.length,
+          trialsEnded,
+          cancelled,
+          reminders,
+          failed,
+        },
+        'subscriptions processed',
+      );
+      return { workspaces: all.length, trialsEnded, cancelled, reminders, failed };
+    },
+  );
+}
+
+export { COMMITMENTS_CONSUMERS, COMMITMENTS_GENERATE_JOB, COMMITMENTS_SUBSCRIPTION_JOB };
 export { COMMITMENTS_AUDIT_POLICY } from '../contracts/index.js';
 export type { GenerateOccurrencesService } from '../application/generate-occurrences.service.js';
 export type { FinancialPeriodPort, OutboxPort, WorkspaceSettingsPort } from '../application/ports/index.js';
+export type { CounterpartyNames } from '../application/ports/subscriptions.js';
+export type { SubscriptionDailyService } from '../application/subscription-daily.service.js';

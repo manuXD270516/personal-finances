@@ -143,7 +143,9 @@ Expand-only, sin datos que migrar: tablas nuevas en `commitments` (el schema lo 
 
 ## Cambios a docs compartidos
 
-(No editados por este change; los consolida el lead.)
+(**Aplicados el 2026-10-10** en docs/01, 03, 04, 05, 08, 10, 11, 14, 24, 28 y ARCHITECTURE.md —este último solo para documentar `COMMITMENTS_SUBSCRIPTIONS_CRON`—, además de `contracts/events/README.md`. Lo que sigue es la lista original.)
+
+Como se construyó N1–N12: N3 se resolvió en el motor (precio indexado, no el plan B); N4, N10 y N12 de forma aditiva; el puerto `RecurringDefinitionPort` quedó como `ManagedDefinitionPort` interno. Detalle en tasks.md § Notas de implementación.
 
 - **docs/01 §9**: FR-COMMITMENTS-014 — aclarar "cargo vinculado en la misma moneda del precio (o con el monto en la moneda del precio indicado por el usuario)" y que el evento lleva `origin`. FR-COMMITMENTS-016 — "N días antes (1–30, default 3), una vez por fecha". FR-NOTIFY-004 — tipos de Phase 3 de suscripciones con sus destinatarios.
 - **docs/04 §3.7**: `Subscription` con `priceCurrency`, `scheduledCancellationOn`, `reminder`, `tolerance`, entidades `PriceChangeProposal` y `SubscriptionCharge`; comandos nuevos (`SupersedeSubscriptionPrice`, `Accept/RejectPriceProposal`, `UndoScheduledCancellation`, `RecordChargeOriginalAmount`, `ResumeSubscription`); evento `SubscriptionTrialEnding`. **§4.7**: quitar `pending_cancellation` (atributo) y `expired` (fuera de alcance), agregar `paused → cancelled` y `trial → cancelled`.

@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Permisos, auditoría y aislamiento de suscripciones'
 scenario: 'VIEWER intenta cancelar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012', 'FR-AUDIT-001']
 nfr: ['NFR-SEC-003']
 invariants: ['INV-029']
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'authorization', 'audit']
@@ -33,7 +35,7 @@ expected_result:
   - 'VIEWER ⇒ 403 INSUFFICIENT_ROLE y "Streamly" sigue ACTIVE'
   - 'Entrada de auditoría con actor EDITOR y plan "Premium" → "Estándar"'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-016 — Un VIEWER no puede cancelar y cada cambio del EDITOR queda auditado

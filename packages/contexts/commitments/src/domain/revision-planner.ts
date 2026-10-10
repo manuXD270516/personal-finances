@@ -61,8 +61,11 @@ export const RevisionPlanner = {
     readonly effectiveFrom: LocalDate;
     readonly through: LocalDate | null;
     readonly existing: readonly ExistingOccurrence[];
+    /** Motivos de cancelación que se reinstauran si la regla vuelve a producir la fecha (por omisión `SUPERSEDED`). */
+    readonly reinstateReasons?: readonly CancelReason[];
   }): RevisionPlan {
     const { effectiveFrom, through } = input;
+    const reinstateReasons: readonly CancelReason[] = input.reinstateReasons ?? ['SUPERSEDED'];
     const wanted =
       through !== null && through.compare(effectiveFrom) >= 0
         ? candidates(input.source, { from: effectiveFrom, to: through })
@@ -76,7 +79,11 @@ export const RevisionPlanner = {
       const found = byDate.get(candidate.occurrenceDate.toString());
       if (!found) insert.push(candidate);
       else if (isUnresolved(found.status)) rewrite.push({ id: found.id, candidate });
-      else if (found.status === 'CANCELLED' && found.cancelReason === 'SUPERSEDED') {
+      else if (
+        found.status === 'CANCELLED' &&
+        found.cancelReason !== null &&
+        reinstateReasons.includes(found.cancelReason)
+      ) {
         reinstate.push({ id: found.id, candidate });
       }
     }

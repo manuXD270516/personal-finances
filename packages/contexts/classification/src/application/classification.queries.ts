@@ -233,6 +233,21 @@ export class ClassificationQueries {
     });
   }
 
+  /**
+   * `CounterpartyCatalogQuery.counterpartiesByIds` (Commitments): incluye archivadas; ids inexistentes se omiten. El
+   * contexto RLS conserva al usuario del actor ambiente (los procesos de fondo no tienen usuario).
+   */
+  counterpartiesByIds(
+    userId: string | null,
+    workspaceId: string,
+    counterpartyIds: readonly string[],
+  ): Promise<Counterparty[]> {
+    return this.deps.uow.run({ userId, workspaceId }, async () => {
+      const wanted = new Set(counterpartyIds);
+      return (await this.deps.counterparties.listAll(workspaceId)).filter((c) => wanted.has(c.id));
+    });
+  }
+
   /** Catálogo completo (grupos, categorías con subcategorías y tags; activos y archivados) para PLANNING. */
   categoryTree(
     userId: string,

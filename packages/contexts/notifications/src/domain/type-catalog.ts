@@ -261,11 +261,171 @@ const OCCURRENCE_DUE: NotificationTypeDefinition = {
   },
 };
 
+// ──────────────────────────────────────────────────────────────────────────── SUBSCRIPTION_* (add-subscriptions)
+
+export const SUBSCRIPTION_RENEWAL_MESSAGE_KEY = 'notifications.subscription_renewal.v1';
+export const SUBSCRIPTION_TRIAL_ENDING_MESSAGE_KEY = 'notifications.subscription_trial_ending.v1';
+export const SUBSCRIPTION_PRICE_CHANGE_MESSAGE_KEY = 'notifications.subscription_price_change.v1';
+
+const SIGNED_PERCENT = /^[+-]\d+\.\d{2}$/;
+
+function textOf(source: Record<string, unknown>, key: string): string {
+  const value = source[key];
+  return typeof value === 'string' && value.length > 0 ? value : fail(key);
+}
+
+function nullableTextOf(source: Record<string, unknown>, key: string): string | null {
+  return source[key] === null ? null : textOf(source, key);
+}
+
+function nullableMoneyOf(source: Record<string, unknown>, key: string): MoneyParam | null {
+  return source[key] === null ? null : moneyOf(source, key);
+}
+
+function daysOf(source: Record<string, unknown>, key: string): number {
+  const value = source[key];
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 30
+    ? value
+    : fail(key);
+}
+
+/**
+ * `commitments.SubscriptionRenewalUpcoming.v1`: faltan N días para la renovación. La clave de negocio es la
+ * suscripción y la fecha de renovación (INV-028 en dos capas: el job ya emite una vez por fecha, la clave cubre el
+ * hecho reentregado con otro identificador de evento). Los nombres viajan en el hecho (PII `B`): NOTIFY no consulta
+ * otros contextos para renderizar.
+ */
+const SUBSCRIPTION_RENEWAL: NotificationTypeDefinition = {
+  type: 'SUBSCRIPTION_RENEWAL',
+  consumer: 'notifications.subscription-renewal',
+  event: { type: 'commitments.SubscriptionRenewalUpcoming', version: 1 },
+  // Todos los miembros activos pueden leer suscripciones (docs/35 D143: VIEWER incluido).
+  recipients: ['OWNER', 'EDITOR', 'VIEWER'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const subscriptionId = uuidOf(p, 'subscriptionId');
+    const renewalDate = localDateOf(p, 'renewalDate');
+    if (typeof p['requiresApproval'] !== 'boolean') fail('requiresApproval');
+    const expectedCharge = nullableMoneyOf(p, 'expectedCharge');
+    return {
+      type: 'SUBSCRIPTION_RENEWAL',
+      dedupeKey: `subscription-renewal:${subscriptionId}:${renewalDate}`,
+      severity: 'INFO',
+      messageKey: SUBSCRIPTION_RENEWAL_MESSAGE_KEY,
+      params: {
+        subscriptionId,
+        providerName: textOf(p, 'providerName'),
+        planName: nullableTextOf(p, 'planName'),
+        renewalDate,
+        daysBefore: daysOf(p, 'daysBefore'),
+        expectedPrice: { ...moneyOf(p, 'expectedPrice') },
+        expectedCharge: expectedCharge === null ? null : { ...expectedCharge },
+        paymentAccountName:
+          typeof p['paymentAccountName'] === 'string' ? (p['paymentAccountName'] as string) : '',
+        requiresApproval: p['requiresApproval'] as boolean,
+      },
+      link: {
+        kind: 'SUBSCRIPTION',
+        subscriptionId,
+        periodId: subscriptionId,
+        periodLabel: renewalDate.slice(0, 7),
+      },
+    };
+  },
+};
+
+/** `commitments.SubscriptionTrialEnding.v1`: faltan N días para el fin del trial; avisa el primer cobro. */
+const SUBSCRIPTION_TRIAL_ENDING: NotificationTypeDefinition = {
+  type: 'SUBSCRIPTION_TRIAL_ENDING',
+  consumer: 'notifications.subscription-trial-ending',
+  event: { type: 'commitments.SubscriptionTrialEnding', version: 1 },
+  recipients: ['OWNER', 'EDITOR', 'VIEWER'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const subscriptionId = uuidOf(p, 'subscriptionId');
+    const trialEndsOn = localDateOf(p, 'trialEndsOn');
+    return {
+      type: 'SUBSCRIPTION_TRIAL_ENDING',
+      dedupeKey: `subscription-trial:${subscriptionId}:${trialEndsOn}`,
+      severity: 'WARNING',
+      messageKey: SUBSCRIPTION_TRIAL_ENDING_MESSAGE_KEY,
+      params: {
+        subscriptionId,
+        providerName: textOf(p, 'providerName'),
+        trialEndsOn,
+        daysBefore: daysOf(p, 'daysBefore'),
+        firstChargePrice: { ...moneyOf(p, 'firstChargePrice') },
+        paymentAccountName:
+          typeof p['paymentAccountName'] === 'string' ? (p['paymentAccountName'] as string) : '',
+      },
+      link: {
+        kind: 'SUBSCRIPTION',
+        subscriptionId,
+        periodId: subscriptionId,
+        periodLabel: trialEndsOn.slice(0, 7),
+      },
+    };
+  },
+};
+
+/**
+ * `commitments.SubscriptionPriceChanged.v1`: SOLO `origin = DETECTED` avisa (hay una propuesta por decidir); los
+ * orígenes `MANUAL` y `CORRECTION` los hizo el propio usuario y se consumen sin notificar (docs/35 D118, D143). La
+ * deduplicación es por suscripción y fecha de vigencia.
+ */
+const SUBSCRIPTION_PRICE_CHANGE: NotificationTypeDefinition = {
+  type: 'SUBSCRIPTION_PRICE_CHANGE',
+  consumer: 'notifications.subscription-price-change',
+  event: { type: 'commitments.SubscriptionPriceChanged', version: 1 },
+  // Requiere acción de quien puede decidir la propuesta (docs/35 D143): VIEWER no recibe.
+  recipients: ['OWNER', 'EDITOR'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const subscriptionId = uuidOf(p, 'subscriptionId');
+    const effectiveFrom = localDateOf(p, 'effectiveFrom');
+    const origin = p['origin'];
+    if (origin !== 'DETECTED' && origin !== 'MANUAL' && origin !== 'CORRECTION') fail('origin');
+    const changePercentage = p['changePercentage'];
+    if (typeof changePercentage !== 'string' || !SIGNED_PERCENT.test(changePercentage))
+      fail('changePercentage');
+    const proposalId = p['proposalId'] === null ? null : uuidOf(p, 'proposalId');
+    return {
+      type: 'SUBSCRIPTION_PRICE_CHANGE',
+      dedupeKey: `subscription-price:${subscriptionId}:${effectiveFrom}`,
+      severity: 'WARNING',
+      messageKey: SUBSCRIPTION_PRICE_CHANGE_MESSAGE_KEY,
+      params: {
+        subscriptionId,
+        providerName: textOf(p, 'providerName'),
+        previousPrice: { ...moneyOf(p, 'previousPrice') },
+        newPrice: { ...moneyOf(p, 'newPrice') },
+        effectiveFrom,
+        changePercentage: changePercentage as string,
+        origin: origin as string,
+        proposalId,
+      },
+      link: {
+        kind: 'SUBSCRIPTION',
+        subscriptionId,
+        ...(proposalId !== null ? { proposalId } : {}),
+        periodId: subscriptionId,
+        periodLabel: effectiveFrom.slice(0, 7),
+      },
+    };
+  },
+  suppressed(payload) {
+    return recordOf(payload, 'payload')['origin'] !== 'DETECTED';
+  },
+};
+
 /** Registro de tipos por fase: una tabla en código, no un motor de reglas (RISK-005). */
 export const NOTIFICATION_TYPE_CATALOG: readonly NotificationTypeDefinition[] = [
   BUDGET_THRESHOLD,
   MONTH_CLOSE_PENDING,
   OCCURRENCE_DUE,
+  SUBSCRIPTION_RENEWAL,
+  SUBSCRIPTION_TRIAL_ENDING,
+  SUBSCRIPTION_PRICE_CHANGE,
 ];
 
 export function definitionOf(type: NotificationType): NotificationTypeDefinition {

@@ -866,7 +866,7 @@ Los **actuals** del presupuesto no se guardan en `planning`. **As-built (Phase 2
 
 ### 5.7 `commitments` — Recurrence engine & Subscriptions (Phase 3)
 
-**Motor de recurrencia (`add-recurrence-engine`, expand-only).** Tres tablas en el schema `commitments`; nomenclatura canónica en [04](04-domain-model.md) §3.7/§4.4. Las suscripciones (`add-subscriptions`) se agregan después como subtipo de la definición (la tabla `subscription` no existe todavía). Ninguna tabla escribe en `ledger.*` ni en `txn.*`: la transacción de una ocurrencia la crea Transactions por su puerto público.
+**Motor de recurrencia (`add-recurrence-engine`, expand-only).** Tres tablas en el schema `commitments`; nomenclatura canónica en [04](04-domain-model.md) §3.7/§4.4. Las suscripciones (`add-subscriptions`, más abajo) se apoyan en una definición administrada (`managed_by = 'SUBSCRIPTION'`). Ninguna tabla escribe en `ledger.*` ni en `txn.*`: la transacción de una ocurrencia la crea Transactions por su puerto público.
 
 ```mermaid
 erDiagram
@@ -879,7 +879,7 @@ erDiagram
     text description
     text notes
     text kind "INCOME EXPENSE TRANSFER"
-    text managed_by "USER (SUBSCRIPTION y DEBT con expand)"
+    text managed_by "USER SUBSCRIPTION (DEBT con expand)"
     uuid managed_ref
     text status "ACTIVE PAUSED ENDED"
     int current_version_no
@@ -942,11 +942,84 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS / grants | version / archivo |
 |-------|--------|-------|---------|--------------|-------------------|
-| `recurring_definition` | `(workspace_id, id)` | `kind IN ('INCOME','EXPENSE','TRANSFER')`; `managed_by = 'USER'` (se relaja con un expand cuando Subscriptions o Debt administren definiciones); `status IN ('ACTIVE','PAUSED','ENDED')`; `name` de 1 a 120 caracteres | `(workspace_id, status, generated_through) WHERE status = 'ACTIVE'` (scheduler) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version`; sin archivo en Phase 3 (se filtra por estado, D128) |
-| `recurring_definition_version` | PK `(definition_id, version_no)` | coherencia de `kind` (`to_account_id` presente ⇔ `TRANSFER`; en dominio y trigger liviano); montos según `amount_type` (> 0, `min <= max`); `until_date IS NULL OR max_count IS NULL`; `lead_days BETWEEN 0 AND 60`; `materialization_mode <> 'AUTO_CREATE' OR amount_type IN ('FIXED','ESTIMATED')` | PK | **WS-RO**: `pf_app`/`pf_worker` SELECT, INSERT; `platform.forbid_mutation()` (append-only) | Inmutable |
+| `recurring_definition` | `(workspace_id, id)` | `kind IN ('INCOME','EXPENSE','TRANSFER')`; `managed_by IN ('USER','SUBSCRIPTION')` (add-subscriptions; `DEBT` con un expand cuando Debt administre definiciones) y `managed_ref` presente ⇔ `managed_by <> 'USER'`; `status IN ('ACTIVE','PAUSED','ENDED')`; `name` de 1 a 120 caracteres | `(workspace_id, status, generated_through) WHERE status = 'ACTIVE'` (scheduler) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version`; sin archivo en Phase 3 (se filtra por estado, D128) |
+| `recurring_definition_version` | PK `(definition_id, version_no)` | coherencia de `kind` (`to_account_id` presente ⇔ `TRANSFER`; en dominio y trigger liviano); montos según `amount_type` (> 0, `min <= max`); `until_date IS NULL OR max_count IS NULL`; `lead_days BETWEEN 0 AND 60`; `materialization_mode <> 'AUTO_CREATE' OR amount_type IN ('FIXED','ESTIMATED') OR indexed_amount IS NOT NULL`; `indexed_amount`/`indexed_currency` ambos o ninguno, solo con `amount_type = 'VARIABLE'` y en otra moneda que `currency` | PK | **WS-RO**: `pf_app`/`pf_worker` SELECT, INSERT; `platform.forbid_mutation()` (append-only) | Inmutable |
 | `recurring_occurrence` | **`(definition_id, occurrence_date)`** — generación idempotente (`INSERT ... ON CONFLICT DO NOTHING`, INV-013); parcial `(workspace_id, transaction_id) WHERE status IN ('MATERIALIZED','MATCHED')` (una transacción resuelve a lo sumo una ocurrencia) | `status IN ('MATERIALIZED','MATCHED')` ⇔ `transaction_id IS NOT NULL`; `status = 'CANCELLED'` ⇔ `cancel_reason IS NOT NULL` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','DUE','OVERDUE')` (comprometido y próximos pagos); `(workspace_id, status, due_date)` (job) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version` |
 
-Las tres tablas se registran en `platform.workspace_scoped_table` (purga demo, ADR-0026) y declaran sección de portabilidad (`recurring-definitions`, `recurring-definition-versions`, `recurring-occurrences`, orden 750). **Defensa en profundidad en `txn.transaction`** (§5.4): índice único parcial `(workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace = 'commitments.occurrence'`, creado con `CREATE UNIQUE INDEX CONCURRENTLY` en una migración separada: una transacción por ocurrencia aunque un bug reintente.
+Las tres tablas se registran en `platform.workspace_scoped_table` (purga demo, ADR-0026) y declaran sección de portabilidad (`recurring-definitions`, `recurring-definition-versions`, `recurring-occurrences`, órdenes 750–752). **Defensa en profundidad en `txn.transaction`** (§5.4): índice único parcial `(workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace = 'commitments.occurrence'`, creado con `CREATE UNIQUE INDEX CONCURRENTLY` en una migración separada: una transacción por ocurrencia aunque un bug reintente.
+
+**Suscripciones (`add-subscriptions`, expand-only).** Cinco tablas más en el mismo schema; una suscripción tiene **id propio** y `UNIQUE (definition_id)` (antes se modelaba con PK = `definition_id`; la cadencia vive en la definición, por eso `billing_cycle` desaparece), estados `TRIAL|ACTIVE|PAUSED|CANCELLED` (sin `pending_cancellation` ni `expired`: la cancelación programada es el atributo `scheduled_cancellation_on`). Dos columnas nuevas en `recurring_definition_version`: `indexed_amount` e `indexed_currency` (precio en otra moneda que la cuenta; la plantilla queda `VARIABLE` y cada ocurrencia estima `precio × tasa de valoración vigente al generarla`), y el CHECK de `managed_by` pasa a `IN ('USER','SUBSCRIPTION')` con `managed_ref` obligatorio si no es `USER`.
+
+```mermaid
+erDiagram
+  RECURRING_DEFINITION ||--|| SUBSCRIPTION : "una definición administrada"
+  SUBSCRIPTION ||--|{ SUBSCRIPTION_PRICE : "historial append-only"
+  SUBSCRIPTION ||--o{ SUBSCRIPTION_CHARGE : "cargos vinculados"
+  SUBSCRIPTION ||--o{ SUBSCRIPTION_PRICE_PROPOSAL : "propuestas"
+  SUBSCRIPTION_CHARGE ||--o{ SUBSCRIPTION_PRICE_PROPOSAL : "origen"
+  SUBSCRIPTION ||--o{ SUBSCRIPTION_REMINDER : "recordatorios emitidos"
+  SUBSCRIPTION {
+    uuid id PK
+    uuid workspace_id FK
+    uuid definition_id FK "UNIQUE"
+    uuid counterparty_id "ref classification.counterparty"
+    text name
+    text plan_name
+    ccy price_currency FK
+    text status "TRIAL ACTIVE PAUSED CANCELLED"
+    date trial_ends_on
+    date scheduled_cancellation_on
+    date cancelled_on
+    text cancellation_reason
+    bool reminders_enabled
+    smallint reminder_days "1..30"
+    numeric price_tolerance_percent "0..50"
+    date next_renewal_on "proyección"
+    int version
+  }
+  SUBSCRIPTION_PRICE {
+    uuid id PK
+    uuid subscription_id FK
+    date effective_from
+    numeric amount
+    ccy currency FK
+    text origin "INITIAL MANUAL PROPOSAL CORRECTION"
+    uuid supersedes_id "UNIQUE"
+  }
+  SUBSCRIPTION_CHARGE {
+    uuid id PK
+    uuid subscription_id FK
+    uuid occurrence_id "ref recurring_occurrence"
+    uuid transaction_id "ref txn.transaction"
+    numeric charged_amount
+    numeric price_currency_amount "monto del extracto"
+    numeric implied_rate
+    numeric deviation_percent
+    text outcome "WITHIN_TOLERANCE PRICE_CHANGE_DETECTED NOT_COMPARABLE VOIDED"
+  }
+  SUBSCRIPTION_PRICE_PROPOSAL {
+    uuid id PK
+    uuid subscription_id FK
+    uuid charge_id FK
+    date effective_from
+    text status "PENDING ACCEPTED REJECTED SUPERSEDED WITHDRAWN"
+  }
+  SUBSCRIPTION_REMINDER {
+    uuid subscription_id PK
+    text kind PK "RENEWAL TRIAL_END"
+    date target_date PK
+  }
+```
+
+| Tabla | Unique | Check | Índices | RLS / grants | version / archivo |
+|-------|--------|-------|---------|--------------|-------------------|
+| `subscription` | `(workspace_id, id)`; `(definition_id)` | `status IN ('TRIAL','ACTIVE','PAUSED','CANCELLED')`; `TRIAL` ⇒ `trial_ends_on`; `CANCELLED` ⇔ `cancelled_on`; `CANCELLED` ⇒ sin cancelación programada; `reminder_days BETWEEN 1 AND 30`; `price_tolerance_percent BETWEEN 0 AND 50` | `(workspace_id, status, next_renewal_on)` | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version`; sin archivo (se cancela, nunca se borra) |
+| `subscription_price` | `(supersedes_id)` — un solo reemplazo por entrada | `amount > 0`; `origin = 'CORRECTION'` ⇔ `supersedes_id IS NOT NULL` | `(subscription_id, effective_from)` | **WS-RO**: SELECT, INSERT; `platform.forbid_mutation()` | Inmutable (append-only) |
+| `subscription_charge` | parcial `(subscription_id, occurrence_id) WHERE outcome <> 'VOIDED'` — un cargo vigente por ocurrencia (idempotencia de negocio de la detección) | `charged_amount > 0`; `expected_amount > 0`; `outcome IN (...)` | `(workspace_id, transaction_id)`; `(subscription_id, occurrence_date DESC)` | WS; SELECT, INSERT, UPDATE | — |
+| `subscription_price_proposal` | `(subscription_id, effective_from)`; parcial `(subscription_id) WHERE status = 'PENDING'` — a lo sumo una pendiente | `ACCEPTED|REJECTED` ⇔ `decided_at` | — | WS; SELECT, INSERT, UPDATE | — |
+| `subscription_reminder` | PK `(workspace_id, subscription_id, kind, target_date)` — exactamente una vez por fecha | — | PK | **WS-RO**: SELECT, INSERT; `forbid_mutation` | Append-only |
+
+Las cinco tablas se registran en `platform.workspace_scoped_table` (órdenes 161–165: se purgan antes que las definiciones) y declaran sección de portabilidad (`subscriptions`, `subscription-prices`, `subscription-charges`, `subscription-price-proposals`, `subscription-reminders`, órdenes 760–764; `managed_ref`, `supersedes_id`, `proposal_id` y `charge_id` se remapean con el mapa de ids). `audit.lifecycle_state_divergences()` cubre también `Subscription`.
 
 ### 5.8 `goals` — Savings goals (Phase 4)
 

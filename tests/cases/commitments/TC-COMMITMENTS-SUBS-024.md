@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Cargos en una moneda distinta del precio'
 scenario: 'Monto en USD del extracto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-014', 'FR-COMMITMENTS-012']
 nfr: []
 invariants: ['INV-002']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/pricing.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'fx', 'price-detection']
@@ -33,7 +36,7 @@ expected_result:
   - 'Tras vincular: outcome NOT_COMPARABLE, tasa implícita 9.8726 BOB por USD, sin propuesta ni evento'
   - 'Tras indicar 12.99 USD: propuesta PENDING 12.99 USD desde 2026-11-15, "+18.20"'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-024 — Un cargo en BOB de una suscripción en USD registra la tasa implícita y detecta solo con el monto del extracto

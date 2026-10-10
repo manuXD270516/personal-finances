@@ -128,6 +128,7 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'Reconciliation',
   'RecurringDefinition',
   'RecurringOccurrence',
+  'Subscription',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

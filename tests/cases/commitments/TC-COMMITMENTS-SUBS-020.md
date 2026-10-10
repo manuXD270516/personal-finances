@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Detección de cambio de precio con tolerancia'
 scenario: 'Aumento detectado en el cargo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-014']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/pricing.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-detection', 'events']
@@ -35,7 +38,7 @@ expected_result:
   - 'Outbox: SubscriptionPriceChanged.v1 origin DETECTED, 9.99 → 11.99 USD, "+20.02"'
   - 'Precio vigente sigue 9.99 USD'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-020 — Un cargo que supera la tolerancia crea una propuesta y publica el cambio de precio detectado

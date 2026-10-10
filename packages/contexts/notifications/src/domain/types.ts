@@ -7,6 +7,10 @@ export const NOTIFICATION_TYPES = [
   // Phase 3 (add-recurrence-engine, FR-NOTIFY-004): una ocurrencia recurrente pasó a próxima.
   'RECURRING_PAYMENT_UPCOMING',
   'RECURRING_APPROVAL_REQUIRED',
+  // Phase 3 (add-subscriptions, FR-NOTIFY-004): renovación, fin de trial y posible cambio de precio de una suscripción.
+  'SUBSCRIPTION_RENEWAL',
+  'SUBSCRIPTION_TRIAL_ENDING',
+  'SUBSCRIPTION_PRICE_CHANGE',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -66,6 +70,19 @@ export type NotificationLink =
   | {
       readonly kind: 'RECURRING_OCCURRENCE';
       readonly occurrenceId: string;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    }
+  /**
+   * Suscripción (add-subscriptions): la web abre `/recurring/suscripciones/<subscriptionId>` (con `?propuesta=` si hay
+   * `proposalId`); si la suscripción ya no existe o fue cancelada, muestra el listado con el aviso "ya no está
+   * disponible". `periodId` es el id de la suscripción y `periodLabel` el mes de la fecha del hecho: el contrato HTTP
+   * del enlace los exige en todos sus tipos.
+   */
+  | {
+      readonly kind: 'SUBSCRIPTION';
+      readonly subscriptionId: string;
+      readonly proposalId?: string;
       readonly periodId: string;
       readonly periodLabel: string;
     };

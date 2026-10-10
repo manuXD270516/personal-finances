@@ -5,16 +5,17 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Estados y transiciones de la suscripción'
 scenario: 'Pausar una suscripción en trial'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/domain/subscription/subscription.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'state-machine']
@@ -32,7 +33,7 @@ expected_result:
   - 'Ambas operaciones se rechazan con INVALID_STATUS_TRANSITION'
   - '"CloudDrive" sigue TRIAL y "OldTV" sigue CANCELLED'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-007 — Una transición no permitida se rechaza sin cambiar el estado

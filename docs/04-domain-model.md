@@ -272,13 +272,13 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 - **AR `RecurringDefinition`** (nomenclatura canónica fijada por `add-recurrence-engine`, decisión 2): `id, workspaceId, name, description, kind (INCOME|EXPENSE|TRANSFER; reservados LOAN_PAYMENT|CARD_PAYMENT hasta Phase 4, D116), managedBy (USER|SUBSCRIPTION|DEBT; hoy solo USER), status (ACTIVE|PAUSED|ENDED), currentVersionNo, versions: DefinitionVersion[], generatedThrough, version`. **VO `DefinitionVersion`** (inmutable, append-only): `versionNo, effectiveFrom, template (accountId, toAccountId?, categoryId?, counterpartyId?, tagIds, paymentMethod?), schedule (RecurrenceRule + cadencia), amountSpec (FIXED|ESTIMATED|MIN_MAX|VARIABLE), materialization (AUTO_CREATE con autoCreateStatus PENDING|POSTED | PENDING_APPROVAL | NOTIFY_ONLY), leadDays`.
 - **AR `RecurringOccurrence`**: `id, definitionId, occurrenceDate (nominal, clave), dueDate (ajustada o editada), definitionVersionNo, expected: AmountSpec, overridden {amount, date}, status (SCHEDULED|DUE|OVERDUE|MATERIALIZED|MATCHED|SKIPPED|CANCELLED), cancelReason? (PAUSED|SUPERSEDED|ENDED), transactionId?, resolution? (CREATED|MATCHED|SKIPPED), version`. Agregado separado (alto volumen, ciclo propio).
-- **AR `Subscription`**: `id, counterpartyId, name, plan, price: Money, billingRule: RecurrenceRule, accountId, status, trialEndsOn?, nextRenewalOn, priceHistory: VO[] (effectiveFrom, price), recurringDefinitionId, cancellationNotes?`.
-- **DS**: `RecurrenceEngine` (expansión pura del `RecurrenceRule`), `OccurrenceGenerator` (ventana deslizante idempotente), `OccurrenceMatcher` (tolerancias de monto/fecha/contraparte), `SubscriptionDetector` (Phase 6+, sugerencias).
+- **AR `Subscription`** (add-subscriptions): `id, workspaceId, definitionId (una definición recurrente propia, administrada: managedBy = SUBSCRIPTION), counterpartyId (provider), name, planName?, priceCurrency, status (TRIAL|ACTIVE|PAUSED|CANCELLED), trialEndsOn?, scheduledCancellationOn? (atributo, no un estado), cancelledOn?, cancellationReason?, cancellationUrl?, reminder {enabled, daysBefore 1..30}, tolerance (0.00–50.00 %, default 1.00), nextRenewalOn (proyección), version`. El ciclo, la cuenta de pago, la categoría y el modo de materialización viven en la definición. Entidades: `PriceHistoryEntry {id, effectiveFrom, price: Money, origin (INITIAL|MANUAL|PROPOSAL|CORRECTION), supersedesId?, proposalId?}` (historial inmutable: una entrada reemplazada es la que otra referencia con `supersedesId`), `PriceChangeProposal {id, chargeId, effectiveFrom, previousPrice, proposedPrice, changePercent, status (PENDING|ACCEPTED|REJECTED|SUPERSEDED|WITHDRAWN)}` y `SubscriptionCharge {id, occurrenceId, occurrenceDate, transactionId, charged: Money, priceCurrencyAmount?, expectedPrice, impliedRate?, deviationPercent?, outcome (WITHIN_TOLERANCE|PRICE_CHANGE_DETECTED|NOT_COMPARABLE|VOIDED)}`.
+- **DS**: `RecurrenceEngine` (expansión pura del `RecurrenceRule`), `OccurrenceGenerator` (ventana deslizante idempotente), `OccurrenceMatcher` (tolerancias de monto/fecha/contraparte), `SubscriptionDetector` (Phase 6+, sugerencias); de add-subscriptions, puros: `SubscriptionStateMachine`, `PriceHistory` (vigente en fecha, cronología, reemplazo), `PriceChangeDetector` (comparación estricta con la tolerancia, `NOT_COMPARABLE` entre monedas), `SubscriptionCostCalculator` (renovaciones por año, anualizado/mensualizado sin redondeo intermedio) y `RenewalReminderPolicy` (ventana `[hoy, hoy + N]`).
 - **Repos**: uno por AR. **Ports**: `TransactionsCommandPort` (sync; en Phase 3 `RecurringTransactionPort` de `@pf/transactions/contracts`), `Clock`, `JobScheduler`.
-- **Comandos**: `CreateDefinition`, `UpdateDefinitionDetails` (anotación), `ReviseDefinition` ("esta y las siguientes": nueva versión inmutable), `PauseDefinition`, `ResumeDefinition`, `EndDefinition`, `GenerateOccurrences(workspace)` (job), `MaterializeOccurrence` ("Aprobar" en la UI; crea la transacción), `EditOccurrence`, `SkipOccurrence`, `LinkOccurrence(transactionId)`, `CreateSubscription`, `ChangeSubscriptionPrice`, `PauseSubscription`, `CancelSubscription`.
-- **Queries**: `ListUpcomingOccurrences(range)`, `GetDefinition`, `ListSubscriptions`, `GetSubscriptionCostSummary`.
-- **Eventos**: `OccurrencesGenerated` (batch, ver [11](11-domain-events.md)), `RecurringOccurrenceDue`, `RecurringOccurrenceMaterialized`, `RecurringOccurrenceChanged`, `RecurringDefinitionChanged`, `SubscriptionPriceChanged`, `SubscriptionRenewalUpcoming`, `SubscriptionCancelled`.
-- **Invariantes**: INV-013; una ocurrencia materializada referencia exactamente una transacción; editar o revisar una definición no altera ocurrencias ya resueltas (`MATERIALIZED|MATCHED|SKIPPED`) ni sus transacciones; una transacción resuelve a lo sumo una ocurrencia; `priceHistory` ordenada y sin solapes.
+- **Comandos**: `CreateDefinition`, `UpdateDefinitionDetails` (anotación), `ReviseDefinition` ("esta y las siguientes": nueva versión inmutable), `PauseDefinition`, `ResumeDefinition`, `EndDefinition`, `GenerateOccurrences(workspace)` (job), `MaterializeOccurrence` ("Aprobar" en la UI; crea la transacción), `EditOccurrence`, `SkipOccurrence`, `LinkOccurrence(transactionId)`, `CreateSubscription`, `UpdateSubscription`, `ChangeSubscriptionPrice`, `SupersedeSubscriptionPrice`, `AcceptPriceProposal`, `RejectPriceProposal`, `PauseSubscription`, `ResumeSubscription`, `CancelSubscription` (inmediata o programada), `UndoScheduledCancellation`, `RecordChargeOriginalAmount`.
+- **Queries**: `ListUpcomingOccurrences(range)`, `GetDefinition`, `ListSubscriptions`, `GetSubscription`, `ListSubscriptionCharges`, `GetSubscriptionCostSummary`, `GetSubscriptionLifecycle`.
+- **Eventos**: `OccurrencesGenerated` (batch, ver [11](11-domain-events.md)), `RecurringOccurrenceDue`, `RecurringOccurrenceMaterialized`, `RecurringOccurrenceChanged`, `RecurringDefinitionChanged`, `SubscriptionPriceChanged` (un solo hecho con `origin` DETECTED|MANUAL|CORRECTION; aceptar una propuesta no lo republica, docs/35 D118), `SubscriptionRenewalUpcoming`, `SubscriptionTrialEnding`, `SubscriptionCancelled`.
+- **Invariantes**: INV-013; una ocurrencia materializada referencia exactamente una transacción; editar o revisar una definición no altera ocurrencias ya resueltas (`MATERIALIZED|MATCHED|SKIPPED`) ni sus transacciones; una transacción resuelve a lo sumo una ocurrencia; el historial de precios de una suscripción es append-only, ordenado y sin solapes (la vigencia de una entrada nueva es posterior a la última no reemplazada); una suscripción tiene exactamente una definición recurrente y las acciones de usuario sobre esa definición se rechazan con `RECURRING_MANAGED_EXTERNALLY`; un cargo de suscripción nunca se recalcula con la tasa de hoy (INV-012).
 
 ### 3.8 GOALS — Savings Goals (`goals`)
 
@@ -541,19 +541,17 @@ Un préstamo **existente** al empezar a usar el sistema entra directo a `active`
 stateDiagram-v2
   [*] --> trial: CreateSubscription (con trial)
   [*] --> active: CreateSubscription
-  trial --> active: trialEndsOn alcanzado
+  trial --> active: trialEndsOn alcanzado (job, una sola vez)
   trial --> cancelled: CancelSubscription
   active --> active: ChangeSubscriptionPrice / renovación
   active --> paused: PauseSubscription
   paused --> active: ResumeSubscription
-  active --> pending_cancellation: CancelSubscription(atPeriodEnd)
-  pending_cancellation --> cancelled: fin del ciclo pagado
-  pending_cancellation --> active: ResumeSubscription
-  active --> cancelled: CancelSubscription(immediate)
-  active --> expired: sin renovación (pago fallido / plan fijo)
+  paused --> cancelled: CancelSubscription
+  active --> cancelled: CancelSubscription
   cancelled --> [*]
-  expired --> [*]
 ```
+
+La cancelación al fin del ciclo pagado **no es un estado** (`pending_cancellation` se retira, docs/35 D139): es el atributo `scheduledCancellationOn` sobre `trial|active|paused`, que el job ejecuta (`→ cancelled`) al llegar la fecha en la zona del workspace y que el EDITOR puede deshacer antes. Tampoco existe `expired` (docs/35 D140): un plan de duración fija se modela con una cancelación programada. Máquina `Subscription` registrada en `audit/lifecycle-timeline` (docs/35 D138).
 
 ## 5. Validación de la lista original de tablas candidatas
 

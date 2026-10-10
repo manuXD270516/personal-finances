@@ -42,6 +42,11 @@ function Recurring({ ctx }: { ctx: WorkspaceContext }) {
     <section aria-labelledby="recurring-title" style={pageStyle}>
       <h1 id="recurring-title">{f.t('title')}</h1>
       <p style={mutedStyle}>{f.t('intro')}</p>
+      <p style={{ margin: 0 }}>
+        <a href={ctx.href('/recurring/suscripciones')} data-testid="subscriptions-link">
+          {f.t('subscriptionsLink')}
+        </a>
+      </p>
       {status ? (
         <p ref={statusRef} tabIndex={-1} role="status" data-testid="recurring-status">
           {status}

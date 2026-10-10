@@ -5,16 +5,20 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Costo mensualizado y anualizado en moneda base'
 scenario: 'Costo de las suscripciones del owner'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-015']
 nfr: []
 invariants: ['INV-001', 'INV-002']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - apps/api/test/perf/subscriptions.perf.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/pricing.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'cost', 'fx', 'valuation']
@@ -35,7 +39,7 @@ expected_result:
   - 'Gimnasio Centro 250.00 BOB/mes y 3000.00 BOB/año'
   - 'Total 487.86 BOB/mes y 5854.33 BOB/año, complete true, ratesUsed con USD/BOB y USDT/BOB PARALLEL'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-025 — El costo mensualizado y anualizado de las suscripciones del owner se valora en BOB con la tasa paralela de hoy

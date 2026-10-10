@@ -4,6 +4,9 @@ import {
   MONTH_CLOSE_PENDING_MESSAGE_KEY,
   RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY,
   RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY,
+  SUBSCRIPTION_PRICE_CHANGE_MESSAGE_KEY,
+  SUBSCRIPTION_RENEWAL_MESSAGE_KEY,
+  SUBSCRIPTION_TRIAL_ENDING_MESSAGE_KEY,
 } from './type-catalog.js';
 import { FORMAT_LOCALE, MESSAGE_CATALOGS } from './messages.js';
 import type { JsonValue, NotificationLocale, NotificationParams } from './types.js';
@@ -110,7 +113,22 @@ const message = (locale: NotificationLocale, key: string): string => {
 };
 
 type MessageKind =
-  'budget_threshold' | 'month_close_pending' | 'recurring_payment_upcoming' | 'recurring_approval_required';
+  | 'budget_threshold'
+  | 'month_close_pending'
+  | 'recurring_payment_upcoming'
+  | 'recurring_approval_required'
+  | 'subscription_renewal'
+  | 'subscription_trial_ending'
+  | 'subscription_price_change';
+
+const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
+  `${formatDecimal(value.amount, locale)} ${value.currency}`;
+
+/** `+20.02` → `+20,02` (el signo se conserva; el decimal sigue el locale). */
+const signedPercentText = (value: string, locale: NotificationLocale): string => {
+  const sign = value.startsWith('-') || value.startsWith('+') ? value[0] : '';
+  return `${sign}${formatDecimal(sign === '' ? value : value.slice(1), locale)}`;
+};
 
 const isRecurring = (kind: MessageKind): boolean =>
   kind === 'recurring_payment_upcoming' || kind === 'recurring_approval_required';
@@ -137,6 +155,9 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === MONTH_CLOSE_PENDING_MESSAGE_KEY) return 'month_close_pending';
   if (messageKey === RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY) return 'recurring_payment_upcoming';
   if (messageKey === RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY) return 'recurring_approval_required';
+  if (messageKey === SUBSCRIPTION_RENEWAL_MESSAGE_KEY) return 'subscription_renewal';
+  if (messageKey === SUBSCRIPTION_TRIAL_ENDING_MESSAGE_KEY) return 'subscription_trial_ending';
+  if (messageKey === SUBSCRIPTION_PRICE_CHANGE_MESSAGE_KEY) return 'subscription_price_change';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
 
@@ -169,6 +190,37 @@ function valuesOf(
       amount: expectedAmountText(params, locale) ?? '',
     };
   }
+  if (kind === 'subscription_renewal') {
+    const price = money(params, 'expectedPrice');
+    const charge = money(params, 'expectedCharge');
+    return {
+      provider: str(params, 'providerName'),
+      plan: str(params, 'planName'),
+      renewalDate: formatDate(str(params, 'renewalDate'), locale),
+      price: moneyText(price, locale),
+      charge: charge.currency === '' ? '' : moneyText(charge, locale),
+      account: str(params, 'paymentAccountName'),
+      days: String(params['daysBefore'] ?? ''),
+    };
+  }
+  if (kind === 'subscription_trial_ending') {
+    return {
+      provider: str(params, 'providerName'),
+      trialEndsOn: formatDate(str(params, 'trialEndsOn'), locale),
+      price: moneyText(money(params, 'firstChargePrice'), locale),
+      account: str(params, 'paymentAccountName'),
+      days: String(params['daysBefore'] ?? ''),
+    };
+  }
+  if (kind === 'subscription_price_change') {
+    return {
+      provider: str(params, 'providerName'),
+      previous: moneyText(money(params, 'previousPrice'), locale),
+      next: moneyText(money(params, 'newPrice'), locale),
+      percent: signedPercentText(str(params, 'changePercentage'), locale),
+      effectiveFrom: formatDate(str(params, 'effectiveFrom'), locale),
+    };
+  }
   return {
     period: str(params, 'periodLabel'),
     periodEnd: formatDate(str(params, 'periodEnd'), locale),
@@ -186,6 +238,15 @@ export function renderInApp(
   const title = fill(message(locale, `inapp.${kind}.title`), values);
   const bodyKey = isRecurring(kind) && values['amount'] === '' ? 'body_variable' : 'body';
   let body = fill(message(locale, `inapp.${kind}.${bodyKey}`), values);
+  if (kind === 'subscription_renewal') {
+    if (values['plan'] !== '')
+      body = `${fill(message(locale, 'inapp.subscription_renewal.plan'), values)} ${body}`;
+    if (values['charge'] !== '' && values['charge'] !== values['price']) {
+      body += ` ${fill(message(locale, 'inapp.subscription_renewal.charge'), values)}`;
+    }
+    if (params['requiresApproval'] === true)
+      body += ` ${message(locale, 'inapp.subscription_renewal.approval')}`;
+  }
   if (kind === 'budget_threshold') {
     if (strings(params, 'alsoCrossed').length > 0) {
       body += ` ${fill(message(locale, 'inapp.budget_threshold.also'), values)}`;

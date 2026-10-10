@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Cancelar una suscripción sin afectar el pasado'
 scenario: 'Cancelación con historia'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-017']
 nfr: []
 invariants: ['INV-012', 'INV-029']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/subscription.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'cancel', 'events']
@@ -36,7 +38,7 @@ expected_result:
   - 'Outbox: commitments.SubscriptionCancelled.v1'
   - 'La segunda cancelación ⇒ INVALID_STATUS_TRANSITION'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-015 — Cancelar finaliza la definición y conserva transacciones e historial

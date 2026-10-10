@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Listado y detalle de suscripciones'
 scenario: 'Listado por defecto sin canceladas'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'list']
@@ -32,7 +34,7 @@ expected_result:
   - 'Primera respuesta: Streamly, CloudDrive y MusicBox con su estado'
   - 'Segunda respuesta: solo OldTV'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-005 — El listado de suscripciones excluye las canceladas salvo al filtrar por ese estado

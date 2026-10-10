@@ -22,6 +22,7 @@ import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../c
 import type { FormatContext } from '../dashboard/types';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { formatBusinessDate } from '../planning/logic';
+import { subscriptionPath } from '../subscriptions/logic';
 import { useCatalogs, type Catalogs } from '../transactions/catalogs';
 import { AmountText, DefinitionStatusBadge } from './Badges';
 import { DefinitionFormView } from './DefinitionForm';
@@ -153,6 +154,14 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
         {f.t(`kinds.${def.kind}`)} · {cadenceSummary(def, f)} ·{' '}
         {f.t(`modes.${def.current.materialization.mode}`)}
       </p>
+      {def.managedBy === 'SUBSCRIPTION' ? (
+        <p role="note" data-testid="managed-by-subscription">
+          <span aria-hidden="true">ℹ</span> {f.t('detail.managedBySubscription')}{' '}
+          {def.managedRef ? (
+            <a href={ctx.href(subscriptionPath(def.managedRef))}>{f.t('detail.openSubscription')}</a>
+          ) : null}
+        </p>
+      ) : null}
       {def.description ? <p style={{ margin: 0 }}>{def.description}</p> : null}
       {def.notes ? <p style={mutedStyle}>{def.notes}</p> : null}
       {status ? (

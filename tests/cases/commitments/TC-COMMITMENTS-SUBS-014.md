@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Cambio de precio manual aplicado a renovaciones futuras'
 scenario: 'Vigencia anterior a la última'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-013']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/price-history.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-history']
@@ -31,7 +34,7 @@ expected_result:
   - 'Rechazo SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL'
   - 'Historial sin cambios y sin evento'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-014 — Un precio con vigencia anterior a la última entrada se rechaza

@@ -5,16 +5,17 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Costo mensualizado y anualizado en moneda base'
 scenario: 'Moneda sin tasa'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-015']
 nfr: []
 invariants: ['INV-002']
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'cost', 'fx']
@@ -31,7 +32,7 @@ expected_result:
   - 'unconverted: 5.000000 USDT'
   - 'Nunca 5.00 BOB (sin 1:1)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-026 — Sin tasa para una moneda el costo total queda incompleto con la parte sin convertir

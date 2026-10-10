@@ -63,7 +63,7 @@ tags:
   - name: Notifications
     description: "Phase 2: in-app notification center, email channel and preferences (budget thresholds, month pending close)."
   - name: Commitments
-    description: "Phase 3: recurring definitions, occurrences, committed amount and upcoming payments (add-recurrence-engine). Subscriptions: LATER."
+    description: "Phase 3: recurring definitions, occurrences, committed amount and upcoming payments (add-recurrence-engine); subscriptions with price history, price-change detection, cost and reminders (add-subscriptions)."
   - name: Goals
     description: "LATER (Phase 4): savings goals and contributions (transfer or earmark)."
   - name: Debt
@@ -6707,6 +6707,652 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/subscriptions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Commitments]
+      operationId: listSubscriptions
+      summary: List the subscriptions of the workspace
+      description: |
+        Ordered by next renewal. Without `status` the cancelled subscriptions are excluded; filter by `status=CANCELLED` to
+        see them. `nextRenewalOn` is the projection refreshed by every subscription command, by the charge consumer and by
+        the hourly subscription job.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          description: One or more statuses, comma separated.
+          schema: { type: string, examples: ['ACTIVE,TRIAL'] }
+        - name: counterpartyId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: paymentAccountId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Subscriptions page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Commitments]
+      operationId: createSubscription
+      summary: Register a subscription (creates its recurring definition and its first price)
+      description: |
+        The provider is an active counterparty, the price is positive in an enabled currency and the first renewal is the
+        start of the recurring definition (a managed expense definition, `managedBy = SUBSCRIPTION`). When the price
+        currency differs from the payment account currency, every expected charge is estimated with the valuation rate
+        of the pair (preferred type, parallel by default) valid when it is generated; without a rate the expected
+        charge has no amount (never 1:1). With `trialEndsOn` it starts in `TRIAL` and the first renewal must not precede
+        it.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionInput' }
+      responses:
+        '201':
+          description: Created subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'COUNTERPARTY_ARCHIVED, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED or CATEGORY_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, CURRENCY_NOT_ENABLED, REFERENCE_NOT_FOUND, VALIDATION_FAILED
+            (first renewal before the end of the trial, tolerance or reminder out of range), INVALID_RRULE,
+            RECURRING_INVALID_SCHEDULE or CATEGORY_KIND_MISMATCH.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/cost-summary:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Commitments]
+      operationId: getSubscriptionCostSummary
+      summary: Monthly and annual cost of the subscriptions in the base currency
+      description: |
+        Annual = price in force today x renewals per year of the cycle (weekly 52, biweekly 26, twice a month 24,
+        monthly 12, bimonthly 6, quarterly 4, semiannual 2, annual 1, daily 365, divided by the interval; a custom
+        rule counts the renewals of the next 12 months); monthly = annual / 12. Converted with the valuation rate of
+        today (same valuation and window as the Home and the budgets), without intermediate rounding. The total
+        includes the `ACTIVE` subscriptions (also those with a scheduled cancellation); `TRIAL` ones are shown apart
+        in `afterTrial` with the price of the first renewal; `PAUSED` and `CANCELLED` are excluded. Without a rate the
+        part is reported unconverted and the total is incomplete (never 1:1).
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Cost summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionCostSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    get:
+      tags: [Commitments]
+      operationId: getSubscription
+      summary: Get a subscription with its price history and pending proposal
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Commitments]
+      operationId: updateSubscription
+      summary: Edit a subscription without altering the past
+      description: |
+        Name, plan, category, materialization mode, reminder, tolerance and cancellation link are annotations. Changing the
+        payment account or the billing cycle needs `effectiveFrom` and applies only to the charges dated on or after it
+        (the recurring definition is revised "this and the following"); settled charges and their transactions never
+        change. A cancelled subscription cannot be edited (409 `INVALID_STATUS_TRANSITION`).
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionUpdate' }
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (cancelled), ACCOUNT_ARCHIVED, ACCOUNT_CLOSED or CATEGORY_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED (account or cycle change without effectiveFrom, tolerance or reminder out of range), INVALID_RRULE, RECURRING_INVALID_SCHEDULE, RECURRING_MODE_NOT_ALLOWED, CATEGORY_KIND_MISMATCH or REFERENCE_NOT_FOUND.
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/prices:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    post:
+      tags: [Commitments]
+      operationId: addSubscriptionPrice
+      summary: Register a new price with its effective date
+      description: |
+        The effective date must be after the last non-superseded entry (422 `SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL`) and the
+        price in the subscription currency (422 `CURRENCY_MISMATCH`). The entry is appended to the immutable history and the
+        recurring definition changes only for the charges dated on or after it; settled charges and transactions never change.
+        Publishes `commitments.SubscriptionPriceChanged.v1` with `origin = MANUAL`.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionPriceInput' }
+      responses:
+        '201':
+          description: Subscription with the new price entry
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (cancelled subscription).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL, CURRENCY_MISMATCH, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED or CURRENCY_NOT_ENABLED.
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/prices/{priceId}/supersede:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+      - $ref: '#/components/parameters/SubscriptionPriceId'
+    post:
+      tags: [Commitments]
+      operationId: supersedeSubscriptionPrice
+      summary: Correct a price entry registered by mistake
+      description: |
+        Registers a replacement with the same effective date; the original is kept, marked as superseded, and stops counting
+        for the price in force. A superseded entry admits no other replacement (409 `INVALID_STATUS_TRANSITION`). The recurring
+        definition changes for the unsettled charges dated on or after the date. Publishes `SubscriptionPriceChanged.v1` with
+        `origin = CORRECTION` only when the resulting price in force towards the future changes.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionPriceSupersedeRequest' }
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (the entry was already superseded, or the subscription is cancelled).'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            CURRENCY_MISMATCH, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED or CURRENCY_NOT_ENABLED.
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/price-proposals/{proposalId}/accept:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+      - $ref: '#/components/parameters/SubscriptionProposalId'
+    post:
+      tags: [Commitments]
+      operationId: acceptSubscriptionPriceProposal
+      summary: Accept a detected price change
+      description: |
+        Appends the proposed price to the history (`origin = PROPOSAL`) with the effective date of the proposal and updates the
+        recurring definition for the unsettled charges from that date, without publishing a second price-change fact. When the
+        proposed date is not after the last entry, `effectiveFrom` must be given and be after it (422
+        `SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL`).
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionPriceProposalAcceptRequest' }
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'SUBSCRIPTION_PROPOSAL_NOT_PENDING.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL.
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/price-proposals/{proposalId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+      - $ref: '#/components/parameters/SubscriptionProposalId'
+    post:
+      tags: [Commitments]
+      operationId: rejectSubscriptionPriceProposal
+      summary: Reject a detected price change
+      description: |
+        The price history does not change. A proposal that is not pending answers 409 `SUBSCRIPTION_PROPOSAL_NOT_PENDING`.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'SUBSCRIPTION_PROPOSAL_NOT_PENDING.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/pause:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    post:
+      tags: [Commitments]
+      operationId: pauseSubscription
+      summary: Pause an active subscription
+      description: |
+        Pauses its recurring definition: no expected charge stays pending while paused. Settled charges and transactions
+        never change. Only `ACTIVE` can be paused (409 `INVALID_STATUS_TRANSITION`).
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/resume:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    post:
+      tags: [Commitments]
+      operationId: resumeSubscription
+      summary: Resume a paused subscription
+      description: |
+        Resumes the definition without generating the charges of the dates elapsed during the pause; the next renewal is recomputed from today.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    post:
+      tags: [Commitments]
+      operationId: cancelSubscription
+      summary: Cancel a subscription now or at the end of the paid cycle
+      description: |
+        With `effectiveOn` today or earlier (default today) the subscription becomes `CANCELLED` and its recurring
+        definition ends: no expected charge dated on or after the cancellation date stays pending; transactions, settled charges
+        and the price history never change. With a future `effectiveOn` the cancellation is only scheduled (attribute
+        `scheduledCancellationOn`, the status does not change) and the hourly job cancels it when the date arrives in the
+        workspace time zone. `commitments.SubscriptionCancelled.v1` is published when it becomes `CANCELLED`.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionCancelRequest' }
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (already cancelled).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/scheduled-cancellation/undo:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    post:
+      tags: [Commitments]
+      operationId: undoScheduledSubscriptionCancellation
+      summary: Undo a scheduled cancellation
+      description: |
+        Removes the scheduled cancellation and reinstates the expected charges that were cancelled for it.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      x-rate-limit: costly
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Updated subscription
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (there is no scheduled cancellation).'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/charges:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    get:
+      tags: [Commitments]
+      operationId: listSubscriptionCharges
+      summary: Charges of the subscription linked to a transaction
+      description: |
+        Most recent first. A charge records the amount charged, the price in force at its nominal date, the deviation
+        (same currency) or the implied rate (charged / price, shown with 4 decimals, other currency) and the detection
+        outcome. A charge in another currency than the price is `NOT_COMPARABLE` until the EDITOR records the statement
+        amount in the price currency.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Charges page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionChargePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/charges/{chargeId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+      - $ref: '#/components/parameters/SubscriptionChargeId'
+    patch:
+      tags: [Commitments]
+      operationId: updateSubscriptionCharge
+      summary: Record the amount charged in the price currency (statement amount)
+      description: |
+        `If-Match` carries the version of the subscription (the charge has no version of its own). For a charge registered in another currency than the price (USD subscription charged on a BOB card): with the
+        statement amount in the price currency the price-change detection runs with the tolerance of the subscription and
+        may create a pending proposal.
+      x-openspec-capability: [commitments/subscriptions]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionChargeUpdate' }
+      responses:
+        '200':
+          description: Updated charge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionCharge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_MISMATCH (the amount must be in the price currency), AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED or VALIDATION_FAILED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    get:
+      tags: [Commitments]
+      operationId: getSubscriptionLifecycle
+      summary: Lifecycle of a subscription
+      description: |
+        Machine `SUBSCRIPTION_LIFECYCLE` (docs/31 D37, docs/35 D138): create (in trial or active), end of trial, pause,
+        resume, schedule or undo a scheduled cancellation and cancel; price, plan or account changes are annotations.
+        Automatic steps (end of trial, scheduled cancellation) carry the worker process as actor.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Subscription lifecycle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/subscriptions/{subscriptionId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/SubscriptionId'
+    get:
+      tags: [Commitments]
+      operationId: exportSubscriptionLifecycle
+      summary: Export the lifecycle of a subscription (CSV or PDF)
+      description: Same synchronous download as the other lifecycles (docs/31 D52); the export is audited.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -6937,6 +7583,30 @@ components:
       in: path
       required: true
       description: Recurring occurrence UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      description: Subscription UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    SubscriptionPriceId:
+      name: priceId
+      in: path
+      required: true
+      description: Subscription price history entry UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    SubscriptionProposalId:
+      name: proposalId
+      in: path
+      required: true
+      description: Subscription price proposal UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    SubscriptionChargeId:
+      name: chargeId
+      in: path
+      required: true
+      description: Subscription charge UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
 
   headers:
@@ -7323,6 +7993,9 @@ components:
         - OCCURRENCE_LINK_MISMATCH               # 422 (add-recurrence-engine: the transaction does not match the occurrence; details.reasons)
         - OCCURRENCE_ALREADY_MATERIALIZED        # 409 (add-recurrence-engine: the occurrence already has its transaction)
         - TRANSACTION_ALREADY_LINKED             # 409 (add-recurrence-engine: the transaction already resolves another occurrence)
+        - RECURRING_MANAGED_EXTERNALLY           # 409 (add-subscriptions: the definition is managed by a subscription; operate it from there)
+        - SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL   # 422 (add-subscriptions: the price effective date must be after the last price entry)
+        - SUBSCRIPTION_PROPOSAL_NOT_PENDING      # 409 (add-subscriptions: the price proposal was already decided, superseded or withdrawn)
 
     # ── Identity ──
     WorkspaceRole:
@@ -10194,11 +10867,11 @@ components:
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
       # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence]
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
@@ -11523,7 +12196,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -11548,13 +12221,21 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION]
         occurrenceId:
           description: >-
             Recurring occurrence (only `RECURRING_OCCURRENCE`, add-recurrence-engine): the app opens
             `/recurring/occurrences/{occurrenceId}`. In that kind `periodId` is the financial period of the due date
             (the occurrence id when no period covers it) and `periodLabel` the month of the due date.
           $ref: '#/components/schemas/Uuid'
+        subscriptionId:
+          description: >-
+            Subscription (only `SUBSCRIPTION`, add-subscriptions): the app opens `/recurring/suscripciones/{subscriptionId}`
+            (with the pending price proposal when `proposalId` is present); if the subscription no longer exists or was
+            cancelled it shows the list with a "no longer available" notice. In that kind `periodId` is the subscription
+            id and `periodLabel` the month of the date of the fact.
+          $ref: '#/components/schemas/Uuid'
+        proposalId: { $ref: '#/components/schemas/Uuid' }
         periodId: { $ref: '#/components/schemas/Uuid' }
         periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
         budgetId: { $ref: '#/components/schemas/Uuid' }
@@ -11865,6 +12546,11 @@ components:
             - type: 'null'
         currency: { $ref: '#/components/schemas/CurrencyCode' }
         amount: { $ref: '#/components/schemas/RecurringAmount' }
+        indexedPrice:
+          description: >-
+            Only for definitions managed by a subscription whose price is in another currency than the account: the
+            price each occurrence is estimated from (`amount` is then `VARIABLE`). Absent otherwise.
+          $ref: '#/components/schemas/Money'
         categoryId:
           oneOf:
             - $ref: '#/components/schemas/Uuid'
@@ -11965,6 +12651,400 @@ components:
           type: integer
           minimum: 0
           description: Occurrences generated by the request (create, resume).
+    # ── Suscripciones (add-subscriptions) ──
+    SubscriptionStatus:
+      type: string
+      enum: [TRIAL, ACTIVE, PAUSED, CANCELLED]
+      description: >-
+        `CANCELLED` is terminal. A cancellation at the end of the paid cycle is the attribute `scheduledCancellationOn`,
+        not a status; there is no `expired` status.
+    SubscriptionBillingCycle:
+      type: object
+      additionalProperties: false
+      required: [cadence, interval, monthDays, rrule]
+      properties:
+        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        interval: { type: integer, minimum: 1, maximum: 120 }
+        monthDays:
+          type: array
+          items: { type: integer, minimum: -1, maximum: 31 }
+          maxItems: 2
+        rrule: { type: [string, 'null'], maxLength: 500 }
+    SubscriptionBillingCycleInput:
+      type: object
+      additionalProperties: false
+      required: [cadence]
+      properties:
+        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        interval: { type: integer, minimum: 1, maximum: 120, default: 1 }
+        monthDays:
+          type: array
+          items: { type: integer, minimum: -1, maximum: 31 }
+          maxItems: 2
+        rrule: { type: [string, 'null'], maxLength: 500 }
+    SubscriptionReminder:
+      type: object
+      additionalProperties: false
+      required: [enabled, daysBefore]
+      properties:
+        enabled: { type: boolean }
+        daysBefore: { type: integer, minimum: 1, maximum: 30 }
+    SubscriptionReminderPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        enabled: { type: boolean }
+        daysBefore: { type: integer, minimum: 1, maximum: 30 }
+    SubscriptionPriceTolerance:
+      type: string
+      pattern: '^[0-9]{1,2}(\.[0-9]{1,2})?$'
+      description: Percentage 0.00–50.00 (default 1.00). A charge differs only when it is strictly greater than the tolerance.
+      examples: ['1.00']
+    SubscriptionPrice:
+      type: object
+      description: Entry of the immutable price history (append-only).
+      additionalProperties: false
+      required: [id, effectiveFrom, price, origin, supersedesId, supersededBy, proposalId]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        price: { $ref: '#/components/schemas/Money' }
+        origin:
+          type: string
+          enum: [INITIAL, MANUAL, PROPOSAL, CORRECTION]
+        supersedesId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        supersededBy:
+          description: Id of the entry that replaces this one (when it was corrected).
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        proposalId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    SubscriptionPriceProposal:
+      type: object
+      additionalProperties: false
+      required: [id, chargeId, effectiveFrom, previousPrice, proposedPrice, changePercent, status, decidedAt, decidedBy]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        chargeId: { $ref: '#/components/schemas/Uuid' }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        previousPrice: { $ref: '#/components/schemas/Money' }
+        proposedPrice: { $ref: '#/components/schemas/Money' }
+        changePercent:
+          type: string
+          pattern: '^[+-][0-9]+\.[0-9]{2}$'
+          examples: ['+20.02']
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED, SUPERSEDED, WITHDRAWN]
+        decidedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        decidedBy:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    Subscription:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - definitionId
+        - counterpartyId
+        - providerName
+        - name
+        - planName
+        - status
+        - currentPrice
+        - billingCycle
+        - paymentAccountId
+        - paymentAccountName
+        - accountCurrency
+        - nextRenewalOn
+        - trialEndsOn
+        - scheduledCancellationOn
+        - cancelledOn
+        - cancellationReason
+        - cancellationUrl
+        - reminder
+        - priceTolerancePercent
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        definitionId: { $ref: '#/components/schemas/Uuid' }
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        providerName: { type: [string, 'null'] }
+        name: { type: string }
+        planName: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/SubscriptionStatus' }
+        currentPrice:
+          description: Price in force today (before the first renewal, the first entry).
+          $ref: '#/components/schemas/Money'
+        billingCycle: { $ref: '#/components/schemas/SubscriptionBillingCycle' }
+        paymentAccountId: { $ref: '#/components/schemas/Uuid' }
+        paymentAccountName: { type: [string, 'null'] }
+        accountCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        nextRenewalOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        trialEndsOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        scheduledCancellationOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        cancelledOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        cancellationReason: { type: [string, 'null'], maxLength: 500 }
+        cancellationUrl: { type: [string, 'null'], maxLength: 500 }
+        reminder: { $ref: '#/components/schemas/SubscriptionReminder' }
+        priceTolerancePercent: { $ref: '#/components/schemas/SubscriptionPriceTolerance' }
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        priceHistory:
+          type: array
+          description: Every entry, including the superseded ones (only in the detail).
+          items: { $ref: '#/components/schemas/SubscriptionPrice' }
+        pendingProposal:
+          description: The pending price proposal, if any (only in the detail).
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionPriceProposal'
+            - type: 'null'
+        definition:
+          type: object
+          description: Recurring definition that generates the charges (only in the detail).
+          additionalProperties: false
+          required: [id, status, materialization, accountId, accountCurrency, categoryId, indexed]
+          properties:
+            id: { $ref: '#/components/schemas/Uuid' }
+            status: { $ref: '#/components/schemas/RecurringStatus' }
+            materialization:
+              type: object
+              additionalProperties: false
+              required: [mode, autoCreateStatus, leadDays]
+              properties:
+                mode: { $ref: '#/components/schemas/RecurringMaterializationMode' }
+                autoCreateStatus: { type: [string, 'null'], enum: [PENDING, POSTED, null] }
+                leadDays: { type: integer, minimum: 0, maximum: 60 }
+            accountId: { $ref: '#/components/schemas/Uuid' }
+            accountCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+            categoryId:
+              oneOf:
+                - $ref: '#/components/schemas/Uuid'
+                - type: 'null'
+            indexed:
+              type: boolean
+              description: True when the price currency differs from the account currency (each charge is estimated with the rate valid when it is generated).
+    SubscriptionPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Subscription' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    SubscriptionInput:
+      type: object
+      additionalProperties: false
+      required: [counterpartyId, name, price, billingCycle, firstRenewalOn, paymentAccountId]
+      properties:
+        counterpartyId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        planName: { type: [string, 'null'], maxLength: 120 }
+        price: { $ref: '#/components/schemas/PositiveMoney' }
+        billingCycle: { $ref: '#/components/schemas/SubscriptionBillingCycleInput' }
+        firstRenewalOn: { $ref: '#/components/schemas/LocalDate' }
+        paymentAccountId: { $ref: '#/components/schemas/Uuid' }
+        materialization: { $ref: '#/components/schemas/RecurringMaterialization' }
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        trialEndsOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        reminder: { $ref: '#/components/schemas/SubscriptionReminderPatch' }
+        priceTolerancePercent: { $ref: '#/components/schemas/SubscriptionPriceTolerance' }
+        cancellationUrl: { type: [string, 'null'], maxLength: 500 }
+    SubscriptionUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        planName: { type: [string, 'null'], maxLength: 120 }
+        categoryId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        materialization: { $ref: '#/components/schemas/RecurringMaterialization' }
+        reminder: { $ref: '#/components/schemas/SubscriptionReminderPatch' }
+        priceTolerancePercent: { $ref: '#/components/schemas/SubscriptionPriceTolerance' }
+        cancellationUrl: { type: [string, 'null'], maxLength: 500 }
+        paymentAccountId: { $ref: '#/components/schemas/Uuid' }
+        billingCycle: { $ref: '#/components/schemas/SubscriptionBillingCycleInput' }
+        effectiveFrom:
+          description: Required with `paymentAccountId` or `billingCycle`.
+          $ref: '#/components/schemas/LocalDate'
+    SubscriptionPriceInput:
+      type: object
+      additionalProperties: false
+      required: [price, effectiveFrom]
+      properties:
+        price: { $ref: '#/components/schemas/PositiveMoney' }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+    SubscriptionPriceSupersedeRequest:
+      type: object
+      additionalProperties: false
+      required: [price]
+      properties:
+        price: { $ref: '#/components/schemas/PositiveMoney' }
+        reason: { type: string, maxLength: 500 }
+    SubscriptionPriceProposalAcceptRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        effectiveFrom:
+          description: Needed only when the proposed date is not after the last price entry.
+          $ref: '#/components/schemas/LocalDate'
+    SubscriptionCancelRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        effectiveOn:
+          description: Today or earlier cancels now (default today); a future date schedules the cancellation.
+          $ref: '#/components/schemas/LocalDate'
+        reason: { type: string, maxLength: 500 }
+    SubscriptionChargeUpdate:
+      type: object
+      additionalProperties: false
+      required: [priceCurrencyAmount]
+      properties:
+        priceCurrencyAmount:
+          description: Amount of the statement in the price currency.
+          $ref: '#/components/schemas/PositiveMoney'
+    SubscriptionCharge:
+      type: object
+      additionalProperties: false
+      required: [id, occurrenceId, occurrenceDate, transactionId, charged, priceCurrencyAmount, expectedPrice, impliedRate, deviationPercent, outcome]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        occurrenceId: { $ref: '#/components/schemas/Uuid' }
+        occurrenceDate: { $ref: '#/components/schemas/LocalDate' }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        charged: { $ref: '#/components/schemas/Money' }
+        priceCurrencyAmount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        expectedPrice: { $ref: '#/components/schemas/Money' }
+        impliedRate:
+          description: Charged / price, 4 decimals (only when the charge currency differs from the price currency).
+          type: [string, 'null']
+          examples: ['9.8726']
+        deviationPercent:
+          type: [string, 'null']
+          pattern: '^[+-][0-9]+\.[0-9]{2}$'
+        outcome:
+          type: string
+          enum: [WITHIN_TOLERANCE, PRICE_CHANGE_DETECTED, NOT_COMPARABLE]
+    SubscriptionChargePage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/SubscriptionCharge' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    SubscriptionCostAmounts:
+      type: object
+      additionalProperties: false
+      required: [native, base]
+      properties:
+        native: { $ref: '#/components/schemas/Money' }
+        base:
+          description: In the base currency; null when there is no rate for the pair (never 1:1).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+    SubscriptionCostItem:
+      type: object
+      additionalProperties: false
+      required: [subscriptionId, name, status, monthly, annual, complete]
+      properties:
+        subscriptionId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/SubscriptionStatus' }
+        monthly: { $ref: '#/components/schemas/SubscriptionCostAmounts' }
+        annual: { $ref: '#/components/schemas/SubscriptionCostAmounts' }
+        complete: { type: boolean }
+    SubscriptionCostSummary:
+      type: object
+      additionalProperties: false
+      required: [baseCurrency, items, totals, afterTrial, meta]
+      properties:
+        baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SubscriptionCostItem' }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [monthly, annual, complete, unconverted]
+          properties:
+            monthly: { $ref: '#/components/schemas/Money' }
+            annual: { $ref: '#/components/schemas/Money' }
+            complete: { type: boolean }
+            unconverted:
+              type: array
+              description: The part without rate, in its own currency.
+              items:
+                type: object
+                additionalProperties: false
+                required: [monthly, annual]
+                properties:
+                  monthly: { $ref: '#/components/schemas/Money' }
+                  annual: { $ref: '#/components/schemas/Money' }
+        afterTrial:
+          type: object
+          description: Subscriptions in trial, with the price of their first renewal; they are not part of the total.
+          additionalProperties: false
+          required: [items, monthly, annual, complete]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/SubscriptionCostItem' }
+            monthly: { $ref: '#/components/schemas/Money' }
+            annual: { $ref: '#/components/schemas/Money' }
+            complete: { type: boolean }
+        meta:
+          type: object
+          additionalProperties: false
+          required: [ratesUsed, rateWindowDays, asOf]
+          properties:
+            ratesUsed:
+              type: array
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            rateWindowDays: { type: integer, minimum: 1 }
+            asOf: { $ref: '#/components/schemas/Instant' }
     RecurringDefinitionPage:
       type: object
       additionalProperties: false

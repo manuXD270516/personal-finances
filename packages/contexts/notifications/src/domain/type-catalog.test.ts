@@ -83,7 +83,7 @@ describe('NotificationTypeCatalog: cierre de mes pendiente', () => {
     expect(definitionForConsumer('notifications.month-close-pending')?.type).toBe('MONTH_CLOSE_PENDING');
     expect(definitionForConsumer('notifications.budget-threshold')?.type).toBe('BUDGET_THRESHOLD');
     expect(definitionForConsumer('otro')).toBeUndefined();
-    expect(new Set(NOTIFICATION_TYPE_CATALOG.map((d) => d.consumer)).size).toBe(3);
+    expect(new Set(NOTIFICATION_TYPE_CATALOG.map((d) => d.consumer)).size).toBe(6);
     expect(definitionForConsumer('notifications.occurrence-due')?.type).toBe('RECURRING_PAYMENT_UPCOMING');
   });
 });

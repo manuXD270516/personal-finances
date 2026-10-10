@@ -31,6 +31,7 @@ import { resolveContractPath } from '../../src/api/api-conventions.js';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import {
   AUDIT_POLICIES,
+  counterpartyNamesOf,
   financeRuntimes,
   financialPeriodPort,
   LIFECYCLE_MACHINES,
@@ -348,6 +349,7 @@ beforeAll(async () => {
     transactions: finance.transactions.recurring,
     links: finance.transactions.links,
     pending: finance.transactions.pending,
+    counterpartyNames: counterpartyNamesOf(finance.classification.counterparties),
     rateValidityWindowDays: 7,
   });
   const defs = commitmentsEventConsumers(commitments);

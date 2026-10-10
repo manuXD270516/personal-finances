@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Cancelación programada al fin del ciclo pagado'
 scenario: 'Cancelar al terminar el mes pagado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-017', 'FR-COMMITMENTS-012']
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/subscription.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'cancel', 'scheduled', 'timezone']
@@ -34,7 +37,7 @@ expected_result:
   - 'El 15 a las 00:05: CANCELLED con fecha 2026-12-15 y SubscriptionCancelled.v1 (scheduled true)'
   - 'Deshacer el 2026-12-01: ACTIVE sin programación y próxima renovación 2026-12-15'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-019 — Una cancelación programada mantiene el estado hasta la fecha y puede deshacerse

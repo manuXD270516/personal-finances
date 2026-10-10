@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/SubscriptionTrialEnding.v1.schema.json",
+  "title": "commitments.SubscriptionTrialEnding.v1",
+  "description": "Faltan como máximo `daysBefore` días para el fin del trial de una suscripción en `TRIAL` con recordatorios activados. A lo sumo uno por (subscriptionId, trialEndsOn). Productor: COMMITMENTS. Consumidor: NOTIFY (`notifications.subscription-trial-ending`). PII baja: `providerName`, `paymentAccountName`.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.SubscriptionTrialEnding"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Subscription"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "subscriptionId",
+        "definitionId",
+        "providerName",
+        "trialEndsOn",
+        "daysBefore",
+        "firstChargePrice",
+        "paymentAccountId",
+        "paymentAccountName"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "subscriptionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "providerName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trialEndsOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "daysBefore": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "firstChargePrice": {
+          "allOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            }
+          ],
+          "description": "Precio del primer cobro (primera renovación), en la moneda del precio."
+        },
+        "paymentAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "paymentAccountName": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000521",
+      "eventType": "commitments.SubscriptionTrialEnding",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T10:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Subscription",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000a5001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "subscriptionId": "01928c4e-0000-7000-8000-0000000a5001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "providerName": "CloudDrive",
+        "trialEndsOn": "2026-11-20",
+        "daysBefore": 3,
+        "firstChargePrice": {
+          "amount": "99.99",
+          "currency": "USD"
+        },
+        "paymentAccountId": "01928c4e-0000-7000-8000-0000000acc01",
+        "paymentAccountName": "Visa USD"
+      }
+    }
+  ]
+}

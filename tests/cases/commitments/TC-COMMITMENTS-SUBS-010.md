@@ -5,16 +5,17 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Próxima renovación derivada del ciclo'
 scenario: 'Renovación omitida'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-012', 'FR-COMMITMENTS-005']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'next-renewal', 'end-of-month']
@@ -32,7 +33,7 @@ expected_result:
   - '2027-01-15'
   - '2027-02-28'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-010 — La próxima renovación omite las ocurrencias omitidas o pagadas y respeta el fin de mes

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/subscription-reminders.schema.json",
+  "title": "pfos-export v1 — subscription-reminders",
+  "description": "Registro de la sección «subscription-reminders» (tabla commitments.subscription_reminder, contexto commitments). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "subscription_id",
+    "kind",
+    "target_date",
+    "emitted_at",
+    "event_id"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "subscription_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "target_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "emitted_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "commitments.subscription_reminder",
+  "x-pfos-context": "commitments"
+}

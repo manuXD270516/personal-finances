@@ -150,7 +150,9 @@ export function NotificationDetailView({
               ? f.t('detail.openPeriodClose', { period })
               : n.link.kind === 'RECURRING_OCCURRENCE'
                 ? f.t('detail.openRecurringOccurrence', { period })
-                : f.t('detail.openBudgetLine', { period })}
+                : n.link.kind === 'SUBSCRIPTION'
+                  ? f.t('detail.openSubscription', { period })
+                  : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

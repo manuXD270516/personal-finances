@@ -5,16 +5,19 @@ spec: notifications/alerts
 related_specs: ['commitments/subscriptions']
 requirement: 'Emails de suscripciones sin detalles salvo opt-in'
 scenario: 'Email de renovación sin detalles'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-006']
 nfr: ['NFR-COMP-001']
 invariants: []
 priority: critical
 type: integration
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/subscription-notifications.test.ts
+  - packages/contexts/notifications/src/domain/subscription-notifications.test.ts
+  - tests/e2e/specs/subscriptions.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['notifications', 'email', 'privacy', 'subscriptions']
@@ -33,7 +36,7 @@ expected_result:
   - 'Sin opt-in: el email dice que una suscripción se renueva en 3 días y no contiene "Streamly", "10.99", "USD" ni "Visa USD"'
   - 'Con opt-in: contiene "Streamly", 15/11/2026 y 10.99 USD'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-033 — El email de renovación no incluye provider, montos ni cuenta salvo opt-in de detalles

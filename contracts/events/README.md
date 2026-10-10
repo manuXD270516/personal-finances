@@ -44,7 +44,11 @@ contracts/events/
 │  ├─ RecurringOccurrenceDue.v1.schema.json  # BECOME_DUE; lo consume NOTIFY (notifications.occurrence-due)
 │  ├─ RecurringOccurrenceMaterialized.v1.schema.json  # MATERIALIZE y LINK (CREATED | MATCHED)
 │  ├─ RecurringOccurrenceChanged.v1.schema.json       # EDIT, SKIP, RELEASE, MARK_OVERDUE
-│  └─ RecurringDefinitionChanged.v1.schema.json       # CREATE, REVISE, PAUSE, RESUME, END
+│  ├─ RecurringDefinitionChanged.v1.schema.json       # CREATE, REVISE, PAUSE, RESUME, END
+│  ├─ SubscriptionPriceChanged.v1.schema.json         # add-subscriptions: origin DETECTED | MANUAL | CORRECTION; lo consume NOTIFY (solo DETECTED)
+│  ├─ SubscriptionRenewalUpcoming.v1.schema.json      # add-subscriptions: recordatorio de renovación (job commitments.subscription-daily)
+│  ├─ SubscriptionTrialEnding.v1.schema.json          # add-subscriptions: recordatorio de fin de trial
+│  └─ SubscriptionCancelled.v1.schema.json            # add-subscriptions: inmediata o programada
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/

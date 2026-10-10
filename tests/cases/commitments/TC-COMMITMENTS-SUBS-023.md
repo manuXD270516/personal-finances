@@ -5,16 +5,18 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Aceptar o rechazar una propuesta de precio'
 scenario: 'Aceptar el aumento detectado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-014', 'FR-COMMITMENTS-013']
 nfr: []
 invariants: ['INV-012']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-proposal']
@@ -32,7 +34,7 @@ expected_result:
   - 'Rechazar: precio vigente 9.99 USD, propuesta REJECTED'
   - 'Aceptar tras rechazar ⇒ SUBSCRIPTION_PROPOSAL_NOT_PENDING'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-023 — Aceptar una propuesta agrega el precio al historial y rechazarla no lo cambia

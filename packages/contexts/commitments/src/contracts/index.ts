@@ -13,12 +13,22 @@ export const COMMITMENTS_EVENTS = {
   occurrenceMaterialized: { eventType: 'commitments.RecurringOccurrenceMaterialized', eventVersion: 1 },
   occurrenceChanged: { eventType: 'commitments.RecurringOccurrenceChanged', eventVersion: 1 },
   definitionChanged: { eventType: 'commitments.RecurringDefinitionChanged', eventVersion: 1 },
+  // add-subscriptions (Phase 3)
+  subscriptionPriceChanged: { eventType: 'commitments.SubscriptionPriceChanged', eventVersion: 1 },
+  subscriptionRenewalUpcoming: { eventType: 'commitments.SubscriptionRenewalUpcoming', eventVersion: 1 },
+  subscriptionTrialEnding: { eventType: 'commitments.SubscriptionTrialEnding', eventVersion: 1 },
+  subscriptionCancelled: { eventType: 'commitments.SubscriptionCancelled', eventVersion: 1 },
 } as const;
 
 /** Consumidores del worker (colas propias, lotes de improve-event-throughput). */
 export const COMMITMENTS_CONSUMERS = {
   transactionVoided: 'commitments.transaction-voided',
+  /** add-subscriptions: cargos de suscripciones (detección de cambios de precio). */
+  subscriptionCharges: 'commitments.subscription-charges',
 } as const;
+
+/** Job periódico de suscripciones (add-subscriptions): fin de trial, cancelación programada y recordatorios. */
+export const COMMITMENTS_SUBSCRIPTION_JOB = 'commitments.subscription-daily' as const;
 
 /** Job periódico del worker (cron `COMMITMENTS_SCHEDULER_CRON`). */
 export const COMMITMENTS_GENERATE_JOB = 'commitments.generate-occurrences' as const;
@@ -104,6 +114,81 @@ export interface RecurringOccurrenceMaterializedV1 {
   readonly matchedBy: 'USER_LINK' | 'SUGGESTION' | null;
   readonly amount: MoneyDto;
   readonly businessDate: string;
+}
+
+// ───────────────────────────────────────────── eventos de suscripciones (add-subscriptions)
+
+export type SubscriptionPriceOriginDto = 'DETECTED' | 'MANUAL' | 'CORRECTION';
+
+export interface SubscriptionPriceChangedV1 {
+  readonly workspaceId: string;
+  readonly subscriptionId: string;
+  readonly definitionId: string;
+  readonly counterpartyId: string;
+  readonly providerName: string;
+  readonly previousPrice: MoneyDto;
+  readonly newPrice: MoneyDto;
+  readonly effectiveFrom: string;
+  /** Variación con signo y 2 decimales (`+20.02`). */
+  readonly changePercentage: string;
+  readonly origin: SubscriptionPriceOriginDto;
+  readonly proposalId: string | null;
+  readonly chargeId: string | null;
+  readonly transactionId: string | null;
+}
+
+export interface SubscriptionRenewalUpcomingV1 {
+  readonly workspaceId: string;
+  readonly subscriptionId: string;
+  readonly definitionId: string;
+  readonly providerName: string;
+  readonly planName: string | null;
+  readonly renewalDate: string;
+  readonly daysBefore: number;
+  readonly expectedPrice: MoneyDto;
+  /** Cargo esperado en la moneda de la cuenta; `null` si es un precio indexado sin tasa o aún no hay ocurrencia. */
+  readonly expectedCharge: MoneyDto | null;
+  readonly paymentAccountId: string;
+  readonly paymentAccountName: string;
+  readonly requiresApproval: boolean;
+}
+
+export interface SubscriptionTrialEndingV1 {
+  readonly workspaceId: string;
+  readonly subscriptionId: string;
+  readonly definitionId: string;
+  readonly providerName: string;
+  readonly trialEndsOn: string;
+  readonly daysBefore: number;
+  readonly firstChargePrice: MoneyDto;
+  readonly paymentAccountId: string;
+  readonly paymentAccountName: string;
+}
+
+export interface SubscriptionCancelledV1 {
+  readonly workspaceId: string;
+  readonly subscriptionId: string;
+  readonly definitionId: string;
+  readonly counterpartyId: string;
+  readonly cancelledOn: string;
+  readonly scheduled: boolean;
+  readonly reason: string | null;
+}
+
+/** Suscripción activa para lectores futuros (Reporting, Planning). */
+export interface ActiveSubscriptionDto {
+  readonly subscriptionId: string;
+  readonly name: string;
+  readonly status: 'TRIAL' | 'ACTIVE' | 'PAUSED';
+  readonly price: MoneyDto;
+  readonly cadence: string;
+  readonly interval: number;
+  readonly paymentAccountId: string;
+  readonly nextRenewalOn: string | null;
+}
+
+export interface SubscriptionsQuery {
+  listActive(input: { readonly workspaceId: string }): Promise<readonly ActiveSubscriptionDto[]>;
 }
 
 // ───────────────────────────────────────────── consultas públicas
@@ -196,8 +281,9 @@ export interface DefinitionStatsQuery {
 }
 
 /**
- * Reservado para Subscriptions (`managedBy = SUBSCRIPTION`) y Debt (`DEBT`): crearán y cambiarán definiciones
- * administradas sin pasar por la API de usuario. En este change solo existe el tipo; no hay implementación.
+ * Reservado para Debt (`DEBT`). Las suscripciones (`managedBy = SUBSCRIPTION`) operan su definición dentro del
+ * contexto con `ManagedDefinitionPort` (application) sobre `DefinitionsService`, sin pasar por la API de usuario
+ * (openspec add-subscriptions); este tipo público sigue sin implementación.
  */
 export interface RecurringDefinitionPort {
   createManaged(input: {
@@ -249,6 +335,7 @@ export const COMMITMENTS_AUDIT_POLICY = {
     amount: 'money',
     amountMin: 'money',
     amountMax: 'money',
+    indexedPrice: 'plain',
     categoryId: 'plain',
     counterpartyId: 'plain',
     tagIds: 'plain',
@@ -286,6 +373,38 @@ export const COMMITMENTS_AUDIT_POLICY = {
     skipReason: 'plain',
     cancelReason: 'plain',
     lastAutoCreateError: 'plain',
+  },
+  // add-subscriptions: la suscripción. Las notas de cancelación son texto libre acotado (500); el enlace de
+  // cancelación se audita (decisión 15).
+  Subscription: {
+    name: 'plain',
+    planName: 'plain',
+    counterpartyId: 'plain',
+    definitionId: 'plain',
+    priceCurrency: 'plain',
+    status: 'plain',
+    trialEndsOn: 'plain',
+    scheduledCancellationOn: 'plain',
+    cancelledOn: 'plain',
+    cancellationReason: 'plain',
+    cancellationUrl: 'plain',
+    reminderEnabled: 'plain',
+    reminderDaysBefore: 'plain',
+    tolerancePercent: 'plain',
+    nextRenewalOn: 'plain',
+    price: 'money',
+    previousPrice: 'money',
+    effectiveFrom: 'plain',
+    priceOrigin: 'plain',
+    paymentAccountId: 'plain',
+    cadence: 'plain',
+    interval: 'plain',
+    categoryId: 'plain',
+    materializationMode: 'plain',
+    proposalId: 'plain',
+    proposalStatus: 'plain',
+    chargeId: 'plain',
+    priceCurrencyAmount: 'money',
   },
 } as const satisfies AuditFieldPoliciesDto;
 

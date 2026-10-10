@@ -5,16 +5,19 @@ spec: commitments/subscriptions
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Corrección de un precio registrado por error'
 scenario: 'Monto tipeado mal'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-013']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/subscriptions.api.test.ts
+  - packages/contexts/commitments/src/application/subscriptions.service.test.ts
+  - packages/contexts/commitments/src/domain/subscription/price-history.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['subscriptions', 'price-history', 'supersede']
@@ -33,7 +36,7 @@ expected_result:
   - 'Historial conserva 129.90 USD marcada como reemplazada por 12.99 USD'
   - 'Segundo reemplazo ⇒ INVALID_STATUS_TRANSITION'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-SUBS-018 — Corregir un precio tipeado mal lo reemplaza conservando la entrada original

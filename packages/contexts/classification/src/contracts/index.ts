@@ -172,6 +172,26 @@ export interface CategoryCatalogQuery {
 
 export const CATEGORY_CATALOG_QUERY = Symbol.for('pf.classification.CategoryCatalogQuery');
 
+/** Contraparte resumida para lecturas de otros contextos (Commitments: provider de una suscripción). */
+export interface CounterpartySummaryDto {
+  readonly counterpartyId: string;
+  readonly name: string;
+  readonly archived: boolean;
+}
+
+/**
+ * Nombres de contrapartes por id (incluye archivadas: los históricos las siguen mostrando). Sin efectos; se ejecuta en
+ * la unidad de trabajo del llamador si existe (openspec add-subscriptions: nombres del provider en hechos y vistas).
+ */
+export interface CounterpartyCatalogQuery {
+  counterpartiesByIds(input: {
+    readonly workspaceId: string;
+    readonly counterpartyIds: readonly string[];
+  }): Promise<readonly CounterpartySummaryDto[]>;
+}
+
+export const COUNTERPARTY_CATALOG_QUERY = Symbol.for('pf.classification.CounterpartyCatalogQuery');
+
 /**
  * Provisión síncrona al crear un workspace (design §6-§7): categorías de sistema siempre y catálogo inicial si
  * `seedDefaultCategories`. Se invoca dentro de la unidad de trabajo de `CreateWorkspace` (misma transacción).
