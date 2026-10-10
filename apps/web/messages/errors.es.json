@@ -113,5 +113,9 @@
   "OCCURRENCE_LINK_MISMATCH": "La transacción no coincide con el pago: debe ser del mismo tipo, cuenta y moneda y no estar anulada.",
   "OCCURRENCE_ALREADY_MATERIALIZED": "Este pago ya tiene su transacción.",
   "TRANSACTION_ALREADY_LINKED": "Esa transacción ya está vinculada a otro pago recurrente.",
-  "MATCH_SUGGESTION_NOT_PENDING": "Esta coincidencia ya no está pendiente: se resolvió, se descartó o dejó de aplicar."
+  "MATCH_SUGGESTION_NOT_PENDING": "Esta coincidencia ya no está pendiente: se resolvió, se descartó o dejó de aplicar.",
+  "IMPORT_UNSUPPORTED_FORMAT": "No pudimos leer el archivo como texto delimitado (CSV). Revisa que sea un CSV y que no esté vacío ni tenga más de 50 columnas.",
+  "IMPORT_TOO_MANY_ROWS": "El archivo tiene más filas de las permitidas (5.000). Divídelo en varios archivos e impórtalos por separado.",
+  "IMPORT_MAPPING_INVALID": "La asignación de columnas no es válida para este archivo. Revisa la columna de la fecha, la descripción y el monto.",
+  "IMPORT_REVIEW_INCOMPLETE": "Aún hay posibles duplicados sin decidir. Decide cada uno (crear, omitir o excluir) antes de aprobar."
 }

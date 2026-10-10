@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Vista previa sin efectos antes de aprobar"
 scenario: "Resumen de la vista previa"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-IMPORTS-009"]
 nfr: ["NFR-DATA-016"]
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/test/integration/pg-imports.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -35,7 +38,7 @@ expected_result:
   - "Tras re-mapear: fechas recalculadas"
   - "En todo momento: 0 transacciones con import_job_id y saldo contable 4000.00 BOB"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-015 — La vista previa informa conteos, totales y saldo resultante sin crear transacciones ni asientos

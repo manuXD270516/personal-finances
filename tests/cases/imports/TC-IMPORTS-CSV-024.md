@@ -5,16 +5,21 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Fallo parcial y reintento"
 scenario: "Periodo cerrado entre la vista previa y la persistencia"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-PLANNING-005","FR-IMPORTS-010"]
 nfr: []
 invariants: ["INV-014","INV-015"]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/batch-planner.test.ts
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/test/integration/pg-imports.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -35,7 +40,7 @@ expected_result:
   - "Tras el reintento: 450 creadas, COMPLETED, ninguna duplicada"
   - "Variante: COMPLETED_WITH_ERRORS con 250 creadas y 200 fallidas listadas"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-024 — Un lote rechazado por periodo cerrado deja el import parcial y el reintento crea solo las filas faltantes

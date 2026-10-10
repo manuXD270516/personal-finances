@@ -165,6 +165,8 @@ export interface TransactionState {
   readonly reconciliationMode: ReconciliationMode | null;
   /** Sesión de reconciliación que creó la transacción (solo el ajuste de la sesión); `null` en el resto. */
   readonly reconciliationId: string | null;
+  /** Importación que creó la transacción (`source = IMPORT`, add-basic-csv-import); `null` en el resto. */
+  readonly importJobId: string | null;
   readonly legs: readonly Leg[];
   readonly splits: readonly Split[];
   readonly revision: number;
@@ -202,6 +204,8 @@ export interface RecordTransactionInput {
   readonly confirmedRefundExcess?: boolean;
   /** Solo el ajuste que crea una sesión de reconciliación (add-reconciliation decisión 4). */
   readonly reconciliationId?: string | null;
+  /** Solo las transacciones importadas (add-basic-csv-import). */
+  readonly importJobId?: string | null;
   /** `undefined` ⇒ un split por el total con `defaultCategoryId` (*Uncategorized*); `[]` ⇒ VALIDATION_FAILED. */
   readonly splits?: readonly SplitInput[];
   readonly defaultCategoryId?: string | null;
@@ -682,6 +686,7 @@ export class Transaction {
         confirmedRefundExcess: input.confirmedRefundExcess ?? false,
         reconciliationMode: null,
         reconciliationId: input.reconciliationId ?? null,
+        importJobId: input.importJobId ?? null,
         legs: [
           {
             accountId: input.accountId,
@@ -760,6 +765,7 @@ export class Transaction {
         confirmedRefundExcess: false,
         reconciliationMode: null,
         reconciliationId: null,
+        importJobId: null,
         legs: transferLegs(from, to, amount, fee?.amount ?? null),
         splits,
         revision: 1,
@@ -802,6 +808,7 @@ export class Transaction {
         confirmedRefundExcess: false,
         reconciliationMode: null,
         reconciliationId: null,
+        importJobId: null,
         revision: 1,
         version: 1,
         activeEntryId: null,

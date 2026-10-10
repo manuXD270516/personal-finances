@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Límites de tamaño y contenido del archivo"
 scenario: "Imagen renombrada como CSV"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-SEC-012"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/csv-sniffer.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","limits"]
@@ -31,7 +34,7 @@ expected_result:
   - "422 IMPORT_UNSUPPORTED_FORMAT (contenido binario)"
   - "No existe ninguna importación nueva"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-005 — Una imagen renombrada como CSV se rechaza con IMPORT_UNSUPPORTED_FORMAT

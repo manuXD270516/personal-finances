@@ -5,16 +5,20 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Cancelación de una importación"
 scenario: "Cancelar durante la revisión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/test/integration/pg-imports.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -32,7 +36,7 @@ expected_result:
   - "Primera: CANCELLED, 0 transacciones, staging descartado, auditoría"
   - "Segunda: 409 INVALID_STATUS_TRANSITION"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-025 — Cancelar una importación en revisión no crea transacciones y una completada no se puede cancelar

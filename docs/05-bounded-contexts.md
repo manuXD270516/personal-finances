@@ -141,6 +141,7 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 
 ### 2.12 IMPORTS — Imports & Banking Integrations (`imports`, `@pf/imports`)
 - **Propósito:** traer movimientos externos (archivos y APIs bancarias) de forma idempotente y revisable.
+- **Phase 3 (`add-basic-csv-import`, FR-IMPORTS-003):** el contexto existe desde Phase 3 con un **subconjunto CSV**: `ImportJob` con los estados `AWAITING_MAPPING → AWAITING_REVIEW → APPROVED → PERSISTING → COMPLETED | PARTIALLY_FAILED → COMPLETED_WITH_ERRORS | CANCELLED`, una sola cuenta destino, mapeo manual, staging de celdas (sin DOCUMENTS ni Object Storage: el archivo no se guarda), vista previa, deduplicación básica y persistencia asíncrona por lotes. Puertos: `ImportJobRepository`, `StagingRepository`, `RowLinkRepository`, cuentas (`@pf/accounts/contracts`), saldos (`@pf/ledger/contracts`), periodos cerrados (`@pf/planning/contracts` `PeriodQuery`) y los contratos de Transactions `ImportedTransactionsCommand.recordBatch`, `DuplicateCandidatesQuery.findForImport` y `TransactionStatusQuery.statusOf`. Eventos propios: `imports.ImportApproved` e `imports.ImportCompleted` (nunca por fila). Phase 6 lo extiende sin cambios rompedores.
 - **Responsabilidades:** parseo por formato, perfiles de mapeo, staging por fila, fingerprinting, dedupe, revisión, commit batch, conexiones bancarias y sincronización.
 - **NO responsabilidades:** decidir categorías (Rules); crear asientos (Transactions/Ledger); guardar archivos (Documents).
 - **API pública:** ver 04 §3.12.

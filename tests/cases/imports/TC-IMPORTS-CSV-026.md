@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["identity/workspace-portability"]
 requirement: "Textos importados como datos no confiables"
 scenario: "Fórmula en la descripción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-SEC-010","NFR-SEC-015"]
 invariants: []
 priority: critical
 type: security
 level: security
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/domain/row-normalizer.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","csv-injection"]
@@ -36,7 +38,7 @@ expected_result:
   - "La descripción larga queda en 500 caracteres sin tabulación ni espacios repetidos y con IMPORT_DESCRIPTION_TRUNCATED"
   - "Los logs no contienen montos ni descripciones"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-026 — Una descripción con fórmula se guarda literal y sale neutralizada en el CSV del export

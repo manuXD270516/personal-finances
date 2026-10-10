@@ -68,6 +68,7 @@ interface TxnDb {
     confirmed_refund_excess: boolean;
     reconciliation_id: string | null;
     reconciliation_mode: ReconciliationMode | null;
+    import_job_id: string | null;
     revision: number;
     active_entry_id: string | null;
     voided_at: string | null;
@@ -161,6 +162,7 @@ const txColumns = [
   't.confirmed_refund_excess',
   't.reconciliation_id',
   't.reconciliation_mode',
+  't.import_job_id',
   't.revision',
   't.active_entry_id',
   't.void_reason',
@@ -201,6 +203,7 @@ function txRow(s: TransactionState): Omit<TxnDb['txn.transaction'], 'created_at'
     confirmed_refund_excess: s.confirmedRefundExcess,
     reconciliation_id: s.reconciliationId,
     reconciliation_mode: s.reconciliationMode,
+    import_job_id: s.importJobId,
     revision: s.revision,
     active_entry_id: s.activeEntryId,
     voided_at: s.voidedAt,
@@ -956,6 +959,7 @@ export class PgTransactionRepository implements TransactionRepository {
         confirmedRefundExcess: r.confirmed_refund_excess,
         reconciliationMode: r.reconciliation_mode,
         reconciliationId: r.reconciliation_id,
+        importJobId: r.import_job_id,
         legs: legs
           .filter((l) => l.transaction_id === r.id)
           .map((l) => ({

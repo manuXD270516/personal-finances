@@ -38,6 +38,11 @@ describe('protección CSRF del BFF', () => {
     const mp = { 'content-type': 'multipart/form-data; boundary=x' };
     const at = (path: string) => new Request(`https://app.test${path}`, { method: 'POST', headers: mp });
     expect(contentTypeAllowed(at('/api/bff/v1/workspace-imports'))).toBe(true);
+    // add-basic-csv-import: el extracto CSV de una cuenta del workspace.
+    const W = '0199a000-0000-7000-8000-00000000a001';
+    expect(contentTypeAllowed(at(`/api/bff/v1/workspaces/${W}/imports`))).toBe(true);
+    expect(contentTypeAllowed(at(`/api/bff/v1/workspaces/${W}/imports/${W}/mapping`))).toBe(false);
+    expect(contentTypeAllowed(at(`/api/bff/v1/workspaces/${W}/accounts`))).toBe(false);
     expect(contentTypeAllowed(at('/api/bff/v1/workspaces'))).toBe(false);
   });
 });

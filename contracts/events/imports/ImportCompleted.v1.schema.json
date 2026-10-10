@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/imports/ImportCompleted.v1.schema.json",
+  "title": "imports.ImportCompleted.v1",
+  "description": "Fin de la persistencia de una importación CSV: COMPLETED, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS (aceptar el resultado parcial). Productor: IMPORTS. Sin consumidores obligatorios en Phase 3 (NOTIFY y REPORTING en Phase 6). Idempotencia natural: (importJobId, status). Sin PII: solo conteos y el rango de fechas.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "imports.ImportCompleted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "ImportJob"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "importJobId",
+        "accountId",
+        "sourceType",
+        "status",
+        "stats",
+        "dateRange"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "importJobId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "sourceType": {
+          "enum": [
+            "FILE_CSV"
+          ]
+        },
+        "status": {
+          "enum": [
+            "COMPLETED",
+            "PARTIALLY_FAILED",
+            "COMPLETED_WITH_ERRORS"
+          ]
+        },
+        "stats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "imported",
+            "duplicates",
+            "ignored",
+            "errors"
+          ],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "imported": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duplicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ignored": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "errors": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "dateRange": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to"
+              ],
+              "properties": {
+                "from": {
+                  "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+                },
+                "to": {
+                  "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000901",
+      "eventType": "imports.ImportCompleted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ImportJob",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b1001",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "importJobId": "01928c4e-0000-7000-8000-0000000b1001",
+        "accountId": "01928c4e-0000-7000-8000-0000000ac001",
+        "sourceType": "FILE_CSV",
+        "status": "COMPLETED",
+        "stats": {
+          "total": 5,
+          "imported": 3,
+          "duplicates": 1,
+          "ignored": 0,
+          "errors": 1
+        },
+        "dateRange": {
+          "from": "2026-10-01",
+          "to": "2026-10-05"
+        }
+      }
+    }
+  ]
+}

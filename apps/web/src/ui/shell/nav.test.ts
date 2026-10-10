@@ -15,6 +15,10 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/en')).toBe('home');
     expect(activeNav('/transacciones/nueva')).toBe('transactions');
     expect(activeNav('/transferencias/nueva')).toBe('transactions');
+    // add-basic-csv-import: importaciones de extractos CSV.
+    expect(activeNav('/imports')).toBe('transactions');
+    expect(activeNav('/en/imports/nueva')).toBe('transactions');
+    expect(activeNav('/pt/imports/0198f0aa')).toBe('transactions');
     expect(activeNav('/en/cuentas/abc')).toBe('accounts');
     expect(activeNav('/instituciones')).toBe('accounts');
     expect(activeNav('/fx/conversiones/nueva')).toBe('fx');
@@ -36,6 +40,7 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/workspaces/nuevo')).toBeUndefined();
     expect(activeNav('/cuentasx')).toBeUndefined();
     expect(activeNav('/recurringx')).toBeUndefined();
+    expect(activeNav('/importsx')).toBeUndefined();
   });
 
   it('usa la primera letra del nombre visible para el avatar', () => {

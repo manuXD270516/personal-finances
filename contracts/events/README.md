@@ -50,6 +50,9 @@ contracts/events/
 │  ├─ SubscriptionTrialEnding.v1.schema.json          # add-subscriptions: recordatorio de fin de trial
 │  ├─ SubscriptionCancelled.v1.schema.json            # add-subscriptions: inmediata o programada
 │  └─ OccurrenceMatchSuggested.v1.schema.json         # add-commitment-matching: sugerencia de coincidencia creada o re-propuesta (nunca vincula sola)
+├─ imports/                             # add-basic-csv-import (importación CSV; nunca eventos por fila, docs/33 D112)
+│  ├─ ImportApproved.v1.schema.json     # aprobación o reintento: lo consume el worker (imports.persist)
+│  └─ ImportCompleted.v1.schema.json    # fin con COMPLETED, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS (sin consumidores obligatorios en Phase 3)
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/

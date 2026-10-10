@@ -31,6 +31,9 @@ export function csrfTokenValid(req: Request, sid: string, csrfSecret: string): b
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+/** Subidas multipart admitidas: `/v1/workspace-imports` y `/v1/workspaces/{id}/imports` (add-basic-csv-import). */
+const MULTIPART_UPLOAD_PATHS = /\/v1\/(?:workspace-imports|workspaces\/[0-9a-f-]{36}\/imports)$/i;
+
 const JSON_TYPES = new Set(['application/json', 'application/merge-patch+json']);
 
 /** Las mutaciones con cuerpo solo aceptan JSON; sin cuerpo (p. ej. DELETE) no se exige tipo. */
@@ -41,8 +44,8 @@ export function contentTypeAllowed(req: Request): boolean {
     return req.headers.get('content-length') === null || req.headers.get('content-length') === '0';
   const base = type.split(';')[0]!.trim().toLowerCase();
   if (JSON_TYPES.has(base)) return true;
-  // `multipart/form-data` SÍ lo puede producir un <form> ajeno sin preflight: por eso solo se admite en la subida del
-  // import del workspace y, como en todo POST, siguen exigidos el Origin propio y el X-CSRF-Token (capas 2 y 3), que un
-  // <form> no puede fijar.
-  return base === 'multipart/form-data' && new URL(req.url).pathname.endsWith('/v1/workspace-imports');
+  // `multipart/form-data` SÍ lo puede producir un <form> ajeno sin preflight: por eso solo se admite en las subidas
+  // de archivos (import del workspace e import de extractos CSV) y, como en todo POST, siguen exigidos el Origin propio
+  // y el X-CSRF-Token (capas 2 y 3), que un <form> no puede fijar.
+  return base === 'multipart/form-data' && MULTIPART_UPLOAD_PATHS.test(new URL(req.url).pathname);
 }

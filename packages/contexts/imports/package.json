@@ -1,0 +1,55 @@
+{
+  "name": "@pf/imports",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded context IMPORTS: importación CSV básica de una cuenta (openspec add-basic-csv-import).",
+  "exports": {
+    "./contracts": {
+      "@pf/source": "./src/contracts/index.ts",
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./interface/imports.module": {
+      "@pf/source": "./src/interface/imports.module.ts",
+      "types": "./dist/interface/imports.module.d.ts",
+      "default": "./dist/interface/imports.module.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@pf/accounts": "workspace:*",
+    "@pf/identity": "workspace:*",
+    "@pf/audit": "workspace:*",
+    "@pf/ledger": "workspace:*",
+    "@pf/planning": "workspace:*",
+    "@pf/platform": "workspace:*",
+    "@pf/shared-kernel": "workspace:*",
+    "@pf/transactions": "workspace:*",
+    "busboy": "1.6.0",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "fast-check": "4.10.2",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

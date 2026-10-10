@@ -441,6 +441,7 @@
     "reactivate": "Reactivar",
     "viewTransactions": "Ver transacciones",
     "recordMovement": "Registrar movimiento",
+    "importCsv": "Importar CSV",
     "pending": "Pendiente de contabilizar: {amount}",
     "includedInNetWorth": "Cuenta en el patrimonio neto",
     "excludedFromNetWorth": "excluida del patrimonio neto",
@@ -707,6 +708,7 @@
       "newTransfer": "Transferencia",
       "payCard": "Pagar tarjeta",
       "newConversion": "Conversión",
+      "importCsv": "Importar CSV",
       "bulk": "Acciones en lote",
       "markCleared": "Marcar como confirmadas ({n})",
       "markUncleared": "Quitar confirmación ({n})",
@@ -3309,6 +3311,284 @@
       "meta": "Calculado el {date} · moneda de reporte {currency}",
       "freshness": "último movimiento {date}",
       "listTitle": "Pagos conocidos"
+    }
+  },
+  "Imports": {
+    "title": "Importar extracto (CSV)",
+    "listTitle": "Importaciones de extractos",
+    "intro": "Sube el extracto CSV de tu banco, indica qué columna es cada dato, revisa lo que se va a crear y apruébalo. Hasta que apruebes no se crea ninguna transacción ni cambia ningún saldo.",
+    "newImport": "Nueva importación",
+    "backToList": "Volver a las importaciones",
+    "loading": "Cargando…",
+    "empty": "Todavía no importaste ningún extracto.",
+    "loadMore": "Cargar más",
+    "viewerNotice": "Tu rol solo permite consultar las importaciones: no puedes subir archivos, decidir filas ni aprobar.",
+    "steps": {
+      "label": "Pasos de la importación",
+      "upload": "Archivo",
+      "mapping": "Columnas",
+      "review": "Revisar",
+      "result": "Resultado",
+      "current": "paso actual",
+      "done": "completado",
+      "heading": "Paso {n} de 4: {title}"
+    },
+    "list": {
+      "region": "Importaciones, tabla con desplazamiento",
+      "caption": "Importaciones del espacio de trabajo, la más reciente primero",
+      "file": "Archivo",
+      "account": "Cuenta",
+      "status": "Estado",
+      "date": "Fecha",
+      "actions": "Acciones",
+      "resume": "Retomar",
+      "open": "Ver"
+    },
+    "status": {
+      "AWAITING_MAPPING": "Esperando las columnas",
+      "AWAITING_REVIEW": "Por revisar",
+      "APPROVED": "Aprobada, en cola",
+      "PERSISTING": "Creando transacciones",
+      "COMPLETED": "Completada",
+      "PARTIALLY_FAILED": "Con filas fallidas",
+      "COMPLETED_WITH_ERRORS": "Completada con errores",
+      "CANCELLED": "Cancelada"
+    },
+    "info": {
+      "file": "Archivo",
+      "account": "Cuenta",
+      "detected": "Detectado",
+      "detectedValue": "{encoding}, separador {delimiter}, {columns} columnas",
+      "status": "Estado",
+      "encoding": {
+        "utf8": "UTF-8",
+        "windows1252": "Windows-1252"
+      },
+      "delimiter": {
+        "comma": "coma",
+        "semicolon": "punto y coma",
+        "tab": "tabulación",
+        "pipe": "barra vertical"
+      }
+    },
+    "upload": {
+      "intro": "Elige la cuenta a la que pertenece el extracto y su archivo CSV (hasta {max}). El archivo no se guarda: solo se conservan sus celdas, como datos, hasta que termines o venza la revisión.",
+      "account": "Cuenta destino",
+      "accountPlaceholder": "Elige una cuenta",
+      "file": "Archivo CSV",
+      "fileHint": "Extensión .csv, .txt o .tsv; UTF-8 o Windows-1252.",
+      "submit": "Subir y continuar",
+      "uploading": "Subiendo…",
+      "errors": {
+        "account": "Elige la cuenta destino.",
+        "none": "Elige un archivo CSV.",
+        "empty": "El archivo está vacío.",
+        "tooLarge": "El archivo supera el máximo de {max}.",
+        "extension": "El archivo debe ser .csv, .txt o .tsv."
+      }
+    },
+    "mapping": {
+      "sampleTitle": "Muestra del archivo",
+      "untrusted": "Estos textos vienen del archivo y se muestran tal cual, sin interpretarlos.",
+      "noSample": "La muestra solo se ve al subir el archivo. Puedes elegir las columnas por su número, o cancelar y volver a subirlo.",
+      "sampleRegion": "Muestra de las primeras filas del archivo, con desplazamiento",
+      "sampleCaption": "Primeras filas del archivo",
+      "recordNumber": "Fila",
+      "column": "Columna {n}",
+      "columnNamed": "Columna {n}: {name}",
+      "roles": {
+        "date": "Fecha",
+        "description": "Descripción",
+        "amount": "Monto",
+        "debit": "Débito",
+        "credit": "Crédito"
+      },
+      "formLabel": "Asignación de columnas",
+      "errorsTitle": "Corrige estos datos para continuar:",
+      "hasHeader": "La primera fila (después de las que se saltan) es un encabezado",
+      "skipRows": "Filas a saltar al inicio",
+      "skipRowsHint": "Texto del banco antes del encabezado; entre 0 y 50.",
+      "date": "Columna de la fecha",
+      "description": "Columna de la descripción",
+      "amountMode": "Cómo viene el monto",
+      "modes": {
+        "SIGNED": "Una columna con signo",
+        "DEBIT_CREDIT": "Dos columnas: débito y crédito"
+      },
+      "amount": "Columna del monto",
+      "signConvention": "Convención de signo",
+      "signHint": "Indica qué signo tiene el dinero que sale de la cuenta.",
+      "sign": {
+        "NEGATIVE_IS_OUTFLOW": "Negativo es salida (gasto)",
+        "POSITIVE_IS_OUTFLOW": "Positivo es salida (p. ej. tarjeta de crédito)"
+      },
+      "debit": "Columna de débito (salidas)",
+      "credit": "Columna de crédito (entradas)",
+      "dateFormat": "Formato de fecha",
+      "dateFormatHint": "Se aplica a todas las filas; no se adivina.",
+      "decimalSeparator": "Separador decimal",
+      "decimalHint": "El otro carácter se toma como separador de miles.",
+      "decimal": {
+        "comma": "Coma (1.234,56)",
+        "dot": "Punto (1,234.56)"
+      },
+      "chooseColumn": "Elige una columna",
+      "chooseOption": "Elige una opción",
+      "apply": "Aplicar y ver la vista previa",
+      "applying": "Calculando la vista previa…",
+      "backToReview": "Volver a la revisión",
+      "errors": {
+        "required": "Es obligatorio.",
+        "range": "La columna no existe en el archivo.",
+        "duplicate": "Esta columna ya se usa para otro dato.",
+        "skipRows": "Escribe un número entero entre 0 y 50."
+      }
+    },
+    "review": {
+      "transferNotice": "Las transferencias entre tus propias cuentas y los pagos de tarjeta no deben importarse como gasto o ingreso: regístralos como transferencia y omite esas filas.",
+      "counts": "{rows} filas · {newRows} nuevas · {already} ya importadas · {duplicates} posibles duplicados · {invalid} con errores",
+      "pending": "{count, plural, one {Falta decidir # posible duplicado.} other {Faltan decidir # posibles duplicados.}}",
+      "noPending": "No hay decisiones pendientes.",
+      "pendingFromServer": "{count, plural, one {No se puede aprobar: falta decidir # posible duplicado.} other {No se puede aprobar: faltan decidir # posibles duplicados.}}",
+      "transferRowsNote": "Algún posible duplicado coincide con una transferencia o conversión ya registrada: si es un pago de tarjeta o una transferencia propia, omítelo.",
+      "empty": "No hay filas con este filtro.",
+      "loadMore": "Cargar más filas",
+      "approve": "Aprobar {count, plural, one {# transacción} other {# transacciones}}",
+      "approveBlocked": "{count, plural, one {Decide el posible duplicado pendiente para poder aprobar.} other {Decide los # posibles duplicados pendientes para poder aprobar.}}",
+      "editMapping": "Cambiar las columnas",
+      "tableRegion": "Vista previa de las filas, tabla con desplazamiento",
+      "tableCaption": "Filas del extracto con su clasificación y decisión"
+    },
+    "totals": {
+      "toCreate": "Transacciones a crear",
+      "outflows": "Total de salidas",
+      "inflows": "Total de entradas",
+      "currentBalance": "Saldo actual de la cuenta",
+      "resultingBalance": "Saldo resultante"
+    },
+    "filters": {
+      "label": "Filtrar filas por clasificación",
+      "all": "Todas ({count})",
+      "NEW": "Nuevas ({count})",
+      "DUPLICATE_PROBABLE": "Posibles duplicados ({count})",
+      "DUPLICATE_EXACT": "Ya importadas ({count})",
+      "INVALID": "Con errores ({count})"
+    },
+    "classification": {
+      "NEW": "Nueva",
+      "DUPLICATE_EXACT": "Ya importada",
+      "DUPLICATE_PROBABLE": "Posible duplicado",
+      "INVALID": "Con error"
+    },
+    "row": {
+      "line": "Línea",
+      "date": "Fecha",
+      "description": "Descripción",
+      "amount": "Monto",
+      "status": "Clasificación",
+      "decision": "Decisión",
+      "decideGroup": "Decisión de la línea {line}",
+      "pending": "Falta decidir",
+      "failed": "No se creó esta fila: {reason}",
+      "direction": {
+        "IN": "entrada",
+        "OUT": "salida"
+      },
+      "decisionState": {
+        "CREATE": "Se creará",
+        "SKIP": "Se omite (es el mismo)",
+        "EXCLUDE": "Excluida"
+      },
+      "decide": {
+        "dup": {
+          "CREATE": "Crear de todos modos",
+          "CREATEAria": "Crear de todos modos la línea {line}",
+          "SKIP": "Omitir, es el mismo",
+          "SKIPAria": "Omitir la línea {line}, es el mismo movimiento",
+          "EXCLUDE": "Excluir",
+          "EXCLUDEAria": "Excluir la línea {line}"
+        },
+        "new": {
+          "CREATE": "Incluir",
+          "CREATEAria": "Incluir la línea {line}",
+          "SKIP": "Omitir",
+          "SKIPAria": "Omitir la línea {line}",
+          "EXCLUDE": "Excluir",
+          "EXCLUDEAria": "Excluir la línea {line}"
+        }
+      }
+    },
+    "candidate": {
+      "title": "Coincide con un movimiento ya registrado:",
+      "noDate": "sin fecha",
+      "noAmount": "sin monto",
+      "transferWarning": "Posible pago de tarjeta o transferencia propia: si ya la registraste como transferencia, omítela.",
+      "kind": {
+        "EXPENSE": "gasto",
+        "INCOME": "ingreso",
+        "TRANSFER": "transferencia",
+        "CONVERSION": "conversión",
+        "REFUND": "reembolso",
+        "ADJUSTMENT": "ajuste",
+        "UNKNOWN": "movimiento"
+      }
+    },
+    "issues": {
+      "IMPORT_INVALID_DATE": "La fecha no coincide con el formato elegido.",
+      "IMPORT_INVALID_AMOUNT": "El monto no es válido: está vacío, es cero, no es un número o tiene más decimales que la moneda.",
+      "IMPORT_FUTURE_DATE": "La fecha es futura.",
+      "PERIOD_CLOSED": "La fecha cae en un periodo cerrado.",
+      "ACCOUNT_CLOSED": "La cuenta está cerrada.",
+      "IMPORT_DESCRIPTION_TRUNCATED": "La descripción era muy larga y se recortó.",
+      "UNKNOWN": "La fila tiene un problema."
+    },
+    "warnings": {
+      "IMPORT_FILE_ALREADY_IMPORTED": "Este mismo archivo ya se importó en esta cuenta el {date}. Puedes continuar: las filas ya importadas no se duplican.",
+      "previousLink": "Ver la importación anterior"
+    },
+    "approve": {
+      "title": "Aprobar la importación",
+      "description": "Al aprobar se crean las transacciones; después podrás anular cada una desde Transacciones.",
+      "confirm": "Aprobar e importar",
+      "cancel": "Volver a revisar",
+      "toCreate": "{count, plural, one {Se creará # transacción.} other {Se crearán # transacciones.}}",
+      "notCreated": "No se crean: {skipped} omitidas como duplicado y {excluded} excluidas.",
+      "flows": "Salidas: {outflows}. Entradas: {inflows}.",
+      "balance": "Saldo actual {current}, saldo resultante {resulting}.",
+      "uncategorized": "Las transacciones quedan sin categoría: categorízalas después con la edición masiva de Transacciones.",
+      "bulkLink": "Ir a Transacciones"
+    },
+    "cancel": {
+      "button": "Cancelar importación",
+      "title": "Cancelar la importación",
+      "description": "No se crea ninguna transacción y se descartan las celdas del archivo. Esta acción no se puede deshacer.",
+      "confirm": "Cancelar importación",
+      "keep": "Seguir con la importación"
+    },
+    "progress": {
+      "bar": "Progreso de la importación",
+      "batches": "Lote {done} de {count}: {created} transacciones creadas.",
+      "starting": "Preparando la creación de transacciones…"
+    },
+    "result": {
+      "completed": "{count, plural, one {Importación completada: se creó # transacción sin categoría.} other {Importación completada: se crearon # transacciones sin categoría.}}",
+      "partial": "La importación terminó con filas fallidas: {created} transacciones creadas y {failed} sin crear. Puedes reintentar o aceptar el resultado parcial.",
+      "acceptedErrors": "Resultado parcial aceptado: {created} transacciones creadas y {failed} sin crear.",
+      "cancelled": "La importación se canceló. No se creó ninguna transacción.",
+      "rows": "Filas del archivo",
+      "created": "Creadas",
+      "skipped": "Omitidas",
+      "alreadyImported": "Ya importadas",
+      "invalid": "Con errores",
+      "failed": "Fallidas",
+      "errorCount": "{count, plural, one {# fila} other {# filas}}",
+      "errorLines": "Líneas del archivo: {lines}",
+      "errorMore": "y {count} más",
+      "retry": "Reintentar",
+      "accept": "Aceptar el resultado parcial",
+      "linksLabel": "Siguientes pasos",
+      "viewTransactions": "Ver las transacciones de la cuenta",
+      "importAnother": "Importar otro archivo"
     }
   }
 }

@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Formato de fecha y separador decimal explícitos"
 scenario: "Coma decimal con punto de miles"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-IMPORTS-006"]
 nfr: []
 invariants: ["INV-001","INV-003"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/domain/row-normalizer.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -32,7 +34,7 @@ expected_result:
   - "8000.00 BOB como Decimal (nunca number)"
   - "La propiedad se cumple para coma y punto decimal"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-010 — Con coma decimal el valor 8.000,00 se interpreta como 8000.00 BOB exactos

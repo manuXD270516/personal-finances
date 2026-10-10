@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["platform/event-delivery"]
 requirement: "Volumen de eventos de un import grande"
 scenario: "Extracto de 5 000 filas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-PERF-007","NFR-PERF-008"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - apps/api/test/perf/imports.perf.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","performance","D112"]
@@ -33,7 +35,7 @@ expected_result:
   - "Backlog de cada consumidor (reporting.data-version, planning.budget-thresholds, planning.journal-entry-posted y los de Phase 3) en 0 en ≤ 120 s"
   - "Eventos propios de imports: exactamente 2 (ImportApproved, ImportCompleted)"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-029 — Un import de 5 000 filas cumple los tiempos de vista previa y persistencia y cada consumidor drena sus eventos en 120 s

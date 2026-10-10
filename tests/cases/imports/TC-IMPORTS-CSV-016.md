@@ -5,16 +5,23 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Idempotencia por fila"
 scenario: "Mismo archivo dos veces"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-010","FR-IMPORTS-007"]
 nfr: []
 invariants: ["INV-014"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/duplicate-classifier.test.ts
+  - packages/contexts/imports/src/domain/row-fingerprint.test.ts
+  - packages/contexts/imports/test/integration/pg-imports.int.test.ts
+  - packages/contexts/transactions/src/application/imported-transactions.adapter.test.ts
+  - packages/contexts/transactions/test/integration/pg-imported.int.test.ts
+status: automated
 regression_suite: true
 phase: 3
 tags: ["csv-import"]
@@ -34,7 +41,7 @@ expected_result:
   - "Segunda aprobación: 0 creadas"
   - "Saldo de Banco BOB 11718.70 BOB"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-016 — Reimportar el mismo archivo clasifica todas las filas como ya importadas y crea 0 transacciones

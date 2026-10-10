@@ -1,0 +1,4 @@
+Fecha;Descripción;Monto
+03/10/2026;"=HYPERLINK(""http://example.test"",""clic"")";-12,00
+04/10/2026;+SUMA(1+1);-5,00
+05/10/2026;@CMD;-1,00

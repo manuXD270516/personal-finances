@@ -5,16 +5,20 @@ spec: imports/import-pipeline
 related_specs: ["transactions/duplicate-detection","transactions/transfers"]
 requirement: "Deduplicación básica con movimientos existentes"
 scenario: "Gasto registrado a mano"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-007","FR-TRANSACTIONS-031","FR-TRANSACTIONS-032"]
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/src/domain/duplicate-classifier.test.ts
+  - packages/contexts/transactions/test/integration/pg-imported.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -32,7 +36,7 @@ expected_result:
   - "Fila PAGO TARJETA: DUPLICATE_PROBABLE con la transferencia como candidato"
   - "Con el gasto del 2026-10-06 (5 días): la fila es NEW"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-020 — Una fila igual a un gasto manual o a una transferencia registrada es posible duplicado

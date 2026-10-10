@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Límites de tamaño y contenido del archivo"
 scenario: "Archivo demasiado grande"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003"]
 nfr: ["NFR-SEC-012"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","limits"]
@@ -32,7 +34,7 @@ expected_result:
   - "El servidor deja de leer al superar el límite (no bufferiza el archivo completo)"
   - "No existe ninguna importación nueva"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-003 — Un CSV de 2.5 MiB se rechaza con 413 UPLOAD_TOO_LARGE sin crear la importación

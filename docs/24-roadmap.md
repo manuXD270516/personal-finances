@@ -139,6 +139,7 @@ flowchart LR
 - **Exit criteria:** generación re-ejecutada N veces sin duplicados (PBT); todas las suscripciones reales del owner modeladas; 0 pagos recurrentes sorpresa en un mes (SM-07), medido con el indicador de pagos sorpresa de `GET /reports/surprise-payments` (`add-upcoming-payments`: pagos cuya ocurrencia se generó el mismo día o después; solo ve pagos vinculados a un compromiso) sobre un periodo cerrado del owner.
 - **Dependencias:** Phase 1 (TRANSACTIONS para materializar ocurrencias), Phase 2 (PLANNING para compromisos en plan mensual; NOTIFY para recordatorios).
 - **Riesgos clave:** RISK-020 (RRULE/TZ/fin de mes), RISK-016 (CSV bancario heterogéneo).
+- **Decisión sobre el CSV básico (pregunta abierta 4, resuelta con docs/35 D122):** entra en Phase 3 como último change y opcional (`add-basic-csv-import`, implementado); si los Must de la fase no se terminan, pasa intacto a Phase 6.
 
 ### 5.4 Phase 4 — Metas de ahorro y deudas
 
@@ -317,6 +318,6 @@ gantt
 1. ¿Aprueba el owner tratar el hardening de producción como Hito H paralelo (no como fase) y la Colaboración como track posterior no numerado?
 2. ¿Se hará el **despliegue personal mínimo** al final de Phase 2 o el owner prefiere operar local-only hasta el Hito H? (Depende de SPIKE-09 y del presupuesto.) *Presupuesto fijado por el owner el 2026-10-05: USD 10–20/mes (docs/31 D51); el host lo elige el change de despliegue (ADR-0027).*
 3. ~~¿Phase 5 (FX providers) puede adelantarse?~~ Resuelta 2026-10-02: los providers de tasa paralela se adelantan a Phase 1 (docs/31 D29, ADR-0025); Phase 5 conserva más providers, cripto y commodities.
-4. ¿El CSV básico (Phase 3, Could) se considera necesario para cargar el histórico del owner, o el owner empezará "desde cero" con saldos iniciales?
+4. ~~¿El CSV básico (Phase 3, Could) se considera necesario para cargar el histórico del owner, o el owner empezará "desde cero" con saldos iniciales?~~ Resuelta 2026-10-10 (docs/35 D122): entra en Phase 3 como último change, solo si los Must de la fase están terminados.
 5. ¿El umbral "≥ 6 meses de datos cerrados" para Phase 8 se cumplirá a tiempo según el cronograma? Si no, Phase 8 puede posponerse sin bloquear Phase 9/10.
 6. ¿Qué dedicación semanal real tiene el owner? Las duraciones asumen ~20 h/semana.

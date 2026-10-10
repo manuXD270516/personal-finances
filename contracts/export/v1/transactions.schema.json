@@ -35,7 +35,8 @@
     "created_at",
     "updated_at",
     "reconciliation_id",
-    "reconciliation_mode"
+    "reconciliation_mode",
+    "import_job_id"
   ],
   "properties": {
     "id": {
@@ -185,6 +186,13 @@
         "string",
         "null"
       ]
+    },
+    "import_job_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
     }
   },
   "x-pfos-table": "txn.transaction",

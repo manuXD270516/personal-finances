@@ -192,6 +192,12 @@ function Register({
           <a href={ctx.href('/transferencias/nueva')}>{t('list.newTransfer')}</a>
           <a href={ctx.href('/transferencias/nueva?pagoTarjeta=1')}>{t('list.payCard')}</a>
           <a href={ctx.href('/fx/conversiones/nueva')}>{t('list.newConversion')}</a>
+          <a
+            href={ctx.href(`/imports/nueva${filters.accountId ? `?cuenta=${filters.accountId}` : ''}`)}
+            data-testid="import-csv"
+          >
+            {t('list.importCsv')}
+          </a>
         </nav>
       ) : null}
       <form

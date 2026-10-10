@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Formato de fecha y separador decimal explícitos"
 scenario: "Día y mes según el formato elegido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-IMPORTS-006"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/domain/row-normalizer.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","dates","RISK-020"]
@@ -32,7 +34,7 @@ expected_result:
   - "dd/MM/yyyy ⇒ 2026-04-03; MM/dd/yyyy ⇒ 2026-03-04"
   - "Línea 6 inválida con IMPORT_INVALID_DATE"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-012 — La fecha se interpreta con el formato elegido y una fecha inexistente es inválida con su línea

@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Aviso de archivo ya importado"
 scenario: "Re-subida del mismo archivo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-010"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/test/integration/pg-imports.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "201 con warnings[] = IMPORT_FILE_ALREADY_IMPORTED, fecha 2026-10-20 e id de la importación anterior"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-019 — Volver a subir el mismo archivo advierte que ya fue importado sin bloquear

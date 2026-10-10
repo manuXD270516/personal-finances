@@ -5,16 +5,19 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Retención del contenido importado"
 scenario: "Purga a los 90 días"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-003","FR-IMPORTS-010"]
 nfr: []
 invariants: ["INV-014"]
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+  - packages/contexts/imports/test/integration/pg-imports.int.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import","retention"]
@@ -32,7 +35,7 @@ expected_result:
   - "Import completado el 2026-10-20: sin filas de staging; import_job, conteos y row_link conservados; reimportar sigue dando 0 nuevas"
   - "Import en revisión desde el 2026-10-20: CANCELLED por SYSTEM con auditoría y staging descartado"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-030 — Las celdas crudas se purgan a los 90 días y una revisión abandonada expira a los 30

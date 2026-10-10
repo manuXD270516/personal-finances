@@ -35,6 +35,12 @@ import {
   parseFxProviderSettings,
 } from '@pf/fx/interface/fx.module';
 import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
+import { IMPORTS_AUDIT_POLICY } from '@pf/imports/contracts';
+import {
+  createImportsRuntime,
+  ImportsModule,
+  type ImportsRuntime,
+} from '@pf/imports/interface/imports.module';
 import {
   IdentityModule,
   identityUserLocales,
@@ -59,7 +65,7 @@ import {
 } from '@pf/planning/interface/planning.module';
 import { JWKS_METRICS, type JwksObserver, type JwtVerifierOptions } from '@pf/platform/api';
 import { otelCounters, otelHistograms, type CounterMetrics } from '@pf/platform/otel';
-import { demoDataEnabled, type ApiConfig } from '@pf/platform/config';
+import { demoDataEnabled, type ApiConfig, type WorkerConfig } from '@pf/platform/config';
 import type { JobQueue } from '@pf/platform/queue';
 import { DEMO_MANIFEST } from '../demo/dataset/demo-plan.js';
 import { demoJobsPort } from '../demo/demo-jobs-port.js';
@@ -209,6 +215,8 @@ export const AUDIT_POLICIES = [
   NOTIFICATIONS_AUDIT_POLICY,
   // add-recurrence-engine (Phase 3): definiciones y ocurrencias recurrentes.
   COMMITMENTS_AUDIT_POLICY,
+  // add-basic-csv-import (Phase 3): importaciones CSV (sin celdas, descripciones ni montos de filas).
+  IMPORTS_AUDIT_POLICY,
 ];
 
 /**
@@ -281,9 +289,18 @@ export function financeRuntimes(input: {
     Partial<
       Pick<
         ApiConfig,
-        'REPORTING_RATE_VALIDITY_WINDOW' | 'PLANNING_PERIOD_LOOKAHEAD' | 'COMMITMENTS_HORIZON_DAYS'
+        | 'REPORTING_RATE_VALIDITY_WINDOW'
+        | 'PLANNING_PERIOD_LOOKAHEAD'
+        | 'COMMITMENTS_HORIZON_DAYS'
+        | 'IMPORT_CSV_MAX_BYTES'
+        | 'IMPORT_CSV_MAX_ROWS'
+        | 'IMPORT_CSV_MAX_COLUMNS'
+        | 'IMPORT_PERSIST_BATCH_SIZE'
+        | 'IMPORT_REVIEW_TTL'
+        | 'IMPORT_FUTURE_DATE_TOLERANCE_DAYS'
       >
     > &
+    Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>> &
     Parameters<typeof parseFxProviderSettings>[0];
   readonly outbox?: OutboxWriter;
 }) {
@@ -474,6 +491,23 @@ export function financeRuntimes(input: {
     histograms: otelHistograms('@pf/commitments'),
   });
   deferred.commitments = commitments;
+  // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
+  const imports = createImportsRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    outbox: classificationOutbox(writer),
+    calendar: identityWorkspaceCalendar(input.pool),
+    accounts: accounts.query,
+    balances: ledger.accountBalances,
+    periods: planning.periodQuery,
+    transactions: {
+      imported: transactions.imported,
+      duplicateCandidates: transactions.duplicateCandidates,
+      statuses: transactions.statuses,
+    },
+    settings: importsSettingsFrom(input.config),
+  });
   return {
     classification,
     fx,
@@ -484,6 +518,7 @@ export function financeRuntimes(input: {
     planning,
     notifications,
     commitments,
+    imports,
   };
 }
 
@@ -531,6 +566,7 @@ export function identityImports(input: {
     planning,
     notifications,
     commitments,
+    imports,
   } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -605,6 +641,8 @@ export function identityImports(input: {
     NotificationsModule.register({ runtime: notifications, conventions: input.conventions }),
     // COMMITMENTS — openspec add-recurrence-engine (Phase 3): `/recurring*`.
     CommitmentsModule.register({ runtime: commitments, conventions: input.conventions }),
+    // IMPORTS — openspec add-basic-csv-import (Phase 3): `/imports*`.
+    ImportsModule.register({ runtime: imports, conventions: input.conventions }),
   ];
 }
 
@@ -708,6 +746,37 @@ export function lifecycleExportLoaders(
       lifecycle: await classification.queries.lifecycleOf(userId, workspaceId, 'Counterparty', aggregateId),
       label: (await classification.queries.getCounterparty(userId, workspaceId, aggregateId)).name,
     }),
+  };
+}
+
+/**
+ * Ajustes `IMPORT_*` de IMPORTS desde la configuración (los valores ausentes usan el default del runtime; la ventana de
+ * duplicados es la de `transactions/duplicate-detection`, no configurable).
+ */
+export function importsSettingsFrom(
+  config: Partial<
+    Pick<
+      ApiConfig,
+      | 'IMPORT_CSV_MAX_BYTES'
+      | 'IMPORT_CSV_MAX_ROWS'
+      | 'IMPORT_CSV_MAX_COLUMNS'
+      | 'IMPORT_PERSIST_BATCH_SIZE'
+      | 'IMPORT_REVIEW_TTL'
+      | 'IMPORT_FUTURE_DATE_TOLERANCE_DAYS'
+    >
+  > &
+    Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>>,
+): Partial<ImportsRuntime['settings']> {
+  return {
+    ...(config.IMPORT_CSV_MAX_BYTES ? { maxBytes: config.IMPORT_CSV_MAX_BYTES } : {}),
+    ...(config.IMPORT_CSV_MAX_ROWS ? { maxRows: config.IMPORT_CSV_MAX_ROWS } : {}),
+    ...(config.IMPORT_CSV_MAX_COLUMNS ? { maxColumns: config.IMPORT_CSV_MAX_COLUMNS } : {}),
+    ...(config.IMPORT_PERSIST_BATCH_SIZE ? { batchSize: config.IMPORT_PERSIST_BATCH_SIZE } : {}),
+    ...(config.IMPORT_REVIEW_TTL ? { reviewTtlMs: config.IMPORT_REVIEW_TTL } : {}),
+    ...(config.IMPORT_STAGING_RETENTION ? { stagingRetentionMs: config.IMPORT_STAGING_RETENTION } : {}),
+    ...(config.IMPORT_FUTURE_DATE_TOLERANCE_DAYS !== undefined
+      ? { futureToleranceDays: config.IMPORT_FUTURE_DATE_TOLERANCE_DAYS }
+      : {}),
   };
 }
 

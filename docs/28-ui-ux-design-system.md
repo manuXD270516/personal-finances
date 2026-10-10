@@ -212,6 +212,8 @@ Checklist guiado en Plan → "Cerrar septiembre":
 
 Pasos: 1 Archivo → 2 Mapeo de columnas (solo si no hay perfil; vista previa de 20 filas, selector de formato de fecha/decimal) → 3 Revisar → 4 Resultado (con reconciliación). Progreso con barra y etapa actual durante el procesamiento (polling).
 
+**Phase 3 (`add-basic-csv-import`, `/imports`):** asistente de 4 pasos Subir y mapear → Revisar → Aprobar → Progreso y resultado, sin categoría, sin fusionar y sin saldo de extracto: la revisión muestra los conteos por clasificación, salidas y entradas a crear y el saldo actual → resultante; cada posible duplicado muestra su candidato (gasto, ingreso o pata de transferencia) con "Crear de todos modos" / "Omitir, es el mismo" / "Excluir"; las transacciones se crean `POSTED` sin categoría y se categorizan después con la edición masiva de Transacciones. Todo texto del archivo se muestra escapado.
+
 ### 4.8 Recurrentes (`/recurring`, Phase 3, `add-recurrence-engine`)
 
 - **Próximos**: lista de pagos de 7/30/60/90 días (atrasados primero) con estado en texto + icono (Programada, Próxima, Atrasada, Creada, Vinculada, Omitida, Cancelada; NFR-USAB-104) y acciones **Aprobar** (en la API, `materialize`), **Vincular**, **Omitir** y **Editar** monto o fecha. **Vincular** abre un buscador de transacciones filtrado por cuenta, tipo y ±15 días.

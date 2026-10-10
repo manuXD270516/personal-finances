@@ -307,6 +307,9 @@ export class PgWorkspaceImporter implements WorkspaceImporter {
         else if (c.kind === 'uuid') next[c.name] = typeof v === 'string' ? (remap.get(v) ?? v) : v;
         else if (c.kind === 'uuid[]') next[c.name] = (v as string[]).map((x) => remap.get(x) ?? x);
         else if (c.kind === 'jsonb') next[c.name] = remap.replaceDeep(v);
+        // bytea viaja en base64 (formato del export); `jsonb_populate_recordset` lo lee en el formato hexadecimal de
+        // PostgreSQL. add-basic-csv-import es la primera sección que exporta hashes binarios (checksum y huellas).
+        else if (c.kind === 'bytea') next[c.name] = `\\x${Buffer.from(String(v), 'base64').toString('hex')}`;
         else if (c.kind === 'text' && textRefs.has(c.name)) next[c.name] = remap.replaceText(String(v));
         else next[c.name] = v;
       }

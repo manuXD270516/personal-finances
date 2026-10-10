@@ -229,7 +229,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 2. **Audit trail base en Phase 1** (prerrequisito de integridad para transacciones editables).
 3. **Reporting básico incremental** desde Phase 1 (saldos, ingresos/gastos del mes); avanzado en Phase 7.
 4. **Notifications base en Phase 2** (alertas de presupuesto).
-5. **CSV import básico** puede adelantarse a Phase 3 (Could) para cargar histórico real temprano; pipeline completo en Phase 6.
+5. **CSV import básico** se adelantó a Phase 3 (Could, docs/35 D122; `add-basic-csv-import`) para cargar histórico real temprano; pipeline completo en Phase 6.
 
 ## 14. Taxonomía de capabilities OpenSpec (`openspec/specs/<context>/<capability>/spec.md`)
 
@@ -246,7 +246,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | debt | `debt/loans`, `debt/amortization`, `debt/credit-cards` |
 | fx | `fx/market-rates`, `fx/market-rate-providers`, `fx/conversion-pricing` |
 | documents | `documents/attachments` |
-| imports | `imports/import-pipeline`, `imports/banking-providers` |
+| imports | `imports/import-pipeline` (activa desde Phase 3 con el subconjunto CSV de `add-basic-csv-import`; pipeline completo en Phase 6), `imports/banking-providers` |
 | rules | `rules/rule-engine` |
 | reporting | `reporting/dashboard`, `reporting/financial-reports`, `reporting/net-worth`, `reporting/cash-flow-calendar` (versión simple en Phase 3: `add-upcoming-payments`; calendario completo en Phase 7) |
 | forecast | `forecast/expense-forecasting` |

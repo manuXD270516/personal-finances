@@ -29,6 +29,7 @@
     "@pf/ledger": "workspace:*",
     "@pf/notifications": "workspace:*",
     "@pf/commitments": "workspace:*",
+    "@pf/imports": "workspace:*",
     "@pf/planning": "workspace:*",
     "@pf/platform": "workspace:*",
     "@pf/reporting": "workspace:*",

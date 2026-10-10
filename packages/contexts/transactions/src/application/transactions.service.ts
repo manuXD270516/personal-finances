@@ -83,6 +83,8 @@ export interface RecordTransactionCommand {
   readonly paymentMethod?: PaymentMethod | null;
   readonly source?: TransactionSource;
   readonly externalRef?: ExternalRef | null;
+  /** Importación que crea la transacción (`source = IMPORT`, add-basic-csv-import). */
+  readonly importJobId?: string | null;
   readonly refundOfTransactionId?: string | null;
   readonly confirmRefundExceedsOriginal?: boolean;
   readonly reason?: string | null;
@@ -191,14 +193,20 @@ export interface ListTransactionsQuery extends Omit<TransactionListFilter, 'q' |
 }
 
 const MAX_BULK = 500;
-/** `origin.refId` de `TransactionCreated.v1`: la ocurrencia recurrente que originó la transacción (add-recurrence-engine). */
+/**
+ * `origin.refId` de `TransactionCreated.v1`: la ocurrencia recurrente que originó la transacción (add-recurrence-engine)
+ * o la importación que la creó (add-basic-csv-import).
+ */
 const recurringRefOf = (s: {
   readonly source: string;
+  readonly importJobId?: string | null;
   readonly externalRef: { readonly namespace: string; readonly id: string } | null;
 }): string | null =>
   s.source === 'RECURRING' && s.externalRef?.namespace === RECURRING_OCCURRENCE_NAMESPACE
     ? s.externalRef.id
-    : null;
+    : s.source === 'IMPORT'
+      ? (s.importJobId ?? null)
+      : null;
 
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `transaction ${id} not found`);
 /** 412 con la versión vigente (`currentVersion`, docs/10 §6). */
@@ -316,6 +324,7 @@ export class TransactionsService {
         paymentMethod: cmd.paymentMethod ?? null,
         source: cmd.source ?? 'MANUAL',
         externalRef: cmd.externalRef ?? null,
+        importJobId: cmd.importJobId ?? null,
         refundOfTransactionId: cmd.refundOfTransactionId ?? null,
         reason: cmd.reason ?? null,
         confirmedRefundExcess: confirmedExcess,

@@ -441,6 +441,7 @@
     "reactivate": "Reactivate",
     "viewTransactions": "View transactions",
     "recordMovement": "Record a movement",
+    "importCsv": "Import CSV",
     "pending": "Pending posting: {amount}",
     "includedInNetWorth": "Counts towards net worth",
     "excludedFromNetWorth": "excluded from net worth",
@@ -707,6 +708,7 @@
       "newTransfer": "Transfer",
       "payCard": "Pay card",
       "newConversion": "Conversion",
+      "importCsv": "Import CSV",
       "bulk": "Bulk actions",
       "markCleared": "Mark as cleared ({n})",
       "markUncleared": "Unmark cleared ({n})",
@@ -3309,6 +3311,284 @@
       "meta": "Computed on {date} · reporting currency {currency}",
       "freshness": "latest activity {date}",
       "listTitle": "Known payments"
+    }
+  },
+  "Imports": {
+    "title": "Import a statement (CSV)",
+    "listTitle": "Statement imports",
+    "intro": "Upload your bank statement as a CSV, say which column is each piece of data, review what will be created and approve it. Nothing is created and no balance changes until you approve.",
+    "newImport": "New import",
+    "backToList": "Back to imports",
+    "loading": "Loading…",
+    "empty": "You have not imported any statement yet.",
+    "loadMore": "Load more",
+    "viewerNotice": "Your role only lets you view imports: you cannot upload files, decide rows or approve.",
+    "steps": {
+      "label": "Import steps",
+      "upload": "File",
+      "mapping": "Columns",
+      "review": "Review",
+      "result": "Result",
+      "current": "current step",
+      "done": "completed",
+      "heading": "Step {n} of 4: {title}"
+    },
+    "list": {
+      "region": "Imports, scrollable table",
+      "caption": "Workspace imports, newest first",
+      "file": "File",
+      "account": "Account",
+      "status": "Status",
+      "date": "Date",
+      "actions": "Actions",
+      "resume": "Resume",
+      "open": "View"
+    },
+    "status": {
+      "AWAITING_MAPPING": "Waiting for columns",
+      "AWAITING_REVIEW": "To review",
+      "APPROVED": "Approved, queued",
+      "PERSISTING": "Creating transactions",
+      "COMPLETED": "Completed",
+      "PARTIALLY_FAILED": "Some rows failed",
+      "COMPLETED_WITH_ERRORS": "Completed with errors",
+      "CANCELLED": "Cancelled"
+    },
+    "info": {
+      "file": "File",
+      "account": "Account",
+      "detected": "Detected",
+      "detectedValue": "{encoding}, {delimiter} separator, {columns} columns",
+      "status": "Status",
+      "encoding": {
+        "utf8": "UTF-8",
+        "windows1252": "Windows-1252"
+      },
+      "delimiter": {
+        "comma": "comma",
+        "semicolon": "semicolon",
+        "tab": "tab",
+        "pipe": "vertical bar"
+      }
+    },
+    "upload": {
+      "intro": "Choose the account the statement belongs to and its CSV file (up to {max}). The file itself is not stored: only its cells are kept, as data, until you finish or the review expires.",
+      "account": "Target account",
+      "accountPlaceholder": "Choose an account",
+      "file": "CSV file",
+      "fileHint": "Extension .csv, .txt or .tsv; UTF-8 or Windows-1252.",
+      "submit": "Upload and continue",
+      "uploading": "Uploading…",
+      "errors": {
+        "account": "Choose the target account.",
+        "none": "Choose a CSV file.",
+        "empty": "The file is empty.",
+        "tooLarge": "The file is larger than the {max} limit.",
+        "extension": "The file must be .csv, .txt or .tsv."
+      }
+    },
+    "mapping": {
+      "sampleTitle": "File sample",
+      "untrusted": "These texts come from the file and are shown as they are, without interpreting them.",
+      "noSample": "The sample is only shown when the file is uploaded. You can pick the columns by number, or cancel and upload the file again.",
+      "sampleRegion": "Sample of the first rows of the file, scrollable",
+      "sampleCaption": "First rows of the file",
+      "recordNumber": "Row",
+      "column": "Column {n}",
+      "columnNamed": "Column {n}: {name}",
+      "roles": {
+        "date": "Date",
+        "description": "Description",
+        "amount": "Amount",
+        "debit": "Debit",
+        "credit": "Credit"
+      },
+      "formLabel": "Column assignment",
+      "errorsTitle": "Fix these items to continue:",
+      "hasHeader": "The first row (after the skipped ones) is a header",
+      "skipRows": "Rows to skip at the start",
+      "skipRowsHint": "Bank text before the header; between 0 and 50.",
+      "date": "Date column",
+      "description": "Description column",
+      "amountMode": "How the amount is laid out",
+      "modes": {
+        "SIGNED": "One signed column",
+        "DEBIT_CREDIT": "Two columns: debit and credit"
+      },
+      "amount": "Amount column",
+      "signConvention": "Sign convention",
+      "signHint": "Say which sign money leaving the account has.",
+      "sign": {
+        "NEGATIVE_IS_OUTFLOW": "Negative is an outflow (expense)",
+        "POSITIVE_IS_OUTFLOW": "Positive is an outflow (e.g. credit card)"
+      },
+      "debit": "Debit column (outflows)",
+      "credit": "Credit column (inflows)",
+      "dateFormat": "Date format",
+      "dateFormatHint": "Applies to every row; it is never guessed.",
+      "decimalSeparator": "Decimal separator",
+      "decimalHint": "The other character is taken as the thousands separator.",
+      "decimal": {
+        "comma": "Comma (1.234,56)",
+        "dot": "Dot (1,234.56)"
+      },
+      "chooseColumn": "Choose a column",
+      "chooseOption": "Choose an option",
+      "apply": "Apply and see the preview",
+      "applying": "Computing the preview…",
+      "backToReview": "Back to the review",
+      "errors": {
+        "required": "This is required.",
+        "range": "The column does not exist in the file.",
+        "duplicate": "This column is already used for another item.",
+        "skipRows": "Enter a whole number between 0 and 50."
+      }
+    },
+    "review": {
+      "transferNotice": "Transfers between your own accounts and card payments must not be imported as an expense or income: record them as a transfer and skip those rows.",
+      "counts": "{rows} rows · {newRows} new · {already} already imported · {duplicates} possible duplicates · {invalid} with errors",
+      "pending": "{count, plural, one {# possible duplicate still needs a decision.} other {# possible duplicates still need a decision.}}",
+      "noPending": "There are no pending decisions.",
+      "pendingFromServer": "{count, plural, one {It cannot be approved: # possible duplicate still needs a decision.} other {It cannot be approved: # possible duplicates still need a decision.}}",
+      "transferRowsNote": "A possible duplicate matches an already recorded transfer or conversion: if it is a card payment or a transfer between your own accounts, skip it.",
+      "empty": "There are no rows with this filter.",
+      "loadMore": "Load more rows",
+      "approve": "Approve {count, plural, one {# transaction} other {# transactions}}",
+      "approveBlocked": "{count, plural, one {Decide the pending possible duplicate to be able to approve.} other {Decide the # pending possible duplicates to be able to approve.}}",
+      "editMapping": "Change the columns",
+      "tableRegion": "Row preview, scrollable table",
+      "tableCaption": "Statement rows with their classification and decision"
+    },
+    "totals": {
+      "toCreate": "Transactions to create",
+      "outflows": "Total outflows",
+      "inflows": "Total inflows",
+      "currentBalance": "Current account balance",
+      "resultingBalance": "Resulting balance"
+    },
+    "filters": {
+      "label": "Filter rows by classification",
+      "all": "All ({count})",
+      "NEW": "New ({count})",
+      "DUPLICATE_PROBABLE": "Possible duplicates ({count})",
+      "DUPLICATE_EXACT": "Already imported ({count})",
+      "INVALID": "With errors ({count})"
+    },
+    "classification": {
+      "NEW": "New",
+      "DUPLICATE_EXACT": "Already imported",
+      "DUPLICATE_PROBABLE": "Possible duplicate",
+      "INVALID": "Has an error"
+    },
+    "row": {
+      "line": "Line",
+      "date": "Date",
+      "description": "Description",
+      "amount": "Amount",
+      "status": "Classification",
+      "decision": "Decision",
+      "decideGroup": "Decision for line {line}",
+      "pending": "Needs a decision",
+      "failed": "This row was not created: {reason}",
+      "direction": {
+        "IN": "inflow",
+        "OUT": "outflow"
+      },
+      "decisionState": {
+        "CREATE": "Will be created",
+        "SKIP": "Skipped (same movement)",
+        "EXCLUDE": "Excluded"
+      },
+      "decide": {
+        "dup": {
+          "CREATE": "Create anyway",
+          "CREATEAria": "Create line {line} anyway",
+          "SKIP": "Skip, it is the same",
+          "SKIPAria": "Skip line {line}, it is the same movement",
+          "EXCLUDE": "Exclude",
+          "EXCLUDEAria": "Exclude line {line}"
+        },
+        "new": {
+          "CREATE": "Include",
+          "CREATEAria": "Include line {line}",
+          "SKIP": "Skip",
+          "SKIPAria": "Skip line {line}",
+          "EXCLUDE": "Exclude",
+          "EXCLUDEAria": "Exclude line {line}"
+        }
+      }
+    },
+    "candidate": {
+      "title": "Matches an already recorded movement:",
+      "noDate": "no date",
+      "noAmount": "no amount",
+      "transferWarning": "Possible card payment or transfer between your own accounts: if you already recorded it as a transfer, skip it.",
+      "kind": {
+        "EXPENSE": "expense",
+        "INCOME": "income",
+        "TRANSFER": "transfer",
+        "CONVERSION": "conversion",
+        "REFUND": "refund",
+        "ADJUSTMENT": "adjustment",
+        "UNKNOWN": "movement"
+      }
+    },
+    "issues": {
+      "IMPORT_INVALID_DATE": "The date does not match the chosen format.",
+      "IMPORT_INVALID_AMOUNT": "The amount is not valid: it is empty, zero, not a number or has more decimals than the currency.",
+      "IMPORT_FUTURE_DATE": "The date is in the future.",
+      "PERIOD_CLOSED": "The date falls in a closed period.",
+      "ACCOUNT_CLOSED": "The account is closed.",
+      "IMPORT_DESCRIPTION_TRUNCATED": "The description was too long and was shortened.",
+      "UNKNOWN": "The row has a problem."
+    },
+    "warnings": {
+      "IMPORT_FILE_ALREADY_IMPORTED": "This same file was already imported into this account on {date}. You can continue: rows already imported are not duplicated.",
+      "previousLink": "See the previous import"
+    },
+    "approve": {
+      "title": "Approve the import",
+      "description": "Approving creates the transactions; afterwards you can void each one from Transactions.",
+      "confirm": "Approve and import",
+      "cancel": "Back to the review",
+      "toCreate": "{count, plural, one {# transaction will be created.} other {# transactions will be created.}}",
+      "notCreated": "Not created: {skipped} skipped as duplicates and {excluded} excluded.",
+      "flows": "Outflows: {outflows}. Inflows: {inflows}.",
+      "balance": "Current balance {current}, resulting balance {resulting}.",
+      "uncategorized": "The transactions are left uncategorized: categorize them afterwards with the bulk edit in Transactions.",
+      "bulkLink": "Go to Transactions"
+    },
+    "cancel": {
+      "button": "Cancel import",
+      "title": "Cancel the import",
+      "description": "No transaction is created and the cells of the file are discarded. This cannot be undone.",
+      "confirm": "Cancel import",
+      "keep": "Keep importing"
+    },
+    "progress": {
+      "bar": "Import progress",
+      "batches": "Batch {done} of {count}: {created} transactions created.",
+      "starting": "Getting ready to create the transactions…"
+    },
+    "result": {
+      "completed": "{count, plural, one {Import completed: # uncategorized transaction was created.} other {Import completed: # uncategorized transactions were created.}}",
+      "partial": "The import finished with failed rows: {created} transactions created and {failed} not created. You can retry or accept the partial result.",
+      "acceptedErrors": "Partial result accepted: {created} transactions created and {failed} not created.",
+      "cancelled": "The import was cancelled. No transaction was created.",
+      "rows": "Rows in the file",
+      "created": "Created",
+      "skipped": "Skipped",
+      "alreadyImported": "Already imported",
+      "invalid": "With errors",
+      "failed": "Failed",
+      "errorCount": "{count, plural, one {# row} other {# rows}}",
+      "errorLines": "File lines: {lines}",
+      "errorMore": "and {count} more",
+      "retry": "Retry",
+      "accept": "Accept the partial result",
+      "linksLabel": "Next steps",
+      "viewTransactions": "View the account transactions",
+      "importAnother": "Import another file"
     }
   }
 }

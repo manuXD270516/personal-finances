@@ -730,6 +730,89 @@ export const VARIABLES = {
     },
   ),
 
+  // ── Imports: importación CSV básica (openspec add-basic-csv-import, design.md § Contratos; docs/35 D122, D151) ──
+  IMPORT_CSV_MAX_BYTES: variable(
+    positiveInt.refine((n) => n <= 20_971_520, 'hasta 20971520 bytes (20 MiB)'),
+    {
+      group: 'Imports',
+      description:
+        'Tamaño máximo en bytes del CSV que se puede subir para importar (docs/35 D151, 2 MiB): el servidor deja de leer al superarlo y responde 413 `UPLOAD_TOO_LARGE` sin crear la importación.',
+      default: '2097152',
+    },
+  ),
+  IMPORT_CSV_MAX_ROWS: variable(
+    positiveInt.refine((n) => n <= 100_000, 'hasta 100000 filas'),
+    {
+      group: 'Imports',
+      description:
+        'Máximo de filas de datos de un CSV importado (docs/35 D151, 5000): más ⇒ 422 `IMPORT_TOO_MANY_ROWS`. El mapeo y la clasificación son síncronos, así que el tope acota el tiempo hasta la vista previa.',
+      default: '5000',
+    },
+  ),
+  IMPORT_CSV_MAX_COLUMNS: variable(
+    positiveInt.refine((n) => n <= 200, 'hasta 200 columnas'),
+    {
+      group: 'Imports',
+      description: 'Máximo de columnas de un CSV importado (50): más ⇒ 422 `IMPORT_UNSUPPORTED_FORMAT`.',
+      default: '50',
+    },
+  ),
+  IMPORT_PERSIST_BATCH_SIZE: variable(
+    positiveInt.refine((n) => n <= 1000, 'hasta 1000 filas por lote'),
+    {
+      group: 'Imports',
+      description:
+        'Filas por lote de la persistencia de una importación aprobada (200): un lote es una transacción de base de datos con su asiento por fila. Lotes cortos mantienen breves los bloqueos del ledger.',
+      default: '200',
+    },
+  ),
+  IMPORT_REVIEW_TTL: variable(
+    z
+      .string()
+      .regex(/^P\d+D$/, 'duración ISO 8601 en días (`P30D`)')
+      .transform((v) => Number(v.slice(1, -1)) * 86_400_000)
+      .refine((ms) => ms >= 86_400_000 && ms <= 365 * 86_400_000, 'entre P1D y P365D'),
+    {
+      group: 'Imports',
+      description:
+        'Cuánto espera una importación sin aprobar (esperando mapeo o revisión) antes de expirar (`P30D`): el job diario `imports.expire-reviews` la cancela (actor `SYSTEM`, auditado) y descarta sus celdas crudas.',
+      default: 'P30D',
+    },
+  ),
+  IMPORT_STAGING_RETENTION: variable(
+    z
+      .string()
+      .regex(/^P\d+D$/, 'duración ISO 8601 en días (`P90D`)')
+      .transform((v) => Number(v.slice(1, -1)) * 86_400_000)
+      .refine((ms) => ms >= 86_400_000 && ms <= 3650 * 86_400_000, 'entre P1D y P3650D'),
+    {
+      group: 'Imports',
+      description:
+        'Retención de las celdas crudas del archivo (staging) desde que la importación termina (`P90D`): el job diario `imports.purge-staging` las borra; se conservan la importación, sus conteos y los vínculos de idempotencia por fila.',
+      default: 'P90D',
+    },
+  ),
+  IMPORT_FUTURE_DATE_TOLERANCE_DAYS: variable(z.coerce.number().int().min(0).max(30), {
+    group: 'Imports',
+    description:
+      'Días de tolerancia hacia el futuro de la fecha de una fila importada, en la zona horaria del workspace (3): una fecha posterior a hoy + tolerancia es inválida (`IMPORT_FUTURE_DATE`).',
+    default: '3',
+  }),
+  IMPORT_MAINTENANCE_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `40 3 * * *`) u `off`',
+      ),
+    {
+      group: 'Worker',
+      description:
+        'Cron (5 campos, UTC) de los jobs diarios `imports.expire-reviews` e `imports.purge-staging`. También corren al arrancar el worker. `off` desactiva el cron.',
+      default: '40 3 * * *',
+    },
+  ),
+
   // ── Notificaciones (openspec add-alerts, design decisiones 6, 7, 9 y 11; docs/33 D87–D93) ──
   EMAIL_DRIVER: variable(z.enum(['smtp', 'none']), {
     group: 'Notificaciones',
@@ -921,6 +1004,13 @@ export const APP_VARIABLES = {
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',
     'COMMITMENTS_HORIZON_DAYS',
+    // add-basic-csv-import: la API lee, valida y deja en staging el CSV, y reparte los lotes al aprobar.
+    'IMPORT_CSV_MAX_BYTES',
+    'IMPORT_CSV_MAX_ROWS',
+    'IMPORT_CSV_MAX_COLUMNS',
+    'IMPORT_PERSIST_BATCH_SIZE',
+    'IMPORT_REVIEW_TTL',
+    'IMPORT_FUTURE_DATE_TOLERANCE_DAYS',
     // add-workspace-export: la API solicita, descarga (descifra en streaming) e importa.
     ...EXPORT_PORTABILITY,
     'REAUTH_MAX_AGE',
@@ -948,6 +1038,9 @@ export const APP_VARIABLES = {
     'COMMITMENTS_HORIZON_DAYS',
     'COMMITMENTS_SCHEDULER_CRON',
     'COMMITMENTS_SUBSCRIPTIONS_CRON',
+    // add-basic-csv-import: jobs diarios de expiración y purga del staging.
+    'IMPORT_STAGING_RETENTION',
+    'IMPORT_MAINTENANCE_CRON',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).

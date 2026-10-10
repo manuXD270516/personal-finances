@@ -5,16 +5,18 @@ spec: imports/import-pipeline
 related_specs: ["transactions/transaction-recording"]
 requirement: "Idempotencia por fila"
 scenario: "Rangos solapados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IMPORTS-010","FR-IMPORTS-007"]
 nfr: []
 invariants: ["INV-014"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports.api.test.ts
+  - packages/contexts/imports/src/application/imports.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ["csv-import"]
@@ -33,7 +35,7 @@ expected_result:
   - "Vista previa: 10 ya importadas, 15 nuevas"
   - "Se crean 15 transacciones"
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-IMPORTS-CSV-017 — Un archivo que se solapa con uno ya importado crea solo las filas nuevas
