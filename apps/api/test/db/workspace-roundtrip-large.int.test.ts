@@ -81,8 +81,11 @@ describe('Ida y vuelta del dataset large (NFR-REL-014)', () => {
       const a = before;
       const b = await rowsByTable(migrator, restored);
       // `ledger.balance_snapshot` es derivado (se reconstruye en segundo plano): no viaja en el export.
+      // `planning.financial_period` lo provisiona Planning en segundo plano (D62/D64) en cuanto existe el workspace
+      // restaurado, así que su conteo depende de cuándo corre el worker y no de la ida y vuelta.
       const business = (k: string) =>
         k !== 'ledger.balance_snapshot' &&
+        k !== 'planning.financial_period' &&
         /^(ledger|txn|acct|accounts|classification|planning|fx|reconciliation)\./u.test(k);
       const keys = Object.keys(a).filter(business);
       expect(keys.length).toBeGreaterThan(5);
