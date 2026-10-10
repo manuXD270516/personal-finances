@@ -136,6 +136,14 @@ describe('TimeZoneId, LocaleTag y User', () => {
     expect(codeOf(() => LocaleTag.of('not a locale!'))).toBe('VALIDATION_FAILED');
   });
 
+  it('[TC-IDENTITY-AUTH-009] LocaleTag.fromStored tolera un locale guardado no soportado con el de respaldo; `of` sigue estricto', () => {
+    expect(LocaleTag.fromStored('fr-FR', 'es-BO').value).toBe('es-BO');
+    expect(LocaleTag.fromStored('not a locale!', 'en-US').value).toBe('en-US');
+    expect(LocaleTag.fromStored('pt-br', 'es-BO').value).toBe('pt-BR');
+    expect(codeOf(() => LocaleTag.of('fr-FR'))).toBe('VALIDATION_FAILED');
+    expect(codeOf(() => LocaleTag.fromStored('fr-FR', 'fr-FR'))).toBe('VALIDATION_FAILED');
+  });
+
   it('User.updatePreferences valida la zona y solo versiona cambios reales', () => {
     const user = User.restore({
       id: OWNER,

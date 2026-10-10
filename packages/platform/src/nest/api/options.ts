@@ -33,6 +33,8 @@ export interface ApiConventionsOptions {
     readonly limiter: RateLimiter;
     readonly reads: RateLimitPolicy;
     readonly writes: RateLimitPolicy;
+    /** Cuota de las operaciones con `x-rate-limit: costly` (docs/10 §10); ausente ⇒ sin cuota costosa. */
+    readonly costly?: RateLimitPolicy;
   };
 }
 

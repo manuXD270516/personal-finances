@@ -70,6 +70,16 @@ export interface WorkspaceTimeZones {
   timeZoneOf(userId: string, workspaceId: string): Promise<string>;
 }
 
+/**
+ * Nombre visible ACTUAL de los usuarios que figuran como actores en el log del workspace (lo implementa IDENTITY, dueño
+ * de `iam.user`; mismo patrón que `WorkspaceTimeZones`). Se invoca dentro de la unidad de trabajo de lectura (contexto
+ * RLS del usuario y el workspace) y resuelve todo el lote de una vez. Los ids que no se pueden resolver no aparecen en
+ * el mapa.
+ */
+export interface UserDisplayNames {
+  namesOf(workspaceId: string, userIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+}
+
 /** Unidad de trabajo de lectura con contexto RLS (usuario + workspace). */
 export interface ReadUnitOfWork {
   run<T>(ctx: { userId: string; workspaceId: string }, fn: () => Promise<T>): Promise<T>;

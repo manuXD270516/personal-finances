@@ -12,6 +12,7 @@ import type {
   LifecycleBackfillSource,
   LifecycleStore,
   ReadUnitOfWork,
+  UserDisplayNames,
   WorkspaceTimeZones,
 } from '../ports/index.js';
 
@@ -204,4 +205,10 @@ export function sequentialIds(prefix = '0190a000-0000-7000-8000-'): IdGenerator 
 
 export const fixedTimeZones = (timeZone: string): WorkspaceTimeZones => ({
   timeZoneOf: async () => timeZone,
+});
+
+/** Nombres visibles fijos por id de usuario (los demás no se resuelven). */
+export const fixedUserNames = (names: Readonly<Record<string, string>> = {}): UserDisplayNames => ({
+  namesOf: async (_workspaceId, userIds) =>
+    new Map(userIds.flatMap((id) => (names[id] === undefined ? [] : [[id, names[id]] as const]))),
 });

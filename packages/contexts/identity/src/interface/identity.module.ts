@@ -212,6 +212,28 @@ export function identityWorkspaceTimeZones(pool: Pool): {
 }
 
 /**
+ * Nombre visible actual de los usuarios que figuran como actores en el log de auditoría del workspace, para AUDIT (CSV
+ * del log; fix-phase-2-gaps). Se resuelve en bloque con `iam.audit_actor_names` (SECURITY DEFINER acotada al workspace
+ * del contexto RLS y a los actores de su log; ver la migración). Se invoca dentro de la unidad de trabajo del llamador.
+ */
+export function identityUserDisplayNames(): {
+  namesOf(workspaceId: string, userIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+} {
+  return {
+    namesOf: async (workspaceId, userIds) => {
+      if (userIds.length === 0) return new Map();
+      const { rows } = await requireSqlExecutor().query(
+        'SELECT user_id, display_name FROM iam.audit_actor_names($1::uuid, $2::uuid[])',
+        [workspaceId, [...userIds]],
+      );
+      return new Map(
+        (rows as { user_id: string; display_name: string }[]).map((r) => [r.user_id, r.display_name]),
+      );
+    },
+  };
+}
+
+/**
  * Moneda de reporte (`baseCurrency`) y zona horaria del workspace para otros contextos (FX valora el costo de una
  * conversión en la moneda de reporte y fecha las tasas en la zona del workspace; add-manual-conversions). Se invoca
  * dentro de la unidad de trabajo del llamador, con el usuario de la petición (RLS de membresía).

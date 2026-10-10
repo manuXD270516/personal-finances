@@ -5,7 +5,13 @@ import { RedactionPolicy } from '../domain/redaction-policy.js';
 import { AuditLogExporter, AUDIT_CSV_COLUMNS, MAX_EXPORT_ROWS } from './audit-export.js';
 import { AuditQueries } from './audit-queries.js';
 import { AuditRecorder } from './audit-recorder.js';
-import { InMemoryAudit, fixedTimeZones, sequentialIds, sha256IpHasher } from './testing/in-memory.js';
+import {
+  InMemoryAudit,
+  fixedTimeZones,
+  fixedUserNames,
+  sequentialIds,
+  sha256IpHasher,
+} from './testing/in-memory.js';
 
 const U1 = '0190a000-0000-7000-8000-000000000001';
 const U2 = '0190a000-0000-7000-8000-000000000002';
@@ -238,6 +244,7 @@ describe('[TC-AUDIT-GLOBAL-003] exportación CSV del log', () => {
       uow: mem,
       store: mem,
       timeZones: fixedTimeZones('America/La_Paz'),
+      userNames: fixedUserNames({ [U1]: 'Ana Pérez', [U2]: '=HYPERLINK("x")' }),
       audit: recorder,
     });
   });
@@ -287,6 +294,28 @@ describe('[TC-AUDIT-GLOBAL-003] exportación CSV del log', () => {
         { field: 'to', before: null, after: '2026-03-31' },
       ]),
     );
+  });
+
+  it('[TC-AUDIT-GLOBAL-008] actorName sigue a actorId: nombre visible del usuario, vacío para procesos y neutralizado si empieza con =', async () => {
+    await txEvent(1, U1);
+    await txEvent(2, U2);
+    await write({
+      action: 'transactions.transaction.updated',
+      aggregateType: 'Transaction',
+      aggregateId: tx(3),
+      actor: { type: 'WORKER', process: 'recurring-generator' },
+      changes: [{ field: 'description', before: 'a', after: 'b' }],
+    });
+    const file = await mem.run({ workspaceId: W1 }, () =>
+      exporter.export({ userId: OWNER, workspaceId: W1 }),
+    );
+    const [header, ...rows] = text(file.body).slice(1).trimEnd().split('\r\n');
+    const cols = header!.split(',');
+    expect(cols.indexOf('actorName')).toBe(cols.indexOf('actorId') + 1);
+    const byId = (needle: string) => rows.find((r) => r.includes(needle))!;
+    expect(byId(U1)).toContain(`${U1},Ana Pérez,`);
+    expect(byId(U2)).toContain(`${U2},"'=HYPERLINK(""x"")",`);
+    expect(byId('recurring-generator')).toContain('recurring-generator,,');
   });
 
   it('los montos salen como decimal string y los valores nulos como celdas vacías', async () => {

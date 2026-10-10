@@ -26,6 +26,15 @@ export interface ApiRequestState {
   expectedVersion?: number;
   /** La cuota de esta petición ya se consumió (guard anónimo o interceptor autenticado). */
   rateLimited?: boolean;
+  /** La cuota de operaciones costosas de esta petición ya se consumió. */
+  costlyCharged?: boolean;
+  /**
+   * Payload que identifica la petición para la idempotencia cuando el cuerpo no es JSON (p. ej. `{ fileSha256 }` en
+   * multipart): lo fija un guard de la operación tras leer el archivo; sustituye al cuerpo en `request_hash`.
+   */
+  idempotencyPayload?: unknown;
+  /** Archivo ya leído por el guard de una operación multipart, para que el handler no vuelva a leer el stream. */
+  upload?: Buffer;
 }
 
 export type ApiRequest = IncomingMessage & {

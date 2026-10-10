@@ -1,12 +1,5 @@
 import { Controller, Get, Inject, Param, Req, Res, StreamableFile } from '@nestjs/common';
-import {
-  ApiProblem,
-  DEFAULT_PAGE_LIMIT,
-  MAX_PAGE_LIMIT,
-  buildPage,
-  rateLimitHeaders,
-  type RateLimitPolicy,
-} from '@pf/platform/api';
+import { ApiProblem, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, buildPage } from '@pf/platform/api';
 import {
   API_CONVENTIONS,
   ValidatedQuery,
@@ -27,9 +20,6 @@ import {
 export const AUDIT_QUERIES = Symbol('AUDIT_QUERIES');
 /** Token de la exportación CSV del log. */
 export const AUDIT_LOG_EXPORTER = Symbol('AUDIT_LOG_EXPORTER');
-
-/** Exportaciones del log por usuario y minuto (design decisión 3). */
-export const EXPORT_POLICY: RateLimitPolicy = { name: 'audit-export', quota: 10, windowSeconds: 60 };
 
 type Query = Record<string, unknown>;
 const str = (q: Query, k: string): string | undefined =>
@@ -62,7 +52,8 @@ export function filtersOf(query: Query): AuditFilters {
  * de una entidad (`aggregateType` + `aggregateId`, cronológico) o consulta global (openspec add-global-audit-view:
  * `actorUserId`, `action`, `aggregateType`, `origin`, `correlationId`, `category` y rango `from`/`to` en la zona del
  * workspace, más reciente primero), paginados por cursor firmado (keyset `occurredAt` + `id`).
- * `GET …/audit-log/export?format=csv` (`exportAuditLog`): CSV de la misma consulta, solo OWNER (`x-required-role: OWNER`).
+ * `GET …/audit-log/export?format=csv` (`exportAuditLog`): CSV de la misma consulta, solo OWNER (`x-required-role: OWNER`);
+ * la cuota de operaciones costosas (`x-rate-limit: costly`) la aplica la plataforma.
  */
 @Controller()
 export class AuditLogController {
@@ -139,31 +130,11 @@ export class AuditLogController {
     const principal = principalOf(req);
     if (!principal) throw new ApiProblem('UNAUTHENTICATED', 'an authenticated user is required');
     if (query['format'] !== 'csv') throw new ApiProblem('VALIDATION_FAILED', 'format must be csv');
-    await this.limitExports(principal.userId, workspaceId);
     const file = await this.exporter.export({ userId: principal.userId, workspaceId, ...filtersOf(query) });
     res.setHeader('content-type', file.contentType);
     res.setHeader('content-disposition', `attachment; filename="${file.fileName}"`);
     res.setHeader('cache-control', 'no-store');
     res.setHeader('x-content-type-options', 'nosniff');
     return new StreamableFile(file.body, { length: file.body.byteLength });
-  }
-
-  /** 10 exportaciones por usuario y minuto sobre el `RateLimiter` de la API (429 `RATE_LIMITED` + `Retry-After`). */
-  private async limitExports(userId: string, workspaceId: string): Promise<void> {
-    const limiter = this.options.rateLimit?.limiter;
-    if (!limiter) return;
-    const decision = await limiter.consume(
-      `${userId}:${workspaceId}`,
-      EXPORT_POLICY,
-      this.options.clock.now().toDate(),
-    );
-    if (!decision.allowed) {
-      throw new ApiProblem('RATE_LIMITED', `quota "${EXPORT_POLICY.name}" exceeded`, {
-        headers: {
-          ...rateLimitHeaders(EXPORT_POLICY, decision),
-          'retry-after': String(decision.retryAfterSeconds),
-        },
-      });
-    }
   }
 }

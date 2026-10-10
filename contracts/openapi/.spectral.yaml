@@ -45,6 +45,16 @@ rules:
       functionOptions:
         values: [AUTHENTICATED, VIEWER, EDITOR, OWNER]
 
+  pfos-rate-limit-extension:
+    description: x-rate-limit, when present, marks a costly operation (extra quota bucket, docs/10 §10).
+    severity: error
+    given: '#Operations'
+    then:
+      field: x-rate-limit
+      function: enumeration
+      functionOptions:
+        values: [costly]
+
   pfos-required-role-present:
     description: x-required-role must be present.
     severity: error

@@ -130,6 +130,8 @@ export interface PortabilityWiringInput {
   readonly retentionMs: number;
   readonly reauthMaxAgeMs: number;
   readonly maxImportBytes: number;
+  /** `APP_DEFAULT_LOCALE`: respaldo del importer para un locale del archivo no soportado. */
+  readonly defaultLocale?: string;
   readonly queue: JobQueue;
   /** Solo el worker construye e importa (rol `pf_worker`); la API recibe versiones que fallan si se invocan. */
   readonly pool?: Pool;
@@ -167,6 +169,7 @@ export function portabilityOptions(input: PortabilityWiringInput): PortabilityOp
           hooks: { [PLANNING_CLOSE_SNAPSHOT_HASH_HOOK]: closeSnapshotRestoreHook },
           schemaDir: resolveExportContractsDir(),
           random: (n) => randomBytes(n),
+          ...(input.defaultLocale ? { defaultLocale: input.defaultLocale } : {}),
         })
       : unavailableImporter,
     inspector: archiveInspector(sectionNames),

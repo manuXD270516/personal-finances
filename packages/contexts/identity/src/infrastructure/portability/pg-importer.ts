@@ -4,6 +4,7 @@ import { DomainError, type PortabilitySection } from '@pf/shared-kernel';
 import type { ImportOutcome, WorkspaceImporter } from '../../application/portability/ports.js';
 import { compareVerification, type ExportManifest } from '../../domain/export-manifest.js';
 import { IdRemap, isUuid, type RandomBytes } from '../../domain/id-remap.js';
+import { LocaleTag } from '../../domain/locale-tag.js';
 import { inspectArchive, RecordValidators } from './archive-inspector.js';
 import {
   computeVerification,
@@ -38,6 +39,8 @@ export interface PgImporterOptions {
   readonly nowMillis?: () => number;
   /** `statement_timeout` de la transacción de importación (la única transacción larga del producto, D100). */
   readonly statementTimeout?: string;
+  /** Locale de respaldo (`APP_DEFAULT_LOCALE`) para un locale del archivo que la aplicación no soporta (por defecto `es-BO`). */
+  readonly defaultLocale?: string;
 }
 
 const BATCH_ROWS = 500;
@@ -363,7 +366,7 @@ export class PgWorkspaceImporter implements WorkspaceImporter {
           input.name,
           row['base_currency'],
           row['time_zone'],
-          row['locale'],
+          LocaleTag.fromStored(String(row['locale']), this.options.defaultLocale ?? 'es-BO').value,
           row['fiscal_month_start_day'],
           row['min_liquidity_reserve_amount'] ?? null,
           row['min_liquidity_reserve_currency'] ?? null,

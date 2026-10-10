@@ -116,7 +116,12 @@ export interface IdentityDb {
 const db = (): Kysely<IdentityDb> => unitOfWorkKysely<IdentityDb>();
 const now = sql<Date>`now()`;
 
+/** Locale de respaldo al rehidratar un locale guardado no soportado (`APP_DEFAULT_LOCALE`). */
+export const DEFAULT_FALLBACK_LOCALE = 'es-BO';
+
 export class PgUserRepository implements UserRepository {
+  constructor(private readonly fallbackLocale: string = DEFAULT_FALLBACK_LOCALE) {}
+
   async provision(identity: VerifiedIdentity): Promise<string> {
     const { rows } = await sql<{
       id: string;
@@ -151,7 +156,7 @@ export class PgUserRepository implements UserRepository {
       idpSubject: r.idp_subject,
       email: r.email,
       displayName: r.display_name,
-      locale: LocaleTag.of(r.locale),
+      locale: LocaleTag.fromStored(r.locale, this.fallbackLocale),
       timeZone: r.time_zone === null ? null : TimeZoneId.of(r.time_zone),
       status: r.status,
       version: r.version,
@@ -178,6 +183,8 @@ export class PgUserRepository implements UserRepository {
 }
 
 export class PgWorkspaceRepository implements WorkspaceRepository {
+  constructor(private readonly fallbackLocale: string = DEFAULT_FALLBACK_LOCALE) {}
+
   async lockProvisioning(userId: string): Promise<void> {
     await sql`SELECT pg_advisory_xact_lock(hashtextextended(${'iam.provision:' + userId}, 0))`.execute(db());
   }
@@ -283,7 +290,7 @@ export class PgWorkspaceRepository implements WorkspaceRepository {
         name: r.name,
         baseCurrency: currency(r.base_currency, r.base_scale),
         timeZone: TimeZoneId.of(r.time_zone),
-        locale: LocaleTag.of(r.locale),
+        locale: LocaleTag.fromStored(r.locale, this.fallbackLocale),
         fiscalMonthStartDay: r.fiscal_month_start_day,
         minimumLiquidityReserve:
           r.reserve_amount === null || r.reserve_currency === null || r.reserve_scale === null
@@ -539,8 +546,8 @@ export function pgIdentityDeps(input: {
   const uow: UnitOfWork = new PgUnitOfWork(input.pool);
   return {
     uow,
-    users: new PgUserRepository(),
-    workspaces: new PgWorkspaceRepository(),
+    users: new PgUserRepository(input.defaults.locale),
+    workspaces: new PgWorkspaceRepository(input.defaults.locale),
     memberships: new PgMembershipReader(),
     currencies: new PgCurrencyCatalog(),
     outbox: input.outbox,

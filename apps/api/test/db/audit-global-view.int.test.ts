@@ -230,3 +230,103 @@ describe('iam.workspace_exists (auditoría de rechazos de no miembros)', () => {
     }
   });
 });
+
+describe('iam.audit_actor_names (nombre visible de los actores del log, fix-phase-2-gaps)', () => {
+  let migrator: Client;
+  let app: Client;
+  let owner: string;
+  let actor: string;
+  let stranger: string;
+  const ws = randomUUID();
+  const other = randomUUID();
+
+  async function provision(label: string): Promise<string> {
+    const { rows } = await migrator.query<{ id: string }>(
+      `SELECT iam.provision_user('https://idp.test/gaudit', $1, $2, $3) AS id`,
+      [`sub-${label}-${randomUUID()}`, `${label}-${randomUUID()}@demo.pfos.test`, `Nombre ${label}`],
+    );
+    return rows[0]?.id as string;
+  }
+
+  beforeAll(async () => {
+    migrator = await connect(deps.migratorUrl);
+    app = await connect(deps.databaseUrl);
+    owner = await provision('owner');
+    actor = await provision('actor');
+    stranger = await provision('stranger');
+    for (const id of [ws, other]) {
+      await inTx(
+        app,
+        { userId: owner, workspaceId: id },
+        async () => {
+          await app.query(
+            `INSERT INTO iam.workspace (id, name, base_currency, time_zone, locale) VALUES ($1, 'W', 'BOB', 'America/La_Paz', 'es-BO')`,
+            [id],
+          );
+          await app.query(
+            `INSERT INTO iam.workspace_membership (workspace_id, user_id, role) VALUES ($1, $2, 'OWNER')`,
+            [id, owner],
+          );
+        },
+        true,
+      );
+    }
+    await inTx(
+      app,
+      { userId: owner, workspaceId: ws },
+      async () => {
+        await app.query(
+          `INSERT INTO audit.audit_log (id, occurred_at, workspace_id, actor_type, actor_user_id, action,
+             aggregate_type, aggregate_id, origin, correlation_id)
+           VALUES ($1, now(), $2, 'USER', $3, 'transactions.transaction.created', 'Transaction', $4, 'ui', $5)`,
+          [randomUUID(), ws, actor, randomUUID(), randomUUID()],
+        );
+      },
+      true,
+    );
+  });
+
+  afterAll(async () => {
+    await app?.end();
+    await migrator?.end();
+  });
+
+  const names = (ctxWorkspace: string, asked: string, ids: string[]) =>
+    inTx(
+      app,
+      { userId: owner, workspaceId: ctxWorkspace },
+      async () =>
+        (
+          await app.query<{ user_id: string; display_name: string }>(
+            'SELECT user_id, display_name FROM iam.audit_actor_names($1::uuid, $2::uuid[])',
+            [asked, ids],
+          )
+        ).rows,
+    );
+
+  it('[TC-AUDIT-GLOBAL-008] devuelve el nombre solo de los usuarios de la lista que son actores del log del workspace', async () => {
+    const rows = await names(ws, ws, [actor, stranger, owner]);
+    expect(rows).toEqual([{ user_id: actor, display_name: 'Nombre actor' }]);
+  });
+
+  it('exige que el contexto RLS sea el del workspace pedido y no filtra filas de audit.audit_log al dueño', async () => {
+    await expect(names(other, ws, [actor])).rejects.toMatchObject({ code: '42501' });
+    await migrator.query('BEGIN');
+    try {
+      await migrator.query('SELECT set_config($1, $2, true)', ['app.workspace_id', ws]);
+      await migrator.query('SELECT * FROM iam.audit_actor_names($1::uuid, $2::uuid[])', [ws, [actor]]);
+      const { rows } = await migrator.query('SELECT 1 FROM audit.audit_log WHERE workspace_id = $1', [ws]);
+      expect(rows).toEqual([]);
+    } finally {
+      await migrator.query('ROLLBACK');
+    }
+  });
+
+  it('fijar la GUC de sondeo no da a pf_app acceso a filas de otro workspace', async () => {
+    const seen = await inTx(app, { userId: owner, workspaceId: other }, async () => {
+      await app.query(`SELECT set_config('pf.audit_actor_probe', $1, true)`, [ws]);
+      return (await app.query('SELECT 1 FROM audit.audit_log')).rows;
+    });
+    expect(seen).toEqual([]);
+  });
+});

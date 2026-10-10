@@ -116,7 +116,13 @@ beforeAll(async () => {
   signingKey = pair.privateKey;
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
   runtime = await createApiRuntime(
-    apiConfig(baseEnv(deps, { RATE_LIMIT_READS_PER_MIN: '100000', RATE_LIMIT_WRITES_PER_MIN: '100000' })),
+    apiConfig(
+      baseEnv(deps, {
+        RATE_LIMIT_READS_PER_MIN: '100000',
+        RATE_LIMIT_WRITES_PER_MIN: '100000',
+        RATE_LIMIT_COSTLY_PER_MIN: '100000',
+      }),
+    ),
     capturingLogger('finance-api', 'api').logger,
     {
       clock,

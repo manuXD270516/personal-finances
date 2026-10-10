@@ -4,7 +4,7 @@ import { auditActionCategory } from '../domain/audit-action-category.js';
 import type { AuditRecord } from '../domain/audit-record.js';
 import { pageQueryOf, validateFilters, type AuditFilters } from './audit-queries.js';
 import { UTF8_BOM, csvCell, isoInTimeZone, neutralizeFormula } from './lifecycle-report.js';
-import type { AuditLogStore, ReadUnitOfWork, WorkspaceTimeZones } from './ports/index.js';
+import type { AuditLogStore, ReadUnitOfWork, UserDisplayNames, WorkspaceTimeZones } from './ports/index.js';
 
 /** Máximo de registros de una exportación síncrona (design decisión 3); más ⇒ `VALIDATION_FAILED`. */
 export const MAX_EXPORT_ROWS = 50_000;
@@ -14,6 +14,7 @@ export const AUDIT_CSV_COLUMNS = [
   'occurredAt',
   'actorType',
   'actorId',
+  'actorName',
   'origin',
   'action',
   'category',
@@ -29,6 +30,8 @@ export interface AuditExportDeps {
   readonly uow: ReadUnitOfWork;
   readonly store: AuditLogStore;
   readonly timeZones: WorkspaceTimeZones;
+  /** Nombre visible de los actores (IDENTITY), resuelto en bloque por exportación. */
+  readonly userNames: UserDisplayNames;
   readonly audit: AuditPort;
   /** Tope de filas (por defecto 50000); parametrizable solo para pruebas. */
   readonly maxRows?: number;
@@ -69,12 +72,20 @@ export function diffSummary(changes: AuditRecord['changes']): string {
     .join(' | ');
 }
 
-/** Fila del CSV de un registro (instante en la zona del workspace con su desfase). */
-export function auditCsvRow(r: AuditRecord, timeZone: string): string[] {
+/**
+ * Fila del CSV de un registro (instante en la zona del workspace con su desfase). `actorName` es el nombre visible
+ * actual del usuario; vacío para procesos o si no se pudo resolver (el `actorId` siempre está).
+ */
+export function auditCsvRow(
+  r: AuditRecord,
+  timeZone: string,
+  actorNames: ReadonlyMap<string, string> = new Map(),
+): string[] {
   return [
     isoInTimeZone(r.occurredAt.toString(), timeZone),
     r.actor.type,
     r.actor.userId ?? r.actor.process ?? '',
+    r.actor.userId ? (actorNames.get(r.actor.userId) ?? '') : '',
     r.origin,
     r.action,
     auditActionCategory(r.action),
@@ -88,9 +99,13 @@ export function auditCsvRow(r: AuditRecord, timeZone: string): string[] {
 }
 
 /** CSV RFC 4180 (coma, CRLF, encabezado estable) con BOM UTF-8 (convenciones del recorrido, docs/31 D52). */
-export function auditCsv(records: readonly AuditRecord[], timeZone: string): string {
-  const lines = [[...AUDIT_CSV_COLUMNS], ...records.map((r) => auditCsvRow(r, timeZone))].map((row) =>
-    row.map(csvCell).join(','),
+export function auditCsv(
+  records: readonly AuditRecord[],
+  timeZone: string,
+  actorNames: ReadonlyMap<string, string> = new Map(),
+): string {
+  const lines = [[...AUDIT_CSV_COLUMNS], ...records.map((r) => auditCsvRow(r, timeZone, actorNames))].map(
+    (row) => row.map(csvCell).join(','),
   );
   return `${UTF8_BOM}${lines.join('\r\n')}\r\n`;
 }
@@ -109,7 +124,7 @@ export class AuditLogExporter {
     input: AuditFilters & { readonly userId: string; readonly workspaceId: string },
   ): Promise<AuditExportFile> {
     const valid = validateFilters(input);
-    const { uow, store, timeZones, audit } = this.deps;
+    const { uow, store, timeZones, userNames, audit } = this.deps;
     const max = this.deps.maxRows ?? MAX_EXPORT_ROWS;
     return uow.run({ userId: input.userId, workspaceId: input.workspaceId }, async () => {
       const timeZone = await timeZones.timeZoneOf(input.userId, input.workspaceId);
@@ -122,7 +137,12 @@ export class AuditLogExporter {
           `the export would exceed ${max} records; narrow the filters`,
         );
       }
-      const body = new TextEncoder().encode(auditCsv(records, timeZone));
+      const actorIds = [...new Set(records.flatMap((r) => (r.actor.userId ? [r.actor.userId] : [])))];
+      const actorNames =
+        actorIds.length === 0
+          ? new Map<string, string>()
+          : await userNames.namesOf(input.workspaceId, actorIds);
+      const body = new TextEncoder().encode(auditCsv(records, timeZone, actorNames));
       const changes: { field: string; before: null; after: string | number }[] = [
         { field: 'format', before: null, after: 'csv' },
         { field: 'rowCount', before: null, after: records.length },

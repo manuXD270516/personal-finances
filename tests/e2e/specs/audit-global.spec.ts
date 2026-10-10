@@ -27,7 +27,7 @@ async function seriousViolations(page: Page) {
 }
 
 test.describe('Auditoría global', () => {
-  test('[TC-AUDIT-GLOBAL-001] [TC-AUDIT-GLOBAL-003] el OWNER filtra por actor y por acción, abre el detalle con el diff y exporta el CSV', async ({
+  test('[TC-AUDIT-GLOBAL-001] [TC-AUDIT-GLOBAL-003] [TC-AUDIT-GLOBAL-008] el OWNER filtra por actor y por acción, abre el detalle con el diff y exporta el CSV', async ({
     browser,
   }) => {
     const { context, page, W, workspaceId } = await newFinanceUser(browser, 'audit-global');
@@ -87,9 +87,11 @@ test.describe('Auditoría global', () => {
     const csv = bytes.toString('utf8').slice(1);
     const lines = csv.trimEnd().split('\r\n');
     expect(lines[0]).toBe(
-      'occurredAt,actorType,actorId,origin,action,category,aggregateType,aggregateId,aggregateVersion,reason,correlationId,changes',
+      'occurredAt,actorType,actorId,actorName,origin,action,category,aggregateType,aggregateId,aggregateVersion,reason,correlationId,changes',
     );
     expect(lines).toHaveLength(3);
+    // fix-phase-2-gaps: la columna actorName trae el nombre visible del usuario que hizo el cambio.
+    expect(lines[1]!.split(',')[3]).not.toBe('');
     expect(csv).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-04:00/);
     // La descripción "=SUM(A1)" sale neutralizada.
     expect(csv).toContain("description:  → '=SUM(A1)");

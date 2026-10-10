@@ -497,6 +497,12 @@ export const VARIABLES = {
     description: 'Escrituras por minuto por usuario y por workspace (docs/10 §10).',
     default: '120',
   }),
+  RATE_LIMIT_COSTLY_PER_MIN: variable(positiveInt, {
+    group: 'Convenciones de API',
+    description:
+      'Operaciones costosas (edición masiva, export/import de workspace, export CSV de auditoría) por minuto por usuario y por workspace; se suma a la cuota de escrituras (docs/10 §10).',
+    default: '10',
+  }),
 
   // ── Worker ──
   WORKER_CONCURRENCY: variable(positiveInt, {
@@ -862,6 +868,7 @@ export const APP_VARIABLES = {
     'RATE_LIMIT_STORE',
     'RATE_LIMIT_READS_PER_MIN',
     'RATE_LIMIT_WRITES_PER_MIN',
+    'RATE_LIMIT_COSTLY_PER_MIN',
     'OIDC_ISSUER_URL',
     'OIDC_JWKS_URI',
     'OIDC_API_AUDIENCE',

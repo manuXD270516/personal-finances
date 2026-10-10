@@ -142,6 +142,30 @@ describe('[TC-IDENTITY-AUTH-006] GET /me devuelve perfil, locale, zona horaria y
   });
 });
 
+describe('[TC-IDENTITY-AUTH-009] GET /me con un locale guardado no soportado responde con el locale por defecto', () => {
+  it('iam.user.locale = fr-FR escrito directo en la base: 200 con es-BO; la escritura de un locale no soportado sigue rechazándose', async () => {
+    const u = await user(`kc-me-fr-${randomUUID()}`);
+    const admin = await connect(deps.superuserUrl);
+    try {
+      await admin.query(`UPDATE iam."user" SET locale = 'fr-FR' WHERE id = $1`, [u.id]);
+    } finally {
+      await admin.end();
+    }
+    const r = await call('GET', '/api/v1/me', { token: u.token });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body).toMatchObject({ id: u.id, locale: 'es-BO' });
+
+    const write = await call('PATCH', '/api/v1/me', {
+      token: u.token,
+      body: { locale: 'fr-FR' },
+      contentType: 'application/merge-patch+json',
+      headers: { 'if-match': String(r.headers.get('etag')) },
+    });
+    expect(write.status).toBe(400);
+    expect(write.body['code']).toBe('VALIDATION_FAILED');
+  });
+});
+
 describe('[TC-IDENTITY-AUTH-008] el usuario actualiza locale y zona horaria; una zona inválida se rechaza', () => {
   it('[TC-PLATFORM-API-014] PATCH /me con If-Match: 200 y ETag nuevo; zona inválida 422 INVALID_TIMEZONE; versión vieja 412 con currentVersion', async () => {
     const u = await user(`kc-prefs-${randomUUID()}`);
