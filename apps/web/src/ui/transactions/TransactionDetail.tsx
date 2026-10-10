@@ -25,6 +25,7 @@ import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
+import { MatchSuggestionsNotice } from '../recurring/MatchSuggestionsPanel';
 import { useCatalogs } from './catalogs';
 import { availableActions } from './logic';
 import { TransactionForm, type RecordKind } from './TransactionForm';
@@ -131,6 +132,7 @@ function Detail({
   const f = useFormat('Transactions', ctx);
   const fx = useFormat('Fx', ctx);
   const lf = useFormat('Lifecycle', ctx);
+  const rf = useFormat('Recurring', ctx);
   const { t, locale } = f;
   const catalogs = useCatalogs(ctx);
   const cf = useFormat('CustomFields', ctx);
@@ -248,6 +250,15 @@ function Detail({
         <p role="status" style={warningStyle} data-testid="duplicate-notice">
           {t('detail.duplicateNotice')}
         </p>
+      ) : null}
+      {tx.status !== 'VOIDED' && ['INCOME', 'EXPENSE', 'TRANSFER'].includes(tx.kind) ? (
+        <MatchSuggestionsNotice
+          ctx={ctx}
+          f={rf}
+          catalogs={catalogs}
+          scope={{ kind: 'transaction', transactionId: tx.id }}
+          onChanged={(message) => setStatus(message)}
+        />
       ) : null}
       <Tabs
         idPrefix="tx"

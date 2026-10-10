@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/commitments/OccurrenceMatchSuggested.v1.schema.json",
+  "title": "commitments.OccurrenceMatchSuggested.v1",
+  "description": "Se creó (o se re-propuso tras una edición compatible, docs/35 D136) una sugerencia de coincidencia entre una ocurrencia no resuelta y una transacción registrada o importada. La sugerencia NUNCA vincula nada por sí sola (D121): solo un EDITOR u OWNER la confirma. Productor: COMMITMENTS (consumidores `commitments.occurrence-matcher` y `commitments.match-backfill`). Consumidores: REPORTING (Q9 «requiere tu atención», Phase 7); NOTIFY solo si el owner lo pide (hoy no hay notificación por sugerencia, D135). Idempotencia natural: (suggestionId, aggregateVersion). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "commitments.OccurrenceMatchSuggested"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "MatchSuggestion"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "suggestionId",
+        "occurrenceId",
+        "definitionId",
+        "transactionId",
+        "score",
+        "confidence",
+        "amountDelta",
+        "dateDeltaDays",
+        "ambiguous",
+        "transactionOrigin"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "suggestionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "occurrenceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "definitionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "score": {
+          "type": "string",
+          "pattern": "^(100[.]00|[0-9]{1,2}[.][0-9]{2})$",
+          "description": "Puntaje 0..100 con 2 decimales (HALF_EVEN): monto (0..50) + fecha (0..30) + contraparte (10 ó 20)."
+        },
+        "confidence": {
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW"
+          ],
+          "description": "HIGH ≥ 80, MEDIUM ≥ 60, LOW < 60."
+        },
+        "amountDelta": {
+          "description": "Diferencia absoluta de monto contra lo esperado (distancia al rango en MIN_MAX); null si la ocurrencia es VARIABLE.",
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dateDeltaDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "description": "Distancia absoluta en días entre la fecha de negocio de la transacción y el vencimiento."
+        },
+        "ambiguous": {
+          "type": "boolean",
+          "description": "Las dos mejores candidatas del conjunto empatan en puntaje."
+        },
+        "transactionOrigin": {
+          "enum": [
+            "MANUAL",
+            "IMPORT",
+            "RECURRING",
+            "DEBT",
+            "GOAL",
+            "SYSTEM"
+          ],
+          "description": "Origen de la transacción (TransactionSource); las importadas también quedan en estado de sugerencia."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000512",
+      "eventType": "commitments.OccurrenceMatchSuggested",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-19T16:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "MatchSuggestion",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000d5001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d4",
+      "causationId": "01928c4e-7a3b-7c11-8f00-000000000511",
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "suggestionId": "01928c4e-0000-7000-8000-0000000d5001",
+        "occurrenceId": "01928c4e-0000-7000-8000-0000000cc001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de001",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7001",
+        "score": "85.00",
+        "confidence": "HIGH",
+        "amountDelta": {
+          "amount": "0.00",
+          "currency": "BOB"
+        },
+        "dateDeltaDays": 1,
+        "ambiguous": false,
+        "transactionOrigin": "MANUAL"
+      }
+    }
+  ]
+}

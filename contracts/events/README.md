@@ -48,7 +48,8 @@ contracts/events/
 │  ├─ SubscriptionPriceChanged.v1.schema.json         # add-subscriptions: origin DETECTED | MANUAL | CORRECTION; lo consume NOTIFY (solo DETECTED)
 │  ├─ SubscriptionRenewalUpcoming.v1.schema.json      # add-subscriptions: recordatorio de renovación (job commitments.subscription-daily)
 │  ├─ SubscriptionTrialEnding.v1.schema.json          # add-subscriptions: recordatorio de fin de trial
-│  └─ SubscriptionCancelled.v1.schema.json            # add-subscriptions: inmediata o programada
+│  ├─ SubscriptionCancelled.v1.schema.json            # add-subscriptions: inmediata o programada
+│  └─ OccurrenceMatchSuggested.v1.schema.json         # add-commitment-matching: sugerencia de coincidencia creada o re-propuesta (nunca vincula sola)
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/

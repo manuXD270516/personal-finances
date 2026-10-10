@@ -24,6 +24,12 @@ export interface DefinitionState {
   /** Fecha de fin fijada por "terminar" (cierra la serie; el estado pasa a ENDED al superarla). */
   readonly endDate: string | null;
   readonly endedAt: string | null;
+  /**
+   * Tolerancias del matching sugerido (openspec add-commitment-matching, anotación de la definición): `null` = valor
+   * por omisión según el tipo de monto (docs/35 D120). No versionan la plantilla ni cambian el estado.
+   */
+  readonly matchingAmountTolerancePct: string | null;
+  readonly matchingDateWindowDays: number | null;
   readonly version: number;
   readonly createdAt: string;
   readonly createdBy: string | null;
@@ -35,6 +41,9 @@ export interface Annotation {
   readonly name?: string;
   readonly description?: string | null;
   readonly notes?: string | null;
+  /** Ya validadas por `validateToleranceOverrides`; `null` restablece el valor por omisión. */
+  readonly matchingAmountTolerancePct?: string | null;
+  readonly matchingDateWindowDays?: number | null;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -113,6 +122,8 @@ export class RecurringDefinition {
         generatedThrough: null,
         endDate: null,
         endedAt: null,
+        matchingAmountTolerancePct: null,
+        matchingDateWindowDays: null,
         version: 1,
         createdAt: input.at,
         createdBy: input.by,
@@ -186,7 +197,7 @@ export class RecurringDefinition {
     return chosen;
   }
 
-  /** Anotación: nombre, descripción o notas (sin versión de plantilla ni transición). */
+  /** Anotación: nombre, descripción, notas o tolerancias de matching (sin versión de plantilla ni transición). */
   annotate(changes: Annotation, at: string, by: string | null): void {
     const patch: Partial<Mutable<DefinitionState>> = {};
     const fields: string[] = [];
@@ -207,6 +218,20 @@ export class RecurringDefinition {
         patch.notes = value;
         fields.push('notes');
       }
+    }
+    if (
+      changes.matchingAmountTolerancePct !== undefined &&
+      changes.matchingAmountTolerancePct !== this.state.matchingAmountTolerancePct
+    ) {
+      patch.matchingAmountTolerancePct = changes.matchingAmountTolerancePct;
+      fields.push('matchingAmountTolerancePct');
+    }
+    if (
+      changes.matchingDateWindowDays !== undefined &&
+      changes.matchingDateWindowDays !== this.state.matchingDateWindowDays
+    ) {
+      patch.matchingDateWindowDays = changes.matchingDateWindowDays;
+      fields.push('matchingDateWindowDays');
     }
     if (fields.length === 0) return;
     this.apply(patch, at, by);

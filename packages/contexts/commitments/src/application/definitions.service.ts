@@ -16,6 +16,7 @@ import {
   candidates,
   ruleOfSchedule,
   templateOf,
+  validateToleranceOverrides,
   type Candidate,
   type DefinitionVersion,
   type ManagedBy,
@@ -244,10 +245,18 @@ export class DefinitionsService {
     readonly name?: string | undefined;
     readonly description?: string | null | undefined;
     readonly notes?: string | null | undefined;
+    /** `SetMatchingTolerances` (add-commitment-matching): `null` restablece el valor por omisión del tipo de monto. */
+    readonly matching?:
+      | {
+          readonly amountTolerancePercent?: string | null | undefined;
+          readonly dateWindowDays?: number | null | undefined;
+        }
+      | undefined;
     readonly manager?: Exclude<ManagedBy, 'USER'> | undefined;
   }): Promise<DefinitionDto> {
     const { deps } = this;
     const { at } = await this.todayOf(cmd.workspaceId);
+    const matching = cmd.matching ? validateToleranceOverrides(cmd.matching) : {};
     return deps.uow.run(cmd.workspaceId, async () => {
       const def = await this.load(cmd.workspaceId, cmd.definitionId, cmd.expectedVersion, cmd.manager);
       const before = def.snapshot;
@@ -256,6 +265,12 @@ export class DefinitionsService {
           ...(cmd.name !== undefined ? { name: cmd.name } : {}),
           ...(cmd.description !== undefined ? { description: cmd.description } : {}),
           ...(cmd.notes !== undefined ? { notes: cmd.notes } : {}),
+          ...(matching.amountTolerancePct !== undefined
+            ? { matchingAmountTolerancePct: matching.amountTolerancePct }
+            : {}),
+          ...(matching.dateWindowDays !== undefined
+            ? { matchingDateWindowDays: matching.dateWindowDays }
+            : {}),
         },
         at,
         cmd.userId,
@@ -263,10 +278,12 @@ export class DefinitionsService {
       if (def.changedFields.length === 0) return definitionDto(def, { withVersions: true });
       await this.persist(def);
       const after = def.snapshot;
+      type Annotated =
+        'name' | 'description' | 'notes' | 'matchingAmountTolerancePct' | 'matchingDateWindowDays';
       const changes: AuditChangeInput[] = def.changedFields.map((field) => ({
         field,
-        before: before[field as 'name' | 'description' | 'notes'],
-        after: after[field as 'name' | 'description' | 'notes'],
+        before: before[field as Annotated],
+        after: after[field as Annotated],
       }));
       await deps.lifecycle.record(definitionEntry(def, 'updated', changes), definitionSteps(def, []));
       return definitionDto(def, { withVersions: true });
@@ -434,6 +451,7 @@ export class DefinitionsService {
           created = inserted.length;
           generatedRows.push(...inserted);
         }
+        await this.expireSuggestions(workspaceId, ids.cancelled);
         // Hecho de generación: las nuevas y las reinstauradas dentro de la ventana revisada.
         const reinstatedRows = ids.reinstated
           .map((id) => loaded.get(id))
@@ -798,7 +816,24 @@ export class DefinitionsService {
       });
     }
     await recordOccurrences(deps, items);
+    if (action === 'cancelled' && loaded.length > 0) {
+      await this.expireSuggestions(
+        workspaceId,
+        loaded.map((o) => o.id),
+      );
+    }
     return loaded;
+  }
+
+  /** Las sugerencias propuestas de ocurrencias canceladas expiran (`OCCURRENCE_CANCELLED`, add-commitment-matching). */
+  private async expireSuggestions(workspaceId: string, occurrenceIds: readonly string[]): Promise<void> {
+    if (occurrenceIds.length === 0) return;
+    const ids = await this.deps.matching.expireForOccurrences(
+      workspaceId,
+      occurrenceIds,
+      'OCCURRENCE_CANCELLED',
+    );
+    this.deps.metrics?.increment('commitments_match_suggestions_total', { outcome: 'expired' }, ids.length);
   }
 }
 

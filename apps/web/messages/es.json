@@ -2378,7 +2378,9 @@
       "upcoming": "Próximos",
       "approval": "Por aprobar",
       "approvalCount": "Por aprobar ({count})",
-      "definitions": "Definiciones"
+      "definitions": "Definiciones",
+      "matches": "Coincidencias por revisar",
+      "matchesCount": "Coincidencias por revisar ({count})"
     },
     "status": {
       "SCHEDULED": "Programada",
@@ -2654,7 +2656,13 @@
       "reviseSubmit": "Aplicar el cambio",
       "save": "Guardar",
       "saving": "Guardando…",
-      "created": "Creaste «{name}»: {count, plural, one {se generó # ocurrencia} other {se generaron # ocurrencias}}."
+      "created": "Creaste «{name}»: {count, plural, one {se generó # ocurrencia} other {se generaron # ocurrencias}}.",
+      "matchingLegend": "Coincidencia sugerida con transacciones",
+      "matchingNote": "Cuando registras o importas un gasto parecido a este pago, te lo sugerimos para vincularlo. Si dejas un campo vacío se usa el valor por omisión (ventana de {window} días; máximo {max}).",
+      "matchingPercent": "Tolerancia de monto (%)",
+      "matchingPercentHint": "Por omisión: ±{fixed} % (fijo), ±{estimated} % (estimado) o ±{range} % sobre el rango.",
+      "matchingDays": "Ventana de fechas (días)",
+      "matchingDaysHint": "Entero de 0 a {max}; por omisión {window}."
     },
     "errors": {
       "REQUIRED": "Este dato es obligatorio.",
@@ -2673,7 +2681,9 @@
       "AUTO_AMOUNT": "La creación automática necesita un monto fijo o estimado.",
       "SAME_ACCOUNT": "La cuenta de destino debe ser distinta de la de origen.",
       "CURRENCY": "Las dos cuentas deben tener la misma moneda.",
-      "NO_CHANGES": "No hay cambios para guardar."
+      "NO_CHANGES": "No hay cambios para guardar.",
+      "TOLERANCE_PERCENT": "La tolerancia debe estar entre 0 y 100, con hasta 2 decimales.",
+      "TOLERANCE_DAYS": "La ventana debe ser un entero entre 0 y 15 días."
     },
     "preview": {
       "title": "Próximas fechas",
@@ -2714,7 +2724,12 @@
       "versionsCaption": "Versiones de la definición, la más reciente primero",
       "occurrences": "Ocurrencias",
       "managedBySubscription": "Este pago recurrente lo administra una suscripción: pausa, cancela o cambia su precio desde allí.",
-      "openSubscription": "Abrir la suscripción"
+      "openSubscription": "Abrir la suscripción",
+      "matching": "Coincidencia sugerida",
+      "matchingValue": "±{percent} % de monto y ±{days} días ({origin})",
+      "matchingVariable": "Monto variable: misma contraparte y ±{days} días ({origin})",
+      "matchingDefault": "por omisión",
+      "matchingCustom": "configurada"
     },
     "summary": {
       "account": "Cuenta",
@@ -2752,7 +2767,50 @@
       "skipReason": "Motivo de la omisión",
       "matchedBy": "Vinculada por"
     },
-    "subscriptionsLink": "Ver mis suscripciones y su costo"
+    "subscriptionsLink": "Ver mis suscripciones y su costo",
+    "matches": {
+      "intro": "Estas transacciones parecen el pago de un compromiso. Nada se vincula hasta que tú lo confirmes; si no es, descártala y no volverá a sugerirse.",
+      "caption": "Coincidencias sugeridas entre transacciones y pagos recurrentes",
+      "empty": "No hay coincidencias por revisar.",
+      "noticeTitle": "Coincidencias sugeridas",
+      "notice": "Esto parece el pago de {name} ({date})",
+      "noticeOccurrence": "Parece pagado con la transacción del {date} ({amount})",
+      "expectedPayment": "Se esperaba {expected} en {account}.",
+      "transaction": "Transacción del {date}: {amount} en {account} ({source})",
+      "counterparty": "contraparte {name}",
+      "occurrence": "Pago esperado: {expected} el {date} en {account}",
+      "source": {
+        "MANUAL": "registrada a mano",
+        "IMPORT": "importada",
+        "OTHER": "de otra fuente"
+      },
+      "score": "{confidence} ({score} de 100)",
+      "confidence": {
+        "HIGH": "Confianza alta",
+        "MEDIUM": "Confianza media",
+        "LOW": "Confianza baja"
+      },
+      "reasonsLabel": "Por qué coincide",
+      "reasons": {
+        "amountSame": "Mismo monto",
+        "amountDiff": "Monto distinto en {delta}",
+        "amountVariable": "Monto variable: se compara solo la contraparte",
+        "dateSame": "El mismo día del vencimiento",
+        "dateDays": "{days, plural, one {# día} other {# días}} de diferencia con el vencimiento",
+        "counterpartyMatch": "Misma contraparte",
+        "counterpartyUnknown": "Contraparte sin indicar"
+      },
+      "ambiguousBadge": "Ambigua",
+      "ambiguous": "Ambigua: hay otra coincidencia con el mismo puntaje. Revisa cuál corresponde antes de confirmar.",
+      "confirm": "Confirmar",
+      "dismiss": "Descartar",
+      "confirmLabel": "Confirmar la coincidencia con {name} del {date}",
+      "dismissLabel": "Descartar la coincidencia con {name} del {date}",
+      "confirmed": "Vinculaste {name} con la transacción sugerida.",
+      "dismissed": "Descartaste la coincidencia con {name}. No se volverá a sugerir.",
+      "viewOccurrence": "Ver el pago recurrente",
+      "viewTransaction": "Ver la transacción"
+    }
   },
   "Subscriptions": {
     "title": "Suscripciones",

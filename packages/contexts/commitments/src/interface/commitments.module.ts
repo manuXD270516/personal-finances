@@ -20,6 +20,8 @@ import { CommitmentsQueries } from '../application/commitments.queries.js';
 import { DefinitionsService } from '../application/definitions.service.js';
 import { GenerateOccurrencesService } from '../application/generate-occurrences.service.js';
 import { EngineManagedDefinitions } from '../application/managed-definitions.js';
+import { MatchingQueries } from '../application/matching.queries.js';
+import { MatchingService } from '../application/matching.service.js';
 import { OccurrencesService } from '../application/occurrences.service.js';
 import type {
   CommitmentsDeps,
@@ -40,6 +42,7 @@ import {
   type CommittedQuery,
   type DefinitionStatsQuery,
   type OccurrenceLinkPort,
+  type OccurrenceMatchCandidatesQuery,
   type ResolvedOccurrencesQuery,
   type SubscriptionsQuery,
   type UpcomingPaymentsQuery,
@@ -55,12 +58,14 @@ import {
   PgOccurrenceRepository,
   uuidV7Ids,
 } from '../infrastructure/pg-commitments.js';
+import { PgMatchSuggestionRepository } from '../infrastructure/pg-matching.js';
 import {
   PgChargeRepository,
   PgProposalRepository,
   PgReminderRepository,
   PgSubscriptionRepository,
 } from '../infrastructure/pg-subscriptions.js';
+import { MATCHING_QUERIES, MATCHING_SERVICE, MatchSuggestionsController } from './matching-http.js';
 import {
   COMMITMENTS_QUERIES,
   DEFINITIONS_SERVICE,
@@ -120,6 +125,11 @@ export interface CommitmentsRuntime {
   readonly resolved: ResolvedOccurrencesQuery;
   readonly stats: DefinitionStatsQuery;
   readonly linkPort: OccurrenceLinkPort;
+  /** Matching sugerido (openspec add-commitment-matching). */
+  readonly matching: MatchingService;
+  readonly matchingQueries: MatchingQueries;
+  /** Contrato público para Imports (Phase 6): candidatas de filas sin registrar, sin persistir. */
+  readonly matchCandidates: OccurrenceMatchCandidatesQuery;
   /** Suscripciones (openspec add-subscriptions). */
   readonly subscriptions: SubscriptionsService;
   readonly subscriptionQueries: SubscriptionsQueries;
@@ -147,6 +157,7 @@ export function createCommitmentsRuntime(options: CommitmentsRuntimeOptions): Co
     uow: new PgCommitmentsUnitOfWork(options.pool),
     definitions: new PgDefinitionRepository(),
     occurrences: new PgOccurrenceRepository(),
+    matching: new PgMatchSuggestionRepository(),
     calendar: options.calendar,
     settings: options.settings,
     periods: options.periods,
@@ -170,6 +181,7 @@ export function createCommitmentsRuntime(options: CommitmentsRuntimeOptions): Co
   const queries = new CommitmentsQueries(deps);
   const occurrences = new OccurrencesService(deps);
   const definitions = new DefinitionsService(deps);
+  const matchingQueries = new MatchingQueries(deps);
   const subscriptionDeps: SubscriptionsDeps = {
     ...deps,
     subscriptions: new PgSubscriptionRepository(),
@@ -189,6 +201,9 @@ export function createCommitmentsRuntime(options: CommitmentsRuntimeOptions): Co
     subscriptionDaily: new SubscriptionDailyService(subscriptionDeps),
     subscriptionsQuery: subscriptionQueries,
     queries,
+    matching: new MatchingService(deps, occurrences),
+    matchingQueries,
+    matchCandidates: matchingQueries,
     generate: new GenerateOccurrencesService(deps, occurrences),
     committed: queries,
     upcoming: queries,
@@ -220,12 +235,15 @@ export class CommitmentsModule {
   static register(options: CommitmentsModuleOptions): DynamicModule {
     return {
       module: CommitmentsModule,
-      controllers: [RecurringController, SubscriptionsController],
+      // `match-suggestions` va antes que `RecurringController` (`:definitionId` no debe capturarla).
+      controllers: [MatchSuggestionsController, RecurringController, SubscriptionsController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: DEFINITIONS_SERVICE, useValue: options.runtime.definitions },
         { provide: OCCURRENCES_SERVICE, useValue: options.runtime.occurrences },
         { provide: COMMITMENTS_QUERIES, useValue: options.runtime.queries },
+        { provide: MATCHING_SERVICE, useValue: options.runtime.matching },
+        { provide: MATCHING_QUERIES, useValue: options.runtime.matchingQueries },
         { provide: SUBSCRIPTIONS_SERVICE, useValue: options.runtime.subscriptions },
         { provide: SUBSCRIPTION_CHARGES_SERVICE, useValue: options.runtime.subscriptionCharges },
         { provide: SUBSCRIPTIONS_QUERIES, useValue: options.runtime.subscriptionQueries },
@@ -247,9 +265,25 @@ const payloadOf = (event: { readonly payload: unknown }): Record<string, unknown
     ? (event.payload as Record<string, unknown>)
     : {};
 
+/** Cambios de una transacción que pueden alterar su compatibilidad con una ocurrencia (design decisión 4). */
+const MATCH_RELEVANT_FIELDS: ReadonlySet<string> = new Set([
+  'amount',
+  'businessDate',
+  'accountId',
+  'counterpartyId',
+  'splits',
+]);
+
 /**
  * Consumidores idempotentes del worker (inbox en la misma transacción, INV-028):
  *  - `commitments.transaction-voided`: `transactions.TransactionVoided.v1` libera la ocurrencia creada o vinculada.
+ *  - `commitments.occurrence-matcher` (add-commitment-matching): `TransactionCreated/Updated/Voided.v1` ⇒ sugerencias
+ *    de coincidencia. Recibe ráfagas (imports de Phase 6): usa la concurrencia y el lote por omisión del runtime
+ *    (`EVENT_CONSUMER_CONCURRENCY` / `EVENT_CONSUMER_BATCH_SIZE`), así que entra en el presupuesto de conexiones del
+ *    worker (D112: Σ concurrencia + 4 reservadas ≤ `DATABASE_POOL_MAX`; 1 en el host de 2 GB, 4 en desarrollo) y la
+ *    ráfaga de 1 000 transacciones se mide en la suite `perf`.
+ *  - `commitments.match-backfill`: `OccurrencesGenerated.v1` y `RecurringDefinitionChanged.v1` ⇒ transacciones ya
+ *    registradas para las ocurrencias nuevas, reinstauradas o reescritas (misma concurrencia por omisión).
  * Baja frecuencia (anular una transacción): `concurrency: 1` no reserva conexiones del pool del worker (D112).
  */
 export function commitmentsEventConsumers(runtime: CommitmentsRuntime): EventConsumerDefinition[] {
@@ -262,6 +296,61 @@ export function commitmentsEventConsumers(runtime: CommitmentsRuntime): EventCon
         const transactionId = payloadOf(event)['transactionId'];
         if (typeof transactionId !== 'string') return;
         await runtime.occurrences.onTransactionVoided({ workspaceId: event.workspaceId, transactionId });
+      },
+    },
+    {
+      consumer: COMMITMENTS_CONSUMERS.occurrenceMatcher,
+      events: [
+        { type: 'transactions.TransactionCreated', version: 1 },
+        { type: 'transactions.TransactionUpdated', version: 1 },
+        { type: 'transactions.TransactionVoided', version: 1 },
+      ],
+      handler: async (event) => {
+        const p = payloadOf(event);
+        const transactionId = p['transactionId'];
+        if (typeof transactionId !== 'string') return;
+        const { workspaceId, eventId } = event;
+        if (event.eventType === 'transactions.TransactionVoided') {
+          await runtime.matching.onTransactionVoided({ workspaceId, transactionId });
+          return;
+        }
+        if (event.eventType === 'transactions.TransactionUpdated') {
+          const changed = Array.isArray(p['changedFields']) ? (p['changedFields'] as unknown[]) : [];
+          if (!changed.some((f) => typeof f === 'string' && MATCH_RELEVANT_FIELDS.has(f))) return;
+        } else if ((p['origin'] as { type?: unknown } | undefined)?.type === 'RECURRING') {
+          // La creó una ocurrencia: nunca es candidata (externalRef `commitments.occurrence`).
+          return;
+        }
+        await runtime.matching.onTransactionChanged({ workspaceId, transactionId, eventId });
+      },
+    },
+    {
+      consumer: COMMITMENTS_CONSUMERS.matchBackfill,
+      events: [
+        { type: 'commitments.OccurrencesGenerated', version: 1 },
+        { type: 'commitments.RecurringDefinitionChanged', version: 1 },
+      ],
+      handler: async (event) => {
+        const p = payloadOf(event);
+        const ids: string[] = [];
+        if (event.eventType === 'commitments.OccurrencesGenerated') {
+          for (const o of Array.isArray(p['occurrences']) ? (p['occurrences'] as unknown[]) : []) {
+            const id = (o as { occurrenceId?: unknown }).occurrenceId;
+            if (typeof id === 'string') ids.push(id);
+          }
+        } else {
+          // Reinstauradas (reanudar) y reescritas (revisión): vuelven a ser candidatas de pagos ya registrados.
+          for (const key of ['reinstatedOccurrenceIds', 'rewrittenOccurrenceIds']) {
+            for (const id of Array.isArray(p[key]) ? (p[key] as unknown[]) : []) {
+              if (typeof id === 'string') ids.push(id);
+            }
+          }
+        }
+        await runtime.matching.onOccurrencesAvailable({
+          workspaceId: event.workspaceId,
+          occurrenceIds: [...new Set(ids)],
+          eventId: event.eventId,
+        });
       },
     },
     // add-subscriptions: cargos de suscripciones (detección de cambios de precio) y próxima renovación.

@@ -2378,7 +2378,9 @@
       "upcoming": "Upcoming",
       "approval": "To approve",
       "approvalCount": "To approve ({count})",
-      "definitions": "Definitions"
+      "definitions": "Definitions",
+      "matches": "Matches to review",
+      "matchesCount": "Matches to review ({count})"
     },
     "status": {
       "SCHEDULED": "Scheduled",
@@ -2654,7 +2656,13 @@
       "reviseSubmit": "Apply the change",
       "save": "Save",
       "saving": "Saving…",
-      "created": "You created \"{name}\": {count, plural, one {# occurrence was generated} other {# occurrences were generated}}."
+      "created": "You created \"{name}\": {count, plural, one {# occurrence was generated} other {# occurrences were generated}}.",
+      "matchingLegend": "Suggested matching with transactions",
+      "matchingNote": "When you record or import an expense similar to this payment, we suggest linking it. An empty field uses the default (window of {window} days; maximum {max}).",
+      "matchingPercent": "Amount tolerance (%)",
+      "matchingPercentHint": "Default: ±{fixed} % (fixed), ±{estimated} % (estimated) or ±{range} % over the range.",
+      "matchingDays": "Date window (days)",
+      "matchingDaysHint": "Whole number from 0 to {max}; default {window}."
     },
     "errors": {
       "REQUIRED": "This field is required.",
@@ -2673,7 +2681,9 @@
       "AUTO_AMOUNT": "Automatic creation needs a fixed or estimated amount.",
       "SAME_ACCOUNT": "The destination account must be different from the source.",
       "CURRENCY": "Both accounts must have the same currency.",
-      "NO_CHANGES": "There are no changes to save."
+      "NO_CHANGES": "There are no changes to save.",
+      "TOLERANCE_PERCENT": "The tolerance must be between 0 and 100, with up to 2 decimals.",
+      "TOLERANCE_DAYS": "The window must be a whole number between 0 and 15 days."
     },
     "preview": {
       "title": "Next dates",
@@ -2714,7 +2724,12 @@
       "versionsCaption": "Versions of the definition, most recent first",
       "occurrences": "Occurrences",
       "managedBySubscription": "This recurring payment is managed by a subscription: pause, cancel or change its price from there.",
-      "openSubscription": "Open the subscription"
+      "openSubscription": "Open the subscription",
+      "matching": "Suggested matching",
+      "matchingValue": "±{percent} % of the amount and ±{days} days ({origin})",
+      "matchingVariable": "Variable amount: same counterparty and ±{days} days ({origin})",
+      "matchingDefault": "default",
+      "matchingCustom": "configured"
     },
     "summary": {
       "account": "Account",
@@ -2752,7 +2767,50 @@
       "skipReason": "Reason for skipping",
       "matchedBy": "Linked by"
     },
-    "subscriptionsLink": "See my subscriptions and their cost"
+    "subscriptionsLink": "See my subscriptions and their cost",
+    "matches": {
+      "intro": "These transactions look like the payment of a commitment. Nothing is linked until you confirm it; if it is not, dismiss it and it will not be suggested again.",
+      "caption": "Suggested matches between transactions and recurring payments",
+      "empty": "There are no matches to review.",
+      "noticeTitle": "Suggested matches",
+      "notice": "This looks like the payment of {name} ({date})",
+      "noticeOccurrence": "It looks paid by the transaction of {date} ({amount})",
+      "expectedPayment": "{expected} was expected in {account}.",
+      "transaction": "Transaction of {date}: {amount} in {account} ({source})",
+      "counterparty": "counterparty {name}",
+      "occurrence": "Expected payment: {expected} on {date} in {account}",
+      "source": {
+        "MANUAL": "entered by hand",
+        "IMPORT": "imported",
+        "OTHER": "from another source"
+      },
+      "score": "{confidence} ({score} out of 100)",
+      "confidence": {
+        "HIGH": "High confidence",
+        "MEDIUM": "Medium confidence",
+        "LOW": "Low confidence"
+      },
+      "reasonsLabel": "Why it matches",
+      "reasons": {
+        "amountSame": "Same amount",
+        "amountDiff": "Amount differs by {delta}",
+        "amountVariable": "Variable amount: only the counterparty is compared",
+        "dateSame": "On the due date",
+        "dateDays": "{days, plural, one {# day} other {# days}} away from the due date",
+        "counterpartyMatch": "Same counterparty",
+        "counterpartyUnknown": "Counterparty not set"
+      },
+      "ambiguousBadge": "Ambiguous",
+      "ambiguous": "Ambiguous: there is another match with the same score. Check which one fits before confirming.",
+      "confirm": "Confirm",
+      "dismiss": "Dismiss",
+      "confirmLabel": "Confirm the match with {name} of {date}",
+      "dismissLabel": "Dismiss the match with {name} of {date}",
+      "confirmed": "You linked {name} with the suggested transaction.",
+      "dismissed": "You dismissed the match with {name}. It will not be suggested again.",
+      "viewOccurrence": "View the recurring payment",
+      "viewTransaction": "View the transaction"
+    }
   },
   "Subscriptions": {
     "title": "Subscriptions",

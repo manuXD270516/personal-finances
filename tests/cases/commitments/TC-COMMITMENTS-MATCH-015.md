@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Confirmar una sugerencia'
 scenario: 'VIEWER no confirma'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - apps/web/src/ui/recurring/matching.test.tsx
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'authz']
@@ -30,7 +32,7 @@ expected_result:
   - '200 con la sugerencia'
   - '403 INSUFFICIENT_ROLE en ambas acciones; la sugerencia sigue PROPOSED'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-015 — Un VIEWER puede ver sugerencias pero no confirmarlas ni descartarlas

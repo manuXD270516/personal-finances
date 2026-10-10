@@ -885,6 +885,8 @@ erDiagram
     int current_version_no
     date generated_through "high-water mark"
     timestamptz ended_at
+    numeric matching_amount_tolerance_pct "0..100, NULL = por omision (add-commitment-matching)"
+    smallint matching_date_window_days "0..15, NULL = por omision"
     text last_auto_create_error
     int version
   }
@@ -947,6 +949,14 @@ erDiagram
 | `recurring_occurrence` | **`(definition_id, occurrence_date)`** — generación idempotente (`INSERT ... ON CONFLICT DO NOTHING`, INV-013); parcial `(workspace_id, transaction_id) WHERE status IN ('MATERIALIZED','MATCHED')` (una transacción resuelve a lo sumo una ocurrencia) | `status IN ('MATERIALIZED','MATCHED')` ⇔ `transaction_id IS NOT NULL`; `status = 'CANCELLED'` ⇔ `cancel_reason IS NOT NULL` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','DUE','OVERDUE')` (comprometido y próximos pagos); `(workspace_id, status, due_date)` (job) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version` |
 
 Las tres tablas se registran en `platform.workspace_scoped_table` (purga demo, ADR-0026) y declaran sección de portabilidad (`recurring-definitions`, `recurring-definition-versions`, `recurring-occurrences`, órdenes 750–752). **Defensa en profundidad en `txn.transaction`** (§5.4): índice único parcial `(workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace = 'commitments.occurrence'`, creado con `CREATE UNIQUE INDEX CONCURRENTLY` en una migración separada: una transacción por ocurrencia aunque un bug reintente.
+
+**Matching sugerido (`add-commitment-matching`, expand-only).** Una tabla nueva en `commitments` y dos columnas nulas en `recurring_definition` (`matching_amount_tolerance_pct numeric(5,2)` 0..100 y `matching_date_window_days smallint` 0..15; `NULL` = valor por omisión del tipo de monto, D120). La sugerencia no escribe en `ledger.*` ni en `txn.*`: confirmar reutiliza el vínculo manual del motor.
+
+| Tabla | Unique | Check | Índices | RLS / grants | version / archivo |
+|-------|--------|-------|---------|--------------|-------------------|
+| `occurrence_match_suggestion` | **`(occurrence_id, transaction_id)`** — idempotencia del consumidor (`INSERT ... ON CONFLICT DO NOTHING`, INV-028) y descarte permanente; `(workspace_id, id)` | `status IN ('PROPOSED','CONFIRMED','DISMISSED','EXPIRED')`; `status = 'EXPIRED'` ⇔ `expire_reason IS NOT NULL`; `confidence IN ('HIGH','MEDIUM','LOW')`; `score BETWEEN 0 AND 100`; `counterparty_match IN ('MATCH','UNKNOWN')`; `amount_delta >= 0` (NULL en `VARIABLE`); `CONFIRMED`/`DISMISSED` ⇔ `decided_at` presente | `(workspace_id, status, created_at) WHERE status = 'PROPOSED'`; `(workspace_id, score DESC, id) WHERE status = 'PROPOSED'` (bandeja); `(workspace_id, transaction_id)` | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version` |
+
+Columnas: `id, workspace_id, occurrence_id, definition_id, transaction_id` (referencia lógica a `txn.transaction`, sin FK cruzada)`, score numeric(5,2), confidence, amount_delta numeric(38,18), currency, date_delta_days smallint, counterparty_match, ambiguous, status, expire_reason (TRANSACTION_VOIDED|OCCURRENCE_RESOLVED|OCCURRENCE_CANCELLED|INCOMPATIBLE|SUPERSEDED), source_event_id, created_at, decided_at, decided_by, version`. Se registra en `platform.workspace_scoped_table` (orden de purga 169, antes que las ocurrencias) y declara la sección de portabilidad `occurrence-match-suggestions` (orden 765, después de las de suscripciones 760–764; remapea `occurrence_id`, `definition_id` y `transaction_id`).
 
 **Suscripciones (`add-subscriptions`, expand-only).** Cinco tablas más en el mismo schema; una suscripción tiene **id propio** y `UNIQUE (definition_id)` (antes se modelaba con PK = `definition_id`; la cadencia vive en la definición, por eso `billing_cycle` desaparece), estados `TRIAL|ACTIVE|PAUSED|CANCELLED` (sin `pending_cancellation` ni `expired`: la cancelación programada es el atributo `scheduled_cancellation_on`). Dos columnas nuevas en `recurring_definition_version`: `indexed_amount` e `indexed_currency` (precio en otra moneda que la cuenta; la plantilla queda `VARIABLE` y cada ocurrencia estima `precio × tasa de valoración vigente al generarla`), y el CHECK de `managed_by` pasa a `IN ('USER','SUBSCRIPTION')` con `managed_ref` obligatorio si no es `USER`.
 

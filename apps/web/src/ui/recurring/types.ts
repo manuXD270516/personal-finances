@@ -117,6 +117,8 @@ export interface RecurringDefinition {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly current: RecurringDefinitionVersion;
+  /** Tolerancias del matching sugerido (`null` = valor por omisión del tipo de monto). */
+  readonly matching?: MatchingTolerances;
   /** Solo en el detalle; la más antigua primero. */
   readonly versions?: readonly RecurringDefinitionVersion[];
   /** Solo en el listado. */
@@ -192,4 +194,64 @@ export interface CommittedAmount {
   readonly items: readonly CommittedItem[];
   readonly ratesUsed: readonly ResolvedRate[];
   readonly generatedAt: string;
+}
+
+// ───────────────────────────── Matching sugerido (openspec add-commitment-matching) ─────────────────────────────
+
+/** Tolerancias del matching de una definición; `null` = el valor por omisión según el tipo de monto (D120). */
+export interface MatchingTolerances {
+  /** Porcentaje 0..100 con hasta 2 decimales (texto). */
+  readonly amountTolerancePercent: string | null;
+  /** Días 0..15. */
+  readonly dateWindowDays: number | null;
+}
+
+export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+export const MATCH_CONFIDENCES: readonly MatchConfidence[] = ['HIGH', 'MEDIUM', 'LOW'];
+export type MatchSuggestionStatus = 'PROPOSED' | 'CONFIRMED' | 'DISMISSED' | 'EXPIRED';
+
+export interface MatchSuggestion {
+  readonly id: string;
+  readonly occurrence: {
+    readonly id: string;
+    readonly definitionId: string;
+    readonly definitionName: string;
+    readonly kind: RecurringKind;
+    readonly status: OccurrenceStatus;
+    readonly dueDate: string;
+    readonly expected: RecurringAmount;
+    readonly accountId: string;
+    readonly toAccountId: string | null;
+  } | null;
+  readonly transaction: {
+    readonly id: string;
+    readonly kind: string;
+    readonly status: string;
+    readonly businessDate: string;
+    readonly amount: Money;
+    readonly accountId: string;
+    readonly toAccountId: string | null;
+    readonly counterpartyId: string | null;
+    readonly source: string;
+  } | null;
+  /** 0..100 con 2 decimales (texto). */
+  readonly score: string;
+  readonly confidence: MatchConfidence;
+  readonly reasons: {
+    readonly amountDelta: Money | null;
+    readonly dateDeltaDays: number;
+    readonly counterparty: 'MATCH' | 'UNKNOWN';
+  };
+  readonly ambiguous: boolean;
+  readonly status: MatchSuggestionStatus;
+  readonly expireReason: string | null;
+  readonly createdAt: string;
+  readonly version: number;
+}
+
+export interface MatchSuggestionPage {
+  readonly data: readonly MatchSuggestion[];
+  readonly page: { readonly limit: number; readonly hasMore: boolean; readonly nextCursor: string | null };
+  /** Sugerencias pendientes del workspace (el contador de "Coincidencias por revisar"). */
+  readonly proposedCount: number;
 }

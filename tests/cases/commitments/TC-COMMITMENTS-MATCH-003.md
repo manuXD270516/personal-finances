@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Criterios de compatibilidad y tolerancias'
 scenario: 'Monto fuera de tolerancia'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: ['INV-001']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/occurrence-matcher.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'tolerance']
@@ -33,7 +35,7 @@ expected_result:
   - 'b: sugerencia con amountDelta 13.40 BOB y dateDeltaDays 2'
   - 'c: sugerencia (Δ = 3.98, en el borde inclusive)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-003 — Montos fuera de la tolerancia del tipo no se sugieren y los estimados dentro sí

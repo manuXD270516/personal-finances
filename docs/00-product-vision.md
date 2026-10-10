@@ -152,7 +152,7 @@ PFOS **no** hará (al menos en el horizonte de este roadmap):
 | SM-04 | Cierre mensual | Cerrar un mes ≤ 10 min incluyendo reconciliación | Timestamps de flujo de cierre |
 | SM-05 | Respuesta a las 9 preguntas | Las 9 preguntas visibles en el Home al terminar Phase 7 | Checklist de aceptación del dashboard |
 | SM-06 | Visibilidad de costo FX | 100 % de conversiones con tasa efectiva y fees registrados | Reporte de conversiones |
-| SM-07 | Pagos sorpresa | 0 pagos recurrentes conocidos no anticipados por mes (Phase 3+) | Comparar ocurrencias vs transacciones no planificadas |
+| SM-07 | Pagos sorpresa | 0 pagos recurrentes conocidos no anticipados por mes (Phase 3+) | Comparar ocurrencias vs transacciones no planificadas (el indicador lo calcula `reporting/cash-flow-calendar`; el *backfill* de sugerencias de `add-commitment-matching` convierte en vínculo confirmable el pago registrado antes de definir el compromiso) |
 | SM-08 | Metas | ≥ 1 meta de ahorro con estado `on-track` o `ahead` sostenido 3 meses (Phase 4+) | Goals report |
 
 ### 9.2 Métricas de calidad e integridad

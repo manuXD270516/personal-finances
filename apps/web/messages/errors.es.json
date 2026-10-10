@@ -112,5 +112,6 @@
   "OCCURRENCE_AMOUNT_REQUIRED": "Indica el monto para aprobar este pago: no tiene un monto esperado.",
   "OCCURRENCE_LINK_MISMATCH": "La transacción no coincide con el pago: debe ser del mismo tipo, cuenta y moneda y no estar anulada.",
   "OCCURRENCE_ALREADY_MATERIALIZED": "Este pago ya tiene su transacción.",
-  "TRANSACTION_ALREADY_LINKED": "Esa transacción ya está vinculada a otro pago recurrente."
+  "TRANSACTION_ALREADY_LINKED": "Esa transacción ya está vinculada a otro pago recurrente.",
+  "MATCH_SUGGESTION_NOT_PENDING": "Esta coincidencia ya no está pendiente: se resolvió, se descartó o dejó de aplicar."
 }

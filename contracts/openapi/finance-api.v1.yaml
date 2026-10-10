@@ -6121,6 +6121,140 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/recurring/match-suggestions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Commitments]
+      operationId: listMatchSuggestions
+      summary: List match suggestions between unresolved occurrences and registered transactions
+      description: |
+        Suggestions the system found for a transaction (manual or imported) that looks like the payment of an unresolved
+        occurrence (add-commitment-matching, FR-COMMITMENTS-010). A suggestion NEVER links anything by itself: an EDITOR
+        or OWNER confirms or dismisses it. Ordered by score (highest first). By default only `PROPOSED` ones are listed;
+        `proposedCount` is the number of pending suggestions of the workspace (the "Coincidencias por revisar" counter).
+        Every confidence level is listed with its confidence, `LOW` included.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          description: Comma-separated statuses; default `PROPOSED`.
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/MatchSuggestionStatus' }
+          style: form
+          explode: false
+        - name: occurrenceId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: transactionId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: definitionId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Suggestions page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchSuggestionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/match-suggestions/{suggestionId}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/MatchSuggestionId'
+    post:
+      tags: [Commitments]
+      operationId: confirmMatchSuggestion
+      summary: Confirm a suggestion (links the occurrence with the transaction)
+      description: |
+        Links the occurrence with the transaction with the same rules as the manual link (`matchedBy = SUGGESTION`),
+        marks the suggestion `CONFIRMED` and expires (`SUPERSEDED`) the other proposed suggestions of that occurrence and
+        of that transaction, in one unit of work. A suggestion that is no longer proposed → 409
+        `MATCH_SUGGESTION_NOT_PENDING`; `OCCURRENCE_ALREADY_MATERIALIZED`, `TRANSACTION_ALREADY_LINKED` and
+        `OCCURRENCE_LINK_MISMATCH` (the transaction changed in between) apply as in the manual link. `If-Match` is
+        optional (the version of the suggestion).
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: If-Match
+          in: header
+          required: false
+          description: Optional ETag of the suggestion version; a mismatch → 412.
+          schema: { type: string, examples: ['"1"'] }
+      responses:
+        '200':
+          description: Confirmed suggestion and the linked occurrence
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchSuggestionConfirmResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'MATCH_SUGGESTION_NOT_PENDING, OCCURRENCE_ALREADY_MATERIALIZED or TRANSACTION_ALREADY_LINKED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'OCCURRENCE_LINK_MISMATCH.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/recurring/match-suggestions/{suggestionId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/MatchSuggestionId'
+    post:
+      tags: [Commitments]
+      operationId: dismissMatchSuggestion
+      summary: Dismiss a suggestion (the pair is never suggested again)
+      description: |
+        Permanent: the same occurrence and transaction pair is not suggested again even if the transaction is edited or
+        the fact is delivered again. It changes neither the occurrence nor the transaction. A suggestion that is no
+        longer proposed → 409 `MATCH_SUGGESTION_NOT_PENDING`. `If-Match` is optional.
+      x-openspec-capability: [commitments/recurrence-engine]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: If-Match
+          in: header
+          required: false
+          description: Optional ETag of the suggestion version; a mismatch → 412.
+          schema: { type: string, examples: ['"1"'] }
+      responses:
+        '200':
+          description: Dismissed suggestion
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchSuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'MATCH_SUGGESTION_NOT_PENDING.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/recurring/occurrences:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -6432,8 +6566,12 @@ paths:
     patch:
       tags: [Commitments]
       operationId: updateRecurringDefinition
-      summary: Rename or annotate a definition (name, description, notes)
-      description: 'Annotation only: it does not create a version of the template.'
+      summary: Rename or annotate a definition (name, description, notes, matching tolerances)
+      description: |
+        Annotation only: it does not create a version of the template. `matching` sets the tolerances of the suggested
+        matching for this definition (add-commitment-matching): `amountTolerancePercent` (0..100; defaults `FIXED` 2 %,
+        `ESTIMATED` 25 %, `MIN_MAX` 5 % over the range) and `dateWindowDays` (0..15, default 5); `null` restores the
+        default.
       x-openspec-capability: [commitments/recurrence-engine]
       x-required-role: EDITOR
       parameters:
@@ -7584,6 +7722,12 @@ components:
       required: true
       description: Recurring occurrence UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
+    MatchSuggestionId:
+      name: suggestionId
+      in: path
+      required: true
+      description: Match suggestion UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     SubscriptionId:
       name: subscriptionId
       in: path
@@ -7996,6 +8140,7 @@ components:
         - RECURRING_MANAGED_EXTERNALLY           # 409 (add-subscriptions: the definition is managed by a subscription; operate it from there)
         - SUBSCRIPTION_PRICE_NOT_CHRONOLOGICAL   # 422 (add-subscriptions: the price effective date must be after the last price entry)
         - SUBSCRIPTION_PROPOSAL_NOT_PENDING      # 409 (add-subscriptions: the price proposal was already decided, superseded or withdrawn)
+        - MATCH_SUGGESTION_NOT_PENDING           # 409 (add-commitment-matching: the match suggestion was already confirmed, dismissed or expired)
 
     # ── Identity ──
     WorkspaceRole:
@@ -12491,6 +12636,7 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         description: { type: [string, 'null'], maxLength: 1000 }
         notes: { type: [string, 'null'], maxLength: 2000 }
+        matching: { $ref: '#/components/schemas/MatchingTolerancesPatch' }
     RecurringTemplateChanges:
       type: object
       description: Fields of the template to change from the effective date; omitted fields keep the current value.
@@ -12629,6 +12775,7 @@ components:
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
         current: { $ref: '#/components/schemas/RecurringDefinitionVersion' }
+        matching: { $ref: '#/components/schemas/MatchingTolerances' }
         versions:
           type: array
           description: Every version, oldest first (only in the detail).
@@ -12651,6 +12798,161 @@ components:
           type: integer
           minimum: 0
           description: Occurrences generated by the request (create, resume).
+    # ── Matching sugerido (add-commitment-matching) ──
+    MatchingTolerances:
+      type: object
+      description: >-
+        Tolerances of the suggested matching of a definition; `null` = the default of the amount type (`FIXED` 2 %,
+        `ESTIMATED` 25 %, `MIN_MAX` 5 % over the range; window 5 days).
+      additionalProperties: false
+      required: [amountTolerancePercent, dateWindowDays]
+      properties:
+        amountTolerancePercent:
+          oneOf:
+            - type: string
+              pattern: '^(100([.]00?)?|[0-9]{1,2}([.][0-9]{1,2})?)$'
+              examples: ['5.00']
+            - type: 'null'
+        dateWindowDays:
+          oneOf:
+            - type: integer
+              minimum: 0
+              maximum: 15
+            - type: 'null'
+    MatchingTolerancesPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        amountTolerancePercent:
+          oneOf:
+            - type: string
+              pattern: '^(100([.]00?)?|[0-9]{1,2}([.][0-9]{1,2})?)$'
+            - type: 'null'
+        dateWindowDays:
+          oneOf:
+            - type: integer
+              minimum: 0
+              maximum: 15
+            - type: 'null'
+    MatchSuggestionStatus:
+      type: string
+      enum: [PROPOSED, CONFIRMED, DISMISSED, EXPIRED]
+    MatchConfidence:
+      type: string
+      description: '`HIGH` ≥ 80, `MEDIUM` ≥ 60, `LOW` < 60 (the score is explainable: amount 0..50, date 0..30, counterparty 10 or 20).'
+      enum: [HIGH, MEDIUM, LOW]
+    MatchExpireReason:
+      type: string
+      enum: [TRANSACTION_VOIDED, OCCURRENCE_RESOLVED, OCCURRENCE_CANCELLED, INCOMPATIBLE, SUPERSEDED]
+    MatchSuggestionOccurrence:
+      type: object
+      additionalProperties: false
+      required: [id, definitionId, definitionName, kind, status, dueDate, expected, accountId, toAccountId]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        definitionId: { $ref: '#/components/schemas/Uuid' }
+        definitionName: { type: string }
+        kind: { $ref: '#/components/schemas/RecurringKind' }
+        status: { $ref: '#/components/schemas/RecurringOccurrenceStatus' }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        expected: { $ref: '#/components/schemas/RecurringAmount' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    MatchSuggestionTransaction:
+      type: object
+      additionalProperties: false
+      required: [id, kind, status, businessDate, amount, accountId, toAccountId, counterpartyId, source]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        kind: { type: string }
+        status: { type: string }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        amount: { $ref: '#/components/schemas/Money' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        toAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        counterpartyId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        source:
+          type: string
+          description: Origin of the transaction (`MANUAL`, `IMPORT`, …).
+    MatchSuggestionReasons:
+      type: object
+      description: Why it matches (explainable, no ML).
+      additionalProperties: false
+      required: [amountDelta, dateDeltaDays, counterparty]
+      properties:
+        amountDelta:
+          description: Absolute difference against the expected amount (distance to the range of a `MIN_MAX`); null for `VARIABLE`.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        dateDeltaDays:
+          type: integer
+          minimum: 0
+          maximum: 15
+        counterparty:
+          type: string
+          description: '`MATCH` both have the same counterparty; `UNKNOWN` one of them has none (a different one is never suggested).'
+          enum: [MATCH, UNKNOWN]
+    MatchSuggestion:
+      type: object
+      additionalProperties: false
+      required: [id, occurrence, transaction, score, confidence, reasons, ambiguous, status, expireReason, createdAt, version]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        occurrence:
+          oneOf:
+            - $ref: '#/components/schemas/MatchSuggestionOccurrence'
+            - type: 'null'
+        transaction:
+          oneOf:
+            - $ref: '#/components/schemas/MatchSuggestionTransaction'
+            - type: 'null'
+        score:
+          type: string
+          pattern: '^(100[.]00|[0-9]{1,2}[.][0-9]{2})$'
+          examples: ['85.00']
+        confidence: { $ref: '#/components/schemas/MatchConfidence' }
+        reasons: { $ref: '#/components/schemas/MatchSuggestionReasons' }
+        ambiguous:
+          type: boolean
+          description: The two best candidates of the set have the same score.
+        status: { $ref: '#/components/schemas/MatchSuggestionStatus' }
+        expireReason:
+          oneOf:
+            - $ref: '#/components/schemas/MatchExpireReason'
+            - type: 'null'
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        version: { $ref: '#/components/schemas/Version' }
+    MatchSuggestionPage:
+      type: object
+      additionalProperties: false
+      required: [data, page, proposedCount]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/MatchSuggestion' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+        proposedCount:
+          type: integer
+          minimum: 0
+          description: Pending (`PROPOSED`) suggestions of the workspace.
+    MatchSuggestionConfirmResult:
+      type: object
+      additionalProperties: false
+      required: [suggestion, occurrence]
+      properties:
+        suggestion: { $ref: '#/components/schemas/MatchSuggestion' }
+        occurrence: { $ref: '#/components/schemas/RecurringOccurrence' }
     # ── Suscripciones (add-subscriptions) ──
     SubscriptionStatus:
       type: string

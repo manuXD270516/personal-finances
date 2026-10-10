@@ -5,16 +5,21 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Descartar una sugerencia'
 scenario: 'Descartada no vuelve'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/match-suggestion.test.ts
+  - packages/contexts/commitments/test/integration/pg-matching.int.test.ts
+  - tests/e2e/specs/commitment-matching.spec.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'dismiss']
@@ -31,7 +36,7 @@ expected_result:
   - 'Ninguna sugerencia nueva para el par'
   - 'Ocurrencia sin resolver'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-008 — Un par descartado nunca vuelve a sugerirse aunque la transacción se edite

@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Candidatas para filas de un import'
 scenario: 'Lote importado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: ['NFR-PERF-008']
 invariants: ['INV-028']
 priority: high
 type: integration
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/event-throughput.int.test.ts
+  - apps/api/test/perf/commitments.perf.ts
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'imports']
@@ -32,7 +35,7 @@ expected_result:
   - 'Exactamente 12 sugerencias PROPOSED'
   - 'Drenado dentro de la meta de D112 (≥ 42 eventos/s)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-012 — Las candidatas de una vista previa no se persisten y una ráfaga de 1000 importadas no duplica sugerencias

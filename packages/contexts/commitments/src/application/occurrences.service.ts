@@ -10,6 +10,7 @@ import {
   buildAmountSpec,
   resolveApprovalAmount,
   type AmountSpec,
+  type ExpireReason,
   type RecurringDefinition,
   type RecurringOccurrence,
 } from '../domain/index.js';
@@ -165,6 +166,7 @@ export class OccurrencesService {
     });
     occ.materialize({ transactionId: txn.transactionId, at: input.at, by: input.by });
     await this.persist(occ);
+    await this.expireSuggestions(occ.workspaceId, occ.id, 'OCCURRENCE_RESOLVED');
     const after = occ.snapshot;
     const payload: RecurringOccurrenceMaterializedV1 = {
       workspaceId: s.workspaceId,
@@ -367,6 +369,7 @@ export class OccurrencesService {
       const before = occ.snapshot;
       occ.skip({ reason: cmd.reason ?? null, at, by: cmd.userId });
       await this.persist(occ);
+      await this.expireSuggestions(occ.workspaceId, occ.id, 'OCCURRENCE_RESOLVED');
       const after = occ.snapshot;
       const def = await this.definitionOf(occ);
       const event = await publishEvent(
@@ -417,6 +420,8 @@ export class OccurrencesService {
     readonly occurrenceId: string;
     readonly transactionId: string;
     readonly matchedBy?: 'USER_LINK' | 'SUGGESTION';
+    /** Sugerencia que se confirma (add-commitment-matching): queda en el recorrido y se conserva al expirar las demás. */
+    readonly suggestionId?: string;
   }): Promise<OccurrenceDto> {
     const { deps } = this;
     const { at } = await this.clockOf(cmd.workspaceId);
@@ -457,6 +462,20 @@ export class OccurrencesService {
       const matchedBy = cmd.matchedBy ?? 'USER_LINK';
       occ.link({ transactionId: txn.transactionId, matchedBy, at, by: cmd.userId });
       await this.persist(occ);
+      // La bandeja nunca muestra sugerencias obsoletas (design decisión 6): las demás de la ocurrencia y de la
+      // transacción expiran en la misma unidad de trabajo (`SUPERSEDED` al confirmar una; resuelta por otra vía si no).
+      await this.expireSuggestions(
+        occ.workspaceId,
+        occ.id,
+        cmd.suggestionId ? 'SUPERSEDED' : 'OCCURRENCE_RESOLVED',
+        cmd.suggestionId,
+      );
+      await this.expireTransactionSuggestions(
+        occ.workspaceId,
+        txn.transactionId,
+        'SUPERSEDED',
+        cmd.suggestionId,
+      );
       const after = occ.snapshot;
       const payload: RecurringOccurrenceMaterializedV1 = {
         workspaceId: s.workspaceId,
@@ -487,10 +506,42 @@ export class OccurrencesService {
           { field: 'amount', before: null, after: txn.amount },
           { field: 'businessDate', before: null, after: txn.businessDate },
         ]),
-        occurrenceSteps(occ, [event], { detailRefs: { transactionId: txn.transactionId } }),
+        occurrenceSteps(occ, [event], {
+          detailRefs: {
+            transactionId: txn.transactionId,
+            ...(cmd.suggestionId ? { suggestionId: cmd.suggestionId } : {}),
+          },
+        }),
       );
       return this.view(cmd.workspaceId, occ.id);
     });
+  }
+
+  // ───────────────────────────────────────────────────────────── sugerencias de coincidencia
+
+  /** Expira las propuestas de la ocurrencia (add-commitment-matching), en la unidad de trabajo del llamador. */
+  private async expireSuggestions(
+    workspaceId: string,
+    occurrenceId: string,
+    reason: ExpireReason,
+    exceptId?: string,
+  ): Promise<void> {
+    const ids = await this.deps.matching.expireForOccurrences(workspaceId, [occurrenceId], reason, {
+      ...(exceptId ? { exceptId } : {}),
+    });
+    this.deps.metrics?.increment('commitments_match_suggestions_total', { outcome: 'expired' }, ids.length);
+  }
+
+  private async expireTransactionSuggestions(
+    workspaceId: string,
+    transactionId: string,
+    reason: ExpireReason,
+    exceptId?: string,
+  ): Promise<void> {
+    const ids = await this.deps.matching.expireForTransaction(workspaceId, transactionId, reason, {
+      ...(exceptId ? { exceptId } : {}),
+    });
+    this.deps.metrics?.increment('commitments_match_suggestions_total', { outcome: 'expired' }, ids.length);
   }
 
   // ───────────────────────────────────────────────────────────── liberar

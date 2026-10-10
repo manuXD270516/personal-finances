@@ -67,6 +67,8 @@ interface DefinitionRow {
   generated_through: string | null;
   end_date: string | null;
   ended_at: string | null;
+  matching_amount_tolerance_pct: string | null;
+  matching_date_window_days: number | null;
   version: number;
   created_at: string;
   created_by: string | null;
@@ -79,7 +81,8 @@ const DEFINITION_COLUMNS = sql`
   d.current_version_no, d.generated_through::text AS generated_through, d.end_date::text AS end_date,
   CASE WHEN d.ended_at IS NULL THEN NULL
        ELSE to_char(d.ended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS ended_at,
-  d.version,
+  d.matching_amount_tolerance_pct::text AS matching_amount_tolerance_pct,
+  d.matching_date_window_days AS matching_date_window_days, d.version,
   to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, d.created_by,
   to_char(d.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, d.updated_by`;
 
@@ -97,6 +100,9 @@ const toState = (r: DefinitionRow): DefinitionState => ({
   generatedThrough: r.generated_through,
   endDate: r.end_date,
   endedAt: r.ended_at,
+  matchingAmountTolerancePct:
+    r.matching_amount_tolerance_pct === null ? null : dec(r.matching_amount_tolerance_pct).toFixed(2),
+  matchingDateWindowDays: r.matching_date_window_days === null ? null : Number(r.matching_date_window_days),
   version: Number(r.version),
   createdAt: r.created_at,
   createdBy: r.created_by,
@@ -219,10 +225,12 @@ export class PgDefinitionRepository implements DefinitionRepository {
     await sql`
       INSERT INTO commitments.recurring_definition
         (id, workspace_id, name, description, notes, kind, managed_by, managed_ref, status, current_version_no,
-         generated_through, end_date, ended_at, version, created_at, created_by, updated_at, updated_by)
+         generated_through, end_date, ended_at, matching_amount_tolerance_pct, matching_date_window_days, version,
+         created_at, created_by, updated_at, updated_by)
       VALUES (${s.id}, ${s.workspaceId}, ${s.name}, ${s.description}, ${s.notes}, ${s.kind}, ${s.managedBy},
               ${s.managedRef}::uuid, ${s.status}, ${s.currentVersionNo}, ${s.generatedThrough}::date,
-              ${s.endDate}::date, ${s.endedAt}::timestamptz, ${s.version}, ${s.createdAt}::timestamptz,
+              ${s.endDate}::date, ${s.endedAt}::timestamptz, ${s.matchingAmountTolerancePct}::numeric,
+              ${s.matchingDateWindowDays}, ${s.version}, ${s.createdAt}::timestamptz,
               ${s.createdBy}::uuid, ${s.updatedAt}::timestamptz, ${s.updatedBy}::uuid)`.execute(db());
     await insertVersions(definition, definition.addedVersions);
     definition.markPersisted();
@@ -268,7 +276,9 @@ export class PgDefinitionRepository implements DefinitionRepository {
       UPDATE commitments.recurring_definition
          SET name = ${s.name}, description = ${s.description}, notes = ${s.notes}, status = ${s.status},
              current_version_no = ${s.currentVersionNo}, generated_through = ${s.generatedThrough}::date,
-             end_date = ${s.endDate}::date, ended_at = ${s.endedAt}::timestamptz, version = ${s.version},
+             end_date = ${s.endDate}::date, ended_at = ${s.endedAt}::timestamptz,
+             matching_amount_tolerance_pct = ${s.matchingAmountTolerancePct}::numeric,
+             matching_date_window_days = ${s.matchingDateWindowDays}, version = ${s.version},
              updated_at = ${s.updatedAt}::timestamptz, updated_by = ${s.updatedBy}::uuid
        WHERE workspace_id = ${s.workspaceId} AND id = ${s.id}::uuid AND version = ${definition.persistedVersion}`.execute(
       db(),

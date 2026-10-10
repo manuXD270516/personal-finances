@@ -12,6 +12,7 @@ import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { formatBusinessDate } from '../planning/logic';
 import { useCatalogs } from '../transactions/catalogs';
 import { AmountText, OccurrenceStatusBadge } from './Badges';
+import { MatchSuggestionsNotice } from './MatchSuggestionsPanel';
 import { OccurrenceActionPanel } from './OccurrenceActionPanel';
 import { actionButtonId } from './OccurrencesTable';
 import { availableOccurrenceActions, definitionPath, type OccurrenceAction } from './logic';
@@ -132,6 +133,19 @@ function Detail({ ctx, occurrenceId }: { ctx: WorkspaceContext; occurrenceId: st
         <p role="status" data-testid="occurrence-status-message">
           {status}
         </p>
+      ) : null}
+      {o.status === 'SCHEDULED' || o.status === 'DUE' || o.status === 'OVERDUE' ? (
+        <MatchSuggestionsNotice
+          ctx={ctx}
+          f={f}
+          catalogs={catalogs}
+          scope={{ kind: 'occurrence', occurrenceId: o.id }}
+          refreshKey={o.version}
+          onChanged={(message) => {
+            setStatus(message);
+            void load();
+          }}
+        />
       ) : null}
       {actions.length > 0 ? (
         <div style={rowStyle} role="group" aria-label={f.t('detail.actions')}>

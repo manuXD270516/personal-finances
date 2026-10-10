@@ -112,5 +112,6 @@
   "OCCURRENCE_AMOUNT_REQUIRED": "Enter the amount to approve this payment: it has no expected amount.",
   "OCCURRENCE_LINK_MISMATCH": "The transaction does not match the payment: it must have the same kind, account and currency and not be voided.",
   "OCCURRENCE_ALREADY_MATERIALIZED": "This payment already has its transaction.",
-  "TRANSACTION_ALREADY_LINKED": "That transaction is already linked to another recurring payment."
+  "TRANSACTION_ALREADY_LINKED": "That transaction is already linked to another recurring payment.",
+  "MATCH_SUGGESTION_NOT_PENDING": "This match is no longer pending: it was resolved, dismissed or stopped applying."
 }

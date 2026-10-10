@@ -392,6 +392,12 @@ Umbrales (configurables por workspace):
 - Un candidato solo puede emparejarse con **una** fila (asignación greedy por score descendente, determinista por id para empates).
 - Métrica de calidad: tasa de "fusiones deshechas" por usuario → ajuste de pesos (backlog).
 
+### 8.3 Coincidencia con compromisos recurrentes (Phase 3, `add-commitment-matching`)
+
+- La **vista previa** consulta a COMMITMENTS con `OccurrenceMatchCandidatesQuery.findCandidates` (hasta 500 filas por llamada; solo lectura, sin persistir) para mostrar "coincide con Internet 20/10" junto a cada fila: tipo, cuenta, monto, fecha y contraparte opcional, con los mismos criterios y puntaje del matching (tolerancias por tipo de monto y ventana de fechas, D120).
+- Las transacciones ya importadas con `origin = IMPORT` reciben sugerencias por el flujo normal (consumidor `commitments.occurrence-matcher` de `TransactionCreated.v1`, que tolera ráfagas: lotes y concurrencia de `improve-event-throughput`, benchmark de 1 000 transacciones).
+- **Imports no auto-confirma**, ni siquiera una coincidencia exacta de confianza alta (D121): la ocurrencia se vincula solo cuando un EDITOR u OWNER confirma la sugerencia; la confirmación en lote se diseña con el import de Phase 6.
+
 ## 9. Reconciliación contra extracto
 
 Pertenece a Transactions (`transactions/reconciliation`); Imports aporta el `StatementBalance` y dispara.

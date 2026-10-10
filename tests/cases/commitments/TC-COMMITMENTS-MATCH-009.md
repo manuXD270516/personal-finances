@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Ranking de candidatas'
 scenario: 'Dos internet en la misma cuenta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/occurrence-matcher.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'ranking']
@@ -30,7 +32,7 @@ expected_result:
   - 'a: casa 90.00, oficina 80.00, sin ambigüedad'
   - 'b: ambas 85.00, ambiguous true'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-009 — Con dos ocurrencias candidatas la más cercana va primero y el empate se marca ambiguo

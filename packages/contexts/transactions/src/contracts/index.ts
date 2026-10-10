@@ -262,6 +262,17 @@ export interface TransactionLinkQuery {
     readonly workspaceId: string;
     readonly transactionIds: readonly string[];
   }): Promise<readonly TransactionLinkDto[]>;
+  /**
+   * Transacciones NO anuladas de ingreso, gasto o transferencia cuya cuenta de origen está en `accountIds` y cuya fecha
+   * de negocio cae en `[from, to]` (inclusive), por fecha y id; SIN bloqueo (add-commitment-matching: backfill de
+   * sugerencias). Aditivo.
+   */
+  listLinkCandidates(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly TransactionLinkDto[]>;
 }
 
 export const TRANSACTION_LINK_QUERY = Symbol.for('pf.transactions.TransactionLinkQuery');

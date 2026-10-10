@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: []
 requirement: 'Criterios de compatibilidad y tolerancias'
 scenario: 'Contraparte distinta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-010']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/match-suggestions.api.test.ts
+  - apps/web/src/ui/recurring/matching.test.tsx
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/commitments/src/domain/matching/occurrence-matcher.test.ts
+status: automated
 regression_suite: false
 phase: 3
 tags: ['matching', 'counterparty']
@@ -33,7 +37,7 @@ expected_result:
   - 'b: 2026-10-23 sin sugerencia; 2026-10-21 con sugerencia'
   - 'c: sin sugerencia (VARIABLE exige contraparte igual)'
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # TC-COMMITMENTS-MATCH-004 — Contraparte contradictoria excluye la coincidencia y la tolerancia configurada se respeta

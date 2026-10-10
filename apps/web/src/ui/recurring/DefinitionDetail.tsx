@@ -31,6 +31,16 @@ import { OccurrencesPanel } from './OccurrencesPanel';
 import { RevisionResult } from './RevisionResult';
 import { formFromVersion, notifyRecurringChanged } from './logic';
 import {
+  DEFAULT_TOLERANCE_PERCENT,
+  DEFAULT_WINDOW_DAYS,
+  MAX_WINDOW_DAYS,
+  buildMatchingPatch,
+  toleranceFormOf,
+  toleranceSummary,
+  type ToleranceErrors,
+  type ToleranceForm,
+} from './matching-logic';
+import {
   OFFERED_KINDS,
   type OfferedKind,
   type RecurringDefinition,
@@ -431,17 +441,26 @@ function AnnotationForm({
   const [name, setName] = useState(definition.name);
   const [description, setDescription] = useState(definition.description ?? '');
   const [notes, setNotes] = useState(definition.notes ?? '');
+  const [tolerance, setTolerance] = useState<ToleranceForm>(() => toleranceFormOf(definition));
+  const [toleranceErrors, setToleranceErrors] = useState<ToleranceErrors>({});
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const patch: Record<string, string | null> = {};
+    const patch: Record<string, unknown> = {};
     if (name.trim() !== definition.name) patch['name'] = name.trim();
     if (description.trim() !== (definition.description ?? ''))
       patch['description'] = description.trim() || null;
     if (notes.trim() !== (definition.notes ?? '')) patch['notes'] = notes.trim() || null;
+    const matching = buildMatchingPatch(tolerance, definition.matching, f.locale);
+    if (!matching.ok) {
+      setToleranceErrors(matching.errors);
+      return;
+    }
+    setToleranceErrors({});
+    if (matching.patch) patch['matching'] = matching.patch;
     if (name.trim() === '') {
       setMessage(f.t('errors.REQUIRED'));
       return;
@@ -515,6 +534,52 @@ function AnnotationForm({
           )}
         </Field>
       </div>
+      <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--pf-space-2)' }}>
+        <legend style={{ fontWeight: 600 }}>{f.t('form.matchingLegend')}</legend>
+        <p style={mutedStyle}>
+          {f.t('form.matchingNote', { window: DEFAULT_WINDOW_DAYS, max: MAX_WINDOW_DAYS })}
+        </p>
+        <div style={rowStyle}>
+          <Field
+            label={f.t('form.matchingPercent')}
+            hint={f.t('form.matchingPercentHint', {
+              fixed: DEFAULT_TOLERANCE_PERCENT.FIXED,
+              estimated: DEFAULT_TOLERANCE_PERCENT.ESTIMATED,
+              range: DEFAULT_TOLERANCE_PERCENT.MIN_MAX,
+            })}
+            error={toleranceErrors.percent ? f.t(`errors.${toleranceErrors.percent}`) : undefined}
+          >
+            {(p) => (
+              <input
+                {...p}
+                name="matchingPercent"
+                inputMode="decimal"
+                autoComplete="off"
+                style={inputStyle}
+                value={tolerance.percent}
+                onChange={(e) => setTolerance({ ...tolerance, percent: e.target.value })}
+              />
+            )}
+          </Field>
+          <Field
+            label={f.t('form.matchingDays')}
+            hint={f.t('form.matchingDaysHint', { window: DEFAULT_WINDOW_DAYS, max: MAX_WINDOW_DAYS })}
+            error={toleranceErrors.days ? f.t(`errors.${toleranceErrors.days}`) : undefined}
+          >
+            {(p) => (
+              <input
+                {...p}
+                name="matchingDays"
+                inputMode="numeric"
+                autoComplete="off"
+                style={inputStyle}
+                value={tolerance.days}
+                onChange={(e) => setTolerance({ ...tolerance, days: e.target.value })}
+              />
+            )}
+          </Field>
+        </div>
+      </fieldset>
       {message ? (
         <p role="alert" style={{ margin: 0 }}>
           {message}
@@ -609,6 +674,9 @@ function CurrentVersion({
     <section aria-labelledby="current-version-title" style={{ display: 'grid', gap: 'var(--pf-space-2)' }}>
       <h2 id="current-version-title">{f.t('detail.current', { version: definition.currentVersionNo })}</h2>
       <VersionSummary v={definition.current} f={f} catalogs={catalogs} />
+      <p style={mutedStyle} data-testid="matching-tolerances">
+        {f.t('detail.matching')}: {toleranceSummary(definition.matching, definition.current.amount.type, f)}
+      </p>
     </section>
   );
 }
