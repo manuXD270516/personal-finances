@@ -145,6 +145,19 @@ Los changes 1–10 (más el 9b, agregado el 2026-10-02 por decisión del owner, 
 
 Dependencias que fijan el orden: el motor (26) crea el contexto y los contratos (`UpcomingPaymentsQuery`, `CommittedQuery`, `RecurringDefinitionPort`, `managedBy`) que usan los demás; `add-upcoming-payments` va segundo porque responde Q4/Q8 con solo el motor; `add-subscriptions` usa `RecurringDefinitionPort`; `add-commitment-matching` agrega requirements a la spec del motor ya archivada y alimenta SM-07; la importación CSV es independiente y opcional, al final.
 
+**Phase 4 (consolidado el 2026-10-10).** Los 6 changes se redactaron en paralelo en tres hilos; las preguntas abiertas al owner están en [36-phase-4-consolidation-questions.md](36-phase-4-consolidation-questions.md).
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 31 | `add-loans` | `debt/loans` y `debt/amortization` (nuevas: préstamo, desembolso y pago como transacciones `LOAN_DISBURSEMENT`/`LOAN_PAYMENT`, cronograma French al centavo, cuotas como compromisos `LOAN_PAYMENT` administrados, comparación con la tabla del banco; FR-DEBT-001..003, 006, 007, 011) + `commitments/recurrence-engine` + `transactions/transaction-recording`; crea el contexto `@pf/debt` y el `RecurringDefinitionPort` público | 4 |
+| 32 | `add-credit-cards` | `debt/credit-cards` (nueva: términos, ciclos y estados de cuenta, pago como transferencia, plan `CARD_PAYMENT`, utilización 30/80 %, bimoneda, cuotas; FR-DEBT-012..017) + `commitments/recurrence-engine` + `reporting/cash-flow-calendar` + `notifications/alerts` | 4 |
+| 33 | `add-savings-goals` | `goals/savings-goals` (nueva: metas, aportes reales y reservas, cálculos, simulación, multi-moneda, hitos y meta alcanzada, aporte recurrente `managedBy = GOAL`; FR-GOALS-001..010) + `notifications/alerts`, `planning/budgets`, `reporting/dashboard` (Q9), `transactions/transfers`; crea `@pf/goals` | 4 |
+| 34 | `add-loan-amortization-advanced` | `debt/amortization` y `debt/loans` (alemán, capital fijo, custom, prepagos, tasa variable, simulador; FR-DEBT-004, 005, 008..010) | 4 |
+| 35 | `add-debt-summary` | `debt/loans` + `reporting/dashboard` (resumen de deudas: total por moneda y en base, interés del año, fecha libre de deudas; FR-DEBT-018) | 4 |
+| 36 | `add-spendable-amount` | `reporting/dashboard` (Q5 "¿cuánto puedo gastar?": líquido − reservado − comprometido − aportes planificados − reserva mínima; FR-PLANNING-024) | 4 |
+
+Dependencias que fijan el orden: `add-loans` crea `@pf/debt`, el `RecurringDefinitionPort` público y las guardas del motor por `kind = LOAN_PAYMENT`; `add-credit-cards` reutiliza contexto y puerto; `add-savings-goals` agrega `GOAL` al puerto; la amortización avanzada requiere el núcleo de préstamos; el resumen de deudas lee préstamos y tarjetas; Q5 va al final porque compone metas, compromisos, tarjetas y préstamos y modifica el mismo requirement del Home que `add-savings-goals`.
+
 Dependencias que fijan el orden: `add-financial-periods` es la base del plan mensual (`add-budgets`, `add-budget-templates`) y del cierre; `add-reconciliation` y `add-budgets` van antes de `add-month-closing` (ítem de cuentas conciliadas y presupuesto vs real congelado en el snapshot); `add-alerts` va después de `add-month-closing` porque consume `planning.MonthClosePending.v1` y `planning.BudgetThresholdReached.v1`; `add-bulk-edit` reutiliza el alcance de edición en periodo cerrado que fija `add-month-closing`; `add-net-worth-evolution` usa los snapshots de cierre; `add-workspace-export` va al final porque exporta e importa los datos de todos los demás. `improve-event-throughput` (agregado por el owner el 2026-10-09) va después y antes de cualquier change de Phase 6: los imports multiplican el volumen de eventos y el ritmo actual (~2 eventos/s por consumidor) incumpliría NFR-PERF-008.
 
 ## 8. Integración con CI y herramientas
