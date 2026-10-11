@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Emisión única y recálculo del estado de cuenta'
 scenario: 'Compra retroactiva en un ciclo cerrado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013', 'FR-NOTIFY-005']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+  - packages/contexts/debt/test/integration/pg-cards.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'idempotency']

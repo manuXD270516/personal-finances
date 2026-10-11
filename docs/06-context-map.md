@@ -130,6 +130,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 28 | OIDC IdP | IDENTITY | ACL | OIDC | Claims → `User`; el modelo del IdP no entra al dominio. |
 | 29 | ACCOUNTS | DEBT | C/S | SYNC-TX | `AccountProvisioningPort.openAccount`: Debt abre la cuenta `LOAN` del préstamo en su propia UoW (as-built `add-loans`); Accounts sigue siendo dueño del agregado y de sus validaciones. |
 | 30 | COMMITMENTS | DEBT | C/S | SYNC-TX | `RecurringDefinitionPort` (`createManaged`, `settle`, `unsettle`, `setExpected`, `end`, `revise`): las cuotas del préstamo son ocurrencias de una definición administrada (`managedBy = DEBT`, `kind = LOAN_PAYMENT`) que Debt resuelve en la misma UoW; COMMITMENTS no depende de DEBT (pagar desde Recurrentes redirige al formulario del préstamo, D162). |
+| 31 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Lectura (as-built `add-credit-cards`): `AccountMovementsQuery` (movimientos de la cuenta de tarjeta por fecha y clase), `PendingFlowQuery` (compras pendientes) y `TransactionLinkQuery` (validar la compra de un plan de cuotas). Debt no crea transacciones de tarjeta: el pago es la transferencia del usuario o la del plan de pago que materializa el motor. |
 
 ### 3.1 Composición "abrir cuenta con saldo inicial"
 

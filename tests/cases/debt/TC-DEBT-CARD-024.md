@@ -5,16 +5,21 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Cuotas en el saldo facturado y calendario de cargos futuros'
 scenario: 'Primer ciclo de la laptop'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-017', 'FR-DEBT-013']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+  - packages/contexts/debt/src/domain/utilization.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'installments', 'calendar']

@@ -131,6 +131,20 @@ export class InMemoryCommitments {
       [...this.definitionsMap.values()].some(
         (r) => r.state.workspaceId === workspaceId && r.state.status === 'ACTIVE',
       ),
+    listActiveTransfersTo: async (workspaceId, accountId) =>
+      [...this.definitionsMap.values()]
+        .filter((r) => {
+          const current = r.versions.find((v) => v.versionNo === r.state.currentVersionNo);
+          return (
+            r.state.workspaceId === workspaceId &&
+            r.state.status === 'ACTIVE' &&
+            r.state.managedBy === 'USER' &&
+            r.state.kind === 'TRANSFER' &&
+            current?.toAccountId === accountId
+          );
+        })
+        .sort((a, b) => a.state.name.toLowerCase().localeCompare(b.state.name.toLowerCase()))
+        .map((r) => ({ definitionId: r.state.id, name: r.state.name })),
   };
 
   readonly occurrences: OccurrenceRepository = {
@@ -313,7 +327,8 @@ export class InMemoryCommitments {
         .map((o) => this.matchRowOf(o))
         .filter(
           (r) =>
-            r.occurrence.kind === input.kind &&
+            (r.occurrence.kind === input.kind ||
+              (input.kind === 'TRANSFER' && r.occurrence.kind === 'CARD_PAYMENT')) &&
             r.occurrence.accountId === input.accountId &&
             (input.kind !== 'TRANSFER' || r.occurrence.toAccountId === input.toAccountId),
         )

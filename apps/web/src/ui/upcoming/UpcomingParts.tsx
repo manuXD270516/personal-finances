@@ -1,7 +1,8 @@
 import { formatMoney, formatLocalDate } from '../dashboard/format';
 import type { FormatContext, Money } from '../dashboard/types';
 import { periodName } from '../planning/logic';
-import { joinMoney, statusLabel, statusPresentation } from './logic';
+import { cardHref, cardPaymentName, looksLikeCardPayment } from '../debt/cards/logic';
+import { itemPath, joinMoney, statusLabel, statusPresentation } from './logic';
 import type { CommittedBlock, UpcomingPaymentItem } from './types';
 
 /** Estado de un pago: glifo decorativo, tono y texto (el significado nunca depende solo del color). */
@@ -12,6 +13,54 @@ export function StatusBadge({ item, f }: { item: UpcomingPaymentItem; f: FormatC
       <span aria-hidden="true">{icon}</span>
       {statusLabel(item, f)}
     </span>
+  );
+}
+
+/** Resuelve la tarjeta de un pago próximo a partir de la definición de su plan de pago. */
+export type CardOf = (definitionId: string) => { readonly id: string; readonly name: string } | undefined;
+
+/**
+ * Nombre de un pago próximo. Los pagos del plan de una tarjeta se rotulan "Pago de tarjeta · <nombre>" con la marca de
+ * estimado y un enlace a la tarjeta (los ítems no traen el tipo recurrente: se reconocen por la definición del plan o,
+ * si aún no cargó la lista de tarjetas, por el prefijo del nombre que fija Deuda).
+ */
+export function ItemName({
+  item,
+  f,
+  href,
+  cardOf,
+}: {
+  item: UpcomingPaymentItem;
+  f: FormatContext;
+  href: (path: string) => string;
+  cardOf?: CardOf | undefined;
+}) {
+  const card = item.definitionId ? cardOf?.(item.definitionId) : undefined;
+  const isCard = card !== undefined || looksLikeCardPayment(item.name);
+  if (!isCard) return <a href={href(itemPath(item))}>{item.name}</a>;
+  const name = card?.name ?? cardPaymentName(item.name);
+  return (
+    <>
+      <a href={href(itemPath(item))} data-testid="card-payment-item">
+        {f.t('cardPayment.label', { name })}
+      </a>
+      {item.estimated ? (
+        <>
+          <br />
+          <span className="pf-home-muted" data-testid="card-payment-estimated">
+            {f.t('cardPayment.estimated')}
+          </span>
+        </>
+      ) : null}
+      {card ? (
+        <>
+          <br />
+          <a href={href(cardHref(card.id))} className="pf-home-muted" data-testid="card-payment-link">
+            {f.t('cardPayment.viewCard')}
+          </a>
+        </>
+      ) : null}
+    </>
   );
 }
 

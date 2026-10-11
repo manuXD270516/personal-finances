@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/CreditUtilizationThresholdReached.v1.schema.json",
+  "title": "debt.CreditUtilizationThresholdReached.v1",
+  "description": "La utilización del crédito de una tarjeta (separada por cuenta o compartida) pasó de estar por debajo de un umbral a ser mayor o igual a él. Un hecho por cambio, con el umbral más alto cruzado y los demás en alsoCrossed; un umbral vuelve a avisar solo tras bajar de él. Productor: DEBT (consumidor debt.card-activity, comandos de límites y job debt.card-daily). Lo consume NOTIFY (CARD_UTILIZATION). Idempotencia: (cardId, scope, threshold, crossingNo). El nombre de la tarjeta es PII de baja sensibilidad (B).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.CreditUtilizationThresholdReached"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "CreditCard"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "cardId",
+        "cardName",
+        "scope",
+        "accountId",
+        "limit",
+        "used",
+        "utilization",
+        "threshold",
+        "alsoCrossed",
+        "crossingNo",
+        "crossedAt"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "cardId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "cardName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "scope": {
+          "enum": ["SHARED", "ACCOUNT"]
+        },
+        "accountId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "used": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "utilization": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+        },
+        "threshold": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+        },
+        "alsoCrossed": {
+          "type": "array",
+          "items": {
+            "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+          }
+        },
+        "crossingNo": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "crossedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000c03",
+      "eventType": "debt.CreditUtilizationThresholdReached",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-28T15:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CreditCard",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000c0001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "cardId": "01928c4e-0000-7000-8000-0000000c0001",
+        "cardName": "Visa Oro",
+        "scope": "ACCOUNT",
+        "accountId": "01928c4e-0000-7000-8000-0000000a0003",
+        "limit": {
+          "amount": "1000.00",
+          "currency": "USD"
+        },
+        "used": {
+          "amount": "850.00",
+          "currency": "USD"
+        },
+        "utilization": "85.00",
+        "threshold": "80.00",
+        "alsoCrossed": ["30.00"],
+        "crossingNo": 1,
+        "crossedAt": "2026-10-28T15:00:00.000Z"
+      }
+    }
+  ]
+}

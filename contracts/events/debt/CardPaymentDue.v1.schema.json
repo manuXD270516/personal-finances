@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/CardPaymentDue.v1.schema.json",
+  "title": "debt.CardPaymentDue.v1",
+  "description": "Recordatorio de vencimiento de un estado de cuenta al que le falta algo para no generar intereses: N días antes del vencimiento, una sola vez por (cuenta de la tarjeta, fecha de cierre), con o sin plan de pago. Productor: DEBT (job debt.card-daily). Lo consume NOTIFY (CARD_PAYMENT_DUE). El nombre de la tarjeta es PII de baja sensibilidad (B).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.CardPaymentDue"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "CreditCard"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "cardId",
+        "cardName",
+        "cardAccountId",
+        "accountId",
+        "currency",
+        "statementId",
+        "closingDate",
+        "dueDate",
+        "daysBefore",
+        "remainingNoInterest",
+        "remainingMinimum",
+        "paymentPlanDefinitionId"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "cardId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "cardName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "cardAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "statementId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "closingDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "dueDate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "daysBefore": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "remainingNoInterest": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "remainingMinimum": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "paymentPlanDefinitionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000c02",
+      "eventType": "debt.CardPaymentDue",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-12T13:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "CreditCard",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000c0001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "cardId": "01928c4e-0000-7000-8000-0000000c0001",
+        "cardName": "Visa Oro",
+        "cardAccountId": "01928c4e-0000-7000-8000-0000000c0002",
+        "accountId": "01928c4e-0000-7000-8000-0000000a0003",
+        "currency": "BOB",
+        "statementId": "01928c4e-0000-7000-8000-0000000c0003",
+        "closingDate": "2026-10-25",
+        "dueDate": "2026-11-15",
+        "daysBefore": 3,
+        "remainingNoInterest": {
+          "amount": "1120.50",
+          "currency": "BOB"
+        },
+        "remainingMinimum": {
+          "amount": "56.02",
+          "currency": "BOB"
+        },
+        "paymentPlanDefinitionId": null
+      }
+    }
+  ]
+}

@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: ['debt/credit-cards']
 requirement: 'Pago de tarjeta administrado por la tarjeta'
 scenario: 'Usuario crea un pago de tarjeta directamente'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-001', 'FR-DEBT-013', 'FR-DEBT-014']
 nfr: []
 invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/commitments/src/application/card-payment.service.test.ts
+  - packages/contexts/commitments/src/domain/card-payment.test.ts
+  - packages/contexts/commitments/test/integration/pg-card-payment.int.test.ts
+status: automated
 regression_suite: true
 phase: 4
 tags: ['recurrence', 'card-payment']

@@ -131,5 +131,9 @@
   "LOAN_HAS_PAYMENTS": "El préstamo tiene pagos vigentes y no se puede cancelar. Anula primero sus pagos.",
   "LOAN_REFERENCE_INVALID": "La tabla del banco tiene filas con errores y no se guardó. Corrígelas y vuelve a cargarla.",
   "PAYMENT_BREAKDOWN_MISMATCH": "El desglose del recibo no suma el monto pagado. Revisa capital, interés, comisiones, seguro e impuestos.",
-  "TRANSACTION_MANAGED_EXTERNALLY": "Esta transacción la administra un préstamo: edita montos o anula el pago desde el préstamo. Aquí solo puedes cambiar notas y etiquetas."
+  "TRANSACTION_MANAGED_EXTERNALLY": "Esta transacción la administra un préstamo: edita montos o anula el pago desde el préstamo. Aquí solo puedes cambiar notas y etiquetas.",
+  "CREDIT_CARD_ACCOUNT_INVALID": "La cuenta debe ser una cuenta de tarjeta de crédito activa y solo puede haber una por moneda.",
+  "CREDIT_CARD_ACCOUNT_IN_USE": "Esa cuenta ya pertenece a otra tarjeta. Elige otra cuenta o archiva la tarjeta anterior.",
+  "CARD_PAYMENT_PLAN_CONFLICT": "Ya existe un pago recurrente activo hacia esta tarjeta. Termínalo en Pagos recurrentes y vuelve a activar el plan de pago.",
+  "INSTALLMENT_PLAN_INVALID": "Esa compra no se puede pagar en cuotas: debe ser un gasto posteado de una cuenta de la tarjeta, sin otro plan de cuotas."
 }

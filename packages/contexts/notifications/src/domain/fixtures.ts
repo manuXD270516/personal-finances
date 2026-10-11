@@ -109,3 +109,46 @@ export const priceChangedPayload = (overrides: Record<string, unknown> = {}): Re
   transactionId: '01928c4e-0000-7000-8000-0000000a7001',
   ...overrides,
 });
+
+export const CARD_ID = '01928c4e-0000-7000-8000-0000000c0001';
+export const CARD_ACCOUNT_ID = '01928c4e-0000-7000-8000-0000000c0002';
+export const CARD_LEDGER_ACCOUNT_ID = '01928c4e-0000-7000-8000-0000000a0003';
+export const STATEMENT_ID = '01928c4e-0000-7000-8000-0000000c0003';
+
+/**
+ * `debt.CardPaymentDue.v1`: "Visa Oro" (BOB), estado cerrado el 2026-10-25 que vence el 2026-11-15, faltan 1120.50 BOB
+ * para no generar intereses (mínimo 56.02), recordatorio 3 días antes.
+ */
+export const cardPaymentDuePayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  workspaceId: WS,
+  cardId: CARD_ID,
+  cardName: 'Visa Oro',
+  cardAccountId: CARD_ACCOUNT_ID,
+  accountId: CARD_LEDGER_ACCOUNT_ID,
+  currency: 'BOB',
+  statementId: STATEMENT_ID,
+  closingDate: '2026-10-25',
+  dueDate: '2026-11-15',
+  daysBefore: 3,
+  remainingNoInterest: { amount: '1120.50', currency: 'BOB' },
+  remainingMinimum: { amount: '56.02', currency: 'BOB' },
+  paymentPlanDefinitionId: null,
+  ...overrides,
+});
+
+/** `debt.CreditUtilizationThresholdReached.v1`: "Visa Oro" (USD) al 85.00 %, umbral 80.00 (también 30.00). */
+export const cardUtilizationPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  workspaceId: WS,
+  cardId: CARD_ID,
+  cardName: 'Visa Oro',
+  scope: 'ACCOUNT',
+  accountId: CARD_LEDGER_ACCOUNT_ID,
+  limit: { amount: '1000.00', currency: 'USD' },
+  used: { amount: '850.00', currency: 'USD' },
+  utilization: '85.00',
+  threshold: '80.00',
+  alsoCrossed: ['30.00'],
+  crossingNo: 1,
+  crossedAt: '2026-10-28T15:00:00.000Z',
+  ...overrides,
+});

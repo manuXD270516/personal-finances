@@ -10,6 +10,8 @@ import { mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { formatBusinessDate } from '../planning/logic';
+import { cardHref, cardPaymentName } from '../debt/cards/logic';
+import { useCardLookup } from '../debt/cards/useCardLookup';
 import { paymentHref } from '../debt/logic';
 import { useLoanLookup } from '../debt/useLoanLookup';
 import { useCatalogs } from '../transactions/catalogs';
@@ -21,6 +23,7 @@ import {
   availableOccurrenceActions,
   canRegisterLoanPayment,
   definitionPath,
+  isCardPayment,
   isLoanInstallment,
   type OccurrenceAction,
 } from './logic';
@@ -47,6 +50,11 @@ function Detail({ ctx, occurrenceId }: { ctx: WorkspaceContext; occurrenceId: st
   const today = todayIn(ctx.timeZone);
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
   const loans = useLoanLookup(ctx, loaded.status === 'ready' && isLoanInstallment(loaded.occurrence));
+  const cards = useCardLookup(
+    ctx.api,
+    ctx.base,
+    loaded.status === 'ready' && isCardPayment(loaded.occurrence),
+  );
   const [action, setAction] = useState<OccurrenceAction | undefined>();
   const [status, setStatus] = useState<string | undefined>();
 
@@ -117,7 +125,9 @@ function Detail({ ctx, occurrenceId }: { ctx: WorkspaceContext; occurrenceId: st
       </p>
       <div style={{ ...rowStyle, alignItems: 'center' }}>
         <h1 id="occurrence-title" style={{ margin: 0 }}>
-          {o.definitionName}
+          {isCardPayment(o)
+            ? f.t('cardPayment.label', { name: cardPaymentName(o.definitionName) })
+            : o.definitionName}
         </h1>
         <OccurrenceStatusBadge status={o.status} f={f} />
       </div>
@@ -155,6 +165,23 @@ function Detail({ ctx, occurrenceId }: { ctx: WorkspaceContext; occurrenceId: st
             void load();
           }}
         />
+      ) : null}
+      {isCardPayment(o) ? (
+        <p style={mutedStyle} data-testid="occurrence-card">
+          {o.expected.type === 'ESTIMATED' ? `${f.t('cardPayment.estimatedNote')} ` : ''}
+          <a
+            href={ctx.href(
+              cards.ofDefinition(o.definitionId)
+                ? cardHref(cards.ofDefinition(o.definitionId)!.id)
+                : '/debts?vista=tarjetas',
+            )}
+            data-testid="occurrence-card-link"
+          >
+            {cards.ofDefinition(o.definitionId)
+              ? f.t('cardPayment.viewCard', { name: cards.ofDefinition(o.definitionId)!.name })
+              : f.t('cardPayment.viewCards')}
+          </a>
+        </p>
       ) : null}
       {isLoanInstallment(o) ? (
         <p style={mutedStyle} data-testid="occurrence-loan">

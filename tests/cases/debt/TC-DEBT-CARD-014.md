@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Montos informados por el banco'
 scenario: 'Extracto del banco con intereses no registrados'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013']
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'reported']

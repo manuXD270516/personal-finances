@@ -295,11 +295,11 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-DEBT-009 | **Tasa variable**: registrar cambios de tasa con fecha de vigencia y recalcular cuotas futuras. | Should | 4 | debt/amortization |
 | FR-DEBT-010 | **Payoff simulator**: comparar escenarios (pagos extra únicos o recurrentes, estrategias *avalanche*/*snowball* entre deudas) mostrando intereses totales, fecha de fin y ahorro, sin persistir. | Should | 4 | debt/amortization |
 | FR-DEBT-011 | Las cuotas de préstamo DEBEN generar compromisos recurrentes (COMMITMENTS) para alimentar Q4/Q8 y el cash-flow calendar. Implementado por `add-loans`: una definición administrada (`managedBy = DEBT`, `kind = LOAN_PAYMENT`) con calendario explícito y una ocurrencia por cuota. | Must | 4 | debt/loans |
-| FR-DEBT-012 | El sistema DEBE gestionar tarjetas de crédito: límite, moneda, día de cierre, día de vencimiento, tasa, regla de pago mínimo (% o monto) y cuenta LIABILITY asociada. | Must | 4 | debt/credit-cards |
-| FR-DEBT-013 | El sistema DEBE calcular por ciclo: compras del ciclo, saldo al cierre, pago mínimo, pago para no generar intereses y fecha de vencimiento; y generar recordatorio de vencimiento. | Must | 4 | debt/credit-cards |
-| FR-DEBT-014 | El pago de tarjeta DEBE ser una transferencia ASSET→LIABILITY (no es gasto). | Must | 4 | debt/credit-cards |
-| FR-DEBT-015 | Utilización de crédito (saldo/límite) con alerta configurable (default 30 % y 80 %). | Should | 4 | debt/credit-cards |
-| FR-DEBT-016 | Tarjetas bimoneda (p.ej. BOB + USD) modeladas como una tarjeta con una cuenta LIABILITY por moneda y límite compartido o separado. | Should | 4 | debt/credit-cards |
+| FR-DEBT-012 | El sistema DEBE gestionar tarjetas de crédito: límite, moneda, día de cierre y de vencimiento (1–31; en meses cortos, el último día), ajuste de fin de semana del vencimiento, tasa informativa, regla de pago mínimo (% con piso o monto) por cuenta, umbrales de utilización y días de recordatorio por tarjeta, y cuenta LIABILITY asociada. | Must | 4 | debt/credit-cards |
+| FR-DEBT-013 | El sistema DEBE calcular por ciclo: compras del ciclo, saldo al cierre, saldo facturado (el saldo al cierre menos el capital de las cuotas aún no facturadas), pago mínimo, pago para no generar intereses, lo que falta tras los pagos posteriores al cierre, estado (`OPEN`, `ISSUED`, `PAID`, `PARTIALLY_PAID`, `OVERDUE`) y fecha de vencimiento; emitir el estado de cuenta una sola vez; y generar recordatorio de vencimiento. | Must | 4 | debt/credit-cards |
+| FR-DEBT-014 | El pago de tarjeta DEBE ser una transferencia ASSET→LIABILITY (o una conversión si se paga desde otra moneda); no es gasto. | Must | 4 | debt/credit-cards |
+| FR-DEBT-015 | Utilización de crédito (saldo adeudado más compras pendientes, sobre el límite) con alerta configurable (default 30 % y 80 %). | Should | 4 | debt/credit-cards |
+| FR-DEBT-016 | Tarjetas bimoneda (p.ej. BOB + USD) modeladas como una tarjeta con una cuenta LIABILITY por moneda y límite compartido o separado. | Must | 4 | debt/credit-cards |
 | FR-DEBT-017 | Compras en cuotas (sin/con interés) en tarjeta, con calendario de cargos futuros. | Could | 4 | debt/credit-cards |
 | FR-DEBT-018 | Resumen de deudas: total adeudado por moneda y en base, interés pagado YTD, fecha estimada libre de deudas. | Could | 4 | debt/loans |
 
@@ -423,7 +423,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-NOTIFY-001 | Centro de notificaciones in-app con estados `unread`/`read`/`archived`, contador y enlace al recurso origen. | Must | 2 | notifications/alerts |
 | FR-NOTIFY-002 | Canal **email** (SMTP; Mailpit en local) con plantillas en español. | Should | 2 | notifications/alerts |
 | FR-NOTIFY-003 | Preferencias por tipo de notificación y canal, y horario de silencio. | Should | 2 | notifications/alerts |
-| FR-NOTIFY-004 | Tipos (incrementales por fase): umbral de presupuesto (2), cierre de mes pendiente (2), próximo pago / ocurrencia por aprobar (3), renovación, fin de trial y posible cambio de precio de una suscripción (3; renovación y fin de trial a OWNER, EDITOR y VIEWER, cambio de precio a OWNER y EDITOR), hito de meta / sobre-asignación (4), vencimiento de tarjeta y cuota (4), tasa obsoleta (5), import completado/fallido (6), riesgo de déficit (7), violación de invariante (OWNER, 1→2). | Must | 2 → 7 | notifications/alerts |
+| FR-NOTIFY-004 | Tipos (incrementales por fase): umbral de presupuesto (2), cierre de mes pendiente (2), próximo pago / ocurrencia por aprobar (3), renovación, fin de trial y posible cambio de precio de una suscripción (3; renovación y fin de trial a OWNER, EDITOR y VIEWER, cambio de precio a OWNER y EDITOR), hito de meta / sobre-asignación (4), vencimiento de tarjeta (OWNER y EDITOR, N días antes; 4), utilización de tarjeta (OWNER y EDITOR; 4) y cuota (4), tasa obsoleta (5), import completado/fallido (6), riesgo de déficit (7), violación de invariante (OWNER, 1→2). | Must | 2 → 7 | notifications/alerts |
 | FR-NOTIFY-005 | Las notificaciones DEBEN ser idempotentes: un mismo evento origen no genera notificaciones duplicadas (inbox por `(consumer, eventId)` + clave de deduplicación de negocio). | Must | 2 | notifications/alerts |
 | FR-NOTIFY-006 | Los emails NO DEBEN incluir saldos ni montos salvo opt-in explícito; deben enlazar a la app autenticada. | Must | 2 | notifications/alerts |
 | FR-NOTIFY-007 | Digest semanal/mensual por email. | Should | 7 | notifications/alerts |
@@ -491,6 +491,6 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 5. ¿El cierre de mes debe **bloquear** si hay cuentas sin reconciliar o solo advertir (FR-PLANNING-003)?
 6. ¿Custom fields se necesitan ya en Phase 1 o pueden esperar a Phase 2 (propuesta actual)?
 7. Lista definitiva de los 16 reportes: validar con el doc 14 (reporting).
-8. ¿Las tarjetas bimoneda (FR-DEBT-016) son un caso real del owner? Si sí, subir a Must.
+8. ¿Las tarjetas bimoneda (FR-DEBT-016) son un caso real del owner? Si sí, subir a Must. — _Resuelta (D171, 2026-10-10): sí; FR-DEBT-016 es Must._
 9. ¿Se requiere soporte de **cuentas conjuntas** (una cuenta compartida entre workspaces) o basta con el workspace compartido del track de Colaboración?
 10. ~~**Ubicación de FR-REPORTING-004**~~: resuelta por el owner el 2026-10-05 ([docs/31 D50](./31-phase-1-consolidation-decisions.md)): pasa a `reporting/dashboard` en Phase 1, servido por `GET /reports/summary` en el Home.

@@ -5,16 +5,20 @@ spec: commitments/recurrence-engine
 related_specs: ['debt/credit-cards', 'reporting/cash-flow-calendar']
 requirement: 'Pago de tarjeta en el comprometido y en próximos pagos'
 scenario: 'Pago de tarjeta en el comprometido de noviembre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-011', 'FR-DEBT-013']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/commitments/src/application/card-payment.service.test.ts
+  - packages/contexts/commitments/src/domain/card-payment.test.ts
+  - packages/contexts/commitments/test/integration/pg-card-payment.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['recurrence', 'committed']

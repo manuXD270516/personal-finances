@@ -33,6 +33,7 @@ import {
   commitmentsEventConsumers,
   createCommitmentsRuntime,
 } from '@pf/commitments/interface/commitments.module';
+import { debtEventConsumers } from '@pf/debt/interface/debt.module';
 import { createImportsRuntime, importsEventConsumers } from '@pf/imports/interface/imports.module';
 import {
   createDemoDataRuntime,
@@ -73,6 +74,7 @@ import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audi
 import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-jobs.js';
+import { registerDebtCardsJob } from './debt-jobs.js';
 import { registerImportsJobs } from './imports-jobs.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
@@ -411,6 +413,14 @@ export async function createWorkerRuntime(
     runOnStart: options.commitmentsOnStart ?? true,
   });
 
+  // DEBT (add-credit-cards): job `debt.card-daily` (estados de cuenta, recordatorios y red de seguridad) y consumidor
+  // `debt.card-activity`; las tarjetas usan los MISMOS contratos públicos que la API (movimientos por cuenta, saldos
+  // históricos, valoración y el puerto de definiciones administradas) compuestos con el pool del worker.
+  await registerDebtCardsJob(queue, finance.cards, activeWorkspaces, logger, {
+    cron: config.DEBT_CARDS_CRON,
+    runOnStart: options.commitmentsOnStart ?? true,
+  });
+
   // IMPORTS (add-basic-csv-import): consumidor `imports.persist` (crea las transacciones por lotes con los MISMOS casos
   // de uso de TRANSACTIONS que la API, vía su contrato público) y jobs diarios de expiración y purga del staging.
   const imports = createImportsRuntime({
@@ -493,6 +503,7 @@ export async function createWorkerRuntime(
     reportingDataVersionConsumer(),
     ...planningEventConsumers(planning),
     ...commitmentsEventConsumers(commitments),
+    ...debtEventConsumers(finance.cards),
     ...importsEventConsumers(imports, logger),
     ...notificationEventConsumers(notifications),
   ]);

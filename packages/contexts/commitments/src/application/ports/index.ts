@@ -101,6 +101,11 @@ export interface DefinitionRepository {
   /** Definiciones con trabajo pendiente para el job: activas o con ocurrencias por vencer/atrasar. */
   idsNeedingWork(workspaceId: string): Promise<string[]>;
   hasActive(workspaceId: string): Promise<boolean>;
+  /** Definiciones `ACTIVE` del usuario (`managedBy = USER`) de tipo `TRANSFER` cuyo destino vigente es la cuenta. */
+  listActiveTransfersTo(
+    workspaceId: string,
+    accountId: string,
+  ): Promise<readonly { readonly definitionId: string; readonly name: string }[]>;
 }
 
 /** Ocurrencia con los datos de su definición y versión (lecturas con join). */

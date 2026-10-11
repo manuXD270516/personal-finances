@@ -5,16 +5,19 @@ spec: notifications/alerts
 related_specs: ['debt/credit-cards']
 requirement: 'Notificación de utilización de la tarjeta'
 scenario: 'Visa Oro al 85 %'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-005', 'FR-DEBT-015']
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/debt-cards.int.test.ts
+  - packages/contexts/notifications/src/application/card-notifications.test.ts
+  - packages/contexts/notifications/src/domain/card-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['notifications', 'utilization']

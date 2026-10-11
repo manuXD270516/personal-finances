@@ -192,6 +192,14 @@ export const ERROR_CATALOG = {
     status: 409,
     title: 'The transaction is managed by another module; operate it from there',
   },
+  // debt / credit-cards (add-credit-cards)
+  CREDIT_CARD_ACCOUNT_INVALID: { status: 422, title: 'The account must be an active credit card account' },
+  CREDIT_CARD_ACCOUNT_IN_USE: { status: 409, title: 'The account already belongs to another credit card' },
+  CARD_PAYMENT_PLAN_CONFLICT: {
+    status: 409,
+    title: 'An active recurring transfer to the card prevents enabling the payment plan',
+  },
+  INSTALLMENT_PLAN_INVALID: { status: 422, title: 'The installment plan is not valid for this purchase' },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

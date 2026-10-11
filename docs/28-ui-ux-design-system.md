@@ -27,7 +27,7 @@
 | **Plan** | `/plan` | Periodo actual, presupuesto, plantillas, cierre de mes | 2 |
 | **Recurrentes** | `/recurring` | Pestañas **Próximos** (7/30/60/90 días), **Por aprobar** (bandeja; contador en la sidebar), **Coincidencias por revisar** (add-commitment-matching: sugerencias de vincular una transacción con una ocurrencia, con contador en la pestaña) y **Definiciones**; detalle de definición, tarjeta "Comprometido del periodo"; **Suscripciones** (`/recurring/suscripciones`, add-subscriptions: listado con estado y próxima renovación, alta con aviso de moneda distinta, detalle con historial de precios, propuesta de cambio de precio, cargos con tasa implícita, recorrido y cancelación ahora o al fin del ciclo, y vista de costo mensual/anual en moneda base con las tasas usadas); después calendario | 3 |
 | **Metas** | `/goals` | Savings goals | 4 |
-| **Deudas** | `/debts` | Préstamos, tarjetas, amortización | 4 |
+| **Deudas** | `/debts` | Préstamos y **Tarjetas** (`add-credit-cards`: listado con utilización —texto y barra, nunca solo color— y próximo vencimiento; detalle `/debts/tarjetas/{id}` con ciclo abierto, estados de cuenta con diferencia emitido/recalculado y montos del banco, plan de pago, cuotas y calendario de cargos futuros), amortización | 4 |
 | **Cripto & FX** | `/fx` | Conversiones, tasas, wallets, costo de conversión | 1 (manual) / 5 |
 | **Reportes** | `/reports` | 16 reportes (14-reporting.md §7) | 1 / 7 |
 | **Pronóstico** | `/forecast` | Forecasts con rangos y drivers | 8 |
@@ -148,7 +148,7 @@ flowchart LR
 
 ### 4.2 Transferencia
 
-Campos: Desde (cuenta) → Hacia (cuenta), monto, fecha. Si las monedas difieren, el formulario **se convierte** en conversión (4.3) con aviso. Pago de tarjeta de crédito = transferencia a cuenta de tarjeta; el formulario lo etiqueta "Pago de tarjeta" y sugiere el monto del estado de cuenta / mínimo.
+Campos: Desde (cuenta) → Hacia (cuenta), monto, fecha. Si las monedas difieren, el formulario **se convierte** en conversión (4.3) con aviso. Pago de tarjeta de crédito = transferencia a cuenta de tarjeta; el formulario lo etiqueta "Pago de tarjeta" y sugiere el monto del estado de cuenta / mínimo ("Total para no generar intereses" y "Pago mínimo", según lo que falta del último estado emitido; si la moneda del origen difiere se convierte, como siempre). En Próximos pagos el pago de tarjeta se rotula "Pago de tarjeta · <nombre>" y se marca como estimado antes del cierre.
 
 ### 4.3 Conversión USDT → BOB con fee
 

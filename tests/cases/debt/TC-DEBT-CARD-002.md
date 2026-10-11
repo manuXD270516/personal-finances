@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Registro de una tarjeta de crédito'
 scenario: 'Cuenta bancaria como tarjeta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-012']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/logic.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'validation']
@@ -34,7 +38,7 @@ steps:
 expected_result:
   - 'A: 422 CREDIT_CARD_ACCOUNT_INVALID'
   - 'B: 409 CREDIT_CARD_ACCOUNT_IN_USE'
-  - 'C: 422 VALIDATION_FAILED'
+  - 'C: 400 VALIDATION_FAILED'
   - 'Ninguna tarjeta nueva creada'
 created: 2026-10-10
 updated: 2026-10-10

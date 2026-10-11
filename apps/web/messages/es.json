@@ -2319,7 +2319,8 @@
       "openBudgetLine": "Ver la línea en el plan de {period}",
       "openPeriodClose": "Ir al cierre de {period}",
       "openRecurringOccurrence": "Ver el pago recurrente de {period}",
-      "openSubscription": "Ver la suscripción"
+      "openSubscription": "Ver la suscripción",
+      "openCreditCard": "Ver la tarjeta"
     },
     "prefs": {
       "title": "Notificaciones",
@@ -2342,7 +2343,9 @@
         "RECURRING_APPROVAL_REQUIRED": "Pago recurrente por aprobar",
         "SUBSCRIPTION_RENEWAL": "Renovación de suscripción próxima",
         "SUBSCRIPTION_TRIAL_ENDING": "Fin de prueba de suscripción",
-        "SUBSCRIPTION_PRICE_CHANGE": "Posible cambio de precio de una suscripción"
+        "SUBSCRIPTION_PRICE_CHANGE": "Posible cambio de precio de una suscripción",
+        "CARD_PAYMENT_DUE": "Vencimiento de pago de tarjeta",
+        "CARD_UTILIZATION": "Utilización de tarjeta"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalles (montos y nombres) en los emails",
@@ -2822,6 +2825,14 @@
       "managedNotice": "Esta cuota la administra el préstamo; se resuelve al registrar el pago allí.",
       "definitionManaged": "Estas cuotas las administra un préstamo: no se pausan ni se editan aquí.",
       "openLoan": "Abrir el préstamo"
+    },
+    "cardPayment": {
+      "label": "Pago de tarjeta · {name}",
+      "estimated": "Estimado",
+      "estimatedNote": "Monto estimado: se ajusta al emitirse el estado de cuenta.",
+      "viewCard": "Ver la tarjeta {name}",
+      "viewCards": "Ver tarjetas",
+      "definitionManaged": "Este pago lo administra el plan de pago de una tarjeta: no se pausa, no se termina ni se revisa aquí. Aprueba, edita u omite cada pago en Próximos."
     }
   },
   "Subscriptions": {
@@ -3321,6 +3332,11 @@
       "meta": "Calculado el {date} · moneda de reporte {currency}",
       "freshness": "último movimiento {date}",
       "listTitle": "Pagos conocidos"
+    },
+    "cardPayment": {
+      "label": "Pago de tarjeta · {name}",
+      "estimated": "Estimado: se ajusta al emitirse el estado de cuenta",
+      "viewCard": "Ver la tarjeta"
     }
   },
   "Imports": {
@@ -4037,6 +4053,333 @@
       "BANK_TRANSFER": "Transferencia bancaria",
       "DIGITAL_WALLET": "Billetera digital",
       "OTHER": "Otro"
+    },
+    "tabs": {
+      "label": "Deudas",
+      "loans": "Préstamos",
+      "cards": "Tarjetas"
+    }
+  },
+  "Cards": {
+    "title": "Tarjetas de crédito",
+    "intro": "Tus tarjetas: cuánto debes, cuánto de tu límite usas, cuándo vence el próximo pago y cuánto falta para no generar intereses.",
+    "viewerNotice": "Solo puedes consultar las tarjetas; registrar o cambiar una requiere el rol de editor.",
+    "loading": "Cargando…",
+    "notFound": "Esta tarjeta no existe o no es de este espacio de trabajo.",
+    "back": "Volver a Tarjetas",
+    "cancel": "Cancelar",
+    "errors": {
+      "REQUIRED": "Completa este campo.",
+      "INVALID": "Escribe un número válido.",
+      "SCALE": "Tiene más decimales de los que admite la moneda.",
+      "NOT_POSITIVE": "Debe ser mayor que cero.",
+      "RANGE": "Está fuera del rango permitido.",
+      "DUPLICATE_CURRENCY": "Solo puede haber una cuenta por moneda en la misma tarjeta.",
+      "SHARED_NEEDS_TWO": "Un límite compartido necesita al menos dos cuentas (dos monedas)."
+    },
+    "status": {
+      "ARCHIVED": "Archivada"
+    },
+    "statementStatus": {
+      "OPEN": "Ciclo abierto",
+      "ISSUED": "Emitido",
+      "PAID": "Pagado",
+      "PARTIALLY_PAID": "Pago parcial",
+      "OVERDUE": "Vencido"
+    },
+    "weekend": {
+      "NONE": "Sin ajuste",
+      "PREVIOUS": "Pasar al día hábil anterior",
+      "NEXT": "Pasar al día hábil siguiente"
+    },
+    "utilization": {
+      "value": "Utilización {percent} %",
+      "level": {
+        "ok": "Normal",
+        "warn": "Atención",
+        "danger": "Crítica",
+        "unknown": "Sin dato"
+      },
+      "overdrawn": "Sobre el límite",
+      "missingRates": "No se puede calcular: falta la tasa de cambio de {currencies}.",
+      "unknown": "No se puede calcular la utilización.",
+      "label": "Utilización de {name} en {currency}",
+      "labelShared": "Utilización del límite compartido de {name}"
+    },
+    "list": {
+      "new": "Nueva tarjeta",
+      "empty": "Aún no registraste tarjetas. Registra una sobre tus cuentas de tarjeta de crédito para ver su utilización, el cierre y el vencimiento.",
+      "calendar": "Cierra el día {statementDay} · vence el día {dueDay}",
+      "sharedLimit": "Límite compartido {limit} · usado {used} · disponible {available}",
+      "region": "Cuentas de {name}",
+      "caption": "Cuentas de {name} con saldo adeudado, crédito usado, utilización, disponible, próximo vencimiento y lo que falta pagar",
+      "account": "Moneda",
+      "balance": "Saldo adeudado",
+      "used": "Crédito usado",
+      "utilization": "Utilización",
+      "available": "Disponible",
+      "nextDue": "Próximo vencimiento",
+      "missing": "Falta para no generar intereses",
+      "planActive": "Pago automático activo",
+      "sharedRef": "Ver límite compartido"
+    },
+    "form": {
+      "title": "Nueva tarjeta de crédito",
+      "stepsLabel": "Pasos del alta de la tarjeta",
+      "stepOf": "Paso {n} de {total}: {name}",
+      "steps": {
+        "accounts": "Cuentas",
+        "limits": "Límites y pago mínimo",
+        "calendar": "Cierre, vencimiento y alertas",
+        "plan": "Plan de pago (opcional)"
+      },
+      "name": "Nombre de la tarjeta",
+      "nameHint": "Por ejemplo, Visa Oro.",
+      "accountsLegend": "Cuentas de la tarjeta",
+      "accountsHint": "Elige las cuentas de tipo tarjeta de crédito: una por moneda. Registrar la tarjeta no crea movimientos ni cambia saldos.",
+      "noAccounts": "No tienes cuentas de tarjeta de crédito activas. Crea una para continuar.",
+      "accountInUse": "ya pertenece a otra tarjeta",
+      "currencyTaken": "ya elegiste una cuenta en esa moneda",
+      "createAccount": "Crear cuenta de tarjeta",
+      "createAccountRegion": "Crear una cuenta de tarjeta de crédito",
+      "limitMode": "Tipo de límite",
+      "limitModes": {
+        "SEPARATE": "Un límite por cuenta",
+        "SHARED": "Un límite compartido"
+      },
+      "limitHint": {
+        "SEPARATE": "Cada moneda tiene su propio límite.",
+        "SHARED": "Un solo límite para todas las monedas, declarado en la moneda que elijas; el uso en otra moneda se valora con la tasa de hoy."
+      },
+      "sharedLimit": "Límite compartido",
+      "sharedCurrency": "Moneda del límite",
+      "accountTerms": "{name} ({currency})",
+      "creditLimit": "Límite de crédito ({currency})",
+      "minimumRule": "Regla de pago mínimo",
+      "minimumTypes": {
+        "PERCENT": "Porcentaje del saldo",
+        "FIXED": "Monto fijo"
+      },
+      "minPercent": "Porcentaje del saldo facturado (%)",
+      "minPercentHint": "Entre 0,01 y 100.",
+      "minFloor": "Piso del pago mínimo ({currency})",
+      "minFloorHint": "Opcional: el mínimo nunca baja de este monto.",
+      "minFixed": "Pago mínimo fijo ({currency})",
+      "calendarHint": "Los días van de 1 a 31; en los meses cortos se usa el último día del mes.",
+      "statementDay": "Día de cierre",
+      "dueDay": "Día de vencimiento",
+      "weekend": "Si el vencimiento cae en fin de semana",
+      "weekendHint": "Ajuste de la fecha de pago.",
+      "annualRate": "Tasa anual informativa (%)",
+      "annualRateHint": "Opcional. Solo informativa: no se calculan intereses con ella.",
+      "thresholds": "Umbrales de utilización (%)",
+      "thresholdsHint": "Opcional, hasta tres separados por punto y coma. Vacío = 30 y 80.",
+      "reminderDays": "Días de aviso antes del vencimiento",
+      "reminderHint": "Entre 1 y 30; por defecto 3.",
+      "planHint": "El plan de pago crea un pago recurrente administrado por la tarjeta, con el monto del estado de cuenta. Puedes activarlo después.",
+      "planEnable": "Activar el pago automático de la cuenta en {currency}",
+      "planSource": "Cuenta desde la que se paga",
+      "chooseAccount": "Elige una cuenta",
+      "fixErrors": "{count, plural, one {Corrige # campo} other {Corrige # campos}} para continuar.",
+      "prev": "Anterior",
+      "next": "Siguiente",
+      "save": "Registrar tarjeta",
+      "saving": "Guardando…",
+      "createdTitle": "Tarjeta {name} registrada",
+      "conflictIntro": "La tarjeta quedó registrada, pero el plan de pago no se activó porque ya tienes una transferencia recurrente hacia estas cuentas:",
+      "conflictAction": "Termina esa transferencia en Pagos recurrentes y luego activa el plan de pago desde el detalle de la tarjeta.",
+      "openCard": "Abrir la tarjeta"
+    },
+    "plan": {
+      "title": "Pago automático ({currency})",
+      "intro": "El plan de pago crea cada mes el pago de la tarjeta en Pagos recurrentes: estimado antes del cierre, exacto después. Aprueba, edita u omite cada pago allí.",
+      "source": "Cuenta desde la que se paga",
+      "sourceHint": "Una cuenta de activo en {currency}.",
+      "policy": "Qué paga",
+      "policies": {
+        "NO_INTEREST": "Total para no generar intereses",
+        "MINIMUM": "Pago mínimo"
+      },
+      "policyHint": {
+        "NO_INTEREST": "Paga lo que falta del estado de cuenta para no generar intereses.",
+        "MINIMUM": "Paga solo el mínimo; el banco puede cobrar intereses sobre el resto."
+      },
+      "mode": "Cómo se crea el pago",
+      "modes": {
+        "PENDING_APPROVAL": "Por aprobar",
+        "AUTO_CREATE": "Crear automáticamente",
+        "NOTIFY_ONLY": "Solo avisar"
+      },
+      "modeHint": {
+        "PENDING_APPROVAL": "Cada pago queda por aprobar en Pagos recurrentes.",
+        "AUTO_CREATE": "El pago se registra solo en su fecha.",
+        "NOTIFY_ONLY": "Solo te avisa; tú registras la transferencia."
+      },
+      "commitment": "Compromiso",
+      "viewCommitment": "Ver el pago recurrente",
+      "off": "El pago automático está desactivado: los pagos de esta cuenta los registras tú.",
+      "enable": "Activar pago automático",
+      "change": "Cambiar el plan",
+      "update": "Guardar el plan",
+      "disable": "Desactivar",
+      "disableTitle": "¿Desactivar el pago automático?",
+      "disableDescription": "Termina el pago recurrente desde hoy. Los pagos ya creados no se tocan.",
+      "enabled": "Pago automático activado.",
+      "updated": "Plan de pago actualizado.",
+      "disabled": "Pago automático desactivado.",
+      "conflictIntro": "Ya tienes una transferencia recurrente hacia esta tarjeta, y no puede haber dos pagos para la misma cuenta:",
+      "conflictAction": "Termina esa transferencia en Pagos recurrentes y vuelve a activar el plan de pago."
+    },
+    "detail": {
+      "actions": "Acciones de la tarjeta",
+      "tabsLabel": "Secciones de la tarjeta",
+      "tabs": {
+        "overview": "Resumen",
+        "statements": "Estados de cuenta",
+        "plan": "Plan de pago",
+        "installments": "Cuotas",
+        "future": "Cargos futuros"
+      },
+      "rate": "tasa anual informativa {rate} %",
+      "utilizationTitle": "Utilización del crédito",
+      "sharedLimit": "Límite compartido {limit}",
+      "accountLimit": "Límite en {currency}: {limit}",
+      "usedAvailable": "usado {used} · disponible {available}",
+      "noLimit": "No hay límites registrados.",
+      "openCycle": "Ciclo abierto en {currency}",
+      "openCycleDates": "Desde el {start} · cierra el {closing} · vence el {due}",
+      "pendingPurchases": "Compras pendientes",
+      "lastStatement": "Último estado de cuenta",
+      "missing": "falta {amount}"
+    },
+    "terms": {
+      "edit": "Editar términos",
+      "title": "Editar términos de la tarjeta",
+      "calendarNote": "El cierre y el vencimiento nuevos aplican desde el ciclo abierto; los estados de cuenta ya emitidos conservan sus fechas y cifras.",
+      "sharedLimit": "Límite compartido ({currency})",
+      "account": "Cuenta en {currency}",
+      "minimumType": "Regla de pago mínimo",
+      "save": "Guardar cambios",
+      "saved": "Términos actualizados."
+    },
+    "archive": {
+      "action": "Archivar tarjeta",
+      "title": "¿Archivar {name}?",
+      "description": "Termina sus planes de pago y deja de emitir estados de cuenta y avisos. Los estados de cuenta y los planes de cuotas siguen disponibles; las cuentas conservan su saldo.",
+      "done": "Tarjeta archivada.",
+      "archivedNotice": "Esta tarjeta está archivada: solo puedes consultarla."
+    },
+    "statements": {
+      "accountTitle": "Estados de cuenta en {currency}",
+      "empty": "Aún no hay estados de cuenta.",
+      "cycle": "Cierre {closing} · vence {due}",
+      "noInterest": "Total para no generar intereses",
+      "remainingNoInterest": "Falta pagar",
+      "minimum": "Pago mínimo",
+      "remainingMinimum": "Falta para el mínimo",
+      "notIssued": "Este ciclo se calcula al consultarlo; el estado de cuenta se emite al cierre.",
+      "changed": "{count, plural, one {Cambió # cifra desde que se emitió: hubo movimientos con fecha anterior al cierre.} other {Cambiaron # cifras desde que se emitió: hubo movimientos con fecha anterior al cierre.}} Lo emitido no se modifica.",
+      "inconsistent": "Los movimientos del ciclo no cuadran con el saldo al cierre (por ejemplo, un saldo inicial o una corrección).",
+      "figuresRegion": "Cifras del ciclo",
+      "figuresCaption": "Cifras del ciclo en {currency} con cierre el {closing}",
+      "figure": "Cifra",
+      "issued": "Emitido",
+      "recalculated": "Recalculado hoy",
+      "difference": "Diferencia",
+      "calculated": "Calculado",
+      "figures": {
+        "previousBalance": "Saldo anterior",
+        "purchases": "Compras",
+        "refunds": "Reembolsos",
+        "payments": "Pagos",
+        "otherNet": "Otros movimientos (neto)",
+        "closingBalance": "Saldo al cierre",
+        "unbilledInstallments": "Cuotas por facturar",
+        "billedBalance": "Saldo facturado",
+        "minimumDue": "Pago mínimo",
+        "noInterestPayment": "Pago para no generar intereses",
+        "creditBalance": "Saldo a favor"
+      },
+      "reported": {
+        "title": "Montos informados por el banco",
+        "hint": "Si el extracto del banco difiere, regístralo: reemplaza el cálculo para pagar y deja a la vista la diferencia. No crea movimientos.",
+        "billed": "Saldo facturado del banco ({currency})",
+        "minimum": "Pago mínimo del banco ({currency})",
+        "save": "Guardar montos del banco",
+        "saved": "Montos del banco registrados.",
+        "billedShort": "Saldo facturado (banco)",
+        "minimumShort": "Pago mínimo (banco)",
+        "difference": "Diferencia con el sistema",
+        "noDifference": "Sin diferencia"
+      }
+    },
+    "installments": {
+      "intro": "Convierte una compra posteada de la tarjeta en cuotas: se descuentan del saldo facturado y se suman al calendario de cargos futuros. No crea movimientos contables.",
+      "new": "Nuevo plan de cuotas",
+      "newTitle": "Pagar una compra en cuotas",
+      "purchase": "Compra",
+      "purchaseHint": "Gastos posteados de las cuentas de la tarjeta.",
+      "choosePurchase": "Elige una compra",
+      "noDescription": "sin descripción",
+      "count": "Número de cuotas",
+      "countHint": "De 2 a 60.",
+      "rate": "Tasa anual (%)",
+      "rateHint": "Opcional. Vacío o 0 = sin interés; con tasa se usa el sistema francés.",
+      "startCycle": "Primera cuota",
+      "startCycles": {
+        "PURCHASE": "En el ciclo de la compra",
+        "NEXT": "En el ciclo siguiente"
+      },
+      "create": "Crear plan de cuotas",
+      "created": "Plan de cuotas creado.",
+      "cancelled": "Plan de cuotas cancelado.",
+      "empty": "Aún no hay planes de cuotas.",
+      "planSummary": "Compra del {date} · {amount} en {count} cuotas",
+      "status": {
+        "ACTIVE": "Activo",
+        "COMPLETED": "Completado",
+        "CANCELLED": "Cancelado"
+      },
+      "cancelReasons": {
+        "PURCHASE_VOIDED": "la compra se anuló",
+        "PURCHASE_REVISED": "la compra se modificó",
+        "USER": "cancelado por ti"
+      },
+      "cancel": "Cancelar plan",
+      "cancelLabel": "Cancelar el plan de cuotas de la compra del {date}",
+      "cancelTitle": "¿Cancelar el plan de cuotas?",
+      "cancelDescription": "Las cuotas pendientes dejan de descontarse del saldo facturado y salen del calendario de cargos futuros; las ya facturadas quedan en el historial.",
+      "region": "Cuotas del plan",
+      "caption": "Calendario de las {count} cuotas del plan",
+      "n": "Cuota",
+      "closing": "Cierre",
+      "due": "Vencimiento",
+      "principal": "Capital",
+      "interest": "Interés proyectado",
+      "total": "Total"
+    },
+    "future": {
+      "intro": "Cuotas que se facturarán en los próximos ciclos, por fecha de vencimiento.",
+      "months": "Horizonte",
+      "monthsOption": "{months} meses",
+      "empty": "No hay cargos futuros: no hay cuotas pendientes.",
+      "region": "Calendario de cargos futuros",
+      "caption": "Cargos futuros por fecha de vencimiento",
+      "due": "Vencimiento",
+      "closing": "Cierre del ciclo",
+      "installments": "Cuotas",
+      "total": "Total",
+      "installment": "Cuota {n} de {of}: {amount}"
+    },
+    "transfer": {
+      "label": "Pago de tarjeta",
+      "viewStatement": "Ver estado de cuenta",
+      "statementInfo": "Último estado de cuenta: vence el {due}.",
+      "nothingMissing": "No falta pagar nada del último estado de cuenta.",
+      "noInterest": "Total para no generar intereses: {amount}",
+      "noInterestConvert": "Total para no generar intereses: {amount} (conviértelo antes)",
+      "minimum": "Pago mínimo: {amount}",
+      "minimumConvert": "Pago mínimo: {amount} (conviértelo antes)"
     }
   }
 }

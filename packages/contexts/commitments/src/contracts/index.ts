@@ -44,7 +44,7 @@ export interface MoneyDto {
   readonly currency: string;
 }
 
-export type RecurringKindDto = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT';
+export type RecurringKindDto = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT' | 'CARD_PAYMENT';
 export type ManagedByDto = 'USER' | 'SUBSCRIPTION' | 'DEBT';
 export type OccurrenceStatusDto =
   | 'SCHEDULED'
@@ -310,6 +310,81 @@ export interface DefinitionStatsQuery {
   hasActiveDefinitions(input: { readonly workspaceId: string }): Promise<boolean>;
 }
 
+/** Calendario explícito de ítems `{key, dueDate, amount}` (préstamos; `key` = número de cuota). */
+export interface CreateManagedExplicitInput {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly managedBy: Exclude<ManagedByDto, 'USER'>;
+  /** Id del agregado administrador (el préstamo). */
+  readonly managedRef: string;
+  readonly name: string;
+  readonly kind: RecurringKindDto;
+  readonly accountId: string;
+  readonly counterpartyId?: string | null;
+  readonly currency: string;
+  readonly explicitSchedule: readonly {
+    readonly key: string;
+    readonly dueDate: string;
+    readonly amount: string;
+  }[];
+  /** Solo `NOTIFY_ONLY` está soportado para calendarios explícitos. */
+  readonly materialization: 'NOTIFY_ONLY';
+}
+
+/**
+ * Regla mensual (openspec add-credit-cards, decisión 7): pago de tarjeta `CARD_PAYMENT` de `accountId` (origen) a
+ * `toAccountId` (la cuenta de la tarjeta), mensual en `monthDays`, de monto `VARIABLE` hasta que el administrador fije
+ * el esperado con `setExpected`. La clave de cada ocurrencia es su fecha nominal `YYYY-MM-DD`.
+ */
+export interface CreateManagedMonthlyInput {
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly managedBy: Exclude<ManagedByDto, 'USER'>;
+  readonly managedRef: string;
+  readonly name: string;
+  readonly kind: 'CARD_PAYMENT';
+  readonly accountId: string;
+  readonly toAccountId: string;
+  readonly counterpartyId?: string | null;
+  readonly currency: string;
+  readonly monthlyRule: {
+    /** Días del mes (1..31; 29..31 ⇒ último día en meses cortos). */
+    readonly monthDays: readonly number[];
+    /** Primera fecha nominal permitida (`YYYY-MM-DD`). */
+    readonly startDate: string;
+    readonly weekendAdjustment: 'NONE' | 'PREVIOUS' | 'NEXT';
+  };
+  readonly materialization: {
+    readonly mode: 'AUTO_CREATE' | 'PENDING_APPROVAL' | 'NOTIFY_ONLY';
+    readonly autoCreateStatus?: 'PENDING' | 'POSTED';
+    readonly leadDays?: number;
+  };
+}
+
+export type CreateManagedInput = CreateManagedExplicitInput | CreateManagedMonthlyInput;
+
+/** Monto esperado fijado por el administrador (`NONE` ⇒ sin monto: la ocurrencia pasa a `VARIABLE`). */
+export interface ManagedExpectationDto {
+  readonly type: 'FIXED' | 'ESTIMATED' | 'NONE';
+  /** Obligatorio con `FIXED` y `ESTIMATED` (> 0, a la escala de la moneda). */
+  readonly amount?: string;
+}
+
+/** Ocurrencia de una definición administrada vista por su administrador. */
+export interface ManagedOccurrenceDto {
+  readonly occurrenceId: string;
+  /** Clave de calendario explícito, o la fecha nominal si la definición se rige por una regla. */
+  readonly key: string;
+  readonly occurrenceDate: string;
+  readonly dueDate: string;
+  readonly status: OccurrenceStatusDto;
+  readonly expected: ExpectedAmountDto;
+  readonly transactionId: string | null;
+  /** El usuario editó el monto a mano (el administrador no lo pisa hasta que él mismo lo restablezca). */
+  readonly editedByUser: boolean;
+  readonly skipReason: string | null;
+}
+
 /**
  * Puerto público de definiciones administradas por otro contexto (openspec add-loans, design § Dependencias con el
  * motor N1–N9). Corre en la unidad de trabajo del llamador (la ocurrencia, la definición, la auditoría y el outbox de
@@ -324,29 +399,13 @@ export interface DefinitionStatsQuery {
  *   la misma transacción (1:N solo para `LOAN_PAYMENT`).
  * - `unsettle`: devuelve a no resueltas las ocurrencias de `keys` (vinculadas a `transactionId`, si se indica) con
  *   su estado derivado (próxima/atrasada) y su monto esperado original (o `restoreExpected`).
- * - `setExpected`: cambia el monto esperado de una ocurrencia no resuelta (pago parcial).
+ * - `setExpected`: cambia el monto esperado de una ocurrencia no resuelta (pago parcial o, para tarjetas, exacto,
+ *   estimado o sin monto); `skip` la omite con un motivo; `listOccurrences` las lee (add-credit-cards).
+ * - `createManaged` con `monthlyRule`: regla mensual de `CARD_PAYMENT` (la clave de la ocurrencia es su fecha nominal).
  * - `end`: termina la definición desde `from`: cancela las ocurrencias no resueltas con vencimiento ≥ `from`.
  */
 export interface RecurringDefinitionPort {
-  createManaged(input: {
-    readonly workspaceId: string;
-    readonly userId: string;
-    readonly managedBy: Exclude<ManagedByDto, 'USER'>;
-    /** Id del agregado administrador (el préstamo). */
-    readonly managedRef: string;
-    readonly name: string;
-    readonly kind: RecurringKindDto;
-    readonly accountId: string;
-    readonly counterpartyId?: string | null;
-    readonly currency: string;
-    readonly explicitSchedule: readonly {
-      readonly key: string;
-      readonly dueDate: string;
-      readonly amount: string;
-    }[];
-    /** Solo `NOTIFY_ONLY` está soportado para calendarios explícitos. */
-    readonly materialization: 'NOTIFY_ONLY';
-  }): Promise<{ readonly definitionId: string }>;
+  createManaged(input: CreateManagedInput): Promise<{ readonly definitionId: string }>;
   settle(input: {
     readonly workspaceId: string;
     readonly userId: string;
@@ -362,13 +421,34 @@ export interface RecurringDefinitionPort {
     /** Monto esperado a restituir por clave (pendiente de la cuota tras la anulación). */
     readonly restoreExpected?: readonly { readonly key: string; readonly amount: string }[];
   }): Promise<void>;
+  /**
+   * Fija el monto esperado de una ocurrencia no resuelta: `amount` (monto exacto, pago parcial de una cuota) o
+   * `expectation` (`FIXED`, `ESTIMATED` o `NONE`; openspec add-credit-cards). Una ocurrencia resuelta no cambia. Los
+   * cambios del administrador no marcan la ocurrencia como editada por el usuario.
+   */
   setExpected(input: {
     readonly workspaceId: string;
     readonly userId: string;
     readonly definitionId: string;
     readonly key: string;
-    readonly amount: string;
+    readonly amount?: string;
+    readonly expectation?: ManagedExpectationDto;
   }): Promise<void>;
+  /** Omite una ocurrencia no resuelta con un motivo (conserva su fecha nominal); una resuelta no cambia. */
+  skip(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+    readonly key: string;
+    readonly reason: string;
+  }): Promise<void>;
+  /** Ocurrencias de la definición con fecha nominal en `[from, to]` (genera las del horizonte pendientes). */
+  listOccurrences(input: {
+    readonly workspaceId: string;
+    readonly definitionId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly ManagedOccurrenceDto[]>;
   end(input: {
     readonly workspaceId: string;
     readonly userId: string;
@@ -389,7 +469,22 @@ export interface RecurringDefinitionPort {
     readonly counterpartyId?: string | null;
     readonly accountId?: string;
     readonly effectiveFrom: string;
+    /** add-credit-cards: cambio de términos de una regla mensual (días, ajuste de fin de semana, modo). */
+    readonly monthDays?: readonly number[];
+    readonly weekendAdjustment?: 'NONE' | 'PREVIOUS' | 'NEXT';
+    readonly materialization?: CreateManagedMonthlyInput['materialization'];
   }): Promise<void>;
+}
+
+/**
+ * Definiciones del USUARIO que transfieren a una cuenta (openspec add-credit-cards, decisión 7): Debt rechaza el plan
+ * de pago de una tarjeta con `CARD_PAYMENT_PLAN_CONFLICT` mientras exista una `TRANSFER` activa hacia su cuenta.
+ */
+export interface RecurringDefinitionQuery {
+  listActiveTransfersTo(input: {
+    readonly workspaceId: string;
+    readonly accountId: string;
+  }): Promise<readonly { readonly definitionId: string; readonly name: string }[]>;
 }
 
 /**
@@ -449,6 +544,7 @@ export const RESOLVED_OCCURRENCES_QUERY = Symbol.for('pf.commitments.ResolvedOcc
 export const DEFINITION_STATS_QUERY = Symbol.for('pf.commitments.DefinitionStatsQuery');
 export const OCCURRENCE_LINK_PORT = Symbol.for('pf.commitments.OccurrenceLinkPort');
 export const RECURRING_DEFINITION_PORT = Symbol.for('pf.commitments.RecurringDefinitionPort');
+export const RECURRING_DEFINITION_QUERY = Symbol.for('pf.commitments.RecurringDefinitionQuery');
 export const OCCURRENCE_MATCH_CANDIDATES_QUERY = Symbol.for('pf.commitments.OccurrenceMatchCandidatesQuery');
 
 /**

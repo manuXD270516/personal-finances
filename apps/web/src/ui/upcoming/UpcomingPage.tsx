@@ -7,6 +7,8 @@ import { ProblemMessage } from '../../errors/ProblemMessage';
 import { problemOf, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { HOME_CSS } from '../dashboard/styles';
 import type { FormatContext, HomeQuestionStatus } from '../dashboard/types';
+import { looksLikeCardPayment } from '../debt/cards/logic';
+import { useCardLookup } from '../debt/cards/useCardLookup';
 import { localized, useSession } from '../session-context';
 import { CommitmentsHomeView } from './CommitmentsHomeView';
 import { DEFAULT_DAYS, HOME_DAYS, UPCOMING_PATH, RECURRING_PATH } from './logic';
@@ -68,6 +70,12 @@ export function HomeCommitments({
     };
   }, [api, workspaceId, available]);
 
+  const hasCardPayments =
+    upcoming !== undefined &&
+    upcoming !== 'error' &&
+    upcoming.items.some((i) => looksLikeCardPayment(i.name));
+  const cards = useCardLookup(api, workspaceId ? `/workspaces/${workspaceId}` : undefined, hasCardPayments);
+
   if (!q4 && !q8) return null;
   return (
     <CommitmentsHomeView
@@ -79,6 +87,7 @@ export function HomeCommitments({
       createHref={localized(uiLocale, RECURRING_PATH)}
       createAccountHref={localized(uiLocale, '/cuentas/nueva')}
       href={(path) => localized(uiLocale, path)}
+      cardOf={cards.ofDefinition}
     />
   );
 }
@@ -122,6 +131,12 @@ function Upcoming({ ctx }: { ctx: WorkspaceContext }) {
     };
   }, [ctx.api, ctx.base]);
 
+  const cards = useCardLookup(
+    ctx.api,
+    ctx.base,
+    upcoming !== undefined && upcoming.items.some((i) => looksLikeCardPayment(i.name)),
+  );
+
   return (
     <div className="pf-home" data-testid="upcoming-payments-page">
       <style>{HOME_CSS}</style>
@@ -139,6 +154,7 @@ function Upcoming({ ctx }: { ctx: WorkspaceContext }) {
           onDaysChange={setDays}
           f={f}
           href={ctx.href}
+          cardOf={cards.ofDefinition}
         />
       ) : null}
     </div>

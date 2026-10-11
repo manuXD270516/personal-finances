@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
+import { Tabs } from '../common/Tabs';
 import { cellStyle, mutedStyle, numCellStyle, pageStyle, tableStyle, tableWrapStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
+import { CardsPanel } from './cards/CardsList';
 import { debtHref, loanPath, loansPath } from './logic';
 import { debtText, LoanStatusBadge } from './Tables';
 import type { Loan, LoanDetail } from './types';
@@ -100,8 +102,27 @@ export function LoansTable({
   );
 }
 
-export function LoansListPage() {
-  return <WithWorkspace>{(ctx) => <LoansList ctx={ctx} />}</WithWorkspace>;
+/** `/debts`: pestañas Préstamos y Tarjetas (`?vista=tarjetas` abre la segunda). */
+export function LoansListPage({ initialTab }: { initialTab?: string | undefined } = {}) {
+  return <WithWorkspace>{(ctx) => <DebtsHome ctx={ctx} initialTab={initialTab} />}</WithWorkspace>;
+}
+
+function DebtsHome({ ctx, initialTab }: { ctx: WorkspaceContext; initialTab: string | undefined }) {
+  const f = useFormat('Debt', ctx);
+  return (
+    <section aria-labelledby="debts-title" style={pageStyle} data-testid="debts-page">
+      <h1 id="debts-title">{f.t('title')}</h1>
+      <Tabs
+        label={f.t('tabs.label')}
+        idPrefix="debts"
+        {...(initialTab ? { initial: initialTab } : {})}
+        tabs={[
+          { id: 'prestamos', label: f.t('tabs.loans'), content: <LoansList ctx={ctx} /> },
+          { id: 'tarjetas', label: f.t('tabs.cards'), content: <CardsPanel ctx={ctx} /> },
+        ]}
+      />
+    </section>
+  );
 }
 
 const MAX_DETAILS = 50;
@@ -142,8 +163,10 @@ function LoansList({ ctx }: { ctx: WorkspaceContext }) {
   }, [ctx.api, ctx.base]);
 
   return (
-    <section aria-labelledby="debts-title" style={pageStyle} data-testid="debts-page">
-      <h1 id="debts-title">{f.t('title')}</h1>
+    <section aria-labelledby="loans-title" style={pageStyle} data-testid="loans-panel">
+      <h2 id="loans-title" style={{ margin: 0, fontSize: 'var(--pf-text-xl)' }}>
+        {f.t('tabs.loans')}
+      </h2>
       <p style={mutedStyle}>{f.t('intro')}</p>
       {ctx.canEdit ? (
         <p style={{ margin: 0 }}>

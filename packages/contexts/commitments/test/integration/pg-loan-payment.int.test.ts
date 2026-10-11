@@ -256,7 +256,8 @@ describe('Cuotas de préstamo sobre PostgreSQL', () => {
     expect(await sqlState(insertDefinition('LOAN_PAYMENT', 'DEBT', randomUUID()))).toBeUndefined();
     expect(await sqlState(insertDefinition('LOAN_PAYMENT', 'SUBSCRIPTION', randomUUID()))).toBe('23514');
     expect(await sqlState(insertDefinition('LOAN_PAYMENT', 'USER', null))).toBe('23514');
-    expect(await sqlState(insertDefinition('CARD_PAYMENT', 'DEBT', randomUUID()))).toBe('23514');
+    // CARD_PAYMENT se admitió en add-credit-cards (pg-card-payment.int.test.ts); un tipo desconocido sigue rechazado
+    expect(await sqlState(insertDefinition('UNKNOWN_KIND', 'DEBT', randomUUID()))).toBe('23514');
 
     const def = loanDefinition();
     await asUser(() => uow.run(w1, () => defs.insert(def)));

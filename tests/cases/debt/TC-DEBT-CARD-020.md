@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Utilización y crédito disponible'
 scenario: 'Límite compartido'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-015', 'FR-DEBT-016']
 nfr: []
 invariants: ['INV-002']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/cards/logic.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/utilization.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'utilization', 'fx']

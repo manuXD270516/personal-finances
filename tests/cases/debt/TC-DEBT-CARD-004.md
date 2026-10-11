@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Límite compartido o separado'
 scenario: 'Límite compartido en BOB'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-016', 'FR-DEBT-012']
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'limit']

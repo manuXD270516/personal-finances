@@ -131,5 +131,9 @@
   "LOAN_HAS_PAYMENTS": "The loan has active payments and cannot be cancelled. Void its payments first.",
   "LOAN_REFERENCE_INVALID": "The bank table has rows with errors and was not saved. Fix them and load it again.",
   "PAYMENT_BREAKDOWN_MISMATCH": "The receipt breakdown does not add up to the amount paid. Check principal, interest, fees, insurance and taxes.",
-  "TRANSACTION_MANAGED_EXTERNALLY": "This transaction is managed by a loan: edit amounts or void the payment from the loan. Here you can only change notes and tags."
+  "TRANSACTION_MANAGED_EXTERNALLY": "This transaction is managed by a loan: edit amounts or void the payment from the loan. Here you can only change notes and tags.",
+  "CREDIT_CARD_ACCOUNT_INVALID": "The account must be an active credit card account, and only one per currency is allowed.",
+  "CREDIT_CARD_ACCOUNT_IN_USE": "That account already belongs to another card. Choose another account or archive the previous card.",
+  "CARD_PAYMENT_PLAN_CONFLICT": "An active recurring payment to this card already exists. End it under Recurring payments and enable the payment plan again.",
+  "INSTALLMENT_PLAN_INVALID": "That purchase cannot be paid in installments: it must be a posted expense of a card account with no other installment plan."
 }

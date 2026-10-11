@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Pago de tarjeta como transferencia que no es gasto'
 scenario: 'Parte en dólares pagada con bolivianos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-014', 'FR-DEBT-016']
 nfr: []
 invariants: ['INV-010', 'INV-030']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/transactions/src/domain/account-movements.test.ts
+  - packages/contexts/transactions/test/integration/pg-account-movements.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'conversion']

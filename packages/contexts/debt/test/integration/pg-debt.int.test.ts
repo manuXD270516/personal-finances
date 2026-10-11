@@ -374,8 +374,10 @@ describe('referencias del banco, aislamiento y purga', () => {
   });
 
   it('las tablas de debt están registradas para la purga demo con hijas antes que padres', async () => {
+    // Las nueve tablas de tarjetas (add-credit-cards) se verifican en pg-cards.int.test.ts.
     const { rows } = await migrator.query<{ table_name: string; purge_order: number }>(
-      `SELECT table_name, purge_order FROM platform.workspace_scoped_table WHERE schema_name = 'debt'`,
+      `SELECT table_name, purge_order FROM platform.workspace_scoped_table
+        WHERE schema_name = 'debt' AND table_name !~ '^(card_|credit_card)'`,
     );
     const order = Object.fromEntries(rows.map((r) => [r.table_name, Number(r.purge_order)]));
     expect(Object.keys(order).sort()).toEqual([

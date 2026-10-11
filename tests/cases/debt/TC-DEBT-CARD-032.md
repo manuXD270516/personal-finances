@@ -5,16 +5,19 @@ spec: reporting/cash-flow-calendar
 related_specs: ['debt/credit-cards', 'commitments/recurrence-engine']
 requirement: 'Vencimientos de tarjeta en los próximos pagos'
 scenario: 'Estado de cuenta emitido en la lista de 30 días'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-REPORTING-016', 'FR-DEBT-013', 'FR-COMMITMENTS-011']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - tests/e2e/specs/credit-cards.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['upcoming-payments', 'credit-cards']

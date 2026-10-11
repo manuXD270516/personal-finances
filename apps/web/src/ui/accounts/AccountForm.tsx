@@ -38,12 +38,12 @@ interface FormState {
   customFields: Record<string, string>;
 }
 
-const initialState = (ctx: WorkspaceContext, account?: Account): FormState => ({
+const initialState = (ctx: WorkspaceContext, account?: Account, fixedType?: AccountType): FormState => ({
   name: account?.name ?? '',
-  type: account?.type ?? 'BANK',
+  type: account?.type ?? fixedType ?? 'BANK',
   currency: account?.currency ?? ctx.ws.baseCurrency,
   institutionId: account?.institutionId ?? '',
-  liquidity: account?.liquidity ?? 'LIQUID',
+  liquidity: account?.liquidity ?? (fixedType ? defaultLiquidity(fixedType) : 'LIQUID'),
   liquidityTouched: Boolean(account),
   includeInNetWorth: account?.includeInNetWorth ?? true,
   identifier: account?.accountNumberLast4 ?? '',
@@ -66,9 +66,12 @@ export function AccountForm({
   institutions,
   onSaved,
   onCancel,
+  fixedType,
 }: {
   ctx: WorkspaceContext;
   account?: Account;
+  /** Alta con el tipo fijo (p. ej. `CREDIT_CARD` desde el alta de una tarjeta): el selector de tipo queda deshabilitado. */
+  fixedType?: AccountType;
   institutions: readonly Institution[];
   onSaved: (account: Account) => void;
   onCancel?: () => void;
@@ -80,7 +83,7 @@ export function AccountForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, CustomFieldError>>({});
   const { t } = f;
   const editing = Boolean(account);
-  const [s, setS] = useState<FormState>(() => initialState(ctx, account));
+  const [s, setS] = useState<FormState>(() => initialState(ctx, account, fixedType));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
   const [busy, setBusy] = useState(false);
@@ -246,7 +249,7 @@ export function AccountForm({
               name="type"
               style={inputStyle}
               value={s.type}
-              disabled={editing}
+              disabled={editing || fixedType !== undefined}
               onChange={(e) => setType(e.target.value as AccountType)}
             >
               {ACCOUNT_TYPES.map((type) => (

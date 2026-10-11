@@ -344,6 +344,21 @@ export class PgDefinitionRepository implements DefinitionRepository {
     return rows.map((r) => r.id);
   }
 
+  async listActiveTransfersTo(
+    workspaceId: string,
+    accountId: string,
+  ): Promise<readonly { readonly definitionId: string; readonly name: string }[]> {
+    const { rows } = await sql<{ id: string; name: string }>`
+      SELECT d.id, d.name
+        FROM commitments.recurring_definition d
+        JOIN commitments.recurring_definition_version v
+          ON v.definition_id = d.id AND v.version_no = d.current_version_no
+       WHERE d.workspace_id = ${workspaceId} AND d.status = 'ACTIVE' AND d.managed_by = 'USER'
+         AND d.kind = 'TRANSFER' AND v.to_account_id = ${accountId}::uuid
+       ORDER BY lower(d.name), d.id`.execute(db());
+    return rows.map((r) => ({ definitionId: r.id, name: r.name }));
+  }
+
   async hasActive(workspaceId: string): Promise<boolean> {
     const { rows } = await sql<{ found: boolean }>`
       SELECT EXISTS (SELECT 1 FROM commitments.recurring_definition

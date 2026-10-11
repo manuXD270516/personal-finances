@@ -20,6 +20,8 @@ import {
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
+import { cardHref } from '../debt/cards/logic';
+import { useCardLookup } from '../debt/cards/useCardLookup';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { formatBusinessDate } from '../planning/logic';
 import { subscriptionPath } from '../subscriptions/logic';
@@ -73,6 +75,11 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
   const catalogs = useCatalogs(ctx);
   const today = todayIn(ctx.timeZone);
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
+  const cards = useCardLookup(
+    ctx.api,
+    ctx.base,
+    loaded.status === 'ready' && loaded.definition.kind === 'CARD_PAYMENT',
+  );
   const [panel, setPanel] = useState<Panel>();
   const [status, setStatus] = useState<string | undefined>();
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
@@ -172,7 +179,21 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
           ) : null}
         </p>
       ) : null}
-      {def.managedBy === 'DEBT' ? (
+      {def.managedBy === 'DEBT' && def.kind === 'CARD_PAYMENT' ? (
+        <p role="note" data-testid="managed-by-card">
+          <span aria-hidden="true">ℹ</span> {f.t('cardPayment.definitionManaged')}{' '}
+          <a
+            href={ctx.href(
+              cards.ofDefinition(def.id) ? cardHref(cards.ofDefinition(def.id)!.id) : '/debts?vista=tarjetas',
+            )}
+            data-testid="definition-card-link"
+          >
+            {cards.ofDefinition(def.id)
+              ? f.t('cardPayment.viewCard', { name: cards.ofDefinition(def.id)!.name })
+              : f.t('cardPayment.viewCards')}
+          </a>
+        </p>
+      ) : def.managedBy === 'DEBT' ? (
         <p role="note" data-testid="managed-by-debt">
           <span aria-hidden="true">ℹ</span> {f.t('loan.definitionManaged')}{' '}
           <a href={ctx.href(def.managedRef ? `/debts/${def.managedRef}` : '/debts')}>

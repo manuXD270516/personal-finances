@@ -47,6 +47,15 @@ export interface OccurrenceEdit {
   readonly dueDate?: string;
 }
 
+export interface OccurrenceEditOptions {
+  /**
+   * Edición de quien administra la definición (add-credit-cards): el monto es el del administrador, así que la
+   * ocurrencia NO queda marcada como editada por el usuario (`amountOverridden`); si el usuario la había editado, el
+   * valor del administrador pasa a ser el vigente y la marca se limpia.
+   */
+  readonly byManager?: boolean;
+}
+
 /**
  * AR `RecurringOccurrence` (COMMITMENTS, docs/04 §3.7; design decisiones 5, 8, 11-13). Agregado separado de la
  * definición (alto volumen, ciclo propio). Toda transición se valida contra `RECURRING_OCCURRENCE_LIFECYCLE`; editar
@@ -291,7 +300,7 @@ export class RecurringOccurrence {
   }
 
   /** Anotación: edita monto esperado y/o vencimiento de ESTA ocurrencia (sin tocar la definición ni las demás). */
-  edit(changes: OccurrenceEdit): void {
+  edit(changes: OccurrenceEdit, options: OccurrenceEditOptions = {}): void {
     if (!this.unresolved) {
       throw new DomainError(
         'INVALID_STATUS_TRANSITION',
@@ -302,7 +311,7 @@ export class RecurringOccurrence {
     const fields: string[] = [];
     if (changes.expected && !sameAmountSpec(changes.expected, this.state.expected)) {
       patch.expected = changes.expected;
-      patch.amountOverridden = true;
+      patch.amountOverridden = options.byManager !== true;
       fields.push('expected');
     }
     if (changes.dueDate !== undefined && changes.dueDate !== this.state.dueDate) {

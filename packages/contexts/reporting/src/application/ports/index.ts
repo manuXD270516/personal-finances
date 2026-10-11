@@ -115,7 +115,7 @@ export interface UpcomingOccurrenceRow {
   readonly occurrenceId: string;
   readonly definitionId: string;
   readonly definitionName: string;
-  readonly kind: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT';
+  readonly kind: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT' | 'CARD_PAYMENT';
   readonly dueDate: string;
   readonly status: 'SCHEDULED' | 'DUE' | 'OVERDUE';
   readonly requiresApproval: boolean;

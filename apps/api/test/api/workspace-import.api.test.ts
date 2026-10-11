@@ -31,6 +31,9 @@ let m: Mini;
 let zip: Buffer;
 let subscriptionId: string;
 let loanId: string;
+let cardId: string;
+let cardPurchaseId: string;
+let cardAccountIds: string[];
 
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -152,6 +155,62 @@ beforeAll(async () => {
     accountId: m.bank,
   });
   expect(installmentPaid.status, JSON.stringify(installmentPaid.body)).toBe(201);
+  // Una tarjeta bimoneda con plan de pago y una compra en cuotas (openspec add-credit-cards, tarea 4.4): sus nueve
+  // tablas viajan en el export y las cuentas, la definición del plan y la compra se remapean al importar.
+  const usd = (amount: string) => money(amount, 'USD');
+  const visaBob = (
+    await api.post(m.owner, '/accounts', {
+      name: 'Visa Oro BOB (export)',
+      type: 'CREDIT_CARD',
+      currency: 'BOB',
+      openingBalance: { amount: money('500.00'), date: '2026-10-01' },
+    })
+  ).body['id'] as string;
+  const visaUsd = (
+    await api.post(m.owner, '/accounts', {
+      name: 'Visa Oro USD (export)',
+      type: 'CREDIT_CARD',
+      currency: 'USD',
+      openingBalance: { amount: usd('100.00'), date: '2026-10-01' },
+    })
+  ).body['id'] as string;
+  cardAccountIds = [visaBob, visaUsd];
+  // "Hoy" en la zona del workspace (el reloj es real): en UTC puede ser ya el día siguiente.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+  const laptop = await api.post(m.owner, '/transactions', {
+    kind: 'EXPENSE',
+    transactionDate: today,
+    accountId: visaBob,
+    amount: money('900.00'),
+    description: 'Laptop (export)',
+  });
+  expect(laptop.status, JSON.stringify(laptop.body)).toBe(201);
+  cardPurchaseId = laptop.body['id'] as string;
+  const card = await api.post(m.owner, '/credit-cards', {
+    name: 'Visa Oro (export)',
+    statementDay: 25,
+    dueDay: 15,
+    accounts: [
+      {
+        accountId: visaBob,
+        creditLimit: money('10000.00'),
+        minimumRule: { type: 'PERCENT', percent: '5.00', floor: money('50.00') },
+        paymentPlan: { sourceAccountId: m.bank },
+      },
+      {
+        accountId: visaUsd,
+        creditLimit: usd('2000.00'),
+        minimumRule: { type: 'FIXED', amount: usd('25.00') },
+      },
+    ],
+  });
+  expect(card.status, JSON.stringify(card.body)).toBe(201);
+  cardId = card.body['id'] as string;
+  const installments = await api.post(m.owner, `/credit-cards/${cardId}/installment-plans`, {
+    purchaseTransactionId: cardPurchaseId,
+    installmentCount: 3,
+  });
+  expect(installments.status, JSON.stringify(installments.body)).toBe(201);
   await h.startWorker();
   const exported = await exportAndWait(h, m.owner, m.ws);
   zip = (await downloadExport(h, m.owner, m.ws, exported['id'] as string)).raw;
@@ -588,6 +647,111 @@ describe('Préstamos en el round-trip', () => {
     );
     expect(definition.body).toMatchObject({ managedBy: 'DEBT', managedRef: imported!.id });
     const original = await h.call('GET', `/api/v1/workspaces/${m.ws}/loans/${loanId}`, {
+      token: m.owner.token,
+    });
+    expect(original.status).toBe(200);
+  }, 120_000);
+});
+
+describe('Tarjetas en el round-trip', () => {
+  it('[TC-DEBT-CARD-003] [TC-IDENTITY-RESTORE-001] una tarjeta bimoneda con plan de pago y cuotas se restaura con ids nuevos y referencias remapeadas', async () => {
+    const reader = ZipReader.open(zip);
+    expect(reader.names()).toEqual(
+      expect.arrayContaining([
+        'json/credit-cards.jsonl',
+        'json/credit-card-terms.jsonl',
+        'json/credit-card-accounts.jsonl',
+        'json/card-installment-plans.jsonl',
+        'json/card-installments.jsonl',
+        'json/card-utilization-states.jsonl',
+      ]),
+    );
+    expect(lines(reader.read('json/credit-card-accounts.jsonl'))).toHaveLength(2);
+    expect(lines(reader.read('json/card-installments.jsonl'))).toHaveLength(3);
+    const done = await importAndWait(h, m.owner, zip);
+    expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
+    const created = done['workspaceId'] as string;
+    const list = await h.call('GET', `/api/v1/workspaces/${created}/credit-cards`, { token: m.owner.token });
+    expect(list.status, JSON.stringify(list.body)).toBe(200);
+    const [imported] = list.body['data'] as { id: string; name: string }[];
+    expect(imported).toMatchObject({ name: 'Visa Oro (export)' });
+    expect(imported!.id).not.toBe(cardId);
+    const detail = (
+      await h.call('GET', `/api/v1/workspaces/${created}/credit-cards/${imported!.id}`, {
+        token: m.owner.token,
+      })
+    ).body as Json & {
+      accounts: {
+        accountId: string;
+        currency: string;
+        balance: Json;
+        creditLimit: Json;
+        minimumRule: Json;
+        paymentPlan: { definitionId: string; sourceAccountId: string } | null;
+      }[];
+    };
+    expect(detail.accounts.map((a) => [a.currency, a.balance])).toEqual([
+      ['BOB', money('1400.00')],
+      ['USD', money('100.00', 'USD')],
+    ]);
+    // Las cuentas de la tarjeta importada son las del workspace nuevo, no las del origen.
+    const importedAccounts = (
+      await h.call('GET', `/api/v1/workspaces/${created}/accounts?limit=200`, { token: m.owner.token })
+    ).body['data'] as { id: string; name: string }[];
+    const importedIds = new Set(importedAccounts.map((a) => a.id));
+    for (const a of detail.accounts) {
+      expect(importedIds.has(a.accountId), `cuenta ${a.accountId}`).toBe(true);
+      expect(cardAccountIds).not.toContain(a.accountId);
+    }
+    const bob = detail.accounts.find((a) => a.currency === 'BOB')!;
+    expect(bob.creditLimit).toEqual(money('10000.00'));
+    expect(bob.minimumRule).toMatchObject({ type: 'PERCENT', percent: '5.00', floor: money('50.00') });
+    expect(importedIds.has(bob.paymentPlan!.sourceAccountId)).toBe(true);
+    // La definición del plan viaja remapeada: CARD_PAYMENT administrada por DEBT hacia la cuenta importada.
+    const definition = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/recurring/${bob.paymentPlan!.definitionId}`,
+      { token: m.owner.token },
+    );
+    expect(definition.body).toMatchObject({ kind: 'CARD_PAYMENT', managedBy: 'DEBT' });
+    expect((definition.body['current'] as { toAccountId: string }).toAccountId).toBe(bob.accountId);
+    // El plan de cuotas apunta a la compra importada.
+    const plans = (
+      await h.call('GET', `/api/v1/workspaces/${created}/credit-cards/${imported!.id}/installment-plans`, {
+        token: m.owner.token,
+      })
+    ).body['data'] as { purchaseTransactionId: string; status: string; installments: { total: Json }[] }[];
+    expect(plans).toHaveLength(1);
+    expect(plans[0]).toMatchObject({ status: 'ACTIVE' });
+    expect(plans[0]!.installments.map((i) => (i.total as { amount: string }).amount)).toEqual([
+      '300.00',
+      '300.00',
+      '300.00',
+    ]);
+    expect(plans[0]!.purchaseTransactionId).not.toBe(cardPurchaseId);
+    const purchase = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/transactions/${plans[0]!.purchaseTransactionId}`,
+      { token: m.owner.token },
+    );
+    expect(purchase.status, JSON.stringify(purchase.body)).toBe(200);
+    expect(purchase.body['description']).toBe('Laptop (export)');
+    // El `scope_key` de los umbrales (texto con el id de la cuenta de tarjeta) se remapea con el mismo mapa.
+    const scopes = await asAdmin(h, async (c) => {
+      const keys = await c.query<{ scope_key: string }>(
+        `SELECT DISTINCT scope_key FROM debt.card_utilization_state WHERE card_id = $1`,
+        [imported!.id],
+      );
+      const accounts = await c.query<{ id: string }>(
+        `SELECT id::text FROM debt.credit_card_account WHERE card_id = $1`,
+        [imported!.id],
+      );
+      return { keys: keys.rows.map((r) => r.scope_key), accounts: accounts.rows.map((r) => r.id) };
+    });
+    expect(scopes.keys.length).toBeGreaterThan(0);
+    for (const key of scopes.keys) expect(scopes.accounts).toContain(key);
+    // La tarjeta de origen sigue intacta.
+    const original = await h.call('GET', `/api/v1/workspaces/${m.ws}/credit-cards/${cardId}`, {
       token: m.owner.token,
     });
     expect(original.status).toBe(200);

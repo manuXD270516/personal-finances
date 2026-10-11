@@ -59,6 +59,7 @@ export function createEnvFile(): string {
     // El job de recurrencia pasa las ocurrencias a próxima/atrasada: cada minuto para no esperar al cron horario.
     ['COMMITMENTS_SCHEDULER_CRON', '* * * * *'],
     ['COMMITMENTS_SUBSCRIPTIONS_CRON', '* * * * *'],
+    ['DEBT_CARDS_CRON', '* * * * *'],
   ]);
   const extra = new Map([
     ['FX_PROVIDER_PARALELO_BO_URL', simUrl],

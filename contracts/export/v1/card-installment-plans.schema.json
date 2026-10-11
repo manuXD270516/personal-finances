@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/card-installment-plans.schema.json",
+  "title": "pfos-export v1 — card-installment-plans",
+  "description": "Registro de la sección «card-installment-plans» (tabla debt.card_installment_plan, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "card_account_id",
+    "purchase_transaction_id",
+    "purchase_date",
+    "principal",
+    "currency",
+    "installment_count",
+    "annual_rate",
+    "start_cycle",
+    "status",
+    "cancel_reason",
+    "created_by",
+    "created_at",
+    "updated_at",
+    "version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "card_account_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "purchase_transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "purchase_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "principal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "installment_count": {
+      "type": "integer"
+    },
+    "annual_rate": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "start_cycle": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "cancel_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "version": {
+      "type": "integer"
+    }
+  },
+  "x-pfos-table": "debt.card_installment_plan",
+  "x-pfos-context": "debt"
+}

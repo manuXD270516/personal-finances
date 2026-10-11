@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Compras en cuotas con interés'
 scenario: '1200.00 BOB en 3 cuotas al 24 % anual'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-017']
 nfr: []
 invariants: ['INV-017', 'INV-020']
 priority: low
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+  - packages/contexts/debt/src/domain/installment-scheduler.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'installments', 'french']

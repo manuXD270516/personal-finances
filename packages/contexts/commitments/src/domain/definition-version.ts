@@ -21,6 +21,8 @@ import {
   RECURRING_KINDS,
   RESERVED_RECURRING_KINDS,
   LOAN_PAYMENT_KIND,
+  CARD_PAYMENT_KIND,
+  isTransferLike,
   type AutoCreateStatus,
   type ManagedBy,
   type MaterializationMode,
@@ -133,10 +135,11 @@ const schedule422 = (message: string, pointer?: string) => {
 
 /**
  * Valida el tipo de definición: los reservados de Phase 4 se rechazan con 422 (D116). Excepción (openspec add-loans,
- * N2): `LOAN_PAYMENT` se admite SOLO para definiciones administradas por `DEBT`.
+ * N2): `LOAN_PAYMENT` se admite SOLO para definiciones administradas por `DEBT`; igual `CARD_PAYMENT` (openspec
+ * add-credit-cards, decisión 7).
  */
 export function assertKindAvailable(kind: string, managedBy?: ManagedBy): RecurringKind {
-  if (kind === LOAN_PAYMENT_KIND && managedBy === 'DEBT') return kind;
+  if ((kind === LOAN_PAYMENT_KIND || kind === CARD_PAYMENT_KIND) && managedBy === 'DEBT') return kind;
   if ((RESERVED_RECURRING_KINDS as readonly string[]).includes(kind)) {
     throw new DomainError('RECURRING_KIND_NOT_AVAILABLE', `kind ${kind} is reserved for a later phase`).at(
       '/kind',
@@ -293,7 +296,8 @@ export function buildSchedule(input: ScheduleInput, allowExplicit = false): Sche
 export function buildMaterialization(
   input: MaterializationInput | undefined,
   amount: AmountSpec,
-  indexed = false,
+  /** Monto que se estima o fija después (precio indexado; pago de tarjeta): `AUTO_CREATE` admite `VARIABLE`. */
+  deferredAmount = false,
 ): MaterializationSpec {
   const mode = input?.mode ?? 'PENDING_APPROVAL';
   if (!(MATERIALIZATION_MODES as readonly string[]).includes(mode)) {
@@ -309,7 +313,7 @@ export function buildMaterialization(
   }
   if (mode === 'AUTO_CREATE') {
     // Un precio indexado se estima al generar cada ocurrencia: sin tasa queda sin monto y el intento reintenta.
-    if ((amount.type === 'VARIABLE' && !indexed) || amount.type === 'MIN_MAX') {
+    if ((amount.type === 'VARIABLE' && !deferredAmount) || amount.type === 'MIN_MAX') {
       throw new DomainError(
         'RECURRING_MODE_NOT_ALLOWED',
         `AUTO_CREATE needs a FIXED or ESTIMATED amount, got ${amount.type}`,
@@ -346,9 +350,9 @@ export function buildDefinitionVersion(input: {
 }): DefinitionVersion {
   const { kind, template } = input;
   const currency = makeCurrency(input.currency.code, input.currency.scale);
-  if (kind === 'TRANSFER') {
+  if (isTransferLike(kind)) {
     if (!template.toAccountId) {
-      throw new DomainError('VALIDATION_FAILED', 'a TRANSFER needs a destination account').at('/toAccountId');
+      throw new DomainError('VALIDATION_FAILED', `a ${kind} needs a destination account`).at('/toAccountId');
     }
     if (template.toAccountId === template.accountId) {
       throw new DomainError('TRANSFER_SAME_ACCOUNT', 'source and destination accounts must differ').at(
@@ -356,10 +360,10 @@ export function buildDefinitionVersion(input: {
       );
     }
     if (template.categoryId) {
-      throw new DomainError('VALIDATION_FAILED', 'a TRANSFER has no category').at('/categoryId');
+      throw new DomainError('VALIDATION_FAILED', `a ${kind} has no category`).at('/categoryId');
     }
   } else if (template.toAccountId) {
-    throw new DomainError('VALIDATION_FAILED', 'only a TRANSFER has a destination account').at(
+    throw new DomainError('VALIDATION_FAILED', 'only a transfer has a destination account').at(
       '/toAccountId',
     );
   }
@@ -390,6 +394,15 @@ export function buildDefinitionVersion(input: {
   if (kind === LOAN_PAYMENT_KIND && !explicit) {
     throw schedule422('a LOAN_PAYMENT needs an explicit schedule', '/schedule/cadence');
   }
+  if (kind === CARD_PAYMENT_KIND) {
+    // Regla mensual (un día) o semimensual (dos): el pago de tarjeta se rige por el vencimiento del ciclo.
+    if (explicit || (schedule.cadence !== 'MONTHLY' && schedule.cadence !== 'SEMIMONTHLY')) {
+      throw schedule422('a CARD_PAYMENT follows a monthly rule', '/schedule/cadence');
+    }
+    if (schedule.monthDays.length < 1) {
+      throw schedule422('a CARD_PAYMENT needs its due day of the month', '/schedule/monthDays');
+    }
+  }
   if (explicit) {
     if (amount.type !== 'VARIABLE' || indexedPrice !== null) {
       throw new DomainError(
@@ -413,7 +426,11 @@ export function buildDefinitionVersion(input: {
     });
     (schedule as { explicit: readonly ExplicitScheduleItem[] }).explicit = items;
   }
-  const materialization = buildMaterialization(template.materialization, amount, indexedPrice !== null);
+  const materialization = buildMaterialization(
+    template.materialization,
+    amount,
+    indexedPrice !== null || kind === CARD_PAYMENT_KIND,
+  );
   if (explicit && materialization.mode !== 'NOTIFY_ONLY') {
     throw new DomainError(
       'RECURRING_MODE_NOT_ALLOWED',

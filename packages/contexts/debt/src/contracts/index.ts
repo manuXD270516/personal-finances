@@ -13,7 +13,19 @@ export const DEBT_EVENTS = {
   loanPaymentRecorded: { eventType: 'debt.LoanPaymentRecorded', eventVersion: 1 },
   loanPaymentVoided: { eventType: 'debt.LoanPaymentVoided', eventVersion: 1 },
   loanPaidOff: { eventType: 'debt.LoanPaidOff', eventVersion: 1 },
+  // add-credit-cards (Phase 4)
+  cardStatementIssued: { eventType: 'debt.CardStatementIssued', eventVersion: 1 },
+  cardPaymentDue: { eventType: 'debt.CardPaymentDue', eventVersion: 1 },
+  creditUtilizationThresholdReached: { eventType: 'debt.CreditUtilizationThresholdReached', eventVersion: 1 },
 } as const;
+
+/** Consumidor del worker de tarjetas (add-credit-cards, decisión 14): movimientos de las cuentas de tarjeta. */
+export const DEBT_CONSUMERS = {
+  cardActivity: 'debt.card-activity',
+} as const;
+
+/** Job periódico de tarjetas (add-credit-cards, decisiones 5 y 8): emisión, recordatorios y red de seguridad. */
+export const DEBT_CARD_DAILY_JOB = 'debt.card-daily' as const;
 
 export interface MoneyDto {
   readonly amount: string;
@@ -151,6 +163,109 @@ export interface LoanPortfolioQuery {
 
 export const LOAN_PORTFOLIO_QUERY = Symbol.for('pf.debt.LoanPortfolioQuery');
 
+// ───────────────────────────────────────────── tarjetas de crédito (add-credit-cards)
+
+export type CardStatementStatusDto = 'OPEN' | 'ISSUED' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE';
+export type CardPaymentPolicyDto = 'NO_INTEREST' | 'MINIMUM';
+export type CardLimitModeDto = 'SEPARATE' | 'SHARED';
+export type DueWeekendAdjustmentDto = 'NONE' | 'PREVIOUS' | 'NEXT';
+
+/** `debt.CardStatementIssued.v1` (clave natural `(cardAccountId, closingDate)`). */
+export interface CardStatementIssuedV1 {
+  readonly workspaceId: string;
+  readonly cardId: string;
+  readonly cardName: string;
+  readonly cardAccountId: string;
+  readonly accountId: string;
+  readonly currency: string;
+  readonly statementId: string;
+  readonly cycleStart: string;
+  readonly closingDate: string;
+  readonly dueDate: string;
+  readonly previousBalance: MoneyDto;
+  readonly purchases: MoneyDto;
+  readonly refunds: MoneyDto;
+  readonly payments: MoneyDto;
+  readonly otherNet: MoneyDto;
+  readonly closingBalance: MoneyDto;
+  readonly unbilledInstallments: MoneyDto;
+  readonly billedBalance: MoneyDto;
+  readonly minimumDue: MoneyDto;
+  readonly noInterestPayment: MoneyDto;
+}
+
+/** `debt.CardPaymentDue.v1` (clave natural `(cardAccountId, closingDate)`); lo consume NOTIFY. */
+export interface CardPaymentDueV1 {
+  readonly workspaceId: string;
+  readonly cardId: string;
+  readonly cardName: string;
+  readonly cardAccountId: string;
+  readonly accountId: string;
+  readonly currency: string;
+  readonly statementId: string;
+  readonly closingDate: string;
+  readonly dueDate: string;
+  readonly daysBefore: number;
+  readonly remainingNoInterest: MoneyDto;
+  readonly remainingMinimum: MoneyDto;
+  readonly paymentPlanDefinitionId: string | null;
+}
+
+/** `debt.CreditUtilizationThresholdReached.v1` (clave `(cardId, scope, threshold, crossingNo)`); lo consume NOTIFY. */
+export interface CreditUtilizationThresholdReachedV1 {
+  readonly workspaceId: string;
+  readonly cardId: string;
+  readonly cardName: string;
+  readonly scope: 'SHARED' | 'ACCOUNT';
+  readonly accountId: string | null;
+  readonly limit: MoneyDto;
+  readonly used: MoneyDto;
+  /** Porcentaje con 2 decimales HALF_EVEN (`85.00`). */
+  readonly utilization: string;
+  readonly threshold: string;
+  readonly alsoCrossed: readonly string[];
+  readonly crossingNo: number;
+  readonly crossedAt: string;
+}
+
+/** Una cuenta de una tarjeta para `add-debt-summary` y Reporting (Phase 7); sin efectos. */
+export interface CardPortfolioAccountDto {
+  readonly cardId: string;
+  readonly cardName: string;
+  readonly cardAccountId: string;
+  readonly accountId: string;
+  readonly currency: string;
+  /** Saldo adeudado de la cuenta (presentado). */
+  readonly balance: MoneyDto;
+  /** Último estado emitido: vencimiento y lo que falta (sin intereses y mínimo); `null` si no hay. */
+  readonly lastStatement: {
+    readonly statementId: string;
+    readonly closingDate: string;
+    readonly dueDate: string;
+    readonly remainingNoInterest: MoneyDto;
+    readonly remainingMinimum: MoneyDto;
+    readonly status: CardStatementStatusDto;
+  } | null;
+  /** Ciclo abierto: cierre, vencimiento y estimación del pago para no generar intereses. */
+  readonly openCycle: {
+    readonly closingDate: string;
+    readonly dueDate: string;
+    readonly estimatedNoInterest: MoneyDto;
+    /** El ciclo tiene compras propias (movimientos de compra desde el último cierre). */
+    readonly hasOwnPurchases: boolean;
+  };
+  /** Capital de cuotas aún no facturado y vencimiento del pago que factura la última cuota. */
+  readonly unbilledInstallments: MoneyDto;
+  readonly lastInstallmentDueDate: string | null;
+}
+
+/** Contrato público de lectura de tarjetas (simétrico a `LoanPortfolioQuery`; insumo de `add-debt-summary`). */
+export interface CardPortfolioQuery {
+  listCards(input: { readonly workspaceId: string }): Promise<readonly CardPortfolioAccountDto[]>;
+}
+
+export const CARD_PORTFOLIO_QUERY = Symbol.for('pf.debt.CardPortfolioQuery');
+
 /**
  * Allow-list de auditoría de DEBT (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado nunca se
  * copia a `audit.audit_log`.
@@ -212,6 +327,46 @@ export const DEBT_AUDIT_POLICY = {
     matched: 'plain',
     totalRows: 'plain',
     explanation: 'plain',
+  },
+  // add-credit-cards: montos (`money`), días, umbrales, política e ids; el nombre es texto.
+  CreditCard: {
+    name: 'plain',
+    status: 'plain',
+    statementDay: 'plain',
+    dueDay: 'plain',
+    dueWeekendAdjustment: 'plain',
+    annualRate: 'plain',
+    limitMode: 'plain',
+    sharedLimit: 'money',
+    utilizationThresholds: 'plain',
+    reminderDays: 'plain',
+    // Campos por cuenta de la tarjeta, con el sufijo de su moneda (`creditLimit.BOB`): una por moneda.
+    'accountId.*': 'plain',
+    'creditLimit.*': 'money',
+    'minimumRule.*': 'plain',
+    'paymentPlanSourceAccountId.*': 'plain',
+    'paymentPlanPolicy.*': 'plain',
+    'paymentPlanMaterialization.*': 'plain',
+    'paymentPlanDefinitionId.*': 'plain',
+  },
+  CardStatement: {
+    cardAccountId: 'plain',
+    closingDate: 'plain',
+    dueDate: 'plain',
+    billedBalance: 'money',
+    minimumDue: 'money',
+    reportedBilledBalance: 'money',
+    reportedMinimumDue: 'money',
+  },
+  CardInstallmentPlan: {
+    cardAccountId: 'plain',
+    purchaseTransactionId: 'plain',
+    principal: 'money',
+    installmentCount: 'plain',
+    annualRate: 'plain',
+    startCycle: 'plain',
+    status: 'plain',
+    cancelReason: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
 

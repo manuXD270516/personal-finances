@@ -1,9 +1,16 @@
 import { formatLocalDate } from '../dashboard/format';
 import type { FormatContext, HomeQuestionStatus } from '../dashboard/types';
-import { homeSlice, itemPath, amountText } from './logic';
+import { homeSlice, amountText } from './logic';
 import { UPCOMING_CSS } from './styles';
 import type { UpcomingPayments } from './types';
-import { CommittedSummary, IncompleteNote, StatusBadge, fromCommitment } from './UpcomingParts';
+import {
+  CommittedSummary,
+  IncompleteNote,
+  ItemName,
+  StatusBadge,
+  fromCommitment,
+  type CardOf,
+} from './UpcomingParts';
 
 export interface CommitmentsHomeViewProps {
   /** Respuesta de `getUpcomingPayments?days=7`; `'error'` si la lectura falló; `undefined` mientras carga. */
@@ -20,6 +27,8 @@ export interface CommitmentsHomeViewProps {
   readonly createAccountHref?: string | undefined;
   /** Localiza la ruta de un ítem (ocurrencia o transacción) con el prefijo de idioma. */
   readonly href: (path: string) => string;
+  /** Tarjeta de un pago del plan de pago de una tarjeta (add-credit-cards). */
+  readonly cardOf?: CardOf | undefined;
 }
 
 /**
@@ -103,9 +112,10 @@ function Q8Card({
   createHref,
   createAccountHref,
   href,
+  cardOf,
 }: Pick<
   CommitmentsHomeViewProps,
-  'upcoming' | 'q8' | 'f' | 'fullHref' | 'createHref' | 'createAccountHref' | 'href'
+  'upcoming' | 'q8' | 'f' | 'fullHref' | 'createHref' | 'createAccountHref' | 'href' | 'cardOf'
 >) {
   const noData = q8?.status === 'NO_DATA' || (upcoming && upcoming !== 'error' && !upcoming.hasCommitments);
   const body = () => {
@@ -149,7 +159,7 @@ function Q8Card({
               data-status={item.status}
             >
               <span>
-                <a href={href(itemPath(item))}>{item.name}</a>
+                <ItemName item={item} f={f} href={href} cardOf={cardOf} />
                 <br />
                 <span className="pf-upc-date">
                   {formatLocalDate(item.date, f.locale)} · <StatusBadge item={item} f={f} />

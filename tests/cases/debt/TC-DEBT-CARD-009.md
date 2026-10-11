@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Resumen del ciclo y saldo al cierre'
 scenario: 'Ciclo de octubre de Visa Oro BOB'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013', 'FR-LEDGER-012']
 nfr: []
 invariants: ['INV-022', 'INV-001']
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+  - packages/contexts/transactions/src/domain/account-movements.test.ts
+  - packages/contexts/transactions/test/integration/pg-account-movements.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'cycle']

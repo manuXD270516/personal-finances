@@ -72,6 +72,21 @@ const es: MessageCatalog = {
   'email.subscription_price_change.basic': 'Una de tus suscripciones podría haber cambiado de precio.',
   'email.subscription_price_change.detailed':
     '{provider}: el precio pasó de {previous} a {next} ({percent} %) desde el {effectiveFrom}.',
+  // in-app: tarjetas de crédito
+  'inapp.card_payment_due.title': 'Vencimiento de {card} ({currency}): {dueDate}',
+  'inapp.card_payment_due.body':
+    'Para no pagar intereses faltan {noInterest}; el pago mínimo pendiente es {minimum}.',
+  'inapp.card_utilization.title': '{card} alcanzó el {threshold} % de su límite',
+  'inapp.card_utilization.body': 'Utilización actual: {utilization} % ({used} de {limit}).',
+  // email: tarjetas (basic sin nombre, monedas ni montos; detailed con ellos)
+  'email.card_payment_due.subject': 'Tienes un vencimiento de tarjeta',
+  'email.card_payment_due.basic': 'Una de tus tarjetas de crédito vence el {dueDate}.',
+  'email.card_payment_due.detailed':
+    'El estado de cuenta de {card} ({currency}) vence el {dueDate}: faltan {noInterest} para no pagar intereses.',
+  'email.card_utilization.subject': 'Tienes un aviso de uso de tarjeta',
+  'email.card_utilization.basic': 'Una de tus tarjetas de crédito alcanzó el {threshold} % de su límite.',
+  'email.card_utilization.detailed':
+    '{card} alcanzó el {threshold} % de su límite: utilización {utilization} % ({used} de {limit}).',
   // email: común
   'email.cta': 'Ver la notificación',
   'email.footer':
@@ -138,6 +153,19 @@ const en: MessageCatalog = {
   'email.subscription_price_change.basic': 'One of your subscriptions may have changed its price.',
   'email.subscription_price_change.detailed':
     '{provider}: the price went from {previous} to {next} ({percent} %) since {effectiveFrom}.',
+  'inapp.card_payment_due.title': '{card} ({currency}) due on {dueDate}',
+  'inapp.card_payment_due.body':
+    'To avoid interest you still need to pay {noInterest}; the minimum payment still due is {minimum}.',
+  'inapp.card_utilization.title': '{card} reached {threshold} % of its limit',
+  'inapp.card_utilization.body': 'Current utilization: {utilization} % ({used} of {limit}).',
+  'email.card_payment_due.subject': 'You have a card payment due',
+  'email.card_payment_due.basic': 'One of your credit cards is due on {dueDate}.',
+  'email.card_payment_due.detailed':
+    'The statement of {card} ({currency}) is due on {dueDate}: {noInterest} left to avoid interest.',
+  'email.card_utilization.subject': 'You have a card usage alert',
+  'email.card_utilization.basic': 'One of your credit cards reached {threshold} % of its limit.',
+  'email.card_utilization.detailed':
+    '{card} reached {threshold} % of its limit: utilization {utilization} % ({used} of {limit}).',
   'email.cta': 'View the notification',
   'email.footer':
     'You receive this notice because email notifications are turned on. You can change it in your preferences.',
@@ -202,6 +230,19 @@ const pt: MessageCatalog = {
   'email.subscription_price_change.basic': 'Uma das suas assinaturas pode ter mudado de preço.',
   'email.subscription_price_change.detailed':
     '{provider}: o preço passou de {previous} para {next} ({percent} %) desde {effectiveFrom}.',
+  'inapp.card_payment_due.title': 'Vencimento de {card} ({currency}): {dueDate}',
+  'inapp.card_payment_due.body':
+    'Para não pagar juros faltam {noInterest}; o pagamento mínimo pendente é {minimum}.',
+  'inapp.card_utilization.title': '{card} atingiu {threshold} % do limite',
+  'inapp.card_utilization.body': 'Utilização atual: {utilization} % ({used} de {limit}).',
+  'email.card_payment_due.subject': 'Você tem um vencimento de cartão',
+  'email.card_payment_due.basic': 'Um dos seus cartões de crédito vence em {dueDate}.',
+  'email.card_payment_due.detailed':
+    'A fatura de {card} ({currency}) vence em {dueDate}: faltam {noInterest} para não pagar juros.',
+  'email.card_utilization.subject': 'Você tem um aviso de uso de cartão',
+  'email.card_utilization.basic': 'Um dos seus cartões de crédito atingiu {threshold} % do limite.',
+  'email.card_utilization.detailed':
+    '{card} atingiu {threshold} % do limite: utilização {utilization} % ({used} de {limit}).',
   'email.cta': 'Ver a notificação',
   'email.footer':
     'Você recebe este aviso porque as notificações por email estão ativadas. Você pode alterá-lo nas suas preferências.',

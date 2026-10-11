@@ -1,10 +1,17 @@
 import { formatDecimal } from '../AuditHistory';
 import { formatInstant, formatLocalDate, formatMoney } from '../dashboard/format';
 import type { FormatContext, ResolvedRate } from '../dashboard/types';
-import { DAY_OPTIONS, RECURRING_PATH, amountText, itemPath, joinMoney } from './logic';
+import { DAY_OPTIONS, RECURRING_PATH, amountText, joinMoney } from './logic';
 import { UPCOMING_CSS } from './styles';
 import type { SurprisePayments, UpcomingPayments } from './types';
-import { CommittedSummary, IncompleteNote, StatusBadge, fromCommitment } from './UpcomingParts';
+import {
+  CommittedSummary,
+  IncompleteNote,
+  ItemName,
+  StatusBadge,
+  fromCommitment,
+  type CardOf,
+} from './UpcomingParts';
 
 export interface UpcomingFullViewProps {
   readonly upcoming: UpcomingPayments;
@@ -14,6 +21,8 @@ export interface UpcomingFullViewProps {
   readonly onDaysChange: (days: number) => void;
   readonly f: FormatContext;
   readonly href: (path: string) => string;
+  /** Tarjeta de un pago del plan de pago de una tarjeta (add-credit-cards). */
+  readonly cardOf?: CardOf | undefined;
 }
 
 function rateLine(r: ResolvedRate, f: FormatContext): string {
@@ -80,7 +89,12 @@ function Totals({ upcoming, f }: { upcoming: UpcomingPayments; f: FormatContext 
   );
 }
 
-function ItemsTable({ upcoming, f, href }: Pick<UpcomingFullViewProps, 'upcoming' | 'f' | 'href'>) {
+function ItemsTable({
+  upcoming,
+  f,
+  href,
+  cardOf,
+}: Pick<UpcomingFullViewProps, 'upcoming' | 'f' | 'href' | 'cardOf'>) {
   if (upcoming.items.length === 0) {
     return (
       <p data-testid="upcoming-empty" className="pf-home-empty">
@@ -120,7 +134,7 @@ function ItemsTable({ upcoming, f, href }: Pick<UpcomingFullViewProps, 'upcoming
             >
               <td>{formatLocalDate(item.date, f.locale)}</td>
               <th scope="row">
-                <a href={href(itemPath(item))}>{item.name}</a>
+                <ItemName item={item} f={f} href={href} cardOf={cardOf} />
                 {fromCommitment(item) ? (
                   <>
                     <br />
@@ -242,7 +256,15 @@ function Surprise({ surprise, f }: { surprise: UpcomingFullViewProps['surprise']
  * comprometido del periodo, saldo proyectado por cuenta rotulado como proyección e indicador de pagos sorpresa con su
  * limitación. Aprobar, omitir y vincular se hacen en Recurrentes (enlaces); aquí no se duplican.
  */
-export function UpcomingFullView({ upcoming, surprise, days, onDaysChange, f, href }: UpcomingFullViewProps) {
+export function UpcomingFullView({
+  upcoming,
+  surprise,
+  days,
+  onDaysChange,
+  f,
+  href,
+  cardOf,
+}: UpcomingFullViewProps) {
   const options = DAY_OPTIONS.includes(days as (typeof DAY_OPTIONS)[number])
     ? DAY_OPTIONS
     : [...DAY_OPTIONS, days].sort((a, b) => a - b);
@@ -286,7 +308,7 @@ export function UpcomingFullView({ upcoming, surprise, days, onDaysChange, f, hr
       </div>
       <section aria-labelledby="upcoming-list-title" className="pf-home-group">
         <h2 id="upcoming-list-title">{f.t('page.listTitle')}</h2>
-        <ItemsTable upcoming={upcoming} f={f} href={href} />
+        <ItemsTable upcoming={upcoming} f={f} href={href} cardOf={cardOf} />
       </section>
       <Totals upcoming={upcoming} f={f} />
       <section

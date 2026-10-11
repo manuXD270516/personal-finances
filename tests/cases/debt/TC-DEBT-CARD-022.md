@@ -5,16 +5,21 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Compras en cuotas sin interés'
 scenario: 'Laptop en 3 cuotas'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-017']
 nfr: []
 invariants: ['INV-020', 'INV-017']
 priority: medium
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+  - packages/contexts/debt/src/domain/installment-scheduler.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'installments']

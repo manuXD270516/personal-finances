@@ -1,5 +1,11 @@
 import { DomainError, Money, currency as makeCurrency, type Currency } from '@pf/shared-kernel';
-import type { TemplateInput, ScheduleInput, MaterializationInput, RecurringKind } from '../domain/index.js';
+import {
+  isTransferLike,
+  type TemplateInput,
+  type ScheduleInput,
+  type MaterializationInput,
+  type RecurringKind,
+} from '../domain/index.js';
 import type { CommitmentsDeps } from './ports/index.js';
 import type { MoneyDto } from '../contracts/index.js';
 
@@ -76,7 +82,7 @@ export async function resolveTemplate(
 
   const accounts = [
     { accountId: template.accountId, ...(amountCurrency ? { currency: amountCurrency } : {}) },
-    ...(kind === 'TRANSFER' && template.toAccountId ? [{ accountId: template.toAccountId }] : []),
+    ...(isTransferLike(kind) && template.toAccountId ? [{ accountId: template.toAccountId }] : []),
   ];
   let eligibility;
   try {
@@ -89,9 +95,22 @@ export async function resolveTemplate(
   }
   const from = eligibility.find((e) => e.accountId === template.accountId);
   if (!from) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/accountId');
-  if (kind === 'TRANSFER' && template.toAccountId) {
+  if (isTransferLike(kind) && template.toAccountId) {
     const to = eligibility.find((e) => e.accountId === template.toAccountId);
     if (!to) throw new DomainError('REFERENCE_NOT_FOUND', 'destination account not found').at('/toAccountId');
+    if (kind === 'CARD_PAYMENT') {
+      // Pago de tarjeta: de una cuenta de activo a la cuenta de pasivo de la tarjeta.
+      if (from.nature !== 'ASSET') {
+        throw new DomainError('VALIDATION_FAILED', 'the payment account must be an asset account').at(
+          '/accountId',
+        );
+      }
+      if (to.nature !== 'LIABILITY') {
+        throw new DomainError('VALIDATION_FAILED', 'the card account must be a liability account').at(
+          '/toAccountId',
+        );
+      }
+    }
     if (to.currency !== from.currency) {
       throw new DomainError(
         'TRANSFER_CURRENCY_MISMATCH',
@@ -124,7 +143,7 @@ export async function resolveTemplate(
     indexedPrice = { amount: price.toFixed(), currency: priceCurrency.code };
   }
 
-  if (kind !== 'TRANSFER' && (template.categoryId || (template.tagIds?.length ?? 0) > 0)) {
+  if (!isTransferLike(kind) && (template.categoryId || (template.tagIds?.length ?? 0) > 0)) {
     await deps.classification.validate({
       userId: input.userId,
       workspaceId,

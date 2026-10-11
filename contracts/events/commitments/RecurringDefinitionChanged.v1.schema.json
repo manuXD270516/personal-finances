@@ -29,7 +29,8 @@
         "INCOME",
         "EXPENSE",
         "TRANSFER",
-        "LOAN_PAYMENT"
+        "LOAN_PAYMENT",
+        "CARD_PAYMENT"
       ]
     },
     "ManagedBy": {

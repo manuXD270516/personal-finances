@@ -385,4 +385,65 @@ describe('Contrato de los hechos de commitments', () => {
       expect(full(example), JSON.stringify(full.errors)).toBe(true);
     }
   });
+
+  it('[TC-DEBT-CARD-030] los hechos del pago de tarjeta (generar, fijar monto, omitir, resolver, revisar, terminar) cumplen su JSON Schema', async () => {
+    const mem = new InMemoryCommitments();
+    mem.setNow('2026-10-17T16:00:00Z');
+    const deps = mem.deps();
+    const defs = new DefinitionsService(deps);
+    const occs = new OccurrencesService(deps);
+    const port = new EngineRecurringDefinitionPort(deps, defs);
+    const { definitionId } = await port.createManaged({
+      workspaceId: WS,
+      userId: USER,
+      managedBy: 'DEBT',
+      managedRef: '0190a000-0000-7000-8000-0000000d0c01',
+      name: 'Pago de tarjeta · Visa Oro BOB',
+      kind: 'CARD_PAYMENT',
+      accountId: BANK,
+      toAccountId: CARD,
+      currency: 'BOB',
+      monthlyRule: { monthDays: [15], startDate: '2026-11-15', weekendAdjustment: 'NONE' },
+      materialization: { mode: 'PENDING_APPROVAL' },
+    });
+    const range = { workspaceId: WS, userId: USER, definitionId };
+    await port.setExpected({
+      ...range,
+      key: '2026-11-15',
+      expectation: { type: 'FIXED', amount: '1120.50' },
+    });
+    await port.setExpected({
+      ...range,
+      key: '2026-12-15',
+      expectation: { type: 'ESTIMATED', amount: '300.00' },
+    });
+    await port.setExpected({ ...range, key: '2027-01-15', expectation: { type: 'NONE' } });
+    await port.skip({ ...range, key: '2027-01-15', reason: 'NOTHING_BILLED' });
+    mem.setNow('2026-11-14T16:00:00Z');
+    await new GenerateOccurrencesService(deps, occs).runWorkspace(WS);
+    const first = mem.forDefinition(definitionId)[0]!;
+    await occs.materialize({ workspaceId: WS, userId: USER, occurrenceId: first.id });
+    await port.revise({ ...range, effectiveFrom: '2026-12-01', monthDays: [20] });
+    await port.end({ ...range, from: '2027-01-01' });
+    const checks = validators();
+    const seen = new Set<string>();
+    for (const event of mem.events) {
+      const validate = checks.get(event.eventType);
+      if (!validate) continue;
+      seen.add(event.eventType);
+      expect(validate(event.payload), `${event.eventType}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+    expect([...seen].sort()).toEqual([
+      'commitments.OccurrencesGenerated',
+      'commitments.RecurringDefinitionChanged',
+      'commitments.RecurringOccurrenceChanged',
+      'commitments.RecurringOccurrenceDue',
+      'commitments.RecurringOccurrenceMaterialized',
+    ]);
+    expect(
+      mem.events.some(
+        (e) => e.eventType === 'commitments.RecurringOccurrenceDue' && e.payload['kind'] === 'CARD_PAYMENT',
+      ),
+    ).toBe(true);
+  });
 });

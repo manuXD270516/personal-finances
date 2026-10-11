@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Cambio de los términos de la tarjeta'
 scenario: 'Cierre pasa del 25 al 20'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-012']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calendar.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+  - packages/contexts/debt/test/integration/pg-cards.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'terms']

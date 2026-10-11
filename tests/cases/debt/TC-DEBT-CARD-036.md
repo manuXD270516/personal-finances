@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: ['debt/credit-cards', 'commitments/recurrence-engine']
 requirement: 'Sin doble aviso del pago de tarjeta'
 scenario: 'Plan en modo solo aviso'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-005']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/card-notifications.test.ts
+status: automated
 regression_suite: true
 phase: 4
 tags: ['notifications', 'dedupe']

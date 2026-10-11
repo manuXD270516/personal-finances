@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/card-utilization-crossings.schema.json",
+  "title": "pfos-export v1 — card-utilization-crossings",
+  "description": "Registro de la sección «card-utilization-crossings» (tabla debt.card_utilization_crossing, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "card_id",
+    "scope_key",
+    "threshold",
+    "crossing_no",
+    "utilization",
+    "crossed_at",
+    "event_id"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "card_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "scope_key": {
+      "type": "string"
+    },
+    "threshold": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "crossing_no": {
+      "type": "integer"
+    },
+    "utilization": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "crossed_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "event_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "debt.card_utilization_crossing",
+  "x-pfos-context": "debt"
+}

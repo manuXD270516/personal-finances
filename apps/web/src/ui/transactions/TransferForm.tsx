@@ -9,6 +9,9 @@ import { parseAmount, scaleFor } from '../common/money';
 import { PAYMENT_METHODS, type PaymentMethod, type Transaction } from '../common/types';
 import { Field, formStyle, inputStyle, mutedStyle, pageStyle, rowStyle, warningStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
+import { CardPaymentHint } from '../debt/cards/CardPaymentHint';
+import { paymentSuggestions } from '../debt/cards/logic';
+import { useCardOfAccount } from '../debt/cards/useCardLookup';
 import { useCatalogs } from './catalogs';
 
 export function NewTransferPage(props: {
@@ -50,6 +53,7 @@ function TransferForm({
   toAccountId?: string;
 }) {
   const f = useFormat('Transactions', ctx);
+  const cf = useFormat('Cards', ctx);
   const { t, locale } = f;
   const catalogs = useCatalogs(ctx);
   const [s, setS] = useState({
@@ -124,6 +128,10 @@ function TransferForm({
     }
   }
 
+  // Destino = cuenta de una tarjeta registrada: rótulo "Pago de tarjeta" y sugerencias del último estado emitido.
+  const card = useCardOfAccount(ctx.api, ctx.base, to?.type === 'CREDIT_CARD' ? to.id : undefined);
+  const suggestions = to ? paymentSuggestions(card, to.id) : null;
+
   const owed =
     to && to.classification === 'LIABILITY' && !isNegative(to.balance.amount) ? to.balance : undefined;
 
@@ -188,6 +196,16 @@ function TransferForm({
               {t('transfer.payAll')}
             </button>
           </p>
+        ) : null}
+        {suggestions && to ? (
+          <CardPaymentHint
+            suggestions={suggestions}
+            f={cf}
+            href={ctx.href}
+            mismatch={mismatch}
+            onPick={(amount) => set({ amount })}
+            conversionLink={conversionHref(ctx.href, from?.id ?? '', to.id, '')}
+          />
         ) : null}
         {mismatch && from && to ? (
           <div role="alert" style={warningStyle} data-testid="transfer-mismatch">

@@ -131,5 +131,9 @@
   "LOAN_HAS_PAYMENTS": "O empréstimo tem pagamentos vigentes e não pode ser cancelado. Anule antes os pagamentos.",
   "LOAN_REFERENCE_INVALID": "A tabela do banco tem linhas com erros e não foi salva. Corrija-as e carregue de novo.",
   "PAYMENT_BREAKDOWN_MISMATCH": "O detalhamento do recibo não soma o valor pago. Revise capital, juros, comissões, seguro e impostos.",
-  "TRANSACTION_MANAGED_EXTERNALLY": "Esta transação é administrada por um empréstimo: edite valores ou anule o pagamento pelo empréstimo. Aqui você só pode mudar notas e etiquetas."
+  "TRANSACTION_MANAGED_EXTERNALLY": "Esta transação é administrada por um empréstimo: edite valores ou anule o pagamento pelo empréstimo. Aqui você só pode mudar notas e etiquetas.",
+  "CREDIT_CARD_ACCOUNT_INVALID": "A conta deve ser uma conta de cartão de crédito ativa, e só pode haver uma por moeda.",
+  "CREDIT_CARD_ACCOUNT_IN_USE": "Essa conta já pertence a outro cartão. Escolha outra conta ou arquive o cartão anterior.",
+  "CARD_PAYMENT_PLAN_CONFLICT": "Já existe um pagamento recorrente ativo para este cartão. Encerre-o em Pagamentos recorrentes e ative o plano de pagamento novamente.",
+  "INSTALLMENT_PLAN_INVALID": "Essa compra não pode ser paga em parcelas: deve ser uma despesa lançada de uma conta do cartão, sem outro plano de parcelas."
 }

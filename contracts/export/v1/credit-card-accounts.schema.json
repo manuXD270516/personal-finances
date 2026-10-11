@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/credit-card-accounts.schema.json",
+  "title": "pfos-export v1 — credit-card-accounts",
+  "description": "Registro de la sección «credit-card-accounts» (tabla debt.credit_card_account, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "card_id",
+    "account_id",
+    "currency",
+    "credit_limit_amount",
+    "minimum_rule_type",
+    "minimum_percent",
+    "minimum_floor_amount",
+    "minimum_amount",
+    "plan_source_account_id",
+    "plan_policy",
+    "plan_materialization",
+    "plan_definition_id",
+    "plan_enabled_at",
+    "card_status",
+    "version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "card_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "account_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "credit_limit_amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "minimum_rule_type": {
+      "type": "string"
+    },
+    "minimum_percent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "minimum_floor_amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "minimum_amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "plan_source_account_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "plan_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plan_materialization": {},
+    "plan_definition_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "plan_enabled_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "card_status": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    }
+  },
+  "x-pfos-table": "debt.credit_card_account",
+  "x-pfos-context": "debt"
+}

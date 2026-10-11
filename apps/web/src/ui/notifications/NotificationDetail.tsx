@@ -152,7 +152,9 @@ export function NotificationDetailView({
                 ? f.t('detail.openRecurringOccurrence', { period })
                 : n.link.kind === 'SUBSCRIPTION'
                   ? f.t('detail.openSubscription', { period })
-                  : f.t('detail.openBudgetLine', { period })}
+                  : n.link.kind === 'CREDIT_CARD'
+                    ? f.t('detail.openCreditCard')
+                    : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

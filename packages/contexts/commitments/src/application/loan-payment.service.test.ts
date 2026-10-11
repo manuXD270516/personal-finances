@@ -1,5 +1,6 @@
 import { DomainError } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
+import type { CreateManagedExplicitInput } from '../contracts/index.js';
 import { CommitmentsQueries } from './commitments.queries.js';
 import { DefinitionsService } from './definitions.service.js';
 import { GenerateOccurrencesService } from './generate-occurrences.service.js';
@@ -42,7 +43,7 @@ function schedule(count = 24) {
   });
 }
 
-const createLoan = (s: S, over: Partial<Parameters<S['port']['createManaged']>[0]> = {}) =>
+const createLoan = (s: S, over: Partial<CreateManagedExplicitInput> = {}) =>
   s.port.createManaged({
     workspaceId: WS,
     userId: USER,

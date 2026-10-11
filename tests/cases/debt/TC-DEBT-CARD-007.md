@@ -5,16 +5,17 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Fechas de cierre y vencimiento del ciclo'
 scenario: 'Vencimiento en domingo con ajuste al lunes'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/card-cycle-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'dates']
