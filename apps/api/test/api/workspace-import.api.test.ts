@@ -484,7 +484,9 @@ describe('Importación con worker', () => {
           // audita: esas filas dependen de cuándo corre el worker, no de la importación.
           const own = t === 'audit.audit_log' ? ` AND action NOT LIKE 'planning.%'` : '';
           out[t] = (
-            await c.query(`SELECT to_jsonb(x) AS r FROM ${t} x WHERE workspace_id = $1${own} ORDER BY 1`, [ws])
+            await c.query(`SELECT to_jsonb(x) AS r FROM ${t} x WHERE workspace_id = $1${own} ORDER BY 1`, [
+              ws,
+            ])
           ).rows.map((r) => r.r);
         }
         return out;
