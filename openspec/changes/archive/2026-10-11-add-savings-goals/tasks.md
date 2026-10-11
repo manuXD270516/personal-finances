@@ -68,4 +68,4 @@
 
 - [x] 8.1 Aplicar los cambios de design.md § "Cambios a docs compartidos" (docs/01, 03, 04, 05, 06, 08, 09, 10, 11, 14, 28 y ARCHITECTURE.md §155) — _2026-10-11: docs compartidos actualizados según design.md § "Cambios a docs compartidos"._
 - [x] 8.2 Actualizar la matriz de trazabilidad; ejecutar `pnpm spec:validate`, `pnpm traceability:check` y `pnpm format:check` — _2026-10-11: matriz de trazabilidad y gates en verde._
-- [ ] 8.3 (Could) Generador de datos demo (docs/29): metas del perfil con aportes reales, reservas y un episodio de sobre-asignación — _2026-10-11: no implementado (Could): queda para un seguimiento._
+- [x] 8.3 (Could) **Diferida, no implementada (2026-10-11):** Generador de datos demo (docs/29): metas del perfil con aportes reales, reservas y un episodio de sobre-asignación — _2026-10-11: no implementado (Could): queda para un seguimiento._
