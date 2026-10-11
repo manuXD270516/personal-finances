@@ -273,10 +273,8 @@ export class CommitmentsQueries
 
   private async compose(workspaceId: string, from: string, to: string) {
     const { deps } = this;
-    const [classes, currencyOf] = await Promise.all([
-      this.accountClasses(workspaceId),
-      this.currencyMap(workspaceId),
-    ]);
+    const classes = await this.accountClasses(workspaceId);
+    const currencyOf = await this.currencyMap(workspaceId);
     const unresolved = await deps.occurrences.listUnresolvedInRange(workspaceId, from, to);
     const pendingRows = await deps.pending.listPending({ workspaceId, dateFrom: from, dateTo: to });
     const items: CommittedItemDto[] = [];

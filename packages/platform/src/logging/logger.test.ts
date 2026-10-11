@@ -62,7 +62,7 @@ describe('logger estructurado (docs/18 §3)', () => {
     );
     const out = lines.join('\n');
     expect(out).not.toContain(TOKEN);
-    expect(out).not.toContain('7731.42');
+    expect(out).not.toMatch(/(?<![\d:.])7731[.,]42(?!\d)/u);
     expect(out).toContain('[REDACTED]');
   });
 

@@ -19,12 +19,14 @@ export async function assembleDetail(
   today: LocalDate,
 ): Promise<SubscriptionDto> {
   const workspaceId = sub.workspaceId;
-  const [info, names, accounts, proposals] = await Promise.all([
-    deps.managed.info(workspaceId, sub.snapshot.definitionId),
-    deps.counterpartyNames.namesOf({ workspaceId, counterpartyIds: [sub.snapshot.counterpartyId] }),
-    accountNames(deps, workspaceId),
-    deps.proposals.listForSubscription(workspaceId, sub.id),
-  ]);
+  // Secuencial: dentro de la unidad de trabajo todas comparten un único cliente `pg`.
+  const info = await deps.managed.info(workspaceId, sub.snapshot.definitionId);
+  const names = await deps.counterpartyNames.namesOf({
+    workspaceId,
+    counterpartyIds: [sub.snapshot.counterpartyId],
+  });
+  const accounts = await accountNames(deps, workspaceId);
+  const proposals = await deps.proposals.listForSubscription(workspaceId, sub.id);
   return subscriptionDto(sub, {
     today: today.toString(),
     providerName: names.get(sub.snapshot.counterpartyId) ?? null,
@@ -47,13 +49,11 @@ export async function assembleRows(
   today: LocalDate,
 ): Promise<SubscriptionDto[]> {
   if (rows.length === 0) return [];
-  const [names, accounts] = await Promise.all([
-    deps.counterpartyNames.namesOf({
-      workspaceId,
-      counterpartyIds: [...new Set(rows.map((r) => r.subscription.snapshot.counterpartyId))],
-    }),
-    accountNames(deps, workspaceId),
-  ]);
+  const names = await deps.counterpartyNames.namesOf({
+    workspaceId,
+    counterpartyIds: [...new Set(rows.map((r) => r.subscription.snapshot.counterpartyId))],
+  });
+  const accounts = await accountNames(deps, workspaceId);
   return rows.map((r) =>
     subscriptionDto(r.subscription, {
       today: today.toString(),

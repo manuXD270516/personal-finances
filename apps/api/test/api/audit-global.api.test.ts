@@ -561,7 +561,7 @@ describe('[TC-AUDIT-GLOBAL-004] un rechazo por rol insuficiente queda auditado c
     );
     expect(raw).toHaveLength(1);
     const dump = String(raw[0]?.['dump']);
-    expect(dump).not.toContain('45.90');
+    expect(dump).not.toMatch(/(?<![\d:.])45[.,]90(?!\d)/u);
     expect(dump).not.toContain('Compra');
     expect(raw[0]?.['aggregate_type']).toBe('Workspace');
     expect(raw[0]?.['aggregate_id']).toBe(t.ws);

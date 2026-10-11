@@ -190,10 +190,11 @@ export class SubscriptionDailyService {
     });
     if (!first) return 0;
     const info = await deps.managed.info(workspaceId, sub.snapshot.definitionId);
-    const [names, accounts] = await Promise.all([
-      deps.counterpartyNames.namesOf({ workspaceId, counterpartyIds: [sub.snapshot.counterpartyId] }),
-      accountNames(deps, workspaceId),
-    ]);
+    const names = await deps.counterpartyNames.namesOf({
+      workspaceId,
+      counterpartyIds: [sub.snapshot.counterpartyId],
+    });
+    const accounts = await accountNames(deps, workspaceId);
     const providerName = names.get(sub.snapshot.counterpartyId) ?? sub.snapshot.name;
     const paymentAccountName = accounts.get(info.accountId) ?? '';
     const price = sub.history.at(targetDate) ?? sub.history.active[0];

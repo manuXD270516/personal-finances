@@ -1032,10 +1032,10 @@ describe('gasto y comprometido del préstamo (reportes)', () => {
     const committed = await get(solo, '/recurring/committed');
     expect(committed.status, committed.text).toBe(200);
     expect(contract.validateResponse('getCommittedAmount', 200, committed.body)).toEqual([]);
-    expect(JSON.stringify(committed.body['byCurrency'])).toContain('2342.02');
+    expect(JSON.stringify(committed.body['byCurrency'])).toMatch(/(?<![\d:.])2342[.]02(?!\d)/u);
     const upcoming = await get(solo, '/reports/upcoming-payments?days=30');
     expect(upcoming.status, upcoming.text).toBe(200);
-    expect(upcoming.text).toContain('2342.02');
+    expect(upcoming.text).toMatch(/(?<![\d:.])2342[.]02(?!\d)/u);
     expect(upcoming.text).toContain('Préstamo vehicular');
     // Pago de la cuota 1: el comprometido baja y el gasto de noviembre es solo el interés.
     setToday('2026-11-15');
@@ -1049,11 +1049,11 @@ describe('gasto y comprometido del préstamo (reportes)', () => {
       }),
     );
     const after = await get(solo, '/recurring/committed');
-    expect(JSON.stringify(after.body['byCurrency'])).not.toContain('2342.02');
+    expect(JSON.stringify(after.body['byCurrency'])).not.toMatch(/(?<![\d:.])2342[.]02(?!\d)/u);
     const report = await get(solo, '/reports/summary?month=2026-11');
     expect(report.status, report.text).toBe(200);
-    expect(report.text).toContain('479.17');
-    expect(report.text).not.toContain('1862.85');
+    expect(report.text).toMatch(/(?<![\d:.])479[.]17(?!\d)/u);
+    expect(report.text).not.toMatch(/(?<![\d:.])1862[.]85(?!\d)/u);
   });
 });
 

@@ -304,11 +304,9 @@ export class ClosingService {
     const s = period.snapshot;
     const range = { workspaceId, dateFrom: s.periodStart, dateTo: s.periodEnd };
     const policy = await this.policyOf(workspaceId);
-    const [pending, duplicates, uncategorized] = await Promise.all([
-      this.deps.closing.countPendingInRange(range),
-      this.deps.closing.countOpenDuplicatesInRange(range),
-      this.deps.closing.countUncategorizedInRange(range),
-    ]);
+    const pending = await this.deps.closing.countPendingInRange(range);
+    const duplicates = await this.deps.closing.countOpenDuplicatesInRange(range);
+    const uncategorized = await this.deps.closing.countUncategorizedInRange(range);
     const accounts = await this.deps.accounts.listAccounts({ workspaceId });
     const balances = await this.deps.balances.getAccountBalances({
       workspaceId,

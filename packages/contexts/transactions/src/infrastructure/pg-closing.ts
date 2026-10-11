@@ -64,12 +64,9 @@ export class PgTransactionsClosingQuery implements TransactionsClosingQuery {
   countUncategorizedInRange(input: ClosingRangeInput): Promise<ClosingFindingDto> {
     const { from, to } = range(input);
     return this.uow.run(input.workspaceId, async () => {
-      const ids = (
-        await Promise.all([
-          this.categories.uncategorized(input.workspaceId, 'EXPENSE'),
-          this.categories.uncategorized(input.workspaceId, 'INCOME'),
-        ])
-      ).filter((id): id is string => id !== null);
+      const expense = await this.categories.uncategorized(input.workspaceId, 'EXPENSE');
+      const income = await this.categories.uncategorized(input.workspaceId, 'INCOME');
+      const ids = [expense, income].filter((id): id is string => id !== null);
       if (ids.length === 0) return this.finding(0, [], []);
       // Solo transacciones con asiento activo y porciones vigentes; transferencias/conversiones no cuentan (sus
       // porciones son comisiones con categoría *Fees*), ni los ajustes (sin porciones).

@@ -411,16 +411,14 @@ export class PgPreferencesRepository implements PreferencesRepository {
     const out = new Map<string, NotificationPreferences>();
     if (userIds.length === 0) return out;
     const ids = [...userIds];
-    const [settings, prefs] = await Promise.all([
-      sql<SettingRow>`
-        SELECT user_id, to_char(quiet_hours_start, 'HH24:MI') AS quiet_hours_start,
-               to_char(quiet_hours_end, 'HH24:MI') AS quiet_hours_end, include_details_in_email, version
-          FROM notifications.user_setting
-         WHERE workspace_id = ${workspaceId} AND user_id = ANY(${ids}::uuid[])`.execute(db()),
-      sql<PreferenceRow>`
-        SELECT user_id, notification_type, channel, enabled FROM notifications.notification_preference
-         WHERE workspace_id = ${workspaceId} AND user_id = ANY(${ids}::uuid[])`.execute(db()),
-    ]);
+    const settings = await sql<SettingRow>`
+      SELECT user_id, to_char(quiet_hours_start, 'HH24:MI') AS quiet_hours_start,
+             to_char(quiet_hours_end, 'HH24:MI') AS quiet_hours_end, include_details_in_email, version
+        FROM notifications.user_setting
+       WHERE workspace_id = ${workspaceId} AND user_id = ANY(${ids}::uuid[])`.execute(db());
+    const prefs = await sql<PreferenceRow>`
+      SELECT user_id, notification_type, channel, enabled FROM notifications.notification_preference
+       WHERE workspace_id = ${workspaceId} AND user_id = ANY(${ids}::uuid[])`.execute(db());
     for (const userId of ids) {
       out.set(
         userId,

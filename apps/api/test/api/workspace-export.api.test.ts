@@ -190,13 +190,13 @@ describe('Exportación del workspace', () => {
     expect(tx).toContain('"amount":"45.90"');
     expect(tx).toContain('"amount":"100.000000"');
     const csv = reader.read('csv/transactions.csv').toString('utf8');
-    expect(csv).toContain('45.90');
-    expect(csv).toContain('100.000000');
+    expect(csv).toMatch(/(?<![\d:.])45[.]90(?!\d)/u);
+    expect(csv).toMatch(/(?<![\d:.])100[.]000000(?!\d)/u);
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
     expect(csv).not.toMatch(/,=HYPERLINK/u);
     const balances = reader.read('csv/account-balances.csv').toString('utf8');
     expect(balances).toContain('Bank A');
-    expect(balances).toContain('3099.10');
+    expect(balances).toMatch(/(?<![\d:.])3099[.]10(?!\d)/u);
     const bank = manifest.verification.accountBalances.find(
       (a) => a.accountId === w.bank && a.currency === 'BOB',
     );

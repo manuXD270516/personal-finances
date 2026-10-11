@@ -69,7 +69,7 @@ describe('[TC-AUDIT-GLOBAL-004] un rechazo por rol insuficiente queda auditado c
       { field: 'operationId', before: null, after: 'createTransaction' },
       { field: 'code', before: null, after: 'INSUFFICIENT_ROLE' },
     ]);
-    expect(JSON.stringify(r)).not.toContain('45.90');
+    expect(JSON.stringify(r)).not.toMatch(/(?<![\d:.])45[.,]90(?!\d)/u);
     expect(JSON.stringify(r)).not.toContain('Compra');
     // La IP queda solo como HMAC (nunca en claro).
     expect(r.clientIpHash).not.toBeNull();

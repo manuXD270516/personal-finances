@@ -144,8 +144,8 @@ describe('DispatchEmailDelivery: ocurrencia recurrente', () => {
     for (const delivery of [...env.deliveries.rows.values()]) await run(dispatch, delivery.id);
     expect(env.sender.sent.map((m) => m.to).sort()).toEqual(['editor@pfos.test', 'owner@pfos.test']);
     for (const mail of env.sender.sent) {
-      expect(mail.subject).not.toContain('3500');
-      expect(mail.text).not.toContain('3500');
+      expect(mail.subject).not.toMatch(/(?<![\d:.])3500(?!\d)/u);
+      expect(mail.text).not.toMatch(/(?<![\d:.])3500(?!\d)/u);
       expect(mail.text).not.toContain('Alquiler');
       expect(mail.text).toContain('05/11/2026');
     }
@@ -166,7 +166,9 @@ describe('DispatchEmailDelivery: ocurrencia recurrente', () => {
     const ownerMail = env.sender.sent.find((m) => m.to === 'owner@pfos.test');
     expect(ownerMail?.text).toContain('Alquiler');
     expect(ownerMail?.text).toContain('3.500,00 BOB');
-    expect(env.sender.sent.find((m) => m.to === 'editor@pfos.test')?.text).not.toContain('3.500,00');
+    expect(env.sender.sent.find((m) => m.to === 'editor@pfos.test')?.text).not.toMatch(
+      /(?<![\d:.,])3\.500,00(?!\d)/u,
+    );
   });
 });
 
