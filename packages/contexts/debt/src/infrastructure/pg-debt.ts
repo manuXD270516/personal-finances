@@ -11,9 +11,12 @@ import type {
   LoanRepository,
   PaymentRecord,
   PaymentRepository,
+  RateChangeRecord,
+  RateChangeRepository,
   ReferenceRecord,
   ReferenceRepository,
   ScheduleRepository,
+  ScheduleVersionListing,
   ScheduleVersionRecord,
   StoredInstallment,
   UnitOfWork,
@@ -21,6 +24,7 @@ import type {
 import {
   Loan,
   type ComponentAmounts,
+  type CustomRowInput,
   type LoanCharges,
   type LoanState,
   type ReferenceScheduleRow,
@@ -87,6 +91,8 @@ interface LoanRow {
   frequency: LoanState['frequency'];
   term_installments: number;
   method: LoanState['method'];
+  fixed_principal_amount: string | null;
+  custom_schedule: CustomRowInput[] | null;
   disbursement_date: string;
   first_due_date: string;
   charges: LoanCharges;
@@ -109,7 +115,8 @@ interface LoanRow {
 const LOAN_COLUMNS = sql`
   l.id, l.workspace_id, l.name, l.account_id, l.disbursement_account_id, l.payment_account_id,
   l.lender_counterparty_id, l.principal, l.currency, c.scale, l.annual_rate, l.rate_type, l.day_count, l.frequency,
-  l.term_installments, l.method, ${D('l.disbursement_date')} AS disbursement_date,
+  l.term_installments, l.method, l.fixed_principal_amount, l.custom_schedule,
+  ${D('l.disbursement_date')} AS disbursement_date,
   ${D('l.first_due_date')} AS first_due_date, l.charges, l.retained_fee, l.origin,
   ${D('l.existing_as_of')} AS existing_as_of, l.existing_outstanding, l.next_installment_no, l.status,
   l.current_schedule_version, l.recurring_definition_id, l.disbursement_transaction_id, l.cancelled_reason,
@@ -133,6 +140,8 @@ const toLoan = (r: LoanRow): Loan => {
     frequency: r.frequency,
     termInstallments: Number(r.term_installments),
     method: r.method,
+    fixedPrincipalAmount: r.fixed_principal_amount === null ? null : money(r.fixed_principal_amount, scale),
+    customSchedule: r.custom_schedule,
     disbursementDate: r.disbursement_date,
     firstDueDate: r.first_due_date,
     charges: r.charges,
@@ -173,13 +182,14 @@ export class PgLoanRepository implements LoanRepository {
       INSERT INTO debt.loan (
         id, workspace_id, name, account_id, disbursement_account_id, payment_account_id, lender_counterparty_id,
         principal, currency, annual_rate, rate_type, day_count, frequency, term_installments, method,
-        disbursement_date, first_due_date, charges, retained_fee, origin, existing_as_of, existing_outstanding,
+        fixed_principal_amount, custom_schedule, disbursement_date, first_due_date, charges, retained_fee, origin, existing_as_of, existing_outstanding,
         next_installment_no, status, current_schedule_version, recurring_definition_id,
         disbursement_transaction_id, cancelled_reason, created_by, created_at, updated_at, version)
       VALUES (
         ${s.id}, ${s.workspaceId}, ${s.name}, ${s.accountId}, ${s.disbursementAccountId}, ${s.paymentAccountId},
         ${s.lenderCounterpartyId}, ${s.principal}, ${s.currency}, ${s.annualRate}, ${s.rateType}, ${s.dayCount},
-        ${s.frequency}, ${s.termInstallments}, ${s.method}, ${s.disbursementDate}::date, ${s.firstDueDate}::date,
+        ${s.frequency}, ${s.termInstallments}, ${s.method}, ${s.fixedPrincipalAmount},
+        ${s.customSchedule === null ? null : json(s.customSchedule)}::jsonb, ${s.disbursementDate}::date, ${s.firstDueDate}::date,
         ${json(s.charges)}::jsonb, ${s.retainedFee}, ${s.origin}, ${s.existing?.asOf ?? null}::date,
         ${s.existing?.outstanding ?? null}, ${s.existing?.nextInstallmentNo ?? null}, ${s.status},
         ${s.currentScheduleVersion}, ${s.recurringDefinitionId}, ${s.disbursementTransactionId},
@@ -196,7 +206,9 @@ export class PgLoanRepository implements LoanRepository {
         payment_account_id = ${s.paymentAccountId}, lender_counterparty_id = ${s.lenderCounterpartyId},
         principal = ${s.principal}, annual_rate = ${s.annualRate}, rate_type = ${s.rateType},
         day_count = ${s.dayCount}, frequency = ${s.frequency}, term_installments = ${s.termInstallments},
-        method = ${s.method}, disbursement_date = ${s.disbursementDate}::date,
+        method = ${s.method}, fixed_principal_amount = ${s.fixedPrincipalAmount},
+        custom_schedule = ${s.customSchedule === null ? null : json(s.customSchedule)}::jsonb,
+        disbursement_date = ${s.disbursementDate}::date,
         first_due_date = ${s.firstDueDate}::date, charges = ${json(s.charges)}::jsonb,
         retained_fee = ${s.retainedFee}, status = ${s.status},
         current_schedule_version = ${s.currentScheduleVersion},
@@ -259,6 +271,65 @@ interface InstallmentRow {
   scale: number;
 }
 
+const INSTALLMENT_COLUMNS = sql`
+  i.id, i.loan_id, i.schedule_version, i.installment_no, ${D('i.due_date')} AS due_date,
+  ${D('i.period_start')} AS period_start, ${D('i.period_end')} AS period_end,
+  i.principal_amount, i.interest_amount, i.fees_amount, i.insurance_amount, i.tax_amount,
+  i.total_amount, i.opening_balance, i.closing_balance, c.scale`;
+
+const toInstallment = (r: InstallmentRow): StoredInstallment => {
+  const scale = Number(r.scale);
+  return {
+    id: r.id,
+    loanId: r.loan_id,
+    scheduleVersion: Number(r.schedule_version),
+    n: Number(r.installment_no),
+    dueDate: r.due_date,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    principal: money(r.principal_amount, scale),
+    interest: money(r.interest_amount, scale),
+    fees: money(r.fees_amount, scale),
+    insurance: money(r.insurance_amount, scale),
+    taxes: money(r.tax_amount, scale),
+    total: money(r.total_amount, scale),
+    openingBalance: money(r.opening_balance, scale),
+    closingBalance: money(r.closing_balance, scale),
+  };
+};
+
+interface VersionRow {
+  loan_id: string;
+  schedule_version: number;
+  reason: ScheduleVersionRecord['reason'];
+  effective_from: string;
+  from_installment_no: number;
+  source_payment_id: string | null;
+  source_rate_change_id: string | null;
+  source_reference_id: string | null;
+  parameters: Record<string, unknown>;
+  created_by: string;
+  created_at?: string;
+  installment_count?: number;
+}
+
+const VERSION_COLUMNS = sql`
+  v.loan_id, v.schedule_version, v.reason, ${D('v.effective_from')} AS effective_from, v.from_installment_no,
+  v.source_payment_id, v.source_rate_change_id, v.source_reference_id, v.parameters, v.created_by`;
+
+const toVersion = (r: VersionRow): ScheduleVersionRecord => ({
+  loanId: r.loan_id,
+  scheduleVersion: Number(r.schedule_version),
+  reason: r.reason,
+  effectiveFrom: r.effective_from,
+  fromInstallmentNo: Number(r.from_installment_no),
+  sourcePaymentId: r.source_payment_id,
+  sourceRateChangeId: r.source_rate_change_id,
+  sourceReferenceId: r.source_reference_id,
+  parameters: r.parameters,
+  createdBy: r.created_by,
+});
+
 export class PgScheduleRepository implements ScheduleRepository {
   async insertVersion(
     workspaceId: string,
@@ -267,11 +338,12 @@ export class PgScheduleRepository implements ScheduleRepository {
   ): Promise<void> {
     await sql`
       INSERT INTO debt.loan_schedule_version
-        (loan_id, workspace_id, schedule_version, reason, effective_from, parameters, created_by)
+        (loan_id, workspace_id, schedule_version, reason, effective_from, from_installment_no, source_payment_id,
+         source_rate_change_id, source_reference_id, parameters, created_by)
       VALUES (${version.loanId}, ${workspaceId}, ${version.scheduleVersion}, ${version.reason},
-              ${version.effectiveFrom}::date, ${json(version.parameters)}::jsonb, ${version.createdBy})`.execute(
-      db(),
-    );
+              ${version.effectiveFrom}::date, ${version.fromInstallmentNo}, ${version.sourcePaymentId ?? null},
+              ${version.sourceRateChangeId ?? null}, ${version.sourceReferenceId ?? null},
+              ${json(version.parameters)}::jsonb, ${version.createdBy})`.execute(db());
     for (const part of chunks(installments)) {
       await sql`
         INSERT INTO debt.loan_installment
@@ -291,60 +363,82 @@ export class PgScheduleRepository implements ScheduleRepository {
   }
 
   async versionOf(loanId: string, version: number): Promise<ScheduleVersionRecord | null> {
-    const { rows } = await sql<{
-      loan_id: string;
-      schedule_version: number;
-      reason: 'INITIAL';
-      effective_from: string;
-      parameters: Record<string, unknown>;
-      created_by: string;
-    }>`
-      SELECT loan_id, schedule_version, reason, ${D('effective_from')} AS effective_from, parameters, created_by
-        FROM debt.loan_schedule_version WHERE loan_id = ${loanId} AND schedule_version = ${version}`.execute(
+    const { rows } = await sql<VersionRow>`
+      SELECT ${VERSION_COLUMNS} FROM debt.loan_schedule_version v
+       WHERE v.loan_id = ${loanId} AND v.schedule_version = ${version}`.execute(db());
+    return rows[0] ? toVersion(rows[0]) : null;
+  }
+
+  async versions(loanId: string): Promise<readonly ScheduleVersionListing[]> {
+    const { rows } = await sql<VersionRow>`
+      SELECT ${VERSION_COLUMNS}, ${ISO('v.created_at')} AS created_at,
+             (SELECT COUNT(*) FROM debt.loan_installment i
+               WHERE i.loan_id = v.loan_id AND i.schedule_version = v.schedule_version)::int AS installment_count
+        FROM debt.loan_schedule_version v WHERE v.loan_id = ${loanId} ORDER BY v.schedule_version`.execute(
       db(),
     );
-    const r = rows[0];
-    return r
-      ? {
-          loanId: r.loan_id,
-          scheduleVersion: Number(r.schedule_version),
-          reason: r.reason,
-          effectiveFrom: r.effective_from,
-          parameters: r.parameters,
-          createdBy: r.created_by,
-        }
-      : null;
+    return rows.map((r) => ({
+      ...toVersion(r),
+      createdAt: r.created_at as string,
+      installmentCount: Number(r.installment_count),
+    }));
   }
 
   async installments(loanId: string, version: number): Promise<readonly StoredInstallment[]> {
+    // Efectivo: de cada número, la fila de la última versión <= version cuya vigencia por número lo cubre.
     const { rows } = await sql<InstallmentRow>`
-      SELECT i.id, i.loan_id, i.schedule_version, i.installment_no, ${D('i.due_date')} AS due_date,
-             ${D('i.period_start')} AS period_start, ${D('i.period_end')} AS period_end,
-             i.principal_amount, i.interest_amount, i.fees_amount, i.insurance_amount, i.tax_amount,
-             i.total_amount, i.opening_balance, i.closing_balance, c.scale
+      SELECT ${INSTALLMENT_COLUMNS}
+        FROM debt.loan_installment i JOIN fx.currency c ON c.code = i.currency
+       WHERE i.loan_id = ${loanId} AND i.schedule_version <= ${version}
+         AND i.schedule_version = (
+           SELECT MAX(v.schedule_version) FROM debt.loan_schedule_version v
+            WHERE v.loan_id = i.loan_id AND v.schedule_version <= ${version}
+              AND v.from_installment_no <= i.installment_no)
+       ORDER BY i.installment_no`.execute(db());
+    return rows.map(toInstallment);
+  }
+
+  async ownInstallments(loanId: string, version: number): Promise<readonly StoredInstallment[]> {
+    const { rows } = await sql<InstallmentRow>`
+      SELECT ${INSTALLMENT_COLUMNS}
         FROM debt.loan_installment i JOIN fx.currency c ON c.code = i.currency
        WHERE i.loan_id = ${loanId} AND i.schedule_version = ${version}
        ORDER BY i.installment_no`.execute(db());
-    return rows.map((r) => {
-      const scale = Number(r.scale);
-      return {
-        id: r.id,
-        loanId: r.loan_id,
-        scheduleVersion: Number(r.schedule_version),
-        n: Number(r.installment_no),
-        dueDate: r.due_date,
-        periodStart: r.period_start,
-        periodEnd: r.period_end,
-        principal: money(r.principal_amount, scale),
-        interest: money(r.interest_amount, scale),
-        fees: money(r.fees_amount, scale),
-        insurance: money(r.insurance_amount, scale),
-        taxes: money(r.tax_amount, scale),
-        total: money(r.total_amount, scale),
-        openingBalance: money(r.opening_balance, scale),
-        closingBalance: money(r.closing_balance, scale),
-      };
-    });
+    return rows.map(toInstallment);
+  }
+}
+
+export class PgRateChangeRepository implements RateChangeRepository {
+  async insert(workspaceId: string, c: RateChangeRecord): Promise<void> {
+    await sql`
+      INSERT INTO debt.loan_rate_change
+        (id, workspace_id, loan_id, annual_rate, effective_from, schedule_version, created_by, created_at)
+      VALUES (${c.id}, ${workspaceId}, ${c.loanId}, ${c.annualRate}, ${c.effectiveFrom}::date,
+              ${c.scheduleVersion}, ${c.createdBy}, ${c.createdAt}::timestamptz)`.execute(db());
+  }
+
+  async list(loanId: string): Promise<readonly RateChangeRecord[]> {
+    const { rows } = await sql<{
+      id: string;
+      loan_id: string;
+      annual_rate: string;
+      effective_from: string;
+      schedule_version: number;
+      created_by: string;
+      created_at: string;
+    }>`
+      SELECT id, loan_id, annual_rate, ${D('effective_from')} AS effective_from, schedule_version, created_by,
+             ${ISO('created_at')} AS created_at
+        FROM debt.loan_rate_change WHERE loan_id = ${loanId} ORDER BY effective_from`.execute(db());
+    return rows.map((r) => ({
+      id: r.id,
+      loanId: r.loan_id,
+      annualRate: rate(r.annual_rate),
+      effectiveFrom: r.effective_from,
+      scheduleVersion: Number(r.schedule_version),
+      createdBy: r.created_by,
+      createdAt: r.created_at,
+    }));
   }
 }
 
@@ -365,6 +459,9 @@ interface PaymentRow {
   taxes: string;
   explicit_breakdown: boolean;
   payment_method: string | null;
+  kind: 'REGULAR' | 'PREPAYMENT';
+  prepayment_option: 'REDUCE_TERM' | 'REDUCE_INSTALLMENT' | null;
+  prepayment_fee: string | null;
   status: 'ACTIVE' | 'VOIDED';
   voided_at: string | null;
   voided_reason: string | null;
@@ -375,7 +472,7 @@ interface PaymentRow {
 
 const PAYMENT_COLUMNS = sql`
   p.id, p.loan_id, p.payment_no, p.transaction_id, p.account_id, ${D('p.business_date')} AS business_date,
-  p.amount, p.principal, p.interest, p.fees, p.insurance, p.taxes, p.explicit_breakdown, p.payment_method, p.status,
+  p.amount, p.principal, p.interest, p.fees, p.insurance, p.taxes, p.explicit_breakdown, p.payment_method, p.kind, p.prepayment_option, p.prepayment_fee, p.status,
   ${ISO('p.voided_at')} AS voided_at, p.voided_reason, p.created_by, ${ISO('p.created_at')} AS created_at, c.scale`;
 
 const toPayment = (r: PaymentRow): PaymentRecord => {
@@ -395,6 +492,9 @@ const toPayment = (r: PaymentRow): PaymentRecord => {
     taxes: money(r.taxes, scale),
     explicitBreakdown: r.explicit_breakdown,
     paymentMethod: r.payment_method,
+    kind: r.kind,
+    prepaymentOption: r.prepayment_option,
+    prepaymentFee: r.prepayment_fee === null ? null : money(r.prepayment_fee, scale),
     status: r.status,
     voidedAt: r.voided_at,
     voidedReason: r.voided_reason,
@@ -422,11 +522,12 @@ export class PgPaymentRepository implements PaymentRepository {
     await sql`
       INSERT INTO debt.loan_payment
         (id, workspace_id, loan_id, payment_no, transaction_id, account_id, business_date, amount, principal,
-         interest, fees, insurance, taxes, explicit_breakdown, payment_method, status, created_by, created_at)
+         interest, fees, insurance, taxes, explicit_breakdown, payment_method, kind, prepayment_option,
+         prepayment_fee, status, created_by, created_at)
       VALUES (${p.id}, ${workspaceId}, ${p.loanId}, ${p.paymentNo}, ${p.transactionId}, ${p.accountId},
               ${p.businessDate}::date, ${p.amount}, ${p.principal}, ${p.interest}, ${p.fees}, ${p.insurance},
-              ${p.taxes}, ${p.explicitBreakdown}, ${p.paymentMethod}, 'ACTIVE', ${p.createdBy},
-              ${p.createdAt}::timestamptz)`.execute(db());
+              ${p.taxes}, ${p.explicitBreakdown}, ${p.paymentMethod}, ${p.kind}, ${p.prepaymentOption},
+              ${p.prepaymentFee}, 'ACTIVE', ${p.createdBy}, ${p.createdAt}::timestamptz)`.execute(db());
     if (allocations.length > 0) {
       await sql`
         INSERT INTO debt.loan_payment_allocation

@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Reasignación de fondos entre metas"
 scenario: "Fondos reales hacia una meta sin la cuenta vinculada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018"]
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "reassign", "validation"]
@@ -31,7 +33,7 @@ expected_result:
   - "422 GOAL_ACCOUNT_NOT_LINKED"
   - "Ningún movimiento en ninguna meta"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-028 — Reasignar fondos reales a una meta que no tiene la cuenta vinculada se rechaza y ninguna meta cambia

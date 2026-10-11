@@ -34,6 +34,10 @@ const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `loan ${i
 /** Texto decimal a la escala de la moneda (sin pasar por punto flotante). */
 const fixed = (value: Decimal, scale: number): string => value.toFixed(scale);
 
+/** Un borrador `CUSTOM` sin cuotas definidas todavía no tiene cronograma que mostrar. */
+const awaitsCustom = (s: { method: string; customSchedule: readonly unknown[] | null }): boolean =>
+  s.method === 'CUSTOM' && (s.customSchedule === null || s.customSchedule.length === 0);
+
 const daysBetween = (from: string, to: LocalDate): number =>
   Math.max(0, to.toEpochDay() - LocalDate.parse(from).toEpochDay());
 
@@ -133,8 +137,14 @@ export class LoansQueries implements LoanPortfolioQuery {
         taxes: money(paid?.taxes ?? zero.amount, s.currency),
       };
       const hasSchedule = states.length > 0 && (s.status === 'ACTIVE' || s.status === 'PAID_OFF');
-      const outstanding = hasSchedule ? outstandingPrincipal(states, scale) : null;
-      const open = states.filter((x) => x.status !== 'PAID');
+      // Un préstamo saldado por un pago extraordinario conserva sus cuotas sin pagar en el cronograma, pero ya no debe nada.
+      const paidOff = s.status === 'PAID_OFF';
+      const outstanding = hasSchedule
+        ? paidOff
+          ? dec('0').toFixed(scale)
+          : outstandingPrincipal(states, scale)
+        : null;
+      const open = paidOff ? [] : states.filter((x) => x.status !== 'PAID');
       const overdue = open
         .filter((x) => x.installment.dueDate < today.toString())
         .map((x) => ({
@@ -164,7 +174,7 @@ export class LoansQueries implements LoanPortfolioQuery {
             : null,
         overdueInstallments: s.status === 'ACTIVE' ? overdue : [],
         paidTotals,
-        preview: s.status === 'DRAFT' ? this.previewOf(loan, scale) : null,
+        preview: s.status === 'DRAFT' && !awaitsCustom(s) ? this.previewOf(loan, scale) : null,
       };
     });
   }
@@ -204,6 +214,8 @@ export class LoansQueries implements LoanPortfolioQuery {
       frequency: input.frequency,
       termInstallments: input.termInstallments,
       method: input.method,
+      fixedPrincipalAmount: input.fixedPrincipalAmount?.amount,
+      customSchedule: input.customSchedule,
       disbursementDate: origin === 'EXISTING' ? (input.existing?.asOf as string) : input.disbursementDate,
       firstDueDate: input.firstDueDate,
       charges: input.charges,
@@ -236,6 +248,7 @@ export class LoansQueries implements LoanPortfolioQuery {
       const today = await this.today(workspaceId);
       if (s.currentScheduleVersion === null) {
         if (version !== undefined) throw notFound(`${loanId} schedule version ${version}`);
+        if (awaitsCustom(s)) return { version: null, installments: [] };
         const preview = computeSchedule(s, scale);
         const zero = dec('0').toFixed(scale);
         const zeros = { taxes: zero, insurance: zero, fees: zero, interest: zero, principal: zero };
@@ -260,6 +273,10 @@ export class LoansQueries implements LoanPortfolioQuery {
         };
       }
       const v = version ?? s.currentScheduleVersion;
+      // Cronograma efectivo a esa versión: lo pagado de versiones anteriores más las cuotas de la versión.
+      if (version !== undefined && (await deps.schedules.versionOf(loan.id, v)) === null) {
+        throw notFound(`${loanId} schedule version ${v}`);
+      }
       const stored = await deps.schedules.installments(loan.id, v);
       if (stored.length === 0) throw notFound(`${loanId} schedule version ${v}`);
       const states = installmentStates(stored, await deps.payments.paidByInstallment(loan.id), scale);
@@ -345,8 +362,14 @@ export class LoansQueries implements LoanPortfolioQuery {
         const balance = dec(balances.get(s.accountId) ?? '0').toFixed(scale);
         if (!requested && s.status === 'PAID_OFF' && dec(balance).isZero()) continue;
         const states = await this.states(loan, scale);
-        const outstanding = states.length > 0 ? outstandingPrincipal(states, scale) : dec('0').toFixed(scale);
-        const open = states.filter((x) => x.status !== 'PAID');
+        const settled = s.status === 'PAID_OFF';
+        const outstanding =
+          states.length > 0 && !settled ? outstandingPrincipal(states, scale) : dec('0').toFixed(scale);
+        // Tasa vigente hoy: la inicial o la del último cambio con vigencia ya alcanzada.
+        const changes = await deps.rateChanges.list(loan.id);
+        const rate =
+          changes.filter((c) => c.effectiveFrom <= today.toString()).at(-1)?.annualRate ?? s.annualRate;
+        const open = settled ? [] : states.filter((x) => x.status !== 'PAID');
         const next = open[0];
         const last = open.length > 0 ? open[open.length - 1] : undefined;
         out.push({
@@ -357,7 +380,7 @@ export class LoansQueries implements LoanPortfolioQuery {
           status: s.status,
           method: s.method,
           rateType: s.rateType,
-          annualRate: s.annualRate,
+          annualRate: rate,
           outstandingPrincipal: money(outstanding, s.currency),
           accountBalance: money(balance, s.currency),
           unreconciledDifference: money(dec(outstanding).minus(balance).toFixed(scale), s.currency),

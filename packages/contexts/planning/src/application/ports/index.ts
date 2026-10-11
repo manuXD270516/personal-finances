@@ -211,6 +211,36 @@ export interface ActorPort {
   userId(): string;
 }
 
+/** Aporte planificado de una meta en un rango (GOALS, `GoalPlanPeriodDto`; REPORTING/PLANNING no importan `@pf/goals`). */
+export interface GoalPlanRow {
+  readonly goalId: string;
+  readonly goalName: string;
+  /** Moneda de la meta: en ella van `planned`, `contributed`, `pending` y `exceededBy` (texto decimal). */
+  readonly currency: string;
+  readonly planned: string;
+  readonly contributed: string;
+  /** `max(0, planned − contributed)`. */
+  readonly pending: string;
+  readonly exceededBy: string;
+  readonly automation: 'NONE' | 'RECURRING';
+  readonly definitionId: string | null;
+  /** `false` si algún movimiento en otra moneda quedó sin tasa. */
+  readonly complete: boolean;
+}
+
+/**
+ * Lo que PLANNING necesita de GOALS para la sección "Aportes a metas" del plan (add-savings-goals, decisión 20). El
+ * adapter vive en la composición de `apps/api` sobre `GoalPlansQuery.getForPeriod`, que solo devuelve metas `ACTIVE`
+ * con plan (las pausadas, alcanzadas, cerradas o canceladas no aparecen).
+ */
+export interface GoalPlanPort {
+  getForPeriod(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly GoalPlanRow[]>;
+}
+
 /** Dependencias de los casos de uso de presupuestos (openspec add-budgets § Decisiones). */
 export interface BudgetsDeps {
   readonly uow: UnitOfWork;
@@ -233,6 +263,8 @@ export interface BudgetsDeps {
   readonly clock: Clock;
   /** `REPORTING_RATE_VALIDITY_WINDOW` en días (docs/31 D53); la misma ventana que el resumen del Home. */
   readonly rateValidityWindowDays: number;
+  /** Aportes planificados a metas del periodo (add-savings-goals); sin él, la sección "Aportes a metas" va vacía. */
+  readonly goalPlans?: GoalPlanPort;
 }
 
 // ───────────────────────────────────────────── add-month-closing

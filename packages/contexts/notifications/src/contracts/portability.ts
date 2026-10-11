@@ -27,6 +27,12 @@ export const NOTIFICATIONS_PORTABILITY_SECTIONS: readonly PortabilitySection[] =
 ];
 
 export const NOTIFICATIONS_PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
-  { table: 'notifications.notification', reason: 'Derivada y transitoria (retención 12 meses, docs/33 D93).' },
-  { table: 'notifications.notification_delivery', reason: 'Entregas técnicas de las notificaciones (transitorias).' },
+  {
+    table: 'notifications.notification',
+    reason: 'Derivada y transitoria (retención 12 meses, docs/33 D93).',
+  },
+  {
+    table: 'notifications.notification_delivery',
+    reason: 'Entregas técnicas de las notificaciones (transitorias).',
+  },
 ];

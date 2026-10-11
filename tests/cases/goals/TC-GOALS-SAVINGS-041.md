@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Permisos, idempotencia y aislamiento de las metas"
 scenario: "VIEWER intenta aportar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-006", "FR-AUDIT-001"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/test/integration/pg-goals.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "rbac", "idempotency", "rls"]
@@ -37,7 +39,7 @@ expected_result:
   - "404 RESOURCE_NOT_FOUND"
   - "PF002 (RLS fail-closed)"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-041 — VIEWER no escribe, la Idempotency-Key evita aportes duplicados y otro workspace no ve las metas

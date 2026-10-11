@@ -79,7 +79,8 @@
       "enum": [
         "USER",
         "SUBSCRIPTION",
-        "DEBT"
+        "DEBT",
+        "GOAL"
       ]
     },
     "Status": {

@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Estrategias avalanche y snowball entre préstamos'
 scenario: 'Avalanche frente a snowball'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-010']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/payoff-simulator.test.ts
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'simulator', 'strategies']
@@ -29,7 +32,7 @@ expected_result:
   - 'Sin extra el interés total es 3425.46 BOB y la fecha libre de deudas 2028-10-15'
   - 'Avalanche da 1815.57 BOB de interés (ahorro 1609.89 BOB) y snowball 2000.08 BOB (ahorro 1425.38 BOB), ambos libres de deudas el 2027-11-15, con snowball saldando "A" el 2027-03-15'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-042 — Avalanche y snowball con un extra mensual entre dos préstamos
@@ -50,5 +53,5 @@ Entonces sin extra el interés total es 3425.46 BOB y la fecha libre de deudas 2
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
 - Cifras verificadas con un cálculo de referencia independiente (Decimal, HALF_EVEN, 30/360).

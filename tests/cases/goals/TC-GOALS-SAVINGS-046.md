@@ -5,16 +5,21 @@ spec: reporting/dashboard
 related_specs: ["goals/savings-goals"]
 requirement: "Metas en curso en el Home"
 scenario: "Cuatro metas activas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001", "FR-REPORTING-002", "FR-GOALS-003"]
 nfr: ["NFR-PERF-004"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/goals/src/application/goals.queries.test.ts
+  - packages/contexts/reporting/src/application/report-summary.goals.test.ts
+  - tests/e2e/specs/goals.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "home", "q9"]
@@ -32,7 +37,7 @@ expected_result:
   - "Laptop con overAllocated = true"
   - "p95 del resumen ≤ 300 ms"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-046 — La tarjeta Q9 del Home muestra hasta 3 metas por prioridad y fecha objetivo con sus cálculos y la cantidad restante

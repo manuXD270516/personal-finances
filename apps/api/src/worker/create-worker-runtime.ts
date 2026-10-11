@@ -34,6 +34,7 @@ import {
   createCommitmentsRuntime,
 } from '@pf/commitments/interface/commitments.module';
 import { debtEventConsumers } from '@pf/debt/interface/debt.module';
+import { goalsEventConsumers } from '@pf/goals/interface/goals.module';
 import { createImportsRuntime, importsEventConsumers } from '@pf/imports/interface/imports.module';
 import {
   createDemoDataRuntime,
@@ -75,6 +76,7 @@ import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-jobs.js';
 import { registerDebtCardsJob } from './debt-jobs.js';
+import { registerGoalsDailyJob } from './goals-jobs.js';
 import { registerImportsJobs } from './imports-jobs.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
@@ -421,6 +423,13 @@ export async function createWorkerRuntime(
     runOnStart: options.commitmentsOnStart ?? true,
   });
 
+  // GOALS (add-savings-goals): job `goals.daily-evaluation` y consumidores (sobre-asignación, anulaciones y revisiones,
+  // aportes recurrentes y sugerencias); usan los MISMOS contratos públicos que la API, con el pool del worker.
+  await registerGoalsDailyJob(queue, finance.goals, activeWorkspaces, logger, {
+    cron: config.GOALS_DAILY_CRON,
+    runOnStart: options.commitmentsOnStart ?? true,
+  });
+
   // IMPORTS (add-basic-csv-import): consumidor `imports.persist` (crea las transacciones por lotes con los MISMOS casos
   // de uso de TRANSACTIONS que la API, vía su contrato público) y jobs diarios de expiración y purga del staging.
   const imports = createImportsRuntime({
@@ -504,6 +513,7 @@ export async function createWorkerRuntime(
     ...planningEventConsumers(planning),
     ...commitmentsEventConsumers(commitments),
     ...debtEventConsumers(finance.cards),
+    ...goalsEventConsumers(finance.goals),
     ...importsEventConsumers(imports, logger),
     ...notificationEventConsumers(notifications),
   ]);

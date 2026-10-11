@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Reservas limitadas por el saldo de la cuenta"
 scenario: "Reserva mayor que el disponible"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-004"]
 nfr: []
 invariants: ["INV-018"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/src/domain/earmark-guard.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "earmark", "guard"]
@@ -30,7 +34,7 @@ expected_result:
   - "422 EARMARK_EXCEEDS_BALANCE con details {balance: 7000.00 BOB, reserved: 3500.00 BOB, available: 3500.00 BOB}"
   - "Sin movimiento"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-014 — Una reserva mayor que el disponible de la cuenta se rechaza con EARMARK_EXCEEDS_BALANCE y su detalle

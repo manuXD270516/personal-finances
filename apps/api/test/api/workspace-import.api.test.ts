@@ -31,6 +31,7 @@ let m: Mini;
 let zip: Buffer;
 let subscriptionId: string;
 let loanId: string;
+let goalId: string;
 let cardId: string;
 let cardPurchaseId: string;
 let cardAccountIds: string[];
@@ -143,6 +144,7 @@ beforeAll(async () => {
     principal: money('1000.00'),
     annualRate: '0.12',
     termInstallments: 3,
+    rateType: 'VARIABLE',
     disbursementDate: '2026-10-01',
     firstDueDate: '2026-11-01',
     disburseNow: true,
@@ -155,6 +157,25 @@ beforeAll(async () => {
     accountId: m.bank,
   });
   expect(installmentPaid.status, JSON.stringify(installmentPaid.body)).toBe(201);
+  // Amortización avanzada (openspec add-loan-amortization-advanced, tarea 4.4): un prepago reduciendo la cuota y un
+  // cambio de tasa dejan tres versiones del cronograma, la tasa con su vigencia y un pago extraordinario.
+  const prepaid = await api.post(m.owner, `/loans/${loanId}/prepayments`, {
+    amount: money('100.00'),
+    businessDate: '2026-10-06',
+    option: 'REDUCE_INSTALLMENT',
+    accountId: m.bank,
+  });
+  expect(prepaid.status, JSON.stringify(prepaid.body)).toBe(201);
+  const afterPrepayment = await h.call('GET', `${api.base}/loans/${loanId}`, { token: m.owner.token });
+  const rateChanged = await h.call('POST', `${api.base}/loans/${loanId}/rate-changes`, {
+    token: m.owner.token,
+    body: { annualRate: '0.15', effectiveFrom: '2026-12-01' },
+    headers: {
+      'idempotency-key': randomUUID(),
+      'if-match': `"${String(afterPrepayment.body['version'])}"`,
+    },
+  });
+  expect(rateChanged.status, JSON.stringify(rateChanged.body)).toBe(201);
   // Una tarjeta bimoneda con plan de pago y una compra en cuotas (openspec add-credit-cards, tarea 4.4): sus nueve
   // tablas viajan en el export y las cuentas, la definición del plan y la compra se remapean al importar.
   const usd = (amount: string) => money(amount, 'USD');
@@ -211,6 +232,38 @@ beforeAll(async () => {
     installmentCount: 3,
   });
   expect(installments.status, JSON.stringify(installments.body)).toBe(201);
+  // Una meta con una reserva y un aporte real (openspec add-savings-goals): movimientos, cuentas vinculadas y plan viajan
+  // en el export y se remapean al importar.
+  const savings = await api.post(m.owner, '/accounts', {
+    name: 'Ahorro (export)',
+    type: 'SAVINGS',
+    currency: 'BOB',
+    openingBalance: { amount: money('0.00'), date: '2026-09-01' },
+  });
+  expect(savings.status, JSON.stringify(savings.body)).toBe(201);
+  const goal = await api.post(m.owner, '/goals', {
+    name: 'Meta (export)',
+    type: 'EMERGENCY_FUND',
+    target: money('5000.00'),
+    startDate: '2026-10-01',
+    linkedAccountIds: [savings.body['id']],
+  });
+  expect(goal.status, JSON.stringify(goal.body)).toBe(201);
+  goalId = goal.body['id'] as string;
+  const contributed = await api.post(m.owner, `/goals/${goalId}/contributions`, {
+    fund: 'REAL',
+    amount: money('100.00'),
+    businessDate: '2026-10-05',
+    sourceAccountId: m.bank,
+    destinationAccountId: savings.body['id'],
+  });
+  expect(contributed.status, JSON.stringify(contributed.body)).toBe(201);
+  const reserved = await api.post(m.owner, `/goals/${goalId}/contributions`, {
+    fund: 'EARMARK',
+    amount: money('50.00'),
+    sourceAccountId: m.bank,
+  });
+  expect(reserved.status, JSON.stringify(reserved.body)).toBe(201);
   await h.startWorker();
   const exported = await exportAndWait(h, m.owner, m.ws);
   zip = (await downloadExport(h, m.owner, m.ws, exported['id'] as string)).raw;
@@ -625,9 +678,12 @@ describe('Préstamos en el round-trip', () => {
         'json/loan-installments.jsonl',
         'json/loan-payments.jsonl',
         'json/loan-payment-allocations.jsonl',
+        'json/loan-rate-changes.jsonl',
       ]),
     );
-    expect(lines(reader.read('json/loan-payments.jsonl'))).toHaveLength(1);
+    expect(lines(reader.read('json/loan-payments.jsonl'))).toHaveLength(2);
+    expect(lines(reader.read('json/loan-rate-changes.jsonl'))).toHaveLength(1);
+    expect(lines(reader.read('json/loan-schedule-versions.jsonl'))).toHaveLength(3);
     const done = await importAndWait(h, m.owner, zip);
     expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
     const created = done['workspaceId'] as string;
@@ -639,12 +695,40 @@ describe('Préstamos en el round-trip', () => {
     const detail = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}`, {
       token: m.owner.token,
     });
-    expect(detail.body['outstandingPrincipal']).toEqual(money('669.98'));
-    expect(detail.body['accountBalance']).toEqual(money('669.98'));
+    expect(detail.body['outstandingPrincipal']).toEqual(money('569.98'));
+    expect(detail.body['accountBalance']).toEqual(money('569.98'));
+    expect(detail.body['currentScheduleVersion']).toBe(3);
+    const versions = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/loans/${imported!.id}/schedule-versions`,
+      {
+        token: m.owner.token,
+      },
+    );
+    expect((versions.body['data'] as { reason: string }[]).map((v) => v.reason)).toEqual([
+      'INITIAL',
+      'PREPAYMENT',
+      'RATE_CHANGE',
+    ]);
+    const rates = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}/rate-changes`, {
+      token: m.owner.token,
+    });
+    expect(
+      (rates.body['data'] as { annualRate: string; initial: boolean }[]).map((r) => [
+        r.annualRate,
+        r.initial,
+      ]),
+    ).toEqual([
+      ['0.12', true],
+      ['0.15', false],
+    ]);
     const payments = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}/payments`, {
       token: m.owner.token,
     });
-    expect((payments.body['data'] as unknown[]).length).toBe(1);
+    expect((payments.body['data'] as { kind: string }[]).map((x) => x.kind)).toEqual([
+      'REGULAR',
+      'PREPAYMENT',
+    ]);
     const definition = await h.call(
       'GET',
       `/api/v1/workspaces/${created}/recurring/${imported!.recurringDefinitionId}`,
@@ -760,6 +844,35 @@ describe('Tarjetas en el round-trip', () => {
       token: m.owner.token,
     });
     expect(original.status).toBe(200);
+  }, 120_000);
+});
+
+describe('Metas de ahorro en el round-trip', () => {
+  it('[TC-GOALS-SAVINGS-029] [TC-IDENTITY-RESTORE-001] una meta con aporte real y reserva se restaura con ids nuevos y el mismo progreso', async () => {
+    const reader = ZipReader.open(zip);
+    expect(reader.names()).toEqual(
+      expect.arrayContaining([
+        'json/savings-goals.jsonl',
+        'json/goal-movements.jsonl',
+        'json/goal-linked-accounts.jsonl',
+      ]),
+    );
+    expect(lines(reader.read('json/goal-movements.jsonl'))).toHaveLength(2);
+    const done = await importAndWait(h, m.owner, zip);
+    expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
+    const created = done['workspaceId'] as string;
+    const list = await h.call('GET', `/api/v1/workspaces/${created}/goals`, { token: m.owner.token });
+    expect(list.status, JSON.stringify(list.body)).toBe(200);
+    const imported = (list.body['data'] as { id: string; name: string; progress: { total: unknown } }[]).find(
+      (g) => g.name === 'Meta (export)',
+    );
+    expect(imported).toBeDefined();
+    expect(imported!.id).not.toBe(goalId);
+    expect(imported!.progress.total).toEqual(money('150.00'));
+    const movements = await h.call('GET', `/api/v1/workspaces/${created}/goals/${imported!.id}/movements`, {
+      token: m.owner.token,
+    });
+    expect((movements.body['data'] as unknown[]).length).toBe(2);
   }, 120_000);
 });
 

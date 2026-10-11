@@ -34,7 +34,7 @@ export const transactionKindOf = (
 /** Tipos reservados para Phase 4 (D116): se rechazan con `RECURRING_KIND_NOT_AVAILABLE` salvo el administrador. */
 export const RESERVED_RECURRING_KINDS = ['LOAN_PAYMENT', 'CARD_PAYMENT'] as const;
 
-export const MANAGED_BY = ['USER', 'SUBSCRIPTION', 'DEBT'] as const;
+export const MANAGED_BY = ['USER', 'SUBSCRIPTION', 'DEBT', 'GOAL'] as const;
 export type ManagedBy = (typeof MANAGED_BY)[number];
 
 export const AMOUNT_TYPES = ['FIXED', 'ESTIMATED', 'MIN_MAX', 'VARIABLE'] as const;

@@ -1,4 +1,4 @@
-import { DomainError, LocalDate, currency as makeCurrency, type Currency } from '@pf/shared-kernel';
+import { DomainError, LocalDate, currency as makeCurrency, dec, type Currency } from '@pf/shared-kernel';
 import {
   COMMITMENTS_EVENTS,
   type CreateManagedMonthlyInput,
@@ -31,7 +31,7 @@ import {
   recordOccurrences,
 } from './recorder.js';
 
-const MANAGERS = ['SUBSCRIPTION', 'DEBT'] as const;
+const MANAGERS = ['SUBSCRIPTION', 'DEBT', 'GOAL'] as const;
 type Manager = (typeof MANAGERS)[number];
 
 const expectedOf = (o: RecurringOccurrence) => {
@@ -167,7 +167,10 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
         accountId: input.accountId,
         toAccountId: input.toAccountId,
         counterpartyId: input.counterpartyId ?? null,
-        amount: { type: 'VARIABLE' },
+        amount:
+          input.amount === undefined
+            ? { type: 'VARIABLE' }
+            : { type: 'FIXED', amount: { amount: input.amount, currency: input.currency } },
         schedule: { ...schedule, startDate: rule.startDate, weekendAdjustment: rule.weekendAdjustment },
         materialization: materializationOf(input.materialization),
       },
@@ -721,6 +724,8 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
       const cur = def.current;
       const changes: {
         accountId?: string;
+        toAccountId?: string;
+        amount?: { type: 'FIXED'; amount: { amount: string; currency: string } };
         counterpartyId?: string | null;
         schedule?: { cadence?: string; monthDays?: readonly number[]; weekendAdjustment?: string };
         materialization?: {
@@ -733,6 +738,15 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
         changes.accountId = input.accountId;
       if (input.counterpartyId !== undefined && input.counterpartyId !== cur.counterpartyId) {
         changes.counterpartyId = input.counterpartyId;
+      }
+      if (input.toAccountId !== undefined && input.toAccountId !== cur.toAccountId) {
+        changes.toAccountId = input.toAccountId;
+      }
+      if (input.amount !== undefined) {
+        const currentAmount = cur.amount.type === 'FIXED' ? cur.amount.amount : null;
+        if (currentAmount === null || dec(currentAmount).cmp(dec(input.amount)) !== 0) {
+          changes.amount = { type: 'FIXED', amount: { amount: input.amount, currency: cur.currency } };
+        }
       }
       // Regla mensual (add-credit-cards): días del mes, ajuste de fin de semana y modo de materialización.
       if (input.monthDays !== undefined) {
@@ -800,6 +814,92 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
           occurrenceSteps(occ, [event]),
         );
       }
+    });
+  }
+
+  // ───────────────────────────────────────────────────────────── add-loan-amortization-advanced (N3)
+
+  /**
+   * Reemplazo del calendario explícito (prepago, cambio de tasa, cronograma custom): una versión nueva de la definición
+   * con los ítems desde la fecha efectiva. El motor reescribe las ocurrencias no resueltas (misma fecha ⇒ se actualiza
+   * el monto esperado y se conserva la identidad), cancela las que ya no existen (`SUPERSEDED`) y crea las nuevas; las
+   * resueltas y sus transacciones no se tocan.
+   */
+  async replaceSchedule(input: Parameters<RecurringDefinitionPort['replaceSchedule']>[0]): Promise<void> {
+    const { deps } = this;
+    const { workspaceId } = input;
+    await deps.uow.run(workspaceId, async () => {
+      const def = await this.locked(workspaceId, input.definitionId);
+      if (def.current.schedule.cadence !== 'EXPLICIT') {
+        throw new DomainError('RECURRING_INVALID_SCHEDULE', 'the definition has no explicit schedule').at(
+          '/definitionId',
+        );
+      }
+      const lastResolved = await deps.occurrences.lastResolvedNominal(workspaceId, def.id);
+      const options = [input.effectiveFrom, def.current.effectiveFrom];
+      if (lastResolved !== null) options.push(LocalDate.parse(lastResolved).plusDays(1).toString());
+      const effectiveFrom = options.sort().at(-1) as string;
+      const items = input.items.filter((i) => i.dueDate >= effectiveFrom);
+      if (items.length === 0) {
+        throw new DomainError('RECURRING_INVALID_SCHEDULE', 'the schedule needs at least one item').at(
+          '/items',
+        );
+      }
+      await this.definitions.revise({
+        workspaceId,
+        userId: input.userId,
+        definitionId: def.id,
+        expectedVersion: def.version,
+        effectiveFrom,
+        changes: {
+          schedule: {
+            cadence: 'EXPLICIT',
+            explicit: items.map((i) => ({ key: i.key, dueDate: i.dueDate, amount: i.amount })),
+          },
+        },
+        manager: def.snapshot.managedBy as Manager,
+      });
+    });
+  }
+
+  // ───────────────────────────────────────────────────────────── add-savings-goals (N5)
+
+  /** Alias del contrato de metas: misma revisión de plantilla que `revise`, con monto fijo y cuenta destino. */
+  async reviseManaged(input: Parameters<RecurringDefinitionPort['reviseManaged']>[0]): Promise<void> {
+    await this.revise(input);
+  }
+
+  /** Pausa la definición administrada (cancela las no resueltas con fecha nominal >= hoy); idempotente. */
+  async pauseManaged(input: Parameters<RecurringDefinitionPort['pauseManaged']>[0]): Promise<void> {
+    const { deps } = this;
+    const { workspaceId } = input;
+    await deps.uow.run(workspaceId, async () => {
+      const def = await this.locked(workspaceId, input.definitionId);
+      if (def.status !== 'ACTIVE') return;
+      await this.definitions.pause({
+        workspaceId,
+        userId: input.userId,
+        definitionId: def.id,
+        expectedVersion: def.version,
+        manager: def.snapshot.managedBy as Manager,
+      });
+    });
+  }
+
+  /** Reanuda la definición administrada pausada; idempotente si ya está activa. */
+  async resumeManaged(input: Parameters<RecurringDefinitionPort['resumeManaged']>[0]): Promise<void> {
+    const { deps } = this;
+    const { workspaceId } = input;
+    await deps.uow.run(workspaceId, async () => {
+      const def = await this.locked(workspaceId, input.definitionId);
+      if (def.status !== 'PAUSED') return;
+      await this.definitions.resume({
+        workspaceId,
+        userId: input.userId,
+        definitionId: def.id,
+        expectedVersion: def.version,
+        manager: def.snapshot.managedBy as Manager,
+      });
     });
   }
 }

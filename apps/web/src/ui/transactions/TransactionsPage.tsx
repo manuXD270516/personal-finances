@@ -5,11 +5,13 @@ import type { ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import {
   PAYMENT_METHODS,
+  TRANSACTION_SOURCES,
   TRANSACTION_STATUSES,
   type Page,
   type PaymentMethod,
   type Transaction,
   type TransactionKind,
+  type TransactionSource,
   type TransactionStatus,
 } from '../common/types';
 import { auditHref } from '../audit/logic';
@@ -303,6 +305,25 @@ function Register({
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
                   {t(`paymentMethods.${m}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t('filters.source')}>
+          {(p) => (
+            <select
+              {...p}
+              style={inputStyle}
+              name="source"
+              value={filters.source}
+              data-testid="filter-source"
+              onChange={(e) => setFilter({ source: e.target.value as TransactionSource | '' })}
+            >
+              <option value="">{t('filters.any')}</option>
+              {TRANSACTION_SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {t(`sources.${s}`)}
                 </option>
               ))}
             </select>

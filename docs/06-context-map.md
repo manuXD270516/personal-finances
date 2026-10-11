@@ -108,7 +108,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 6 | FX | TRANSACTIONS | C/S | SYNC-Q | Tasa de referencia al registrar una conversión (opcional; si no hay, `referenceRate=null`). |
 | 7 | TRANSACTIONS | FX | OHS/PL | ASYNC | `ConversionRecorded` → FX guarda observación de tasa del usuario (útil para P2P USDT/BOB). |
 | 8 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Desembolso/pago de préstamo y pago de tarjeta: la cuota marcada como pagada y la transacción deben confirmarse juntas (INV-016). As-built `add-loans`: Debt llama a `LoanTransactionsPort` (`recordDisbursement`, `recordPayment`, `voidManaged`) dentro de su UoW y las transacciones `LOAN_*` quedan administradas (`TRANSACTION_MANAGED_EXTERNALLY`). |
-| 9 | TRANSACTIONS | GOALS | C/S | SYNC-TX | Aporte REAL = transferencia + `GoalContribution` atómicos (INV-018). |
+| 9 | TRANSACTIONS | GOALS | C/S | SYNC-TX | Aporte REAL = transferencia (`GoalTransferPort.recordTransfer`, `source = GOAL`, `externalRef = {goals.movement, movementId}`) + `GoalMovement` atómicos (INV-018). Transactions no conoce a Goals; anular o revisar la transferencia llega a Goals por eventos y genera el movimiento inverso. |
 | 10 | TRANSACTIONS | COMMITMENTS | C/S | SYNC-TX | Materializar ocurrencia = crear transacción + marcar ocurrencia atómicamente (INV-013). |
 | 11 | TRANSACTIONS | IMPORTS | C/S | SYNC-TX (por lote) | `ImportTransactions` batch con fingerprints; fila marcada `IMPORTED` en la misma tx (INV-014). |
 | 12 | TRANSACTIONS | RULES | C/S | ASYNC trigger + SYNC comando | Rules reacciona a `TransactionCreated` (async) y aplica `ApplyClassification` (sync dentro de su handler). |
@@ -131,6 +131,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 29 | ACCOUNTS | DEBT | C/S | SYNC-TX | `AccountProvisioningPort.openAccount`: Debt abre la cuenta `LOAN` del préstamo en su propia UoW (as-built `add-loans`); Accounts sigue siendo dueño del agregado y de sus validaciones. |
 | 30 | COMMITMENTS | DEBT | C/S | SYNC-TX | `RecurringDefinitionPort` (`createManaged`, `settle`, `unsettle`, `setExpected`, `end`, `revise`): las cuotas del préstamo son ocurrencias de una definición administrada (`managedBy = DEBT`, `kind = LOAN_PAYMENT`) que Debt resuelve en la misma UoW; COMMITMENTS no depende de DEBT (pagar desde Recurrentes redirige al formulario del préstamo, D162). |
 | 31 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Lectura (as-built `add-credit-cards`): `AccountMovementsQuery` (movimientos de la cuenta de tarjeta por fecha y clase), `PendingFlowQuery` (compras pendientes) y `TransactionLinkQuery` (validar la compra de un plan de cuotas). Debt no crea transacciones de tarjeta: el pago es la transferencia del usuario o la del plan de pago que materializa el motor. |
+| 32 | COMMITMENTS | GOALS | C/S | SYNC-TX | `RecurringDefinitionPort` (`createManaged`, `reviseManaged`, `pauseManaged`, `resumeManaged`, `end`): el aporte programado de una meta es una definición `TRANSFER` administrada (`managedBy = GOAL`) que Goals crea y mantiene en su UoW; las acciones de usuario sobre la definición devuelven `RECURRING_MANAGED_EXTERNALLY` y las acciones sobre sus ocurrencias siguen permitidas. COMMITMENTS no depende de GOALS. |
 
 ### 3.1 Composición "abrir cuenta con saldo inicial"
 

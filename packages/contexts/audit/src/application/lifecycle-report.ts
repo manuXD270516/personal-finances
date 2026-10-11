@@ -250,6 +250,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       RecurringOccurrence: 'Ocurrencia recurrente',
       Subscription: 'Suscripción',
       Loan: 'Préstamo',
+      SavingsGoal: 'Meta de ahorro',
     },
     states: {
       Transaction: {
@@ -277,6 +278,13 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       },
       Subscription: { TRIAL: 'En prueba', ACTIVE: 'Activa', PAUSED: 'Pausada', CANCELLED: 'Cancelada' },
       Loan: { DRAFT: 'Borrador', ACTIVE: 'Activo', PAID_OFF: 'Saldado', CANCELLED: 'Cancelado' },
+      SavingsGoal: {
+        ACTIVE: 'Activa',
+        PAUSED: 'Pausada',
+        ACHIEVED: 'Alcanzada',
+        CLOSED: 'Cerrada',
+        CANCELLED: 'Cancelada',
+      },
     },
     transitions: {
       Transaction: {
@@ -331,6 +339,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REACTIVATE: 'Reactivar',
         CANCEL: 'Cancelar',
       },
+      SavingsGoal: {
+        CREATE: 'Crear',
+        PAUSE: 'Pausar',
+        RESUME: 'Reanudar',
+        REACH: 'Alcanzar',
+        REOPEN: 'Reabrir',
+        CLOSE: 'Cerrar',
+        CANCEL: 'Cancelar',
+      },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -373,6 +390,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       RecurringOccurrence: 'Recurring occurrence',
       Subscription: 'Subscription',
       Loan: 'Loan',
+      SavingsGoal: 'Savings goal',
     },
     states: {
       Transaction: {
@@ -400,6 +418,13 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       },
       Subscription: { TRIAL: 'Trial', ACTIVE: 'Active', PAUSED: 'Paused', CANCELLED: 'Cancelled' },
       Loan: { DRAFT: 'Draft', ACTIVE: 'Active', PAID_OFF: 'Paid off', CANCELLED: 'Cancelled' },
+      SavingsGoal: {
+        ACTIVE: 'Active',
+        PAUSED: 'Paused',
+        ACHIEVED: 'Achieved',
+        CLOSED: 'Closed',
+        CANCELLED: 'Cancelled',
+      },
     },
     transitions: {
       Transaction: {
@@ -454,6 +479,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REACTIVATE: 'Reactivate',
         CANCEL: 'Cancel',
       },
+      SavingsGoal: {
+        CREATE: 'Create',
+        PAUSE: 'Pause',
+        RESUME: 'Resume',
+        REACH: 'Reach',
+        REOPEN: 'Reopen',
+        CLOSE: 'Close',
+        CANCEL: 'Cancel',
+      },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -496,6 +530,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       RecurringOccurrence: 'Ocorrência recorrente',
       Subscription: 'Assinatura',
       Loan: 'Empréstimo',
+      SavingsGoal: 'Meta de poupança',
     },
     states: {
       Transaction: {
@@ -523,6 +558,13 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       },
       Subscription: { TRIAL: 'Em teste', ACTIVE: 'Ativa', PAUSED: 'Pausada', CANCELLED: 'Cancelada' },
       Loan: { DRAFT: 'Rascunho', ACTIVE: 'Ativo', PAID_OFF: 'Quitado', CANCELLED: 'Cancelado' },
+      SavingsGoal: {
+        ACTIVE: 'Ativa',
+        PAUSED: 'Pausada',
+        ACHIEVED: 'Alcançada',
+        CLOSED: 'Encerrada',
+        CANCELLED: 'Cancelada',
+      },
     },
     transitions: {
       Transaction: {
@@ -575,6 +617,15 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         REGISTER_EXISTING: 'Registrar empréstimo em andamento',
         PAY_OFF: 'Quitar',
         REACTIVATE: 'Reativar',
+        CANCEL: 'Cancelar',
+      },
+      SavingsGoal: {
+        CREATE: 'Criar',
+        PAUSE: 'Pausar',
+        RESUME: 'Retomar',
+        REACH: 'Alcançar',
+        REOPEN: 'Reabrir',
+        CLOSE: 'Encerrar',
         CANCEL: 'Cancelar',
       },
     },

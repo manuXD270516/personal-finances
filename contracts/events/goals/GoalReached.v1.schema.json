@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/goals/GoalReached.v1.schema.json",
+  "title": "goals.GoalReached.v1",
+  "description": "Una meta de ahorro alcanzó su objetivo: el avance, convertido a la moneda del objetivo con tasas vigentes, llegó a ser mayor o igual a él. Un hecho por cada vez que la meta pasa a ACHIEVED (si el avance cae o el objetivo sube y luego se vuelve a alcanzar, se emite otro). `trigger` indica qué lo causó: un movimiento, un cambio del objetivo o un cambio de tasa. Productor: GOALS. Lo consume NOTIFY (GOAL_REACHED). Idempotencia: (goalId, aggregateVersion). El nombre de la meta es PII de baja sensibilidad (B).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "goals.GoalReached"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "SavingsGoal"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goalId",
+        "goalName",
+        "target",
+        "progress",
+        "reachedOn",
+        "trigger"
+      ],
+      "properties": {
+        "goalId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "goalName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "target": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+        },
+        "progress": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "reachedOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "trigger": {
+          "enum": [
+            "MOVEMENT",
+            "TARGET_CHANGE",
+            "RATE_CHANGE"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000c02",
+      "eventType": "goals.GoalReached",
+      "eventVersion": 1,
+      "occurredAt": "2026-12-18T16:05:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "SavingsGoal",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000c0001",
+      "aggregateVersion": 9,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "goalId": "01928c4e-0000-7000-8000-0000000c0001",
+        "goalName": "Fondo de emergencia",
+        "target": {
+          "amount": "10000.00",
+          "currency": "BOB"
+        },
+        "progress": {
+          "amount": "10120.00",
+          "currency": "BOB"
+        },
+        "reachedOn": "2026-12-18",
+        "trigger": "MOVEMENT"
+      }
+    }
+  ]
+}

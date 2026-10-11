@@ -30,6 +30,7 @@
     "@pf/notifications": "workspace:*",
     "@pf/commitments": "workspace:*",
     "@pf/debt": "workspace:*",
+    "@pf/goals": "workspace:*",
     "@pf/imports": "workspace:*",
     "@pf/planning": "workspace:*",
     "@pf/platform": "workspace:*",

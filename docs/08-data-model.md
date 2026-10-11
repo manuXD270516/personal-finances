@@ -128,7 +128,7 @@ La lista de tablas del brief inicial se reconcilia con los contextos canónicos 
 | `financial_periods` / `months` | Renombrar | `planning.financial_period` | Periodos explícitos (no se asume mes calendario). |
 | `month_closings` | Reemplazar (add-month-closing) | `planning.close_snapshot`, `close_snapshot_balance`, `close_snapshot_without_statement`, `period_reopening`, `close_pending_notice`, `closing_policy` | Snapshots y reaperturas **append-only** (PF003) en lugar de intentos mutables: el cierre es síncrono. |
 | `recurring_payments`, `subscriptions` | Fusionar | `commitments.recurring_definition` (+ `subscription` subtipo) + `recurring_occurrence` | Un motor de recurrencia. |
-| `savings_goals`, `goal_contributions` | Mantener | `goals.*` | Contribución TRANSFER o EARMARK. |
+| `savings_goals`, `goal_contributions` | Mantener / renombrar | `goals.savings_goal`, `goal_linked_account`, `goal_movement` y 4 tablas de apoyo | `goal_movement` unifica aportes reales y reservas (`fund` × `movement`); `kind` y `linked_account_id` desaparecen (as-built `add-savings-goals`, §5.8). |
 | `loans`, `loan_payments` | Mantener / renombrar | `debt.loan`, `debt.loan_installment` | Pagos reales son transacciones. As-built `add-loans`: `debt.loan_payment` + `debt.loan_payment_allocation` enlazan la transacción y la cuota (la cuota ya no guarda `paid_transaction_id`). |
 | `credit_cards` | Mantener | `debt.credit_card`, `debt.credit_card_statement` | La tarjeta es un `accounts.account` LIABILITY + términos en Debt. |
 | `documents`, `attachments` | Mantener | `documents.document`, `documents.attachment_link` | Link polimórfico (§5.11). |
@@ -165,7 +165,7 @@ flowchart TB
   SP -->|category_id lógico| CAT[classification.category]
   OCC[commitments.recurring_occurrence] -->|transaction_id| TX
   INST[debt.loan_installment] -->|paid_transaction_id| TX
-  GC[goals.goal_contribution] -->|transaction_id| TX
+  GM[goals.goal_movement] -->|transaction_id| TX
   IR[imports.row_link] -->|transaction_id| TX
   AL[documents.attachment_link] -->|target_id| TX
   BL[planning.budget_line] -->|category_id| CAT
@@ -881,7 +881,7 @@ erDiagram
     text description
     text notes
     text kind "INCOME EXPENSE TRANSFER LOAN_PAYMENT (solo managed_by DEBT)"
-    text managed_by "USER SUBSCRIPTION DEBT"
+    text managed_by "USER SUBSCRIPTION DEBT GOAL"
     uuid managed_ref
     text status "ACTIVE PAUSED ENDED"
     int current_version_no
@@ -949,7 +949,7 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS / grants | version / archivo |
 |-------|--------|-------|---------|--------------|-------------------|
-| `recurring_definition` | `(workspace_id, id)` | `kind IN ('INCOME','EXPENSE','TRANSFER')`; `managed_by IN ('USER','SUBSCRIPTION')` (add-subscriptions; `DEBT` con un expand cuando Debt administre definiciones) y `managed_ref` presente ⇔ `managed_by <> 'USER'`; `status IN ('ACTIVE','PAUSED','ENDED')`; `name` de 1 a 120 caracteres | `(workspace_id, status, generated_through) WHERE status = 'ACTIVE'` (scheduler) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version`; sin archivo en Phase 3 (se filtra por estado, D128) |
+| `recurring_definition` | `(workspace_id, id)` | `kind IN ('INCOME','EXPENSE','TRANSFER')`; `managed_by IN ('USER','SUBSCRIPTION','DEBT','GOAL')` (add-subscriptions; `DEBT` con `add-loans`; `GOAL` con `add-savings-goals`, migración `20261013100000_commitments_goal_managed.sql`) y `managed_ref` presente ⇔ `managed_by <> 'USER'`; `status IN ('ACTIVE','PAUSED','ENDED')`; `name` de 1 a 120 caracteres | `(workspace_id, status, generated_through) WHERE status = 'ACTIVE'` (scheduler) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version`; sin archivo en Phase 3 (se filtra por estado, D128) |
 | `recurring_definition_version` | PK `(definition_id, version_no)` | coherencia de `kind` (`to_account_id` presente ⇔ `TRANSFER`; en dominio y trigger liviano); montos según `amount_type` (> 0, `min <= max`); `until_date IS NULL OR max_count IS NULL`; `lead_days BETWEEN 0 AND 60`; `materialization_mode <> 'AUTO_CREATE' OR amount_type IN ('FIXED','ESTIMATED') OR indexed_amount IS NOT NULL`; `indexed_amount`/`indexed_currency` ambos o ninguno, solo con `amount_type = 'VARIABLE'` y en otra moneda que `currency` | PK | **WS-RO**: `pf_app`/`pf_worker` SELECT, INSERT; `platform.forbid_mutation()` (append-only) | Inmutable |
 | `recurring_occurrence` | **`(definition_id, occurrence_date)`** — generación idempotente (`INSERT ... ON CONFLICT DO NOTHING`, INV-013); parcial `(workspace_id, transaction_id) WHERE status IN ('MATERIALIZED','MATCHED')` (una transacción resuelve a lo sumo una ocurrencia) | `status IN ('MATERIALIZED','MATCHED')` ⇔ `transaction_id IS NOT NULL`; `status = 'CANCELLED'` ⇔ `cancel_reason IS NOT NULL` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','DUE','OVERDUE')` (comprometido y próximos pagos); `(workspace_id, status, due_date)` (job) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version` |
 
@@ -1042,40 +1042,78 @@ Las cinco tablas se registran en `platform.workspace_scoped_table` (órdenes 161
 
 ```mermaid
 erDiagram
-  SAVINGS_GOAL ||--o{ GOAL_CONTRIBUTION : "aportes"
+  SAVINGS_GOAL ||--o{ GOAL_LINKED_ACCOUNT : "cuentas vinculadas"
+  SAVINGS_GOAL ||--o{ GOAL_MOVEMENT : "movimientos (append-only)"
+  SAVINGS_GOAL ||--o| GOAL_PLAN : "plan mensual"
+  SAVINGS_GOAL ||--o{ RECURRING_MATERIALIZATION : "aportes recurrentes en espera"
+  SAVINGS_GOAL |o--o{ CONTRIBUTION_SUGGESTION : "sugerencias"
+  GOAL_MOVEMENT |o--o| GOAL_MOVEMENT : "reverses_id"
   SAVINGS_GOAL {
     uuid id PK
     uuid workspace_id FK
     text name
+    text goal_type "EMERGENCY_FUND PURCHASE TRAVEL EDUCATION RETIREMENT CUSTOM"
     money target_amount
     ccy currency FK
+    date start_date
     date target_date
-    uuid linked_account_id "ref accounts.account"
-    text strategy "TRANSFER EARMARK MIXED"
-    text status "ACTIVE PAUSED ACHIEVED ABANDONED"
-    smallint priority
-    timestamptz achieved_at
+    smallint priority "1..5"
+    numeric tolerance_percent "0..50, default 5.00"
+    smallint pace_periods "1..12, default 3"
+    text status "ACTIVE PAUSED ACHIEVED CLOSED CANCELLED"
+    date achieved_on
+    date closed_on
+    date cancelled_on
     timestamptz archived_at
     int version
   }
-  GOAL_CONTRIBUTION {
+  GOAL_LINKED_ACCOUNT {
+    uuid workspace_id PK
+    uuid goal_id PK
+    uuid account_id PK "ref accounts.account"
+  }
+  GOAL_MOVEMENT {
     uuid id PK
     uuid workspace_id FK
     uuid goal_id FK
-    text kind "REAL EARMARK WITHDRAWAL RELEASE"
-    money amount "WITHDRAWAL y RELEASE negativos"
+    text fund "REAL EARMARK"
+    text movement "CONTRIBUTION WITHDRAWAL REVERSAL REASSIGN_IN REASSIGN_OUT"
+    money amount "firmado, en la moneda de la cuenta"
     ccy currency FK
-    date contribution_date
+    uuid account_id "ref accounts.account"
+    date occurred_on
     uuid transaction_id "ref txn.transaction"
-    text notes
-    timestamptz created_at
+    int transaction_revision
+    uuid reverses_id FK
+    uuid reassignment_id
+    text origin "USER RECURRING SUGGESTION SYSTEM"
+  }
+  GOAL_PLAN {
+    uuid goal_id PK
+    money monthly_amount "moneda del objetivo"
+    text fund "REAL EARMARK"
+    uuid source_account_id
+    uuid destination_account_id
+    smallint day_of_month
+    text automation "NONE RECURRING"
+    text materialization_mode "PENDING_APPROVAL AUTO_CREATE"
+    uuid definition_id "ref commitments.recurring_definition"
   }
 ```
 
+Además `account_reservation_state` (candado por cuenta y episodio de sobre-asignación vigente), `recurring_materialization` (aporte recurrente que espera su transferencia posteada) y `contribution_suggestion`. Las referencias a cuentas, transacciones y definiciones recurrentes son lógicas, sin FK (NFR-DATA-015).
+
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `savings_goal` | `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `target_amount > 0`; `strategy IN ('TRANSFER','MIXED')` ⇒ `linked_account_id IS NOT NULL` | — | WS | `version`, `archived_at` |
-| `goal_contribution` | `(transaction_id) WHERE transaction_id IS NOT NULL` | `kind IN ('REAL','WITHDRAWAL')` ⇔ `transaction_id IS NOT NULL` (04 §5); `kind IN ('WITHDRAWAL','RELEASE')` ⇔ `amount < 0` | `(workspace_id, goal_id, contribution_date)` | **WS-RO** (corrección = contribución inversa) | Append-only |
+| `savings_goal` | `(workspace_id, id)`; `(workspace_id, lower(name)) WHERE archived_at IS NULL` | `target_amount > 0`; `target_date IS NULL OR target_date > start_date`; `priority BETWEEN 1 AND 5`; `tolerance_percent BETWEEN 0 AND 50`; `pace_periods BETWEEN 1 AND 12`; `status IN ('ACTIVE','PAUSED','ACHIEVED','CLOSED','CANCELLED')`; `archived_at IS NULL OR status IN ('CLOSED','CANCELLED')` | `(workspace_id, status)` | WS | `version`, `archived_at`; sin DELETE |
+| `goal_linked_account` | PK `(workspace_id, goal_id, account_id)` | FK a la meta | `(workspace_id, account_id)` | WS | Se desvincula solo sin fondos reales (DELETE) |
+| `goal_movement` | `(reverses_id)`; parcial `(workspace_id, transaction_id, transaction_revision) WHERE movement = 'CONTRIBUTION' AND fund = 'REAL'`; parcial `(workspace_id, transaction_id, transaction_revision, goal_id) WHERE movement = 'WITHDRAWAL' AND fund = 'REAL'` | signo por `movement` (`CONTRIBUTION` y `REASSIGN_IN` > 0; `WITHDRAWAL` y `REASSIGN_OUT` < 0; `REVERSAL` ≠ 0, con el signo opuesto al original); `fund = 'EARMARK'` ⇒ sin transacción; `fund = 'REAL'` con `CONTRIBUTION`/`WITHDRAWAL` ⇒ `transaction_id` y `transaction_revision` presentes; `movement = 'REVERSAL'` ⇔ `reverses_id IS NOT NULL`; `REASSIGN_*` ⇔ `reassignment_id IS NOT NULL` | `(workspace_id, goal_id, occurred_on)`, `(workspace_id, account_id)`, `(workspace_id, transaction_id)` | **WS-RO** (corrección = movimiento inverso) | Append-only (`forbid_mutation`, también TRUNCATE) |
+| `goal_plan` | PK `goal_id` | `monthly_amount > 0`; `automation = 'RECURRING'` ⇒ `fund = 'REAL'` y `definition_id`, modo de materialización, cuentas origen y destino y `day_of_month` presentes | `(workspace_id, definition_id)` | WS | `version`; DELETE al quitar el plan |
+| `account_reservation_state` | PK `(workspace_id, account_id)` | `state = 'OVER_ALLOCATED'` ⇔ `episode_id`, `since`, `shortfall` y `currency` presentes | — | WS | `version` |
+| `recurring_materialization` | PK `(workspace_id, transaction_id)` | `status IN ('WAITING','RECORDED','RELEASED')` | parcial `(workspace_id, goal_id) WHERE status = 'WAITING'` | WS | — |
+| `contribution_suggestion` | `(workspace_id, transaction_id, transaction_revision)` | `status IN ('PENDING','CONFIRMED','DISMISSED','EXPIRED')`; `CONFIRMED` ⇔ `movement_id`; `CONFIRMED`/`DISMISSED` ⇔ `decided_at` y `decided_by` | parcial `(workspace_id, created_at) WHERE status = 'PENDING'` | WS | Una sugerencia descartada nunca se re-propone (la fila queda) |
+
+**As-built Phase 4 (`add-savings-goals`, migración `20261013100100_goals_schema.sql`).** Siete tablas con RLS forzada y grants mínimos (`pf_worker` es miembro de `pf_app` y hereda sus grants; `goal_movement` solo SELECT e INSERT) y `forbid_mutation` en `goal_movement`. Registradas en `platform.workspace_scoped_table` (purga 195–197, hijas antes que padres) y exportables (secciones `savings-goals`, `goal-linked-accounts`, `goal-movements`, `goal-plans`, `goal-account-reservation-states`, `goal-recurring-materializations` y `goal-contribution-suggestions`, órdenes 772–778). Ninguna columna guarda progreso, porcentaje ni reservado: se derivan en lectura con `SUM … GROUP BY` sobre los movimientos. `audit.lifecycle_state_divergences()` cubre también `SavingsGoal`. La migración `20261013100000_commitments_goal_managed.sql` amplía el CHECK `managed_by` de `commitments.recurring_definition` con `GOAL` (y exige `kind = 'TRANSFER'` para esas definiciones); `20261013100200_txn_goal_ref_uk.sql` crea el índice único parcial `transaction_goal_ref_uk` sobre la referencia externa `goals.movement` de las transferencias no anuladas (una transferencia vigente por movimiento), que Transactions guarda con `source = GOAL`.
 
 ### 5.9 `debt` — Loans, amortization, credit cards (Phase 4)
 
@@ -1239,9 +1277,9 @@ erDiagram
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
 | `loan` | `(workspace_id, id)`; **parcial `(workspace_id, account_id) WHERE status <> 'CANCELLED'`** | `principal > 0`; `annual_rate >= 0`; `term_installments BETWEEN 1 AND 600`; `first_due_date > disbursement_date` (salvo `origin = 'EXISTING'`); `status IN ('DRAFT','ACTIVE','PAID_OFF','CANCELLED')`; `method IN ('FRENCH','GERMAN','FIXED_PRINCIPAL','CUSTOM')` (`FIXED_PRINCIPAL` reemplaza a `BULLET`); `origin` ⇔ campos `existing_*`; `ACTIVE`/`PAID_OFF` ⇔ `current_schedule_version` | `(workspace_id, status)` | WS | `version` (reemplaza `term_months`, `start_date` y `amortization_method` del diseño previo) |
-| `loan_schedule_version` | PK `(loan_id, schedule_version)` | `reason IN ('INITIAL')` en este change | — | **WS-RO** | Append-only (`forbid_mutation`); `add-loan-amortization-advanced` agrega versiones |
+| `loan_schedule_version` | PK `(loan_id, schedule_version)` | `reason IN ('INITIAL','PREPAYMENT','PREPAYMENT_VOIDED','RATE_CHANGE','CUSTOM_DEFINED','CUSTOM_ADOPTED')`; `from_installment_no >= 1` (primera cuota que reemplaza); `source_payment_id`, `source_rate_change_id`, `source_reference_id` (lógicas, sin FK) | — | **WS-RO** | Append-only (`forbid_mutation`). El cronograma **efectivo** de la versión V toma, de cada número de cuota, la fila de la última versión ≤ V cuya `from_installment_no` lo cubre (`add-loan-amortization-advanced`) |
 | `loan_installment` | **`(loan_id, schedule_version, installment_no)`**; `(workspace_id, id)` | `total_amount = principal_amount + interest_amount + fees_amount + insurance_amount + tax_amount`; todos `>= 0`; FK a `loan_schedule_version` | — | **WS-RO** | Append-only: la cuota **no** guarda estado ni `paid_transaction_id` (lo reemplazan las imputaciones); el estado `UNPAID`/`PARTIALLY_PAID`/`PAID` y `DUE`/`OVERDUE` se derivan |
-| `loan_payment` | `(transaction_id)`; `(loan_id, payment_no)`; `(workspace_id, id)` | `amount = principal + interest + fees + insurance + taxes` (INV-016); `status IN ('ACTIVE','VOIDED')`; `VOIDED` ⇔ `voided_at` | `(loan_id, status, business_date)`; `(workspace_id, business_date) WHERE status = 'ACTIVE'` | WS | Una fila por pago; solo cambia al anularse (reemplaza al modelo previo `loan_schedule_change`, que llega con `add-loan-amortization-advanced`) |
+| `loan_payment` | `(transaction_id)`; `(loan_id, payment_no)`; `(workspace_id, id)` | `amount = principal + interest + fees + insurance + taxes` (INV-016); `status IN ('ACTIVE','VOIDED')`; `VOIDED` ⇔ `voided_at` | `(loan_id, status, business_date)`; `(workspace_id, business_date) WHERE status = 'ACTIVE'` | WS | Una fila por pago; solo cambia al anularse. `add-loan-amortization-advanced` agrega `kind` (`REGULAR`/`PREPAYMENT`), `prepayment_option` y `prepayment_fee`; el modelo previo `loan_schedule_change` queda absorbido por `loan_schedule_version` (motivo + parámetros) |
 | `loan_payment_allocation` | PK `(payment_id, installment_id)` | componentes `>= 0` | `(loan_id, installment_no)` | **WS-RO** | Append-only; el estado de la cuota se deriva de las imputaciones de pagos `ACTIVE` |
 | `loan_reference_schedule` | `(loan_id, reference_version)`; `(workspace_id, id)` | `source IN ('CSV','PASTE','MANUAL')`; `row_count BETWEEN 1 AND 600` | — | **WS-RO** | Append-only; el archivo original NO se guarda |
 | `loan_reference_row` | PK `(reference_id, installment_no)` | montos `>= 0` | — | **WS-RO** | Append-only |
@@ -1253,6 +1291,8 @@ erDiagram
 | `card_installment_plan` / `card_installment` | parcial `(workspace_id, purchase_transaction_id) WHERE status <> 'CANCELLED'`; PK `(plan_id, n)` | `installment_count BETWEEN 2 AND 60`; `total = principal + interest` | `(workspace_id, billing_closing_date)` | WS | Cuotas no facturadas reasignables |
 | `card_utilization_state` | PK `(card_id, scope_key, threshold)` | — | — | WS | Umbral armado o desarmado |
 | `card_utilization_crossing`, `card_reminder` | PK `(card_id, scope_key, threshold, crossing_no)`; PK `(workspace_id, card_account_id, closing_date)` | — | — | **WS-RO** | Append-only |
+
+**As-built Phase 4 (`add-loan-amortization-advanced`, migración `20261014100000_debt_amortization_advanced.sql`).** Expand: `debt.loan.fixed_principal_amount` (obligatorio y solo con `FIXED_PRINCIPAL`) y `debt.loan.custom_schedule` (cuotas custom de un borrador, que el desembolso fija como versión 1 y limpia), `from_installment_no` y `source_*` en `debt.loan_schedule_version` con los motivos nuevos, `kind`/`prepayment_option`/`prepayment_fee` en `debt.loan_payment` y la tabla `debt.loan_rate_change` (WS-RO: `UNIQUE (loan_id, effective_from)`, `forbid_mutation`, purga con orden 181) con la sección de portabilidad `loan-rate-changes` (orden 797).
 
 **As-built Phase 4 (`add-loans`, migración `20261011100000_debt_schema.sql`).** Se crean las 8 tablas de préstamos (`loan`, `loan_schedule_version`, `loan_installment`, `loan_payment`, `loan_payment_allocation`, `loan_reference_schedule`, `loan_reference_row`, `loan_schedule_comparison`) con RLS forzada por `workspace_id`, registradas en `platform.workspace_scoped_table` y con `forbid_mutation` (PF003) en versión, cuotas, imputaciones, referencias y filas; cuenta, contraparte, transacción y definición recurrente son referencias lógicas, sin FK entre schemas. Portabilidad: secciones `loans`, `loan-schedule-versions`, `loan-installments`, `loan-payments`, `loan-payment-allocations`, `loan-reference-schedules`, `loan-reference-rows` y `loan-schedule-comparisons` (órdenes 780–787). Las tablas de tarjetas llegan con `add-credit-cards` (abajo). Expand en otros contextos: ver §5.4 (kinds `LOAN_*`, `loan_payment_breakdown`, `assert_splits_sum`) y §5.7 (`LOAN_PAYMENT`, `explicit_schedule`, `schedule_key`).
 
@@ -1910,7 +1950,7 @@ erDiagram
 | `planning.budget_template_version`, `budget_template_line` | SELECT, INSERT | SELECT | Sí (la purga del workspace demo sigue permitida, ADR-0026) |
 | `planning.budget_threshold_crossing` | SELECT, INSERT | SELECT, INSERT (hereda de `pf_app`) | Sí (la purga del workspace demo sigue permitida, ADR-0026) |
 | `audit.audit_log`, `audit.lifecycle_transition` | SELECT, INSERT | SELECT, INSERT | Sí |
-| `goals.goal_contribution`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |
+| `goals.goal_movement`, `debt.loan_schedule_change`, `rules.rule_execution`, `forecasting.forecast_point` | SELECT, INSERT | SELECT, INSERT | Sí (salvo purga por retención con rol de mantenimiento) |
 | `reporting.*` | SELECT | SELECT, INSERT, UPDATE, DELETE, TRUNCATE | No |
 | Resto de tablas de negocio | SELECT, INSERT, UPDATE | SELECT, INSERT, UPDATE | No (DELETE no concedido salvo tablas de enlace/técnicas: `accounts.account_tag`, `txn.split_tag`, `classification.counterparty_alias`, `fx.rate_preference`, `txn.split_custom_field_value`, `accounts.account_custom_field_value`, `attachment_link`, `reconciliation_item`; purgas de `imports.staged_transaction` solo `pf_maintenance`) |
 

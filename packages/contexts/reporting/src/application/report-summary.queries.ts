@@ -14,6 +14,8 @@ import {
 import type {
   AccountBalanceLineDto,
   CurrencyTotalsDto,
+  GoalContributionsDto,
+  GoalsBlockDto,
   MoneyDto,
   MoneyVariationDto,
   ReportSummaryDto,
@@ -36,12 +38,36 @@ import {
   type NominalFlow,
   type ValuedAccount,
 } from '../domain/index.js';
-import type { ReportingDeps } from './ports/index.js';
+import type { GoalHomeSummaryRow, ReportingDeps } from './ports/index.js';
 
 export const DEFAULT_TOP_CATEGORIES = 5;
 /** Ventana de vigencia por defecto de las tasas de valoración (días; docs/31 D53: ajuste de Reporting). */
 export const DEFAULT_RATE_VALIDITY_WINDOW_DAYS = 7;
 export const MAX_TOP_CATEGORIES = 20;
+/** Metas que muestra la tarjeta de Q9 del Home (add-savings-goals). */
+export const GOALS_HOME_LIMIT = 3;
+
+/** Bloque `goals` (Q9): sin metas `ACTIVE`/`PAUSED`/`ACHIEVED` ⇒ `NO_DATA` con `CREATE_GOAL`, sin porcentajes. */
+function goalsBlock(summary: GoalHomeSummaryRow | null): GoalsBlockDto {
+  if (summary === null || summary.goalCount === 0) {
+    return {
+      status: 'NO_DATA',
+      action: 'CREATE_GOAL',
+      items: [],
+      moreCount: 0,
+      complete: true,
+      ratesUsed: [],
+    };
+  }
+  return {
+    status: 'AVAILABLE',
+    action: null,
+    items: summary.items,
+    moreCount: summary.moreCount,
+    complete: summary.items.every((i) => i.complete),
+    ratesUsed: summary.ratesUsed,
+  };
+}
 
 export interface GetReportSummaryQuery {
   readonly userId: string | null;
@@ -172,6 +198,19 @@ export class ReportSummaryQueries {
       amount: money(r.amount),
     }));
 
+    // ---- metas (add-savings-goals): Q9 (consulta por lote, nada por meta) y aportes netos del periodo (Q6)
+    const goalSummary = deps.goalSummary
+      ? await deps.goalSummary.listForHome({ workspaceId: ws, limit: GOALS_HOME_LIMIT })
+      : null;
+    const goalFlowRows = deps.goalFlows
+      ? await deps.goalFlows.netForRange({
+          workspaceId: ws,
+          from: period.from.toString(),
+          to: period.to.toString(),
+        })
+      : null;
+    const goalFlows = (goalFlowRows ?? []).map((r) => ({ date: r.date, amount: money(r.amount) }));
+
     // ---- saldos presentados por cuenta (cero si aún no tiene ledger account)
     const presentedByAccount = new Map(
       balances.balances.filter((b) => b.accountId !== null).map((b) => [b.accountId as string, b.presented]),
@@ -197,8 +236,9 @@ export class ReportSummaryQueries {
             return close.epochMillis > now.epochMillis ? nowText : close.toString();
           })();
     // Pedidos de tasa de los flujos: `FlowValuation` (shared-kernel, docs/33 D109) comparte las reglas con Planning.
+    // Los aportes a metas comparten la MISMA resolución de tasas (una sola llamada a FX por petición, NFR-PERF-004).
     const flowRequests = FlowValuation.rateRequests(
-      flows.map((f) => ({ date: f.businessDate, amount: f.amount })),
+      [...flows.map((f) => ({ date: f.businessDate, amount: f.amount })), ...goalFlows],
       reporting,
       timeZone,
       now,
@@ -225,6 +265,8 @@ export class ReportSummaryQueries {
     const used = new Map<string, ResolvedRateDto>();
     const usedStocks = new Map<string, ResolvedRateDto>();
     const usedFlows = new Map<string, ResolvedRateDto>();
+    // Tasas de los aportes a metas: se informan en `meta.ratesUsed` pero no son parte de las cifras de cierre.
+    const usedGoalFlows = new Map<string, ResolvedRateDto>();
     const useRate = (
       r: ValuationRateDto | undefined,
       own: Map<string, ResolvedRateDto>,
@@ -237,6 +279,8 @@ export class ReportSummaryQueries {
     };
     const stockRateFor = (code: string) => useRate(stockRates.get(code), usedStocks);
     const flowRateFor = (code: string, date: string) => useRate(flowRates.get(`${code}|${date}`), usedFlows);
+    const goalFlowRateFor = (code: string, date: string) =>
+      useRate(flowRates.get(`${code}|${date}`), usedGoalFlows);
 
     // ---- stocks: dinero disponible y patrimonio neto
     const isLiquid = (a: AccountSummaryDto) => a.nature === 'ASSET' && a.liquidity === 'LIQUID';
@@ -280,6 +324,18 @@ export class ReportSummaryQueries {
     };
     const top = KpiCalculator.topCategories(inPeriod, topN, { ...topOptions, nature: 'EXPENSE' });
     const topIncome = KpiCalculator.topCategories(inPeriod, topN, { ...topOptions, nature: 'INCOME' });
+
+    // ---- aportes netos a metas del periodo (Q6): por moneda y consolidados; no tocan ahorro ni tasa de ahorro
+    const goalsInPeriod = goalFlows.filter((f) => f.date >= periodText.from && f.date <= periodText.to);
+    const goalContribution = ConsolidationService.consolidateFlows(goalsInPeriod, reporting, goalFlowRateFor);
+    const goalContributions: GoalContributionsDto =
+      goalFlowRows === null
+        ? { native: [], base: null, complete: true }
+        : {
+            native: sumByCurrency(goalsInPeriod.map((f) => f.amount)).map((m) => m.toJSON()),
+            base: present(goalContribution.total, reporting).toJSON(),
+            complete: goalContribution.complete,
+          };
 
     // ---- comparación
     const variation = (cur: Decimal, prev: Decimal): MoneyVariationDto => {
@@ -434,7 +490,10 @@ export class ReportSummaryQueries {
       questions: homeQuestions({
         hasAccounts: accounts.length > 0,
         hasCommitments: await this.hasCommitments(ws, accounts.length > 0),
+        hasGoals: (goalSummary?.goalCount ?? 0) > 0,
       }),
+      goals: goalsBlock(goalSummary),
+      goalContributions,
       meta: {
         generatedAt: nowText,
         reportingCurrency: reporting.code,

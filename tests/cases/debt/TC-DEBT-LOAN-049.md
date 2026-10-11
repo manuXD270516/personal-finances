@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: []
 requirement: 'Registrar un pago extraordinario'
 scenario: 'Prepago con una cuota vencida sin pagar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'prepayment', 'validation']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'Se rechaza con `LOAN_INSTALLMENTS_PENDING` y no se crea ninguna transacción'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-049 — Un prepago con cuotas vencidas impagas se rechaza
@@ -48,4 +49,4 @@ Entonces se rechaza con `LOAN_INSTALLMENTS_PENDING` y no se crea ninguna transac
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

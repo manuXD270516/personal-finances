@@ -67,7 +67,7 @@ export interface BudgetView {
 }
 
 /** Clave de identidad de una tasa usada (misma versión almacenada y orientación => una sola entrada). */
-const rateKey = (r: ResolvedRateDto): string =>
+export const rateKey = (r: ResolvedRateDto): string =>
   `${r.fxRateId ?? JSON.stringify(r.components.map((c) => (c as { id?: unknown }).id))}|${r.rate.base}|${r.rate.quote}`;
 
 const decimalsOf = (amount: string): number => amount.split('.')[1]?.length ?? 0;

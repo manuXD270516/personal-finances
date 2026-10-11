@@ -25,6 +25,7 @@ import {
   CHARGE_KEYS,
   DAY_COUNTS,
   FREQUENCIES,
+  LOAN_METHODS,
   type ChargeKey,
   type LoanDetail,
   type SchedulePreview,
@@ -194,6 +195,60 @@ export function LoanFields({
                 data-testid="loan-term"
                 onChange={(e) => set({ termInstallments: e.target.value })}
               />
+            )}
+          </Field>
+        </div>
+        <div style={rowStyle}>
+          <Field label={f.t('form.method')} hint={f.t(`form.methodHint.${form.method}`)}>
+            {(p) => (
+              <select
+                {...p}
+                style={inputStyle}
+                value={form.method}
+                data-testid="loan-method"
+                onChange={(e) => set({ method: e.target.value as LoanForm['method'] })}
+              >
+                {LOAN_METHODS.filter((m) => !(existing && m === 'CUSTOM')).map((m) => (
+                  <option key={m} value={m}>
+                    {f.t(`form.methods.${m}`)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          {form.method === 'FIXED_PRINCIPAL' ? (
+            <Field
+              label={f.t('form.fixedPrincipal')}
+              error={err('fixedPrincipal')}
+              hint={f.t('form.fixedPrincipalHint')}
+            >
+              {(p) => (
+                <input
+                  {...p}
+                  style={inputStyle}
+                  inputMode="decimal"
+                  value={form.fixedPrincipal}
+                  data-testid="loan-fixed-principal"
+                  onChange={(e) => set({ fixedPrincipal: e.target.value })}
+                />
+              )}
+            </Field>
+          ) : null}
+          <Field label={f.t('form.rateType')} hint={f.t(`form.rateTypeHint.${form.rateType}`)}>
+            {(p) => (
+              <select
+                {...p}
+                style={inputStyle}
+                value={form.rateType}
+                data-testid="loan-rate-type"
+                onChange={(e) => set({ rateType: e.target.value as LoanForm['rateType'] })}
+              >
+                {(['FIXED', 'VARIABLE'] as const).map((t) => (
+                  <option key={t} value={t}>
+                    {f.t(`form.rateTypes.${t}`)}
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
         </div>

@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Sistema alemán de capital constante'
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-004', 'FR-DEBT-006']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-methods.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'pbt']
@@ -30,7 +31,7 @@ expected_result:
   - 'La cuota alemana no crece con tasa constante y 30/360 regular'
   - 'El principal de las cuotas 1 a n−1 del capital fijo es el principal fijo'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-023 — PBT: alemán y capital fijo suman el principal y respetan su forma
@@ -52,5 +53,5 @@ Entonces la suma del principal es exactamente el principal
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
 - Cubre también el requirement "Sistema de capital fijo con cuota final balloon".

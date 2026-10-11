@@ -5,16 +5,20 @@ spec: reporting/dashboard
 related_specs: ["goals/savings-goals"]
 requirement: "Preguntas del Home sin datos o no disponibles"
 scenario: "Workspace sin metas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001"]
 nfr: ["NFR-USAB-009"]
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/reporting/src/application/report-summary.goals.test.ts
+  - packages/contexts/reporting/src/domain/home-questions.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "home", "empty-state"]
@@ -29,7 +33,7 @@ expected_result:
   - "A: Q9 NO_DATA con acción CREATE_GOAL, sin 0 %; Q5 NOT_AVAILABLE_IN_PHASE"
   - "B: Q9 AVAILABLE; Q5 sigue NOT_AVAILABLE_IN_PHASE hasta add-spendable-amount"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-047 — Con metas habilitadas solo Q5 sigue no disponible y un workspace sin metas ofrece crear una sin mostrar 0 %

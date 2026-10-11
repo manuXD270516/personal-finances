@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Aporte mensual requerido"
 scenario: "Seis periodos hasta marzo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-003"]
 nfr: ["NFR-USAB-004"]
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/goals/src/domain/required-contribution-calculator.test.ts
+  - packages/shared-kernel/src/time/financial-period-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "required", "periods"]
@@ -30,7 +33,7 @@ expected_result:
   - "requiredMonthly = 1666.67 BOB"
   - "periods = 6 (\"2026-10\" a \"2027-03\")"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-031 — El aporte mensual requerido divide el restante por los periodos financieros hasta la fecha objetivo, ambos incluidos

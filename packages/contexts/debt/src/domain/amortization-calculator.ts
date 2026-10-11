@@ -1,11 +1,23 @@
-import { DomainError, LocalDate, Money, MoneyDecimal, dec, type Currency } from '@pf/shared-kernel';
+import { Money, MoneyDecimal, dec, type Currency, type LocalDate } from '@pf/shared-kernel';
+import {
+  RATE_UNIT,
+  addMonthsClamped,
+  chargeCalc,
+  days360European,
+  divHalfEven,
+  fmt,
+  rateUnits,
+  unitsOf,
+  validation,
+  type ChargeCalc,
+} from './amortization-math.js';
+import { runPeriods, type EnginePeriod, type PrincipalPolicy } from './schedule-engine.js';
 import {
   DAY_COUNTS,
   LOAN_FREQUENCIES,
   MAX_LOAN_INSTALLMENTS,
   MIN_LOAN_INSTALLMENTS,
   MONTHS_PER_PERIOD,
-  type ChargeSpec,
   type DayCount,
   type LoanCharges,
   type LoanFrequency,
@@ -39,7 +51,15 @@ export interface AmortizationInput {
   /** Número de la primera cuota (por omisión 1; un préstamo en curso continúa la numeración). */
   readonly firstInstallmentNo?: number;
   readonly charges?: LoanCharges;
+  /** Sistema de amortización calculable (`FRENCH` por omisión; el `CUSTOM` no se calcula, se carga). */
+  readonly method?: CalculableMethod;
+  /** Solo `FIXED_PRINCIPAL`: principal de las cuotas 1..n−1 (escala de la moneda); la última es el balloon. */
+  readonly fixedPrincipalAmount?: string;
 }
+
+/** Sistemas que el calculador sabe calcular (add-loan-amortization-advanced, decisión 1). */
+export const CALCULABLE_METHODS = ['FRENCH', 'GERMAN', 'FIXED_PRINCIPAL'] as const;
+export type CalculableMethod = (typeof CALCULABLE_METHODS)[number];
 
 export interface AmortizationSchedule {
   readonly installments: readonly ScheduleInstallment[];
@@ -49,72 +69,8 @@ export interface AmortizationSchedule {
   readonly leveled: boolean;
 }
 
-const RATE_SCALE = 18;
-const RATE_UNIT = 10n ** BigInt(RATE_SCALE);
 /** Ventana (en unidades menores) alrededor de la cuota nivelada donde se busca el mínimo |última − cuota|. */
 const LEVEL_WINDOW = 6n;
-
-const validation = (message: string, details?: Record<string, unknown>) =>
-  new DomainError('VALIDATION_FAILED', message, details ? { details } : {});
-
-/** Cociente entero de a/b (b > 0, a ≥ 0) con redondeo HALF_EVEN. */
-function divHalfEven(a: bigint, b: bigint): bigint {
-  const q = a / b;
-  const r = a % b;
-  const twice = 2n * r;
-  return twice > b || (twice === b && q % 2n === 1n) ? q + 1n : q;
-}
-
-/** Tasa decimal (0..max) → entero escalado a 10^18. */
-function rateUnits(value: string, label: string, max: string): bigint {
-  let d;
-  try {
-    d = new MoneyDecimal(value);
-  } catch {
-    throw validation(`${label} must be a decimal string`, { field: label });
-  }
-  if (!d.isFinite() || d.isNeg() || d.gt(max) || d.decimalPlaces() > RATE_SCALE) {
-    throw validation(`${label} must be between 0 and ${max} with at most ${RATE_SCALE} decimals`, {
-      field: label,
-    });
-  }
-  return BigInt(d.times(RATE_UNIT.toString()).toFixed(0));
-}
-
-/** Días 30/360 europeo (días 31 → 30) entre dos fechas. */
-export function days360European(from: LocalDate, to: LocalDate): number {
-  return (
-    360 * (to.year - from.year) +
-    30 * (to.month - from.month) +
-    (Math.min(to.day, 30) - Math.min(from.day, 30))
-  );
-}
-
-/** Suma `months` meses conservando el día; día inexistente ⇒ último día del mes (mismo criterio que el motor). */
-export function addMonthsClamped(date: LocalDate, months: number): LocalDate {
-  const index = date.year * 12 + (date.month - 1) + months;
-  const year = Math.floor(index / 12);
-  const month = (index % 12) + 1;
-  return LocalDate.of(year, month, Math.min(date.day, LocalDate.daysInMonth(year, month)));
-}
-
-interface ChargeCalc {
-  readonly fixed: bigint | null;
-  readonly rate: bigint | null;
-}
-
-function chargeCalc(spec: ChargeSpec | undefined, currency: Currency, label: string): ChargeCalc {
-  if (!spec) return { fixed: 0n, rate: null };
-  if (spec.mode === 'FIXED') {
-    const money = Money.parse(spec.value, currency);
-    if (money.isNegative()) throw validation(`${label} must not be negative`, { field: label });
-    return { fixed: money.toMinorUnits(), rate: null };
-  }
-  if (spec.mode === 'RATE_ON_BALANCE') {
-    return { fixed: null, rate: rateUnits(spec.value, label, '1') };
-  }
-  throw validation(`${label} has an unknown mode`, { field: label });
-}
 
 interface Context {
   readonly currency: Currency;
@@ -135,11 +91,6 @@ interface Context {
 
 const interestOf = (ctx: Context, balance: bigint, k: number): bigint =>
   divHalfEven(balance * ctx.rate * BigInt(ctx.days[k] as number), RATE_UNIT * ctx.denominator);
-
-const chargeOf = (ctx: Context, calc: ChargeCalc, balance: bigint): bigint =>
-  calc.fixed !== null
-    ? calc.fixed
-    : divHalfEven(balance * (calc.rate as bigint) * BigInt(ctx.monthsPerPeriod), RATE_UNIT);
 
 function buildContext(input: AmortizationInput): Context {
   const { currency: cur } = input;
@@ -284,78 +235,90 @@ function levelFrom(ctx: Context, start: bigint): bigint | null {
   return best?.A ?? null;
 }
 
-function fmt(units: bigint, scale: number): string {
-  const negative = units < 0n;
-  const digits = (negative ? -units : units).toString().padStart(scale + 1, '0');
-  const intPart = digits.slice(0, digits.length - scale);
-  const frac = scale > 0 ? `.${digits.slice(digits.length - scale)}` : '';
-  return `${negative ? '-' : ''}${intPart}${frac}`;
+/**
+ * Principal fijo por cuota del capital fijo (decisión 1): positivo, a la escala de la moneda y tal que las cuotas
+ * 1..n−1 no agoten el principal (el balloon sería ≤ 0); si no, `VALIDATION_FAILED`.
+ */
+function fixedPrincipalUnits(input: AmortizationInput, ctx: Context): bigint {
+  if (input.fixedPrincipalAmount === undefined) {
+    throw validation('fixedPrincipalAmount is required for the FIXED_PRINCIPAL method', {
+      field: 'fixedPrincipalAmount',
+    });
+  }
+  const fixed = Money.parse(input.fixedPrincipalAmount, ctx.currency);
+  if (!fixed.isPositive()) {
+    throw validation('fixedPrincipalAmount must be greater than zero', { field: 'fixedPrincipalAmount' });
+  }
+  const units = fixed.toMinorUnits();
+  const before = units * BigInt(ctx.n - 1);
+  if (before >= ctx.principal) {
+    throw validation('the fixed principal leaves no balloon installment', {
+      field: 'fixedPrincipalAmount',
+      sumBeforeLast: fmt(before, ctx.currency.scale),
+      principal: fmt(ctx.principal, ctx.currency.scale),
+    });
+  }
+  return units;
 }
 
 /**
- * Calcula el cronograma francés. Errores (`DomainError`): `VALIDATION_FAILED` por entradas inválidas y, si en una
+ * Calcula el cronograma (francés, alemán o capital fijo). Errores (`DomainError`): `VALIDATION_FAILED` por entradas inválidas y, si en una
  * cuota intermedia `A − interés < 0`, `VALIDATION_FAILED` con `details.reason = 'NEGATIVE_AMORTIZATION'`.
  */
 export function calculateSchedule(input: AmortizationInput): AmortizationSchedule {
   const ctx = buildContext(input);
   const scale = ctx.currency.scale;
-  const standard = standardInstallment(ctx, 12 / ctx.monthsPerPeriod);
+  const method: CalculableMethod = input.method ?? 'FRENCH';
+  if (!(CALCULABLE_METHODS as readonly string[]).includes(method)) {
+    throw validation('unknown amortization method', { field: 'method' });
+  }
 
-  let installment = standard;
+  let installment = 0n;
   let leveled = false;
-  const needsLeveling =
-    ctx.rate > 0n && ctx.n > 1 && (input.dayCount !== 'D30_360' || ctx.irregularFirstPeriod);
-  if (needsLeveling) {
-    const level = levelFrom(ctx, standard);
-    if (level === null) {
-      throw validation('the schedule would require negative amortization', {
-        reason: 'NEGATIVE_AMORTIZATION',
-      });
+  let policy: PrincipalPolicy;
+  if (method === 'FRENCH') {
+    const standard = standardInstallment(ctx, 12 / ctx.monthsPerPeriod);
+    installment = standard;
+    const needsLeveling =
+      ctx.rate > 0n && ctx.n > 1 && (input.dayCount !== 'D30_360' || ctx.irregularFirstPeriod);
+    if (needsLeveling) {
+      const level = levelFrom(ctx, standard);
+      if (level === null) {
+        throw validation('the schedule would require negative amortization', {
+          reason: 'NEGATIVE_AMORTIZATION',
+        });
+      }
+      installment = level;
+      leveled = true;
     }
-    installment = level;
-    leveled = true;
+    policy = { kind: 'LEVEL', installment };
+  } else if (method === 'GERMAN') {
+    policy = { kind: 'CONSTANT', principal: divHalfEven(ctx.principal, BigInt(ctx.n)) };
+  } else {
+    policy = { kind: 'CONSTANT', principal: fixedPrincipalUnits(input, ctx) };
   }
 
   const firstNo = input.firstInstallmentNo ?? 1;
-  const rows: ScheduleInstallment[] = [];
-  let balance = ctx.principal;
-  for (let k = 0; k < ctx.n; k += 1) {
-    const interest = interestOf(ctx, balance, k);
-    let principal: bigint;
-    if (k === ctx.n - 1) {
-      principal = balance;
-    } else {
-      principal = installment - interest;
-      if (principal < 0n) {
-        throw validation('the installment does not cover the interest (negative amortization)', {
-          reason: 'NEGATIVE_AMORTIZATION',
-          installmentNo: firstNo + k,
-          interest: fmt(interest, scale),
-          installment: fmt(installment, scale),
-        });
-      }
-      // Casos de escala mínima: con redondeo hacia arriba la cuota podría exceder el saldo antes del final.
-      if (principal > balance) principal = balance;
-    }
-    const fees = chargeOf(ctx, ctx.fees, balance);
-    const insurance = chargeOf(ctx, ctx.insurance, balance);
-    const taxes = chargeOf(ctx, ctx.taxes, balance);
-    const closing = balance - principal;
-    rows.push({
-      n: firstNo + k,
-      dueDate: (ctx.dueDates[k] as LocalDate).toString(),
-      periodStart: (ctx.starts[k] as LocalDate).toString(),
-      periodEnd: (ctx.dueDates[k] as LocalDate).toString(),
-      principal: fmt(principal, scale),
-      interest: fmt(interest, scale),
-      fees: fmt(fees, scale),
-      insurance: fmt(insurance, scale),
-      taxes: fmt(taxes, scale),
-      total: fmt(principal + interest + fees + insurance + taxes, scale),
-      openingBalance: fmt(balance, scale),
-      closingBalance: fmt(closing, scale),
-    });
-    balance = closing;
+  const periods: EnginePeriod[] = ctx.dueDates.map((dueDate, k) => ({
+    n: firstNo + k,
+    dueDate,
+    periodStart: ctx.starts[k] as LocalDate,
+    days: ctx.days[k] as number,
+    rate: ctx.rate,
+  }));
+  const rows = runPeriods({
+    scale,
+    denominator: ctx.denominator,
+    monthsPerPeriod: ctx.monthsPerPeriod,
+    charges: { fees: ctx.fees, insurance: ctx.insurance, taxes: ctx.taxes },
+    opening: ctx.principal,
+    periods,
+    policy,
+  });
+  if (method !== 'FRENCH') {
+    // Cuota base de referencia de los sistemas de principal fijo: principal + interés de la primera cuota.
+    const first = rows[0] as ScheduleInstallment;
+    installment = unitsOf(dec(first.principal).plus(first.interest).toFixed(scale), ctx.currency);
   }
   return { installments: rows, installmentAmount: fmt(installment, scale), leveled };
 }
@@ -370,3 +333,59 @@ export const AmortizationCalculator = {
   previewSchedule,
   levelInstallment,
 } as const;
+
+/** Periodos explícitos de un tramo (cuotas restantes de un préstamo en curso), con los días de cada devengo. */
+export interface TailPeriodSpec {
+  readonly n: number;
+  readonly dueDate: LocalDate;
+  readonly periodStart: LocalDate;
+  readonly days: number;
+}
+
+export interface TailInstallmentInput {
+  readonly currency: Currency;
+  /** Saldo de principal al inicio del tramo. */
+  readonly principal: string;
+  readonly annualRate: string;
+  readonly dayCount: DayCount;
+  readonly frequency: LoanFrequency;
+  readonly periods: readonly TailPeriodSpec[];
+}
+
+/**
+ * Cuota francesa (con la misma nivelación D153 del cronograma inicial) de un tramo sobre fechas dadas: la usan el
+ * ScheduleRecalculator al reducir la cuota y al cambiar la tasa (add-loan-amortization-advanced, decisión 3).
+ * Devuelve la cuota base en unidades menores (principal + interés, sin cargos) y si se niveló.
+ */
+export function frenchInstallmentFor(input: TailInstallmentInput): { installment: bigint; leveled: boolean } {
+  const n = input.periods.length;
+  if (n < 1) throw validation('the tail needs at least one installment', { field: 'periods' });
+  const principalMoney = Money.parse(input.principal, input.currency);
+  if (!principalMoney.isPositive()) throw validation('principal must be positive', { field: 'principal' });
+  const months = MONTHS_PER_PERIOD[input.frequency];
+  const first = input.periods[0] as TailPeriodSpec;
+  const zero: ChargeCalc = { fixed: 0n, rate: null };
+  const ctx: Context = {
+    currency: input.currency,
+    principal: principalMoney.toMinorUnits(),
+    n,
+    rate: rateUnits(input.annualRate, 'annualRate', '1'),
+    days: input.periods.map((p) => p.days),
+    denominator: input.dayCount === 'ACT_365' ? 365n : 360n,
+    monthsPerPeriod: months,
+    dueDates: input.periods.map((p) => p.dueDate),
+    starts: input.periods.map((p) => p.periodStart),
+    irregularFirstPeriod: first.days !== 30 * months,
+    fees: zero,
+    insurance: zero,
+    taxes: zero,
+  };
+  const standard = standardInstallment(ctx, 12 / months);
+  const needsLeveling = ctx.rate > 0n && n > 1 && (input.dayCount !== 'D30_360' || ctx.irregularFirstPeriod);
+  if (!needsLeveling) return { installment: standard, leveled: false };
+  const level = levelFrom(ctx, standard);
+  if (level === null) {
+    throw validation('the schedule would require negative amortization', { reason: 'NEGATIVE_AMORTIZATION' });
+  }
+  return { installment: level, leveled: true };
+}

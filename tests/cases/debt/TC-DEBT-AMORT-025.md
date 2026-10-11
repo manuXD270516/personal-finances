@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Sistema de capital fijo con cuota final balloon'
 scenario: 'Capital fijo excesivo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-004']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-methods.test.ts
+  - packages/contexts/debt/src/domain/loan.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'fixed-principal', 'validation']
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - 'Se rechaza con `VALIDATION_FAILED` porque las primeras 11 cuotas suman 11000.00 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-025 — Un capital fijo que agota el principal antes de la última cuota se rechaza
@@ -48,4 +51,4 @@ Entonces se rechaza con `VALIDATION_FAILED` porque las primeras 11 cuotas suman 
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

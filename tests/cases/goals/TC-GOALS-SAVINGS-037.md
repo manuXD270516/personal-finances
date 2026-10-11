@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta alcanzada"
 scenario: "Laptop alcanzada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-008"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "reached", "events"]
@@ -36,7 +40,7 @@ expected_result:
   - "Tras −600.00: ACTIVE (REOPEN) con 8500.00 BOB"
   - "Tras +500.00: ACHIEVED otra vez y un hecho nuevo"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-037 — Alcanzar el objetivo publica GoalReached una vez por alcance y un retiro que la deja por debajo la reabre

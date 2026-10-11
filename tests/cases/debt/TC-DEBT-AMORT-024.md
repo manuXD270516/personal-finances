@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Sistema de capital fijo con cuota final balloon'
 scenario: 'Capital fijo con balloon'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-004']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-methods.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'fixed-principal', 'balloon']
@@ -29,7 +31,7 @@ expected_result:
   - 'La cuota 1 es 600.00 BOB (interés 100.00), la cuota 11 es 550.00 BOB (interés 50.00) y la cuota 12 es 4545.00 BOB (principal 4500.00, interés 45.00)'
   - 'El interés total es 870.00 BOB y la suma del principal es 10000.00 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-024 — Capital fijo con cuota final balloon
@@ -50,4 +52,4 @@ Entonces la cuota 1 es 600.00 BOB (interés 100.00), la cuota 11 es 550.00 BOB (
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

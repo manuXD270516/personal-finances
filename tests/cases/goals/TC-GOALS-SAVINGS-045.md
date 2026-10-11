@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ["goals/savings-goals"]
 requirement: "Notificación de hito de una meta"
 scenario: "Cruce del 50 %"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-GOALS-008"]
 nfr: []
 invariants: ["INV-028"]
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/goal-notifications.test.ts
+  - packages/contexts/notifications/src/domain/goal-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "notifications", "milestones"]
@@ -30,7 +32,7 @@ expected_result:
   - "Tercer hecho: sin notificación (50 % ya notificado)"
   - "Progreso incompleto: sin hitos"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-045 — Los hitos 25/50/75 % se notifican una vez por meta con el mayor hito cruzado

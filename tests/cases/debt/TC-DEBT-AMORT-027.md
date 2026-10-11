@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cronograma custom cargado manualmente'
 scenario: 'Principal que no suma'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-005', 'FR-DEBT-006']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/custom-schedule.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'custom', 'validation']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - 'Se rechaza con `CUSTOM_SCHEDULE_INVALID` informando 999.99 BOB frente a 1000.00 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-027 — Un cronograma custom cuyo principal no suma se rechaza
@@ -48,4 +50,4 @@ Entonces se rechaza con `CUSTOM_SCHEDULE_INVALID` informando 999.99 BOB frente a
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta de ahorro con tipo, objetivo, fechas y cuentas vinculadas"
 scenario: "Tarjeta de crédito como cuenta vinculada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "validation"]
@@ -30,7 +33,7 @@ expected_result:
   - "Ambos comandos se rechazan con GOAL_ACCOUNT_NOT_ELIGIBLE"
   - "No cambia nada"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-003 — Una cuenta de pasivo no puede vincularse a una meta

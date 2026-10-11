@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Retiro de fondos de una meta"
 scenario: "Retiro con transferencia nueva"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018", "INV-029"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "withdrawal"]
@@ -31,7 +34,7 @@ expected_result:
   - "Movimiento REAL/WITHDRAWAL de −400.00 BOB con el motivo y la transacción"
   - "Progreso 600.00 BOB; auditoría con actor EDITOR"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-024 — Retirar fondos reales crea una transferencia desde la cuenta vinculada y un retiro negativo con motivo

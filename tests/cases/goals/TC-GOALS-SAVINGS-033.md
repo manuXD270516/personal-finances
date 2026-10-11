@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Fecha esperada de cumplimiento según el ritmo"
 scenario: "Ritmo de 1200.00 BOB al mes"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-003"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/domain/expected-date-calculator.test.ts
+  - packages/shared-kernel/src/time/financial-period-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "pace", "expected-date"]
@@ -33,7 +37,7 @@ expected_result:
   - "expectedDate 2027-02-28 con pace.source PLAN"
   - "Sin fecha esperada y \"sin ritmo suficiente\" (NO_PACE)"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-033 — La fecha esperada sale del ritmo de los últimos 3 periodos terminados, del plan si no hay historia, o no se informa

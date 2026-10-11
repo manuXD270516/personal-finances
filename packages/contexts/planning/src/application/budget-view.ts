@@ -8,7 +8,7 @@ import type {
   BudgetTargetKindDto,
   BudgetVsActual,
 } from '../contracts/index.js';
-import type { BudgetView, LineView } from './budget-calculator.js';
+import { rateKey, type BudgetView, type LineView } from './budget-calculator.js';
 import type { OmittedLineDto } from './template-view.js';
 
 const money = (m: Money): BudgetMoneyDto => m.toJSON();
@@ -85,6 +85,47 @@ export interface BudgetOriginDto {
 
 export const NO_ORIGIN: BudgetOriginDto = { templateVersion: null, clonedFromBudgetId: null };
 
+/** Aporte planificado de una meta al periodo, en la moneda de la meta (sección de solo lectura del plan). */
+export interface GoalContributionItemDto {
+  readonly goalId: string;
+  readonly name: string;
+  readonly planned: BudgetMoneyDto;
+  readonly contributed: BudgetMoneyDto;
+  readonly pending: BudgetMoneyDto;
+  readonly exceededBy: BudgetMoneyDto;
+}
+
+/**
+ * Sección "Aportes a metas" del plan (add-savings-goals, decisión 20): solo lectura, no crea líneas ni cambia gastado,
+ * umbrales ni disponible para gastar. El total pendiente se consolida en la moneda del plan con la tasa vigente de hoy.
+ */
+export interface GoalContributionsDto {
+  readonly items: readonly GoalContributionItemDto[];
+  readonly pendingTotal: {
+    readonly native: readonly BudgetMoneyDto[];
+    /** `null` si GOALS no está conectado a la composición. */
+    readonly base: BudgetMoneyDto | null;
+    readonly complete: boolean;
+  };
+}
+
+/** Sección sin metas ni conversión (puerto de GOALS no cableado o respuestas de escritura del plan). */
+export const NO_GOAL_CONTRIBUTIONS: GoalContributionsDto = {
+  items: [],
+  pendingTotal: { native: [], base: null, complete: true },
+};
+
+/** Sección de metas más las tasas que usó su consolidación (se suman a `meta.ratesUsed`). */
+export interface GoalContributionsView {
+  readonly section: GoalContributionsDto;
+  readonly ratesUsed: readonly ResolvedRateDto[];
+}
+
+export const NO_GOAL_CONTRIBUTIONS_VIEW: GoalContributionsView = {
+  section: NO_GOAL_CONTRIBUTIONS,
+  ratesUsed: [],
+};
+
 export interface BudgetDto extends BudgetOriginDto {
   readonly id: string;
   readonly periodId: string;
@@ -98,6 +139,8 @@ export interface BudgetDto extends BudgetOriginDto {
   readonly lines: readonly BudgetLineDto[];
   readonly totals: BudgetTotalsDto;
   readonly meta: BudgetMetaDto;
+  /** Aportes planificados a metas del periodo (solo lectura, aditivo). */
+  readonly goalContributions: GoalContributionsDto;
   readonly version: number;
   readonly createdAt: string | null;
   /** Solo en la respuesta de creación: líneas del origen que no se copiaron. */
@@ -159,11 +202,18 @@ export function toLineDto(view: LineView, currency: string): BudgetLineDto {
   };
 }
 
-export function toBudgetDto(view: BudgetView, origin: BudgetOriginDto = NO_ORIGIN): BudgetDto {
+export function toBudgetDto(
+  view: BudgetView,
+  origin: BudgetOriginDto = NO_ORIGIN,
+  goals: GoalContributionsView = NO_GOAL_CONTRIBUTIONS_VIEW,
+): BudgetDto {
   const code = view.currency.code;
   const snapshot = view.budget.snapshot;
   const attributions = new Map<string, RateAttributionDto>();
-  for (const r of view.ratesUsed) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+  const ratesUsed = [...view.ratesUsed];
+  const known = new Set(ratesUsed.map(rateKey));
+  for (const r of goals.ratesUsed) if (!known.has(rateKey(r))) ratesUsed.push(r);
+  for (const r of ratesUsed) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
   const t = view.totals;
   return {
     id: snapshot.id,
@@ -193,9 +243,10 @@ export function toBudgetDto(view: BudgetView, origin: BudgetOriginDto = NO_ORIGI
       generatedAt: view.generatedAt,
       timeZone: view.timeZone,
       rateWindowDays: view.windowDays,
-      ratesUsed: view.ratesUsed,
+      ratesUsed,
       attributions: [...attributions.values()],
     },
+    goalContributions: goals.section,
     version: snapshot.version,
     createdAt: snapshot.createdAt,
   };

@@ -34,6 +34,11 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/debts')).toBe('debt');
     expect(activeNav('/en/debts/nuevo')).toBe('debt');
     expect(activeNav('/pt/debts/0198f0aa/comparar')).toBe('debt');
+    // Phase 4 (add-savings-goals): Metas → listado, alta, detalle y reservas por cuenta.
+    expect(activeNav('/goals')).toBe('goals');
+    expect(activeNav('/en/goals/nuevo')).toBe('goals');
+    expect(activeNav('/pt/goals/0198f0aa')).toBe('goals');
+    expect(activeNav('/goals/reservas')).toBe('goals');
     // La evolución del patrimonio cuelga del Home (add-net-worth-evolution).
     expect(activeNav('/patrimonio')).toBe('home');
     expect(activeNav('/en/patrimonio')).toBe('home');
@@ -45,6 +50,7 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/cuentasx')).toBeUndefined();
     expect(activeNav('/recurringx')).toBeUndefined();
     expect(activeNav('/debtsx')).toBeUndefined();
+    expect(activeNav('/goalsx')).toBeUndefined();
     expect(activeNav('/importsx')).toBeUndefined();
   });
 

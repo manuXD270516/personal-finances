@@ -125,6 +125,47 @@ export interface TopCategoryDto {
   readonly previousAmount: MoneyDto | null;
 }
 
+/** Meta del Home (Q9, add-savings-goals): mismos cálculos que `goals/savings-goals`. */
+export interface GoalHomeItemDto {
+  readonly goalId: string;
+  readonly name: string;
+  readonly priority: number;
+  readonly percent: string;
+  readonly progress: MoneyDto;
+  readonly target: MoneyDto;
+  readonly tracking: {
+    readonly status: 'BEHIND' | 'ON_TRACK' | 'AHEAD' | null;
+    readonly lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'ACHIEVED' | 'CLOSED' | 'CANCELLED';
+    readonly expected: MoneyDto | null;
+    readonly deviationPercent: string | null;
+  };
+  readonly lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'ACHIEVED' | 'CLOSED' | 'CANCELLED';
+  readonly requiredMonthly: MoneyDto | null;
+  readonly overdue: boolean;
+  readonly expectedDate: string | null;
+  readonly overAllocated: boolean;
+  readonly complete: boolean;
+}
+
+/** Bloque `goals` de `ReportSummary` (Q9): `NO_DATA` con `CREATE_GOAL` si no hay metas activas, pausadas ni alcanzadas. */
+export interface GoalsBlockDto {
+  readonly status: 'AVAILABLE' | 'NO_DATA';
+  readonly action: 'CREATE_GOAL' | null;
+  /** Hasta 3, por prioridad, fecha objetivo (sin fecha al final) y nombre. */
+  readonly items: readonly GoalHomeItemDto[];
+  readonly moreCount: number;
+  readonly complete: boolean;
+  readonly ratesUsed: readonly ResolvedRateDto[];
+}
+
+/** Bloque `goalContributions` de `ReportSummary` (Q6): aportes netos a metas del periodo, sin reasignaciones. */
+export interface GoalContributionsDto {
+  readonly native: readonly MoneyDto[];
+  /** Consolidado en la moneda de reporte con la tasa de la fecha de cada movimiento; `null` sin datos de metas. */
+  readonly base: MoneyDto | null;
+  readonly complete: boolean;
+}
+
 /** `ReportSummary` del contrato (`GET /workspaces/{workspaceId}/reports/summary`). */
 export interface ReportSummaryDto {
   readonly period: { readonly from: string; readonly to: string };
@@ -143,6 +184,10 @@ export interface ReportSummaryDto {
   readonly topIncomeCategories: readonly TopCategoryDto[];
   readonly netWorth: NetWorthBreakdownDto;
   readonly questions: readonly HomeQuestionStatusDto[];
+  /** Metas en curso (Q9, add-savings-goals). */
+  readonly goals: GoalsBlockDto;
+  /** Aportes netos a metas del periodo junto al ahorro (Q6); no alteran el ahorro ni la tasa de ahorro. */
+  readonly goalContributions: GoalContributionsDto;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

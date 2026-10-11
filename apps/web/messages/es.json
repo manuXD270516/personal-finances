@@ -42,7 +42,8 @@
     "userMenu": "Menú de la cuenta",
     "language": "Idioma",
     "recurringPending": "{count, plural, one {# pago por aprobar} other {# pagos por aprobar}}",
-    "debt": "Deudas"
+    "debt": "Deudas",
+    "goals": "Metas"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -306,7 +307,8 @@
       "AVAILABLE_IN_PHASE_3": "Se habilitará con los pagos recurrentes y compromisos (fase 3).",
       "AVAILABLE_IN_PHASE_4": "Se habilitará con las metas de ahorro (fase 4).",
       "UNKNOWN": "Esta pregunta se habilitará más adelante.",
-      "CREATE_COMMITMENT": "Crea un compromiso recurrente para anticipar tus pagos."
+      "CREATE_COMMITMENT": "Crea un compromiso recurrente para anticipar tus pagos.",
+      "CREATE_GOAL": "Crea tu primera meta de ahorro."
     },
     "liquid": {
       "caption": "Dinero disponible en cuentas líquidas, consolidado en {currency}",
@@ -418,6 +420,38 @@
       "freshness": "Datos al: {date}",
       "reportingCurrency": "Moneda de reporte: {currency}",
       "approx": "Algunas cifras usan tasas aproximadas."
+    },
+    "goals": {
+      "tracking": {
+        "BEHIND": "Atrasada",
+        "ON_TRACK": "En ritmo",
+        "AHEAD": "Adelantada"
+      },
+      "status": {
+        "ACTIVE": "Activa",
+        "PAUSED": "Pausada",
+        "ACHIEVED": "Alcanzada",
+        "CLOSED": "Cerrada",
+        "CANCELLED": "Cancelada"
+      },
+      "percent": "{percent} %",
+      "progressOf": "{current} de {target}",
+      "aria": "Progreso de la meta {name}",
+      "overAllocated": "Sobre-asignada",
+      "partial": "Progreso parcial: falta una tasa de cambio",
+      "required": "Requerido: {amount} por mes",
+      "requiredOverdue": "Vencida: faltan {amount}",
+      "requiredNone": "Requerido: sin fecha objetivo",
+      "expected": "Fecha esperada: {date}",
+      "noPace": "Sin ritmo suficiente para estimar la fecha",
+      "expectedNone": "Sin fecha esperada",
+      "viewAll": "Ver todas las metas",
+      "empty": "Aún no tienes metas de ahorro.",
+      "create": "Crear meta",
+      "more": "{count, plural, one {# meta más} other {# metas más}}",
+      "incomplete": "Algunas metas tienen fondos en otra moneda sin tasa vigente: su progreso es parcial.",
+      "contributions": "Aportes netos a metas del periodo:",
+      "contributionsIncomplete": "incompleto: falta una tasa de cambio"
     }
   },
   "Common": {
@@ -718,7 +752,8 @@
       "empty": "No hay transacciones con estos filtros.",
       "select": "Seleccionar «{name}»",
       "loading": "Cargando transacciones…",
-      "more": "Cargar más"
+      "more": "Cargar más",
+      "origin": "Origen: {source}"
     },
     "bulk": {
       "selected": "{n} seleccionadas",
@@ -777,7 +812,8 @@
       "any": "Todos",
       "withoutStatement": "Conciliación sin extracto",
       "withoutStatementHint": "Transacciones marcadas como conciliadas sin extracto.",
-      "withoutStatementOnly": "Solo las pendientes de revisión"
+      "withoutStatementOnly": "Solo las pendientes de revisión",
+      "source": "Origen"
     },
     "detail": {
       "recorded": "Movimiento registrado.",
@@ -837,7 +873,8 @@
       },
       "customFields": "Campos personalizados",
       "reconciliation": "Conciliación",
-      "statementRef": "Extracto del {date} por {balance}"
+      "statementRef": "Extracto del {date} por {balance}",
+      "source": "Origen"
     },
     "history": {
       "title": "Historial (ciclo de vida)",
@@ -927,6 +964,14 @@
         "label": "Conciliada sin extracto — pendiente de revisión",
         "hint": "Marcada como conciliada sin extracto: queda pendiente de revisión hasta que una conciliación posterior la coteje."
       }
+    },
+    "sources": {
+      "MANUAL": "Manual",
+      "IMPORT": "Importación",
+      "RECURRING": "Recurrente",
+      "DEBT": "Deudas",
+      "GOAL": "Meta de ahorro",
+      "SYSTEM": "Sistema"
     }
   },
   "Fx": {
@@ -1933,7 +1978,20 @@
       "applied": "Cambios propagados a los meses futuros."
     },
     "lineFromNotification": "Línea de la notificación",
-    "lineMissing": "La línea del presupuesto que originó la notificación ya no existe en este plan."
+    "lineMissing": "La línea del presupuesto que originó la notificación ya no existe en este plan.",
+    "goalContributions": {
+      "title": "Aportes a metas",
+      "intro": "Lo que planificaste aportar este periodo a tus metas. Es informativo: no son líneas del plan ni cambian el disponible para gastar.",
+      "region": "Aportes planificados a metas",
+      "caption": "Aportes planificados, aportados y pendientes por meta",
+      "goal": "Meta",
+      "planned": "Planificado",
+      "contributed": "Aportado",
+      "pending": "Pendiente",
+      "exceededBy": "Excedido en {amount}",
+      "pendingTotal": "Total pendiente:",
+      "incomplete": "incompleto: falta una tasa de cambio"
+    }
   },
   "Templates": {
     "title": "Templates de presupuesto",
@@ -2320,7 +2378,9 @@
       "openPeriodClose": "Ir al cierre de {period}",
       "openRecurringOccurrence": "Ver el pago recurrente de {period}",
       "openSubscription": "Ver la suscripción",
-      "openCreditCard": "Ver la tarjeta"
+      "openCreditCard": "Ver la tarjeta",
+      "openGoal": "Ver la meta",
+      "openGoalReservations": "Ver las reservas de la cuenta"
     },
     "prefs": {
       "title": "Notificaciones",
@@ -2345,7 +2405,10 @@
         "SUBSCRIPTION_TRIAL_ENDING": "Fin de prueba de suscripción",
         "SUBSCRIPTION_PRICE_CHANGE": "Posible cambio de precio de una suscripción",
         "CARD_PAYMENT_DUE": "Vencimiento de pago de tarjeta",
-        "CARD_UTILIZATION": "Utilización de tarjeta"
+        "CARD_UTILIZATION": "Utilización de tarjeta",
+        "GOAL_OVER_ALLOCATED": "Meta sobre-asignada (reservas mayores al saldo)",
+        "GOAL_REACHED": "Meta alcanzada",
+        "GOAL_MILESTONE": "Hito de una meta (25 %, 50 %, 75 %)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalles (montos y nombres) en los emails",
@@ -2833,6 +2896,10 @@
       "viewCard": "Ver la tarjeta {name}",
       "viewCards": "Ver tarjetas",
       "definitionManaged": "Este pago lo administra el plan de pago de una tarjeta: no se pausa, no se termina ni se revisa aquí. Aprueba, edita u omite cada pago en Próximos."
+    },
+    "goal": {
+      "definitionManaged": "Esta programación la administra una meta de ahorro: no se pausa ni se edita aquí.",
+      "openGoal": "Abrir la meta"
     }
   },
   "Subscriptions": {
@@ -3669,7 +3736,8 @@
       "new": "Nuevo préstamo",
       "empty": "Aún no registraste préstamos. Crea uno nuevo o registra uno en curso para ver su cronograma y sus cuotas.",
       "nextValue": "Cuota {n} · {date} · {amount}",
-      "overdueDays": "{days, plural, one {# día de atraso} other {# días de atraso}}"
+      "overdueDays": "{days, plural, one {# día de atraso} other {# días de atraso}}",
+      "simulator": "Simulador de pagos extra"
     },
     "form": {
       "title": "Nuevo préstamo",
@@ -3737,7 +3805,31 @@
       "fixErrors": "{count, plural, one {Hay # dato por corregir.} other {Hay # datos por corregir.}} Revisa los campos marcados.",
       "saving": "Guardando…",
       "save": "Guardar préstamo",
-      "saveAndDisburse": "Guardar y desembolsar"
+      "saveAndDisburse": "Guardar y desembolsar",
+      "method": "Sistema de amortización",
+      "methods": {
+        "FRENCH": "Francés (cuota constante)",
+        "GERMAN": "Alemán (capital constante)",
+        "FIXED_PRINCIPAL": "Capital fijo con cuota final (balloon)",
+        "CUSTOM": "Cronograma propio (cuota por cuota)"
+      },
+      "methodHint": {
+        "FRENCH": "Todas las cuotas valen lo mismo; el interés baja y el capital sube.",
+        "GERMAN": "Cada cuota amortiza el mismo capital; la cuota va bajando.",
+        "FIXED_PRINCIPAL": "Indicas el capital de cada cuota; la última cuota paga el saldo restante.",
+        "CUSTOM": "Defines las cuotas una por una o usas la tabla del banco; el sistema no las recalcula. Se define en el detalle del borrador."
+      },
+      "fixedPrincipal": "Capital por cuota",
+      "fixedPrincipalHint": "Capital de las cuotas anteriores a la última; la suma debe ser menor que el principal.",
+      "rateType": "Tipo de tasa",
+      "rateTypes": {
+        "FIXED": "Fija",
+        "VARIABLE": "Variable"
+      },
+      "rateTypeHint": {
+        "FIXED": "La tasa no cambia durante el préstamo.",
+        "VARIABLE": "Podrás registrar cambios de tasa con su fecha de vigencia."
+      }
     },
     "errors": {
       "REQUIRED": "Es obligatorio.",
@@ -3797,7 +3889,11 @@
       "disburse": "Desembolsar",
       "edit": "Editar",
       "cancel": "Cancelar préstamo",
-      "compare": "Comparar con la tabla del banco"
+      "compare": "Comparar con la tabla del banco",
+      "prepay": "Pago extraordinario",
+      "rateChange": "Cambiar tasa",
+      "custom": "Cargar cronograma propio",
+      "customEdit": "Cargar cronograma nuevo"
     },
     "schedule": {
       "title": "Cronograma",
@@ -3837,7 +3933,8 @@
       "voided": "Anulado",
       "active": "Vigente",
       "void": "Anular",
-      "voidLabel": "Anular el pago {n}"
+      "voidLabel": "Anular el pago {n}",
+      "prepayment": "Pago extraordinario ({option})"
     },
     "payment": {
       "title": "Registrar pago",
@@ -4058,6 +4155,161 @@
       "label": "Deudas",
       "loans": "Préstamos",
       "cards": "Tarjetas"
+    },
+    "prepayment": {
+      "title": "Pago extraordinario",
+      "hint": "Adelanta capital: elige si quieres terminar antes (misma cuota) o pagar una cuota menor (mismas fechas). Las cuotas vencidas a la fecha del pago deben estar pagadas.",
+      "amount": "Monto a capital ({currency})",
+      "date": "Fecha del pago",
+      "dateHint": "El interés de la cuota siguiente se calcula sobre el saldo reducido completo.",
+      "fee": "Comisión por prepago ({currency}, opcional)",
+      "feeHint": "Se registra como gasto en «Comisiones de préstamo».",
+      "option": "Qué reducir",
+      "options": {
+        "REDUCE_TERM": "Reducir el plazo",
+        "REDUCE_INSTALLMENT": "Reducir la cuota"
+      },
+      "optionHint": {
+        "REDUCE_TERM": "Mantienes la cuota y terminas de pagar antes.",
+        "REDUCE_INSTALLMENT": "Mantienes las fechas y cada cuota baja."
+      },
+      "compare": "Comparar opciones",
+      "previewTitle": "Comparación de opciones",
+      "previewCaption": "Cuota, fecha de fin, interés restante y ahorro de cada opción frente al cronograma vigente",
+      "paysOff": "Este pago cubre todo el principal pendiente: el préstamo quedará saldado.",
+      "current": "Cronograma vigente",
+      "columns": {
+        "option": "Opción",
+        "installment": "Cuota",
+        "end": "Fin",
+        "interest": "Interés restante",
+        "saved": "Ahorro de interés"
+      },
+      "saving": "Registrando…",
+      "submit": "Registrar pago extraordinario",
+      "done": "Pago extraordinario registrado."
+    },
+    "rateChange": {
+      "title": "Cambio de tasa",
+      "hint": "Las cuotas cuyo periodo empieza en o después de la vigencia se recalculan con la tasa nueva, conservando su número y sus fechas.",
+      "rate": "Tasa nominal anual nueva (%)",
+      "effectiveFrom": "Vigente desde",
+      "effectiveHint": "Un periodo ya iniciado no se prorratea: la tasa nueva rige desde el periodo siguiente.",
+      "compare": "Ver efecto",
+      "previewTitle": "Efecto del cambio de tasa",
+      "previewCaption": "Cuota, fecha de fin e interés restante con la tasa nueva frente al cronograma vigente",
+      "proposed": "Con {rate} %",
+      "saving": "Registrando…",
+      "submit": "Registrar cambio de tasa",
+      "done": "Cambio de tasa registrado."
+    },
+    "custom": {
+      "title": "Cronograma propio",
+      "hintDraft": "Carga las cuotas del banco una por una o adopta la tabla ya cargada. La suma del capital debe ser igual al principal.",
+      "hintActive": "Reemplaza las cuotas no pagadas por las de la tabla del banco. La suma del capital debe ser igual al principal pendiente; el sistema ya no recalculará este préstamo.",
+      "reference": "Tabla del banco cargada",
+      "referenceOption": "Versión {version} ({rows} cuotas)",
+      "adopt": "Usar la tabla del banco",
+      "noReference": "Aún no cargaste una tabla del banco para este préstamo (Comparar con la tabla del banco).",
+      "gridLabel": "Cuotas del cronograma propio",
+      "remove": "Quitar",
+      "cellLabel": "Cuota {n}: {field}",
+      "add": "Agregar cuota",
+      "sum": "Suma del capital: {sum} de {expected} {currency}",
+      "gap": "Falta o sobra {gap} {currency}",
+      "sumMatches": "La suma coincide.",
+      "saving": "Guardando…",
+      "submit": "Guardar cronograma",
+      "done": "Cronograma guardado."
+    },
+    "versions": {
+      "title": "Versiones del cronograma",
+      "caption": "Versiones del cronograma con su motivo, vigencia y cuotas que reemplazan",
+      "version": "Versión",
+      "reason": "Motivo",
+      "effectiveFrom": "Vigente desde",
+      "range": "Cuotas",
+      "view": "Ver cuotas",
+      "currentTag": "vigente",
+      "replacedTag": "reemplazada",
+      "reasons": {
+        "INITIAL": "Inicial",
+        "PREPAYMENT": "Pago extraordinario",
+        "PREPAYMENT_VOIDED": "Pago extraordinario anulado",
+        "RATE_CHANGE": "Cambio de tasa",
+        "CUSTOM_DEFINED": "Cronograma propio",
+        "CUSTOM_ADOPTED": "Tabla del banco adoptada"
+      },
+      "rangeReplaced": "Desde la {from}, reemplazada desde la {replaced}",
+      "rangeCurrent": "Desde la {from}",
+      "ratesTitle": "Historial de tasas",
+      "rateInitial": "{rate} % desde el desembolso ({date})",
+      "rateChanged": "{rate} % desde el {date}",
+      "viewing": "Cuotas efectivas a la versión {version}"
+    },
+    "simulator": {
+      "title": "Simulador de pagos extra",
+      "intro": "Compara cuánto interés ahorras y cuándo terminas de pagar. Es solo una simulación: no registra pagos, cronogramas ni auditoría.",
+      "mode": "Qué quieres simular",
+      "modes": {
+        "STRATEGIES": "Estrategias entre préstamos",
+        "LOAN": "Extras en un préstamo"
+      },
+      "currency": "Moneda del extra",
+      "monthlyExtra": "Extra mensual",
+      "monthlyHint": "Solo participan los préstamos activos en esta moneda; los demás quedan fuera de la estrategia.",
+      "loan": "Préstamo",
+      "extraType": "Tipo de extra",
+      "extraTypes": {
+        "ONE_TIME": "Único",
+        "MONTHLY": "Todos los meses"
+      },
+      "afterInstallment": "Junto a la cuota n.º",
+      "fromInstallment": "Desde la cuota n.º",
+      "extraAmount": "Monto",
+      "addExtra": "Agregar extra",
+      "notSaved": "La simulación no se guarda; puedes exportar la tabla comparativa a CSV.",
+      "run": "Simular",
+      "running": "Simulando…",
+      "export": "Exportar CSV",
+      "compareTitle": "Comparación",
+      "startBalance": "Principal pendiente de los préstamos incluidos: {amount}",
+      "columns": {
+        "strategy": "Estrategia",
+        "interest": "Interés total",
+        "saved": "Ahorro frente a no pagar extra",
+        "debtFree": "Libre de deudas",
+        "loans": "Fin de cada préstamo",
+        "scenario": "Escenario",
+        "end": "Fecha de fin",
+        "installments": "Cuotas"
+      },
+      "strategies": {
+        "NONE": "Sin extra",
+        "AVALANCHE": "Avalanche (mayor tasa primero)",
+        "SNOWBALL": "Snowball (menor saldo primero)"
+      },
+      "scenarios": {
+        "current": "Cronograma vigente",
+        "scenario": "Con los extras"
+      },
+      "saved": "Ahorro de interés: {amount}; terminas {months} meses antes.",
+      "outTitle": "Préstamos fuera de la estrategia",
+      "out": {
+        "CURRENCY": "{name} está en {currency}: conserva su cronograma vigente.",
+        "CUSTOM": "{name} tiene cronograma propio: el sistema no lo recalcula."
+      },
+      "chart": {
+        "title": "Saldo total por mes ({currency})",
+        "desc": "Saldo de principal total de {from} a {to}, desde un máximo de {max}; la tabla comparativa tiene los mismos resultados."
+      },
+      "csv": {
+        "scenario": "Escenario",
+        "interest": "Interés total",
+        "saved": "Ahorro",
+        "end": "Fin",
+        "months": "Meses o cuotas"
+      }
     }
   },
   "Cards": {
@@ -4380,6 +4632,408 @@
       "noInterestConvert": "Total para no generar intereses: {amount} (conviértelo antes)",
       "minimum": "Pago mínimo: {amount}",
       "minimumConvert": "Pago mínimo: {amount} (conviértelo antes)"
+    }
+  },
+  "Goals": {
+    "title": "Metas de ahorro",
+    "intro": "Define cuánto quieres ahorrar, para cuándo y en qué cuentas. El progreso y el estado se calculan con tus movimientos; nada se mueve sin que lo registres.",
+    "viewerNotice": "Tienes acceso de solo lectura: puedes ver las metas, pero no modificarlas.",
+    "loading": "Cargando…",
+    "notFound": "Esta meta no existe o no es de este espacio de trabajo.",
+    "back": "Volver a Metas",
+    "created": "Meta creada.",
+    "pausedNote": "La meta está pausada: no se evalúa su avance, pero sigue aceptando movimientos.",
+    "list": {
+      "region": "Listado de metas",
+      "caption": "Metas de ahorro con su progreso, estado, aporte mensual requerido y fecha esperada",
+      "name": "Meta",
+      "progress": "Progreso",
+      "status": "Estado",
+      "required": "Requerido al mes",
+      "expected": "Fecha esperada",
+      "targetDate": "Fecha objetivo",
+      "priority": "Prioridad {priority}",
+      "archived": "Archivada",
+      "noDate": "Sin fecha",
+      "empty": "Aún no tienes metas. Crea la primera para empezar a ahorrar con un objetivo.",
+      "emptyFiltered": "No hay metas con este filtro.",
+      "new": "Nueva meta",
+      "reservations": "Reservas por cuenta",
+      "filters": "Filtros de metas",
+      "filter": "Estado",
+      "includeArchived": "Incluir archivadas"
+    },
+    "filters": {
+      "OPEN": "En curso",
+      "ACTIVE": "Activas",
+      "PAUSED": "Pausadas",
+      "ACHIEVED": "Alcanzadas",
+      "CLOSED": "Cerradas",
+      "CANCELLED": "Canceladas",
+      "ALL": "Todas"
+    },
+    "status": {
+      "ACTIVE": "Activa",
+      "PAUSED": "Pausada",
+      "ACHIEVED": "Alcanzada",
+      "CLOSED": "Cerrada",
+      "CANCELLED": "Cancelada"
+    },
+    "tracking": {
+      "BEHIND": "Atrasada",
+      "ON_TRACK": "En ritmo",
+      "AHEAD": "Adelantada",
+      "deviation": "{percent} % respecto de lo esperado ({expected})"
+    },
+    "types": {
+      "EMERGENCY_FUND": "Fondo de emergencia",
+      "PURCHASE": "Compra",
+      "TRAVEL": "Viaje",
+      "EDUCATION": "Educación",
+      "RETIREMENT": "Jubilación",
+      "CUSTOM": "Otra"
+    },
+    "funds": {
+      "REAL": "Aporte real",
+      "EARMARK": "Reserva"
+    },
+    "movementKinds": {
+      "CONTRIBUTION": "Aporte",
+      "WITHDRAWAL": "Retiro",
+      "REVERSAL": "Inverso",
+      "REASSIGN_IN": "Reasignación recibida",
+      "REASSIGN_OUT": "Reasignación enviada"
+    },
+    "origins": {
+      "USER": "Manual",
+      "RECURRING": "Aporte recurrente",
+      "SUGGESTION": "Sugerencia",
+      "SYSTEM": "Sistema"
+    },
+    "transactionKinds": {
+      "INCOME": "Ingreso",
+      "EXPENSE": "Gasto",
+      "TRANSFER": "Transferencia",
+      "REFUND": "Reembolso",
+      "ADJUSTMENT": "Ajuste",
+      "OPENING_BALANCE": "Saldo inicial",
+      "CONVERSION": "Conversión",
+      "LOAN_DISBURSEMENT": "Desembolso de préstamo",
+      "LOAN_PAYMENT": "Pago de préstamo"
+    },
+    "progress": {
+      "percent": "{percent} %",
+      "of": "{current} de {target}",
+      "exceeded": "supera el objetivo",
+      "aria": "Progreso de la meta {name}",
+      "incomplete": "Progreso parcial: hay fondos en otra moneda sin tasa de cambio vigente.",
+      "incompleteWith": "Progreso parcial: sin tasa vigente para {amounts}; no se convierten 1:1."
+    },
+    "overAllocated": {
+      "badge": "Sobre-asignada"
+    },
+    "required": {
+      "none": "—",
+      "monthly": "{amount} por mes",
+      "overdue": "Vencida: faltan {amount}"
+    },
+    "expected": {
+      "achieved": "Alcanzada el {date}",
+      "noPace": "Sin ritmo suficiente",
+      "beyondHorizon": "Más allá del horizonte de cálculo"
+    },
+    "rates": {
+      "title": "Tasas usadas ({count})",
+      "window": "Ventana de vigencia de las tasas: {days} días."
+    },
+    "pace": {
+      "HISTORY": "historial",
+      "PLAN": "plan mensual",
+      "SIMULATED": "simulado",
+      "NONE": "sin ritmo"
+    },
+    "overview": {
+      "title": "Progreso",
+      "remaining": "Restante",
+      "target": "Objetivo",
+      "targetDate": "Fecha objetivo",
+      "required": "Aporte mensual requerido",
+      "pace": "Ritmo actual",
+      "paceValue": "{amount} por mes (últimos {periods} periodos; {source})",
+      "expected": "Fecha esperada",
+      "deviation": "Avance contra lo esperado",
+      "tolerance": "Tolerancia del estado",
+      "paceWindow": "ritmo de los últimos {periods} periodos",
+      "startDate": "Fecha de inicio",
+      "closedOn": "Cerrada el",
+      "cancelledOn": "Cancelada el",
+      "cancelReason": "Motivo de la cancelación"
+    },
+    "accounts": {
+      "title": "Cuentas vinculadas",
+      "none": "La meta no tiene cuentas vinculadas. Edítala para vincular una cuenta y poder registrar aportes reales.",
+      "region": "Cuentas vinculadas y sus fondos",
+      "caption": "Fondos reales y reservas de la meta por cuenta vinculada",
+      "account": "Cuenta",
+      "real": "Aportes reales",
+      "earmark": "Reservas",
+      "status": "Estado",
+      "seeReservations": "Ver reservas de la cuenta",
+      "ok": "En orden"
+    },
+    "plan": {
+      "title": "Plan mensual",
+      "none": "Sin plan mensual. Define cuánto quieres aportar cada mes para ver el pendiente en el plan del periodo.",
+      "monthly": "Aporte mensual",
+      "dayOfMonth": "Día del mes",
+      "source": "Cuenta de origen",
+      "destination": "Cuenta de destino",
+      "materialization": "Creación del aporte",
+      "modes": {
+        "PENDING_APPROVAL": "Pedir aprobación cada mes",
+        "AUTO_CREATE": "Crear el aporte automáticamente"
+      },
+      "managedNotice": "El aporte recurrente lo administra esta meta: se cambia o se quita desde aquí, no en Recurrentes.",
+      "viewDefinition": "Ver la programación",
+      "manualNotice": "El plan es una referencia: no programa aportes. Los aportes se registran a mano.",
+      "pending": "Aporte en proceso: hay un aporte recurrente esperando su transferencia posteada.",
+      "edit": "Editar el plan",
+      "set": "Definir el plan",
+      "remove": "Quitar el plan",
+      "formTitle": "Plan mensual y aporte recurrente",
+      "intro": "El plan mensual alimenta el pendiente del periodo; con aporte recurrente, la meta programa cada mes la transferencia.",
+      "monthlyAmount": "Aporte mensual ({currency})",
+      "dayHint": "De 1 a 31; en meses cortos se usa el último día.",
+      "recurring": "Programar el aporte cada mes",
+      "recurringHint": "Crea una programación administrada por la meta; cada ocurrencia se registra como aporte real.",
+      "recurringOnlyReal": "La programación recurrente solo aplica a aportes reales.",
+      "autoStatus": "Estado de la transferencia creada",
+      "autoStatuses": {
+        "POSTED": "Contabilizada",
+        "PENDING": "Pendiente"
+      },
+      "save": "Guardar el plan",
+      "done": "Plan guardado."
+    },
+    "simulation": {
+      "title": "Simulación",
+      "intro": "Prueba otros valores y mira cómo cambian el aporte requerido y la fecha esperada. No se guarda nada.",
+      "monthly": "Aporte mensual ({currency})",
+      "targetAmount": "Objetivo ({currency})",
+      "targetDate": "Fecha objetivo",
+      "run": "Simular",
+      "notSaved": "Resultado de la simulación; no se guardó ningún cambio.",
+      "required": "Aporte mensual requerido",
+      "periods": "Periodos",
+      "expected": "Fecha esperada",
+      "progress": "Progreso"
+    },
+    "movements": {
+      "empty": "La meta aún no tiene movimientos.",
+      "region": "Movimientos de la meta",
+      "caption": "Movimientos de la meta, del más reciente al más antiguo",
+      "date": "Fecha",
+      "kind": "Movimiento",
+      "account": "Cuenta",
+      "amount": "Monto",
+      "origin": "Origen",
+      "detail": "Detalle",
+      "reversed": "Revertido",
+      "inverseOf": "Cancela un movimiento anterior",
+      "reassignment": "Reasignación {id}",
+      "viewTransaction": "Ver la transacción",
+      "more": "Cargar más movimientos"
+    },
+    "tabs": {
+      "movements": "Movimientos"
+    },
+    "panels": {
+      "fund": "Tipo de fondo"
+    },
+    "contribute": {
+      "title": "Aportar o reservar",
+      "amount": "Monto",
+      "amountIn": "Monto ({currency})",
+      "date": "Fecha",
+      "source": "Cuenta de origen",
+      "reserveAccount": "Cuenta donde se reserva",
+      "destination": "Cuenta de destino (vinculada a la meta)",
+      "noLinked": "La meta no tiene cuentas vinculadas: edítala para vincular una.",
+      "note": "Nota (opcional)",
+      "hint": {
+        "REAL": "Mueve dinero: crea una transferencia contabilizada hacia la cuenta de destino.",
+        "EARMARK": "Reserva dinero en una cuenta sin moverlo; el saldo de la cuenta no cambia."
+      },
+      "submitReal": "Registrar aporte",
+      "submitEarmark": "Reservar",
+      "doneReal": "Aporte registrado.",
+      "doneEarmark": "Reserva registrada."
+    },
+    "withdraw": {
+      "title": "Retirar o liberar",
+      "account": "Cuenta",
+      "funds": "Fondos de la meta en la cuenta: {amount}",
+      "mode": "Cómo sale el dinero",
+      "modes": {
+        "TRANSFER": "Transferir a otra cuenta",
+        "LINK": "Vincular un gasto o transferencia existente",
+        "RELEASE": "Liberar la reserva"
+      },
+      "modeHint": {
+        "TRANSFER": "Crea una transferencia contabilizada desde la cuenta de la meta.",
+        "LINK": "Usa una transacción ya registrada que sacó dinero de la cuenta; el monto puede ser menor al de la transacción.",
+        "RELEASE": "Quita la reserva sin crear ninguna transacción."
+      },
+      "toAccount": "Cuenta de destino",
+      "reason": "Motivo (opcional)",
+      "submit": "Registrar retiro",
+      "submitRelease": "Liberar",
+      "done": "Retiro registrado.",
+      "doneRelease": "Reserva liberada."
+    },
+    "reassign": {
+      "title": "Reasignar fondos",
+      "hint": "Mueve fondos de esta meta a otra sin cambiar lo reservado de la cuenta.",
+      "target": "Meta de destino",
+      "submit": "Reasignar",
+      "done": "Fondos reasignados."
+    },
+    "link": {
+      "title": "Vincular una transferencia existente",
+      "intro": "Registra como aporte real una transferencia ya contabilizada hacia una cuenta vinculada; cuenta por el monto de la transferencia.",
+      "transaction": "Transferencia",
+      "transactionId": "O pega el ID de la transacción",
+      "hint": "Transferencias recientes hacia las cuentas vinculadas.",
+      "none": "No hay transferencias elegibles",
+      "submit": "Vincular como aporte",
+      "done": "Transferencia vinculada como aporte."
+    },
+    "edit": {
+      "done": "Cambios guardados."
+    },
+    "actions": {
+      "label": "Acciones de la meta",
+      "contribute": "Aportar o reservar",
+      "withdraw": "Retirar o liberar",
+      "reassign": "Reasignar",
+      "link": "Vincular transacción",
+      "edit": "Editar",
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "close": "Cerrar",
+      "cancel": "Cancelar meta",
+      "archive": "Archivar"
+    },
+    "transitions": {
+      "pause": "Meta pausada.",
+      "resume": "Meta reanudada.",
+      "close": "Meta cerrada.",
+      "cancel": "Meta cancelada.",
+      "archive": "Meta archivada.",
+      "removePlan": "Plan quitado."
+    },
+    "confirm": {
+      "closeTitle": "¿Cerrar esta meta?",
+      "closeText": "La meta se da por cumplida y se liberan sus reservas. Los fondos reales quedan en sus cuentas. No se puede reabrir.",
+      "close": "Sí, cerrar",
+      "cancelTitle": "¿Cancelar esta meta?",
+      "cancelText": "Se liberan las reservas de la meta con movimientos explícitos y se termina su aporte recurrente. No se puede reabrir.",
+      "cancel": "Sí, cancelar la meta",
+      "reason": "Motivo (opcional)",
+      "archiveTitle": "¿Archivar esta meta?",
+      "archiveText": "La meta sale del listado en curso; sigue disponible con el filtro de archivadas.",
+      "archive": "Sí, archivar",
+      "removePlanTitle": "¿Quitar el plan?",
+      "removePlanText": "Se quita el plan y se termina el aporte recurrente, si lo hay. Los aportes ya registrados no cambian.",
+      "removePlan": "Sí, quitar el plan"
+    },
+    "form": {
+      "title": "Nueva meta",
+      "basics": "Datos de la meta",
+      "name": "Nombre",
+      "type": "Tipo",
+      "priority": "Prioridad",
+      "priorityHint": "1 es la más importante.",
+      "target": "Monto objetivo",
+      "currency": "Moneda",
+      "currencyLocked": "La moneda no cambia cuando la meta ya tiene fondos o un plan.",
+      "startDate": "Fecha de inicio",
+      "startDateLocked": "La fecha de inicio no se edita.",
+      "targetDate": "Fecha objetivo (opcional)",
+      "targetDateHint": "Sin fecha objetivo no se calcula el aporte requerido ni el estado de avance.",
+      "accounts": "Cuentas vinculadas",
+      "accountsHint": "Solo cuentas activas de tipo activo. Los aportes reales llegan a estas cuentas.",
+      "noAccounts": "No hay cuentas activas para vincular.",
+      "tracking": "Seguimiento",
+      "tolerance": "Tolerancia del estado (%)",
+      "toleranceHint": "De 0 a 50. Dentro de esta franja la meta se considera \"en ritmo\".",
+      "pacePeriods": "Periodos para calcular el ritmo",
+      "pacePeriodsHint": "De 1 a 12 periodos terminados.",
+      "notes": "Notas (opcional)",
+      "save": "Crear meta",
+      "saveChanges": "Guardar cambios",
+      "saving": "Guardando…",
+      "cancel": "Cancelar",
+      "fixErrors": "{count, plural, one {Corrige # campo antes de continuar.} other {Corrige # campos antes de continuar.}}",
+      "choose": "Elegir…"
+    },
+    "errors": {
+      "REQUIRED": "Este dato es obligatorio.",
+      "INVALID": "El valor no es válido.",
+      "SCALE": "Tiene más decimales de los que admite.",
+      "NOT_POSITIVE": "Debe ser mayor que cero.",
+      "RANGE": "El valor está fuera del rango permitido.",
+      "DATE_ORDER": "La fecha objetivo no puede ser anterior a la de inicio.",
+      "NO_CHANGES": "No hay cambios que guardar.",
+      "SAME_GOAL": "Elige una opción distinta."
+    },
+    "eligibility": {
+      "KIND": "Solo se pueden vincular transferencias.",
+      "STATUS": "La transferencia debe estar contabilizada.",
+      "ACCOUNT": "La cuenta de destino debe estar vinculada a la meta.",
+      "AMOUNT": "El monto supera el de la transacción."
+    },
+    "earmarkDetails": "Saldo {balance}, ya reservado {reserved}, disponible {available}.",
+    "suggestions": {
+      "title": "Sugerencias de aporte",
+      "intro": "Transferencias tuyas hacia una cuenta vinculada a una meta. Solo cuentan como aporte si las confirmas.",
+      "empty": "No hay sugerencias pendientes.",
+      "item": "Transferencia de {amount} a {account} el {date}.",
+      "viewTransaction": "Ver la transferencia",
+      "proposed": "Meta sugerida: {goal}",
+      "chooseGoal": "Elegir la meta",
+      "confirm": "Confirmar aporte",
+      "dismiss": "Descartar",
+      "confirmed": "Aporte registrado.",
+      "dismissed": "Sugerencia descartada."
+    },
+    "reservations": {
+      "title": "Reservas por cuenta",
+      "intro": "Lo que cada cuenta tiene reservado para metas frente a su saldo. Si lo reservado supera el saldo, la cuenta está sobre-asignada.",
+      "filtered": "Mostrando una sola cuenta.",
+      "all": "Ver todas las cuentas",
+      "empty": "Ninguna cuenta tiene fondos reservados para metas.",
+      "region": "Reservas por cuenta",
+      "caption": "Saldo, reservado y disponible de cada cuenta con fondos de metas",
+      "account": "Cuenta",
+      "balance": "Saldo",
+      "reserved": "Reservado",
+      "available": "Disponible",
+      "status": "Estado",
+      "goals": "Metas",
+      "shortfall": "Faltan {amount}",
+      "since": "Desde el {date}",
+      "ok": "En orden",
+      "goalFunds": "reserva {earmarked}, aportes reales {real}",
+      "accountStatus": {
+        "ACTIVE": "Cuenta activa",
+        "CLOSED": "Cuenta cerrada",
+        "ARCHIVED": "Cuenta archivada"
+      }
+    },
+    "transaction": {
+      "title": "Meta de ahorro",
+      "reverted": "revertido"
     }
   }
 }

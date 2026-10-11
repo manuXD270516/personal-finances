@@ -90,13 +90,51 @@ export interface StoredInstallment extends ScheduleInstallment {
   readonly scheduleVersion: number;
 }
 
+export const SCHEDULE_VERSION_REASONS = [
+  'INITIAL',
+  'PREPAYMENT',
+  'PREPAYMENT_VOIDED',
+  'RATE_CHANGE',
+  'CUSTOM_DEFINED',
+  'CUSTOM_ADOPTED',
+] as const;
+export type ScheduleVersionReason = (typeof SCHEDULE_VERSION_REASONS)[number];
+
 export interface ScheduleVersionRecord {
   readonly loanId: string;
   readonly scheduleVersion: number;
-  readonly reason: 'INITIAL';
+  readonly reason: ScheduleVersionReason;
   readonly effectiveFrom: string;
+  /** Primera cuota que la versión reemplaza (1 en la versión inicial). */
+  readonly fromInstallmentNo: number;
+  readonly sourcePaymentId?: string | null;
+  readonly sourceRateChangeId?: string | null;
+  readonly sourceReferenceId?: string | null;
   readonly parameters: Record<string, unknown>;
   readonly createdBy: string;
+}
+
+/** Versión con lo que solo la base conoce: fecha de creación y cuántas cuotas aporta. */
+export interface ScheduleVersionListing extends ScheduleVersionRecord {
+  readonly createdAt: string;
+  readonly installmentCount: number;
+}
+
+export interface RateChangeRecord {
+  readonly id: string;
+  readonly loanId: string;
+  /** Fracción decimal. */
+  readonly annualRate: string;
+  readonly effectiveFrom: string;
+  readonly scheduleVersion: number;
+  readonly createdBy: string;
+  readonly createdAt: string;
+}
+
+export interface RateChangeRepository {
+  insert(workspaceId: string, change: RateChangeRecord): Promise<void>;
+  /** Por vigencia ascendente. */
+  list(loanId: string): Promise<readonly RateChangeRecord[]>;
 }
 
 export interface LoanRepository {
@@ -118,7 +156,15 @@ export interface ScheduleRepository {
     installments: readonly StoredInstallment[],
   ): Promise<void>;
   versionOf(loanId: string, version: number): Promise<ScheduleVersionRecord | null>;
+  /** Versiones del cronograma, de la más antigua a la vigente. */
+  versions(loanId: string): Promise<readonly ScheduleVersionListing[]>;
+  /**
+   * Cronograma EFECTIVO a esa versión: de cada número de cuota, la fila de la última versión ≤ `version` cuya
+   * `from_installment_no` lo cubre (las cuotas que una versión posterior reemplazó se excluyen).
+   */
   installments(loanId: string, version: number): Promise<readonly StoredInstallment[]>;
+  /** Solo las cuotas que la versión aporta. */
+  ownInstallments(loanId: string, version: number): Promise<readonly StoredInstallment[]>;
 }
 
 export interface PaymentRecord {
@@ -136,6 +182,10 @@ export interface PaymentRecord {
   readonly taxes: string;
   readonly explicitBreakdown: boolean;
   readonly paymentMethod: string | null;
+  /** `PREPAYMENT`: pago extraordinario a principal (+ comisión) sin imputaciones a cuotas. */
+  readonly kind: 'REGULAR' | 'PREPAYMENT';
+  readonly prepaymentOption: 'REDUCE_TERM' | 'REDUCE_INSTALLMENT' | null;
+  readonly prepaymentFee: string | null;
   readonly status: 'ACTIVE' | 'VOIDED';
   readonly voidedAt: string | null;
   readonly voidedReason: string | null;
@@ -242,6 +292,7 @@ export interface DebtDeps {
   readonly loans: LoanRepository;
   readonly schedules: ScheduleRepository;
   readonly payments: PaymentRepository;
+  readonly rateChanges: RateChangeRepository;
   readonly references: ReferenceRepository;
   readonly accounts: AccountsPort;
   readonly provisioning: AccountProvisioningPort;

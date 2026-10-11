@@ -11,6 +11,7 @@ const CARD_PLAN_CURRENCY = '(SELECT p.currency FROM debt.card_installment_plan p
 
 /**
  * Secciones de exportación/importación del workspace que pertenecen a DEBT (openspec add-loans decisión 16 y tarea 4.5;
+ * add-loan-amortization-advanced agrega `loan-rate-changes` con el orden 797 y columnas nuevas en préstamos, versiones y pagos;
  * orden 780–787, después de COMMITMENTS 750–765 e IMPORTS 770–771 y antes de NOTIFICATIONS 800): el préstamo, las
  * versiones inmutables de su cronograma y sus cuotas, los pagos con sus imputaciones, las tablas del banco cargadas
  * como referencia y las comparaciones. Los ids de cuentas, transacciones, contrapartes y la definición recurrente se
@@ -24,7 +25,12 @@ export const DEBT_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     table: 'debt.loan',
     order: 780,
     orderBy: ['id'],
-    money: { principal: 't.currency', retained_fee: 't.currency', existing_outstanding: 't.currency' },
+    money: {
+      principal: 't.currency',
+      retained_fee: 't.currency',
+      existing_outstanding: 't.currency',
+      fixed_principal_amount: 't.currency',
+    },
   },
   {
     name: 'loan-schedule-versions',
@@ -64,6 +70,7 @@ export const DEBT_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
       fees: LOAN_CURRENCY,
       insurance: LOAN_CURRENCY,
       taxes: LOAN_CURRENCY,
+      prepayment_fee: LOAN_CURRENCY,
     },
   },
   {
@@ -111,6 +118,14 @@ export const DEBT_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     table: 'debt.loan_schedule_comparison',
     order: 787,
     orderBy: ['loan_id', 'reference_id', 'schedule_version'],
+  },
+  // add-loan-amortization-advanced (orden 797, libre entre DEBT 796 y NOTIFICATIONS 800): historial de tasas del préstamo.
+  {
+    name: 'loan-rate-changes',
+    context: 'debt',
+    table: 'debt.loan_rate_change',
+    order: 797,
+    orderBy: ['loan_id', 'effective_from'],
   },
   // add-credit-cards (órdenes 788–796): tarjetas, versiones de términos, cuentas, estados de cuenta, planes de cuotas,
   // umbrales y recordatorios. Los ids de cuentas, de la definición del plan de pago y de las compras se remapean al importar.

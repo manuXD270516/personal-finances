@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { AccountBalancesList } from './AccountBalancesList';
 import { ExpenseCard, IncomeCard, SavingsCard } from './FlowCards';
+import { GoalsCard } from './GoalsCard';
 import { formatInstant, formatLocalDate } from './format';
 import { LiquidBalanceCard } from './LiquidBalanceCard';
 import { NetWorthCard } from './NetWorthCard';
@@ -21,6 +22,10 @@ export interface DashboardViewProps extends FormatContext {
   readonly commitmentsSection?: ReactNode;
   /** Widget de presupuestos (add-budgets 6.2: disponible para gastar), entre "Este mes" y el patrimonio. */
   readonly budgetWidget?: ReactNode;
+  /** Destino de "Ver todas las metas" y de "Crear meta" (Q9, add-savings-goals) y del detalle de una meta. */
+  readonly goalsHref?: string | undefined;
+  readonly createGoalHref?: string | undefined;
+  readonly goalHref?: ((goalId: string) => string) | undefined;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
   readonly evolutionCard?: ReactNode;
 }
@@ -42,6 +47,9 @@ export function DashboardView({
   createAccountHref,
   registerRateHref,
   registerExpenseHref,
+  goalsHref,
+  createGoalHref,
+  goalHref,
   budgetWidget,
   evolutionCard,
   commitmentsSection,
@@ -50,7 +58,12 @@ export function DashboardView({
   const { t, locale } = ctx;
   const timeZone = summary.meta.timeZone || ctx.timeZone;
   const fctx: FormatContext = { ...ctx, timeZone };
-  const unavailable = summary.questions.filter((q) => q.status === 'NOT_AVAILABLE_IN_PHASE');
+  // Con metas habilitadas (add-savings-goals) Q9 tiene su propia tarjeta; sin el bloque sigue como "no disponible".
+  const goalsCard =
+    (summary.goals !== undefined && summary.goals !== null) || statusOf(summary, 'Q9').status === 'NO_DATA';
+  const unavailable = summary.questions.filter(
+    (q) => q.status === 'NOT_AVAILABLE_IN_PHASE' && !(q.question === 'Q9' && goalsCard),
+  );
   const attributions = summary.meta.attributions ?? [];
   const external = { target: '_blank', rel: 'noopener noreferrer' } as const;
   const q2 = statusOf(summary, 'Q2');
@@ -115,6 +128,14 @@ export function DashboardView({
       </section>
 
       {budgetWidget ?? null}
+
+      <GoalsCard
+        summary={summary}
+        ctx={fctx}
+        goalsHref={goalsHref}
+        createGoalHref={createGoalHref}
+        goalHref={goalHref}
+      />
 
       <section data-testid="wealth" aria-labelledby="wealth-title" className="pf-home-group">
         <h2 id="wealth-title">{t('sections.wealth')}</h2>

@@ -5,16 +5,20 @@ spec: reporting/dashboard
 related_specs: ["goals/savings-goals"]
 requirement: "Aportes a metas del mes en el ahorro"
 scenario: "Aportes de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-002", "FR-GOALS-003"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/goals/src/application/goals.queries.test.ts
+  - packages/contexts/reporting/src/application/report-summary.goals.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "home", "q6"]
@@ -30,7 +34,7 @@ expected_result:
   - "goalContributions.base = 2500.00 BOB"
   - "Ahorro 6695.00 BOB y tasa 83.7 % sin cambios"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-048 — Los aportes netos a metas del mes se informan junto al ahorro sin cambiar el ahorro ni la tasa

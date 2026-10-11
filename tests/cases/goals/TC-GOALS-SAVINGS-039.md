@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Aporte recurrente programado"
 scenario: "Aporte mensual de 1500.00 BOB programado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-009", "FR-COMMITMENTS-001"]
 nfr: []
 invariants: ["INV-013", "INV-018", "INV-028"]
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/commitments/src/application/goal-managed.service.test.ts
+  - packages/contexts/goals/src/application/plan.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "plan", "recurring"]
@@ -37,7 +42,7 @@ expected_result:
   - "Pausar desde recurring: 409 RECURRING_MANAGED_EXTERNALLY"
   - "Pausar la meta pausa la definición"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-039 — El aporte programado crea un compromiso administrado por la meta y cada ocurrencia aprobada se registra como aporte real

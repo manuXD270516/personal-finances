@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Reasignación de fondos entre metas"
 scenario: "Reasignar una reserva"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018", "INV-029"]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/src/domain/goal-movement.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "reassign"]
@@ -33,7 +37,7 @@ expected_result:
   - "Reservado de \"Banco BOB\" sigue 1500.00 BOB"
   - "Dos hechos SavingsContributionRecorded.v1 y una auditoría por meta"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-027 — Reasignar una reserva entre metas registra dos movimientos ligados y no cambia lo reservado de la cuenta

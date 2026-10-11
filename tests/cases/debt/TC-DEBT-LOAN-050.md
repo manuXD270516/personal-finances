@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: []
 requirement: 'Anular un pago extraordinario'
 scenario: 'Prepago anulado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: ['INV-008', 'INV-016']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/schedule-recalculator.test.ts
+  - packages/contexts/commitments/src/application/loan-payment.service.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'prepayment', 'void', 'versioning']
@@ -29,7 +32,7 @@ expected_result:
   - 'La deuda vuelve a 9132.95 BOB y la versión 3 rige con las cuotas 4 a 12 de 1066.19 BOB (la 12 de 1066.14 BOB)'
   - 'Las versiones 1 y 2 siguen consultables como reemplazadas'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-050 — Anular el prepago restituye el cronograma previo como versión nueva
@@ -50,4 +53,4 @@ Entonces la deuda vuelve a 9132.95 BOB y la versión 3 rige con las cuotas 4 a 1
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

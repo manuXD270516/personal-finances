@@ -152,3 +152,65 @@ export const cardUtilizationPayload = (overrides: Record<string, unknown> = {}):
   crossedAt: '2026-10-28T15:00:00.000Z',
   ...overrides,
 });
+
+export const GOAL_ACCOUNT_ID = '01928c4e-0000-7000-8000-0000000a0010';
+export const GOAL_EPISODE_ID = '01928c4e-0000-7000-8000-0000000e0010';
+export const LAPTOP_GOAL_ID = '01928c4e-0000-7000-8000-0000000c0011';
+export const EMERGENCY_GOAL_ID = '01928c4e-0000-7000-8000-0000000c0012';
+
+/** `goals.EarmarkExceedsBalance.v1`: "Banco BOB" con saldo 5800.00, reservado 7000.00, faltante 1200.00 BOB. */
+export const earmarkExceedsPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  accountId: GOAL_ACCOUNT_ID,
+  accountName: 'Banco BOB',
+  episodeId: GOAL_EPISODE_ID,
+  balance: { amount: '5800.00', currency: 'BOB' },
+  reserved: { amount: '7000.00', currency: 'BOB' },
+  shortfall: { amount: '1200.00', currency: 'BOB' },
+  detectedOn: '2026-10-20',
+  goals: [
+    { goalId: LAPTOP_GOAL_ID, goalName: 'Laptop', reserved: { amount: '4000.00', currency: 'BOB' } },
+    {
+      goalId: EMERGENCY_GOAL_ID,
+      goalName: 'Fondo de emergencia',
+      reserved: { amount: '3000.00', currency: 'BOB' },
+    },
+  ],
+  ...overrides,
+});
+
+/** `goals.GoalReached.v1`: "Laptop" alcanzó 9000.00 de 9000.00 BOB el 2026-10-20. */
+export const goalReachedPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  goalId: LAPTOP_GOAL_ID,
+  goalName: 'Laptop',
+  target: { amount: '9000.00', currency: 'BOB' },
+  progress: { amount: '9000.00', currency: 'BOB' },
+  reachedOn: '2026-10-20',
+  trigger: 'MOVEMENT',
+  ...overrides,
+});
+
+/** `goals.SavingsContributionRecorded.v1` de "Fondo de emergencia" (objetivo 15000.00 BOB) de 46.67 % a 53.33 %. */
+export const contributionRecordedPayload = (
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => ({
+  goalId: EMERGENCY_GOAL_ID,
+  goalName: 'Fondo de emergencia',
+  goalStatus: 'ACTIVE',
+  movementId: '01928c4e-0000-7000-8000-0000000f0001',
+  fund: 'REAL',
+  movement: 'CONTRIBUTION',
+  amount: { amount: '1000.00', currency: 'BOB' },
+  accountId: GOAL_ACCOUNT_ID,
+  occurredOn: '2026-10-20',
+  transactionId: null,
+  reversesId: null,
+  reassignmentId: null,
+  origin: 'USER',
+  target: { amount: '15000.00', currency: 'BOB' },
+  progressBefore: { amount: '7000.50', currency: 'BOB' },
+  progressAfter: { amount: '8000.50', currency: 'BOB' },
+  percentBefore: '46.67',
+  percentAfter: '53.33',
+  progressComplete: true,
+  ...overrides,
+});

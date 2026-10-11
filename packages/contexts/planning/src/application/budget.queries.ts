@@ -3,6 +3,7 @@ import { DomainError, Instant } from '@pf/shared-kernel';
 import type { BudgetVsActual, BudgetVsActualQuery } from '../contracts/index.js';
 import { BudgetCalculator, type BudgetView } from './budget-calculator.js';
 import { originOf } from './budget-origin.js';
+import { goalContributionsOf } from './goal-contributions.js';
 import {
   toBudgetDto,
   toBudgetVsActual,
@@ -30,9 +31,11 @@ export class BudgetQueries implements BudgetVsActualQuery {
     return this.deps.uow.run(workspaceId, async () => {
       const budget = await this.deps.budgets.findById(workspaceId, budgetId);
       if (!budget) throw new DomainError('RESOURCE_NOT_FOUND', `budget ${budgetId} not found`);
+      const view = await this.viewOf(workspaceId, budget.periodId, budget);
       return toBudgetDto(
-        await this.viewOf(workspaceId, budget.periodId, budget),
+        view,
         await originOf(this.deps, budget),
+        await goalContributionsOf(this.deps, workspaceId, view),
       );
     });
   }
@@ -45,7 +48,12 @@ export class BudgetQueries implements BudgetVsActualQuery {
       if (!period || !budget) {
         throw new DomainError('RESOURCE_NOT_FOUND', `period ${periodId} has no budget plan`);
       }
-      return toBudgetDto(await this.viewOf(workspaceId, periodId, budget), await originOf(this.deps, budget));
+      const view = await this.viewOf(workspaceId, periodId, budget);
+      return toBudgetDto(
+        view,
+        await originOf(this.deps, budget),
+        await goalContributionsOf(this.deps, workspaceId, view),
+      );
     });
   }
 

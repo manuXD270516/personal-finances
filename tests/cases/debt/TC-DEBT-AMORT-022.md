@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Sistema alemán de capital constante'
 scenario: 'Principal no divisible'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-004', 'FR-DEBT-006']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-methods.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'german', 'rounding']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'El principal de las cuotas es 3333.33, 3333.33 y 3333.34 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-022 — En el alemán la última cuota absorbe el residuo del principal
@@ -48,4 +49,4 @@ Entonces el principal de las cuotas es 3333.33, 3333.33 y 3333.34 BOB
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

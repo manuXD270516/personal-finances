@@ -140,6 +140,17 @@ export class LifecycleExportController {
     return this.download(req, res, workspaceId, 'Loan', id, format);
   }
 
+  @Get(`${WS}/goals/:goalId/lifecycle/export`)
+  goal(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: ApiResponse,
+    @Param('workspaceId') workspaceId: string,
+    @Param('goalId') id: string,
+    @Query('format') format: unknown,
+  ) {
+    return this.download(req, res, workspaceId, 'SavingsGoal', id, format);
+  }
+
   @Get(`${WS}/recurring/:definitionId/lifecycle/export`)
   recurringDefinition(
     @Req() req: ApiRequest,

@@ -22,11 +22,13 @@ interface LinkRow {
   source: string;
   external_ref_namespace: string | null;
   external_ref_id: string | null;
+  revision: number;
 }
 
 const LINK_COLUMNS = sql`
   t.id, t.kind, t.status, t.transaction_date::text AS business_date, t.amount::text AS amount,
   t.currency, t.account_id, t.counterparty_id, t.source, t.external_ref_namespace, t.external_ref_id,
+  t.revision,
   (SELECT l.account_id FROM txn.transaction_leg l
     WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
       AND l.role = 'TARGET' AND l.superseded_in_revision IS NULL LIMIT 1) AS to_account_id`;
@@ -117,6 +119,7 @@ export class PgTransactionLinkQuery implements TransactionLinkQuery {
         counterpartyId: r.counterparty_id,
         source: r.source,
         externalRef: ref(r),
+        revision: Number(r.revision),
       });
     }
     return out;
