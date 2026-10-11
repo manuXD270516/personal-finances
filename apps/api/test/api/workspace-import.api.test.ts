@@ -480,8 +480,11 @@ describe('Importación con worker', () => {
           'ledger.posting',
           'audit.audit_log',
         ]) {
+          // Planning provisiona periodos de la víctima en segundo plano (consumidor de asientos, D62/D64) y los
+          // audita: esas filas dependen de cuándo corre el worker, no de la importación.
+          const own = t === 'audit.audit_log' ? ` AND action NOT LIKE 'planning.%'` : '';
           out[t] = (
-            await c.query(`SELECT to_jsonb(x) AS r FROM ${t} x WHERE workspace_id = $1 ORDER BY 1`, [ws])
+            await c.query(`SELECT to_jsonb(x) AS r FROM ${t} x WHERE workspace_id = $1${own} ORDER BY 1`, [ws])
           ).rows.map((r) => r.r);
         }
         return out;
