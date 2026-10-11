@@ -5,16 +5,22 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Aporte mensual planificado"
 scenario: "Pendiente del periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-009"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/commitments/src/application/goal-managed.service.test.ts
+  - packages/contexts/goals/src/application/goals.queries.test.ts
+  - packages/contexts/goals/src/application/plan.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "plan"]
@@ -31,7 +37,7 @@ expected_result:
   - "Pendientes de input"
   - "El plan en otra moneda se rechaza con CURRENCY_MISMATCH"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-038 — El pendiente planificado del periodo es el planificado menos lo aportado, nunca negativo

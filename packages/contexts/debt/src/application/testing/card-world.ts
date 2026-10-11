@@ -311,6 +311,9 @@ export class CardWorld {
           world.ensureOccurrences(def.id);
         }
       },
+      reviseManaged: async (input) => recurring.revise(input),
+      pauseManaged: async () => undefined,
+      resumeManaged: async () => undefined,
     };
 
     const recurringQuery: RecurringDefinitionQuery = {

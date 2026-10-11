@@ -3,16 +3,19 @@
  * `ReportSummary` y sus esquemas. Los montos y tasas son `DecimalString` (INV-001): nunca `number`.
  */
 
-export interface Money {
-  readonly amount: string;
-  readonly currency: string;
-}
+import type { GoalContributionsNet, GoalsHomeBlock } from '../goals/types';
+import type { Money, RateAttribution, ResolvedRate } from '../common/fx-types';
 
-export type FxRateType =
-  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL';
-export type FxRateSource = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
-export type FxRateProvider = 'PARALELO_BO' | 'DOLARAPI_BO';
-export type RateSelection = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
+export type {
+  Money,
+  FxRateType,
+  FxRateSource,
+  FxRateProvider,
+  RateSelection,
+  RateAttribution,
+  ResolvedRate,
+} from '../common/fx-types';
+
 export type AccountType =
   | 'BANK'
   | 'CASH'
@@ -25,34 +28,6 @@ export type AccountType =
   | 'VIRTUAL'
   | 'MANUAL_ASSET'
   | 'MANUAL_LIABILITY';
-
-export interface RateAttribution {
-  readonly provider: FxRateProvider;
-  readonly text: string;
-  readonly url: string;
-  readonly license?: string | null;
-  readonly licenseUrl?: string | null;
-}
-
-export interface ResolvedRate {
-  readonly rate: { readonly base: string; readonly quote: string; readonly value: string };
-  readonly fxRateId?: string | null;
-  readonly derivation: 'DIRECT' | 'INVERSE' | 'CROSS';
-  readonly rateType: FxRateType;
-  /** Tipo pedido; si difiere de `rateType`, se usó una tasa manual fresca de otro tipo. */
-  readonly requestedRateType?: FxRateType | null;
-  readonly source: FxRateSource;
-  readonly asOf: string;
-  readonly ageDays: number;
-  readonly approx: boolean;
-  readonly ageSeconds?: number;
-  readonly provider?: FxRateProvider | null;
-  readonly selection?: RateSelection;
-  readonly stale?: boolean;
-  readonly attribution?: RateAttribution | null;
-  /** Fuente declarada de una tasa manual (p. ej. "Casa de cambio centro"). */
-  readonly sourceLabel?: string | null;
-}
 
 export interface CurrencyTotals {
   readonly currency: string;
@@ -158,6 +133,10 @@ export interface ReportSummary {
   readonly topIncomeCategories?: readonly TopCategory[];
   readonly netWorth: NetWorthBreakdown;
   readonly questions: readonly HomeQuestionStatus[];
+  /** Q9 (add-savings-goals): metas en curso; puede faltar en respuestas anteriores a la fase 4. */
+  readonly goals?: GoalsHomeBlock | null;
+  /** Aportes netos a metas del periodo junto al ahorro (Q6); no cambia el ahorro ni su tasa. */
+  readonly goalContributions?: GoalContributionsNet | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

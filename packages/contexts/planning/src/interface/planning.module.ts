@@ -54,6 +54,7 @@ import type {
   BudgetsDeps,
   ClosingDeps,
   ClosingMetricsPort,
+  GoalPlanPort,
   OutboxPort,
   PlanningDeps,
   WorkspaceSettingsPort,
@@ -116,6 +117,12 @@ export interface BudgetsRuntimeOptions {
   readonly rates: FxValuationPort;
   /** `REPORTING_RATE_VALIDITY_WINDOW` en días (docs/31 D53): la misma ventana que el resumen del Home. */
   readonly rateValidityWindowDays: number;
+  /**
+   * Aportes planificados a metas del periodo (GOALS, `GoalPlansQuery.getForPeriod`; add-savings-goals): alimenta la
+   * sección de solo lectura `goalContributions` de `GET /budgets/{id}`. GOALS se compone después de PLANNING, así que la
+   * composición lo entrega con resolución tardía. Sin él, la sección va vacía.
+   */
+  readonly goalPlans?: GoalPlanPort;
   /** Moneda base del workspace (solo la API, para crear planes). */
   readonly settings?: WorkspaceSettingsPort;
   /** Historial de auditoría del plan (solo la API). */
@@ -251,6 +258,7 @@ export function createPlanningRuntime(options: PlanningRuntimeOptions): Planning
       ids: uuidV7Ids,
       clock: options.clock,
       rateValidityWindowDays: b.rateValidityWindowDays,
+      ...(b.goalPlans ? { goalPlans: b.goalPlans } : {}),
     };
     const budgetQueries = new BudgetQueries(budgetsDeps);
     const budgetsService = new BudgetsService(budgetsDeps);

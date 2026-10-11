@@ -31,6 +31,7 @@ import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
 import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastructure/pg-account-movements.js';
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
+import { GoalTransferAdapter } from '../application/goal-transfer.port.js';
 import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
 import { ImportedTransactionsAdapter } from '../application/imported-transactions.adapter.js';
 import {
@@ -43,6 +44,7 @@ import { LOAN_TRANSACTIONS_PORT } from '../contracts/index.js';
 import type {
   AccountMovementsQuery,
   CounterpartyCategoryUsageQuery,
+  GoalTransferPort,
   LoanTransactionsPort,
   DuplicateCandidatesQuery,
   ImportedTransactionsCommand,
@@ -100,6 +102,8 @@ export interface TransactionsRuntime {
   readonly recurring: RecurringTransactionPort;
   /** Escritura para DEBT (add-loans): desembolso y pago de préstamo administrados, en la UoW del llamador. */
   readonly loans: LoanTransactionsPort;
+  /** Escritura para GOALS (add-savings-goals): transferencia de un aporte o retiro con origen `GOAL`, en la UoW del llamador. */
+  readonly goals: GoalTransferPort;
   /** Lectura de una transacción para vincularla a una ocurrencia (add-recurrence-engine). */
   readonly links: TransactionLinkQuery;
   /** Transacciones `PENDING` (add-recurrence-engine, comprometido del periodo). */
@@ -165,6 +169,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),
     recurring: new RecurringTransactionAdapter(service),
     loans: new LoanTransactionsAdapter(service),
+    goals: new GoalTransferAdapter(service),
     links: new PgTransactionLinkQuery(deps.uow, deps.currencies),
     pending: new PgPendingFlowQuery(deps.uow, deps.currencies),
     movements: new PgAccountMovementsQuery(

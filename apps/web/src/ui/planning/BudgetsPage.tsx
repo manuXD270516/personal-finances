@@ -24,6 +24,7 @@ import {
 import { BudgetLineForm, natureOf, type TargetOptions } from './BudgetLineForm';
 import { loadCatalog, type Catalog } from './catalog';
 import { BudgetLinesTable, LineMissingNotice, targetName, type TargetNames } from './BudgetLinesTable';
+import { BudgetGoalContributionsView } from './BudgetGoalContributions';
 import { BudgetTotalsView } from './BudgetTotalsView';
 import { defaultPeriodId, formatBusinessDate, periodName, type FinancialPeriod } from './logic';
 import { loadPeriods } from './PeriodsPage';
@@ -402,6 +403,7 @@ function PlanView({
       <PlanOriginInfo origin={budget.origin} templateVersion={budget.templateVersion} f={f} />
       <OmittedLinesNotice omitted={omitted} names={names} f={f} />
       <BudgetTotalsView budget={budget} f={f} />
+      <BudgetGoalContributionsView section={budget.goalContributions} f={f} href={ctx.href} />
       {canWrite ? (
         <div style={rowStyle}>
           <label style={{ display: 'flex', gap: 'var(--pf-space-2)', alignItems: 'center' }}>

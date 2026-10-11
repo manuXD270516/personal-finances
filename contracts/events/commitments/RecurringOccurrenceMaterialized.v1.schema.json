@@ -28,7 +28,8 @@
       "enum": [
         "USER",
         "SUBSCRIPTION",
-        "DEBT"
+        "DEBT",
+        "GOAL"
       ]
     },
     "Payload": {

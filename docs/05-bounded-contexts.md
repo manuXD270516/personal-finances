@@ -22,7 +22,7 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 | 5 | CLASSIFICATION | Supporting | 1 | Category, CategoryGroup, Tag, CustomFieldDefinition, Counterparty | Media |
 | 6 | PLANNING | Core | 2 | FinancialPeriod, Budget, BudgetTemplate | Media-Baja |
 | 7 | COMMITMENTS | Core | 3 | RecurringDefinition, RecurringOccurrence, Subscription | Media |
-| 8 | GOALS | Supporting | 4 | SavingsGoal, GoalContribution | Media |
+| 8 | GOALS | Supporting | 4 | SavingsGoal, GoalMovement | Media |
 | 9 | DEBT | Core | 4 | Loan, CreditCardProfile, CardStatement | Media |
 | 10 | FX | Supporting | 1 / 5 | CurrencyDefinition, ExchangeRate, RateProviderConfig | Alta |
 | 11 | DOCUMENTS | Generic | 6 | Document | Alta |
@@ -105,11 +105,11 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 
 ### 2.8 GOALS — Savings Goals (`goals`, `@pf/goals`)
 - **Propósito:** metas de ahorro y su progreso.
-- **Responsabilidades:** metas; aportes reales (vía transferencia) y earmarks; retiros; progreso; detección de meta alcanzada; vigilancia de sobre-asignación de earmarks.
+- **Responsabilidades:** metas; movimientos (aportes reales vía transferencia, reservas o earmarks, retiros, liberaciones, inversos y reasignaciones) como única fuente del progreso; reservado por cuenta; aporte requerido, fecha esperada y estado de avance; detección de meta alcanzada; vigilancia de sobre-asignación por episodio; plan mensual y aporte recurrente administrado; sugerencias de aporte.
 - **NO responsabilidades:** mover dinero por sí mismo (Transactions); saldos (Ledger).
 - **API pública:** ver 04 §3.8.
-- **Eventos publicados:** `goals.SavingsContributionRecorded`, `GoalReached`, `EarmarkExceedsBalance`. **Consumidos:** `transactions.TransferCompleted` (transferencias manuales a cuentas vinculadas → sugerir/registrar aporte), `TransactionVoided` (anular aporte REAL), `ledger.JournalEntryPosted` (re-evaluar earmarks vs saldo).
-- **Dependencias:** Transactions (sync), Ledger (query), Audit.
+- **Eventos publicados:** `goals.SavingsContributionRecorded`, `goals.GoalReached`, `goals.EarmarkExceedsBalance`. **Consumidos:** `transactions.TransferCompleted` (transferencias manuales a cuentas vinculadas → sugerir aporte; completa el aporte recurrente que esperaba su transferencia), `TransactionVoided`, `TransferRevised` y `TransactionUpdated` (movimiento inverso del aporte o retiro respaldado), `commitments.RecurringOccurrenceMaterialized` (con `managedBy = GOAL` → aporte recurrente), `ledger.JournalEntryPosted` (re-evaluar lo reservado contra el saldo contable).
+- **Dependencias:** Transactions (sync, `GoalTransferPort`, `TransactionLinkQuery`), Ledger (`AccountBalancesQuery`), Accounts (query), FX (`FxValuationPort`), Commitments (sync, `RecurringDefinitionPort` para el aporte programado administrado), Identity (calendario y moneda base), Audit.
 - **Extracción:** Media.
 
 ### 2.9 DEBT — Debt & Credit (`debt`, `@pf/debt`)
@@ -237,6 +237,10 @@ flowchart TD
   COMMITMENTS --> TRANSACTIONS
   GOALS --> TRANSACTIONS
   GOALS --> LEDGER
+  GOALS --> ACCOUNTS
+  GOALS --> FX
+  GOALS --> COMMITMENTS
+  GOALS --> IDENTITY
   DEBT --> TRANSACTIONS
   IMPORTS --> TRANSACTIONS
   IMPORTS --> DOCUMENTS

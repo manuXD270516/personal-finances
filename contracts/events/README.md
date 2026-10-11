@@ -62,6 +62,10 @@ contracts/events/
 │  ├─ CardStatementIssued.v1.schema.json    # add-credit-cards: estado de cuenta emitido una vez por (cuenta, cierre) con cifras congeladas
 │  ├─ CardPaymentDue.v1.schema.json         # add-credit-cards: recordatorio de vencimiento (lo consume NOTIFY)
 │  └─ CreditUtilizationThresholdReached.v1.schema.json  # add-credit-cards: umbral de utilización cruzado (lo consume NOTIFY)
+├─ goals/                               # add-savings-goals (metas de ahorro)
+│  ├─ SavingsContributionRecorded.v1.schema.json  # un hecho por movimiento (aporte, retiro, reversa, reasignación) con avance antes y después
+│  ├─ GoalReached.v1.schema.json         # la meta alcanzó su objetivo (cada vez que pasa a ACHIEVED; lo consume NOTIFY)
+│  └─ EarmarkExceedsBalance.v1.schema.json  # cuenta sobre-asignada, una vez por episodio (aggregateType Account; lo consume NOTIFY)
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/
@@ -137,3 +141,13 @@ Notas: el agregado de cada evento es `RecurringDefinition` (`OccurrencesGenerate
 | `ledger.JournalEntryPosted.v1` | LEDGER | REPORTING, GOALS |
 
 (Varios consumidores pertenecen a fases posteriores; en Phase 1 el consumidor efectivo es REPORTING.)
+
+## Eventos Phase 4 — Goals (`add-savings-goals`)
+
+| Evento | Productor | Consumidores |
+|---|---|---|
+| `goals.SavingsContributionRecorded.v1` | GOALS | NOTIFY (hitos `GOAL_MILESTONE`), REPORTING, AUDIT |
+| `goals.GoalReached.v1` | GOALS | NOTIFY (`GOAL_REACHED`) |
+| `goals.EarmarkExceedsBalance.v1` | GOALS | NOTIFY (`GOAL_OVER_ALLOCATED`) |
+
+Notas: el agregado de `SavingsContributionRecorded` y `GoalReached` es `SavingsGoal` (`aggregateId` = `goalId`); el de `EarmarkExceedsBalance` es `Account` (`aggregateId` = `accountId`, un hecho por `episodeId`). Los montos de movimiento van firmados con `Money` (nunca `PositiveMoney`): aporte y entrada de reasignación positivos, retiro y salida negativos, la reversa con el signo opuesto del movimiento que revierte. `percentBefore` y `percentAfter` son porcentajes con 2 decimales y pueden superar 100. `progressComplete = false` indica fondos sin tasa vigente (no se emiten hitos con progreso incompleto). Los payloads no repiten `workspaceId` (viaja en el envelope). Reemplaza el `SavingsContributionRecorded` de docs/11 (aún no publicado).

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/goals/EarmarkExceedsBalance.v1.schema.json",
+  "title": "goals.EarmarkExceedsBalance.v1",
+  "description": "Una cuenta quedó sobre-asignada: lo reservado por metas de ahorro (apartados más aportes reales que siguen en la cuenta) supera su saldo. Un hecho por episodio (se vuelve a emitir solo después de que la cuenta deje de estar sobre-asignada y vuelva a estarlo). `shortfall` = reserved − balance. Productor: GOALS (consumidor goals.balance-watch y job goals.daily-evaluation). Lo consume NOTIFY (GOAL_OVER_ALLOCATED). Idempotencia: (accountId, episodeId). El aggregateId del envelope es el id de la cuenta. Los nombres de la cuenta y de las metas son PII de baja sensibilidad (B).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "goals.EarmarkExceedsBalance"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Account"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "accountName",
+        "episodeId",
+        "balance",
+        "reserved",
+        "shortfall",
+        "detectedOn",
+        "goals"
+      ],
+      "properties": {
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "episodeId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "balance": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "reserved": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "shortfall": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+        },
+        "detectedOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "goals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "goalId",
+              "goalName",
+              "reserved"
+            ],
+            "properties": {
+              "goalId": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+              },
+              "goalName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "reserved": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Money"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000c03",
+      "eventType": "goals.EarmarkExceedsBalance",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-05T13:10:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Account",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000a0002",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "accountId": "01928c4e-0000-7000-8000-0000000a0002",
+        "accountName": "Caja de ahorro BNB",
+        "episodeId": "01928c4e-0000-7000-8000-0000000c0301",
+        "balance": {
+          "amount": "3000.00",
+          "currency": "BOB"
+        },
+        "reserved": {
+          "amount": "4300.00",
+          "currency": "BOB"
+        },
+        "shortfall": {
+          "amount": "1300.00",
+          "currency": "BOB"
+        },
+        "detectedOn": "2026-11-05",
+        "goals": [
+          {
+            "goalId": "01928c4e-0000-7000-8000-0000000c0001",
+            "goalName": "Fondo de emergencia",
+            "reserved": {
+              "amount": "3000.00",
+              "currency": "BOB"
+            }
+          },
+          {
+            "goalId": "01928c4e-0000-7000-8000-0000000c0002",
+            "goalName": "Viaje a Uyuni",
+            "reserved": {
+              "amount": "1300.00",
+              "currency": "BOB"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Transferencia a una cuenta vinculada sugerida como aporte"
 scenario: "Sugerencia confirmada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-010", "FR-GOALS-002"]
 nfr: []
 invariants: ["INV-028"]
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "suggestion"]
@@ -35,7 +39,7 @@ expected_result:
   - "Descartada: sin aporte y sin nueva sugerencia de esa transferencia"
   - "Una transferencia con source GOAL no genera sugerencia"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-040 — Una transferencia manual a una cuenta vinculada se sugiere como aporte y solo se registra al confirmarla

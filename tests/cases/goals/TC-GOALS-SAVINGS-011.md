@@ -5,16 +5,17 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Aporte real mediante transferencia a una cuenta vinculada"
 scenario: "Fecha en un periodo cerrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002", "FR-LEDGER-011"]
 nfr: []
 invariants: ["INV-015", "INV-018"]
 priority: high
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/goals/src/application/movements.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "contribution", "period"]
@@ -31,7 +32,7 @@ expected_result:
   - "409 PERIOD_CLOSED propagado desde Transactions"
   - "Ni la transferencia ni el movimiento ni la auditoría persisten"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-011 — Un aporte real con fecha en un periodo cerrado se rechaza con PERIOD_CLOSED y no deja aporte huérfano

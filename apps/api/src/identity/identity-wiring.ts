@@ -35,6 +35,13 @@ import {
   createDebtRuntime,
 } from '@pf/debt/interface/debt.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
+import { GOALS_AUDIT_POLICY } from '@pf/goals/contracts';
+import {
+  GOAL_LIFECYCLE_MACHINE,
+  GoalsModule,
+  createGoalsRuntime,
+  type GoalsRuntime,
+} from '@pf/goals/interface/goals.module';
 import {
   createFxRuntime,
   EXCHANGE_RATE_LIFECYCLE_MACHINE,
@@ -217,6 +224,8 @@ export const LIFECYCLE_MACHINES = [
   SUBSCRIPTION_LIFECYCLE_MACHINE,
   // add-loans (Phase 4): préstamo de DEBT.
   LOAN_LIFECYCLE_MACHINE,
+  // add-savings-goals (Phase 4): meta de ahorro de GOALS.
+  GOAL_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -235,6 +244,8 @@ export const AUDIT_POLICIES = [
   IMPORTS_AUDIT_POLICY,
   // add-loans (Phase 4): préstamos, pagos, tablas del banco y comparaciones.
   DEBT_AUDIT_POLICY,
+  // add-savings-goals (Phase 4): metas, movimientos, reservas y sugerencias.
+  GOALS_AUDIT_POLICY,
 ];
 
 /**
@@ -352,6 +363,7 @@ export function financeRuntimes(input: {
     periods?: PeriodQuery;
     closingSnapshots?: ClosingSnapshotQuery;
     commitments?: CommitmentsRuntime;
+    goals?: GoalsRuntime;
   } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
@@ -452,6 +464,15 @@ export function financeRuntimes(input: {
         deferred.commitments?.stats.hasActiveDefinitions(query) ?? Promise.resolve(false),
     },
     pending: transactions.pending,
+    // add-savings-goals: Q9 y aportes netos a metas del mes (GOALS se compone después de REPORTING).
+    goalSummary: {
+      listForHome: (query) =>
+        deferred.goals?.queries.listForHome(query) ??
+        Promise.resolve({ items: [], moreCount: 0, goalCount: 0, ratesUsed: [] }),
+    },
+    goalFlows: {
+      netForRange: (query) => deferred.goals?.queries.netForRange(query) ?? Promise.resolve([]),
+    },
     metrics: { observe: (name, value) => reportingHistograms.record(name, value, {}) },
     rateValidityWindowDays,
   });
@@ -474,6 +495,10 @@ export function financeRuntimes(input: {
       rateValidityWindowDays,
       settings: identityWorkspaceSettings(input.pool),
       history: input.history,
+      // add-savings-goals: sección de solo lectura "Aportes a metas" (GOALS se compone después de PLANNING).
+      goalPlans: {
+        getForPeriod: (query) => deferred.goals?.queries.getForPeriod(query) ?? Promise.resolve([]),
+      },
     },
     // add-month-closing: checklist, bloqueo del ledger y snapshot sobre los puertos públicos de cada contexto.
     closing: {
@@ -564,6 +589,25 @@ export function financeRuntimes(input: {
     rates: fx.valuation,
     rateValidityWindowDays,
   });
+  // GOALS (add-savings-goals): metas de ahorro. Solo contratos públicos: TRANSACTIONS (`GoalTransferPort`,
+  // `TransactionLinkQuery`), COMMITMENTS (`RecurringDefinitionPort`), ACCOUNTS, LEDGER, FX e IDENTITY.
+  const goals = createGoalsRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    outbox: classificationOutbox(writer),
+    calendar: actorCalendar,
+    accountCatalog: accounts.catalog,
+    balances: ledger.accountBalances,
+    rates: fx.valuation,
+    transfers: transactions.goals,
+    links: transactions.links,
+    recurring: commitments.recurringDefinitions,
+    rateValidityWindowDays,
+  });
+  deferred.goals = goals;
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
   const imports = createImportsRuntime({
     pool: input.pool,
@@ -594,6 +638,7 @@ export function financeRuntimes(input: {
     imports,
     debt,
     cards,
+    goals,
   };
 }
 
@@ -644,6 +689,7 @@ export function identityImports(input: {
     imports,
     debt,
     cards,
+    goals,
   } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -703,6 +749,7 @@ export function identityImports(input: {
         planning,
         commitments,
         debt,
+        goals,
       }),
     }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
@@ -723,6 +770,8 @@ export function identityImports(input: {
     ImportsModule.register({ runtime: imports, conventions: input.conventions }),
     // DEBT — openspec add-loans (Phase 4): `/loans*`.
     DebtModule.register({ runtime: debt, cards, conventions: input.conventions }),
+    // GOALS — openspec add-savings-goals (Phase 4): `/goals*`.
+    GoalsModule.register({ runtime: goals, conventions: input.conventions }),
   ];
 }
 
@@ -734,11 +783,16 @@ export function identityImports(input: {
 export function lifecycleExportLoaders(
   runtimes: Pick<
     ReturnType<typeof financeRuntimes>,
-    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'commitments' | 'debt'
+    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'commitments' | 'debt' | 'goals'
   >,
 ): LifecycleExportLoaders {
-  const { transactions, accounts, fx, classification, planning, commitments, debt } = runtimes;
+  const { transactions, accounts, fx, classification, planning, commitments, debt, goals } = runtimes;
   return {
+    // add-savings-goals (Phase 4): meta de ahorro de GOALS.
+    SavingsGoal: async ({ userId, workspaceId, aggregateId }) => ({
+      lifecycle: await goals.queries.lifecycle({ userId, workspaceId, goalId: aggregateId }),
+      label: await goals.queries.nameOf(workspaceId, aggregateId),
+    }),
     // add-loans (Phase 4): préstamo de DEBT.
     Loan: async ({ userId, workspaceId, aggregateId }) => {
       const loan = await debt.queries.get(workspaceId, aggregateId);

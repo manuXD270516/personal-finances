@@ -1,4 +1,4 @@
-import { DomainError } from '@pf/shared-kernel';
+import { DomainError, dec } from '@pf/shared-kernel';
 import type {
   BudgetTargetKind,
   JsonValue,
@@ -21,6 +21,11 @@ export interface NotificationPlan {
   readonly link: NotificationLink;
 }
 
+/** Datos del sobre del evento que algunas claves de negocio necesitan. */
+export interface PlanEnvelope {
+  readonly aggregateVersion?: number | undefined;
+}
+
 export interface NotificationTypeDefinition {
   readonly type: NotificationType;
   /** Consumidor de eventos (`<contexto>.<propósito>`): clave del inbox y nombre de la cola. */
@@ -29,8 +34,11 @@ export interface NotificationTypeDefinition {
   readonly event: { readonly type: string; readonly version: number };
   /** Roles con membresía activa que reciben el tipo (decisión 1; docs/33 D89). */
   readonly recipients: readonly WorkspaceRoleName[];
-  /** Traduce el payload del hecho (validado por contrato en el productor; se revalida su forma mínima aquí). */
-  plan(payload: unknown): NotificationPlan;
+  /**
+   * Traduce el payload del hecho (validado por contrato en el productor; se revalida su forma mínima aquí). El sobre
+   * (`envelope`) solo lo necesitan los tipos cuya clave de negocio usa la versión del agregado (`GOAL_REACHED`).
+   */
+  plan(payload: unknown, envelope?: PlanEnvelope): NotificationPlan;
   /** Otros tipos que este mismo consumidor puede producir (el tipo concreto lo decide `plan`). */
   readonly alsoTypes?: readonly NotificationType[];
   /** `true` si el hecho NO debe generar aviso genérico (p. ej. D119); se evalúa tras validar con `plan`. */
@@ -181,7 +189,8 @@ export const RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY = 'notifications.recurring_
 
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const EXPECTED_TYPES = ['FIXED', 'ESTIMATED', 'MIN_MAX', 'VARIABLE'];
-const MANAGED_BY = ['USER', 'SUBSCRIPTION', 'DEBT'];
+// `GOAL` (add-savings-goals N6): las metas administran definiciones del motor; su ocurrencia conserva el aviso genérico.
+const MANAGED_BY = ['USER', 'SUBSCRIPTION', 'DEBT', 'GOAL'];
 
 function localDateOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
@@ -533,6 +542,156 @@ const CARD_UTILIZATION: NotificationTypeDefinition = {
   },
 };
 
+// ──────────────────────────────────────────────────────────────────────────── GOAL_* (add-savings-goals)
+
+export const GOAL_OVER_ALLOCATED_MESSAGE_KEY = 'notifications.goal_over_allocated.v1';
+export const GOAL_REACHED_MESSAGE_KEY = 'notifications.goal_reached.v1';
+export const GOAL_MILESTONE_MESSAGE_KEY = 'notifications.goal_milestone.v1';
+
+/** Hitos de avance que NOTIFY deriva del movimiento (el 100 % lo notifica `GoalReached`). */
+export const GOAL_MILESTONES = ['25', '50', '75'] as const;
+
+/**
+ * Hitos cruzados por un movimiento: `m` se cruza si `percentBefore < m <= percentAfter` (comparación con Decimal,
+ * nunca `number`). Devuelve el mayor y los demás en orden ascendente; `null` si no cruzó ninguno.
+ */
+export function crossedMilestones(
+  percentBefore: string,
+  percentAfter: string,
+): { readonly milestone: string; readonly alsoCrossed: readonly string[] } | null {
+  const before = dec(percentBefore);
+  const after = dec(percentAfter);
+  const crossed = GOAL_MILESTONES.filter((m) => before.lt(m) && after.gte(m));
+  const highest = crossed.at(-1);
+  return highest === undefined ? null : { milestone: highest, alsoCrossed: crossed.slice(0, -1) };
+}
+
+/**
+ * `goals.EarmarkExceedsBalance.v1`: las reservas de metas de una cuenta superan su saldo. Requiere acción de quien puede
+ * reasignar o ajustar metas (OWNER y EDITOR, docs/37 D187). Clave de negocio (cuenta, episodio): el hecho reentregado
+ * con otro `eventId` no duplica. Nombres y montos viajan en el hecho (PII `B`).
+ */
+const GOAL_OVER_ALLOCATED: NotificationTypeDefinition = {
+  type: 'GOAL_OVER_ALLOCATED',
+  consumer: 'notifications.goal-over-allocated',
+  event: { type: 'goals.EarmarkExceedsBalance', version: 1 },
+  recipients: ['OWNER', 'EDITOR'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const accountId = uuidOf(p, 'accountId');
+    const episodeId = uuidOf(p, 'episodeId');
+    const detectedOn = localDateOf(p, 'detectedOn');
+    const goalsRaw = p['goals'];
+    if (!Array.isArray(goalsRaw)) fail('goals');
+    const goals = (goalsRaw as unknown[]).map((g) => {
+      const item = recordOf(g, 'goals[]');
+      return {
+        goalId: uuidOf(item, 'goalId'),
+        goalName: textOf(item, 'goalName'),
+        reserved: { ...moneyOf(item, 'reserved') },
+      };
+    });
+    return {
+      type: 'GOAL_OVER_ALLOCATED',
+      dedupeKey: `goal-over-allocated:${accountId}:${episodeId}`,
+      severity: 'WARNING',
+      messageKey: GOAL_OVER_ALLOCATED_MESSAGE_KEY,
+      params: {
+        accountId,
+        accountName: textOf(p, 'accountName'),
+        episodeId,
+        balance: { ...moneyOf(p, 'balance') },
+        reserved: { ...moneyOf(p, 'reserved') },
+        shortfall: { ...moneyOf(p, 'shortfall') },
+        detectedOn,
+        goals,
+      },
+      link: {
+        kind: 'GOAL_RESERVATIONS',
+        accountId,
+        periodId: accountId,
+        periodLabel: detectedOn.slice(0, 7),
+      },
+    };
+  },
+};
+
+/**
+ * `goals.GoalReached.v1`: la meta alcanzó su objetivo. Todos los miembros activos reciben el aviso. La clave de negocio
+ * es la meta y la versión del agregado del evento: cada vez que la meta vuelve a alcanzarse es otro hecho, y la
+ * reentrega del mismo no duplica. Sin versión de agregado (solo pruebas de contrato) cae a la fecha de alcance.
+ */
+const GOAL_REACHED: NotificationTypeDefinition = {
+  type: 'GOAL_REACHED',
+  consumer: 'notifications.goal-reached',
+  event: { type: 'goals.GoalReached', version: 1 },
+  recipients: ['OWNER', 'EDITOR', 'VIEWER'],
+  plan(payload, envelope) {
+    const p = recordOf(payload, 'payload');
+    const goalId = uuidOf(p, 'goalId');
+    const reachedOn = localDateOf(p, 'reachedOn');
+    const version = envelope?.aggregateVersion;
+    if (version !== undefined && (!Number.isInteger(version) || version < 1)) fail('aggregateVersion');
+    return {
+      type: 'GOAL_REACHED',
+      dedupeKey: `goal-reached:${goalId}:${version ?? reachedOn}`,
+      severity: 'INFO',
+      messageKey: GOAL_REACHED_MESSAGE_KEY,
+      params: {
+        goalId,
+        goalName: textOf(p, 'goalName'),
+        target: { ...moneyOf(p, 'target') },
+        progress: { ...moneyOf(p, 'progress') },
+        reachedOn,
+      },
+      link: { kind: 'GOAL', goalId, periodId: goalId, periodLabel: reachedOn.slice(0, 7) },
+    };
+  },
+};
+
+function planGoalMilestone(payload: unknown): NotificationPlan {
+  const p = recordOf(payload, 'payload');
+  const goalId = uuidOf(p, 'goalId');
+  const percentBefore = decimalOf(p, 'percentBefore');
+  const percentAfter = decimalOf(p, 'percentAfter');
+  if (typeof p['progressComplete'] !== 'boolean') fail('progressComplete');
+  const occurredOn = localDateOf(p, 'occurredOn');
+  const crossing = p['progressComplete'] === true ? crossedMilestones(percentBefore, percentAfter) : null;
+  return {
+    type: 'GOAL_MILESTONE',
+    dedupeKey: `goal-milestone:${goalId}:${crossing?.milestone ?? 'none'}`,
+    severity: 'INFO',
+    messageKey: GOAL_MILESTONE_MESSAGE_KEY,
+    params: {
+      goalId,
+      goalName: textOf(p, 'goalName'),
+      milestone: crossing?.milestone ?? null,
+      alsoCrossed: [...(crossing?.alsoCrossed ?? [])],
+      percentBefore,
+      percentAfter,
+      target: { ...moneyOf(p, 'target') },
+      progress: { ...moneyOf(p, 'progressAfter') },
+      occurredOn,
+    },
+    link: { kind: 'GOAL', goalId, periodId: goalId, periodLabel: occurredOn.slice(0, 7) },
+  };
+}
+
+/**
+ * `goals.SavingsContributionRecorded.v1`: de cada movimiento NOTIFY deriva los hitos 25/50/75 % (el mayor cruzado, los
+ * demás en `alsoCrossed`). Clave de negocio `(meta, hito)` para siempre por destinatario: aunque el porcentaje baje y
+ * vuelva a cruzar, no hay un segundo aviso. Un movimiento sin hito cruzado o con progreso incompleto (falta de tasa) se
+ * consume sin notificar (`suppressed`); `plan` devuelve entonces un plan inerte (`milestone: null`) que nunca se guarda.
+ */
+const GOAL_MILESTONE: NotificationTypeDefinition = {
+  type: 'GOAL_MILESTONE',
+  consumer: 'notifications.goal-milestone',
+  event: { type: 'goals.SavingsContributionRecorded', version: 1 },
+  recipients: ['OWNER', 'EDITOR', 'VIEWER'],
+  plan: planGoalMilestone,
+  suppressed: (payload) => planGoalMilestone(payload).params['milestone'] === null,
+};
+
 /** Registro de tipos por fase: una tabla en código, no un motor de reglas (RISK-005). */
 export const NOTIFICATION_TYPE_CATALOG: readonly NotificationTypeDefinition[] = [
   BUDGET_THRESHOLD,
@@ -543,6 +702,9 @@ export const NOTIFICATION_TYPE_CATALOG: readonly NotificationTypeDefinition[] = 
   SUBSCRIPTION_PRICE_CHANGE,
   CARD_PAYMENT_DUE,
   CARD_UTILIZATION,
+  GOAL_OVER_ALLOCATED,
+  GOAL_REACHED,
+  GOAL_MILESTONE,
 ];
 
 export function definitionOf(type: NotificationType): NotificationTypeDefinition {

@@ -74,6 +74,13 @@ overflow-wrap:anywhere;display:grid;gap:0.5rem;align-content:start}
 .pf-home-cat-name::before{content:counter(pfcat) ". ";color:var(--pf-fg-muted);font-variant-numeric:tabular-nums}
 .pf-home-legend{display:flex;flex-wrap:wrap;gap:0.25rem 1rem;align-items:center}
 .pf-home-legend-mark{display:inline-block;width:2px;height:0.75rem;background:var(--pf-fg);opacity:0.55;margin-right:0.375rem;vertical-align:middle}
+.pf-home-goals{grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));align-items:start}
+.pf-home-goal-name{margin:0;font-size:1rem}
+.pf-home-meter-fill[data-kind="goal"]{background:var(--pf-primary)}
+.pf-home-badge{display:inline-block;border:1px solid var(--pf-border);border-radius:9999px;padding:0 0.5rem;font-size:0.75rem;font-weight:500;line-height:1.6;white-space:nowrap}
+.pf-home-badge[data-tone="ok"]{color:var(--pf-fin-ok);border-color:var(--pf-fin-ok)}
+.pf-home-badge[data-tone="warn"]{color:var(--pf-fin-warning);border-color:var(--pf-fin-warning)}
+.pf-home-badge[data-tone="danger"]{color:var(--pf-fin-over-budget);border-color:var(--pf-fin-over-budget)}
 .pf-home-soon{border-style:dashed;background:var(--pf-surface)}
 .pf-home-empty{background:var(--pf-surface);border:1px dashed var(--pf-border);border-radius:8px;padding:1rem;display:grid;gap:0.5rem}
 .pf-home-empty p{margin:0}

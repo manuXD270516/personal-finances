@@ -5,16 +5,20 @@ spec: transactions/transfers
 related_specs: ["goals/savings-goals"]
 requirement: "Transferencias de aportes y retiros de metas"
 scenario: "Transferencia de un aporte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-TRANSACTIONS-003", "FR-GOALS-002"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/transactions/src/application/goal-transfer.port.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "transactions", "transfers"]
@@ -36,7 +40,7 @@ expected_result:
   - "Ingresos y gastos del mes sin cambios"
   - "La anulación se acepta y el enlace sigue indicando la meta (con el inverso)"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-049 — La transferencia de un aporte tiene origen goal, se filtra por origen, muestra su meta y no es ingreso ni gasto

@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta en una moneda distinta a la de sus fondos"
 scenario: "Viaje en USD con fondos en BOB y USD"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-007", "FR-FX-006"]
 nfr: []
 invariants: ["INV-001"]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.queries.test.ts
+  - packages/contexts/goals/src/domain/goal-progress-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "fx", "multi-currency"]
@@ -33,7 +37,7 @@ expected_result:
   - "Sin tasa: total 300.00 USD, complete = false, unconverted [7500.00 BOB]"
   - "Neto de \"2026-09\" para el ritmo: 100.00 USD"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-036 — Una meta en USD con fondos en BOB y USD convierte con la tasa vigente informada y nunca a 1:1

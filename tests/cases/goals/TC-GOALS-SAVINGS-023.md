@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Anulación o revisión de la transacción de un movimiento"
 scenario: "Transferencia revisada a 450.00 BOB"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002"]
 nfr: []
 invariants: ["INV-018", "INV-028"]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "revision", "events"]
@@ -31,7 +33,7 @@ expected_result:
   - "Caso 1: REVERSAL de −500.00 BOB y CONTRIBUTION de 450.00 BOB con transaction_revision 2; progreso 1450.00 BOB"
   - "Caso 2: solo el REVERSAL; progreso 1000.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-023 — Revisar la transferencia de un aporte reemplaza el aporte por el monto revisado o lo revierte si el destino deja de estar vinculado

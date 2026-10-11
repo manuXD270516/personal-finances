@@ -152,7 +152,17 @@ export function TransactionsListView({
             <StatusBadge status={tx.status} f={f} />
             <WithoutStatementBadge tx={tx} f={f} />
             <span style={{ ...mutedStyle, flexBasis: '100%' }}>
-              {t(`kinds.${tx.kind}`)} · {accounts.join(' → ')}
+              {t(`kinds.${tx.kind}`)}
+              {tx.source !== 'MANUAL' && f.has(`sources.${tx.source}`) ? (
+                <>
+                  {' · '}
+                  <span data-testid="tx-source" data-source={tx.source}>
+                    {t('list.origin', { source: t(`sources.${tx.source}`) })}
+                  </span>
+                </>
+              ) : null}
+              {' · '}
+              {accounts.join(' → ')}
               {categories.length ? ` · ${categories.join(', ')}` : ''}
               {tx.paymentMethod ? (
                 <>

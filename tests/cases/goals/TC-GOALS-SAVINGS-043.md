@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ["goals/savings-goals"]
 requirement: "Emails de metas sin montos salvo opt-in"
 scenario: "Email de sobre-asignación sin detalles"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-006"]
 nfr: ["NFR-COMP-001"]
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/goal-notifications.test.ts
+  - packages/contexts/notifications/src/domain/goal-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "notifications", "email", "privacy"]
@@ -30,7 +32,7 @@ expected_result:
   - "No contiene \"Banco BOB\", \"1200.00\", \"BOB\", \"Laptop\" ni \"Fondo de emergencia\""
   - "El in-app sí muestra los detalles"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-043 — Los emails de metas no incluyen montos, monedas ni nombres sin opt-in de detalles

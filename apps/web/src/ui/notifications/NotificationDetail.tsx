@@ -154,7 +154,11 @@ export function NotificationDetailView({
                   ? f.t('detail.openSubscription', { period })
                   : n.link.kind === 'CREDIT_CARD'
                     ? f.t('detail.openCreditCard')
-                    : f.t('detail.openBudgetLine', { period })}
+                    : n.link.kind === 'GOAL'
+                      ? f.t('detail.openGoal')
+                      : n.link.kind === 'GOAL_RESERVATIONS'
+                        ? f.t('detail.openGoalReservations')
+                        : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/goals/SavingsContributionRecorded.v1.schema.json",
+  "title": "goals.SavingsContributionRecorded.v1",
+  "description": "Se registró un movimiento de una meta de ahorro: aporte, retiro, reversa, o entrada o salida de una reasignación, sobre fondos REALES (transferencia) o RESERVADOS (apartado). Un hecho por movimiento, con el avance de la meta antes y después. Los montos van firmados, en la moneda de la cuenta (aporte y entrada positivos, retiro y salida negativos, la reversa con el signo opuesto del movimiento que revierte); target y avance, en la moneda del objetivo. Productor: GOALS. Lo consumen NOTIFY (hitos), REPORTING y AUDIT. Idempotencia: movementId. El nombre de la meta es PII de baja sensibilidad (B).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "goals.SavingsContributionRecorded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "SavingsGoal"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goalId",
+        "goalName",
+        "goalStatus",
+        "movementId",
+        "fund",
+        "movement",
+        "amount",
+        "accountId",
+        "occurredOn",
+        "transactionId",
+        "reversesId",
+        "reassignmentId",
+        "origin",
+        "target",
+        "progressBefore",
+        "progressAfter",
+        "percentBefore",
+        "percentAfter",
+        "progressComplete"
+      ],
+      "properties": {
+        "goalId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "goalName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "goalStatus": {
+          "enum": [
+            "ACTIVE",
+            "PAUSED",
+            "ACHIEVED",
+            "CLOSED",
+            "CANCELLED"
+          ]
+        },
+        "movementId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "fund": {
+          "enum": [
+            "REAL",
+            "EARMARK"
+          ]
+        },
+        "movement": {
+          "enum": [
+            "CONTRIBUTION",
+            "WITHDRAWAL",
+            "REVERSAL",
+            "REASSIGN_IN",
+            "REASSIGN_OUT"
+          ]
+        },
+        "amount": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money",
+          "description": "Firmado, en la moneda de la cuenta."
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "occurredOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "transactionId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reversesId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reassignmentId": {
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "origin": {
+          "enum": [
+            "USER",
+            "RECURRING",
+            "SUGGESTION",
+            "SYSTEM"
+          ]
+        },
+        "target": {
+          "$ref": "../envelope.v1.schema.json#/$defs/PositiveMoney"
+        },
+        "progressBefore": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "progressAfter": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "percentBefore": {
+          "type": "string",
+          "pattern": "^-?[0-9]+[.][0-9]{2}$",
+          "description": "Porcentaje con 2 decimales (HALF_EVEN); puede superar 100."
+        },
+        "percentAfter": {
+          "type": "string",
+          "pattern": "^-?[0-9]+[.][0-9]{2}$"
+        },
+        "progressComplete": {
+          "type": "boolean",
+          "description": "false si algún fondo quedó sin convertir por falta de tasa (no hay hitos con progreso incompleto)."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000c01",
+      "eventType": "goals.SavingsContributionRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T15:30:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "SavingsGoal",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000c0001",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "goalId": "01928c4e-0000-7000-8000-0000000c0001",
+        "goalName": "Fondo de emergencia",
+        "goalStatus": "ACTIVE",
+        "movementId": "01928c4e-0000-7000-8000-0000000c0101",
+        "fund": "REAL",
+        "movement": "CONTRIBUTION",
+        "amount": {
+          "amount": "500.00",
+          "currency": "BOB"
+        },
+        "accountId": "01928c4e-0000-7000-8000-0000000a0002",
+        "occurredOn": "2026-10-20",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7201",
+        "reversesId": null,
+        "reassignmentId": null,
+        "origin": "USER",
+        "target": {
+          "amount": "10000.00",
+          "currency": "BOB"
+        },
+        "progressBefore": {
+          "amount": "2500.00",
+          "currency": "BOB"
+        },
+        "progressAfter": {
+          "amount": "3000.00",
+          "currency": "BOB"
+        },
+        "percentBefore": "25.00",
+        "percentAfter": "30.00",
+        "progressComplete": true
+      }
+    }
+  ]
+}

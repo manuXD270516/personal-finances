@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Estados y transiciones de una meta"
 scenario: "Cancelar libera las reservas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001", "FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "state", "earmark"]
@@ -33,7 +35,7 @@ expected_result:
   - "Existe un movimiento EARMARK/WITHDRAWAL de −2000.00 BOB sobre \"Banco BOB\" con origen SYSTEM"
   - "El disponible para reservar de \"Banco BOB\" pasa de 5000.00 BOB a 7000.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-007 — Cancelar una meta libera sus reservas con movimientos explícitos y sube el disponible de la cuenta

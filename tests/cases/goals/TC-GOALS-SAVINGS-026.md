@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Retiro de fondos de una meta"
 scenario: "Retiro vinculado a un gasto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "withdrawal", "earmark"]
@@ -35,7 +38,7 @@ expected_result:
   - "Liberación EARMARK/WITHDRAWAL de −500.00 BOB; \"Laptop\" acumula 1500.00 BOB"
   - "Disponible para reservar de \"Banco BOB\" sube 500.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-026 — Un gasto existente puede vincularse como retiro parcial y una reserva puede liberarse sin transacción

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/goal-linked-accounts.schema.json",
+  "title": "pfos-export v1 — goal-linked-accounts",
+  "description": "Registro de la sección «goal-linked-accounts» (tabla goals.goal_linked_account, contexto goals). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "goal_id",
+    "account_id",
+    "linked_at",
+    "linked_by"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "goal_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "account_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "linked_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "linked_by": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "goals.goal_linked_account",
+  "x-pfos-context": "goals"
+}

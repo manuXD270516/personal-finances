@@ -130,6 +130,7 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'RecurringOccurrence',
   'Subscription',
   'Loan',
+  'SavingsGoal',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

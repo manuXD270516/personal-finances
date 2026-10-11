@@ -655,7 +655,7 @@ describe('GET /reports/summary — flujos del mes (PG real)', () => {
 });
 
 describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
-  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1, Q4 y Q8 NO_DATA; Q5 y Q9 NOT_AVAILABLE_IN_PHASE', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1, Q4, Q8 y Q9 NO_DATA; Q5 NOT_AVAILABLE_IN_PHASE', async () => {
     const r = await summary(empty);
     expect(r.status).toBe(200);
     const q = Object.fromEntries(
@@ -666,12 +666,12 @@ describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
       Q4: 'NO_DATA',
       Q5: 'NOT_AVAILABLE_IN_PHASE',
       Q8: 'NO_DATA',
-      Q9: 'NOT_AVAILABLE_IN_PHASE',
+      Q9: 'NO_DATA',
     });
     expect(r.body['accounts']).toEqual([]);
   });
 
-  it('[TC-REPORTING-DASHBOARD-005] con una transacción pendiente de egreso Q4 y Q8 están disponibles; Q5 y Q9 siguen sin estarlo', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] con una transacción pendiente de egreso Q4 y Q8 están disponibles; Q5 sigue sin estarlo y Q9 pide crear una meta', async () => {
     // El workspace canónico tiene un gasto PENDING (INV-023): basta una pendiente para habilitar Q4/Q8.
     const r = await summary(canonical);
     expect(r.status).toBe(200);
@@ -684,7 +684,7 @@ describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
     expect(q['Q4']).toEqual({ question: 'Q4', status: 'AVAILABLE', actionHint: null });
     expect(q['Q8']).toEqual({ question: 'Q8', status: 'AVAILABLE', actionHint: null });
     expect(q['Q5']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
-    expect(q['Q9']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
+    expect(q['Q9']).toMatchObject({ status: 'NO_DATA', actionHint: 'CREATE_GOAL' });
   });
 
   it('aislamiento: un workspace no ve cuentas ni flujos de otro y no puede leer su resumen', async () => {

@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Aporte mensual requerido"
 scenario: "Mes financiero que empieza el día 25"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-003"]
 nfr: ["NFR-USAB-004"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/goals/src/domain/required-contribution-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "required", "periods", "timezone"]
@@ -31,7 +33,7 @@ expected_result:
   - "Sin requerido (null, no 0.00)"
   - "Sin off-by-one en el borde 24/25 de octubre"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-032 — Requerido con mes financiero que empieza el 25, con fecha objetivo vencida y sin fecha objetivo

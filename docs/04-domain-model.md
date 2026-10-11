@@ -55,7 +55,7 @@ Regla: el **código** usa el término en inglés; la **UI y la documentación** 
 | Regla de recurrencia | `RecurrenceRule` | SHARED KERNEL | Patrón (mensual, día 5, último día hábil…). |
 | Suscripción | `Subscription` | COMMITMENTS | Servicio con precio y ciclo de renovación (Netflix, Spotify…). |
 | Meta de ahorro | `SavingsGoal` | GOALS | Objetivo monetario con fecha opcional. |
-| Aporte / reserva | `GoalContribution` (`REAL_TRANSFER` / `EARMARK`) | GOALS | Aporte real (transferencia) o reserva virtual (sin ledger). |
+| Aporte / reserva | `GoalMovement` (`fund` `REAL` / `EARMARK`) | GOALS | Aporte real (transferencia) o reserva virtual (sin ledger); todo movimiento de una meta es una fila firmada append-only. |
 | Préstamo / cuota | `Loan` / `LoanInstallment` | DEBT | Deuda amortizable y su cronograma. |
 | Tarjeta de crédito | `CreditCardProfile` | DEBT | Perfil (límite, corte, vencimiento) de una cuenta LIABILITY. |
 | Estado de cuenta (tarjeta) | `CardStatement` | DEBT | Corte mensual de la tarjeta. |
@@ -283,14 +283,15 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.8 GOALS — Savings Goals (`goals`)
 
-- **AR `SavingsGoal`**: `id, name, target: Money, targetDate?, mode (REAL|EARMARK|MIXED), linkedAccountIds[], status (active|paused|achieved|closed|cancelled), progress (derivado de contribuciones), priority`.
-- **AR `GoalContribution`**: `id, goalId, type (REAL_TRANSFER|EARMARK|WITHDRAWAL|EARMARK_RELEASE), amount: Money, date, transactionId? (REAL/WITHDRAWAL), sourceAccountId? (EARMARK), note`.
-- **DS**: `GoalProgressCalculator`, `EarmarkGuard` (Σ earmarks ≤ saldo), `ContributionPlanner` (aporte mensual sugerido).
-- **Repos**: uno por AR. **Ports**: `TransactionsCommandPort` (sync, crea la transferencia real), `BalanceQuery` (Ledger), `Clock`.
-- **Comandos**: `CreateGoal`, `UpdateGoal`, `ContributeToGoal` (REAL ⇒ transferencia + contribución en la misma tx; EARMARK ⇒ sólo contribución), `WithdrawFromGoal`, `ReleaseEarmark`, `PauseGoal`, `ResumeGoal`, `CloseGoal`, `CancelGoal`.
-- **Queries**: `ListGoals`, `GetGoalProgress`, `GetEarmarkedByAccount`.
-- **Eventos**: `SavingsContributionRecorded`, `GoalReached`, `EarmarkExceedsBalance`.
-- **Invariantes**: INV-018; contribución en la moneda de la meta (otra moneda requiere conversión previa); no se aporta a metas `closed|cancelled`.
+- **AR `SavingsGoal`** (as-built, `add-savings-goals`): `id, name, type (EMERGENCY_FUND|PURCHASE|TRAVEL|EDUCATION|RETIREMENT|CUSTOM), target: Money, startDate, targetDate?, linkedAccountIds[] (cuentas de naturaleza activo), priority 1..5, icon?, color?, notes?, tolerancePercent (0..50, default 5.00), pacePeriods (1..12, default 3), status (active|paused|achieved|closed|cancelled), achievedOn?, closedOn?, cancelledOn?, archivedAt?, version`. Sin `mode`: el tipo de fondo es una propiedad de cada movimiento. El progreso no se persiste: se deriva de los movimientos.
+- **Entidad `GoalMovement`** (reemplaza a `GoalContribution.type`): `id, goalId, fund (REAL|EARMARK), movement (CONTRIBUTION|WITHDRAWAL|REVERSAL|REASSIGN_IN|REASSIGN_OUT), amount: Money firmado en la moneda de la cuenta, accountId, occurredOn, transactionId?, transactionRevision?, reversesId?, reassignmentId?, origin (USER|RECURRING|SUGGESTION|SYSTEM), note?`. Append-only: la corrección es un movimiento inverso. La liberación de una reserva es `EARMARK + WITHDRAWAL`; solo los movimientos `REAL` de aporte y retiro respaldan una transacción.
+- **Entidades `GoalPlan`** (aporte mensual planificado, con `automation NONE|RECURRING` y `definitionId` de la definición recurrente administrada) y **`ContributionSuggestion`** (transferencia hacia una cuenta vinculada que el usuario puede confirmar como aporte o descartar; `PENDING|CONFIRMED|DISMISSED|EXPIRED`). VO `ReservationEpisode` (`NORMAL|OVER_ALLOCATED`, `episodeId`, `since`, `shortfall`).
+- **DS**: `GoalProgressCalculator` (Σ por moneda, convertido una vez con la tasa vigente), `RequiredContributionCalculator`, `ExpectedDateCalculator` (ritmo de los últimos `pacePeriods` periodos terminados), `GoalTrackingEvaluator` (lineal con tolerancia), `EarmarkGuard` (reservado + monto ≤ saldo contable), `GoalStateMachine`.
+- **Repos**: uno por AR. **Ports**: `GoalTransferPort` (sync, crea la transferencia real en la misma UoW), `TransactionLinkQuery`, `AccountBalancesQuery` (Ledger), `AccountCatalogQuery` (Accounts), `FxValuationPort` (FX), `RecurringDefinitionPort` (Commitments, sync, definición administrada `managedBy = GOAL`), `WorkspaceCalendarQuery` (Identity), `Clock`.
+- **Comandos**: `CreateGoal`, `UpdateGoal`, `PauseGoal`, `ResumeGoal`, `CloseGoal`, `CancelGoal`, `ArchiveGoal`, `ContributeToGoal` (REAL ⇒ transferencia + movimiento en la misma tx; EARMARK ⇒ solo movimiento), `LinkTransactionToGoal`, `WithdrawFromGoal` (modos `TRANSFER`, `LINK`, `RELEASE`), `ReassignGoalFunds`, `SetGoalPlan`, `RemoveGoalPlan`, `ConfirmContributionSuggestion`, `DismissContributionSuggestion`.
+- **Queries**: `ListGoals`, `GetGoal`, `ListGoalMovements`, `SimulateGoal`, `GetAccountReservations`, `ListContributionSuggestions`, `GetGoalLifecycle`, `ListGoalTransactionLinks`; contratos públicos `GoalReservationsQuery`, `GoalPlansQuery`, `GoalSummaryQuery`, `GoalFlowsQuery`.
+- **Eventos**: `SavingsContributionRecorded`, `GoalReached`, `EarmarkExceedsBalance` (publicado como `goals.EarmarkExceedsBalance`); consume `TransferCompleted`, `TransferRevised`, `TransactionVoided`, `TransactionUpdated`, `RecurringOccurrenceMaterialized` y `JournalEntryPosted`.
+- **Invariantes**: INV-018; el movimiento nunca deja un `(meta, cuenta, fondo)` en negativo; el aporte real es una transferencia posteada hacia una cuenta vinculada; una transferencia respalda a lo sumo un aporte por revisión; no se aporta a metas `closed|cancelled`; las metas multi-moneda guardan los fondos en la moneda de cada cuenta y convierten solo el progreso (nunca 1:1 sin tasa).
 
 ### 3.9 DEBT — Debt & Credit (`debt`)
 
@@ -510,10 +511,12 @@ stateDiagram-v2
   active --> paused: PauseGoal
   paused --> active: ResumeGoal
   active --> achieved: progress >= target / GoalReached
-  achieved --> active: WithdrawFromGoal deja progress < target
+  paused --> achieved: progress >= target / GoalReached
+  achieved --> active: REOPEN (un movimiento o cambio de objetivo deja progress < target; el tipo de cambio no reabre)
   achieved --> closed: CloseGoal (libera earmarks)
   active --> cancelled: CancelGoal (libera earmarks)
   paused --> cancelled: CancelGoal
+  achieved --> cancelled: CancelGoal (libera earmarks)
   closed --> [*]
   cancelled --> [*]
 ```
@@ -580,8 +583,8 @@ Decisiones: **Mantener**, **Renombrar**, **Fusionar** (absorbida en otro concept
 | BudgetItem | Mantener (entidad de `Budget`) | PLANNING | Sin ciclo de vida propio (as-built: `BudgetLine`, `planning.budget_line`). |
 | BudgetTemplate | Mantener | PLANNING | add-budget-templates: versiones instantánea completa, predeterminado y archivado (nunca se borra). |
 | BudgetTemplateVersion | Mantener (inmutable) | PLANNING | Presupuestos referencian la versión usada (trazabilidad). |
-| SavingsGoal | Mantener | GOALS | — |
-| GoalContribution | Mantener (tipos REAL/EARMARK/WITHDRAWAL/RELEASE) | GOALS | Unifica aporte real y earmark; sólo REAL/WITHDRAWAL tienen transacción. |
+| SavingsGoal | Mantener | GOALS | Sin `mode`; `type`, `linkedAccountIds`, `tolerancePercent` y `pacePeriods` (as-built). |
+| GoalContribution | **Renombrar** → `GoalMovement` | GOALS | `fund` (REAL/EARMARK) × `movement` (CONTRIBUTION/WITHDRAWAL/REVERSAL/REASSIGN_IN/REASSIGN_OUT); sólo los REAL de aporte y retiro tienen transacción. |
 | RecurringDefinition | Mantener | COMMITMENTS | — |
 | RecurringOccurrence | Mantener | COMMITMENTS | UNIQUE `(definitionId, occurrenceDate)` (INV-013). |
 | Provider | **Renombrar** → `Counterparty` | CLASSIFICATION | "Provider" colisiona con MarketRateProvider/BankingProvider; contraparte cubre comercio, persona, empleador, banco. |
@@ -607,6 +610,6 @@ Decisiones: **Mantener**, **Renombrar**, **Fusionar** (absorbida en otro concept
 2. ~~**Jerarquía de categorías**~~: resuelta — tres niveles fijos grupo → categoría → subcategoría ([31-phase-1-consolidation-decisions.md](31-phase-1-consolidation-decisions.md), D8).
 3. **Reapertura de periodos en cascada**: ¿reabrir M obliga a reabrir M+1…?
 4. **Cuentas multi-moneda** (Binance, Wise): una `Account` por moneda bajo la misma institución, ¿con agrupador visual?
-5. **Metas multi-moneda**: ¿permitir contribuciones en otra moneda valorizadas, o exigir conversión previa (propuesto)?
+5. ~~**Metas multi-moneda**: ¿permitir contribuciones en otra moneda valorizadas, o exigir conversión previa (propuesto)?~~ Resuelta (`add-savings-goals`, decisión 11): los fondos se guardan en la moneda de cada cuenta y el progreso se convierte a la moneda del objetivo con la tasa de valoración vigente (sin tasa ⇒ `unconverted[]`, nunca 1:1).
 6. **Orden de imputación de pagos de préstamo** por defecto en Bolivia (impuestos/seguro/interés/principal) — validar con contratos reales del owner.
 7. **Tags a nivel transacción vs split**: propuesto split; confirmar UX.

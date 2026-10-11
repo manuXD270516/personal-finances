@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Retiro de fondos de una meta"
 scenario: "Retiro mayor que los fondos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/src/domain/goal-movement.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "withdrawal", "guard"]
@@ -31,7 +35,7 @@ expected_result:
   - "422 GOAL_INSUFFICIENT_FUNDS aunque el saldo de la cuenta alcance"
   - "Sin transferencia ni movimiento"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-025 — Un retiro mayor que los fondos de la meta en esa cuenta se rechaza con GOAL_INSUFFICIENT_FUNDS

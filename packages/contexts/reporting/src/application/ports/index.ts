@@ -1,6 +1,6 @@
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
-import type { FxValuationPort } from '@pf/fx/contracts';
+import type { FxValuationPort, ResolvedRateDto } from '@pf/fx/contracts';
 import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type { NominalFlowQuery } from '@pf/transactions/contracts';
@@ -61,6 +61,74 @@ export interface ReportingDeps {
    */
   readonly commitments: Pick<UpcomingCommitmentsPort, 'hasActiveDefinitions'>;
   readonly pending: PendingTransactionsPort;
+  /**
+   * Q9 del Home (add-savings-goals): metas en curso (GOALS, `GoalSummaryQuery.listForHome`). Opcional: sin él, Q9 es
+   * `NO_DATA` con la acción `CREATE_GOAL`.
+   */
+  readonly goalSummary?: GoalSummaryPort;
+  /**
+   * Aportes netos a metas del periodo (GOALS, `GoalFlowsQuery.netForRange`). Opcional: sin él, `goalContributions`
+   * del resumen va vacío.
+   */
+  readonly goalFlows?: GoalFlowsPort;
+}
+
+// ───────────────────────────────────────────── reporting/dashboard: metas (add-savings-goals)
+
+interface GoalMoneyRow {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/** Meta del Home (GOALS, `GoalHomeItemDto`; estructuralmente compatible: REPORTING no importa `@pf/goals`). */
+export interface GoalHomeItemRow {
+  readonly goalId: string;
+  readonly name: string;
+  readonly priority: number;
+  readonly percent: string;
+  readonly progress: GoalMoneyRow;
+  readonly target: GoalMoneyRow;
+  readonly tracking: {
+    readonly status: 'BEHIND' | 'ON_TRACK' | 'AHEAD' | null;
+    readonly lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'ACHIEVED' | 'CLOSED' | 'CANCELLED';
+    readonly expected: GoalMoneyRow | null;
+    readonly deviationPercent: string | null;
+  };
+  readonly lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'ACHIEVED' | 'CLOSED' | 'CANCELLED';
+  readonly requiredMonthly: GoalMoneyRow | null;
+  readonly overdue: boolean;
+  readonly expectedDate: string | null;
+  readonly overAllocated: boolean;
+  readonly complete: boolean;
+}
+
+export interface GoalHomeSummaryRow {
+  /** Hasta `limit` metas por prioridad, fecha objetivo (sin fecha al final) y nombre: el orden lo da GOALS. */
+  readonly items: readonly GoalHomeItemRow[];
+  readonly moreCount: number;
+  /** Metas `ACTIVE`, `PAUSED` o `ACHIEVED` no archivadas. */
+  readonly goalCount: number;
+  readonly ratesUsed: readonly ResolvedRateDto[];
+}
+
+/** Lo que REPORTING necesita de GOALS para Q9 (adapter sobre `GoalSummaryQuery.listForHome`). */
+export interface GoalSummaryPort {
+  listForHome(input: { readonly workspaceId: string; readonly limit: number }): Promise<GoalHomeSummaryRow>;
+}
+
+/** Flujo neto de metas por día de negocio y moneda (GOALS, `GoalFlowDto`; sin reasignaciones). */
+export interface GoalFlowRow {
+  readonly date: string;
+  readonly amount: GoalMoneyRow;
+}
+
+/** Lo que REPORTING necesita de GOALS para Q6 (adapter sobre `GoalFlowsQuery.netForRange`). */
+export interface GoalFlowsPort {
+  netForRange(input: {
+    readonly workspaceId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly GoalFlowRow[]>;
 }
 
 /**

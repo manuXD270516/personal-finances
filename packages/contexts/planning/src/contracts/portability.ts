@@ -18,7 +18,13 @@ export const PLANNING_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     order: 700,
     orderBy: ['period_start', 'id'],
   },
-  { name: 'budget-templates', context: 'planning', table: 'planning.budget_template', order: 710, orderBy: ['id'] },
+  {
+    name: 'budget-templates',
+    context: 'planning',
+    table: 'planning.budget_template',
+    order: 710,
+    orderBy: ['id'],
+  },
   {
     name: 'budget-template-versions',
     context: 'planning',
@@ -105,7 +111,13 @@ export const PLANNING_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     idColumns: [],
     money: { amount: 't.currency' },
   },
-  { name: 'period-reopenings', context: 'planning', table: 'planning.period_reopening', order: 750, orderBy: ['id'] },
+  {
+    name: 'period-reopenings',
+    context: 'planning',
+    table: 'planning.period_reopening',
+    order: 750,
+    orderBy: ['id'],
+  },
   {
     name: 'close-pending-notices',
     context: 'planning',

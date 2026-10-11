@@ -242,6 +242,7 @@ export function notificationEventConsumers(runtime: NotificationsWorkerRuntime):
           eventId: event.eventId,
           workspaceId: event.workspaceId,
           occurredAt: event.occurredAt,
+          aggregateVersion: event.aggregateVersion,
           payload: event.payload,
         },
         definition,

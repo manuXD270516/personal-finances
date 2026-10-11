@@ -12,6 +12,8 @@ import type { NominalFlowRowDto } from '@pf/transactions/contracts';
 import type {
   ClosingSnapshotsPort,
   CommittedRangeRow,
+  GoalFlowRow,
+  GoalHomeSummaryRow,
   NetWorthHistoryDeps,
   PendingTransactionRow,
   ReportingDeps,
@@ -107,6 +109,11 @@ export class InMemoryReporting {
   /** Egresos resueltos por transacciones no anuladas (`ResolvedOccurrencesQuery`). */
   readonly resolvedOutflows: ResolvedOutflowRow[] = [];
   readonly metricSamples: { name: string; value: number }[] = [];
+  /** Metas del Home (GOALS, `GoalSummaryQuery`); `null` = puerto no cableado (Q9 `NO_DATA`). */
+  goalHome: GoalHomeSummaryRow | null = null;
+  /** Flujos netos de metas (GOALS, `GoalFlowsQuery`); `null` = puerto no cableado. */
+  goalFlowRows: GoalFlowRow[] | null = null;
+  readonly goalRequests: { kind: 'home' | 'flows'; from?: string; to?: string; limit?: number }[] = [];
 
   addPeriod(label: string, periodStart: string, periodEnd: string, status = 'CLOSED') {
     this.periods.push({ id: `period-${label}`, label, periodStart, periodEnd, status });
@@ -239,6 +246,26 @@ export class InMemoryReporting {
               (input.accountIds === undefined || input.accountIds.includes(p.accountId)),
           ),
       },
+      ...(this.goalHome
+        ? {
+            goalSummary: {
+              listForHome: async ({ limit }: { limit: number }) => {
+                this.goalRequests.push({ kind: 'home', limit });
+                return this.goalHome as GoalHomeSummaryRow;
+              },
+            },
+          }
+        : {}),
+      ...(this.goalFlowRows
+        ? {
+            goalFlows: {
+              netForRange: async ({ from, to }: { from: string; to: string }) => {
+                this.goalRequests.push({ kind: 'flows', from, to });
+                return (this.goalFlowRows as GoalFlowRow[]).filter((f) => f.date >= from && f.date <= to);
+              },
+            },
+          }
+        : {}),
       ...(this.rateValidityWindowDays === undefined
         ? {}
         : { rateValidityWindowDays: this.rateValidityWindowDays }),

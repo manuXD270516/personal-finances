@@ -200,6 +200,31 @@ export const ERROR_CATALOG = {
     title: 'An active recurring transfer to the card prevents enabling the payment plan',
   },
   INSTALLMENT_PLAN_INVALID: { status: 422, title: 'The installment plan is not valid for this purchase' },
+  EARMARK_EXCEEDS_BALANCE: {
+    status: 422,
+    title: 'The reservation exceeds the available balance of the account',
+  },
+  GOAL_CLOSED: { status: 409, title: 'The goal is closed or cancelled and admits no new movements' },
+  GOAL_ACCOUNT_NOT_ELIGIBLE: { status: 422, title: 'The account cannot be linked to a savings goal' },
+  GOAL_ACCOUNT_NOT_LINKED: { status: 422, title: 'The account is not linked to the goal' },
+  GOAL_ACCOUNT_HAS_FUNDS: {
+    status: 409,
+    title: 'The account still holds funds of the goal and cannot be unlinked',
+  },
+  GOAL_INSUFFICIENT_FUNDS: { status: 422, title: 'The goal does not hold enough funds in the account' },
+  GOAL_TRANSACTION_NOT_ELIGIBLE: { status: 422, title: 'The transaction cannot be linked to a savings goal' },
+  GOAL_TRANSACTION_ALREADY_LINKED: {
+    status: 409,
+    title: 'The transaction is already linked to a savings goal',
+  },
+  GOAL_CURRENCY_LOCKED: {
+    status: 409,
+    title: 'The currency of the goal cannot change once it has movements',
+  },
+  GOAL_SUGGESTION_NOT_PENDING: {
+    status: 409,
+    title: 'The contribution suggestion was already decided or expired',
+  },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

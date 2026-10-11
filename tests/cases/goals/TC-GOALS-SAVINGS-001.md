@@ -5,16 +5,22 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta de ahorro con tipo, objetivo, fechas y cuentas vinculadas"
 scenario: "Fondo de emergencia creado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001"]
 nfr: []
 invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+  - tests/e2e/specs/goals.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "create"]
@@ -33,7 +39,7 @@ expected_result:
   - "progress.total = 0.00 BOB, percent = \"0.00\", remaining = 15000.00 BOB"
   - "Auditoría goals.goal.created con actor EDITOR en la misma transacción"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-001 — Crear una meta de ahorro con tipo, objetivo, fechas y cuenta vinculada la deja activa y sin progreso

@@ -87,6 +87,27 @@ const es: MessageCatalog = {
   'email.card_utilization.basic': 'Una de tus tarjetas de crédito alcanzó el {threshold} % de su límite.',
   'email.card_utilization.detailed':
     '{card} alcanzó el {threshold} % de su límite: utilización {utilization} % ({used} de {limit}).',
+  // in-app: metas de ahorro
+  'inapp.goal_over_allocated.title': 'Lo reservado para metas supera el saldo de {account}',
+  'inapp.goal_over_allocated.body':
+    'Saldo {balance}, reservado {reserved}: faltan {shortfall}. Metas afectadas: {goals}.',
+  'inapp.goal_reached.title': 'Alcanzaste tu meta {goal}',
+  'inapp.goal_reached.body': 'Llevas {progress} de {target} (al {reachedDate}).',
+  'inapp.goal_milestone.title': '{goal} llegó al {milestone} % de su objetivo',
+  'inapp.goal_milestone.body': 'Llevas {progress} de {target} ({percent} %).',
+  'inapp.goal_milestone.also': 'También se cruzaron los hitos {also}.',
+  // email: metas (basic sin montos, monedas ni nombres de metas o cuentas; detailed con ellos)
+  'email.goal_over_allocated.subject': 'Tienes una cuenta con más reservado que su saldo',
+  'email.goal_over_allocated.basic': 'Una de tus cuentas tiene más dinero reservado para metas que su saldo.',
+  'email.goal_over_allocated.detailed':
+    'En {account} lo reservado para metas ({reserved}) supera el saldo ({balance}) por {shortfall}. Metas afectadas: {goals}.',
+  'email.goal_reached.subject': 'Alcanzaste una de tus metas de ahorro',
+  'email.goal_reached.basic': 'Una de tus metas de ahorro alcanzó su objetivo.',
+  'email.goal_reached.detailed': 'Alcanzaste tu meta {goal}: llevas {progress} de {target}.',
+  'email.goal_milestone.subject': 'Una de tus metas de ahorro avanzó',
+  'email.goal_milestone.basic': 'Una de tus metas de ahorro llegó al {milestone} % de su objetivo.',
+  'email.goal_milestone.detailed':
+    '{goal} llegó al {milestone} % de su objetivo: llevas {progress} de {target}.',
   // email: común
   'email.cta': 'Ver la notificación',
   'email.footer':
@@ -166,6 +187,26 @@ const en: MessageCatalog = {
   'email.card_utilization.basic': 'One of your credit cards reached {threshold} % of its limit.',
   'email.card_utilization.detailed':
     '{card} reached {threshold} % of its limit: utilization {utilization} % ({used} of {limit}).',
+  'inapp.goal_over_allocated.title': 'Money set aside for goals exceeds the balance of {account}',
+  'inapp.goal_over_allocated.body':
+    'Balance {balance}, set aside {reserved}: {shortfall} short. Affected goals: {goals}.',
+  'inapp.goal_reached.title': 'You reached your goal {goal}',
+  'inapp.goal_reached.body': 'You have {progress} of {target} (as of {reachedDate}).',
+  'inapp.goal_milestone.title': '{goal} reached {milestone} % of its target',
+  'inapp.goal_milestone.body': 'You have {progress} of {target} ({percent} %).',
+  'inapp.goal_milestone.also': 'Milestones {also} were also crossed.',
+  'email.goal_over_allocated.subject': 'You have an account with more set aside than its balance',
+  'email.goal_over_allocated.basic':
+    'One of your accounts has more money set aside for goals than its balance.',
+  'email.goal_over_allocated.detailed':
+    'In {account} the amount set aside for goals ({reserved}) exceeds the balance ({balance}) by {shortfall}. Affected goals: {goals}.',
+  'email.goal_reached.subject': 'You reached one of your savings goals',
+  'email.goal_reached.basic': 'One of your savings goals reached its target.',
+  'email.goal_reached.detailed': 'You reached your goal {goal}: you have {progress} of {target}.',
+  'email.goal_milestone.subject': 'One of your savings goals moved forward',
+  'email.goal_milestone.basic': 'One of your savings goals reached {milestone} % of its target.',
+  'email.goal_milestone.detailed':
+    '{goal} reached {milestone} % of its target: you have {progress} of {target}.',
   'email.cta': 'View the notification',
   'email.footer':
     'You receive this notice because email notifications are turned on. You can change it in your preferences.',
@@ -243,6 +284,26 @@ const pt: MessageCatalog = {
   'email.card_utilization.basic': 'Um dos seus cartões de crédito atingiu {threshold} % do limite.',
   'email.card_utilization.detailed':
     '{card} atingiu {threshold} % do limite: utilização {utilization} % ({used} de {limit}).',
+  'inapp.goal_over_allocated.title': 'O valor reservado para metas supera o saldo de {account}',
+  'inapp.goal_over_allocated.body':
+    'Saldo {balance}, reservado {reserved}: faltam {shortfall}. Metas afetadas: {goals}.',
+  'inapp.goal_reached.title': 'Você alcançou sua meta {goal}',
+  'inapp.goal_reached.body': 'Você tem {progress} de {target} (em {reachedDate}).',
+  'inapp.goal_milestone.title': '{goal} chegou a {milestone} % do objetivo',
+  'inapp.goal_milestone.body': 'Você tem {progress} de {target} ({percent} %).',
+  'inapp.goal_milestone.also': 'Também foram cruzados os marcos {also}.',
+  'email.goal_over_allocated.subject': 'Você tem uma conta com mais reservado do que o saldo',
+  'email.goal_over_allocated.basic':
+    'Uma das suas contas tem mais dinheiro reservado para metas do que o seu saldo.',
+  'email.goal_over_allocated.detailed':
+    'Em {account} o valor reservado para metas ({reserved}) supera o saldo ({balance}) em {shortfall}. Metas afetadas: {goals}.',
+  'email.goal_reached.subject': 'Você alcançou uma das suas metas de poupança',
+  'email.goal_reached.basic': 'Uma das suas metas de poupança alcançou o objetivo.',
+  'email.goal_reached.detailed': 'Você alcançou sua meta {goal}: tem {progress} de {target}.',
+  'email.goal_milestone.subject': 'Uma das suas metas de poupança avançou',
+  'email.goal_milestone.basic': 'Uma das suas metas de poupança chegou a {milestone} % do objetivo.',
+  'email.goal_milestone.detailed':
+    '{goal} chegou a {milestone} % do objetivo: você tem {progress} de {target}.',
   'email.cta': 'Ver a notificação',
   'email.footer':
     'Você recebe este aviso porque as notificações por email estão ativadas. Você pode alterá-lo nas suas preferências.',

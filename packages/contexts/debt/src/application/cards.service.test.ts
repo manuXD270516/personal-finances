@@ -597,6 +597,7 @@ describe('Cuotas (decisión 13)', () => {
       counterpartyId: null,
       source: 'MANUAL',
       externalRef: null,
+      revision: 1,
     });
     world.addEntry({
       accountId: 'acct-bob',

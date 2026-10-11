@@ -107,7 +107,7 @@ export interface RecurringDefinition {
   readonly description: string | null;
   readonly notes: string | null;
   readonly kind: RecurringKind;
-  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT';
+  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
   readonly managedRef: string | null;
   readonly status: RecurringStatus;
   readonly currentVersionNo: number;
@@ -132,7 +132,7 @@ export interface RecurringOccurrence {
   readonly definitionId: string;
   readonly definitionName: string;
   readonly kind: RecurringKind;
-  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT';
+  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
   readonly occurrenceDate: string;
   readonly dueDate: string;
   readonly definitionVersionNo: number;

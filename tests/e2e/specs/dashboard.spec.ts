@@ -77,18 +77,20 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     const ws = (me.body?.['memberships'] as { workspaceId: string }[])[0]!.workspaceId;
     const W = `/workspaces/${ws}`;
 
-    // Workspace nuevo y sin cuentas: Q1, Q4 y Q8 NO_DATA (sin 0.00 BOB; piden crear la primera cuenta) y Q5/Q9 aún no
-    // disponibles, sin montos.
+    // Workspace nuevo y sin cuentas: Q1, Q4 y Q8 NO_DATA (sin 0.00 BOB; piden crear la primera cuenta) y Q9 NO_DATA (ofrece crear una meta,
+    // sin 0 %) y Q5 aún no disponible, sin montos.
     await page.reload();
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('liquid-balance-no-accounts')).toBeVisible();
     await expect(page.getByTestId('liquid-balance-amount')).toHaveCount(0);
-    for (const q of ['Q5', 'Q9']) {
-      const widget = page.getByTestId(`question-${q}`);
-      await expect(widget).toHaveAttribute('data-status', 'NOT_AVAILABLE_IN_PHASE');
-      await expect(widget).toContainText('Aún no disponible');
-      await expect(widget).not.toContainText(/\d+,\d{2}/);
-    }
+    const q5 = page.getByTestId('question-Q5');
+    await expect(q5).toHaveAttribute('data-status', 'NOT_AVAILABLE_IN_PHASE');
+    await expect(q5).toContainText('Aún no disponible');
+    await expect(q5).not.toContainText(/\d+,\d{2}/);
+    const q9 = page.getByTestId('question-Q9');
+    await expect(q9).toHaveAttribute('data-status', 'NO_DATA');
+    await expect(q9.getByTestId('home-create-goal')).toHaveAttribute('data-action', 'CREATE_GOAL');
+    await expect(q9).not.toContainText(/\d+,\d{2}/);
     for (const q of ['Q4', 'Q8']) {
       const widget = page.getByTestId(`question-${q}`);
       await expect(widget).toHaveAttribute('data-status', 'NO_DATA');
@@ -194,6 +196,8 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
       'Este mes',
       // add-budgets 6.2: widget del plan del mes (disponible para gastar), entre "Este mes" y el patrimonio.
       'Presupuesto del mes',
+      // add-savings-goals: Q9 "¿Voy a cumplir mis metas?" justo antes del patrimonio.
+      '¿Voy a cumplir mis metas?',
       'Patrimonio y cuentas',
       'Próximamente',
     ]);

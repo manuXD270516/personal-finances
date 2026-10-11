@@ -204,6 +204,8 @@ export interface SourceEvent {
   readonly eventId: string;
   readonly workspaceId: string;
   readonly occurredAt: string;
+  /** Versión del agregado del sobre: clave de negocio de `GOAL_REACHED`. */
+  readonly aggregateVersion?: number | undefined;
   readonly payload: unknown;
 }
 

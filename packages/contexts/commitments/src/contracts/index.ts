@@ -45,7 +45,7 @@ export interface MoneyDto {
 }
 
 export type RecurringKindDto = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT' | 'CARD_PAYMENT';
-export type ManagedByDto = 'USER' | 'SUBSCRIPTION' | 'DEBT';
+export type ManagedByDto = 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
 export type OccurrenceStatusDto =
   | 'SCHEDULED'
   | 'DUE'
@@ -342,7 +342,10 @@ export interface CreateManagedMonthlyInput {
   readonly managedBy: Exclude<ManagedByDto, 'USER'>;
   readonly managedRef: string;
   readonly name: string;
-  readonly kind: 'CARD_PAYMENT';
+  /** `CARD_PAYMENT` (Debt) o `TRANSFER` (aporte recurrente de una meta, `managedBy = GOAL`; openspec add-savings-goals). */
+  readonly kind: 'CARD_PAYMENT' | 'TRANSFER';
+  /** Monto fijo de cada ocurrencia (`FIXED`, a la escala de la moneda); sin él la ocurrencia es `VARIABLE`. */
+  readonly amount?: string;
   readonly accountId: string;
   readonly toAccountId: string;
   readonly counterpartyId?: string | null;
@@ -403,6 +406,8 @@ export interface ManagedOccurrenceDto {
  *   estimado o sin monto); `skip` la omite con un motivo; `listOccurrences` las lee (add-credit-cards).
  * - `createManaged` con `monthlyRule`: regla mensual de `CARD_PAYMENT` (la clave de la ocurrencia es su fecha nominal).
  * - `end`: termina la definición desde `from`: cancela las ocurrencias no resueltas con vencimiento ≥ `from`.
+ * - `reviseManaged`, `pauseManaged`, `resumeManaged` (openspec add-savings-goals, N5): el administrador cambia el monto,
+ *   las cuentas o la regla mensual de su definición, la pausa (cancela las no resueltas con fecha ≥ hoy) y la reanuda.
  */
 export interface RecurringDefinitionPort {
   createManaged(input: CreateManagedInput): Promise<{ readonly definitionId: string }>;
@@ -473,6 +478,23 @@ export interface RecurringDefinitionPort {
     readonly monthDays?: readonly number[];
     readonly weekendAdjustment?: 'NONE' | 'PREVIOUS' | 'NEXT';
     readonly materialization?: CreateManagedMonthlyInput['materialization'];
+    /** add-savings-goals: cuenta destino y monto fijo de una regla mensual `TRANSFER`. */
+    readonly toAccountId?: string;
+    readonly amount?: string;
+  }): Promise<void>;
+  /** Igual que `revise` (nombre del contrato de metas, N5). */
+  reviseManaged(input: Parameters<RecurringDefinitionPort['revise']>[0]): Promise<void>;
+  /** Pausa la definición administrada: cancela las ocurrencias no resueltas con fecha nominal ≥ hoy. */
+  pauseManaged(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+  }): Promise<void>;
+  /** Reanuda la definición administrada pausada (idempotente si ya está activa). */
+  resumeManaged(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
   }): Promise<void>;
 }
 
