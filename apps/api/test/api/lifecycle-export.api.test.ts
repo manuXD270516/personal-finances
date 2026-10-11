@@ -539,7 +539,7 @@ describe('Exportación del recorrido (GET …/lifecycle/export?format=csv|pdf)',
       ['audit.lifecycle.exported', 'LifecycleExport'],
     ]);
     expect(JSON.stringify(audits[0]?.changes)).toContain('csv');
-    expect(JSON.stringify(audits[0]?.changes)).not.toContain('85.00');
+    expect(JSON.stringify(audits[0]?.changes)).not.toMatch(/(?<![\d:.])85[.,]00(?!\d)/u);
   });
 
   it('[TC-AUDIT-LIFECYCLE-022] un motivo "=SUM(A1:A9)" sale como \'=SUM(A1:A9)', async () => {

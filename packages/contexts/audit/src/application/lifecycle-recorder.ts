@@ -82,9 +82,16 @@ export class LifecycleRecorder implements LifecyclePort {
             .map((p) => [keyOf(p.type, p.id), { aggregateType: p.type, aggregateId: p.id }]),
         ).values(),
       ];
-      const bases = store.nextSequences
-        ? await store.nextSequences(ws, distinct)
-        : await Promise.all(distinct.map((a) => store.nextSequence(ws, a.aggregateType, a.aggregateId)));
+      let bases: readonly number[];
+      if (store.nextSequences) {
+        bases = await store.nextSequences(ws, distinct);
+      } else {
+        const sequential: number[] = [];
+        for (const a of distinct) {
+          sequential.push(await store.nextSequence(ws, a.aggregateType, a.aggregateId));
+        }
+        bases = sequential;
+      }
       distinct.forEach((a, i) =>
         next.set(`${ws}|${keyOf(a.aggregateType, a.aggregateId)}`, bases[i] as number),
       );

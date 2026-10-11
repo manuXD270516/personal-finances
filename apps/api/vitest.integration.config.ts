@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     include: ['test/api/**/*.api.test.ts', 'test/**/*.int.test.ts'],
     globalSetup: ['test/support/global-setup.ts'],
+    setupFiles: ['test/support/fail-on-pg-concurrent-query.ts'],
     testTimeout: 60_000,
     hookTimeout: 180_000,
     fileParallelism: false,

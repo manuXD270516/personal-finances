@@ -213,7 +213,7 @@ test.describe('aislamiento entre workspaces a través del BFF (security/access-c
     expect(missing.status).toBe(404);
     expect(missing.body?.['code']).toBe('RESOURCE_NOT_FOUND');
     expect(leaks(viaRoute.body, `${W1}/accounts/${w2Bank}`)).toEqual([]);
-    expect(JSON.stringify(viaRoute.body)).not.toContain('5000');
+    expect(JSON.stringify(viaRoute.body)).not.toMatch(/(?<![\w.:-])5000(?![\w.])/u);
     expect(Object.keys(viaRoute.body ?? {}).sort()).toEqual(Object.keys(missing.body ?? {}).sort());
 
     // URL manipulada en la UI: con W1 activo, el detalle de la cuenta de W2 muestra "no encontrado" sin sus datos.
