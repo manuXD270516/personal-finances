@@ -3736,7 +3736,8 @@
       "new": "Nuevo préstamo",
       "empty": "Aún no registraste préstamos. Crea uno nuevo o registra uno en curso para ver su cronograma y sus cuotas.",
       "nextValue": "Cuota {n} · {date} · {amount}",
-      "overdueDays": "{days, plural, one {# día de atraso} other {# días de atraso}}"
+      "overdueDays": "{days, plural, one {# día de atraso} other {# días de atraso}}",
+      "simulator": "Simulador de pagos extra"
     },
     "form": {
       "title": "Nuevo préstamo",
@@ -3804,7 +3805,31 @@
       "fixErrors": "{count, plural, one {Hay # dato por corregir.} other {Hay # datos por corregir.}} Revisa los campos marcados.",
       "saving": "Guardando…",
       "save": "Guardar préstamo",
-      "saveAndDisburse": "Guardar y desembolsar"
+      "saveAndDisburse": "Guardar y desembolsar",
+      "method": "Sistema de amortización",
+      "methods": {
+        "FRENCH": "Francés (cuota constante)",
+        "GERMAN": "Alemán (capital constante)",
+        "FIXED_PRINCIPAL": "Capital fijo con cuota final (balloon)",
+        "CUSTOM": "Cronograma propio (cuota por cuota)"
+      },
+      "methodHint": {
+        "FRENCH": "Todas las cuotas valen lo mismo; el interés baja y el capital sube.",
+        "GERMAN": "Cada cuota amortiza el mismo capital; la cuota va bajando.",
+        "FIXED_PRINCIPAL": "Indicas el capital de cada cuota; la última cuota paga el saldo restante.",
+        "CUSTOM": "Defines las cuotas una por una o usas la tabla del banco; el sistema no las recalcula. Se define en el detalle del borrador."
+      },
+      "fixedPrincipal": "Capital por cuota",
+      "fixedPrincipalHint": "Capital de las cuotas anteriores a la última; la suma debe ser menor que el principal.",
+      "rateType": "Tipo de tasa",
+      "rateTypes": {
+        "FIXED": "Fija",
+        "VARIABLE": "Variable"
+      },
+      "rateTypeHint": {
+        "FIXED": "La tasa no cambia durante el préstamo.",
+        "VARIABLE": "Podrás registrar cambios de tasa con su fecha de vigencia."
+      }
     },
     "errors": {
       "REQUIRED": "Es obligatorio.",
@@ -3864,7 +3889,11 @@
       "disburse": "Desembolsar",
       "edit": "Editar",
       "cancel": "Cancelar préstamo",
-      "compare": "Comparar con la tabla del banco"
+      "compare": "Comparar con la tabla del banco",
+      "prepay": "Pago extraordinario",
+      "rateChange": "Cambiar tasa",
+      "custom": "Cargar cronograma propio",
+      "customEdit": "Cargar cronograma nuevo"
     },
     "schedule": {
       "title": "Cronograma",
@@ -3904,7 +3933,8 @@
       "voided": "Anulado",
       "active": "Vigente",
       "void": "Anular",
-      "voidLabel": "Anular el pago {n}"
+      "voidLabel": "Anular el pago {n}",
+      "prepayment": "Pago extraordinario ({option})"
     },
     "payment": {
       "title": "Registrar pago",
@@ -4125,6 +4155,161 @@
       "label": "Deudas",
       "loans": "Préstamos",
       "cards": "Tarjetas"
+    },
+    "prepayment": {
+      "title": "Pago extraordinario",
+      "hint": "Adelanta capital: elige si quieres terminar antes (misma cuota) o pagar una cuota menor (mismas fechas). Las cuotas vencidas a la fecha del pago deben estar pagadas.",
+      "amount": "Monto a capital ({currency})",
+      "date": "Fecha del pago",
+      "dateHint": "El interés de la cuota siguiente se calcula sobre el saldo reducido completo.",
+      "fee": "Comisión por prepago ({currency}, opcional)",
+      "feeHint": "Se registra como gasto en «Comisiones de préstamo».",
+      "option": "Qué reducir",
+      "options": {
+        "REDUCE_TERM": "Reducir el plazo",
+        "REDUCE_INSTALLMENT": "Reducir la cuota"
+      },
+      "optionHint": {
+        "REDUCE_TERM": "Mantienes la cuota y terminas de pagar antes.",
+        "REDUCE_INSTALLMENT": "Mantienes las fechas y cada cuota baja."
+      },
+      "compare": "Comparar opciones",
+      "previewTitle": "Comparación de opciones",
+      "previewCaption": "Cuota, fecha de fin, interés restante y ahorro de cada opción frente al cronograma vigente",
+      "paysOff": "Este pago cubre todo el principal pendiente: el préstamo quedará saldado.",
+      "current": "Cronograma vigente",
+      "columns": {
+        "option": "Opción",
+        "installment": "Cuota",
+        "end": "Fin",
+        "interest": "Interés restante",
+        "saved": "Ahorro de interés"
+      },
+      "saving": "Registrando…",
+      "submit": "Registrar pago extraordinario",
+      "done": "Pago extraordinario registrado."
+    },
+    "rateChange": {
+      "title": "Cambio de tasa",
+      "hint": "Las cuotas cuyo periodo empieza en o después de la vigencia se recalculan con la tasa nueva, conservando su número y sus fechas.",
+      "rate": "Tasa nominal anual nueva (%)",
+      "effectiveFrom": "Vigente desde",
+      "effectiveHint": "Un periodo ya iniciado no se prorratea: la tasa nueva rige desde el periodo siguiente.",
+      "compare": "Ver efecto",
+      "previewTitle": "Efecto del cambio de tasa",
+      "previewCaption": "Cuota, fecha de fin e interés restante con la tasa nueva frente al cronograma vigente",
+      "proposed": "Con {rate} %",
+      "saving": "Registrando…",
+      "submit": "Registrar cambio de tasa",
+      "done": "Cambio de tasa registrado."
+    },
+    "custom": {
+      "title": "Cronograma propio",
+      "hintDraft": "Carga las cuotas del banco una por una o adopta la tabla ya cargada. La suma del capital debe ser igual al principal.",
+      "hintActive": "Reemplaza las cuotas no pagadas por las de la tabla del banco. La suma del capital debe ser igual al principal pendiente; el sistema ya no recalculará este préstamo.",
+      "reference": "Tabla del banco cargada",
+      "referenceOption": "Versión {version} ({rows} cuotas)",
+      "adopt": "Usar la tabla del banco",
+      "noReference": "Aún no cargaste una tabla del banco para este préstamo (Comparar con la tabla del banco).",
+      "gridLabel": "Cuotas del cronograma propio",
+      "remove": "Quitar",
+      "cellLabel": "Cuota {n}: {field}",
+      "add": "Agregar cuota",
+      "sum": "Suma del capital: {sum} de {expected} {currency}",
+      "gap": "Falta o sobra {gap} {currency}",
+      "sumMatches": "La suma coincide.",
+      "saving": "Guardando…",
+      "submit": "Guardar cronograma",
+      "done": "Cronograma guardado."
+    },
+    "versions": {
+      "title": "Versiones del cronograma",
+      "caption": "Versiones del cronograma con su motivo, vigencia y cuotas que reemplazan",
+      "version": "Versión",
+      "reason": "Motivo",
+      "effectiveFrom": "Vigente desde",
+      "range": "Cuotas",
+      "view": "Ver cuotas",
+      "currentTag": "vigente",
+      "replacedTag": "reemplazada",
+      "reasons": {
+        "INITIAL": "Inicial",
+        "PREPAYMENT": "Pago extraordinario",
+        "PREPAYMENT_VOIDED": "Pago extraordinario anulado",
+        "RATE_CHANGE": "Cambio de tasa",
+        "CUSTOM_DEFINED": "Cronograma propio",
+        "CUSTOM_ADOPTED": "Tabla del banco adoptada"
+      },
+      "rangeReplaced": "Desde la {from}, reemplazada desde la {replaced}",
+      "rangeCurrent": "Desde la {from}",
+      "ratesTitle": "Historial de tasas",
+      "rateInitial": "{rate} % desde el desembolso ({date})",
+      "rateChanged": "{rate} % desde el {date}",
+      "viewing": "Cuotas efectivas a la versión {version}"
+    },
+    "simulator": {
+      "title": "Simulador de pagos extra",
+      "intro": "Compara cuánto interés ahorras y cuándo terminas de pagar. Es solo una simulación: no registra pagos, cronogramas ni auditoría.",
+      "mode": "Qué quieres simular",
+      "modes": {
+        "STRATEGIES": "Estrategias entre préstamos",
+        "LOAN": "Extras en un préstamo"
+      },
+      "currency": "Moneda del extra",
+      "monthlyExtra": "Extra mensual",
+      "monthlyHint": "Solo participan los préstamos activos en esta moneda; los demás quedan fuera de la estrategia.",
+      "loan": "Préstamo",
+      "extraType": "Tipo de extra",
+      "extraTypes": {
+        "ONE_TIME": "Único",
+        "MONTHLY": "Todos los meses"
+      },
+      "afterInstallment": "Junto a la cuota n.º",
+      "fromInstallment": "Desde la cuota n.º",
+      "extraAmount": "Monto",
+      "addExtra": "Agregar extra",
+      "notSaved": "La simulación no se guarda; puedes exportar la tabla comparativa a CSV.",
+      "run": "Simular",
+      "running": "Simulando…",
+      "export": "Exportar CSV",
+      "compareTitle": "Comparación",
+      "startBalance": "Principal pendiente de los préstamos incluidos: {amount}",
+      "columns": {
+        "strategy": "Estrategia",
+        "interest": "Interés total",
+        "saved": "Ahorro frente a no pagar extra",
+        "debtFree": "Libre de deudas",
+        "loans": "Fin de cada préstamo",
+        "scenario": "Escenario",
+        "end": "Fecha de fin",
+        "installments": "Cuotas"
+      },
+      "strategies": {
+        "NONE": "Sin extra",
+        "AVALANCHE": "Avalanche (mayor tasa primero)",
+        "SNOWBALL": "Snowball (menor saldo primero)"
+      },
+      "scenarios": {
+        "current": "Cronograma vigente",
+        "scenario": "Con los extras"
+      },
+      "saved": "Ahorro de interés: {amount}; terminas {months} meses antes.",
+      "outTitle": "Préstamos fuera de la estrategia",
+      "out": {
+        "CURRENCY": "{name} está en {currency}: conserva su cronograma vigente.",
+        "CUSTOM": "{name} tiene cronograma propio: el sistema no lo recalcula."
+      },
+      "chart": {
+        "title": "Saldo total por mes ({currency})",
+        "desc": "Saldo de principal total de {from} a {to}, desde un máximo de {max}; la tabla comparativa tiene los mismos resultados."
+      },
+      "csv": {
+        "scenario": "Escenario",
+        "interest": "Interés total",
+        "saved": "Ahorro",
+        "end": "Fin",
+        "months": "Meses o cuotas"
+      }
     }
   },
   "Cards": {

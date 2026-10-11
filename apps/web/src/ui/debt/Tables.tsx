@@ -384,7 +384,13 @@ export function PaymentsTable({
                   .join(' · ')}
                 {p.explicitBreakdown ? ` (${f.t('payments.explicit')})` : ''}
               </td>
-              <td style={cellStyle}>{p.installmentNos.join(', ')}</td>
+              <td style={cellStyle}>
+                {p.kind === 'PREPAYMENT'
+                  ? f.t('payments.prepayment', {
+                      option: f.t(`prepayment.options.${p.prepaymentOption ?? 'REDUCE_TERM'}`),
+                    })
+                  : p.installmentNos.join(', ')}
+              </td>
               <td style={cellStyle}>
                 {p.status === 'VOIDED' ? (
                   <>

@@ -11,6 +11,7 @@ import {
   type LoanCharges,
   type LoanFrequency,
 } from './loan-types.js';
+import type { CustomRowInput } from './custom-schedule.js';
 import {
   LOAN_LIFECYCLE,
   type LoanStatus,
@@ -56,6 +57,10 @@ export interface LoanState {
   /** NEW: plazo total; EXISTING: cuotas restantes. */
   readonly termInstallments: number;
   readonly method: LoanMethod;
+  /** Solo `FIXED_PRINCIPAL`: principal de las cuotas anteriores a la última (la última es el balloon). */
+  readonly fixedPrincipalAmount: string | null;
+  /** `CUSTOM` en borrador: cuotas definidas que `DisburseLoan` fija como versión 1 (se limpian al desembolsar). */
+  readonly customSchedule: readonly CustomRowInput[] | null;
   /** EXISTING: igual a `existing.asOf`. */
   readonly disbursementDate: string;
   readonly firstDueDate: string;
@@ -174,6 +179,7 @@ export interface LoanTermsInput {
   readonly frequency?: string | undefined;
   readonly termInstallments: number;
   readonly method?: string | undefined;
+  readonly fixedPrincipalAmount?: string | null | undefined;
   readonly disbursementDate: string;
   readonly firstDueDate: string;
   readonly charges?: unknown;
@@ -187,6 +193,7 @@ interface ValidatedTerms {
   readonly frequency: LoanFrequency;
   readonly termInstallments: number;
   readonly method: LoanMethod;
+  readonly fixedPrincipalAmount: string | null;
   readonly disbursementDate: string;
   readonly firstDueDate: string;
   readonly charges: LoanCharges;
@@ -203,12 +210,6 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback
 /** Valida y normaliza las condiciones financieras (alta y edición del borrador). */
 export function validateTerms(input: LoanTermsInput, origin: LoanOrigin): ValidatedTerms {
   const method = oneOf(input.method, LOAN_METHODS, 'FRENCH', '/method');
-  if (method !== 'FRENCH') {
-    throw new DomainError(
-      'LOAN_METHOD_NOT_AVAILABLE',
-      `the ${method} amortization method is not available`,
-    ).at('/method');
-  }
   const principal = parseAmount(input.principal, input.currency, input.currencyScale, '/principal', true);
   const annualRate = parseFraction(input.annualRate, '/annualRate', MAX_ANNUAL_RATE);
   const term = input.termInstallments;
@@ -223,6 +224,7 @@ export function validateTerms(input: LoanTermsInput, origin: LoanOrigin): Valida
   if (origin === 'NEW' ? firstDueDate <= disbursementDate : firstDueDate < disbursementDate) {
     fail('the first due date must be after the disbursement date', '/firstDueDate');
   }
+  const fixedPrincipalAmount = validFixedPrincipal(input, method, principal, term);
   return {
     principal,
     annualRate,
@@ -231,10 +233,52 @@ export function validateTerms(input: LoanTermsInput, origin: LoanOrigin): Valida
     frequency: oneOf(input.frequency, LOAN_FREQUENCIES, 'MONTHLY', '/frequency'),
     termInstallments: term,
     method,
+    fixedPrincipalAmount,
     disbursementDate,
     firstDueDate,
     charges: normalizeCharges(input.charges, input.currency, input.currencyScale),
   };
+}
+
+/**
+ * Principal por cuota del capital fijo (add-loan-amortization-advanced, decisión 1): obligatorio solo con
+ * `FIXED_PRINCIPAL`, positivo, a la escala de la moneda y tal que las cuotas 1..n−1 no agoten el principal
+ * (`VALIDATION_FAILED`: el balloon sería ≤ 0).
+ */
+function validFixedPrincipal(
+  input: LoanTermsInput,
+  method: LoanMethod,
+  principal: string,
+  term: number,
+): string | null {
+  const given = input.fixedPrincipalAmount;
+  if (method !== 'FIXED_PRINCIPAL') {
+    if (given !== undefined && given !== null) {
+      fail('only the FIXED_PRINCIPAL method takes a fixed principal', '/fixedPrincipalAmount');
+    }
+    return null;
+  }
+  if (given === undefined || given === null) {
+    return fail('fixedPrincipalAmount is required for the FIXED_PRINCIPAL method', '/fixedPrincipalAmount');
+  }
+  const fixed = parseAmount(given, input.currency, input.currencyScale, '/fixedPrincipalAmount', true);
+  const beforeLast = dec(fixed).times(term - 1);
+  if (beforeLast.gte(principal)) {
+    throw new DomainError('VALIDATION_FAILED', 'the fixed principal leaves no balloon installment', {
+      details: { sumBeforeLast: beforeLast.toFixed(input.currencyScale), principal },
+    }).at('/fixedPrincipalAmount');
+  }
+  return fixed;
+}
+
+/** Las cuotas custom solo acompañan al método `CUSTOM`. */
+function validCustomRows(
+  input: { readonly customSchedule?: readonly CustomRowInput[] | null | undefined },
+  method: LoanMethod,
+) {
+  if (input.customSchedule && input.customSchedule.length > 0 && method !== 'CUSTOM') {
+    fail('custom installments need the CUSTOM method', '/customSchedule');
+  }
 }
 
 export interface LoanEdit {
@@ -255,6 +299,7 @@ const TERM_FIELDS = [
   'frequency',
   'termInstallments',
   'method',
+  'fixedPrincipalAmount',
   'disbursementDate',
   'firstDueDate',
   'charges',
@@ -282,9 +327,11 @@ export class Loan {
       readonly workspaceId: string;
       readonly at: string;
       readonly by: string;
+      readonly customSchedule?: readonly CustomRowInput[] | null | undefined;
     },
   ): Loan {
     const terms = validateTerms(input, 'NEW');
+    validCustomRows(input, terms.method);
     const loan = new Loan(
       {
         id: input.id,
@@ -296,6 +343,7 @@ export class Loan {
         lenderCounterpartyId: input.lenderCounterpartyId ?? null,
         currency: input.currency,
         ...terms,
+        customSchedule: input.customSchedule ?? null,
         retainedFee: dec('0').toFixed(input.currencyScale),
         origin: 'NEW',
         existing: null,
@@ -328,6 +376,7 @@ export class Loan {
       readonly recurringDefinitionId?: string | null;
       readonly at: string;
       readonly by: string;
+      readonly customSchedule?: readonly CustomRowInput[] | null | undefined;
     },
   ): Loan {
     const nextNo = input.nextInstallmentNo;
@@ -335,6 +384,7 @@ export class Loan {
       fail('nextInstallmentNo must be a positive integer', '/nextInstallmentNo');
     }
     const terms = validateTerms(input, 'EXISTING');
+    validCustomRows(input, terms.method);
     const loan = new Loan(
       {
         id: input.id,
@@ -346,6 +396,7 @@ export class Loan {
         lenderCounterpartyId: input.lenderCounterpartyId ?? null,
         currency: input.currency,
         ...terms,
+        customSchedule: input.customSchedule ?? null,
         retainedFee: dec('0').toFixed(input.currencyScale),
         origin: 'EXISTING',
         existing: { asOf: terms.disbursementDate, outstanding: terms.principal, nextInstallmentNo: nextNo },
@@ -418,6 +469,23 @@ export class Loan {
     }
   }
 
+  /** `CUSTOM` ⇒ `LOAN_SCHEDULE_IS_CUSTOM`: el cronograma prevalece y el sistema no lo recalcula (D196). */
+  assertCalculable(): void {
+    if (this.state.method === 'CUSTOM') {
+      throw new DomainError(
+        'LOAN_SCHEDULE_IS_CUSTOM',
+        'a custom schedule is not recalculated; load the new bank table',
+      );
+    }
+  }
+
+  /** Solo un préstamo de tasa variable admite cambios de tasa (`LOAN_RATE_FIXED`). */
+  assertVariableRate(): void {
+    if (this.state.rateType !== 'VARIABLE') {
+      throw new DomainError('LOAN_RATE_FIXED', 'only a variable-rate loan admits rate changes');
+    }
+  }
+
   // ───────────────────────────────────────────────────────────── comandos
 
   /** Edita nombre, prestamista y cuenta de pago (siempre) y las condiciones (solo en borrador). */
@@ -478,6 +546,10 @@ export class Loan {
         frequency: changes.terms.frequency ?? s.frequency,
         termInstallments: changes.terms.termInstallments ?? s.termInstallments,
         method: changes.terms.method ?? s.method,
+        fixedPrincipalAmount:
+          changes.terms.fixedPrincipalAmount !== undefined
+            ? changes.terms.fixedPrincipalAmount
+            : s.fixedPrincipalAmount,
         disbursementDate: changes.terms.disbursementDate ?? s.disbursementDate,
         firstDueDate: changes.terms.firstDueDate ?? s.firstDueDate,
         charges: changes.terms.charges !== undefined ? changes.terms.charges : s.charges,
@@ -493,6 +565,7 @@ export class Loan {
         frequency: v.frequency,
         termInstallments: v.termInstallments,
         method: v.method,
+        fixedPrincipalAmount: v.fixedPrincipalAmount,
         disbursementDate: v.disbursementDate,
         firstDueDate: v.firstDueDate,
         charges: v.charges,
@@ -527,6 +600,7 @@ export class Loan {
         retainedFee: input.retainedFee,
         disbursementTransactionId: input.transactionId,
         recurringDefinitionId: input.recurringDefinitionId,
+        customSchedule: null,
       },
       at,
     );
@@ -537,6 +611,33 @@ export class Loan {
   attachCommitment(definitionId: string): void {
     if (this.persisted !== 0) throw new DomainError('INTERNAL_ERROR', 'the loan is already persisted');
     this.state = { ...this.state, recurringDefinitionId: definitionId };
+  }
+
+  /**
+   * Cronograma custom de un borrador (`PUT custom-schedule`): el método pasa a `CUSTOM` y las cuotas quedan en el
+   * borrador hasta el desembolso, que fija la versión 1 con ellas.
+   */
+  defineDraftCustomSchedule(rows: readonly CustomRowInput[], at: string): void {
+    this.assertDraft();
+    this.apply({ method: 'CUSTOM', fixedPrincipalAmount: null, customSchedule: [...rows] }, at);
+    this.fieldsChanged = ['method', 'customSchedule'];
+    this.transition = null;
+  }
+
+  /**
+   * Nueva versión del cronograma de un préstamo activo (prepago, cambio de tasa, custom, restitución): apunta a la
+   * versión vigente; es una anotación del recorrido, no una transición (D37). `toCustom` fija el método `CUSTOM`.
+   */
+  setScheduleVersion(version: number, fields: readonly string[], at: string, toCustom = false): void {
+    this.assertActive();
+    this.transition = null;
+    this.apply(
+      toCustom
+        ? { currentScheduleVersion: version, method: 'CUSTOM', fixedPrincipalAmount: null }
+        : { currentScheduleVersion: version },
+      at,
+    );
+    this.fieldsChanged = [...fields];
   }
 
   /** ACTIVE → PAID_OFF: el principal pendiente llegó a cero. */

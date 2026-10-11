@@ -17,6 +17,9 @@ import {
   type LoanDayCount,
   type LoanFrequency,
   type LoanInstallment,
+  type LoanMethod,
+  type PayoffSimulation,
+  type PrepaymentOption,
   type LoanOrigin,
   type LoanStatus,
   type MappingField,
@@ -89,6 +92,11 @@ export interface LoanForm {
   readonly dayCount: LoanDayCount;
   readonly frequency: LoanFrequency;
   readonly termInstallments: string;
+  /** Sistema de amortización (add-loan-amortization-advanced). */
+  readonly method: LoanMethod;
+  /** `FIXED_PRINCIPAL`: principal por cuota anterior a la última. */
+  readonly fixedPrincipal: string;
+  readonly rateType: 'FIXED' | 'VARIABLE';
   readonly disbursementDate: string;
   readonly firstDueDate: string;
   readonly charges: Readonly<Record<ChargeKey, ChargeForm>>;
@@ -117,6 +125,9 @@ export function emptyLoanForm(currency: string, today: string): LoanForm {
     dayCount: 'D30_360',
     frequency: 'MONTHLY',
     termInstallments: '',
+    method: 'FRENCH',
+    fixedPrincipal: '',
+    rateType: 'FIXED',
     disbursementDate: today,
     firstDueDate: '',
     charges: { fees: EMPTY_CHARGE, insurance: EMPTY_CHARGE, taxes: EMPTY_CHARGE },
@@ -208,7 +219,23 @@ function buildTerms(form: LoanForm, o: Opts, errors: Record<string, FormErrorCod
     else if (!/^\d+$/.test(next) || Number(next) < 1) errors['nextInstallmentNo'] = 'RANGE';
   }
   const charges = buildCharges(form, o, errors);
-  return { principal, annualRate, term, charges };
+  let fixedPrincipal: string | undefined;
+  if (form.method === 'FIXED_PRINCIPAL') {
+    fixedPrincipal = amountOrError(
+      form.fixedPrincipal,
+      'fixedPrincipal',
+      { ...o, currency: form.currency },
+      errors,
+    );
+    if (
+      fixedPrincipal !== undefined &&
+      principal !== undefined &&
+      term >= 1 &&
+      BigInt(fixedPrincipal.replace('.', '')) * BigInt(term - 1) >= BigInt(principal.replace('.', ''))
+    )
+      errors['fixedPrincipal'] = 'RANGE';
+  }
+  return { principal, annualRate, term, charges, fixedPrincipal };
 }
 
 function termsPayload(form: LoanForm, t: ReturnType<typeof buildTerms>) {
@@ -219,7 +246,11 @@ function termsPayload(form: LoanForm, t: ReturnType<typeof buildTerms>) {
     dayCount: form.dayCount,
     frequency: form.frequency,
     termInstallments: t.term,
-    method: 'FRENCH',
+    method: form.method,
+    rateType: form.rateType,
+    ...(form.method === 'FIXED_PRINCIPAL' && t.fixedPrincipal !== undefined
+      ? { fixedPrincipalAmount: { amount: t.fixedPrincipal, currency: form.currency } }
+      : {}),
     firstDueDate: form.firstDueDate,
     ...(form.origin === 'NEW'
       ? { disbursementDate: form.disbursementDate }
@@ -232,6 +263,8 @@ function termsPayload(form: LoanForm, t: ReturnType<typeof buildTerms>) {
 
 /** Cuerpo de `POST …/loans/schedule-preview`; `null` mientras falte algún dato (la vista previa espera). */
 export function buildPreviewInput(form: LoanForm, o: Opts): Record<string, unknown> | null {
+  // Un cronograma custom no se calcula: se define cuota por cuota en el detalle del borrador.
+  if (form.method === 'CUSTOM') return null;
   const errors: Record<string, FormErrorCode> = {};
   const t = buildTerms(form, o, errors);
   if (Object.keys(errors).length > 0) return null;
@@ -600,3 +633,311 @@ export function referencePath(base: string, loanId: string, suffix = ''): string
 }
 export const comparisonPath = (base: string, loanId: string, referenceId: string, suffix = ''): string =>
   `${referencePath(base, loanId)}/${referenceId}/comparison${suffix}`;
+
+// ───────────────────────────── Amortización avanzada (add-loan-amortization-advanced) ─────────────────────────────
+
+export const prepaymentsPath = (base: string, id: string): string => `${loanPath(base, id)}/prepayments`;
+export const rateChangesPath = (base: string, id: string): string => `${loanPath(base, id)}/rate-changes`;
+export const scheduleVersionsPath = (base: string, id: string): string =>
+  `${loanPath(base, id)}/schedule-versions`;
+export const customSchedulePath = (base: string, id: string): string =>
+  `${loanPath(base, id)}/custom-schedule`;
+export const simulationsPath = (base: string): string => `${base}/loans/payoff-simulations`;
+
+/** Unidades menores exactas de un monto ya normalizado a la escala de la moneda (sin `number`). */
+const unitsOf = (value: string): bigint => BigInt(value.replace('.', ''));
+
+/** ¿Admite el préstamo un pago extraordinario / cambio de tasa? (un custom no se recalcula, D196). */
+export const canRecalculate = (loan: { method: LoanMethod; status: LoanStatus }): boolean =>
+  loan.status === 'ACTIVE' && loan.method !== 'CUSTOM';
+export const canChangeRate = (loan: { method: LoanMethod; status: LoanStatus; rateType: string }): boolean =>
+  canRecalculate(loan) && loan.rateType === 'VARIABLE';
+
+// ── Pago extraordinario ──
+
+export interface PrepaymentForm {
+  readonly amount: string;
+  readonly businessDate: string;
+  readonly option: PrepaymentOption;
+  readonly fee: string;
+  readonly accountId: string;
+}
+
+export const emptyPrepaymentForm = (opts: { businessDate: string; accountId: string }): PrepaymentForm => ({
+  amount: '',
+  businessDate: opts.businessDate,
+  option: 'REDUCE_TERM',
+  fee: '',
+  accountId: opts.accountId,
+});
+
+/** Cuerpo de `POST …/prepayments` (con `option`) o de su vista previa (sin `option`/`accountId`). */
+export function buildPrepaymentInput(
+  form: PrepaymentForm,
+  o: Opts & { currency: string },
+  preview = false,
+): BuildResult<Record<string, unknown>> {
+  const errors: Record<string, FormErrorCode> = {};
+  const amount = amountOrError(form.amount, 'amount', o, errors);
+  if (form.businessDate === '') errors['businessDate'] = 'REQUIRED';
+  else if (!isDate(form.businessDate)) errors['businessDate'] = 'INVALID';
+  let fee: string | undefined;
+  if (form.fee.trim() !== '') fee = amountOrError(form.fee, 'fee', o, errors, true);
+  if (!preview && form.accountId === '') errors['accountId'] = 'REQUIRED';
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    input: {
+      amount: { amount: amount!, currency: o.currency },
+      businessDate: form.businessDate,
+      ...(fee !== undefined && !isZeroAmount(fee) ? { fee: { amount: fee, currency: o.currency } } : {}),
+      ...(preview ? {} : { option: form.option, accountId: form.accountId }),
+    },
+  };
+}
+
+// ── Cambio de tasa ──
+
+export interface RateChangeForm {
+  readonly ratePct: string;
+  readonly effectiveFrom: string;
+}
+
+export function buildRateChangeInput(
+  form: RateChangeForm,
+  locale: string,
+): BuildResult<Record<string, unknown>> {
+  const errors: Record<string, FormErrorCode> = {};
+  let annualRate: string | undefined;
+  if (form.ratePct.trim() === '') errors['ratePct'] = 'REQUIRED';
+  else {
+    const fraction = percentToFraction(form.ratePct, locale);
+    if (fraction === null) errors['ratePct'] = 'INVALID';
+    else if (fraction !== '1' && !fraction.startsWith('0')) errors['ratePct'] = 'RANGE';
+    else annualRate = fraction;
+  }
+  if (form.effectiveFrom === '') errors['effectiveFrom'] = 'REQUIRED';
+  else if (!isDate(form.effectiveFrom)) errors['effectiveFrom'] = 'INVALID';
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, input: { annualRate: annualRate!, effectiveFrom: form.effectiveFrom } };
+}
+
+// ── Cronograma custom ──
+
+export interface CustomRowForm {
+  readonly dueDate: string;
+  readonly principal: string;
+  readonly interest: string;
+  readonly fees: string;
+  readonly insurance: string;
+  readonly taxes: string;
+}
+
+export const emptyCustomRow = (): CustomRowForm => ({
+  dueDate: '',
+  principal: '',
+  interest: '',
+  fees: '',
+  insurance: '',
+  taxes: '',
+});
+
+const CUSTOM_AMOUNTS = ['principal', 'interest', 'fees', 'insurance', 'taxes'] as const;
+
+/** Cuotas de la grilla → `rows` del PUT; los errores se indexan `rows.<i>.<campo>`. */
+export function buildCustomRows(
+  rows: readonly CustomRowForm[],
+  o: Opts & { currency: string },
+): BuildResult<{ rows: Record<string, string>[] }> {
+  const errors: Record<string, FormErrorCode> = {};
+  if (rows.length === 0) errors['rows'] = 'REQUIRED';
+  const out = rows.map((row, i) => {
+    const r: Record<string, string> = {};
+    if (row.dueDate === '') errors[`rows.${i}.dueDate`] = 'REQUIRED';
+    else if (!isDate(row.dueDate)) errors[`rows.${i}.dueDate`] = 'INVALID';
+    else r['dueDate'] = row.dueDate;
+    for (const k of CUSTOM_AMOUNTS) {
+      if (row[k].trim() === '') {
+        if (k === 'principal') errors[`rows.${i}.principal`] = 'REQUIRED';
+        continue;
+      }
+      const v = amountOrError(row[k], `rows.${i}.${k}`, o, errors, true);
+      if (v !== undefined) r[k] = v;
+    }
+    return r;
+  });
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, input: { rows: out } };
+}
+
+/** Σ de principal de la grilla (campos inválidos o vacíos valen 0) y su diferencia con el principal esperado. */
+export function customPrincipalSum(
+  rows: readonly CustomRowForm[],
+  o: Opts & { currency: string },
+): { sum: string; invalid: boolean } {
+  let total = 0n;
+  let invalid = false;
+  for (const row of rows) {
+    if (row.principal.trim() === '') continue;
+    const r = parseAmount(row.principal, {
+      locale: o.locale,
+      currency: o.currency,
+      scale: o.scale,
+      allowZero: true,
+    });
+    if (!r.ok) invalid = true;
+    else total += unitsOf(r.value);
+  }
+  const digits = total.toString().padStart(o.scale + 1, '0');
+  const sum = o.scale > 0 ? `${digits.slice(0, -o.scale)}.${digits.slice(-o.scale)}` : digits;
+  return { sum, invalid };
+}
+
+/** Diferencia (esperado − suma) a la escala de la moneda, para avisar antes de enviar. */
+export function principalGap(expected: string, sum: string): string {
+  const diff = unitsOf(expected) - unitsOf(sum);
+  const neg = diff < 0n;
+  const scale = expected.includes('.') ? expected.split('.')[1]!.length : 0;
+  const digits = (neg ? -diff : diff).toString().padStart(scale + 1, '0');
+  const text = scale > 0 ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
+  return neg ? `-${text}` : text;
+}
+
+// ── Simulador ──
+
+export interface ExtraForm {
+  readonly type: 'ONE_TIME' | 'MONTHLY';
+  readonly installmentNo: string;
+  readonly amount: string;
+}
+
+export interface SimulatorForm {
+  readonly mode: 'LOAN' | 'STRATEGIES';
+  readonly loanId: string;
+  readonly extras: readonly ExtraForm[];
+  readonly currency: string;
+  readonly monthlyExtra: string;
+}
+
+export const emptyExtra = (): ExtraForm => ({ type: 'ONE_TIME', installmentNo: '1', amount: '' });
+export const emptySimulatorForm = (currency: string): SimulatorForm => ({
+  mode: 'STRATEGIES',
+  loanId: '',
+  extras: [emptyExtra()],
+  currency,
+  monthlyExtra: '',
+});
+
+export function buildSimulationInput(
+  form: SimulatorForm,
+  o: Opts,
+): BuildResult<{ scenario: Record<string, unknown> }> {
+  const errors: Record<string, FormErrorCode> = {};
+  if (form.mode === 'STRATEGIES') {
+    const extra = amountOrError(
+      form.monthlyExtra,
+      'monthlyExtra',
+      { ...o, currency: form.currency },
+      errors,
+      true,
+    );
+    if (Object.keys(errors).length > 0) return { ok: false, errors };
+    return { ok: true, input: { scenario: { monthlyExtra: { amount: extra!, currency: form.currency } } } };
+  }
+  if (form.loanId === '') errors['loanId'] = 'REQUIRED';
+  const extras = form.extras.map((e, i) => {
+    const amount = amountOrError(e.amount, `extras.${i}.amount`, { ...o, currency: form.currency }, errors);
+    const no = e.installmentNo.trim();
+    if (!/^\d+$/.test(no) || Number(no) < 1) errors[`extras.${i}.installmentNo`] = 'RANGE';
+    return e.type === 'ONE_TIME'
+      ? { type: 'ONE_TIME', installmentNo: Number(no), amount }
+      : { type: 'MONTHLY', fromInstallmentNo: Number(no), amount };
+  });
+  if (extras.length === 0) errors['extras'] = 'REQUIRED';
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, input: { scenario: { loanId: form.loanId, extras } } };
+}
+
+const csvCell = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+
+/**
+ * Tabla comparativa de una simulación en CSV (la simulación no se guarda, D202): decimales con punto, una fila por
+ * estrategia o escenario.
+ */
+export function simulationToCsv(result: PayoffSimulation, header: readonly string[]): string {
+  const lines: string[][] = [[...header]];
+  if (result.type === 'STRATEGIES') {
+    for (const s of result.strategies)
+      lines.push([
+        s.strategy,
+        s.totalInterest,
+        s.interestSaved,
+        s.debtFreeDate ?? '',
+        String(s.monthsToDebtFree),
+      ]);
+  } else {
+    lines.push([
+      'CURRENT',
+      result.current.totalInterest,
+      '0',
+      result.current.endDate ?? '',
+      String(result.current.installments),
+    ]);
+    lines.push([
+      'SCENARIO',
+      result.scenario.totalInterest,
+      result.interestSaved,
+      result.scenario.endDate ?? '',
+      String(result.scenario.installments),
+    ]);
+  }
+  return lines.map((l) => l.map(csvCell).join(',')).join('\n') + '\n';
+}
+
+export interface ChartSeries {
+  readonly key: string;
+  readonly points: readonly { readonly period: string; readonly balance: string }[];
+}
+
+export interface ChartGeometry {
+  readonly width: number;
+  readonly height: number;
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** Trazos SVG de las series de saldo total (eje común; sin `number` en dinero: solo coordenadas de pantalla). */
+export function chartPaths(
+  series: readonly ChartSeries[],
+  g: ChartGeometry,
+  scale: number,
+): {
+  readonly paths: Readonly<Record<string, string>>;
+  readonly max: string;
+  readonly periods: readonly string[];
+} {
+  const periods = [...new Set(series.flatMap((s) => s.points.map((p) => p.period)))].sort();
+  let maxUnits = 1n;
+  for (const s of series)
+    for (const p of s.points) if (unitsOf(p.balance) > maxUnits) maxUnits = unitsOf(p.balance);
+  const plotW = g.width - g.left - g.right;
+  const plotH = g.height - g.top - g.bottom;
+  const x = (i: number) => g.left + (periods.length <= 1 ? 0 : (plotW * i) / (periods.length - 1));
+  const y = (units: bigint) => g.top + plotH - Number((units * 10_000n) / maxUnits) * (plotH / 10_000);
+  const paths: Record<string, string> = {};
+  for (const s of series) {
+    const byPeriod = new Map(s.points.map((p) => [p.period, p.balance] as const));
+    let last = 0n;
+    const cmds = periods.map((period, i) => {
+      const b = byPeriod.get(period);
+      if (b !== undefined) last = unitsOf(b);
+      return `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(last).toFixed(1)}`;
+    });
+    paths[s.key] = cmds.join(' ');
+  }
+  const digits = maxUnits.toString().padStart(scale + 1, '0');
+  const max = scale > 0 ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
+  return { paths, max, periods };
+}

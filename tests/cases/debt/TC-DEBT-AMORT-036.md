@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Vista previa del recálculo'
 scenario: 'Comparar las dos opciones del prepago'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'prepayment', 'preview']
@@ -29,7 +31,7 @@ expected_result:
   - 'Ve reducir plazo: cuota 1066.19 BOB, fin 2027-07-15, ahorro 247.49 BOB; y reducir cuota: cuota 715.96 BOB, fin 2027-10-15, ahorro 151.99 BOB'
   - 'El cronograma vigente no cambia'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-036 — La vista previa del prepago compara ambas opciones sin persistir
@@ -50,4 +52,4 @@ Entonces ve reducir plazo: cuota 1066.19 BOB, fin 2027-07-15, ahorro 247.49 BOB;
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

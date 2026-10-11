@@ -86,6 +86,7 @@ describe('alta de préstamo: armado del payload', () => {
       frequency: 'MONTHLY',
       termInstallments: 24,
       method: 'FRENCH',
+      rateType: 'FIXED',
       firstDueDate: '2026-11-15',
       disbursementDate: '2026-10-15',
       account: { create: { name: 'Préstamo vehicular' } },
@@ -193,6 +194,7 @@ describe('alta de préstamo: armado del payload', () => {
       annualRate: '0.115',
       termInstallments: 24,
       method: 'FRENCH',
+      rateType: 'FIXED',
     });
     expect(body).not.toHaveProperty('account');
     expect(body).not.toHaveProperty('disbursementAccountId');

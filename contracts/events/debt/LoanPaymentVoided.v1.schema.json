@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/debt/LoanPaymentVoided.v1.schema.json",
   "title": "debt.LoanPaymentVoided.v1",
-  "description": "Se anuló el último pago de un préstamo (reversa del asiento; las cuotas imputadas vuelven al estado anterior). Productor: DEBT. Idempotencia: (loanId, paymentId, 'VOIDED'). Sin PII.",
+  "description": "Se anuló el último pago de un préstamo (reversa del asiento; las cuotas imputadas vuelven al estado anterior). Productor: DEBT. Idempotencia: (loanId, paymentId, 'VOIDED'). Sin PII. Anular un pago extraordinario no tiene cuotas imputadas (`installmentNos` vacío).",
   "type": "object",
   "allOf": [
     {
@@ -55,7 +55,7 @@
             "type": "integer",
             "minimum": 1
           },
-          "minItems": 1
+          "minItems": 0
         },
         "currency": {
           "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"

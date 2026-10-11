@@ -314,6 +314,7 @@ export class CardWorld {
       reviseManaged: async (input) => recurring.revise(input),
       pauseManaged: async () => undefined,
       resumeManaged: async () => undefined,
+      replaceSchedule: async () => undefined,
     };
 
     const recurringQuery: RecurringDefinitionQuery = {

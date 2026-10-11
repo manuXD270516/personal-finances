@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cambio de tasa variable con vigencia'
 scenario: 'Tasa fija'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-009']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'variable-rate', 'validation']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'Se rechaza con `LOAN_RATE_FIXED` y el cronograma no cambia'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-038 — Un préstamo de tasa fija no admite cambios de tasa
@@ -48,4 +49,4 @@ Entonces se rechaza con `LOAN_RATE_FIXED` y el cronograma no cambia
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

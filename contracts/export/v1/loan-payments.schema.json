@@ -26,7 +26,10 @@
     "voided_by",
     "voided_reason",
     "created_by",
-    "created_at"
+    "created_at",
+    "kind",
+    "prepayment_option",
+    "prepayment_fee"
   ],
   "properties": {
     "id": {
@@ -119,6 +122,22 @@
     "created_at": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "prepayment_option": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "prepayment_fee": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
     }
   },
   "x-pfos-table": "debt.loan_payment",

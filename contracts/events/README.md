@@ -59,6 +59,7 @@ contracts/events/
 │  ├─ LoanPaymentRecorded.v1.schema.json    # pago con desglose, cuotas imputadas y principal pendiente
 │  ├─ LoanPaymentVoided.v1.schema.json      # anulación del último pago (nuevo respecto de docs/11)
 │  ├─ LoanPaidOff.v1.schema.json            # principal pendiente en cero: préstamo saldado
+│  ├─ LoanRateChanged.v1.schema.json        # add-loan-amortization-advanced: cambio de tasa variable con vigencia
 │  ├─ CardStatementIssued.v1.schema.json    # add-credit-cards: estado de cuenta emitido una vez por (cuenta, cierre) con cifras congeladas
 │  ├─ CardPaymentDue.v1.schema.json         # add-credit-cards: recordatorio de vencimiento (lo consume NOTIFY)
 │  └─ CreditUtilizationThresholdReached.v1.schema.json  # add-credit-cards: umbral de utilización cruzado (lo consume NOTIFY)

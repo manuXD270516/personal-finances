@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Simulación sin efectos'
 scenario: 'Simular no cambia nada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-010']
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'simulator']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - 'Los cronogramas, las transacciones y el comprometido del periodo no cambian'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-044 — Simular no crea transacciones, versiones, compromisos ni auditoría
@@ -48,4 +50,4 @@ Entonces los cronogramas, las transacciones y el comprometido del periodo no cam
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

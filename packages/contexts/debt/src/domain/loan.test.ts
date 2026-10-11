@@ -55,11 +55,47 @@ describe('AR Loan: alta y validaciones', () => {
     expect(code(() => Loan.register(terms({ firstDueDate: '2026-10-15' })))).toBe('VALIDATION_FAILED');
   });
 
-  it('[TC-DEBT-LOAN-003] los sistemas distintos del francés no están disponibles', () => {
-    for (const method of ['GERMAN', 'FIXED_PRINCIPAL', 'CUSTOM']) {
-      expect(code(() => Loan.register(terms({ method })))).toBe('LOAN_METHOD_NOT_AVAILABLE');
+  it('[TC-DEBT-LOAN-046] [TC-DEBT-AMORT-025] los sistemas alemán, capital fijo y custom se aceptan al registrar', () => {
+    for (const method of ['GERMAN', 'CUSTOM']) {
+      expect(Loan.register(terms({ method })).snapshot.method).toBe(method);
     }
+    const fixed = Loan.register(terms({ method: 'FIXED_PRINCIPAL', fixedPrincipalAmount: '500.00' }));
+    expect(fixed.snapshot).toMatchObject({ method: 'FIXED_PRINCIPAL', fixedPrincipalAmount: '500.00' });
     expect(code(() => Loan.register(terms({ method: 'BULLET' })))).toBe('VALIDATION_FAILED');
+  });
+
+  it('[TC-DEBT-AMORT-025] el capital fijo exige un principal por cuota que no agote el principal antes de la última', () => {
+    const base = { principal: '10000.00', termInstallments: 12, method: 'FIXED_PRINCIPAL' };
+    expect(code(() => Loan.register(terms({ ...base, fixedPrincipalAmount: '1000.00' })))).toBe(
+      'VALIDATION_FAILED',
+    );
+    expect(code(() => Loan.register(terms(base)))).toBe('VALIDATION_FAILED');
+    expect(code(() => Loan.register(terms({ ...base, fixedPrincipalAmount: '0.00' })))).toBe(
+      'VALIDATION_FAILED',
+    );
+    expect(code(() => Loan.register(terms({ ...base, fixedPrincipalAmount: '500.001' })))).toBe(
+      'AMOUNT_SCALE_EXCEEDED',
+    );
+    expect(
+      code(() => Loan.register(terms({ ...base, method: 'GERMAN', fixedPrincipalAmount: '500.00' }))),
+    ).toBe('VALIDATION_FAILED');
+    try {
+      Loan.register(terms({ ...base, fixedPrincipalAmount: '1000.00' }));
+    } catch (err) {
+      expect((err as DomainError).details).toMatchObject({
+        sumBeforeLast: '11000.00',
+        principal: '10000.00',
+      });
+    }
+  });
+
+  it('las guardas: un custom no se recalcula (LOAN_SCHEDULE_IS_CUSTOM) y solo la tasa variable admite cambios (LOAN_RATE_FIXED)', () => {
+    expect(code(() => Loan.register(terms({ method: 'CUSTOM' })).assertCalculable())).toBe(
+      'LOAN_SCHEDULE_IS_CUSTOM',
+    );
+    expect(code(() => Loan.register(terms()).assertCalculable())).toBe('NO_ERROR');
+    expect(code(() => Loan.register(terms()).assertVariableRate())).toBe('LOAN_RATE_FIXED');
+    expect(code(() => Loan.register(terms({ rateType: 'VARIABLE' })).assertVariableRate())).toBe('NO_ERROR');
   });
 
   it('[TC-DEBT-LOAN-044] un principal con más decimales que la moneda se rechaza', () => {

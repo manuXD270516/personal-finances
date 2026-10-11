@@ -32,6 +32,8 @@ export interface LoanView {
   readonly frequency: LoanState['frequency'];
   readonly termInstallments: number;
   readonly method: LoanState['method'];
+  /** Solo `FIXED_PRINCIPAL`: principal de las cuotas anteriores a la última. */
+  readonly fixedPrincipalAmount: MoneyView | null;
   readonly disbursementDate: string;
   readonly firstDueDate: string;
   readonly charges: LoanCharges;
@@ -68,6 +70,7 @@ export function toLoanView(s: LoanState, lenderName: string | null = null): Loan
     frequency: s.frequency,
     termInstallments: s.termInstallments,
     method: s.method,
+    fixedPrincipalAmount: s.fixedPrincipalAmount === null ? null : money(s.fixedPrincipalAmount, s.currency),
     disbursementDate: s.disbursementDate,
     firstDueDate: s.firstDueDate,
     charges: s.charges,
@@ -157,6 +160,10 @@ export interface PaymentView {
   readonly taxes: string;
   readonly explicitBreakdown: boolean;
   readonly paymentMethod: string | null;
+  /** `PREPAYMENT`: pago extraordinario a principal (+ comisión) sin imputaciones a cuotas. */
+  readonly kind: PaymentRecord['kind'];
+  readonly prepaymentOption: PaymentRecord['prepaymentOption'];
+  readonly prepaymentFee: MoneyView | null;
   readonly status: PaymentRecord['status'];
   readonly installmentNos: readonly number[];
   readonly voidedAt: string | null;
@@ -184,6 +191,9 @@ export function toPaymentView(
     taxes: p.taxes,
     explicitBreakdown: p.explicitBreakdown,
     paymentMethod: p.paymentMethod,
+    kind: p.kind,
+    prepaymentOption: p.prepaymentOption,
+    prepaymentFee: p.prepaymentFee === null ? null : money(p.prepaymentFee, currency),
     status: p.status,
     installmentNos,
     voidedAt: p.voidedAt,

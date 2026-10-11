@@ -15,3 +15,8 @@ export * from './utilization.js';
 export * from './payment-plan-expectation.js';
 export * from './credit-card.js';
 export * from './card-installment-plan.js';
+export * from './amortization-math.js';
+export * from './schedule-engine.js';
+export * from './custom-schedule.js';
+export * from './schedule-recalculator.js';
+export * from './payoff-simulator.js';

@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Compromisos actualizados con la nueva versión del cronograma'
 scenario: 'Plazo reducido en los próximos pagos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-011', 'FR-DEBT-008']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/loan-payment.service.test.ts
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'commitments', 'prepayment']
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - 'La ocurrencia del 2027-07-15 espera 1017.22 BOB y no queda ninguna ocurrencia sin resolver del préstamo después del 2027-07-15'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-051 — Reducir el plazo actualiza y cancela ocurrencias de cuotas
@@ -48,4 +51,4 @@ Entonces la ocurrencia del 2027-07-15 espera 1017.22 BOB y no queda ninguna ocur
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

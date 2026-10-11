@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cambio de tasa variable con vigencia'
 scenario: 'Sube la tasa al 15 %'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-009']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/schedule-recalculator.test.ts
+  - packages/contexts/debt/test/integration/pg-debt.int.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'variable-rate']
@@ -29,7 +32,7 @@ expected_result:
   - 'La versión 2 tiene las cuotas 7 a 12 de 1075.36 BOB con interés de la cuota 7 de 77.24 BOB y la suma de su principal es 6179.02 BOB'
   - 'El historial de tasas muestra 12.00 % desde el desembolso y 15.00 % desde el 2027-04-15'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-037 — Un cambio de tasa recalcula las cuotas futuras como versión nueva
@@ -50,4 +53,4 @@ Entonces la versión 2 tiene las cuotas 7 a 12 de 1075.36 BOB con interés de la
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

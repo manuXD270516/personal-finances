@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: []
 requirement: 'Registrar un pago extraordinario'
 scenario: 'Prepago con comisión'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: ['INV-016', 'INV-004']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'prepayment']
@@ -29,7 +31,7 @@ expected_result:
   - '"Banco BOB" baja 3030.00 BOB, la deuda baja 3000.00 BOB a 6132.95 BOB y el gasto en "Comisiones de préstamo" es 30.00 BOB'
   - 'El cronograma vigente es la versión 2 con las cuotas 4 a 9'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-047 — El prepago reduce la deuda y la comisión es gasto, con versión nueva
@@ -50,4 +52,4 @@ Entonces "Banco BOB" baja 3030.00 BOB, la deuda baja 3000.00 BOB a 6132.95 BOB y
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

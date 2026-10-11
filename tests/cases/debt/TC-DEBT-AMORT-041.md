@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Simulador de pagos extra en un préstamo'
 scenario: 'Extra recurrente'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-010']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/payoff-simulator.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'simulator']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - 'El interés total es 670.30 BOB, la fecha de fin es 2027-09-15 y el ahorro es 123.93 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-041 — Simulación de un extra mensual con ahorro y fecha de fin
@@ -48,4 +50,4 @@ Entonces el interés total es 670.30 BOB, la fecha de fin es 2027-09-15 y el aho
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

@@ -301,8 +301,8 @@ describe('registro del préstamo (borrador, cuentas y vista previa)', () => {
     problem(r, 400, 'VALIDATION_FAILED');
   });
 
-  it('[TC-DEBT-LOAN-003] [TC-DEBT-AMORT-013] un sistema distinto del francés se rechaza mientras no esté habilitado', async () => {
-    problem(await post(owner, '/loans', vehicular({ method: 'GERMAN' })), 422, 'LOAN_METHOD_NOT_AVAILABLE');
+  it('[TC-DEBT-AMORT-013] un nombre de sistema desconocido se rechaza con VALIDATION_FAILED', async () => {
+    problem(await post(owner, '/loans', vehicular({ method: 'BULLET' })), 400, 'VALIDATION_FAILED');
   });
 
   it('[TC-DEBT-LOAN-044] un principal con más decimales que la moneda se rechaza', async () => {
@@ -1054,5 +1054,786 @@ describe('gasto y comprometido del préstamo (reportes)', () => {
     expect(report.status, report.text).toBe(200);
     expect(report.text).toContain('479.17');
     expect(report.text).not.toContain('1862.85');
+  });
+});
+
+// ───────────────────────────────────────────── add-loan-amortization-advanced (tareas 5.2 y 7)
+
+/** Préstamo de los scenarios de la spec: 12000.00 BOB al 12.00 %, 30/360, 12 cuotas desde 2026-11-15. */
+const loan12 = (over: Record<string, unknown> = {}) =>
+  activeLoan({ principal: bob('12000.00'), annualRate: '0.12', termInstallments: 12, ...over });
+
+/** Paga las cuotas 1..count del préstamo de 12000.00 (1066.19 cada una; la 12 de 1066.14). */
+async function payFirst(loan: Record<string, any>, count: number) {
+  const dates = ['2026-11-15', '2026-12-15', '2027-01-15', '2027-02-15', '2027-03-15', '2027-04-15'];
+  for (let i = 0; i < count; i += 1) {
+    setToday(dates[i]!);
+    await payOk(loan['id'], { amount: bob('1066.19'), businessDate: dates[i] });
+  }
+}
+
+const postWithVersion = (u: User, path: string, body: unknown, version: number) =>
+  call('POST', `${W(u)}${path}`, {
+    token: u.token,
+    body,
+    headers: { 'idempotency-key': randomUUID(), 'if-match': `"${version}"` },
+  });
+const putSchedule = async (loan: Record<string, any>, rows: unknown[], u: User = owner) =>
+  withVersion(
+    u,
+    'PUT',
+    `/loans/${loan['id']}/custom-schedule`,
+    { rows },
+    (await detail(loan['id']))['version'],
+  );
+const prepay = (loanId: string, over: Record<string, unknown> = {}, u: User = owner) =>
+  post(u, `/loans/${loanId}/prepayments`, {
+    amount: bob('3000.00'),
+    businessDate: '2027-01-15',
+    option: 'REDUCE_TERM',
+    accountId: bank,
+    ...over,
+  });
+const versionsOf = async (loanId: string) =>
+  checked('listLoanScheduleVersions', 200, await get(owner, `/loans/${loanId}/schedule-versions`))[
+    'data'
+  ] as any[];
+const occurrencesFor = async (definitionId: string) => {
+  const r = await get(owner, `/recurring/${definitionId}/occurrences?limit=200`);
+  expect(r.status, r.text).toBe(200);
+  return r.body['data'] as any[];
+};
+const allTotals = (list: any[]) => list.map((i) => i.total);
+
+describe('sistemas de amortización habilitados (alemán, capital fijo y custom)', () => {
+  it('[TC-DEBT-LOAN-046] [TC-DEBT-AMORT-021] un préstamo alemán queda en borrador con cuotas decrecientes de 1120.00 a 1010.00', async () => {
+    setToday('2026-10-10');
+    const loan = await register({
+      principal: bob('12000.00'),
+      annualRate: '0.12',
+      termInstallments: 12,
+      method: 'GERMAN',
+    });
+    expect(loan['status']).toBe('DRAFT');
+    expect(loan['method']).toBe('GERMAN');
+    const totals = allTotals(loan['preview'].installments);
+    expect(totals[0]).toBe('1120.00');
+    expect(totals[1]).toBe('1110.00');
+    expect(totals[11]).toBe('1010.00');
+    expect(loan['preview'].totalInterest).toBe('780.00');
+    expect(loan['preview'].installments.every((i: any) => i.principal === '1000.00')).toBe(true);
+  });
+
+  it('[TC-DEBT-AMORT-024] el capital fijo calcula 600.00, 550.00 y el balloon de 4545.00 con 870.00 de interés', async () => {
+    const loan = await register({
+      principal: bob('10000.00'),
+      annualRate: '0.12',
+      termInstallments: 12,
+      method: 'FIXED_PRINCIPAL',
+      fixedPrincipalAmount: bob('500.00'),
+    });
+    expect(loan['fixedPrincipalAmount']).toEqual(bob('500.00'));
+    const list = loan['preview'].installments;
+    expect([list[0].total, list[10].total, list[11].total]).toEqual(['600.00', '550.00', '4545.00']);
+    expect([list[11].principal, list[11].interest]).toEqual(['4500.00', '45.00']);
+    expect(loan['preview'].totalInterest).toBe('870.00');
+  });
+
+  it('[TC-DEBT-AMORT-025] un principal por cuota que agota el principal antes de la última se rechaza con VALIDATION_FAILED', async () => {
+    const r = await post(
+      owner,
+      '/loans',
+      vehicular({
+        principal: bob('10000.00'),
+        termInstallments: 12,
+        method: 'FIXED_PRINCIPAL',
+        fixedPrincipalAmount: bob('1000.00'),
+      }),
+    );
+    problem(r, 400, 'VALIDATION_FAILED');
+    expect(r.body['details']).toMatchObject({ sumBeforeLast: '11000.00', principal: '10000.00' });
+  });
+});
+
+describe('cronograma custom (cargado e importado) y su prevalencia', () => {
+  const rows = [
+    { dueDate: '2026-11-15', principal: '400.00', interest: '10.00' },
+    { dueDate: '2026-12-15', principal: '300.00', interest: '6.00' },
+    { dueDate: '2027-01-15', principal: '300.00', interest: '3.00' },
+  ];
+  const customDraft = () =>
+    register({ principal: bob('1000.00'), annualRate: '0.12', termInstallments: 3, method: 'CUSTOM' });
+
+  it('[TC-DEBT-AMORT-026] [TC-DEBT-AMORT-029] las cuotas cargadas a mano rigen el préstamo y el pago se imputa contra ellas', async () => {
+    setToday('2026-10-15');
+    const draft = await customDraft();
+    expect(draft['preview']).toBeNull();
+    const defined = checked('defineLoanCustomSchedule', 200, await putSchedule(draft, rows));
+    expect(defined['scheduleVersion']).toBeNull();
+    expect(allTotals(defined['installments'])).toEqual(['410.00', '306.00', '303.00']);
+    expect(allTotals((await detail(draft['id']))['preview'].installments)).toEqual([
+      '410.00',
+      '306.00',
+      '303.00',
+    ]);
+    checked('disburseLoan', 200, await post(owner, `/loans/${draft['id']}/disburse`, {}));
+    expect(allTotals(await installments(draft['id']))).toEqual(['410.00', '306.00', '303.00']);
+    setToday('2026-11-15');
+    const paid = await payOk(draft['id'], { amount: bob('410.00') });
+    expect([paid['payment']['principal'], paid['payment']['interest']]).toEqual(['400.00', '10.00']);
+    expect((await installments(draft['id']))[0].status).toBe('PAID');
+  });
+
+  it('[TC-DEBT-AMORT-027] un principal que no suma se rechaza con CUSTOM_SCHEDULE_INVALID informando 999.99 frente a 1000.00', async () => {
+    const draft = await customDraft();
+    const bad = [{ ...rows[0]! }, { ...rows[1]!, principal: '299.99' }, { ...rows[2]! }];
+    const r = await putSchedule(draft, bad);
+    problem(r, 422, 'CUSTOM_SCHEDULE_INVALID');
+    expect(r.body['details'].principalSum).toEqual({ expected: '1000.00', actual: '999.99' });
+    // sin cuotas definidas no se puede desembolsar
+    const disburse = await post(owner, `/loans/${draft['id']}/disburse`, {});
+    problem(disburse, 422, 'CUSTOM_SCHEDULE_INVALID');
+    // el rol VIEWER no define cronogramas
+    const viewerPut = await withVersion(
+      member(viewer),
+      'PUT',
+      `/loans/${draft['id']}/custom-schedule`,
+      { rows },
+      1,
+    );
+    problem(viewerPut, 403, 'INSUFFICIENT_ROLE');
+  });
+
+  it('[TC-DEBT-AMORT-030] un cambio de tasa o un prepago sobre un préstamo custom se rechaza con LOAN_SCHEDULE_IS_CUSTOM', async () => {
+    setToday('2026-10-15');
+    const draft = await customDraft();
+    checked('defineLoanCustomSchedule', 200, await putSchedule(draft, rows));
+    checked('disburseLoan', 200, await post(owner, `/loans/${draft['id']}/disburse`, {}));
+    const current = await detail(draft['id']);
+    const change = await postWithVersion(
+      owner,
+      `/loans/${draft['id']}/rate-changes`,
+      { annualRate: '0.15', effectiveFrom: '2026-11-15' },
+      current['version'],
+    );
+    problem(change, 409, 'LOAN_SCHEDULE_IS_CUSTOM');
+    problem(
+      await prepay(draft['id'], { amount: bob('100.00'), businessDate: '2026-10-20' }),
+      409,
+      'LOAN_SCHEDULE_IS_CUSTOM',
+    );
+    expect(allTotals(await installments(draft['id']))).toEqual(['410.00', '306.00', '303.00']);
+    expect((await versionsOf(draft['id'])).map((v) => v.reason)).toEqual(['INITIAL']);
+  });
+
+  it('[TC-DEBT-AMORT-028] adoptar la tabla del banco en un préstamo activo crea la versión 2 custom sin tocar la cuota pagada', async () => {
+    setToday('2026-10-15');
+    const loan = await activeLoan();
+    setToday('2026-11-15');
+    const paid = await payOk(loan['id']);
+    const before = await installments(loan['id']);
+    const text = [
+      'Nro;Fecha;Capital;Interés;Cuota',
+      ...before.map((i) =>
+        [
+          i.n,
+          i.dueDate.split('-').reverse().join('/'),
+          i.principal.replace('.', ','),
+          i.interest.replace('.', ','),
+          i.total.replace('.', ','),
+        ].join(';'),
+      ),
+    ].join('\n');
+    const reference = checked(
+      'uploadLoanReferenceSchedule',
+      201,
+      await post(owner, `/loans/${loan['id']}/reference-schedules`, {
+        source: 'PASTE',
+        text,
+        delimiter: ';',
+        mapping: {
+          installmentNo: 'Nro',
+          dueDate: 'Fecha',
+          principal: 'Capital',
+          interest: 'Interés',
+          total: 'Cuota',
+        },
+        dateFormat: 'DD/MM/YYYY',
+        decimalSeparator: ',',
+      }),
+    );
+    const current = await detail(loan['id']);
+    const adopted = checked(
+      'adoptLoanReferenceSchedule',
+      200,
+      await postWithVersion(
+        owner,
+        `/loans/${loan['id']}/custom-schedule/adopt`,
+        { referenceId: reference['id'] },
+        current['version'],
+      ),
+    );
+    expect(adopted['scheduleVersion']).toBe(2);
+    expect(adopted['installments'].map((i: any) => i.n)).toEqual(Array.from({ length: 23 }, (_, k) => k + 2));
+    const after = await installments(loan['id']);
+    expect(after).toHaveLength(24);
+    expect(after[0]).toEqual(before[0]);
+    expect(after[0].status).toBe('PAID');
+    expect((await detail(loan['id']))['method']).toBe('CUSTOM');
+    const versions = await versionsOf(loan['id']);
+    expect(versions.map((v) => [v.scheduleVersion, v.reason, v.fromInstallmentNo, v.current])).toEqual([
+      [1, 'INITIAL', 1, false],
+      [2, 'CUSTOM_ADOPTED', 2, true],
+    ]);
+    expect(versions[1].sourceReferenceId).toBe(reference['id']);
+    expect(versions[0].replacedFromInstallmentNo).toBe(2);
+    // el pago original no cambia
+    const payments = (await get(owner, `/loans/${loan['id']}/payments`)).body['data'] as any[];
+    expect(payments.map((p) => [p.id, p.status])).toEqual([[paid['payment']['id'], 'ACTIVE']]);
+    // la tabla se adopta sobre un préstamo custom: ya no se recalcula
+    problem(
+      await prepay(loan['id'], { amount: bob('100.00'), businessDate: '2026-11-20' }),
+      409,
+      'LOAN_SCHEDULE_IS_CUSTOM',
+    );
+  });
+});
+
+describe('pago extraordinario: reducir plazo o cuota, versiones y compromisos', () => {
+  it('[TC-DEBT-AMORT-036] la vista previa compara ambas opciones sin cambiar el cronograma vigente', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const versionBefore = (await detail(loan['id']))['currentScheduleVersion'];
+    const r = await call('POST', `${W(member(viewer))}/loans/${loan['id']}/prepayments/preview`, {
+      token: viewer.token,
+      body: { amount: bob('3000.00'), businessDate: '2027-01-15' },
+    });
+    const preview = checked('previewLoanPrepayment', 200, r);
+    expect(preview['outstandingPrincipal']).toEqual(bob('9132.95'));
+    expect(preview['fromInstallmentNo']).toBe(4);
+    const [term, installment] = preview['options'];
+    expect([term.option, term.installmentAmount, term.endDate, term.interestSaved]).toEqual([
+      'REDUCE_TERM',
+      bob('1066.19'),
+      '2027-07-15',
+      bob('247.49'),
+    ]);
+    expect([
+      installment.option,
+      installment.installmentAmount,
+      installment.endDate,
+      installment.interestSaved,
+    ]).toEqual(['REDUCE_INSTALLMENT', bob('715.96'), '2027-10-15', bob('151.99')]);
+    expect(preview['current'].remainingInterest).toEqual(bob('462.71'));
+    expect(term.remainingInterest).toEqual(bob('215.22'));
+    expect(installment.remainingInterest).toEqual(bob('310.72'));
+    const after = await detail(loan['id']);
+    expect(after['currentScheduleVersion']).toBe(versionBefore);
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+  });
+
+  it('[TC-DEBT-LOAN-047] [TC-DEBT-AMORT-031] [TC-DEBT-AMORT-034] [TC-DEBT-LOAN-051] el prepago con comisión reduce la deuda, es gasto y fija la versión 2 con las cuotas 4 a 9', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const bankBefore = dec(await ledgerBalance(owner, bank));
+    const reply = await prepay(loan['id'], { fee: bob('30.00') });
+    const result = checked('recordLoanPrepayment', 201, reply);
+    expect(result['scheduleVersion']).toBe(2);
+    expect(result['paidOff']).toBe(false);
+    expect(result['payment']).toMatchObject({
+      kind: 'PREPAYMENT',
+      prepaymentOption: 'REDUCE_TERM',
+      installmentNos: [],
+      principal: '3000.00',
+      fees: '30.00',
+      amount: bob('3030.00'),
+      prepaymentFee: bob('30.00'),
+    });
+    expect(
+      dec(await ledgerBalance(owner, bank))
+        .minus(bankBefore)
+        .toFixed(2),
+    ).toBe('-3030.00');
+    const d = await detail(loan['id']);
+    expect(d['accountBalance']).toEqual(bob('6132.95'));
+    expect(d['outstandingPrincipal']).toEqual(bob('6132.95'));
+    expect(d['currentScheduleVersion']).toBe(2);
+    // el gasto "Comisiones de préstamo" es la comisión; la transacción es administrada por el préstamo
+    const tx = await get(owner, `/transactions/${result['payment']['transactionId']}`);
+    expect(tx.body['kind']).toBe('LOAN_PAYMENT');
+    const feeSplit = (tx.body['splits'] as any[]).find((s) => s.amount.amount === '30.00');
+    expect(feeSplit, tx.text).toBeDefined();
+    // cronograma vigente: cuotas 1 a 3 pagadas (versión 1) y 4 a 9 de la versión 2
+    const list = await installments(loan['id']);
+    expect(list.map((i) => [i.n, i.status])).toEqual([
+      [1, 'PAID'],
+      [2, 'PAID'],
+      [3, 'PAID'],
+      [4, 'UNPAID'],
+      [5, 'UNPAID'],
+      [6, 'UNPAID'],
+      [7, 'UNPAID'],
+      [8, 'UNPAID'],
+      [9, 'UNPAID'],
+    ]);
+    expect(list.slice(3, 8).every((i) => i.total === '1066.19')).toBe(true);
+    expect([list[8].dueDate, list[8].total]).toEqual(['2027-07-15', '1017.22']);
+    // historial: la versión 1 sigue consultable (12 cuotas) y las pagadas conservan sus pagos
+    const versions = await versionsOf(loan['id']);
+    expect(
+      versions.map((v) => [v.scheduleVersion, v.reason, v.effectiveFrom, v.fromInstallmentNo, v.current]),
+    ).toEqual([
+      [1, 'INITIAL', '2026-10-15', 1, false],
+      [2, 'PREPAYMENT', '2027-01-15', 4, true],
+    ]);
+    expect(versions[0].replacedFromInstallmentNo).toBe(4);
+    expect(versions[1].parameters.option).toBe('REDUCE_TERM');
+    const v1 = checked(
+      'listLoanInstallments',
+      200,
+      await get(owner, `/loans/${loan['id']}/installments?version=1`),
+    );
+    expect(v1['data']).toHaveLength(12);
+    expect(v1['data'].slice(0, 3).every((i: any) => i.status === 'PAID')).toBe(true);
+    problem(await get(owner, `/loans/${loan['id']}/installments?version=9`), 404, 'RESOURCE_NOT_FOUND');
+    // el compromiso conserva las ocurrencias resueltas y espera la cuota de la versión 2 en las no resueltas
+    const occs = await occurrencesFor(loan['recurringDefinitionId']);
+    const byDate = Object.fromEntries(occs.map((o) => [o.occurrenceDate, o]));
+    expect(byDate['2027-01-15'].status === 'MATERIALIZED' || byDate['2027-01-15'].status === 'MATCHED').toBe(
+      true,
+    );
+    expect(byDate['2027-02-15'].expected.amount).toEqual(bob('1066.19'));
+    expect(byDate['2027-04-15'].expected.amount).toEqual(bob('1066.19'));
+    // eventos
+    const recorded = await outboxOf(owner.ws, 'debt.LoanPaymentRecorded', loan['id']);
+    expect(recorded.at(-1)!.payload).toMatchObject({
+      kind: 'PREPAYMENT',
+      prepaymentOption: 'REDUCE_TERM',
+      installmentNos: [],
+    });
+    const generated = await outboxOf(owner.ws, 'debt.LoanScheduleGenerated', loan['id']);
+    expect(
+      generated.map((e) => [
+        e.payload['scheduleVersion'],
+        e.payload['reason'],
+        e.payload['fromInstallmentNo'],
+      ]),
+    ).toEqual([
+      [1, 'INITIAL', 1],
+      [2, 'PREPAYMENT', 4],
+    ]);
+  });
+
+  it('[TC-DEBT-LOAN-051] reducir el plazo cancela las ocurrencias de las cuotas que desaparecen y actualiza la última', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12({ principal: bob('6000.00'), termInstallments: 6 });
+    const dates = ['2026-11-15', '2026-12-15', '2027-01-15'];
+    const first = (await installments(loan['id']))[0].total;
+    for (const date of dates) {
+      setToday(date);
+      await payOk(loan['id'], { amount: bob(first), businessDate: date });
+    }
+    setToday('2027-01-15');
+    checked('recordLoanPrepayment', 201, await prepay(loan['id'], { amount: bob('2000.00') }));
+    const list = await installments(loan['id']);
+    expect(list.length).toBeLessThan(6);
+    const lastRow = list[list.length - 1];
+    const occs = await occurrencesFor(loan['recurringDefinitionId']);
+    const live = occs.filter((o) => o.status !== 'CANCELLED' && o.occurrenceDate > '2027-01-15');
+    // la última ocurrencia sin resolver espera la última cuota del cronograma vigente y no hay ninguna después
+    expect(live.at(-1)?.occurrenceDate).toBe(lastRow.dueDate);
+    expect(live.at(-1)?.expected.amount).toEqual(bob(lastRow.total));
+    // las ocurrencias que desaparecen se cancelan con SUPERSEDED (cubierto en los tests del puerto de COMMITMENTS)
+    expect(occs.filter((o) => o.status !== 'CANCELLED' && o.occurrenceDate > lastRow.dueDate)).toEqual([]);
+  });
+
+  it('[TC-DEBT-AMORT-032] [TC-DEBT-LOAN-052] reducir la cuota deja 715.96 (la 12 de 715.99) con las mismas fechas y actualiza el comprometido', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const result = checked(
+      'recordLoanPrepayment',
+      201,
+      await prepay(loan['id'], { option: 'REDUCE_INSTALLMENT' }),
+    );
+    expect(result['scheduleVersion']).toBe(2);
+    const list = await installments(loan['id']);
+    expect(list).toHaveLength(12);
+    expect(list.slice(3, 11).every((i) => i.total === '715.96')).toBe(true);
+    expect([list[11].dueDate, list[11].total]).toEqual(['2027-10-15', '715.99']);
+    const occs = await occurrencesFor(loan['recurringDefinitionId']);
+    const february = occs.find((o) => o.occurrenceDate === '2027-02-15');
+    expect(february?.expected.amount).toEqual(bob('715.96'));
+    expect(['SCHEDULED', 'DUE']).toContain(february?.status);
+  });
+
+  it('[TC-DEBT-LOAN-049] un prepago con una cuota vencida sin pagar se rechaza con LOAN_INSTALLMENTS_PENDING y no crea transacción', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-02-20');
+    const before = await txnCount(owner, 'LOAN_PAYMENT');
+    const r = await prepay(loan['id'], { businessDate: '2027-02-20' });
+    problem(r, 409, 'LOAN_INSTALLMENTS_PENDING');
+    expect(r.body['details'].installmentNos).toEqual([4]);
+    expect(await txnCount(owner, 'LOAN_PAYMENT')).toBe(before);
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+  });
+
+  it('[TC-DEBT-AMORT-035] con una cuota parcialmente pagada no se recalcula', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-02-15');
+    await payOk(loan['id'], { amount: bob('500.00'), businessDate: '2027-02-15' });
+    const before = await txnCount(owner, 'LOAN_PAYMENT');
+    problem(await prepay(loan['id'], { businessDate: '2027-02-16' }), 409, 'LOAN_INSTALLMENTS_PENDING');
+    expect(await txnCount(owner, 'LOAN_PAYMENT')).toBe(before);
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+    // la vista previa tampoco recalcula
+    const preview = await post(owner, `/loans/${loan['id']}/prepayments/preview`, {
+      amount: bob('3000.00'),
+      businessDate: '2027-02-16',
+    });
+    problem(preview, 409, 'LOAN_INSTALLMENTS_PENDING');
+  });
+
+  it('un prepago mayor que el principal pendiente se rechaza con LOAN_OVERPAYMENT; un VIEWER no lo registra', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const r = await prepay(loan['id'], { amount: bob('9132.96') });
+    problem(r, 422, 'LOAN_OVERPAYMENT');
+    problem(await prepay(loan['id'], {}, member(viewer)), 403, 'INSUFFICIENT_ROLE');
+    problem(
+      await prepay(loan['id'], { amount: bob('100.00'), fee: bob('1.00'), option: 'OTRA' }),
+      400,
+      'VALIDATION_FAILED',
+    );
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+  });
+
+  it('[TC-DEBT-LOAN-048] un prepago por todo el pendiente salda el préstamo y termina su compromiso', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const result = checked('recordLoanPrepayment', 201, await prepay(loan['id'], { amount: bob('9132.95') }));
+    expect(result['paidOff']).toBe(true);
+    expect(result['scheduleVersion']).toBeNull();
+    const d = await detail(loan['id']);
+    expect(d['status']).toBe('PAID_OFF');
+    expect(d['accountBalance']).toEqual(bob('0.00'));
+    expect(d['outstandingPrincipal']).toEqual(bob('0.00'));
+    const def = await get(owner, `/recurring/${loan['recurringDefinitionId']}`);
+    expect(def.body['status']).toBe('ENDED');
+    expect(await outboxOf(owner.ws, 'debt.LoanPaidOff', loan['id'])).toHaveLength(1);
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+    // anular ese prepago reactiva el préstamo con el mismo cronograma
+    const voided = await voidPayment(loan, result['payment']['id']);
+    checked('voidLoanPayment', 200, voided);
+    const back = await detail(loan['id']);
+    expect(back['status']).toBe('ACTIVE');
+    expect(back['outstandingPrincipal']).toEqual(bob('9132.95'));
+  });
+
+  it('[TC-DEBT-LOAN-050] anular el prepago restituye las cuotas 4 a 12 de 1066.19 (la 12 de 1066.14) como versión 3 y conserva las anteriores', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const result = checked('recordLoanPrepayment', 201, await prepay(loan['id']));
+    const voided = await voidPayment(loan, result['payment']['id']);
+    const body = checked('voidLoanPayment', 200, voided);
+    expect(body['payment']['status']).toBe('VOIDED');
+    const d = await detail(loan['id']);
+    expect(d['accountBalance']).toEqual(bob('9132.95'));
+    expect(d['outstandingPrincipal']).toEqual(bob('9132.95'));
+    expect(d['currentScheduleVersion']).toBe(3);
+    const list = await installments(loan['id']);
+    expect(list).toHaveLength(12);
+    expect(list.slice(3, 11).every((i) => i.total === '1066.19')).toBe(true);
+    expect(list[11].total).toBe('1066.14');
+    const versions = await versionsOf(loan['id']);
+    expect(versions.map((v) => [v.scheduleVersion, v.reason, v.current])).toEqual([
+      [1, 'INITIAL', false],
+      [2, 'PREPAYMENT', false],
+      [3, 'PREPAYMENT_VOIDED', true],
+    ]);
+    const v2 = checked(
+      'listLoanInstallments',
+      200,
+      await get(owner, `/loans/${loan['id']}/installments?version=2`),
+    );
+    expect(v2['data']).toHaveLength(9);
+    // y el compromiso vuelve a esperar las cuotas de la versión 3
+    const occs = await occurrencesFor(loan['recurringDefinitionId']);
+    const byDate = Object.fromEntries(occs.map((o) => [o.occurrenceDate, o]));
+    expect(byDate['2027-02-15'].expected.amount).toEqual(bob('1066.19'));
+    expect(byDate['2027-04-15'].status).not.toBe('CANCELLED');
+    expect(byDate['2027-04-15'].expected.amount).toEqual(bob('1066.19'));
+  });
+});
+
+describe('cambio de tasa variable', () => {
+  const rateChange = async (loan: Record<string, any>, body: Record<string, unknown>) =>
+    postWithVersion(owner, `/loans/${loan['id']}/rate-changes`, body, (await detail(loan['id']))['version']);
+
+  it('[TC-DEBT-AMORT-037] sube al 15 % desde 2027-04-15: cuotas 7 a 12 de 1075.36 con interés de 77.24 y el historial de tasas', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12({ rateType: 'VARIABLE' });
+    await payFirst(loan, 6);
+    setToday('2027-04-15');
+    const preview = checked(
+      'previewLoanRateChange',
+      200,
+      await post(owner, `/loans/${loan['id']}/rate-changes/preview`, {
+        annualRate: '0.15',
+        effectiveFrom: '2027-04-15',
+      }),
+    );
+    expect(preview['proposed'].installmentAmount).toEqual(bob('1075.36'));
+    expect(preview['proposed'].installments[0].interest).toBe('77.24');
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+    const reply = await rateChange(loan, { annualRate: '0.15', effectiveFrom: '2027-04-15' });
+    const result = checked('changeLoanRate', 201, reply);
+    expect(result['scheduleVersion']).toBe(2);
+    expect(result['rateChange']).toMatchObject({
+      annualRate: '0.15',
+      effectiveFrom: '2027-04-15',
+      initial: false,
+    });
+    const list = await installments(loan['id']);
+    expect(list.slice(6).every((i, k) => (k < 5 ? i.total === '1075.36' : true))).toBe(true);
+    expect(list[6].interest).toBe('77.24');
+    expect(
+      list
+        .slice(6)
+        .reduce((acc, i) => acc.plus(i.principal), dec('0'))
+        .toFixed(2),
+    ).toBe('6179.02');
+    expect(list.slice(0, 6).every((i) => i.status === 'PAID')).toBe(true);
+    const history = checked(
+      'listLoanRateChanges',
+      200,
+      await get(owner, `/loans/${loan['id']}/rate-changes`),
+    );
+    expect(history['data'].map((c: any) => [c.annualRate, c.effectiveFrom, c.initial])).toEqual([
+      ['0.12', '2026-10-15', true],
+      ['0.15', '2027-04-15', false],
+    ]);
+    const versions = await versionsOf(loan['id']);
+    expect(versions.map((v) => [v.reason, v.fromInstallmentNo])).toEqual([
+      ['INITIAL', 1],
+      ['RATE_CHANGE', 7],
+    ]);
+    const events = await outboxOf(owner.ws, 'debt.LoanRateChanged', loan['id']);
+    expect(events.map((e) => e.payload)).toMatchObject([
+      { previousRate: '0.12', newRate: '0.15', effectiveFrom: '2027-04-15', scheduleVersion: 2 },
+    ]);
+    // el principal pendiente sigue siendo el de la cuota 7 en adelante
+    expect((await detail(loan['id']))['outstandingPrincipal']).toEqual(bob('6179.02'));
+  });
+
+  it('[TC-DEBT-AMORT-038] un préstamo de tasa fija rechaza el cambio con LOAN_RATE_FIXED', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    problem(
+      await rateChange(loan, { annualRate: '0.15', effectiveFrom: '2026-11-15' }),
+      409,
+      'LOAN_RATE_FIXED',
+    );
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+  });
+
+  it('[TC-DEBT-AMORT-039] una vigencia anterior al primer periodo no pagado se rechaza con LOAN_CHANGE_DATE_INVALID', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12({ rateType: 'VARIABLE' });
+    await payFirst(loan, 6);
+    const r = await rateChange(loan, { annualRate: '0.15', effectiveFrom: '2027-02-01' });
+    problem(r, 422, 'LOAN_CHANGE_DATE_INVALID');
+    expect(await versionsOf(loan['id'])).toHaveLength(1);
+    expect((await get(owner, `/loans/${loan['id']}/rate-changes`)).body['data']).toHaveLength(1);
+    // un VIEWER no registra cambios de tasa; la tasa debe ser una fracción
+    const asViewer = await call('POST', `${W(member(viewer))}/loans/${loan['id']}/rate-changes`, {
+      token: viewer.token,
+      body: { annualRate: '0.15', effectiveFrom: '2027-04-15' },
+      headers: { 'idempotency-key': randomUUID(), 'if-match': `"${(await detail(loan['id']))['version']}"` },
+    });
+    problem(asViewer, 403, 'INSUFFICIENT_ROLE');
+    problem(
+      await rateChange(loan, { annualRate: '1.5', effectiveFrom: '2027-04-15' }),
+      400,
+      'VALIDATION_FAILED',
+    );
+  });
+
+  it('anular un prepago reaplica los cambios de tasa registrados después de él', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12({ rateType: 'VARIABLE' });
+    await payFirst(loan, 3);
+    setToday('2027-01-15');
+    const result = checked('recordLoanPrepayment', 201, await prepay(loan['id']));
+    checked(
+      'changeLoanRate',
+      201,
+      await rateChange(loan, { annualRate: '0.15', effectiveFrom: '2027-02-15' }),
+    );
+    const voided = checked('voidLoanPayment', 200, await voidPayment(loan, result['payment']['id']));
+    expect(voided['payment']['status']).toBe('VOIDED');
+    const list = await installments(loan['id']);
+    expect(list).toHaveLength(12);
+    // la cuota 4 (periodo ya iniciado el 2027-01-15) conserva su monto; desde la 5 rige la tasa nueva y suman el pendiente
+    expect(list[3].total).toBe('1066.19');
+    expect(dec(list[4].total).gt('1066.19')).toBe(true);
+    expect(
+      list
+        .slice(3)
+        .reduce((acc, i) => acc.plus(i.principal), dec('0'))
+        .toFixed(2),
+    ).toBe('9132.95');
+    expect((await versionsOf(loan['id'])).map((v) => v.reason)).toEqual([
+      'INITIAL',
+      'PREPAYMENT',
+      'RATE_CHANGE',
+      'PREPAYMENT_VOIDED',
+    ]);
+  });
+});
+
+describe('simulador de pagos extra (sin efectos)', () => {
+  const simulate = (u: User, scenario: Record<string, unknown>) =>
+    call('POST', `${W(u)}/loans/payoff-simulations`, { token: u.token, body: { scenario } });
+
+  it('[TC-DEBT-AMORT-040] [TC-DEBT-AMORT-041] extras sobre un préstamo: único junto a la cuota 3 y mensual de 200.00', async () => {
+    setToday('2026-10-15');
+    const loan = await loan12();
+    const single = checked(
+      'simulateLoanPayoff',
+      200,
+      await simulate(member(viewer), {
+        loanId: loan['id'],
+        extras: [{ type: 'ONE_TIME', installmentNo: 3, amount: '3000.00' }],
+      }),
+    );
+    expect(single).toMatchObject({
+      type: 'LOAN_EXTRAS',
+      interestSaved: '247.49',
+      current: { totalInterest: '794.23', endDate: '2027-10-15' },
+      scenario: { totalInterest: '546.74', endDate: '2027-07-15' },
+    });
+    const monthly = checked(
+      'simulateLoanPayoff',
+      200,
+      await simulate(member(viewer), {
+        loanId: loan['id'],
+        extras: [{ type: 'MONTHLY', fromInstallmentNo: 1, amount: '200.00' }],
+      }),
+    );
+    expect(monthly).toMatchObject({
+      interestSaved: '123.93',
+      scenario: { totalInterest: '670.30', endDate: '2027-09-15' },
+    });
+    problem(
+      await simulate(member(viewer), {
+        loanId: loan['id'],
+        extras: [{ type: 'ONE_TIME', installmentNo: 1, amount: '0.00' }],
+      }),
+      400,
+      'VALIDATION_FAILED',
+    );
+  });
+
+  it('[TC-DEBT-AMORT-042] [TC-DEBT-AMORT-043] [TC-DEBT-AMORT-044] avalanche frente a snowball con la otra moneda fuera y sin efectos', async () => {
+    const sim = await user(`kc-loans-sim-${randomUUID()}`);
+    const bankSim = await account(sim, 'Banco BOB', 'BOB', '1000.00');
+    const bankSimUsd = await account(sim, 'Banco USD', 'USD', '500.00');
+    setToday('2026-10-15');
+    const open = async (
+      name: string,
+      principal: string,
+      rate: string,
+      n: number,
+      currency = 'BOB',
+      bankId = bankSim,
+    ) => {
+      const draft = await post(sim, '/loans', {
+        name,
+        account: { create: { name: `${name} ${(seq += 1)}` } },
+        disbursementAccountId: bankId,
+        principal: { amount: principal, currency },
+        annualRate: rate,
+        termInstallments: n,
+        disbursementDate: '2026-10-15',
+        firstDueDate: '2026-11-15',
+      });
+      expect(draft.status, draft.text).toBe(201);
+      checked('disburseLoan', 200, await post(sim, `/loans/${draft.body['id']}/disburse`, {}));
+      return draft.body['id'] as string;
+    };
+    const a = await open('A', '3000.00', '0.12', 12);
+    const b = await open('B', '12000.00', '0.24', 24);
+    const snapshot = async () => {
+      const app = await connect(deps.databaseUrl);
+      try {
+        return await inTx(app, { userId: sim.id, workspaceId: sim.ws }, async () => {
+          const q = (sqlText: string) =>
+            app.query<{ n: string }>(sqlText, [sim.ws]).then((r) => Number(r.rows[0]!.n));
+          return [
+            await q(`SELECT count(*) AS n FROM txn.transaction WHERE workspace_id = $1`),
+            await q(`SELECT count(*) AS n FROM debt.loan_schedule_version WHERE workspace_id = $1`),
+            await q(`SELECT count(*) AS n FROM audit.audit_log WHERE workspace_id = $1`),
+            await q(`SELECT count(*) AS n FROM commitments.recurring_occurrence WHERE workspace_id = $1`),
+          ];
+        });
+      } finally {
+        await app.end();
+      }
+    };
+    const outbox = async () =>
+      Number(
+        (await worker.query(`SELECT count(*) AS n FROM platform.outbox WHERE workspace_id = $1`, [sim.ws]))
+          .rows[0].n,
+      );
+    const before = [...(await snapshot()), await outbox()];
+    const scenario = { monthlyExtra: bob('500.00') };
+    const result = checked('simulateLoanPayoff', 200, await simulate(sim, scenario));
+    const by = Object.fromEntries((result['strategies'] as any[]).map((s) => [s.strategy, s]));
+    expect(by['NONE']).toMatchObject({ totalInterest: '3425.46', debtFreeDate: '2028-10-15' });
+    expect(by['AVALANCHE']).toMatchObject({
+      totalInterest: '1815.57',
+      interestSaved: '1609.89',
+      debtFreeDate: '2027-11-15',
+    });
+    expect(by['SNOWBALL']).toMatchObject({
+      totalInterest: '2000.08',
+      interestSaved: '1425.38',
+      debtFreeDate: '2027-11-15',
+    });
+    expect(by['SNOWBALL'].loans.find((l: any) => l.loanId === a).endDate).toBe('2027-03-15');
+    expect(result['outOfStrategy']).toEqual([]);
+    expect(b).toBeDefined();
+    // un préstamo en otra moneda queda fuera de la estrategia y conserva su cronograma
+    const usd = await open('C', '5000.00', '0.1', 12, 'USD', bankSimUsd);
+    const usdBefore = await get(sim, `/loans/${usd}/installments`);
+    const withUsd = checked('simulateLoanPayoff', 200, await simulate(sim, scenario));
+    expect(withUsd['outOfStrategy']).toEqual([
+      { loanId: usd, name: 'C', reason: 'CURRENCY', currency: 'USD' },
+    ]);
+    const avalanche = (withUsd['strategies'] as any[]).find((s) => s.strategy === 'AVALANCHE');
+    expect(avalanche.totalInterest).toBe('1815.57');
+    expect((await get(sim, `/loans/${usd}/installments`)).body).toEqual(usdBefore.body);
+    // simular no cambia nada
+    const counts = [...(await snapshot()), await outbox()];
+    await simulate(sim, scenario);
+    await simulate(sim, { strategies: ['AVALANCHE'], monthlyExtra: bob('100.00') });
+    expect([...(await snapshot()), await outbox()]).toEqual(counts);
+    expect(counts.length).toBe(before.length);
   });
 });

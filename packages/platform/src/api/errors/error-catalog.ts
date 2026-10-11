@@ -184,6 +184,21 @@ export const ERROR_CATALOG = {
   LOAN_PAYMENT_NOT_LATEST: { status: 409, title: 'Only the most recent loan payment can be voided' },
   LOAN_HAS_PAYMENTS: { status: 409, title: 'The loan has payments and cannot be cancelled' },
   LOAN_REFERENCE_INVALID: { status: 422, title: 'The bank schedule is not valid' },
+  // debt / amortization (add-loan-amortization-advanced)
+  CUSTOM_SCHEDULE_INVALID: { status: 422, title: 'The custom schedule is not valid' },
+  LOAN_SCHEDULE_IS_CUSTOM: {
+    status: 409,
+    title: 'The loan has a custom schedule; load the new bank table instead of recalculating',
+  },
+  LOAN_INSTALLMENTS_PENDING: {
+    status: 409,
+    title: 'Overdue or partially paid installments must be settled before recalculating the schedule',
+  },
+  LOAN_RATE_FIXED: { status: 409, title: 'Only a variable-rate loan admits rate changes' },
+  LOAN_CHANGE_DATE_INVALID: {
+    status: 422,
+    title: 'The effective date precedes the start of the first unpaid period',
+  },
   PAYMENT_BREAKDOWN_MISMATCH: {
     status: 422,
     title: 'The payment breakdown does not add up to the amount paid',

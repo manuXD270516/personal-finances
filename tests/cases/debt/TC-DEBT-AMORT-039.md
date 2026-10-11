@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cambio de tasa variable con vigencia'
 scenario: 'Vigencia en un periodo ya pagado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-009']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/schedule-recalculator.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'variable-rate', 'validation']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - 'Se rechaza con `LOAN_CHANGE_DATE_INVALID` y el cronograma no cambia'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-039 — Una vigencia anterior al primer periodo no pagado se rechaza
@@ -48,4 +50,4 @@ Entonces se rechaza con `LOAN_CHANGE_DATE_INVALID` y el cronograma no cambia
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

@@ -145,5 +145,10 @@
   "GOAL_TRANSACTION_NOT_ELIGIBLE": "Essa transação não pode ser vinculada à meta: deve ser uma transferência lançada entre suas contas, com uma conta vinculada à meta.",
   "GOAL_TRANSACTION_ALREADY_LINKED": "Essa transação já está vinculada a uma meta.",
   "GOAL_CURRENCY_LOCKED": "A moeda da meta não pode mudar porque ela já tem movimentos.",
-  "GOAL_SUGGESTION_NOT_PENDING": "Essa sugestão de aporte já foi confirmada, descartada ou expirou."
+  "GOAL_SUGGESTION_NOT_PENDING": "Essa sugestão de aporte já foi confirmada, descartada ou expirou.",
+  "CUSTOM_SCHEDULE_INVALID": "O cronograma próprio não é válido: confira se o capital soma o esperado e se as datas crescem.",
+  "LOAN_SCHEDULE_IS_CUSTOM": "Este empréstimo tem cronograma próprio: carregue a nova tabela do banco em vez de recalculá-lo.",
+  "LOAN_INSTALLMENTS_PENDING": "Pague ou complete as parcelas vencidas ou parciais antes de recalcular o cronograma.",
+  "LOAN_RATE_FIXED": "Só um empréstimo de taxa variável admite mudanças de taxa.",
+  "LOAN_CHANGE_DATE_INVALID": "A data de vigência é anterior ao início do primeiro período não pago."
 }

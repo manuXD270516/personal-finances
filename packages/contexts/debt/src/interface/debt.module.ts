@@ -24,6 +24,8 @@ import type { CardBalancePort, CardDeps, CardSettings } from '../application/car
 import { CardsQueries } from '../application/cards.queries.js';
 import { CardsService } from '../application/cards.service.js';
 import { InstallmentsService } from '../application/installments.service.js';
+import { AmortizationQueries } from '../application/amortization.queries.js';
+import { AmortizationService } from '../application/amortization.service.js';
 import { LoansQueries } from '../application/loans.queries.js';
 import { LoansService } from '../application/loans.service.js';
 import { PaymentsService } from '../application/payments.service.js';
@@ -49,6 +51,7 @@ import {
   PgDebtUnitOfWork,
   PgLoanRepository,
   PgPaymentRepository,
+  PgRateChangeRepository,
   PgReferenceRepository,
   PgScheduleRepository,
   pgCurrencyCatalog,
@@ -56,6 +59,8 @@ import {
 } from '../infrastructure/pg-debt.js';
 import { CARDS_QUERIES, CARDS_SERVICE, CreditCardsController, INSTALLMENTS_SERVICE } from './cards-http.js';
 import {
+  AMORTIZATION_QUERIES,
+  AMORTIZATION_SERVICE,
   LOANS_QUERIES,
   LOANS_SERVICE,
   LoansController,
@@ -94,6 +99,9 @@ export interface DebtRuntime {
   readonly payments: PaymentsService;
   readonly references: ReferencesService;
   readonly queries: LoansQueries;
+  /** add-loan-amortization-advanced: cronograma custom, prepagos, cambio de tasa y simulador. */
+  readonly amortization: AmortizationService;
+  readonly amortizationQueries: AmortizationQueries;
 }
 
 /** Composición de DEBT sobre PostgreSQL (misma transacción que la `PgUnitOfWork` de cada comando). */
@@ -149,6 +157,7 @@ export function createDebtRuntime(options: DebtRuntimeOptions): DebtRuntime {
     loans: new PgLoanRepository(),
     schedules: new PgScheduleRepository(),
     payments: new PgPaymentRepository(),
+    rateChanges: new PgRateChangeRepository(),
     references: new PgReferenceRepository(),
     accounts,
     provisioning: options.provisioning,
@@ -171,11 +180,14 @@ export function createDebtRuntime(options: DebtRuntimeOptions): DebtRuntime {
   const loans = new LoansService(deps);
   const references = new ReferencesService(deps);
   loans.comparisonHook = (workspaceId, loan, scale) => references.snapshotLatest(workspaceId, loan, scale);
+  const amortization = new AmortizationService(deps);
   return {
     loans,
-    payments: new PaymentsService(deps),
+    payments: new PaymentsService(deps, amortization),
     references,
     queries: new LoansQueries(deps),
+    amortization,
+    amortizationQueries: new AmortizationQueries(deps),
   };
 }
 
@@ -393,6 +405,8 @@ export class DebtModule {
         { provide: PAYMENTS_SERVICE, useValue: options.runtime.payments },
         { provide: REFERENCES_SERVICE, useValue: options.runtime.references },
         { provide: LOANS_QUERIES, useValue: options.runtime.queries },
+        { provide: AMORTIZATION_SERVICE, useValue: options.runtime.amortization },
+        { provide: AMORTIZATION_QUERIES, useValue: options.runtime.amortizationQueries },
         { provide: CARDS_SERVICE, useValue: options.cards.cards },
         { provide: CARDS_QUERIES, useValue: options.cards.queries },
         { provide: INSTALLMENTS_SERVICE, useValue: options.cards.installments },

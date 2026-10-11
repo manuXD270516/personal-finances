@@ -817,6 +817,51 @@ export class EngineRecurringDefinitionPort implements RecurringDefinitionPort {
     });
   }
 
+  // ───────────────────────────────────────────────────────────── add-loan-amortization-advanced (N3)
+
+  /**
+   * Reemplazo del calendario explícito (prepago, cambio de tasa, cronograma custom): una versión nueva de la definición
+   * con los ítems desde la fecha efectiva. El motor reescribe las ocurrencias no resueltas (misma fecha ⇒ se actualiza
+   * el monto esperado y se conserva la identidad), cancela las que ya no existen (`SUPERSEDED`) y crea las nuevas; las
+   * resueltas y sus transacciones no se tocan.
+   */
+  async replaceSchedule(input: Parameters<RecurringDefinitionPort['replaceSchedule']>[0]): Promise<void> {
+    const { deps } = this;
+    const { workspaceId } = input;
+    await deps.uow.run(workspaceId, async () => {
+      const def = await this.locked(workspaceId, input.definitionId);
+      if (def.current.schedule.cadence !== 'EXPLICIT') {
+        throw new DomainError('RECURRING_INVALID_SCHEDULE', 'the definition has no explicit schedule').at(
+          '/definitionId',
+        );
+      }
+      const lastResolved = await deps.occurrences.lastResolvedNominal(workspaceId, def.id);
+      const options = [input.effectiveFrom, def.current.effectiveFrom];
+      if (lastResolved !== null) options.push(LocalDate.parse(lastResolved).plusDays(1).toString());
+      const effectiveFrom = options.sort().at(-1) as string;
+      const items = input.items.filter((i) => i.dueDate >= effectiveFrom);
+      if (items.length === 0) {
+        throw new DomainError('RECURRING_INVALID_SCHEDULE', 'the schedule needs at least one item').at(
+          '/items',
+        );
+      }
+      await this.definitions.revise({
+        workspaceId,
+        userId: input.userId,
+        definitionId: def.id,
+        expectedVersion: def.version,
+        effectiveFrom,
+        changes: {
+          schedule: {
+            cadence: 'EXPLICIT',
+            explicit: items.map((i) => ({ key: i.key, dueDate: i.dueDate, amount: i.amount })),
+          },
+        },
+        manager: def.snapshot.managedBy as Manager,
+      });
+    });
+  }
+
   // ───────────────────────────────────────────────────────────── add-savings-goals (N5)
 
   /** Alias del contrato de metas: misma revisión de plantilla que `revise`, con monto fijo y cuenta destino. */

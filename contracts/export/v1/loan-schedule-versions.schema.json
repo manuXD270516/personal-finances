@@ -13,7 +13,11 @@
     "effective_from",
     "parameters",
     "created_at",
-    "created_by"
+    "created_by",
+    "from_installment_no",
+    "source_payment_id",
+    "source_rate_change_id",
+    "source_reference_id"
   ],
   "properties": {
     "loan_id": {
@@ -46,6 +50,30 @@
     },
     "created_by": {
       "type": "string",
+      "format": "uuid"
+    },
+    "from_installment_no": {
+      "type": "integer"
+    },
+    "source_payment_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "source_rate_change_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "source_reference_id": {
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "uuid"
     }
   },

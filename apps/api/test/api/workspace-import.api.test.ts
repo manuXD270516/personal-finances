@@ -144,6 +144,7 @@ beforeAll(async () => {
     principal: money('1000.00'),
     annualRate: '0.12',
     termInstallments: 3,
+    rateType: 'VARIABLE',
     disbursementDate: '2026-10-01',
     firstDueDate: '2026-11-01',
     disburseNow: true,
@@ -156,6 +157,25 @@ beforeAll(async () => {
     accountId: m.bank,
   });
   expect(installmentPaid.status, JSON.stringify(installmentPaid.body)).toBe(201);
+  // Amortización avanzada (openspec add-loan-amortization-advanced, tarea 4.4): un prepago reduciendo la cuota y un
+  // cambio de tasa dejan tres versiones del cronograma, la tasa con su vigencia y un pago extraordinario.
+  const prepaid = await api.post(m.owner, `/loans/${loanId}/prepayments`, {
+    amount: money('100.00'),
+    businessDate: '2026-10-06',
+    option: 'REDUCE_INSTALLMENT',
+    accountId: m.bank,
+  });
+  expect(prepaid.status, JSON.stringify(prepaid.body)).toBe(201);
+  const afterPrepayment = await h.call('GET', `${api.base}/loans/${loanId}`, { token: m.owner.token });
+  const rateChanged = await h.call('POST', `${api.base}/loans/${loanId}/rate-changes`, {
+    token: m.owner.token,
+    body: { annualRate: '0.15', effectiveFrom: '2026-12-01' },
+    headers: {
+      'idempotency-key': randomUUID(),
+      'if-match': `"${String(afterPrepayment.body['version'])}"`,
+    },
+  });
+  expect(rateChanged.status, JSON.stringify(rateChanged.body)).toBe(201);
   // Una tarjeta bimoneda con plan de pago y una compra en cuotas (openspec add-credit-cards, tarea 4.4): sus nueve
   // tablas viajan en el export y las cuentas, la definición del plan y la compra se remapean al importar.
   const usd = (amount: string) => money(amount, 'USD');
@@ -658,9 +678,12 @@ describe('Préstamos en el round-trip', () => {
         'json/loan-installments.jsonl',
         'json/loan-payments.jsonl',
         'json/loan-payment-allocations.jsonl',
+        'json/loan-rate-changes.jsonl',
       ]),
     );
-    expect(lines(reader.read('json/loan-payments.jsonl'))).toHaveLength(1);
+    expect(lines(reader.read('json/loan-payments.jsonl'))).toHaveLength(2);
+    expect(lines(reader.read('json/loan-rate-changes.jsonl'))).toHaveLength(1);
+    expect(lines(reader.read('json/loan-schedule-versions.jsonl'))).toHaveLength(3);
     const done = await importAndWait(h, m.owner, zip);
     expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
     const created = done['workspaceId'] as string;
@@ -672,12 +695,40 @@ describe('Préstamos en el round-trip', () => {
     const detail = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}`, {
       token: m.owner.token,
     });
-    expect(detail.body['outstandingPrincipal']).toEqual(money('669.98'));
-    expect(detail.body['accountBalance']).toEqual(money('669.98'));
+    expect(detail.body['outstandingPrincipal']).toEqual(money('569.98'));
+    expect(detail.body['accountBalance']).toEqual(money('569.98'));
+    expect(detail.body['currentScheduleVersion']).toBe(3);
+    const versions = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/loans/${imported!.id}/schedule-versions`,
+      {
+        token: m.owner.token,
+      },
+    );
+    expect((versions.body['data'] as { reason: string }[]).map((v) => v.reason)).toEqual([
+      'INITIAL',
+      'PREPAYMENT',
+      'RATE_CHANGE',
+    ]);
+    const rates = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}/rate-changes`, {
+      token: m.owner.token,
+    });
+    expect(
+      (rates.body['data'] as { annualRate: string; initial: boolean }[]).map((r) => [
+        r.annualRate,
+        r.initial,
+      ]),
+    ).toEqual([
+      ['0.12', true],
+      ['0.15', false],
+    ]);
     const payments = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}/payments`, {
       token: m.owner.token,
     });
-    expect((payments.body['data'] as unknown[]).length).toBe(1);
+    expect((payments.body['data'] as { kind: string }[]).map((x) => x.kind)).toEqual([
+      'REGULAR',
+      'PREPAYMENT',
+    ]);
     const definition = await h.call(
       'GET',
       `/api/v1/workspaces/${created}/recurring/${imported!.recurringDefinitionId}`,

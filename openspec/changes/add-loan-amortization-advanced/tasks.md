@@ -4,53 +4,61 @@
 
 ## 1. SPEC y TEST CASES
 
-- [ ] 1.1 Revisar con el owner los deltas de `debt/amortization` y `debt/loans` y las preguntas abiertas 1–9 de design.md; `openspec validate add-loan-amortization-advanced --strict`
-- [ ] 1.2 Revisar TC-DEBT-AMORT-021..044 y TC-DEBT-LOAN-046..052 contra los scenarios (recalcular a mano: alemán 12000.00/12 ⇒ 1120.00…1010.00, interés 780.00; capital fijo 10000.00 ⇒ 600.00, 550.00, balloon 4545.00, interés 870.00; prepago 3000.00 ⇒ reducir plazo 6 cuotas, última 1017.22, ahorro 247.49; reducir cuota 715.96, última 715.99, ahorro 151.99; tasa 15 % ⇒ 1075.36, interés cuota 7 77.24; simulador 3425.46 / 1815.57 / 2000.08 BOB); marcar TC-DEBT-LOAN-003 como `deprecated` al aplicar; `pnpm traceability:check` sin errores
+- [x] 1.1 Revisar con el owner los deltas de `debt/amortization` y `debt/loans` y las preguntas abiertas 1–9 de design.md; `openspec validate add-loan-amortization-advanced --strict`
+- [x] 1.2 Revisar TC-DEBT-AMORT-021..044 y TC-DEBT-LOAN-046..052 contra los scenarios (recalcular a mano: alemán 12000.00/12 ⇒ 1120.00…1010.00, interés 780.00; capital fijo 10000.00 ⇒ 600.00, 550.00, balloon 4545.00, interés 870.00; prepago 3000.00 ⇒ reducir plazo 6 cuotas, última 1017.22, ahorro 247.49; reducir cuota 715.96, última 715.99, ahorro 151.99; tasa 15 % ⇒ 1075.36, interés cuota 7 77.24; simulador 3425.46 / 1815.57 / 2000.08 BOB); marcar TC-DEBT-LOAN-003 como `deprecated` al aplicar; `pnpm traceability:check` sin errores
 
 ## 2. DOMAIN (TDD, lógica financiera crítica)
 
-- [ ] 2.1 Estrategias `GERMAN` y `FIXED_PRINCIPAL` del calculador test-first: TC-DEBT-AMORT-021, -022, -024, -025; PBT: TC-DEBT-AMORT-023
-- [ ] 2.2 `CustomScheduleValidator` test-first: TC-DEBT-AMORT-026, -027
-- [ ] 2.3 `ScheduleRecalculator` (precondición de frontera, reducir plazo, reducir cuota, cambio de tasa, restitución) test-first: TC-DEBT-AMORT-031, -032, -035, -037, -039, TC-DEBT-LOAN-050; PBT: TC-DEBT-AMORT-033
-- [ ] 2.4 `PayoffSimulator` test-first con el cálculo de referencia independiente: TC-DEBT-AMORT-040..043
-- [ ] 2.5 Entidad `RateChange` y guardas `LOAN_RATE_FIXED`, `LOAN_CHANGE_DATE_INVALID`, `LOAN_SCHEDULE_IS_CUSTOM`: TC-DEBT-AMORT-030, -038, -039
+- [x] 2.1 Estrategias `GERMAN` y `FIXED_PRINCIPAL` del calculador test-first: TC-DEBT-AMORT-021, -022, -024, -025; PBT: TC-DEBT-AMORT-023
+- [x] 2.2 `CustomScheduleValidator` test-first: TC-DEBT-AMORT-026, -027
+- [x] 2.3 `ScheduleRecalculator` (precondición de frontera, reducir plazo, reducir cuota, cambio de tasa, restitución) test-first: TC-DEBT-AMORT-031, -032, -035, -037, -039, TC-DEBT-LOAN-050; PBT: TC-DEBT-AMORT-033
+- [x] 2.4 `PayoffSimulator` test-first con el cálculo de referencia independiente: TC-DEBT-AMORT-040..043
+- [x] 2.5 Entidad `RateChange` y guardas `LOAN_RATE_FIXED`, `LOAN_CHANGE_DATE_INVALID`, `LOAN_SCHEDULE_IS_CUSTOM`: TC-DEBT-AMORT-030, -038, -039
 
 ## 3. APPLICATION
 
-- [ ] 3.1 Habilitar `GERMAN`, `FIXED_PRINCIPAL` y `CUSTOM` en `RegisterLoan`/`DisburseLoan`: TC-DEBT-LOAN-046
-- [ ] 3.2 `DefineCustomSchedule` y `AdoptReferenceSchedule` (versión nueva en `ACTIVE`, prevalencia): TC-DEBT-AMORT-026..030
-- [ ] 3.3 `RecordPrepayment` (UoW: transacción con principal + comisión, versión nueva, `replaceSchedule`, `PAY_OFF` si salda) y `PreviewRecalculation`: TC-DEBT-AMORT-031, -032, -034..036, TC-DEBT-LOAN-047..049, -051, -052
-- [ ] 3.4 `VoidLoanPayment` para prepagos (versión `PREPAYMENT_VOIDED`, `replaceSchedule`): TC-DEBT-LOAN-050
-- [ ] 3.5 `ChangeLoanRate` y su vista previa (`LoanRateChanged.v1`, historial de tasas): TC-DEBT-AMORT-037..039
-- [ ] 3.6 `SimulatePayoff` (lee `LoanPortfolioQuery` y cronogramas vigentes; sin escritura ni auditoría): TC-DEBT-AMORT-040..044
-- [ ] 3.7 `ListScheduleVersions` y anotaciones del recorrido del préstamo (versiones y tasas): TC-DEBT-AMORT-034
+- [x] 3.1 Habilitar `GERMAN`, `FIXED_PRINCIPAL` y `CUSTOM` en `RegisterLoan`/`DisburseLoan`: TC-DEBT-LOAN-046
+- [x] 3.2 `DefineCustomSchedule` y `AdoptReferenceSchedule` (versión nueva en `ACTIVE`, prevalencia): TC-DEBT-AMORT-026..030
+- [x] 3.3 `RecordPrepayment` (UoW: transacción con principal + comisión, versión nueva, `replaceSchedule`, `PAY_OFF` si salda) y `PreviewRecalculation`: TC-DEBT-AMORT-031, -032, -034..036, TC-DEBT-LOAN-047..049, -051, -052
+- [x] 3.4 `VoidLoanPayment` para prepagos (versión `PREPAYMENT_VOIDED`, `replaceSchedule`): TC-DEBT-LOAN-050
+- [x] 3.5 `ChangeLoanRate` y su vista previa (`LoanRateChanged.v1`, historial de tasas): TC-DEBT-AMORT-037..039
+- [x] 3.6 `SimulatePayoff` (lee `LoanPortfolioQuery` y cronogramas vigentes; sin escritura ni auditoría): TC-DEBT-AMORT-040..044
+- [x] 3.7 `ListScheduleVersions` y anotaciones del recorrido del préstamo (versiones y tasas): TC-DEBT-AMORT-034
 
 ## 4. INFRASTRUCTURE
 
-- [ ] 4.1 Migración expand (`fixed_principal_amount`, motivos y columnas de `loan_schedule_version`, `kind`/`prepayment_*` de `loan_payment`, tabla `loan_rate_change` con RLS y `forbid_mutation`); tests de integración: append-only de versiones y tasas, reemplazo de ocurrencias sin tocar resueltas
-- [ ] 4.2 `RecurringDefinitionPort.replaceSchedule` (si `add-loans` no lo implementó): cancelación `SUPERSEDED` de no resueltas, actualización in situ si la fecha coincide, generación de nuevas
-- [ ] 4.3 Esquemas de eventos: `LoanScheduleGenerated.v1` (`reason`, `fromInstallmentNo`), `LoanPaymentRecorded.v1` (`kind`, `prepaymentOption`), `LoanRateChanged.v1` nuevo; tests de contrato
-- [ ] 4.4 Portabilidad de `loan_rate_change` y columnas nuevas; round-trip con un préstamo con prepago y cambio de tasa
+- [x] 4.1 Migración expand (`fixed_principal_amount`, motivos y columnas de `loan_schedule_version`, `kind`/`prepayment_*` de `loan_payment`, tabla `loan_rate_change` con RLS y `forbid_mutation`); tests de integración: append-only de versiones y tasas, reemplazo de ocurrencias sin tocar resueltas
+- [x] 4.2 `RecurringDefinitionPort.replaceSchedule` (si `add-loans` no lo implementó): cancelación `SUPERSEDED` de no resueltas, actualización in situ si la fecha coincide, generación de nuevas
+- [x] 4.3 Esquemas de eventos: `LoanScheduleGenerated.v1` (`reason`, `fromInstallmentNo`), `LoanPaymentRecorded.v1` (`kind`, `prepaymentOption`), `LoanRateChanged.v1` nuevo; tests de contrato
+- [x] 4.4 Portabilidad de `loan_rate_change` y columnas nuevas; round-trip con un préstamo con prepago y cambio de tasa
 
 ## 5. API
 
-- [ ] 5.1 OpenAPI aditivo (operaciones de design.md § Contratos, `LoanMethod` habilitado, códigos nuevos); `oasdiff` sin rupturas
-- [ ] 5.2 Endpoints y tests de API: TC-DEBT-AMORT-021..044, TC-DEBT-LOAN-046..052
+- [x] 5.1 OpenAPI aditivo (operaciones de design.md § Contratos, `LoanMethod` habilitado, códigos nuevos); `oasdiff` sin rupturas
+- [x] 5.2 Endpoints y tests de API: TC-DEBT-AMORT-021..044, TC-DEBT-LOAN-046..052
 
 ## 6. UI
 
-- [ ] 6.1 Alta de préstamo con sistema alemán, capital fijo (principal por cuota) y custom (grilla editable o "usar la tabla del banco cargada")
-- [ ] 6.2 Pago extraordinario: formulario con vista previa comparada de ambas opciones (cuota, fin, ahorro) y comisión opcional; cambio de tasa con vista previa; historial de versiones y de tasas
-- [ ] 6.3 Deudas → Simulador: escenarios de un préstamo y estrategias avalanche/snowball con tabla comparativa, gráfico de saldo total (skill dataviz) y export CSV; aviso de préstamos fuera de la estrategia
-- [ ] 6.4 i18n es/en/pt y accesibilidad
+- [x] 6.1 Alta de préstamo con sistema alemán, capital fijo (principal por cuota) y custom (grilla editable o "usar la tabla del banco cargada")
+- [x] 6.2 Pago extraordinario: formulario con vista previa comparada de ambas opciones (cuota, fin, ahorro) y comisión opcional; cambio de tasa con vista previa; historial de versiones y de tasas
+- [x] 6.3 Deudas → Simulador: escenarios de un préstamo y estrategias avalanche/snowball con tabla comparativa, gráfico de saldo total (skill dataviz) y export CSV; aviso de préstamos fuera de la estrategia
+- [x] 6.4 i18n es/en/pt y accesibilidad
 
 ## 7. TESTS / E2E
 
-- [ ] 7.1 E2E: prepago reduciendo plazo con vista previa y verificación de las ocurrencias en próximos pagos
-- [ ] 7.2 E2E: simulador avalanche vs snowball con dos préstamos demo
-- [ ] 7.3 Regresión: TC-DEBT-AMORT-001..020, TC-DEBT-LOAN-001..045 (salvo -003), TC-COMMITMENTS-*, TC-REPORTING-UPCOMING-* en verde; rendimiento del simulador (10 préstamos, 600 meses, p95 < 300 ms)
+- [x] 7.1 E2E: prepago reduciendo plazo con vista previa y verificación de las ocurrencias en próximos pagos
+- [x] 7.2 E2E: simulador avalanche vs snowball con dos préstamos demo
+- [x] 7.3 Regresión: TC-DEBT-AMORT-001..020, TC-DEBT-LOAN-001..045 (salvo -003), TC-COMMITMENTS-*, TC-REPORTING-UPCOMING-* en verde; rendimiento del simulador (10 préstamos, 600 meses, p95 < 300 ms)
 
 ## 8. DOCS
 
-- [ ] 8.1 Aplicar los cambios de design.md § Cambios a docs compartidos (docs/01, 03, 04, 08, 10, 11, 28)
-- [ ] 8.2 Matriz de trazabilidad y estados de TC (TC-DEBT-LOAN-003 `deprecated`, reemplazado por TC-DEBT-LOAN-046); `openspec validate add-loan-amortization-advanced --strict`, `pnpm traceability:check`, `pnpm format:check`
+- [x] 8.1 Aplicar los cambios de design.md § Cambios a docs compartidos (docs/01, 03, 04, 08, 10, 11, 28)
+- [x] 8.2 Matriz de trazabilidad y estados de TC (TC-DEBT-LOAN-003 `deprecated`, reemplazado por TC-DEBT-LOAN-046); `openspec validate add-loan-amortization-advanced --strict`, `pnpm traceability:check`, `pnpm format:check`
+
+## Notas de implementación (2026-10-11)
+
+- **1.1–1.2:** las preguntas 1–9 de `design.md` quedaron decididas por el owner (D194–D202 de docs/37, todas = recomendación): prepago aplicado en la frontera del periodo, cambio de tasa sin prorrateo, custom sin recálculo, simulador solo en la moneda del extra, sin tarjetas, comisión ingresada por el usuario, rollover siempre, reducir cuota en capital fijo con principal proporcional y balloon que absorbe, simulaciones sin persistir (export CSV). Todas las cifras de los scenarios salen exactas con Decimal/HALF_EVEN (`schedule-recalculator.test.ts`, `payoff-simulator.test.ts`); `TC-DEBT-LOAN-003` queda `deprecated` (lo reemplaza `TC-DEBT-LOAN-046`).
+- **2–3:** `schedule-engine.ts` (motor de filas compartido), `amortization-methods`, `custom-schedule.ts`, `schedule-recalculator.ts`, `payoff-simulator.ts` y los servicios `AmortizationService`/`AmortizationQueries`. PBT con `fast-check` y timeout explícito (TC-DEBT-AMORT-023 y -033). Ninguna consulta paralela sobre un mismo cliente pg.
+- **4:** migración `20261014100000_debt_amortization_advanced.sql` (expand). Desviación menor: se agregó `debt.loan.custom_schedule jsonb` para guardar las cuotas custom de un borrador hasta el desembolso (el diseño no nombraba dónde viven). `RecurringDefinitionPort.replaceSchedule` se implementó sobre `DefinitionsService.revise` (calendario explícito nuevo desde la vigencia; misma fecha ⇒ la ocurrencia conserva su identidad). `LoanPaymentRecorded.v1`/`LoanPaymentVoided.v1` relajan `installmentNos` a `minItems: 0` (un prepago no imputa a cuotas).
+- **5–6:** OpenAPI aditivo (`oasdiff` sin rupturas, Redocly y Spectral sin errores); UI en Deudas → Préstamo (sistema y tipo de tasa en el alta, pago extraordinario con vista previa comparada, cambio de tasa, cronograma propio, historial de versiones y de tasas) y Deudas → Simulador (`/debts/simulador`).
+- **Criterios de lectura:** la precondición de frontera del cambio de tasa usa "hoy" (no la vigencia) para las cuotas vencidas, para poder registrar vigencias futuras; la anulación de un prepago reaplica los cambios de tasa registrados después; un préstamo saldado por prepago conserva sus cuotas sin pagar en el cronograma pero informa principal pendiente 0.

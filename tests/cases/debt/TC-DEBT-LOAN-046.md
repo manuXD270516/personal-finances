@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: []
 requirement: 'Sistemas de amortización habilitados'
 scenario: 'Préstamo alemán registrado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-004']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/loan.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'german']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - 'El préstamo queda en borrador con una vista previa de cuotas decrecientes de 1120.00 a 1010.00 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-046 — El sistema alemán se acepta al registrar un préstamo
@@ -48,4 +50,4 @@ Entonces el préstamo queda en borrador con una vista previa de cuotas decrecien
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

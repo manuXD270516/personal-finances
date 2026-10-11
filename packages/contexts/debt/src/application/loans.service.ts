@@ -1,10 +1,12 @@
 import type { LifecyclePort } from '@pf/audit/contracts';
-import { DomainError, LocalDate, dec } from '@pf/shared-kernel';
+import { DomainError, LocalDate, dec, currency as makeCurrency } from '@pf/shared-kernel';
 import { DEBT_EVENTS } from '../contracts/index.js';
 import {
   Loan,
   validLoanName,
+  validateCustomSchedule,
   validateTerms,
+  type CustomRowInput,
   type LoanEdit,
   type LoanState,
   type ScheduleInstallment,
@@ -12,7 +14,7 @@ import {
 } from '../domain/index.js';
 import type { AccountInfo, DebtDeps, StoredInstallment } from './ports/index.js';
 import { loanChanges, loanEntry, loanSteps, publishLoanEvent } from './recorder.js';
-import { computeSchedule, toStored } from './schedule-support.js';
+import { computeSchedule, scheduleParameters, toCustomRow, toStored } from './schedule-support.js';
 import { toLoanView, type LoanView } from './views.js';
 
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `loan ${id} not found`);
@@ -35,6 +37,10 @@ export interface LoanTermsCommand {
   readonly frequency?: string | undefined;
   readonly termInstallments: number;
   readonly method?: string | undefined;
+  /** Solo `FIXED_PRINCIPAL`: principal de las cuotas anteriores a la última. */
+  readonly fixedPrincipalAmount?: MoneyInput | undefined;
+  /** Solo `CUSTOM`: las cuotas definidas (obligatorias en un préstamo en curso; en un borrador se pueden cargar después). */
+  readonly customSchedule?: readonly CustomRowInput[] | undefined;
   readonly disbursementDate: string;
   readonly firstDueDate: string;
   readonly charges?: unknown;
@@ -198,18 +204,8 @@ export class LoansService {
         scheduleVersion: 1,
         reason: 'INITIAL',
         effectiveFrom: s.existing?.asOf ?? s.disbursementDate,
-        parameters: {
-          method: s.method,
-          annualRate: s.annualRate,
-          dayCount: s.dayCount,
-          frequency: s.frequency,
-          termInstallments: s.termInstallments,
-          principal: s.principal,
-          firstDueDate: s.firstDueDate,
-          charges: s.charges,
-          installmentAmount: schedule.installmentAmount,
-          leveled: schedule.leveled,
-        },
+        fromInstallmentNo: s.existing?.nextInstallmentNo ?? 1,
+        parameters: scheduleParameters(s, schedule),
         createdBy: userId,
       },
       stored,
@@ -246,6 +242,7 @@ export class LoansService {
       loanId: loan.id,
       scheduleVersion: 1,
       reason: 'INITIAL' as const,
+      fromInstallmentNo: s.existing?.nextInstallmentNo ?? 1,
       effectiveFrom: s.existing?.asOf ?? s.disbursementDate,
       currency: s.currency,
       installments: installments.map((i) => ({
@@ -259,6 +256,49 @@ export class LoansService {
         total: i.total,
       })),
     };
+  }
+
+  /** `fixedPrincipalAmount` del contrato (`{amount, currency}`) → monto del dominio; otra moneda ⇒ `CURRENCY_MISMATCH`. */
+  private fixedPrincipalOf(
+    cmd: { readonly fixedPrincipalAmount?: MoneyInput | undefined },
+    code: string,
+  ): string | undefined {
+    const fixed = cmd.fixedPrincipalAmount;
+    if (fixed === undefined || fixed === null) return undefined;
+    if (fixed.currency !== code) {
+      throw new DomainError('CURRENCY_MISMATCH', 'the fixed principal must be in the loan currency').at(
+        '/fixedPrincipalAmount/currency',
+      );
+    }
+    return fixed.amount;
+  }
+
+  /** Cuotas custom del alta normalizadas por el validador (Σ principal exacto, fechas crecientes); `null` si no hay. */
+  private normalizeCustom(
+    cmd: { readonly customSchedule?: readonly CustomRowInput[] | undefined },
+    method: string,
+    code: string,
+    scale: number,
+    firstNo: number,
+    terms: { readonly principal: string; readonly disbursementDate: string },
+  ): readonly CustomRowInput[] | null {
+    const rows = cmd.customSchedule;
+    if (rows === undefined || rows.length === 0) return null;
+    if (method !== 'CUSTOM') {
+      throw new DomainError('VALIDATION_FAILED', 'custom installments need the CUSTOM method').at(
+        '/customSchedule',
+      );
+    }
+    const start = LocalDate.parse(terms.disbursementDate);
+    const installments = validateCustomSchedule({
+      currency: makeCurrency(code, scale),
+      expectedPrincipal: terms.principal,
+      after: start,
+      accrualStart: start,
+      firstInstallmentNo: firstNo,
+      rows,
+    });
+    return installments.map(toCustomRow);
   }
 
   // ───────────────────────────────────────────────────────────── registrar
@@ -298,6 +338,7 @@ export class LoansService {
         frequency: cmd.frequency,
         termInstallments: cmd.termInstallments,
         method: cmd.method,
+        fixedPrincipalAmount: this.fixedPrincipalOf(cmd, code),
         disbursementDate: origin === 'EXISTING' ? (asOf as string) : cmd.disbursementDate,
         firstDueDate: cmd.firstDueDate,
         charges: cmd.charges,
@@ -309,7 +350,15 @@ export class LoansService {
       // Valida condiciones (rangos, escala, método) antes de tocar cuentas.
       const loanId = deps.ids.next();
       validLoanName(cmd.name);
-      validateTerms(terms, origin);
+      const validated = validateTerms(terms, origin);
+      const customSchedule = this.normalizeCustom(
+        cmd,
+        validated.method,
+        code,
+        scale,
+        cmd.existing?.nextInstallmentNo ?? 1,
+        terms,
+      );
       if (cmd.lenderCounterpartyId) {
         await deps.counterparties.assertUsable(cmd.userId, workspaceId, cmd.lenderCounterpartyId);
       }
@@ -372,7 +421,15 @@ export class LoansService {
 
       const loan =
         origin === 'NEW'
-          ? Loan.register({ ...terms, accountId, id: loanId, workspaceId, at, by: cmd.userId })
+          ? Loan.register({
+              ...terms,
+              accountId,
+              id: loanId,
+              workspaceId,
+              at,
+              by: cmd.userId,
+              customSchedule,
+            })
           : Loan.registerExisting({
               ...terms,
               accountId,
@@ -381,8 +438,13 @@ export class LoansService {
               nextInstallmentNo: cmd.existing!.nextInstallmentNo,
               at,
               by: cmd.userId,
+              customSchedule,
             });
-      const schedule = computeSchedule(loan.snapshot, scale);
+      // Un borrador custom sin cuotas aún no tiene cronograma que calcular (se carga con el PUT custom-schedule).
+      const schedule =
+        origin === 'NEW' && validated.method === 'CUSTOM' && customSchedule === null
+          ? null
+          : computeSchedule(loan.snapshot, scale);
 
       if (origin === 'NEW') {
         await deps.loans.insert(loan);
@@ -398,17 +460,23 @@ export class LoansService {
       }
 
       // En curso: compromiso de cuotas, cronograma v1 y alta activa en la misma unidad.
-      const definition = await this.createCommitment(workspaceId, cmd.userId, loan, schedule.installments);
+      const existingSchedule = schedule as AmortizationSchedule;
+      const definition = await this.createCommitment(
+        workspaceId,
+        cmd.userId,
+        loan,
+        existingSchedule.installments,
+      );
       const restored = loan;
       restored.attachCommitment(definition.definitionId);
       await deps.loans.insert(restored);
       restored.markPersisted();
-      await this.persistSchedule(workspaceId, restored, schedule, cmd.userId);
+      await this.persistSchedule(workspaceId, restored, existingSchedule, cmd.userId);
       const event = await publishLoanEvent(
         deps,
         restored,
         DEBT_EVENTS.loanScheduleGenerated,
-        this.scheduleGenerated(restored, schedule.installments, workspaceId),
+        this.scheduleGenerated(restored, existingSchedule.installments, workspaceId),
       );
       await this.lifecycle.record(
         loanEntry(restored, 'registered', loanChanges(null, restored.snapshot)),
