@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: ['debt/loans']
 requirement: 'Cuotas de préstamo administradas por el contexto de deudas'
 scenario: 'Aprobar una cuota desde recurrentes'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-011', 'FR-COMMITMENTS-008']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/commitments/src/application/loan-payment.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['commitments', 'loans']

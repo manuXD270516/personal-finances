@@ -140,6 +140,7 @@ interface VersionRow {
   indexed_amount: string | null;
   indexed_currency: string | null;
   indexed_scale: number | null;
+  explicit_schedule: DefinitionVersion['schedule']['explicit'] | null;
 }
 
 const VERSION_COLUMNS = sql`
@@ -148,7 +149,8 @@ const VERSION_COLUMNS = sql`
   v.category_id, v.counterparty_id, v.tag_ids::text[] AS tag_ids, v.payment_method, v.cadence, v.interval,
   v.month_days AS month_days, v.rrule, v.dtstart::text AS dtstart, v.until_date::text AS until_date,
   v.max_count, v.weekend_adjustment, v.materialization_mode, v.auto_create_status, v.lead_days,
-  v.indexed_amount::text AS indexed_amount, v.indexed_currency, ic.scale AS indexed_scale`;
+  v.indexed_amount::text AS indexed_amount, v.indexed_currency, ic.scale AS indexed_scale,
+  v.explicit_schedule AS explicit_schedule`;
 
 const toVersion = (r: VersionRow): DefinitionVersion => {
   const scale = Number(r.scale);
@@ -177,6 +179,7 @@ const toVersion = (r: VersionRow): DefinitionVersion => {
       endDate: r.until_date,
       maxOccurrences: r.max_count === null ? null : Number(r.max_count),
       weekendAdjustment: r.weekend_adjustment,
+      ...(r.cadence === 'EXPLICIT' ? { explicit: r.explicit_schedule ?? [] } : {}),
     },
     materialization: {
       mode: r.materialization_mode,
@@ -205,7 +208,7 @@ async function insertVersions(
         (workspace_id, definition_id, version_no, effective_from, account_id, to_account_id, currency, amount_type,
          amount, amount_min, amount_max, category_id, counterparty_id, tag_ids, payment_method, cadence, interval,
          month_days, rrule, dtstart, until_date, max_count, weekend_adjustment, materialization_mode,
-         auto_create_status, lead_days, indexed_amount, indexed_currency, created_by)
+         auto_create_status, lead_days, indexed_amount, indexed_currency, explicit_schedule, created_by)
       VALUES (${s.workspaceId}, ${s.id}, ${v.versionNo}, ${v.effectiveFrom}::date, ${v.accountId}::uuid,
               ${v.toAccountId}::uuid, ${v.currency}, ${v.amount.type}, ${v.amount.amount}::numeric,
               ${v.amount.min}::numeric, ${v.amount.max}::numeric, ${v.categoryId}::uuid, ${v.counterpartyId}::uuid,
@@ -213,9 +216,9 @@ async function insertVersions(
               ${JSON.stringify(v.schedule.monthDays)}::jsonb, ${v.schedule.rrule}, ${v.schedule.startDate}::date,
               ${v.schedule.endDate}::date, ${v.schedule.maxOccurrences}, ${v.schedule.weekendAdjustment},
               ${v.materialization.mode}, ${v.materialization.autoCreateStatus}, ${v.materialization.leadDays},
-              ${v.indexedPrice?.amount ?? null}::numeric, ${v.indexedPrice?.currency ?? null}, ${s.updatedBy}::uuid)`.execute(
-      db(),
-    );
+              ${v.indexedPrice?.amount ?? null}::numeric, ${v.indexedPrice?.currency ?? null},
+              ${v.schedule.cadence === 'EXPLICIT' ? JSON.stringify(v.schedule.explicit ?? []) : null}::jsonb,
+              ${s.updatedBy}::uuid)`.execute(db());
   }
 }
 
@@ -378,6 +381,8 @@ interface OccurrenceRow {
   resolved_by: string | null;
   last_auto_create_error: string | null;
   last_auto_create_on: string | null;
+  schedule_key: string | null;
+  shares_transaction: boolean;
   version: number;
   created_at: string;
 }
@@ -390,7 +395,7 @@ const OCCURRENCE_COLUMNS = sql`
   o.skip_reason,
   CASE WHEN o.resolved_at IS NULL THEN NULL
        ELSE to_char(o.resolved_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END AS resolved_at,
-  o.resolved_by, o.last_auto_create_error, o.last_auto_create_on::text AS last_auto_create_on, o.version,
+  o.resolved_by, o.last_auto_create_error, o.last_auto_create_on::text AS last_auto_create_on, o.schedule_key, o.shares_transaction, o.version,
   to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`;
 
 const toOccurrenceState = (r: OccurrenceRow): OccurrenceState => {
@@ -421,6 +426,8 @@ const toOccurrenceState = (r: OccurrenceRow): OccurrenceState => {
     resolvedBy: r.resolved_by,
     lastAutoCreateError: r.last_auto_create_error,
     lastAutoCreateOn: r.last_auto_create_on,
+    scheduleKey: r.schedule_key,
+    sharesTransaction: r.shares_transaction,
     version: Number(r.version),
     createdAt: r.created_at,
   };
@@ -490,6 +497,8 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
           resolved_by: s.resolvedBy,
           last_auto_create_error: s.lastAutoCreateError,
           last_auto_create_on: s.lastAutoCreateOn,
+          schedule_key: s.scheduleKey,
+          shares_transaction: s.sharesTransaction,
           version: s.version,
           created_at: s.createdAt,
         };
@@ -679,7 +688,7 @@ export class PgOccurrenceRepository implements OccurrenceRepository {
         FROM commitments.recurring_occurrence o
         JOIN commitments.recurring_definition d ON d.workspace_id = o.workspace_id AND d.id = o.definition_id
        WHERE o.workspace_id = ${workspaceId} AND o.status IN ('MATERIALIZED', 'MATCHED')
-         AND d.kind <> 'INCOME' AND o.due_date BETWEEN ${from}::date AND ${to}::date
+         AND d.kind NOT IN ('INCOME', 'LOAN_PAYMENT') AND o.due_date BETWEEN ${from}::date AND ${to}::date
        ORDER BY o.due_date, o.id`.execute(db());
     return rows.map((r) => ({
       occurrenceId: r.id,

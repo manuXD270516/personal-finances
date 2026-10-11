@@ -6,7 +6,12 @@ import {
   type RecurrenceRule,
 } from '@pf/shared-kernel';
 import type { AmountSpec } from './amount-spec.js';
-import { ruleOfSchedule, type DefinitionVersion, type IndexedPrice } from './definition-version.js';
+import {
+  explicitItemsOf,
+  ruleOfSchedule,
+  type DefinitionVersion,
+  type IndexedPrice,
+} from './definition-version.js';
 import type { OccurrenceState } from './recurring-occurrence.js';
 
 /** Ocurrencia que la regla produce para una ventana (aún no persistida). */
@@ -18,6 +23,8 @@ export interface Candidate {
   readonly currency: string;
   /** Si la versión indexa el precio, la aplicación estima el monto con la tasa vigente al generar. */
   readonly indexedPrice?: IndexedPrice;
+  /** Clave del ítem de un calendario explícito (en préstamos, el número de cuota). */
+  readonly scheduleKey?: string;
 }
 
 export interface GeneratorSource {
@@ -60,6 +67,22 @@ export function candidates(source: GeneratorSource, window: DateWindow): Candida
     let hi = window.to.compare(to) < 0 ? window.to : to;
     if (cap !== null && cap.compare(hi) < 0) hi = cap;
     if (hi.compare(lo) < 0) continue;
+    if (version.schedule.cadence === 'EXPLICIT') {
+      // Calendario explícito (N3): un candidato por ítem dentro de la ventana; monto FIXED del ítem, sin ajustes.
+      for (const item of explicitItemsOf(version.schedule)) {
+        const date = LocalDate.parse(item.dueDate);
+        if (date.compare(lo) < 0 || date.compare(hi) > 0) continue;
+        out.push({
+          occurrenceDate: date,
+          dueDate: date,
+          versionNo: version.versionNo,
+          expected: { type: 'FIXED', amount: item.amount, min: null, max: null },
+          currency: version.currency,
+          scheduleKey: item.key,
+        });
+      }
+      continue;
+    }
     const rule: RecurrenceRule = ruleOfSchedule(version.schedule);
     lo = lo.compare(rule.dtstart) < 0 ? rule.dtstart : lo;
     for (const date of expandRecurrence(rule, { from: lo, to: hi })) {
@@ -84,6 +107,15 @@ export function seriesEnd(
   source: GeneratorSource,
 ): { readonly finite: false } | { readonly finite: true; readonly last: LocalDate | null } {
   const latest = source.versions.reduce((a, b) => (b.versionNo > a.versionNo ? b : a));
+  if (latest.schedule.cadence === 'EXPLICIT') {
+    const cap = source.endDate;
+    const dates = explicitItemsOf(latest.schedule)
+      .map((i) => i.dueDate)
+      .filter((d) => cap === null || d <= cap)
+      .sort();
+    const last = dates.at(-1);
+    return { finite: true, last: last ? LocalDate.parse(last) : null };
+  }
   const rule = ruleOfSchedule(latest.schedule);
   const cap = source.endDate ? LocalDate.parse(source.endDate) : null;
   let bound: LocalDate | null = rule.until;

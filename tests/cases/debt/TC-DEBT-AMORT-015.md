@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cargar la tabla del banco como referencia'
 scenario: 'Tabla del banco pegada desde la planilla'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-003', 'FR-DEBT-006']
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/debt/src/domain/reference-schedule-parser.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'reference', 'exit-criterion']

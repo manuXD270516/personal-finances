@@ -233,6 +233,16 @@ export interface Transaction {
   readonly legs: readonly TransactionLeg[];
   readonly splits: readonly TransactionSplit[];
   readonly conversion?: ConversionDetail | null;
+  /** Préstamo que administra la transacción (`LOAN_DISBURSEMENT` / `LOAN_PAYMENT`, add-loans). */
+  readonly loanId?: string | null;
+  /** Desglose de un `LOAN_PAYMENT`: el principal reduce la deuda; el resto es gasto. */
+  readonly loanPaymentBreakdown?: {
+    readonly principal: Money;
+    readonly interest: Money;
+    readonly fees: Money;
+    readonly insurance: Money;
+    readonly taxes: Money;
+  } | null;
   readonly source: string;
   readonly revision: number;
   readonly voidedAt?: string | null;

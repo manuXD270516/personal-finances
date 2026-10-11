@@ -172,6 +172,14 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
           ) : null}
         </p>
       ) : null}
+      {def.managedBy === 'DEBT' ? (
+        <p role="note" data-testid="managed-by-debt">
+          <span aria-hidden="true">ℹ</span> {f.t('loan.definitionManaged')}{' '}
+          <a href={ctx.href(def.managedRef ? `/debts/${def.managedRef}` : '/debts')}>
+            {f.t('loan.openLoan')}
+          </a>
+        </p>
+      ) : null}
       {def.description ? <p style={{ margin: 0 }}>{def.description}</p> : null}
       {def.notes ? <p style={mutedStyle}>{def.notes}</p> : null}
       {status ? (
@@ -182,7 +190,7 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
       {revision ? <RevisionResult result={revision} f={f} /> : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
-      {ctx.canEdit ? (
+      {ctx.canEdit && def.managedBy !== 'DEBT' ? (
         <div style={rowStyle} role="group" aria-label={f.t('detail.actions')}>
           {def.status === 'ACTIVE' ? (
             <button

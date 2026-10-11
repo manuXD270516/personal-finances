@@ -20,8 +20,11 @@ import type {
   UnitOfWork,
 } from '../application/ports/index.js';
 import {
+  LoanPaymentBreakdown,
   normalizeText,
   Transaction,
+  type LoanPaymentBreakdownJson,
+  type LoanSystemCategoryCode,
   type CustomFieldValue,
   type AccountNature,
   type ConversionDetail,
@@ -63,6 +66,8 @@ interface TxnDb {
     source: TransactionSource;
     external_ref_namespace: string | null;
     external_ref_id: string | null;
+    /** `jsonb`: el driver lo devuelve parseado; se escribe como texto JSON. */
+    loan_payment_breakdown: LoanPaymentBreakdownJson | string | null;
     refund_of_transaction_id: string | null;
     adjustment_reason: string | null;
     confirmed_refund_excess: boolean;
@@ -163,6 +168,7 @@ const txColumns = [
   't.reconciliation_id',
   't.reconciliation_mode',
   't.import_job_id',
+  't.loan_payment_breakdown',
   't.revision',
   't.active_entry_id',
   't.void_reason',
@@ -176,6 +182,16 @@ const txColumns = [
   iso('t.updated_at').as('updated_at'),
   'c.scale',
 ] as const;
+
+/** Desglose de un pago de préstamo desde la columna `jsonb` (objeto ya parseado por el driver, o texto). */
+function breakdownOf(
+  raw: LoanPaymentBreakdownJson | string | null,
+  currency: Currency,
+): LoanPaymentBreakdown | null {
+  if (raw === null || raw === undefined) return null;
+  const json = typeof raw === 'string' ? (JSON.parse(raw) as LoanPaymentBreakdownJson) : raw;
+  return LoanPaymentBreakdown.fromJson(json, currency);
+}
 
 const searchText = (s: TransactionState): string => normalizeText(`${s.description ?? ''} ${s.notes ?? ''}`);
 
@@ -204,6 +220,7 @@ function txRow(s: TransactionState): Omit<TxnDb['txn.transaction'], 'created_at'
     reconciliation_id: s.reconciliationId,
     reconciliation_mode: s.reconciliationMode,
     import_job_id: s.importJobId,
+    loan_payment_breakdown: s.loanPaymentBreakdown ? JSON.stringify(s.loanPaymentBreakdown.toJson()) : null,
     revision: s.revision,
     active_entry_id: s.activeEntryId,
     voided_at: s.voidedAt,
@@ -432,6 +449,27 @@ export class PgTransactionRepository implements TransactionRepository {
       .select(txColumns)
       .where('t.workspace_id', '=', workspaceId)
       .where('t.id', '=', id);
+    if (options.forUpdate) q = q.forUpdate('t');
+    const row = await q.executeTakeFirst();
+    if (!row) return null;
+    return (await this.hydrate(workspaceId, [row as TxRow]))[0] ?? null;
+  }
+
+  async findByExternalRef(
+    workspaceId: string,
+    ref: { readonly namespace: string; readonly id: string },
+    options: { readonly forUpdate?: boolean } = {},
+  ): Promise<Transaction | null> {
+    let q = db()
+      .selectFrom('txn.transaction as t')
+      .innerJoin('fx.currency as c', 'c.code', 't.currency')
+      .select(txColumns)
+      .where('t.workspace_id', '=', workspaceId)
+      .where('t.external_ref_namespace', '=', ref.namespace)
+      .where('t.external_ref_id', '=', ref.id)
+      .where('t.status', '<>', 'VOIDED')
+      .orderBy('t.created_at', 'desc')
+      .limit(1);
     if (options.forUpdate) q = q.forUpdate('t');
     const row = await q.executeTakeFirst();
     if (!row) return null;
@@ -988,6 +1026,7 @@ export class PgTransactionRepository implements TransactionRepository {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
         conversion: conversions.get(r.id)?.at(-1)?.detail ?? null,
+        loanPaymentBreakdown: breakdownOf(r.loan_payment_breakdown, ccy),
       });
     });
   }
@@ -1023,6 +1062,10 @@ export class ClassificationCategoryLookup implements CategoryLookupPort {
 
   fees(workspaceId: string): Promise<string | null> {
     return this.lookup.systemCategoryId({ userId: actorUserId(), workspaceId, systemCode: 'FEES' });
+  }
+
+  loanExpense(workspaceId: string, systemCode: LoanSystemCategoryCode): Promise<string | null> {
+    return this.lookup.systemCategoryId({ userId: actorUserId(), workspaceId, systemCode });
   }
 
   withDescendants(workspaceId: string, categoryIds: readonly string[]): Promise<string[]> {

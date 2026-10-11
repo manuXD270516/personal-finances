@@ -65,11 +65,23 @@ export const OCCURRENCE_ACTIONS: readonly OccurrenceAction[] = ['approve', 'link
 
 /** Acciones disponibles de una ocurrencia: solo un EDITOR/OWNER y solo si no está resuelta (D114: también `NOTIFY_ONLY`). */
 export function availableOccurrenceActions(
-  occurrence: Pick<RecurringOccurrence, 'status'>,
+  occurrence: Pick<RecurringOccurrence, 'status'> & Partial<Pick<RecurringOccurrence, 'kind' | 'managedBy'>>,
   canEdit: boolean,
 ): readonly OccurrenceAction[] {
+  // Las cuotas de un préstamo las administra el préstamo (409 RECURRING_MANAGED_EXTERNALLY): solo "Registrar pago".
+  if (isLoanInstallment(occurrence)) return [];
   return canEdit && isUnresolved(occurrence.status) ? OCCURRENCE_ACTIONS : [];
 }
+
+/** Ocurrencia de una cuota de préstamo (`kind = LOAN_PAYMENT`, definición administrada por Deudas). */
+export const isLoanInstallment = (o: Partial<Pick<RecurringOccurrence, 'kind' | 'managedBy'>>): boolean =>
+  o.kind === 'LOAN_PAYMENT' || o.managedBy === 'DEBT';
+
+/** ¿Ofrece "Registrar pago"? Solo EDITOR/OWNER y mientras la cuota no esté resuelta. */
+export const canRegisterLoanPayment = (
+  o: Pick<RecurringOccurrence, 'status'> & Partial<Pick<RecurringOccurrence, 'kind' | 'managedBy'>>,
+  canEdit: boolean,
+): boolean => canEdit && isLoanInstallment(o) && isUnresolved(o.status);
 
 // ───────────────────────────── Montos ─────────────────────────────
 

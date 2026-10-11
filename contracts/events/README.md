@@ -53,6 +53,12 @@ contracts/events/
 ├─ imports/                             # add-basic-csv-import (importación CSV; nunca eventos por fila, docs/33 D112)
 │  ├─ ImportApproved.v1.schema.json     # aprobación o reintento: lo consume el worker (imports.persist)
 │  └─ ImportCompleted.v1.schema.json    # fin con COMPLETED, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS (sin consumidores obligatorios en Phase 3)
+├─ debt/                                # add-loans (préstamos; sin consumidores obligatorios en Phase 4)
+│  ├─ LoanDisbursed.v1.schema.json      # desembolso: principal, comisión retenida y transacción
+│  ├─ LoanScheduleGenerated.v1.schema.json  # cronograma fijado (v1 INITIAL) con todas sus cuotas
+│  ├─ LoanPaymentRecorded.v1.schema.json    # pago con desglose, cuotas imputadas y principal pendiente
+│  ├─ LoanPaymentVoided.v1.schema.json      # anulación del último pago (nuevo respecto de docs/11)
+│  └─ LoanPaidOff.v1.schema.json            # principal pendiente en cero: préstamo saldado
 ├─ fx/
 │  └─ RateRecorded.v1.schema.json
 └─ ledger/

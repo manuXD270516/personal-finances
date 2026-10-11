@@ -7,6 +7,7 @@ import { DefinitionsService } from './definitions.service.js';
 import { GenerateOccurrencesService } from './generate-occurrences.service.js';
 import { MatchingService } from './matching.service.js';
 import { OccurrencesService } from './occurrences.service.js';
+import { EngineRecurringDefinitionPort } from './recurring-definition-port.js';
 import { SubscriptionDailyService } from './subscription-daily.service.js';
 import { SubscriptionsQueries } from './subscriptions.queries.js';
 import { SubscriptionsService } from './subscriptions.service.js';
@@ -327,5 +328,61 @@ describe('Contrato de los hechos de commitments', () => {
     expect(validate({ ...payload, score: 85 })).toBe(false);
     expect(validate({ ...payload, score: '85.5' })).toBe(false);
     expect(validate({ ...payload, amountDelta: { amount: 0, currency: 'BOB' } })).toBe(false);
+  });
+  it('[TC-DEBT-LOAN-035] los hechos de una cuota de préstamo (generar, resolver, devolver, editar, terminar) cumplen su JSON Schema', async () => {
+    const mem = new InMemoryCommitments();
+    mem.setNow('2026-11-14T16:00:00Z');
+    const deps = mem.deps();
+    const port = new EngineRecurringDefinitionPort(deps, new DefinitionsService(deps));
+    const { definitionId } = await port.createManaged({
+      workspaceId: WS,
+      userId: USER,
+      managedBy: 'DEBT',
+      managedRef: '0190a000-0000-7000-8000-0000000d0001',
+      name: 'Préstamo vehicular',
+      kind: 'LOAN_PAYMENT',
+      accountId: BANK,
+      currency: 'BOB',
+      explicitSchedule: [
+        { key: '1', dueDate: '2026-11-15', amount: '2342.02' },
+        { key: '2', dueDate: '2026-12-15', amount: '2342.02' },
+      ],
+      materialization: 'NOTIFY_ONLY',
+    });
+    const txn = mem.addTransaction({
+      kind: 'LOAN_PAYMENT',
+      accountId: BANK,
+      amount: { amount: '2342.02', currency: 'BOB' },
+      businessDate: '2026-11-15',
+    });
+    await port.settle({ workspaceId: WS, userId: USER, definitionId, keys: ['1'], transactionId: txn });
+    await port.setExpected({ workspaceId: WS, userId: USER, definitionId, key: '2', amount: '372.02' });
+    mem.setNow('2026-11-20T16:00:00Z');
+    await port.unsettle({ workspaceId: WS, userId: USER, definitionId, keys: ['1'] });
+    await port.end({ workspaceId: WS, userId: USER, definitionId, from: '2026-12-15' });
+    const checks = validators();
+    const seen = new Set<string>();
+    for (const event of mem.events) {
+      const validate = checks.get(event.eventType);
+      if (!validate) continue;
+      seen.add(event.eventType);
+      expect(validate(event.payload), `${event.eventType}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+    expect([...seen].sort()).toEqual([
+      'commitments.OccurrencesGenerated',
+      'commitments.RecurringDefinitionChanged',
+      'commitments.RecurringOccurrenceChanged',
+      'commitments.RecurringOccurrenceMaterialized',
+    ]);
+    // los ejemplos con LOAN_PAYMENT cumplen el envelope completo
+    const ajv = new Ajv2020({ strict: true, allErrors: true });
+    addFormats(ajv);
+    ajv.addSchema(load('envelope.v1.schema.json'));
+    const schema = load(FILES['commitments.OccurrencesGenerated'] as string);
+    ajv.addSchema(schema);
+    const full = ajv.compile({ $ref: String(schema['$id']) });
+    for (const example of schema['examples'] as unknown[]) {
+      expect(full(example), JSON.stringify(full.errors)).toBe(true);
+    }
   });
 });

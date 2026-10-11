@@ -44,6 +44,12 @@ import {
 const notFound = (what: string, id: string) =>
   new DomainError('RESOURCE_NOT_FOUND', `${what} ${id} not found`);
 
+/** Nombre visible de la ocurrencia: una cuota de préstamo lleva su número ("Préstamo vehicular — cuota 1"). */
+const nameOf = (v: OccurrenceView): string =>
+  v.kind === 'LOAN_PAYMENT' && v.occurrence.scheduleKey
+    ? `${v.definitionName} — cuota ${v.occurrence.scheduleKey}`
+    : v.definitionName;
+
 const UNRESOLVED: readonly OccurrenceStatus[] = ['SCHEDULED', 'DUE', 'OVERDUE'];
 
 /** `CommittedAmount` del contrato HTTP. */
@@ -289,7 +295,7 @@ export class CommitmentsQueries
         source: 'OCCURRENCE',
         id: o.id,
         definitionId: o.definitionId,
-        name: v.definitionName,
+        name: nameOf(v),
         kind: v.kind,
         date: o.dueDate,
         amount: projected === null ? null : money(projected, o.currency),
@@ -441,8 +447,9 @@ export class CommitmentsQueries
           return {
             occurrenceId: o.id,
             definitionId: o.definitionId,
-            definitionName: v.definitionName,
+            definitionName: nameOf(v),
             kind: v.kind,
+            ...(o.scheduleKey ? { scheduleKey: o.scheduleKey } : {}),
             occurrenceDate: o.occurrenceDate,
             dueDate: o.dueDate,
             status: o.status as 'SCHEDULED' | 'DUE' | 'OVERDUE',

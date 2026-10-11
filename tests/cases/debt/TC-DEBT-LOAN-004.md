@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: ['accounts/account-management']
 requirement: 'Cuenta del préstamo y cuenta destino'
 scenario: 'Cuenta del préstamo creada en el mismo acto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-001']
 nfr: []
 invariants: ['INV-030']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/accounts/src/application/account-provisioning.adapter.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'accounts']

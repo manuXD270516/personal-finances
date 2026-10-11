@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/loan-reference-rows.schema.json",
+  "title": "pfos-export v1 — loan-reference-rows",
+  "description": "Registro de la sección «loan-reference-rows» (tabla debt.loan_reference_row, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference_id",
+    "workspace_id",
+    "installment_no",
+    "due_date",
+    "principal",
+    "interest",
+    "fees",
+    "insurance",
+    "taxes",
+    "total",
+    "balance"
+  ],
+  "properties": {
+    "reference_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "installment_no": {
+      "type": "integer"
+    },
+    "due_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "principal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "interest": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "fees": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "insurance": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "taxes": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "total": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "balance": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    }
+  },
+  "x-pfos-table": "debt.loan_reference_row",
+  "x-pfos-context": "debt"
+}

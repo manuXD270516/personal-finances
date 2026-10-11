@@ -24,8 +24,10 @@ interface FlowRow {
  * `INCOME:*`/`EXPENSE:*` del ledger (cada posting nominal lleva el `split_id` de su porción, FR-LEDGER-008), leído en
  * el schema dueño de los splits sin joins cross-schema:
  *   INCOME → ingreso (+); EXPENSE → gasto (+); REFUND → gasto (−, en la fecha del reembolso);
- *   TRANSFER / CONVERSION → solo sus porciones de comisión (gasto +, categoría *Fees*); ADJUSTMENT no tiene porciones.
- * El principal de transferencias y conversiones, los saldos iniciales y los ajustes nunca son flujo (docs/14 §4.3).
+ *   TRANSFER / CONVERSION → solo sus porciones de comisión (gasto +, categoría *Fees*); ADJUSTMENT no tiene porciones;
+ *   LOAN_PAYMENT / LOAN_DISBURSEMENT (add-loans) → sus porciones (interés, comisiones, seguro, impuestos, comisión
+ *   retenida: gasto +); el principal no es flujo.
+ * El principal de transferencias, conversiones y préstamos, los saldos iniciales y los ajustes nunca son flujo (docs/14 §4.3).
  */
 export class PgNominalFlowQuery implements NominalFlowQuery {
   constructor(
@@ -68,7 +70,7 @@ export class PgNominalFlowQuery implements NominalFlowQuery {
           ${tagJoin}
          WHERE t.workspace_id = ${input.workspaceId}
            AND t.status IN ('POSTED', 'CLEARED', 'RECONCILED')
-           AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND', 'TRANSFER', 'CONVERSION')
+           AND t.kind IN ('INCOME', 'EXPENSE', 'REFUND', 'TRANSFER', 'CONVERSION', 'LOAN_DISBURSEMENT', 'LOAN_PAYMENT')
            AND t.transaction_date BETWEEN ${from}::date AND ${to}::date
            ${categoryFilter}
          GROUP BY 1, 2, 3, 4, 5

@@ -231,7 +231,7 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 - **DS**: `TransactionPostingTranslator` (Transaction → JournalEntryDraft; implementa todo el mapeo de [09 §6](09-ledger-design.md)), `SplitAllocator` (largest remainder), `ConversionCalculator` (effective rate, spread, validaciones), `DuplicateDetector`, `TransferMatcher` (empareja dos transacciones importadas como una transferencia), `ReconciliationService`.
 - **Repos**: `TransactionRepository`, `ReconciliationRepository`, `DuplicateCandidateRepository`.
 - **Ports**: `LedgerPostingPort` (sync), `AccountDirectory` (Accounts query), `ClassificationValidator` (Classification query), `ReferenceRateProvider` (FX query), `AuditPort`, `Clock`, `IdGenerator`.
-- **Comandos** (públicos; algunos invocados por Debt/Goals/Commitments/Imports/Rules): `RecordTransaction` (income/expense con splits), `RecordTransfer`, `RecordConversion`, `RecordRefund`, `RecordAdjustment`, `RecordOpeningBalance`, `RecordLoanDisbursement`, `RecordLoanPayment`, `PostTransaction` (pending→posted), `ClearTransaction`, `AmendTransaction`, `VoidTransaction`, `ApplyClassification` (categoría/tags/custom fields/contraparte por split, con `appliedBy: USER|RULE|IMPORT`), `BulkEditTransactions`, `StartReconciliation`, `ToggleClearedInSession`, `CompleteReconciliation` (con ajuste opcional), `CancelReconciliation`, `ReconcileWithoutStatement` (marcado directo con modo explícito, D74), `UnreconcileTransaction`, `ResolveDuplicate` (confirm/dismiss/merge), `LinkAsTransfer`, `ImportTransactions` (batch con fingerprints, usado por Imports).
+- **Comandos** (públicos; algunos invocados por Debt/Goals/Commitments/Imports/Rules): `RecordTransaction` (income/expense con splits), `RecordTransfer`, `RecordConversion`, `RecordRefund`, `RecordAdjustment`, `RecordOpeningBalance`, `RecordLoanDisbursement`, `RecordLoanPayment` (as-built `add-loans`: solo se invocan por el puerto `LoanTransactionsPort` —`recordDisbursement`, `recordPayment`, `voidManaged`— y producen transacciones **administradas** `source = DEBT`; `RecordTransaction` rechaza esos kinds con `VALIDATION_FAILED` y la edición financiera o anulación por la API de transacciones responde `TRANSACTION_MANAGED_EXTERNALLY`, 409, `details {managedBy: 'DEBT', loanId}`), `PostTransaction` (pending→posted), `ClearTransaction`, `AmendTransaction`, `VoidTransaction`, `ApplyClassification` (categoría/tags/custom fields/contraparte por split, con `appliedBy: USER|RULE|IMPORT`), `BulkEditTransactions`, `StartReconciliation`, `ToggleClearedInSession`, `CompleteReconciliation` (con ajuste opcional), `CancelReconciliation`, `ReconcileWithoutStatement` (marcado directo con modo explícito, D74), `UnreconcileTransaction`, `ResolveDuplicate` (confirm/dismiss/merge), `LinkAsTransfer`, `ImportTransactions` (batch con fingerprints, usado por Imports).
 - **Queries**: `GetTransaction`, `ListTransactions(filters, cursor)`, `SearchTransactions`, `GetReconciliation` (saldo confirmado y diferencia en vivo), `ListReconciliations`, `ReconciliationStatusQuery.getCoverage({workspaceId, accountIds, from?, through})` (contrato público para PLANNING, D111), `ListDuplicateCandidates`, `CountPendingInPeriod(yearMonth)`.
 - **Eventos**: `TransactionCreated`, `TransactionUpdated`, `TransactionPosted`, `TransactionVoided`, `TransactionCategorized`, `TransferCompleted`, `TransferRevised`, `ConversionRecorded`, `ConversionRevised`, `TransactionCleared`, `ReconciliationCompleted`, `DuplicateDetected`.
 - **Invariantes**: INV-002, 003, 009, 010, 012, 016, 021, 023, 024, 026, 027, 033; además: transfer requiere misma moneda y cuentas distintas; conversión requiere monedas distintas; legs de cuentas con su moneda; `reconciled` ⇒ campos financieros inmutables; `REFUND` no puede exceder el original (advertencia, no bloqueo).
@@ -294,14 +294,15 @@ Convenciones: **AR** = aggregate root, **E** = entidad, **VO** = value object, *
 
 ### 3.9 DEBT — Debt & Credit (`debt`)
 
-- **AR `Loan`**: `id, liabilityAccountId, disbursementAccountId, lenderCounterpartyId?, principal: Money, annualRate: Percentage, rateType (FIXED|VARIABLE), method (FRENCH|GERMAN|BULLET|CUSTOM), termMonths, firstDueDate, paymentDayRule, recurringCharges: VO (insurance, fees, taxes por cuota), status, installments: E LoanInstallment[] (n, dueDate, principal, interest, fees, insurance, taxes, total, status (PLANNED|DUE|PAID|PARTIALLY_PAID|OVERDUE), paymentTransactionIds[]), scheduleVersion`.
+- **AR `Loan`** (as-built `add-loans`): `id, name, liabilityAccountId, disbursementAccountId, paymentAccountId, lenderCounterpartyId?, principal: Money, annualRate: Percentage (fracción decimal, `"0.115"`), rateType (FIXED|VARIABLE), dayCount (30/360|ACT/360|ACT/365), frequency, termInstallments, method (FRENCH disponible; GERMAN|FIXED_PRINCIPAL|CUSTOM reservados para `add-loan-amortization-advanced`; `FIXED_PRINCIPAL` reemplaza a `BULLET`, que FR-DEBT-004 no pide), disbursementDate, firstDueDate, charges: VO (insurance, fees, taxes por cuota, modo `FIXED|RATE_ON_BALANCE`), origin (NEW|EXISTING), status (DRAFT|ACTIVE|PAID_OFF|CANCELLED), currentScheduleVersion, recurringDefinitionId?, disbursementTransactionId?`. El cronograma es **versionado e inmutable** (`LoanInstallment`: n, dueDate, principal, interest, fees, insurance, taxes, total, saldos inicial y final, por `scheduleVersion`); el estado de pago **no** vive en la cuota: se deriva de las imputaciones de pagos vigentes (`UNPAID|PARTIALLY_PAID|PAID`, `PAID` cuando Σ principal imputado ≥ principal esperado) y `DUE`/`OVERDUE` se derivan del vencimiento contra hoy en la zona del workspace (sin job).
+- **Entidades de Debt** (as-built): `LoanPayment` (pago vigente o anulado, una transacción por pago, desglose principal/interés/comisiones/seguro/impuestos), imputación por cuota y componente, `ReferenceSchedule` (tabla del banco cargada; solo se guardan las filas) y `ScheduleComparison` (referencia × versión del cronograma, estado `MATCH|UNEXPLAINED|EXPLAINED`, `scheduleVersion = 0` para la vista previa de un borrador).
 - **AR `CreditCardProfile`**: `id, accountId (LIABILITY), creditLimit: Money, statementDay, dueDay, minimumPaymentRule, gracePeriodDays`.
 - **AR `CardStatement`**: `id, cardProfileId, period: DateRange, closingBalance, minimumDue, dueDate, status (OPEN|ISSUED|PAID|PARTIALLY_PAID|OVERDUE)`.
-- **DS**: `AmortizationCalculator` (francés/alemán/bullet con HALF_EVEN y residuo en última cuota), `PaymentAllocator` (orden: impuestos → seguro → fees → interés → principal, configurable), `ScheduleRecalculator` (prepagos, cambio de tasa ⇒ nueva `scheduleVersion`).
-- **Repos**: uno por AR. **Ports**: `TransactionsCommandPort` (sync), `BalanceQuery`, `Clock`.
-- **Comandos**: `RegisterLoan`, `DisburseLoan`, `RecordLoanPayment(amount, breakdown?)`, `RecordPrepayment`, `ChangeLoanRate`, `RegisterCreditCard`, `IssueCardStatement`, `RecordCardPayment` (transfer).
-- **Queries**: `GetLoan`, `GetAmortizationSchedule`, `ListDebts`, `GetCardStatus` (límite disponible incluye pending).
-- **Eventos**: `LoanDisbursed`, `LoanScheduleGenerated`, `LoanPaymentRecorded`, `LoanInstallmentOverdue`, `LoanPaidOff`, `CardStatementIssued`, `CardPaymentDue`.
+- **DS**: `AmortizationCalculator` (puro; francés con HALF_EVEN y residuo en la última cuota; cuota nivelada solo con ACT/360, ACT/365 o primer periodo irregular, y 30/360 regular con la fórmula estándar, D153; alemán y capital fijo en `add-loan-amortization-advanced`), `PaymentAllocator` (orden **fijo** impuestos → seguro → comisiones → interés → principal, D155: no es configurable), `ScheduleComparator` y `ReferenceScheduleParser` (CSV, pegado o filas; ≤ 256 KiB y ≤ 600 filas), `ScheduleRecalculator` (prepagos, cambio de tasa ⇒ nueva `scheduleVersion`; `add-loan-amortization-advanced`).
+- **Repos**: uno por AR. **Ports** (as-built `add-loans`): `LoanTransactionsPort` (TRANSACTIONS: `recordDisbursement`, `recordPayment`, `voidManaged`), `AccountProvisioningPort` (ACCOUNTS: `openAccount`, abre la cuenta `LOAN` en la UoW del llamador con saldo inicial y fecha opcionales), `RecurringDefinitionPort` (COMMITMENTS: `createManaged` con calendario explícito, `settle`, `unsettle`, `setExpected`, `end`, `revise`), `AccountBalancesQuery`, `Clock`.
+- **Comandos**: `RegisterLoan`, `RegisterExistingLoan`, `DisburseLoan`, `CancelLoan`, `RecordLoanPayment(amount, breakdown?)` y `VoidLoanPayment` (solo el último pago), `UploadReferenceSchedule`, `ExplainComparison`, `RecordPrepayment`, `ChangeLoanRate`, `RegisterCreditCard`, `IssueCardStatement`, `RecordCardPayment` (transfer).
+- **Queries**: `GetLoan` (`unreconciledDifference` = principal pendiente − saldo de la cuenta), `ListLoans`, `PreviewSchedule`, `GetAmortizationSchedule`, `LoanPortfolioQuery` (`listLoans`, `interestPaid`; contrato público para `add-debt-summary`), `ListDebts`, `GetCardStatus` (límite disponible incluye pending).
+- **Eventos**: `LoanDisbursed`, `LoanScheduleGenerated`, `LoanPaymentRecorded`, `LoanPaymentVoided` (nuevo en `add-loans`), `LoanInstallmentOverdue` (fuera de Phase 4, D159), `LoanPaidOff`, `CardStatementIssued`, `CardPaymentDue`.
 - **Invariantes**: INV-016, INV-017, INV-030.
 
 ### 3.10 FX — FX & Market Data (`fx`)
@@ -521,20 +522,17 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   [*] --> draft: RegisterLoan
+  [*] --> active: RegisterExistingLoan
   draft --> active: DisburseLoan / transacción LOAN_DISBURSEMENT + cronograma
   draft --> cancelled: CancelLoan
-  active --> delinquent: cuota OVERDUE
-  delinquent --> active: pagos al día
-  active --> active: RecordLoanPayment / ChangeLoanRate / RecordPrepayment
+  active --> active: RecordLoanPayment / VoidLoanPayment
   active --> paid_off: saldo principal = 0 / LoanPaidOff
-  delinquent --> paid_off: saldo principal = 0
-  active --> refinanced: RefinanceLoan (cierra; nuevo Loan)
-  paid_off --> [*]
-  refinanced --> [*]
+  paid_off --> active: se anula el pago que saldó el préstamo
+  active --> cancelled: CancelLoan (sin pagos vigentes)
   cancelled --> [*]
 ```
 
-Un préstamo **existente** al empezar a usar el sistema entra directo a `active` con saldo inicial (`OPENING_BALANCE` sobre la cuenta LIABILITY) en vez de desembolso.
+As-built `add-loans` (máquina `LOAN_LIFECYCLE`, transiciones `REGISTER`, `DISBURSE`, `REGISTER_EXISTING`, `PAY_OFF`, `REACTIVATE`, `CANCEL`): sin `delinquent` ni `refinanced` en Phase 4 (morosidad fuera, D159); `paid_off` **no** es terminal (anular el último pago lo reactiva). Al saldarse termina el compromiso de cuotas y, al reactivar, se crea uno nuevo con lo pendiente. Un préstamo **existente** al empezar a usar el sistema entra directo a `active` (transición `REGISTER_EXISTING`) con el saldo pendiente como saldo inicial (`OPENING_BALANCE` sobre la cuenta LIABILITY, abierta en el acto o ya existente con ese mismo saldo) en vez de desembolso.
 
 ### 4.7 Subscription
 

@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: ['security/access-control']
 requirement: 'Permisos, auditoría e idempotencia de los préstamos'
 scenario: 'VIEWER no registra pagos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: []
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'rbac']

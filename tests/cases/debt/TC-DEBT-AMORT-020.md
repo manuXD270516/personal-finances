@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Diferencia explicada'
 scenario: 'Centavo explicado por redondeo del banco'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-003', 'FR-DEBT-006']
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'comparison', 'exit-criterion']

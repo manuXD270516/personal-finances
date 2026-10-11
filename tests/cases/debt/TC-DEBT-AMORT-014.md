@@ -5,16 +5,20 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cronograma fijado como versión inmutable'
 scenario: 'Renombrar un préstamo activo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-003']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - apps/web/src/ui/debt/debt.test.tsx
+  - packages/contexts/debt/src/domain/loan.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'versioning']

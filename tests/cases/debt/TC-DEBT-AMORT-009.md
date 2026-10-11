@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Fechas de vencimiento de las cuotas'
 scenario: 'Primera cuota el día 31'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-001']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'dates']

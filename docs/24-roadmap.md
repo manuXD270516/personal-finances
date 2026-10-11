@@ -149,6 +149,8 @@ flowchart LR
 - **Exit criteria:** cronograma French coincide al centavo con una tabla real del banco del owner (o diferencia explicada); Σ principal de cuotas = principal; pagos de tarjeta no cuentan como gasto; metas del owner con estado calculado.
 - **Dependencias:** Phase 1 (TRANSACTIONS/LEDGER para desembolsos/pagos/contribuciones), Phase 2 (PLANNING para aportes y pagos en el plan), Phase 3 (COMMITMENTS para cuotas como compromisos).
 - **Riesgos clave:** RISK-001 (redondeo de cuotas), RISK-017, RISK-005 (sobre-modelar amortización).
+- **As-built `add-loans` (primer change de deuda):** préstamos con cronograma francés, desembolso y pago como transacciones administradas, cuotas como compromisos y comparación con la tabla del banco (FR-DEBT-001..003, 006, 007, 011); decisiones del owner D153–D164 (docs/37). Morosidad (D159) y feriados (D160) quedan fuera de la fase.
+- **Procedimiento del exit criterion "cronograma French coincide con la tabla del banco":** el owner carga la tabla real de su préstamo **fuera del repositorio** (pantalla Deudas → Préstamo → "Comparar con la tabla del banco": CSV, texto pegado o filas), compara con el cronograma del sistema y el resultado queda persistido como `MATCH` (coincide al centavo) o `EXPLAINED` (diferencia con explicación escrita por el owner; `UNEXPLAINED` no cierra el criterio). En el informe de cierre de la fase solo se anota el estado (`MATCH` o `EXPLAINED`) y, si aplica, la causa en términos generales (convención de días, cargos, fechas), **sin cifras personales**: el repositorio es público y las fixtures usan montos inventados.
 
 ### 5.5 Phase 5 — FX y cripto avanzado
 

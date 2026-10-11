@@ -24,6 +24,7 @@ import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../c
 import { useCustomFields } from '../custom-fields/CustomFieldInputs';
 import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
+import { LoanTransactionInfo } from '../debt/LoanTransactionInfo';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { MatchSuggestionsNotice } from '../recurring/MatchSuggestionsPanel';
 import { useCatalogs } from './catalogs';
@@ -343,6 +344,7 @@ function Detail({
                     </>
                   ) : null}
                 </dl>
+                {tx.loanId ? <LoanTransactionInfo ctx={ctx} tx={tx} /> : null}
                 <section aria-labelledby="tx-legs-title" style={cardStyle}>
                   <h2 id="tx-legs-title" style={{ fontSize: '1rem', marginTop: 0 }}>
                     {t('detail.legs')}

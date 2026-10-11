@@ -7,6 +7,7 @@ import type { Clock, Money } from '@pf/shared-kernel';
 import type {
   ConversionDetail,
   LegRole,
+  LoanSystemCategoryCode,
   PaymentMethod,
   Reconciliation,
   SystemFlag,
@@ -98,6 +99,15 @@ export interface TransactionRepository {
     filter: TransactionListFilter,
     page: { readonly offset: number; readonly limit: number },
   ): Promise<Transaction[]>;
+  /**
+   * Transacción NO anulada del workspace con esa referencia externa (idempotencia de los puertos de escritura de otros
+   * contextos, p. ej. DEBT); `null` si no hay.
+   */
+  findByExternalRef(
+    workspaceId: string,
+    ref: { readonly namespace: string; readonly id: string },
+    options?: { readonly forUpdate?: boolean },
+  ): Promise<Transaction | null>;
   /** Transacciones no anuladas de la cuenta y moneda con el mismo monto en la ventana de fechas. */
   duplicateCandidates(
     workspaceId: string,
@@ -257,6 +267,8 @@ export interface CategoryLookupPort {
   uncategorized(workspaceId: string, kind: 'EXPENSE' | 'INCOME'): Promise<string | null>;
   /** Categoría de sistema *Fees* (comisión por defecto de una transferencia, add-transfers decisión 2). */
   fees(workspaceId: string): Promise<string | null>;
+  /** Categoría de sistema de un gasto de préstamo por `systemCode` (add-loans: interés, comisiones, seguro, impuestos). */
+  loanExpense(workspaceId: string, systemCode: LoanSystemCategoryCode): Promise<string | null>;
   /** Las categorías dadas y todas sus subcategorías (filtro `categoryId` del listado). */
   withDescendants(workspaceId: string, categoryIds: readonly string[]): Promise<string[]>;
 }

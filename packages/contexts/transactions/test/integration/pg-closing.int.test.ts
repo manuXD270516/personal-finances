@@ -31,6 +31,7 @@ const GROCERIES = randomUUID();
 const categories: CategoryLookupPort = {
   uncategorized: async (_ws, kind) => (kind === 'INCOME' ? UNCAT_INCOME : UNCAT),
   fees: async () => null,
+  loanExpense: async () => null,
   withDescendants: async (_ws, ids) => [...ids],
 };
 

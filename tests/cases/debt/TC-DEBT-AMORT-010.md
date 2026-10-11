@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Fechas de vencimiento de las cuotas'
 scenario: 'Primer periodo largo con 30/360'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-001', 'FR-DEBT-003']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'dates', 'day-count']

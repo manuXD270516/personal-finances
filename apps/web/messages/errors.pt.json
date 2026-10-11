@@ -117,5 +117,19 @@
   "IMPORT_UNSUPPORTED_FORMAT": "Não conseguimos ler o arquivo como texto delimitado (CSV). Verifique se é um CSV, se não está vazio e se não tem mais de 50 colunas.",
   "IMPORT_TOO_MANY_ROWS": "O arquivo tem mais linhas do que o permitido (5.000). Divida-o em vários arquivos e importe-os separadamente.",
   "IMPORT_MAPPING_INVALID": "A atribuição de colunas não é válida para este arquivo. Verifique as colunas de data, descrição e valor.",
-  "IMPORT_REVIEW_INCOMPLETE": "Ainda há possíveis duplicatas sem decisão. Decida cada uma (criar, pular ou excluir) antes de aprovar."
+  "IMPORT_REVIEW_INCOMPLETE": "Ainda há possíveis duplicatas sem decisão. Decida cada uma (criar, pular ou excluir) antes de aprovar.",
+  "LOAN_METHOD_NOT_AVAILABLE": "Este método de amortização ainda não está disponível. Por enquanto só o sistema francês (parcela constante) é aceito.",
+  "LOAN_ACCOUNT_INVALID": "A conta do empréstimo deve ser uma conta ativa do tipo empréstimo e na mesma moeda.",
+  "LOAN_ACCOUNT_IN_USE": "Essa conta já pertence a outro empréstimo. Escolha outra ou crie uma conta nova.",
+  "LOAN_ACCOUNT_NOT_EMPTY": "Um empréstimo novo precisa de uma conta de empréstimo com saldo zero. Use uma conta nova ou registre um empréstimo em andamento.",
+  "LOAN_BALANCE_MISMATCH": "O saldo da conta não coincide com o saldo pendente informado. Revise o valor ou a conta.",
+  "LOAN_NOT_DRAFT": "Este empréstimo não é mais um rascunho, por isso não pode ser desembolsado de novo.",
+  "LOAN_NOT_ACTIVE": "Este empréstimo não está ativo: desembolse-o antes de registrar pagamentos ou ele já está quitado ou cancelado.",
+  "LOAN_TERMS_LOCKED": "As condições financeiras de um empréstimo ativo não podem ser editadas. Você pode mudar o nome, o credor e a conta de pagamento.",
+  "LOAN_OVERPAYMENT": "O pagamento é maior que o que ainda se deve do empréstimo. Revise o valor.",
+  "LOAN_PAYMENT_NOT_LATEST": "Só o pagamento mais recente do empréstimo pode ser anulado. Anule antes os posteriores.",
+  "LOAN_HAS_PAYMENTS": "O empréstimo tem pagamentos vigentes e não pode ser cancelado. Anule antes os pagamentos.",
+  "LOAN_REFERENCE_INVALID": "A tabela do banco tem linhas com erros e não foi salva. Corrija-as e carregue de novo.",
+  "PAYMENT_BREAKDOWN_MISMATCH": "O detalhamento do recibo não soma o valor pago. Revise capital, juros, comissões, seguro e impostos.",
+  "TRANSACTION_MANAGED_EXTERNALLY": "Esta transação é administrada por um empréstimo: edite valores ou anule o pagamento pelo empréstimo. Aqui você só pode mudar notas e etiquetas."
 }

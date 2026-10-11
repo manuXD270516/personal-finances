@@ -394,7 +394,7 @@ describe('Suscripciones sobre PostgreSQL', () => {
     ).toBe('42501');
   });
 
-  it('managed_by admite SUBSCRIPTION con su referencia y rechaza DEBT y una referencia en una definición de usuario', async () => {
+  it('managed_by admite SUBSCRIPTION y DEBT con su referencia y rechaza otro administrador y una referencia en una definición de usuario', async () => {
     const insert = (managedBy: string, ref: string | null) => () =>
       inCtx(w1, (c) =>
         c.query(
@@ -406,6 +406,7 @@ describe('Suscripciones sobre PostgreSQL', () => {
     expect(await sqlState(insert('SUBSCRIPTION', randomUUID()))).toBeUndefined();
     expect(await sqlState(insert('SUBSCRIPTION', null))).toBe('23514');
     expect(await sqlState(insert('USER', randomUUID()))).toBe('23514');
-    expect(await sqlState(insert('DEBT', randomUUID()))).toBe('23514');
+    expect(await sqlState(insert('DEBT', randomUUID()))).toBeUndefined();
+    expect(await sqlState(insert('GOAL', randomUUID()))).toBe('23514');
   });
 });

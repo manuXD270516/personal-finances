@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Redondeo HALF_EVEN y residuo en la última cuota'
 scenario: 'Suma exacta del principal'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-006']
 nfr: []
 invariants: ['INV-017']
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'rounding']

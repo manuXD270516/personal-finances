@@ -5,16 +5,18 @@ spec: commitments/recurrence-engine
 related_specs: ['debt/loans', 'reporting/cash-flow-calendar']
 requirement: 'Cuotas de préstamo en el comprometido y en los próximos pagos'
 scenario: 'Comprometido con alquiler y cuota'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-011', 'FR-DEBT-011']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/commitments/src/application/loan-payment.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['commitments', 'loans', 'q4']

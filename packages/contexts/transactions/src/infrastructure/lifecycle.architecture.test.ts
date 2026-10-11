@@ -39,16 +39,27 @@ describe('Arquitectura del recorrido (add-lifecycle-timeline)', () => {
       'reconcile',
       'reconcileWithoutStatement',
       'recordConversion',
+      'recordLoanDisbursement',
+      'recordLoanPayment',
       'recordTransfer',
       'unreconcile',
       'void',
     ]);
-    // Toda creación (record, recordTransfer, recordConversion) pasa por el constructor, que marca RECORD.
+    // Toda creación (record, recordTransfer, recordConversion, recordLoan*) pasa por el constructor, que marca RECORD.
     const ctor = methods(read('../domain/transaction.ts')).find((m) => m.name === 'constructor');
     expect(ctor?.body).toMatch(/this\.mark\('RECORD', null, state\.status/);
     for (const m of changing) {
       // Los factories crean el estado inicial: su transición RECORD la marca el constructor.
-      if (['record', 'recordConversion', 'recordTransfer'].includes(m.name)) continue;
+      if (
+        [
+          'record',
+          'recordConversion',
+          'recordTransfer',
+          'recordLoanDisbursement',
+          'recordLoanPayment',
+        ].includes(m.name)
+      )
+        continue;
       expect(m.body, m.name).toMatch(/this\.mark\(/);
     }
   });

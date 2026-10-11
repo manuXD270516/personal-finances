@@ -41,7 +41,8 @@
     "menu": "Navigation menu",
     "userMenu": "Account menu",
     "language": "Language",
-    "recurringPending": "{count, plural, one {# payment to approve} other {# payments to approve}}"
+    "recurringPending": "{count, plural, one {# payment to approve} other {# payments to approve}}",
+    "debt": "Debts"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -2812,6 +2813,15 @@
       "dismissed": "You dismissed the match with {name}. It will not be suggested again.",
       "viewOccurrence": "View the recurring payment",
       "viewTransaction": "View the transaction"
+    },
+    "loan": {
+      "origin": "Loan:",
+      "viewLoans": "View loans",
+      "registerPayment": "Register payment",
+      "registerPaymentLabel": "Register the payment of {name} due {date} on the loan",
+      "managedNotice": "This installment is managed by the loan; it is resolved when you register the payment there.",
+      "definitionManaged": "These installments are managed by a loan: they cannot be paused or edited here.",
+      "openLoan": "Open the loan"
     }
   },
   "Subscriptions": {
@@ -3589,6 +3599,444 @@
       "linksLabel": "Next steps",
       "viewTransactions": "View the account transactions",
       "importAnother": "Import another file"
+    }
+  },
+  "Debt": {
+    "title": "Debts",
+    "intro": "Your loans: how much you owe, the next installment and how your schedule compares with the bank table.",
+    "viewerNotice": "You can only view loans; registering or paying requires the editor role.",
+    "loading": "Loading…",
+    "notFound": "We could not find this loan. It may have been removed or you may not have access.",
+    "back": "Back to Debts",
+    "cancelAction": "Cancel",
+    "reason": "Reason",
+    "debtAmount": "Debt {amount}",
+    "columns": {
+      "n": "No.",
+      "due": "Due date",
+      "total": "Installment",
+      "balance": "Balance",
+      "state": "Status"
+    },
+    "components": {
+      "principal": "Principal",
+      "interest": "Interest",
+      "fees": "Fees",
+      "insurance": "Insurance",
+      "taxes": "Taxes"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "ACTIVE": "Active",
+      "PAID_OFF": "Paid off",
+      "CANCELLED": "Cancelled"
+    },
+    "dayCount": {
+      "D30_360": "30/360",
+      "ACT_360": "Actual/360",
+      "ACT_365": "Actual/365"
+    },
+    "frequency": {
+      "MONTHLY": "Monthly",
+      "BIMONTHLY": "Every 2 months",
+      "QUARTERLY": "Quarterly",
+      "SEMIANNUAL": "Semiannual",
+      "ANNUAL": "Annual"
+    },
+    "list": {
+      "region": "Loans table",
+      "caption": "Loans with their status, outstanding debt, next installment and delay",
+      "name": "Loan",
+      "outstanding": "Outstanding debt",
+      "next": "Next installment",
+      "overdue": "Delay",
+      "new": "New loan",
+      "empty": "You have not registered any loans yet. Create a new one or register an ongoing loan to see its schedule and installments.",
+      "nextValue": "Installment {n} · {date} · {amount}",
+      "overdueDays": "{days, plural, one {# day overdue} other {# days overdue}}"
+    },
+    "form": {
+      "title": "New loan",
+      "origin": "What are you registering?",
+      "origins": {
+        "NEW": "New loan",
+        "EXISTING": "Ongoing loan"
+      },
+      "originHint": {
+        "NEW": "It is saved as a draft with a schedule preview; disbursing records the money received and fixes the installments.",
+        "EXISTING": "You already paid some installments: enter the outstanding balance and the next installment. No disbursement is recorded."
+      },
+      "terms": "Terms",
+      "name": "Name",
+      "currency": "Currency",
+      "principal": "Principal",
+      "outstanding": "Outstanding balance",
+      "outstandingHint": "Principal you still owe on the balance date.",
+      "rate": "Nominal annual rate (%)",
+      "rateHint": "As a percentage, for example 11.50.",
+      "dayCount": "Day-count convention",
+      "frequency": "Frequency",
+      "term": "Number of installments",
+      "remaining": "Remaining installments",
+      "termHint": "Between 1 and 600.",
+      "disbursementDate": "Disbursement date",
+      "firstDue": "First installment date",
+      "asOf": "Balance date",
+      "nextNo": "Next installment number",
+      "nextDue": "Next installment date",
+      "charges": "Charges per installment (optional)",
+      "chargesHint": "Fees, insurance and taxes: a fixed amount per installment or a monthly rate on the balance.",
+      "chargeKind": {
+        "fees": "Fees",
+        "insurance": "Insurance",
+        "taxes": "Taxes"
+      },
+      "chargeModes": {
+        "NONE": "No charge",
+        "FIXED": "Fixed amount per installment",
+        "RATE_ON_BALANCE": "Monthly rate on the balance"
+      },
+      "chargeFixed": "Amount per installment",
+      "chargeRate": "Monthly rate (%)",
+      "chargeRateHint": "For example 0.0400 % monthly on the balance at the start of the period.",
+      "accounts": "Lender and accounts",
+      "lender": "Lender",
+      "lenderHint": "Counterparty (optional).",
+      "none": "None",
+      "choose": "Choose an option",
+      "loanAccount": "Loan account",
+      "accountModes": {
+        "CREATE": "Create the account now",
+        "EXISTING": "Use an existing loan account"
+      },
+      "newAccountName": "Loan account name",
+      "newAccountHint": "A loan-type (liability) account is created in the same currency.",
+      "existingAccount": "Loan account",
+      "disbursementAccount": "Disbursement destination account",
+      "paymentAccount": "Payment account",
+      "paymentAccountHint": "Account you usually pay the installments from.",
+      "disburseNow": "Disburse now",
+      "retainedFee": "Retained fee (optional)",
+      "retainedFeeHint": "It is deducted from the amount you receive and recorded as an expense.",
+      "fixErrors": "{count, plural, one {# field needs fixing.} other {# fields need fixing.}} Check the marked fields.",
+      "saving": "Saving…",
+      "save": "Save loan",
+      "saveAndDisburse": "Save and disburse"
+    },
+    "errors": {
+      "REQUIRED": "This field is required.",
+      "INVALID": "The value is not valid.",
+      "SCALE": "It has more decimals than the currency allows.",
+      "NOT_POSITIVE": "It must be greater than zero.",
+      "RANGE": "It is outside the allowed range.",
+      "DATE_ORDER": "It must be after the disbursement or balance date."
+    },
+    "preview": {
+      "title": "Schedule preview",
+      "waiting": "Fill in the principal, rate, number of installments and dates to see the schedule.",
+      "loading": "Calculating the schedule…",
+      "region": "Schedule table",
+      "caption": "Installment schedule with principal, interest and balance",
+      "installment": "Installment",
+      "totalInterest": "Total interest",
+      "totalAmount": "Total to pay",
+      "leveled": "The installment was leveled: with actual days or an irregular first period, the constant installment minimizes the gap with the last one.",
+      "totals": "Totals"
+    },
+    "summary": {
+      "lender": "Lender",
+      "account": "Loan account",
+      "paymentAccount": "Payment account",
+      "principal": "Principal",
+      "outstandingAtStart": "Balance when registered",
+      "rate": "Nominal annual rate",
+      "dayCount": "Day-count convention",
+      "frequency": "Frequency",
+      "term": "Installments",
+      "installment": "Installment",
+      "disbursement": "Disbursement",
+      "firstDue": "First installment",
+      "chargeFixed": "{amount} per installment",
+      "chargeRate": "{rate} % monthly on the balance",
+      "retainedFee": "Retained fee",
+      "cancelledReason": "Cancellation reason"
+    },
+    "balances": {
+      "title": "Debt",
+      "outstanding": "Outstanding principal (schedule)",
+      "account": "Account balance",
+      "difference": "Unrecorded difference",
+      "differenceNote": "The loan account has movements that were not registered as loan payments. Register them as payments so both figures match.",
+      "paidTotals": "Paid so far"
+    },
+    "next": {
+      "title": "Next installment",
+      "value": "Installment {n} due {date} for {amount}",
+      "overdue": "{count, plural, one {# overdue installment} other {# overdue installments}}",
+      "overdueItem": "Installment {n} due {date}: {amount} missing ({days, plural, one {# day} other {# days}} overdue)"
+    },
+    "actions": {
+      "label": "Loan actions",
+      "pay": "Register payment",
+      "disburse": "Disburse",
+      "edit": "Edit",
+      "cancel": "Cancel loan",
+      "compare": "Compare with the bank table"
+    },
+    "schedule": {
+      "title": "Schedule",
+      "draftTitle": "Expected schedule"
+    },
+    "installments": {
+      "region": "Schedule table with status",
+      "caption": "Installments with their status and the expected, paid and difference amounts",
+      "expected": "Expected",
+      "paid": "Paid",
+      "difference": "Difference",
+      "detail": "Detail",
+      "components": "By component",
+      "componentsCaption": "Expected, paid and difference by component of installment {n}",
+      "component": "Component",
+      "pay": "Pay installment {n}",
+      "state": {
+        "UNPAID": "Pending",
+        "PARTIALLY_PAID": "Partial",
+        "PAID": "Paid",
+        "OVERDUE": "Overdue"
+      }
+    },
+    "payments": {
+      "title": "Payments",
+      "region": "Payments table",
+      "caption": "Loan payments with their breakdown",
+      "empty": "There are no payments yet.",
+      "no": "No.",
+      "date": "Date",
+      "account": "Account",
+      "amount": "Amount",
+      "breakdown": "Breakdown",
+      "installments": "Installments",
+      "actions": "Actions",
+      "explicit": "per receipt",
+      "voided": "Voided",
+      "active": "Active",
+      "void": "Void",
+      "voidLabel": "Void payment {n}"
+    },
+    "payment": {
+      "title": "Register payment",
+      "amount": "Amount paid ({currency})",
+      "date": "Payment date",
+      "account": "Payment account",
+      "method": "Payment method",
+      "mode": "How to split the payment",
+      "modes": {
+        "AUTO": "Automatic",
+        "BREAKDOWN": "Receipt breakdown"
+      },
+      "modeHint": {
+        "AUTO": "The amount is applied to the pending installments in order: taxes, insurance, fees, interest and principal.",
+        "BREAKDOWN": "Copy the amounts from the bank receipt for a single installment; they must add up to the amount paid."
+      },
+      "installmentNo": "Installment number",
+      "sum": "Breakdown total: {sum} {currency}",
+      "sumInvalid": "Some breakdown amount is not valid.",
+      "sumMismatch": "{delta} {currency} missing or extra compared with the amount paid.",
+      "sumMatches": "It matches the amount paid.",
+      "saving": "Registering…",
+      "submit": "Register payment",
+      "done": "Payment registered."
+    },
+    "disburse": {
+      "title": "Disburse the loan",
+      "hint": "The disbursement of {amount} is recorded, the schedule is fixed and the installments become active.",
+      "submit": "Disburse",
+      "done": "Loan disbursed."
+    },
+    "cancel": {
+      "title": "Cancel the loan",
+      "description": "A draft has no accounting effects; an active loan without payments reverses its disbursement. This cannot be undone.",
+      "confirm": "Cancel loan",
+      "done": "Loan cancelled."
+    },
+    "void": {
+      "title": "Void the latest payment",
+      "description": "The payment is reversed and the installments return to their previous state. Only the most recent payment can be voided.",
+      "confirm": "Void payment",
+      "done": "Payment voided."
+    },
+    "edit": {
+      "title": "Edit loan",
+      "draftNote": "While it is a draft you can cancel it and register a new one to change its terms.",
+      "locked": "The financial terms of an active loan are locked; you can change the name, the lender and the payment account.",
+      "save": "Save changes",
+      "done": "Changes saved."
+    },
+    "compare": {
+      "title": "Compare with the bank table",
+      "titleFor": "Compare {name} with the bank table",
+      "intro": "Load your bank amortization table and see, installment by installment and to the cent, how it differs from your schedule. The table never changes the loan.",
+      "backToLoan": "Back to the loan",
+      "load": "Load the bank table",
+      "source": "How to load the table",
+      "sources": {
+        "PASTE": "Paste text",
+        "CSV": "Upload a CSV",
+        "MANUAL": "Row by row"
+      },
+      "pasteLabel": "Bank table",
+      "pasteHint": "Paste the rows with their header (No., Date, Principal, Interest…). Up to 256 KiB and 600 rows.",
+      "fileLabel": "CSV file",
+      "fileHint": "UTF-8 text, up to 256 KiB and 600 rows. It is read in your browser.",
+      "detect": "Detect columns",
+      "detected": "We found {rows, plural, one {# row} other {# rows}} and {columns, plural, one {# column} other {# columns}}. Confirm the delimiter and the columns.",
+      "delimiter": "Delimiter",
+      "delimiterHint": "If the delimiter is wrong, choose another one and the text is read again.",
+      "delimiters": {
+        "semicolon": "Semicolon (;)",
+        "comma": "Comma (,)",
+        "tab": "Tab"
+      },
+      "dateFormat": "Date format",
+      "dateFormats": {
+        "DD/MM/YYYY": "dd/mm/yyyy",
+        "YYYY-MM-DD": "yyyy-mm-dd",
+        "MM/DD/YYYY": "mm/dd/yyyy"
+      },
+      "decimal": "Decimal separator",
+      "decimals": {
+        "comma": "Comma (1234,56)",
+        "dot": "Dot (1234.56)"
+      },
+      "sampleRegion": "Sample of the loaded table",
+      "sampleCaption": "First rows of the bank table",
+      "mapping": "Columns",
+      "mappingHint": "Choose which header column matches each field. Fields marked with * are required.",
+      "mappingMissing": "Choose the column for: {fields}.",
+      "noColumn": "No column",
+      "fields": {
+        "installmentNo": "Installment no.",
+        "dueDate": "Date",
+        "principal": "Principal",
+        "interest": "Interest",
+        "fees": "Fees",
+        "insurance": "Insurance",
+        "taxes": "Taxes",
+        "total": "Installment",
+        "balance": "Balance"
+      },
+      "upload": "Load and compare",
+      "loading": "Loading…",
+      "loaded": "Table loaded (version {version}).",
+      "versions": "Bank table",
+      "versionOption": "Version {version} · {source} · {rows} rows · {date}",
+      "export": "Export the report as CSV",
+      "empty": "You have not loaded a bank table to compare yet ({currency}).",
+      "manualHint": "Enter each installment of the bank table. Principal and interest are required; the other amounts are optional.",
+      "manualRegion": "Bank table rows",
+      "manualCaption": "Row-by-row entry of the bank table",
+      "manualCols": {
+        "n": "No.",
+        "dueDate": "Date",
+        "principal": "Principal",
+        "interest": "Interest",
+        "fees": "Fees",
+        "insurance": "Insurance",
+        "taxes": "Taxes",
+        "total": "Installment"
+      },
+      "manualActions": "Actions",
+      "manualCell": "Row {row}, {col}",
+      "manualRemove": "Remove row {row}",
+      "manualRemoveShort": "Remove",
+      "manualAdd": "Add row",
+      "errors": {
+        "title": "{count, plural, one {The table has # error.} other {The table has # errors.}} Nothing was saved.",
+        "item": "Row {row}, {field}",
+        "codes": {
+          "DATE_INVALID": "the date is not valid for the chosen format",
+          "INSTALLMENT_NO_DUPLICATED": "the installment number is repeated",
+          "INSTALLMENT_NO_INVALID": "the installment number is not valid",
+          "MAPPING_COLUMN_NOT_FOUND": "the chosen column was not found",
+          "TOTAL_MISMATCH": "the installment does not match the sum of its components",
+          "VALUE_MISSING": "the value is missing"
+        }
+      },
+      "status": {
+        "MATCH": "Matches to the cent",
+        "EXPLAINED": "Difference explained",
+        "UNEXPLAINED": "Unexplained differences"
+      },
+      "rowStatus": {
+        "MATCH": "Matches",
+        "DIFFERENT": "Differs",
+        "ONLY_REFERENCE": "Bank only",
+        "ONLY_SYSTEM": "System only"
+      },
+      "components": {
+        "principal": "Principal",
+        "interest": "Interest",
+        "fees": "Fees",
+        "insurance": "Insurance",
+        "taxes": "Taxes",
+        "total": "Installment"
+      },
+      "summary": {
+        "title": "Summary",
+        "matched": "{matched} of {total} installments match.",
+        "first": "First difference: installment {n}.",
+        "sums": "Sum of the differences (bank − system)",
+        "principal": "Total principal: bank {bank} versus loan {loan}.",
+        "onlyReference": "Installments only in the bank table: {list}.",
+        "onlySystem": "Installments only in the system: {list}.",
+        "dates": "Installments with another due date: {list}."
+      },
+      "suggestions": {
+        "title": "Suggestions",
+        "conventionCurrent": "With the current convention ({dayCount}) {matching} of {total} installments match ({interest} on interest).",
+        "convention": "With {dayCount}, {matching} of {total} installments would match ({interest} on interest).",
+        "better": "It is better than the current one.",
+        "ONLY_DATES": "Only the due dates differ.",
+        "ONLY_CHARGES": "Principal and interest match: the difference is in the charges (fees, insurance or taxes).",
+        "ONLY_LAST_INSTALLMENT": "Only the last installment differs, within the rounding tolerance ({tolerance}).",
+        "PRINCIPAL_SUM_DIFFERS": "The principal of the bank table differs from the loan principal by {difference}."
+      },
+      "table": {
+        "title": "Report by installment",
+        "onlyDiff": "Show only installments with differences",
+        "region": "Comparison report table",
+        "caption": "Difference by component (bank minus system) for each installment",
+        "diffOf": "Diff. {component}",
+        "detail": "System and bank",
+        "detailCaption": "System and bank values of installment {n}",
+        "system": "System",
+        "bank": "Bank",
+        "diff": "Difference",
+        "bankDate": "bank: {date}"
+      },
+      "explain": {
+        "title": "Explain the difference",
+        "hint": "If the difference is expected (for example, bank rounding), explain it so it stays on record.",
+        "label": "Explanation",
+        "limit": "{count} of 1000 characters",
+        "submit": "Explain the difference",
+        "update": "Update the explanation",
+        "done": "Explanation saved."
+      }
+    },
+    "transaction": {
+      "badge": "Loan",
+      "viewLoan": "View the loan",
+      "breakdownCaption": "Loan payment breakdown"
+    },
+    "paymentMethods": {
+      "CASH": "Cash",
+      "QR": "QR",
+      "DEBIT_CARD": "Debit card",
+      "CREDIT_CARD": "Credit card",
+      "BANK_TRANSFER": "Bank transfer",
+      "DIGITAL_WALLET": "Digital wallet",
+      "OTHER": "Other"
     }
   }
 }

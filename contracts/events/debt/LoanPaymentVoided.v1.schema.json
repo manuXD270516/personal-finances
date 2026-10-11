@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/LoanPaymentVoided.v1.schema.json",
+  "title": "debt.LoanPaymentVoided.v1",
+  "description": "Se anuló el último pago de un préstamo (reversa del asiento; las cuotas imputadas vuelven al estado anterior). Productor: DEBT. Idempotencia: (loanId, paymentId, 'VOIDED'). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.LoanPaymentVoided"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Loan"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "loanId",
+        "paymentId",
+        "transactionId",
+        "installmentNos",
+        "currency",
+        "remainingPrincipal"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "loanId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "paymentId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "installmentNos": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "remainingPrincipal": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a04",
+      "eventType": "debt.LoanPaymentVoided",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-20T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 4,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "paymentId": "01928c4e-0000-7000-8000-0000000b0101",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7101",
+        "installmentNos": [
+          1
+        ],
+        "currency": "BOB",
+        "remainingPrincipal": "50000.00"
+      }
+    }
+  ]
+}

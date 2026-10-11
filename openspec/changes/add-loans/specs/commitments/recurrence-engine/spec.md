@@ -7,7 +7,7 @@ El tipo `LOAN_PAYMENT` DEBE (MUST) admitirse solo en definiciones administradas 
 Trace: FR-DEBT-011, FR-COMMITMENTS-001, FR-COMMITMENTS-008 · Priority: Must
 
 #### Scenario: Calendario de cuotas generado hasta el horizonte
-- **CUANDO** hoy es 2026-10-15, el horizonte es de 90 días y el "Préstamo vehicular" crea su definición de cuotas con 24 cuotas de 2342.02 BOB (la última de 2341.90 BOB) desde el 2026-11-15
+- **CUANDO** hoy es 2026-10-17, el horizonte es de 90 días y el "Préstamo vehicular" crea su definición de cuotas con 24 cuotas de 2342.02 BOB (la última de 2341.90 BOB) desde el 2026-11-15
 - **ENTONCES** existen ocurrencias programadas para el 2026-11-15, el 2026-12-15 y el 2027-01-15 por 2342.02 BOB cada una
 - **Y** la ocurrencia del 2027-02-15 se genera cuando el horizonte la alcanza
 

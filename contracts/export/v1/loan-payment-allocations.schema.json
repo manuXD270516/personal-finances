@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/loan-payment-allocations.schema.json",
+  "title": "pfos-export v1 — loan-payment-allocations",
+  "description": "Registro de la sección «loan-payment-allocations» (tabla debt.loan_payment_allocation, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "payment_id",
+    "installment_id",
+    "workspace_id",
+    "loan_id",
+    "installment_no",
+    "principal",
+    "interest",
+    "fees",
+    "insurance",
+    "taxes"
+  ],
+  "properties": {
+    "payment_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "installment_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "loan_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "installment_no": {
+      "type": "integer"
+    },
+    "principal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "interest": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "fees": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "insurance": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "taxes": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    }
+  },
+  "x-pfos-table": "debt.loan_payment_allocation",
+  "x-pfos-context": "debt"
+}

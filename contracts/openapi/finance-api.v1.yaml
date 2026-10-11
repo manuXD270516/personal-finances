@@ -67,7 +67,7 @@ tags:
   - name: Goals
     description: "LATER (Phase 4): savings goals and contributions (transfer or earmark)."
   - name: Debt
-    description: "LATER (Phase 4): loans, amortization schedules, installments, credit cards and statements."
+    description: "Phase 4: loans (register, disburse, payments with breakdown, installment commitments), French amortization schedules and comparison with the bank table (add-loans). Credit cards and statements: LATER."
   - name: FxRates
     description: "Phase 1 (docs/31 D29, ADR-0025): market rate providers (paralelo.bo primary, bo.dolarapi.com fallback/official), provider status and anomaly review. Manual rates are under FX. More providers, crypto and commodities: Phase 5."
   - name: Documents
@@ -7917,6 +7917,653 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Debt: préstamos (openspec add-loans) ──
+  /workspaces/{workspaceId}/loans:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Debt]
+      operationId: listLoans
+      summary: List the loans of the workspace
+      description: |
+        Newest first. Without `status` every status is returned. `status` accepts a comma separated list of `DRAFT`, `ACTIVE`, `PAID_OFF` and `CANCELLED`.
+      x-openspec-capability: [debt/loans]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, examples: ['ACTIVE,PAID_OFF'] }
+      responses:
+        '200':
+          description: List the loans of the workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: registerLoan
+      summary: Register a loan (new in draft, or ongoing and active)
+      description: |
+        A new loan (`origin = NEW`, default) is stored as a draft with the preview of its French schedule and no ledger entry; `disburseNow`
+        disburses it in the same unit of work. An ongoing loan (`origin = EXISTING`) declares the outstanding principal (`principal`) at
+        `existing.asOf`, the number of the next installment and the remaining installments (`termInstallments`): it is created active with its
+        schedule version 1 and its installment commitment, without a disbursement transaction. The loan account is an existing active `loan`
+        account or is created in the same act (`account.create`). Amortization methods other than `FRENCH` answer 422
+        `LOAN_METHOD_NOT_AVAILABLE`.
+      x-openspec-capability: [debt/loans]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanInput' }
+      responses:
+        '201':
+          description: Register a loan (new in draft, or ongoing and active)
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_ACCOUNT_IN_USE, LOAN_ACCOUNT_NOT_EMPTY, COUNTERPARTY_ARCHIVED, ACCOUNT_ARCHIVED, ACCOUNT_CLOSED or PERIOD_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED, LOAN_METHOD_NOT_AVAILABLE, LOAN_ACCOUNT_INVALID, LOAN_BALANCE_MISMATCH, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/schedule-preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Debt]
+      operationId: previewLoanSchedule
+      summary: Preview the schedule of some loan terms without saving anything
+      description: |
+        Same calculator and rules as the schedule fixed on activation (`debt/amortization`): HALF_EVEN per component and the last installment absorbs the residue. Persists nothing; accounts are not required.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanPreviewInput' }
+      responses:
+        '200':
+          description: Preview the schedule of some loan terms without saving anything
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SchedulePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED (including `details.reason = NEGATIVE_AMORTIZATION`), AMOUNT_SCALE_EXCEEDED or LOAN_METHOD_NOT_AVAILABLE.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: getLoan
+      summary: Get a loan with its status
+      description: |
+        Terms, outstanding principal according to the schedule (principal minus principal paid), balance owed according to the loan account,
+        the difference between both (movements of the account not registered as loan payments: `outstandingPrincipal - accountBalance`), the next
+        installment, the overdue installments (due before today in the workspace time zone) and the accumulated interest, fees, insurance and
+        taxes paid. A draft carries the preview of its schedule.
+      x-openspec-capability: [debt/loans]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Get a loan with its status
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Debt]
+      operationId: updateLoan
+      summary: Edit a loan (all terms in draft; name, lender and payment account once active)
+      description: |
+        Editing the financial terms of a non-draft loan answers 409 `LOAN_TERMS_LOCKED` and leaves schedule version 1 untouched.
+      x-openspec-capability: [debt/loans]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanUpdate' }
+      responses:
+        '200':
+          description: Edit a loan (all terms in draft; name, lender and payment account once active)
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_TERMS_LOCKED, LOAN_NOT_ACTIVE, LOAN_ACCOUNT_IN_USE, LOAN_ACCOUNT_NOT_EMPTY, COUNTERPARTY_ARCHIVED, ACCOUNT_ARCHIVED or ACCOUNT_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED, LOAN_METHOD_NOT_AVAILABLE, LOAN_ACCOUNT_INVALID, CURRENCY_MISMATCH or REFERENCE_NOT_FOUND.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/disburse:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: disburseLoan
+      summary: Disburse a draft loan
+      description: |
+        In one unit of work: creates the `LOAN_DISBURSEMENT` transaction dated on the disbursement date (increases the destination account by
+        the principal minus the retained fee, increases the debt by the full principal and records the retained fee as an expense in the system
+        category "Loan fees"), fixes schedule version 1, activates the loan and creates the commitment of its installments.
+      x-openspec-capability: [debt/loans]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DisburseInput' }
+      responses:
+        '200':
+          description: Disburse a draft loan
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_DRAFT, PERIOD_CLOSED, ACCOUNT_ARCHIVED or ACCOUNT_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: cancelLoan
+      summary: Cancel a draft or an active loan without payments
+      description: |
+        A draft has no accounting effects. An active loan without active payments voids its disbursement (reversal entry) and ends its commitment. With active payments: 409 `LOAN_HAS_PAYMENTS`.
+      x-openspec-capability: [debt/loans]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelInput' }
+      responses:
+        '200':
+          description: Cancel a draft or an active loan without payments
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_HAS_PAYMENTS, INVALID_STATUS_TRANSITION or PERIOD_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/installments:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: listLoanInstallments
+      summary: List the installments of a schedule version with their payment state
+      description: |
+        By default the current version (the preview for a draft). The state (`UNPAID`, `PARTIALLY_PAID`, `PAID`) is derived from the active
+        payment allocations; each installment shows the expected, paid and difference per component (`paid - expected`).
+      x-openspec-capability: [debt/loans]
+      x-required-role: VIEWER
+      parameters:
+        - name: version
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: List the installments of a schedule version with their payment state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallmentList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/payments:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: listLoanPayments
+      summary: List the payments of a loan
+      description: |
+        Oldest first, including voided payments.
+      x-openspec-capability: [debt/loans]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: List the payments of a loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanPaymentList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: recordLoanPayment
+      summary: Register a payment of a loan with its breakdown
+      description: |
+        Creates, in one unit of work, a `LOAN_PAYMENT` transaction that withdraws the amount from the payment account, reduces the debt by the
+        principal and records interest, fees, insurance and taxes as expenses. Without `breakdown` the amount is allocated to the unpaid
+        installments in order and, within each one, taxes, insurance, fees, interest and principal. With `breakdown` (for one installment,
+        `installmentNo` required) the components must add up to the amount. A payment account in another currency than the loan answers 422
+        `CURRENCY_MISMATCH` (no implicit conversion).
+      x-openspec-capability: [debt/loans]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanPaymentInput' }
+      responses:
+        '201':
+          description: Register a payment of a loan with its breakdown
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanPaymentResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE, PERIOD_CLOSED, ACCOUNT_ARCHIVED or ACCOUNT_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, LOAN_OVERPAYMENT, PAYMENT_BREAKDOWN_MISMATCH or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/payments/{paymentId}/void:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+      - $ref: '#/components/parameters/LoanPaymentId'
+    post:
+      tags: [Debt]
+      operationId: voidLoanPayment
+      summary: Void the most recent active payment of a loan
+      description: |
+        Voids the payment transaction (reversal entry), returns the allocated installments to their previous state and restores the commitment occurrences. Only the most recent active payment can be voided (409 `LOAN_PAYMENT_NOT_LATEST`); voiding the payment that paid the loan off reactivates it.
+      x-openspec-capability: [debt/loans]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VoidInput' }
+      responses:
+        '200':
+          description: Void the most recent active payment of a loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanPaymentResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_PAYMENT_NOT_LATEST, LOAN_NOT_ACTIVE or PERIOD_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/reference-schedules:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: listLoanReferenceSchedules
+      summary: List the bank's amortization tables loaded for a loan
+      description: |
+        Newest version first.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: List the bank's amortization tables loaded for a loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReferenceList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: uploadLoanReferenceSchedule
+      summary: Load the bank's amortization table as a reference
+      description: |
+        `source = CSV | PASTE` carries the delimited `text` (UTF-8, at most 256 KiB and 600 rows) with an explicit column `mapping`, `dateFormat` and
+        `decimalSeparator`; `source = MANUAL` carries `rows`. Invalid rows answer 422 `LOAN_REFERENCE_INVALID` with `details.rows[]`
+        (row, field, code, message) and nothing is stored. The reference never changes the loan schedule; every load is kept as a new
+        version. The response includes the comparison against the current schedule (the preview for a draft).
+      x-openspec-capability: [debt/amortization]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReferenceInput' }
+      responses:
+        '201':
+          description: Load the bank's amortization table as a reference
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReferenceUploadResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            LOAN_REFERENCE_INVALID, VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/reference-schedules/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: previewLoanReferenceSchedule
+      summary: Detect the delimiter and columns of a pasted bank table
+      description: |
+        Reads the text and returns the detected delimiter, the header and the first rows so the user can confirm the delimiter and the column mapping. Stores nothing.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReferencePreviewInput' }
+      responses:
+        '200':
+          description: Detect the delimiter and columns of a pasted bank table
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReferencePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED or UPLOAD_TOO_LARGE.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/reference-schedules/{referenceId}/comparison:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+      - $ref: '#/components/parameters/ReferenceScheduleId'
+    get:
+      tags: [Debt]
+      operationId: getLoanScheduleComparison
+      summary: Compare the loan schedule with a bank table installment by installment
+      description: |
+        Matches by installment number and reports, per installment, the due date and each component on both sides with the difference (bank
+        minus system) and whether it matches to the cent; the summary has the matching installments, the first different one, the sum of the
+        differences per component, the reference principal against the loan principal and the installments present on one side only.
+        `suggestions` are deterministic hints (other day-count conventions and whether the differences are limited to dates, charges, the
+        last installment or the principal sum); they never change the loan.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Compare the loan schedule with a bank table installment by installment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScheduleComparison' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/reference-schedules/{referenceId}/comparison/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+      - $ref: '#/components/parameters/ReferenceScheduleId'
+    get:
+      tags: [Debt]
+      operationId: exportLoanScheduleComparison
+      summary: Export the comparison report as CSV
+      description: |
+        Synchronous download (`text/csv`) with one row per installment: system and bank values and their difference per component.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Export the comparison report as CSV
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/reference-schedules/{referenceId}/comparison/explanation:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+      - $ref: '#/components/parameters/ReferenceScheduleId'
+    post:
+      tags: [Debt]
+      operationId: explainLoanScheduleComparison
+      summary: Record the explanation of the differences of a comparison
+      description: |
+        A comparison with differences becomes `EXPLAINED` with the text, its author and date, for the reference and schedule versions compared. A comparison without differences cannot be explained (422).
+      x-openspec-capability: [debt/amortization]
+      x-required-role: EDITOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExplainInput' }
+      responses:
+        '200':
+          description: Record the explanation of the differences of a comparison
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScheduleComparison' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: getLoanLifecycle
+      summary: Lifecycle of a loan
+      description: |
+        Machine `LOAN_LIFECYCLE` (docs/31 D37): register in draft, disburse or register an ongoing loan, pay off, reactivate by voiding the payment that paid it off and cancel; payments and their voids are annotations.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Lifecycle of a loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: exportLoanLifecycle
+      summary: Export the lifecycle of a loan (CSV or PDF)
+      description: |
+        Same synchronous download as the other lifecycles (docs/31 D52); the export is audited.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -8177,6 +8824,24 @@ components:
       in: path
       required: true
       description: Subscription price history entry UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    LoanId:
+      name: loanId
+      in: path
+      required: true
+      description: Loan UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    LoanPaymentId:
+      name: paymentId
+      in: path
+      required: true
+      description: Loan payment UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    ReferenceScheduleId:
+      name: referenceId
+      in: path
+      required: true
+      description: Reference schedule (bank table) UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
     SubscriptionProposalId:
       name: proposalId
@@ -8587,6 +9252,20 @@ components:
         - IMPORT_TOO_MANY_ROWS                   # 422 (add-basic-csv-import: more data rows than IMPORT_CSV_MAX_ROWS)
         - IMPORT_MAPPING_INVALID                 # 422 (add-basic-csv-import: missing columns or unassigned date, description or amount)
         - IMPORT_REVIEW_INCOMPLETE               # 409 (add-basic-csv-import: possible duplicates without a decision; details.pendingDecisions)
+        - LOAN_METHOD_NOT_AVAILABLE              # 422 (add-loans: only the French method is available)
+        - LOAN_ACCOUNT_INVALID                   # 422 (add-loans: the loan account is not an active loan account)
+        - LOAN_ACCOUNT_IN_USE                    # 409 (add-loans: the account already backs another non-cancelled loan)
+        - LOAN_ACCOUNT_NOT_EMPTY                 # 409 (add-loans: a new loan needs a zero-balance loan account)
+        - LOAN_BALANCE_MISMATCH                  # 422 (add-loans: the account balance differs from the declared outstanding principal; details.accountBalance, details.declared)
+        - LOAN_NOT_DRAFT                         # 409 (add-loans: the operation needs a draft loan)
+        - LOAN_NOT_ACTIVE                        # 409 (add-loans: the operation needs an active loan)
+        - LOAN_TERMS_LOCKED                      # 409 (add-loans: financial terms of a non-draft loan cannot be edited)
+        - LOAN_OVERPAYMENT                       # 422 (add-loans: the payment or its principal exceeds what is still owed)
+        - LOAN_PAYMENT_NOT_LATEST                # 409 (add-loans: only the most recent active payment can be voided)
+        - LOAN_HAS_PAYMENTS                      # 409 (add-loans: a loan with active payments cannot be cancelled)
+        - LOAN_REFERENCE_INVALID                 # 422 (add-loans: the bank schedule has invalid rows; details.rows[])
+        - PAYMENT_BREAKDOWN_MISMATCH             # 422 (add-loans: the breakdown does not add up to the amount; details.sum, details.amount)
+        - TRANSACTION_MANAGED_EXTERNALLY         # 409 (add-loans: the transaction is managed by a loan; details.managedBy, details.loanId)
 
     # ── Identity ──
     WorkspaceRole:
@@ -9094,7 +9773,9 @@ components:
       type: string
       description: |
         A credit-card payment is a `TRANSFER` ASSET → LIABILITY (docs/31 D18); there is no dedicated kind.
-        LOAN_DISBURSEMENT and LOAN_PAYMENT are produced by Debt (Phase 4).
+        LOAN_DISBURSEMENT and LOAN_PAYMENT are produced by a loan (Debt) and managed by it: creating them through
+        `POST /transactions` answers 422 `VALIDATION_FAILED`; editing amounts, accounts, date or splits or voiding them
+        there answers 409 `TRANSACTION_MANAGED_EXTERNALLY` (`managedBy`, `loanId`).
       enum: [INCOME, EXPENSE, TRANSFER, REFUND, ADJUSTMENT, OPENING_BALANCE, CONVERSION, LOAN_DISBURSEMENT, LOAN_PAYMENT]
     TransactionStatus:
       type: string
@@ -9305,6 +9986,16 @@ components:
         externalRef:
           oneOf:
             - $ref: '#/components/schemas/ExternalRef'
+            - type: 'null'
+        loanId:
+          description: Loan that manages the transaction (kinds LOAN_DISBURSEMENT and LOAN_PAYMENT); null otherwise.
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        loanPaymentBreakdown:
+          description: Breakdown of a LOAN_PAYMENT (principal reduces the debt; the rest is expense); null otherwise.
+          oneOf:
+            - $ref: '#/components/schemas/LoanPaymentBreakdown'
             - type: 'null'
         revision:
           type: integer
@@ -11458,11 +12149,11 @@ components:
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
       # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription]
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
@@ -12937,16 +13628,26 @@ components:
     RecurringKind:
       type: string
       description: >-
-        Kind of a recurring definition. `LOAN_PAYMENT` and `CARD_PAYMENT` are reserved for Phase 4 (`debt/*`) and are
-        rejected with 422 `RECURRING_KIND_NOT_AVAILABLE`; today a card payment is a `TRANSFER` to the liability account.
+        Kind of a recurring definition. `LOAN_PAYMENT` (loan installments) is created and revised only by the loan that
+        manages it (`managedBy = DEBT`, explicit installment schedule, notify-only): it is readable here but a user
+        `POST`/`PATCH` of it is still rejected with 422 `RECURRING_KIND_NOT_AVAILABLE`. `CARD_PAYMENT` stays reserved
+        for Phase 4 (`debt/*`); today a card payment is a `TRANSFER` to the liability account.
       enum: [INCOME, EXPENSE, TRANSFER, LOAN_PAYMENT, CARD_PAYMENT]
-      x-reserved: [LOAN_PAYMENT, CARD_PAYMENT]
+      x-reserved: [CARD_PAYMENT]
+      x-managed: [LOAN_PAYMENT]
     RecurringStatus:
       type: string
       enum: [ACTIVE, PAUSED, ENDED]
     RecurringCadence:
       type: string
       description: Predefined cadences (with an interval N) or `CUSTOM` (a subset of RRULE).
+      # x-extensible-enum (oasdiff): el calendario explícito (`EXPLICIT`, cuotas de préstamo administradas) se agrega
+      # sin romper a los clientes; las peticiones usan `RecurringCadenceInput` (conjunto cerrado, sin `EXPLICIT`).
+      x-extensible-enum: [DAILY, WEEKLY, BIWEEKLY, SEMIMONTHLY, MONTHLY, BIMONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL, CUSTOM, EXPLICIT]
+      x-managed: [EXPLICIT]
+    RecurringCadenceInput:
+      type: string
+      description: Cadence accepted in requests (closed set; `EXPLICIT` is created only by the managing context).
       enum: [DAILY, WEEKLY, BIWEEKLY, SEMIMONTHLY, MONTHLY, BIMONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL, CUSTOM]
     RecurringWeekendAdjustment:
       type: string
@@ -12967,7 +13668,7 @@ components:
       additionalProperties: false
       required: [cadence, startDate]
       properties:
-        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        cadence: { $ref: '#/components/schemas/RecurringCadenceInput' }
         interval: { type: integer, minimum: 1, maximum: 120, default: 1 }
         monthDays:
           type: array
@@ -12995,7 +13696,7 @@ components:
       description: Partial schedule of a revision; omitted fields keep their value (a new cadence or interval restarts the anchor at the effective date).
       additionalProperties: false
       properties:
-        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        cadence: { $ref: '#/components/schemas/RecurringCadenceInput' }
         interval: { type: integer, minimum: 1, maximum: 120 }
         monthDays:
           type: array
@@ -13852,7 +14553,7 @@ components:
       additionalProperties: false
       required: [cadence]
       properties:
-        cadence: { $ref: '#/components/schemas/RecurringCadence' }
+        cadence: { $ref: '#/components/schemas/RecurringCadenceInput' }
         interval: { type: integer, minimum: 1, maximum: 120, default: 1 }
         monthDays:
           type: array
@@ -14446,3 +15147,514 @@ components:
           type: array
           items: { $ref: '#/components/schemas/ResolvedRate' }
         generatedAt: { $ref: '#/components/schemas/Instant' }
+
+    # ── Debt: préstamos (openspec add-loans) ──
+    LoanStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, PAID_OFF, CANCELLED]
+      x-extensible-enum: true
+    LoanMethod:
+      type: string
+      description: Only `FRENCH` is available in Phase 4; the others answer 422 `LOAN_METHOD_NOT_AVAILABLE`.
+      enum: [FRENCH, GERMAN, FIXED_PRINCIPAL, CUSTOM]
+    LoanRateType:
+      type: string
+      enum: [FIXED, VARIABLE]
+    LoanDayCount:
+      type: string
+      description: 30/360 European (default), actual/360 or actual/365.
+      enum: [D30_360, ACT_360, ACT_365]
+    LoanFrequency:
+      type: string
+      enum: [MONTHLY, BIMONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL]
+    LoanPaymentBreakdown:
+      type: object
+      additionalProperties: false
+      required: [principal, interest, fees, insurance, taxes]
+      properties:
+        principal: { $ref: '#/components/schemas/Money' }
+        interest: { $ref: '#/components/schemas/Money' }
+        fees: { $ref: '#/components/schemas/Money' }
+        insurance: { $ref: '#/components/schemas/Money' }
+        taxes: { $ref: '#/components/schemas/Money' }
+    LoanChargeSpec:
+      type: object
+      description: A per-installment charge. `FIXED`, `value` is the amount per installment in the loan currency; `RATE_ON_BALANCE`, `value` is the MONTHLY rate as a decimal fraction ("0.0004" = 0.0400 %) over the balance at the start of the period.
+      additionalProperties: false
+      required: [mode, value]
+      properties:
+        mode: { type: string, enum: [FIXED, RATE_ON_BALANCE] }
+        value: { $ref: '#/components/schemas/PositiveDecimalString' }
+    LoanCharges:
+      type: object
+      additionalProperties: false
+      properties:
+        fees: { $ref: '#/components/schemas/LoanChargeSpec' }
+        insurance: { $ref: '#/components/schemas/LoanChargeSpec' }
+        taxes: { $ref: '#/components/schemas/LoanChargeSpec' }
+    LoanAccountRef:
+      type: object
+      description: An existing `loan` account (`id`) or an account created in the same act (`create`).
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        create:
+          type: object
+          additionalProperties: false
+          required: [name]
+          properties:
+            name: { type: string, minLength: 1, maxLength: 120 }
+            institutionId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+    LoanExistingInput:
+      type: object
+      description: Ongoing loan (`origin = EXISTING`) declaration. `principal` is the outstanding principal at `asOf`; `termInstallments` the remaining installments; `firstDueDate` the due date of installment `nextInstallmentNo`.
+      additionalProperties: false
+      required: [asOf, nextInstallmentNo]
+      properties:
+        asOf: { $ref: '#/components/schemas/LocalDate' }
+        nextInstallmentNo: { type: integer, minimum: 1 }
+    LoanPreviewInput:
+      type: object
+      description: Loan terms; the same fields as `LoanInput` without accounts.
+      additionalProperties: false
+      required: [name, principal, annualRate, termInstallments, firstDueDate]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        origin: { type: string, enum: [NEW, EXISTING], default: NEW }
+        principal: { $ref: '#/components/schemas/PositiveMoney' }
+        annualRate: { $ref: '#/components/schemas/DecimalString' }
+        rateType: { $ref: '#/components/schemas/LoanRateType' }
+        dayCount: { $ref: '#/components/schemas/LoanDayCount' }
+        frequency: { $ref: '#/components/schemas/LoanFrequency' }
+        termInstallments: { type: integer, minimum: 1, maximum: 600 }
+        method: { $ref: '#/components/schemas/LoanMethod' }
+        disbursementDate: { $ref: '#/components/schemas/LocalDate' }
+        firstDueDate: { $ref: '#/components/schemas/LocalDate' }
+        charges: { $ref: '#/components/schemas/LoanCharges' }
+        existing: { $ref: '#/components/schemas/LoanExistingInput' }
+    LoanInput:
+      type: object
+      description: |
+        `annualRate` is a decimal fraction between 0 and 1 ("0.115" = 11.50 % nominal annual). New loans need `disbursementDate`; ongoing loans need `existing`
+        and take `existing.asOf` as the accrual start. The first due date must be after the disbursement date.
+      additionalProperties: false
+      required: [name, account, disbursementAccountId, principal, annualRate, termInstallments, firstDueDate]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        origin: { type: string, enum: [NEW, EXISTING], default: NEW }
+        account: { $ref: '#/components/schemas/LoanAccountRef' }
+        disbursementAccountId: { $ref: '#/components/schemas/Uuid' }
+        paymentAccountId: { $ref: '#/components/schemas/Uuid' }
+        lenderCounterpartyId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        principal: { $ref: '#/components/schemas/PositiveMoney' }
+        annualRate: { $ref: '#/components/schemas/DecimalString' }
+        rateType: { $ref: '#/components/schemas/LoanRateType' }
+        dayCount: { $ref: '#/components/schemas/LoanDayCount' }
+        frequency: { $ref: '#/components/schemas/LoanFrequency' }
+        termInstallments: { type: integer, minimum: 1, maximum: 600 }
+        method: { $ref: '#/components/schemas/LoanMethod' }
+        disbursementDate: { $ref: '#/components/schemas/LocalDate' }
+        firstDueDate: { $ref: '#/components/schemas/LocalDate' }
+        charges: { $ref: '#/components/schemas/LoanCharges' }
+        existing: { $ref: '#/components/schemas/LoanExistingInput' }
+        disburseNow: { type: boolean, default: false }
+        retainedFee: { $ref: '#/components/schemas/DecimalString' }
+    LoanUpdate:
+      type: object
+      description: Name, lender and payment account always; the remaining fields only while the loan is a draft (otherwise 409 `LOAN_TERMS_LOCKED`).
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        lenderCounterpartyId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        paymentAccountId: { $ref: '#/components/schemas/Uuid' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        disbursementAccountId: { $ref: '#/components/schemas/Uuid' }
+        principal: { $ref: '#/components/schemas/PositiveMoney' }
+        annualRate: { $ref: '#/components/schemas/DecimalString' }
+        rateType: { $ref: '#/components/schemas/LoanRateType' }
+        dayCount: { $ref: '#/components/schemas/LoanDayCount' }
+        frequency: { $ref: '#/components/schemas/LoanFrequency' }
+        termInstallments: { type: integer, minimum: 1, maximum: 600 }
+        method: { $ref: '#/components/schemas/LoanMethod' }
+        disbursementDate: { $ref: '#/components/schemas/LocalDate' }
+        firstDueDate: { $ref: '#/components/schemas/LocalDate' }
+        charges: { $ref: '#/components/schemas/LoanCharges' }
+    DisburseInput:
+      type: object
+      additionalProperties: false
+      properties:
+        retainedFee:
+          $ref: '#/components/schemas/DecimalString'
+    CancelInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    VoidInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    LoanExisting:
+      type: object
+      additionalProperties: false
+      required: [asOf, outstanding, nextInstallmentNo]
+      properties:
+        asOf: { $ref: '#/components/schemas/LocalDate' }
+        outstanding: { $ref: '#/components/schemas/Money' }
+        nextInstallmentNo: { type: integer, minimum: 1 }
+    Loan:
+      type: object
+      required:
+        [id, name, status, origin, accountId, disbursementAccountId, paymentAccountId, lenderCounterpartyId, lenderName,
+         principal, annualRate, rateType, dayCount, frequency, termInstallments, method, disbursementDate, firstDueDate,
+         charges, retainedFee, existing, currentScheduleVersion, recurringDefinitionId, disbursementTransactionId,
+         cancelledReason, version, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/LoanStatus' }
+        origin: { type: string, enum: [NEW, EXISTING] }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        disbursementAccountId: { $ref: '#/components/schemas/Uuid' }
+        paymentAccountId: { $ref: '#/components/schemas/Uuid' }
+        lenderCounterpartyId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        lenderName: { type: [string, 'null'] }
+        principal: { $ref: '#/components/schemas/Money' }
+        annualRate: { $ref: '#/components/schemas/DecimalString' }
+        rateType: { $ref: '#/components/schemas/LoanRateType' }
+        dayCount: { $ref: '#/components/schemas/LoanDayCount' }
+        frequency: { $ref: '#/components/schemas/LoanFrequency' }
+        termInstallments: { type: integer }
+        method: { $ref: '#/components/schemas/LoanMethod' }
+        disbursementDate: { $ref: '#/components/schemas/LocalDate' }
+        firstDueDate: { $ref: '#/components/schemas/LocalDate' }
+        charges: { $ref: '#/components/schemas/LoanCharges' }
+        retainedFee: { $ref: '#/components/schemas/Money' }
+        existing: { oneOf: [{ $ref: '#/components/schemas/LoanExisting' }, { type: 'null' }] }
+        currentScheduleVersion: { type: [integer, 'null'] }
+        recurringDefinitionId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        disbursementTransactionId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        cancelledReason: { type: [string, 'null'] }
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+    LoanList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Loan' }
+    ScheduleInstallment:
+      type: object
+      required: [n, dueDate, periodStart, periodEnd, principal, interest, fees, insurance, taxes, total, openingBalance, closingBalance]
+      properties:
+        n: { type: integer, minimum: 1 }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        periodStart: { $ref: '#/components/schemas/LocalDate' }
+        periodEnd: { $ref: '#/components/schemas/LocalDate' }
+        principal: { $ref: '#/components/schemas/DecimalString' }
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+        total: { $ref: '#/components/schemas/DecimalString' }
+        openingBalance: { $ref: '#/components/schemas/DecimalString' }
+        closingBalance: { $ref: '#/components/schemas/DecimalString' }
+    SchedulePreview:
+      type: object
+      additionalProperties: false
+      required: [currency, installmentAmount, leveled, totalInterest, totalAmount, installments]
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        installmentAmount: { $ref: '#/components/schemas/DecimalString' }
+        leveled:
+          type: boolean
+          description: "`true` when the level installment applies (actual/360, actual/365 or an irregular first period): the smallest installment in cents that minimises |last - installment|."
+        totalInterest: { $ref: '#/components/schemas/DecimalString' }
+        totalAmount: { $ref: '#/components/schemas/DecimalString' }
+        installments:
+          type: array
+          items: { $ref: '#/components/schemas/ScheduleInstallment' }
+    LoanNextInstallment:
+      type: object
+      additionalProperties: false
+      required: [n, dueDate, outstanding, overdueDays]
+      properties:
+        n: { type: integer }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        outstanding: { $ref: '#/components/schemas/Money' }
+        overdueDays: { type: integer, minimum: 0 }
+    LoanPaidTotals:
+      type: object
+      additionalProperties: false
+      required: [principal, interest, fees, insurance, taxes]
+      properties:
+        principal: { $ref: '#/components/schemas/Money' }
+        interest: { $ref: '#/components/schemas/Money' }
+        fees: { $ref: '#/components/schemas/Money' }
+        insurance: { $ref: '#/components/schemas/Money' }
+        taxes: { $ref: '#/components/schemas/Money' }
+    LoanDetail:
+      allOf:
+        - $ref: '#/components/schemas/Loan'
+        - type: object
+          required:
+            [outstandingPrincipal, accountBalance, unreconciledDifference, installmentAmount, nextInstallment,
+             overdueInstallments, paidTotals, preview]
+          properties:
+            outstandingPrincipal:
+              description: Principal pending according to the schedule; null for a draft or a cancelled loan.
+              oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+            accountBalance:
+              description: Balance owed according to the loan account.
+              $ref: '#/components/schemas/Money'
+            unreconciledDifference:
+              description: Outstanding principal minus the account balance (movements of the account not registered as loan payments).
+              oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+            installmentAmount:
+              oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+            nextInstallment:
+              oneOf: [{ $ref: '#/components/schemas/LoanNextInstallment' }, { type: 'null' }]
+            overdueInstallments:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [n, dueDate, outstanding, overdueDays]
+                properties:
+                  n: { type: integer }
+                  dueDate: { $ref: '#/components/schemas/LocalDate' }
+                  outstanding: { $ref: '#/components/schemas/Money' }
+                  overdueDays: { type: integer, minimum: 0 }
+            paidTotals: { $ref: '#/components/schemas/LoanPaidTotals' }
+            preview:
+              description: Preview of the schedule (draft loans only).
+              oneOf: [{ $ref: '#/components/schemas/SchedulePreview' }, { type: 'null' }]
+    LoanComponents:
+      type: object
+      additionalProperties: false
+      required: [taxes, insurance, fees, interest, principal]
+      properties:
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        principal: { $ref: '#/components/schemas/DecimalString' }
+    LoanInstallment:
+      allOf:
+        - $ref: '#/components/schemas/ScheduleInstallment'
+        - type: object
+          required: [id, status, overdue, expected, paid, differences, pendingTotal]
+          properties:
+            id: { type: string }
+            status: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID] }
+            overdue: { type: boolean }
+            expected: { $ref: '#/components/schemas/LoanComponents' }
+            paid: { $ref: '#/components/schemas/LoanComponents' }
+            differences: { $ref: '#/components/schemas/LoanComponents' }
+            pendingTotal: { $ref: '#/components/schemas/DecimalString' }
+    InstallmentList:
+      type: object
+      additionalProperties: false
+      required: [scheduleVersion, data]
+      properties:
+        scheduleVersion: { type: [integer, 'null'] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/LoanInstallment' }
+    LoanPaymentBreakdownInput:
+      type: object
+      description: Explicit breakdown of a payment (one installment). Omitted components are zero; the components must add up to `amount`.
+      additionalProperties: false
+      properties:
+        principal: { $ref: '#/components/schemas/DecimalString' }
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+    LoanPaymentInput:
+      type: object
+      additionalProperties: false
+      required: [amount, businessDate]
+      properties:
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        accountId:
+          description: Payment account; defaults to the usual payment account of the loan.
+          $ref: '#/components/schemas/Uuid'
+        paymentMethod: { type: [string, 'null'], maxLength: 40 }
+        installmentNo: { type: integer, minimum: 1 }
+        breakdown: { $ref: '#/components/schemas/LoanPaymentBreakdownInput' }
+    LoanPayment:
+      type: object
+      additionalProperties: false
+      required:
+        [id, loanId, paymentNo, transactionId, accountId, businessDate, amount, principal, interest, fees, insurance, taxes,
+         explicitBreakdown, paymentMethod, status, installmentNos, voidedAt, voidedReason, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        loanId: { $ref: '#/components/schemas/Uuid' }
+        paymentNo: { type: integer, minimum: 1 }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        amount: { $ref: '#/components/schemas/Money' }
+        principal: { $ref: '#/components/schemas/DecimalString' }
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+        explicitBreakdown: { type: boolean }
+        paymentMethod: { type: [string, 'null'] }
+        status: { type: string, enum: [ACTIVE, VOIDED] }
+        installmentNos:
+          type: array
+          items: { type: integer }
+        voidedAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+        voidedReason: { type: [string, 'null'] }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    LoanPaymentResult:
+      type: object
+      additionalProperties: false
+      required: [payment, loan]
+      properties:
+        payment: { $ref: '#/components/schemas/LoanPayment' }
+        loan: { $ref: '#/components/schemas/Loan' }
+    LoanPaymentList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/LoanPayment' }
+    ReferenceColumnMapping:
+      type: object
+      description: Each field is a 0-based column index or the header name.
+      additionalProperties: false
+      required: [installmentNo, dueDate, principal, interest]
+      properties:
+        installmentNo: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        dueDate: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        principal: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        interest: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        fees: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        insurance: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        taxes: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        total: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+        balance: { oneOf: [{ type: integer, minimum: 0 }, { type: string }] }
+    ReferenceManualRow:
+      type: object
+      additionalProperties: false
+      required: [n, dueDate, principal, interest]
+      properties:
+        n: { type: integer, minimum: 1 }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        principal: { $ref: '#/components/schemas/DecimalString' }
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+        total: { $ref: '#/components/schemas/DecimalString' }
+        balance: { $ref: '#/components/schemas/DecimalString' }
+    ReferenceInput:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        source: { type: string, enum: [CSV, PASTE, MANUAL] }
+        text: { type: string, maxLength: 262144 }
+        delimiter: { type: string, enum: [',', ';', "\t"] }
+        hasHeader: { type: boolean, default: true }
+        mapping: { $ref: '#/components/schemas/ReferenceColumnMapping' }
+        dateFormat: { type: string, enum: [DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY] }
+        decimalSeparator: { type: string, enum: [',', '.'] }
+        rows:
+          type: array
+          maxItems: 600
+          items: { $ref: '#/components/schemas/ReferenceManualRow' }
+    ReferencePreviewInput:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 262144 }
+        delimiter: { type: string, enum: [',', ';', "\t"] }
+        hasHeader: { type: boolean, default: true }
+    ReferencePreview:
+      type: object
+      additionalProperties: false
+      required: [delimiter, headers, rowCount, preview]
+      properties:
+        delimiter: { type: string }
+        headers:
+          type: array
+          items: { type: string }
+        rowCount: { type: integer }
+        preview:
+          type: array
+          items:
+            type: array
+            items: { type: string }
+    ReferenceSchedule:
+      type: object
+      required: [id, referenceVersion, source, rowCount, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        referenceVersion: { type: integer, minimum: 1 }
+        source: { type: string, enum: [CSV, PASTE, MANUAL] }
+        rowCount: { type: integer }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    ReferenceList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ReferenceSchedule' }
+    ScheduleComparison:
+      type: object
+      description: Rows and summary as computed by the comparator; `status` is `MATCH` (no differences), `EXPLAINED` or `UNEXPLAINED`.
+      additionalProperties: false
+      required:
+        [referenceId, referenceVersion, scheduleVersion, status, explanation, explainedBy, explainedAt, matched, totalRows,
+         firstDifferenceNo, summary, rows, suggestions]
+      properties:
+        referenceId: { $ref: '#/components/schemas/Uuid' }
+        referenceVersion: { type: integer }
+        scheduleVersion:
+          type: integer
+          description: Schedule version compared; 0 is the preview of a draft.
+        status: { type: string, enum: [MATCH, UNEXPLAINED, EXPLAINED] }
+        explanation: { type: [string, 'null'] }
+        explainedBy: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        explainedAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+        matched: { type: integer }
+        totalRows: { type: integer }
+        firstDifferenceNo: { type: [integer, 'null'] }
+        summary: { type: object, additionalProperties: true }
+        rows:
+          type: array
+          items: { type: object, additionalProperties: true }
+        suggestions:
+          type: array
+          items: { type: object, additionalProperties: true }
+    ReferenceUploadResult:
+      allOf:
+        - $ref: '#/components/schemas/ReferenceSchedule'
+        - type: object
+          required: [comparison]
+          properties:
+            comparison: { $ref: '#/components/schemas/ScheduleComparison' }
+    ExplainInput:
+      type: object
+      additionalProperties: false
+      required: [explanation]
+      properties:
+        explanation: { type: string, minLength: 1, maxLength: 1000 }

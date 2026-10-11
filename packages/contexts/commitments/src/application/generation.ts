@@ -94,6 +94,8 @@ export async function generateOccurrences(
       expected: c.expected,
       currency: c.currency,
       at,
+      scheduleKey: c.scheduleKey ?? null,
+      sharesTransaction: s.kind === 'LOAN_PAYMENT',
     }),
   );
   const inserted = created.length > 0 ? await deps.occurrences.insertIfAbsent(created) : [];

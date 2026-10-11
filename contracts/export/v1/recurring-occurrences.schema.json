@@ -30,7 +30,9 @@
     "last_auto_create_error",
     "last_auto_create_on",
     "version",
-    "created_at"
+    "created_at",
+    "schedule_key",
+    "shares_transaction"
   ],
   "properties": {
     "id": {
@@ -156,6 +158,15 @@
     "created_at": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "schedule_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "shares_transaction": {
+      "type": "boolean"
     }
   },
   "x-pfos-table": "commitments.recurring_occurrence",

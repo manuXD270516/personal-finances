@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: []
 requirement: 'Préstamo saldado y préstamo cancelado'
 scenario: 'Cancelar un desembolso registrado por error'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-002', 'FR-DEBT-011']
 nfr: []
 invariants: ['INV-008']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/debt/src/domain/loan.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'cancel']

@@ -41,7 +41,8 @@
     "menu": "Menú de navegación",
     "userMenu": "Menú de la cuenta",
     "language": "Idioma",
-    "recurringPending": "{count, plural, one {# pago por aprobar} other {# pagos por aprobar}}"
+    "recurringPending": "{count, plural, one {# pago por aprobar} other {# pagos por aprobar}}",
+    "debt": "Deudas"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -2812,6 +2813,15 @@
       "dismissed": "Descartaste la coincidencia con {name}. No se volverá a sugerir.",
       "viewOccurrence": "Ver el pago recurrente",
       "viewTransaction": "Ver la transacción"
+    },
+    "loan": {
+      "origin": "Préstamo:",
+      "viewLoans": "Ver préstamos",
+      "registerPayment": "Registrar pago",
+      "registerPaymentLabel": "Registrar el pago de {name} del {date} en el préstamo",
+      "managedNotice": "Esta cuota la administra el préstamo; se resuelve al registrar el pago allí.",
+      "definitionManaged": "Estas cuotas las administra un préstamo: no se pausan ni se editan aquí.",
+      "openLoan": "Abrir el préstamo"
     }
   },
   "Subscriptions": {
@@ -3589,6 +3599,444 @@
       "linksLabel": "Siguientes pasos",
       "viewTransactions": "Ver las transacciones de la cuenta",
       "importAnother": "Importar otro archivo"
+    }
+  },
+  "Debt": {
+    "title": "Deudas",
+    "intro": "Tus préstamos: cuánto debes, la próxima cuota y cómo se compara tu cronograma con la tabla del banco.",
+    "viewerNotice": "Solo puedes consultar los préstamos; registrar o pagar requiere el rol de editor.",
+    "loading": "Cargando…",
+    "notFound": "No encontramos este préstamo. Es posible que se haya eliminado o que no tengas acceso.",
+    "back": "Volver a Deudas",
+    "cancelAction": "Cancelar",
+    "reason": "Motivo",
+    "debtAmount": "Deuda {amount}",
+    "columns": {
+      "n": "Nº",
+      "due": "Vencimiento",
+      "total": "Cuota",
+      "balance": "Saldo",
+      "state": "Estado"
+    },
+    "components": {
+      "principal": "Capital",
+      "interest": "Interés",
+      "fees": "Comisiones",
+      "insurance": "Seguro",
+      "taxes": "Impuestos"
+    },
+    "status": {
+      "DRAFT": "Borrador",
+      "ACTIVE": "Activo",
+      "PAID_OFF": "Saldado",
+      "CANCELLED": "Cancelado"
+    },
+    "dayCount": {
+      "D30_360": "30/360",
+      "ACT_360": "Real/360",
+      "ACT_365": "Real/365"
+    },
+    "frequency": {
+      "MONTHLY": "Mensual",
+      "BIMONTHLY": "Bimestral",
+      "QUARTERLY": "Trimestral",
+      "SEMIANNUAL": "Semestral",
+      "ANNUAL": "Anual"
+    },
+    "list": {
+      "region": "Tabla de préstamos",
+      "caption": "Préstamos con su estado, deuda pendiente, próxima cuota y atraso",
+      "name": "Préstamo",
+      "outstanding": "Deuda pendiente",
+      "next": "Próxima cuota",
+      "overdue": "Atraso",
+      "new": "Nuevo préstamo",
+      "empty": "Aún no registraste préstamos. Crea uno nuevo o registra uno en curso para ver su cronograma y sus cuotas.",
+      "nextValue": "Cuota {n} · {date} · {amount}",
+      "overdueDays": "{days, plural, one {# día de atraso} other {# días de atraso}}"
+    },
+    "form": {
+      "title": "Nuevo préstamo",
+      "origin": "¿Qué vas a registrar?",
+      "origins": {
+        "NEW": "Préstamo nuevo",
+        "EXISTING": "Préstamo en curso"
+      },
+      "originHint": {
+        "NEW": "Se guarda como borrador con la vista previa del cronograma; al desembolsar se registra el ingreso y se fijan las cuotas.",
+        "EXISTING": "Ya tienes cuotas pagadas: indica el saldo pendiente y la próxima cuota. No se registra ningún desembolso."
+      },
+      "terms": "Condiciones",
+      "name": "Nombre",
+      "currency": "Moneda",
+      "principal": "Principal",
+      "outstanding": "Saldo pendiente",
+      "outstandingHint": "Principal que aún debes a la fecha del saldo.",
+      "rate": "Tasa nominal anual (%)",
+      "rateHint": "En porcentaje, por ejemplo 11,50.",
+      "dayCount": "Convención de días",
+      "frequency": "Periodicidad",
+      "term": "Número de cuotas",
+      "remaining": "Cuotas restantes",
+      "termHint": "Entre 1 y 600.",
+      "disbursementDate": "Fecha de desembolso",
+      "firstDue": "Fecha de la primera cuota",
+      "asOf": "Fecha del saldo",
+      "nextNo": "Número de la próxima cuota",
+      "nextDue": "Fecha de la próxima cuota",
+      "charges": "Cargos por cuota (opcionales)",
+      "chargesHint": "Comisión, seguro e impuestos: un monto fijo por cuota o una tasa mensual sobre el saldo.",
+      "chargeKind": {
+        "fees": "Comisión",
+        "insurance": "Seguro",
+        "taxes": "Impuestos"
+      },
+      "chargeModes": {
+        "NONE": "Sin cargo",
+        "FIXED": "Monto fijo por cuota",
+        "RATE_ON_BALANCE": "Tasa mensual sobre el saldo"
+      },
+      "chargeFixed": "Monto por cuota",
+      "chargeRate": "Tasa mensual (%)",
+      "chargeRateHint": "Por ejemplo 0,0400 % mensual sobre el saldo al inicio del periodo.",
+      "accounts": "Prestamista y cuentas",
+      "lender": "Prestamista",
+      "lenderHint": "Contraparte (opcional).",
+      "none": "Ninguno",
+      "choose": "Elige una opción",
+      "loanAccount": "Cuenta del préstamo",
+      "accountModes": {
+        "CREATE": "Crear la cuenta ahora",
+        "EXISTING": "Usar una cuenta de préstamo existente"
+      },
+      "newAccountName": "Nombre de la cuenta del préstamo",
+      "newAccountHint": "Se crea una cuenta de tipo préstamo (pasivo) en la misma moneda.",
+      "existingAccount": "Cuenta de préstamo",
+      "disbursementAccount": "Cuenta destino del desembolso",
+      "paymentAccount": "Cuenta de pago",
+      "paymentAccountHint": "Cuenta desde la que sueles pagar las cuotas.",
+      "disburseNow": "Desembolsar ahora",
+      "retainedFee": "Comisión retenida (opcional)",
+      "retainedFeeHint": "Se descuenta del monto que recibes y se registra como gasto.",
+      "fixErrors": "{count, plural, one {Hay # dato por corregir.} other {Hay # datos por corregir.}} Revisa los campos marcados.",
+      "saving": "Guardando…",
+      "save": "Guardar préstamo",
+      "saveAndDisburse": "Guardar y desembolsar"
+    },
+    "errors": {
+      "REQUIRED": "Es obligatorio.",
+      "INVALID": "El valor no es válido.",
+      "SCALE": "Tiene más decimales de los que admite la moneda.",
+      "NOT_POSITIVE": "Debe ser mayor que cero.",
+      "RANGE": "Está fuera del rango permitido.",
+      "DATE_ORDER": "Debe ser posterior a la fecha de desembolso o del saldo."
+    },
+    "preview": {
+      "title": "Vista previa del cronograma",
+      "waiting": "Completa el principal, la tasa, el número de cuotas y las fechas para ver el cronograma.",
+      "loading": "Calculando el cronograma…",
+      "region": "Tabla del cronograma",
+      "caption": "Cronograma de cuotas con capital, interés y saldo",
+      "installment": "Cuota",
+      "totalInterest": "Interés total",
+      "totalAmount": "Total a pagar",
+      "leveled": "La cuota se niveló: con días reales o un primer periodo irregular, la cuota constante minimiza la diferencia con la última.",
+      "totals": "Totales"
+    },
+    "summary": {
+      "lender": "Prestamista",
+      "account": "Cuenta del préstamo",
+      "paymentAccount": "Cuenta de pago",
+      "principal": "Principal",
+      "outstandingAtStart": "Saldo al registrarlo",
+      "rate": "Tasa nominal anual",
+      "dayCount": "Convención de días",
+      "frequency": "Periodicidad",
+      "term": "Cuotas",
+      "installment": "Cuota",
+      "disbursement": "Desembolso",
+      "firstDue": "Primera cuota",
+      "chargeFixed": "{amount} por cuota",
+      "chargeRate": "{rate} % mensual sobre el saldo",
+      "retainedFee": "Comisión retenida",
+      "cancelledReason": "Motivo de la cancelación"
+    },
+    "balances": {
+      "title": "Deuda",
+      "outstanding": "Principal pendiente (cronograma)",
+      "account": "Saldo de la cuenta",
+      "difference": "Diferencia no registrada",
+      "differenceNote": "La cuenta del préstamo tiene movimientos que no se registraron como pagos del préstamo. Regístralos como pagos para que coincidan.",
+      "paidTotals": "Pagado hasta hoy"
+    },
+    "next": {
+      "title": "Próxima cuota",
+      "value": "Cuota {n} del {date} por {amount}",
+      "overdue": "{count, plural, one {# cuota atrasada} other {# cuotas atrasadas}}",
+      "overdueItem": "Cuota {n} del {date}: faltan {amount} ({days, plural, one {# día} other {# días}} de atraso)"
+    },
+    "actions": {
+      "label": "Acciones del préstamo",
+      "pay": "Registrar pago",
+      "disburse": "Desembolsar",
+      "edit": "Editar",
+      "cancel": "Cancelar préstamo",
+      "compare": "Comparar con la tabla del banco"
+    },
+    "schedule": {
+      "title": "Cronograma",
+      "draftTitle": "Cronograma previsto"
+    },
+    "installments": {
+      "region": "Tabla del cronograma con su estado",
+      "caption": "Cuotas con su estado y lo esperado, pagado y la diferencia",
+      "expected": "Esperado",
+      "paid": "Pagado",
+      "difference": "Diferencia",
+      "detail": "Detalle",
+      "components": "Por componente",
+      "componentsCaption": "Esperado, pagado y diferencia por componente de la cuota {n}",
+      "component": "Componente",
+      "pay": "Pagar cuota {n}",
+      "state": {
+        "UNPAID": "Pendiente",
+        "PARTIALLY_PAID": "Parcial",
+        "PAID": "Pagada",
+        "OVERDUE": "Atrasada"
+      }
+    },
+    "payments": {
+      "title": "Pagos",
+      "region": "Tabla de pagos",
+      "caption": "Pagos del préstamo con su desglose",
+      "empty": "Todavía no hay pagos registrados.",
+      "no": "Nº",
+      "date": "Fecha",
+      "account": "Cuenta",
+      "amount": "Monto",
+      "breakdown": "Desglose",
+      "installments": "Cuotas",
+      "actions": "Acciones",
+      "explicit": "según recibo",
+      "voided": "Anulado",
+      "active": "Vigente",
+      "void": "Anular",
+      "voidLabel": "Anular el pago {n}"
+    },
+    "payment": {
+      "title": "Registrar pago",
+      "amount": "Monto pagado ({currency})",
+      "date": "Fecha del pago",
+      "account": "Cuenta de pago",
+      "method": "Medio de pago",
+      "mode": "Cómo repartir el pago",
+      "modes": {
+        "AUTO": "Automático",
+        "BREAKDOWN": "Desglose del recibo"
+      },
+      "modeHint": {
+        "AUTO": "El monto se reparte entre las cuotas pendientes en orden: impuestos, seguro, comisiones, interés y capital.",
+        "BREAKDOWN": "Copia los montos del recibo del banco para una sola cuota; la suma debe ser igual al monto pagado."
+      },
+      "installmentNo": "Número de cuota",
+      "sum": "Suma del desglose: {sum} {currency}",
+      "sumInvalid": "Algún monto del desglose no es válido.",
+      "sumMismatch": "Falta o sobra {delta} {currency} frente al monto pagado.",
+      "sumMatches": "Coincide con el monto pagado.",
+      "saving": "Registrando…",
+      "submit": "Registrar pago",
+      "done": "Pago registrado."
+    },
+    "disburse": {
+      "title": "Desembolsar el préstamo",
+      "hint": "Se registra el desembolso de {amount}, se fija el cronograma y se activan las cuotas.",
+      "submit": "Desembolsar",
+      "done": "Préstamo desembolsado."
+    },
+    "cancel": {
+      "title": "Cancelar el préstamo",
+      "description": "Un borrador no tiene efectos contables; uno activo sin pagos revierte su desembolso. Esta acción no se puede deshacer.",
+      "confirm": "Cancelar préstamo",
+      "done": "Préstamo cancelado."
+    },
+    "void": {
+      "title": "Anular el último pago",
+      "description": "Se revierte el pago y las cuotas vuelven a su estado anterior. Solo se puede anular el pago más reciente.",
+      "confirm": "Anular pago",
+      "done": "Pago anulado."
+    },
+    "edit": {
+      "title": "Editar préstamo",
+      "draftNote": "Mientras sea un borrador puedes cancelarlo y registrar uno nuevo para cambiar sus condiciones.",
+      "locked": "Las condiciones financieras de un préstamo activo están bloqueadas; puedes cambiar el nombre, el prestamista y la cuenta de pago.",
+      "save": "Guardar cambios",
+      "done": "Cambios guardados."
+    },
+    "compare": {
+      "title": "Comparar con la tabla del banco",
+      "titleFor": "Comparar {name} con la tabla del banco",
+      "intro": "Carga la tabla de amortización de tu banco y mira cuota por cuota, al centavo, en qué difiere de tu cronograma. La tabla no cambia el préstamo.",
+      "backToLoan": "Volver al préstamo",
+      "load": "Cargar la tabla del banco",
+      "source": "Cómo cargar la tabla",
+      "sources": {
+        "PASTE": "Pegar texto",
+        "CSV": "Subir un CSV",
+        "MANUAL": "Fila por fila"
+      },
+      "pasteLabel": "Tabla del banco",
+      "pasteHint": "Pega las filas con su encabezado (Nro, Fecha, Capital, Interés…). Hasta 256 KiB y 600 filas.",
+      "fileLabel": "Archivo CSV",
+      "fileHint": "Texto UTF-8, hasta 256 KiB y 600 filas. Se lee en tu navegador.",
+      "detect": "Detectar columnas",
+      "detected": "Detectamos {rows, plural, one {# fila} other {# filas}} y {columns, plural, one {# columna} other {# columnas}}. Confirma el separador y las columnas.",
+      "delimiter": "Separador",
+      "delimiterHint": "Si el separador es incorrecto, elige otro y se vuelve a leer.",
+      "delimiters": {
+        "semicolon": "Punto y coma (;)",
+        "comma": "Coma (,)",
+        "tab": "Tabulación"
+      },
+      "dateFormat": "Formato de fecha",
+      "dateFormats": {
+        "DD/MM/YYYY": "dd/mm/aaaa",
+        "YYYY-MM-DD": "aaaa-mm-dd",
+        "MM/DD/YYYY": "mm/dd/aaaa"
+      },
+      "decimal": "Separador decimal",
+      "decimals": {
+        "comma": "Coma (1234,56)",
+        "dot": "Punto (1234.56)"
+      },
+      "sampleRegion": "Muestra de la tabla cargada",
+      "sampleCaption": "Primeras filas de la tabla del banco",
+      "mapping": "Columnas",
+      "mappingHint": "Elige qué columna del encabezado corresponde a cada dato. Los marcados con * son obligatorios.",
+      "mappingMissing": "Falta elegir la columna de: {fields}.",
+      "noColumn": "Sin columna",
+      "fields": {
+        "installmentNo": "Nro de cuota",
+        "dueDate": "Fecha",
+        "principal": "Capital",
+        "interest": "Interés",
+        "fees": "Comisiones",
+        "insurance": "Seguro",
+        "taxes": "Impuestos",
+        "total": "Cuota",
+        "balance": "Saldo"
+      },
+      "upload": "Cargar y comparar",
+      "loading": "Cargando…",
+      "loaded": "Tabla cargada (versión {version}).",
+      "versions": "Tabla del banco",
+      "versionOption": "Versión {version} · {source} · {rows} filas · {date}",
+      "export": "Exportar el reporte en CSV",
+      "empty": "Todavía no cargaste una tabla del banco para comparar ({currency}).",
+      "manualHint": "Ingresa cada cuota de la tabla del banco. Capital e interés son obligatorios; los demás montos, opcionales.",
+      "manualRegion": "Filas de la tabla del banco",
+      "manualCaption": "Ingreso fila por fila de la tabla del banco",
+      "manualCols": {
+        "n": "Nro",
+        "dueDate": "Fecha",
+        "principal": "Capital",
+        "interest": "Interés",
+        "fees": "Comisiones",
+        "insurance": "Seguro",
+        "taxes": "Impuestos",
+        "total": "Cuota"
+      },
+      "manualActions": "Acciones",
+      "manualCell": "Fila {row}, {col}",
+      "manualRemove": "Quitar la fila {row}",
+      "manualRemoveShort": "Quitar",
+      "manualAdd": "Agregar fila",
+      "errors": {
+        "title": "{count, plural, one {La tabla tiene # error.} other {La tabla tiene # errores.}} No se guardó nada.",
+        "item": "Fila {row}, {field}",
+        "codes": {
+          "DATE_INVALID": "la fecha no es válida para el formato elegido",
+          "INSTALLMENT_NO_DUPLICATED": "el número de cuota está repetido",
+          "INSTALLMENT_NO_INVALID": "el número de cuota no es válido",
+          "MAPPING_COLUMN_NOT_FOUND": "no se encontró la columna elegida",
+          "TOTAL_MISMATCH": "la cuota no coincide con la suma de sus componentes",
+          "VALUE_MISSING": "falta el valor"
+        }
+      },
+      "status": {
+        "MATCH": "Coincide al centavo",
+        "EXPLAINED": "Diferencia explicada",
+        "UNEXPLAINED": "Con diferencias sin explicar"
+      },
+      "rowStatus": {
+        "MATCH": "Coincide",
+        "DIFFERENT": "Difiere",
+        "ONLY_REFERENCE": "Solo en el banco",
+        "ONLY_SYSTEM": "Solo en el sistema"
+      },
+      "components": {
+        "principal": "Capital",
+        "interest": "Interés",
+        "fees": "Comisiones",
+        "insurance": "Seguro",
+        "taxes": "Impuestos",
+        "total": "Cuota"
+      },
+      "summary": {
+        "title": "Resumen",
+        "matched": "{matched} de {total} cuotas coinciden.",
+        "first": "Primera diferencia: cuota {n}.",
+        "sums": "Suma de las diferencias (banco − sistema)",
+        "principal": "Capital total: banco {bank} frente a préstamo {loan}.",
+        "onlyReference": "Cuotas solo en la tabla del banco: {list}.",
+        "onlySystem": "Cuotas solo en el sistema: {list}.",
+        "dates": "Cuotas con otra fecha de vencimiento: {list}."
+      },
+      "suggestions": {
+        "title": "Sugerencias",
+        "conventionCurrent": "Con la convención actual ({dayCount}) coinciden {matching} de {total} cuotas ({interest} en el interés).",
+        "convention": "Con {dayCount} coincidirían {matching} de {total} cuotas ({interest} en el interés).",
+        "better": "Es mejor que la actual.",
+        "ONLY_DATES": "Solo difieren las fechas de vencimiento.",
+        "ONLY_CHARGES": "Capital e interés coinciden: la diferencia está en los cargos (comisiones, seguro o impuestos).",
+        "ONLY_LAST_INSTALLMENT": "Solo difiere la última cuota, dentro de la tolerancia de redondeo ({tolerance}).",
+        "PRINCIPAL_SUM_DIFFERS": "El capital de la tabla del banco difiere del principal del préstamo en {difference}."
+      },
+      "table": {
+        "title": "Reporte por cuota",
+        "onlyDiff": "Mostrar solo las cuotas con diferencias",
+        "region": "Tabla del reporte de comparación",
+        "caption": "Diferencia por componente (banco menos sistema) de cada cuota",
+        "diffOf": "Dif. {component}",
+        "detail": "Sistema y banco",
+        "detailCaption": "Valores del sistema y del banco de la cuota {n}",
+        "system": "Sistema",
+        "bank": "Banco",
+        "diff": "Diferencia",
+        "bankDate": "banco: {date}"
+      },
+      "explain": {
+        "title": "Explicar la diferencia",
+        "hint": "Si la diferencia es esperada (por ejemplo, redondeo del banco), explícala para dejarla registrada.",
+        "label": "Explicación",
+        "limit": "{count} de 1000 caracteres",
+        "submit": "Explicar la diferencia",
+        "update": "Actualizar la explicación",
+        "done": "Explicación guardada."
+      }
+    },
+    "transaction": {
+      "badge": "Préstamo",
+      "viewLoan": "Ver el préstamo",
+      "breakdownCaption": "Desglose del pago del préstamo"
+    },
+    "paymentMethods": {
+      "CASH": "Efectivo",
+      "QR": "QR",
+      "DEBIT_CARD": "Tarjeta de débito",
+      "CREDIT_CARD": "Tarjeta de crédito",
+      "BANK_TRANSFER": "Transferencia bancaria",
+      "DIGITAL_WALLET": "Billetera digital",
+      "OTHER": "Otro"
     }
   }
 }

@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: ['platform/event-delivery']
 requirement: 'Hechos publicados de los préstamos'
 scenario: 'Pago publicado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'events']

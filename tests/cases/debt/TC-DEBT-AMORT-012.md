@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Vista previa del cronograma'
 scenario: 'Vista previa sin efectos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-003']
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'preview']

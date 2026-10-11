@@ -30,6 +30,7 @@ import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructu
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
+import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
 import { ImportedTransactionsAdapter } from '../application/imported-transactions.adapter.js';
 import {
   PgDuplicateCandidatesQuery,
@@ -37,8 +38,10 @@ import {
   PgTransactionStatusQuery,
 } from '../infrastructure/pg-imported.js';
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
+import { LOAN_TRANSACTIONS_PORT } from '../contracts/index.js';
 import type {
   CounterpartyCategoryUsageQuery,
+  LoanTransactionsPort,
   DuplicateCandidatesQuery,
   ImportedTransactionsCommand,
   PendingFlowQuery,
@@ -93,6 +96,8 @@ export interface TransactionsRuntime {
   readonly closing: TransactionsClosingQuery;
   /** Escritura para COMMITMENTS (add-recurrence-engine): crea la transacción de una ocurrencia en la UoW del llamador. */
   readonly recurring: RecurringTransactionPort;
+  /** Escritura para DEBT (add-loans): desembolso y pago de préstamo administrados, en la UoW del llamador. */
+  readonly loans: LoanTransactionsPort;
   /** Lectura de una transacción para vincularla a una ocurrencia (add-recurrence-engine). */
   readonly links: TransactionLinkQuery;
   /** Transacciones `PENDING` (add-recurrence-engine, comprometido del periodo). */
@@ -155,6 +160,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
     closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),
     recurring: new RecurringTransactionAdapter(service),
+    loans: new LoanTransactionsAdapter(service),
     links: new PgTransactionLinkQuery(deps.uow, deps.currencies),
     pending: new PgPendingFlowQuery(deps.uow, deps.currencies),
     imported: new ImportedTransactionsAdapter(service, new PgImportedRefReader(), deps.uow),
@@ -195,7 +201,10 @@ export class TransactionsModule {
         { provide: BULK_EDIT_SERVICE, useValue: options.runtime.bulkEdit },
         { provide: CONVERSIONS_SERVICE, useValue: options.runtime.conversions },
         { provide: RECONCILIATIONS_SERVICE, useValue: options.runtime.reconciliations },
+        // Puerto de escritura de DEBT (add-loans): otros módulos Nest lo inyectan con `LOAN_TRANSACTIONS_PORT`.
+        { provide: LOAN_TRANSACTIONS_PORT, useValue: options.runtime.loans },
       ],
+      exports: [LOAN_TRANSACTIONS_PORT],
     };
   }
 }

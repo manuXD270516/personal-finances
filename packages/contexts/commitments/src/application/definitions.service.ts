@@ -181,7 +181,7 @@ export class DefinitionsService {
     const { workspaceId } = cmd;
     const calendarNow = await this.todayOf(workspaceId);
     return deps.uow.run(workspaceId, async () => {
-      const kind = assertKindAvailable(cmd.kind);
+      const kind = assertKindAvailable(cmd.kind, cmd.managedBy);
       const resolved = await resolveTemplate(deps, {
         workspaceId,
         userId: cmd.userId,
@@ -196,6 +196,7 @@ export class DefinitionsService {
         effectiveFrom: startDate,
         currency: resolved.currency,
         template: resolved.template,
+        allowExplicit: cmd.managedBy !== undefined,
       });
       const def = RecurringDefinition.create({
         id: deps.ids.next(),
@@ -345,6 +346,7 @@ export class DefinitionsService {
         effectiveFrom: effectiveFrom.toString(),
         currency: resolved.currency,
         template: resolved.template,
+        allowExplicit: def.snapshot.managedBy !== 'USER',
       });
       def.revise(next, at, cmd.userId);
       // La versión nueva se guarda antes de tocar ocurrencias: estas la referencian (FK por versión).
@@ -445,6 +447,8 @@ export class DefinitionsService {
               expected: c.expected,
               currency: c.currency,
               at,
+              scheduleKey: c.scheduleKey ?? null,
+              sharesTransaction: def.kind === 'LOAN_PAYMENT',
             }),
           );
           const inserted = await deps.occurrences.insertIfAbsent(rows);
@@ -722,6 +726,8 @@ export class DefinitionsService {
        * llegó (cancelación programada de una suscripción; la termina el administrador al ejecutarla).
        */
       readonly deferClose?: boolean | undefined;
+      /** Solo quien administra la definición: pasa a `ENDED` al instante aunque la fecha de cierre sea futura. */
+      readonly closeNow?: boolean | undefined;
     },
   ): Promise<DefinitionDto> {
     const { deps } = this;
@@ -746,7 +752,7 @@ export class DefinitionsService {
       );
       const ids: ChangedIds = { cancelled: rows.map((r) => r.id), reinstated: [], rewritten: [] };
       const before = def.snapshot;
-      if (endDate.compare(today) <= 0 && !cmd.deferClose) {
+      if ((endDate.compare(today) <= 0 && !cmd.deferClose) || cmd.closeNow) {
         def.end({ endDate: endDate.toString(), at, by: cmd.userId });
       } else {
         def.scheduleEnd(endDate.toString(), at, cmd.userId);

@@ -5,16 +5,19 @@ spec: transactions/transaction-recording
 related_specs: ['debt/loans']
 requirement: 'Transacciones de préstamo administradas por el préstamo'
 scenario: 'Agregar una nota al pago'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/transactions/src/application/loans.service.test.ts
+  - packages/contexts/transactions/src/domain/loan-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['transactions', 'loans']

@@ -100,6 +100,27 @@ export const ACCOUNTS_QUERY_PORT = Symbol.for('pf.accounts.AccountsQueryPort');
 export const ACCOUNT_CATALOG_QUERY = Symbol.for('pf.accounts.AccountCatalogQuery');
 export const ACCOUNT_OPENING_BALANCE_PORT = Symbol.for('pf.accounts.AccountOpeningBalancePort');
 
+/**
+ * Alta de una cuenta en la unidad de trabajo del llamador (openspec add-loans, design decisión 7): lo implementa
+ * ACCOUNTS (es su agregado) con las mismas validaciones, auditoría y asiento de apertura que `OpenAccount`
+ * (nombre único, moneda habilitada). Los errores de dominio se propagan sin traducir y abortan la unidad de trabajo
+ * del llamador. `openingBalance` es el saldo PRESENTADO (para pasivos, positivo = adeudado).
+ */
+export interface AccountProvisioningPort {
+  openAccount(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly type: AccountTypeDto;
+    readonly name: string;
+    readonly currency: string;
+    readonly institutionId?: string | null;
+    readonly openingBalance?: MoneyDto | null;
+    readonly openingDate?: string | null;
+  }): Promise<{ readonly accountId: string }>;
+}
+
+export const ACCOUNT_PROVISIONING_PORT = Symbol.for('pf.accounts.AccountProvisioningPort');
+
 /** Eventos publicados por el outbox (contracts/events/accounts/*.v1.schema.json). */
 export const ACCOUNT_EVENTS = {
   opened: { eventType: 'accounts.AccountOpened', eventVersion: 1 },

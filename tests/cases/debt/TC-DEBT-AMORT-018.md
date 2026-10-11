@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Reporte de diferencias contra la tabla del banco'
 scenario: 'Diferencia de un centavo en la última cuota'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-003', 'FR-DEBT-006']
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/debt/src/domain/schedule-comparator.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'comparison', 'exit-criterion']

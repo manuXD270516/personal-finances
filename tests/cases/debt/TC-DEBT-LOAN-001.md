@@ -5,16 +5,20 @@ spec: debt/loans
 related_specs: []
 requirement: 'Registrar un préstamo con sus condiciones'
 scenario: 'Préstamo vehicular en borrador'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-001']
 nfr: []
 invariants: ['INV-001', 'INV-002']
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - apps/web/src/ui/debt/logic.test.ts
+  - packages/contexts/debt/src/domain/loan.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'register']

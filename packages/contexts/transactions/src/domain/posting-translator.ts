@@ -28,6 +28,8 @@ export interface JournalEntryDraft {
  *   ADJUSTMENT ±cuenta, ∓EQUITY:ADJUSTMENTS:<CCY>
  *   TRANSFER   +destino, −origen (monto + comisión), +EXPENSE:<CCY> por el split de comisión (sin INCOME/EXPENSE si
  *              no hay comisión: el pago de tarjeta no es gasto, INV-030)
+ *   LOAN_DISBURSEMENT +destino (neto), −pasivo del préstamo (principal), +EXPENSE:<CCY> por la comisión retenida
+ *   LOAN_PAYMENT −origen (monto), +pasivo del préstamo (principal, omitido si es 0), +EXPENSE:<CCY> por split
  *   CONVERSION −origen (bruto), +EQUITY:FX_TRADING:<src> (convertido), −EQUITY:FX_TRADING:<tgt> (bruto destino),
  *              +destino (neto) y por cada fee −tercera cuenta (si la paga) y +EXPENSE:<fee.ccy> con su split *Fees*
  *              (add-manual-conversions decisión 1; docs/09 §6.12–§6.15). Cuadra POR MONEDA (INV-004).
@@ -58,8 +60,10 @@ export function toJournalEntryDraft(tx: TransactionState): JournalEntryDraft {
       amount: leg.amount.negate(),
       splitId: null,
     }));
-  } else if (tx.kind === 'TRANSFER') {
+  } else if (tx.kind === 'TRANSFER' || tx.kind === 'LOAN_DISBURSEMENT' || tx.kind === 'LOAN_PAYMENT') {
     // +destino, −origen (incluye la comisión) y +EXPENSE:<CCY> por el split de comisión (docs/09 §6.4, §6.8).
+    // Préstamos (docs/09 §6.9): los legs son los postings sobre cuentas del usuario y cada split es el gasto
+    // (comisión retenida del desembolso; interés/cargos del pago); el principal no genera gasto (INV-009).
     nominal = tx.splits.map((s) => ({
       target: { kind: 'SYSTEM', systemKind: 'EXPENSE' },
       amount: s.amount,

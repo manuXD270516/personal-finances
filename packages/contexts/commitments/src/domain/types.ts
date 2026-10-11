@@ -3,9 +3,18 @@
  * UI en español: Programada, Próxima, Atrasada, Creada, Vinculada, Omitida, Cancelada.
  */
 export const RECURRING_KINDS = ['INCOME', 'EXPENSE', 'TRANSFER'] as const;
-export type RecurringKind = (typeof RECURRING_KINDS)[number];
 
-/** Tipos reservados para Phase 4 (D116): se rechazan con `RECURRING_KIND_NOT_AVAILABLE`. */
+/**
+ * Tipos que SOLO crea el contexto administrador (openspec add-loans, N2): `LOAN_PAYMENT` únicamente en definiciones
+ * administradas por `DEBT` con calendario explícito. La API de usuario los rechaza con `RECURRING_KIND_NOT_AVAILABLE`.
+ */
+export const MANAGED_ONLY_KINDS = ['LOAN_PAYMENT'] as const;
+export type RecurringKind = (typeof RECURRING_KINDS)[number] | (typeof MANAGED_ONLY_KINDS)[number];
+
+/** Cuota de préstamo: la resuelve DEBT (1 transacción puede resolver varias), nunca el motor ni el matching. */
+export const LOAN_PAYMENT_KIND = 'LOAN_PAYMENT' as const;
+
+/** Tipos reservados para Phase 4 (D116): se rechazan con `RECURRING_KIND_NOT_AVAILABLE` salvo el administrador. */
 export const RESERVED_RECURRING_KINDS = ['LOAN_PAYMENT', 'CARD_PAYMENT'] as const;
 
 export const MANAGED_BY = ['USER', 'SUBSCRIPTION', 'DEBT'] as const;

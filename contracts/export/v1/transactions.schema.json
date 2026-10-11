@@ -36,7 +36,8 @@
     "updated_at",
     "reconciliation_id",
     "reconciliation_mode",
-    "import_job_id"
+    "import_job_id",
+    "loan_payment_breakdown"
   ],
   "properties": {
     "id": {
@@ -193,7 +194,8 @@
         "null"
       ],
       "format": "uuid"
-    }
+    },
+    "loan_payment_breakdown": {}
   },
   "x-pfos-table": "txn.transaction",
   "x-pfos-context": "transactions"

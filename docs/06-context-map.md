@@ -107,7 +107,7 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 5 | CLASSIFICATION | TRANSACTIONS | OHS/PL | ASYNC | `CategoriesMerged`/`TagsMerged`/`CounterpartiesMerged` → reasignación idempotente; no necesita atomicidad (el origen archivado sigue existiendo). |
 | 6 | FX | TRANSACTIONS | C/S | SYNC-Q | Tasa de referencia al registrar una conversión (opcional; si no hay, `referenceRate=null`). |
 | 7 | TRANSACTIONS | FX | OHS/PL | ASYNC | `ConversionRecorded` → FX guarda observación de tasa del usuario (útil para P2P USDT/BOB). |
-| 8 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Desembolso/pago de préstamo y pago de tarjeta: la cuota marcada como pagada y la transacción deben confirmarse juntas (INV-016). |
+| 8 | TRANSACTIONS | DEBT | C/S | SYNC-TX | Desembolso/pago de préstamo y pago de tarjeta: la cuota marcada como pagada y la transacción deben confirmarse juntas (INV-016). As-built `add-loans`: Debt llama a `LoanTransactionsPort` (`recordDisbursement`, `recordPayment`, `voidManaged`) dentro de su UoW y las transacciones `LOAN_*` quedan administradas (`TRANSACTION_MANAGED_EXTERNALLY`). |
 | 9 | TRANSACTIONS | GOALS | C/S | SYNC-TX | Aporte REAL = transferencia + `GoalContribution` atómicos (INV-018). |
 | 10 | TRANSACTIONS | COMMITMENTS | C/S | SYNC-TX | Materializar ocurrencia = crear transacción + marcar ocurrencia atómicamente (INV-013). |
 | 11 | TRANSACTIONS | IMPORTS | C/S | SYNC-TX (por lote) | `ImportTransactions` batch con fingerprints; fila marcada `IMPORTED` en la misma tx (INV-014). |
@@ -128,6 +128,8 @@ Convención de flechas: **upstream → downstream** (el downstream depende del u
 | 26 | ml-forecasting | FORECAST | **ACL** | HTTP | Ver §4.3. |
 | 27 | LLM provider | ASSISTANT | **ACL** | HTTP | Ver §4.4. |
 | 28 | OIDC IdP | IDENTITY | ACL | OIDC | Claims → `User`; el modelo del IdP no entra al dominio. |
+| 29 | ACCOUNTS | DEBT | C/S | SYNC-TX | `AccountProvisioningPort.openAccount`: Debt abre la cuenta `LOAN` del préstamo en su propia UoW (as-built `add-loans`); Accounts sigue siendo dueño del agregado y de sus validaciones. |
+| 30 | COMMITMENTS | DEBT | C/S | SYNC-TX | `RecurringDefinitionPort` (`createManaged`, `settle`, `unsettle`, `setExpected`, `end`, `revise`): las cuotas del préstamo son ocurrencias de una definición administrada (`managedBy = DEBT`, `kind = LOAN_PAYMENT`) que Debt resuelve en la misma UoW; COMMITMENTS no depende de DEBT (pagar desde Recurrentes redirige al formulario del préstamo, D162). |
 
 ### 3.1 Composición "abrir cuenta con saldo inicial"
 

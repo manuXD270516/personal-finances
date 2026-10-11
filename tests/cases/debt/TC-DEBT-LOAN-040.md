@@ -5,16 +5,22 @@ spec: transactions/transaction-recording
 related_specs: ['debt/loans']
 requirement: 'Transacciones de préstamo administradas por el préstamo'
 scenario: 'Pago de préstamo en el listado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - apps/web/src/ui/debt/debt.test.tsx
+  - packages/contexts/transactions/src/application/loans.service.test.ts
+  - packages/contexts/transactions/src/interface/transactions-dto.loans.test.ts
+  - packages/contexts/transactions/test/integration/pg-loans.int.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['transactions', 'loans']

@@ -142,8 +142,9 @@ export const RECURRING_OCCURRENCE_LIFECYCLE = LifecycleMachine.define({
     {
       code: 'RELEASE',
       from: ['MATERIALIZED', 'MATCHED'],
-      to: ['DUE', 'OVERDUE'],
-      guard: 'la transacción vinculada fue anulada',
+      to: ['SCHEDULED', 'DUE', 'OVERDUE'],
+      guard:
+        'la transacción vinculada fue anulada (SCHEDULED solo al devolver una cuota de préstamo aún lejana)',
       events: ['commitments.RecurringOccurrenceChanged.v1'],
     },
     {

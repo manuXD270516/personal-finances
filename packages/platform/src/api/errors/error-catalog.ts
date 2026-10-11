@@ -168,6 +168,30 @@ export const ERROR_CATALOG = {
     title: 'The price effective date must be after the last price entry',
   },
   SUBSCRIPTION_PROPOSAL_NOT_PENDING: { status: 409, title: 'The price proposal is no longer pending' },
+  // debt / loans (Phase 4)
+  LOAN_METHOD_NOT_AVAILABLE: { status: 422, title: 'This amortization method is not available yet' },
+  LOAN_ACCOUNT_INVALID: { status: 422, title: 'The loan account must be an active loan account' },
+  LOAN_ACCOUNT_IN_USE: { status: 409, title: 'The account already backs another loan' },
+  LOAN_ACCOUNT_NOT_EMPTY: { status: 409, title: 'A new loan needs a loan account with a zero balance' },
+  LOAN_BALANCE_MISMATCH: {
+    status: 422,
+    title: 'The account balance does not match the declared outstanding principal',
+  },
+  LOAN_NOT_DRAFT: { status: 409, title: 'The loan is not a draft' },
+  LOAN_NOT_ACTIVE: { status: 409, title: 'The loan is not active' },
+  LOAN_TERMS_LOCKED: { status: 409, title: 'The financial terms of an active loan cannot be edited' },
+  LOAN_OVERPAYMENT: { status: 422, title: 'The payment exceeds what is still owed on the loan' },
+  LOAN_PAYMENT_NOT_LATEST: { status: 409, title: 'Only the most recent loan payment can be voided' },
+  LOAN_HAS_PAYMENTS: { status: 409, title: 'The loan has payments and cannot be cancelled' },
+  LOAN_REFERENCE_INVALID: { status: 422, title: 'The bank schedule is not valid' },
+  PAYMENT_BREAKDOWN_MISMATCH: {
+    status: 422,
+    title: 'The payment breakdown does not add up to the amount paid',
+  },
+  TRANSACTION_MANAGED_EXTERNALLY: {
+    status: 409,
+    title: 'The transaction is managed by another module; operate it from there',
+  },
 } as const satisfies Record<string, { readonly status: number; readonly title: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

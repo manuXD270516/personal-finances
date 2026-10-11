@@ -117,5 +117,19 @@
   "IMPORT_UNSUPPORTED_FORMAT": "No pudimos leer el archivo como texto delimitado (CSV). Revisa que sea un CSV y que no esté vacío ni tenga más de 50 columnas.",
   "IMPORT_TOO_MANY_ROWS": "El archivo tiene más filas de las permitidas (5.000). Divídelo en varios archivos e impórtalos por separado.",
   "IMPORT_MAPPING_INVALID": "La asignación de columnas no es válida para este archivo. Revisa la columna de la fecha, la descripción y el monto.",
-  "IMPORT_REVIEW_INCOMPLETE": "Aún hay posibles duplicados sin decidir. Decide cada uno (crear, omitir o excluir) antes de aprobar."
+  "IMPORT_REVIEW_INCOMPLETE": "Aún hay posibles duplicados sin decidir. Decide cada uno (crear, omitir o excluir) antes de aprobar.",
+  "LOAN_METHOD_NOT_AVAILABLE": "Este método de amortización todavía no está disponible. Por ahora solo se admite el sistema francés (cuota constante).",
+  "LOAN_ACCOUNT_INVALID": "La cuenta del préstamo debe ser una cuenta activa de tipo préstamo y en la misma moneda.",
+  "LOAN_ACCOUNT_IN_USE": "Esa cuenta ya pertenece a otro préstamo. Elige otra o crea una cuenta nueva.",
+  "LOAN_ACCOUNT_NOT_EMPTY": "Un préstamo nuevo necesita una cuenta de préstamo con saldo cero. Usa una cuenta nueva o registra un préstamo en curso.",
+  "LOAN_BALANCE_MISMATCH": "El saldo de la cuenta no coincide con el saldo pendiente que indicaste. Revisa el monto o la cuenta.",
+  "LOAN_NOT_DRAFT": "Este préstamo ya no es un borrador, por eso no se puede desembolsar de nuevo.",
+  "LOAN_NOT_ACTIVE": "Este préstamo no está activo: desembólsalo antes de registrar pagos o ya está saldado o cancelado.",
+  "LOAN_TERMS_LOCKED": "Las condiciones financieras de un préstamo activo no se pueden editar. Puedes cambiar el nombre, el prestamista y la cuenta de pago.",
+  "LOAN_OVERPAYMENT": "El pago es mayor que lo que aún se debe del préstamo. Revisa el monto.",
+  "LOAN_PAYMENT_NOT_LATEST": "Solo se puede anular el pago más reciente del préstamo. Anula primero los posteriores.",
+  "LOAN_HAS_PAYMENTS": "El préstamo tiene pagos vigentes y no se puede cancelar. Anula primero sus pagos.",
+  "LOAN_REFERENCE_INVALID": "La tabla del banco tiene filas con errores y no se guardó. Corrígelas y vuelve a cargarla.",
+  "PAYMENT_BREAKDOWN_MISMATCH": "El desglose del recibo no suma el monto pagado. Revisa capital, interés, comisiones, seguro e impuestos.",
+  "TRANSACTION_MANAGED_EXTERNALLY": "Esta transacción la administra un préstamo: edita montos o anula el pago desde el préstamo. Aquí solo puedes cambiar notas y etiquetas."
 }

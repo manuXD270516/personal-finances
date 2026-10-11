@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: ['accounts/account-management']
 requirement: 'Préstamo preexistente con saldo pendiente'
 scenario: 'Préstamo en curso desde la cuota 7'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-002']
 nfr: []
 invariants: ['INV-017']
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/accounts/src/application/account-provisioning.adapter.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'existing']

@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: []
 requirement: 'Permisos, auditoría e idempotencia de los préstamos'
 scenario: 'Reintento del registro de un pago'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: ['NFR-REL-007']
 invariants: ['INV-027']
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - apps/api/test/api/workspace-import.api.test.ts
+  - packages/contexts/debt/test/integration/pg-debt.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'idempotency']

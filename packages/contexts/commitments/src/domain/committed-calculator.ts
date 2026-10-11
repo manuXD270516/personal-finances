@@ -18,7 +18,8 @@ export function countsAsCommittedOutflow(input: {
   readonly from: AccountClass | undefined;
   readonly to?: AccountClass | undefined;
 }): boolean {
-  if (input.kind === 'EXPENSE') return true;
+  // La cuota de préstamo es un egreso comprometido (openspec add-loans, N8).
+  if (input.kind === 'EXPENSE' || input.kind === 'LOAN_PAYMENT') return true;
   if (input.kind === 'TRANSFER') {
     return (
       input.from !== undefined &&

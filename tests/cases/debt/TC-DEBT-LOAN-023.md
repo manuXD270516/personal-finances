@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Cuotas como compromisos recurrentes'
 scenario: 'Pausar el compromiso del préstamo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-011']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/commitments/src/application/loan-payment.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'commitments']

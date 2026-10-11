@@ -7,6 +7,7 @@ import { AUDIT_PORTABILITY_SECTIONS } from '@pf/audit/contracts';
 import { CLASSIFICATION_PORTABILITY_SECTIONS } from '@pf/classification/contracts';
 import { COMMITMENTS_PORTABILITY_SECTIONS } from '@pf/commitments/contracts';
 import { FX_PORTABILITY_SECTIONS } from '@pf/fx/contracts';
+import { DEBT_PORTABILITY_SECTIONS } from '@pf/debt/contracts';
 import { IMPORTS_PORTABILITY_EXCLUSIONS, IMPORTS_PORTABILITY_SECTIONS } from '@pf/imports/contracts';
 import {
   EXPORT_RETENTION_QUEUE,
@@ -57,6 +58,8 @@ export const PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   ...COMMITMENTS_PORTABILITY_SECTIONS,
   // add-basic-csv-import: jobs y vínculos de idempotencia (orden 770–771, después de COMMITMENTS 750–765).
   ...IMPORTS_PORTABILITY_SECTIONS,
+  // add-loans: préstamos, cronogramas, pagos y tablas del banco (orden 780–787, después de IMPORTS 770–771).
+  ...DEBT_PORTABILITY_SECTIONS,
   ...NOTIFICATIONS_PORTABILITY_SECTIONS,
   ...AUDIT_PORTABILITY_SECTIONS,
 ].sort((a, b) => a.order - b.order);

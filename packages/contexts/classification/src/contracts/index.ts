@@ -103,7 +103,15 @@ export interface ClassificationLookup {
   systemCategoryId(input: {
     readonly userId: string;
     readonly workspaceId: string;
-    readonly systemCode: 'UNCATEGORIZED' | 'UNCATEGORIZED_INCOME' | 'FEES';
+    readonly systemCode:
+      | 'UNCATEGORIZED'
+      | 'UNCATEGORIZED_INCOME'
+      | 'FEES'
+      // add-loans: categorías de sistema de los gastos de un préstamo (interés, comisiones, seguro, impuestos).
+      | 'INTEREST'
+      | 'LOAN_FEES'
+      | 'INSURANCE'
+      | 'TAXES';
   }): Promise<string | null>;
   categoryIdsWithDescendants(input: {
     readonly userId: string;

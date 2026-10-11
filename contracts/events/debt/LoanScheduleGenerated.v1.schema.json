@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/LoanScheduleGenerated.v1.schema.json",
+  "title": "debt.LoanScheduleGenerated.v1",
+  "description": "Se fijó una versión del cronograma de un préstamo (v1 al desembolsar o al registrar un préstamo en curso). Productor: DEBT. Idempotencia: (loanId, scheduleVersion). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.LoanScheduleGenerated"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Loan"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "loanId",
+        "scheduleVersion",
+        "reason",
+        "effectiveFrom",
+        "currency",
+        "installments"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "loanId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "scheduleVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "enum": [
+            "INITIAL"
+          ]
+        },
+        "effectiveFrom": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "installments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 600,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "n",
+              "dueDate",
+              "principal",
+              "interest",
+              "fees",
+              "insurance",
+              "taxes",
+              "total"
+            ],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "dueDate": {
+                "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+              },
+              "principal": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+              },
+              "interest": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+              },
+              "fees": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+              },
+              "insurance": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+              },
+              "taxes": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+              },
+              "total": {
+                "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a02",
+      "eventType": "debt.LoanScheduleGenerated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "scheduleVersion": 1,
+        "reason": "INITIAL",
+        "effectiveFrom": "2026-10-15",
+        "currency": "BOB",
+        "installments": [
+          {
+            "n": 1,
+            "dueDate": "2026-11-15",
+            "principal": "330.02",
+            "interest": "10.00",
+            "fees": "0.00",
+            "insurance": "0.00",
+            "taxes": "0.00",
+            "total": "340.02"
+          },
+          {
+            "n": 2,
+            "dueDate": "2026-12-15",
+            "principal": "333.32",
+            "interest": "6.70",
+            "fees": "0.00",
+            "insurance": "0.00",
+            "taxes": "0.00",
+            "total": "340.02"
+          },
+          {
+            "n": 3,
+            "dueDate": "2027-01-15",
+            "principal": "336.66",
+            "interest": "3.37",
+            "fees": "0.00",
+            "insurance": "0.00",
+            "taxes": "0.00",
+            "total": "340.03"
+          }
+        ]
+      }
+    }
+  ]
+}

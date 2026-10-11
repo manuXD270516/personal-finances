@@ -14,6 +14,10 @@ export const TRANSACTIONS_PORTABILITY_SECTIONS: readonly PortabilitySection[] = 
     order: 600,
     orderBy: ['id'],
     selfRefs: ['refund_of_transaction_id'],
+    // `external_ref_id` de los pagos y desembolsos de préstamo (add-loans) es el id del pago/préstamo: se remapea con el
+    // resto de ids al importar (el UUID no mapeado de otros espacios de nombres se conserva tal cual). El `jsonb`
+    // `loan_payment_breakdown` (loanId) se remapea por el recorrido profundo del importador.
+    textRefs: ['external_ref_id'],
     money: { amount: 't.currency' },
   },
   {

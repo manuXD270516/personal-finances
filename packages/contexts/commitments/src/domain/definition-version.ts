@@ -2,6 +2,7 @@ import {
   CADENCES,
   DomainError,
   LocalDate,
+  Money,
   RRuleSubset,
   WEEKEND_ADJUSTMENTS,
   createRecurrenceRule,
@@ -19,17 +20,34 @@ import {
   PAYMENT_METHODS,
   RECURRING_KINDS,
   RESERVED_RECURRING_KINDS,
+  LOAN_PAYMENT_KIND,
   type AutoCreateStatus,
+  type ManagedBy,
   type MaterializationMode,
   type PaymentMethod,
   type RecurringKind,
 } from './types.js';
 
-/** Cadencia persistida: las 9 predefinidas o `CUSTOM` (RRULE). */
-export type ScheduleCadence = Cadence | 'CUSTOM';
+/** Cadencia persistida: las 9 predefinidas, `CUSTOM` (RRULE) o `EXPLICIT` (calendario de ítems, solo administradas). */
+export type ScheduleCadence = Cadence | 'CUSTOM' | 'EXPLICIT';
+
+/** Máximo de ítems de un calendario explícito (un préstamo a 30 años mensual son 360 cuotas). */
+export const MAX_EXPLICIT_ITEMS = 1000;
+
+/**
+ * Ítem de un calendario explícito (openspec add-loans, N3): `key` única en la definición (en préstamos, el número de
+ * cuota), fecha de vencimiento (única) y monto esperado del ítem.
+ */
+export interface ExplicitScheduleItem {
+  readonly key: string;
+  readonly dueDate: string;
+  readonly amount: string;
+}
 
 export interface ScheduleSpec {
   readonly cadence: ScheduleCadence;
+  /** Solo `EXPLICIT`: ítems ordenados por fecha; en ese caso no hay regla (`rrule`, `monthDays`, fin ni máximo). */
+  readonly explicit?: readonly ExplicitScheduleItem[] | null;
   readonly interval: number;
   /** Días del mes de la cadencia (semimensual: dos; mensual y derivadas: a lo sumo uno). */
   readonly monthDays: readonly number[];
@@ -50,6 +68,8 @@ export interface ScheduleInput {
   readonly endDate?: string | null | undefined;
   readonly maxOccurrences?: number | null | undefined;
   readonly weekendAdjustment?: string | undefined;
+  /** Solo con la cadencia `EXPLICIT` (definiciones administradas). */
+  readonly explicit?: readonly ExplicitScheduleItem[] | null | undefined;
 }
 
 export interface MaterializationSpec {
@@ -111,8 +131,12 @@ const schedule422 = (message: string, pointer?: string) => {
   return pointer ? err.at(pointer) : err;
 };
 
-/** Valida el tipo de definición: los reservados de Phase 4 se rechazan con 422 (D116). */
-export function assertKindAvailable(kind: string): RecurringKind {
+/**
+ * Valida el tipo de definición: los reservados de Phase 4 se rechazan con 422 (D116). Excepción (openspec add-loans,
+ * N2): `LOAN_PAYMENT` se admite SOLO para definiciones administradas por `DEBT`.
+ */
+export function assertKindAvailable(kind: string, managedBy?: ManagedBy): RecurringKind {
+  if (kind === LOAN_PAYMENT_KIND && managedBy === 'DEBT') return kind;
   if ((RESERVED_RECURRING_KINDS as readonly string[]).includes(kind)) {
     throw new DomainError('RECURRING_KIND_NOT_AVAILABLE', `kind ${kind} is reserved for a later phase`).at(
       '/kind',
@@ -134,6 +158,9 @@ function parseDate(value: string, pointer: string): LocalDate {
 
 /** Regla de recurrencia de una programación (cadencia predefinida o RRULE + fin/COUNT). */
 export function ruleOfSchedule(schedule: ScheduleSpec): RecurrenceRule {
+  if (schedule.cadence === 'EXPLICIT') {
+    throw new Error('an explicit schedule has no recurrence rule');
+  }
   const dtstart = LocalDate.parse(schedule.startDate);
   const until = schedule.endDate ? LocalDate.parse(schedule.endDate) : null;
   if (schedule.cadence === 'CUSTOM') {
@@ -150,8 +177,61 @@ export function ruleOfSchedule(schedule: ScheduleSpec): RecurrenceRule {
   });
 }
 
-/** Valida y normaliza la programación (`RECURRING_INVALID_SCHEDULE`, `INVALID_RRULE`). */
-export function buildSchedule(input: ScheduleInput): ScheduleSpec {
+/** Ítems de un calendario explícito (vacío si la programación es una regla). */
+export const explicitItemsOf = (schedule: ScheduleSpec): readonly ExplicitScheduleItem[] =>
+  schedule.cadence === 'EXPLICIT' ? (schedule.explicit ?? []) : [];
+
+/** Calendario explícito: claves y fechas únicas, ordenado por fecha; sin regla ni fin (`RECURRING_INVALID_SCHEDULE`). */
+function buildExplicitSchedule(input: ScheduleInput): ScheduleSpec {
+  const items = input.explicit ?? [];
+  if (items.length < 1 || items.length > MAX_EXPLICIT_ITEMS) {
+    throw schedule422(`an explicit schedule needs 1..${MAX_EXPLICIT_ITEMS} items`, '/schedule/explicit');
+  }
+  if (input.rrule || input.endDate || input.maxOccurrences || (input.monthDays?.length ?? 0) > 0) {
+    throw schedule422('an explicit schedule takes no recurrence rule or end', '/schedule');
+  }
+  const keys = new Set<string>();
+  const dates = new Set<string>();
+  const out: ExplicitScheduleItem[] = [];
+  items.forEach((item, i) => {
+    const pointer = `/schedule/explicit/${i}`;
+    const key = typeof item.key === 'string' ? item.key.trim() : '';
+    if (key.length < 1 || key.length > 40) {
+      throw schedule422('key must have between 1 and 40 characters', `${pointer}/key`);
+    }
+    if (keys.has(key)) throw schedule422(`duplicated key ${key}`, `${pointer}/key`);
+    keys.add(key);
+    const dueDate = parseDate(item.dueDate, `${pointer}/dueDate`).toString();
+    if (dates.has(dueDate)) throw schedule422(`duplicated due date ${dueDate}`, `${pointer}/dueDate`);
+    dates.add(dueDate);
+    out.push({ key, dueDate, amount: item.amount });
+  });
+  out.sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
+  return {
+    cadence: 'EXPLICIT',
+    explicit: out,
+    interval: 1,
+    monthDays: [],
+    rrule: null,
+    startDate: (out[0] as ExplicitScheduleItem).dueDate,
+    endDate: null,
+    maxOccurrences: null,
+    weekendAdjustment: 'NONE',
+  };
+}
+
+/**
+ * Valida y normaliza la programación (`RECURRING_INVALID_SCHEDULE`, `INVALID_RRULE`). La cadencia `EXPLICIT` solo se
+ * admite con `allowExplicit` (definiciones administradas por otro contexto, openspec add-loans N3).
+ */
+export function buildSchedule(input: ScheduleInput, allowExplicit = false): ScheduleSpec {
+  if (input.cadence === 'EXPLICIT') {
+    if (!allowExplicit) {
+      throw schedule422('the EXPLICIT cadence is reserved for managed definitions', '/schedule/cadence');
+    }
+    return buildExplicitSchedule(input);
+  }
+  if (input.explicit) throw schedule422('explicit items need the EXPLICIT cadence', '/schedule/explicit');
   const startDate = parseDate(input.startDate, '/schedule/startDate').toString();
   let endDate = input.endDate ? parseDate(input.endDate, '/schedule/endDate').toString() : null;
   let maxOccurrences = input.maxOccurrences ?? null;
@@ -261,6 +341,8 @@ export function buildDefinitionVersion(input: {
   readonly effectiveFrom: string;
   readonly currency: { readonly code: string; readonly scale: number };
   readonly template: TemplateInput;
+  /** Definición administrada por otro contexto: admite el calendario explícito. */
+  readonly allowExplicit?: boolean;
 }): DefinitionVersion {
   const { kind, template } = input;
   const currency = makeCurrency(input.currency.code, input.currency.scale);
@@ -303,8 +385,41 @@ export function buildDefinitionVersion(input: {
   if (indexedPrice !== null && amount.type !== 'VARIABLE') {
     throw new DomainError('VALIDATION_FAILED', 'an indexed definition has no fixed amount').at('/amount');
   }
-  const schedule = buildSchedule(template.schedule);
+  const schedule = buildSchedule(template.schedule, input.allowExplicit ?? false);
+  const explicit = schedule.cadence === 'EXPLICIT';
+  if (kind === LOAN_PAYMENT_KIND && !explicit) {
+    throw schedule422('a LOAN_PAYMENT needs an explicit schedule', '/schedule/cadence');
+  }
+  if (explicit) {
+    if (amount.type !== 'VARIABLE' || indexedPrice !== null) {
+      throw new DomainError(
+        'RECURRING_INVALID_AMOUNT',
+        'an explicit schedule carries its amounts per item; the template amount is VARIABLE',
+      ).at('/amount');
+    }
+    const items = (schedule.explicit ?? []).map((item, i) => {
+      try {
+        const parsed = Money.parse(item.amount, currency);
+        if (!parsed.isPositive()) throw new DomainError('AMOUNT_NOT_POSITIVE', 'amount must be positive');
+        return { ...item, amount: parsed.toFixed() };
+      } catch (err) {
+        if (err instanceof DomainError) {
+          throw new DomainError('RECURRING_INVALID_AMOUNT', `${err.code}: ${err.message}`).at(
+            `/schedule/explicit/${i}/amount`,
+          );
+        }
+        throw err;
+      }
+    });
+    (schedule as { explicit: readonly ExplicitScheduleItem[] }).explicit = items;
+  }
   const materialization = buildMaterialization(template.materialization, amount, indexedPrice !== null);
+  if (explicit && materialization.mode !== 'NOTIFY_ONLY') {
+    throw new DomainError(
+      'RECURRING_MODE_NOT_ALLOWED',
+      'an explicit schedule only supports the NOTIFY_ONLY mode',
+    ).at('/materialization/mode');
+  }
   return {
     versionNo: input.versionNo,
     effectiveFrom: input.effectiveFrom,
@@ -341,6 +456,7 @@ export function templateOf(version: DefinitionVersion): TemplateInput {
       endDate: version.schedule.endDate,
       maxOccurrences: version.schedule.maxOccurrences,
       weekendAdjustment: version.schedule.weekendAdjustment,
+      ...(version.schedule.cadence === 'EXPLICIT' ? { explicit: version.schedule.explicit ?? [] } : {}),
     },
     materialization: {
       mode: version.materialization.mode,
