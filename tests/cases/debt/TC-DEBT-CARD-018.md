@@ -5,16 +5,21 @@ spec: debt/credit-cards
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Transferencias recurrentes existentes hacia la tarjeta'
 scenario: 'Pago Visa ya cargado como transferencia'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013', 'FR-COMMITMENTS-001']
 nfr: []
 invariants: []
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - apps/web/src/ui/debt/cards/logic.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - tests/e2e/specs/credit-cards.spec.ts
+status: automated
 regression_suite: true
 phase: 4
 tags: ['credit-cards', 'payment-plan', 'backward-compat']

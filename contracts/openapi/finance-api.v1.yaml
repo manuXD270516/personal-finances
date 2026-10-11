@@ -6051,8 +6051,8 @@ paths:
       description: |
         Creates version 1 and generates synchronously the occurrences of the first window (from the start of the
         financial period that contains today, or the start date if later, up to today + the generation horizon).
-        `LOAN_PAYMENT` and `CARD_PAYMENT` are reserved for Phase 4 → 422 `RECURRING_KIND_NOT_AVAILABLE` (a card payment
-        is a `TRANSFER` to the liability account today). The currency is the account currency; a transfer uses one
+        `LOAN_PAYMENT` and `CARD_PAYMENT` are created only by the module that manages them (loans and credit cards) → 422
+        `RECURRING_KIND_NOT_AVAILABLE` (a recurring payment of your own to a card is a `TRANSFER` to the liability account). The currency is the account currency; a transfer uses one
         currency. `AUTO_CREATE` needs a `FIXED` or `ESTIMATED` amount.
       x-openspec-capability: [commitments/recurrence-engine]
       x-required-role: EDITOR
@@ -8564,6 +8564,488 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Debt: tarjetas de crédito (openspec add-credit-cards) ──
+  /workspaces/{workspaceId}/credit-cards:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Debt]
+      operationId: listCreditCards
+      summary: List the credit cards of the workspace
+      description: |
+        Each card carries, per account, the balance owed, the credit used (balance plus pending purchases), the utilization, the open cycle
+        and the last issued statement with what is still missing to pay, and the next due date. `accountId` finds the card of an account
+        (the transfer form uses it to suggest the amounts when the destination is a card). Cards are ordered active first, by name.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, ARCHIVED] }
+        - name: accountId
+          in: query
+          description: Only the card that includes this credit card account.
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: List the credit cards of the workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCardList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: createCreditCard
+      summary: Register a credit card over existing credit card accounts
+      description: |
+        The card is a profile over `credit_card` accounts that already exist (one per currency); registering it creates no ledger entry and
+        changes no balance. The calendar (`statementDay`, `dueDay`, 1 to 31, last day of the month in short months) is shared by its accounts;
+        each account keeps its own minimum payment rule and, with a separate limit, its own limit. A shared limit is declared in the currency of
+        one of the accounts. The last closed cycle is issued at once when its due date has not passed. `paymentPlan` of an account enables the
+        managed payment plan; when an active recurring transfer of the user to that account exists the card is registered without the plan and the
+        response lists `paymentPlanConflicts`.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreditCardInput' }
+      responses:
+        '201':
+          description: Register a credit card over existing credit card accounts
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCard' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CREDIT_CARD_ACCOUNT_IN_USE.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, CREDIT_CARD_ACCOUNT_INVALID, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+    get:
+      tags: [Debt]
+      operationId: getCreditCard
+      summary: Get a credit card with its open cycle and utilization
+      description: |
+        Terms, accounts, the open cycle (`OPEN`, figures to today), the last issued statement, the utilization (`utilization` null and
+        `missingRates` filled when a shared limit cannot be valued because a rate is missing: never 1:1) and the payment plans.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Get a credit card with its open cycle and utilization
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCard' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Debt]
+      operationId: updateCreditCard
+      summary: Edit the name, limits, minimum rule, thresholds, reminder, rate or calendar of a card
+      description: |
+        Name, limits, minimum rule, thresholds, reminder and rate apply at once to the cycles not yet issued. The closing day, the due day and
+        the weekend adjustment apply from the open cycle: issued statements keep their dates and figures and the payment plan is revised from its
+        first unresolved occurrence. The limits and thresholds are evaluated synchronously.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreditCardUpdate' }
+      responses:
+        '200':
+          description: Edit the name, limits, minimum rule, thresholds, reminder, rate or calendar of a card
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCard' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION (archived card) or CONCURRENCY_CONFLICT.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, AMOUNT_NOT_POSITIVE or AMOUNT_SCALE_EXCEEDED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+    post:
+      tags: [Debt]
+      operationId: archiveCreditCard
+      summary: Archive a credit card
+      description: |
+        Ends its payment plans; statements and installment plans stay available. Statements, reminders and alerts stop; its accounts keep their
+        status and balance and may be linked to another card.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archive a credit card
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCard' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/statements:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+    get:
+      tags: [Debt]
+      operationId: listCardStatements
+      summary: List the statements of a card (open cycle, issued and calculated, up to 12 closed cycles)
+      description: |
+        Newest first. Every row carries `issued` (figures frozen at issue time, null when the cycle was never issued), `current` (recalculated
+        from the ledger today), `difference` (`current - issued`), the figures reported by the bank when registered, what is still missing
+        to pay (`remainingNoInterest`, `remainingMinimum`) and the status. A cycle without `id` is calculated on read and has no reminder.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      parameters:
+        - name: accountId
+          in: query
+          description: Only the statements of this credit card account.
+          schema: { $ref: '#/components/schemas/Uuid' }
+        - name: from
+          in: query
+          description: Closing date from (inclusive).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          description: Closing date to (inclusive).
+          schema: { $ref: '#/components/schemas/LocalDate' }
+      responses:
+        '200':
+          description: List the statements of a card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardStatementList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/statements/{statementId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+      - $ref: '#/components/parameters/CardStatementId'
+    get:
+      tags: [Debt]
+      operationId: getCardStatement
+      summary: Get an issued statement with its recalculation and difference
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Get an issued statement with its recalculation and difference
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardStatement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Debt]
+      operationId: updateCardStatement
+      summary: Register the billed balance and the minimum payment reported by the bank
+      description: |
+        When present they replace the calculated ones for the payment without interest, the minimum, what is still missing and the status;
+        the difference with the system figures stays visible. `null` clears a field. Registering them creates no ledger entry.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardStatementReportedInput' }
+      responses:
+        '200':
+          description: Register the billed balance and the minimum payment reported by the bank
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardStatement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, AMOUNT_NOT_POSITIVE or AMOUNT_SCALE_EXCEEDED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/accounts/{accountId}/payment-plan:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+      - $ref: '#/components/parameters/AccountId'
+    put:
+      tags: [Debt]
+      operationId: enableCardPaymentPlan
+      summary: Enable (or change) the managed payment plan of a card account
+      description: |
+        Creates the recurring commitment of kind `CARD_PAYMENT` managed by the card (monthly on the due date, from the next due date) from the
+        source account to the card account. The expected amount of each occurrence follows the statement: estimated before the close, exact
+        after it, from the scheduled installments for later cycles, and skipped when there is nothing to pay. The default policy is
+        `NO_INTEREST` and the default mode `PENDING_APPROVAL`. It is rejected with 409 `CARD_PAYMENT_PLAN_CONFLICT` while an active recurring
+        transfer of the user to the account exists.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardPaymentPlanInput' }
+      responses:
+        '200':
+          description: Enable (or change) the managed payment plan of a card account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCard' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'CARD_PAYMENT_PLAN_CONFLICT (details.conflictingDefinitions), ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'VALIDATION_FAILED, CURRENCY_MISMATCH or REFERENCE_NOT_FOUND.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Debt]
+      operationId: disableCardPaymentPlan
+      summary: Disable the managed payment plan of a card account
+      description: Ends the commitment from today; the transactions already created are not touched.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Disable the managed payment plan of a card account
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditCard' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/installment-plans:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+    get:
+      tags: [Debt]
+      operationId: listCardInstallmentPlans
+      summary: List the installment plans of a card
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: List the installment plans of a card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardInstallmentPlanList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: createCardInstallmentPlan
+      summary: Pay a posted purchase of the card in installments
+      description: |
+        2 to 60 installments billed one per cycle from the purchase cycle (or the next one). Without interest the installment is the purchase
+        divided by the count rounded half-even, the last one absorbing the residue; with a positive annual rate the French system at the monthly
+        rate (annual ÷ 12) is used and the interest is a projection that is never posted. It creates no ledger entry.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardInstallmentPlanInput' }
+      responses:
+        '201':
+          description: Pay a posted purchase of the card in installments
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardInstallmentPlan' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'INSTALLMENT_PLAN_INVALID, VALIDATION_FAILED or IDEMPOTENCY_KEY_REUSED.'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/installment-plans/{planId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+      - $ref: '#/components/parameters/CardInstallmentPlanId'
+    post:
+      tags: [Debt]
+      operationId: cancelCardInstallmentPlan
+      summary: Cancel an installment plan
+      description: The pending installments stop being subtracted from the billed balance and leave the future charges calendar; the installments of closed cycles stay in the history.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Cancel an installment plan
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardInstallmentPlan' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/credit-cards/{cardId}/future-charges:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/CardId'
+    get:
+      tags: [Debt]
+      operationId: getCardFutureCharges
+      summary: Calendar of future charges (installments) of a card
+      description: Per due date and account, the installments that will be billed in that cycle with their principal, projected interest and total.
+      x-openspec-capability: [debt/credit-cards]
+      x-required-role: VIEWER
+      parameters:
+        - name: months
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 24, default: 6 }
+      responses:
+        '200':
+          description: Calendar of future charges (installments) of a card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardFutureChargeList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -8856,6 +9338,24 @@ components:
       description: Subscription charge UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
 
+    CardId:
+      name: cardId
+      in: path
+      required: true
+      description: Credit card UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    CardStatementId:
+      name: statementId
+      in: path
+      required: true
+      description: Issued card statement UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    CardInstallmentPlanId:
+      name: planId
+      in: path
+      required: true
+      description: Card installment plan UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
   headers:
     ETag:
       description: Strong entity tag derived from the aggregate `version`
@@ -9235,7 +9735,7 @@ components:
         - EXPORT_VERIFICATION_FAILED             # 422 (add-workspace-export: imported balances do not match the manifest; nothing persisted)
         - UPLOAD_TOO_LARGE                       # 413 (add-workspace-export: the uploaded file exceeds WORKSPACE_IMPORT_MAX_BYTES)
         - INVALID_RRULE                          # 422 (add-recurrence-engine: RRULE outside the supported subset, COUNT with UNTIL, or no dates in 5 years)
-        - RECURRING_KIND_NOT_AVAILABLE           # 422 (add-recurrence-engine: LOAN_PAYMENT and CARD_PAYMENT are reserved for Phase 4)
+        - RECURRING_KIND_NOT_AVAILABLE           # 422 (add-recurrence-engine: LOAN_PAYMENT and CARD_PAYMENT are created only by their managing module)
         - RECURRING_INVALID_SCHEDULE             # 422 (add-recurrence-engine: inconsistent cadence, interval, month days or end)
         - RECURRING_INVALID_AMOUNT               # 422 (add-recurrence-engine: amount inconsistent with its type, not positive, out of range or over the currency scale)
         - RECURRING_MODE_NOT_ALLOWED             # 422 (add-recurrence-engine: AUTO_CREATE with a VARIABLE or MIN_MAX amount)
@@ -9266,6 +9766,10 @@ components:
         - LOAN_REFERENCE_INVALID                 # 422 (add-loans: the bank schedule has invalid rows; details.rows[])
         - PAYMENT_BREAKDOWN_MISMATCH             # 422 (add-loans: the breakdown does not add up to the amount; details.sum, details.amount)
         - TRANSACTION_MANAGED_EXTERNALLY         # 409 (add-loans: the transaction is managed by a loan; details.managedBy, details.loanId)
+        - CREDIT_CARD_ACCOUNT_INVALID            # 422 (add-credit-cards: the account is not an active credit_card account, or two accounts share a currency)
+        - CREDIT_CARD_ACCOUNT_IN_USE             # 409 (add-credit-cards: the account already belongs to another active card)
+        - CARD_PAYMENT_PLAN_CONFLICT             # 409 (add-credit-cards: an active recurring transfer to the card exists; details.conflictingDefinitions)
+        - INSTALLMENT_PLAN_INVALID               # 422 (add-credit-cards: the purchase cannot be paid in installments)
 
     # ── Identity ──
     WorkspaceRole:
@@ -13478,7 +13982,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -13503,7 +14007,7 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD]
         occurrenceId:
           description: >-
             Recurring occurrence (only `RECURRING_OCCURRENCE`, add-recurrence-engine): the app opens
@@ -13517,6 +14021,12 @@ components:
             cancelled it shows the list with a "no longer available" notice. In that kind `periodId` is the subscription
             id and `periodLabel` the month of the date of the fact.
           $ref: '#/components/schemas/Uuid'
+        cardId:
+          description: >-
+            Credit card (only `CREDIT_CARD`, add-credit-cards): the app opens `/debts/tarjetas/{cardId}` (with the statement when
+            `statementId` is present). In that kind `periodId` is the card id and `periodLabel` the month of the due date or of the crossing.
+          $ref: '#/components/schemas/Uuid'
+        statementId: { $ref: '#/components/schemas/Uuid' }
         proposalId: { $ref: '#/components/schemas/Uuid' }
         periodId: { $ref: '#/components/schemas/Uuid' }
         periodLabel: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
@@ -13630,11 +14140,13 @@ components:
       description: >-
         Kind of a recurring definition. `LOAN_PAYMENT` (loan installments) is created and revised only by the loan that
         manages it (`managedBy = DEBT`, explicit installment schedule, notify-only): it is readable here but a user
-        `POST`/`PATCH` of it is still rejected with 422 `RECURRING_KIND_NOT_AVAILABLE`. `CARD_PAYMENT` stays reserved
-        for Phase 4 (`debt/*`); today a card payment is a `TRANSFER` to the liability account.
+        `POST`/`PATCH` of it is still rejected with 422 `RECURRING_KIND_NOT_AVAILABLE`. `CARD_PAYMENT` is the payment plan
+        of a credit card (`managedBy = DEBT`, monthly on the due date, materialized as a transfer from an asset account to the
+        card account): only the card creates it, clients never do; its occurrences can be approved, edited, skipped and linked
+        like any other, but the definition cannot be paused, resumed, ended or revised from `/recurring`
+        (409 `RECURRING_MANAGED_EXTERNALLY`). A recurring transfer of the user to a card stays a `TRANSFER`.
       enum: [INCOME, EXPENSE, TRANSFER, LOAN_PAYMENT, CARD_PAYMENT]
-      x-reserved: [CARD_PAYMENT]
-      x-managed: [LOAN_PAYMENT]
+      x-managed: [LOAN_PAYMENT, CARD_PAYMENT]
     RecurringStatus:
       type: string
       enum: [ACTIVE, PAUSED, ENDED]
@@ -15533,6 +16045,580 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/LoanPayment' }
+    # ── Debt: tarjetas de crédito (Phase 4, add-credit-cards) ──
+    CardStatementStatus:
+      type: string
+      description: |
+        `OPEN` is the cycle in course. A statement is `ISSUED` until its due date, `PAID` as soon as nothing is missing to avoid interest, and
+        after the due date `PARTIALLY_PAID` when the minimum is covered or `OVERDUE` when it is not. Calculated on read.
+      enum: [OPEN, ISSUED, PAID, PARTIALLY_PAID, OVERDUE]
+    CardPaymentPolicy:
+      type: string
+      description: What the payment plan pays at each due date.
+      enum: [NO_INTEREST, MINIMUM]
+    CardMinimumRuleInput:
+      description: Minimum payment rule of a card account (percentage with an optional floor, or a fixed amount).
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, percent]
+          properties:
+            type: { type: string, enum: [PERCENT] }
+            percent:
+              type: string
+              description: Percentage from 0.01 to 100.00 with at most two decimals.
+              pattern: '^(100(\.0{1,2})?|[0-9]{1,2}(\.[0-9]{1,2})?)$'
+              examples: ['5.00']
+            floor: { $ref: '#/components/schemas/Money' }
+        - type: object
+          additionalProperties: false
+          required: [type, amount]
+          properties:
+            type: { type: string, enum: [FIXED] }
+            amount: { $ref: '#/components/schemas/Money' }
+    CardMinimumRule:
+      description: Minimum payment rule of a card account.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, percent, floor]
+          properties:
+            type: { type: string, enum: [PERCENT] }
+            percent: { type: string, examples: ['5.00'] }
+            floor:
+              oneOf:
+                - $ref: '#/components/schemas/Money'
+                - type: 'null'
+        - type: object
+          additionalProperties: false
+          required: [type, amount]
+          properties:
+            type: { type: string, enum: [FIXED] }
+            amount: { $ref: '#/components/schemas/Money' }
+    CardMaterializationInput:
+      type: object
+      description: How the occurrences of the payment plan are materialized (default `PENDING_APPROVAL`).
+      additionalProperties: false
+      properties:
+        mode: { type: string, enum: [AUTO_CREATE, PENDING_APPROVAL, NOTIFY_ONLY] }
+        autoCreateStatus: { type: string, enum: [PENDING, POSTED] }
+        leadDays: { type: integer, minimum: 0, maximum: 60 }
+    CardPaymentPlanInput:
+      type: object
+      additionalProperties: false
+      required: [sourceAccountId]
+      properties:
+        sourceAccountId:
+          description: Active asset account, in the currency of the card account, that pays the statement.
+          $ref: '#/components/schemas/Uuid'
+        policy: { $ref: '#/components/schemas/CardPaymentPolicy' }
+        materialization: { $ref: '#/components/schemas/CardMaterializationInput' }
+    CardPaymentPlan:
+      type: object
+      additionalProperties: false
+      required: [sourceAccountId, policy, materialization, definitionId, enabledAt]
+      properties:
+        sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+        policy: { $ref: '#/components/schemas/CardPaymentPolicy' }
+        materialization:
+          type: object
+          additionalProperties: false
+          required: [mode, autoCreateStatus, leadDays]
+          properties:
+            mode: { type: string, enum: [AUTO_CREATE, PENDING_APPROVAL, NOTIFY_ONLY] }
+            autoCreateStatus:
+              oneOf:
+                - type: string
+                  enum: [PENDING, POSTED]
+                - type: 'null'
+            leadDays:
+              oneOf:
+                - type: integer
+                - type: 'null'
+        definitionId:
+          description: Recurring definition of kind `CARD_PAYMENT` managed by the card (read-only under `/recurring`).
+          $ref: '#/components/schemas/Uuid'
+        enabledAt: { $ref: '#/components/schemas/Instant' }
+    CreditCardAccountInput:
+      type: object
+      additionalProperties: false
+      required: [accountId, minimumRule]
+      properties:
+        accountId:
+          description: Active `credit_card` account of the workspace; one account per currency.
+          $ref: '#/components/schemas/Uuid'
+        creditLimit:
+          description: Required with a separate limit (the default), in the currency of the account; not allowed with a shared limit.
+          $ref: '#/components/schemas/Money'
+        minimumRule: { $ref: '#/components/schemas/CardMinimumRuleInput' }
+        paymentPlan:
+          description: Enables the managed payment plan at once (a conflict leaves the card registered without it).
+          $ref: '#/components/schemas/CardPaymentPlanInput'
+    CreditCardInput:
+      type: object
+      additionalProperties: false
+      required: [name, accounts, statementDay, dueDay]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        accounts:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreditCardAccountInput' }
+        limitMode: { type: string, enum: [SEPARATE, SHARED], default: SEPARATE }
+        sharedLimit:
+          description: Single positive limit, in the currency of one of the accounts (`limitMode = SHARED`, two or more accounts).
+          $ref: '#/components/schemas/Money'
+        statementDay: { type: integer, minimum: 1, maximum: 31 }
+        dueDay: { type: integer, minimum: 1, maximum: 31 }
+        dueWeekendAdjustment: { type: string, enum: [NONE, PREVIOUS, NEXT], default: NONE }
+        annualRate:
+          type: string
+          description: Informative nominal annual rate, 0.00 to 999.99 percent. It is not used to compute interest.
+          pattern: '^[0-9]{1,3}(\.[0-9]{1,2})?$'
+          examples: ['54.50']
+        utilizationThresholds:
+          type: array
+          description: One to three distinct percentages between 0.01 and 100.00 (default `30.00` and `80.00`).
+          minItems: 1
+          maxItems: 3
+          items: { type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,2})?$' }
+        reminderDays: { type: integer, minimum: 1, maximum: 30, default: 3 }
+    CreditCardUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        limitMode: { type: string, enum: [SEPARATE, SHARED] }
+        sharedLimit: { $ref: '#/components/schemas/Money' }
+        accounts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [accountId]
+            properties:
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              creditLimit: { $ref: '#/components/schemas/Money' }
+              minimumRule: { $ref: '#/components/schemas/CardMinimumRuleInput' }
+        statementDay: { type: integer, minimum: 1, maximum: 31 }
+        dueDay: { type: integer, minimum: 1, maximum: 31 }
+        dueWeekendAdjustment: { type: string, enum: [NONE, PREVIOUS, NEXT] }
+        annualRate:
+          oneOf:
+            - type: string
+              pattern: '^[0-9]{1,3}(\.[0-9]{1,2})?$'
+            - type: 'null'
+        utilizationThresholds:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: { type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,2})?$' }
+        reminderDays: { type: integer, minimum: 1, maximum: 30 }
+    CardFigures:
+      type: object
+      description: Figures of a cycle of a card account, in its currency (never summed across currencies).
+      additionalProperties: false
+      required:
+        - previousBalance
+        - purchases
+        - refunds
+        - payments
+        - otherNet
+        - closingBalance
+        - unbilledInstallments
+        - billedBalance
+        - minimumDue
+        - noInterestPayment
+        - creditBalance
+      properties:
+        previousBalance: { $ref: '#/components/schemas/Money' }
+        purchases: { $ref: '#/components/schemas/Money' }
+        refunds: { $ref: '#/components/schemas/Money' }
+        payments: { $ref: '#/components/schemas/Money' }
+        otherNet:
+          description: Net (signed) of adjustments, opening balances and other movements; positive increases the debt.
+          $ref: '#/components/schemas/Money'
+        closingBalance:
+          description: Balance owed at the closing date; `previous + purchases - refunds - payments + otherNet`.
+          $ref: '#/components/schemas/Money'
+        unbilledInstallments:
+          description: Principal of the installments that will be billed in later cycles.
+          $ref: '#/components/schemas/Money'
+        billedBalance:
+          description: '`closingBalance - unbilledInstallments`.'
+          $ref: '#/components/schemas/Money'
+        minimumDue: { $ref: '#/components/schemas/Money' }
+        noInterestPayment: { $ref: '#/components/schemas/Money' }
+        creditBalance:
+          description: Credit in favour of the holder when the billed balance is negative; zero otherwise.
+          $ref: '#/components/schemas/Money'
+    CardStatement:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - cardAccountId
+        - accountId
+        - currency
+        - cycleStart
+        - closingDate
+        - dueDate
+        - status
+        - issuedAt
+        - issued
+        - current
+        - difference
+        - reported
+        - reportedDifference
+        - noInterestPayment
+        - minimumDue
+        - remainingNoInterest
+        - remainingMinimum
+        - consistent
+        - version
+      properties:
+        id:
+          description: Null when the cycle is calculated on read and was never issued.
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        cardAccountId: { $ref: '#/components/schemas/Uuid' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        cycleStart: { $ref: '#/components/schemas/LocalDate' }
+        closingDate: { $ref: '#/components/schemas/LocalDate' }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        status: { $ref: '#/components/schemas/CardStatementStatus' }
+        issuedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        issued:
+          description: Figures frozen when the statement was issued.
+          oneOf:
+            - $ref: '#/components/schemas/CardFigures'
+            - type: 'null'
+        current:
+          description: Figures recalculated today from the ledger.
+          $ref: '#/components/schemas/CardFigures'
+        difference:
+          description: '`current - issued`; null when there is no issued statement.'
+          oneOf:
+            - $ref: '#/components/schemas/CardFigures'
+            - type: 'null'
+        reported:
+          description: Figures informed by the bank (Could); null when the cycle was never issued.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [billedBalance, minimumDue]
+              properties:
+                billedBalance:
+                  oneOf:
+                    - $ref: '#/components/schemas/Money'
+                    - type: 'null'
+                minimumDue:
+                  oneOf:
+                    - $ref: '#/components/schemas/Money'
+                    - type: 'null'
+            - type: 'null'
+        reportedDifference:
+          description: Billed balance reported by the bank minus the one calculated by the system.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        noInterestPayment: { $ref: '#/components/schemas/Money' }
+        minimumDue: { $ref: '#/components/schemas/Money' }
+        remainingNoInterest:
+          description: What is still missing to avoid interest after the payments received since the closing date.
+          $ref: '#/components/schemas/Money'
+        remainingMinimum: { $ref: '#/components/schemas/Money' }
+        consistent:
+          type: boolean
+          description: '`false` when the ledger movements of the cycle do not add up to the closing balance (opening balances, corrections).'
+        version:
+          oneOf:
+            - type: integer
+            - type: 'null'
+    CardStatementList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CardStatement' }
+    CardStatementReportedInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reportedBilledBalance:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        reportedMinimumDue:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+    CardUtilization:
+      type: object
+      additionalProperties: false
+      required: [scope, accountId, limit, used, available, utilization, overdrawn, missingRates]
+      properties:
+        scope: { type: string, enum: [SHARED, ACCOUNT] }
+        accountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        limit: { $ref: '#/components/schemas/Money' }
+        used:
+          description: Credit used = balance owed plus pending purchases (shared limit valued at today's rate; never 1:1).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        available:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        utilization:
+          description: Percentage with two decimals (half-even); null when it cannot be calculated.
+          oneOf:
+            - type: string
+              examples: ['30.53']
+            - type: 'null'
+        overdrawn: { type: boolean }
+        missingRates:
+          type: array
+          description: Currencies without a valuation rate that prevent the calculation.
+          items: { $ref: '#/components/schemas/CurrencyCode' }
+    CardAccount:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - accountId
+        - currency
+        - creditLimit
+        - minimumRule
+        - balance
+        - pendingPurchases
+        - creditUsed
+        - utilization
+        - openCycle
+        - lastStatement
+        - nextDueDate
+        - paymentPlan
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        creditLimit:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        minimumRule: { $ref: '#/components/schemas/CardMinimumRule' }
+        balance: { $ref: '#/components/schemas/Money' }
+        pendingPurchases: { $ref: '#/components/schemas/Money' }
+        creditUsed: { $ref: '#/components/schemas/Money' }
+        utilization:
+          oneOf:
+            - $ref: '#/components/schemas/CardUtilization'
+            - type: 'null'
+        openCycle: { $ref: '#/components/schemas/CardStatement' }
+        lastStatement:
+          oneOf:
+            - $ref: '#/components/schemas/CardStatement'
+            - type: 'null'
+        nextDueDate:
+          description: Due date of the oldest issued statement with something missing, or the one of the open cycle.
+          $ref: '#/components/schemas/LocalDate'
+        paymentPlan:
+          oneOf:
+            - $ref: '#/components/schemas/CardPaymentPlan'
+            - type: 'null'
+    CardPaymentPlanConflict:
+      type: object
+      additionalProperties: false
+      required: [accountId, conflictingDefinitions]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        conflictingDefinitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [definitionId, name]
+            properties:
+              definitionId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+    CreditCard:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - status
+        - statementDay
+        - dueDay
+        - dueWeekendAdjustment
+        - annualRate
+        - limitMode
+        - sharedLimit
+        - utilizationThresholds
+        - reminderDays
+        - accounts
+        - utilization
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        statementDay: { type: integer, minimum: 1, maximum: 31 }
+        dueDay: { type: integer, minimum: 1, maximum: 31 }
+        dueWeekendAdjustment: { type: string, enum: [NONE, PREVIOUS, NEXT] }
+        annualRate:
+          oneOf:
+            - type: string
+            - type: 'null'
+        limitMode: { type: string, enum: [SEPARATE, SHARED] }
+        sharedLimit:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        utilizationThresholds:
+          type: array
+          items: { type: string }
+        reminderDays: { type: integer }
+        accounts:
+          type: array
+          items: { $ref: '#/components/schemas/CardAccount' }
+        utilization:
+          type: array
+          description: One entry per account with a separate limit, or the shared one.
+          items: { $ref: '#/components/schemas/CardUtilization' }
+        paymentPlanConflicts:
+          type: array
+          description: Only on creation, for the payment plans requested but not enabled because of an active recurring transfer.
+          items: { $ref: '#/components/schemas/CardPaymentPlanConflict' }
+        ratesUsed:
+          type: array
+          description: Valuation rates used for a shared limit.
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+    CreditCardList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CreditCard' }
+    CardInstallmentPlanInput:
+      type: object
+      additionalProperties: false
+      required: [purchaseTransactionId, installmentCount]
+      properties:
+        purchaseTransactionId:
+          description: Posted expense of a card account without another active installment plan.
+          $ref: '#/components/schemas/Uuid'
+        installmentCount: { type: integer, minimum: 2, maximum: 60 }
+        annualRate:
+          type: string
+          description: Nominal annual rate in percent; `0.00` (default) means no interest.
+          pattern: '^[0-9]{1,3}(\.[0-9]{1,2})?$'
+        startCycle: { type: string, enum: [PURCHASE, NEXT], default: PURCHASE }
+    CardInstallment:
+      type: object
+      additionalProperties: false
+      required: [n, billingClosingDate, dueDate, principal, interest, total]
+      properties:
+        n: { type: integer, minimum: 1 }
+        billingClosingDate: { $ref: '#/components/schemas/LocalDate' }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        principal: { $ref: '#/components/schemas/Money' }
+        interest:
+          description: Projected interest; never posted as an expense.
+          $ref: '#/components/schemas/Money'
+        total: { $ref: '#/components/schemas/Money' }
+    CardInstallmentPlan:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - cardAccountId
+        - purchaseTransactionId
+        - purchaseDate
+        - principal
+        - installmentCount
+        - annualRate
+        - startCycle
+        - status
+        - cancelReason
+        - installments
+        - version
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        cardAccountId: { $ref: '#/components/schemas/Uuid' }
+        purchaseTransactionId: { $ref: '#/components/schemas/Uuid' }
+        purchaseDate: { $ref: '#/components/schemas/LocalDate' }
+        principal: { $ref: '#/components/schemas/Money' }
+        installmentCount: { type: integer }
+        annualRate: { type: string }
+        startCycle: { type: string, enum: [PURCHASE, NEXT] }
+        status: { type: string, enum: [ACTIVE, COMPLETED, CANCELLED] }
+        cancelReason:
+          oneOf:
+            - type: string
+              enum: [PURCHASE_VOIDED, PURCHASE_REVISED, USER]
+            - type: 'null'
+        installments:
+          type: array
+          items: { $ref: '#/components/schemas/CardInstallment' }
+        version: { $ref: '#/components/schemas/Version' }
+    CardInstallmentPlanList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CardInstallmentPlan' }
+    CardFutureCharge:
+      type: object
+      additionalProperties: false
+      required: [dueDate, closingDate, accountId, currency, installments, total]
+      properties:
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        closingDate: { $ref: '#/components/schemas/LocalDate' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        installments:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [planId, purchaseTransactionId, n, of, principal, interest, total]
+            properties:
+              planId: { $ref: '#/components/schemas/Uuid' }
+              purchaseTransactionId: { $ref: '#/components/schemas/Uuid' }
+              n: { type: integer }
+              of: { type: integer }
+              principal: { $ref: '#/components/schemas/Money' }
+              interest: { $ref: '#/components/schemas/Money' }
+              total: { $ref: '#/components/schemas/Money' }
+        total: { $ref: '#/components/schemas/Money' }
+    CardFutureChargeList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CardFutureCharge' }
     ReferenceColumnMapping:
       type: object
       description: Each field is a 0-based column index or the header name.

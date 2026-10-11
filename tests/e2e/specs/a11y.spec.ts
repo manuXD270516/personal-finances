@@ -56,6 +56,10 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   // loans.spec.ts).
   { path: '/debts', name: 'Deudas' },
   { path: '/debts/nuevo', name: 'Nuevo préstamo' },
+  // add-credit-cards 6.1: pestaña Tarjetas de Deudas y asistente de alta (el detalle con datos, el formulario de pago y el
+  // plan de pago los analiza credit-cards.spec.ts).
+  { path: '/debts?vista=tarjetas', name: 'Deudas: tarjetas' },
+  { path: '/debts/tarjetas/nueva', name: 'Nueva tarjeta de crédito' },
 ];
 
 async function seriousViolations(page: Page) {

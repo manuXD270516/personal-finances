@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Pago de la tarjeta como compromiso administrado'
 scenario: 'Monto exacto después del cierre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013', 'FR-DEBT-014', 'FR-COMMITMENTS-011']
 nfr: []
 invariants: ['INV-013']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/payment-plan-expectation.test.ts
+  - tests/e2e/specs/credit-cards.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'payment-plan']

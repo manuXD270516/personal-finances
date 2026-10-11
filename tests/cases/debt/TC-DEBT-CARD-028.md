@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Permisos, auditoría y aislamiento de las tarjetas'
 scenario: 'VIEWER intenta cambiar el límite'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-012', 'FR-AUDIT-001']
 nfr: ['NFR-SEC-003']
 invariants: ['INV-025', 'INV-029']
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+  - packages/contexts/debt/test/integration/pg-cards.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'rbac', 'rls']

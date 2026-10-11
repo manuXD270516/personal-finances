@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Tarjeta bimoneda con una cuenta por moneda'
 scenario: 'Visa Oro en BOB y USD'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-016']
 nfr: []
 invariants: ['INV-002']
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/api/test/api/workspace-import.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'multi-currency']

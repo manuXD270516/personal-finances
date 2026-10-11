@@ -28,7 +28,12 @@ import {
   createClassificationRuntime,
 } from '@pf/classification/interface/classification.module';
 import { DEBT_AUDIT_POLICY } from '@pf/debt/contracts';
-import { DebtModule, LOAN_LIFECYCLE_MACHINE, createDebtRuntime } from '@pf/debt/interface/debt.module';
+import {
+  DebtModule,
+  LOAN_LIFECYCLE_MACHINE,
+  createCardsRuntime,
+  createDebtRuntime,
+} from '@pf/debt/interface/debt.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
 import {
   createFxRuntime,
@@ -36,7 +41,7 @@ import {
   FxModule,
   parseFxProviderSettings,
 } from '@pf/fx/interface/fx.module';
-import { IDENTITY_AUDIT_POLICY } from '@pf/identity/contracts';
+import { IDENTITY_AUDIT_POLICY, type WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import { IMPORTS_AUDIT_POLICY } from '@pf/imports/contracts';
 import {
   createImportsRuntime,
@@ -48,7 +53,9 @@ import {
   identityUserLocales,
   identityUserLocaleTags,
   identityWorkspaceCalendar,
+  identityWorkspaceCalendarDirectory,
   identityWorkspaceSettings,
+  identityWorkspaceSettingsDirectory,
   identityUserDisplayNames,
   identityWorkspaceTimeZones,
   type DemoDataOptions,
@@ -65,7 +72,12 @@ import {
   FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
   PlanningModule,
 } from '@pf/planning/interface/planning.module';
-import { JWKS_METRICS, type JwksObserver, type JwtVerifierOptions } from '@pf/platform/api';
+import {
+  JWKS_METRICS,
+  currentRequestContext,
+  type JwksObserver,
+  type JwtVerifierOptions,
+} from '@pf/platform/api';
 import { otelCounters, otelHistograms, type CounterMetrics } from '@pf/platform/otel';
 import { demoDataEnabled, type ApiConfig, type WorkerConfig } from '@pf/platform/config';
 import type { JobQueue } from '@pf/platform/queue';
@@ -311,6 +323,23 @@ export function financeRuntimes(input: {
   readonly outbox?: OutboxWriter;
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
+  // IDENTITY según el actor: la API lee el workspace con la membresía del usuario de la petición; el job y los
+  // consumidores del worker (actor de proceso o sin contexto; `pf_worker` no ve `iam.workspace` por membresía) usan el
+  // directorio de workspaces. Los comandos que DEBT ejecuta en el worker pasan por el puerto público de COMMITMENTS
+  // (y este por el calendario de PLANNING), así que también deben resolverlo sin usuario (PF002 "user context not set").
+  const requestCalendar = identityWorkspaceCalendar(input.pool);
+  const directoryCalendar = identityWorkspaceCalendarDirectory(input.pool);
+  const requestSettings = identityWorkspaceSettings(input.pool);
+  const directorySettings = identityWorkspaceSettingsDirectory(input.pool);
+  const isUser = () => currentRequestContext()?.actor?.type === 'USER';
+  const actorCalendar: WorkspaceCalendarQuery = {
+    calendarOf: (workspaceId) =>
+      isUser() ? requestCalendar.calendarOf(workspaceId) : directoryCalendar.calendarOf(workspaceId),
+  };
+  const actorSettings: typeof requestSettings = {
+    settingsOf: (workspaceId) =>
+      isUser() ? requestSettings.settingsOf(workspaceId) : directorySettings.settingsOf(workspaceId),
+  };
   // docs/31 D53: la ventana de vigencia de las tasas de valoración y de referencia es un ajuste de REPORTING
   // (`REPORTING_RATE_VALIDITY_WINDOW`, 7 d por defecto); FX la recibe de aquí y la aplica sin cambiar su semántica.
   const rateValidityWindowDays =
@@ -434,7 +463,7 @@ export function financeRuntimes(input: {
     audit: input.audit,
     lifecycle: input.lifecycle,
     outbox: classificationOutbox(writer),
-    calendar: identityWorkspaceCalendar(input.pool),
+    calendar: actorCalendar,
     activity: ledger.activityRange,
     ...(input.config.PLANNING_PERIOD_LOOKAHEAD ? { lookahead: input.config.PLANNING_PERIOD_LOOKAHEAD } : {}),
     // add-budgets: presupuesto vs real desde la fuente de verdad, con la misma valoración y ventana que el Home.
@@ -480,8 +509,8 @@ export function financeRuntimes(input: {
     lifecycle: input.lifecycle,
     lifecycleQuery: input.lifecycleQuery,
     outbox: classificationOutbox(writer),
-    calendar: identityWorkspaceCalendar(input.pool),
-    settings: identityWorkspaceSettings(input.pool),
+    calendar: actorCalendar,
+    settings: actorSettings,
     periods: financialPeriodPort(planning.periodQuery),
     accounts: accounts.query,
     accountCatalog: accounts.catalog,
@@ -516,6 +545,25 @@ export function financeRuntimes(input: {
     transactions: transactions.loans,
     recurring: commitments.recurringDefinitions,
   });
+  // DEBT (add-credit-cards): tarjetas de crédito sobre los mismos contratos públicos (movimientos por cuenta de
+  // TRANSACTIONS, saldos históricos del ledger, valoración de FX y el puerto de definiciones administradas).
+  const cards = createCardsRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    outbox: classificationOutbox(writer),
+    calendar: actorCalendar,
+    accounts: accounts.query,
+    accountCatalog: accounts.catalog,
+    balanceHistory: ledger.accountBalanceHistory,
+    movements: transactions.movements,
+    pending: transactions.pending,
+    links: transactions.links,
+    recurring: commitments.recurringDefinitions,
+    recurringQuery: commitments.recurringDefinitionQuery,
+    rates: fx.valuation,
+    rateValidityWindowDays,
+  });
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
   const imports = createImportsRuntime({
     pool: input.pool,
@@ -545,6 +593,7 @@ export function financeRuntimes(input: {
     commitments,
     imports,
     debt,
+    cards,
   };
 }
 
@@ -594,6 +643,7 @@ export function identityImports(input: {
     commitments,
     imports,
     debt,
+    cards,
   } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -672,7 +722,7 @@ export function identityImports(input: {
     // IMPORTS — openspec add-basic-csv-import (Phase 3): `/imports*`.
     ImportsModule.register({ runtime: imports, conventions: input.conventions }),
     // DEBT — openspec add-loans (Phase 4): `/loans*`.
-    DebtModule.register({ runtime: debt, conventions: input.conventions }),
+    DebtModule.register({ runtime: debt, cards, conventions: input.conventions }),
   ];
 }
 

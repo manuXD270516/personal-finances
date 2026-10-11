@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Alertas de utilización'
 scenario: 'Dos umbrales en un solo cambio'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-015', 'FR-NOTIFY-005']
 nfr: []
 invariants: ['INV-028']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/debt-cards.int.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/utilization.test.ts
+  - packages/contexts/debt/test/integration/pg-cards.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'utilization', 'alerts']

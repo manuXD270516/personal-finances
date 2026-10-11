@@ -2319,7 +2319,8 @@
       "openBudgetLine": "View the line in the {period} plan",
       "openPeriodClose": "Go to the {period} close",
       "openRecurringOccurrence": "View the recurring payment of {period}",
-      "openSubscription": "View the subscription"
+      "openSubscription": "View the subscription",
+      "openCreditCard": "View the card"
     },
     "prefs": {
       "title": "Notifications",
@@ -2342,7 +2343,9 @@
         "RECURRING_APPROVAL_REQUIRED": "Recurring payment to approve",
         "SUBSCRIPTION_RENEWAL": "Upcoming subscription renewal",
         "SUBSCRIPTION_TRIAL_ENDING": "Subscription trial ending",
-        "SUBSCRIPTION_PRICE_CHANGE": "Possible subscription price change"
+        "SUBSCRIPTION_PRICE_CHANGE": "Possible subscription price change",
+        "CARD_PAYMENT_DUE": "Card payment due",
+        "CARD_UTILIZATION": "Card utilization"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -2822,6 +2825,14 @@
       "managedNotice": "This installment is managed by the loan; it is resolved when you register the payment there.",
       "definitionManaged": "These installments are managed by a loan: they cannot be paused or edited here.",
       "openLoan": "Open the loan"
+    },
+    "cardPayment": {
+      "label": "Card payment · {name}",
+      "estimated": "Estimated",
+      "estimatedNote": "Estimated amount: it is adjusted when the statement is issued.",
+      "viewCard": "View the card {name}",
+      "viewCards": "View cards",
+      "definitionManaged": "This payment is managed by the payment plan of a card: it is not paused, ended or revised here. Approve, edit or skip each payment in Upcoming."
     }
   },
   "Subscriptions": {
@@ -3321,6 +3332,11 @@
       "meta": "Computed on {date} · reporting currency {currency}",
       "freshness": "latest activity {date}",
       "listTitle": "Known payments"
+    },
+    "cardPayment": {
+      "label": "Card payment · {name}",
+      "estimated": "Estimated: adjusted when the statement is issued",
+      "viewCard": "View the card"
     }
   },
   "Imports": {
@@ -4037,6 +4053,333 @@
       "BANK_TRANSFER": "Bank transfer",
       "DIGITAL_WALLET": "Digital wallet",
       "OTHER": "Other"
+    },
+    "tabs": {
+      "label": "Debts",
+      "loans": "Loans",
+      "cards": "Cards"
+    }
+  },
+  "Cards": {
+    "title": "Credit cards",
+    "intro": "Your cards: what you owe, how much of your limit you use, when the next payment is due and how much is missing to avoid interest.",
+    "viewerNotice": "You can only view cards; registering or changing one requires the editor role.",
+    "loading": "Loading…",
+    "notFound": "This card does not exist or does not belong to this workspace.",
+    "back": "Back to Cards",
+    "cancel": "Cancel",
+    "errors": {
+      "REQUIRED": "Fill in this field.",
+      "INVALID": "Enter a valid number.",
+      "SCALE": "It has more decimals than the currency allows.",
+      "NOT_POSITIVE": "It must be greater than zero.",
+      "RANGE": "It is outside the allowed range.",
+      "DUPLICATE_CURRENCY": "A card can have only one account per currency.",
+      "SHARED_NEEDS_TWO": "A shared limit needs at least two accounts (two currencies)."
+    },
+    "status": {
+      "ARCHIVED": "Archived"
+    },
+    "statementStatus": {
+      "OPEN": "Open cycle",
+      "ISSUED": "Issued",
+      "PAID": "Paid",
+      "PARTIALLY_PAID": "Partially paid",
+      "OVERDUE": "Overdue"
+    },
+    "weekend": {
+      "NONE": "No adjustment",
+      "PREVIOUS": "Move to the previous business day",
+      "NEXT": "Move to the next business day"
+    },
+    "utilization": {
+      "value": "Utilization {percent}%",
+      "level": {
+        "ok": "Normal",
+        "warn": "Attention",
+        "danger": "Critical",
+        "unknown": "No data"
+      },
+      "overdrawn": "Over the limit",
+      "missingRates": "It cannot be calculated: the exchange rate for {currencies} is missing.",
+      "unknown": "Utilization cannot be calculated.",
+      "label": "Utilization of {name} in {currency}",
+      "labelShared": "Utilization of the shared limit of {name}"
+    },
+    "list": {
+      "new": "New card",
+      "empty": "You have not registered any cards yet. Register one over your credit card accounts to see its utilization, closing and due dates.",
+      "calendar": "Closes on day {statementDay} · due on day {dueDay}",
+      "sharedLimit": "Shared limit {limit} · used {used} · available {available}",
+      "region": "Accounts of {name}",
+      "caption": "Accounts of {name} with balance owed, credit used, utilization, available, next due date and what is missing to pay",
+      "account": "Currency",
+      "balance": "Balance owed",
+      "used": "Credit used",
+      "utilization": "Utilization",
+      "available": "Available",
+      "nextDue": "Next due date",
+      "missing": "Missing to avoid interest",
+      "planActive": "Automatic payment on",
+      "sharedRef": "See shared limit"
+    },
+    "form": {
+      "title": "New credit card",
+      "stepsLabel": "Card registration steps",
+      "stepOf": "Step {n} of {total}: {name}",
+      "steps": {
+        "accounts": "Accounts",
+        "limits": "Limits and minimum payment",
+        "calendar": "Closing, due date and alerts",
+        "plan": "Payment plan (optional)"
+      },
+      "name": "Card name",
+      "nameHint": "For example, Visa Gold.",
+      "accountsLegend": "Card accounts",
+      "accountsHint": "Choose the credit card accounts: one per currency. Registering the card creates no transactions and changes no balances.",
+      "noAccounts": "You have no active credit card accounts. Create one to continue.",
+      "accountInUse": "already belongs to another card",
+      "currencyTaken": "you already chose an account in that currency",
+      "createAccount": "Create a card account",
+      "createAccountRegion": "Create a credit card account",
+      "limitMode": "Limit type",
+      "limitModes": {
+        "SEPARATE": "One limit per account",
+        "SHARED": "One shared limit"
+      },
+      "limitHint": {
+        "SEPARATE": "Each currency has its own limit.",
+        "SHARED": "A single limit for all currencies, declared in the currency you choose; usage in another currency is valued at today's rate."
+      },
+      "sharedLimit": "Shared limit",
+      "sharedCurrency": "Limit currency",
+      "accountTerms": "{name} ({currency})",
+      "creditLimit": "Credit limit ({currency})",
+      "minimumRule": "Minimum payment rule",
+      "minimumTypes": {
+        "PERCENT": "Percentage of the balance",
+        "FIXED": "Fixed amount"
+      },
+      "minPercent": "Percentage of the billed balance (%)",
+      "minPercentHint": "Between 0.01 and 100.",
+      "minFloor": "Minimum payment floor ({currency})",
+      "minFloorHint": "Optional: the minimum never goes below this amount.",
+      "minFixed": "Fixed minimum payment ({currency})",
+      "calendarHint": "Days go from 1 to 31; in short months the last day of the month is used.",
+      "statementDay": "Closing day",
+      "dueDay": "Due day",
+      "weekend": "If the due date falls on a weekend",
+      "weekendHint": "Adjustment of the payment date.",
+      "annualRate": "Informative annual rate (%)",
+      "annualRateHint": "Optional. Informative only: no interest is calculated with it.",
+      "thresholds": "Utilization thresholds (%)",
+      "thresholdsHint": "Optional, up to three separated by semicolons. Empty = 30 and 80.",
+      "reminderDays": "Reminder days before the due date",
+      "reminderHint": "Between 1 and 30; 3 by default.",
+      "planHint": "The payment plan creates a recurring payment managed by the card, with the statement amount. You can enable it later.",
+      "planEnable": "Enable automatic payment for the {currency} account",
+      "planSource": "Account that pays",
+      "chooseAccount": "Choose an account",
+      "fixErrors": "{count, plural, one {Fix # field} other {Fix # fields}} to continue.",
+      "prev": "Previous",
+      "next": "Next",
+      "save": "Register card",
+      "saving": "Saving…",
+      "createdTitle": "Card {name} registered",
+      "conflictIntro": "The card was registered, but the payment plan was not enabled because you already have a recurring transfer to these accounts:",
+      "conflictAction": "End that transfer in Recurring payments and then enable the payment plan from the card detail.",
+      "openCard": "Open the card"
+    },
+    "plan": {
+      "title": "Automatic payment ({currency})",
+      "intro": "The payment plan creates the card payment every month in Recurring payments: estimated before closing, exact after. Approve, edit or skip each payment there.",
+      "source": "Account that pays",
+      "sourceHint": "An asset account in {currency}.",
+      "policy": "What it pays",
+      "policies": {
+        "NO_INTEREST": "Total to avoid interest",
+        "MINIMUM": "Minimum payment"
+      },
+      "policyHint": {
+        "NO_INTEREST": "Pays what is missing from the statement to avoid interest.",
+        "MINIMUM": "Pays only the minimum; the bank may charge interest on the rest."
+      },
+      "mode": "How the payment is created",
+      "modes": {
+        "PENDING_APPROVAL": "Pending approval",
+        "AUTO_CREATE": "Create automatically",
+        "NOTIFY_ONLY": "Notify only"
+      },
+      "modeHint": {
+        "PENDING_APPROVAL": "Each payment waits for approval in Recurring payments.",
+        "AUTO_CREATE": "The payment is recorded by itself on its date.",
+        "NOTIFY_ONLY": "It only notifies you; you record the transfer."
+      },
+      "commitment": "Commitment",
+      "viewCommitment": "View the recurring payment",
+      "off": "Automatic payment is off: you record the payments of this account yourself.",
+      "enable": "Enable automatic payment",
+      "change": "Change the plan",
+      "update": "Save the plan",
+      "disable": "Disable",
+      "disableTitle": "Disable automatic payment?",
+      "disableDescription": "It ends the recurring payment from today. Payments already created are not touched.",
+      "enabled": "Automatic payment enabled.",
+      "updated": "Payment plan updated.",
+      "disabled": "Automatic payment disabled.",
+      "conflictIntro": "You already have a recurring transfer to this card, and there cannot be two payments for the same account:",
+      "conflictAction": "End that transfer in Recurring payments and enable the payment plan again."
+    },
+    "detail": {
+      "actions": "Card actions",
+      "tabsLabel": "Card sections",
+      "tabs": {
+        "overview": "Overview",
+        "statements": "Statements",
+        "plan": "Payment plan",
+        "installments": "Installments",
+        "future": "Future charges"
+      },
+      "rate": "informative annual rate {rate}%",
+      "utilizationTitle": "Credit utilization",
+      "sharedLimit": "Shared limit {limit}",
+      "accountLimit": "Limit in {currency}: {limit}",
+      "usedAvailable": "used {used} · available {available}",
+      "noLimit": "No limits registered.",
+      "openCycle": "Open cycle in {currency}",
+      "openCycleDates": "From {start} · closes {closing} · due {due}",
+      "pendingPurchases": "Pending purchases",
+      "lastStatement": "Last statement",
+      "missing": "{amount} missing"
+    },
+    "terms": {
+      "edit": "Edit terms",
+      "title": "Edit card terms",
+      "calendarNote": "The new closing and due days apply from the open cycle; statements already issued keep their dates and figures.",
+      "sharedLimit": "Shared limit ({currency})",
+      "account": "Account in {currency}",
+      "minimumType": "Minimum payment rule",
+      "save": "Save changes",
+      "saved": "Terms updated."
+    },
+    "archive": {
+      "action": "Archive card",
+      "title": "Archive {name}?",
+      "description": "It ends its payment plans and stops issuing statements and reminders. Statements and installment plans stay available; the accounts keep their balance.",
+      "done": "Card archived.",
+      "archivedNotice": "This card is archived: you can only view it."
+    },
+    "statements": {
+      "accountTitle": "Statements in {currency}",
+      "empty": "There are no statements yet.",
+      "cycle": "Closing {closing} · due {due}",
+      "noInterest": "Total to avoid interest",
+      "remainingNoInterest": "Still to pay",
+      "minimum": "Minimum payment",
+      "remainingMinimum": "Missing for the minimum",
+      "notIssued": "This cycle is calculated when you view it; the statement is issued at closing.",
+      "changed": "{count, plural, one {# figure changed since it was issued: there were transactions dated before the closing.} other {# figures changed since it was issued: there were transactions dated before the closing.}} What was issued is not modified.",
+      "inconsistent": "The movements of the cycle do not add up to the closing balance (for example, an opening balance or a correction).",
+      "figuresRegion": "Cycle figures",
+      "figuresCaption": "Cycle figures in {currency} closing on {closing}",
+      "figure": "Figure",
+      "issued": "Issued",
+      "recalculated": "Recalculated today",
+      "difference": "Difference",
+      "calculated": "Calculated",
+      "figures": {
+        "previousBalance": "Previous balance",
+        "purchases": "Purchases",
+        "refunds": "Refunds",
+        "payments": "Payments",
+        "otherNet": "Other movements (net)",
+        "closingBalance": "Closing balance",
+        "unbilledInstallments": "Installments to bill",
+        "billedBalance": "Billed balance",
+        "minimumDue": "Minimum payment",
+        "noInterestPayment": "Payment to avoid interest",
+        "creditBalance": "Credit balance"
+      },
+      "reported": {
+        "title": "Amounts reported by the bank",
+        "hint": "If the bank statement differs, register it: it replaces the calculation for paying and keeps the difference visible. It creates no transactions.",
+        "billed": "Bank billed balance ({currency})",
+        "minimum": "Bank minimum payment ({currency})",
+        "save": "Save bank amounts",
+        "saved": "Bank amounts registered.",
+        "billedShort": "Billed balance (bank)",
+        "minimumShort": "Minimum payment (bank)",
+        "difference": "Difference with the system",
+        "noDifference": "No difference"
+      }
+    },
+    "installments": {
+      "intro": "Turn a posted purchase of the card into installments: they are subtracted from the billed balance and added to the future charges calendar. It creates no accounting entries.",
+      "new": "New installment plan",
+      "newTitle": "Pay a purchase in installments",
+      "purchase": "Purchase",
+      "purchaseHint": "Posted expenses of the card accounts.",
+      "choosePurchase": "Choose a purchase",
+      "noDescription": "no description",
+      "count": "Number of installments",
+      "countHint": "From 2 to 60.",
+      "rate": "Annual rate (%)",
+      "rateHint": "Optional. Empty or 0 = no interest; with a rate the French system is used.",
+      "startCycle": "First installment",
+      "startCycles": {
+        "PURCHASE": "In the purchase cycle",
+        "NEXT": "In the next cycle"
+      },
+      "create": "Create installment plan",
+      "created": "Installment plan created.",
+      "cancelled": "Installment plan cancelled.",
+      "empty": "There are no installment plans yet.",
+      "planSummary": "Purchase of {date} · {amount} in {count} installments",
+      "status": {
+        "ACTIVE": "Active",
+        "COMPLETED": "Completed",
+        "CANCELLED": "Cancelled"
+      },
+      "cancelReasons": {
+        "PURCHASE_VOIDED": "the purchase was voided",
+        "PURCHASE_REVISED": "the purchase was changed",
+        "USER": "cancelled by you"
+      },
+      "cancel": "Cancel plan",
+      "cancelLabel": "Cancel the installment plan of the purchase of {date}",
+      "cancelTitle": "Cancel the installment plan?",
+      "cancelDescription": "The pending installments stop being subtracted from the billed balance and leave the future charges calendar; those already billed stay in the history.",
+      "region": "Plan installments",
+      "caption": "Schedule of the {count} installments of the plan",
+      "n": "Installment",
+      "closing": "Closing",
+      "due": "Due date",
+      "principal": "Principal",
+      "interest": "Projected interest",
+      "total": "Total"
+    },
+    "future": {
+      "intro": "Installments that will be billed in the next cycles, by due date.",
+      "months": "Horizon",
+      "monthsOption": "{months} months",
+      "empty": "There are no future charges: no installments are pending.",
+      "region": "Future charges calendar",
+      "caption": "Future charges by due date",
+      "due": "Due date",
+      "closing": "Cycle closing",
+      "installments": "Installments",
+      "total": "Total",
+      "installment": "Installment {n} of {of}: {amount}"
+    },
+    "transfer": {
+      "label": "Card payment",
+      "viewStatement": "View statement",
+      "statementInfo": "Last statement: due {due}.",
+      "nothingMissing": "Nothing is missing from the last statement.",
+      "noInterest": "Total to avoid interest: {amount}",
+      "noInterestConvert": "Total to avoid interest: {amount} (convert it first)",
+      "minimum": "Minimum payment: {amount}",
+      "minimumConvert": "Minimum payment: {amount} (convert it first)"
     }
   }
 }

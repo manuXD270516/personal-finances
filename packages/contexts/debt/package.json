@@ -32,6 +32,7 @@
     "@pf/audit": "workspace:*",
     "@pf/classification": "workspace:*",
     "@pf/commitments": "workspace:*",
+    "@pf/fx": "workspace:*",
     "@pf/identity": "workspace:*",
     "@pf/ledger": "workspace:*",
     "@pf/planning": "workspace:*",

@@ -5,16 +5,21 @@ spec: notifications/alerts
 related_specs: ['debt/credit-cards']
 requirement: 'Notificación de vencimiento de tarjeta'
 scenario: 'Vencimiento de Visa Oro notificado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-004', 'FR-NOTIFY-005', 'FR-NOTIFY-006', 'FR-DEBT-013']
 nfr: []
 invariants: ['INV-028']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/debt-cards.int.test.ts
+  - apps/web/src/ui/debt/cards/logic.test.ts
+  - packages/contexts/notifications/src/application/card-notifications.test.ts
+  - packages/contexts/notifications/src/domain/card-notifications.test.ts
+  - packages/contexts/notifications/test/integration/pg-notifications.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['notifications', 'credit-cards']

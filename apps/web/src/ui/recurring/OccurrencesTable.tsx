@@ -7,10 +7,12 @@ import { paymentHref } from '../debt/logic';
 import {
   availableOccurrenceActions,
   canRegisterLoanPayment,
+  isCardPayment,
   isLoanInstallment,
   occurrencePath,
   type OccurrenceAction,
 } from './logic';
+import { cardHref, cardPaymentName } from '../debt/cards/logic';
 import type { RecurringOccurrence } from './types';
 
 export const actionButtonId = (id: string, action: OccurrenceAction): string => `occ-${id}-${action}`;
@@ -32,6 +34,7 @@ export function OccurrencesTable({
   onAction,
   busyId,
   loanOf,
+  cardOf,
 }: {
   occurrences: readonly RecurringOccurrence[];
   f: FormatContext;
@@ -45,6 +48,8 @@ export function OccurrencesTable({
   busyId?: string | undefined;
   /** Préstamo de origen de una definición de cuotas (add-loans). */
   loanOf?: (definitionId: string) => { id: string; name: string } | undefined;
+  /** Tarjeta de origen de una definición `CARD_PAYMENT` (add-credit-cards). */
+  cardOf?: (definitionId: string) => { id: string; name: string } | undefined;
 }) {
   if (occurrences.length === 0)
     return (
@@ -96,12 +101,32 @@ export function OccurrencesTable({
               >
                 <td style={cellStyle}>
                   <a href={href(occurrencePath(o.id))} data-testid="occurrence-link">
-                    {o.definitionName}
+                    {isCardPayment(o)
+                      ? f.t('cardPayment.label', { name: cardPaymentName(o.definitionName) })
+                      : o.definitionName}
                   </a>
                   <div style={mutedStyle}>
                     {f.t(`kinds.${o.kind}`)} · {f.t(`modes.${o.mode}`)}
                     {o.overridden ? ` · ${f.t('overridden')}` : ''}
                   </div>
+                  {isCardPayment(o) ? (
+                    <div style={mutedStyle} data-testid="occurrence-card">
+                      {o.expected.type === 'ESTIMATED' ? (
+                        <span data-testid="occurrence-card-estimated">{f.t('cardPayment.estimated')} · </span>
+                      ) : null}
+                      <a
+                        href={href(
+                          cardOf?.(o.definitionId)
+                            ? cardHref(cardOf(o.definitionId)!.id)
+                            : '/debts?vista=tarjetas',
+                        )}
+                      >
+                        {cardOf?.(o.definitionId)
+                          ? f.t('cardPayment.viewCard', { name: cardOf(o.definitionId)!.name })
+                          : f.t('cardPayment.viewCards')}
+                      </a>
+                    </div>
+                  ) : null}
                   {isLoanInstallment(o) ? (
                     <div style={mutedStyle} data-testid="occurrence-loan">
                       {f.t('loan.origin')}{' '}

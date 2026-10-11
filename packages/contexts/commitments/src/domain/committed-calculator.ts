@@ -20,7 +20,8 @@ export function countsAsCommittedOutflow(input: {
 }): boolean {
   // La cuota de préstamo es un egreso comprometido (openspec add-loans, N8).
   if (input.kind === 'EXPENSE' || input.kind === 'LOAN_PAYMENT') return true;
-  if (input.kind === 'TRANSFER') {
+  // El pago de tarjeta (add-credit-cards) es una transferencia a la cuenta de la tarjeta (D127).
+  if (input.kind === 'TRANSFER' || input.kind === 'CARD_PAYMENT') {
     return (
       input.from !== undefined &&
       input.to !== undefined &&

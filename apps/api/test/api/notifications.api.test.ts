@@ -326,6 +326,8 @@ describe('Preferencias de notificaciones', () => {
           { type: 'SUBSCRIPTION_RENEWAL', inApp: true, email: true },
           { type: 'SUBSCRIPTION_TRIAL_ENDING', inApp: true, email: true },
           { type: 'SUBSCRIPTION_PRICE_CHANGE', inApp: true, email: true },
+          { type: 'CARD_PAYMENT_DUE', inApp: true, email: true },
+          { type: 'CARD_UTILIZATION', inApp: true, email: true },
         ],
         quietHours: null,
         includeDetailsInEmail: false,

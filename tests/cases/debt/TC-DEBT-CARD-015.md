@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Pago de tarjeta como transferencia que no es gasto'
 scenario: 'Pago del estado de cuenta desde el banco'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-014', 'FR-TRANSACTIONS-018']
 nfr: []
 invariants: ['INV-009', 'INV-030']
 priority: critical
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - apps/web/src/ui/debt/cards/logic.test.ts
+  - tests/e2e/specs/credit-cards.spec.ts
+status: automated
 regression_suite: true
 phase: 4
 tags: ['credit-cards', 'exit-criterion', 'payment']

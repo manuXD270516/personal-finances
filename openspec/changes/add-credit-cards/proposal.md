@@ -18,7 +18,7 @@ El objetivo de Phase 4 (docs/24 §5.4) es "controlar préstamos y tarjetas" y un
 ## Capabilities
 
 ### New Capabilities
-- `debt/credit-cards`: tarjetas de crédito con una cuenta por moneda, límite separado o compartido, ciclo de cierre y vencimiento con meses cortos y zona del workspace, resumen del ciclo, pago mínimo y pago sin intereses, estados de cuenta emitidos una vez, pago como transferencia que no es gasto, plan de pago administrado, recordatorio de vencimiento, utilización con alertas y compras en cuotas (24 requirements: 11 Must, 8 Should, 5 Could).
+- `debt/credit-cards`: tarjetas de crédito con una cuenta por moneda, límite separado o compartido, ciclo de cierre y vencimiento con meses cortos y zona del workspace, resumen del ciclo, pago mínimo y pago sin intereses, estados de cuenta emitidos una vez, pago como transferencia que no es gasto, plan de pago administrado, recordatorio de vencimiento, utilización con alertas y compras en cuotas (24 requirements: 13 Must, 6 Should, 5 Could; bimoneda y límite compartido o separado son Must por D171).
 
 ### Modified Capabilities
 - `commitments/recurrence-engine`: habilita `CARD_PAYMENT` solo para definiciones administradas por una tarjeta, monto esperado fijado por el administrador y pago de tarjeta en el comprometido y los próximos pagos (3 requirements ADDED: 3 Must).

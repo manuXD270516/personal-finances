@@ -5,16 +5,17 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Regla de pago mínimo'
 scenario: 'Porcentaje con redondeo HALF_EVEN'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-012', 'FR-DEBT-013']
 nfr: []
 invariants: ['INV-020', 'INV-001']
 priority: critical
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/minimum-payment-rule.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'rounding']

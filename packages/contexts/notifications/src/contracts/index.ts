@@ -14,6 +14,8 @@ export const NOTIFICATION_CONSUMERS = {
   subscriptionRenewal: 'notifications.subscription-renewal',
   subscriptionTrialEnding: 'notifications.subscription-trial-ending',
   subscriptionPriceChange: 'notifications.subscription-price-change',
+  cardPaymentDue: 'notifications.card-payment-due',
+  creditUtilization: 'notifications.card-utilization',
 } as const;
 
 /** Colas de trabajos pg-boss del worker (design decisiones 7 y 11). */

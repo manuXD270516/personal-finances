@@ -712,6 +712,9 @@ importers:
       '@pf/commitments':
         specifier: workspace:*
         version: link:../commitments
+      '@pf/fx':
+        specifier: workspace:*
+        version: link:../fx
       '@pf/identity':
         specifier: workspace:*
         version: link:../identity

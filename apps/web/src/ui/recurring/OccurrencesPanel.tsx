@@ -7,12 +7,14 @@ import type { Page } from '../common/types';
 import { Field, inputStyle, mutedStyle, rowStyle } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { FormatContext } from '../dashboard/types';
+import { useCardLookup } from '../debt/cards/useCardLookup';
 import { useLoanLookup } from '../debt/useLoanLookup';
 import type { Catalogs } from '../transactions/catalogs';
 import { OccurrenceActionPanel } from './OccurrenceActionPanel';
 import { actionButtonId, OccurrencesTable } from './OccurrencesTable';
 import {
   DEFAULT_UPCOMING_DAYS,
+  isCardPayment,
   isLoanInstallment,
   LIST_LIMIT,
   trayQuery,
@@ -100,6 +102,7 @@ export function OccurrencesPanel({
   }, []);
 
   const loans = useLoanLookup(ctx, (items ?? []).some(isLoanInstallment));
+  const cards = useCardLookup(ctx.api, ctx.base, (items ?? []).some(isCardPayment));
   const accountName = (id: string) => catalogs.names.account(id);
   const currencyOf = (id: string) => catalogs.accounts.find((a) => a.id === id)?.currency;
   const loading = items === undefined;
@@ -193,6 +196,7 @@ export function OccurrencesPanel({
           }
           onAction={(action, occurrence) => setActive({ action, occurrence })}
           loanOf={loans.ofDefinition}
+          cardOf={cards.ofDefinition}
         />
       )}
       {hasMore ? (

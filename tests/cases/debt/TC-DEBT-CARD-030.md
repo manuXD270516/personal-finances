@@ -5,16 +5,19 @@ spec: commitments/recurrence-engine
 related_specs: ['debt/credit-cards']
 requirement: 'Monto esperado fijado por el administrador'
 scenario: 'De estimación a monto exacto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-COMMITMENTS-008', 'FR-DEBT-013']
 nfr: []
 invariants: ['INV-013', 'INV-029']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/card-payment.service.test.ts
+  - packages/contexts/commitments/src/application/events.contract.test.ts
+  - packages/contexts/commitments/test/integration/pg-card-payment.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['recurrence', 'managed']

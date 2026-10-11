@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/credit-card-terms.schema.json",
+  "title": "pfos-export v1 — credit-card-terms",
+  "description": "Registro de la sección «credit-card-terms» (tabla debt.credit_card_terms, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "card_id",
+    "seq",
+    "effective_from",
+    "statement_day",
+    "due_day",
+    "due_weekend_adjustment",
+    "recorded_at",
+    "recorded_by"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "card_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "seq": {
+      "type": "integer"
+    },
+    "effective_from": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "statement_day": {
+      "type": "integer"
+    },
+    "due_day": {
+      "type": "integer"
+    },
+    "due_weekend_adjustment": {
+      "type": "string"
+    },
+    "recorded_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "recorded_by": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "debt.credit_card_terms",
+  "x-pfos-context": "debt"
+}

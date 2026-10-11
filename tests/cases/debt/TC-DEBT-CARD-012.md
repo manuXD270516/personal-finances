@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Estado del estado de cuenta'
 scenario: 'Mínimo no cubierto'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'statement-status']

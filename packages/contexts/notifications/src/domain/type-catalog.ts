@@ -255,9 +255,12 @@ const OCCURRENCE_DUE: NotificationTypeDefinition = {
     };
   },
   // D119: una ocurrencia que ya gestiona una suscripción y no requiere aprobación la avisa `add-subscriptions`.
+  // D119 (suscripciones) y su aplicación a tarjetas (add-credit-cards decisión 9, TC-DEBT-CARD-036): el vencimiento del
+  // pago de tarjeta sin aprobación lo avisa `CARD_PAYMENT_DUE`; "ocurrencia por aprobar" se mantiene.
   suppressed(payload) {
     const p = recordOf(payload, 'payload');
-    return p['managedBy'] === 'SUBSCRIPTION' && p['requiresApproval'] === false;
+    if (p['requiresApproval'] !== false) return false;
+    return p['managedBy'] === 'SUBSCRIPTION' || (p['managedBy'] === 'DEBT' && p['kind'] === 'CARD_PAYMENT');
   },
 };
 
@@ -418,6 +421,118 @@ const SUBSCRIPTION_PRICE_CHANGE: NotificationTypeDefinition = {
   },
 };
 
+// ──────────────────────────────────────────────────────────────────────────── CARD_* (add-credit-cards)
+
+export const CARD_PAYMENT_DUE_MESSAGE_KEY = 'notifications.card_payment_due.v1';
+export const CARD_UTILIZATION_MESSAGE_KEY = 'notifications.card_utilization.v1';
+
+/** Con 1 día o menos para el vencimiento el aviso es `WARNING`; antes, `INFO` (add-credit-cards decisión 9). */
+export const CARD_DUE_WARNING_DAYS = 1;
+
+/**
+ * `debt.CardPaymentDue.v1`: recordatorio del vencimiento de un estado de cuenta al que le falta algo para no generar
+ * intereses. Solo quienes pueden registrar el pago (OWNER y EDITOR). La clave de negocio es (cuenta de la tarjeta, fecha
+ * de cierre), igual que la del productor: un recordatorio entregado dos veces con otro `eventId` no duplica. Nombre y
+ * montos viajan en el hecho (PII `B`): NOTIFY no consulta otros contextos.
+ */
+const CARD_PAYMENT_DUE: NotificationTypeDefinition = {
+  type: 'CARD_PAYMENT_DUE',
+  consumer: 'notifications.card-payment-due',
+  event: { type: 'debt.CardPaymentDue', version: 1 },
+  recipients: ['OWNER', 'EDITOR'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const cardId = uuidOf(p, 'cardId');
+    const cardAccountId = uuidOf(p, 'cardAccountId');
+    const statementId = uuidOf(p, 'statementId');
+    const closingDate = localDateOf(p, 'closingDate');
+    const dueDate = localDateOf(p, 'dueDate');
+    const daysBefore = p['daysBefore'];
+    if (
+      typeof daysBefore !== 'number' ||
+      !Number.isInteger(daysBefore) ||
+      daysBefore < 0 ||
+      daysBefore > 30
+    ) {
+      fail('daysBefore');
+    }
+    const days = daysBefore as number;
+    const currency = p['currency'];
+    if (typeof currency !== 'string' || currency.length === 0) fail('currency');
+    return {
+      type: 'CARD_PAYMENT_DUE',
+      dedupeKey: `card-due:${cardAccountId}:${closingDate}`,
+      severity: days <= CARD_DUE_WARNING_DAYS ? 'WARNING' : 'INFO',
+      messageKey: CARD_PAYMENT_DUE_MESSAGE_KEY,
+      params: {
+        cardId,
+        cardName: textOf(p, 'cardName'),
+        cardAccountId,
+        statementId,
+        currency: currency as string,
+        closingDate,
+        dueDate,
+        daysBefore: days,
+        remainingNoInterest: { ...moneyOf(p, 'remainingNoInterest') },
+        remainingMinimum: { ...moneyOf(p, 'remainingMinimum') },
+      },
+      link: { kind: 'CREDIT_CARD', cardId, statementId, periodId: cardId, periodLabel: dueDate.slice(0, 7) },
+    };
+  },
+};
+
+/**
+ * `debt.CreditUtilizationThresholdReached.v1`: la utilización pasó a ser >= un umbral (el más alto cruzado; los demás
+ * viajan en `alsoCrossed` y NO generan avisos aparte). Clave de negocio `(tarjeta, ámbito, umbral, nº de cruce)`; en el
+ * ámbito `ACCOUNT` el ámbito incluye la cuenta, porque las cuentas de una tarjeta bimoneda cruzan por separado.
+ */
+const CARD_UTILIZATION: NotificationTypeDefinition = {
+  type: 'CARD_UTILIZATION',
+  consumer: 'notifications.card-utilization',
+  event: { type: 'debt.CreditUtilizationThresholdReached', version: 1 },
+  recipients: ['OWNER', 'EDITOR'],
+  plan(payload) {
+    const p = recordOf(payload, 'payload');
+    const cardId = uuidOf(p, 'cardId');
+    const scope = p['scope'];
+    if (scope !== 'SHARED' && scope !== 'ACCOUNT') fail('scope');
+    const accountId = p['accountId'] === null ? null : uuidOf(p, 'accountId');
+    if (scope === 'ACCOUNT' && accountId === null) fail('accountId');
+    const threshold = decimalOf(p, 'threshold');
+    const alsoRaw = p['alsoCrossed'];
+    if (!Array.isArray(alsoRaw)) fail('alsoCrossed');
+    const alsoCrossed = (alsoRaw as unknown[]).map((t) => {
+      if (typeof t !== 'string' || !DECIMAL.test(t)) fail('alsoCrossed[]');
+      return t as string;
+    });
+    const crossingNo = p['crossingNo'];
+    if (typeof crossingNo !== 'number' || !Number.isInteger(crossingNo) || crossingNo < 1) fail('crossingNo');
+    const crossedAt = textOf(p, 'crossedAt');
+    if (Number.isNaN(Date.parse(crossedAt))) fail('crossedAt');
+    const scopeKey = scope === 'SHARED' ? 'SHARED' : `ACCOUNT:${accountId}`;
+    return {
+      type: 'CARD_UTILIZATION',
+      dedupeKey: `card-utilization:${cardId}:${scopeKey}:${threshold}:${crossingNo as number}`,
+      severity: 'WARNING',
+      messageKey: CARD_UTILIZATION_MESSAGE_KEY,
+      params: {
+        cardId,
+        cardName: textOf(p, 'cardName'),
+        scope: scope as string,
+        accountId,
+        limit: { ...moneyOf(p, 'limit') },
+        used: { ...moneyOf(p, 'used') },
+        utilization: decimalOf(p, 'utilization'),
+        threshold,
+        alsoCrossed,
+        crossingNo: crossingNo as number,
+        crossedAt,
+      },
+      link: { kind: 'CREDIT_CARD', cardId, periodId: cardId, periodLabel: crossedAt.slice(0, 7) },
+    };
+  },
+};
+
 /** Registro de tipos por fase: una tabla en código, no un motor de reglas (RISK-005). */
 export const NOTIFICATION_TYPE_CATALOG: readonly NotificationTypeDefinition[] = [
   BUDGET_THRESHOLD,
@@ -426,6 +541,8 @@ export const NOTIFICATION_TYPE_CATALOG: readonly NotificationTypeDefinition[] = 
   SUBSCRIPTION_RENEWAL,
   SUBSCRIPTION_TRIAL_ENDING,
   SUBSCRIPTION_PRICE_CHANGE,
+  CARD_PAYMENT_DUE,
+  CARD_UTILIZATION,
 ];
 
 export function definitionOf(type: NotificationType): NotificationTypeDefinition {

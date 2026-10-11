@@ -23,7 +23,7 @@ Trace: FR-DEBT-012, INV-030 · Priority: Must
 
 ### Requirement: Tarjeta bimoneda con una cuenta por moneda
 Una tarjeta DEBE (MUST) poder agrupar una cuenta `credit_card` por moneda (por ejemplo BOB y USD) que comparten nombre, día de cierre, día de vencimiento y ajuste de fin de semana; cada cuenta DEBE (MUST) conservar su saldo, su regla de pago mínimo y su estado de cuenta por ciclo en su propia moneda, y NO DEBE (MUST NOT) sumarse nunca un monto de una moneda con otro de otra moneda en los cálculos del ciclo.
-Trace: FR-DEBT-016 · Priority: Should
+Trace: FR-DEBT-016 · Priority: Must
 
 #### Scenario: Visa Oro en BOB y USD
 - **CUANDO** el EDITOR registra "Visa Oro" con "Visa Oro BOB" (mínimo 5.00 % con piso 50.00 BOB) y "Visa Oro USD" (mínimo 5.00 % con piso 10.00 USD), cierre el día 25 y vencimiento el día 15
@@ -36,7 +36,7 @@ Trace: FR-DEBT-016 · Priority: Should
 
 ### Requirement: Límite compartido o separado
 Una tarjeta DEBE (MUST) declarar su límite como separado (un límite positivo por cuenta, en la moneda de esa cuenta) o compartido (un único límite positivo en la moneda de una de sus cuentas); una tarjeta de una sola cuenta DEBE (MUST) tener límite separado. Un límite compartido en una moneda que no es la de ninguna de sus cuentas DEBE (MUST) rechazarse con `VALIDATION_FAILED`.
-Trace: FR-DEBT-016, FR-DEBT-012 · Priority: Should
+Trace: FR-DEBT-016, FR-DEBT-012 · Priority: Must
 
 #### Scenario: Límite compartido en BOB
 - **CUANDO** el EDITOR registra "Visa Oro" con "Visa Oro BOB" y "Visa Oro USD" y un límite compartido de 15000.00 BOB

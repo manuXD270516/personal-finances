@@ -75,7 +75,15 @@ export function availableOccurrenceActions(
 
 /** Ocurrencia de una cuota de préstamo (`kind = LOAN_PAYMENT`, definición administrada por Deudas). */
 export const isLoanInstallment = (o: Partial<Pick<RecurringOccurrence, 'kind' | 'managedBy'>>): boolean =>
-  o.kind === 'LOAN_PAYMENT' || o.managedBy === 'DEBT';
+  o.kind === 'LOAN_PAYMENT' || (o.managedBy === 'DEBT' && o.kind !== 'CARD_PAYMENT');
+
+/**
+ * Ocurrencia del plan de pago de una tarjeta (`kind = CARD_PAYMENT`, definición administrada por la tarjeta,
+ * `managedBy = DEBT`). A diferencia de las cuotas de préstamo, aprobar, editar, omitir y vincular SÍ están permitidos
+ * (openspec add-credit-cards); lo que no se puede es crear, pausar, terminar o revisar la definición.
+ */
+export const isCardPayment = (o: Partial<Pick<RecurringOccurrence, 'kind'>>): boolean =>
+  o.kind === 'CARD_PAYMENT';
 
 /** ¿Ofrece "Registrar pago"? Solo EDITOR/OWNER y mientras la cuota no esté resuelta. */
 export const canRegisterLoanPayment = (

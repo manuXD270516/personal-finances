@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: ['debt/credit-cards']
 requirement: 'Idioma de las notificaciones de tarjeta'
 scenario: 'Destinatario en inglés'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-NOTIFY-002', 'FR-NOTIFY-004']
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/domain/card-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['notifications', 'i18n']

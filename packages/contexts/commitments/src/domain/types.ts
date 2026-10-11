@@ -8,11 +8,28 @@ export const RECURRING_KINDS = ['INCOME', 'EXPENSE', 'TRANSFER'] as const;
  * Tipos que SOLO crea el contexto administrador (openspec add-loans, N2): `LOAN_PAYMENT` únicamente en definiciones
  * administradas por `DEBT` con calendario explícito. La API de usuario los rechaza con `RECURRING_KIND_NOT_AVAILABLE`.
  */
-export const MANAGED_ONLY_KINDS = ['LOAN_PAYMENT'] as const;
+export const MANAGED_ONLY_KINDS = ['LOAN_PAYMENT', 'CARD_PAYMENT'] as const;
 export type RecurringKind = (typeof RECURRING_KINDS)[number] | (typeof MANAGED_ONLY_KINDS)[number];
 
 /** Cuota de préstamo: la resuelve DEBT (1 transacción puede resolver varias), nunca el motor ni el matching. */
 export const LOAN_PAYMENT_KIND = 'LOAN_PAYMENT' as const;
+
+/**
+ * Pago de tarjeta (openspec add-credit-cards, decisión 7): `CARD_PAYMENT` solo en definiciones administradas por
+ * `DEBT`, con regla mensual; es una TRANSFERENCIA de la cuenta de pago (activo) a la cuenta de la tarjeta (pasivo).
+ */
+export const CARD_PAYMENT_KIND = 'CARD_PAYMENT' as const;
+
+/** Tipos cuya materialización es una transferencia entre dos cuentas (`TRANSFER` y `CARD_PAYMENT`). */
+export const isTransferLike = (kind: string): boolean => kind === 'TRANSFER' || kind === CARD_PAYMENT_KIND;
+
+/** Tipo de la transacción que materializa o vincula una ocurrencia (`CARD_PAYMENT` ⇒ `TRANSFER`). */
+export const transactionKindOf = (
+  kind: RecurringKind,
+): Exclude<RecurringKind, 'LOAN_PAYMENT' | 'CARD_PAYMENT'> => {
+  if (kind === 'LOAN_PAYMENT') throw new Error('a loan payment is resolved by its manager');
+  return kind === CARD_PAYMENT_KIND ? 'TRANSFER' : kind;
+};
 
 /** Tipos reservados para Phase 4 (D116): se rechazan con `RECURRING_KIND_NOT_AVAILABLE` salvo el administrador. */
 export const RESERVED_RECURRING_KINDS = ['LOAN_PAYMENT', 'CARD_PAYMENT'] as const;

@@ -11,6 +11,9 @@ export const NOTIFICATION_TYPES = [
   'SUBSCRIPTION_RENEWAL',
   'SUBSCRIPTION_TRIAL_ENDING',
   'SUBSCRIPTION_PRICE_CHANGE',
+  // Phase 4 (add-credit-cards, FR-NOTIFY-004): vencimiento del estado de cuenta y utilización del crédito de una tarjeta.
+  'CARD_PAYMENT_DUE',
+  'CARD_UTILIZATION',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -83,6 +86,18 @@ export type NotificationLink =
       readonly kind: 'SUBSCRIPTION';
       readonly subscriptionId: string;
       readonly proposalId?: string;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    }
+  /**
+   * Tarjeta de crédito (add-credit-cards): la web abre la tarjeta (y su estado de cuenta si hay `statementId`); si ya
+   * no existe muestra el listado con el aviso "ya no está disponible". `periodId` es el id de la tarjeta y
+   * `periodLabel` el mes del vencimiento (o del cruce): el contrato HTTP del enlace los exige en todos sus tipos.
+   */
+  | {
+      readonly kind: 'CREDIT_CARD';
+      readonly cardId: string;
+      readonly statementId?: string;
       readonly periodId: string;
       readonly periodLabel: string;
     };

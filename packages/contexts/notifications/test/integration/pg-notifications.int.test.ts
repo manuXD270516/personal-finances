@@ -117,6 +117,35 @@ describe('PgNotificationRepository', () => {
     ).toBe(true);
   });
 
+  it('[TC-DEBT-CARD-034] el tipo CARD_PAYMENT_DUE con enlace CREDIT_CARD se persiste y su clave de negocio no se duplica por destinatario', async () => {
+    const ws = await newWorkspace();
+    const cardId = randomUUID();
+    const dedupeKey = `card-due:${randomUUID()}:2026-10-25`;
+    const card = (userId: string) =>
+      notification(ws, userId, {
+        type: 'CARD_PAYMENT_DUE',
+        severity: 'INFO',
+        messageKey: 'notifications.card_payment_due.v1',
+        params: { cardName: 'Visa Oro', currency: 'BOB', dueDate: '2026-11-15' },
+        link: {
+          kind: 'CREDIT_CARD',
+          cardId,
+          statementId: randomUUID(),
+          periodId: cardId,
+          periodLabel: '2026-11',
+        },
+        dedupeKey,
+      });
+    expect(await inWorker(ws, () => notifications.insertIfAbsent(card(owner)))).toBe(true);
+    // El mismo hecho entregado otra vez (otro eventId) no duplica para el mismo destinatario.
+    expect(await inWorker(ws, () => notifications.insertIfAbsent(card(owner)))).toBe(false);
+    const [row, ...rest] = await asUser(owner, ws, () =>
+      notifications.list({ workspaceId: ws, userId: owner, statuses: ['UNREAD'], limit: 10 }),
+    );
+    expect(rest).toHaveLength(0);
+    expect(row).toMatchObject({ type: 'CARD_PAYMENT_DUE', link: { kind: 'CREDIT_CARD', cardId } });
+  });
+
   it('[TC-NOTIFICATIONS-INAPP-003] estados, contador y bandeja paginada por posición (created_at, id)', async () => {
     const ws = await newWorkspace();
     const [a, b, c] = [
@@ -418,6 +447,8 @@ describe('PgPreferencesRepository', () => {
         { type: 'SUBSCRIPTION_RENEWAL', inApp: true, email: true },
         { type: 'SUBSCRIPTION_TRIAL_ENDING', inApp: true, email: true },
         { type: 'SUBSCRIPTION_PRICE_CHANGE', inApp: true, email: true },
+        { type: 'CARD_PAYMENT_DUE', inApp: true, email: true },
+        { type: 'CARD_UTILIZATION', inApp: true, email: true },
       ],
       quietHours: null,
       includeDetailsInEmail: false,

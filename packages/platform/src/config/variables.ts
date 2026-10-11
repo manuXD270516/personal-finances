@@ -119,7 +119,7 @@ export const VARIABLES = {
     group: 'PostgreSQL',
     description:
       'Tamaño máximo del pool de conexiones por proceso. En el worker debe cubrir la concurrencia sumada de los consumidores de eventos (`EVENT_CONSUMER_CONCURRENCY`) más 4 conexiones reservadas; las conexiones se abren bajo demanda.',
-    default: '40',
+    default: '44',
   }),
 
   // ── Object storage (API S3) ──
@@ -715,6 +715,20 @@ export const VARIABLES = {
       default: '20 * * * *',
     },
   ),
+  DEBT_CARDS_CRON: variable(
+    z
+      .string()
+      .regex(
+        /^(off|(\S+\s+){4}\S+)$/,
+        'debe ser una expresión cron de 5 campos (p. ej. `30 * * * *`) u `off`',
+      ),
+    {
+      group: 'Worker',
+      description:
+        'Cron (5 campos, UTC) del job `debt.card-daily` (add-credit-cards): emite una sola vez el estado de cuenta de cada ciclo cerrado de las tarjetas, publica los recordatorios de vencimiento (uno por cuenta y cierre) y es la red de seguridad del monto esperado del plan de pago y de los umbrales de utilización de límites compartidos. Evalúa con "hoy" en la zona horaria de cada workspace. También corre al arrancar el worker. `off` desactiva el cron.',
+      default: '30 * * * *',
+    },
+  ),
   COMMITMENTS_SCHEDULER_CRON: variable(
     z
       .string()
@@ -1038,6 +1052,7 @@ export const APP_VARIABLES = {
     'COMMITMENTS_HORIZON_DAYS',
     'COMMITMENTS_SCHEDULER_CRON',
     'COMMITMENTS_SUBSCRIPTIONS_CRON',
+    'DEBT_CARDS_CRON',
     // add-basic-csv-import: jobs diarios de expiración y purga del staging.
     'IMPORT_STAGING_RETENTION',
     'IMPORT_MAINTENANCE_CRON',

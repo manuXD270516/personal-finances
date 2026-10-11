@@ -10,7 +10,8 @@ export type NotificationStatus = 'UNREAD' | 'READ' | 'ARCHIVED';
 export type NotificationEmailStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SUPPRESSED';
 
 export interface NotificationLink {
-  readonly kind: 'BUDGET_LINE' | 'PERIOD_CLOSE' | 'RECURRING_OCCURRENCE' | 'SUBSCRIPTION' | (string & {});
+  readonly kind:
+    'BUDGET_LINE' | 'PERIOD_CLOSE' | 'RECURRING_OCCURRENCE' | 'SUBSCRIPTION' | 'CREDIT_CARD' | (string & {});
   readonly periodId: string;
   readonly periodLabel: string;
   /** Ocurrencia recurrente (solo `RECURRING_OCCURRENCE`, add-recurrence-engine): abre `/recurring/occurrences/{id}`. */
@@ -18,6 +19,9 @@ export interface NotificationLink {
   /** Suscripción (solo `SUBSCRIPTION`, add-subscriptions): abre `/recurring/suscripciones/{id}` (con `?propuesta=`). */
   readonly subscriptionId?: string;
   readonly proposalId?: string;
+  /** Tarjeta de crédito (solo `CREDIT_CARD`, add-credit-cards): abre `/debts/tarjetas/{cardId}` (con `?statementId=`). */
+  readonly cardId?: string;
+  readonly statementId?: string;
   readonly budgetId?: string;
   readonly budgetLineId?: string;
   readonly targetKind?: string;
@@ -106,6 +110,15 @@ export function resourcePath(link: NotificationLink): string | undefined {
   if (link.kind === 'SUBSCRIPTION' && link.subscriptionId) {
     const query = link.proposalId ? `?${new URLSearchParams({ propuesta: link.proposalId }).toString()}` : '';
     return `/recurring/suscripciones/${encodeURIComponent(link.subscriptionId)}${query}`;
+  }
+  if (link.kind === 'CREDIT_CARD') {
+    // En este tipo `periodId` es el id de la tarjeta (contrato): vale como respaldo si falta `cardId`.
+    const cardId = link.cardId ?? link.periodId;
+    if (!cardId) return undefined;
+    const query = link.statementId
+      ? `?${new URLSearchParams({ statementId: link.statementId }).toString()}`
+      : '';
+    return `/debts/tarjetas/${encodeURIComponent(cardId)}${query}`;
   }
   return undefined;
 }

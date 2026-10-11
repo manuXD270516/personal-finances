@@ -5,16 +5,19 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Anular la compra cancela su plan de cuotas'
 scenario: 'Laptop devuelta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-017']
 nfr: []
 invariants: ['INV-028']
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/credit-card.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'installments', 'void']

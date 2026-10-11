@@ -5,16 +5,17 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Pago para no generar intereses y saldo pendiente'
 scenario: 'Pago parcial después del cierre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013']
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'statement']

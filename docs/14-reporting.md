@@ -219,7 +219,7 @@ Convenciones de gráficos: ECharts, colores de categoría estables, signos segú
 | Ingreso esperado (salario, alquiler cobrado) | Commitments (`direction = INFLOW`) | `EXPECTED` |
 | Facturas / bills | Commitments | `KNOWN` (monto fijo) o `ESTIMATED` (variable: promedio) |
 | Suscripciones | Commitments (subscriptions) | `KNOWN` |
-| Pagos de tarjeta de crédito | Debt (`credit-cards`: due date, statement balance o mínimo según setting) | `KNOWN` tras cierre de estado de cuenta; `ESTIMATED` antes |
+| Pagos de tarjeta de crédito | Debt (`credit-cards`): ocurrencias `CARD_PAYMENT` del plan de pago administrado (monto exacto con el estado de cuenta emitido, `ESTIMATED` en el ciclo abierto y con las cuotas programadas en ciclos posteriores; sin monto si no hay cuotas) | `KNOWN` tras cierre de estado de cuenta; `ESTIMATED` antes |
 | Cuotas de préstamo | Debt (`amortization` schedule) | `KNOWN` |
 | Aportes planificados a metas | Goals (plan de contribución) | `PLANNED` (solo si es transfer real a otra cuenta; earmarks no mueven dinero pero sí reducen *disponible* en una vista opcional) |
 | Transacciones `pending` / programadas | Transactions | `KNOWN` |

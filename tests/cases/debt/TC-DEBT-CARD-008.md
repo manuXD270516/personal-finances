@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Ciclo según la zona horaria del workspace'
 scenario: 'Cierre a medianoche de La Paz'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013']
 nfr: []
 invariants: []
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calendar.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'timezone']

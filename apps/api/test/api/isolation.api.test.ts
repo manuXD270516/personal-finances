@@ -345,7 +345,13 @@ const RESOURCE_PARAMS =
   /\{(accountId|institutionId|transactionId|categoryGroupId|categoryId|tagId|counterpartyId|fxRateId)\}/;
 const byId = contract
   .operations()
-  .filter((op) => op.path.startsWith('/workspaces/{workspaceId}/') && RESOURCE_PARAMS.test(op.path))
+  .filter(
+    (op) =>
+      op.path.startsWith('/workspaces/{workspaceId}/') &&
+      RESOURCE_PARAMS.test(op.path) &&
+      // Las tarjetas (cardId) tienen su propio aislamiento: TC-DEBT-CARD-028 en credit-cards.api.test.ts.
+      !op.path.includes('{cardId}'),
+  )
   .sort((a, b) => a.operationId.localeCompare(b.operationId));
 
 /** Estado observable de los recursos de W2 (para verificar que ningún intento cruzado los modificó). */

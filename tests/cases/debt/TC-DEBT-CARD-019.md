@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Recordatorio de vencimiento de la tarjeta'
 scenario: 'Tres días antes'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013', 'FR-NOTIFY-004', 'FR-NOTIFY-005']
 nfr: []
 invariants: ['INV-028']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/test/integration/pg-cards.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'reminder']

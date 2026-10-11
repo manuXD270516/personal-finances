@@ -29,6 +29,7 @@ import {
 import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
+import { PgAccountMovementsQuery, systemCategoryCodesFrom } from '../infrastructure/pg-account-movements.js';
 import { RecurringTransactionAdapter } from '../application/recurring-transaction.port.js';
 import { LoanTransactionsAdapter } from '../application/loan-transactions.port.js';
 import { ImportedTransactionsAdapter } from '../application/imported-transactions.adapter.js';
@@ -40,6 +41,7 @@ import {
 import { PgReconciliationRepository } from '../infrastructure/pg-reconciliations.js';
 import { LOAN_TRANSACTIONS_PORT } from '../contracts/index.js';
 import type {
+  AccountMovementsQuery,
   CounterpartyCategoryUsageQuery,
   LoanTransactionsPort,
   DuplicateCandidatesQuery,
@@ -102,6 +104,8 @@ export interface TransactionsRuntime {
   readonly links: TransactionLinkQuery;
   /** Transacciones `PENDING` (add-recurrence-engine, comprometido del periodo). */
   readonly pending: PendingFlowQuery;
+  /** Query pública `AccountMovementsQuery` para DEBT (add-credit-cards, decisión 12): cifras del ciclo de una tarjeta. */
+  readonly movements: AccountMovementsQuery;
   /** Registro en lote de filas importadas, en la UoW del llamador (add-basic-csv-import). */
   readonly imported: ImportedTransactionsCommand;
   /** Candidatos a duplicado de un lote de filas de un extracto (add-basic-csv-import). */
@@ -163,6 +167,11 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     loans: new LoanTransactionsAdapter(service),
     links: new PgTransactionLinkQuery(deps.uow, deps.currencies),
     pending: new PgPendingFlowQuery(deps.uow, deps.currencies),
+    movements: new PgAccountMovementsQuery(
+      deps.uow,
+      deps.currencies,
+      systemCategoryCodesFrom(deps.categories),
+    ),
     imported: new ImportedTransactionsAdapter(service, new PgImportedRefReader(), deps.uow),
     duplicateCandidates: new PgDuplicateCandidatesQuery(deps.uow, deps.currencies),
     statuses: new PgTransactionStatusQuery(deps.uow),
@@ -175,6 +184,18 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
  */
 export function createPendingFlowQuery(pool: Pool): PendingFlowQuery {
   return new PgPendingFlowQuery(new PgTransactionsUnitOfWork(pool), pgCurrencyCatalog);
+}
+
+/**
+ * `AccountMovementsQuery` para procesos sin comandos (el worker de DEBT, que emite estados de cuenta;
+ * add-credit-cards): solo lee patas vigentes en la unidad de trabajo del llamador.
+ */
+export function createAccountMovementsQuery(pool: Pool, lookup: ClassificationLookup): AccountMovementsQuery {
+  return new PgAccountMovementsQuery(
+    new PgTransactionsUnitOfWork(pool),
+    pgCurrencyCatalog,
+    systemCategoryCodesFrom(new ClassificationCategoryLookup(lookup)),
+  );
 }
 
 export interface TransactionsModuleOptions {

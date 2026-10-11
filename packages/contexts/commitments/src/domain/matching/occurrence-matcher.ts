@@ -1,7 +1,7 @@
 import { LocalDate, MoneyDecimal, dec, type Decimal } from '@pf/shared-kernel';
 import type { AmountSpec } from '../amount-spec.js';
 import type { OccurrenceStatus } from '../lifecycle.js';
-import type { RecurringKind } from '../types.js';
+import { isTransferLike, type RecurringKind } from '../types.js';
 import { resolveTolerances, type MatchToleranceOverrides, type MatchTolerances } from './match-tolerances.js';
 
 /** Espacio de nombres de `externalRef` de las transacciones que creó una ocurrencia (nunca se sugieren). */
@@ -116,8 +116,12 @@ function evaluateAmount(
   }
 }
 
+/** Tipo de transacción que cumple una ocurrencia: el pago de tarjeta es una transferencia (add-credit-cards). */
+const transactionKindOfOccurrence = (kind: MatchOccurrence['kind']): string =>
+  kind === 'CARD_PAYMENT' ? 'TRANSFER' : kind;
+
 const sameAccounts = (tx: MatchTransaction, occ: MatchOccurrence): boolean =>
-  tx.accountId === occ.accountId && (occ.kind !== 'TRANSFER' || tx.toAccountId === occ.toAccountId);
+  tx.accountId === occ.accountId && (!isTransferLike(occ.kind) || tx.toAccountId === occ.toAccountId);
 
 const confidenceOf = (score: Decimal): MatchConfidence =>
   score.gte(80) ? 'HIGH' : score.gte(60) ? 'MEDIUM' : 'LOW';
@@ -154,7 +158,7 @@ export const OccurrenceMatcher = {
   evaluate(tx: MatchTransaction, occ: MatchOccurrence): MatchCandidate | null {
     if (!isEligibleTransaction(tx)) return null;
     if (!OPEN_STATUSES.includes(occ.status)) return null;
-    if (tx.kind !== occ.kind) return null;
+    if (tx.kind !== transactionKindOfOccurrence(occ.kind)) return null;
     if (!sameAccounts(tx, occ)) return null;
     if (tx.amount.currency !== occ.currency) return null;
 

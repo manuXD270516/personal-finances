@@ -5,16 +5,18 @@ spec: reporting/cash-flow-calendar
 related_specs: ['debt/credit-cards']
 requirement: 'Cuotas de tarjeta futuras en los próximos pagos'
 scenario: 'Cuota de la laptop en 60 días'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-017', 'FR-REPORTING-016']
 nfr: []
 invariants: []
 priority: low
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/domain/payment-plan-expectation.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['upcoming-payments', 'installments']

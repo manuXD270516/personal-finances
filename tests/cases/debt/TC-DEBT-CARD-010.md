@@ -5,16 +5,18 @@ spec: debt/credit-cards
 related_specs: []
 requirement: 'Resumen del ciclo y saldo al cierre'
 scenario: 'Compra pendiente fuera del ciclo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-013', 'FR-LEDGER-013']
 nfr: []
 invariants: ['INV-023']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+  - packages/contexts/transactions/test/integration/pg-account-movements.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['credit-cards', 'pending']

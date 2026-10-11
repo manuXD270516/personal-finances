@@ -8,7 +8,9 @@ import {
 import {
   OccurrenceClock,
   buildAmountSpec,
+  isTransferLike,
   resolveApprovalAmount,
+  transactionKindOf,
   type AmountSpec,
   type ExpireReason,
   type RecurringDefinition,
@@ -154,7 +156,7 @@ export class OccurrencesService {
     const txn = await deps.transactions.record({
       workspaceId: s.workspaceId,
       userId: input.by ?? '',
-      kind: def.kind as Exclude<typeof def.kind, 'LOAN_PAYMENT'>,
+      kind: transactionKindOf(def.kind),
       status: input.status,
       businessDate: businessDate.toString(),
       accountId: version.accountId,
@@ -444,10 +446,10 @@ export class OccurrencesService {
       const version = def.versionNo(s.definitionVersionNo);
       const reasons: string[] = [];
       if (txn.status === 'VOIDED') reasons.push('VOIDED');
-      if (txn.kind !== def.kind) reasons.push('KIND');
+      if (txn.kind !== (def.kind === 'CARD_PAYMENT' ? 'TRANSFER' : def.kind)) reasons.push('KIND');
       if (
         txn.accountId !== version.accountId ||
-        (def.kind === 'TRANSFER' && txn.toAccountId !== version.toAccountId)
+        (isTransferLike(def.kind) && txn.toAccountId !== version.toAccountId)
       ) {
         reasons.push('ACCOUNT');
       }

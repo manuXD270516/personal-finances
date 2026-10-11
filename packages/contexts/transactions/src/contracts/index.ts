@@ -303,6 +303,52 @@ export interface PendingFlowQuery {
 
 export const PENDING_FLOW_QUERY = Symbol.for('pf.transactions.PendingFlowQuery');
 
+// ───────────────────────────────────────────── add-credit-cards (DEBT)
+
+/**
+ * Clase de un movimiento sobre una cuenta de pasivo (tarjeta) para el resumen del ciclo (openspec add-credit-cards,
+ * decisión 3 y 12): `PURCHASE` (gasto cargado a la cuenta, comisiones e intereses incluidos, y la pata origen de una
+ * transferencia o conversión que SALE de la cuenta), `REFUND` (reembolso), `PAYMENT` (pata destino de una transferencia
+ * o conversión que ENTRA a la cuenta) y `OTHER` (ajustes, saldo inicial, ingresos y cualquier otro movimiento).
+ */
+export type AccountMovementClassDto = 'PURCHASE' | 'REFUND' | 'PAYMENT' | 'OTHER';
+
+export interface AccountMovementRowDto {
+  readonly accountId: string;
+  /** Fecha de negocio `YYYY-MM-DD` (de `DAY` y de `TRANSACTION`). */
+  readonly businessDate: string;
+  readonly movementClass: AccountMovementClassDto;
+  /** Código de la categoría de sistema de la transacción (p. ej. `INTEREST_PAID`); `null` si no aplica. */
+  readonly systemCategoryCode: string | null;
+  /** Presente solo con `groupBy = 'TRANSACTION'`. */
+  readonly transactionId: string | null;
+  /**
+   * Efecto sobre lo adeudado de la cuenta (saldo PRESENTADO de un pasivo), en la moneda de la cuenta: positivo
+   * AUMENTA la deuda (`PURCHASE`, y `OTHER` de aumento) y negativo la REDUCE (`REFUND`, `PAYMENT` y `OTHER` de
+   * reducción). Σ de las filas de un rango = variación del saldo presentado en el rango.
+   */
+  readonly amount: { readonly amount: string; readonly currency: string };
+}
+
+/**
+ * Resumen de movimientos por cuenta, fecha y clase (solo transacciones con asiento activo: `POSTED`, `CLEARED`,
+ * `RECONCILED`; nunca `PENDING` ni `VOIDED`). Sin efectos; en la unidad de trabajo del llamador si existe. Con
+ * `groupBy = 'DAY'` suma por `(cuenta, fecha, clase, categoría de sistema)`; con `'TRANSACTION'` una fila por
+ * transacción y clase. La clasificación vive aquí (Transactions es dueño de `kind` y de los roles de las patas).
+ */
+export interface AccountMovementsQuery {
+  summarizeAccountMovements(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    /** Inclusivos, `YYYY-MM-DD`. */
+    readonly dateFrom: string;
+    readonly dateTo: string;
+    readonly groupBy: 'DAY' | 'TRANSACTION';
+  }): Promise<readonly AccountMovementRowDto[]>;
+}
+
+export const ACCOUNT_MOVEMENTS_QUERY = Symbol.for('pf.transactions.AccountMovementsQuery');
+
 // ───────────────────────────────────────────── add-basic-csv-import (IMPORTS)
 
 /** Espacio de nombres de `externalRef` de las transacciones creadas por una fila importada (huella de fila en hex). */

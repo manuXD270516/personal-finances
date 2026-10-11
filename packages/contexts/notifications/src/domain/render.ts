@@ -1,6 +1,8 @@
 import { DomainError } from '@pf/shared-kernel';
 import {
   BUDGET_THRESHOLD_MESSAGE_KEY,
+  CARD_PAYMENT_DUE_MESSAGE_KEY,
+  CARD_UTILIZATION_MESSAGE_KEY,
   MONTH_CLOSE_PENDING_MESSAGE_KEY,
   RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY,
   RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY,
@@ -64,6 +66,10 @@ export function formatDecimal(amount: string, locale: NotificationLocale): strin
   return `${m[1] ?? ''}${integer}${m[3] ? `${decimal}${m[3]}` : ''}`;
 }
 
+/** `80.00` → `80`; `12.50` → `12.5` (texto, sin pasar por `number`). */
+export const trimDecimalZeros = (value: string): string =>
+  /^-?\d+\.\d+$/.test(value) ? value.replace(/\.?0+$/, '') : value;
+
 const formatPercent = (value: string, locale: NotificationLocale): string => formatDecimal(value, locale);
 
 /** `2026-10-31` → fecha corta del locale (es/pt `31/10/2026`, en `10/31/2026`) sin pasar por la zona del servidor. */
@@ -119,7 +125,9 @@ type MessageKind =
   | 'recurring_approval_required'
   | 'subscription_renewal'
   | 'subscription_trial_ending'
-  | 'subscription_price_change';
+  | 'subscription_price_change'
+  | 'card_payment_due'
+  | 'card_utilization';
 
 const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
   `${formatDecimal(value.amount, locale)} ${value.currency}`;
@@ -158,6 +166,8 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === SUBSCRIPTION_RENEWAL_MESSAGE_KEY) return 'subscription_renewal';
   if (messageKey === SUBSCRIPTION_TRIAL_ENDING_MESSAGE_KEY) return 'subscription_trial_ending';
   if (messageKey === SUBSCRIPTION_PRICE_CHANGE_MESSAGE_KEY) return 'subscription_price_change';
+  if (messageKey === CARD_PAYMENT_DUE_MESSAGE_KEY) return 'card_payment_due';
+  if (messageKey === CARD_UTILIZATION_MESSAGE_KEY) return 'card_utilization';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
 
@@ -219,6 +229,25 @@ function valuesOf(
       next: moneyText(money(params, 'newPrice'), locale),
       percent: signedPercentText(str(params, 'changePercentage'), locale),
       effectiveFrom: formatDate(str(params, 'effectiveFrom'), locale),
+    };
+  }
+  if (kind === 'card_payment_due') {
+    return {
+      card: str(params, 'cardName'),
+      currency: str(params, 'currency'),
+      dueDate: formatDate(str(params, 'dueDate'), locale),
+      noInterest: moneyText(money(params, 'remainingNoInterest'), locale),
+      minimum: moneyText(money(params, 'remainingMinimum'), locale),
+    };
+  }
+  if (kind === 'card_utilization') {
+    return {
+      card: str(params, 'cardName'),
+      // El umbral se muestra sin ceros decimales ("80 %"); la utilización conserva su escala ("85,00 %").
+      threshold: formatDecimal(trimDecimalZeros(str(params, 'threshold')), locale),
+      utilization: formatPercent(str(params, 'utilization'), locale),
+      used: moneyText(money(params, 'used'), locale),
+      limit: moneyText(money(params, 'limit'), locale),
     };
   }
   return {

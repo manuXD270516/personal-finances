@@ -1,5 +1,12 @@
 # @pf/debt — bounded context DEBT
 
+Préstamos y tarjetas de crédito. Tarjetas (openspec `add-credit-cards`, `debt/credit-cards`, FR-DEBT-012..017, Phase 4): perfil sobre cuentas `credit_card`
+existentes (una por moneda, límite separado o compartido), ciclos con cierre y vencimiento (1–31, fin de mes, zona del workspace), estados de
+cuenta emitidos una sola vez por el job `debt.card-daily` (cifras congeladas y recálculo con diferencia), pago mínimo HALF_EVEN, pago como
+transferencia que no es gasto, plan de pago administrado (`CARD_PAYMENT`, `managedBy = DEBT`), recordatorio, utilización con alertas (consumidor
+`debt.card-activity`) y cuotas. Debt no escribe en el ledger. Detalle en `src/domain/card-*.ts`, `src/application/card*.ts` y la migración
+`apps/api/db/migrations/20261012110000_debt_credit_cards.sql`.
+
 Préstamos (openspec `add-loans`; capabilities `debt/loans` y `debt/amortization`, FR-DEBT-001..003, 006, 007 y 011, Must, Phase 4):
 registro de préstamos nuevos y en curso, desembolso y pago como **transacciones administradas** (`LOAN_DISBURSEMENT` / `LOAN_PAYMENT`,
 `source = DEBT`), cronograma francés versionado al centavo, imputación de pagos por componente, cuotas como compromisos
