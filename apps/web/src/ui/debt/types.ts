@@ -58,7 +58,8 @@ export interface Loan {
   readonly dayCount: LoanDayCount;
   readonly frequency: LoanFrequency;
   readonly termInstallments: number;
-  readonly method: string;
+  readonly method: LoanMethod;
+  readonly fixedPrincipalAmount?: Money | null;
   readonly disbursementDate: string | null;
   readonly firstDueDate: string;
   readonly charges: LoanCharges;
@@ -152,6 +153,9 @@ export interface LoanPayment {
   readonly taxes: string;
   readonly explicitBreakdown: boolean;
   readonly paymentMethod: string | null;
+  readonly kind?: 'REGULAR' | 'PREPAYMENT';
+  readonly prepaymentOption?: PrepaymentOption | null;
+  readonly prepaymentFee?: Money | null;
   readonly status: 'ACTIVE' | 'VOIDED';
   readonly installmentNos: readonly number[];
   readonly voidedAt: string | null;
@@ -330,3 +334,123 @@ export interface ReferenceRowError {
   readonly code: string;
   readonly message: string;
 }
+
+// ───────────────────────────── Amortización avanzada (openspec add-loan-amortization-advanced) ─────────────────────────────
+
+export type LoanMethod = 'FRENCH' | 'GERMAN' | 'FIXED_PRINCIPAL' | 'CUSTOM';
+export const LOAN_METHODS: readonly LoanMethod[] = ['FRENCH', 'GERMAN', 'FIXED_PRINCIPAL', 'CUSTOM'];
+export type PrepaymentOption = 'REDUCE_TERM' | 'REDUCE_INSTALLMENT';
+export const PREPAYMENT_OPTIONS: readonly PrepaymentOption[] = ['REDUCE_TERM', 'REDUCE_INSTALLMENT'];
+
+/** Resumen de las cuotas no pagadas de un cronograma. */
+export interface ScheduleTail {
+  readonly installmentAmount: Money | null;
+  readonly installmentCount: number;
+  readonly endDate: string | null;
+  readonly remainingInterest: Money;
+  readonly remainingPrincipal: Money;
+}
+
+export interface RecalculationOption extends ScheduleTail {
+  readonly option: PrepaymentOption;
+  readonly interestSaved: Money;
+  readonly installments: readonly ScheduleInstallment[];
+}
+
+export interface PrepaymentPreview {
+  readonly loanId: string;
+  readonly currency: string;
+  readonly outstandingPrincipal: Money;
+  readonly amount: Money;
+  readonly fee: Money;
+  readonly paysOff: boolean;
+  readonly fromInstallmentNo: number;
+  readonly current: ScheduleTail;
+  readonly options: readonly RecalculationOption[];
+}
+
+export interface RateChangePreview {
+  readonly loanId: string;
+  readonly currency: string;
+  readonly annualRate: string;
+  readonly effectiveFrom: string;
+  readonly fromInstallmentNo: number;
+  readonly current: ScheduleTail;
+  readonly proposed: ScheduleTail & {
+    readonly interestSaved: Money;
+    readonly installments: readonly ScheduleInstallment[];
+  };
+}
+
+export interface ScheduleVersion {
+  readonly scheduleVersion: number;
+  readonly reason: string;
+  readonly effectiveFrom: string;
+  readonly fromInstallmentNo: number;
+  readonly replacedFromInstallmentNo: number | null;
+  readonly current: boolean;
+  readonly installmentCount: number;
+  readonly sourcePaymentId: string | null;
+  readonly sourceRateChangeId: string | null;
+  readonly sourceReferenceId: string | null;
+  readonly createdAt: string;
+}
+
+export interface RateChange {
+  readonly id: string | null;
+  readonly annualRate: string;
+  readonly effectiveFrom: string;
+  readonly scheduleVersion: number;
+  readonly initial: boolean;
+}
+
+export type PayoffStrategy = 'AVALANCHE' | 'SNOWBALL' | 'NONE';
+export const PAYOFF_STRATEGIES: readonly PayoffStrategy[] = ['NONE', 'AVALANCHE', 'SNOWBALL'];
+
+export interface PayoffSeriesPoint {
+  readonly period: string;
+  readonly balance: string;
+}
+export interface PayoffProjection {
+  readonly totalInterest: string;
+  readonly endDate: string | null;
+  readonly installments: number;
+  readonly series: readonly PayoffSeriesPoint[];
+}
+export interface PayoffExtrasSimulation {
+  readonly type: 'LOAN_EXTRAS';
+  readonly loanId: string;
+  readonly currency: string;
+  readonly current: PayoffProjection;
+  readonly scenario: PayoffProjection;
+  readonly interestSaved: string;
+  readonly monthsSaved: number;
+}
+export interface PayoffStrategyResult {
+  readonly strategy: PayoffStrategy;
+  readonly totalInterest: string;
+  readonly debtFreeDate: string | null;
+  readonly interestSaved: string;
+  readonly monthsToDebtFree: number;
+  readonly loans: readonly {
+    readonly loanId: string;
+    readonly name: string;
+    readonly endDate: string | null;
+    readonly interest: string;
+  }[];
+  readonly series: readonly PayoffSeriesPoint[];
+}
+export interface PayoffStrategiesSimulation {
+  readonly type: 'STRATEGIES';
+  readonly currency: string;
+  readonly monthlyExtra: string;
+  readonly startBalance: string;
+  readonly strategies: readonly PayoffStrategyResult[];
+  readonly outOfStrategy: readonly {
+    readonly loanId: string;
+    readonly name: string;
+    readonly reason: 'CURRENCY' | 'CUSTOM';
+    readonly currency: string;
+  }[];
+}
+export type PayoffSimulation = PayoffExtrasSimulation | PayoffStrategiesSimulation;

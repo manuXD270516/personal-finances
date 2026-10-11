@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Cronograma custom importado desde la tabla del banco'
 scenario: 'Adoptar la tabla del banco'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-005']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'custom', 'versioning']
@@ -29,7 +30,7 @@ expected_result:
   - 'El préstamo pasa a cronograma custom versión 2 con las cuotas 2 a 24 de la referencia'
   - 'La cuota 1 pagada de la versión 1 y su pago no cambian'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-028 — Adoptar la tabla del banco crea una versión custom sin tocar lo pagado
@@ -50,4 +51,4 @@ Entonces el préstamo pasa a cronograma custom versión 2 con las cuotas 2 a 24 
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

@@ -1193,6 +1193,7 @@ export class GoalsWorld {
       settle: notUsed,
       unsettle: notUsed,
       setExpected: notUsed,
+      replaceSchedule: notUsed,
       skip: notUsed,
       listOccurrences: async (): Promise<readonly ManagedOccurrenceDto[]> => [],
     };

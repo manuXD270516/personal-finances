@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import type {
   AllocationRecord,
   PaymentRecord,
+  ScheduleVersionReason,
   StoredInstallment,
 } from '../../src/application/ports/index.js';
 import { Loan } from '../../src/domain/index.js';
@@ -13,6 +14,7 @@ import {
   PgDebtUnitOfWork,
   PgLoanRepository,
   PgPaymentRepository,
+  PgRateChangeRepository,
   PgReferenceRepository,
   PgScheduleRepository,
 } from '../../src/infrastructure/pg-debt.js';
@@ -39,6 +41,7 @@ const loans = new PgLoanRepository();
 const schedules = new PgScheduleRepository();
 const payments = new PgPaymentRepository();
 const references = new PgReferenceRepository();
+const rateChanges = new PgRateChangeRepository();
 const AT = '2026-10-10T16:00:00.000Z';
 
 const asUser = <T>(fn: () => Promise<T>): Promise<T> =>
@@ -123,6 +126,7 @@ async function activeLoan(ws: string) {
         scheduleVersion: 1,
         reason: 'INITIAL',
         effectiveFrom: '2026-10-15',
+        fromInstallmentNo: 1,
         parameters: {},
         createdBy: user,
       },
@@ -153,6 +157,9 @@ const payment = (loanId: string, no: number, over: Partial<PaymentRecord> = {}):
   taxes: '0.00',
   explicitBreakdown: false,
   paymentMethod: null,
+  kind: 'REGULAR',
+  prepaymentOption: null,
+  prepaymentFee: null,
   status: 'ACTIVE',
   voidedAt: null,
   voidedReason: null,
@@ -385,6 +392,7 @@ describe('referencias del banco, aislamiento y purga', () => {
       'loan_installment',
       'loan_payment',
       'loan_payment_allocation',
+      'loan_rate_change',
       'loan_reference_row',
       'loan_reference_schedule',
       'loan_schedule_comparison',
@@ -394,7 +402,241 @@ describe('referencias del banco, aislamiento y purga', () => {
     expect(order['loan_payment_allocation']).toBeLessThan(order['loan_installment']!);
     expect(order['loan_installment']).toBeLessThan(order['loan_schedule_version']!);
     expect(order['loan_schedule_version']).toBeLessThan(order['loan']!);
+    expect(order['loan_rate_change']).toBeLessThan(order['loan']!);
     expect(order['loan_reference_row']).toBeLessThan(order['loan_reference_schedule']!);
     expect(order['loan_schedule_comparison']).toBeLessThan(order['loan_reference_schedule']!);
+  });
+});
+
+// ───────────────────────────────────────────── add-loan-amortization-advanced (tarea 4.1)
+
+const versionRows = (
+  loanId: string,
+  version: number,
+  numbers: readonly number[],
+  principal: string,
+): StoredInstallment[] =>
+  numbers.map((n) => ({
+    ...installment(loanId, n, principal, '1.00'),
+    scheduleVersion: version,
+    dueDate: `2027-${String(n).padStart(2, '0')}-15`,
+    periodStart: `2027-${String(n - 1).padStart(2, '0')}-15`,
+    periodEnd: `2027-${String(n).padStart(2, '0')}-15`,
+  }));
+
+async function insertVersion(
+  ws: string,
+  loanId: string,
+  version: number,
+  reason: ScheduleVersionReason,
+  from: number,
+  rows: readonly StoredInstallment[],
+  extra: { sourcePaymentId?: string } = {},
+) {
+  await inWs(ws, () =>
+    schedules.insertVersion(
+      ws,
+      {
+        loanId,
+        scheduleVersion: version,
+        reason,
+        effectiveFrom: '2026-12-15',
+        fromInstallmentNo: from,
+        sourcePaymentId: extra.sourcePaymentId ?? null,
+        parameters: { reason },
+        createdBy: user,
+      },
+      rows,
+    ),
+  );
+}
+
+describe('versiones del cronograma, prepagos y tasas (add-loan-amortization-advanced)', () => {
+  it('[TC-DEBT-AMORT-034] el cronograma efectivo toma de cada versión solo lo que no reemplaza la siguiente', async () => {
+    const { loan } = await activeLoan(w1);
+    const v2 = versionRows(loan.id, 2, [2, 3], '300.00');
+    await insertVersion(w1, loan.id, 2, 'PREPAYMENT', 2, v2);
+    // versión 3 (reducir plazo): solo la cuota 2; la 3 deja de existir
+    const v3 = versionRows(loan.id, 3, [2], '600.00');
+    await insertVersion(w1, loan.id, 3, 'RATE_CHANGE', 2, v3);
+
+    const asOf = async (version: number) =>
+      (await inWs(w1, () => schedules.installments(loan.id, version))).map((i) => [i.n, i.scheduleVersion]);
+    expect(await asOf(1)).toEqual([
+      [1, 1],
+      [2, 1],
+    ]);
+    expect(await asOf(2)).toEqual([
+      [1, 1],
+      [2, 2],
+      [3, 2],
+    ]);
+    expect(await asOf(3)).toEqual([
+      [1, 1],
+      [2, 3],
+    ]);
+    expect((await inWs(w1, () => schedules.ownInstallments(loan.id, 2))).map((i) => i.n)).toEqual([2, 3]);
+
+    const versions = await inWs(w1, () => schedules.versions(loan.id));
+    expect(
+      versions.map((v) => [v.scheduleVersion, v.reason, v.fromInstallmentNo, v.installmentCount]),
+    ).toEqual([
+      [1, 'INITIAL', 1, 2],
+      [2, 'PREPAYMENT', 2, 2],
+      [3, 'RATE_CHANGE', 2, 1],
+    ]);
+    // las cuotas de las versiones reemplazadas se conservan sin cambios (inmutables)
+    expect((await inWs(w1, () => schedules.ownInstallments(loan.id, 1))).map((i) => i.principal)).toEqual([
+      '330.02',
+      '333.32',
+    ]);
+    expect(
+      await sqlState(() =>
+        inCtx(migrator, w1, (c) => c.query(`TRUNCATE debt.loan_schedule_version CASCADE`)),
+      ),
+    ).toBe('PF003');
+  });
+
+  it('el motivo de la versión se limita a los valores del diseño', async () => {
+    const { loan } = await activeLoan(w1);
+    const code = await sqlState(() =>
+      insertVersion(w1, loan.id, 2, 'PREPAYMENT', 2, versionRows(loan.id, 2, [2], '1.00')).then(() =>
+        inCtx(app, w1, (c) =>
+          c.query(
+            `INSERT INTO debt.loan_schedule_version (loan_id, workspace_id, schedule_version, reason, effective_from, parameters, created_by)
+             VALUES ($1, $2, 9, 'OTRO', '2026-12-15', '{}', $3)`,
+            [loan.id, w1, user],
+          ),
+        ),
+      ),
+    );
+    expect(code).toBe('23514');
+  });
+
+  it('el pago extraordinario guarda su opción y comisión; la opción solo existe en un PREPAYMENT', async () => {
+    const { loan } = await activeLoan(w1);
+    const prepay = payment(loan.id, 1, {
+      amount: '3030.00',
+      principal: '3000.00',
+      interest: '0.00',
+      fees: '30.00',
+      kind: 'PREPAYMENT',
+      prepaymentOption: 'REDUCE_TERM',
+      prepaymentFee: '30.00',
+    });
+    await inWs(w1, () => payments.insert(w1, prepay, []));
+    const read = (await inWs(w1, () => payments.find(loan.id, prepay.id)))!;
+    expect([read.kind, read.prepaymentOption, read.prepaymentFee, read.amount]).toEqual([
+      'PREPAYMENT',
+      'REDUCE_TERM',
+      '30.00',
+      '3030.00',
+    ]);
+    // un prepago no imputa a cuotas: el pagado por cuota no cambia
+    expect((await inWs(w1, () => payments.paidByInstallment(loan.id))).size).toBe(0);
+    for (const broken of [
+      payment(loan.id, 2, { kind: 'PREPAYMENT', prepaymentOption: null }),
+      payment(loan.id, 2, { kind: 'REGULAR', prepaymentOption: 'REDUCE_TERM' }),
+      payment(loan.id, 2, { kind: 'REGULAR', prepaymentFee: '1.00' }),
+    ]) {
+      expect(await sqlState(() => inWs(w1, () => payments.insert(w1, broken, [])))).toBe('23514');
+    }
+  });
+
+  it('[TC-DEBT-AMORT-037] el historial de tasas es append-only, único por vigencia y aislado por workspace', async () => {
+    const { loan } = await activeLoan(w1);
+    const change = {
+      id: randomUUID(),
+      loanId: loan.id,
+      annualRate: '0.15',
+      effectiveFrom: '2027-04-15',
+      scheduleVersion: 2,
+      createdBy: user,
+      createdAt: AT,
+    };
+    await inWs(w1, () => rateChanges.insert(w1, change));
+    expect(await inWs(w1, () => rateChanges.list(loan.id))).toEqual([change]);
+    expect(
+      await sqlState(() => inWs(w1, () => rateChanges.insert(w1, { ...change, id: randomUUID() }))),
+    ).toBe('23505');
+    for (const sql of [
+      `UPDATE debt.loan_rate_change SET annual_rate = 0.5 WHERE loan_id = $1`,
+      `DELETE FROM debt.loan_rate_change WHERE loan_id = $1`,
+    ]) {
+      expect(['42501', 'PF003']).toContain(
+        await sqlState(() => inCtx(app, w1, (c) => c.query(sql, [loan.id]))),
+      );
+    }
+    expect(await sqlState(() => inCtx(migrator, w1, (c) => c.query(`TRUNCATE debt.loan_rate_change`)))).toBe(
+      'PF003',
+    );
+    expect(await inWs(w2, () => rateChanges.list(loan.id))).toEqual([]);
+    expect(
+      await sqlState(() =>
+        inWs(w2, () => rateChanges.insert(w2, { ...change, id: randomUUID(), effectiveFrom: '2027-05-15' })),
+      ),
+    ).toBeDefined();
+  });
+
+  it('el capital fijo exige su principal por cuota y solo ese método lo admite', async () => {
+    const fixed = Loan.register({
+      id: randomUUID(),
+      workspaceId: w1,
+      at: AT,
+      by: user,
+      name: 'Capital fijo',
+      accountId: randomUUID(),
+      disbursementAccountId: randomUUID(),
+      paymentAccountId: randomUUID(),
+      principal: '10000.00',
+      currency: 'BOB',
+      currencyScale: 2,
+      annualRate: '0.12',
+      termInstallments: 12,
+      method: 'FIXED_PRINCIPAL',
+      fixedPrincipalAmount: '500.00',
+      disbursementDate: '2026-10-15',
+      firstDueDate: '2026-11-15',
+    });
+    await inWs(w1, () => loans.insert(fixed));
+    const loaded = (await inWs(w1, () => loans.findById(w1, fixed.id)))!;
+    expect([loaded.snapshot.method, loaded.snapshot.fixedPrincipalAmount]).toEqual([
+      'FIXED_PRINCIPAL',
+      '500.00',
+    ]);
+    const custom = Loan.register({
+      id: randomUUID(),
+      workspaceId: w1,
+      at: AT,
+      by: user,
+      name: 'Custom',
+      accountId: randomUUID(),
+      disbursementAccountId: randomUUID(),
+      paymentAccountId: randomUUID(),
+      principal: '1000.00',
+      currency: 'BOB',
+      currencyScale: 2,
+      annualRate: '0.12',
+      termInstallments: 1,
+      method: 'CUSTOM',
+      customSchedule: [{ dueDate: '2026-11-15', principal: '1000.00', interest: '10.00' }],
+      disbursementDate: '2026-10-15',
+      firstDueDate: '2026-11-15',
+    });
+    await inWs(w1, () => loans.insert(custom));
+    expect((await inWs(w1, () => loans.findById(w1, custom.id)))!.snapshot.customSchedule).toEqual([
+      { dueDate: '2026-11-15', principal: '1000.00', interest: '10.00' },
+    ]);
+    // el CHECK de la base: FIXED_PRINCIPAL sin principal fijo y un fijo en otro método se rechazan
+    for (const set of [
+      `method = 'FIXED_PRINCIPAL', fixed_principal_amount = NULL`,
+      `fixed_principal_amount = 1.00`,
+    ]) {
+      expect(
+        await sqlState(() =>
+          inCtx(app, w1, (c) => c.query(`UPDATE debt.loan SET ${set} WHERE id = $1`, [custom.id])),
+        ),
+      ).toBe('23514');
+    }
   });
 });

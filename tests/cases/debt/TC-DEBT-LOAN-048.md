@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: []
 requirement: 'Registrar un pago extraordinario'
 scenario: 'Prepago que salda el préstamo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'prepayment', 'paid-off']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'La deuda queda en 0.00 BOB, el préstamo queda saldado y su compromiso terminado'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-048 — Un prepago por todo el pendiente salda el préstamo
@@ -48,4 +49,4 @@ Entonces la deuda queda en 0.00 BOB, el préstamo queda saldado y su compromiso 
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

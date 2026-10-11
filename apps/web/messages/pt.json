@@ -3736,7 +3736,8 @@
       "new": "Novo empréstimo",
       "empty": "Você ainda não registrou empréstimos. Crie um novo ou registre um em andamento para ver o cronograma e as parcelas.",
       "nextValue": "Parcela {n} · {date} · {amount}",
-      "overdueDays": "{days, plural, one {# dia de atraso} other {# dias de atraso}}"
+      "overdueDays": "{days, plural, one {# dia de atraso} other {# dias de atraso}}",
+      "simulator": "Simulador de pagamentos extras"
     },
     "form": {
       "title": "Novo empréstimo",
@@ -3804,7 +3805,31 @@
       "fixErrors": "{count, plural, one {Há # dado para corrigir.} other {Há # dados para corrigir.}} Revise os campos marcados.",
       "saving": "Salvando…",
       "save": "Salvar empréstimo",
-      "saveAndDisburse": "Salvar e desembolsar"
+      "saveAndDisburse": "Salvar e desembolsar",
+      "method": "Sistema de amortização",
+      "methods": {
+        "FRENCH": "Francês (parcela constante)",
+        "GERMAN": "Alemão (capital constante)",
+        "FIXED_PRINCIPAL": "Capital fixo com parcela final (balloon)",
+        "CUSTOM": "Cronograma próprio (parcela a parcela)"
+      },
+      "methodHint": {
+        "FRENCH": "Todas as parcelas valem o mesmo; os juros caem e o capital sobe.",
+        "GERMAN": "Cada parcela amortiza o mesmo capital; a parcela vai diminuindo.",
+        "FIXED_PRINCIPAL": "Você indica o capital de cada parcela; a última paga o saldo restante.",
+        "CUSTOM": "Você define as parcelas uma a uma ou usa a tabela do banco; o sistema não as recalcula. É definido no detalhe do rascunho."
+      },
+      "fixedPrincipal": "Capital por parcela",
+      "fixedPrincipalHint": "Capital das parcelas anteriores à última; a soma deve ser menor que o principal.",
+      "rateType": "Tipo de taxa",
+      "rateTypes": {
+        "FIXED": "Fixa",
+        "VARIABLE": "Variável"
+      },
+      "rateTypeHint": {
+        "FIXED": "A taxa não muda durante o empréstimo.",
+        "VARIABLE": "Você poderá registrar mudanças de taxa com data de vigência."
+      }
     },
     "errors": {
       "REQUIRED": "É obrigatório.",
@@ -3864,7 +3889,11 @@
       "disburse": "Desembolsar",
       "edit": "Editar",
       "cancel": "Cancelar empréstimo",
-      "compare": "Comparar com a tabela do banco"
+      "compare": "Comparar com a tabela do banco",
+      "prepay": "Pagamento extra",
+      "rateChange": "Alterar taxa",
+      "custom": "Carregar cronograma próprio",
+      "customEdit": "Carregar novo cronograma"
     },
     "schedule": {
       "title": "Cronograma",
@@ -3904,7 +3933,8 @@
       "voided": "Anulado",
       "active": "Vigente",
       "void": "Anular",
-      "voidLabel": "Anular o pagamento {n}"
+      "voidLabel": "Anular o pagamento {n}",
+      "prepayment": "Pagamento extra ({option})"
     },
     "payment": {
       "title": "Registrar pagamento",
@@ -4125,6 +4155,161 @@
       "label": "Dívidas",
       "loans": "Empréstimos",
       "cards": "Cartões"
+    },
+    "prepayment": {
+      "title": "Pagamento extra",
+      "hint": "Antecipe capital: escolha terminar antes (mesma parcela) ou pagar uma parcela menor (mesmas datas). As parcelas vencidas na data do pagamento devem estar pagas.",
+      "amount": "Valor para o capital ({currency})",
+      "date": "Data do pagamento",
+      "dateHint": "Os juros da parcela seguinte são calculados sobre o saldo reduzido completo.",
+      "fee": "Tarifa de pré-pagamento ({currency}, opcional)",
+      "feeHint": "É registrada como despesa em «Tarifas de empréstimo».",
+      "option": "O que reduzir",
+      "options": {
+        "REDUCE_TERM": "Reduzir o prazo",
+        "REDUCE_INSTALLMENT": "Reduzir a parcela"
+      },
+      "optionHint": {
+        "REDUCE_TERM": "Você mantém a parcela e termina de pagar antes.",
+        "REDUCE_INSTALLMENT": "Você mantém as datas e cada parcela diminui."
+      },
+      "compare": "Comparar opções",
+      "previewTitle": "Comparação de opções",
+      "previewCaption": "Parcela, data final, juros restantes e economia de cada opção frente ao cronograma vigente",
+      "paysOff": "Este pagamento cobre todo o principal pendente: o empréstimo ficará quitado.",
+      "current": "Cronograma vigente",
+      "columns": {
+        "option": "Opção",
+        "installment": "Parcela",
+        "end": "Fim",
+        "interest": "Juros restantes",
+        "saved": "Economia de juros"
+      },
+      "saving": "Registrando…",
+      "submit": "Registrar pagamento extra",
+      "done": "Pagamento extra registrado."
+    },
+    "rateChange": {
+      "title": "Mudança de taxa",
+      "hint": "As parcelas cujo período começa na data de vigência ou depois são recalculadas com a nova taxa, mantendo número e datas.",
+      "rate": "Nova taxa nominal anual (%)",
+      "effectiveFrom": "Vigente desde",
+      "effectiveHint": "Um período já iniciado não é proporcionalizado: a nova taxa vale a partir do período seguinte.",
+      "compare": "Ver o efeito",
+      "previewTitle": "Efeito da mudança de taxa",
+      "previewCaption": "Parcela, data final e juros restantes com a nova taxa frente ao cronograma vigente",
+      "proposed": "Com {rate} %",
+      "saving": "Registrando…",
+      "submit": "Registrar mudança de taxa",
+      "done": "Mudança de taxa registrada."
+    },
+    "custom": {
+      "title": "Cronograma próprio",
+      "hintDraft": "Carregue as parcelas do banco uma a uma ou adote a tabela já carregada. A soma do capital deve ser igual ao principal.",
+      "hintActive": "Substitui as parcelas não pagas pelas da tabela do banco. A soma do capital deve ser igual ao principal pendente; o sistema deixará de recalcular este empréstimo.",
+      "reference": "Tabela do banco carregada",
+      "referenceOption": "Versão {version} ({rows} parcelas)",
+      "adopt": "Usar a tabela do banco",
+      "noReference": "Você ainda não carregou uma tabela do banco para este empréstimo (Comparar com a tabela do banco).",
+      "gridLabel": "Parcelas do cronograma próprio",
+      "remove": "Remover",
+      "cellLabel": "Parcela {n}: {field}",
+      "add": "Adicionar parcela",
+      "sum": "Soma do capital: {sum} de {expected} {currency}",
+      "gap": "Falta ou sobra {gap} {currency}",
+      "sumMatches": "A soma confere.",
+      "saving": "Salvando…",
+      "submit": "Salvar cronograma",
+      "done": "Cronograma salvo."
+    },
+    "versions": {
+      "title": "Versões do cronograma",
+      "caption": "Versões do cronograma com motivo, vigência e as parcelas que substituem",
+      "version": "Versão",
+      "reason": "Motivo",
+      "effectiveFrom": "Vigente desde",
+      "range": "Parcelas",
+      "view": "Ver parcelas",
+      "currentTag": "vigente",
+      "replacedTag": "substituída",
+      "reasons": {
+        "INITIAL": "Inicial",
+        "PREPAYMENT": "Pagamento extra",
+        "PREPAYMENT_VOIDED": "Pagamento extra anulado",
+        "RATE_CHANGE": "Mudança de taxa",
+        "CUSTOM_DEFINED": "Cronograma próprio",
+        "CUSTOM_ADOPTED": "Tabela do banco adotada"
+      },
+      "rangeReplaced": "A partir da {from}, substituída a partir da {replaced}",
+      "rangeCurrent": "A partir da {from}",
+      "ratesTitle": "Histórico de taxas",
+      "rateInitial": "{rate} % desde o desembolso ({date})",
+      "rateChanged": "{rate} % desde {date}",
+      "viewing": "Parcelas em vigor na versão {version}"
+    },
+    "simulator": {
+      "title": "Simulador de pagamentos extras",
+      "intro": "Compare quanto você economiza de juros e quando termina de pagar. É só uma simulação: não registra pagamentos, cronogramas nem auditoria.",
+      "mode": "O que simular",
+      "modes": {
+        "STRATEGIES": "Estratégias entre empréstimos",
+        "LOAN": "Extras em um empréstimo"
+      },
+      "currency": "Moeda do extra",
+      "monthlyExtra": "Extra mensal",
+      "monthlyHint": "Só participam os empréstimos ativos nesta moeda; os demais ficam fora da estratégia.",
+      "loan": "Empréstimo",
+      "extraType": "Tipo de extra",
+      "extraTypes": {
+        "ONE_TIME": "Único",
+        "MONTHLY": "Todo mês"
+      },
+      "afterInstallment": "Junto à parcela n.º",
+      "fromInstallment": "A partir da parcela n.º",
+      "extraAmount": "Valor",
+      "addExtra": "Adicionar extra",
+      "notSaved": "A simulação não é salva; você pode exportar a tabela comparativa para CSV.",
+      "run": "Simular",
+      "running": "Simulando…",
+      "export": "Exportar CSV",
+      "compareTitle": "Comparação",
+      "startBalance": "Principal pendente dos empréstimos incluídos: {amount}",
+      "columns": {
+        "strategy": "Estratégia",
+        "interest": "Juros totais",
+        "saved": "Economia frente a não pagar extra",
+        "debtFree": "Livre de dívidas",
+        "loans": "Fim de cada empréstimo",
+        "scenario": "Cenário",
+        "end": "Data final",
+        "installments": "Parcelas"
+      },
+      "strategies": {
+        "NONE": "Sem extra",
+        "AVALANCHE": "Avalanche (maior taxa primeiro)",
+        "SNOWBALL": "Snowball (menor saldo primeiro)"
+      },
+      "scenarios": {
+        "current": "Cronograma vigente",
+        "scenario": "Com os extras"
+      },
+      "saved": "Economia de juros: {amount}; você termina {months} meses antes.",
+      "outTitle": "Empréstimos fora da estratégia",
+      "out": {
+        "CURRENCY": "{name} está em {currency}: mantém seu cronograma vigente.",
+        "CUSTOM": "{name} tem cronograma próprio: o sistema não o recalcula."
+      },
+      "chart": {
+        "title": "Saldo total por mês ({currency})",
+        "desc": "Saldo de principal total de {from} a {to}, até um máximo de {max}; a tabela comparativa tem os mesmos resultados."
+      },
+      "csv": {
+        "scenario": "Cenário",
+        "interest": "Juros totais",
+        "saved": "Economia",
+        "end": "Fim",
+        "months": "Meses ou parcelas"
+      }
     }
   },
   "Cards": {

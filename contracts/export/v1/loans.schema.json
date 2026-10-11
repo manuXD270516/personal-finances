@@ -37,7 +37,9 @@
     "created_by",
     "created_at",
     "updated_at",
-    "version"
+    "version",
+    "fixed_principal_amount",
+    "custom_schedule"
   ],
   "properties": {
     "id": {
@@ -180,7 +182,15 @@
     },
     "version": {
       "type": "integer"
-    }
+    },
+    "fixed_principal_amount": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "custom_schedule": {}
   },
   "x-pfos-table": "debt.loan",
   "x-pfos-context": "debt"

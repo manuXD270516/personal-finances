@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Estrategias avalanche y snowball entre préstamos'
 scenario: 'Préstamo en otra moneda'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-010']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/payoff-simulator.test.ts
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'simulator', 'multi-currency']
@@ -28,7 +31,7 @@ steps:
 expected_result:
   - 'El préstamo en USD figura fuera de la estrategia y conserva su cronograma vigente'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-043 — Los préstamos de otra moneda quedan fuera de la estrategia
@@ -48,4 +51,4 @@ Entonces el préstamo en USD figura fuera de la estrategia y conserva su cronogr
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

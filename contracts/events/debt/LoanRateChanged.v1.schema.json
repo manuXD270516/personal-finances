@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/LoanRateChanged.v1.schema.json",
+  "title": "debt.LoanRateChanged.v1",
+  "description": "Se registró un cambio de tasa en un préstamo de tasa variable con su fecha de vigencia; las cuotas cuyo periodo empieza en o después de la vigencia se recalcularon como una versión nueva del cronograma (`scheduleVersion`). Productor: DEBT. Idempotencia: (loanId, rateChangeId). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.LoanRateChanged"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Loan"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "loanId",
+        "rateChangeId",
+        "previousRate",
+        "newRate",
+        "effectiveFrom",
+        "scheduleVersion"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "loanId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "rateChangeId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "previousRate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal",
+          "description": "Tasa nominal anual anterior como fracción decimal (0.12 = 12 %)."
+        },
+        "newRate": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal",
+          "description": "Tasa nominal anual nueva como fracción decimal (0.15 = 15 %)."
+        },
+        "effectiveFrom": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "scheduleVersion": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a14",
+      "eventType": "debt.LoanRateChanged",
+      "eventVersion": 1,
+      "occurredAt": "2027-04-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 9,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "rateChangeId": "01928c4e-0000-7000-8000-0000000b0201",
+        "previousRate": "0.12",
+        "newRate": "0.15",
+        "effectiveFrom": "2027-04-15",
+        "scheduleVersion": 2
+      }
+    }
+  ]
+}

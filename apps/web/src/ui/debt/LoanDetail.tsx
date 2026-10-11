@@ -14,10 +14,29 @@ import type { FormatContext } from '../dashboard/types';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { formatBusinessDate } from '../planning/logic';
 import { useCatalogs } from '../transactions/catalogs';
+import { CustomSchedulePanel, PrepaymentPanel, RateChangePanel, VersionsSection } from './AmortizationPanels';
 import { DisbursePanel, EditPanel, PaymentPanel, ReasonPanel } from './LoanPanels';
 import { InstallmentsTable, LoanStatusBadge, PaymentsTable, SchedulePreviewTable, debtText } from './Tables';
-import { fractionToPercent, debtHref, emptyPaymentForm, loanPath } from './logic';
-import type { LoanDetail, LoanInstallment, LoanPayment } from './types';
+import {
+  canChangeRate,
+  canRecalculate,
+  debtHref,
+  emptyPrepaymentForm,
+  emptyPaymentForm,
+  fractionToPercent,
+  loanPath,
+  scheduleVersionsPath,
+  rateChangesPath,
+  type CustomRowForm,
+} from './logic';
+import type {
+  LoanDetail,
+  LoanInstallment,
+  LoanPayment,
+  RateChange,
+  ReferenceSchedule,
+  ScheduleVersion,
+} from './types';
 
 export interface PaymentPrefill {
   readonly open: boolean;
@@ -38,9 +57,12 @@ type Loaded =
       readonly loan: LoanDetail;
       readonly installments: readonly LoanInstallment[];
       readonly payments: readonly LoanPayment[];
+      readonly versions: readonly ScheduleVersion[];
+      readonly rates: readonly RateChange[];
+      readonly references: readonly ReferenceSchedule[];
     };
 
-type Panel = 'pay' | 'disburse' | 'cancel' | 'void' | 'edit';
+type Panel = 'pay' | 'disburse' | 'cancel' | 'void' | 'edit' | 'prepay' | 'rate' | 'custom';
 
 /** Resumen de condiciones, saldos y acumulados (presentacional). */
 export function LoanSummary({
@@ -243,6 +265,9 @@ function Detail({
   const [panel, setPanel] = useState<Panel | undefined>(prefill.open ? 'pay' : undefined);
   const [voidTarget, setVoidTarget] = useState<LoanPayment | undefined>();
   const [status, setStatus] = useState<string | undefined>();
+  const [viewVersion, setViewVersion] = useState<
+    { version: number; items: readonly LoanInstallment[] } | undefined
+  >();
 
   const load = useCallback(async () => {
     try {
@@ -260,7 +285,27 @@ function Detail({
           .then((r) => r.data?.data ?? [])
           .catch(() => [] as LoanPayment[]),
       ]);
-      setLoaded({ status: 'ready', loan: d, installments: inst, payments: pay });
+      const [versions, rates, references] = [
+        live
+          ? await ctx.api
+              .get<{ data: ScheduleVersion[] }>(scheduleVersionsPath(ctx.base, loanId))
+              .then((r) => r.data?.data ?? [])
+              .catch(() => [] as ScheduleVersion[])
+          : ([] as ScheduleVersion[]),
+        live
+          ? await ctx.api
+              .get<{ data: RateChange[] }>(rateChangesPath(ctx.base, loanId))
+              .then((r) => r.data?.data ?? [])
+              .catch(() => [] as RateChange[])
+          : ([] as RateChange[]),
+        d.status === 'DRAFT' || d.status === 'ACTIVE'
+          ? await ctx.api
+              .get<{ data: ReferenceSchedule[] }>(`${loanPath(ctx.base, loanId)}/reference-schedules`)
+              .then((r) => r.data?.data ?? [])
+              .catch(() => [] as ReferenceSchedule[])
+          : ([] as ReferenceSchedule[]),
+      ];
+      setLoaded({ status: 'ready', loan: d, installments: inst, payments: pay, versions, rates, references });
     } catch (err) {
       if (err instanceof FinanceApiError && err.status === 404) setLoaded({ status: 'notFound' });
       else setLoaded({ status: 'error', problem: problemOf(err) });
@@ -293,11 +338,12 @@ function Detail({
       </section>
     );
 
-  const { loan, installments, payments } = loaded;
+  const { loan, installments, payments, versions, rates, references } = loaded;
   const accountName = (id: string) => catalogs.names.account(id);
   const done = (message: string) => {
     setPanel(undefined);
     setVoidTarget(undefined);
+    setViewVersion(undefined);
     setStatus(message);
     void load();
   };
@@ -306,6 +352,20 @@ function Detail({
     setVoidTarget(undefined);
   };
   const active = loan.status === 'ACTIVE';
+  const viewScheduleVersion = (version: number) =>
+    void ctx.api
+      .get<{ data: LoanInstallment[] }>(`${loanPath(ctx.base, loan.id)}/installments?version=${version}`)
+      .then((r) => setViewVersion({ version, items: r.data?.data ?? [] }))
+      .catch((err: unknown) => setStatus(problemMessage(problemOf(err), ctx.uiLocale)));
+  /** Filas iniciales de la grilla custom: las del borrador (vista previa) si ya se definieron. */
+  const customInitial: readonly CustomRowForm[] = (loan.preview?.installments ?? []).map((i) => ({
+    dueDate: i.dueDate,
+    principal: i.principal,
+    interest: i.interest,
+    fees: i.fees,
+    insurance: i.insurance,
+    taxes: i.taxes,
+  }));
   const panelProps = { ctx, f, loan, onCancel: close, onDone: done };
   // Prefill del pago: cuota indicada (o la próxima) y su pendiente.
   const prefNo = prefill.installmentNo ?? loan.nextInstallment?.n;
@@ -345,6 +405,36 @@ function Detail({
               {f.t('actions.pay')}
             </button>
           ) : null}
+          {canRecalculate(loan) ? (
+            <button
+              type="button"
+              data-testid="loan-prepay"
+              onClick={() => setPanel('prepay')}
+              disabled={panel === 'prepay'}
+            >
+              {f.t('actions.prepay')}
+            </button>
+          ) : null}
+          {canChangeRate(loan) ? (
+            <button
+              type="button"
+              data-testid="loan-rate-change"
+              onClick={() => setPanel('rate')}
+              disabled={panel === 'rate'}
+            >
+              {f.t('actions.rateChange')}
+            </button>
+          ) : null}
+          {loan.status === 'DRAFT' || active ? (
+            <button
+              type="button"
+              data-testid="loan-custom"
+              onClick={() => setPanel('custom')}
+              disabled={panel === 'custom'}
+            >
+              {loan.method === 'CUSTOM' ? f.t('actions.customEdit') : f.t('actions.custom')}
+            </button>
+          ) : null}
           {loan.status === 'DRAFT' ? (
             <button type="button" data-testid="loan-disburse" onClick={() => setPanel('disburse')}>
               {f.t('actions.disburse')}
@@ -377,6 +467,31 @@ function Detail({
             ...(prefNo !== undefined ? { installmentNo: prefNo } : {}),
             ...(prefAmount !== undefined ? { amount: prefAmount } : {}),
           })}
+        />
+      ) : null}
+      {panel === 'prepay' && canRecalculate(loan) ? (
+        <PrepaymentPanel
+          {...panelProps}
+          accounts={catalogs.accounts}
+          initial={emptyPrepaymentForm({ businessDate: today, accountId: loan.paymentAccountId })}
+        />
+      ) : null}
+      {panel === 'rate' && canChangeRate(loan) ? (
+        <RateChangePanel
+          {...panelProps}
+          initial={{
+            ratePct: '',
+            effectiveFrom: loan.nextInstallment
+              ? (installments.find((i) => i.n === loan.nextInstallment?.n)?.periodStart ?? today)
+              : today,
+          }}
+        />
+      ) : null}
+      {panel === 'custom' ? (
+        <CustomSchedulePanel
+          {...panelProps}
+          references={references}
+          initialRows={loan.status === 'DRAFT' ? customInitial : []}
         />
       ) : null}
       {panel === 'disburse' ? <DisbursePanel {...panelProps} /> : null}
@@ -425,6 +540,29 @@ function Detail({
                       currency={loan.principal.currency}
                       loanId={loan.id}
                       canPay={ctx.canEdit && active}
+                    />
+                  </section>
+                ) : null}
+                {versions.length > 0 ? (
+                  <VersionsSection
+                    f={f}
+                    versions={versions}
+                    rates={rates}
+                    viewing={viewVersion?.version}
+                    onView={viewScheduleVersion}
+                  />
+                ) : null}
+                {viewVersion ? (
+                  <section aria-labelledby="loan-version-view-title" data-testid="loan-version-view">
+                    <h3 id="loan-version-view-title" style={{ fontSize: '1rem' }}>
+                      {f.t('versions.viewing', { version: viewVersion.version })}
+                    </h3>
+                    <InstallmentsTable
+                      f={f}
+                      items={viewVersion.items}
+                      currency={loan.principal.currency}
+                      loanId={loan.id}
+                      canPay={false}
                     />
                   </section>
                 ) : null}

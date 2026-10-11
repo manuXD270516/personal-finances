@@ -13,6 +13,8 @@ export const DEBT_EVENTS = {
   loanPaymentRecorded: { eventType: 'debt.LoanPaymentRecorded', eventVersion: 1 },
   loanPaymentVoided: { eventType: 'debt.LoanPaymentVoided', eventVersion: 1 },
   loanPaidOff: { eventType: 'debt.LoanPaidOff', eventVersion: 1 },
+  // add-loan-amortization-advanced (Phase 4)
+  loanRateChanged: { eventType: 'debt.LoanRateChanged', eventVersion: 1 },
   // add-credit-cards (Phase 4)
   cardStatementIssued: { eventType: 'debt.CardStatementIssued', eventVersion: 1 },
   cardPaymentDue: { eventType: 'debt.CardPaymentDue', eventVersion: 1 },
@@ -62,11 +64,21 @@ export interface LoanInstallmentDto {
   readonly total: string;
 }
 
+export type LoanScheduleReasonDto =
+  | 'INITIAL'
+  | 'PREPAYMENT'
+  | 'PREPAYMENT_VOIDED'
+  | 'RATE_CHANGE'
+  | 'CUSTOM_DEFINED'
+  | 'CUSTOM_ADOPTED';
+
 export interface LoanScheduleGeneratedV1 {
   readonly workspaceId: string;
   readonly loanId: string;
   readonly scheduleVersion: number;
-  readonly reason: 'INITIAL';
+  readonly reason: LoanScheduleReasonDto;
+  /** Primera cuota que la versión reemplaza (aditivo; 1 si se omite). */
+  readonly fromInstallmentNo?: number;
   readonly effectiveFrom: string;
   readonly currency: string;
   readonly installments: readonly LoanInstallmentDto[];
@@ -86,6 +98,9 @@ export interface LoanPaymentRecordedV1 {
   readonly loanId: string;
   readonly paymentId: string;
   readonly transactionId: string;
+  /** `REGULAR` si se omite; `PREPAYMENT` sin imputaciones a cuotas (`installmentNos` vacío). */
+  readonly kind?: 'REGULAR' | 'PREPAYMENT';
+  readonly prepaymentOption?: 'REDUCE_TERM' | 'REDUCE_INSTALLMENT';
   readonly installmentNos: readonly number[];
   readonly currency: string;
   readonly breakdown: LoanPaymentBreakdownEventDto;
@@ -101,6 +116,18 @@ export interface LoanPaymentVoidedV1 {
   readonly installmentNos: readonly number[];
   readonly currency: string;
   readonly remainingPrincipal: string;
+}
+
+/** `debt.LoanRateChanged.v1` (clave `(loanId, rateChangeId)`). */
+export interface LoanRateChangedV1 {
+  readonly workspaceId: string;
+  readonly loanId: string;
+  readonly rateChangeId: string;
+  /** Fracción decimal (`0.12` = 12 %). */
+  readonly previousRate: string;
+  readonly newRate: string;
+  readonly effectiveFrom: string;
+  readonly scheduleVersion: number;
 }
 
 export interface LoanPaidOffV1 {
@@ -297,6 +324,19 @@ export const DEBT_AUDIT_POLICY = {
     recurringDefinitionId: 'plain',
     disbursementTransactionId: 'plain',
     reason: 'plain',
+    // add-loan-amortization-advanced: versión del cronograma, prepago, cambio de tasa y cronograma custom.
+    fixedPrincipalAmount: 'money',
+    scheduleVersion: 'plain',
+    scheduleReason: 'plain',
+    fromInstallmentNo: 'plain',
+    effectiveFrom: 'plain',
+    prepaymentAmount: 'money',
+    prepaymentFee: 'money',
+    prepaymentOption: 'plain',
+    previousRate: 'plain',
+    newRate: 'plain',
+    customInstallments: 'plain',
+    referenceVersion: 'plain',
   },
   LoanPayment: {
     loanId: 'plain',
@@ -312,6 +352,9 @@ export const DEBT_AUDIT_POLICY = {
     status: 'plain',
     voidedReason: 'plain',
     installmentNos: 'plain',
+    kind: 'plain',
+    prepaymentOption: 'plain',
+    prepaymentFee: 'money',
   },
   LoanReferenceSchedule: {
     loanId: 'plain',

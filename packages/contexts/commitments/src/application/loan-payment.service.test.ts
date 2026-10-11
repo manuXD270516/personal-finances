@@ -792,3 +792,152 @@ describe('Revisión de la plantilla administrada', () => {
     expect(def.versions).toHaveLength(1);
   });
 });
+
+describe('Reemplazo del calendario por un recálculo (N3, add-loan-amortization-advanced)', () => {
+  const MONTHS = ['2026-11-15', '2026-12-15', '2027-01-15', '2027-02-15', '2027-03-15', '2027-04-15'];
+  const dueOf = (n: number): string => {
+    const month = 10 + n - 1;
+    return `${2026 + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, '0')}-15`;
+  };
+  /** Cuotas 1..12 del préstamo de 12000.00 BOB al 12 %: 1066.19 y la última 1066.14. */
+  const original = Array.from({ length: 12 }, (_, i) => ({
+    key: String(i + 1),
+    dueDate: dueOf(i + 1),
+    amount: i === 11 ? '1066.14' : '1066.19',
+  }));
+  const range = (from: number, to: number, amount: string, last?: string) =>
+    Array.from({ length: to - from + 1 }, (_, i) => ({
+      key: String(from + i),
+      dueDate: dueOf(from + i),
+      amount: from + i === to && last ? last : amount,
+    }));
+
+  /** Préstamo con las cuotas 1 a 3 pagadas y todas las ocurrencias generadas (hoy = 2027-08-01). */
+  async function paidThree() {
+    const s = setup('2026-10-17');
+    const { definitionId } = await createLoan(s, { explicitSchedule: original });
+    const txn = payment(s, '3198.57', '2027-01-15');
+    await s.port.settle({
+      workspaceId: WS,
+      userId: USER,
+      definitionId,
+      keys: ['1', '2', '3'],
+      transactionId: txn,
+    });
+    s.mem.setNow(noon('2027-08-01'));
+    await s.job.runWorkspace(WS);
+    expect(occsOf(s, definitionId)).toHaveLength(12);
+    return { s, definitionId };
+  }
+
+  it('[TC-DEBT-LOAN-051] reducir el plazo actualiza la ocurrencia de la última cuota y cancela las que ya no existen', async () => {
+    const { s, definitionId } = await paidThree();
+    const ids = new Map(occsOf(s, definitionId).map((o) => [o.scheduleKey, o.id]));
+    await s.port.replaceSchedule({
+      workspaceId: WS,
+      userId: USER,
+      definitionId,
+      effectiveFrom: '2027-02-15',
+      items: [...range(4, 8, '1066.19'), { key: '9', dueDate: '2027-07-15', amount: '1017.22' }],
+    });
+    // misma fecha ⇒ misma ocurrencia con el monto nuevo (INV-013: conserva su identidad)
+    expect(byKey(s, definitionId, '9')).toMatchObject({
+      id: ids.get('9'),
+      occurrenceDate: '2027-07-15',
+      expected: { type: 'FIXED', amount: '1017.22' },
+    });
+    for (const key of ['10', '11', '12']) {
+      expect(byKey(s, definitionId, key)).toMatchObject({ status: 'CANCELLED', cancelReason: 'SUPERSEDED' });
+    }
+    const unresolvedAfter = occsOf(s, definitionId).filter(
+      (o) => o.occurrenceDate > '2027-07-15' && o.status !== 'CANCELLED',
+    );
+    expect(unresolvedAfter).toEqual([]);
+    // las resueltas no cambian
+    for (const key of ['1', '2', '3']) expect(byKey(s, definitionId, key).status).toBe('MATCHED');
+    const def = (await s.deps.definitions.findById(WS, definitionId))!;
+    expect(def.versions).toHaveLength(2);
+    expect(def.current.effectiveFrom).toBe('2027-02-15');
+  });
+
+  it('[TC-DEBT-LOAN-052] reducir la cuota cambia el monto esperado de cada ocurrencia sin cambiar sus fechas', async () => {
+    const { s, definitionId } = await paidThree();
+    const dates = occsOf(s, definitionId).map((o) => o.occurrenceDate);
+    await s.port.replaceSchedule({
+      workspaceId: WS,
+      userId: USER,
+      definitionId,
+      effectiveFrom: '2027-02-15',
+      items: range(4, 12, '715.96', '715.99'),
+    });
+    expect(occsOf(s, definitionId).map((o) => o.occurrenceDate)).toEqual(dates);
+    expect(byKey(s, definitionId, '4')).toMatchObject({
+      occurrenceDate: '2027-02-15',
+      expected: { amount: '715.96' },
+    });
+    expect(byKey(s, definitionId, '12')).toMatchObject({
+      occurrenceDate: '2027-10-15',
+      expected: { amount: '715.99' },
+    });
+    expect(occsOf(s, definitionId).filter((o) => o.status === 'CANCELLED')).toEqual([]);
+  });
+
+  it('[TC-DEBT-LOAN-050] restituir el cronograma reinstaura las ocurrencias canceladas con sus montos originales', async () => {
+    const { s, definitionId } = await paidThree();
+    await s.port.replaceSchedule({
+      workspaceId: WS,
+      userId: USER,
+      definitionId,
+      effectiveFrom: '2027-02-15',
+      items: [...range(4, 8, '1066.19'), { key: '9', dueDate: '2027-07-15', amount: '1017.22' }],
+    });
+    await s.port.replaceSchedule({
+      workspaceId: WS,
+      userId: USER,
+      definitionId,
+      effectiveFrom: '2027-02-15',
+      items: range(4, 12, '1066.19', '1066.14'),
+    });
+    expect(occsOf(s, definitionId).filter((o) => o.status === 'CANCELLED')).toEqual([]);
+    expect(byKey(s, definitionId, '9').expected.amount).toBe('1066.19');
+    expect(byKey(s, definitionId, '12').expected.amount).toBe('1066.14');
+    expect((await s.deps.definitions.findById(WS, definitionId))!.versions).toHaveLength(3);
+    // el pago de una cuota posterior sigue funcionando con la clave de la versión vigente
+    const txn = payment(s, '1066.19', '2027-02-15');
+    const definition = definitionId;
+    await s.port.settle({
+      workspaceId: WS,
+      userId: USER,
+      definitionId: definition,
+      keys: ['4'],
+      transactionId: txn,
+    });
+    expect(byKey(s, definitionId, '4').status).toBe('MATCHED');
+  });
+
+  it('la fecha efectiva se adelanta tras la última ocurrencia resuelta, ignora los ítems anteriores y rechaza una definición de regla', async () => {
+    const { s, definitionId } = await paidThree();
+    await s.port.replaceSchedule({
+      workspaceId: WS,
+      userId: USER,
+      definitionId,
+      effectiveFrom: '2027-01-01',
+      items: [{ key: '3', dueDate: '2027-01-15', amount: '1.00' }, ...range(4, 12, '700.00')],
+    });
+    const def = (await s.deps.definitions.findById(WS, definitionId))!;
+    expect(def.current.effectiveFrom).toBe('2027-01-16');
+    expect(byKey(s, definitionId, '3').status).toBe('MATCHED');
+    expect(byKey(s, definitionId, '4').expected.amount).toBe('700.00');
+    const err = await code(
+      s.port.replaceSchedule({
+        workspaceId: WS,
+        userId: USER,
+        definitionId,
+        effectiveFrom: '2030-01-01',
+        items: [],
+      }),
+    );
+    expect(err.code).toBe('RECURRING_INVALID_SCHEDULE');
+    expect(MONTHS).toHaveLength(6);
+  });
+});

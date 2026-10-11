@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/debt/LoanScheduleGenerated.v1.schema.json",
   "title": "debt.LoanScheduleGenerated.v1",
-  "description": "Se fijó una versión del cronograma de un préstamo (v1 al desembolsar o al registrar un préstamo en curso). Productor: DEBT. Idempotencia: (loanId, scheduleVersion). Sin PII.",
+  "description": "Se fijó una versión del cronograma de un préstamo: la v1 al desembolsar o al registrar un préstamo en curso (INITIAL) y, en un préstamo activo, cada recálculo — pago extraordinario (PREPAYMENT), su anulación (PREPAYMENT_VOIDED), cambio de tasa (RATE_CHANGE) o cronograma custom (CUSTOM_DEFINED, CUSTOM_ADOPTED). `installments` son las cuotas de la versión, que reemplaza las no pagadas desde `fromInstallmentNo` (1 si se omite). Productor: DEBT. Idempotencia: (loanId, scheduleVersion). Sin PII.",
   "type": "object",
   "allOf": [
     {
@@ -49,8 +49,17 @@
         },
         "reason": {
           "enum": [
-            "INITIAL"
+            "INITIAL",
+            "PREPAYMENT",
+            "PREPAYMENT_VOIDED",
+            "RATE_CHANGE",
+            "CUSTOM_DEFINED",
+            "CUSTOM_ADOPTED"
           ]
+        },
+        "fromInstallmentNo": {
+          "type": "integer",
+          "minimum": 1
         },
         "effectiveFrom": {
           "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
@@ -160,6 +169,53 @@
             "insurance": "0.00",
             "taxes": "0.00",
             "total": "340.03"
+          }
+        ]
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a12",
+      "eventType": "debt.LoanScheduleGenerated",
+      "eventVersion": 1,
+      "occurredAt": "2027-01-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 6,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "scheduleVersion": 2,
+        "reason": "PREPAYMENT",
+        "fromInstallmentNo": 4,
+        "effectiveFrom": "2027-01-15",
+        "currency": "BOB",
+        "installments": [
+          {
+            "n": 4,
+            "dueDate": "2027-02-15",
+            "principal": "1006.19",
+            "interest": "60.00",
+            "fees": "0.00",
+            "insurance": "0.00",
+            "taxes": "0.00",
+            "total": "1066.19"
+          },
+          {
+            "n": 5,
+            "dueDate": "2027-03-15",
+            "principal": "1016.25",
+            "interest": "49.94",
+            "fees": "0.00",
+            "insurance": "0.00",
+            "taxes": "0.00",
+            "total": "1066.19"
           }
         ]
       }

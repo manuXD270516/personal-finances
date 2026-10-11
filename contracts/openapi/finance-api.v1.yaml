@@ -8321,6 +8321,365 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Debt: amortización avanzada (openspec add-loan-amortization-advanced) ──
+  /workspaces/{workspaceId}/loans/payoff-simulations:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Debt]
+      operationId: simulateLoanPayoff
+      summary: Simulate extra payments on one loan or compare avalanche and snowball strategies
+      description: |
+        Persists nothing: no transactions, schedule versions, commitments or audit records are created. With `scenario.loanId` it projects
+        that loan with one-time or monthly extras applied to the principal after the scheduled installment (reduce term, no fee) and shows
+        total interest, end date and interest saved against the current schedule. With `scenario.monthlyExtra` it compares avalanche (highest
+        rate first), snowball (smallest balance first) and no extra among the active loans in the currency of the extra, adding the
+        installments of paid-off loans to the extra (rollover); loans in another currency or with a custom schedule are reported as
+        `outOfStrategy` and keep their current schedule. Credit cards are not part of the simulation. At most 20 active loans, 600 months.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayoffSimulationInput' }
+      responses:
+        '200':
+          description: Simulate extra payments on one loan or compare avalanche and snowball strategies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PayoffSimulation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED or LOAN_SCHEDULE_IS_CUSTOM.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/custom-schedule:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    put:
+      tags: [Debt]
+      operationId: defineLoanCustomSchedule
+      summary: Define the schedule of a loan installment by installment (custom schedule)
+      description: |
+        The rows are validated (sum of principal equal to the principal of a draft or to the outstanding principal of an active loan,
+        strictly increasing due dates after the disbursement or the last paid installment, non-negative components at the scale of the
+        currency, total equal to the sum of the components) or rejected with 422 `CUSTOM_SCHEDULE_INVALID` (`details.rows[]`,
+        `details.principalSum`). A draft keeps the rows until the disbursement fixes them as version 1. An active loan gets a new schedule
+        version (`CUSTOM_DEFINED`) from the first unpaid installment, paid installments never change, and from then on the system does not
+        recalculate it (prepayments and rate changes answer 409 `LOAN_SCHEDULE_IS_CUSTOM`). A partially paid installment answers 409
+        `LOAN_INSTALLMENTS_PENDING`.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomScheduleInput' }
+      responses:
+        '200':
+          description: Define the schedule of a loan installment by installment (custom schedule)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomScheduleResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE, LOAN_INSTALLMENTS_PENDING or CONCURRENCY_CONFLICT.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            CUSTOM_SCHEDULE_INVALID or VALIDATION_FAILED.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/custom-schedule/adopt:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: adoptLoanReferenceSchedule
+      summary: Adopt a loaded bank table as the custom schedule of the loan
+      description: |
+        Same validations and effects as `PUT custom-schedule`, taking the rows of the bank table (`reference-schedules`) as the schedule. In an
+        active loan the rows from the first unpaid installment are adopted as a new version (`CUSTOM_ADOPTED`); the numbering of the table must
+        cover the unpaid installments and the paid installments and their payments do not change.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomScheduleAdoptInput' }
+      responses:
+        '200':
+          description: Adopt a loaded bank table as the custom schedule of the loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomScheduleResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE, LOAN_INSTALLMENTS_PENDING or CONCURRENCY_CONFLICT.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            CUSTOM_SCHEDULE_INVALID or VALIDATION_FAILED.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/prepayments:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: recordLoanPrepayment
+      summary: Register an extraordinary payment choosing to reduce the term or the installment
+      description: |
+        Creates, in one unit of work, a `LOAN_PAYMENT` transaction that reduces the debt by `amount` (the optional `fee` is recorded as an
+        expense in "Comisiones de préstamo" and withdrawn from the payment account together with the amount), a new schedule version from
+        the first unpaid installment (`REDUCE_TERM`: same installment, fewer installments; `REDUCE_INSTALLMENT`: same dates, smaller
+        installment) and the replacement of the unresolved occurrences of the installment commitment. Installments due on or before
+        `businessDate` must be paid and none may be partially paid (409 `LOAN_INSTALLMENTS_PENDING`); an amount above the outstanding
+        principal answers 422 `LOAN_OVERPAYMENT`; an amount equal to it pays the loan off. A custom schedule answers 409
+        `LOAN_SCHEDULE_IS_CUSTOM`. The prepayment is voided with `POST payments/{paymentId}/void` (the previous schedule is restored as a new version).
+      x-openspec-capability: [debt/loans, debt/amortization]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrepaymentInput' }
+      responses:
+        '201':
+          description: Register an extraordinary payment choosing to reduce the term or the installment
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrepaymentResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: >-
+            LOAN_NOT_ACTIVE, LOAN_INSTALLMENTS_PENDING (details.installmentNos), LOAN_SCHEDULE_IS_CUSTOM, PERIOD_CLOSED, ACCOUNT_ARCHIVED or ACCOUNT_CLOSED.
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, LOAN_OVERPAYMENT or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/prepayments/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: previewLoanPrepayment
+      summary: Preview both options of an extraordinary payment without saving anything
+      description: |
+        For each option (`REDUCE_TERM`, `REDUCE_INSTALLMENT`) returns the resulting schedule with its installment, end date, remaining interest
+        and the interest saved against the current schedule. Persists nothing; same preconditions as the payment.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrepaymentPreviewInput' }
+      responses:
+        '200':
+          description: Preview both options of an extraordinary payment without saving anything
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrepaymentPreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE, LOAN_INSTALLMENTS_PENDING or LOAN_SCHEDULE_IS_CUSTOM.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH or LOAN_OVERPAYMENT.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/rate-changes:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: listLoanRateChanges
+      summary: List the rate history of a loan
+      description: |
+        The initial rate of the loan (`initial = true`, in force since the disbursement) followed by the registered rate changes, by effective date.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: List the rate history of a loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateChangeList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Debt]
+      operationId: changeLoanRate
+      summary: Register a new rate with its effective date on a variable-rate loan
+      description: |
+        The installments whose period starts on or after `effectiveFrom` are recalculated with the new rate keeping their number and dates, as a
+        new schedule version; an effective date inside a period already started applies from the next period (no proration). A fixed-rate loan
+        answers 409 `LOAN_RATE_FIXED`, a custom schedule 409 `LOAN_SCHEDULE_IS_CUSTOM`, and an effective date before the start of the first
+        unpaid period 422 `LOAN_CHANGE_DATE_INVALID`.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RateChangeInput' }
+      responses:
+        '201':
+          description: Register a new rate with its effective date on a variable-rate loan
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateChangeResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE, LOAN_RATE_FIXED, LOAN_SCHEDULE_IS_CUSTOM or LOAN_INSTALLMENTS_PENDING.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED or LOAN_CHANGE_DATE_INVALID.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/rate-changes/preview:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    post:
+      tags: [Debt]
+      operationId: previewLoanRateChange
+      summary: Preview a rate change without saving anything
+      description: |
+        The schedule that the new rate would produce against the current one (installment, end date, remaining interest). Persists nothing; same rules as the change.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RateChangeInput' }
+      responses:
+        '200':
+          description: Preview a rate change without saving anything
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateChangePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'LOAN_NOT_ACTIVE, LOAN_RATE_FIXED, LOAN_SCHEDULE_IS_CUSTOM or LOAN_INSTALLMENTS_PENDING.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED or LOAN_CHANGE_DATE_INVALID.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/loans/{loanId}/schedule-versions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/LoanId'
+    get:
+      tags: [Debt]
+      operationId: listLoanScheduleVersions
+      summary: List the schedule versions of a loan
+      description: |
+        Every recalculation (prepayment, rate change, custom schedule, restoration after voiding a prepayment) creates a version that replaces only
+        the unpaid installments; replaced versions stay consultable (`GET installments?version=`) and the payments already allocated never move.
+      x-openspec-capability: [debt/amortization]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: List the schedule versions of a loan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScheduleVersionList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/loans/{loanId}/reference-schedules:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -10628,6 +10987,11 @@ components:
         - LOAN_PAYMENT_NOT_LATEST                # 409 (add-loans: only the most recent active payment can be voided)
         - LOAN_HAS_PAYMENTS                      # 409 (add-loans: a loan with active payments cannot be cancelled)
         - LOAN_REFERENCE_INVALID                 # 422 (add-loans: the bank schedule has invalid rows; details.rows[])
+        - CUSTOM_SCHEDULE_INVALID                # 422 (add-loan-amortization-advanced: invalid custom schedule; details.rows[], details.principalSum)
+        - LOAN_SCHEDULE_IS_CUSTOM                # 409 (add-loan-amortization-advanced: a custom schedule is not recalculated)
+        - LOAN_INSTALLMENTS_PENDING              # 409 (add-loan-amortization-advanced: partially paid or overdue installments; details.installmentNos[])
+        - LOAN_RATE_FIXED                        # 409 (add-loan-amortization-advanced: only a variable-rate loan admits rate changes)
+        - LOAN_CHANGE_DATE_INVALID               # 422 (add-loan-amortization-advanced: the effective date precedes the first unpaid period)
         - PAYMENT_BREAKDOWN_MISMATCH             # 422 (add-loans: the breakdown does not add up to the amount; details.sum, details.amount)
         - TRANSACTION_MANAGED_EXTERNALLY         # 409 (add-loans: the transaction is managed by a loan; details.managedBy, details.loanId)
         - CREDIT_CARD_ACCOUNT_INVALID            # 422 (add-credit-cards: the account is not an active credit_card account, or two accounts share a currency)
@@ -17263,7 +17627,9 @@ components:
       x-extensible-enum: true
     LoanMethod:
       type: string
-      description: Only `FRENCH` is available in Phase 4; the others answer 422 `LOAN_METHOD_NOT_AVAILABLE`.
+      description: |
+        `FRENCH` (constant installment), `GERMAN` (constant principal), `FIXED_PRINCIPAL` (user-defined principal per installment and a balloon final
+        installment) and `CUSTOM` (installments defined by the user or adopted from the bank table, which the system never recalculates).
       enum: [FRENCH, GERMAN, FIXED_PRINCIPAL, CUSTOM]
     LoanRateType:
       type: string
@@ -17336,6 +17702,15 @@ components:
         frequency: { $ref: '#/components/schemas/LoanFrequency' }
         termInstallments: { type: integer, minimum: 1, maximum: 600 }
         method: { $ref: '#/components/schemas/LoanMethod' }
+        fixedPrincipalAmount:
+          description: Required with `FIXED_PRINCIPAL`, in the currency of the loan; the first n-1 installments must not exhaust the principal.
+          $ref: '#/components/schemas/PositiveMoney'
+        customSchedule:
+          description: Only `CUSTOM`. Required for an ongoing loan; a draft can load it later with `PUT custom-schedule`.
+          type: array
+          minItems: 1
+          maxItems: 600
+          items: { $ref: '#/components/schemas/CustomScheduleRow' }
         disbursementDate: { $ref: '#/components/schemas/LocalDate' }
         firstDueDate: { $ref: '#/components/schemas/LocalDate' }
         charges: { $ref: '#/components/schemas/LoanCharges' }
@@ -17361,6 +17736,15 @@ components:
         frequency: { $ref: '#/components/schemas/LoanFrequency' }
         termInstallments: { type: integer, minimum: 1, maximum: 600 }
         method: { $ref: '#/components/schemas/LoanMethod' }
+        fixedPrincipalAmount:
+          description: Required with `FIXED_PRINCIPAL`, in the currency of the loan; the first n-1 installments must not exhaust the principal.
+          $ref: '#/components/schemas/PositiveMoney'
+        customSchedule:
+          description: Only `CUSTOM`. Required for an ongoing loan; a draft can load it later with `PUT custom-schedule`.
+          type: array
+          minItems: 1
+          maxItems: 600
+          items: { $ref: '#/components/schemas/CustomScheduleRow' }
         disbursementDate: { $ref: '#/components/schemas/LocalDate' }
         firstDueDate: { $ref: '#/components/schemas/LocalDate' }
         charges: { $ref: '#/components/schemas/LoanCharges' }
@@ -17384,6 +17768,7 @@ components:
         frequency: { $ref: '#/components/schemas/LoanFrequency' }
         termInstallments: { type: integer, minimum: 1, maximum: 600 }
         method: { $ref: '#/components/schemas/LoanMethod' }
+        fixedPrincipalAmount: { $ref: '#/components/schemas/PositiveMoney' }
         disbursementDate: { $ref: '#/components/schemas/LocalDate' }
         firstDueDate: { $ref: '#/components/schemas/LocalDate' }
         charges: { $ref: '#/components/schemas/LoanCharges' }
@@ -17437,6 +17822,9 @@ components:
         frequency: { $ref: '#/components/schemas/LoanFrequency' }
         termInstallments: { type: integer }
         method: { $ref: '#/components/schemas/LoanMethod' }
+        fixedPrincipalAmount:
+          description: "Only `FIXED_PRINCIPAL`: principal of the installments before the last one (the last one is the balloon)."
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
         disbursementDate: { $ref: '#/components/schemas/LocalDate' }
         firstDueDate: { $ref: '#/components/schemas/LocalDate' }
         charges: { $ref: '#/components/schemas/LoanCharges' }
@@ -17619,6 +18007,12 @@ components:
         taxes: { $ref: '#/components/schemas/DecimalString' }
         explicitBreakdown: { type: boolean }
         paymentMethod: { type: [string, 'null'] }
+        kind:
+          description: "`PREPAYMENT` is an extraordinary payment to principal (plus fee) without allocations to installments."
+          type: string
+          enum: [REGULAR, PREPAYMENT]
+        prepaymentOption: { oneOf: [{ $ref: '#/components/schemas/PrepaymentOption' }, { type: 'null' }] }
+        prepaymentFee: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
         status: { type: string, enum: [ACTIVE, VOIDED] }
         installmentNos:
           type: array
@@ -17641,6 +18035,370 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/LoanPayment' }
+    # ── Debt: amortización avanzada (openspec add-loan-amortization-advanced) ──
+    CustomScheduleRow:
+      type: object
+      description: One installment of a custom schedule. Omitted components are zero; `total`, if given, must equal the sum of the components. `n`, if given, must be the expected consecutive number.
+      additionalProperties: false
+      required: [dueDate, principal]
+      properties:
+        n: { type: integer, minimum: 1 }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        principal: { $ref: '#/components/schemas/DecimalString' }
+        interest: { $ref: '#/components/schemas/DecimalString' }
+        fees: { $ref: '#/components/schemas/DecimalString' }
+        insurance: { $ref: '#/components/schemas/DecimalString' }
+        taxes: { $ref: '#/components/schemas/DecimalString' }
+        total: { $ref: '#/components/schemas/DecimalString' }
+    CustomScheduleInput:
+      type: object
+      additionalProperties: false
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 600
+          items: { $ref: '#/components/schemas/CustomScheduleRow' }
+    CustomScheduleAdoptInput:
+      type: object
+      additionalProperties: false
+      required: [referenceId]
+      properties:
+        referenceId:
+          description: A bank table loaded for this loan (`reference-schedules`).
+          $ref: '#/components/schemas/Uuid'
+    CustomScheduleResult:
+      type: object
+      additionalProperties: false
+      required: [loan, scheduleVersion, installments]
+      properties:
+        loan: { $ref: '#/components/schemas/Loan' }
+        scheduleVersion:
+          description: Version created in an active loan; null in a draft (version 1 is fixed on disbursement).
+          type: [integer, 'null']
+        installments:
+          type: array
+          items: { $ref: '#/components/schemas/ScheduleInstallment' }
+    PrepaymentOption:
+      type: string
+      description: "`REDUCE_TERM` keeps the installment and ends earlier; `REDUCE_INSTALLMENT` keeps the dates and lowers the installment."
+      enum: [REDUCE_TERM, REDUCE_INSTALLMENT]
+    PrepaymentInput:
+      type: object
+      additionalProperties: false
+      required: [amount, businessDate, option]
+      properties:
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        option: { $ref: '#/components/schemas/PrepaymentOption' }
+        fee:
+          description: Prepayment fee entered by the user; recorded as an expense in "Comisiones de préstamo".
+          $ref: '#/components/schemas/Money'
+        accountId:
+          description: Payment account; defaults to the usual payment account of the loan.
+          $ref: '#/components/schemas/Uuid'
+        paymentMethod: { type: [string, 'null'], maxLength: 40 }
+    PrepaymentPreviewInput:
+      type: object
+      additionalProperties: false
+      required: [amount, businessDate]
+      properties:
+        amount: { $ref: '#/components/schemas/PositiveMoney' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        fee: { $ref: '#/components/schemas/Money' }
+    ScheduleTail:
+      type: object
+      description: Summary of the unpaid installments of a schedule.
+      required: [installmentAmount, installmentCount, endDate, remainingInterest, remainingPrincipal]
+      properties:
+        installmentAmount:
+          description: Total of the first unpaid installment.
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        installmentCount: { type: integer, minimum: 0 }
+        endDate: { oneOf: [{ $ref: '#/components/schemas/LocalDate' }, { type: 'null' }] }
+        remainingInterest: { $ref: '#/components/schemas/Money' }
+        remainingPrincipal: { $ref: '#/components/schemas/Money' }
+    RecalculationOption:
+      allOf:
+        - $ref: '#/components/schemas/ScheduleTail'
+        - type: object
+          required: [option, interestSaved, installments]
+          properties:
+            option: { $ref: '#/components/schemas/PrepaymentOption' }
+            interestSaved:
+              description: Remaining interest of the current schedule minus that of this option.
+              $ref: '#/components/schemas/Money'
+            installments:
+              type: array
+              items: { $ref: '#/components/schemas/ScheduleInstallment' }
+    PrepaymentPreview:
+      type: object
+      additionalProperties: false
+      required: [loanId, currency, outstandingPrincipal, amount, fee, paysOff, fromInstallmentNo, current, options]
+      properties:
+        loanId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        outstandingPrincipal: { $ref: '#/components/schemas/Money' }
+        amount: { $ref: '#/components/schemas/Money' }
+        fee: { $ref: '#/components/schemas/Money' }
+        paysOff:
+          description: The amount equals the outstanding principal, so the loan would be paid off and there is no new schedule.
+          type: boolean
+        fromInstallmentNo:
+          description: First unpaid installment, where the recalculation starts.
+          type: integer
+        current: { $ref: '#/components/schemas/ScheduleTail' }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/RecalculationOption' }
+    PrepaymentResult:
+      type: object
+      additionalProperties: false
+      required: [payment, loan, scheduleVersion, paidOff]
+      properties:
+        payment: { $ref: '#/components/schemas/LoanPayment' }
+        loan: { $ref: '#/components/schemas/Loan' }
+        scheduleVersion:
+          description: Version created by the prepayment; null when it paid the loan off.
+          type: [integer, 'null']
+        paidOff: { type: boolean }
+    RateChangeInput:
+      type: object
+      additionalProperties: false
+      required: [annualRate, effectiveFrom]
+      properties:
+        annualRate:
+          description: New nominal annual rate as a decimal fraction between 0 and 1 ("0.15" = 15.00 %).
+          $ref: '#/components/schemas/DecimalString'
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+    RateChange:
+      type: object
+      additionalProperties: false
+      required: [id, annualRate, effectiveFrom, scheduleVersion, initial, createdAt]
+      properties:
+        id: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        annualRate: { $ref: '#/components/schemas/DecimalString' }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        scheduleVersion: { type: integer, minimum: 1 }
+        initial:
+          description: The rate agreed at the disbursement (not a registered change).
+          type: boolean
+        createdAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+    RateChangeList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/RateChange' }
+    RateChangeResult:
+      type: object
+      additionalProperties: false
+      required: [rateChange, loan, scheduleVersion]
+      properties:
+        rateChange: { $ref: '#/components/schemas/RateChange' }
+        loan: { $ref: '#/components/schemas/Loan' }
+        scheduleVersion: { type: integer, minimum: 1 }
+    RateChangePreview:
+      type: object
+      additionalProperties: false
+      required: [loanId, currency, annualRate, effectiveFrom, fromInstallmentNo, current, proposed]
+      properties:
+        loanId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        annualRate: { $ref: '#/components/schemas/DecimalString' }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        fromInstallmentNo: { type: integer }
+        current: { $ref: '#/components/schemas/ScheduleTail' }
+        proposed:
+          allOf:
+            - $ref: '#/components/schemas/ScheduleTail'
+            - type: object
+              required: [interestSaved, installments]
+              properties:
+                interestSaved: { $ref: '#/components/schemas/Money' }
+                installments:
+                  type: array
+                  items: { $ref: '#/components/schemas/ScheduleInstallment' }
+    ScheduleVersionReason:
+      type: string
+      enum: [INITIAL, PREPAYMENT, PREPAYMENT_VOIDED, RATE_CHANGE, CUSTOM_DEFINED, CUSTOM_ADOPTED]
+      x-extensible-enum: true
+    ScheduleVersion:
+      type: object
+      additionalProperties: false
+      required:
+        [scheduleVersion, reason, effectiveFrom, fromInstallmentNo, replacedFromInstallmentNo, current, installmentCount,
+         sourcePaymentId, sourceRateChangeId, sourceReferenceId, parameters, createdBy, createdAt]
+      properties:
+        scheduleVersion: { type: integer, minimum: 1 }
+        reason: { $ref: '#/components/schemas/ScheduleVersionReason' }
+        effectiveFrom: { $ref: '#/components/schemas/LocalDate' }
+        fromInstallmentNo:
+          description: First installment that this version replaces.
+          type: integer
+        replacedFromInstallmentNo:
+          description: First installment that a later version replaces; null for the current version.
+          type: [integer, 'null']
+        current: { type: boolean }
+        installmentCount: { type: integer, minimum: 0 }
+        sourcePaymentId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        sourceRateChangeId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        sourceReferenceId: { oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }] }
+        parameters:
+          description: Parameters of the recalculation (option, amount, rate, system installment).
+          type: object
+          additionalProperties: true
+        createdBy: { $ref: '#/components/schemas/Uuid' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    ScheduleVersionList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ScheduleVersion' }
+    PayoffExtra:
+      description: An extra payment applied to the principal after the scheduled installment.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, installmentNo, amount]
+          properties:
+            type: { type: string, enum: [ONE_TIME] }
+            installmentNo: { type: integer, minimum: 1 }
+            amount: { $ref: '#/components/schemas/PositiveDecimalString' }
+        - type: object
+          additionalProperties: false
+          required: [type, fromInstallmentNo, amount]
+          properties:
+            type: { type: string, enum: [MONTHLY] }
+            fromInstallmentNo: { type: integer, minimum: 1 }
+            amount: { $ref: '#/components/schemas/PositiveDecimalString' }
+    PayoffStrategy:
+      type: string
+      enum: [AVALANCHE, SNOWBALL, NONE]
+    PayoffLoanScenario:
+      type: object
+      additionalProperties: false
+      required: [loanId, extras]
+      properties:
+        loanId: { $ref: '#/components/schemas/Uuid' }
+        extras:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/PayoffExtra' }
+    PayoffStrategiesScenario:
+      type: object
+      additionalProperties: false
+      required: [monthlyExtra]
+      properties:
+        monthlyExtra:
+          description: Monthly extra in the currency that selects the loans that take part.
+          $ref: '#/components/schemas/Money'
+        strategies:
+          type: array
+          items: { $ref: '#/components/schemas/PayoffStrategy' }
+    PayoffSimulationInput:
+      type: object
+      additionalProperties: false
+      required: [scenario]
+      properties:
+        scenario:
+          oneOf:
+            - $ref: '#/components/schemas/PayoffLoanScenario'
+            - $ref: '#/components/schemas/PayoffStrategiesScenario'
+    PayoffSeriesPoint:
+      type: object
+      additionalProperties: false
+      required: [period, balance]
+      properties:
+        period:
+          description: "`YYYY-MM` (strategies) or the due date `YYYY-MM-DD` (one loan)."
+          type: string
+        balance:
+          description: Outstanding principal after the payments of the period.
+          $ref: '#/components/schemas/DecimalString'
+    PayoffProjection:
+      type: object
+      additionalProperties: false
+      required: [totalInterest, endDate, installments, series]
+      properties:
+        totalInterest: { $ref: '#/components/schemas/DecimalString' }
+        endDate: { oneOf: [{ $ref: '#/components/schemas/LocalDate' }, { type: 'null' }] }
+        installments: { type: integer, minimum: 0 }
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/PayoffSeriesPoint' }
+    PayoffExtrasSimulation:
+      type: object
+      additionalProperties: false
+      required: [type, loanId, currency, current, scenario, interestSaved, monthsSaved]
+      properties:
+        type: { type: string, enum: [LOAN_EXTRAS] }
+        loanId: { $ref: '#/components/schemas/Uuid' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        current: { $ref: '#/components/schemas/PayoffProjection' }
+        scenario: { $ref: '#/components/schemas/PayoffProjection' }
+        interestSaved: { $ref: '#/components/schemas/DecimalString' }
+        monthsSaved: { type: integer }
+    PayoffStrategyResult:
+      type: object
+      additionalProperties: false
+      required: [strategy, totalInterest, debtFreeDate, interestSaved, monthsToDebtFree, loans, series]
+      properties:
+        strategy: { $ref: '#/components/schemas/PayoffStrategy' }
+        totalInterest: { $ref: '#/components/schemas/DecimalString' }
+        debtFreeDate: { oneOf: [{ $ref: '#/components/schemas/LocalDate' }, { type: 'null' }] }
+        interestSaved:
+          description: Interest saved against no extra.
+          $ref: '#/components/schemas/DecimalString'
+        monthsToDebtFree: { type: integer, minimum: 0 }
+        loans:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [loanId, name, endDate, interest]
+            properties:
+              loanId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              endDate: { oneOf: [{ $ref: '#/components/schemas/LocalDate' }, { type: 'null' }] }
+              interest: { $ref: '#/components/schemas/DecimalString' }
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/PayoffSeriesPoint' }
+    PayoffStrategiesSimulation:
+      type: object
+      additionalProperties: false
+      required: [type, currency, monthlyExtra, startBalance, strategies, outOfStrategy]
+      properties:
+        type: { type: string, enum: [STRATEGIES] }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        monthlyExtra: { $ref: '#/components/schemas/DecimalString' }
+        startBalance: { $ref: '#/components/schemas/DecimalString' }
+        strategies:
+          type: array
+          items: { $ref: '#/components/schemas/PayoffStrategyResult' }
+        outOfStrategy:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [loanId, name, reason, currency]
+            properties:
+              loanId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              reason: { type: string, enum: [CURRENCY, CUSTOM] }
+              currency: { $ref: '#/components/schemas/CurrencyCode' }
+    PayoffSimulation:
+      oneOf:
+        - $ref: '#/components/schemas/PayoffExtrasSimulation'
+        - $ref: '#/components/schemas/PayoffStrategiesSimulation'
     # ── Debt: tarjetas de crédito (Phase 4, add-credit-cards) ──
     CardStatementStatus:
       type: string

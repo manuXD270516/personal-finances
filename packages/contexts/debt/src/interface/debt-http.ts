@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   Res,
   StreamableFile,
@@ -21,6 +22,8 @@ import {
   type ApiResponse,
 } from '@pf/platform/nest';
 import type { LoanStatusDto } from '../contracts/index.js';
+import type { AmortizationQueries, PayoffSimulationRequest } from '../application/amortization.queries.js';
+import type { AmortizationService } from '../application/amortization.service.js';
 import type { LoansQueries } from '../application/loans.queries.js';
 import type { LoansService, RegisterLoanCommand } from '../application/loans.service.js';
 import type { PaymentsService } from '../application/payments.service.js';
@@ -30,6 +33,8 @@ export const LOANS_SERVICE = Symbol('DEBT_LOANS_SERVICE');
 export const PAYMENTS_SERVICE = Symbol('DEBT_PAYMENTS_SERVICE');
 export const REFERENCES_SERVICE = Symbol('DEBT_REFERENCES_SERVICE');
 export const LOANS_QUERIES = Symbol('DEBT_LOANS_QUERIES');
+export const AMORTIZATION_SERVICE = Symbol('DEBT_AMORTIZATION_SERVICE');
+export const AMORTIZATION_QUERIES = Symbol('DEBT_AMORTIZATION_QUERIES');
 
 type Json = Record<string, unknown>;
 const str = (b: Json, k: string): string | undefined =>
@@ -69,6 +74,8 @@ export class LoansController {
     @Inject(PAYMENTS_SERVICE) private readonly payments: PaymentsService,
     @Inject(REFERENCES_SERVICE) private readonly references: ReferencesService,
     @Inject(LOANS_QUERIES) private readonly queries: LoansQueries,
+    @Inject(AMORTIZATION_SERVICE) private readonly amortization: AmortizationService,
+    @Inject(AMORTIZATION_QUERIES) private readonly amortizationQueries: AmortizationQueries,
   ) {}
 
   // ───────────────────────────────────────────── préstamos
@@ -113,6 +120,19 @@ export class LoansController {
     return withDetails(() =>
       this.queries.previewTerms({ ...(body as unknown as RegisterLoanCommand), workspaceId }),
     );
+  }
+
+  // ───────────────────────────────────────────── amortización avanzada (add-loan-amortization-advanced)
+
+  /** Simulador de pagos extra: sin efectos (no escribe ni audita). */
+  @Post('workspaces/:workspaceId/loans/payoff-simulations')
+  @HttpCode(200)
+  simulatePayoff(@Param('workspaceId') workspaceId: string, @Body() body: Json) {
+    const scenario = (body?.['scenario'] ?? body) as unknown as PayoffSimulationRequest | undefined;
+    if (!scenario || typeof scenario !== 'object') {
+      throw new ApiProblem('VALIDATION_FAILED', 'scenario is required');
+    }
+    return withDetails(() => this.amortizationQueries.simulate(workspaceId, scenario));
   }
 
   @Get('workspaces/:workspaceId/loans/:loanId')
@@ -260,6 +280,143 @@ export class LoansController {
         reason: str(body ?? {}, 'reason') ?? '',
       }),
     );
+  }
+
+  // ───────────────────────────────────────────── amortización avanzada
+
+  @Put('workspaces/:workspaceId/loans/:loanId/custom-schedule')
+  @HttpCode(200)
+  defineCustomSchedule(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('loanId') loanId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    return withDetails(() =>
+      this.amortization.defineCustomSchedule({
+        workspaceId,
+        userId: userIdOf(req),
+        loanId,
+        expectedVersion,
+        rows: body['rows'] as never,
+      }),
+    );
+  }
+
+  @Post('workspaces/:workspaceId/loans/:loanId/custom-schedule/adopt')
+  @HttpCode(200)
+  adoptReference(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('loanId') loanId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+  ) {
+    return withDetails(() =>
+      this.amortization.adoptReference({
+        workspaceId,
+        userId: userIdOf(req),
+        loanId,
+        expectedVersion,
+        referenceId: str(body, 'referenceId') ?? '',
+      }),
+    );
+  }
+
+  @Post('workspaces/:workspaceId/loans/:loanId/prepayments')
+  @HttpCode(201)
+  async recordPrepayment(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('loanId') loanId: string,
+    @Body() body: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const result = await withDetails(() =>
+      this.amortization.recordPrepayment({
+        workspaceId,
+        userId: userIdOf(req),
+        loanId,
+        amount: body['amount'] as never,
+        businessDate: str(body, 'businessDate') ?? '',
+        option: str(body, 'option') ?? '',
+        fee: body['fee'] as never,
+        accountId: str(body, 'accountId'),
+        paymentMethod: body['paymentMethod'] as string | null | undefined,
+      }),
+    );
+    res.setHeader('location', `/api/v1/workspaces/${workspaceId}/loans/${loanId}/payments`);
+    return result;
+  }
+
+  @Post('workspaces/:workspaceId/loans/:loanId/prepayments/preview')
+  @HttpCode(200)
+  previewPrepayment(
+    @Param('workspaceId') workspaceId: string,
+    @Param('loanId') loanId: string,
+    @Body() body: Json,
+  ) {
+    return withDetails(() =>
+      this.amortization.previewPrepayment({
+        workspaceId,
+        loanId,
+        amount: body['amount'],
+        businessDate: body['businessDate'],
+        fee: body['fee'],
+      }),
+    );
+  }
+
+  @Get('workspaces/:workspaceId/loans/:loanId/rate-changes')
+  async listRateChanges(@Param('workspaceId') workspaceId: string, @Param('loanId') loanId: string) {
+    return { data: await this.amortizationQueries.rateChanges(workspaceId, loanId) };
+  }
+
+  @Post('workspaces/:workspaceId/loans/:loanId/rate-changes')
+  @HttpCode(201)
+  async changeRate(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @Param('loanId') loanId: string,
+    @ExpectedVersion() expectedVersion: number,
+    @Body() body: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const result = await withDetails(() =>
+      this.amortization.changeRate({
+        workspaceId,
+        userId: userIdOf(req),
+        loanId,
+        expectedVersion,
+        annualRate: body['annualRate'] as string,
+        effectiveFrom: body['effectiveFrom'] as string,
+      }),
+    );
+    res.setHeader('location', `/api/v1/workspaces/${workspaceId}/loans/${loanId}/rate-changes`);
+    return result;
+  }
+
+  @Post('workspaces/:workspaceId/loans/:loanId/rate-changes/preview')
+  @HttpCode(200)
+  previewRateChange(
+    @Param('workspaceId') workspaceId: string,
+    @Param('loanId') loanId: string,
+    @Body() body: Json,
+  ) {
+    return withDetails(() =>
+      this.amortization.previewRateChange({
+        workspaceId,
+        loanId,
+        annualRate: body['annualRate'],
+        effectiveFrom: body['effectiveFrom'],
+      }),
+    );
+  }
+
+  @Get('workspaces/:workspaceId/loans/:loanId/schedule-versions')
+  async listScheduleVersions(@Param('workspaceId') workspaceId: string, @Param('loanId') loanId: string) {
+    return { data: await this.amortizationQueries.versions(workspaceId, loanId) };
   }
 
   // ───────────────────────────────────────────── tabla del banco

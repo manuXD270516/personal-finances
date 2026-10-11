@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: ['commitments/recurrence-engine']
 requirement: 'Compromisos actualizados con la nueva versión del cronograma'
 scenario: 'Cuota reducida en el comprometido'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-011', 'FR-DEBT-008']
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/loan-payment.service.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'commitments', 'prepayment']
@@ -28,7 +30,7 @@ steps:
 expected_result:
   - 'El comprometido de febrero de 2027 incluye 715.96 BOB por esa cuota'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-052 — Reducir la cuota actualiza el comprometido del periodo
@@ -48,4 +50,4 @@ Entonces el comprometido de febrero de 2027 incluye 715.96 BOB por esa cuota
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

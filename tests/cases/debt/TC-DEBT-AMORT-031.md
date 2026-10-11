@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Pago extraordinario reduciendo el plazo'
 scenario: 'Prepago de 3000.00 reduciendo el plazo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/schedule-recalculator.test.ts
+  - apps/api/test/api/loans.api.test.ts
+  - tests/e2e/specs/loan-amortization.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'prepayment']
@@ -29,7 +32,7 @@ expected_result:
   - 'La versión 2 tiene las cuotas 4 a 9 de 1066.19 BOB con la cuota 9 del 2027-07-15 de 1017.22 BOB y la suma de su principal es 6132.95 BOB'
   - 'El interés restante baja de 462.71 BOB a 215.22 BOB (ahorro 247.49 BOB)'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-031 — Prepago reduciendo el plazo: misma cuota y menos cuotas
@@ -50,4 +53,4 @@ Entonces la versión 2 tiene las cuotas 4 a 9 de 1066.19 BOB con la cuota 9 del 
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

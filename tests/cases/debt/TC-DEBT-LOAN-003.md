@@ -12,11 +12,12 @@ invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: automated
-automated_tests:
-  - apps/api/test/api/loans.api.test.ts
-  - packages/contexts/debt/src/domain/loan.test.ts
-status: automated
+automation_status: not_automated
+automated_tests: []
+status: deprecated
+deprecated_by_change: add-loan-amortization-advanced
+deprecation_reason: "El sistema alemán, el capital fijo y el custom dejan de rechazarse con LOAN_METHOD_NOT_AVAILABLE al habilitarse en add-loan-amortization-advanced."
+superseded_by: ['TC-DEBT-LOAN-046']
 regression_suite: false
 phase: 4
 tags: ['loans', 'validation']
@@ -30,7 +31,7 @@ steps:
 expected_result:
   - 'Se rechaza con `LOAN_METHOD_NOT_AVAILABLE` y no se crea el préstamo'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-LOAN-003 — Un sistema distinto del francés se rechaza mientras no esté habilitado

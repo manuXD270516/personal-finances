@@ -177,6 +177,11 @@ function LoansList({ ctx }: { ctx: WorkspaceContext }) {
       ) : (
         <p style={mutedStyle}>{f.t('viewerNotice')}</p>
       )}
+      <p style={{ margin: 0 }}>
+        <a href={ctx.href('/debts/simulador')} data-testid="open-simulator">
+          {f.t('list.simulator')}
+        </a>
+      </p>
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {items === undefined ? (
         <p aria-busy="true">{f.t('loading')}</p>

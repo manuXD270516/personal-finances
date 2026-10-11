@@ -14,6 +14,16 @@ recurrentes `LOAN_PAYMENT` y **comparación con la tabla del banco** (exit crite
 amortización avanzada (`add-loan-amortization-advanced`: alemán, capital fijo, custom, prepagos, tasa variable, `replaceSchedule`) se
 suman después sobre este mismo contexto, sin migraciones destructivas.
 
+Amortización avanzada (openspec `add-loan-amortization-advanced`, FR-DEBT-004, 005, 008..010, Should): sistemas `GERMAN`, `FIXED_PRINCIPAL` (con
+cuota final balloon) y `CUSTOM` (cargado cuota por cuota o adoptado de la tabla del banco; el sistema nunca lo recalcula, D196), **pagos
+extraordinarios** reduciendo plazo o cuota (aplicados en la frontera del periodo, D194; comisión ingresada por el usuario como gasto),
+**cambios de tasa** variable sin prorrateo (D195), **versiones del cronograma** que reemplazan solo las cuotas no pagadas (el cronograma
+efectivo de la versión V toma de cada número la fila de la última versión ≤ V que lo cubre; los pagos nunca se mueven), anulación de un
+prepago que restituye el cronograma previo como versión nueva y el **payoff simulator** (avalanche/snowball con rollover, sin persistir). El motor de
+filas (`schedule-engine.ts`) lo comparten el calculador, el `ScheduleRecalculator` y el simulador. Al fijarse una versión nueva el
+compromiso de cuotas se reemplaza con `RecurringDefinitionPort.replaceSchedule` en la misma unidad de trabajo. Migración
+`apps/api/db/migrations/20261014100000_debt_amortization_advanced.sql` (tabla `debt.loan_rate_change`, columnas nuevas; portabilidad 797).
+
 Flujo: **registrar** (`NEW`, borrador con vista previa del cronograma sin persistir, o `EXISTING` con saldo pendiente a una fecha) →
 **desembolsar** (transacción + versión 1 del cronograma + definición de cuotas en COMMITMENTS, en una sola UoW) → **pagar** (monto con
 imputación automática en el orden fijo impuestos → seguro → comisiones → interés → principal, o con desglose explícito de una cuota;

@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'El cronograma custom prevalece sobre el cálculo'
 scenario: 'Cambio de tasa sobre un custom'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-005', 'FR-DEBT-009']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'custom']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'Se rechaza con `LOAN_SCHEDULE_IS_CUSTOM` y el cronograma no cambia'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-030 — Un cambio de tasa sobre un préstamo custom se rechaza
@@ -48,4 +49,4 @@ Entonces se rechaza con `LOAN_SCHEDULE_IS_CUSTOM` y el cronograma no cambia
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

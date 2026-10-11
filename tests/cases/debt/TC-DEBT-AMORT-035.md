@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Nueva versión del cronograma sin reescribir cuotas pagadas'
 scenario: 'Cuota parcial pendiente'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'prepayment', 'validation']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'Se rechaza con `LOAN_INSTALLMENTS_PENDING` y no se crea ninguna versión ni transacción'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-035 — Con una cuota parcial no se recalcula
@@ -48,4 +49,4 @@ Entonces se rechaza con `LOAN_INSTALLMENTS_PENDING` y no se crea ninguna versió
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

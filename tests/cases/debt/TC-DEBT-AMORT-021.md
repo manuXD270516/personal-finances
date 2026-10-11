@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Sistema alemán de capital constante'
 scenario: 'Alemán a 12 cuotas'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-004']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/amortization-methods.test.ts
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'german']
@@ -29,7 +31,7 @@ expected_result:
   - 'Cada cuota tiene 1000.00 BOB de principal y las cuotas son 1120.00, 1110.00, … hasta 1010.00 BOB'
   - 'El interés total es 780.00 BOB y la suma del principal es 12000.00 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-021 — Cronograma alemán de capital constante con cuota decreciente
@@ -50,4 +52,4 @@ Entonces cada cuota tiene 1000.00 BOB de principal y las cuotas son 1120.00, 111
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

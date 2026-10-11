@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Nueva versión del cronograma sin reescribir cuotas pagadas'
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-008', 'FR-DEBT-009']
 nfr: []
 invariants: ['INV-017']
 priority: high
 type: property
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/debt/src/domain/schedule-recalculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'pbt', 'versioning']
@@ -29,7 +30,7 @@ expected_result:
   - 'La suma del principal de la versión nueva es el principal pendiente'
   - 'El interés restante con reducir plazo es menor o igual que con reducir cuota'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-033 — PBT: todo recálculo conserva las cuotas pagadas y suma el pendiente
@@ -50,4 +51,4 @@ Entonces las cuotas pagadas son idénticas antes y después
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

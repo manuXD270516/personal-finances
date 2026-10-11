@@ -5,16 +5,17 @@ spec: debt/amortization
 related_specs: []
 requirement: 'El cronograma custom prevalece sobre el cálculo'
 scenario: 'Pago contra la cuota custom'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-005', 'FR-DEBT-007']
 nfr: []
 invariants: ['INV-016']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'custom', 'payment']
@@ -28,7 +29,7 @@ steps:
 expected_result:
   - 'Se imputan 400.00 BOB a principal y 10.00 BOB a interés según la cuota custom'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-DEBT-AMORT-029 — Los pagos se imputan contra las cuotas custom
@@ -48,4 +49,4 @@ Entonces se imputan 400.00 BOB a principal y 10.00 BOB a interés según la cuot
 
 ## Notas
 
-- Change: `add-loan-amortization-advanced` (borrador; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).
+- Change: `add-loan-amortization-advanced` (implementado; cifras con `FixedClock` en America/La_Paz, recalculadas con Decimal y HALF_EVEN).

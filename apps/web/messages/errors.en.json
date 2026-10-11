@@ -145,5 +145,10 @@
   "GOAL_TRANSACTION_NOT_ELIGIBLE": "That transaction cannot be linked to the goal: it must be a posted transfer between your accounts, with one account linked to the goal.",
   "GOAL_TRANSACTION_ALREADY_LINKED": "That transaction is already linked to a goal.",
   "GOAL_CURRENCY_LOCKED": "The currency of the goal cannot change because it already has movements.",
-  "GOAL_SUGGESTION_NOT_PENDING": "That contribution suggestion was already confirmed, dismissed or expired."
+  "GOAL_SUGGESTION_NOT_PENDING": "That contribution suggestion was already confirmed, dismissed or expired.",
+  "CUSTOM_SCHEDULE_INVALID": "The custom schedule is not valid: check that the principal adds up and that the dates increase.",
+  "LOAN_SCHEDULE_IS_CUSTOM": "This loan has a custom schedule: load the new bank table instead of recalculating it.",
+  "LOAN_INSTALLMENTS_PENDING": "Pay or complete the overdue or partially paid installments before recalculating the schedule.",
+  "LOAN_RATE_FIXED": "Only a variable-rate loan admits rate changes.",
+  "LOAN_CHANGE_DATE_INVALID": "The effective date is before the start of the first unpaid period."
 }

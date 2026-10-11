@@ -12,6 +12,7 @@ import {
 import type { AllocationRecord, DebtDeps, PaymentRecord, StoredInstallment } from './ports/index.js';
 import { loanChanges, loanEntry, loanSteps, publishLoanEvent } from './recorder.js';
 import { installmentStates, outstandingPrincipal, sumComponents } from './schedule-support.js';
+import type { AmortizationService } from './amortization.service.js';
 import { toLoanView, toPaymentView, type LoanView, type PaymentView } from './views.js';
 
 const notFound = (what: string, id: string) =>
@@ -44,7 +45,11 @@ const COMPONENT_KEYS: readonly PaymentComponent[] = PAYMENT_COMPONENTS;
  * auditoría, recorrido y hechos de outbox. Dos pagos concurrentes se serializan con `FOR UPDATE` del préstamo.
  */
 export class PaymentsService {
-  constructor(private readonly deps: DebtDeps) {}
+  constructor(
+    private readonly deps: DebtDeps,
+    /** Anulación de pagos extraordinarios (add-loan-amortization-advanced): restituye el cronograma previo. */
+    private readonly amortization?: Pick<AmortizationService, 'voidPrepayment'>,
+  ) {}
 
   private get lifecycle(): LifecyclePort {
     return this.deps.lifecycle;
@@ -162,6 +167,9 @@ export class PaymentsService {
         taxes: components.taxes,
         explicitBreakdown: cmd.breakdown !== undefined,
         paymentMethod: cmd.paymentMethod ?? null,
+        kind: 'REGULAR',
+        prepaymentOption: null,
+        prepaymentFee: null,
         status: 'ACTIVE',
         voidedAt: null,
         voidedReason: null,
@@ -323,6 +331,17 @@ export class PaymentsService {
             details: { latestPaymentId: latest?.id ?? null },
           },
         );
+      }
+      if (payment.kind === 'PREPAYMENT') {
+        if (!this.amortization) throw new DomainError('INTERNAL_ERROR', 'prepayments are not configured');
+        return this.amortization.voidPrepayment({
+          workspaceId,
+          userId: cmd.userId,
+          loan,
+          payment,
+          reason,
+          at,
+        });
       }
       const scale = await this.scaleOf(before.currency);
       const version = before.currentScheduleVersion as number;

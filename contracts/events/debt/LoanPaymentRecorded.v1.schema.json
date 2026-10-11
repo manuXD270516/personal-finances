@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/debt/LoanPaymentRecorded.v1.schema.json",
   "title": "debt.LoanPaymentRecorded.v1",
-  "description": "Se registró un pago de un préstamo: la transacción `LOAN_PAYMENT` separó el principal (reduce la deuda) del interés, comisiones, seguro e impuestos (gasto). Productor: DEBT. Idempotencia: (loanId, transactionId). Sin PII.",
+  "description": "Se registró un pago de un préstamo: la transacción `LOAN_PAYMENT` separó el principal (reduce la deuda) del interés, comisiones, seguro e impuestos (gasto). Productor: DEBT. Idempotencia: (loanId, transactionId). Sin PII. Un pago extraordinario (`kind = PREPAYMENT`) reduce el principal y la comisión por prepago va en `breakdown.fees`; no se imputa a cuotas (`installmentNos` vacío).",
   "type": "object",
   "allOf": [
     {
@@ -51,13 +51,26 @@
         "transactionId": {
           "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
         },
+        "kind": {
+          "enum": [
+            "REGULAR",
+            "PREPAYMENT"
+          ],
+          "default": "REGULAR"
+        },
+        "prepaymentOption": {
+          "enum": [
+            "REDUCE_TERM",
+            "REDUCE_INSTALLMENT"
+          ]
+        },
         "installmentNos": {
           "type": "array",
           "items": {
             "type": "integer",
             "minimum": 1
           },
-          "minItems": 1
+          "minItems": 0
         },
         "currency": {
           "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
@@ -138,6 +151,42 @@
         },
         "remainingPrincipal": "48137.15",
         "paidOn": "2026-11-15"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a13",
+      "eventType": "debt.LoanPaymentRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2027-01-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 6,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "paymentId": "01928c4e-0000-7000-8000-0000000b0102",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7102",
+        "kind": "PREPAYMENT",
+        "prepaymentOption": "REDUCE_TERM",
+        "installmentNos": [],
+        "currency": "BOB",
+        "breakdown": {
+          "principal": "3000.00",
+          "interest": "0.00",
+          "fees": "30.00",
+          "insurance": "0.00",
+          "taxes": "0.00",
+          "total": "3030.00"
+        },
+        "remainingPrincipal": "6132.95",
+        "paidOn": "2027-01-15"
       }
     }
   ]
