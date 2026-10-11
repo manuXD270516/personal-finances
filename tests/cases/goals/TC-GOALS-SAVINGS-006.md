@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Estados y transiciones de una meta"
 scenario: "Pausar y reanudar"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "state", "lifecycle"]
@@ -32,7 +35,7 @@ expected_result:
   - "La meta pasa a PAUSED, acepta la reserva y vuelve a ACTIVE"
   - "Auditoría de PAUSE y RESUME con actor y versión"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-006 — Pausar y reanudar una meta son transiciones auditadas y la meta pausada sigue aceptando movimientos

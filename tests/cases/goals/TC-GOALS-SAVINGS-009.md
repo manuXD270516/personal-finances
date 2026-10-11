@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: ["transactions/transfers"]
 requirement: "Aporte real mediante transferencia a una cuenta vinculada"
 scenario: "Aporte de 1000.00 BOB"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002", "FR-TRANSACTIONS-003"]
 nfr: []
 invariants: ["INV-018", "INV-029"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/transactions/src/application/goal-transfer.port.test.ts
+  - tests/e2e/specs/goals.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "contribution", "ledger"]
@@ -35,7 +40,7 @@ expected_result:
   - "Saldos: \"Banco BOB\" 7000.00 BOB, \"Ahorro BOB\" 1000.00 BOB; progreso 1000.00 BOB (6.67 %)"
   - "Outbox con TransferCompleted.v1 y SavingsContributionRecorded.v1 en la misma transacción; un fallo inyectado tras el posteo revierte todo"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-009 — Un aporte real crea una transferencia posteada con origen meta y el movimiento en la misma transacción

@@ -11,7 +11,14 @@ export type NotificationEmailStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SUPPRESSE
 
 export interface NotificationLink {
   readonly kind:
-    'BUDGET_LINE' | 'PERIOD_CLOSE' | 'RECURRING_OCCURRENCE' | 'SUBSCRIPTION' | 'CREDIT_CARD' | (string & {});
+    | 'BUDGET_LINE'
+    | 'PERIOD_CLOSE'
+    | 'RECURRING_OCCURRENCE'
+    | 'SUBSCRIPTION'
+    | 'CREDIT_CARD'
+    | 'GOAL'
+    | 'GOAL_RESERVATIONS'
+    | (string & {});
   readonly periodId: string;
   readonly periodLabel: string;
   /** Ocurrencia recurrente (solo `RECURRING_OCCURRENCE`, add-recurrence-engine): abre `/recurring/occurrences/{id}`. */
@@ -22,6 +29,10 @@ export interface NotificationLink {
   /** Tarjeta de crédito (solo `CREDIT_CARD`, add-credit-cards): abre `/debts/tarjetas/{cardId}` (con `?statementId=`). */
   readonly cardId?: string;
   readonly statementId?: string;
+  /** Meta de ahorro (solo `GOAL`, add-savings-goals): abre `/goals/{goalId}`. */
+  readonly goalId?: string;
+  /** Cuenta sobre-asignada (solo `GOAL_RESERVATIONS`): abre las reservas de la cuenta (`/goals/reservas?accountId=`). */
+  readonly accountId?: string;
   readonly budgetId?: string;
   readonly budgetLineId?: string;
   readonly targetKind?: string;
@@ -119,6 +130,15 @@ export function resourcePath(link: NotificationLink): string | undefined {
       ? `?${new URLSearchParams({ statementId: link.statementId }).toString()}`
       : '';
     return `/debts/tarjetas/${encodeURIComponent(cardId)}${query}`;
+  }
+  if (link.kind === 'GOAL') {
+    // En este tipo `periodId` es el id de la meta (contrato): vale como respaldo si falta `goalId`.
+    const goalId = link.goalId ?? link.periodId;
+    return goalId ? `/goals/${encodeURIComponent(goalId)}` : undefined;
+  }
+  if (link.kind === 'GOAL_RESERVATIONS') {
+    const accountId = link.accountId ?? link.periodId;
+    return accountId ? `/goals/reservas?${new URLSearchParams({ accountId }).toString()}` : undefined;
   }
   return undefined;
 }

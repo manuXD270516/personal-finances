@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Vincular una transacción existente como aporte real"
 scenario: "Transferencia hecha desde la app del banco"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-010", "FR-TRANSACTIONS-003"]
 nfr: []
 invariants: ["INV-018"]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "link"]
@@ -33,7 +36,7 @@ expected_result:
   - "Progreso 1500.00 BOB"
   - "El enlace de la transacción indica \"Fondo de emergencia\""
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-019 — Vincular una transferencia posteada a una cuenta vinculada la registra como aporte real por su monto

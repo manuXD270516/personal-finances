@@ -76,6 +76,9 @@ export function Dashboard() {
       createAccountHref={localized(uiLocale, '/cuentas/nueva')}
       registerRateHref={localized(uiLocale, '/fx')}
       registerExpenseHref={localized(uiLocale, '/transacciones/nueva')}
+      goalsHref={localized(uiLocale, '/goals')}
+      createGoalHref={localized(uiLocale, '/goals/nuevo')}
+      goalHref={(goalId) => localized(uiLocale, `/goals/${goalId}`)}
       evolutionCard={
         <NetWorthEvolutionCard
           locale={loaded.formatLocale}

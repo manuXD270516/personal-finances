@@ -60,6 +60,11 @@ export const DATA_ACTION_ENTITIES = [
   'debt.card_statement',
   'debt.card_installment_plan',
   'fx.exchange_rate',
+  // add-savings-goals (Phase 4): metas, movimientos, reservas por cuenta y sugerencias.
+  'goals.goal',
+  'goals.movement',
+  'goals.reservation',
+  'goals.suggestion',
   'fx.rate_preferences',
   'identity.demo',
   'identity.user',

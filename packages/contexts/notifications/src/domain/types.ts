@@ -14,6 +14,10 @@ export const NOTIFICATION_TYPES = [
   // Phase 4 (add-credit-cards, FR-NOTIFY-004): vencimiento del estado de cuenta y utilización del crédito de una tarjeta.
   'CARD_PAYMENT_DUE',
   'CARD_UTILIZATION',
+  // Phase 4 (add-savings-goals, FR-NOTIFY-004): sobre-asignación de una cuenta, meta alcanzada e hitos 25/50/75 %.
+  'GOAL_OVER_ALLOCATED',
+  'GOAL_REACHED',
+  'GOAL_MILESTONE',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -98,6 +102,27 @@ export type NotificationLink =
       readonly kind: 'CREDIT_CARD';
       readonly cardId: string;
       readonly statementId?: string;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    }
+  /**
+   * Meta de ahorro (add-savings-goals): la web abre la meta; si ya no existe muestra el listado con el aviso "ya no
+   * está disponible". `periodId` es el id de la meta y `periodLabel` el mes del hecho (el contrato HTTP del enlace los
+   * exige en todos sus tipos).
+   */
+  | {
+      readonly kind: 'GOAL';
+      readonly goalId: string;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    }
+  /**
+   * Reservas de una cuenta (add-savings-goals, sobre-asignación): la web abre las reservas de la cuenta. `periodId` es
+   * el id de la cuenta y `periodLabel` el mes de detección.
+   */
+  | {
+      readonly kind: 'GOAL_RESERVATIONS';
+      readonly accountId: string;
       readonly periodId: string;
       readonly periodLabel: string;
     };

@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Estados y transiciones de una meta"
 scenario: "Aporte a una meta cancelada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "state"]
@@ -35,7 +38,7 @@ expected_result:
   - "Cerrar y archivar la meta activa se rechazan con INVALID_STATUS_TRANSITION"
   - "Archivar \"Laptop\" (cancelada) se acepta y la oculta del listado por defecto"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-008 — Movimientos sobre una meta terminal se rechazan y las transiciones no permitidas devuelven INVALID_STATUS_TRANSITION

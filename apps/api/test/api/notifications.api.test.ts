@@ -328,6 +328,9 @@ describe('Preferencias de notificaciones', () => {
           { type: 'SUBSCRIPTION_PRICE_CHANGE', inApp: true, email: true },
           { type: 'CARD_PAYMENT_DUE', inApp: true, email: true },
           { type: 'CARD_UTILIZATION', inApp: true, email: true },
+          { type: 'GOAL_OVER_ALLOCATED', inApp: true, email: true },
+          { type: 'GOAL_REACHED', inApp: true, email: true },
+          { type: 'GOAL_MILESTONE', inApp: true, email: true },
         ],
         quietHours: null,
         includeDetailsInEmail: false,
@@ -460,7 +463,7 @@ describe('Preferencias de notificaciones', () => {
       s.owner,
       '/notification-preferences',
       {
-        types: [{ type: 'GOAL_REACHED', inApp: true, email: true }],
+        types: [{ type: 'SPENDABLE_AMOUNT_LOW', inApp: true, email: true }],
         quietHours: null,
         includeDetailsInEmail: true,
       },

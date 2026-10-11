@@ -30,6 +30,29 @@ export { type RoundingMode } from './money/rounding.js';
 export { Instant, FixedClock, systemClock, type Clock } from './time/instant.js';
 export { LocalDate } from './time/local-date.js';
 export { endOfDayInstant } from './time/end-of-day.js';
+export {
+  FinancialPeriodCalendar,
+  HORIZON_MONTHS,
+  MAX_START_DAY,
+  MIN_START_DAY,
+  PeriodCalendar,
+  assertStartDay,
+  horizonOf,
+  labelOf,
+  maxDate,
+  minDate,
+  parseLabel,
+  planCoverage,
+  planReschedule,
+  plusDays,
+  plusMonths,
+  shiftLabel,
+  type CoverageInput,
+  type DateRange,
+  type PeriodLabel,
+  type PlannedPeriod,
+  type RescheduleChange,
+} from './time/period-calendar.js';
 export { convertExact, present, sumByCurrency, type ExactRate } from './valuation/exact-rate.js';
 export {
   FlowValuation,

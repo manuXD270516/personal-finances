@@ -11,6 +11,7 @@ export type NavKey =
   | 'classification'
   | 'planning'
   | 'recurring'
+  | 'goals'
   | 'debt'
   | 'settings';
 
@@ -34,6 +35,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Phase 3 (add-recurrence-engine): pagos recurrentes (Próximos, Por aprobar con contador, Definiciones); la lista
   // de próximos pagos con comprometido y saldo proyectado (add-upcoming-payments) cuelga de la misma sección.
   { key: 'recurring', path: '/recurring', also: ['/pagos-proximos'] },
+  // Phase 4 (add-savings-goals): Metas de ahorro (listado, alta, detalle y reservas por cuenta).
+  { key: 'goals', path: '/goals' },
   // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).
   { key: 'debt', path: '/debts' },
   { key: 'settings', path: '/configuracion' },

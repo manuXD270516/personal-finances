@@ -201,6 +201,17 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
           </a>
         </p>
       ) : null}
+      {def.managedBy === 'GOAL' ? (
+        <p role="note" data-testid="managed-by-goal">
+          <span aria-hidden="true">ℹ</span> {f.t('goal.definitionManaged')}{' '}
+          <a
+            href={ctx.href(def.managedRef ? `/goals/${def.managedRef}` : '/goals')}
+            data-testid="definition-goal-link"
+          >
+            {f.t('goal.openGoal')}
+          </a>
+        </p>
+      ) : null}
       {def.description ? <p style={{ margin: 0 }}>{def.description}</p> : null}
       {def.notes ? <p style={mutedStyle}>{def.notes}</p> : null}
       {status ? (
@@ -211,7 +222,7 @@ function Detail({ ctx, definitionId }: { ctx: WorkspaceContext; definitionId: st
       {revision ? <RevisionResult result={revision} f={f} /> : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
 
-      {ctx.canEdit && def.managedBy !== 'DEBT' ? (
+      {ctx.canEdit && def.managedBy !== 'DEBT' && def.managedBy !== 'GOAL' ? (
         <div style={rowStyle} role="group" aria-label={f.t('detail.actions')}>
           {def.status === 'ACTIVE' ? (
             <button

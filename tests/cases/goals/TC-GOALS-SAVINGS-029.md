@@ -5,16 +5,23 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Historial de movimientos inmutable y auditado"
 scenario: "Saldo igual a la suma de movimientos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018", "INV-029"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/api/test/api/workspace-import.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+  - packages/contexts/goals/src/domain/goal-movement.test.ts
+  - packages/contexts/goals/test/integration/pg-goals.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "append-only", "pbt"]
@@ -35,7 +42,7 @@ expected_result:
   - "BD: PF003 por forbid_mutation (y sin grants)"
   - "PBT: progreso == Σ(+) − Σ(−) y ningún (meta, cuenta, fondo) negativo"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-029 — El saldo acumulado es siempre la suma de los movimientos y los movimientos no se editan ni se borran

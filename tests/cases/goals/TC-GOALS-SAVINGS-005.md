@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Edición de una meta"
 scenario: "Desvincular una cuenta con fondos"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "validation"]
@@ -32,7 +37,7 @@ expected_result:
   - "El segundo se rechaza con 409 GOAL_CURRENCY_LOCKED"
   - "La versión de la meta no cambia"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-005 — No se desvincula una cuenta con fondos reales de la meta ni se cambia la moneda de una meta con movimientos

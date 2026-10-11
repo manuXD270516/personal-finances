@@ -11,6 +11,7 @@ const CONTEXTS = [
   'classification',
   'debt',
   'fx',
+  'goals',
   'identity',
   'ledger',
   'notifications',

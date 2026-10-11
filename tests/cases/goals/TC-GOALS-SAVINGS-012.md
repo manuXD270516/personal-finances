@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Reserva sobre el saldo de una cuenta"
 scenario: "Reserva para la laptop"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002"]
 nfr: []
 invariants: ["INV-018"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - tests/e2e/specs/goals.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "earmark"]
@@ -34,7 +38,7 @@ expected_result:
   - "Cero transacciones y cero asientos nuevos; saldo de \"Banco BOB\" sigue 7000.00 BOB"
   - "Progreso de \"Laptop\" 2000.00 BOB (22.22 %)"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-012 — Una reserva registra el movimiento sin transacción ni asiento y no cambia el saldo contable

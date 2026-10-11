@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Reservas limitadas por el saldo de la cuenta"
 scenario: "Reserva exactamente igual al disponible"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-004"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/src/domain/earmark-guard.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "earmark", "guard", "pbt"]
@@ -34,7 +36,7 @@ expected_result:
   - "La segunda se rechaza con EARMARK_EXCEEDS_BALANCE"
   - "PBT: tras cada comando aceptado reservado ≤ saldo"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-015 — Reservar exactamente el disponible se acepta; reservar sobre una cuenta llena de aportes reales se rechaza (PBT)

@@ -269,14 +269,14 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 
 | ID | Requerimiento | Prioridad | Fase | Capability |
 |----|---------------|-----------|------|------------|
-| FR-GOALS-001 | El sistema DEBE gestionar metas de ahorro con: nombre, tipo (`emergency_fund`, `purchase`, `travel`, `education`, `retirement`, `custom`), monto objetivo y moneda, fecha objetivo opcional, fecha de inicio, cuenta(s) vinculada(s) opcionales, prioridad, icono, color, notas y estado (`active`, `paused`, `achieved`, `cancelled`). | Must | 4 | goals/savings-goals |
-| FR-GOALS-002 | Contribuciones de dos tipos: **real** (transferencia a cuenta vinculada, vía Transactions) y **virtual/earmark** (asignación sin movimiento de ledger sobre el saldo de una cuenta). Ambas registran fecha, monto y origen. | Must | 4 | goals/savings-goals |
-| FR-GOALS-003 | El sistema DEBE calcular por meta: saldo acumulado, % completado, **aporte mensual requerido** para llegar a la fecha objetivo, **fecha esperada de cumplimiento** según el ritmo de los últimos N meses, y estado `behind`/`on-track`/`ahead` según tolerancia configurable (default ±5 %). | Must | 4 | goals/savings-goals |
-| FR-GOALS-004 | La suma de earmarks sobre una cuenta NO DEBE exceder su saldo disponible; si el saldo cae por debajo, la meta DEBE marcarse como "sobre-asignada" y notificarse. | Must | 4 | goals/savings-goals |
+| FR-GOALS-001 | El sistema DEBE gestionar metas de ahorro con: nombre, tipo (`emergency_fund`, `purchase`, `travel`, `education`, `retirement`, `custom`), monto objetivo y moneda, fecha objetivo opcional, fecha de inicio, cuenta(s) vinculada(s) opcionales (de naturaleza activo), prioridad, icono, color, notas, tolerancia y periodos de ritmo, y estado (`active`, `paused`, `achieved`, `closed`, `cancelled`; `closed` = cumplida y usada, libera las reservas). | Must | 4 | goals/savings-goals |
+| FR-GOALS-002 | Contribuciones de dos tipos: **real** (transferencia posteada hacia una cuenta vinculada, creada desde la meta o vinculada después, vía Transactions) y **virtual/earmark** (asignación sin movimiento de ledger sobre el saldo de una cuenta). Ambas registran fecha, monto y origen. | Must | 4 | goals/savings-goals |
+| FR-GOALS-003 | El sistema DEBE calcular por meta: saldo acumulado, % completado, **aporte mensual requerido** para llegar a la fecha objetivo, **fecha esperada de cumplimiento** según el ritmo de los últimos N periodos financieros terminados (default 3, por meta), y estado `behind`/`on-track`/`ahead` según progreso real frente al esperado lineal desde la fecha de inicio y tolerancia configurable por meta (default ±5 %). El aporte requerido se calcula por periodos financieros del workspace. | Must | 4 | goals/savings-goals |
+| FR-GOALS-004 | Lo reservado sobre una cuenta (reservas más aportes reales que siguen en la cuenta) NO DEBE exceder su saldo contable al registrar una reserva; si el saldo cae por debajo, la meta DEBE marcarse como "sobre-asignada" y notificarse una vez por episodio a OWNER y EDITOR. | Must | 4 | goals/savings-goals |
 | FR-GOALS-005 | Retirar o reasignar fondos de una meta DEBE registrarse explícitamente (contribución negativa o transferencia) y auditarse. | Must | 4 | goals/savings-goals |
 | FR-GOALS-006 | **What-if**: el usuario PUEDE simular cambios de aporte mensual, monto objetivo o fecha y ver el efecto en fecha esperada y aporte requerido, sin persistir. | Should | 4 | goals/savings-goals |
 | FR-GOALS-007 | Metas cuyo objetivo está en una moneda distinta a las contribuciones DEBEN calcular el progreso con tasa de referencia vigente, indicando fecha y fuente de la tasa. | Should | 4 | goals/savings-goals |
-| FR-GOALS-008 | Al alcanzar 100 % se emite `goals.GoalReached.v1`; los hitos intermedios (25/50/75 %) generan notificaciones derivadas de `goals.SavingsContributionRecorded.v1`. | Should | 4 | goals/savings-goals |
+| FR-GOALS-008 | Al alcanzar 100 % se emite `goals.GoalReached.v1`; los hitos intermedios (25/50/75 %) generan notificaciones derivadas de `goals.SavingsContributionRecorded.v1`, una sola vez por meta e hito. | Should | 4 | goals/savings-goals |
 | FR-GOALS-009 | Los aportes planificados a metas DEBEN poder incluirse en el plan mensual (PLANNING) y reflejarse en "disponible para gastar". | Should | 4 | goals/savings-goals |
 | FR-GOALS-010 | Una transacción PUEDE vincularse a una meta (FR-TRANSACTIONS-003) y contar como contribución real. | Must | 4 | goals/savings-goals |
 
@@ -423,7 +423,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-NOTIFY-001 | Centro de notificaciones in-app con estados `unread`/`read`/`archived`, contador y enlace al recurso origen. | Must | 2 | notifications/alerts |
 | FR-NOTIFY-002 | Canal **email** (SMTP; Mailpit en local) con plantillas en español. | Should | 2 | notifications/alerts |
 | FR-NOTIFY-003 | Preferencias por tipo de notificación y canal, y horario de silencio. | Should | 2 | notifications/alerts |
-| FR-NOTIFY-004 | Tipos (incrementales por fase): umbral de presupuesto (2), cierre de mes pendiente (2), próximo pago / ocurrencia por aprobar (3), renovación, fin de trial y posible cambio de precio de una suscripción (3; renovación y fin de trial a OWNER, EDITOR y VIEWER, cambio de precio a OWNER y EDITOR), hito de meta / sobre-asignación (4), vencimiento de tarjeta (OWNER y EDITOR, N días antes; 4), utilización de tarjeta (OWNER y EDITOR; 4) y cuota (4), tasa obsoleta (5), import completado/fallido (6), riesgo de déficit (7), violación de invariante (OWNER, 1→2). | Must | 2 → 7 | notifications/alerts |
+| FR-NOTIFY-004 | Tipos (incrementales por fase): umbral de presupuesto (2), cierre de mes pendiente (2), próximo pago / ocurrencia por aprobar (3), renovación, fin de trial y posible cambio de precio de una suscripción (3; renovación y fin de trial a OWNER, EDITOR y VIEWER, cambio de precio a OWNER y EDITOR), hito de meta, meta alcanzada (OWNER, EDITOR y VIEWER) y sobre-asignación (OWNER y EDITOR) (4), vencimiento de tarjeta (OWNER y EDITOR, N días antes; 4), utilización de tarjeta (OWNER y EDITOR; 4) y cuota (4), tasa obsoleta (5), import completado/fallido (6), riesgo de déficit (7), violación de invariante (OWNER, 1→2). | Must | 2 → 7 | notifications/alerts |
 | FR-NOTIFY-005 | Las notificaciones DEBEN ser idempotentes: un mismo evento origen no genera notificaciones duplicadas (inbox por `(consumer, eventId)` + clave de deduplicación de negocio). | Must | 2 | notifications/alerts |
 | FR-NOTIFY-006 | Los emails NO DEBEN incluir saldos ni montos salvo opt-in explícito; deben enlazar a la app autenticada. | Must | 2 | notifications/alerts |
 | FR-NOTIFY-007 | Digest semanal/mensual por email. | Should | 7 | notifications/alerts |
@@ -477,10 +477,10 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | Q3 ¿Cuánto gasté? | FR-TRANSACTIONS-016, FR-TRANSACTIONS-023, FR-REPORTING-004 |
 | Q4 ¿Cuánto está comprometido? | FR-COMMITMENTS-011, FR-LEDGER-013 |
 | Q5 ¿Cuánto puedo gastar? | FR-PLANNING-024, FR-GOALS-009, FR-COMMITMENTS-011 |
-| Q6 ¿Cuánto ahorré? | FR-REPORTING-002, FR-GOALS-003 |
+| Q6 ¿Cuánto ahorré? | FR-REPORTING-002, FR-GOALS-002, FR-GOALS-003 |
 | Q7 ¿Cómo estoy vs mes pasado? | FR-REPORTING-018, FR-REPORTING-009 |
 | Q8 ¿Qué pagos vienen? | FR-REPORTING-016, FR-REPORTING-014, FR-DEBT-013 |
-| Q9 ¿Voy a cumplir mis metas? | FR-GOALS-003 |
+| Q9 ¿Voy a cumplir mis metas? | FR-REPORTING-001, FR-GOALS-003 |
 
 ## Preguntas abiertas
 

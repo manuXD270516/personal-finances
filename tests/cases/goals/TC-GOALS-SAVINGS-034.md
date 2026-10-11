@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Estado de avance respecto del plan lineal"
 scenario: "Tres estados a mitad de camino"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-003"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/domain/goal-tracking-evaluator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "tracking"]
@@ -30,7 +33,7 @@ expected_result:
   - "Estados y desvíos de input"
   - "Pausada: sin estado de avance, se informa \"pausada\""
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-034 — El estado behind, on-track o ahead compara con el esperado lineal y la tolerancia es inclusiva

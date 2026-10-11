@@ -12,6 +12,9 @@ const subscriptionTrial = definitionOf('SUBSCRIPTION_TRIAL_ENDING');
 const subscriptionPrice = definitionOf('SUBSCRIPTION_PRICE_CHANGE');
 const cardPaymentDue = definitionOf('CARD_PAYMENT_DUE');
 const cardUtilization = definitionOf('CARD_UTILIZATION');
+const goalOverAllocated = definitionOf('GOAL_OVER_ALLOCATED');
+const goalReached = definitionOf('GOAL_REACHED');
+const goalMilestone = definitionOf('GOAL_MILESTONE');
 
 // ajv-formats es CJS: según el loader, el default llega envuelto.
 const addFormats = ((addFormatsModule as unknown as { default?: unknown }).default ??
@@ -30,6 +33,9 @@ describe('Contrato consumido: los ejemplos publicados por el productor son tradu
     ['commitments/SubscriptionPriceChanged.v1.schema.json', subscriptionPrice],
     ['debt/CardPaymentDue.v1.schema.json', cardPaymentDue],
     ['debt/CreditUtilizationThresholdReached.v1.schema.json', cardUtilization],
+    ['goals/EarmarkExceedsBalance.v1.schema.json', goalOverAllocated],
+    ['goals/GoalReached.v1.schema.json', goalReached],
+    ['goals/SavingsContributionRecorded.v1.schema.json', goalMilestone],
   ] as const) {
     it(`[TC-NOTIFICATIONS-INAPP-007] ${file}: sus examples validan el esquema y producen un plan`, () => {
       const ajv = new Ajv2020({ strict: true, allErrors: true });

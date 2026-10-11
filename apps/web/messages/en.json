@@ -42,7 +42,8 @@
     "userMenu": "Account menu",
     "language": "Language",
     "recurringPending": "{count, plural, one {# payment to approve} other {# payments to approve}}",
-    "debt": "Debts"
+    "debt": "Debts",
+    "goals": "Goals"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -306,7 +307,8 @@
       "AVAILABLE_IN_PHASE_3": "Will be enabled with recurring payments and commitments (phase 3).",
       "AVAILABLE_IN_PHASE_4": "Will be enabled with savings goals (phase 4).",
       "UNKNOWN": "This question will be enabled later.",
-      "CREATE_COMMITMENT": "Create a recurring commitment to anticipate your payments."
+      "CREATE_COMMITMENT": "Create a recurring commitment to anticipate your payments.",
+      "CREATE_GOAL": "Create your first savings goal."
     },
     "liquid": {
       "caption": "Money available in liquid accounts, consolidated in {currency}",
@@ -418,6 +420,38 @@
       "freshness": "Data as of: {date}",
       "reportingCurrency": "Reporting currency: {currency}",
       "approx": "Some figures use approximate rates."
+    },
+    "goals": {
+      "tracking": {
+        "BEHIND": "Behind",
+        "ON_TRACK": "On track",
+        "AHEAD": "Ahead"
+      },
+      "status": {
+        "ACTIVE": "Active",
+        "PAUSED": "Paused",
+        "ACHIEVED": "Achieved",
+        "CLOSED": "Closed",
+        "CANCELLED": "Cancelled"
+      },
+      "percent": "{percent} %",
+      "progressOf": "{current} of {target}",
+      "aria": "Progress of goal {name}",
+      "overAllocated": "Over-allocated",
+      "partial": "Partial progress: an exchange rate is missing",
+      "required": "Required: {amount} per month",
+      "requiredOverdue": "Overdue: {amount} missing",
+      "requiredNone": "Required: no target date",
+      "expected": "Expected date: {date}",
+      "noPace": "Not enough pace to estimate the date",
+      "expectedNone": "No expected date",
+      "viewAll": "View all goals",
+      "empty": "You have no savings goals yet.",
+      "create": "Create goal",
+      "more": "{count, plural, one {# more goal} other {# more goals}}",
+      "incomplete": "Some goals have funds in another currency without a current rate: their progress is partial.",
+      "contributions": "Net goal contributions this period:",
+      "contributionsIncomplete": "incomplete: an exchange rate is missing"
     }
   },
   "Common": {
@@ -718,7 +752,8 @@
       "empty": "No transactions match these filters.",
       "select": "Select “{name}”",
       "loading": "Loading transactions…",
-      "more": "Load more"
+      "more": "Load more",
+      "origin": "Origin: {source}"
     },
     "bulk": {
       "selected": "{n} selected",
@@ -777,7 +812,8 @@
       "any": "All",
       "withoutStatement": "Reconciled without a statement",
       "withoutStatementHint": "Transactions marked as reconciled without a statement.",
-      "withoutStatementOnly": "Only those pending review"
+      "withoutStatementOnly": "Only those pending review",
+      "source": "Origin"
     },
     "detail": {
       "recorded": "Movement recorded.",
@@ -837,7 +873,8 @@
       },
       "customFields": "Custom fields",
       "reconciliation": "Reconciliation",
-      "statementRef": "Statement of {date} for {balance}"
+      "statementRef": "Statement of {date} for {balance}",
+      "source": "Origin"
     },
     "history": {
       "title": "History (lifecycle)",
@@ -927,6 +964,14 @@
         "label": "Reconciled without a statement — pending review",
         "hint": "Marked as reconciled without a statement: it stays pending review until a later reconciliation verifies it."
       }
+    },
+    "sources": {
+      "MANUAL": "Manual",
+      "IMPORT": "Import",
+      "RECURRING": "Recurring",
+      "DEBT": "Debts",
+      "GOAL": "Savings goal",
+      "SYSTEM": "System"
     }
   },
   "Fx": {
@@ -1933,7 +1978,20 @@
       "applied": "Changes propagated to the future months."
     },
     "lineFromNotification": "Line from the notification",
-    "lineMissing": "The budget line that triggered the notification no longer exists in this plan."
+    "lineMissing": "The budget line that triggered the notification no longer exists in this plan.",
+    "goalContributions": {
+      "title": "Goal contributions",
+      "intro": "What you planned to contribute to your goals this period. For information only: they are not plan lines and do not change the amount available to spend.",
+      "region": "Planned goal contributions",
+      "caption": "Planned, contributed and pending contributions per goal",
+      "goal": "Goal",
+      "planned": "Planned",
+      "contributed": "Contributed",
+      "pending": "Pending",
+      "exceededBy": "Exceeded by {amount}",
+      "pendingTotal": "Total pending:",
+      "incomplete": "incomplete: an exchange rate is missing"
+    }
   },
   "Templates": {
     "title": "Budget templates",
@@ -2320,7 +2378,9 @@
       "openPeriodClose": "Go to the {period} close",
       "openRecurringOccurrence": "View the recurring payment of {period}",
       "openSubscription": "View the subscription",
-      "openCreditCard": "View the card"
+      "openCreditCard": "View the card",
+      "openGoal": "View the goal",
+      "openGoalReservations": "View the account reservations"
     },
     "prefs": {
       "title": "Notifications",
@@ -2345,7 +2405,10 @@
         "SUBSCRIPTION_TRIAL_ENDING": "Subscription trial ending",
         "SUBSCRIPTION_PRICE_CHANGE": "Possible subscription price change",
         "CARD_PAYMENT_DUE": "Card payment due",
-        "CARD_UTILIZATION": "Card utilization"
+        "CARD_UTILIZATION": "Card utilization",
+        "GOAL_OVER_ALLOCATED": "Over-allocated goal (reservations above the balance)",
+        "GOAL_REACHED": "Goal reached",
+        "GOAL_MILESTONE": "Goal milestone (25 %, 50 %, 75 %)"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -2833,6 +2896,10 @@
       "viewCard": "View the card {name}",
       "viewCards": "View cards",
       "definitionManaged": "This payment is managed by the payment plan of a card: it is not paused, ended or revised here. Approve, edit or skip each payment in Upcoming."
+    },
+    "goal": {
+      "definitionManaged": "This schedule is managed by a savings goal: it cannot be paused or edited here.",
+      "openGoal": "Open the goal"
     }
   },
   "Subscriptions": {
@@ -4380,6 +4447,408 @@
       "noInterestConvert": "Total to avoid interest: {amount} (convert it first)",
       "minimum": "Minimum payment: {amount}",
       "minimumConvert": "Minimum payment: {amount} (convert it first)"
+    }
+  },
+  "Goals": {
+    "title": "Savings goals",
+    "intro": "Set how much you want to save, by when and in which accounts. Progress and status are calculated from your movements; nothing moves unless you record it.",
+    "viewerNotice": "You have read-only access: you can see the goals but not change them.",
+    "loading": "Loading…",
+    "notFound": "This goal does not exist or does not belong to this workspace.",
+    "back": "Back to Goals",
+    "created": "Goal created.",
+    "pausedNote": "The goal is paused: its progress is not evaluated, but it still accepts movements.",
+    "list": {
+      "region": "Goals list",
+      "caption": "Savings goals with their progress, status, required monthly contribution and expected date",
+      "name": "Goal",
+      "progress": "Progress",
+      "status": "Status",
+      "required": "Required per month",
+      "expected": "Expected date",
+      "targetDate": "Target date",
+      "priority": "Priority {priority}",
+      "archived": "Archived",
+      "noDate": "No date",
+      "empty": "You have no goals yet. Create the first one to start saving with a target.",
+      "emptyFiltered": "No goals match this filter.",
+      "new": "New goal",
+      "reservations": "Reservations by account",
+      "filters": "Goal filters",
+      "filter": "Status",
+      "includeArchived": "Include archived"
+    },
+    "filters": {
+      "OPEN": "In progress",
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "ACHIEVED": "Achieved",
+      "CLOSED": "Closed",
+      "CANCELLED": "Cancelled",
+      "ALL": "All"
+    },
+    "status": {
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "ACHIEVED": "Achieved",
+      "CLOSED": "Closed",
+      "CANCELLED": "Cancelled"
+    },
+    "tracking": {
+      "BEHIND": "Behind",
+      "ON_TRACK": "On track",
+      "AHEAD": "Ahead",
+      "deviation": "{percent} % versus expected ({expected})"
+    },
+    "types": {
+      "EMERGENCY_FUND": "Emergency fund",
+      "PURCHASE": "Purchase",
+      "TRAVEL": "Travel",
+      "EDUCATION": "Education",
+      "RETIREMENT": "Retirement",
+      "CUSTOM": "Other"
+    },
+    "funds": {
+      "REAL": "Real contribution",
+      "EARMARK": "Reservation"
+    },
+    "movementKinds": {
+      "CONTRIBUTION": "Contribution",
+      "WITHDRAWAL": "Withdrawal",
+      "REVERSAL": "Reversal",
+      "REASSIGN_IN": "Reassignment received",
+      "REASSIGN_OUT": "Reassignment sent"
+    },
+    "origins": {
+      "USER": "Manual",
+      "RECURRING": "Recurring contribution",
+      "SUGGESTION": "Suggestion",
+      "SYSTEM": "System"
+    },
+    "transactionKinds": {
+      "INCOME": "Income",
+      "EXPENSE": "Expense",
+      "TRANSFER": "Transfer",
+      "REFUND": "Refund",
+      "ADJUSTMENT": "Adjustment",
+      "OPENING_BALANCE": "Opening balance",
+      "CONVERSION": "Conversion",
+      "LOAN_DISBURSEMENT": "Loan disbursement",
+      "LOAN_PAYMENT": "Loan payment"
+    },
+    "progress": {
+      "percent": "{percent} %",
+      "of": "{current} of {target}",
+      "exceeded": "exceeds the target",
+      "aria": "Progress of goal {name}",
+      "incomplete": "Partial progress: some funds are in another currency without a current exchange rate.",
+      "incompleteWith": "Partial progress: no current rate for {amounts}; they are not converted 1:1."
+    },
+    "overAllocated": {
+      "badge": "Over-allocated"
+    },
+    "required": {
+      "none": "—",
+      "monthly": "{amount} per month",
+      "overdue": "Overdue: {amount} missing"
+    },
+    "expected": {
+      "achieved": "Achieved on {date}",
+      "noPace": "Not enough pace",
+      "beyondHorizon": "Beyond the calculation horizon"
+    },
+    "rates": {
+      "title": "Rates used ({count})",
+      "window": "Rate validity window: {days} days."
+    },
+    "pace": {
+      "HISTORY": "history",
+      "PLAN": "monthly plan",
+      "SIMULATED": "simulated",
+      "NONE": "no pace"
+    },
+    "overview": {
+      "title": "Progress",
+      "remaining": "Remaining",
+      "target": "Target",
+      "targetDate": "Target date",
+      "required": "Required monthly contribution",
+      "pace": "Current pace",
+      "paceValue": "{amount} per month (last {periods} periods; {source})",
+      "expected": "Expected date",
+      "deviation": "Progress versus expected",
+      "tolerance": "Status tolerance",
+      "paceWindow": "pace over the last {periods} periods",
+      "startDate": "Start date",
+      "closedOn": "Closed on",
+      "cancelledOn": "Cancelled on",
+      "cancelReason": "Cancellation reason"
+    },
+    "accounts": {
+      "title": "Linked accounts",
+      "none": "The goal has no linked accounts. Edit it to link an account so you can record real contributions.",
+      "region": "Linked accounts and their funds",
+      "caption": "Real funds and reservations of the goal per linked account",
+      "account": "Account",
+      "real": "Real contributions",
+      "earmark": "Reservations",
+      "status": "Status",
+      "seeReservations": "See account reservations",
+      "ok": "In order"
+    },
+    "plan": {
+      "title": "Monthly plan",
+      "none": "No monthly plan. Set how much you want to contribute each month to see the pending amount in the period plan.",
+      "monthly": "Monthly contribution",
+      "dayOfMonth": "Day of the month",
+      "source": "Source account",
+      "destination": "Destination account",
+      "materialization": "Contribution creation",
+      "modes": {
+        "PENDING_APPROVAL": "Ask for approval each month",
+        "AUTO_CREATE": "Create the contribution automatically"
+      },
+      "managedNotice": "This goal manages the recurring contribution: change or remove it here, not in Recurring.",
+      "viewDefinition": "View the schedule",
+      "manualNotice": "The plan is a reference: it does not schedule contributions. Contributions are recorded by hand.",
+      "pending": "Contribution in progress: a recurring contribution is waiting for its posted transfer.",
+      "edit": "Edit the plan",
+      "set": "Set the plan",
+      "remove": "Remove the plan",
+      "formTitle": "Monthly plan and recurring contribution",
+      "intro": "The monthly plan feeds the period pending amount; with a recurring contribution the goal schedules the transfer each month.",
+      "monthlyAmount": "Monthly contribution ({currency})",
+      "dayHint": "From 1 to 31; in short months the last day is used.",
+      "recurring": "Schedule the contribution every month",
+      "recurringHint": "Creates a schedule managed by the goal; each occurrence is recorded as a real contribution.",
+      "recurringOnlyReal": "Recurring scheduling only applies to real contributions.",
+      "autoStatus": "Status of the created transfer",
+      "autoStatuses": {
+        "POSTED": "Posted",
+        "PENDING": "Pending"
+      },
+      "save": "Save the plan",
+      "done": "Plan saved."
+    },
+    "simulation": {
+      "title": "Simulation",
+      "intro": "Try other values and see how the required contribution and the expected date change. Nothing is saved.",
+      "monthly": "Monthly contribution ({currency})",
+      "targetAmount": "Target ({currency})",
+      "targetDate": "Target date",
+      "run": "Simulate",
+      "notSaved": "Simulation result; no change was saved.",
+      "required": "Required monthly contribution",
+      "periods": "Periods",
+      "expected": "Expected date",
+      "progress": "Progress"
+    },
+    "movements": {
+      "empty": "The goal has no movements yet.",
+      "region": "Goal movements",
+      "caption": "Goal movements, newest first",
+      "date": "Date",
+      "kind": "Movement",
+      "account": "Account",
+      "amount": "Amount",
+      "origin": "Origin",
+      "detail": "Detail",
+      "reversed": "Reversed",
+      "inverseOf": "Cancels an earlier movement",
+      "reassignment": "Reassignment {id}",
+      "viewTransaction": "View the transaction",
+      "more": "Load more movements"
+    },
+    "tabs": {
+      "movements": "Movements"
+    },
+    "panels": {
+      "fund": "Type of funds"
+    },
+    "contribute": {
+      "title": "Contribute or reserve",
+      "amount": "Amount",
+      "amountIn": "Amount ({currency})",
+      "date": "Date",
+      "source": "Source account",
+      "reserveAccount": "Account to reserve in",
+      "destination": "Destination account (linked to the goal)",
+      "noLinked": "The goal has no linked accounts: edit it to link one.",
+      "note": "Note (optional)",
+      "hint": {
+        "REAL": "Moves money: creates a posted transfer to the destination account.",
+        "EARMARK": "Reserves money in an account without moving it; the account balance does not change."
+      },
+      "submitReal": "Record contribution",
+      "submitEarmark": "Reserve",
+      "doneReal": "Contribution recorded.",
+      "doneEarmark": "Reservation recorded."
+    },
+    "withdraw": {
+      "title": "Withdraw or release",
+      "account": "Account",
+      "funds": "Goal funds in the account: {amount}",
+      "mode": "How the money leaves",
+      "modes": {
+        "TRANSFER": "Transfer to another account",
+        "LINK": "Link an existing expense or transfer",
+        "RELEASE": "Release the reservation"
+      },
+      "modeHint": {
+        "TRANSFER": "Creates a posted transfer from the goal account.",
+        "LINK": "Uses an already recorded transaction that took money out of the account; the amount may be lower than the transaction.",
+        "RELEASE": "Removes the reservation without creating any transaction."
+      },
+      "toAccount": "Destination account",
+      "reason": "Reason (optional)",
+      "submit": "Record withdrawal",
+      "submitRelease": "Release",
+      "done": "Withdrawal recorded.",
+      "doneRelease": "Reservation released."
+    },
+    "reassign": {
+      "title": "Reassign funds",
+      "hint": "Moves funds from this goal to another without changing what the account has reserved.",
+      "target": "Destination goal",
+      "submit": "Reassign",
+      "done": "Funds reassigned."
+    },
+    "link": {
+      "title": "Link an existing transfer",
+      "intro": "Records an already posted transfer to a linked account as a real contribution; it counts for the transfer amount.",
+      "transaction": "Transfer",
+      "transactionId": "Or paste the transaction ID",
+      "hint": "Recent transfers to the linked accounts.",
+      "none": "No eligible transfers",
+      "submit": "Link as contribution",
+      "done": "Transfer linked as a contribution."
+    },
+    "edit": {
+      "done": "Changes saved."
+    },
+    "actions": {
+      "label": "Goal actions",
+      "contribute": "Contribute or reserve",
+      "withdraw": "Withdraw or release",
+      "reassign": "Reassign",
+      "link": "Link transaction",
+      "edit": "Edit",
+      "pause": "Pause",
+      "resume": "Resume",
+      "close": "Close",
+      "cancel": "Cancel goal",
+      "archive": "Archive"
+    },
+    "transitions": {
+      "pause": "Goal paused.",
+      "resume": "Goal resumed.",
+      "close": "Goal closed.",
+      "cancel": "Goal cancelled.",
+      "archive": "Goal archived.",
+      "removePlan": "Plan removed."
+    },
+    "confirm": {
+      "closeTitle": "Close this goal?",
+      "closeText": "The goal is considered fulfilled and its reservations are released. Real funds stay in their accounts. It cannot be reopened.",
+      "close": "Yes, close",
+      "cancelTitle": "Cancel this goal?",
+      "cancelText": "The goal reservations are released with explicit movements and its recurring contribution ends. It cannot be reopened.",
+      "cancel": "Yes, cancel the goal",
+      "reason": "Reason (optional)",
+      "archiveTitle": "Archive this goal?",
+      "archiveText": "The goal leaves the in-progress list; it stays available with the archived filter.",
+      "archive": "Yes, archive",
+      "removePlanTitle": "Remove the plan?",
+      "removePlanText": "The plan is removed and the recurring contribution, if any, ends. Contributions already recorded do not change.",
+      "removePlan": "Yes, remove the plan"
+    },
+    "form": {
+      "title": "New goal",
+      "basics": "Goal details",
+      "name": "Name",
+      "type": "Type",
+      "priority": "Priority",
+      "priorityHint": "1 is the most important.",
+      "target": "Target amount",
+      "currency": "Currency",
+      "currencyLocked": "The currency cannot change once the goal has funds or a plan.",
+      "startDate": "Start date",
+      "startDateLocked": "The start date cannot be edited.",
+      "targetDate": "Target date (optional)",
+      "targetDateHint": "Without a target date the required contribution and the progress status are not calculated.",
+      "accounts": "Linked accounts",
+      "accountsHint": "Only active asset accounts. Real contributions arrive in these accounts.",
+      "noAccounts": "There are no active accounts to link.",
+      "tracking": "Tracking",
+      "tolerance": "Status tolerance (%)",
+      "toleranceHint": "From 0 to 50. Within this band the goal counts as \"on track\".",
+      "pacePeriods": "Periods to calculate the pace",
+      "pacePeriodsHint": "From 1 to 12 finished periods.",
+      "notes": "Notes (optional)",
+      "save": "Create goal",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "fixErrors": "{count, plural, one {Fix # field before continuing.} other {Fix # fields before continuing.}}",
+      "choose": "Choose…"
+    },
+    "errors": {
+      "REQUIRED": "This field is required.",
+      "INVALID": "The value is not valid.",
+      "SCALE": "It has more decimals than allowed.",
+      "NOT_POSITIVE": "It must be greater than zero.",
+      "RANGE": "The value is outside the allowed range.",
+      "DATE_ORDER": "The target date cannot be before the start date.",
+      "NO_CHANGES": "There are no changes to save.",
+      "SAME_GOAL": "Choose a different option."
+    },
+    "eligibility": {
+      "KIND": "Only transfers can be linked.",
+      "STATUS": "The transfer must be posted.",
+      "ACCOUNT": "The destination account must be linked to the goal.",
+      "AMOUNT": "The amount exceeds the transaction amount."
+    },
+    "earmarkDetails": "Balance {balance}, already reserved {reserved}, available {available}.",
+    "suggestions": {
+      "title": "Contribution suggestions",
+      "intro": "Transfers of yours to an account linked to a goal. They only count as a contribution if you confirm them.",
+      "empty": "There are no pending suggestions.",
+      "item": "Transfer of {amount} to {account} on {date}.",
+      "viewTransaction": "View the transfer",
+      "proposed": "Suggested goal: {goal}",
+      "chooseGoal": "Choose the goal",
+      "confirm": "Confirm contribution",
+      "dismiss": "Dismiss",
+      "confirmed": "Contribution recorded.",
+      "dismissed": "Suggestion dismissed."
+    },
+    "reservations": {
+      "title": "Reservations by account",
+      "intro": "What each account has reserved for goals versus its balance. If the reserved amount exceeds the balance, the account is over-allocated.",
+      "filtered": "Showing a single account.",
+      "all": "See all accounts",
+      "empty": "No account has funds reserved for goals.",
+      "region": "Reservations by account",
+      "caption": "Balance, reserved and available amounts of each account with goal funds",
+      "account": "Account",
+      "balance": "Balance",
+      "reserved": "Reserved",
+      "available": "Available",
+      "status": "Status",
+      "goals": "Goals",
+      "shortfall": "{amount} missing",
+      "since": "Since {date}",
+      "ok": "In order",
+      "goalFunds": "reservation {earmarked}, real contributions {real}",
+      "accountStatus": {
+        "ACTIVE": "Active account",
+        "CLOSED": "Closed account",
+        "ARCHIVED": "Archived account"
+      }
+    },
+    "transaction": {
+      "title": "Savings goal",
+      "reverted": "reversed"
     }
   }
 }

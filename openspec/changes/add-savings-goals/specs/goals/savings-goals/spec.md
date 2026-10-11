@@ -1,3 +1,9 @@
+# Spec Delta
+
+## Purpose
+
+Permite al owner fijar y seguir sus metas de ahorro (fondo de emergencia, compra, viaje, educación, retiro u otras): una meta tiene tipo, objetivo con moneda, fechas, cuentas de ahorro vinculadas, prioridad y una tolerancia para su estado de avance. El dinero se aparta de dos maneras: aportes reales, que son transferencias posteadas hacia una cuenta vinculada creadas desde la meta o vinculadas después, y reservas (earmarks) sobre el saldo de una cuenta, que no tocan el ledger y nunca pueden superar el saldo contable. Lo reservado de una cuenta suma las reservas y los aportes reales que siguen en ella; si el saldo cae por debajo se marca la sobre-asignación una vez por episodio. El saldo acumulado de la meta es siempre la suma de sus movimientos inmutables (aportes, reservas, retiros, liberaciones, inversos y reasignaciones entre metas), con progreso multi-moneda valorado a la tasa vigente y nunca a 1:1. La capability calcula el porcentaje completado, el aporte mensual requerido por periodos financieros, la fecha esperada según el ritmo de los últimos periodos y el estado `behind`/`on-track`/`ahead`, permite simular escenarios sin persistir, publica los hechos de meta alcanzada y de cada movimiento, admite un aporte mensual planificado con programación recurrente administrada por la meta, sugiere registrar como aporte las transferencias manuales hacia cuentas vinculadas, y deja el recorrido de estados de la meta. Alimenta la pregunta "¿Voy a cumplir mis metas?" (Q9) del Home y, más adelante, el cálculo de "¿Cuánto puedo gastar?" (Q5).
+
 ## ADDED Requirements
 
 ### Requirement: Meta de ahorro con tipo, objetivo, fechas y cuentas vinculadas

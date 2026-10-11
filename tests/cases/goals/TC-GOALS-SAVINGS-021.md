@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Vincular una transacción existente como aporte real"
 scenario: "Transferencia ya vinculada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-010"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/goals/test/integration/pg-goals.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "link", "concurrency"]
@@ -34,7 +37,7 @@ expected_result:
   - "El segundo vínculo se rechaza con 409 GOAL_TRANSACTION_ALREADY_LINKED"
   - "En paralelo exactamente uno gana (índice único parcial) y el otro recibe 409"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-021 — Una transferencia que ya es aporte de una meta no puede vincularse a otra, ni en concurrencia

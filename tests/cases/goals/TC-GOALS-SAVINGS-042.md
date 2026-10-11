@@ -5,16 +5,19 @@ spec: notifications/alerts
 related_specs: ["goals/savings-goals"]
 requirement: "Aviso de meta sobre-asignada"
 scenario: "Banco BOB sobre-asignado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-NOTIFY-005", "FR-GOALS-004"]
 nfr: []
 invariants: ["INV-028"]
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/notifications/src/application/goal-notifications.test.ts
+  - packages/contexts/notifications/src/domain/goal-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "notifications"]
@@ -30,7 +33,7 @@ expected_result:
   - "VIEWER sin notificación"
   - "Dedupe goal-over-allocated:<accountId>:<episodeId>"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-042 — La sobre-asignación notifica una vez por episodio a OWNER y EDITOR con el faltante y las metas

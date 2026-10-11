@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Reservado y disponible por cuenta"
 scenario: "Banco con dos reservas y ahorro con aportes reales"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-004"]
 nfr: []
 invariants: ["INV-018"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - tests/e2e/specs/goals.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "earmark", "reservations"]
@@ -32,7 +36,7 @@ expected_result:
   - "\"Banco BOB\": balance 7000.00, reserved 3500.00, available 3500.00 BOB, con el detalle por meta"
   - "\"Ahorro BOB\": balance 1000.00, reserved 1000.00, available 0.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-013 — Lo reservado de una cuenta suma reservas y aportes reales que siguen en ella, y el disponible es saldo menos reservado

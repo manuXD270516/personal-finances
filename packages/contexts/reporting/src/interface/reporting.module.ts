@@ -14,6 +14,8 @@ import { NetWorthHistoryQueries } from '../application/net-worth-history.queries
 import type {
   ClosingSnapshotsPort,
   FinancialPeriodsPort,
+  GoalFlowsPort,
+  GoalSummaryPort,
   NetWorthHistoryDeps,
   PendingTransactionsPort,
   ReportingMetricsPort,
@@ -69,6 +71,13 @@ export interface ReportingRuntimeOptions {
   readonly commitments: UpcomingCommitmentsPort;
   /** Transacciones pendientes (TRANSACTIONS, `PendingFlowQuery`). */
   readonly pending: PendingTransactionsPort;
+  /**
+   * GOALS (add-savings-goals): Q9 del Home (`GoalSummaryQuery.listForHome`) y aportes netos del periodo
+   * (`GoalFlowsQuery.netForRange`). Opcionales: sin ellos Q9 es `NO_DATA` con `CREATE_GOAL` y `goalContributions` va
+   * vacío. GOALS se compone después de REPORTING, así que la composición los entrega con resolución tardía.
+   */
+  readonly goalSummary?: GoalSummaryPort;
+  readonly goalFlows?: GoalFlowsPort;
   /** Histogramas de la consulta de próximos pagos (docs/35 D117); opcional. */
   readonly metrics?: ReportingMetricsPort;
   /**
@@ -111,6 +120,8 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     balanceHistory: options.balanceHistory,
     commitments: options.commitments,
     pending: options.pending,
+    ...(options.goalSummary ? { goalSummary: options.goalSummary } : {}),
+    ...(options.goalFlows ? { goalFlows: options.goalFlows } : {}),
     ...(options.metrics ? { metrics: options.metrics } : {}),
   };
   return {

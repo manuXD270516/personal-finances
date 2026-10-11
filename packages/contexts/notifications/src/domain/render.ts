@@ -3,6 +3,9 @@ import {
   BUDGET_THRESHOLD_MESSAGE_KEY,
   CARD_PAYMENT_DUE_MESSAGE_KEY,
   CARD_UTILIZATION_MESSAGE_KEY,
+  GOAL_MILESTONE_MESSAGE_KEY,
+  GOAL_OVER_ALLOCATED_MESSAGE_KEY,
+  GOAL_REACHED_MESSAGE_KEY,
   MONTH_CLOSE_PENDING_MESSAGE_KEY,
   RECURRING_APPROVAL_REQUIRED_MESSAGE_KEY,
   RECURRING_PAYMENT_UPCOMING_MESSAGE_KEY,
@@ -127,7 +130,10 @@ type MessageKind =
   | 'subscription_trial_ending'
   | 'subscription_price_change'
   | 'card_payment_due'
-  | 'card_utilization';
+  | 'card_utilization'
+  | 'goal_over_allocated'
+  | 'goal_reached'
+  | 'goal_milestone';
 
 const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
   `${formatDecimal(value.amount, locale)} ${value.currency}`;
@@ -168,6 +174,9 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === SUBSCRIPTION_PRICE_CHANGE_MESSAGE_KEY) return 'subscription_price_change';
   if (messageKey === CARD_PAYMENT_DUE_MESSAGE_KEY) return 'card_payment_due';
   if (messageKey === CARD_UTILIZATION_MESSAGE_KEY) return 'card_utilization';
+  if (messageKey === GOAL_OVER_ALLOCATED_MESSAGE_KEY) return 'goal_over_allocated';
+  if (messageKey === GOAL_REACHED_MESSAGE_KEY) return 'goal_reached';
+  if (messageKey === GOAL_MILESTONE_MESSAGE_KEY) return 'goal_milestone';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
 
@@ -250,6 +259,42 @@ function valuesOf(
       limit: moneyText(money(params, 'limit'), locale),
     };
   }
+  if (kind === 'goal_over_allocated') {
+    const goals = Array.isArray(params['goals']) ? params['goals'] : [];
+    const names = goals.flatMap((g) => {
+      if (typeof g !== 'object' || g === null || Array.isArray(g)) return [];
+      const name = (g as { readonly [k: string]: JsonValue })['goalName'];
+      return typeof name === 'string' ? [name] : [];
+    });
+    return {
+      account: str(params, 'accountName'),
+      balance: moneyText(money(params, 'balance'), locale),
+      reserved: moneyText(money(params, 'reserved'), locale),
+      shortfall: moneyText(money(params, 'shortfall'), locale),
+      goals: listOf(names, locale),
+    };
+  }
+  if (kind === 'goal_reached') {
+    return {
+      goal: str(params, 'goalName'),
+      target: moneyText(money(params, 'target'), locale),
+      progress: moneyText(money(params, 'progress'), locale),
+      reachedDate: formatDate(str(params, 'reachedOn'), locale),
+    };
+  }
+  if (kind === 'goal_milestone') {
+    return {
+      goal: str(params, 'goalName'),
+      milestone: formatDecimal(trimDecimalZeros(str(params, 'milestone')), locale),
+      percent: formatPercent(str(params, 'percentAfter'), locale),
+      target: moneyText(money(params, 'target'), locale),
+      progress: moneyText(money(params, 'progress'), locale),
+      also: listOf(
+        strings(params, 'alsoCrossed').map((m) => `${formatDecimal(trimDecimalZeros(m), locale)} %`),
+        locale,
+      ),
+    };
+  }
   return {
     period: str(params, 'periodLabel'),
     periodEnd: formatDate(str(params, 'periodEnd'), locale),
@@ -283,6 +328,9 @@ export function renderInApp(
     if (params['actualComplete'] === false) {
       body += ` ${fill(message(locale, 'inapp.budget_threshold.partial'), values)}`;
     }
+  }
+  if (kind === 'goal_milestone' && strings(params, 'alsoCrossed').length > 0) {
+    body += ` ${fill(message(locale, 'inapp.goal_milestone.also'), values)}`;
   }
   return { title, body };
 }

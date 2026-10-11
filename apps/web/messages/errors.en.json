@@ -135,5 +135,15 @@
   "CREDIT_CARD_ACCOUNT_INVALID": "The account must be an active credit card account, and only one per currency is allowed.",
   "CREDIT_CARD_ACCOUNT_IN_USE": "That account already belongs to another card. Choose another account or archive the previous card.",
   "CARD_PAYMENT_PLAN_CONFLICT": "An active recurring payment to this card already exists. End it under Recurring payments and enable the payment plan again.",
-  "INSTALLMENT_PLAN_INVALID": "That purchase cannot be paid in installments: it must be a posted expense of a card account with no other installment plan."
+  "INSTALLMENT_PLAN_INVALID": "That purchase cannot be paid in installments: it must be a posted expense of a card account with no other installment plan.",
+  "EARMARK_EXCEEDS_BALANCE": "The reservation exceeds the available balance of the account (balance minus what other goals already reserve).",
+  "GOAL_CLOSED": "The goal is closed or cancelled and admits no new movements.",
+  "GOAL_ACCOUNT_NOT_ELIGIBLE": "That account cannot be linked to a goal: it must be an active asset account (not a liability) of your workspace.",
+  "GOAL_ACCOUNT_NOT_LINKED": "That account is not linked to the goal. Link it first.",
+  "GOAL_ACCOUNT_HAS_FUNDS": "The account still holds funds of the goal: withdraw or reassign them before unlinking it.",
+  "GOAL_INSUFFICIENT_FUNDS": "The goal does not hold enough funds in that account for that amount.",
+  "GOAL_TRANSACTION_NOT_ELIGIBLE": "That transaction cannot be linked to the goal: it must be a posted transfer between your accounts, with one account linked to the goal.",
+  "GOAL_TRANSACTION_ALREADY_LINKED": "That transaction is already linked to a goal.",
+  "GOAL_CURRENCY_LOCKED": "The currency of the goal cannot change because it already has movements.",
+  "GOAL_SUGGESTION_NOT_PENDING": "That contribution suggestion was already confirmed, dismissed or expired."
 }

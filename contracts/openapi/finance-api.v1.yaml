@@ -65,7 +65,7 @@ tags:
   - name: Commitments
     description: "Phase 3: recurring definitions, occurrences, committed amount and upcoming payments (add-recurrence-engine); subscriptions with price history, price-change detection, cost and reminders (add-subscriptions)."
   - name: Goals
-    description: "LATER (Phase 4): savings goals and contributions (transfer or earmark)."
+    description: "Phase 4: savings goals with real contributions (transfer) or earmarks, progress and tracking derived on read, reservations per account, contribution plans and suggestions (add-savings-goals)."
   - name: Debt
     description: "Phase 4: loans (register, disburse, payments with breakdown, installment commitments), French amortization schedules and comparison with the bank table (add-loans). Credit cards and statements: LATER."
   - name: FxRates
@@ -9046,6 +9046,858 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  # ── Goals: metas de ahorro (openspec add-savings-goals) ──
+  /workspaces/{workspaceId}/goals:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Goals]
+      operationId: listGoals
+      summary: List the savings goals of the workspace
+      description: |
+        Ordered by priority (1 first), target date (goals without date last) and name. Without `status` the goals `ACTIVE`, `PAUSED` and `ACHIEVED` are returned (archived goals only with `includeArchived`). `status` accepts a comma separated list of `ACTIVE`, `PAUSED`, `ACHIEVED`, `CLOSED` and `CANCELLED`.
+        Every item carries its progress, percent, remaining amount, tracking, required monthly contribution and expected date (derived on read, never stored); funds without a valid rate are listed in `progress.unconverted` and flag `progress.complete = false`. `meta` reports the rates used.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          description: Comma separated list of goal statuses.
+          schema: { type: string, examples: ['ACTIVE,PAUSED'] }
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/GoalType' }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: List the savings goals of the workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Goals]
+      operationId: createGoal
+      summary: Create a savings goal
+      description: |
+        The goal is created `ACTIVE` with the start date of today (workspace time zone) unless `startDate` is given. The currency of the goal is the one of `target`. The linked accounts must be active liquid accounts of the workspace. Defaults: priority 3, tolerance 5.00 % and pace over the last 3 periods.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalCreateInput' }
+      responses:
+        '201':
+          description: Create a savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'NAME_TAKEN, ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, CURRENCY_NOT_ENABLED, GOAL_ACCOUNT_NOT_ELIGIBLE, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/reservations:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Goals]
+      operationId: getGoalReservations
+      summary: Funds reserved by goals per account
+      description: |
+        Per account with funds of goals (`ACTIVE`, `PAUSED` or `ACHIEVED`): booked balance, reserved amount (earmarks plus real contributions that remain in the account), available amount (`balance - reserved`, may be negative), the over-allocation state with its shortfall and start date, and the goals involved. Amounts are in the currency of each account. With `accountId` only that account is returned.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      parameters:
+        - name: accountId
+          in: query
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Funds reserved by goals per account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountReservationList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/transaction-links:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Goals]
+      operationId: listGoalTransactionLinks
+      summary: Goal links of a set of transactions
+      description: |
+        For each given transaction, the movements of goals that it backs (active and reversed) so the transaction list can show the goal badge. At most 100 ids; transactions without links are omitted.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      parameters:
+        - name: transactionIds
+          in: query
+          required: true
+          description: Comma separated transaction ids (at most 100).
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items: { $ref: '#/components/schemas/Uuid' }
+          style: form
+          explode: false
+      responses:
+        '200':
+          description: Goal links of a set of transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalTransactionLinkList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/contribution-suggestions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Goals]
+      operationId: listGoalContributionSuggestions
+      summary: List the contribution suggestions
+      description: |
+        Suggestions detected from transfers between the user accounts that look like a contribution to a goal. Without `status` only the `PENDING` ones are returned. `pendingCount` is always the number of pending suggestions of the workspace.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/GoalSuggestionStatus' }
+      responses:
+        '200':
+          description: List the contribution suggestions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalContributionSuggestionList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/contribution-suggestions/{suggestionId}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalSuggestionId'
+    post:
+      tags: [Goals]
+      operationId: confirmGoalContributionSuggestion
+      summary: Confirm a contribution suggestion
+      description: |
+        Links the suggested transfer to a goal as a real contribution. `goalId` is required when the suggestion has no goal assigned. The movement is recorded with origin `SUGGESTION`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalSuggestionConfirmInput' }
+      responses:
+        '200':
+          description: Confirm a contribution suggestion
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_SUGGESTION_NOT_PENDING, GOAL_CLOSED or GOAL_TRANSACTION_ALREADY_LINKED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, GOAL_ACCOUNT_NOT_LINKED, GOAL_TRANSACTION_NOT_ELIGIBLE, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/contribution-suggestions/{suggestionId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalSuggestionId'
+    post:
+      tags: [Goals]
+      operationId: dismissGoalContributionSuggestion
+      summary: Dismiss a contribution suggestion
+      description: |
+        The suggestion is marked `DISMISSED`; the transaction is not linked to any goal.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Dismiss a contribution suggestion
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalContributionSuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_SUGGESTION_NOT_PENDING.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    get:
+      tags: [Goals]
+      operationId: getGoal
+      summary: Get a savings goal with its derived progress
+      description: |
+        Goal with its progress per currency and converted to the target currency, percent, remaining amount, required monthly contribution (`required`), pace (`pace`, from history or from the plan), expected date, tracking (`BEHIND`, `ON_TRACK`, `AHEAD`), linked accounts with the funds held in each and the contribution plan. `meta` reports the rates used, the validity window of the rates and the instants of the calculation.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Get a savings goal with its derived progress
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Goals]
+      operationId: updateGoal
+      summary: Edit a savings goal
+      description: |
+        Partial update. The currency of the target cannot change once the goal has movements (`GOAL_CURRENCY_LOCKED`). An account cannot be unlinked while it holds funds of the goal (`GOAL_ACCOUNT_HAS_FUNDS`). Closed and cancelled goals cannot be edited (`GOAL_CLOSED`). Raising the target of an achieved goal makes it `ACTIVE` again.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalUpdateInput' }
+      responses:
+        '200':
+          description: Edit a savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_CLOSED, GOAL_CURRENCY_LOCKED, GOAL_ACCOUNT_HAS_FUNDS, NAME_TAKEN, ACCOUNT_CLOSED or ACCOUNT_ARCHIVED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, CURRENCY_NOT_ENABLED, GOAL_ACCOUNT_NOT_ELIGIBLE or REFERENCE_NOT_FOUND.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/pause:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: pauseGoal
+      summary: Pause a savings goal
+      description: |
+        An `ACTIVE` goal becomes `PAUSED`: it keeps its funds and reservations and still accepts movements, but it has no tracking and its scheduled contribution pauses.
+        An invalid transition answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Pause a savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/resume:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: resumeGoal
+      summary: Resume a paused savings goal
+      description: |
+        A `PAUSED` goal becomes `ACTIVE` again.
+        An invalid transition answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Resume a paused savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/close:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: closeGoal
+      summary: Close a savings goal
+      description: |
+        Closes an `ACTIVE`, `PAUSED` or `ACHIEVED` goal: its earmarks are released and the real contributions stay in their accounts as history. A closed goal admits no new movements.
+        An invalid transition answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Close a savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: cancelGoal
+      summary: Cancel a savings goal
+      description: |
+        Cancels the goal (terminal): earmarks are released and the optional reason is stored. Real contributions stay in their accounts as history.
+        An invalid transition answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalCancelInput' }
+      responses:
+        '200':
+          description: Cancel a savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: archiveGoal
+      summary: Archive a closed or cancelled savings goal
+      description: |
+        Hides a `CLOSED` or `CANCELLED` goal from the default list.
+        An invalid transition answers 409 `INVALID_STATUS_TRANSITION`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Archive a closed or cancelled savings goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INVALID_STATUS_TRANSITION.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/movements:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    get:
+      tags: [Goals]
+      operationId: listGoalMovements
+      summary: List the movements of a goal
+      description: |
+        Newest first (by business date and then by recording instant), keyset-paginated. Movements are append-only: a correction is a `REVERSAL` movement that references the original (`reversesId`); there is no edit or delete operation.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: List the movements of a goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalMovementPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/contributions:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: contributeToGoal
+      summary: Contribute to a goal (real transfer or earmark)
+      description: |
+        `fund = REAL` creates a posted transfer from `sourceAccountId` to `destinationAccountId` (required; both liquid accounts in the same currency; transaction with source `GOAL`) and records the contribution. `fund = EARMARK` reserves `amount` in `sourceAccountId` without moving money; it is rejected with 422 `EARMARK_EXCEEDS_BALANCE` (`details.balance`, `details.reserved`, `details.available`) when the available balance of the account is not enough. The account must be linked to the goal.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalContributionInput' }
+      responses:
+        '201':
+          description: Contribute to a goal (real transfer or earmark)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_CLOSED, PERIOD_CLOSED, ACCOUNT_ARCHIVED or ACCOUNT_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, GOAL_ACCOUNT_NOT_LINKED, GOAL_ACCOUNT_NOT_ELIGIBLE, EARMARK_EXCEEDS_BALANCE, TRANSFER_SAME_ACCOUNT, TRANSFER_CURRENCY_MISMATCH, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/contributions/link:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: linkTransactionToGoal
+      summary: Link an existing transfer as a real contribution
+      description: |
+        The transaction must be a posted transfer between user accounts, one of them linked to the goal, and not linked to another goal. Otherwise 422 `GOAL_TRANSACTION_NOT_ELIGIBLE` with `details.reasons[]` (`KIND`, `STATUS`, `ACCOUNT`, `AMOUNT`). The link follows later edits or voids of the transaction through reversal movements.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalLinkInput' }
+      responses:
+        '201':
+          description: Link an existing transfer as a real contribution
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_TRANSACTION_ALREADY_LINKED or GOAL_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, GOAL_TRANSACTION_NOT_ELIGIBLE, GOAL_ACCOUNT_NOT_LINKED, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/withdrawals:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: withdrawFromGoal
+      summary: Withdraw funds from a goal
+      description: |
+        `mode.type = TRANSFER` moves real money out of the goal account to `toAccountId` (posted transfer, source `GOAL`); `LINK` links an existing outgoing transfer; `RELEASE` only releases an earmark (no money moves). Withdrawing more than the funds of the goal in the account answers 422 `GOAL_INSUFFICIENT_FUNDS`.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalWithdrawalInput' }
+      responses:
+        '201':
+          description: Withdraw funds from a goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_CLOSED, GOAL_TRANSACTION_ALREADY_LINKED, PERIOD_CLOSED, ACCOUNT_ARCHIVED or ACCOUNT_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, GOAL_INSUFFICIENT_FUNDS, GOAL_ACCOUNT_NOT_LINKED, GOAL_TRANSACTION_NOT_ELIGIBLE, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/reassignments:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: reassignGoalFunds
+      summary: Reassign funds of a goal to another goal
+      description: |
+        Moves `amount` of the given fund held in `accountId` from this goal to `targetGoalId` without moving money: two movements (`REASSIGN_OUT` and `REASSIGN_IN`) sharing a `reassignmentId`. The account must be linked to both goals.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalReassignInput' }
+      responses:
+        '201':
+          description: Reassign funds of a goal to another goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalReassignmentResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_CLOSED.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, GOAL_INSUFFICIENT_FUNDS, GOAL_ACCOUNT_NOT_LINKED, REFERENCE_NOT_FOUND or IDEMPOTENCY_KEY_REUSED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/simulations:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    post:
+      tags: [Goals]
+      operationId: simulateGoal
+      summary: Simulate a goal with another contribution, target or date
+      description: |
+        Side-effect-free calculation (no `Idempotency-Key`, nothing is persisted): with the given monthly contribution, target amount and/or target date, returns the required monthly contribution, the expected date and the tracking. Omitted fields keep the current value of the goal.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalSimulationInput' }
+      responses:
+        '200':
+          description: Simulate a goal with another contribution, target or date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalSimulation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE or AMOUNT_SCALE_EXCEEDED.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/plan:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    put:
+      tags: [Goals]
+      operationId: setGoalPlan
+      summary: Set the contribution plan of a goal
+      description: |
+        Replaces the plan. `automation = RECURRING` (only with `fund = REAL`) manages a monthly recurring definition owned by the goal (`managedBy = GOAL`), whose occurrences are materialized as contributions according to `materialization`. `If-Match` is the ETag of the goal.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalPlanInput' }
+      responses:
+        '200':
+          description: Set the contribution plan of a goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_CLOSED or ACCOUNT_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: >-
+            VALIDATION_FAILED, AMOUNT_NOT_POSITIVE, AMOUNT_SCALE_EXCEEDED, CURRENCY_MISMATCH, GOAL_ACCOUNT_NOT_LINKED, GOAL_ACCOUNT_NOT_ELIGIBLE or REFERENCE_NOT_FOUND.
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Goals]
+      operationId: removeGoalPlan
+      summary: Remove the contribution plan of a goal
+      description: |
+        Removes the plan and ends its recurring definition, if any. The recorded contributions are untouched. `If-Match` is the ETag of the goal.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Remove the contribution plan of a goal
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'GOAL_CLOSED.'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    get:
+      tags: [Goals]
+      operationId: getGoalLifecycle
+      summary: Lifecycle of a savings goal
+      description: |
+        Machine `SavingsGoal` (docs/31 D37): creation, pause, resume, achievement, reopening (when the progress falls or the target rises), close and cancel; contributions, withdrawals and archiving are annotations.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Lifecycle of a savings goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lifecycle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/goals/{goalId}/lifecycle/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/GoalId'
+    get:
+      tags: [Goals]
+      operationId: exportGoalLifecycle
+      summary: Export the lifecycle of a savings goal (CSV or PDF)
+      description: |
+        Same synchronous download as the other lifecycles (docs/31 D52); the export is audited.
+      x-openspec-capability: [audit/lifecycle-timeline]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/LifecycleExportFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/LifecycleExport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -9338,6 +10190,18 @@ components:
       description: Subscription charge UUIDv7.
       schema: { $ref: '#/components/schemas/Uuid' }
 
+    GoalId:
+      name: goalId
+      in: path
+      required: true
+      description: Savings goal UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
+    GoalSuggestionId:
+      name: suggestionId
+      in: path
+      required: true
+      description: Goal contribution suggestion UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     CardId:
       name: cardId
       in: path
@@ -9770,6 +10634,16 @@ components:
         - CREDIT_CARD_ACCOUNT_IN_USE             # 409 (add-credit-cards: the account already belongs to another active card)
         - CARD_PAYMENT_PLAN_CONFLICT             # 409 (add-credit-cards: an active recurring transfer to the card exists; details.conflictingDefinitions)
         - INSTALLMENT_PLAN_INVALID               # 422 (add-credit-cards: the purchase cannot be paid in installments)
+        - EARMARK_EXCEEDS_BALANCE                # 422 (add-savings-goals: the reservation exceeds the available balance of the account; details.balance, details.reserved, details.available)
+        - GOAL_CLOSED                            # 409 (add-savings-goals: the goal is closed or cancelled and admits no new movements)
+        - GOAL_ACCOUNT_NOT_ELIGIBLE              # 422 (add-savings-goals: the account is a liability account (only asset accounts can back a goal))
+        - GOAL_ACCOUNT_NOT_LINKED                # 422 (add-savings-goals: the account is not linked to the goal)
+        - GOAL_ACCOUNT_HAS_FUNDS                 # 409 (add-savings-goals: unlinking an account that still holds funds of the goal)
+        - GOAL_INSUFFICIENT_FUNDS                # 422 (add-savings-goals: the withdrawal or reassignment exceeds the funds of the goal in the account)
+        - GOAL_TRANSACTION_NOT_ELIGIBLE          # 422 (add-savings-goals: the transaction cannot be linked; details.reasons[] of KIND, STATUS, ACCOUNT or AMOUNT)
+        - GOAL_TRANSACTION_ALREADY_LINKED        # 409 (add-savings-goals: the transaction already backs a movement of a goal)
+        - GOAL_CURRENCY_LOCKED                   # 409 (add-savings-goals: the target currency cannot change once the goal has movements)
+        - GOAL_SUGGESTION_NOT_PENDING            # 409 (add-savings-goals: the contribution suggestion was already confirmed, dismissed or expired)
 
     # ── Identity ──
     WorkspaceRole:
@@ -12214,6 +13088,9 @@ components:
           type: array
           items: { $ref: '#/components/schemas/BudgetLine' }
         totals: { $ref: '#/components/schemas/BudgetTotals' }
+        goalContributions:
+          description: Read-only contributions planned by the savings goals in the period (add-savings-goals); they are not budget lines nor part of `totals`.
+          $ref: '#/components/schemas/BudgetGoalContributions'
         meta: { $ref: '#/components/schemas/BudgetMeta' }
         version: { type: integer, minimum: 1 }
         createdAt:
@@ -12653,11 +13530,11 @@ components:
       pattern: '^[A-Z][A-Za-z]{0,63}$'
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de máquinas crece de forma
       # aditiva (Category y Counterparty, decisión del owner D52; FinancialPeriod, add-financial-periods).
-      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan]
+      x-extensible-enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal]
     LifecycleAggregateTypeInput:
       type: string
       description: LifecycleAggregateType aceptado en peticiones (conjunto cerrado; las respuestas usan el conjunto abierto).
-      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan]
+      enum: [Transaction, Account, ExchangeRate, Category, Counterparty, FinancialPeriod, Reconciliation, RecurringDefinition, RecurringOccurrence, Subscription, Loan, SavingsGoal]
     LifecycleMachine:
       type: object
       description: Máquina de estados declarada por el contexto dueño (dato puro; `from` vacío = creación desde ∅).
@@ -13924,6 +14801,12 @@ components:
                   - $ref: '#/components/schemas/Money'
                   - type: 'null'
         netWorth: { $ref: '#/components/schemas/NetWorthBreakdown' }
+        goals:
+          description: Savings goals block (Home Q9, add-savings-goals).
+          $ref: '#/components/schemas/GoalsHomeBlock'
+        goalContributions:
+          description: Net contributions of the goals in the period (contributions minus withdrawals, reassignments excluded).
+          $ref: '#/components/schemas/GoalContributionsNet'
         questions:
           type: array
           items: { $ref: '#/components/schemas/HomeQuestionStatus' }
@@ -13976,13 +14859,716 @@ components:
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
 
+    # ── Goals: metas de ahorro (add-savings-goals) ──
+    GoalType:
+      type: string
+      enum: [EMERGENCY_FUND, PURCHASE, TRAVEL, EDUCATION, RETIREMENT, CUSTOM]
+    GoalStatus:
+      type: string
+      description: '`ACHIEVED` is derived from the progress (reversible); `CLOSED` and `CANCELLED` are terminal.'
+      enum: [ACTIVE, PAUSED, ACHIEVED, CLOSED, CANCELLED]
+    GoalFund:
+      type: string
+      description: '`REAL` = money moved to the goal account (posted transfer); `EARMARK` = amount reserved in an account without moving money.'
+      enum: [REAL, EARMARK]
+    GoalMovementKind:
+      type: string
+      enum: [CONTRIBUTION, WITHDRAWAL, REVERSAL, REASSIGN_IN, REASSIGN_OUT]
+    GoalMovementOrigin:
+      type: string
+      enum: [USER, RECURRING, SUGGESTION, SYSTEM]
+    GoalSuggestionStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, DISMISSED, EXPIRED]
+    GoalTrackingStatus:
+      type: string
+      enum: [BEHIND, ON_TRACK, AHEAD]
+    GoalProgress:
+      type: object
+      additionalProperties: false
+      required: [byCurrency, total, percent, remaining, complete, unconverted]
+      properties:
+        byCurrency:
+          type: array
+          description: Net funds (real contributions plus earmarks) per currency of the accounts.
+          items: { $ref: '#/components/schemas/Money' }
+        total:
+          description: Funds converted to the currency of the target (only the part with a valid rate).
+          $ref: '#/components/schemas/Money'
+        percent:
+          description: Percent of the target with 2 decimals (HALF_EVEN); may exceed 100.
+          $ref: '#/components/schemas/DecimalString'
+        remaining: { $ref: '#/components/schemas/Money' }
+        complete: { type: boolean, description: False when some funds have no valid rate. }
+        unconverted:
+          type: array
+          description: Funds without a valid rate, in their own currency (never converted 1:1).
+          items: { $ref: '#/components/schemas/Money' }
+    GoalRequired:
+      type: object
+      additionalProperties: false
+      required: [monthly, periods, overdue]
+      properties:
+        monthly:
+          description: Monthly contribution needed to reach the target by the target date; null without target date or when the goal is complete.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        periods:
+          oneOf:
+            - { type: integer, minimum: 0 }
+            - type: 'null'
+        overdue: { type: boolean, description: The target date passed without reaching the target. }
+    GoalPace:
+      type: object
+      additionalProperties: false
+      required: [amount, periods, source, complete]
+      properties:
+        amount:
+          description: Average monthly contribution; null when there is no pace (`source = NONE`).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        periods: { type: integer, minimum: 0 }
+        source: { type: string, enum: [HISTORY, PLAN, SIMULATED, NONE] }
+        complete: { type: boolean }
+    GoalExpectedDate:
+      type: object
+      additionalProperties: false
+      required: [date, reason]
+      properties:
+        date:
+          description: Date the target is expected to be reached at the current pace; null when it cannot be estimated.
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        reason:
+          type: [string, 'null']
+          enum: [NO_PACE, BEYOND_HORIZON, null]
+    GoalTracking:
+      type: object
+      additionalProperties: false
+      required: [status, lifecycleStatus, expected, deviationPercent]
+      properties:
+        status:
+          description: Null when it does not apply (no target date or the goal is not `ACTIVE`).
+          oneOf:
+            - $ref: '#/components/schemas/GoalTrackingStatus'
+            - type: 'null'
+        lifecycleStatus: { $ref: '#/components/schemas/GoalStatus' }
+        expected:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        deviationPercent:
+          description: Signed percent with 2 decimals; null when it does not apply.
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+    GoalPlanMaterialization:
+      type: object
+      additionalProperties: false
+      required: [mode, autoCreateStatus]
+      properties:
+        mode: { type: string, enum: [PENDING_APPROVAL, AUTO_CREATE] }
+        autoCreateStatus:
+          description: Status of the transaction created automatically (`AUTO_CREATE` only).
+          type: [string, 'null']
+          enum: [PENDING, POSTED, null]
+    GoalPlan:
+      type: object
+      additionalProperties: false
+      required: [monthlyAmount, fund, sourceAccountId, destinationAccountId, dayOfMonth, automation, materialization, definitionId, pendingContribution, version]
+      properties:
+        monthlyAmount: { $ref: '#/components/schemas/Money' }
+        fund: { $ref: '#/components/schemas/GoalFund' }
+        sourceAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        destinationAccountId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        dayOfMonth:
+          oneOf:
+            - { type: integer, minimum: 1, maximum: 31 }
+            - type: 'null'
+        automation: { type: string, enum: [NONE, RECURRING] }
+        materialization:
+          oneOf:
+            - $ref: '#/components/schemas/GoalPlanMaterialization'
+            - type: 'null'
+        definitionId:
+          description: Recurring definition managed by the goal (`automation = RECURRING`).
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        pendingContribution:
+          type: boolean
+          description: There are materialized recurring contributions waiting for their posted transfer ("contribution in progress").
+        version: { type: integer, minimum: 1 }
+    GoalLinkedAccount:
+      type: object
+      additionalProperties: false
+      required: [accountId, funds, overAllocated]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        funds:
+          type: object
+          additionalProperties: false
+          required: [real, earmark]
+          properties:
+            real: { $ref: '#/components/schemas/Money' }
+            earmark: { $ref: '#/components/schemas/Money' }
+        overAllocated: { type: boolean }
+    Goal:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - target
+        - startDate
+        - targetDate
+        - linkedAccountIds
+        - priority
+        - icon
+        - color
+        - notes
+        - tolerancePercent
+        - pacePeriods
+        - status
+        - achievedOn
+        - closedOn
+        - cancelledOn
+        - cancelReason
+        - archivedAt
+        - version
+        - createdAt
+        - updatedAt
+        - progress
+        - required
+        - pace
+        - expectedDate
+        - tracking
+        - overAllocated
+        - linkedAccounts
+        - plan
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        type: { $ref: '#/components/schemas/GoalType' }
+        target: { $ref: '#/components/schemas/Money' }
+        startDate: { $ref: '#/components/schemas/LocalDate' }
+        targetDate:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        linkedAccountIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        priority: { type: integer, minimum: 1, maximum: 5 }
+        icon: { type: [string, 'null'], maxLength: 64 }
+        color: { type: [string, 'null'], maxLength: 32 }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+        tolerancePercent:
+          description: Tolerance of the tracking in percent (0 to 50, 2 decimals).
+          $ref: '#/components/schemas/DecimalString'
+        pacePeriods: { type: integer, minimum: 1, maximum: 12 }
+        status: { $ref: '#/components/schemas/GoalStatus' }
+        achievedOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        closedOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        cancelledOn:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        cancelReason: { type: [string, 'null'] }
+        archivedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        version: { $ref: '#/components/schemas/Version' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        progress: { $ref: '#/components/schemas/GoalProgress' }
+        required: { $ref: '#/components/schemas/GoalRequired' }
+        pace: { $ref: '#/components/schemas/GoalPace' }
+        expectedDate: { $ref: '#/components/schemas/GoalExpectedDate' }
+        tracking: { $ref: '#/components/schemas/GoalTracking' }
+        overAllocated:
+          type: boolean
+          description: Some linked account has more reserved than its balance.
+        linkedAccounts:
+          type: array
+          items: { $ref: '#/components/schemas/GoalLinkedAccount' }
+        plan:
+          oneOf:
+            - $ref: '#/components/schemas/GoalPlan'
+            - type: 'null'
+    GoalMeta:
+      type: object
+      additionalProperties: false
+      required: [ratesUsed, rateWindowDays, asOf, today]
+      properties:
+        ratesUsed:
+          type: array
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+        rateWindowDays:
+          type: integer
+          description: Rate validity window (REPORTING_RATE_VALIDITY_WINDOW).
+        asOf: { $ref: '#/components/schemas/Instant' }
+        today:
+          description: Today in the workspace time zone.
+          $ref: '#/components/schemas/LocalDate'
+    GoalDetail:
+      allOf:
+        - $ref: '#/components/schemas/Goal'
+        - type: object
+          required: [meta]
+          properties:
+            meta: { $ref: '#/components/schemas/GoalMeta' }
+    GoalList:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Goal' }
+        meta: { $ref: '#/components/schemas/GoalMeta' }
+    GoalMovement:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - goalId
+        - fund
+        - movement
+        - amount
+        - accountId
+        - occurredOn
+        - transactionId
+        - transactionRevision
+        - reversesId
+        - reassignmentId
+        - origin
+        - note
+        - recordedAt
+        - recordedBy
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        goalId: { $ref: '#/components/schemas/Uuid' }
+        fund: { $ref: '#/components/schemas/GoalFund' }
+        movement: { $ref: '#/components/schemas/GoalMovementKind' }
+        amount:
+          description: Signed, in the currency of the account (contributions and incoming reassignments positive; withdrawals and outgoing reassignments negative; a reversal has the opposite sign of the movement it reverses).
+          $ref: '#/components/schemas/Money'
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        occurredOn: { $ref: '#/components/schemas/LocalDate' }
+        transactionId:
+          description: Transaction backing a real movement; null for earmarks and reassignments.
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        transactionRevision:
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - type: 'null'
+        reversesId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        reassignmentId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        origin: { $ref: '#/components/schemas/GoalMovementOrigin' }
+        note: { type: [string, 'null'] }
+        recordedAt: { $ref: '#/components/schemas/Instant' }
+        recordedBy: { $ref: '#/components/schemas/Uuid' }
+    GoalMovementPage:
+      type: object
+      additionalProperties: false
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/GoalMovement' }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    GoalReassignmentResult:
+      type: object
+      additionalProperties: false
+      required: [reassignmentId, source, target]
+      properties:
+        reassignmentId: { $ref: '#/components/schemas/Uuid' }
+        source: { $ref: '#/components/schemas/GoalMovement' }
+        target: { $ref: '#/components/schemas/GoalMovement' }
+    GoalSimulation:
+      type: object
+      additionalProperties: false
+      required: [requiredMonthly, periods, overdue, expectedDate, tracking, progress, pace]
+      properties:
+        requiredMonthly:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        periods:
+          oneOf:
+            - { type: integer, minimum: 0 }
+            - type: 'null'
+        overdue: { type: boolean }
+        expectedDate: { $ref: '#/components/schemas/GoalExpectedDate' }
+        tracking: { $ref: '#/components/schemas/GoalTracking' }
+        progress: { $ref: '#/components/schemas/GoalProgress' }
+        pace: { $ref: '#/components/schemas/GoalPace' }
+    AccountReservation:
+      type: object
+      additionalProperties: false
+      required: [accountId, accountName, currency, balance, reserved, available, overAllocated, shortfall, since, accountStatus, goals]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        accountName: { type: string }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        balance: { $ref: '#/components/schemas/DecimalString' }
+        reserved:
+          description: Earmarks plus real contributions that remain in the account.
+          $ref: '#/components/schemas/DecimalString'
+        available:
+          description: '`balance - reserved`; negative when the account is over-allocated.'
+          $ref: '#/components/schemas/DecimalString'
+        overAllocated: { type: boolean }
+        shortfall:
+          description: Missing amount while over-allocated.
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        since:
+          description: Start date of the current over-allocation episode.
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        accountStatus: { type: string, enum: [ACTIVE, CLOSED, ARCHIVED] }
+        goals:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [goalId, name, status, earmarked, realHeld]
+            properties:
+              goalId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              status: { $ref: '#/components/schemas/GoalStatus' }
+              earmarked: { $ref: '#/components/schemas/DecimalString' }
+              realHeld: { $ref: '#/components/schemas/DecimalString' }
+    AccountReservationList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AccountReservation' }
+    GoalContributionSuggestion:
+      type: object
+      additionalProperties: false
+      required: [id, transactionId, transactionRevision, accountId, amount, businessDate, goalId, status, decidedAt, movementId, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        transactionRevision: { type: integer, minimum: 1 }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount: { $ref: '#/components/schemas/Money' }
+        businessDate: { $ref: '#/components/schemas/LocalDate' }
+        goalId:
+          description: Suggested goal; null when the suggestion has none.
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        status: { $ref: '#/components/schemas/GoalSuggestionStatus' }
+        decidedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Instant'
+            - type: 'null'
+        movementId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        createdAt: { $ref: '#/components/schemas/Instant' }
+    GoalContributionSuggestionList:
+      type: object
+      additionalProperties: false
+      required: [data, pendingCount]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/GoalContributionSuggestion' }
+        pendingCount: { type: integer, minimum: 0 }
+    GoalTransactionLink:
+      type: object
+      additionalProperties: false
+      required: [transactionId, links]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        links:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [goalId, goalName, movementId, movement, fund, amount, reversesId, active]
+            properties:
+              goalId: { $ref: '#/components/schemas/Uuid' }
+              goalName: { type: string }
+              movementId: { $ref: '#/components/schemas/Uuid' }
+              movement: { $ref: '#/components/schemas/GoalMovementKind' }
+              fund: { $ref: '#/components/schemas/GoalFund' }
+              amount: { $ref: '#/components/schemas/Money' }
+              reversesId:
+                oneOf:
+                  - $ref: '#/components/schemas/Uuid'
+                  - type: 'null'
+              active: { type: boolean, description: False once a reversal cancels the movement. }
+    GoalTransactionLinkList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/GoalTransactionLink' }
+    GoalCreateInput:
+      type: object
+      additionalProperties: false
+      required: [name, type, target]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        type: { $ref: '#/components/schemas/GoalType' }
+        target: { $ref: '#/components/schemas/Money' }
+        startDate: { $ref: '#/components/schemas/LocalDate' }
+        targetDate: { $ref: '#/components/schemas/LocalDate' }
+        linkedAccountIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        priority: { type: integer, minimum: 1, maximum: 5, default: 3 }
+        icon: { type: string, maxLength: 64 }
+        color: { type: string, maxLength: 32 }
+        notes: { type: string, maxLength: 2000 }
+        tolerancePercent: { $ref: '#/components/schemas/DecimalString' }
+        pacePeriods: { type: integer, minimum: 1, maximum: 12, default: 3 }
+    GoalUpdateInput:
+      type: object
+      description: Partial update; absent fields stay unchanged. `targetDate` accepts null to remove the date.
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        type: { $ref: '#/components/schemas/GoalType' }
+        target: { $ref: '#/components/schemas/Money' }
+        targetDate:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        linkedAccountIds:
+          type: array
+          items: { $ref: '#/components/schemas/Uuid' }
+        priority: { type: integer, minimum: 1, maximum: 5 }
+        icon: { type: [string, 'null'], maxLength: 64 }
+        color: { type: [string, 'null'], maxLength: 32 }
+        notes: { type: [string, 'null'], maxLength: 2000 }
+        tolerancePercent: { $ref: '#/components/schemas/DecimalString' }
+        pacePeriods: { type: integer, minimum: 1, maximum: 12 }
+    GoalCancelInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: string, maxLength: 500 }
+    GoalContributionInput:
+      type: object
+      additionalProperties: false
+      required: [fund, amount, sourceAccountId]
+      properties:
+        fund: { $ref: '#/components/schemas/GoalFund' }
+        amount: { $ref: '#/components/schemas/Money' }
+        businessDate:
+          description: Defaults to today in the workspace time zone.
+          $ref: '#/components/schemas/LocalDate'
+        sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+        destinationAccountId:
+          description: Required with `fund = REAL`; ignored with `EARMARK`.
+          $ref: '#/components/schemas/Uuid'
+        note: { type: string, maxLength: 500 }
+    GoalLinkInput:
+      type: object
+      additionalProperties: false
+      required: [transactionId]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+    GoalWithdrawalMode:
+      description: How the funds leave the goal.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, toAccountId]
+          properties:
+            type: { type: string, enum: [TRANSFER] }
+            toAccountId: { $ref: '#/components/schemas/Uuid' }
+            businessDate: { $ref: '#/components/schemas/LocalDate' }
+        - type: object
+          additionalProperties: false
+          required: [type, transactionId]
+          properties:
+            type: { type: string, enum: [LINK] }
+            transactionId: { $ref: '#/components/schemas/Uuid' }
+        - type: object
+          additionalProperties: false
+          required: [type]
+          properties:
+            type: { type: string, enum: [RELEASE] }
+    GoalWithdrawalInput:
+      type: object
+      additionalProperties: false
+      required: [fund, accountId, amount, mode]
+      properties:
+        fund: { $ref: '#/components/schemas/GoalFund' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount: { $ref: '#/components/schemas/Money' }
+        mode: { $ref: '#/components/schemas/GoalWithdrawalMode' }
+        reason: { type: string, maxLength: 500 }
+    GoalReassignInput:
+      type: object
+      additionalProperties: false
+      required: [targetGoalId, fund, accountId, amount]
+      properties:
+        targetGoalId: { $ref: '#/components/schemas/Uuid' }
+        fund: { $ref: '#/components/schemas/GoalFund' }
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount: { $ref: '#/components/schemas/Money' }
+        reason: { type: string, maxLength: 500 }
+    GoalSimulationInput:
+      type: object
+      additionalProperties: false
+      properties:
+        monthlyContribution: { $ref: '#/components/schemas/Money' }
+        targetAmount: { $ref: '#/components/schemas/Money' }
+        targetDate: { $ref: '#/components/schemas/LocalDate' }
+    GoalPlanInput:
+      type: object
+      additionalProperties: false
+      required: [monthlyAmount, fund, automation]
+      properties:
+        monthlyAmount: { $ref: '#/components/schemas/Money' }
+        fund: { $ref: '#/components/schemas/GoalFund' }
+        sourceAccountId: { $ref: '#/components/schemas/Uuid' }
+        destinationAccountId: { $ref: '#/components/schemas/Uuid' }
+        dayOfMonth: { type: integer, minimum: 1, maximum: 31 }
+        automation: { type: string, enum: [NONE, RECURRING] }
+        materialization:
+          description: Required with `automation = RECURRING`.
+          type: object
+          additionalProperties: false
+          required: [mode]
+          properties:
+            mode: { type: string, enum: [PENDING_APPROVAL, AUTO_CREATE] }
+            autoCreateStatus: { type: string, enum: [PENDING, POSTED] }
+    GoalSuggestionConfirmInput:
+      type: object
+      additionalProperties: false
+      properties:
+        goalId:
+          description: Goal to contribute to; required when the suggestion has none.
+          $ref: '#/components/schemas/Uuid'
+    GoalContributionsNet:
+      type: object
+      description: Net contributions of goals (contributions minus withdrawals; reassignments excluded) in native currency and consolidated.
+      additionalProperties: false
+      required: [native, base, complete]
+      properties:
+        native:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
+        base:
+          description: Consolidated in the reporting currency; null when no amount could be converted.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        complete: { type: boolean, description: False when some amount has no valid rate. }
+    GoalHomeItem:
+      type: object
+      additionalProperties: false
+      required: [goalId, name, priority, percent, progress, target, tracking, lifecycleStatus, requiredMonthly, overdue, expectedDate, overAllocated, complete]
+      properties:
+        goalId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        priority: { type: integer, minimum: 1, maximum: 5 }
+        percent: { $ref: '#/components/schemas/DecimalString' }
+        progress: { $ref: '#/components/schemas/Money' }
+        target: { $ref: '#/components/schemas/Money' }
+        tracking: { $ref: '#/components/schemas/GoalTracking' }
+        lifecycleStatus: { $ref: '#/components/schemas/GoalStatus' }
+        requiredMonthly:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        overdue: { type: boolean }
+        expectedDate:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDate'
+            - type: 'null'
+        overAllocated: { type: boolean }
+        complete: { type: boolean, description: False when the progress has funds without a rate. }
+    GoalsHomeBlock:
+      type: object
+      description: Home question Q9 (savings goals). `NO_DATA` with action `CREATE_GOAL` when the workspace has no goals.
+      additionalProperties: false
+      required: [status, action, items, moreCount, complete, ratesUsed]
+      properties:
+        status: { type: string, enum: [AVAILABLE, NO_DATA] }
+        action:
+          type: [string, 'null']
+          enum: [CREATE_GOAL, null]
+        items:
+          type: array
+          maxItems: 3
+          items: { $ref: '#/components/schemas/GoalHomeItem' }
+        moreCount: { type: integer, minimum: 0 }
+        complete: { type: boolean }
+        ratesUsed:
+          type: array
+          items: { $ref: '#/components/schemas/ResolvedRate' }
+    BudgetGoalContributions:
+      type: object
+      description: Planned contributions of the goals in the period (read only; goals with a plan and status `ACTIVE`).
+      additionalProperties: false
+      required: [items, pendingTotal]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [goalId, name, planned, contributed, pending, exceededBy]
+            properties:
+              goalId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              planned: { $ref: '#/components/schemas/Money' }
+              contributed: { $ref: '#/components/schemas/Money' }
+              pending: { $ref: '#/components/schemas/Money' }
+              exceededBy: { $ref: '#/components/schemas/Money' }
+        pendingTotal: { $ref: '#/components/schemas/GoalContributionsNet' }
+
     # ── Notifications (add-alerts, Phase 2) ──
     NotificationType:
       type: string
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -14007,7 +15593,7 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS]
         occurrenceId:
           description: >-
             Recurring occurrence (only `RECURRING_OCCURRENCE`, add-recurrence-engine): the app opens
@@ -14025,6 +15611,16 @@ components:
           description: >-
             Credit card (only `CREDIT_CARD`, add-credit-cards): the app opens `/debts/tarjetas/{cardId}` (with the statement when
             `statementId` is present). In that kind `periodId` is the card id and `periodLabel` the month of the due date or of the crossing.
+          $ref: '#/components/schemas/Uuid'
+        goalId:
+          description: >-
+            Savings goal (only `GOAL`, add-savings-goals): the app opens `/goals/{goalId}`; if the goal no longer exists it shows the
+            list with a "no longer available" notice. In that kind `periodId` is the goal id and `periodLabel` the month of the fact.
+          $ref: '#/components/schemas/Uuid'
+        accountId:
+          description: >-
+            Account (only `GOAL_RESERVATIONS`, add-savings-goals): the app opens the reservations of the account (`/goals/reservas?accountId=`).
+            In that kind `periodId` is the account id and `periodLabel` the month of the detection.
           $ref: '#/components/schemas/Uuid'
         statementId: { $ref: '#/components/schemas/Uuid' }
         proposalId: { $ref: '#/components/schemas/Uuid' }
@@ -14413,8 +16009,8 @@ components:
         kind: { $ref: '#/components/schemas/RecurringKind' }
         managedBy:
           type: string
-          description: Who administers the definition. Only `USER` today; `SUBSCRIPTION` and `DEBT` are reserved.
-          enum: [USER, SUBSCRIPTION, DEBT]
+          description: 'Who administers the definition: the user (`USER`) or another context (`SUBSCRIPTION`, `DEBT`, `GOAL`).'
+          x-extensible-enum: [USER, SUBSCRIPTION, DEBT, GOAL]
         managedRef:
           oneOf:
             - $ref: '#/components/schemas/Uuid'
@@ -15492,7 +17088,7 @@ components:
         kind: { $ref: '#/components/schemas/RecurringKind' }
         managedBy:
           type: string
-          enum: [USER, SUBSCRIPTION, DEBT]
+          x-extensible-enum: [USER, SUBSCRIPTION, DEBT, GOAL]
         occurrenceDate:
           description: 'Nominal date (before the weekend adjustment): the idempotency key of the occurrence.'
           $ref: '#/components/schemas/LocalDate'

@@ -249,6 +249,11 @@ export interface TransactionLinkDto {
   readonly counterpartyId: string | null;
   readonly source: string;
   readonly externalRef: { readonly namespace: string; readonly id: string } | null;
+  /**
+   * Revisión financiera vigente de la transacción (1 al registrarla; sube con cada `REVISE`). Aditivo
+   * (openspec add-savings-goals, N2): Goals respalda cada aporte en `(transactionId, revision)`.
+   */
+  readonly revision: number;
 }
 
 export interface TransactionLinkQuery {
@@ -509,6 +514,39 @@ export interface LoanTransactionsPort {
 }
 
 export const LOAN_TRANSACTIONS_PORT = Symbol.for('pf.transactions.LoanTransactionsPort');
+
+// ───────────────────────────────────────────── add-savings-goals (GOALS)
+
+/** `externalRef` de las transferencias creadas por una meta: el id del movimiento de la meta (`goals.goal_movement`). */
+export const GOAL_MOVEMENT_NAMESPACE = 'goals.movement' as const;
+
+/**
+ * Puerto de escritura de GOALS sobre TRANSACTIONS (openspec add-savings-goals, decisión 3 y N1). Corre en la unidad
+ * de trabajo del llamador (transferencia, asiento del ledger, auditoría y outbox de Transactions se confirman junto
+ * con el movimiento de la meta). Crea una transferencia `POSTED` con `source = GOAL` y
+ * `externalRef = {goals.movement, movementId}`; los errores de dominio (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`,
+ * `ACCOUNT_ARCHIVED`, `TRANSFER_CURRENCY_MISMATCH`, `TRANSFER_SAME_ACCOUNT`) se propagan sin traducir. A diferencia de
+ * las transacciones de DEBT, quedan editables y anulables desde Transactions: Goals reacciona a esos hechos.
+ */
+export interface GoalTransferPort {
+  recordTransfer(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly businessDate: string;
+    readonly fromAccountId: string;
+    readonly toAccountId: string;
+    readonly amount: { readonly amount: string; readonly currency: string };
+    readonly description: string;
+    readonly goalRef: { readonly goalId: string; readonly movementId: string };
+  }): Promise<{
+    readonly transactionId: string;
+    readonly businessDate: string;
+    /** Revisión vigente de la transferencia recién creada (1). */
+    readonly revision: number;
+  }>;
+}
+
+export const GOAL_TRANSFER_PORT = Symbol.for('pf.transactions.GoalTransferPort');
 
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado

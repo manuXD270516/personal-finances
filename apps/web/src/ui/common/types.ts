@@ -115,6 +115,16 @@ export type TransactionKind =
   | 'CONVERSION'
   | 'LOAN_DISBURSEMENT'
   | 'LOAN_PAYMENT';
+/** Origen de la transacción (`TransactionSource`); `GOAL` = aporte o retiro creado por una meta de ahorro. */
+export type TransactionSource = 'MANUAL' | 'IMPORT' | 'RECURRING' | 'DEBT' | 'GOAL' | 'SYSTEM';
+export const TRANSACTION_SOURCES: readonly TransactionSource[] = [
+  'MANUAL',
+  'IMPORT',
+  'RECURRING',
+  'DEBT',
+  'GOAL',
+  'SYSTEM',
+];
 export type TransactionStatus = 'PENDING' | 'POSTED' | 'CLEARED' | 'RECONCILED' | 'VOIDED';
 export const TRANSACTION_STATUSES: readonly TransactionStatus[] = [
   'PENDING',

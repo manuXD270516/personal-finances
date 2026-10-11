@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Edición de una meta"
 scenario: "Bajar el objetivo por debajo de lo ahorrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001", "FR-GOALS-008"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "state"]
@@ -32,7 +37,7 @@ expected_result:
   - "\"Laptop\" vuelve a ACTIVE con percent \"90.00\""
   - "Cada transición queda auditada"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-004 — Cambiar el objetivo reevalúa el estado: alcanzada al bajarlo y reabierta al subirlo

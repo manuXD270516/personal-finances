@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Anulación o revisión de la transacción de un movimiento"
 scenario: "Transferencia anulada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002", "FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018", "INV-028"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+  - packages/contexts/goals/test/integration/pg-goals.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "void", "events"]
@@ -34,7 +38,7 @@ expected_result:
   - "Progreso 1000.00 BOB"
   - "El aporte original sigue en el historial; auditoría con actor de proceso"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-022 — Anular la transferencia de un aporte registra un movimiento inverso y conserva el original

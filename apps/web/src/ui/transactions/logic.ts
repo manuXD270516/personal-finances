@@ -12,6 +12,7 @@ import type {
   PaymentMethod,
   Transaction,
   TransactionKind,
+  TransactionSource,
   TransactionStatus,
 } from '../common/types';
 
@@ -52,6 +53,8 @@ export interface TransactionFilters {
   readonly kind: TransactionKind | '';
   readonly status: TransactionStatus | '';
   readonly paymentMethod: PaymentMethod | '';
+  /** Origen (`source=GOAL` lista los aportes y retiros de metas). */
+  readonly source: TransactionSource | '';
   readonly categoryId: string;
   readonly dateFrom: string;
   readonly dateTo: string;
@@ -67,6 +70,7 @@ export const EMPTY_TRANSACTION_FILTERS: TransactionFilters = {
   kind: '',
   status: '',
   paymentMethod: '',
+  source: '',
   categoryId: '',
   dateFrom: '',
   dateTo: '',
@@ -90,6 +94,7 @@ export function transactionsQuery(
   if (f.status) q.append('status', f.status);
   if (f.withoutStatement) q.append('systemFlag', 'RECONCILED_WITHOUT_STATEMENT');
   if (f.paymentMethod) q.set('paymentMethod', f.paymentMethod);
+  if (f.source) q.append('source', f.source);
   if (f.categoryId) q.append('categoryId', f.categoryId);
   if (f.dateFrom) q.set('dateFrom', f.dateFrom);
   if (f.dateTo) q.set('dateTo', f.dateTo);

@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Vincular una transacción existente como aporte real"
 scenario: "Gasto no elegible"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-010"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "link", "validation"]
@@ -35,7 +39,7 @@ expected_result:
   - "422 con reasons [ACCOUNT]"
   - "Ningún movimiento"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-020 — Vincular un gasto, una transferencia pendiente o una hacia una cuenta no vinculada se rechaza con sus motivos

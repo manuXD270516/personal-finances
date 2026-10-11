@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta de ahorro con tipo, objetivo, fechas y cuentas vinculadas"
 scenario: "Objetivo con más decimales que su moneda"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-001"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.service.test.ts
+  - packages/contexts/goals/src/domain/savings-goal.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "validation"]
@@ -31,7 +36,7 @@ expected_result:
   - "Cada alta se rechaza con el código indicado (problem+json)"
   - "No se crea ninguna meta ni auditoría de creación"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-002 — El alta de una meta rechaza objetivo con más decimales, cero, moneda no habilitada, fechas invertidas y nombre repetido

@@ -113,7 +113,7 @@ export interface OccurrenceView {
   readonly occurrence: OccurrenceState;
   readonly definitionName: string;
   readonly kind: RecurringKind;
-  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT';
+  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL';
   readonly accountId: string;
   readonly toAccountId: string | null;
   readonly mode: 'AUTO_CREATE' | 'PENDING_APPROVAL' | 'NOTIFY_ONLY';

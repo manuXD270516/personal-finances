@@ -383,6 +383,7 @@ export class InMemoryCommitments {
         externalRef: { namespace: 'commitments.occurrence', id: input.occurrenceRef.occurrenceId },
         occurrenceId: input.occurrenceRef.occurrenceId,
         description: input.description,
+        revision: 1,
       });
       return { transactionId: id, status: input.status, businessDate: input.businessDate };
     },
@@ -403,6 +404,7 @@ export class InMemoryCommitments {
       externalRef: null,
       occurrenceId: null,
       description: 'manual',
+      revision: 1,
       ...t,
     });
     return id;

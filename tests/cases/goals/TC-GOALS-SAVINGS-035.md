@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Simulación de escenarios sin persistir"
 scenario: "Aportar 2000.00 BOB al mes"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-006"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/goals.queries.test.ts
+  - packages/contexts/goals/src/domain/expected-date-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "what-if"]
@@ -31,7 +36,7 @@ expected_result:
   - "Resultados de input"
   - "La meta conserva versión y datos; sin auditoría de modificación"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-035 — La simulación devuelve requerido y fecha esperada con otros valores sin persistir nada

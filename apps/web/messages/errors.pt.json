@@ -135,5 +135,15 @@
   "CREDIT_CARD_ACCOUNT_INVALID": "A conta deve ser uma conta de cartão de crédito ativa, e só pode haver uma por moeda.",
   "CREDIT_CARD_ACCOUNT_IN_USE": "Essa conta já pertence a outro cartão. Escolha outra conta ou arquive o cartão anterior.",
   "CARD_PAYMENT_PLAN_CONFLICT": "Já existe um pagamento recorrente ativo para este cartão. Encerre-o em Pagamentos recorrentes e ative o plano de pagamento novamente.",
-  "INSTALLMENT_PLAN_INVALID": "Essa compra não pode ser paga em parcelas: deve ser uma despesa lançada de uma conta do cartão, sem outro plano de parcelas."
+  "INSTALLMENT_PLAN_INVALID": "Essa compra não pode ser paga em parcelas: deve ser uma despesa lançada de uma conta do cartão, sem outro plano de parcelas.",
+  "EARMARK_EXCEEDS_BALANCE": "A reserva excede o saldo disponível da conta (saldo menos o que outras metas já reservam).",
+  "GOAL_CLOSED": "A meta está encerrada ou cancelada e não aceita novos movimentos.",
+  "GOAL_ACCOUNT_NOT_ELIGIBLE": "Essa conta não pode ser vinculada a uma meta: deve ser uma conta ativa de natureza ativo (não um passivo) do seu espaço.",
+  "GOAL_ACCOUNT_NOT_LINKED": "Essa conta não está vinculada à meta. Vincule-a primeiro.",
+  "GOAL_ACCOUNT_HAS_FUNDS": "A conta ainda tem fundos da meta: retire-os ou reatribua-os antes de desvinculá-la.",
+  "GOAL_INSUFFICIENT_FUNDS": "A meta não tem fundos suficientes nessa conta para esse valor.",
+  "GOAL_TRANSACTION_NOT_ELIGIBLE": "Essa transação não pode ser vinculada à meta: deve ser uma transferência lançada entre suas contas, com uma conta vinculada à meta.",
+  "GOAL_TRANSACTION_ALREADY_LINKED": "Essa transação já está vinculada a uma meta.",
+  "GOAL_CURRENCY_LOCKED": "A moeda da meta não pode mudar porque ela já tem movimentos.",
+  "GOAL_SUGGESTION_NOT_PENDING": "Essa sugestão de aporte já foi confirmada, descartada ou expirou."
 }

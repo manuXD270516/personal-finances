@@ -168,6 +168,29 @@ export function ExpenseCard({ summary, ctx }: { summary: ReportSummary; ctx: For
   );
 }
 
+/**
+ * Aportes netos a metas del periodo (add-savings-goals): aportes menos retiros, sin reasignaciones, junto al ahorro y
+ * SIN cambiarlo ni su tasa. Consolidado en la moneda de reporte, o por moneda si no hubo tasa; tolera su ausencia.
+ */
+function GoalContributionsLine({ summary, ctx }: { summary: ReportSummary; ctx: FormatContext }) {
+  const net = summary.goalContributions;
+  if (!net) return null;
+  const { t, locale } = ctx;
+  const text = net.base
+    ? formatMoney(net.base, locale)
+    : net.native.length > 0
+      ? net.native.map((m) => formatMoney(m, locale)).join(', ')
+      : t('none');
+  return (
+    <p className="pf-home-muted" data-testid="goal-contributions">
+      {t('goals.contributions')} <strong data-testid="goal-contributions-amount">{text}</strong>
+      {!net.complete ? (
+        <span data-testid="goal-contributions-incomplete"> · {t('goals.contributionsIncomplete')}</span>
+      ) : null}
+    </p>
+  );
+}
+
 /** Q6 "¿Cuánto ahorré?" con la tasa de ahorro ("—" si no hubo ingresos: nunca 0 % ni infinito). */
 export function SavingsCard({ summary, ctx }: { summary: ReportSummary; ctx: FormatContext }) {
   const { t, locale } = ctx;
@@ -189,6 +212,7 @@ export function SavingsCard({ summary, ctx }: { summary: ReportSummary; ctx: For
             : `${formatDecimal(savingsRate, locale)} %`}
         </strong>
       </p>
+      <GoalContributionsLine summary={summary} ctx={ctx} />
     </KpiCard>
   );
 }

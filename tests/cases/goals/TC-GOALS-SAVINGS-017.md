@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta sobre-asignada cuando el saldo cae"
 scenario: "Ingreso que resuelve el episodio"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-004"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+  - packages/contexts/goals/src/domain/earmark-guard.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "over-allocation"]
@@ -33,7 +36,7 @@ expected_result:
   - "Tras el ingreso: estado NORMAL y marcas quitadas, sin hecho"
   - "Tras el gasto de 800.00 BOB: episodio nuevo con faltante 100.00 BOB y un hecho nuevo con otro episodeId"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-017 — Dentro de un episodio solo cambia el faltante; un ingreso que cubre lo reservado cierra el episodio y la próxima caída publica otro

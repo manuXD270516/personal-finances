@@ -5,16 +5,20 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Aporte real mediante transferencia a una cuenta vinculada"
 scenario: "Cuenta destino no vinculada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/movements.service.test.ts
+  - packages/contexts/transactions/src/application/goal-transfer.port.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "contribution"]
@@ -30,7 +34,7 @@ expected_result:
   - "422 GOAL_ACCOUNT_NOT_LINKED"
   - "No existe ninguna transferencia nueva ni movimiento"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-010 — Un aporte real hacia una cuenta no vinculada se rechaza sin crear la transferencia

@@ -6,6 +6,7 @@
  */
 import { normalizeDecimalInput, parseAmount, subtractAmounts, isZeroAmount } from '../common/money';
 import type { Money, Page } from '../common/types';
+import type { BudgetGoalContributions } from '../goals/types';
 
 export type { Page };
 
@@ -113,6 +114,8 @@ export interface Budget {
   readonly zeroBased: boolean;
   readonly lines: readonly BudgetLine[];
   readonly totals: BudgetTotals;
+  /** Aportes planificados por las metas del periodo (add-savings-goals); solo lectura, fuera de `totals`. */
+  readonly goalContributions?: BudgetGoalContributions | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly timeZone: string;

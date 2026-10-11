@@ -5,16 +5,21 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Meta sobre-asignada cuando el saldo cae"
 scenario: "Gasto que deja la cuenta sobre-asignada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-004", "FR-NOTIFY-004"]
 nfr: ["NFR-PERF-008"]
 invariants: ["INV-018", "INV-028"]
 priority: critical
 type: integration
 level: repository-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/goals/logic.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+  - packages/contexts/goals/src/domain/earmark-guard.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["goals", "over-allocation", "events"]
@@ -34,7 +39,7 @@ expected_result:
   - "Un único goals.EarmarkExceedsBalance.v1 con episodeId en el outbox, aunque el hecho de ledger se entregue dos veces"
   - "Lag ≤ 5 s p95"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # TC-GOALS-SAVINGS-016 — Un gasto que deja la cuenta por debajo de lo reservado la marca sobre-asignada y publica un hecho por episodio
