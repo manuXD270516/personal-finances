@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/loan-schedule-comparisons.schema.json",
+  "title": "pfos-export v1 — loan-schedule-comparisons",
+  "description": "Registro de la sección «loan-schedule-comparisons» (tabla debt.loan_schedule_comparison, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "loan_id",
+    "reference_id",
+    "schedule_version",
+    "matched",
+    "total_rows",
+    "first_difference_no",
+    "summary",
+    "status",
+    "explanation",
+    "explained_by",
+    "explained_at",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "loan_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reference_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schedule_version": {
+      "type": "integer"
+    },
+    "matched": {
+      "type": "integer"
+    },
+    "total_rows": {
+      "type": "integer"
+    },
+    "first_difference_no": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "summary": {
+      "description": "JSON libre (no nulo).",
+      "not": {
+        "type": "null"
+      }
+    },
+    "status": {
+      "type": "string"
+    },
+    "explanation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "explained_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "explained_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "debt.loan_schedule_comparison",
+  "x-pfos-context": "debt"
+}

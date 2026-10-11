@@ -10,12 +10,20 @@ import { mutedStyle, pageStyle, rowStyle } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { formatBusinessDate } from '../planning/logic';
+import { paymentHref } from '../debt/logic';
+import { useLoanLookup } from '../debt/useLoanLookup';
 import { useCatalogs } from '../transactions/catalogs';
 import { AmountText, OccurrenceStatusBadge } from './Badges';
 import { MatchSuggestionsNotice } from './MatchSuggestionsPanel';
 import { OccurrenceActionPanel } from './OccurrenceActionPanel';
 import { actionButtonId } from './OccurrencesTable';
-import { availableOccurrenceActions, definitionPath, type OccurrenceAction } from './logic';
+import {
+  availableOccurrenceActions,
+  canRegisterLoanPayment,
+  definitionPath,
+  isLoanInstallment,
+  type OccurrenceAction,
+} from './logic';
 import type { RecurringOccurrence } from './types';
 
 export function OccurrenceDetailPage({ occurrenceId }: { occurrenceId: string }) {
@@ -38,6 +46,7 @@ function Detail({ ctx, occurrenceId }: { ctx: WorkspaceContext; occurrenceId: st
   const catalogs = useCatalogs(ctx);
   const today = todayIn(ctx.timeZone);
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
+  const loans = useLoanLookup(ctx, loaded.status === 'ready' && isLoanInstallment(loaded.occurrence));
   const [action, setAction] = useState<OccurrenceAction | undefined>();
   const [status, setStatus] = useState<string | undefined>();
 
@@ -146,6 +155,35 @@ function Detail({ ctx, occurrenceId }: { ctx: WorkspaceContext; occurrenceId: st
             void load();
           }}
         />
+      ) : null}
+      {isLoanInstallment(o) ? (
+        <p style={mutedStyle} data-testid="occurrence-loan">
+          {f.t('loan.managedNotice')}{' '}
+          <a
+            href={ctx.href(
+              loans.ofDefinition(o.definitionId)
+                ? `/debts/${loans.ofDefinition(o.definitionId)!.id}`
+                : '/debts',
+            )}
+          >
+            {loans.ofDefinition(o.definitionId)?.name ?? f.t('loan.viewLoans')}
+          </a>
+          {canRegisterLoanPayment(o, ctx.canEdit) ? (
+            <>
+              {' · '}
+              <a
+                href={ctx.href(
+                  loans.ofDefinition(o.definitionId)
+                    ? paymentHref(loans.ofDefinition(o.definitionId)!.id, { date: o.dueDate })
+                    : '/debts',
+                )}
+                data-testid="occurrence-register-payment"
+              >
+                {f.t('loan.registerPayment')}
+              </a>
+            </>
+          ) : null}
+        </p>
       ) : null}
       {actions.length > 0 ? (
         <div style={rowStyle} role="group" aria-label={f.t('detail.actions')}>

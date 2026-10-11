@@ -39,6 +39,7 @@ export function renewalsPerYear(schedule: ScheduleSpec, today: LocalDate): Decim
     const to = sameDayNextYear(today).plusDays(-1);
     return new MoneyDecimal(expandRecurrence(rule, { from: today, to }).length);
   }
+  if (schedule.cadence === 'EXPLICIT') throw new Error('an explicit schedule has no renewal cycle');
   return new MoneyDecimal(RENEWALS_PER_YEAR[schedule.cadence]).div(schedule.interval);
 }
 

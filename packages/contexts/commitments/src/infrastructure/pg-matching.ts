@@ -278,7 +278,7 @@ export class PgMatchSuggestionRepository implements MatchSuggestionRepository {
       ${MATCH_SELECT}
        WHERE o.workspace_id = ${workspaceId}::uuid AND o.status IN ('SCHEDULED', 'DUE', 'OVERDUE')
          AND o.due_date BETWEEN ${input.from}::date AND ${input.to}::date
-         AND d.kind = ${input.kind} AND v.account_id = ${input.accountId}::uuid
+         AND d.kind = ${input.kind} AND d.kind <> 'LOAN_PAYMENT' AND v.account_id = ${input.accountId}::uuid
          ${transfer ? sql`AND v.to_account_id IS NOT DISTINCT FROM ${input.toAccountId}::uuid` : sql``}
        ORDER BY o.due_date, o.id`.execute(db());
     return rows.map(toMatchRow);
@@ -289,6 +289,7 @@ export class PgMatchSuggestionRepository implements MatchSuggestionRepository {
     const { rows } = await sql<MatchRow>`
       ${MATCH_SELECT}
        WHERE o.workspace_id = ${workspaceId}::uuid AND o.id = ANY(${[...ids]}::uuid[])
+         AND d.kind <> 'LOAN_PAYMENT'
        ORDER BY o.due_date, o.id`.execute(db());
     return rows.map(toMatchRow);
   }

@@ -1190,8 +1190,8 @@ describe('Cancelación, seguridad y roles', () => {
     expect(done.status).toBe('COMPLETED');
     const apiLogs = JSON.stringify(h.apiLog.records());
     expect(apiLogs).not.toContain(marker);
-    expect(apiLogs).not.toContain('18.31');
-    expect(apiLogs).not.toContain('18,31');
+    // Con límites: `18.31` también aparece en marcas de tiempo (`…:18.313Z`), que no son montos.
+    expect(apiLogs).not.toMatch(/(?<![\d:.])18[.,]31(?!\d)/u);
   });
 
   it('[TC-IMPORTS-CSV-027] un VIEWER no puede importar y la aprobación queda auditada con el actor y origen import', async () => {

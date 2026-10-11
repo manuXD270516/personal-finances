@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: ['planning/financial-periods']
 requirement: 'Desembolso registrado como transacción'
 scenario: 'Desembolso en un periodo cerrado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-002']
 nfr: []
 invariants: ['INV-015']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'periods']

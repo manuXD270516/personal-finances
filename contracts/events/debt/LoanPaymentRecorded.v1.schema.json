@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/LoanPaymentRecorded.v1.schema.json",
+  "title": "debt.LoanPaymentRecorded.v1",
+  "description": "Se registró un pago de un préstamo: la transacción `LOAN_PAYMENT` separó el principal (reduce la deuda) del interés, comisiones, seguro e impuestos (gasto). Productor: DEBT. Idempotencia: (loanId, transactionId). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.LoanPaymentRecorded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Loan"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "loanId",
+        "paymentId",
+        "transactionId",
+        "installmentNos",
+        "currency",
+        "breakdown",
+        "remainingPrincipal",
+        "paidOn"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "loanId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "paymentId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "installmentNos": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1
+        },
+        "currency": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "breakdown": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "principal",
+            "interest",
+            "fees",
+            "insurance",
+            "taxes",
+            "total"
+          ],
+          "properties": {
+            "principal": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+            },
+            "interest": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+            },
+            "fees": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+            },
+            "insurance": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+            },
+            "taxes": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+            },
+            "total": {
+              "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+            }
+          }
+        },
+        "remainingPrincipal": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Decimal"
+        },
+        "paidOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a03",
+      "eventType": "debt.LoanPaymentRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "paymentId": "01928c4e-0000-7000-8000-0000000b0101",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7101",
+        "installmentNos": [
+          1
+        ],
+        "currency": "BOB",
+        "breakdown": {
+          "principal": "1862.85",
+          "interest": "479.17",
+          "fees": "0.00",
+          "insurance": "0.00",
+          "taxes": "0.00",
+          "total": "2342.02"
+        },
+        "remainingPrincipal": "48137.15",
+        "paidOn": "2026-11-15"
+      }
+    }
+  ]
+}

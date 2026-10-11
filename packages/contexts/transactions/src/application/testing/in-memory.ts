@@ -239,9 +239,23 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         for (const tx of txs) state.txs.set(tx.id, tx.snapshot);
         return true;
       },
+      async findByExternalRef(_ws, ref) {
+        const found = [...state.txs.values()].find(
+          (s) =>
+            s.status !== 'VOIDED' &&
+            s.externalRef?.namespace === ref.namespace &&
+            s.externalRef.id === ref.id,
+        );
+        return found ? Transaction.rehydrate(found) : null;
+      },
       async list(_ws, filter, page) {
         return [...state.txs.values()]
-          .filter((s) => !filter.accountIds || filter.accountIds.includes(s.accountId))
+          .filter(
+            (s) =>
+              !filter.accountIds ||
+              filter.accountIds.includes(s.accountId) ||
+              s.legs.some((l) => filter.accountIds?.includes(l.accountId)),
+          )
           .filter((s) => !filter.systemFlags || filter.systemFlags.every((f) => systemFlagsOf(s).includes(f)))
           .filter((s) => !filter.statuses || filter.statuses.includes(s.status))
           .filter((s) => !filter.kinds || filter.kinds.includes(s.kind))
@@ -625,6 +639,7 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
       uncategorized: async (_ws, kind) =>
         kind === 'INCOME' ? 'cat-uncategorized-income' : 'cat-uncategorized',
       fees: async () => 'cat-fees',
+      loanExpense: async (_ws, code) => `cat-${code.toLowerCase().replaceAll('_', '-')}`,
       withDescendants: async (_ws, ids_) => [...ids_, ...ids_.map((i) => `${i}-child`)],
     },
     outbox: {

@@ -30,6 +30,7 @@ let h: Harness;
 let m: Mini;
 let zip: Buffer;
 let subscriptionId: string;
+let loanId: string;
 
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -130,6 +131,27 @@ beforeAll(async () => {
     headers: { 'idempotency-key': randomUUID(), 'if-match': `"${String(subscribed.body['version'])}"` },
   });
   expect(repriced.status, JSON.stringify(repriced.body)).toBe(201);
+  // Un préstamo desembolsado con un pago (openspec add-loans): cronograma, imputaciones y la definición de cuotas
+  // administrada viajan en el export y se remapean al importar.
+  const loan = await api.post(m.owner, '/loans', {
+    name: 'Préstamo (export)',
+    account: { create: { name: 'Préstamo respaldo' } },
+    disbursementAccountId: m.bank,
+    principal: money('1000.00'),
+    annualRate: '0.12',
+    termInstallments: 3,
+    disbursementDate: '2026-10-01',
+    firstDueDate: '2026-11-01',
+    disburseNow: true,
+  });
+  expect(loan.status, JSON.stringify(loan.body)).toBe(201);
+  loanId = loan.body['id'] as string;
+  const installmentPaid = await api.post(m.owner, `/loans/${loanId}/payments`, {
+    amount: money('340.02'),
+    businessDate: '2026-10-05',
+    accountId: m.bank,
+  });
+  expect(installmentPaid.status, JSON.stringify(installmentPaid.body)).toBe(201);
   await h.startWorker();
   const exported = await exportAndWait(h, m.owner, m.ws);
   zip = (await downloadExport(h, m.owner, m.ws, exported['id'] as string)).raw;
@@ -524,6 +546,48 @@ describe('Suscripciones en el round-trip', () => {
     expect(definition.body).toMatchObject({ managedBy: 'SUBSCRIPTION', managedRef: imported!.id });
     // la suscripción de origen sigue intacta
     const original = await h.call('GET', `/api/v1/workspaces/${m.ws}/subscriptions/${subscriptionId}`, {
+      token: m.owner.token,
+    });
+    expect(original.status).toBe(200);
+  }, 120_000);
+});
+
+describe('Préstamos en el round-trip', () => {
+  it('[TC-DEBT-LOAN-032] [TC-IDENTITY-RESTORE-001] un préstamo con pagos se restaura con ids nuevos, referencias remapeadas y el mismo principal pendiente', async () => {
+    const reader = ZipReader.open(zip);
+    expect(reader.names()).toEqual(
+      expect.arrayContaining([
+        'json/loans.jsonl',
+        'json/loan-installments.jsonl',
+        'json/loan-payments.jsonl',
+        'json/loan-payment-allocations.jsonl',
+      ]),
+    );
+    expect(lines(reader.read('json/loan-payments.jsonl'))).toHaveLength(1);
+    const done = await importAndWait(h, m.owner, zip);
+    expect(done, JSON.stringify(done)).toMatchObject({ status: 'SUCCEEDED' });
+    const created = done['workspaceId'] as string;
+    const list = await h.call('GET', `/api/v1/workspaces/${created}/loans`, { token: m.owner.token });
+    expect(list.status, JSON.stringify(list.body)).toBe(200);
+    const [imported] = list.body['data'] as { id: string; name: string; recurringDefinitionId: string }[];
+    expect(imported).toMatchObject({ name: 'Préstamo (export)' });
+    expect(imported!.id).not.toBe(loanId);
+    const detail = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}`, {
+      token: m.owner.token,
+    });
+    expect(detail.body['outstandingPrincipal']).toEqual(money('669.98'));
+    expect(detail.body['accountBalance']).toEqual(money('669.98'));
+    const payments = await h.call('GET', `/api/v1/workspaces/${created}/loans/${imported!.id}/payments`, {
+      token: m.owner.token,
+    });
+    expect((payments.body['data'] as unknown[]).length).toBe(1);
+    const definition = await h.call(
+      'GET',
+      `/api/v1/workspaces/${created}/recurring/${imported!.recurringDefinitionId}`,
+      { token: m.owner.token },
+    );
+    expect(definition.body).toMatchObject({ managedBy: 'DEBT', managedRef: imported!.id });
+    const original = await h.call('GET', `/api/v1/workspaces/${m.ws}/loans/${loanId}`, {
       token: m.owner.token,
     });
     expect(original.status).toBe(200);

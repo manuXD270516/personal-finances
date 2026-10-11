@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: []
 requirement: 'Anular un pago de préstamo'
 scenario: 'Anular el último pago'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: []
 invariants: ['INV-008', 'INV-016']
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'payment', 'void']

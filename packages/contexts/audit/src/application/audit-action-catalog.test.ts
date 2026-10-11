@@ -9,6 +9,7 @@ const CONTEXTS = [
   'accounts',
   'audit',
   'classification',
+  'debt',
   'fx',
   'identity',
   'ledger',

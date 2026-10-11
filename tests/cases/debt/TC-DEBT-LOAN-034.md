@@ -5,16 +5,17 @@ spec: debt/loans
 related_specs: ['audit/lifecycle-timeline']
 requirement: 'Recorrido del préstamo'
 scenario: 'Recorrido de un préstamo saldado'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-001', 'FR-AUDIT-009']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'lifecycle']

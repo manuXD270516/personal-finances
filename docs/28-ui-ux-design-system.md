@@ -223,6 +223,17 @@ Pasos: 1 Archivo → 2 Mapeo de columnas (solo si no hay perfil; vista previa de
 - **Coincidencias por revisar** (`add-commitment-matching`): cada tarjeta muestra la ocurrencia y la transacción, la **confianza en texto** (Confianza alta, media o baja, con su puntaje; se muestran también las de confianza baja, D132; el icono y el color solo refuerzan), los **motivos** ("mismo monto", "1 día de diferencia con el vencimiento", "contraparte sin indicar"), la marca **Ambigua** cuando hay otra candidata con el mismo puntaje y las acciones **Confirmar** y **Descartar** (solo EDITOR/OWNER; un VIEWER ve la sugerencia sin acciones). No hay notificación por sugerencia (D135): solo el contador de la pestaña. Nada se vincula hasta confirmar. En el **detalle de la transacción** un aviso "Esto parece el pago de Internet (20/10/2026)" y en el **detalle de la ocurrencia** "Parece pagado con la transacción del 19/10/2026" ofrecen las mismas acciones. En el detalle y la edición de una definición, **Coincidencia sugerida** muestra y permite cambiar la tolerancia de monto (0–100 %) y la ventana de fechas (0–15 días) con sus valores por omisión visibles (±2 % fijo, ±25 % estimado, ±5 % rango; ±5 días).
 - Accesible con teclado; montos con la escala de la moneda.
 
+### 4.9 Deudas → Préstamo (`/debts`, Phase 4, `add-loans`)
+
+- **Lista de préstamos**: nombre, prestamista, principal pendiente ("Deuda Bs …"), próxima cuota y estado en texto + icono (Borrador, Activo, Saldado, Cancelado; NFR-USAB-104).
+- **Alta**: dos caminos, **Préstamo nuevo** y **Préstamo en curso** (saldo pendiente a una fecha, sin desembolso). El formulario elige la cuenta del préstamo existente o la crea en el acto (D156) e incluye una **vista previa del cronograma** (sin guardar) que se recalcula con los términos: convención de días, frecuencia, cargos (fijos o sobre saldo, D161) y comisión retenida. Un préstamo en USD pagado desde una cuenta en BOB se rechaza (D157).
+- **Detalle**: principal pendiente, saldo adeudado de la cuenta y **diferencia no registrada** (los movimientos manuales sobre la cuenta se permiten y se muestran como diferencia, D158), próxima cuota, atrasadas, acumulados de interés, comisiones, seguro e impuestos, y el **cronograma** con estado por cuota (Sin pagar, Pago parcial, Pagada; Vencida si corresponde) y esperado, pagado y diferencia por componente.
+- **Registrar pago**: monto, fecha, cuenta y método; imputación automática con vista previa por cuota y componente, o **desglose explícito** de una cuota (Σ componentes = monto). Las diferencias contra lo esperado se muestran. **Anular último pago** solo se ofrece en el pago vigente más reciente.
+- **Comparar con la tabla del banco**: carga por CSV (el navegador lee el archivo como texto), texto pegado o filas manuales, con mapeo de columnas, formato de fecha y separador decimal; la vista de comparación resalta la primera diferencia y las diferencias por componente, permite **explicar** (texto) y **exportar CSV**. El estado (Coincide, Sin explicar, Explicada) va en texto.
+- **Recorrido** (Should, D163): pestaña con el patrón de §6.1 y las exportaciones CSV y PDF.
+- **Recurrentes** (§4.8): las cuotas aparecen como ocurrencias con el nombre del préstamo y el número de cuota; no se aprueban, vinculan, omiten ni editan desde ahí. La acción **Registrar pago** abre el formulario del préstamo prellenado (D162).
+- Accesible con teclado; montos con la escala de la moneda; los textos cargados del banco se tratan como datos y se escapan.
+
 ## 5. Design tokens
 
 Definidos como CSS variables (Tailwind theme + shadcn/ui), con valores light/dark. Los nombres son **semánticos**; los valores concretos se ajustan en implementación verificando contraste.
@@ -278,7 +289,7 @@ Reglas: el rojo se reserva para **problemas** (excedido, faltante, error), no pa
 
 Pestaña **Recorrido** en el detalle de transacción y de cuenta (`add-lifecycle-timeline`): arriba, un **diagrama SVG** generado desde la máquina declarada del agregado (`GET W/lifecycle-machines/{aggregateType}` o `machine` del recorrido) con un **layout fijo por máquina** (estados en columnas según el flujo principal; `VOIDED`/`ARCHIVED` a un costado); estados visitados y transiciones recorridas destacados y **numerados en el orden en que ocurrieron** (la creación es el punto de entrada y no se numera), el estado actual con énfasis y lo no recorrido atenuado; abajo, la **línea de tiempo** (transición en español, origen → destino, actor, fecha/hora en la zona del workspace, motivo, chip "derivada", enlaces "ver revisión n" y "ver asientos" en vista técnica). La línea de tiempo es la **alternativa accesible** del diagrama (`role="img"` + `aria-describedby`); bajo 768 px el diagrama pasa a orientación vertical y la línea de tiempo sigue disponible. Si el recorrido no arranca en una creación se muestra "historia previa incompleta". No usa ECharts: el diagrama es estático y determinista.
 
-Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrece para **categorías y contrapartes** (acción "Recorrido" en el árbol de categorías y en la lista de contrapartes, panel o diálogo accesible, layout fijo de dos estados `Activa` ⇄ `Archivada`) y toda vista del recorrido suma las acciones **"Exportar CSV"** y **"Exportar PDF"** (botones secundarios junto al título; descarga directa, sin modal).
+Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrece para **categorías y contrapartes** (acción "Recorrido" en el árbol de categorías y en la lista de contrapartes, panel o diálogo accesible, layout fijo de dos estados `Activa` ⇄ `Archivada`) y toda vista del recorrido suma las acciones **"Exportar CSV"** y **"Exportar PDF"** (botones secundarios junto al título; descarga directa, sin modal). Desde `add-loans` el patrón también cubre el **préstamo** (pestaña Recorrido del detalle, máquina `LOAN_LIFECYCLE`; los pagos y sus anulaciones son anotaciones).
 
 ## 7. Convenciones de gráficos (ECharts)
 
@@ -319,7 +330,7 @@ Por docs/31 D52 (`add-lifecycle-timeline` tareas 9.x): el mismo patrón se ofrec
 
 - Por defecto: signo menos tipográfico `−` (U+2212) prefijo: `− Bs 245,30`. Ingresos con `+` explícito en listas de transacciones; saldos sin `+`.
 - Opción contable (preferencia): paréntesis `(Bs 245,30)` en reportes.
-- Saldo de tarjeta de crédito: se muestra como **"Deuda Bs 1 450,00"** (positivo con etiqueta), no como negativo, aunque el ledger lo guarde negativo (ARCHITECTURE §4.1).
+- Saldo de tarjeta de crédito: se muestra como **"Deuda Bs 1 450,00"** (positivo con etiqueta), no como negativo, aunque el ledger lo guarde negativo (ARCHITECTURE §4.1). Lo mismo aplica al saldo de la cuenta de un préstamo (`add-loans`).
 
 ### 8.4 Precisión: display vs storage
 

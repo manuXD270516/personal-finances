@@ -79,7 +79,8 @@
       "enum": [
         "INCOME",
         "EXPENSE",
-        "TRANSFER"
+        "TRANSFER",
+        "LOAN_PAYMENT"
       ]
     },
     "Payload": {
@@ -195,6 +196,46 @@
             },
             "currency": "BOB",
             "kind": "EXPENSE"
+          }
+        ]
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000413",
+      "eventType": "commitments.OccurrencesGenerated",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-09T12:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RecurringDefinition",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000de002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c3",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "definitionId": "01928c4e-0000-7000-8000-0000000de002",
+        "definitionVersionNo": 1,
+        "window": {
+          "from": "2026-10-09",
+          "to": "2027-01-07"
+        },
+        "occurrences": [
+          {
+            "occurrenceId": "01928c4e-0000-7000-8000-0000000cc002",
+            "occurrenceDate": "2026-11-15",
+            "dueDate": "2026-11-15",
+            "expected": {
+              "type": "FIXED",
+              "amount": "2342.02",
+              "min": null,
+              "max": null
+            },
+            "currency": "BOB",
+            "kind": "LOAN_PAYMENT"
           }
         ]
       }

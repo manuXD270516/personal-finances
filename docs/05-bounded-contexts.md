@@ -114,11 +114,11 @@ Ficha de cada uno de los 18 bounded contexts canónicos (ARCHITECTURE §3). Los 
 
 ### 2.9 DEBT — Debt & Credit (`debt`, `@pf/debt`)
 - **Propósito:** préstamos y tarjetas de crédito como compromisos amortizables.
-- **Responsabilidades:** préstamos, cronogramas (francés/alemán/bullet), desglose de pagos, prepagos, cambios de tasa, morosidad; perfiles de tarjeta (límite, corte, vencimiento), estados de cuenta, pagos.
+- **Responsabilidades:** préstamos, cronogramas (francés/alemán/capital fijo), desglose de pagos, prepagos, cambios de tasa; perfiles de tarjeta (límite, corte, vencimiento), estados de cuenta, pagos. La morosidad queda fuera de Phase 4 (docs/37 D159). **As-built Phase 4 (`add-loans`):** el contexto existe con préstamos —registro nuevo o en curso, desembolso, pago con imputación, anulación del último pago, cuotas como compromisos `LOAN_PAYMENT` administrados, comparación con la tabla del banco y recorrido—; las transacciones de préstamo (`LOAN_DISBURSEMENT`, `LOAN_PAYMENT`, `source = DEBT`) las crea Transactions por el puerto `LoanTransactionsPort` y quedan **administradas** por Debt, de modo que la imputación y la transacción nunca divergen (INV-016).
 - **NO responsabilidades:** la cuenta LIABILITY en sí (Accounts); asientos (Ledger vía Transactions).
 - **API pública:** ver 04 §3.9.
-- **Eventos publicados:** `debt.LoanDisbursed`, `LoanScheduleGenerated`, `LoanPaymentRecorded`, `LoanInstallmentOverdue`, `LoanPaidOff`, `CardStatementIssued`, `CardPaymentDue`. **Consumidos:** `transactions.TransferCompleted` (pago a cuenta de tarjeta/préstamo hecho fuera de Debt), `TransactionVoided`.
-- **Dependencias:** Transactions (sync), Accounts (query), Ledger (query), Audit.
+- **Eventos publicados:** `debt.LoanDisbursed`, `LoanScheduleGenerated`, `LoanPaymentRecorded`, `LoanPaymentVoided` (nuevo en `add-loans`), `LoanPaidOff`, `CardStatementIssued`, `CardPaymentDue` (`LoanInstallmentOverdue` queda fuera de Phase 4). **Consumidos:** `transactions.TransferCompleted` (pago a cuenta de tarjeta hecho fuera de Debt); para préstamos **ya no** consume `TransactionVoided`: las transacciones `LOAN_*` son administradas (anular el pago se hace solo desde Debt, de forma sincrónica) y los movimientos manuales sobre la cuenta del préstamo se muestran como diferencia no registrada (D158).
+- **Dependencias:** Transactions (sync, `LoanTransactionsPort`), Accounts (query y `AccountProvisioningPort`), Commitments (sync, `RecurringDefinitionPort`), Ledger (query), Audit.
 - **Extracción:** Media.
 
 ### 2.10 FX — FX & Market Data (`fx`, `@pf/fx`)

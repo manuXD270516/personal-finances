@@ -3,7 +3,14 @@ import { cellStyle, mutedStyle, numCellStyle, rowStyle, tableStyle, tableWrapSty
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { AmountText, OccurrenceStatusBadge } from './Badges';
-import { availableOccurrenceActions, occurrencePath, type OccurrenceAction } from './logic';
+import { paymentHref } from '../debt/logic';
+import {
+  availableOccurrenceActions,
+  canRegisterLoanPayment,
+  isLoanInstallment,
+  occurrencePath,
+  type OccurrenceAction,
+} from './logic';
 import type { RecurringOccurrence } from './types';
 
 export const actionButtonId = (id: string, action: OccurrenceAction): string => `occ-${id}-${action}`;
@@ -24,6 +31,7 @@ export function OccurrencesTable({
   empty,
   onAction,
   busyId,
+  loanOf,
 }: {
   occurrences: readonly RecurringOccurrence[];
   f: FormatContext;
@@ -35,6 +43,8 @@ export function OccurrencesTable({
   empty: string;
   onAction?: (action: OccurrenceAction, occurrence: RecurringOccurrence) => void;
   busyId?: string | undefined;
+  /** Préstamo de origen de una definición de cuotas (add-loans). */
+  loanOf?: (definitionId: string) => { id: string; name: string } | undefined;
 }) {
   if (occurrences.length === 0)
     return (
@@ -92,6 +102,18 @@ export function OccurrencesTable({
                     {f.t(`kinds.${o.kind}`)} · {f.t(`modes.${o.mode}`)}
                     {o.overridden ? ` · ${f.t('overridden')}` : ''}
                   </div>
+                  {isLoanInstallment(o) ? (
+                    <div style={mutedStyle} data-testid="occurrence-loan">
+                      {f.t('loan.origin')}{' '}
+                      {loanOf?.(o.definitionId) ? (
+                        <a href={href(`/debts/${loanOf(o.definitionId)!.id}`)}>
+                          {loanOf(o.definitionId)!.name}
+                        </a>
+                      ) : (
+                        <a href={href('/debts')}>{f.t('loan.viewLoans')}</a>
+                      )}
+                    </div>
+                  ) : null}
                 </td>
                 <td style={cellStyle}>{due}</td>
                 <td style={cellStyle}>
@@ -120,6 +142,19 @@ export function OccurrencesTable({
                 {withActions ? (
                   <td style={cellStyle}>
                     <div style={{ ...rowStyle, gap: 'var(--pf-space-1)' }}>
+                      {canRegisterLoanPayment(o, canEdit) ? (
+                        <a
+                          href={href(
+                            loanOf?.(o.definitionId)
+                              ? paymentHref(loanOf(o.definitionId)!.id, { date: o.dueDate })
+                              : '/debts',
+                          )}
+                          data-testid="occurrence-register-payment"
+                          aria-label={f.t('loan.registerPaymentLabel', { name: o.definitionName, date: due })}
+                        >
+                          {f.t('loan.registerPayment')}
+                        </a>
+                      ) : null}
                       {actions.map((a) => (
                         <button
                           key={a}

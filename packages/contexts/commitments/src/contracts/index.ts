@@ -44,7 +44,7 @@ export interface MoneyDto {
   readonly currency: string;
 }
 
-export type RecurringKindDto = 'INCOME' | 'EXPENSE' | 'TRANSFER';
+export type RecurringKindDto = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_PAYMENT';
 export type ManagedByDto = 'USER' | 'SUBSCRIPTION' | 'DEBT';
 export type OccurrenceStatusDto =
   | 'SCHEDULED'
@@ -260,8 +260,11 @@ export interface CommittedQuery {
 export interface UpcomingPaymentDto {
   readonly occurrenceId: string;
   readonly definitionId: string;
+  /** En una cuota de préstamo incluye el número: "Préstamo vehicular — cuota 1". */
   readonly definitionName: string;
   readonly kind: RecurringKindDto;
+  /** Clave del ítem del calendario explícito (número de cuota); ausente si la genera una regla. */
+  readonly scheduleKey?: string;
   readonly occurrenceDate: string;
   readonly dueDate: string;
   readonly status: 'SCHEDULED' | 'DUE' | 'OVERDUE';
@@ -308,17 +311,85 @@ export interface DefinitionStatsQuery {
 }
 
 /**
- * Reservado para Debt (`DEBT`). Las suscripciones (`managedBy = SUBSCRIPTION`) operan su definición dentro del
- * contexto con `ManagedDefinitionPort` (application) sobre `DefinitionsService`, sin pasar por la API de usuario
- * (openspec add-subscriptions); este tipo público sigue sin implementación.
+ * Puerto público de definiciones administradas por otro contexto (openspec add-loans, design § Dependencias con el
+ * motor N1–N9). Corre en la unidad de trabajo del llamador (la ocurrencia, la definición, la auditoría y el outbox de
+ * COMMITMENTS se confirman junto con el cambio del llamador). Genérico por `managedBy`: las guardas y filtros
+ * específicos de cuotas dependen de `kind = LOAN_PAYMENT`, no de `managedBy = DEBT`; los demás administradores
+ * (tarjetas, metas) amplían el puerto de forma aditiva.
+ *
+ * - `createManaged` con `explicitSchedule`: calendario explícito de ítems `{key, dueDate, amount}` (la `key` es única
+ *   en la definición; en préstamos, el número de cuota). El motor genera una ocurrencia por ítem dentro del horizonte
+ *   (`FIXED`, `NOTIFY_ONLY`) y nunca crea transacciones. La clave de idempotencia de la ocurrencia es el ítem (INV-013).
+ * - `settle`: resuelve las ocurrencias de `keys` (generando las que aún no están dentro del horizonte) vinculándolas a
+ *   la misma transacción (1:N solo para `LOAN_PAYMENT`).
+ * - `unsettle`: devuelve a no resueltas las ocurrencias de `keys` (vinculadas a `transactionId`, si se indica) con
+ *   su estado derivado (próxima/atrasada) y su monto esperado original (o `restoreExpected`).
+ * - `setExpected`: cambia el monto esperado de una ocurrencia no resuelta (pago parcial).
+ * - `end`: termina la definición desde `from`: cancela las ocurrencias no resueltas con vencimiento ≥ `from`.
  */
 export interface RecurringDefinitionPort {
   createManaged(input: {
     readonly workspaceId: string;
+    readonly userId: string;
     readonly managedBy: Exclude<ManagedByDto, 'USER'>;
+    /** Id del agregado administrador (el préstamo). */
     readonly managedRef: string;
-    readonly definition: Record<string, unknown>;
+    readonly name: string;
+    readonly kind: RecurringKindDto;
+    readonly accountId: string;
+    readonly counterpartyId?: string | null;
+    readonly currency: string;
+    readonly explicitSchedule: readonly {
+      readonly key: string;
+      readonly dueDate: string;
+      readonly amount: string;
+    }[];
+    /** Solo `NOTIFY_ONLY` está soportado para calendarios explícitos. */
+    readonly materialization: 'NOTIFY_ONLY';
   }): Promise<{ readonly definitionId: string }>;
+  settle(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+    readonly keys: readonly string[];
+    readonly transactionId: string;
+  }): Promise<void>;
+  unsettle(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+    readonly keys: readonly string[];
+    /** Monto esperado a restituir por clave (pendiente de la cuota tras la anulación). */
+    readonly restoreExpected?: readonly { readonly key: string; readonly amount: string }[];
+  }): Promise<void>;
+  setExpected(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+    readonly key: string;
+    readonly amount: string;
+  }): Promise<void>;
+  end(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+    readonly from: string;
+  }): Promise<void>;
+  /**
+   * Cambia nombre, contraparte (prestamista) y/o cuenta de pago habitual de la definición administrada: nueva versión
+   * de la plantilla desde `effectiveFrom` (el calendario explícito no cambia; las ocurrencias no resueltas con
+   * vencimiento ≥ la fecha efectiva pasan a la cuenta nueva y conservan su monto esperado ajustado). La fecha efectiva
+   * se adelanta, si hace falta, hasta el día siguiente a la última ocurrencia resuelta. El nombre es una anotación.
+   */
+  revise(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly definitionId: string;
+    readonly name?: string;
+    readonly counterpartyId?: string | null;
+    readonly accountId?: string;
+    readonly effectiveFrom: string;
+  }): Promise<void>;
 }
 
 /**
@@ -377,6 +448,7 @@ export const UPCOMING_PAYMENTS_QUERY = Symbol.for('pf.commitments.UpcomingPaymen
 export const RESOLVED_OCCURRENCES_QUERY = Symbol.for('pf.commitments.ResolvedOccurrencesQuery');
 export const DEFINITION_STATS_QUERY = Symbol.for('pf.commitments.DefinitionStatsQuery');
 export const OCCURRENCE_LINK_PORT = Symbol.for('pf.commitments.OccurrenceLinkPort');
+export const RECURRING_DEFINITION_PORT = Symbol.for('pf.commitments.RecurringDefinitionPort');
 export const OCCURRENCE_MATCH_CANDIDATES_QUERY = Symbol.for('pf.commitments.OccurrenceMatchCandidatesQuery');
 
 /**

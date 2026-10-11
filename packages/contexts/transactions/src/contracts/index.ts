@@ -373,9 +373,7 @@ export interface DuplicateCandidatesQuery {
     }[];
     readonly windowDays: number;
     readonly excludeTransactionIds?: readonly string[];
-  }): Promise<
-    readonly { readonly rowRef: string; readonly candidates: readonly DuplicateCandidateDto[] }[]
-  >;
+  }): Promise<readonly { readonly rowRef: string; readonly candidates: readonly DuplicateCandidateDto[] }[]>;
 }
 
 export const DUPLICATE_CANDIDATES_QUERY = Symbol.for('pf.transactions.DuplicateCandidatesQuery');
@@ -392,6 +390,79 @@ export const TRANSACTION_STATUS_QUERY = Symbol.for('pf.transactions.TransactionS
 
 /** Ventana de días de la detección de duplicados (`transactions/duplicate-detection`, ±3 días). */
 export const DUPLICATE_WINDOW_DAYS_DEFAULT = 3;
+
+// ───────────────────────────────────────────── add-loans (DEBT)
+
+/** `externalRef` del desembolso: el id del préstamo. */
+export const LOAN_DISBURSEMENT_NAMESPACE = 'debt.loan' as const;
+/** `externalRef` de un pago: el id del pago del préstamo (`debt.loan_payment`). */
+export const LOAN_PAYMENT_NAMESPACE = 'debt.loan-payment' as const;
+
+/** Desglose de un pago de préstamo (docs/04 §3.6): montos decimales a la escala de la moneda; Σ = monto pagado. */
+export interface LoanPaymentBreakdownDto {
+  readonly loanId: string;
+  readonly principal: string;
+  readonly interest: string;
+  readonly fees: string;
+  readonly insurance: string;
+  readonly taxes: string;
+}
+
+/**
+ * Puerto de escritura de DEBT sobre TRANSACTIONS (openspec add-loans, design decisiones 5, 8 y 10). Corre en la
+ * unidad de trabajo del llamador (transacción, ledger, auditoría y outbox de Transactions se confirman junto con los
+ * del préstamo). Los errores de dominio (`PERIOD_CLOSED`, `ACCOUNT_CLOSED`, `CURRENCY_MISMATCH`…) se propagan sin
+ * traducir. Las transacciones creadas son `source = DEBT` y quedan administradas (`TRANSACTION_MANAGED_EXTERNALLY`).
+ */
+export interface LoanTransactionsPort {
+  /**
+   * `LOAN_DISBURSEMENT` POSTED: pata `TARGET` en `destinationAccountId` por `principal − retainedFee`, pata `SOURCE` en
+   * `loanAccountId` por `principal` (aumenta la deuda) y, si `retainedFee > 0`, split de la categoría de sistema
+   * `LOAN_FEES` por la comisión con su pata de gasto (asiento EXPENSE + ASSET + LIABILITY, docs/09 §6.9).
+   * `externalRef = {debt.loan, loanId}`.
+   */
+  recordDisbursement(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly loanId: string;
+    readonly businessDate: string;
+    readonly loanAccountId: string;
+    readonly destinationAccountId: string;
+    readonly principal: { readonly amount: string; readonly currency: string };
+    /** `"0.00"` (o ausente) si no hay comisión retenida. */
+    readonly retainedFee?: string | null;
+    readonly counterpartyId?: string | null;
+    readonly description: string;
+  }): Promise<{ readonly transactionId: string; readonly businessDate: string }>;
+  /**
+   * `LOAN_PAYMENT` POSTED: pata `SOURCE` en `paymentAccountId` por `−amount`, pata `TARGET` en `loanAccountId` por
+   * `+principal` (omitida si el principal es 0) y un split por cada componente no nulo con la categoría de sistema
+   * `INTEREST`, `LOAN_FEES`, `INSURANCE` o `TAXES`; Σ splits = amount − principal. Guarda `breakdown` en la transacción.
+   * `externalRef = {debt.loan-payment, paymentId}`.
+   */
+  recordPayment(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly paymentId: string;
+    readonly businessDate: string;
+    readonly paymentAccountId: string;
+    readonly loanAccountId: string;
+    readonly amount: { readonly amount: string; readonly currency: string };
+    readonly breakdown: LoanPaymentBreakdownDto;
+    readonly paymentMethod?: string | null;
+    readonly counterpartyId?: string | null;
+    readonly description: string;
+  }): Promise<{ readonly transactionId: string; readonly businessDate: string }>;
+  /** Anula una transacción administrada (reversa del asiento); idempotente si ya está anulada. */
+  voidManaged(input: {
+    readonly workspaceId: string;
+    readonly userId: string;
+    readonly transactionId: string;
+    readonly reason: string;
+  }): Promise<void>;
+}
+
+export const LOAN_TRANSACTIONS_PORT = Symbol.for('pf.transactions.LoanTransactionsPort');
 
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
@@ -435,6 +506,9 @@ export const TRANSACTIONS_AUDIT_POLICY = {
     provider: 'plain',
     executedAt: 'plain',
     externalRef: 'plain',
+    // Préstamos (add-loans): préstamo que administra la transacción y principal del pago.
+    loanId: 'plain',
+    principal: 'money',
     // Custom fields de los splits (add-custom-fields): un campo `customFields.<clave>` por clave que cambió.
     'customFields.*': 'plain',
   },

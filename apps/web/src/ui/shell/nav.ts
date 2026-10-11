@@ -4,7 +4,15 @@
  */
 
 export type NavKey =
-  'home' | 'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'recurring' | 'settings';
+  | 'home'
+  | 'transactions'
+  | 'accounts'
+  | 'fx'
+  | 'classification'
+  | 'planning'
+  | 'recurring'
+  | 'debt'
+  | 'settings';
 
 export interface NavItem {
   readonly key: NavKey;
@@ -26,6 +34,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Phase 3 (add-recurrence-engine): pagos recurrentes (Próximos, Por aprobar con contador, Definiciones); la lista
   // de próximos pagos con comprometido y saldo proyectado (add-upcoming-payments) cuelga de la misma sección.
   { key: 'recurring', path: '/recurring', also: ['/pagos-proximos'] },
+  // Phase 4 (add-loans): Deudas → préstamos (lista, alta, detalle y comparación con la tabla del banco).
+  { key: 'debt', path: '/debts' },
   { key: 'settings', path: '/configuracion' },
 ];
 

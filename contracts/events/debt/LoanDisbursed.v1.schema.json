@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/LoanDisbursed.v1.schema.json",
+  "title": "debt.LoanDisbursed.v1",
+  "description": "El préstamo se desembolsó: la transacción `LOAN_DISBURSEMENT` aumentó la deuda por el principal y acreditó el neto en la cuenta destino. Productor: DEBT. Sin consumidores obligatorios en Phase 4. Idempotencia: (loanId). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.LoanDisbursed"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Loan"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "loanId",
+        "accountId",
+        "disbursementAccountId",
+        "transactionId",
+        "principal",
+        "retainedFee",
+        "disbursedOn"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "loanId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "disbursementAccountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "transactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "principal": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "retainedFee": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Money"
+        },
+        "disbursedOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a01",
+      "eventType": "debt.LoanDisbursed",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 2,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "accountId": "01928c4e-0000-7000-8000-0000000ac001",
+        "disbursementAccountId": "01928c4e-0000-7000-8000-0000000ac002",
+        "transactionId": "01928c4e-0000-7000-8000-0000000a7101",
+        "principal": {
+          "amount": "50000.00",
+          "currency": "BOB"
+        },
+        "retainedFee": {
+          "amount": "0.00",
+          "currency": "BOB"
+        },
+        "disbursedOn": "2026-10-15"
+      }
+    }
+  ]
+}

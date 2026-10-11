@@ -20,6 +20,7 @@ import { CommitmentsQueries } from '../application/commitments.queries.js';
 import { DefinitionsService } from '../application/definitions.service.js';
 import { GenerateOccurrencesService } from '../application/generate-occurrences.service.js';
 import { EngineManagedDefinitions } from '../application/managed-definitions.js';
+import { EngineRecurringDefinitionPort } from '../application/recurring-definition-port.js';
 import { MatchingQueries } from '../application/matching.queries.js';
 import { MatchingService } from '../application/matching.service.js';
 import { OccurrencesService } from '../application/occurrences.service.js';
@@ -43,6 +44,8 @@ import {
   type DefinitionStatsQuery,
   type OccurrenceLinkPort,
   type OccurrenceMatchCandidatesQuery,
+  type RecurringDefinitionPort,
+  RECURRING_DEFINITION_PORT,
   type ResolvedOccurrencesQuery,
   type SubscriptionsQuery,
   type UpcomingPaymentsQuery,
@@ -125,6 +128,8 @@ export interface CommitmentsRuntime {
   readonly resolved: ResolvedOccurrencesQuery;
   readonly stats: DefinitionStatsQuery;
   readonly linkPort: OccurrenceLinkPort;
+  /** Puerto público de definiciones administradas por otro contexto (openspec add-loans, N1). */
+  readonly recurringDefinitions: RecurringDefinitionPort;
   /** Matching sugerido (openspec add-commitment-matching). */
   readonly matching: MatchingService;
   readonly matchingQueries: MatchingQueries;
@@ -209,6 +214,7 @@ export function createCommitmentsRuntime(options: CommitmentsRuntimeOptions): Co
     upcoming: queries,
     resolved: queries,
     stats: queries,
+    recurringDefinitions: new EngineRecurringDefinitionPort(deps, definitions),
     linkPort: {
       link: async (input) => {
         const occurrence = await occurrences.link({
@@ -247,7 +253,9 @@ export class CommitmentsModule {
         { provide: SUBSCRIPTIONS_SERVICE, useValue: options.runtime.subscriptions },
         { provide: SUBSCRIPTION_CHARGES_SERVICE, useValue: options.runtime.subscriptionCharges },
         { provide: SUBSCRIPTIONS_QUERIES, useValue: options.runtime.subscriptionQueries },
+        { provide: RECURRING_DEFINITION_PORT, useValue: options.runtime.recurringDefinitions },
       ],
+      exports: [RECURRING_DEFINITION_PORT],
     };
   }
 }
@@ -508,6 +516,7 @@ export async function runSubscriptionDaily(
   );
 }
 
+export { RECURRING_DEFINITION_PORT };
 export { COMMITMENTS_CONSUMERS, COMMITMENTS_GENERATE_JOB, COMMITMENTS_SUBSCRIPTION_JOB };
 export { COMMITMENTS_AUDIT_POLICY } from '../contracts/index.js';
 export type { GenerateOccurrencesService } from '../application/generate-occurrences.service.js';

@@ -23,6 +23,7 @@ import type {
   UpdateTransactionCommand,
 } from '../application/transactions.service.js';
 import {
+  loanIdOf,
   systemFlagsOf,
   type PaymentMethod,
   type SystemFlag,
@@ -154,6 +155,17 @@ export function toTransactionDto(s: TransactionState, totalCost?: ConversionCost
       customFields: Object.fromEntries(x.customFields.map((v) => [v.key, v.value])),
     })),
     conversion: s.conversion ? conversionDetailDto(s.conversion, totalCost) : null,
+    // Préstamos (add-loans): desglose del pago y préstamo que administra la transacción (`null` si no es de préstamo).
+    loanPaymentBreakdown: s.loanPaymentBreakdown
+      ? {
+          principal: s.loanPaymentBreakdown.principal.toJSON(),
+          interest: s.loanPaymentBreakdown.interest.toJSON(),
+          fees: s.loanPaymentBreakdown.fees.toJSON(),
+          insurance: s.loanPaymentBreakdown.insurance.toJSON(),
+          taxes: s.loanPaymentBreakdown.taxes.toJSON(),
+        }
+      : null,
+    loanId: loanIdOf(s),
     source: s.source,
     externalRef: s.externalRef,
     revision: s.revision,

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/loan-reference-schedules.schema.json",
+  "title": "pfos-export v1 — loan-reference-schedules",
+  "description": "Registro de la sección «loan-reference-schedules» (tabla debt.loan_reference_schedule, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "loan_id",
+    "reference_version",
+    "source",
+    "mapping",
+    "row_count",
+    "created_at",
+    "created_by"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "loan_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reference_version": {
+      "type": "integer"
+    },
+    "source": {
+      "type": "string"
+    },
+    "mapping": {},
+    "row_count": {
+      "type": "integer"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "x-pfos-table": "debt.loan_reference_schedule",
+  "x-pfos-context": "debt"
+}

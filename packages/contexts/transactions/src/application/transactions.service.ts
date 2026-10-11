@@ -8,12 +8,24 @@ import type {
 } from '@pf/audit/contracts';
 import type { CustomFieldValueInputDto } from '@pf/classification/contracts';
 import { currency as makeCurrency, DomainError, Money, type FieldViolation } from '@pf/shared-kernel';
-import { RECURRING_OCCURRENCE_NAMESPACE, TRANSACTION_EVENTS } from '../contracts/index.js';
+import {
+  LOAN_DISBURSEMENT_NAMESPACE,
+  LOAN_PAYMENT_NAMESPACE,
+  RECURRING_OCCURRENCE_NAMESPACE,
+  TRANSACTION_EVENTS,
+  type LoanPaymentBreakdownDto,
+} from '../contracts/index.js';
 import {
   assertRefundAllowed,
   diffCustomFields,
   DUPLICATE_WINDOW_DAYS,
+  assertManagedEditAllowed,
   findDuplicates,
+  isManagedKind,
+  LOAN_EXPENSE_COMPONENTS,
+  LoanPaymentBreakdown,
+  loanIdOf,
+  managedExternally,
   normalizeText,
   splitKindOf,
   Transaction,
@@ -25,6 +37,7 @@ import {
   type CustomFieldValue,
   type Split,
   type LegRole,
+  type LoanExpenseComponent,
   type ExternalRef,
   type PaymentMethod,
   type SplitClassificationChange,
@@ -108,6 +121,34 @@ export interface RecordTransferCommand {
   readonly paymentMethod?: PaymentMethod | null;
   readonly source?: TransactionSource;
   readonly externalRef?: ExternalRef | null;
+}
+
+/** `LOAN_DISBURSEMENT` administrado por DEBT (add-loans): no pasa por la API de transacciones. */
+export interface LoanDisbursementCommand {
+  readonly workspaceId: string;
+  readonly loanId: string;
+  readonly businessDate: string;
+  readonly loanAccountId: string;
+  readonly destinationAccountId: string;
+  readonly principal: MoneyDto;
+  /** Comisión retenida (decimal en la moneda del principal); `"0.00"`/ausente si no hay. */
+  readonly retainedFee?: string | null;
+  readonly counterpartyId?: string | null;
+  readonly description: string;
+}
+
+/** `LOAN_PAYMENT` administrado por DEBT (add-loans). */
+export interface LoanPaymentCommand {
+  readonly workspaceId: string;
+  readonly paymentId: string;
+  readonly businessDate: string;
+  readonly paymentAccountId: string;
+  readonly loanAccountId: string;
+  readonly amount: MoneyDto;
+  readonly breakdown: LoanPaymentBreakdownDto;
+  readonly paymentMethod?: PaymentMethod | null;
+  readonly counterpartyId?: string | null;
+  readonly description: string;
 }
 
 export interface UpdateTransactionCommand {
@@ -250,6 +291,13 @@ export class TransactionsService {
   ): Promise<{ readonly transaction: TransactionState; readonly warnings: readonly TransactionWarning[] }> {
     const { uow, transactions, ids } = this.deps;
     return uow.run(cmd.workspaceId, async () => {
+      // Los kinds administrados (préstamos) solo los crea su contexto dueño (add-loans, decisión 10).
+      if (isManagedKind(cmd.kind)) {
+        throw new DomainError(
+          'VALIDATION_FAILED',
+          `${cmd.kind} transactions are created from their own module, not from transactions`,
+        ).at('/kind');
+      }
       const [eligibility] = await this.deps.accounts.assertCanPost({
         workspaceId: cmd.workspaceId,
         accounts: [{ accountId: cmd.accountId, currency: cmd.amount.currency }],
@@ -523,6 +571,239 @@ export class TransactionsService {
     });
   }
 
+  /**
+   * `LOAN_DISBURSEMENT` administrado por DEBT (add-loans, design decisiones 5 y 10): misma unidad de trabajo que
+   * `RecordTransfer` (Accounts `FOR SHARE` con INV-026 → agregado → ledger → persistencia → outbox → auditoría), pero
+   * con `source = DEBT` y `externalRef = {debt.loan, loanId}`. NO es una operación de la API de transacciones. Es
+   * idempotente por `externalRef`: si ya existe una transacción vigente con la misma referencia y los mismos datos la
+   * devuelve sin crear otra; con datos distintos falla (`VALIDATION_FAILED`).
+   */
+  recordLoanDisbursement(cmd: LoanDisbursementCommand): Promise<TransactionState> {
+    const { uow, ids } = this.deps;
+    return uow.run(cmd.workspaceId, async () => {
+      const externalRef = { namespace: LOAN_DISBURSEMENT_NAMESPACE, id: cmd.loanId };
+      const existing = await this.deps.transactions.findByExternalRef(cmd.workspaceId, externalRef, {
+        forUpdate: true,
+      });
+      if (existing) {
+        const e = existing.snapshot;
+        if (
+          e.kind !== 'LOAN_DISBURSEMENT' ||
+          e.amount.toFixed() !== cmd.principal.amount ||
+          e.amount.currency.code !== cmd.principal.currency
+        ) {
+          throw new DomainError(
+            'VALIDATION_FAILED',
+            `loan ${cmd.loanId} already has a different disbursement`,
+          );
+        }
+        return e;
+      }
+      const [loan, destination] = await this.deps.accounts.assertCanPost({
+        workspaceId: cmd.workspaceId,
+        accounts: [
+          { accountId: cmd.loanAccountId, currency: cmd.principal.currency },
+          { accountId: cmd.destinationAccountId, currency: cmd.principal.currency },
+        ],
+      });
+      if (!loan) throw new DomainError('REFERENCE_NOT_FOUND', 'loan account not found').at('/loanAccountId');
+      if (!destination) {
+        throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/destinationAccountId');
+      }
+      const principal = await this.parseMoney(cmd.principal, '/principal');
+      let retainedFee: { amount: Money; categoryId: string; splitId: string } | null = null;
+      if (cmd.retainedFee) {
+        const feeAmount = await this.parseMoney(
+          { amount: cmd.retainedFee, currency: cmd.principal.currency },
+          '/retainedFee',
+        );
+        if (!feeAmount.isZero()) {
+          const categoryId = await this.deps.categories.loanExpense(cmd.workspaceId, 'LOAN_FEES');
+          if (!categoryId) {
+            throw new DomainError('REFERENCE_NOT_FOUND', 'system category LOAN_FEES is not provisioned');
+          }
+          retainedFee = { amount: feeAmount, categoryId, splitId: ids.next() };
+        }
+      }
+      const tx = Transaction.recordLoanDisbursement({
+        id: ids.next(),
+        workspaceId: cmd.workspaceId,
+        businessDate: cmd.businessDate,
+        loanAccount: { accountId: loan.accountId, nature: loan.nature, currency: loan.currency },
+        destinationAccount: {
+          accountId: destination.accountId,
+          nature: destination.nature,
+          currency: destination.currency,
+        },
+        principal,
+        retainedFee,
+        counterpartyId: cmd.counterpartyId ?? null,
+        description: cmd.description,
+        externalRef,
+      });
+      return this.persistManaged(tx, 'transactions.loan_disbursement.created', [
+        { field: 'toAccountId', before: null, after: destination.accountId },
+      ]);
+    });
+  }
+
+  /**
+   * `LOAN_PAYMENT` administrado por DEBT (add-loans, design decisiones 8 y 10, INV-016): pata `SOURCE` en la cuenta de
+   * pago, `TARGET` en la del préstamo por el principal y un split de gasto por cada componente no nulo. El desglose
+   * viaja en la transacción. Idempotente por `externalRef = {debt.loan-payment, paymentId}` (ver `recordLoanDisbursement`).
+   */
+  recordLoanPayment(cmd: LoanPaymentCommand): Promise<TransactionState> {
+    const { uow, ids } = this.deps;
+    return uow.run(cmd.workspaceId, async () => {
+      const externalRef = { namespace: LOAN_PAYMENT_NAMESPACE, id: cmd.paymentId };
+      const existing = await this.deps.transactions.findByExternalRef(cmd.workspaceId, externalRef, {
+        forUpdate: true,
+      });
+      if (existing) {
+        const e = existing.snapshot;
+        if (
+          e.kind !== 'LOAN_PAYMENT' ||
+          e.amount.toFixed() !== cmd.amount.amount ||
+          e.amount.currency.code !== cmd.amount.currency
+        ) {
+          throw new DomainError(
+            'VALIDATION_FAILED',
+            `payment ${cmd.paymentId} already has a different transaction`,
+          );
+        }
+        return e;
+      }
+      const amount = await this.parseMoney(cmd.amount, '/amount');
+      const money = (v: string, pointer: string) =>
+        this.parseMoney({ amount: v, currency: cmd.amount.currency }, `/breakdown/${pointer}`);
+      const breakdown = LoanPaymentBreakdown.create({
+        loanId: cmd.breakdown.loanId,
+        principal: await money(cmd.breakdown.principal, 'principal'),
+        interest: await money(cmd.breakdown.interest, 'interest'),
+        fees: await money(cmd.breakdown.fees, 'fees'),
+        insurance: await money(cmd.breakdown.insurance, 'insurance'),
+        taxes: await money(cmd.breakdown.taxes, 'taxes'),
+      });
+      // Antes de tocar cuentas ni categorías: INV-016 (Σ componentes = monto) ⇒ PAYMENT_BREAKDOWN_MISMATCH.
+      breakdown.assertMatches(amount);
+      const [from, loan] = await this.deps.accounts.assertCanPost({
+        workspaceId: cmd.workspaceId,
+        accounts: [
+          { accountId: cmd.paymentAccountId, currency: cmd.amount.currency },
+          { accountId: cmd.loanAccountId, currency: cmd.amount.currency },
+        ],
+      });
+      if (!from) throw new DomainError('REFERENCE_NOT_FOUND', 'account not found').at('/paymentAccountId');
+      if (!loan) throw new DomainError('REFERENCE_NOT_FOUND', 'loan account not found').at('/loanAccountId');
+      const categoryIds = {} as Record<LoanExpenseComponent, string>;
+      for (const { key, systemCode } of LOAN_EXPENSE_COMPONENTS) {
+        if (!breakdown[key].isPositive()) {
+          categoryIds[key] = '';
+          continue;
+        }
+        const id = await this.deps.categories.loanExpense(cmd.workspaceId, systemCode);
+        if (!id)
+          throw new DomainError('REFERENCE_NOT_FOUND', `system category ${systemCode} is not provisioned`);
+        categoryIds[key] = id;
+      }
+      const tx = Transaction.recordLoanPayment({
+        id: ids.next(),
+        workspaceId: cmd.workspaceId,
+        businessDate: cmd.businessDate,
+        paymentAccount: { accountId: from.accountId, nature: from.nature, currency: from.currency },
+        loanAccount: { accountId: loan.accountId, nature: loan.nature, currency: loan.currency },
+        amount,
+        breakdown,
+        categoryIds,
+        newSplitId: () => ids.next(),
+        counterpartyId: cmd.counterpartyId ?? null,
+        paymentMethod: cmd.paymentMethod ?? null,
+        description: cmd.description,
+        externalRef,
+      });
+      return this.persistManaged(tx, 'transactions.loan_payment.created', [
+        { field: 'toAccountId', before: null, after: loan.accountId },
+        { field: 'loanId', before: null, after: breakdown.loanId },
+        { field: 'principal', before: null, after: breakdown.principal },
+      ]);
+    });
+  }
+
+  /**
+   * Anula una transacción administrada (reversa del asiento) por el camino interno que sí lo permite: solo DEBT la
+   * invoca (`LoanTransactionsPort.voidManaged`), nunca la API de transacciones. Idempotente si ya está anulada.
+   */
+  voidManagedTransaction(workspaceId: string, transactionId: string, reason: string): Promise<void> {
+    return this.deps.uow.run(workspaceId, async () => {
+      const tx = await this.deps.transactions.findById(workspaceId, transactionId, { forUpdate: true });
+      if (!tx) throw notFound(transactionId);
+      if (!isManagedKind(tx.snapshot.kind)) {
+        throw new DomainError(
+          'VALIDATION_FAILED',
+          `transaction ${transactionId} is not a managed transaction`,
+        );
+      }
+      if (tx.status === 'VOIDED') return;
+      await this.voidLoaded(tx, workspaceId, reason, {});
+    });
+  }
+
+  /** Persistencia común de una transacción administrada nueva (posteo, eventos, auditoría y recorrido). */
+  private async persistManaged(
+    tx: Transaction,
+    action: string,
+    extraChanges: readonly AuditChangeInput[],
+  ): Promise<TransactionState> {
+    const entryId = await this.postEntry(tx);
+    tx.attachEntry(entryId);
+    await this.deps.transactions.insert(tx);
+    await this.link(tx, entryId, 'POSTED');
+    const s = tx.snapshot;
+    const events: LifecycleEventRefDto[] = [
+      await this.publish(tx, TRANSACTION_EVENTS.created, {
+        transactionId: s.id,
+        kind: s.kind,
+        status: s.status,
+        businessDate: s.businessDate,
+        description: s.description,
+        counterpartyId: s.counterpartyId,
+        origin: { type: s.source, refId: loanIdOf(s) },
+        legs: legsPayload(s),
+        splits: splitsPayload(s),
+        postingDate: s.postingDate,
+        refundOfTransactionId: null,
+        paymentMethod: s.paymentMethod,
+        transition: 'RECORD',
+      }),
+      ...(await this.publishPosted(tx, entryId, null, null)),
+    ];
+    const changes: AuditChangeInput[] = [
+      { field: 'kind', before: null, after: s.kind },
+      { field: 'status', before: null, after: s.status },
+      { field: 'transactionDate', before: null, after: s.businessDate },
+      { field: 'accountId', before: null, after: s.accountId },
+      { field: 'amount', before: null, after: s.amount },
+      ...extraChanges,
+    ];
+    if (s.splits.length > 0) changes.push({ field: 'splits', before: null, after: splitsAudit(s) });
+    if (s.description !== null) changes.push({ field: 'description', before: null, after: s.description });
+    changes.push({ field: 'journalEntryId', before: null, after: entryId });
+    await this.record(
+      tx,
+      {
+        workspaceId: s.workspaceId,
+        action,
+        aggregateType: 'Transaction',
+        aggregateId: s.id,
+        aggregateVersion: s.version,
+        changes,
+      },
+      { events, journalEntries: { posted: entryId } },
+    );
+    // Releer la fila: `created_at` lo fija la base al insertar (ver `recordTransaction`).
+    return ((await this.deps.transactions.findById(s.workspaceId, s.id)) ?? tx).snapshot;
+  }
+
   /** `PostTransaction`: PENDING → POSTED creando el asiento (TC-TRANSACTIONS-PENDING-001). */
   postTransaction(
     workspaceId: string,
@@ -591,6 +872,14 @@ export class TransactionsService {
       }
       const tx = await this.load(workspaceId, cmd.transactionId, cmd.expectedVersion);
       const before = tx.snapshot;
+      // Administradas (préstamos): solo datos descriptivos; lo financiero se opera desde DEBT (decisión 10).
+      assertManagedEditAllowed(before, {
+        ...(cmd.transactionDate !== undefined ? { businessDate: cmd.transactionDate } : {}),
+        ...(cmd.accountId !== undefined ? { accountId: cmd.accountId } : {}),
+        ...(cmd.toAccountId !== undefined ? { toAccount: cmd.toAccountId } : {}),
+        ...(cmd.amount !== undefined ? { amount: cmd.amount } : {}),
+        ...(cmd.splits !== undefined ? { splits: cmd.splits } : {}),
+      });
       const changes: { -readonly [K in keyof TransactionChanges]: TransactionChanges[K] } = {};
       if (cmd.transactionDate !== undefined) changes.businessDate = cmd.transactionDate;
       for (const f of ['postingDate', 'description', 'notes', 'counterpartyId', 'paymentMethod'] as const) {
@@ -791,9 +1080,27 @@ export class TransactionsService {
   ): Promise<TransactionState> {
     return this.deps.uow.run(workspaceId, async () => {
       const tx = await this.load(workspaceId, transactionId, expectedVersion);
+      // Administradas (préstamos): se anulan desde su contexto (`voidManagedTransaction`), no desde aquí.
+      if (isManagedKind(tx.snapshot.kind)) throw managedExternally(tx.snapshot);
+      return this.voidLoaded(tx, workspaceId, reason, options);
+    });
+  }
+
+  /** Cuerpo común de la anulación (reversa del asiento activo y estado VOIDED) sobre una transacción ya cargada. */
+  private async voidLoaded(
+    tx: Transaction,
+    workspaceId: string,
+    reason: string,
+    options: { readonly correctInCurrentPeriod?: boolean },
+  ): Promise<TransactionState> {
+    {
       const before = tx.snapshot;
       if (before.status === 'POSTED' || before.status === 'CLEARED') {
-        await this.assertAccounts(workspaceId, [before.accountId]);
+        await this.assertAccounts(
+          workspaceId,
+          // Las administradas mueven dos cuentas: ambas deben estar activas para revertir (INV-026).
+          isManagedKind(before.kind) ? before.legs.map((l) => l.accountId) : [before.accountId],
+        );
       }
       const { previousStatus, entryToReverse } = tx.void(reason, this.deps.clock.now().toString());
       let reversalId: string | null = null;
@@ -847,7 +1154,7 @@ export class TransactionsService {
         },
       );
       return s;
-    });
+    }
   }
 
   /** `UnreconcileTransaction`: RECONCILED → CLEARED con motivo (TC-TRANSACTIONS-RECONCILED-003). */

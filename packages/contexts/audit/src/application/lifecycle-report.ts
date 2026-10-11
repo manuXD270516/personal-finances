@@ -249,6 +249,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       RecurringDefinition: 'Definición recurrente',
       RecurringOccurrence: 'Ocurrencia recurrente',
       Subscription: 'Suscripción',
+      Loan: 'Préstamo',
     },
     states: {
       Transaction: {
@@ -275,6 +276,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CANCELLED: 'Cancelada',
       },
       Subscription: { TRIAL: 'En prueba', ACTIVE: 'Activa', PAUSED: 'Pausada', CANCELLED: 'Cancelada' },
+      Loan: { DRAFT: 'Borrador', ACTIVE: 'Activo', PAID_OFF: 'Saldado', CANCELLED: 'Cancelado' },
     },
     transitions: {
       Transaction: {
@@ -321,6 +323,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         UNDO_SCHEDULED_CANCELLATION: 'Deshacer la cancelación programada',
         CANCEL: 'Cancelar',
       },
+      Loan: {
+        REGISTER: 'Registrar',
+        DISBURSE: 'Desembolsar',
+        REGISTER_EXISTING: 'Registrar préstamo en curso',
+        PAY_OFF: 'Saldar',
+        REACTIVATE: 'Reactivar',
+        CANCEL: 'Cancelar',
+      },
     },
     element: 'Elemento',
     currentState: 'Estado actual',
@@ -362,6 +372,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       RecurringDefinition: 'Recurring definition',
       RecurringOccurrence: 'Recurring occurrence',
       Subscription: 'Subscription',
+      Loan: 'Loan',
     },
     states: {
       Transaction: {
@@ -388,6 +399,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CANCELLED: 'Cancelled',
       },
       Subscription: { TRIAL: 'Trial', ACTIVE: 'Active', PAUSED: 'Paused', CANCELLED: 'Cancelled' },
+      Loan: { DRAFT: 'Draft', ACTIVE: 'Active', PAID_OFF: 'Paid off', CANCELLED: 'Cancelled' },
     },
     transitions: {
       Transaction: {
@@ -434,6 +446,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         UNDO_SCHEDULED_CANCELLATION: 'Undo scheduled cancellation',
         CANCEL: 'Cancel',
       },
+      Loan: {
+        REGISTER: 'Register',
+        DISBURSE: 'Disburse',
+        REGISTER_EXISTING: 'Register ongoing loan',
+        PAY_OFF: 'Pay off',
+        REACTIVATE: 'Reactivate',
+        CANCEL: 'Cancel',
+      },
     },
     element: 'Item',
     currentState: 'Current state',
@@ -475,6 +495,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
       RecurringDefinition: 'Definição recorrente',
       RecurringOccurrence: 'Ocorrência recorrente',
       Subscription: 'Assinatura',
+      Loan: 'Empréstimo',
     },
     states: {
       Transaction: {
@@ -501,6 +522,7 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         CANCELLED: 'Cancelada',
       },
       Subscription: { TRIAL: 'Em teste', ACTIVE: 'Ativa', PAUSED: 'Pausada', CANCELLED: 'Cancelada' },
+      Loan: { DRAFT: 'Rascunho', ACTIVE: 'Ativo', PAID_OFF: 'Quitado', CANCELLED: 'Cancelado' },
     },
     transitions: {
       Transaction: {
@@ -545,6 +567,14 @@ const TEXTS: Readonly<Record<LifecycleReportLocale, ReportTexts>> = {
         RESUME: 'Retomar',
         SCHEDULE_CANCELLATION: 'Programar o cancelamento',
         UNDO_SCHEDULED_CANCELLATION: 'Desfazer o cancelamento programado',
+        CANCEL: 'Cancelar',
+      },
+      Loan: {
+        REGISTER: 'Registrar',
+        DISBURSE: 'Desembolsar',
+        REGISTER_EXISTING: 'Registrar empréstimo em andamento',
+        PAY_OFF: 'Quitar',
+        REACTIVATE: 'Reativar',
         CANCEL: 'Cancelar',
       },
     },

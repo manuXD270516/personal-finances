@@ -5,16 +5,21 @@ spec: debt/loans
 related_specs: ['ledger/journal-posting']
 requirement: 'Desembolso registrado como transacción'
 scenario: 'Desembolso completo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-002']
 nfr: []
 invariants: ['INV-004', 'INV-030']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/debt/src/domain/loan.test.ts
+  - packages/contexts/transactions/src/application/loans.service.test.ts
+  - packages/contexts/transactions/src/domain/loan-transactions.test.ts
+  - packages/contexts/transactions/test/integration/pg-loans.int.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'disbursement', 'ledger']

@@ -243,7 +243,7 @@ Se conserva la secuencia propuesta con estos cambios por dependencias:
 | planning | `planning/financial-periods`, `planning/budgets`, `planning/budget-templates`, `planning/month-closing` |
 | commitments | `commitments/recurrence-engine`, `commitments/subscriptions` |
 | goals | `goals/savings-goals` |
-| debt | `debt/loans`, `debt/amortization`, `debt/credit-cards` |
+| debt | `debt/loans`, `debt/amortization` (activas desde Phase 4 con `add-loans`, que crea `@pf/debt`), `debt/credit-cards` |
 | fx | `fx/market-rates`, `fx/market-rate-providers`, `fx/conversion-pricing` |
 | documents | `documents/attachments` |
 | imports | `imports/import-pipeline` (activa desde Phase 3 con el subconjunto CSV de `add-basic-csv-import`; pipeline completo en Phase 6), `imports/banking-providers` |

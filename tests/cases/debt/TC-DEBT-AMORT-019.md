@@ -5,16 +5,19 @@ spec: debt/amortization
 related_specs: []
 requirement: 'Explicación sugerida de las diferencias'
 scenario: 'El banco usa ACT/365'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-003']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/debt/src/domain/schedule-comparator.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['amortization', 'comparison', 'suggestions']

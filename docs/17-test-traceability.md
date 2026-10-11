@@ -211,7 +211,7 @@ flowchart TB
 | R4 | Test con un TC-ID que no existe en `tests/cases` | **Error** |
 | R5 | Test con un TC-ID `deprecated` | **Error** |
 | R6 | Front matter inválido según schema, ID ≠ nombre de archivo, directorio ≠ contexto | **Error** |
-| R7 | Invariante `INV-NNN` sin ningún TC activo, para invariantes cuyo contexto ya está en una fase iniciada (INV-013 desde Phase 3, INV-014 desde el primer import, INV-016/INV-018 desde Phase 4) | **Error** |
+| R7 | Invariante `INV-NNN` sin ningún TC activo, para invariantes cuyo contexto ya está en una fase iniciada (INV-013 desde Phase 3, INV-014 desde el primer import, INV-016/INV-018 desde Phase 4) | **Error**. INV-016 e INV-017 tienen TC activos desde `add-loans` (TC-DEBT-AMORT-004/-005 y TC-DEBT-LOAN-012..018) |
 | R8 | TC-ID duplicado | **Error** |
 | R9 | TC `ready` sin test durante más de N días / tests marcados `skip` con TC `critical` | Warning |
 | R10 | Change sin sección **Test Impact** o que lista TCs inexistentes | **Error** |

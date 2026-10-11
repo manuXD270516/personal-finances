@@ -39,6 +39,24 @@ function limitOf(q: Json): number {
   return Number.isInteger(raw) ? Math.min(Math.max(raw, 1), MAX_PAGE_LIMIT) : DEFAULT_PAGE_LIMIT;
 }
 
+/**
+ * `RECURRING_MANAGED_EXTERNALLY` (409) publica el administrador en la extensión `details` del problem
+ * (`managedBy`, `managedRef` y, en cuotas de préstamo, `scheduleKey`): la UI redirige al préstamo (openspec add-loans, N4).
+ */
+async function withManagedDetails<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (isDomainError(err) && err.code === 'RECURRING_MANAGED_EXTERNALLY') {
+      throw new ApiProblem('RECURRING_MANAGED_EXTERNALLY', err.message, {
+        extensions: { details: err.details },
+        cause: err,
+      });
+    }
+    throw err;
+  }
+}
+
 function userIdOf(req: ApiRequest): string {
   const principal = principalOf(req);
   if (!principal) throw new ApiProblem('UNAUTHENTICATED', 'an authenticated user is required');
@@ -142,16 +160,18 @@ export class RecurringController {
     @Body() body: Json,
     @ExpectedVersion() expected: number,
   ) {
-    return this.occurrences.edit({
-      workspaceId,
-      userId: userIdOf(req),
-      occurrenceId,
-      expectedVersion: expected,
-      ...(body['expectedAmount'] ? { expectedAmount: body['expectedAmount'] as never } : {}),
-      ...(body['expectedMin'] ? { expectedMin: body['expectedMin'] as never } : {}),
-      ...(body['expectedMax'] ? { expectedMax: body['expectedMax'] as never } : {}),
-      ...(str(body, 'dueDate') ? { dueDate: str(body, 'dueDate') as string } : {}),
-    });
+    return withManagedDetails(() =>
+      this.occurrences.edit({
+        workspaceId,
+        userId: userIdOf(req),
+        occurrenceId,
+        expectedVersion: expected,
+        ...(body['expectedAmount'] ? { expectedAmount: body['expectedAmount'] as never } : {}),
+        ...(body['expectedMin'] ? { expectedMin: body['expectedMin'] as never } : {}),
+        ...(body['expectedMax'] ? { expectedMax: body['expectedMax'] as never } : {}),
+        ...(str(body, 'dueDate') ? { dueDate: str(body, 'dueDate') as string } : {}),
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/occurrences/:occurrenceId/materialize')
@@ -162,14 +182,16 @@ export class RecurringController {
     @Param('occurrenceId') occurrenceId: string,
     @Body() body: Json,
   ) {
-    return this.occurrences.materialize({
-      workspaceId,
-      userId: userIdOf(req),
-      occurrenceId,
-      amount: (body['amount'] as never) ?? null,
-      businessDate: str(body, 'businessDate') ?? null,
-      status: (str(body, 'status') as 'PENDING' | 'POSTED' | undefined) ?? null,
-    });
+    return withManagedDetails(() =>
+      this.occurrences.materialize({
+        workspaceId,
+        userId: userIdOf(req),
+        occurrenceId,
+        amount: (body['amount'] as never) ?? null,
+        businessDate: str(body, 'businessDate') ?? null,
+        status: (str(body, 'status') as 'PENDING' | 'POSTED' | undefined) ?? null,
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/occurrences/:occurrenceId/skip')
@@ -180,12 +202,14 @@ export class RecurringController {
     @Param('occurrenceId') occurrenceId: string,
     @Body() body: Json,
   ) {
-    return this.occurrences.skip({
-      workspaceId,
-      userId: userIdOf(req),
-      occurrenceId,
-      reason: str(body, 'reason') ?? null,
-    });
+    return withManagedDetails(() =>
+      this.occurrences.skip({
+        workspaceId,
+        userId: userIdOf(req),
+        occurrenceId,
+        reason: str(body, 'reason') ?? null,
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/occurrences/:occurrenceId/link')
@@ -197,12 +221,14 @@ export class RecurringController {
     @Body() body: Json,
   ) {
     try {
-      return await this.occurrences.link({
-        workspaceId,
-        userId: userIdOf(req),
-        occurrenceId,
-        transactionId: str(body, 'transactionId') ?? '',
-      });
+      return await withManagedDetails(() =>
+        this.occurrences.link({
+          workspaceId,
+          userId: userIdOf(req),
+          occurrenceId,
+          transactionId: str(body, 'transactionId') ?? '',
+        }),
+      );
     } catch (err) {
       // `details.reasons` (ACCOUNT, KIND, CURRENCY, VOIDED) viaja como extensión del problem (RFC 9457).
       if (isDomainError(err) && err.code === 'OCCURRENCE_LINK_MISMATCH') {
@@ -247,23 +273,25 @@ export class RecurringController {
     @Body() body: Json,
     @ExpectedVersion() expected: number,
   ) {
-    return this.definitions.updateDetails({
-      workspaceId,
-      userId: userIdOf(req),
-      definitionId,
-      expectedVersion: expected,
-      ...(body['name'] !== undefined ? { name: str(body, 'name') as string } : {}),
-      ...('description' in body ? { description: (body['description'] as string | null) ?? null } : {}),
-      ...('notes' in body ? { notes: (body['notes'] as string | null) ?? null } : {}),
-      ...(body['matching'] !== undefined
-        ? {
-            matching: body['matching'] as {
-              amountTolerancePercent?: string | null;
-              dateWindowDays?: number | null;
-            },
-          }
-        : {}),
-    });
+    return withManagedDetails(() =>
+      this.definitions.updateDetails({
+        workspaceId,
+        userId: userIdOf(req),
+        definitionId,
+        expectedVersion: expected,
+        ...(body['name'] !== undefined ? { name: str(body, 'name') as string } : {}),
+        ...('description' in body ? { description: (body['description'] as string | null) ?? null } : {}),
+        ...('notes' in body ? { notes: (body['notes'] as string | null) ?? null } : {}),
+        ...(body['matching'] !== undefined
+          ? {
+              matching: body['matching'] as {
+                amountTolerancePercent?: string | null;
+                dateWindowDays?: number | null;
+              },
+            }
+          : {}),
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/:definitionId/revisions')
@@ -275,14 +303,16 @@ export class RecurringController {
     @Body() body: Json,
     @ExpectedVersion() expected: number,
   ) {
-    return this.definitions.revise({
-      workspaceId,
-      userId: userIdOf(req),
-      definitionId,
-      expectedVersion: expected,
-      effectiveFrom: str(body, 'effectiveFrom') ?? '',
-      changes: (body['changes'] as TemplateChanges | undefined) ?? {},
-    });
+    return withManagedDetails(() =>
+      this.definitions.revise({
+        workspaceId,
+        userId: userIdOf(req),
+        definitionId,
+        expectedVersion: expected,
+        effectiveFrom: str(body, 'effectiveFrom') ?? '',
+        changes: (body['changes'] as TemplateChanges | undefined) ?? {},
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/:definitionId/pause')
@@ -293,12 +323,14 @@ export class RecurringController {
     @Param('definitionId') definitionId: string,
     @ExpectedVersion() expected: number,
   ) {
-    return this.definitions.pause({
-      workspaceId,
-      userId: userIdOf(req),
-      definitionId,
-      expectedVersion: expected,
-    });
+    return withManagedDetails(() =>
+      this.definitions.pause({
+        workspaceId,
+        userId: userIdOf(req),
+        definitionId,
+        expectedVersion: expected,
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/:definitionId/resume')
@@ -309,12 +341,14 @@ export class RecurringController {
     @Param('definitionId') definitionId: string,
     @ExpectedVersion() expected: number,
   ) {
-    return this.definitions.resume({
-      workspaceId,
-      userId: userIdOf(req),
-      definitionId,
-      expectedVersion: expected,
-    });
+    return withManagedDetails(() =>
+      this.definitions.resume({
+        workspaceId,
+        userId: userIdOf(req),
+        definitionId,
+        expectedVersion: expected,
+      }),
+    );
   }
 
   @Post('workspaces/:workspaceId/recurring/:definitionId/end')
@@ -326,13 +360,15 @@ export class RecurringController {
     @Body() body: Json,
     @ExpectedVersion() expected: number,
   ) {
-    return this.definitions.end({
-      workspaceId,
-      userId: userIdOf(req),
-      definitionId,
-      expectedVersion: expected,
-      endDate: str(body, 'endDate'),
-    });
+    return withManagedDetails(() =>
+      this.definitions.end({
+        workspaceId,
+        userId: userIdOf(req),
+        definitionId,
+        expectedVersion: expected,
+        endDate: str(body, 'endDate'),
+      }),
+    );
   }
 
   @Get('workspaces/:workspaceId/recurring/:definitionId/occurrences')

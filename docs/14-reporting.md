@@ -102,7 +102,7 @@ Convención de signos del ledger: débito +, crédito − (ARCHITECTURE §4.1). 
 | KPI | Fórmula | Conversión | Notas |
 |---|---|---|---|
 | **Income** | `Income(P) = − Σ posting.amount` sobre postings a `INCOME:*` con `entry_date ∈ P` | `conv_t` por posting | Excluye transfers, conversiones, `EQUITY:*` (opening, FX_TRADING, adjustments). Reversas (void) se netean automáticamente. |
-| **Expenses** | `Expenses(P) = Σ posting.amount` sobre postings a `EXPENSE:*` con `entry_date ∈ P` | `conv_t` | Incluye fees de conversión, intereses y fees de préstamo/tarjeta. **No** incluye pagos de principal de deuda ni pagos de tarjeta (son transfers). Refunds restan. |
+| **Expenses** | `Expenses(P) = Σ posting.amount` sobre postings a `EXPENSE:*` con `entry_date ∈ P` | `conv_t` | Incluye fees de conversión, intereses y fees de préstamo/tarjeta. **No** incluye pagos de principal de deuda ni pagos de tarjeta (son transfers). Refunds restan. **As-built Phase 4 (`add-loans`):** las transacciones `LOAN_PAYMENT` y `LOAN_DISBURSEMENT` tienen flujo nominal solo en sus splits (interés, comisiones, seguro e impuestos de un pago; la comisión retenida de un desembolso); el principal (patas de activo y pasivo) no es gasto ni ingreso. |
 | **Expenses por categoría c** | `Σ posting.amount` EXPENSE donde `split.category = c` | `conv_t` | Puede ser negativo si refunds > gastos en P (se muestra como "neto negativo", no se oculta). |
 | **Net income / Savings (ahorro contable)** | `Savings(P) = Income(P) − Expenses(P)` | — | |
 | **Savings rate** | `SR(P) = Savings(P) / Income(P)` si `Income(P) > 0`; si no, **indefinido** (se muestra "—", no 0 % ni −∞) | — | Se muestra con 1 decimal. |

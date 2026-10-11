@@ -5,16 +5,21 @@ spec: debt/loans
 related_specs: ['reporting/dashboard', 'planning/budgets']
 requirement: 'Gastos del préstamo en los reportes'
 scenario: 'Gasto de noviembre con una cuota pagada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007', 'FR-DEBT-002']
 nfr: []
 invariants: ['INV-009']
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/transactions/src/application/loans.service.test.ts
+  - packages/contexts/transactions/src/domain/loan-transactions.test.ts
+  - packages/contexts/transactions/test/integration/pg-loans.int.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'reporting']

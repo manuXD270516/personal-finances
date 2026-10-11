@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: []
 requirement: 'Diferencias entre el pago real y la cuota esperada'
 scenario: 'Pago parcial de una cuota con cargos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-007']
 nfr: []
 invariants: ['INV-016']
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - packages/contexts/debt/src/domain/payment-allocator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['loans', 'payment', 'partial']

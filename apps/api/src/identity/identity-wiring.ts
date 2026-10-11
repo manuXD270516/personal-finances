@@ -27,6 +27,8 @@ import {
   COUNTERPARTY_LIFECYCLE_MACHINE,
   createClassificationRuntime,
 } from '@pf/classification/interface/classification.module';
+import { DEBT_AUDIT_POLICY } from '@pf/debt/contracts';
+import { DebtModule, LOAN_LIFECYCLE_MACHINE, createDebtRuntime } from '@pf/debt/interface/debt.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
 import {
   createFxRuntime,
@@ -201,6 +203,8 @@ export const LIFECYCLE_MACHINES = [
   RECURRING_OCCURRENCE_LIFECYCLE_MACHINE,
   // add-subscriptions (Phase 3): suscripción de COMMITMENTS (docs/35 D138).
   SUBSCRIPTION_LIFECYCLE_MACHINE,
+  // add-loans (Phase 4): préstamo de DEBT.
+  LOAN_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -217,6 +221,8 @@ export const AUDIT_POLICIES = [
   COMMITMENTS_AUDIT_POLICY,
   // add-basic-csv-import (Phase 3): importaciones CSV (sin celdas, descripciones ni montos de filas).
   IMPORTS_AUDIT_POLICY,
+  // add-loans (Phase 4): préstamos, pagos, tablas del banco y comparaciones.
+  DEBT_AUDIT_POLICY,
 ];
 
 /**
@@ -491,6 +497,25 @@ export function financeRuntimes(input: {
     histograms: otelHistograms('@pf/commitments'),
   });
   deferred.commitments = commitments;
+  // DEBT (add-loans): préstamos. Solo contratos públicos: TRANSACTIONS (`LoanTransactionsPort`), COMMITMENTS
+  // (`RecurringDefinitionPort`), ACCOUNTS (`AccountProvisioningPort`), LEDGER, CLASSIFICATION e IDENTITY.
+  const debt = createDebtRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    audit: input.audit,
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    outbox: classificationOutbox(writer),
+    calendar: identityWorkspaceCalendar(input.pool),
+    accounts: accounts.query,
+    accountCatalog: accounts.catalog,
+    provisioning: accounts.provisioning,
+    balances: ledger.accountBalances,
+    classification: classification.validator,
+    counterparties: classification.counterparties,
+    transactions: transactions.loans,
+    recurring: commitments.recurringDefinitions,
+  });
   // IMPORTS (add-basic-csv-import): contratos públicos de TRANSACTIONS, ACCOUNTS, LEDGER y PLANNING; sin importar sus capas.
   const imports = createImportsRuntime({
     pool: input.pool,
@@ -519,6 +544,7 @@ export function financeRuntimes(input: {
     notifications,
     commitments,
     imports,
+    debt,
   };
 }
 
@@ -567,6 +593,7 @@ export function identityImports(input: {
     notifications,
     commitments,
     imports,
+    debt,
   } = financeRuntimes({
     pool: input.pool,
     clock: input.conventions.clock,
@@ -625,6 +652,7 @@ export function identityImports(input: {
         classification,
         planning,
         commitments,
+        debt,
       }),
     }),
     ClassificationModule.register({ runtime: classification, conventions: input.conventions }),
@@ -643,6 +671,8 @@ export function identityImports(input: {
     CommitmentsModule.register({ runtime: commitments, conventions: input.conventions }),
     // IMPORTS — openspec add-basic-csv-import (Phase 3): `/imports*`.
     ImportsModule.register({ runtime: imports, conventions: input.conventions }),
+    // DEBT — openspec add-loans (Phase 4): `/loans*`.
+    DebtModule.register({ runtime: debt, conventions: input.conventions }),
   ];
 }
 
@@ -654,11 +684,19 @@ export function identityImports(input: {
 export function lifecycleExportLoaders(
   runtimes: Pick<
     ReturnType<typeof financeRuntimes>,
-    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'commitments'
+    'transactions' | 'accounts' | 'fx' | 'classification' | 'planning' | 'commitments' | 'debt'
   >,
 ): LifecycleExportLoaders {
-  const { transactions, accounts, fx, classification, planning, commitments } = runtimes;
+  const { transactions, accounts, fx, classification, planning, commitments, debt } = runtimes;
   return {
+    // add-loans (Phase 4): préstamo de DEBT.
+    Loan: async ({ userId, workspaceId, aggregateId }) => {
+      const loan = await debt.queries.get(workspaceId, aggregateId);
+      return {
+        lifecycle: await debt.queries.lifecycle({ userId, workspaceId, loanId: aggregateId }),
+        label: loan.name,
+      };
+    },
     Transaction: async ({ userId, workspaceId, aggregateId }) => {
       const view = await transactions.service.transactionLifecycle({
         userId,

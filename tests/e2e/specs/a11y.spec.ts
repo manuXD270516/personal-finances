@@ -52,6 +52,10 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   // add-recurrence-engine 7.1: pagos recurrentes (comprometido del periodo y pestañas; la versión con datos, el formulario y
   // el detalle los analiza recurring.spec.ts).
   { path: '/recurring', name: 'Pagos recurrentes' },
+  // add-loans 6.5: lista de préstamos y alta (vista previa; la versión con datos, el detalle y la comparación los analiza
+  // loans.spec.ts).
+  { path: '/debts', name: 'Deudas' },
+  { path: '/debts/nuevo', name: 'Nuevo préstamo' },
 ];
 
 async function seriousViolations(page: Page) {

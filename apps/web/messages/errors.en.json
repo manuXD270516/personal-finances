@@ -117,5 +117,19 @@
   "IMPORT_UNSUPPORTED_FORMAT": "We could not read the file as delimited text (CSV). Check that it is a CSV, that it is not empty and that it has at most 50 columns.",
   "IMPORT_TOO_MANY_ROWS": "The file has more rows than allowed (5,000). Split it into several files and import them separately.",
   "IMPORT_MAPPING_INVALID": "The column mapping is not valid for this file. Check the date, description and amount columns.",
-  "IMPORT_REVIEW_INCOMPLETE": "There are still possible duplicates without a decision. Decide each one (create, skip or exclude) before approving."
+  "IMPORT_REVIEW_INCOMPLETE": "There are still possible duplicates without a decision. Decide each one (create, skip or exclude) before approving.",
+  "LOAN_METHOD_NOT_AVAILABLE": "This amortization method is not available yet. For now only the French system (constant installment) is supported.",
+  "LOAN_ACCOUNT_INVALID": "The loan account must be an active loan-type account in the same currency.",
+  "LOAN_ACCOUNT_IN_USE": "That account already belongs to another loan. Choose another one or create a new account.",
+  "LOAN_ACCOUNT_NOT_EMPTY": "A new loan needs a loan account with a zero balance. Use a new account or register an ongoing loan.",
+  "LOAN_BALANCE_MISMATCH": "The account balance does not match the outstanding balance you entered. Check the amount or the account.",
+  "LOAN_NOT_DRAFT": "This loan is no longer a draft, so it cannot be disbursed again.",
+  "LOAN_NOT_ACTIVE": "This loan is not active: disburse it before registering payments, or it is already paid off or cancelled.",
+  "LOAN_TERMS_LOCKED": "The financial terms of an active loan cannot be edited. You can change the name, the lender and the payment account.",
+  "LOAN_OVERPAYMENT": "The payment is greater than what is still owed on the loan. Check the amount.",
+  "LOAN_PAYMENT_NOT_LATEST": "Only the most recent payment of the loan can be voided. Void the later ones first.",
+  "LOAN_HAS_PAYMENTS": "The loan has active payments and cannot be cancelled. Void its payments first.",
+  "LOAN_REFERENCE_INVALID": "The bank table has rows with errors and was not saved. Fix them and load it again.",
+  "PAYMENT_BREAKDOWN_MISMATCH": "The receipt breakdown does not add up to the amount paid. Check principal, interest, fees, insurance and taxes.",
+  "TRANSACTION_MANAGED_EXTERNALLY": "This transaction is managed by a loan: edit amounts or void the payment from the loan. Here you can only change notes and tags."
 }

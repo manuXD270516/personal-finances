@@ -35,7 +35,8 @@
     "created_at",
     "created_by",
     "indexed_amount",
-    "indexed_currency"
+    "indexed_currency",
+    "explicit_schedule"
   ],
   "properties": {
     "workspace_id": {
@@ -191,7 +192,8 @@
         "string",
         "null"
       ]
-    }
+    },
+    "explicit_schedule": {}
   },
   "x-pfos-table": "commitments.recurring_definition_version",
   "x-pfos-context": "commitments"

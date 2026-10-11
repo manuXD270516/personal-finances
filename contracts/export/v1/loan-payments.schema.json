@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/loan-payments.schema.json",
+  "title": "pfos-export v1 — loan-payments",
+  "description": "Registro de la sección «loan-payments» (tabla debt.loan_payment, contexto debt). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "loan_id",
+    "payment_no",
+    "transaction_id",
+    "account_id",
+    "business_date",
+    "amount",
+    "principal",
+    "interest",
+    "fees",
+    "insurance",
+    "taxes",
+    "explicit_breakdown",
+    "payment_method",
+    "status",
+    "voided_at",
+    "voided_by",
+    "voided_reason",
+    "created_by",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "loan_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "payment_no": {
+      "type": "integer"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "account_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "business_date": {
+      "type": "string",
+      "pattern": "^(-?infinity|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "principal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "interest": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "fees": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "insurance": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "taxes": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "explicit_breakdown": {
+      "type": "boolean"
+    },
+    "payment_method": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": "string"
+    },
+    "voided_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "voided_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "voided_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    }
+  },
+  "x-pfos-table": "debt.loan_payment",
+  "x-pfos-context": "debt"
+}

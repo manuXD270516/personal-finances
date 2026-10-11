@@ -34,6 +34,10 @@ export interface OccurrenceState {
   readonly lastAutoCreateError: string | null;
   /** Día (zona del workspace) del último intento de creación automática: no se reintenta el mismo día. */
   readonly lastAutoCreateOn: string | null;
+  /** Clave del ítem del calendario explícito (cuota de préstamo); `null` en las generadas por una regla. */
+  readonly scheduleKey: string | null;
+  /** `true` solo en `LOAN_PAYMENT`: una transacción puede resolver varias ocurrencias de la definición (N5). */
+  readonly sharesTransaction: boolean;
   readonly version: number;
   readonly createdAt: string;
 }
@@ -78,6 +82,8 @@ export class RecurringOccurrence {
     readonly expected: AmountSpec;
     readonly currency: string;
     readonly at: string;
+    readonly scheduleKey?: string | null | undefined;
+    readonly sharesTransaction?: boolean | undefined;
   }): RecurringOccurrence {
     const occurrence = new RecurringOccurrence(
       {
@@ -101,6 +107,8 @@ export class RecurringOccurrence {
         resolvedBy: null,
         lastAutoCreateError: null,
         lastAutoCreateOn: null,
+        scheduleKey: input.scheduleKey ?? null,
+        sharesTransaction: input.sharesTransaction ?? false,
         version: 1,
         createdAt: input.at,
       },
@@ -196,6 +204,51 @@ export class RecurringOccurrence {
       resolvedBy: input.by,
       lastAutoCreateError: null,
     });
+  }
+
+  /**
+   * Resolución por quien administra la definición (openspec add-loans, N5): la transacción ya existe (la registró el
+   * administrador) y resuelve esta ocurrencia sin emparejamiento (`matchedBy = null`).
+   */
+  settle(input: { readonly transactionId: string; readonly at: string; readonly by: string | null }): void {
+    this.assertNotResolved();
+    this.step('LINK', 'MATCHED', {
+      transactionId: input.transactionId,
+      resolution: 'MATCHED',
+      matchedBy: null,
+      resolvedAt: input.at,
+      resolvedBy: input.by,
+      lastAutoCreateError: null,
+    });
+  }
+
+  /**
+   * Devuelve la ocurrencia resuelta a no resuelta (N6): según el vencimiento contra hoy vuelve a programada, próxima
+   * (dentro de la anticipación) o atrasada; opcionalmente con un monto esperado restituido (sin marcarlo como edición).
+   */
+  unsettle(input: {
+    readonly today: LocalDate;
+    readonly leadDays: number;
+    readonly expected?: AmountSpec;
+    readonly overridden?: boolean;
+  }): string {
+    const released = this.state.transactionId as string;
+    const due = LocalDate.parse(this.state.dueDate);
+    const to: OccurrenceStatus =
+      input.today.compare(due) > 0
+        ? 'OVERDUE'
+        : input.today.compare(due.plusDays(-input.leadDays)) >= 0
+          ? 'DUE'
+          : 'SCHEDULED';
+    this.step('RELEASE', to, {
+      transactionId: null,
+      resolution: null,
+      matchedBy: null,
+      resolvedAt: null,
+      resolvedBy: null,
+      ...(input.expected ? { expected: input.expected, amountOverridden: input.overridden ?? false } : {}),
+    });
+    return released;
   }
 
   /** `SKIP` (terminal): no crea transacción, no cuenta como comprometida y no se regenera. */

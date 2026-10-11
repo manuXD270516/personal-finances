@@ -1,4 +1,5 @@
 import { isZeroAmount, sumAmounts } from '../common/money';
+import { isLoanManagedKind } from '../debt/logic';
 import {
   customFieldParams,
   EMPTY_CUSTOM_FIELD_FILTER,
@@ -104,14 +105,15 @@ export function availableActions(tx: Transaction) {
   const s = tx.status;
   return {
     edit: s !== 'VOIDED',
-    financialEdit: s !== 'VOIDED' && s !== 'RECONCILED',
+    // Las transacciones de préstamo las administra el préstamo (TRANSACTION_MANAGED_EXTERNALLY): sin montos ni anulación.
+    financialEdit: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind),
     post: s === 'PENDING',
     clear: s === 'POSTED',
     unclear: s === 'CLEARED',
     // Marcado directo como conciliada SIN extracto (docs/33 D74); la conciliación contra extracto es la sesión.
     reconcile: s === 'CLEARED',
     unreconcile: s === 'RECONCILED',
-    void: s !== 'VOIDED' && s !== 'RECONCILED',
+    void: s !== 'VOIDED' && s !== 'RECONCILED' && !isLoanManagedKind(tx.kind),
     duplicate: tx.kind === 'INCOME' || tx.kind === 'EXPENSE' || tx.kind === 'REFUND',
   };
 }

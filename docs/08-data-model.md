@@ -129,7 +129,7 @@ La lista de tablas del brief inicial se reconcilia con los contextos canónicos 
 | `month_closings` | Reemplazar (add-month-closing) | `planning.close_snapshot`, `close_snapshot_balance`, `close_snapshot_without_statement`, `period_reopening`, `close_pending_notice`, `closing_policy` | Snapshots y reaperturas **append-only** (PF003) en lugar de intentos mutables: el cierre es síncrono. |
 | `recurring_payments`, `subscriptions` | Fusionar | `commitments.recurring_definition` (+ `subscription` subtipo) + `recurring_occurrence` | Un motor de recurrencia. |
 | `savings_goals`, `goal_contributions` | Mantener | `goals.*` | Contribución TRANSFER o EARMARK. |
-| `loans`, `loan_payments` | Mantener / renombrar | `debt.loan`, `debt.loan_installment` | Pagos reales son transacciones; installment enlaza `paid_transaction_id`. |
+| `loans`, `loan_payments` | Mantener / renombrar | `debt.loan`, `debt.loan_installment` | Pagos reales son transacciones. As-built `add-loans`: `debt.loan_payment` + `debt.loan_payment_allocation` enlazan la transacción y la cuota (la cuota ya no guarda `paid_transaction_id`). |
 | `credit_cards` | Mantener | `debt.credit_card`, `debt.credit_card_statement` | La tarjeta es un `accounts.account` LIABILITY + términos en Debt. |
 | `documents`, `attachments` | Mantener | `documents.document`, `documents.attachment_link` | Link polimórfico (§5.11). |
 | `imports`, `import_rows` | Renombrar | `imports.import_job`, `imports.staged_transaction` (+ `row_link`, `import_error`) | Alineado con [13-import-architecture.md](13-import-architecture.md) §14. |
@@ -463,7 +463,7 @@ erDiagram
   TRANSACTION {
     uuid id PK
     uuid workspace_id FK
-    text kind "Phase 1: INCOME EXPENSE REFUND ADJUSTMENT TRANSFER CONVERSION; reservados OPENING_BALANCE LOAN_DISBURSEMENT LOAN_PAYMENT CARD_PAYMENT"
+    text kind "Phase 1: INCOME EXPENSE REFUND ADJUSTMENT TRANSFER CONVERSION; add-loans: LOAN_DISBURSEMENT LOAN_PAYMENT; reservados OPENING_BALANCE CARD_PAYMENT"
     text status "PENDING POSTED CLEARED RECONCILED VOIDED"
     date transaction_date
     date posting_date "fecha de acreditacion (nullable)"
@@ -481,6 +481,7 @@ erDiagram
     text external_ref_id
     uuid refund_of_transaction_id FK "solo REFUND"
     boolean confirmed_refund_excess
+    jsonb loan_payment_breakdown "solo LOAN_PAYMENT: loanId principal interest fees insurance taxes (add-loans)"
     int revision "sube con cada re-posting"
     uuid active_entry_id "ref ledger.journal_entry"
     timestamptz voided_at
@@ -635,6 +636,7 @@ erDiagram
 As-built Phase 1 (rev. 2026-10-04; migraciones `20261003200000_txn_transactions_core.sql`, `20261003210000_txn_transfers.sql`, `20261003220100_txn_conversions.sql` y `20261004130000_fx_quote_side_rate_types.sql`): la transacción guarda **cabecera nominal** (`account_id`, `amount > 0`, `currency`) y los legs llevan el signo contable; no existe `primary_account_id` ni `leg_no`/`line_no`/`introduced_in_revision` (el orden del split es `position` y la revisión que introduce un leg o split es `revision`). Estados `CLEARED`/`RECONCILED` se marcan sobre la misma columna `status` (mark-cleared/unreconcile, sin tabla propia en Phase 1). **As-built Phase 2 (`add-reconciliation`, rev. 2026-10-08):** `transaction` agrega `reconciliation_mode text` (`STATEMENT` | `WITHOUT_STATEMENT`; CHECK `(status = 'RECONCILED') = (reconciliation_mode IS NOT NULL)`, docs/33 D74), `reconciliation_id uuid` (solo en el `ADJUSTMENT` que crea una sesión) y el índice parcial `(workspace_id, account_id, transaction_date) WHERE reconciliation_mode = 'WITHOUT_STATEMENT'` (filtro `systemFlag`, D111); la migración rellena las `RECONCILED` de Phase 1 con `WITHOUT_STATEMENT` (D77) suspendiendo `FORCE RLS` solo dentro de la migración. La marca `RECONCILED_WITHOUT_STATEMENT` se deriva del modo y no se almacena. `payment_method` (D27) es solo descriptivo: no altera el ledger. Un ajuste lleva `adjustment_direction` (`INCREASE` = débito en ASSET, crédito en LIABILITY, según `account_nature` del leg) y `adjustment_reason`; un reembolso puede enlazar su gasto original con `refund_of_transaction_id` y `confirmed_refund_excess` registra que el usuario aceptó reembolsar más que el original. El saldo inicial de una cuenta se postea hoy directo al ledger (sin fila `OPENING_BALANCE` en `txn`, ver design de add-accounts-management). `conversion_detail`, `conversion_fee` y `transaction_journal_link` son append-only por grants (`SELECT, INSERT`), sin trigger `forbid_mutation`.
 
 Reglas adicionales:
+- **Transacciones de préstamo (as-built Phase 4, `add-loans`; migraciones `20261011100100_txn_loan_kinds.sql` y `20261011100110_txn_loan_ref_uk.sql`):** `kind` admite `LOAN_DISBURSEMENT` y `LOAN_PAYMENT`, siempre con `source = 'DEBT'` (administradas) y `external_ref_namespace` `debt.loan` / `debt.loan-payment`; la columna `loan_payment_breakdown jsonb` guarda `{loanId, principal, interest, fees, insurance, taxes}` y existe si y solo si el kind es `LOAN_PAYMENT` (CHECKs `transaction_loan_source_ck`, `transaction_loan_external_ref_ck` y `transaction_loan_breakdown_ck`); `txn.assert_splits_sum()` (INV-021) se amplía: en `LOAN_PAYMENT` Σ splits = monto − principal (lo que no es principal es gasto) y en `LOAN_DISBURSEMENT` Σ splits = comisión retenida; el índice único parcial `transaction_loan_ref_uk (workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace IN ('debt.loan','debt.loan-payment') AND status <> 'VOIDED'` (`CREATE UNIQUE INDEX CONCURRENTLY`, migración aparte) da una transacción vigente por préstamo y por pago. El pago omite la pata de principal si es 0 (CHECK `posting_nonzero`, docs/09 §6.9). El DTO de la API gana `loanId` y `loanPaymentBreakdown`.
 - **Σ splits vigentes = monto nominal** (INV-021) para kinds con parte nominal (`INCOME`, `EXPENSE`, `REFUND`, categorizados de `ADJUSTMENT`, componentes no-principal de `LOAN_PAYMENT`): validado en dominio y por el constraint trigger diferido `txn.assert_splits_sum()` sobre `transaction` y `transaction_split` (as-built: para `INCOME`, `EXPENSE` y `REFUND`; `23514`, `transaction_splits_sum_ck`). `TRANSFER`/`CONVERSION` solo tienen splits para fees (09 §6.17).
 - **Transferencias**: no hay tabla `transfer`; una transferencia es `kind='TRANSFER'` con legs `SOURCE`/`TARGET` en la misma moneda (cross-currency ⇒ `CONVERSION`). El recurso API `/transfers` es una fachada sobre este modelo ([10-api-design.md](10-api-design.md)). El pago de tarjeta de crédito es una transferencia (`kind='TRANSFER'`, destino `LIABILITY`; D27); `CARD_PAYMENT` queda reservado para `debt/credit-cards` (Phase 4). Refuerzo en BD (add-transfers, migración `20261003210000_txn_transfers.sql`; rev. 2026-10-04): constraint trigger `DEFERRABLE INITIALLY DEFERRED` `txn.assert_transfer_consistency()` sobre `transaction` y `transaction_leg` — entre los legs vigentes de una `TRANSFER` hay exactamente un `SOURCE` negativo y un `TARGET` positivo, ningún otro rol, dos cuentas distintas y una sola moneda igual a la de la cabecera; si no, `23514` con constraint `transaction_transfer_consistency_ck`.
 - **Conversiones en BD** (add-manual-conversions, migración `20261003220100_txn_conversions.sql`; rev. 2026-10-04): constraint trigger diferido `txn.assert_conversion_consistency()` sobre `transaction`, `transaction_leg`, `conversion_detail` y `conversion_fee` — un `SOURCE` negativo, un `TARGET` positivo y legs `FEE` negativos; monedas distintas; cuentas, montos y monedas de los legs iguales a los del detalle vigente (`transaction_conversion_consistency_ck`); y los fees no pagados desde otra cuenta concilian bruto y neto (INV-010: `converted_source_amount` + fees en origen = `source_amount`; `target_amount` + fees en destino = `gross_target_amount`; `conversion_detail_inv010_ck`).
@@ -878,8 +880,8 @@ erDiagram
     text name "1..120"
     text description
     text notes
-    text kind "INCOME EXPENSE TRANSFER"
-    text managed_by "USER SUBSCRIPTION (DEBT con expand)"
+    text kind "INCOME EXPENSE TRANSFER LOAN_PAYMENT (solo managed_by DEBT)"
+    text managed_by "USER SUBSCRIPTION DEBT"
     uuid managed_ref
     text status "ACTIVE PAUSED ENDED"
     int current_version_no
@@ -906,7 +908,7 @@ erDiagram
     uuid counterparty_id
     uuid_array tag_ids
     text payment_method
-    text cadence "9 cadencias y CUSTOM"
+    text cadence "9 cadencias, CUSTOM y EXPLICIT (add-loans)"
     smallint interval
     text rrule "normalizada"
     date dtstart
@@ -916,6 +918,7 @@ erDiagram
     text materialization_mode "AUTO_CREATE PENDING_APPROVAL NOTIFY_ONLY"
     text auto_create_status "PENDING POSTED"
     smallint lead_days
+    jsonb explicit_schedule "cadence EXPLICIT: key dueDate amount por cuota (add-loans)"
   }
   RECURRING_OCCURRENCE {
     uuid id PK
@@ -936,6 +939,8 @@ erDiagram
     text resolution "CREATED MATCHED SKIPPED"
     text matched_by "USER_LINK SUGGESTION"
     text skip_reason
+    text schedule_key "cuota (add-loans), unica por definicion"
+    bool shares_transaction "true solo en LOAN_PAYMENT"
     timestamptz resolved_at
     text last_auto_create_error
     int version
@@ -949,6 +954,8 @@ erDiagram
 | `recurring_occurrence` | **`(definition_id, occurrence_date)`** — generación idempotente (`INSERT ... ON CONFLICT DO NOTHING`, INV-013); parcial `(workspace_id, transaction_id) WHERE status IN ('MATERIALIZED','MATCHED')` (una transacción resuelve a lo sumo una ocurrencia) | `status IN ('MATERIALIZED','MATCHED')` ⇔ `transaction_id IS NOT NULL`; `status = 'CANCELLED'` ⇔ `cancel_reason IS NOT NULL` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','DUE','OVERDUE')` (comprometido y próximos pagos); `(workspace_id, status, due_date)` (job) | WS; `pf_app`/`pf_worker` SELECT, INSERT, UPDATE; sin DELETE | `version` |
 
 Las tres tablas se registran en `platform.workspace_scoped_table` (purga demo, ADR-0026) y declaran sección de portabilidad (`recurring-definitions`, `recurring-definition-versions`, `recurring-occurrences`, órdenes 750–752). **Defensa en profundidad en `txn.transaction`** (§5.4): índice único parcial `(workspace_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace = 'commitments.occurrence'`, creado con `CREATE UNIQUE INDEX CONCURRENTLY` en una migración separada: una transacción por ocurrencia aunque un bug reintente.
+
+**Cuotas de préstamo (`add-loans`, expand-only; migración `20261011100200_commitments_loan_payment.sql`).** `recurring_definition.kind` admite `LOAN_PAYMENT` solo con `managed_by = 'DEBT'` (CHECK `recurring_definition_loan_payment_ck`; `managed_by` admite `DEBT`); `recurring_definition_version` gana `explicit_schedule jsonb` (`[{key, dueDate, amount}]`) y la cadencia `EXPLICIT`, que van juntas (XOR con la regla: sin RRULE, fin ni máximo, y solo `NOTIFY_ONLY`); `recurring_occurrence` gana `schedule_key` (única por definición) y `shares_transaction`, y el índice único de vinculación transacción ↔ ocurrencia pasa a ser parcial (`WHERE NOT shares_transaction`) para que un pago cubra varias cuotas de su préstamo. La transición `RELEASE` de la máquina de ocurrencias admite destino `SCHEDULED`. Las guardas del motor por `kind = LOAN_PAYMENT` (no por `managedBy`) responden `RECURRING_MANAGED_EXTERNALLY` con `details {managedBy, managedRef, scheduleKey}`; los filtros N7 (matcher, liberación por anulación, backfill) y `listResolvedOutflows` excluyen `LOAN_PAYMENT`; el comprometido y los próximos pagos incluyen las cuotas con el nombre del préstamo y el número de cuota.
 
 **Matching sugerido (`add-commitment-matching`, expand-only).** Una tabla nueva en `commitments` y dos columnas nulas en `recurring_definition` (`matching_amount_tolerance_pct numeric(5,2)` 0..100 y `matching_date_window_days smallint` 0..15; `NULL` = valor por omisión del tipo de monto, D120). La sugerencia no escribe en `ledger.*` ni en `txn.*`: confirmar reutiliza el vínculo manual del motor.
 
@@ -1074,56 +1081,132 @@ erDiagram
 
 ```mermaid
 erDiagram
-  LOAN ||--|{ LOAN_INSTALLMENT : "cronograma"
-  LOAN ||--o{ LOAN_SCHEDULE_CHANGE : "cambios"
+  LOAN ||--|{ LOAN_SCHEDULE_VERSION : "versiones del cronograma"
+  LOAN_SCHEDULE_VERSION ||--|{ LOAN_INSTALLMENT : "cuotas"
+  LOAN ||--o{ LOAN_PAYMENT : "pagos"
+  LOAN_PAYMENT ||--|{ LOAN_PAYMENT_ALLOCATION : "imputa"
+  LOAN_INSTALLMENT ||--o{ LOAN_PAYMENT_ALLOCATION : "recibe"
+  LOAN ||--o{ LOAN_REFERENCE_SCHEDULE : "tablas del banco"
+  LOAN_REFERENCE_SCHEDULE ||--|{ LOAN_REFERENCE_ROW : "filas"
+  LOAN_REFERENCE_SCHEDULE ||--o{ LOAN_SCHEDULE_COMPARISON : "comparaciones"
   CREDIT_CARD ||--o{ CREDIT_CARD_STATEMENT : "estados de cuenta"
   LOAN {
     uuid id PK
     uuid workspace_id FK
-    uuid account_id "ref accounts.account LIABILITY"
+    text name
+    uuid account_id "ref accounts.account LOAN (LIABILITY)"
+    uuid disbursement_account_id
+    uuid payment_account_id
     uuid lender_counterparty_id
     money principal
     ccy currency FK
     rate annual_rate "0.125 = 12.5%"
     text rate_type "FIXED VARIABLE"
-    text amortization_method "FRENCH GERMAN BULLET CUSTOM"
-    smallint term_months
-    date start_date
-    date first_payment_date
-    uuid disbursement_transaction_id
-    int schedule_version
-    text status "ACTIVE PAID_OFF REFINANCED CLOSED"
-    timestamptz archived_at
+    text day_count "D30_360 ACT_360 ACT_365"
+    text frequency "MONTHLY BIMONTHLY QUARTERLY SEMIANNUAL ANNUAL"
+    int term_installments "1..600"
+    text method "FRENCH GERMAN FIXED_PRINCIPAL CUSTOM"
+    date disbursement_date
+    date first_due_date
+    jsonb charges "seguro fees impuestos: FIXED o RATE_ON_BALANCE"
+    money retained_fee
+    text origin "NEW EXISTING"
+    date existing_as_of
+    money existing_outstanding
+    int next_installment_no
+    text status "DRAFT ACTIVE PAID_OFF CANCELLED"
+    int current_schedule_version
+    uuid recurring_definition_id "ref commitments.recurring_definition"
+    uuid disbursement_transaction_id "ref txn.transaction"
+    text cancelled_reason
     int version
+  }
+  LOAN_SCHEDULE_VERSION {
+    uuid loan_id PK, FK
+    int schedule_version PK
+    text reason "INITIAL (add-loan-amortization-advanced agrega mas)"
+    date effective_from
+    jsonb parameters
   }
   LOAN_INSTALLMENT {
     uuid id PK
     uuid workspace_id FK
     uuid loan_id FK
-    int schedule_version
-    smallint installment_no
+    int schedule_version FK
+    int installment_no
     date due_date
+    date period_start
+    date period_end
     money principal_amount
     money interest_amount
     money fees_amount
     money insurance_amount
     money tax_amount
     money total_amount
+    money opening_balance
+    money closing_balance
     ccy currency FK
-    text status "SCHEDULED DUE PAID PARTIALLY_PAID OVERDUE SUPERSEDED"
-    uuid paid_transaction_id "ref txn.transaction"
-    date paid_on
   }
-  LOAN_SCHEDULE_CHANGE {
+  LOAN_PAYMENT {
     uuid id PK
     uuid workspace_id FK
     uuid loan_id FK
-    int from_schedule_version
-    int to_schedule_version
-    text reason "PREPAYMENT RATE_CHANGE RESTRUCTURE"
-    jsonb parameters
-    date effective_date
-    timestamptz created_at
+    int payment_no
+    uuid transaction_id "ref txn.transaction, UNIQUE"
+    uuid account_id
+    date business_date
+    money amount
+    money principal
+    money interest
+    money fees
+    money insurance
+    money taxes
+    bool explicit_breakdown
+    text status "ACTIVE VOIDED"
+  }
+  LOAN_PAYMENT_ALLOCATION {
+    uuid payment_id PK, FK
+    uuid installment_id PK, FK
+    int installment_no
+    money principal
+    money interest
+    money fees
+    money insurance
+    money taxes
+  }
+  LOAN_REFERENCE_SCHEDULE {
+    uuid id PK
+    uuid workspace_id FK
+    uuid loan_id FK
+    int reference_version
+    text source "CSV PASTE MANUAL"
+    jsonb mapping
+    int row_count "1..600"
+  }
+  LOAN_REFERENCE_ROW {
+    uuid reference_id PK, FK
+    int installment_no PK
+    date due_date
+    money principal
+    money interest
+    money fees
+    money insurance
+    money taxes
+    money total
+    money balance
+  }
+  LOAN_SCHEDULE_COMPARISON {
+    uuid id PK
+    uuid workspace_id FK
+    uuid reference_id FK
+    uuid loan_id FK
+    int schedule_version "0 = vista previa de un borrador"
+    int matched
+    int total_rows
+    int first_difference_no
+    jsonb summary
+    text status "MATCH UNEXPLAINED EXPLAINED"
+    text explanation
   }
   CREDIT_CARD {
     uuid id PK
@@ -1155,11 +1238,18 @@ erDiagram
 
 | Tabla | Unique | Check | Índices | RLS | version / archivo |
 |-------|--------|-------|---------|-----|-------------------|
-| `loan` | `(workspace_id, account_id)` | `principal > 0`; `annual_rate >= 0`; `term_months > 0` | `(workspace_id, status)` | WS | `version`, `archived_at` |
-| `loan_installment` | **`(loan_id, schedule_version, installment_no)`**; `(paid_transaction_id) WHERE paid_transaction_id IS NOT NULL` | `total_amount = principal_amount + interest_amount + fees_amount + insurance_amount + tax_amount`; todos `>= 0` | `(workspace_id, due_date) WHERE status IN ('SCHEDULED','DUE','OVERDUE')` | WS | Versionado por `schedule_version` (las cuotas de un cronograma reemplazado pasan a `SUPERSEDED`, nunca se borran) |
-| `loan_schedule_change` | `(loan_id, to_schedule_version)` | `to_schedule_version = from_schedule_version + 1` | — | **WS-RO** | Append-only |
+| `loan` | `(workspace_id, id)`; **parcial `(workspace_id, account_id) WHERE status <> 'CANCELLED'`** | `principal > 0`; `annual_rate >= 0`; `term_installments BETWEEN 1 AND 600`; `first_due_date > disbursement_date` (salvo `origin = 'EXISTING'`); `status IN ('DRAFT','ACTIVE','PAID_OFF','CANCELLED')`; `method IN ('FRENCH','GERMAN','FIXED_PRINCIPAL','CUSTOM')` (`FIXED_PRINCIPAL` reemplaza a `BULLET`); `origin` ⇔ campos `existing_*`; `ACTIVE`/`PAID_OFF` ⇔ `current_schedule_version` | `(workspace_id, status)` | WS | `version` (reemplaza `term_months`, `start_date` y `amortization_method` del diseño previo) |
+| `loan_schedule_version` | PK `(loan_id, schedule_version)` | `reason IN ('INITIAL')` en este change | — | **WS-RO** | Append-only (`forbid_mutation`); `add-loan-amortization-advanced` agrega versiones |
+| `loan_installment` | **`(loan_id, schedule_version, installment_no)`**; `(workspace_id, id)` | `total_amount = principal_amount + interest_amount + fees_amount + insurance_amount + tax_amount`; todos `>= 0`; FK a `loan_schedule_version` | — | **WS-RO** | Append-only: la cuota **no** guarda estado ni `paid_transaction_id` (lo reemplazan las imputaciones); el estado `UNPAID`/`PARTIALLY_PAID`/`PAID` y `DUE`/`OVERDUE` se derivan |
+| `loan_payment` | `(transaction_id)`; `(loan_id, payment_no)`; `(workspace_id, id)` | `amount = principal + interest + fees + insurance + taxes` (INV-016); `status IN ('ACTIVE','VOIDED')`; `VOIDED` ⇔ `voided_at` | `(loan_id, status, business_date)`; `(workspace_id, business_date) WHERE status = 'ACTIVE'` | WS | Una fila por pago; solo cambia al anularse (reemplaza al modelo previo `loan_schedule_change`, que llega con `add-loan-amortization-advanced`) |
+| `loan_payment_allocation` | PK `(payment_id, installment_id)` | componentes `>= 0` | `(loan_id, installment_no)` | **WS-RO** | Append-only; el estado de la cuota se deriva de las imputaciones de pagos `ACTIVE` |
+| `loan_reference_schedule` | `(loan_id, reference_version)`; `(workspace_id, id)` | `source IN ('CSV','PASTE','MANUAL')`; `row_count BETWEEN 1 AND 600` | — | **WS-RO** | Append-only; el archivo original NO se guarda |
+| `loan_reference_row` | PK `(reference_id, installment_no)` | montos `>= 0` | — | **WS-RO** | Append-only |
+| `loan_schedule_comparison` | `(reference_id, schedule_version)` | `status IN ('MATCH','UNEXPLAINED','EXPLAINED')`; `EXPLAINED` ⇔ `explanation` (1..1000 caracteres); `schedule_version >= 0` (0 = vista previa de un borrador) | — | WS | `UPDATE` solo para explicar |
 | `credit_card` | `(workspace_id, account_id)` | `statement_day BETWEEN 1 AND 28`; `due_day BETWEEN 1 AND 31` | — | WS | `version` |
 | `credit_card_statement` | `(credit_card_id, period_end)` | `period_end >= period_start` | `(workspace_id, due_date)` | WS | `version` |
+
+**As-built Phase 4 (`add-loans`, migración `20261011100000_debt_schema.sql`).** Se crean las 8 tablas de préstamos (`loan`, `loan_schedule_version`, `loan_installment`, `loan_payment`, `loan_payment_allocation`, `loan_reference_schedule`, `loan_reference_row`, `loan_schedule_comparison`) con RLS forzada por `workspace_id`, registradas en `platform.workspace_scoped_table` y con `forbid_mutation` (PF003) en versión, cuotas, imputaciones, referencias y filas; cuenta, contraparte, transacción y definición recurrente son referencias lógicas, sin FK entre schemas. Portabilidad: secciones `loans`, `loan-schedule-versions`, `loan-installments`, `loan-payments`, `loan-payment-allocations`, `loan-reference-schedules`, `loan-reference-rows` y `loan-schedule-comparisons` (órdenes 780–787). Las tablas de tarjetas (`credit_card`, `credit_card_statement`) llegan con `add-credit-cards`. Expand en otros contextos: ver §5.4 (kinds `LOAN_*`, `loan_payment_breakdown`, `assert_splits_sum`) y §5.7 (`LOAN_PAYMENT`, `explicit_schedule`, `schedule_key`).
 
 ### 5.10 `fx` — Currencies & market data (Phase 1 manual / Phase 5 providers)
 

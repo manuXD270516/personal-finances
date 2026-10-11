@@ -41,7 +41,8 @@
     "menu": "Menu de navegação",
     "userMenu": "Menu da conta",
     "language": "Idioma",
-    "recurringPending": "{count, plural, one {# pagamento a aprovar} other {# pagamentos a aprovar}}"
+    "recurringPending": "{count, plural, one {# pagamento a aprovar} other {# pagamentos a aprovar}}",
+    "debt": "Dívidas"
   },
   "Workspace": {
     "settingsTitle": "Configuração do espaço de trabalho",
@@ -2812,6 +2813,15 @@
       "dismissed": "Você descartou a correspondência com {name}. Ela não será sugerida de novo.",
       "viewOccurrence": "Ver o pagamento recorrente",
       "viewTransaction": "Ver a transação"
+    },
+    "loan": {
+      "origin": "Empréstimo:",
+      "viewLoans": "Ver empréstimos",
+      "registerPayment": "Registrar pagamento",
+      "registerPaymentLabel": "Registrar o pagamento de {name} de {date} no empréstimo",
+      "managedNotice": "Esta parcela é administrada pelo empréstimo; ela é resolvida ao registrar o pagamento lá.",
+      "definitionManaged": "Estas parcelas são administradas por um empréstimo: não podem ser pausadas nem editadas aqui.",
+      "openLoan": "Abrir o empréstimo"
     }
   },
   "Subscriptions": {
@@ -3589,6 +3599,444 @@
       "linksLabel": "Próximos passos",
       "viewTransactions": "Ver as transações da conta",
       "importAnother": "Importar outro arquivo"
+    }
+  },
+  "Debt": {
+    "title": "Dívidas",
+    "intro": "Seus empréstimos: quanto você deve, a próxima parcela e como seu cronograma se compara com a tabela do banco.",
+    "viewerNotice": "Você só pode consultar os empréstimos; registrar ou pagar exige o papel de editor.",
+    "loading": "Carregando…",
+    "notFound": "Não encontramos este empréstimo. Ele pode ter sido removido ou você pode não ter acesso.",
+    "back": "Voltar para Dívidas",
+    "cancelAction": "Cancelar",
+    "reason": "Motivo",
+    "debtAmount": "Dívida {amount}",
+    "columns": {
+      "n": "Nº",
+      "due": "Vencimento",
+      "total": "Parcela",
+      "balance": "Saldo",
+      "state": "Situação"
+    },
+    "components": {
+      "principal": "Capital",
+      "interest": "Juros",
+      "fees": "Comissões",
+      "insurance": "Seguro",
+      "taxes": "Impostos"
+    },
+    "status": {
+      "DRAFT": "Rascunho",
+      "ACTIVE": "Ativo",
+      "PAID_OFF": "Quitado",
+      "CANCELLED": "Cancelado"
+    },
+    "dayCount": {
+      "D30_360": "30/360",
+      "ACT_360": "Real/360",
+      "ACT_365": "Real/365"
+    },
+    "frequency": {
+      "MONTHLY": "Mensal",
+      "BIMONTHLY": "Bimestral",
+      "QUARTERLY": "Trimestral",
+      "SEMIANNUAL": "Semestral",
+      "ANNUAL": "Anual"
+    },
+    "list": {
+      "region": "Tabela de empréstimos",
+      "caption": "Empréstimos com situação, dívida pendente, próxima parcela e atraso",
+      "name": "Empréstimo",
+      "outstanding": "Dívida pendente",
+      "next": "Próxima parcela",
+      "overdue": "Atraso",
+      "new": "Novo empréstimo",
+      "empty": "Você ainda não registrou empréstimos. Crie um novo ou registre um em andamento para ver o cronograma e as parcelas.",
+      "nextValue": "Parcela {n} · {date} · {amount}",
+      "overdueDays": "{days, plural, one {# dia de atraso} other {# dias de atraso}}"
+    },
+    "form": {
+      "title": "Novo empréstimo",
+      "origin": "O que você vai registrar?",
+      "origins": {
+        "NEW": "Empréstimo novo",
+        "EXISTING": "Empréstimo em andamento"
+      },
+      "originHint": {
+        "NEW": "É salvo como rascunho com a prévia do cronograma; ao desembolsar, registra-se o valor recebido e as parcelas são fixadas.",
+        "EXISTING": "Você já pagou parcelas: informe o saldo pendente e a próxima parcela. Nenhum desembolso é registrado."
+      },
+      "terms": "Condições",
+      "name": "Nome",
+      "currency": "Moeda",
+      "principal": "Principal",
+      "outstanding": "Saldo pendente",
+      "outstandingHint": "Principal que você ainda deve na data do saldo.",
+      "rate": "Taxa nominal anual (%)",
+      "rateHint": "Em porcentagem, por exemplo 11,50.",
+      "dayCount": "Convenção de dias",
+      "frequency": "Periodicidade",
+      "term": "Número de parcelas",
+      "remaining": "Parcelas restantes",
+      "termHint": "Entre 1 e 600.",
+      "disbursementDate": "Data do desembolso",
+      "firstDue": "Data da primeira parcela",
+      "asOf": "Data do saldo",
+      "nextNo": "Número da próxima parcela",
+      "nextDue": "Data da próxima parcela",
+      "charges": "Encargos por parcela (opcionais)",
+      "chargesHint": "Comissão, seguro e impostos: um valor fixo por parcela ou uma taxa mensal sobre o saldo.",
+      "chargeKind": {
+        "fees": "Comissão",
+        "insurance": "Seguro",
+        "taxes": "Impostos"
+      },
+      "chargeModes": {
+        "NONE": "Sem encargo",
+        "FIXED": "Valor fixo por parcela",
+        "RATE_ON_BALANCE": "Taxa mensal sobre o saldo"
+      },
+      "chargeFixed": "Valor por parcela",
+      "chargeRate": "Taxa mensal (%)",
+      "chargeRateHint": "Por exemplo 0,0400 % ao mês sobre o saldo no início do período.",
+      "accounts": "Credor e contas",
+      "lender": "Credor",
+      "lenderHint": "Contraparte (opcional).",
+      "none": "Nenhum",
+      "choose": "Escolha uma opção",
+      "loanAccount": "Conta do empréstimo",
+      "accountModes": {
+        "CREATE": "Criar a conta agora",
+        "EXISTING": "Usar uma conta de empréstimo existente"
+      },
+      "newAccountName": "Nome da conta do empréstimo",
+      "newAccountHint": "Cria-se uma conta do tipo empréstimo (passivo) na mesma moeda.",
+      "existingAccount": "Conta de empréstimo",
+      "disbursementAccount": "Conta de destino do desembolso",
+      "paymentAccount": "Conta de pagamento",
+      "paymentAccountHint": "Conta de onde você costuma pagar as parcelas.",
+      "disburseNow": "Desembolsar agora",
+      "retainedFee": "Comissão retida (opcional)",
+      "retainedFeeHint": "É descontada do valor que você recebe e registrada como despesa.",
+      "fixErrors": "{count, plural, one {Há # dado para corrigir.} other {Há # dados para corrigir.}} Revise os campos marcados.",
+      "saving": "Salvando…",
+      "save": "Salvar empréstimo",
+      "saveAndDisburse": "Salvar e desembolsar"
+    },
+    "errors": {
+      "REQUIRED": "É obrigatório.",
+      "INVALID": "O valor não é válido.",
+      "SCALE": "Tem mais casas decimais do que a moeda admite.",
+      "NOT_POSITIVE": "Deve ser maior que zero.",
+      "RANGE": "Está fora do intervalo permitido.",
+      "DATE_ORDER": "Deve ser posterior à data do desembolso ou do saldo."
+    },
+    "preview": {
+      "title": "Prévia do cronograma",
+      "waiting": "Preencha o principal, a taxa, o número de parcelas e as datas para ver o cronograma.",
+      "loading": "Calculando o cronograma…",
+      "region": "Tabela do cronograma",
+      "caption": "Cronograma de parcelas com capital, juros e saldo",
+      "installment": "Parcela",
+      "totalInterest": "Juros totais",
+      "totalAmount": "Total a pagar",
+      "leveled": "A parcela foi nivelada: com dias reais ou um primeiro período irregular, a parcela constante minimiza a diferença com a última.",
+      "totals": "Totais"
+    },
+    "summary": {
+      "lender": "Credor",
+      "account": "Conta do empréstimo",
+      "paymentAccount": "Conta de pagamento",
+      "principal": "Principal",
+      "outstandingAtStart": "Saldo ao registrar",
+      "rate": "Taxa nominal anual",
+      "dayCount": "Convenção de dias",
+      "frequency": "Periodicidade",
+      "term": "Parcelas",
+      "installment": "Parcela",
+      "disbursement": "Desembolso",
+      "firstDue": "Primeira parcela",
+      "chargeFixed": "{amount} por parcela",
+      "chargeRate": "{rate} % ao mês sobre o saldo",
+      "retainedFee": "Comissão retida",
+      "cancelledReason": "Motivo do cancelamento"
+    },
+    "balances": {
+      "title": "Dívida",
+      "outstanding": "Principal pendente (cronograma)",
+      "account": "Saldo da conta",
+      "difference": "Diferença não registrada",
+      "differenceNote": "A conta do empréstimo tem movimentos que não foram registrados como pagamentos do empréstimo. Registre-os como pagamentos para que os valores coincidam.",
+      "paidTotals": "Pago até hoje"
+    },
+    "next": {
+      "title": "Próxima parcela",
+      "value": "Parcela {n} de {date} no valor de {amount}",
+      "overdue": "{count, plural, one {# parcela atrasada} other {# parcelas atrasadas}}",
+      "overdueItem": "Parcela {n} de {date}: faltam {amount} ({days, plural, one {# dia} other {# dias}} de atraso)"
+    },
+    "actions": {
+      "label": "Ações do empréstimo",
+      "pay": "Registrar pagamento",
+      "disburse": "Desembolsar",
+      "edit": "Editar",
+      "cancel": "Cancelar empréstimo",
+      "compare": "Comparar com a tabela do banco"
+    },
+    "schedule": {
+      "title": "Cronograma",
+      "draftTitle": "Cronograma previsto"
+    },
+    "installments": {
+      "region": "Tabela do cronograma com situação",
+      "caption": "Parcelas com sua situação e o esperado, pago e a diferença",
+      "expected": "Esperado",
+      "paid": "Pago",
+      "difference": "Diferença",
+      "detail": "Detalhe",
+      "components": "Por componente",
+      "componentsCaption": "Esperado, pago e diferença por componente da parcela {n}",
+      "component": "Componente",
+      "pay": "Pagar parcela {n}",
+      "state": {
+        "UNPAID": "Pendente",
+        "PARTIALLY_PAID": "Parcial",
+        "PAID": "Paga",
+        "OVERDUE": "Atrasada"
+      }
+    },
+    "payments": {
+      "title": "Pagamentos",
+      "region": "Tabela de pagamentos",
+      "caption": "Pagamentos do empréstimo com seu detalhamento",
+      "empty": "Ainda não há pagamentos registrados.",
+      "no": "Nº",
+      "date": "Data",
+      "account": "Conta",
+      "amount": "Valor",
+      "breakdown": "Detalhamento",
+      "installments": "Parcelas",
+      "actions": "Ações",
+      "explicit": "conforme recibo",
+      "voided": "Anulado",
+      "active": "Vigente",
+      "void": "Anular",
+      "voidLabel": "Anular o pagamento {n}"
+    },
+    "payment": {
+      "title": "Registrar pagamento",
+      "amount": "Valor pago ({currency})",
+      "date": "Data do pagamento",
+      "account": "Conta de pagamento",
+      "method": "Meio de pagamento",
+      "mode": "Como dividir o pagamento",
+      "modes": {
+        "AUTO": "Automático",
+        "BREAKDOWN": "Detalhamento do recibo"
+      },
+      "modeHint": {
+        "AUTO": "O valor é aplicado às parcelas pendentes em ordem: impostos, seguro, comissões, juros e capital.",
+        "BREAKDOWN": "Copie os valores do recibo do banco para uma única parcela; a soma deve ser igual ao valor pago."
+      },
+      "installmentNo": "Número da parcela",
+      "sum": "Soma do detalhamento: {sum} {currency}",
+      "sumInvalid": "Algum valor do detalhamento não é válido.",
+      "sumMismatch": "Faltam ou sobram {delta} {currency} em relação ao valor pago.",
+      "sumMatches": "Coincide com o valor pago.",
+      "saving": "Registrando…",
+      "submit": "Registrar pagamento",
+      "done": "Pagamento registrado."
+    },
+    "disburse": {
+      "title": "Desembolsar o empréstimo",
+      "hint": "Registra-se o desembolso de {amount}, o cronograma é fixado e as parcelas são ativadas.",
+      "submit": "Desembolsar",
+      "done": "Empréstimo desembolsado."
+    },
+    "cancel": {
+      "title": "Cancelar o empréstimo",
+      "description": "Um rascunho não tem efeitos contábeis; um ativo sem pagamentos reverte o desembolso. Esta ação não pode ser desfeita.",
+      "confirm": "Cancelar empréstimo",
+      "done": "Empréstimo cancelado."
+    },
+    "void": {
+      "title": "Anular o último pagamento",
+      "description": "O pagamento é revertido e as parcelas voltam ao estado anterior. Só o pagamento mais recente pode ser anulado.",
+      "confirm": "Anular pagamento",
+      "done": "Pagamento anulado."
+    },
+    "edit": {
+      "title": "Editar empréstimo",
+      "draftNote": "Enquanto for rascunho, você pode cancelá-lo e registrar um novo para mudar as condições.",
+      "locked": "As condições financeiras de um empréstimo ativo estão bloqueadas; você pode mudar o nome, o credor e a conta de pagamento.",
+      "save": "Salvar alterações",
+      "done": "Alterações salvas."
+    },
+    "compare": {
+      "title": "Comparar com a tabela do banco",
+      "titleFor": "Comparar {name} com a tabela do banco",
+      "intro": "Carregue a tabela de amortização do seu banco e veja parcela por parcela, ao centavo, em que ela difere do seu cronograma. A tabela nunca altera o empréstimo.",
+      "backToLoan": "Voltar ao empréstimo",
+      "load": "Carregar a tabela do banco",
+      "source": "Como carregar a tabela",
+      "sources": {
+        "PASTE": "Colar texto",
+        "CSV": "Enviar um CSV",
+        "MANUAL": "Linha por linha"
+      },
+      "pasteLabel": "Tabela do banco",
+      "pasteHint": "Cole as linhas com o cabeçalho (Nº, Data, Capital, Juros…). Até 256 KiB e 600 linhas.",
+      "fileLabel": "Arquivo CSV",
+      "fileHint": "Texto UTF-8, até 256 KiB e 600 linhas. É lido no seu navegador.",
+      "detect": "Detectar colunas",
+      "detected": "Detectamos {rows, plural, one {# linha} other {# linhas}} e {columns, plural, one {# coluna} other {# colunas}}. Confirme o separador e as colunas.",
+      "delimiter": "Separador",
+      "delimiterHint": "Se o separador estiver errado, escolha outro e o texto é lido de novo.",
+      "delimiters": {
+        "semicolon": "Ponto e vírgula (;)",
+        "comma": "Vírgula (,)",
+        "tab": "Tabulação"
+      },
+      "dateFormat": "Formato de data",
+      "dateFormats": {
+        "DD/MM/YYYY": "dd/mm/aaaa",
+        "YYYY-MM-DD": "aaaa-mm-dd",
+        "MM/DD/YYYY": "mm/dd/aaaa"
+      },
+      "decimal": "Separador decimal",
+      "decimals": {
+        "comma": "Vírgula (1234,56)",
+        "dot": "Ponto (1234.56)"
+      },
+      "sampleRegion": "Amostra da tabela carregada",
+      "sampleCaption": "Primeiras linhas da tabela do banco",
+      "mapping": "Colunas",
+      "mappingHint": "Escolha qual coluna do cabeçalho corresponde a cada dado. Os marcados com * são obrigatórios.",
+      "mappingMissing": "Falta escolher a coluna de: {fields}.",
+      "noColumn": "Sem coluna",
+      "fields": {
+        "installmentNo": "Nº da parcela",
+        "dueDate": "Data",
+        "principal": "Capital",
+        "interest": "Juros",
+        "fees": "Comissões",
+        "insurance": "Seguro",
+        "taxes": "Impostos",
+        "total": "Parcela",
+        "balance": "Saldo"
+      },
+      "upload": "Carregar e comparar",
+      "loading": "Carregando…",
+      "loaded": "Tabela carregada (versão {version}).",
+      "versions": "Tabela do banco",
+      "versionOption": "Versão {version} · {source} · {rows} linhas · {date}",
+      "export": "Exportar o relatório em CSV",
+      "empty": "Você ainda não carregou uma tabela do banco para comparar ({currency}).",
+      "manualHint": "Informe cada parcela da tabela do banco. Capital e juros são obrigatórios; os demais valores, opcionais.",
+      "manualRegion": "Linhas da tabela do banco",
+      "manualCaption": "Entrada linha por linha da tabela do banco",
+      "manualCols": {
+        "n": "Nº",
+        "dueDate": "Data",
+        "principal": "Capital",
+        "interest": "Juros",
+        "fees": "Comissões",
+        "insurance": "Seguro",
+        "taxes": "Impostos",
+        "total": "Parcela"
+      },
+      "manualActions": "Ações",
+      "manualCell": "Linha {row}, {col}",
+      "manualRemove": "Remover a linha {row}",
+      "manualRemoveShort": "Remover",
+      "manualAdd": "Adicionar linha",
+      "errors": {
+        "title": "{count, plural, one {A tabela tem # erro.} other {A tabela tem # erros.}} Nada foi salvo.",
+        "item": "Linha {row}, {field}",
+        "codes": {
+          "DATE_INVALID": "a data não é válida para o formato escolhido",
+          "INSTALLMENT_NO_DUPLICATED": "o número da parcela está repetido",
+          "INSTALLMENT_NO_INVALID": "o número da parcela não é válido",
+          "MAPPING_COLUMN_NOT_FOUND": "a coluna escolhida não foi encontrada",
+          "TOTAL_MISMATCH": "a parcela não coincide com a soma dos seus componentes",
+          "VALUE_MISSING": "falta o valor"
+        }
+      },
+      "status": {
+        "MATCH": "Coincide ao centavo",
+        "EXPLAINED": "Diferença explicada",
+        "UNEXPLAINED": "Diferenças sem explicação"
+      },
+      "rowStatus": {
+        "MATCH": "Coincide",
+        "DIFFERENT": "Difere",
+        "ONLY_REFERENCE": "Só no banco",
+        "ONLY_SYSTEM": "Só no sistema"
+      },
+      "components": {
+        "principal": "Capital",
+        "interest": "Juros",
+        "fees": "Comissões",
+        "insurance": "Seguro",
+        "taxes": "Impostos",
+        "total": "Parcela"
+      },
+      "summary": {
+        "title": "Resumo",
+        "matched": "{matched} de {total} parcelas coincidem.",
+        "first": "Primeira diferença: parcela {n}.",
+        "sums": "Soma das diferenças (banco − sistema)",
+        "principal": "Capital total: banco {bank} contra empréstimo {loan}.",
+        "onlyReference": "Parcelas só na tabela do banco: {list}.",
+        "onlySystem": "Parcelas só no sistema: {list}.",
+        "dates": "Parcelas com outra data de vencimento: {list}."
+      },
+      "suggestions": {
+        "title": "Sugestões",
+        "conventionCurrent": "Com a convenção atual ({dayCount}) coincidem {matching} de {total} parcelas ({interest} nos juros).",
+        "convention": "Com {dayCount} coincidiriam {matching} de {total} parcelas ({interest} nos juros).",
+        "better": "É melhor que a atual.",
+        "ONLY_DATES": "Só as datas de vencimento diferem.",
+        "ONLY_CHARGES": "Capital e juros coincidem: a diferença está nos encargos (comissões, seguro ou impostos).",
+        "ONLY_LAST_INSTALLMENT": "Só a última parcela difere, dentro da tolerância de arredondamento ({tolerance}).",
+        "PRINCIPAL_SUM_DIFFERS": "O capital da tabela do banco difere do principal do empréstimo em {difference}."
+      },
+      "table": {
+        "title": "Relatório por parcela",
+        "onlyDiff": "Mostrar só as parcelas com diferenças",
+        "region": "Tabela do relatório de comparação",
+        "caption": "Diferença por componente (banco menos sistema) de cada parcela",
+        "diffOf": "Dif. {component}",
+        "detail": "Sistema e banco",
+        "detailCaption": "Valores do sistema e do banco da parcela {n}",
+        "system": "Sistema",
+        "bank": "Banco",
+        "diff": "Diferença",
+        "bankDate": "banco: {date}"
+      },
+      "explain": {
+        "title": "Explicar a diferença",
+        "hint": "Se a diferença é esperada (por exemplo, arredondamento do banco), explique-a para deixá-la registrada.",
+        "label": "Explicação",
+        "limit": "{count} de 1000 caracteres",
+        "submit": "Explicar a diferença",
+        "update": "Atualizar a explicação",
+        "done": "Explicação salva."
+      }
+    },
+    "transaction": {
+      "badge": "Empréstimo",
+      "viewLoan": "Ver o empréstimo",
+      "breakdownCaption": "Detalhamento do pagamento do empréstimo"
+    },
+    "paymentMethods": {
+      "CASH": "Dinheiro",
+      "QR": "QR",
+      "DEBIT_CARD": "Cartão de débito",
+      "CREDIT_CARD": "Cartão de crédito",
+      "BANK_TRANSFER": "Transferência bancária",
+      "DIGITAL_WALLET": "Carteira digital",
+      "OTHER": "Outro"
     }
   }
 }

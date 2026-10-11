@@ -4,6 +4,7 @@ import type { BalanceQuery } from '@pf/ledger/contracts';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import { DomainError, type Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
+import { AccountProvisioningAdapter } from '../application/account-provisioning.adapter.js';
 import { AccountCatalogQueries } from '../application/account-catalog.queries.js';
 import { AccountsService } from '../application/accounts.service.js';
 import { InstitutionsService } from '../application/institutions.service.js';
@@ -20,8 +21,10 @@ import type {
   WorkspaceCurrenciesPort,
 } from '../application/ports/index.js';
 import {
+  ACCOUNT_PROVISIONING_PORT,
   ACCOUNTS_QUERY_PORT,
   type AccountCatalogQuery,
+  type AccountProvisioningPort,
   type AccountOpeningBalancePort,
   type AccountsQueryPort,
 } from '../contracts/index.js';
@@ -90,6 +93,8 @@ export interface AccountsRuntime {
   readonly query: AccountsQueryPort;
   /** Catálogo de cuentas para Reporting (openspec add-basic-dashboard). */
   readonly catalog: AccountCatalogQuery;
+  /** Alta de cuentas en la unidad de trabajo del llamador (openspec add-loans). */
+  readonly provisioning: AccountProvisioningPort;
 }
 
 /** Composición de ACCOUNTS sobre PostgreSQL (misma transacción que la `PgUnitOfWork` de cada comando). */
@@ -122,6 +127,7 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
       assertCanPost: (input) => accounts.assertCanPost(input.workspaceId, input.accounts),
     },
     catalog: new AccountCatalogQueries(deps),
+    provisioning: new AccountProvisioningAdapter(accounts),
   };
 }
 
@@ -142,8 +148,9 @@ export class AccountsModule {
         { provide: ACCOUNTS_SERVICE, useValue: options.runtime.accounts },
         { provide: INSTITUTIONS_SERVICE, useValue: options.runtime.institutions },
         { provide: ACCOUNTS_QUERY_PORT, useValue: options.runtime.query },
+        { provide: ACCOUNT_PROVISIONING_PORT, useValue: options.runtime.provisioning },
       ],
-      exports: [ACCOUNTS_QUERY_PORT],
+      exports: [ACCOUNTS_QUERY_PORT, ACCOUNT_PROVISIONING_PORT],
     };
   }
 }

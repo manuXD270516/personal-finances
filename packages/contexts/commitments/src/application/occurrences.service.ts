@@ -15,6 +15,7 @@ import {
   type RecurringOccurrence,
 } from '../domain/index.js';
 import type { CommitmentsDeps } from './ports/index.js';
+import { assertNotLoanPayment } from './managed-guard.js';
 import {
   OCCURRENCE_AGGREGATE,
   occurrenceChanges,
@@ -128,8 +129,10 @@ export class OccurrencesService {
     },
   ): Promise<string> {
     const { deps } = this;
-    occ.assertCanResolve();
     const def = await this.definitionOf(occ);
+    // N4: las cuotas de préstamo se pagan desde el préstamo; el motor nunca crea su transacción.
+    assertNotLoanPayment(def, occ.snapshot.scheduleKey);
+    occ.assertCanResolve();
     const s = occ.snapshot;
     const version = def.versionNo(s.definitionVersionNo);
     const currency = await this.currencyOf(s.workspaceId, s.currency);
@@ -151,7 +154,7 @@ export class OccurrencesService {
     const txn = await deps.transactions.record({
       workspaceId: s.workspaceId,
       userId: input.by ?? '',
-      kind: def.kind,
+      kind: def.kind as Exclude<typeof def.kind, 'LOAN_PAYMENT'>,
       status: input.status,
       businessDate: businessDate.toString(),
       accountId: version.accountId,
@@ -268,6 +271,7 @@ export class OccurrencesService {
     const { deps } = this;
     return deps.uow.run(cmd.workspaceId, async () => {
       const occ = await this.lock(cmd.workspaceId, cmd.occurrenceId);
+      assertNotLoanPayment(await this.definitionOf(occ), occ.snapshot.scheduleKey);
       if (occ.version !== cmd.expectedVersion) throw preconditionFailed(occ.version);
       const s = occ.snapshot;
       const currency = await this.currencyOf(cmd.workspaceId, s.currency);
@@ -366,6 +370,7 @@ export class OccurrencesService {
     const { at } = await this.clockOf(cmd.workspaceId);
     return deps.uow.run(cmd.workspaceId, async () => {
       const occ = await this.lock(cmd.workspaceId, cmd.occurrenceId);
+      assertNotLoanPayment(await this.definitionOf(occ), occ.snapshot.scheduleKey);
       const before = occ.snapshot;
       occ.skip({ reason: cmd.reason ?? null, at, by: cmd.userId });
       await this.persist(occ);
@@ -427,6 +432,7 @@ export class OccurrencesService {
     const { at } = await this.clockOf(cmd.workspaceId);
     return deps.uow.run(cmd.workspaceId, async () => {
       const occ = await this.lock(cmd.workspaceId, cmd.occurrenceId);
+      assertNotLoanPayment(await this.definitionOf(occ), occ.snapshot.scheduleKey);
       occ.assertCanResolve();
       const txn = await deps.links.getForLink({
         workspaceId: cmd.workspaceId,
@@ -561,11 +567,13 @@ export class OccurrencesService {
       if (!found) return false;
       const occ = await this.lock(input.workspaceId, found.id);
       if (occ.snapshot.transactionId !== input.transactionId) return false;
+      const def = await this.definitionOf(occ);
+      // N7: anular desde transacciones no libera la cuota de un préstamo; la libera DEBT con `unsettle`.
+      if (def.kind === 'LOAN_PAYMENT') return false;
       const before = occ.snapshot;
       const released = occ.release(today);
       await this.persist(occ);
       const after = occ.snapshot;
-      const def = await this.definitionOf(occ);
       const event = await publishEvent(
         deps,
         {

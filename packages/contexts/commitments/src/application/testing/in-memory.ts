@@ -158,6 +158,7 @@ export class InMemoryCommitments {
       const next = occ.snapshot;
       if (
         next.transactionId &&
+        !next.sharesTransaction &&
         [...this.occurrencesMap.values()].some(
           (o) =>
             o.id !== next.id &&
@@ -208,7 +209,10 @@ export class InMemoryCommitments {
       this.sorted([...this.occurrencesMap.values()])
         .filter(
           (o) =>
-            (o.status === 'MATERIALIZED' || o.status === 'MATCHED') && o.dueDate >= from && o.dueDate <= to,
+            (o.status === 'MATERIALIZED' || o.status === 'MATCHED') &&
+            o.dueDate >= from &&
+            o.dueDate <= to &&
+            this.definitionsMap.get(o.definitionId)?.state.kind !== 'LOAN_PAYMENT',
         )
         .map((o) => ({
           occurrenceId: o.id,
@@ -317,7 +321,12 @@ export class InMemoryCommitments {
     occurrencesByIds: async (workspaceId, ids) =>
       ids
         .map((id) => this.occurrencesMap.get(id))
-        .filter((o): o is OccurrenceState => !!o && o.workspaceId === workspaceId)
+        .filter(
+          (o): o is OccurrenceState =>
+            !!o &&
+            o.workspaceId === workspaceId &&
+            this.definitionsMap.get(o.definitionId)?.state.kind !== 'LOAN_PAYMENT',
+        )
         .map((o) => this.matchRowOf(o)),
     linkedTransactionIds: async (workspaceId, transactionIds) =>
       new Set(

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/debt/LoanPaidOff.v1.schema.json",
+  "title": "debt.LoanPaidOff.v1",
+  "description": "El principal pendiente de un préstamo llegó a cero por pagos: el préstamo quedó saldado y su compromiso de cuotas terminó. Productor: DEBT. Idempotencia: (loanId, aggregateVersion). Sin PII.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "debt.LoanPaidOff"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Loan"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "loanId",
+        "paidOffOn",
+        "lastTransactionId"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "loanId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "paidOffOn": {
+          "$ref": "../envelope.v1.schema.json#/$defs/LocalDate"
+        },
+        "lastTransactionId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a05",
+      "eventType": "debt.LoanPaidOff",
+      "eventVersion": 1,
+      "occurredAt": "2027-01-15T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Loan",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b0001",
+      "aggregateVersion": 5,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "loanId": "01928c4e-0000-7000-8000-0000000b0001",
+        "paidOffOn": "2027-01-15",
+        "lastTransactionId": "01928c4e-0000-7000-8000-0000000a7101"
+      }
+    }
+  ]
+}

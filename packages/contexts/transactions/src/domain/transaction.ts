@@ -10,6 +10,11 @@ import {
 } from './conversion.js';
 import { assertTransition, hasActiveEntry, type TransactionStatus } from './transaction-status.js';
 import {
+  LOAN_EXPENSE_COMPONENTS,
+  type LoanExpenseComponent,
+  type LoanPaymentBreakdown,
+} from './loan-payment-breakdown.js';
+import {
   TRANSACTION_LIFECYCLE,
   type TransactionTransition,
   type TransactionTransitionRecord,
@@ -23,8 +28,20 @@ export const TRANSACTION_KINDS = [
   'ADJUSTMENT',
   'TRANSFER',
   'CONVERSION',
+  'LOAN_DISBURSEMENT',
+  'LOAN_PAYMENT',
 ] as const;
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
+
+/**
+ * Kinds ADMINISTRADOS por otro contexto (add-loans, design decisión 10): solo DEBT los crea (`source = DEBT`) y los
+ * anula; desde la API de transacciones únicamente se editan sus datos descriptivos.
+ */
+export const MANAGED_TRANSACTION_KINDS = ['LOAN_DISBURSEMENT', 'LOAN_PAYMENT'] as const;
+/** `externalRef.namespace` del desembolso (= `LOAN_DISBURSEMENT_NAMESPACE` del contrato; el dominio no importa contratos). */
+const LOAN_DISBURSEMENT_REF_NAMESPACE = 'debt.loan';
+export const isManagedKind = (kind: TransactionKind): boolean =>
+  (MANAGED_TRANSACTION_KINDS as readonly string[]).includes(kind);
 export type AdjustmentDirection = 'INCREASE' | 'DECREASE';
 export type AccountNature = 'ASSET' | 'LIABILITY';
 export const PAYMENT_METHODS = [
@@ -178,7 +195,33 @@ export interface TransactionState {
   readonly updatedAt: string | null;
   /** Solo `CONVERSION`: detalle de precio inmutable de la revisión vigente (docs/09 §7). */
   readonly conversion?: ConversionDetail | null;
+  /** Solo `LOAN_PAYMENT`: desglose del pago (docs/04 §3.6, INV-016). */
+  readonly loanPaymentBreakdown?: LoanPaymentBreakdown | null;
 }
+
+/**
+ * Préstamo que administra la transacción (`LOAN_PAYMENT`: el del desglose; `LOAN_DISBURSEMENT`: el `externalRef`
+ * `debt.loan/<loanId>`); `null` si no es de préstamo.
+ */
+export function loanIdOf(
+  s: Pick<TransactionState, 'kind' | 'externalRef' | 'loanPaymentBreakdown'>,
+): string | null {
+  if (s.kind === 'LOAN_PAYMENT') return s.loanPaymentBreakdown?.loanId ?? null;
+  if (s.kind === 'LOAN_DISBURSEMENT' && s.externalRef?.namespace === LOAN_DISBURSEMENT_REF_NAMESPACE) {
+    return s.externalRef.id;
+  }
+  return null;
+}
+
+/** `TRANSACTION_MANAGED_EXTERNALLY` (409) con el préstamo que administra la transacción. */
+export const managedExternally = (
+  s: Pick<TransactionState, 'id' | 'kind' | 'externalRef' | 'loanPaymentBreakdown'>,
+) =>
+  new DomainError(
+    'TRANSACTION_MANAGED_EXTERNALLY',
+    `transaction ${s.id} (${s.kind}) is managed by DEBT; operate it from the loan`,
+    { details: { managedBy: 'DEBT', loanId: loanIdOf(s) } },
+  );
 
 export interface RecordTransactionInput {
   readonly id: string;
@@ -291,7 +334,10 @@ export function legAmount(
     case 'EXPENSE':
     case 'TRANSFER':
     case 'CONVERSION':
-      // TRANSFER/CONVERSION: leg de origen (los legs completos los arman `transferLegs`/`conversionLegs`).
+    case 'LOAN_DISBURSEMENT':
+    case 'LOAN_PAYMENT':
+      // TRANSFER/CONVERSION/préstamo: leg de origen (los legs completos los arman `transferLegs`/`conversionLegs`/
+      // `loanDisbursementLegs`/`loanPaymentLegs`).
       return amount.negate();
     case 'ADJUSTMENT': {
       // INCREASE = aumenta el saldo PRESENTADO: débito en ASSET, crédito en LIABILITY.
@@ -448,6 +494,150 @@ export function transferFee(s: Pick<TransactionState, 'splits' | 'amount'>): Mon
     s.splits.map((x) => x.amount),
     s.amount.currency,
   );
+}
+
+// ───────────────────────────────────────────── préstamos (add-loans, docs/09 §6.9)
+
+export interface RecordLoanDisbursementInput {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly businessDate: string;
+  /** Cuenta del préstamo (pasivo): pata `SOURCE` por `−principal` (aumenta la deuda). */
+  readonly loanAccount: TransferAccount;
+  /** Cuenta que recibe el neto: pata `TARGET` por `principal − comisión`. */
+  readonly destinationAccount: TransferAccount;
+  readonly principal: Money;
+  /** Comisión retenida por el prestamista (split de gasto); `null` si no hay. */
+  readonly retainedFee?: {
+    readonly amount: Money;
+    readonly categoryId: string;
+    readonly splitId: string;
+  } | null;
+  readonly counterpartyId?: string | null;
+  readonly description?: string | null;
+  readonly externalRef: ExternalRef;
+}
+
+export interface RecordLoanPaymentInput {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly businessDate: string;
+  /** Cuenta desde la que se paga: pata `SOURCE` por `−monto`. */
+  readonly paymentAccount: TransferAccount;
+  /** Cuenta del préstamo: pata `TARGET` por `+principal` (omitida si el principal es 0). */
+  readonly loanAccount: TransferAccount;
+  readonly amount: Money;
+  readonly breakdown: LoanPaymentBreakdown;
+  /** Categoría de sistema de cada componente de gasto y generador de ids de split. */
+  readonly categoryIds: Readonly<Record<LoanExpenseComponent, string>>;
+  readonly newSplitId: () => string;
+  readonly counterpartyId?: string | null;
+  readonly paymentMethod?: PaymentMethod | null;
+  readonly description?: string | null;
+  readonly externalRef: ExternalRef;
+}
+
+function assertLoanAccounts(accounts: readonly [TransferAccount, TransferAccount], amount: Money): void {
+  const [a, b] = accounts;
+  if (a.accountId === b.accountId) {
+    throw validation('the two accounts of a loan transaction must differ', '/accounts');
+  }
+  for (const acc of accounts) {
+    if (acc.currency !== amount.currency.code) {
+      throw new DomainError(
+        'CURRENCY_MISMATCH',
+        `account ${acc.accountId} is in ${acc.currency}, the amount is in ${amount.currency.code}`,
+      ).at('/accounts');
+    }
+  }
+}
+
+const expenseSplit = (id: string, amount: Money, categoryId: string): Split => ({
+  id,
+  amount,
+  categoryId,
+  counterpartyId: null,
+  tagIds: [],
+  memo: null,
+  customFields: [],
+});
+
+/** Legs del desembolso: `SOURCE` = −principal (pasivo), `TARGET` = +(principal − comisión retenida). */
+export function loanDisbursementLegs(
+  loan: TransferAccount,
+  destination: TransferAccount,
+  principal: Money,
+  fee: Money | null,
+): Leg[] {
+  return [
+    { accountId: loan.accountId, nature: loan.nature, amount: principal.negate(), role: 'SOURCE' },
+    {
+      accountId: destination.accountId,
+      nature: destination.nature,
+      amount: fee ? principal.subtract(fee) : principal,
+      role: 'TARGET',
+    },
+  ];
+}
+
+/** Legs del pago: `SOURCE` = −monto, `TARGET` = +principal (omitido si el principal es 0: CHECK `posting_nonzero`). */
+export function loanPaymentLegs(
+  from: TransferAccount,
+  loan: TransferAccount,
+  amount: Money,
+  principal: Money,
+): Leg[] {
+  const legs: Leg[] = [
+    { accountId: from.accountId, nature: from.nature, amount: amount.negate(), role: 'SOURCE' },
+  ];
+  if (principal.isPositive()) {
+    legs.push({ accountId: loan.accountId, nature: loan.nature, amount: principal, role: 'TARGET' });
+  }
+  return legs;
+}
+
+type MoneyLike = { readonly amount: string; readonly currency: string } | Money;
+const moneyKey = (m: MoneyLike): string =>
+  m instanceof Money ? `${m.toFixed()} ${m.currency.code}` : `${m.amount} ${m.currency}`;
+
+/**
+ * Edición financiera de una transacción administrada (monto, cuentas, fecha, moneda o splits distintos de los
+ * actuales) ⇒ `TRANSACTION_MANAGED_EXTERNALLY`. Descripción, notas, tags, memo, contraparte y medio de pago siguen
+ * editables sin tocar el ledger. Se aplica en el servicio (antes de validar cuentas) y en `amend` (defensa).
+ */
+export function assertManagedEditAllowed(
+  s: Pick<
+    TransactionState,
+    | 'id'
+    | 'kind'
+    | 'externalRef'
+    | 'loanPaymentBreakdown'
+    | 'businessDate'
+    | 'accountId'
+    | 'amount'
+    | 'splits'
+  >,
+  changes: {
+    readonly businessDate?: string;
+    readonly accountId?: string;
+    readonly toAccount?: unknown;
+    readonly amount?: MoneyLike;
+    readonly splits?: readonly { readonly amount: MoneyLike; readonly categoryId: string }[];
+  },
+): void {
+  if (!isManagedKind(s.kind)) return;
+  const same =
+    (changes.businessDate === undefined || changes.businessDate === s.businessDate) &&
+    (changes.accountId === undefined || changes.accountId === s.accountId) &&
+    changes.toAccount === undefined &&
+    (changes.amount === undefined || moneyKey(changes.amount) === moneyKey(s.amount)) &&
+    (changes.splits === undefined ||
+      (changes.splits.length === s.splits.length &&
+        changes.splits.every((x, i) => {
+          const cur = s.splits[i] as Split;
+          return moneyKey(x.amount) === moneyKey(cur.amount) && x.categoryId === cur.categoryId;
+        })));
+  if (!same) throw managedExternally(s);
 }
 
 /** Cuenta de una conversión con la moneda y naturaleza que informa Accounts. */
@@ -781,6 +971,126 @@ export class Transaction {
   }
 
   /**
+   * Desembolso de un préstamo (add-loans, docs/09 §6.9): UNA transacción `LOAN_DISBURSEMENT` `source = DEBT` con legs
+   * `SOURCE` (cuenta del préstamo, −principal) y `TARGET` (destino, +neto) y, si hay comisión retenida, un split de
+   * gasto por la comisión. Σ splits = comisión; el principal no es gasto (INV-009). Administrada por DEBT.
+   */
+  static recordLoanDisbursement(input: RecordLoanDisbursementInput): Transaction {
+    const { principal, loanAccount, destinationAccount } = input;
+    if (!principal.isPositive()) {
+      throw new DomainError('AMOUNT_NOT_POSITIVE', 'principal must be > 0').at('/principal/amount');
+    }
+    assertLoanAccounts([loanAccount, destinationAccount], principal);
+    assertText(input.description, 500, '/description');
+    const fee = input.retainedFee ?? null;
+    const splits: Split[] = [];
+    if (fee && !fee.amount.isZero()) {
+      if (fee.amount.currency.code !== principal.currency.code) {
+        throw new DomainError(
+          'CURRENCY_MISMATCH',
+          `the fee is in ${fee.amount.currency.code}, not ${principal.currency.code}`,
+        ).at('/retainedFee/currency');
+      }
+      if (fee.amount.isNegative() || !fee.amount.subtract(principal).isNegative()) {
+        throw validation('the retained fee must be >= 0 and less than the principal', '/retainedFee');
+      }
+      splits.push(expenseSplit(fee.splitId, fee.amount, fee.categoryId));
+    }
+    return new Transaction(
+      {
+        id: input.id,
+        workspaceId: input.workspaceId,
+        kind: 'LOAN_DISBURSEMENT',
+        status: 'POSTED',
+        businessDate: input.businessDate,
+        postingDate: null,
+        accountId: loanAccount.accountId,
+        amount: principal,
+        direction: null,
+        description: input.description ?? null,
+        notes: null,
+        counterpartyId: input.counterpartyId ?? null,
+        paymentMethod: null,
+        source: 'DEBT',
+        externalRef: input.externalRef,
+        refundOfTransactionId: null,
+        adjustmentReason: null,
+        confirmedRefundExcess: false,
+        reconciliationMode: null,
+        reconciliationId: null,
+        importJobId: null,
+        legs: loanDisbursementLegs(loanAccount, destinationAccount, principal, splits[0]?.amount ?? null),
+        splits,
+        revision: 1,
+        version: 1,
+        activeEntryId: null,
+        voidedAt: null,
+        voidReason: null,
+        createdAt: null,
+        updatedAt: null,
+      },
+      null,
+    );
+  }
+
+  /**
+   * Pago de un préstamo (add-loans, docs/09 §6.9, INV-016): UNA transacción `LOAN_PAYMENT` `source = DEBT` con legs
+   * `SOURCE` (−monto) y `TARGET` (+principal, omitido si es 0) y un split de gasto por cada componente no nulo del
+   * desglose (interés, comisiones, seguro, impuestos). Σ splits = monto − principal (INV-021 ampliado).
+   */
+  static recordLoanPayment(input: RecordLoanPaymentInput): Transaction {
+    const { amount, breakdown, paymentAccount, loanAccount } = input;
+    if (!amount.isPositive()) {
+      throw new DomainError('AMOUNT_NOT_POSITIVE', 'amount must be > 0').at('/amount/amount');
+    }
+    assertLoanAccounts([paymentAccount, loanAccount], amount);
+    assertText(input.description, 500, '/description');
+    breakdown.assertMatches(amount);
+    const splits: Split[] = LOAN_EXPENSE_COMPONENTS.flatMap(({ key }) => {
+      const component = breakdown[key];
+      return component.isPositive()
+        ? [expenseSplit(input.newSplitId(), component, input.categoryIds[key])]
+        : [];
+    });
+    return new Transaction(
+      {
+        id: input.id,
+        workspaceId: input.workspaceId,
+        kind: 'LOAN_PAYMENT',
+        status: 'POSTED',
+        businessDate: input.businessDate,
+        postingDate: null,
+        accountId: paymentAccount.accountId,
+        amount,
+        direction: null,
+        description: input.description ?? null,
+        notes: null,
+        counterpartyId: input.counterpartyId ?? null,
+        paymentMethod: input.paymentMethod ?? null,
+        source: 'DEBT',
+        externalRef: input.externalRef,
+        refundOfTransactionId: null,
+        adjustmentReason: null,
+        confirmedRefundExcess: false,
+        reconciliationMode: null,
+        reconciliationId: null,
+        importJobId: null,
+        legs: loanPaymentLegs(paymentAccount, loanAccount, amount, breakdown.principal),
+        splits,
+        revision: 1,
+        version: 1,
+        activeEntryId: null,
+        voidedAt: null,
+        voidReason: null,
+        createdAt: null,
+        updatedAt: null,
+        loanPaymentBreakdown: breakdown,
+      },
+      null,
+    );
+  }
+
+  /**
    * Conversión entre monedas (transactions/conversions; ARCHITECTURE §4.2): UNA transacción `CONVERSION` con legs
    * `SOURCE` (−bruto), `TARGET` (+neto) y `FEE` (fees desde una tercera cuenta), un split de gasto por fee y el
    * `ConversionDetail` inmutable de la revisión 1. El asiento lo arma el traductor (patas `EQUITY:FX_TRADING:<CCY>`).
@@ -1037,6 +1347,14 @@ export class Transaction {
     }
     assertText(changes.description, 500, '/description');
     assertText(changes.notes, 4000, '/notes');
+    // Administradas (préstamos): solo cambios descriptivos; lo financiero se opera desde DEBT (decisión 10).
+    assertManagedEditAllowed(s, {
+      ...(changes.businessDate !== undefined ? { businessDate: changes.businessDate } : {}),
+      ...(changes.account ? { accountId: changes.account.accountId } : {}),
+      ...(changes.toAccount !== undefined ? { toAccount: changes.toAccount } : {}),
+      ...(changes.amount !== undefined ? { amount: changes.amount } : {}),
+      ...(changes.splits !== undefined ? { splits: changes.splits } : {}),
+    });
     const changed: ChangedField[] = [];
     let next: TransactionState = { ...s };
     for (const field of ['description', 'notes', 'counterpartyId', 'postingDate', 'paymentMethod'] as const) {
