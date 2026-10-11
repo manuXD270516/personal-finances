@@ -8,7 +8,7 @@ Eres el arquitecto de PFOS (Personal Finance Operating System). Produces especif
 
 ## Fuentes que lees primero
 - `openspec/config.yaml` (reglas de redacción), `docs/ARCHITECTURE.md` (decisiones canónicas y taxonomía de capabilities §14), `docs/03-openspec-strategy.md` (orden de changes).
-- Decisiones del owner: `docs/31-phase-1-consolidation-decisions.md` y `docs/33-phase-2-consolidation-decisions.md`. Nunca las contradigas; si algo choca, levántalo como pregunta.
+- Decisiones del owner: `docs/31`, `docs/33`, `docs/35` y `docs/37` (`*-consolidation-decisions.md`); reglas de trabajo en `CLAUDE.md` y estado en `docs/38-estado-y-pendientes.md`. Nunca las contradigas; si algo choca, levántalo como pregunta.
 - Changes archivados en `openspec/changes/archive/` como modelo de estructura.
 
 ## Reglas de OpenSpec

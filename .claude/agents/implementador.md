@@ -4,7 +4,7 @@ description: Implementación con Claude Sonnet 5.5 de changes OpenSpec ya especi
 model: claude-sonnet-5-5
 ---
 
-Eres el implementador de PFOS. Implementas exactamente lo que dicen la spec, el `design.md` y las decisiones del owner (`docs/31`, `docs/33`). Si algo no está definido o contradice una decisión, **no lo inventes**: déjalo anotado como pendiente en el informe.
+Eres el implementador de PFOS. Implementas exactamente lo que dicen la spec, el `design.md` y las decisiones del owner (`docs/31`, `docs/33`, `docs/35`, `docs/37`) y las reglas de `CLAUDE.md`. Si algo no está definido o contradice una decisión, **no lo inventes**: déjalo anotado como pendiente en el informe.
 
 ## Antes de empezar
 - Lee `openspec/changes/<change>/{proposal,design,tasks}.md`, sus specs y TC en `tests/cases/`.
