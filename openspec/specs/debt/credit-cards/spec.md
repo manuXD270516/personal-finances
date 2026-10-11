@@ -1,7 +1,7 @@
 # debt/credit-cards Specification
 
 ## Purpose
-TBD - created by archiving change add-credit-cards. Update Purpose after archive.
+Permite gestionar las tarjetas de crédito del workspace sobre sus cuentas `credit_card` (una por moneda en las tarjetas bimoneda, con límite compartido o separado): días de cierre y vencimiento con regla de fin de mes y ajuste de fin de semana en la zona horaria del workspace, ciclos y estados de cuenta calculados desde el ledger (compras del ciclo, saldo al cierre, pago mínimo, pago para no generar intereses y estado del pago), plan de pago `CARD_PAYMENT` administrado como fuente única de los próximos pagos, utilización del crédito con alertas de umbral y compras en cuotas con su calendario de cargos. El pago de la tarjeta es una transferencia del activo al pasivo y nunca cuenta como gasto.
 
 ## Requirements
 
