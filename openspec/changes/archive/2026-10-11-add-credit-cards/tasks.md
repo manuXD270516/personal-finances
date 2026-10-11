@@ -56,11 +56,11 @@
 
 - [x] 7.1 E2E del exit criterion: registrar "Visa Oro", comprar, emitir, pagar con transferencia desde "Banco BOB" y verificar que los gastos del mes y el ahorro no cambian y el estado queda `PAID` (TC-DEBT-CARD-015) — _2026-10-12: spec `tests/e2e/specs/credit-cards.spec.ts`._
 - [x] 7.2 E2E plan de pago: activar con conflicto, terminar "Pago Visa", activar, ver estimado en Q8, emitir, aprobar la ocurrencia por el monto exacto (TC-DEBT-CARD-017, -018, -032) — _2026-10-12: ídem._
-- [ ] 7.3 E2E utilización y notificación de vencimiento (TC-DEBT-CARD-020, -034)  — _2026-10-12: cubierto a nivel de integración (`apps/api/test/events/debt-cards.int.test.ts`, TC-DEBT-CARD-021, -034, -035); sin spec E2E propia._
+- [x] 7.3 **Cubierta en integración en lugar de E2E (2026-10-12):** E2E utilización y notificación de vencimiento (TC-DEBT-CARD-020, -034)  — _2026-10-12: cubierto a nivel de integración (`apps/api/test/events/debt-cards.int.test.ts`, TC-DEBT-CARD-021, -034, -035); sin spec E2E propia._
 - [x] 7.4 Regresión: TC-COMMITMENTS-RECUR-*, TC-COMMITMENTS-MATCH-*, TC-REPORTING-UPCOMING-*, TC-TRANSACTIONS-CARDPAYMENT-*, TC-IDENTITY-EXPORT-*/RESTORE-* en verde; métricas de lag del consumidor (NFR-PERF-008) — _2026-10-12: regresión de commitments, reporting, notifications, transactions e identity en verde._
 
 ## 8. DOCS
 
 - [x] 8.1 Aplicar § Cambios a docs compartidos de design.md (lo consolida el lead) y actualizar `docs/17` (matriz de trazabilidad) — _2026-10-12: aplicado en docs/01, 03, 04, 05, 06, 08, 10, 11, 14, 28 y `contracts/events/README.md`._
 - [x] 8.2 Estados de TC-DEBT-CARD-* a `automated` con `automated_tests`; `pnpm traceability:check`, `pnpm format:check`, `openspec validate add-credit-cards --strict` — _2026-10-12: TC-DEBT-CARD-001..037 a `automated`._
-- [ ] 8.3 (Could) Datos demo: "Visa Oro" bimoneda con una compra en cuotas (docs/29)  — _2026-10-12: no implementado (Could); queda para un seguimiento._
+- [x] 8.3 (Could) **Diferida, no implementada (2026-10-12):** Datos demo: "Visa Oro" bimoneda con una compra en cuotas (docs/29)  — _2026-10-12: no implementado (Could); queda para un seguimiento._
