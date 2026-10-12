@@ -33,6 +33,7 @@ import {
   LOAN_LIFECYCLE_MACHINE,
   createCardsRuntime,
   createDebtRuntime,
+  createDebtSummaryRuntime,
 } from '@pf/debt/interface/debt.module';
 import { FX_AUDIT_POLICY } from '@pf/fx/contracts';
 import { GOALS_AUDIT_POLICY } from '@pf/goals/contracts';
@@ -589,6 +590,22 @@ export function financeRuntimes(input: {
     rates: fx.valuation,
     rateValidityWindowDays,
   });
+  // DEBT (add-debt-summary): resumen de deudas de solo lectura sobre `LoanPortfolioQuery` y `CardPortfolioQuery` del
+  // propio contexto y los contratos públicos de ACCOUNTS, LEDGER, TRANSACTIONS, CLASSIFICATION, FX e IDENTITY.
+  const debtSummary = createDebtSummaryRuntime({
+    pool: input.pool,
+    clock: input.clock,
+    workspaces: identityWorkspaceSettings(input.pool),
+    accountCatalog: accounts.catalog,
+    balances: ledger.accountBalances,
+    flows: transactions.flows,
+    movements: transactions.movements,
+    categories: classification.categories,
+    rates: fx.valuation,
+    loans: debt.queries,
+    cards: cards.queries,
+    rateValidityWindowDays,
+  });
   // GOALS (add-savings-goals): metas de ahorro. Solo contratos públicos: TRANSACTIONS (`GoalTransferPort`,
   // `TransactionLinkQuery`), COMMITMENTS (`RecurringDefinitionPort`), ACCOUNTS, LEDGER, FX e IDENTITY.
   const goals = createGoalsRuntime({
@@ -638,6 +655,7 @@ export function financeRuntimes(input: {
     imports,
     debt,
     cards,
+    debtSummary,
     goals,
   };
 }
@@ -689,6 +707,7 @@ export function identityImports(input: {
     imports,
     debt,
     cards,
+    debtSummary,
     goals,
   } = financeRuntimes({
     pool: input.pool,
@@ -768,8 +787,8 @@ export function identityImports(input: {
     CommitmentsModule.register({ runtime: commitments, conventions: input.conventions }),
     // IMPORTS — openspec add-basic-csv-import (Phase 3): `/imports*`.
     ImportsModule.register({ runtime: imports, conventions: input.conventions }),
-    // DEBT — openspec add-loans (Phase 4): `/loans*`.
-    DebtModule.register({ runtime: debt, cards, conventions: input.conventions }),
+    // DEBT — openspec add-loans, add-credit-cards y add-debt-summary (Phase 4): `/loans*`, `/credit-cards*`, `/debts/summary`.
+    DebtModule.register({ runtime: debt, cards, summary: debtSummary, conventions: input.conventions }),
     // GOALS — openspec add-savings-goals (Phase 4): `/goals*`.
     GoalsModule.register({ runtime: goals, conventions: input.conventions }),
   ];

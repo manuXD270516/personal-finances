@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Total adeudado por moneda y en moneda base'
 scenario: 'Sin tasa para el dólar'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018', 'FR-FX-006']
 nfr: []
 invariants: ['INV-002']
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/debt-summary.api.test.ts
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'fx']
@@ -31,7 +33,7 @@ expected_result:
   - 'Consolidado 48120.50 BOB, complete=false, unconverted [100.00 USD]'
   - 'Nunca 1:1'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-002 — Sin tasa para el dólar el consolidado queda incompleto

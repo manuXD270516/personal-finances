@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Próximos vencimientos de deudas'
 scenario: 'Cuota y estados de cuenta de noviembre'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018', 'FR-DEBT-013', 'FR-DEBT-011']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'dues']
@@ -33,7 +36,7 @@ expected_result:
   - 'Orden: Préstamo auto 2026-11-05 1850.00 BOB; Visa Oro 2026-11-15 1120.50 BOB (mín. 56.02); Visa Oro 2026-11-15 100.00 USD (mín. 10.00); sin "Deuda familiar"'
   - '2026-11-07: Préstamo auto primero, atrasado 2 días con 1850.00 BOB'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-007 — Próximo vencimiento de cada deuda con atrasados primero

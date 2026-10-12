@@ -5,16 +5,21 @@ spec: reporting/dashboard
 related_specs: ['debt/loans']
 requirement: 'Resumen de deudas en el Home'
 scenario: 'Workspace sin pasivos'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-REPORTING-001', 'FR-DEBT-018']
 nfr: []
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/debt-summary.api.test.ts
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+  - tests/e2e/specs/debt-summary.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['home', 'empty-state']
@@ -31,7 +36,7 @@ expected_result:
   - 'A: "no hay deudas registradas" con acción registrar préstamo o tarjeta; sin 0.00 BOB'
   - 'B: "no hay deudas pendientes" sin fecha ni vencimiento'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-010 — Tarjeta Deudas sin pasivos o con deudas saldadas sin ceros inventados

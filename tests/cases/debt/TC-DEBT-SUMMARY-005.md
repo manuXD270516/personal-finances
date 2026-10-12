@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Interés pagado en el año'
 scenario: 'Interés sin deuda asociada'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018']
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'interest', 'timezone']
@@ -34,7 +37,7 @@ expected_result:
   - 'Interés BOB 3275.40 con 25.00 BOB en "otros intereses"'
   - 'A las 23:30 del 31-12 en La Paz el año sigue siendo 2026'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-005 — Interés del año anterior excluido y otros intereses

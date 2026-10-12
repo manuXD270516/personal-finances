@@ -20,3 +20,8 @@ export * from './schedule-engine.js';
 export * from './custom-schedule.js';
 export * from './schedule-recalculator.js';
 export * from './payoff-simulator.js';
+export * from './debt-summary-types.js';
+export * from './debt-summary-calculator.js';
+export * from './interest-attribution.js';
+export * from './debt-free-date-estimator.js';
+export * from './upcoming-debt-dues.js';

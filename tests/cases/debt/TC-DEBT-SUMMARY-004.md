@@ -5,16 +5,20 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Interés pagado en el año'
 scenario: 'Interés del préstamo y de la tarjeta'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018', 'FR-DEBT-007']
 nfr: []
 invariants: ['INV-012', 'INV-002']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/debt-summary.api.test.ts
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'interest']
@@ -32,7 +36,7 @@ expected_result:
   - 'Atribución: "Préstamo auto" 3250.40 BOB; "Visa Oro" 12.00 USD; otros 0'
   - 'attributionConsistent = true'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-004 — Interés pagado en el año con desglose por préstamo y tarjeta
