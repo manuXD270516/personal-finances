@@ -5,6 +5,7 @@ import { GoalsCard } from './GoalsCard';
 import { formatInstant, formatLocalDate } from './format';
 import { LiquidBalanceCard } from './LiquidBalanceCard';
 import { NetWorthCard } from './NetWorthCard';
+import { SpendableCard } from '../spendable/SpendableView';
 import { ActionHint, NotAvailableWidget, statusOf } from './QuestionWidgets';
 import { HOME_CSS } from './styles';
 import { TopCategoriesWidget } from './TopCategoriesWidget';
@@ -26,6 +27,10 @@ export interface DashboardViewProps extends FormatContext {
   readonly goalsHref?: string | undefined;
   readonly createGoalHref?: string | undefined;
   readonly goalHref?: ((goalId: string) => string) | undefined;
+  /** Destinos de la tarjeta Q5 (add-spendable-amount): detalle del disponible, "Crear presupuesto" y próximos pagos. */
+  readonly spendableDetailHref?: string | undefined;
+  readonly createBudgetHref?: string | undefined;
+  readonly upcomingHref?: string | undefined;
   /** Tarjeta "Deudas" (add-debt-summary), junto a la de metas en "Metas y deudas". */
   readonly debtWidget?: ReactNode;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
@@ -53,6 +58,9 @@ export function DashboardView({
   createGoalHref,
   goalHref,
   budgetWidget,
+  spendableDetailHref,
+  createBudgetHref,
+  upcomingHref,
   debtWidget,
   evolutionCard,
   commitmentsSection,
@@ -64,8 +72,14 @@ export function DashboardView({
   // Con metas habilitadas (add-savings-goals) Q9 tiene su propia tarjeta; sin el bloque sigue como "no disponible".
   const goalsCard =
     (summary.goals !== undefined && summary.goals !== null) || statusOf(summary, 'Q9').status === 'NO_DATA';
+  // Con Q5 habilitada (add-spendable-amount) tiene su propia tarjeta; una API anterior sigue como "no disponible".
+  const q5 = statusOf(summary, 'Q5');
+  const spendableCard = q5.status !== 'NOT_AVAILABLE_IN_PHASE';
   const unavailable = summary.questions.filter(
-    (q) => q.status === 'NOT_AVAILABLE_IN_PHASE' && !(q.question === 'Q9' && goalsCard),
+    (q) =>
+      q.status === 'NOT_AVAILABLE_IN_PHASE' &&
+      !(q.question === 'Q9' && goalsCard) &&
+      !(q.question === 'Q5' && spendableCard),
   );
   const attributions = summary.meta.attributions ?? [];
   const external = { target: '_blank', rel: 'noopener noreferrer' } as const;
@@ -81,6 +95,21 @@ export function DashboardView({
         createAccountHref={createAccountHref}
         registerRateHref={registerRateHref}
       />
+
+      {spendableCard ? (
+        <SpendableCard
+          summary={summary.spendable}
+          noData={q5.status === 'NO_DATA' ? { actionHint: q5.actionHint } : undefined}
+          generatedAt={summary.meta.generatedAt}
+          ctx={fctx}
+          links={{
+            detailHref: spendableDetailHref,
+            createBudgetHref,
+            upcomingHref,
+            createAccountHref,
+          }}
+        />
+      ) : null}
 
       {commitmentsSection ?? null}
 

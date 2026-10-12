@@ -21,11 +21,13 @@ import { RecentAuthPolicy } from '../application/portability/reauth.js';
 import { WorkspaceExportService } from '../application/portability/workspace-export.service.js';
 import { WorkspaceImportService } from '../application/portability/workspace-import.service.js';
 import { IdentityService } from '../application/identity.service.js';
+import { WorkspaceSettingsQueries } from '../application/workspace-settings.queries.js';
 import type {
   WorkspaceCalendarQuery,
   WorkspaceRecipientDto,
   WorkspaceRecipientsQuery,
   WorkspaceRoleDto,
+  WorkspaceSettingsQuery,
 } from '../contracts/index.js';
 import type {
   AuditPort,
@@ -254,6 +256,22 @@ export function identityWorkspaceSettings(pool: Pool): {
       });
     },
   };
+}
+
+/**
+ * `WorkspaceSettingsQuery` (openspec add-spendable-amount, S2): reserva mínima de liquidez del workspace para REPORTING.
+ * Se invoca dentro de la unidad de trabajo del llamador, con el usuario de la petición (RLS de membresía), igual que
+ * `identityWorkspaceSettings`.
+ */
+export function identityWorkspaceSettingsQuery(pool: Pool): WorkspaceSettingsQuery {
+  return new WorkspaceSettingsQueries({
+    uow: new PgUnitOfWork(pool),
+    workspaces: new PgWorkspaceRepository(),
+    context: (workspaceId) => {
+      const actor = currentRequestContext()?.actor;
+      return { userId: actor && actor.type === 'USER' ? actor.userId : null, workspaceId };
+    },
+  });
 }
 
 /**

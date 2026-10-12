@@ -5,16 +5,21 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Preguntas del Home sin datos o no disponibles"
 scenario: "Workspace sin cuentas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001"]
 nfr: ["NFR-USAB-009"]
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/home-questions.test.ts
+  - tests/e2e/specs/dashboard.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "home", "empty-state"]
@@ -29,7 +34,7 @@ expected_result:
   - "A: ninguna pregunta con NOT_AVAILABLE_IN_PHASE; Q5 AVAILABLE con monto"
   - "B: Q5 NO_DATA con acción CREATE_ACCOUNT, sin 0.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-015 — Con Q5 habilitada ninguna pregunta del Home queda no disponible y sin cuentas Q5 indica que no hay datos

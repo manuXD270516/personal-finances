@@ -5,6 +5,7 @@
 
 import type { GoalContributionsNet, GoalsHomeBlock } from '../goals/types';
 import type { Money, RateAttribution, ResolvedRate } from '../common/fx-types';
+import type { SpendableSummary } from '../spendable/types';
 
 export type {
   Money,
@@ -137,6 +138,8 @@ export interface ReportSummary {
   readonly goals?: GoalsHomeBlock | null;
   /** Aportes netos a metas del periodo junto al ahorro (Q6); no cambia el ahorro ni su tasa. */
   readonly goalContributions?: GoalContributionsNet | null;
+  /** Q5 (add-spendable-amount): disponible para gastar libre de compromisos; `null` sin cuentas líquidas. */
+  readonly spendable?: SpendableSummary | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

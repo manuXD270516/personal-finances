@@ -71,6 +71,11 @@ export interface ReportingDeps {
    * del resumen va vacío.
    */
   readonly goalFlows?: GoalFlowsPort;
+  /**
+   * Q5 del Home (add-spendable-amount): disponible para gastar libre de compromisos. Opcional: sin él el resumen no
+   * trae el bloque `spendable` (cifras de cierre y pruebas que no lo necesitan).
+   */
+  readonly spendable?: SpendableDeps;
 }
 
 // ───────────────────────────────────────────── reporting/dashboard: metas (add-savings-goals)
@@ -274,5 +279,88 @@ export interface ReportingMetricsPort {
 export interface UpcomingPaymentsDeps extends ReportingDeps {
   readonly periods: FinancialPeriodsPort;
   readonly commitments: UpcomingCommitmentsPort;
+  readonly metrics?: ReportingMetricsPort;
+}
+
+// ───────────────────────────────────────────── reporting/dashboard: disponible para gastar (add-spendable-amount)
+
+/** Ítem de egreso para Q5 (COMMITMENTS, `CommittedQuery.listForSpendable`; estructuralmente compatible). */
+export interface SpendableCommittedRow {
+  readonly source: 'OCCURRENCE' | 'PENDING';
+  readonly id: string;
+  readonly definitionId: string | null;
+  readonly name: string | null;
+  readonly kind: string;
+  readonly date: string;
+  readonly accountId: string;
+  readonly toAccountId: string | null;
+  readonly sourceLiquid: boolean;
+  readonly targetLiquid: boolean | null;
+  readonly managedBy: 'USER' | 'SUBSCRIPTION' | 'DEBT' | 'GOAL' | null;
+  readonly amount: MoneyRow | null;
+  readonly overdueFromPrevious: boolean;
+}
+
+/** Reservado por metas en una cuenta (GOALS, `GoalReservationsQuery.getReservedByAccount`). */
+export interface AccountReservationRow {
+  readonly accountId: string;
+  readonly currency: string;
+  readonly reserved: string;
+}
+
+/** Aporte planificado de una meta en el periodo (GOALS, `GoalPlansQuery.getForPeriod`). */
+export interface GoalPlanRow {
+  readonly goalId: string;
+  readonly goalName: string;
+  readonly currency: string;
+  readonly pending: string;
+}
+
+/** Disponible del plan del periodo (PLANNING, `BudgetVsActualQuery.getForPeriod`); `null` si no hay plan. */
+export interface BudgetAvailabilityRow {
+  readonly budgetId: string;
+  readonly totals: {
+    readonly availableToSpend: MoneyRow;
+    readonly complete: boolean;
+  };
+}
+
+/**
+ * Lo que REPORTING necesita de los otros contextos para Q5. Se declara aquí (no se importan `@pf/goals`, `@pf/planning`
+ * ni `@pf/commitments`: PLANNING ya depende de REPORTING y GOALS/COMMITMENTS se componen después); la composición de
+ * `apps/api` entrega adapters con resolución tardía sobre sus contratos públicos.
+ */
+export interface SpendableDeps {
+  readonly commitments: {
+    listForSpendable(input: {
+      readonly workspaceId: string;
+      readonly periodFrom: string;
+      readonly periodTo: string;
+    }): Promise<{ readonly items: readonly SpendableCommittedRow[]; readonly withoutAmountCount: number }>;
+  };
+  readonly reservations: {
+    getReservedByAccount(input: {
+      readonly workspaceId: string;
+      readonly accountIds?: readonly string[];
+    }): Promise<readonly AccountReservationRow[]>;
+  };
+  readonly goalPlans: {
+    getForPeriod(input: {
+      readonly workspaceId: string;
+      readonly from: string;
+      readonly to: string;
+    }): Promise<readonly GoalPlanRow[]>;
+  };
+  /** Reserva mínima de liquidez (IDENTITY, `WorkspaceSettingsQuery.getMinimumLiquidityReserve`). */
+  readonly minimumReserve: {
+    getMinimumLiquidityReserve(input: { readonly workspaceId: string }): Promise<MoneyRow | null>;
+  };
+  readonly budgets: {
+    getForPeriod(input: {
+      readonly workspaceId: string;
+      readonly periodId: string;
+    }): Promise<BudgetAvailabilityRow | null>;
+  };
+  readonly periods: FinancialPeriodsPort;
   readonly metrics?: ReportingMetricsPort;
 }

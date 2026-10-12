@@ -452,6 +452,56 @@
       "incomplete": "Algumas metas têm fundos em outra moeda sem taxa vigente: seu progresso é parcial.",
       "contributions": "Aportes líquidos a metas do período:",
       "contributionsIncomplete": "incompleto: falta uma taxa de câmbio"
+    },
+    "spendable": {
+      "caption": "Livre de compromissos",
+      "captionHelp": "Dinheiro líquido menos o reservado para metas, os compromissos do período, os aportes planejados e a reserva mínima. A receita esperada não soma.",
+      "period": "Período {label}: {from} a {to}",
+      "negative": "Disponível negativo",
+      "negativeHelp": "Suas reservas, compromissos e aportes planejados superam seu dinheiro líquido.",
+      "incomplete": "Total incompleto: estes valores não puderam ser convertidos por falta de uma taxa vigente.",
+      "unconverted": "{amount} sem converter",
+      "terms": {
+        "liquid": "Dinheiro líquido",
+        "reservedForGoals": "Reservado para metas",
+        "committed": "Comprometido",
+        "plannedGoalContributions": "Aportes planejados para metas",
+        "minimumReserve": "Reserva mínima",
+        "spendable": "Disponível"
+      },
+      "breakdown": "Detalhamento por moeda",
+      "currencyHeading": "Em {currency}",
+      "shortfall": "Em {currency} faltam {amount}: convém converter.",
+      "withoutAmount": "{count, plural, one {# pagamento sem valor não está descontado} other {# pagamentos sem valor não estão descontados}}",
+      "cardsWithoutPayment": "{count, plural, one {# cartão sem pagamento programado} other {# cartões sem pagamento programado}}",
+      "budget": {
+        "title": "Segundo seu orçamento",
+        "partial": "Parcial: falta uma taxa de câmbio.",
+        "none": "Não há orçamento deste período.",
+        "create": "Criar orçamento"
+      },
+      "detailLink": "Ver o detalhe do disponível",
+      "upcomingLink": "O período termina em breve: ver os próximos pagamentos",
+      "empty": "Você ainda não tem contas líquidas.",
+      "detail": {
+        "title": "Detalhe do disponível",
+        "back": "Voltar ao Início",
+        "committed": "Compromissos descontados",
+        "committedEmpty": "Não há compromissos a descontar neste período.",
+        "overdue": "Vencido de um período anterior",
+        "pending": "Transação pendente",
+        "occurrence": "Compromisso",
+        "reserved": "Reservado por conta",
+        "reservedEmpty": "As metas não reservam dinheiro nas suas contas líquidas.",
+        "reservedLine": "{name}: reservado {reserved}, desconta {counted} (saldo {balance})",
+        "planned": "Aportes planejados por meta",
+        "plannedEmpty": "Nenhuma meta ativa tem um aporte planejado pendente.",
+        "rates": "Taxas usadas",
+        "ratesNone": "Nenhuma taxa de câmbio foi usada.",
+        "rateLine": "{pair} {value}",
+        "loading": "Carregando o disponível…",
+        "noAccounts": "Você ainda não tem contas líquidas: não há disponível a calcular."
+      }
     }
   },
   "Common": {

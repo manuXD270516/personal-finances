@@ -1,3 +1,4 @@
+import type { SpendableSummary } from '../spendable/types';
 import type { ReportSummary, ResolvedRate } from './types';
 
 /**
@@ -31,6 +32,40 @@ export const PARALLEL_RATE: ResolvedRate = {
 
 const bob = (amount: string) => ({ amount, currency: 'BOB' });
 const usdt = (amount: string) => ({ amount, currency: 'USDT' });
+
+/** Q5 del escenario de octubre (add-spendable-amount, TC-REPORTING-SPENDABLE-001): 15800 − 5000 − 3179 − 600 − 1500. */
+export const SPENDABLE_SUMMARY: SpendableSummary = {
+  period: {
+    id: '0190a000-0000-7000-8000-0000000000c1',
+    label: '2026-10',
+    start: '2026-10-01',
+    end: '2026-10-31',
+  },
+  reportingCurrency: 'BOB',
+  byCurrency: [
+    {
+      currency: 'BOB',
+      liquid: bob('15800.00'),
+      reservedForGoals: bob('5000.00'),
+      committed: bob('3179.00'),
+      plannedGoalContributions: bob('600.00'),
+      minimumReserve: bob('1500.00'),
+      spendable: bob('5521.00'),
+    },
+  ],
+  consolidated: { total: bob('5521.00'), complete: true, unconverted: [] },
+  shortfalls: [],
+  status: 'OK',
+  withoutAmountCount: 1,
+  cardsWithoutPaymentCount: 0,
+  budgetView: {
+    status: 'AVAILABLE',
+    action: null,
+    budgetId: '0190a000-0000-7000-8000-0000000000b1',
+    amount: bob('3750.00'),
+    complete: true,
+  },
+};
 
 export const SUMMARY: ReportSummary = {
   period: { from: '2026-09-01', to: '2026-09-30' },
@@ -209,12 +244,13 @@ export const SUMMARY: ReportSummary = {
     { question: 'Q2', status: 'AVAILABLE', actionHint: null },
     { question: 'Q3', status: 'AVAILABLE', actionHint: null },
     { question: 'Q4', status: 'AVAILABLE', actionHint: null },
-    { question: 'Q5', status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_2' },
+    { question: 'Q5', status: 'AVAILABLE', actionHint: null },
     { question: 'Q6', status: 'AVAILABLE', actionHint: null },
     { question: 'Q7', status: 'AVAILABLE', actionHint: null },
     { question: 'Q8', status: 'AVAILABLE', actionHint: null },
     { question: 'Q9', status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_4' },
   ],
+  spendable: SPENDABLE_SUMMARY,
   meta: {
     generatedAt: '2026-09-30T22:00:00Z',
     reportingCurrency: 'BOB',
@@ -257,9 +293,10 @@ export const EMPTY_SUMMARY: ReportSummary = {
     unvalued: [],
   },
   questions: SUMMARY.questions.map((q) =>
-    ['Q1', 'Q2', 'Q3', 'Q6', 'Q7'].includes(q.question)
+    ['Q1', 'Q2', 'Q3', 'Q5', 'Q6', 'Q7'].includes(q.question)
       ? { ...q, status: 'NO_DATA' as const, actionHint: 'CREATE_ACCOUNT' }
       : q,
   ),
+  spendable: null,
   meta: { ...SUMMARY.meta, ratesUsed: [], attributions: [] },
 };

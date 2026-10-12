@@ -694,15 +694,14 @@ describe('Home: tarjeta Q9 y aportes a metas', () => {
     expect(card(noBlock)).toContain('data-testid="question-Q9-no-data"');
   });
 
-  it('[TC-GOALS-SAVINGS-047] con metas habilitadas solo Q5 sigue "no disponible" y Q9 no aparece como pendiente de fase', () => {
+  it('[TC-GOALS-SAVINGS-047] [TC-REPORTING-SPENDABLE-015] con metas y Q5 habilitadas ninguna pregunta queda "no disponible" por fase', () => {
     const html = render(<DashboardView summary={withGoals(block())} {...dash} />);
-    expect(html).toContain('data-testid="question-Q5"');
-    expect(html).toMatch(/data-testid="question-Q5"[^>]*data-status="NOT_AVAILABLE_IN_PHASE"/);
-    expect(html.match(/Aún no disponible/g)).toHaveLength(1);
+    expect(html).toMatch(/data-testid="question-Q5"[^>]*data-status="AVAILABLE"/);
+    expect(html.match(/Aún no disponible/g)).toBeNull();
     expect(html).toMatch(/data-testid="question-Q9"[^>]*data-status="AVAILABLE"/);
-    // Sin el bloque (respuesta anterior a la fase 4) Q9 sigue como "no disponible".
+    // Sin el bloque de metas (respuesta anterior a la fase 4) Q9 sigue como "no disponible".
     const old = render(<DashboardView summary={SUMMARY} {...dash} />);
-    expect(old.match(/Aún no disponible/g)).toHaveLength(2);
+    expect(old.match(/Aún no disponible/g)).toHaveLength(1);
     expect(old).not.toContain('data-testid="home-goals"');
     // Un workspace sin datos tampoco rompe el Home.
     expect(render(<DashboardView summary={EMPTY_SUMMARY} {...dash} />)).toContain('data-testid="dashboard"');

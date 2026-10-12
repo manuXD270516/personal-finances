@@ -438,11 +438,12 @@ describe('GetReportSummary — patrimonio neto (reporting/net-worth)', () => {
 });
 
 describe('GetReportSummary — preguntas del Home y frescura', () => {
-  it('[TC-REPORTING-DASHBOARD-005] solo Q5 sigue no disponible; Q9 sin metas es NO_DATA con CREATE_GOAL; Q4 y Q8 sin compromisos ni pendientes son NO_DATA con CREATE_COMMITMENT', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] ninguna pregunta queda no disponible (Q5 con cuentas líquidas está disponible); Q9 sin metas es NO_DATA con CREATE_GOAL; Q4 y Q8 sin compromisos ni pendientes son NO_DATA con CREATE_COMMITMENT', async () => {
     canonical();
     const s = await summary();
     const by = Object.fromEntries(s.questions.map((q) => [q.question, q]));
-    expect(by['Q5']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE', actionHint: 'AVAILABLE_IN_PHASE_2' });
+    expect(by['Q5']).toMatchObject({ status: 'AVAILABLE', actionHint: null });
+    expect(s.questions.filter((q) => q.status === 'NOT_AVAILABLE_IN_PHASE')).toEqual([]);
     expect(by['Q9']).toMatchObject({ status: 'NO_DATA', actionHint: 'CREATE_GOAL' });
     for (const q of ['Q4', 'Q8'])
       expect(by[q]).toMatchObject({ status: 'NO_DATA', actionHint: 'CREATE_COMMITMENT' });

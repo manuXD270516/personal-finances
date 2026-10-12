@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateReadModelAlert, UPCOMING_READ_MODEL_ALERT } from './upcoming-read-model-alert.js';
+import {
+  evaluateReadModelAlert,
+  SPENDABLE_DURATION_METRIC,
+  UPCOMING_READ_MODEL_ALERT,
+} from './upcoming-read-model-alert.js';
 
 const series = (n: number, p95Seconds: number, maxRows = 1200) =>
   Array.from({ length: n }, () => ({ p95Seconds, maxRows }));
@@ -32,5 +36,15 @@ describe('UpcomingPaymentsReadModelRecommended (docs/35 D117)', () => {
     const state = evaluateReadModelAlert([{ p95Seconds: 0.05, maxRows: 5001 }]);
     expect(state).toMatchObject({ firing: true, reasons: ['TOO_MANY_ROWS'] });
     expect(evaluateReadModelAlert([{ p95Seconds: 0.05, maxRows: 5000 }]).firing).toBe(false);
+  });
+});
+
+describe('UpcomingPaymentsReadModelRecommended cubre Q5 (add-spendable-amount)', () => {
+  it('[TC-REPORTING-SPENDABLE-014] la regla incluye la métrica reporting_spendable_duration_seconds sin etiquetas de alta cardinalidad', () => {
+    expect(UPCOMING_READ_MODEL_ALERT.durationMetrics).toEqual([
+      'reporting_upcoming_payments_duration_seconds',
+      'reporting_spendable_duration_seconds',
+    ]);
+    expect(SPENDABLE_DURATION_METRIC).toBe('reporting_spendable_duration_seconds');
   });
 });

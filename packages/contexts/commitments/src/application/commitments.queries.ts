@@ -11,6 +11,8 @@ import {
   type Currency,
 } from '@pf/shared-kernel';
 import type {
+  CommittedForSpendableDto,
+  CommittedForSpendableItemDto,
   CommittedItemDto,
   CommittedQuery,
   CommittedRangeDto,
@@ -268,6 +270,74 @@ export class CommitmentsQueries
     return this.deps.uow.run(workspaceId, async () => {
       const composed = await this.compose(workspaceId, input.from, input.to);
       return composed.range;
+    });
+  }
+
+  /**
+   * Insumo de Q5 (`add-spendable-amount`, S1): las ocurrencias de egreso sin resolver con vencimiento ≤ `periodTo` (las
+   * del periodo y las atrasadas, marcando `overdueFromPrevious` las anteriores a `periodFrom`) y las transacciones
+   * `PENDING` de egreso con fecha ≤ `periodTo`, con la liquidez de origen y destino y `managedBy`. No aplica las
+   * exclusiones de Q5 (REPORTING las aplica) y nunca informa ingresos. Misma lectura que `getForRange` (Q4 no cambia).
+   */
+  listForSpendable(input: {
+    readonly workspaceId: string;
+    readonly periodFrom: string;
+    readonly periodTo: string;
+  }): Promise<CommittedForSpendableDto> {
+    const { workspaceId, periodFrom, periodTo } = input;
+    return this.deps.uow.run(workspaceId, async () => {
+      const classes = await this.accountClasses(workspaceId);
+      const liquid = (id: string | null) => {
+        const c = id === null ? undefined : classes.get(id);
+        return c === undefined ? null : c.nature === 'ASSET' && c.liquidity === 'LIQUID';
+      };
+      const unresolved = await this.deps.occurrences.list(workspaceId, {
+        statuses: UNRESOLVED,
+        dueTo: periodTo,
+        order: 'DUE_DATE',
+      });
+      const pendingRows = await this.deps.pending.listPending({ workspaceId, dateTo: periodTo });
+      const items: CommittedForSpendableItemDto[] = [];
+      for (const v of unresolved) {
+        if (v.kind === 'INCOME') continue;
+        const o = v.occurrence;
+        const projected = projectedAmount(o.expected);
+        items.push({
+          source: 'OCCURRENCE',
+          id: o.id,
+          definitionId: o.definitionId,
+          name: nameOf(v),
+          kind: v.kind,
+          date: o.dueDate,
+          accountId: v.accountId,
+          toAccountId: v.toAccountId,
+          sourceLiquid: liquid(v.accountId) === true,
+          targetLiquid: liquid(v.toAccountId),
+          managedBy: v.managedBy,
+          amount: projected === null ? null : money(projected, o.currency),
+          overdueFromPrevious: o.dueDate < periodFrom,
+        });
+      }
+      for (const p of pendingRows) {
+        if (p.kind !== 'EXPENSE' && p.kind !== 'TRANSFER') continue;
+        items.push({
+          source: 'PENDING',
+          id: p.transactionId,
+          definitionId: null,
+          name: p.description,
+          kind: p.kind,
+          date: p.businessDate,
+          accountId: p.accountId,
+          toAccountId: p.toAccountId,
+          sourceLiquid: liquid(p.accountId) === true,
+          targetLiquid: liquid(p.toAccountId),
+          managedBy: null,
+          amount: p.amount,
+          overdueFromPrevious: false,
+        });
+      }
+      items.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date < b.date ? -1 : 1));
+      return { items, withoutAmountCount: items.filter((i) => i.amount === null).length };
     });
   }
 

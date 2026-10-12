@@ -1,4 +1,3 @@
-import type { AccountSummaryDto } from '@pf/accounts/contracts';
 import type { ResolvedRateDto, RateAttributionDto, ValuationRateDto } from '@pf/fx/contracts';
 import {
   currency as makeCurrency,
@@ -39,10 +38,12 @@ import {
   type ValuedAccount,
 } from '../domain/index.js';
 import type { GoalHomeSummaryRow, ReportingDeps } from './ports/index.js';
+import { isLiquidAccount, SpendableCalculation } from './spendable.queries.js';
+import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey, toExact } from './valuation-support.js';
+
+export { DEFAULT_RATE_VALIDITY_WINDOW_DAYS, rateKey };
 
 export const DEFAULT_TOP_CATEGORIES = 5;
-/** Ventana de vigencia por defecto de las tasas de valoración (días; docs/31 D53: ajuste de Reporting). */
-export const DEFAULT_RATE_VALIDITY_WINDOW_DAYS = 7;
 export const MAX_TOP_CATEGORIES = 20;
 /** Metas que muestra la tarjeta de Q9 del Home (add-savings-goals). */
 export const GOALS_HOME_LIMIT = 3;
@@ -105,16 +106,6 @@ export interface ReportSummaryResult {
 }
 
 const range = (r: DateRange) => ({ from: r.from.toString(), to: r.to.toString() });
-
-/** Clave de identidad de una tasa usada (misma versión almacenada y orientación ⇒ una sola entrada). */
-export const rateKey = (r: ResolvedRateDto) =>
-  `${r.fxRateId ?? JSON.stringify(r.components.map((c) => (c as { id?: unknown }).id))}|${r.rate.base}|${r.rate.quote}`;
-
-const toExact = (v: ValuationRateDto): ExactRate => ({
-  base: v.exact.base,
-  quote: v.exact.quote,
-  value: dec(v.exact.value),
-});
 
 /**
  * `GetReportSummary` (design.md decisiones 1–8; reporting/dashboard + reporting/net-worth): calcula el resumen del
@@ -283,7 +274,7 @@ export class ReportSummaryQueries {
       useRate(flowRates.get(`${code}|${date}`), usedGoalFlows);
 
     // ---- stocks: dinero disponible y patrimonio neto
-    const isLiquid = (a: AccountSummaryDto) => a.nature === 'ASSET' && a.liquidity === 'LIQUID';
+    const isLiquid = isLiquidAccount;
     const liquid = ConsolidationService.consolidate(
       lines.filter((l) => isLiquid(l.account)).map((l) => l.balance),
       reporting,
@@ -297,6 +288,29 @@ export class ReportSummaryQueries {
       balance: l.balance,
     }));
     const nw = NetWorthValuator.value(valued, reporting, stockRateFor);
+
+    // ---- disponible para gastar (Q5, add-spendable-amount): periodo vigente hoy, aparte del periodo del resumen
+    const hasLiquidAccounts = lines.some((l) => isLiquid(l.account));
+    const balanceByAccount = new Map(lines.map((l) => [l.account.accountId, l.balance]));
+    const spendableCalc =
+      deps.spendable && hasLiquidAccounts && query.asOf === undefined
+        ? await new SpendableCalculation(deps, deps.spendable).compute({
+            workspaceId: ws,
+            now,
+            today,
+            reporting,
+            scaleOf,
+            accounts,
+            balanceOf: (accountId) => balanceByAccount.get(accountId) as Money,
+            knownRates: stockRates,
+            windowDays: deps.rateValidityWindowDays ?? DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
+          })
+        : null;
+    // Las tasas del consolidado de Q5 también se informan en `meta.ratesUsed` (sin duplicar las del dinero disponible).
+    for (const r of spendableCalc?.ratesUsed ?? []) {
+      const key = rateKey(r);
+      if (!used.has(key)) used.set(key, r);
+    }
 
     // ---- flujos del periodo
     const periodText = range(period);
@@ -491,9 +505,11 @@ export class ReportSummaryQueries {
         hasAccounts: accounts.length > 0,
         hasCommitments: await this.hasCommitments(ws, accounts.length > 0),
         hasGoals: (goalSummary?.goalCount ?? 0) > 0,
+        hasLiquidAccounts,
       }),
       goals: goalsBlock(goalSummary),
       goalContributions,
+      spendable: spendableCalc?.summary ?? null,
       meta: {
         generatedAt: nowText,
         reportingCurrency: reporting.code,

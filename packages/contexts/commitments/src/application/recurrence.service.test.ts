@@ -4,6 +4,7 @@ import { CommitmentsQueries } from './commitments.queries.js';
 import { DefinitionsService, type CreateDefinitionCommand } from './definitions.service.js';
 import { GenerateOccurrencesService } from './generate-occurrences.service.js';
 import { OccurrencesService } from './occurrences.service.js';
+import { EngineRecurringDefinitionPort } from './recurring-definition-port.js';
 import {
   ARCHIVED_CATEGORY,
   BANK,
@@ -1077,5 +1078,156 @@ describe('Rendimiento de la generación (NFR-PERF-009)', () => {
     expect(result.definitions).toBe(60);
     expect(result.generated).toBeGreaterThan(20 * 30);
     expect(elapsed).toBeLessThanOrEqual(10_000);
+  });
+});
+
+describe('Insumo del disponible para gastar (CommittedQuery.listForSpendable; add-spendable-amount, S1)', () => {
+  const common = {
+    categoryId: null,
+    amount: { type: 'FIXED' as const, amount: bob('500.00') },
+    schedule: { cadence: 'MONTHLY', startDate: '2026-10-20' },
+  };
+
+  it('[TC-REPORTING-SPENDABLE-002] informa egresos con liquidez de origen y destino, pendientes y los sin monto; nunca ingresos', async () => {
+    const s = setup();
+    await create(s, 'Internet', {
+      amount: { type: 'FIXED', amount: bob('199.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-10-22' },
+    });
+    await create(s, 'Netflix', {
+      accountId: CARD,
+      amount: { type: 'FIXED', amount: bob('49.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-10-15' },
+    });
+    await create(s, 'Agua', {
+      amount: { type: 'VARIABLE' },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-10-26' },
+    });
+    await create(s, 'A tarjeta', { ...common, toAccountId: CARD }, 'TRANSFER');
+    await create(s, 'A efectivo', { ...common, toAccountId: CASH }, 'TRANSFER');
+    await create(
+      s,
+      'Sueldo',
+      {
+        ...common,
+        amount: { type: 'FIXED', amount: bob('8000.00') },
+        schedule: { cadence: 'MONTHLY', startDate: '2026-10-30' },
+      },
+      'INCOME',
+    );
+    s.mem.addTransaction({
+      kind: 'EXPENSE',
+      accountId: BANK,
+      amount: bob('300.00'),
+      status: 'PENDING',
+      businessDate: '2026-10-18',
+    });
+    const r = await s.queries.listForSpendable({
+      workspaceId: WS,
+      periodFrom: '2026-10-01',
+      periodTo: '2026-10-31',
+    });
+    const occurrences = r.items.filter((i) => i.source === 'OCCURRENCE');
+    const byName = Object.fromEntries(occurrences.map((i) => [i.name, i]));
+    expect(Object.keys(byName).sort()).toEqual(['A efectivo', 'A tarjeta', 'Agua', 'Internet', 'Netflix']);
+    expect(r.items.filter((i) => i.source === 'PENDING')).toHaveLength(1);
+    expect(byName['Internet']).toMatchObject({
+      source: 'OCCURRENCE',
+      kind: 'EXPENSE',
+      sourceLiquid: true,
+      targetLiquid: null,
+      managedBy: 'USER',
+      amount: bob('199.00'),
+      overdueFromPrevious: false,
+    });
+    // Compra cargada a la tarjeta: origen no líquido (se descuenta al pagar la tarjeta).
+    expect(byName['Netflix']).toMatchObject({ sourceLiquid: false });
+    expect(byName['A tarjeta']).toMatchObject({ kind: 'TRANSFER', sourceLiquid: true, targetLiquid: false });
+    expect(byName['A efectivo']).toMatchObject({ sourceLiquid: true, targetLiquid: true });
+    expect(byName['Agua']?.amount).toBeNull();
+    expect(r.withoutAmountCount).toBe(1);
+    const pending = r.items.find((i) => i.source === 'PENDING');
+    expect(pending).toMatchObject({
+      kind: 'EXPENSE',
+      sourceLiquid: true,
+      amount: bob('300.00'),
+      managedBy: null,
+    });
+    expect(r.items.map((i) => i.date)).toEqual([...r.items.map((i) => i.date)].sort());
+  });
+
+  it('[TC-REPORTING-SPENDABLE-004] las atrasadas de periodos anteriores y las pendientes viejas se informan; los vencimientos posteriores al periodo no', async () => {
+    const s = setup();
+    await create(s, 'Seguro', {
+      amount: { type: 'FIXED', amount: bob('120.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-09-28' },
+    });
+    await create(s, 'Alquiler nov', {
+      amount: { type: 'FIXED', amount: bob('3500.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-11-01' },
+    });
+    s.mem.addTransaction({
+      kind: 'EXPENSE',
+      accountId: BANK,
+      amount: bob('50.00'),
+      status: 'PENDING',
+      businessDate: '2026-09-10',
+    });
+    s.mem.setNow(noon('2026-10-09'));
+    await s.job.runWorkspace(WS);
+    const r = await s.queries.listForSpendable({
+      workspaceId: WS,
+      periodFrom: '2026-10-01',
+      periodTo: '2026-10-31',
+    });
+    const seguro = r.items.filter((i) => i.name === 'Seguro');
+    expect(seguro.length).toBeGreaterThan(0);
+    expect(seguro.filter((i) => i.date < '2026-10-01').every((i) => i.overdueFromPrevious)).toBe(true);
+    expect(seguro.filter((i) => i.date >= '2026-10-01').every((i) => !i.overdueFromPrevious)).toBe(true);
+    expect(r.items.some((i) => i.name === 'Alquiler nov' && i.date > '2026-10-31')).toBe(false);
+    expect(r.items.find((i) => i.source === 'PENDING')).toMatchObject({
+      date: '2026-09-10',
+      overdueFromPrevious: false,
+    });
+  });
+
+  it('[TC-REPORTING-SPENDABLE-003] el aporte de una meta se informa con managedBy GOAL; la ocurrencia ya materializada no se repite como pendiente', async () => {
+    const s = setup();
+    const port = new EngineRecurringDefinitionPort(s.deps, s.defs);
+    await port.createManaged({
+      workspaceId: WS,
+      userId: USER,
+      managedBy: 'GOAL',
+      managedRef: '0190a000-0000-7000-8000-0000000d0901',
+      name: 'Aporte Fondo de emergencia',
+      kind: 'TRANSFER',
+      accountId: BANK,
+      toAccountId: SAVINGS,
+      currency: 'BOB',
+      amount: '1500.00',
+      monthlyRule: { monthDays: [28], startDate: '2026-10-28', weekendAdjustment: 'NONE' },
+      materialization: { mode: 'PENDING_APPROVAL' },
+    });
+    const r = await s.queries.listForSpendable({
+      workspaceId: WS,
+      periodFrom: '2026-10-01',
+      periodTo: '2026-10-31',
+    });
+    expect(r.items.filter((i) => i.managedBy === 'GOAL').map((i) => [i.name, i.date])).toEqual([
+      ['Aporte Fondo de emergencia', '2026-10-28'],
+    ]);
+  });
+
+  it('[TC-REPORTING-UPCOMING-001] getForRange (Q4) no cambia: sigue sin sumar atrasadas anteriores ni ingresos', async () => {
+    const s = setup();
+    await create(s, 'Internet', {
+      amount: { type: 'FIXED', amount: bob('199.00') },
+      schedule: { cadence: 'MONTHLY', startDate: '2026-10-22' },
+    });
+    const before = await s.queries.getForRange({ workspaceId: WS, from: '2026-10-01', to: '2026-10-31' });
+    await s.queries.listForSpendable({ workspaceId: WS, periodFrom: '2026-10-01', periodTo: '2026-10-31' });
+    const after = await s.queries.getForRange({ workspaceId: WS, from: '2026-10-01', to: '2026-10-31' });
+    expect(after).toEqual(before);
+    expect(after.fromCommitments).toEqual([bob('199.00')]);
   });
 });

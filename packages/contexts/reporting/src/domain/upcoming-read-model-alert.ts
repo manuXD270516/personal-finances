@@ -1,5 +1,7 @@
 /** Métrica de duración de la consulta de próximos pagos (histograma, segundos; sin etiquetas de alta cardinalidad). */
 export const UPCOMING_PAYMENTS_DURATION_METRIC = 'reporting_upcoming_payments_duration_seconds' as const;
+/** Métrica de duración del cálculo del disponible para gastar (Q5, add-spendable-amount; sin etiquetas de alta cardinalidad). */
+export const SPENDABLE_DURATION_METRIC = 'reporting_spendable_duration_seconds' as const;
 /** Ocurrencias y pendientes leídas por consulta (histograma; sin etiquetas de alta cardinalidad). */
 export const UPCOMING_PAYMENTS_ROWS_METRIC = 'reporting_upcoming_payments_rows' as const;
 
@@ -10,6 +12,11 @@ export const UPCOMING_PAYMENTS_ROWS_METRIC = 'reporting_upcoming_payments_rows' 
  */
 export const UPCOMING_READ_MODEL_ALERT = {
   name: 'UpcomingPaymentsReadModelRecommended',
+  /**
+   * Métricas de duración que cubre la regla: el mismo camino de lectura directa de la fuente de verdad (la de Q5 se
+   * incluye en add-spendable-amount, sin alerta nueva; docs/18).
+   */
+  durationMetrics: [UPCOMING_PAYMENTS_DURATION_METRIC, SPENDABLE_DURATION_METRIC],
   p95ThresholdSeconds: 0.3,
   forMinutes: 15,
   maxRowsPerQuery: 5000,

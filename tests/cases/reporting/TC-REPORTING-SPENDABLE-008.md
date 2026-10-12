@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Disponible negativo explicado"
 scenario: "Más comprometido que líquido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001", "FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "warning"]
@@ -31,7 +34,7 @@ expected_result:
   - "La tarjeta Q5 muestra −600.00 BOB con estado de alerta (texto + icono)"
   - "Desglose 2000.00 BOB líquidos y −2600.00 BOB comprometidos"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-008 — Un disponible negativo se muestra con su signo, como alerta y con su desglose, nunca como 0.00

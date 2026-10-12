@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Compromisos descontados del disponible"
 scenario: "Vencido de un periodo anterior"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011", "FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "overdue"]
@@ -32,7 +35,7 @@ expected_result:
   - "committed 3299.00 BOB y spendable 5401.00 BOB"
   - "\"Ahorro mensual\" no suma"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-004 — Los vencidos de periodos anteriores restan del disponible y las transferencias entre cuentas líquidas no

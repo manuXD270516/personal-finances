@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Disponible por moneda y consolidado"
 scenario: "BOB y USD consolidados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001", "FR-FX-006", "FR-PLANNING-024"]
 nfr: []
 invariants: ["INV-001"]
 priority: critical
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "fx"]
@@ -33,7 +36,7 @@ expected_result:
   - "byCurrency: 5521.00 BOB y 44.01 USD; consolidated.total 6049.12 BOB con la tasa 12.00 y \"Fuente: paralelo.bo\""
   - "Sin tasa: consolidated 5521.00 BOB, complete false, unconverted [44.01 USD]"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-006 — El disponible se calcula por moneda y se consolida con la tasa vigente informada, sin convertir a 1:1 lo que no tiene tasa

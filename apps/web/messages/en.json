@@ -452,6 +452,56 @@
       "incomplete": "Some goals have funds in another currency without a current rate: their progress is partial.",
       "contributions": "Net goal contributions this period:",
       "contributionsIncomplete": "incomplete: an exchange rate is missing"
+    },
+    "spendable": {
+      "caption": "Free of commitments",
+      "captionHelp": "Liquid money minus what is reserved for goals, the commitments of the period, the planned contributions and the minimum reserve. Expected income does not add up.",
+      "period": "Period {label}: {from} to {to}",
+      "negative": "Negative amount",
+      "negativeHelp": "Your reserves, commitments and planned contributions exceed your liquid money.",
+      "incomplete": "Incomplete total: these amounts could not be converted because there is no current rate.",
+      "unconverted": "{amount} not converted",
+      "terms": {
+        "liquid": "Liquid money",
+        "reservedForGoals": "Reserved for goals",
+        "committed": "Committed",
+        "plannedGoalContributions": "Planned goal contributions",
+        "minimumReserve": "Minimum reserve",
+        "spendable": "Spendable"
+      },
+      "breakdown": "Breakdown by currency",
+      "currencyHeading": "In {currency}",
+      "shortfall": "In {currency} you are short {amount}: consider converting.",
+      "withoutAmount": "{count, plural, one {# payment without an amount is not subtracted} other {# payments without an amount are not subtracted}}",
+      "cardsWithoutPayment": "{count, plural, one {# card without a scheduled payment} other {# cards without a scheduled payment}}",
+      "budget": {
+        "title": "According to your budget",
+        "partial": "Partial: an exchange rate is missing.",
+        "none": "There is no budget for this period.",
+        "create": "Create budget"
+      },
+      "detailLink": "See the spendable amount detail",
+      "upcomingLink": "The period ends soon: see the upcoming payments",
+      "empty": "You do not have liquid accounts yet.",
+      "detail": {
+        "title": "Spendable amount detail",
+        "back": "Back to Home",
+        "committed": "Commitments subtracted",
+        "committedEmpty": "There are no commitments to subtract in this period.",
+        "overdue": "Overdue from a previous period",
+        "pending": "Pending transaction",
+        "occurrence": "Commitment",
+        "reserved": "Reserved per account",
+        "reservedEmpty": "Goals do not hold money in your liquid accounts.",
+        "reservedLine": "{name}: reserved {reserved}, subtracts {counted} (balance {balance})",
+        "planned": "Planned contributions per goal",
+        "plannedEmpty": "No active goal has a pending planned contribution.",
+        "rates": "Rates used",
+        "ratesNone": "No exchange rates were used.",
+        "rateLine": "{pair} {value}",
+        "loading": "Loading the spendable amount…",
+        "noAccounts": "You do not have liquid accounts yet: there is no spendable amount to calculate."
+      }
     }
   },
   "Common": {

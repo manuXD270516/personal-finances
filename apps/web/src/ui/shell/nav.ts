@@ -53,8 +53,9 @@ const within = (path: string, base: string): boolean => path === base || path.st
 /** Sección activa para la ruta actual (`aria-current="page"`); `undefined` fuera de la navegación principal. */
 export function activeNav(pathname: string): NavKey | undefined {
   const path = stripLocale(pathname);
-  // La evolución del patrimonio (/patrimonio) cuelga del Home: no es una sección propia de la sidebar.
-  if (path === '/' || within(path, '/patrimonio')) return 'home';
+  // La evolución del patrimonio (/patrimonio) y el detalle del disponible (/disponible, add-spendable-amount) cuelgan
+  // del Home: no son secciones propias de la sidebar.
+  if (path === '/' || within(path, '/patrimonio') || within(path, '/disponible')) return 'home';
   return NAV_ITEMS.find(
     (item) => item.path !== '/' && [item.path, ...(item.also ?? [])].some((base) => within(path, base)),
   )?.key;
