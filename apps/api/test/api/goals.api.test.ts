@@ -1177,8 +1177,8 @@ describe('cambio de objetivo, revisión de la transferencia, retiro vinculado y 
     expect(before['byCurrency'][0]).toMatchObject({ currency: 'BOB', reservedForGoals: bob('0.00') });
     await ok(reserve(t, goal['id'], '500.00'));
     const after = checked('getSpendable', 200, await get(t.owner, '/reports/spendable'));
-    const total = (b: Record<string, any>) => Number(b['consolidated'].total.amount);
-    expect(total(before) - total(after)).toBe(500);
+    const cents = (b: Record<string, any>) => BigInt(String(b['consolidated'].total.amount).replace('.', ''));
+    expect(cents(before) - cents(after)).toBe(50_000n);
     expect(after['byCurrency'][0]['reservedForGoals']).toEqual(bob('500.00'));
     expect(after['meta']).toHaveProperty('generatedAt');
     expect(after['meta']).toHaveProperty('dataFreshness');
