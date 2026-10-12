@@ -295,6 +295,40 @@ const arbLoan = fc.record({
 });
 
 describe('ScheduleRecalculator — propiedades', () => {
+  it('[TC-DEBT-AMORT-033] contraejemplo de redondeo: cuota original bajo la nivelada del saldo nuevo, reducir plazo devenga centavos más', () => {
+    // 1000.00 al 53.65 % a 112 cuotas, 95 pagadas, prepago del 1 %: la cuota original (45.04) queda 3 centavos bajo
+    // la nivelada del saldo nuevo (45.07), así que la última cuota absorbe un residuo mayor.
+    const input = french({
+      principal: '1000.00',
+      annualRate: '0.5365',
+      installments: 112,
+      accrualStart: d('2026-10-01'),
+      firstDueDate: d('2026-11-01'),
+    });
+    const schedule = calculateSchedule(input);
+    const unpaid = schedule.installments.slice(95);
+    const balance = (unpaid[0] as ScheduleInstallment).openingBalance;
+    const prepay = dec(balance).times(1).div(100).toDecimalPlaces(2, 1).toFixed(2);
+    const common = {
+      terms: termsOf(input),
+      rows: unpaid,
+      balance,
+      amount: prepay,
+      parameters: { installmentAmount: schedule.installmentAmount } as TailParameters,
+    };
+    const term = recalculatePrepayment({ ...common, option: 'REDUCE_TERM' });
+    const inst = recalculatePrepayment({ ...common, option: 'REDUCE_INSTALLMENT' });
+    expect(term.installments.length).toBe(inst.installments.length);
+    expect(dec(term.parameters.installmentAmount ?? '0').lt(inst.parameters.installmentAmount ?? '0')).toBe(
+      true,
+    );
+    const termInterest = sum(term.installments.map((c) => c.interest));
+    const instInterest = sum(inst.installments.map((c) => c.interest));
+    expect(termInterest.gt(instInterest)).toBe(true);
+    // la diferencia es de centavos, no un error de magnitud
+    expect(termInterest.minus(instInterest).lt('1')).toBe(true);
+  });
+
   it(
     '[TC-DEBT-AMORT-033] el recálculo suma el principal pendiente, conserva fechas y reducir plazo no paga más interés',
     () => {
@@ -335,10 +369,23 @@ describe('ScheduleRecalculator — propiedades', () => {
             });
           }
           expect(term.installments.length).toBeLessThanOrEqual(inst.installments.length);
-          // reducir plazo nunca da más interés restante que reducir cuota
-          expect(
-            sum(term.installments.map((c) => c.interest)).lte(sum(inst.installments.map((c) => c.interest))),
-          ).toBe(true);
+          // reducir plazo nunca da más interés restante que reducir cuota, mientras la cuota (o el principal por cuota)
+          // que conserva sea al menos la recalculada: la cuota original está redondeada al centavo y, con saldos
+          // pequeños y tasas altas, puede quedar unos centavos bajo la nivelada del saldo nuevo; entonces el plazo
+          // restante absorbe un residuo mayor y devenga algo más de interés (redondeo legítimo, no un defecto).
+          const keptByTerm = dec(
+            term.parameters.installmentAmount ?? term.parameters.principalPerInstallment ?? '0',
+          );
+          const levelOfInst = dec(
+            inst.parameters.installmentAmount ?? inst.parameters.principalPerInstallment ?? '0',
+          );
+          if (keptByTerm.gte(levelOfInst)) {
+            expect(
+              sum(term.installments.map((c) => c.interest)).lte(
+                sum(inst.installments.map((c) => c.interest)),
+              ),
+            ).toBe(true);
+          }
           // cambio de tasa: Σ principal = saldo y mismas fechas
           const rate = recalculateRateChange({
             terms,
