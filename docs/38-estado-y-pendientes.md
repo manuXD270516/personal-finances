@@ -22,7 +22,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 32 | `add-credit-cards` | Archivado (#103) | — |
 | 33 | `add-savings-goals` | Archivado (#105) | — |
 | 34 | `add-loan-amortization-advanced` | Fusionado (#107), tareas completas | Archivar **justo después** de `add-loans`: agrega requisitos a `debt/loans` y `debt/amortization`, que crea el archive de `add-loans` |
-| 35 | `add-debt-summary` | Implementado (PR pendiente) | Fusionar; archivar después de `add-loans` (agrega requisitos a `debt/loans`) |
+| 35 | `add-debt-summary` | Fusionado (#109), tareas completas | Archivar **después** de `add-loans` y `add-loan-amortization-advanced`: sus specs `debt/loans` son ADDED y chocarían con el archive de `add-loans`. Pendientes de docs: `docs/14` §10, `docs/28`, `docs/03` §7 |
 | 36 | `add-spendable-amount` | Especificado | Implementar al final de la fase (compone metas, compromisos, tarjetas y préstamos) |
 
 Después de Phase 4: informe de cierre de fase, criterios de salida (docs/24 §5.4) y diseño de Phase 5 con el agente `arquitecto`.
