@@ -8924,6 +8924,44 @@ paths:
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   # ── Debt: tarjetas de crédito (openspec add-credit-cards) ──
+  /workspaces/{workspaceId}/debts/summary:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Debt]
+      operationId: getDebtSummary
+      summary: Debt summary - how much is owed, interest paid this year and estimated debt-free date
+      description: |
+        Read-only summary computed on every query from the source of truth (liability accounts and ledger balances,
+        loans, credit cards and posted interest expenses); it has no state of its own. `totals` adds the owed balance
+        per currency and consolidated in the base currency with today's valuation rate; a currency without a rate is
+        never converted 1:1 (`consolidated.complete=false`, native amount in `unconverted[]`). A credit balance
+        (negative liability balance) is listed apart in `creditBalances` and does not reduce what is owed.
+        `interestYtd` is the net `INTEREST` system category expense from 1 January of the current year (workspace time
+        zone) to today, per currency and consolidated with the rate of each date, broken down by loan, credit card
+        and "other interest" so it adds up to the total (`attributionConsistent=false` when it does not). `debtFree`
+        is the latest of the per-debt estimated payoff dates (loan: last unpaid installment of the current schedule;
+        card: paying the billed total with no new purchases); debts without a schedule are listed in `excluded`.
+        `upcomingDues` lists the next due of each debt, overdue first. `status` is `NO_LIABILITIES` (no liability
+        accounts), `NO_DEBT` (liabilities without owed balance) or `ACTIVE`.
+      x-openspec-capability: [debt/loans]
+      x-required-role: VIEWER
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Debt summary
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DebtSummary' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /workspaces/{workspaceId}/credit-cards:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -15100,6 +15138,156 @@ components:
           description: |
             Suggested action code (open set): `CREATE_ACCOUNT`, `CREATE_COMMITMENT` (Q4/Q8 without active recurring
             definitions or pending expenses), `AVAILABLE_IN_PHASE_n`...
+    DebtSummaryConsolidated:
+      type: object
+      description: Total in the base currency. `complete=false` when some currency has no valuation rate (never 1:1).
+      required: [amount, complete, unconverted]
+      properties:
+        amount: { $ref: '#/components/schemas/Money' }
+        complete: { type: boolean }
+        unconverted:
+          type: array
+          description: Native amounts per currency excluded for lack of a rate
+          items: { $ref: '#/components/schemas/Money' }
+    DebtSummary:
+      type: object
+      required: [status, asOf, baseCurrency, debts, totals, creditBalances, interestYtd, debtFree, upcomingDues, meta]
+      properties:
+        status:
+          type: string
+          enum: [NO_LIABILITIES, NO_DEBT, ACTIVE]
+        asOf: { $ref: '#/components/schemas/LocalDate' }
+        baseCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        debts:
+          type: array
+          description: Loans, credit cards (one entry per card, one balance per currency) and other liabilities with an owed balance.
+          items:
+            type: object
+            required: [kind, id, name, balances, estimatedPayoffDate, payoffEstimable]
+            properties:
+              kind:
+                type: string
+                enum: [LOAN, CREDIT_CARD, OTHER_LIABILITY]
+              id:
+                $ref: '#/components/schemas/Uuid'
+                description: loanId, cardId or accountId (other liabilities)
+              name: { type: string }
+              balances:
+                type: array
+                items:
+                  type: object
+                  required: [accountId, accountName, outstanding, includedInNetWorth]
+                  properties:
+                    accountId: { $ref: '#/components/schemas/Uuid' }
+                    accountName: { type: string }
+                    outstanding: { $ref: '#/components/schemas/Money' }
+                    includedInNetWorth: { type: boolean }
+              estimatedPayoffDate:
+                oneOf:
+                  - $ref: '#/components/schemas/LocalDate'
+                  - type: 'null'
+              payoffEstimable: { type: boolean }
+        totals:
+          type: object
+          required: [byCurrency, consolidated]
+          properties:
+            byCurrency:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+            consolidated: { $ref: '#/components/schemas/DebtSummaryConsolidated' }
+        creditBalances:
+          type: array
+          description: Credit balances (negative liability balances), apart from the owed total.
+          items:
+            type: object
+            required: [accountId, name, amount]
+            properties:
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              amount: { $ref: '#/components/schemas/Money' }
+        interestYtd:
+          type: object
+          required: [from, to, byCurrency, consolidated, attribution, attributionConsistent]
+          properties:
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
+            byCurrency:
+              type: array
+              items: { $ref: '#/components/schemas/Money' }
+            consolidated: { $ref: '#/components/schemas/DebtSummaryConsolidated' }
+            attribution:
+              type: array
+              items:
+                type: object
+                required: [kind, id, name, byCurrency]
+                properties:
+                  kind:
+                    type: string
+                    enum: [LOAN, CREDIT_CARD, OTHER]
+                  id:
+                    oneOf:
+                      - $ref: '#/components/schemas/Uuid'
+                      - type: 'null'
+                  name:
+                    oneOf:
+                      - { type: string }
+                      - type: 'null'
+                  byCurrency:
+                    type: array
+                    description: May be negative for `OTHER` when the attribution exceeds the total.
+                    items: { $ref: '#/components/schemas/Money' }
+            attributionConsistent: { type: boolean }
+        debtFree:
+          type: object
+          required: [date, excluded]
+          properties:
+            date:
+              description: Null when there are no debts or none can be estimated.
+              oneOf:
+                - $ref: '#/components/schemas/LocalDate'
+                - type: 'null'
+            excluded:
+              type: array
+              description: Debts with an owed balance that cannot be estimated (no schedule).
+              items:
+                type: object
+                required: [kind, id, name]
+                properties:
+                  kind:
+                    type: string
+                    enum: [LOAN, CREDIT_CARD, OTHER_LIABILITY]
+                  id: { $ref: '#/components/schemas/Uuid' }
+                  name: { type: string }
+        upcomingDues:
+          type: array
+          items:
+            type: object
+            required: [kind, id, name, accountId, dueDate, amount, minimum, estimated, overdueDays]
+            properties:
+              kind:
+                type: string
+                enum: [LOAN, CREDIT_CARD]
+              id: { $ref: '#/components/schemas/Uuid' }
+              name: { type: string }
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              dueDate: { $ref: '#/components/schemas/LocalDate' }
+              amount: { $ref: '#/components/schemas/Money' }
+              minimum:
+                oneOf:
+                  - $ref: '#/components/schemas/Money'
+                  - type: 'null'
+              estimated:
+                type: boolean
+                description: True for the estimated amount of an open card cycle.
+              overdueDays: { type: integer, minimum: 0 }
+        meta:
+          type: object
+          required: [ratesUsed, rateWindowDays]
+          properties:
+            ratesUsed:
+              type: array
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            rateWindowDays: { type: integer, minimum: 0 }
     ReportSummary:
       type: object
       required: [period, byCurrency, consolidated, accounts, topExpenseCategories, netWorth, questions, meta]

@@ -481,6 +481,22 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
   });
 
+  it('NFR-PERF-004 (referencia, add-debt-summary 7.2): GET /debts/summary con el Large Seed', async () => {
+    const samples = await timed(ITERATIONS, async () => {
+      const r = await call('GET', `${W}/debts/summary`);
+      if (r.status !== 200) throw new Error(`debts summary: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id: 'debts-summary',
+        nfr: 'NFR-PERF-004',
+        title: 'GET /debts/summary (resumen de deudas, Home)',
+        samples,
+        limitMs: PERF_THRESHOLDS['NFR-PERF-004'].limitMs,
+      }),
+    );
+  });
+
   it('NFR-PERF-004 (referencia, add-budgets 5.2): GET /budgets/{id} con 30 líneas y el historial del Large Seed', async () => {
     // Periodos hasta hoy (cobertura desde el asiento más antiguo) y plan del periodo con más historia reciente.
     await ok('POST', `${W}/periods`, { through: new Date().toISOString().slice(0, 10) });

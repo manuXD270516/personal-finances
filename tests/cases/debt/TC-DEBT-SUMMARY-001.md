@@ -5,16 +5,20 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Total adeudado por moneda y en moneda base'
 scenario: 'Préstamo, tarjeta bimoneda y otro pasivo'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018', 'FR-FX-006']
 nfr: []
 invariants: ['INV-002', 'INV-022', 'INV-031']
 priority: high
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/debt-summary.api.test.ts
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'totals', 'fx']
@@ -33,7 +37,7 @@ expected_result:
   - 'Deudas: "Préstamo auto" (préstamo), "Visa Oro" (tarjeta con BOB y USD), "Deuda familiar" (otro pasivo)'
   - 'El consolidado coincide con los pasivos del patrimonio neto'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-001 — Total adeudado por moneda y consolidado en BOB

@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Fecha estimada libre de deudas'
 scenario: 'Con un pasivo no estimable'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018']
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'payoff-date']
@@ -34,7 +37,7 @@ expected_result:
   - 'Laptop: "Visa Oro" 2027-01-15'
   - 'Sin deudas: estado NO_DEBT sin fecha'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-006 — Fecha estimada libre de deudas con pasivos no estimables y cuotas

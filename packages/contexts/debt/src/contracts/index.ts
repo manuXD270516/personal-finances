@@ -3,6 +3,7 @@
  * Montos como `{amount: "<decimal>", currency: "<código>"}` (nunca `number`, ADR-0006).
  */
 import type { AuditFieldPoliciesDto } from '@pf/audit/contracts';
+import type { ResolvedRateDto } from '@pf/fx/contracts';
 
 export const DEBT_CONTEXT = 'debt' as const;
 
@@ -292,6 +293,91 @@ export interface CardPortfolioQuery {
 }
 
 export const CARD_PORTFOLIO_QUERY = Symbol.for('pf.debt.CardPortfolioQuery');
+
+// ───────────────────────────────────────────── resumen de deudas (add-debt-summary)
+
+export type DebtSummaryStatusDto = 'NO_LIABILITIES' | 'NO_DEBT' | 'ACTIVE';
+export type DebtSummaryKindDto = 'LOAN' | 'CREDIT_CARD' | 'OTHER_LIABILITY';
+
+export interface DebtSummaryConsolidatedDto {
+  /** Σ en la moneda base (HALF_EVEN solo al presentar); solo con lo que tiene tasa. */
+  readonly amount: MoneyDto;
+  /** `false` si alguna moneda quedó sin convertir (nunca 1:1). */
+  readonly complete: boolean;
+  readonly unconverted: readonly MoneyDto[];
+}
+
+export interface DebtSummaryDebtDto {
+  readonly kind: DebtSummaryKindDto;
+  /** `loanId`, `cardId` o `accountId` (otros pasivos). */
+  readonly id: string;
+  readonly name: string;
+  readonly balances: readonly {
+    readonly accountId: string;
+    readonly accountName: string;
+    readonly outstanding: MoneyDto;
+    readonly includedInNetWorth: boolean;
+  }[];
+  readonly estimatedPayoffDate: string | null;
+  readonly payoffEstimable: boolean;
+}
+
+export interface DebtSummaryInterestDto {
+  readonly from: string;
+  readonly to: string;
+  readonly byCurrency: readonly MoneyDto[];
+  readonly consolidated: DebtSummaryConsolidatedDto;
+  readonly attribution: readonly {
+    readonly kind: 'LOAN' | 'CREDIT_CARD' | 'OTHER';
+    readonly id: string | null;
+    readonly name: string | null;
+    readonly byCurrency: readonly MoneyDto[];
+  }[];
+  readonly attributionConsistent: boolean;
+}
+
+export interface DebtSummaryDueDto {
+  readonly kind: 'LOAN' | 'CREDIT_CARD';
+  readonly id: string;
+  readonly name: string;
+  readonly accountId: string;
+  readonly dueDate: string;
+  readonly amount: MoneyDto;
+  readonly minimum: MoneyDto | null;
+  readonly estimated: boolean;
+  readonly overdueDays: number;
+}
+
+/** Respuesta de `GET W/debts/summary` (`DebtSummary`). Sin estado propio: se calcula al consultar. */
+export interface DebtSummaryDto {
+  readonly status: DebtSummaryStatusDto;
+  readonly asOf: string;
+  readonly baseCurrency: string;
+  readonly debts: readonly DebtSummaryDebtDto[];
+  readonly totals: {
+    readonly byCurrency: readonly MoneyDto[];
+    readonly consolidated: DebtSummaryConsolidatedDto;
+  };
+  readonly creditBalances: readonly {
+    readonly accountId: string;
+    readonly name: string;
+    readonly amount: MoneyDto;
+  }[];
+  readonly interestYtd: DebtSummaryInterestDto;
+  readonly debtFree: {
+    readonly date: string | null;
+    readonly excluded: readonly { readonly kind: DebtSummaryKindDto; readonly id: string; readonly name: string }[];
+  };
+  readonly upcomingDues: readonly DebtSummaryDueDto[];
+  readonly meta: { readonly ratesUsed: readonly ResolvedRateDto[]; readonly rateWindowDays: number };
+}
+
+/** Contrato público de lectura del resumen de deudas (insumo del Debt Evolution de Phase 7). Sin efectos. */
+export interface DebtSummaryQuery {
+  getDebtSummary(input: { readonly workspaceId: string; readonly userId: string }): Promise<DebtSummaryDto>;
+}
+
+export const DEBT_SUMMARY_QUERY = Symbol.for('pf.debt.DebtSummaryQuery');
 
 /**
  * Allow-list de auditoría de DEBT (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado nunca se

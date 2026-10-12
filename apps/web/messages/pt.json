@@ -4153,6 +4153,7 @@
     },
     "tabs": {
       "label": "Dívidas",
+      "summary": "Resumo",
       "loans": "Empréstimos",
       "cards": "Cartões"
     },
@@ -5034,6 +5035,101 @@
     "transaction": {
       "title": "Meta de poupança",
       "reverted": "estornado"
+    }
+  },
+  "DebtSummary": {
+    "card": {
+      "title": "Dívidas",
+      "owedLabel": "Total devido",
+      "owed": "{amount} devidos",
+      "interest": "{amount} de juros em {year}",
+      "debtFree": "livre de dívidas em {month}",
+      "debtFreeExcluding": "livre de dívidas em {month} (sem contar {names})",
+      "debtFreeUnknown": "Não conseguimos estimar quando você termina de pagar: {names} não tem cronograma.",
+      "debtFreeAssumption": "Supõe que você paga o valor faturado dos seus cartões e não faz novas compras.",
+      "nextDue": "Próximo vencimento",
+      "nextDueValue": "{name} · {date} · {amount}",
+      "estimatedTag": "(estimado)",
+      "overdueDays": "{days, plural, one {# dia de atraso} other {# dias de atraso}}",
+      "unconverted": "sem converter: {amounts}",
+      "incompleteHint": "Falta a taxa de avaliação de alguma moeda; o total não inclui esses valores.",
+      "noLiabilities": "Não há dívidas registradas.",
+      "registerLoan": "Registrar um empréstimo",
+      "registerCard": "Registrar um cartão",
+      "noDebt": "Não há dívidas pendentes.",
+      "viewAll": "Ver resumo de dívidas",
+      "loadError": "Não foi possível carregar o resumo de dívidas."
+    },
+    "panel": {
+      "title": "Resumo de dívidas",
+      "intro": "Quanto você deve e quando termina? Calculado na consulta com os saldos das suas contas de passivo.",
+      "loading": "Carregando…",
+      "asOf": "Em {date}",
+      "noLiabilities": "Você ainda não registrou empréstimos nem cartões. Registre um para ver quanto deve e quando termina.",
+      "noDebt": "Não há dívidas pendentes.",
+      "totals": {
+        "title": "Total devido",
+        "caption": "Total devido por moeda",
+        "currency": "Moeda",
+        "amount": "Devido",
+        "consolidated": "Consolidado em {currency}: {amount}",
+        "unconverted": "Sem converter (falta a taxa de avaliação): {amounts}. Nunca se converte 1:1."
+      },
+      "debts": {
+        "title": "Dívidas",
+        "caption": "Dívidas por tipo e moeda com a data estimada de término",
+        "region": "Tabela de dívidas",
+        "debt": "Dívida",
+        "kind": "Tipo",
+        "account": "Conta",
+        "outstanding": "Devido",
+        "payoff": "Término estimado",
+        "notEstimable": "Não estimável",
+        "notInNetWorth": "Não incluído no patrimônio",
+        "kinds": {
+          "LOAN": "Empréstimo",
+          "CREDIT_CARD": "Cartão",
+          "OTHER_LIABILITY": "Outro passivo"
+        }
+      },
+      "credits": {
+        "title": "Saldos a favor",
+        "note": "Mostrados à parte: não reduzem o que você deve.",
+        "item": "{name}: {amount} a favor"
+      },
+      "interest": {
+        "title": "Juros pagos em {year}",
+        "range": "De {from} a {to}",
+        "caption": "Juros pagos no ano por moeda",
+        "currency": "Moeda",
+        "amount": "Juros",
+        "consolidated": "Consolidado em {currency}: {amount}",
+        "none": "Você não pagou juros este ano.",
+        "attributionCaption": "Detalhamento dos juros por dívida",
+        "attributionRegion": "Tabela do detalhamento dos juros",
+        "source": "Origem",
+        "other": "Outros juros",
+        "inconsistent": "O detalhamento não fecha com o total (há juros registrados em outras contas); \"Outros juros\" mostra a diferença como está."
+      },
+      "debtFree": {
+        "title": "Data estimada livre de dívidas",
+        "date": "{date}",
+        "none": "Não é possível estimar uma data.",
+        "assumptions": "Premissas: os empréstimos terminam com a última parcela não paga do cronograma; os cartões, pagando o total faturado e sem novas compras.",
+        "excluded": "Não foi possível estimar e não conta na data: {names}."
+      },
+      "dues": {
+        "title": "Próximos vencimentos",
+        "caption": "Próximo vencimento de cada dívida",
+        "region": "Tabela de próximos vencimentos",
+        "debt": "Dívida",
+        "due": "Vence",
+        "amount": "Valor",
+        "minimum": "Mínimo",
+        "overdue": "Atraso",
+        "estimated": "estimado",
+        "none": "Nenhuma dívida tem vencimento conhecido."
+      }
     }
   }
 }
