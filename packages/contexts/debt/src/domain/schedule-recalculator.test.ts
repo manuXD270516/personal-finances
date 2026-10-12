@@ -374,10 +374,10 @@ describe('ScheduleRecalculator — propiedades', () => {
           // pequeños y tasas altas, puede quedar unos centavos bajo la nivelada del saldo nuevo; entonces el plazo
           // restante absorbe un residuo mayor y devenga algo más de interés (redondeo legítimo, no un defecto).
           const keptByTerm = dec(
-            term.parameters.installmentAmount ?? term.parameters.principalPerInstallment,
+            term.parameters.installmentAmount ?? term.parameters.principalPerInstallment ?? '0',
           );
           const levelOfInst = dec(
-            inst.parameters.installmentAmount ?? inst.parameters.principalPerInstallment,
+            inst.parameters.installmentAmount ?? inst.parameters.principalPerInstallment ?? '0',
           );
           if (keptByTerm.gte(levelOfInst)) {
             expect(
