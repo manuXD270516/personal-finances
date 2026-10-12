@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Compromisos descontados del disponible"
 scenario: "Aporte programado de una meta contado una sola vez"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-COMMITMENTS-011", "FR-GOALS-009"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/recurrence.service.test.ts
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "goals", "double-count"]
@@ -33,7 +36,7 @@ expected_result:
   - "committed 3179.00 BOB (sin la ocurrencia de la meta), plannedGoalContributions 1500.00 BOB, spendable 4621.00 BOB"
   - "Q4 sí incluye la ocurrencia (regla D127 sin cambios)"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-003 — El aporte programado de una meta hacia una cuenta no líquida se descuenta una sola vez, como aporte planificado

@@ -4107,6 +4107,61 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/reports/spendable:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getSpendable
+      summary: Spendable amount free of commitments (Home Q5) with the breakdown of each term
+      description: |
+        Answers Home question Q5 ("how much can I spend?") for the financial period that contains today in the workspace
+        time zone, from the source of truth, without read models (read-your-writes). Per currency `c`, in exact decimal:
+        `spendable_c = liquid_c − reservedForGoals_c − committed_c − plannedGoalContributions_c − minimumReserve_c`,
+        with every term reported. `liquid` is the booked balance of the non-archived `ASSET` + `LIQUID` accounts;
+        `reservedForGoals` is what the goals hold in each liquid account (reservations plus real contributions still
+        there), capped at the account balance when positive and zero otherwise; `committed` is the unresolved expense
+        occurrences of the period and overdue ones of previous periods, the recurring transfers from a liquid account to
+        a non-liquid one (card payments and loan installments included) and the `PENDING` expense transactions dated up
+        to the end of the period, only when paid from a liquid account (a purchase charged to a card is discounted when
+        the card is paid; transfers between liquid accounts, occurrences managed by a goal and `VARIABLE` amounts do
+        not count: those are reported in `withoutAmountCount`); `plannedGoalContributions` is the pending planned
+        contribution of each `ACTIVE` goal with a plan; `minimumReserve` is the workspace minimum liquidity reserve in its
+        currency (null when not configured). Expected income never adds up (conservative). Terms are added per currency
+        BEFORE converting; `consolidated.total` converts each currency with the valuation rate in force when the query
+        runs (no rate within `REPORTING_RATE_VALIDITY_WINDOW` means `complete=false` with the currency in `unconverted`,
+        never 1:1); HALF_EVEN only when presenting. A negative consolidated total is returned with its sign and
+        `status=WARNING`; when a currency is negative but the consolidated total is not, `shortfalls` lists it ("convert").
+        `budgetView` is the second view "according to your budget" (the available-to-spend of the period plan,
+        FR-PLANNING-024, unchanged), or `NO_PLAN` with action `CREATE_BUDGET`. `period.id` is null when no financial
+        period covers today (the calendar month is used and there is no plan to read).
+      x-openspec-capability: [reporting/dashboard]
+      x-required-role: VIEWER
+      parameters:
+        - name: reportingCurrency
+          in: query
+          description: Defaults to the workspace base currency
+          schema: { $ref: '#/components/schemas/CurrencyCode' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Spendable amount
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Spendable' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/reports/surprise-payments:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -15136,8 +15191,9 @@ components:
         actionHint:
           type: [string, 'null']
           description: |
-            Suggested action code (open set): `CREATE_ACCOUNT`, `CREATE_COMMITMENT` (Q4/Q8 without active recurring
-            definitions or pending expenses), `AVAILABLE_IN_PHASE_n`...
+            Suggested action code (open set): `CREATE_ACCOUNT` (also Q5 without liquid accounts), `CREATE_COMMITMENT`
+            (Q4/Q8 without active recurring definitions or pending expenses), `CREATE_GOAL` (Q9 without goals),
+            `AVAILABLE_IN_PHASE_n`...
     DebtSummaryConsolidated:
       type: object
       description: Total in the base currency. `complete=false` when some currency has no valuation rate (never 1:1).
@@ -15288,6 +15344,172 @@ components:
               type: array
               items: { $ref: '#/components/schemas/ResolvedRate' }
             rateWindowDays: { type: integer, minimum: 0 }
+    SpendableCurrencyTerms:
+      type: object
+      description: Terms of the spendable amount of one currency (exact, at the scale of the currency).
+      additionalProperties: false
+      required: [currency, liquid, reservedForGoals, committed, plannedGoalContributions, minimumReserve, spendable]
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        liquid: { $ref: '#/components/schemas/Money' }
+        reservedForGoals: { $ref: '#/components/schemas/Money' }
+        committed: { $ref: '#/components/schemas/Money' }
+        plannedGoalContributions: { $ref: '#/components/schemas/Money' }
+        minimumReserve:
+          description: Null when the workspace has no minimum liquidity reserve in this currency (the term is not shown).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        spendable:
+          $ref: '#/components/schemas/Money'
+          description: '`liquid − reservedForGoals − committed − plannedGoalContributions − minimumReserve`; may be negative'
+    SpendableBudgetView:
+      type: object
+      description: Second view "according to your budget" (available-to-spend of the period plan, FR-PLANNING-024).
+      additionalProperties: false
+      required: [status, action, budgetId, amount, complete]
+      properties:
+        status: { type: string, enum: [AVAILABLE, NO_PLAN] }
+        action:
+          type: [string, 'null']
+          enum: [CREATE_BUDGET, null]
+        budgetId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        amount:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        complete:
+          type: [boolean, 'null']
+    SpendableSummary:
+      type: object
+      description: Spendable amount block of `ReportSummary` (Home Q5) and base of `Spendable`, without the item detail.
+      required:
+        - period
+        - reportingCurrency
+        - byCurrency
+        - consolidated
+        - shortfalls
+        - status
+        - withoutAmountCount
+        - cardsWithoutPaymentCount
+        - budgetView
+      properties:
+        period:
+          type: object
+          additionalProperties: false
+          required: [id, label, start, end]
+          properties:
+            id:
+              oneOf:
+                - $ref: '#/components/schemas/Uuid'
+                - type: 'null'
+            label: { type: string, examples: ['2026-10'] }
+            start: { $ref: '#/components/schemas/LocalDate' }
+            end: { $ref: '#/components/schemas/LocalDate' }
+        reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        byCurrency:
+          type: array
+          items: { $ref: '#/components/schemas/SpendableCurrencyTerms' }
+        consolidated:
+          type: object
+          additionalProperties: false
+          required: [total, complete, unconverted]
+          properties:
+            total:
+              $ref: '#/components/schemas/Money'
+              description: Consolidated in the reporting currency (HALF_EVEN); negative values keep their sign
+            complete: { type: boolean }
+            unconverted:
+              type: array
+              description: Per-currency amounts without a rate in force, excluded from the total (never 1:1)
+              items: { $ref: '#/components/schemas/Money' }
+        shortfalls:
+          type: array
+          description: Currencies with a negative spendable amount while the consolidated total is not negative ("convert").
+          items: { $ref: '#/components/schemas/Money' }
+        status:
+          type: string
+          enum: [OK, WARNING]
+          description: '`WARNING` when the consolidated spendable amount is negative'
+        withoutAmountCount:
+          type: integer
+          minimum: 0
+          description: '`VARIABLE` occurrences and pending items that do not subtract (D115)'
+        cardsWithoutPaymentCount:
+          type: integer
+          minimum: 0
+          description: Cards with an owed balance and no scheduled or pending payment towards them (D213)
+        budgetView: { $ref: '#/components/schemas/SpendableBudgetView' }
+    Spendable:
+      description: Spendable amount free of commitments with the breakdown of each term (Home Q5).
+      allOf:
+        - $ref: '#/components/schemas/SpendableSummary'
+        - type: object
+          required: [committedItems, reservedByAccount, plannedByGoal, meta]
+          properties:
+            committedItems:
+              type: array
+              description: Items that subtract from the committed term (with an amount), by date and id
+              items:
+                type: object
+                additionalProperties: false
+                required: [source, id, definitionId, name, kind, date, accountId, amount, overdueFromPrevious]
+                properties:
+                  source: { type: string, enum: [OCCURRENCE, PENDING] }
+                  id: { $ref: '#/components/schemas/Uuid' }
+                  definitionId:
+                    oneOf:
+                      - $ref: '#/components/schemas/Uuid'
+                      - type: 'null'
+                  name: { type: [string, 'null'] }
+                  kind: { type: string, enum: [EXPENSE, TRANSFER, LOAN_PAYMENT, CARD_PAYMENT] }
+                  date: { $ref: '#/components/schemas/LocalDate' }
+                  accountId: { $ref: '#/components/schemas/Uuid' }
+                  amount: { $ref: '#/components/schemas/Money' }
+                  overdueFromPrevious: { type: boolean }
+            reservedByAccount:
+              type: array
+              description: What the goals hold in each liquid account and how much of it subtracts (capped at the balance)
+              items:
+                type: object
+                additionalProperties: false
+                required: [accountId, name, balance, reserved, counted]
+                properties:
+                  accountId: { $ref: '#/components/schemas/Uuid' }
+                  name: { type: string }
+                  balance: { $ref: '#/components/schemas/Money' }
+                  reserved: { $ref: '#/components/schemas/Money' }
+                  counted: { $ref: '#/components/schemas/Money' }
+            plannedByGoal:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [goalId, goalName, pending]
+                properties:
+                  goalId: { $ref: '#/components/schemas/Uuid' }
+                  goalName: { type: string }
+                  pending: { $ref: '#/components/schemas/Money' }
+            meta:
+              type: object
+              additionalProperties: false
+              required: [generatedAt, rateWindowDays, ratesUsed, attributions]
+              properties:
+                generatedAt: { $ref: '#/components/schemas/Instant' }
+                rateWindowDays: { type: integer, minimum: 0 }
+                dataFreshness:
+                  $ref: '#/components/schemas/Instant'
+                  description: Instant of the latest ledger data included
+                ratesUsed:
+                  type: array
+                  items: { $ref: '#/components/schemas/ResolvedRate' }
+                attributions:
+                  type: array
+                  description: 'Distinct attributions of the provider rates used; clients must display them'
+                  items: { $ref: '#/components/schemas/RateAttribution' }
     ReportSummary:
       type: object
       required: [period, byCurrency, consolidated, accounts, topExpenseCategories, netWorth, questions, meta]
@@ -15359,6 +15581,13 @@ components:
         goalContributions:
           description: Net contributions of the goals in the period (contributions minus withdrawals, reassignments excluded).
           $ref: '#/components/schemas/GoalContributionsNet'
+        spendable:
+          description: |
+            Spendable amount free of commitments (Home Q5, add-spendable-amount) for the financial period that contains
+            today; null when the workspace has no liquid accounts (Q5 is then `NO_DATA` with action `CREATE_ACCOUNT`).
+          oneOf:
+            - $ref: '#/components/schemas/SpendableSummary'
+            - type: 'null'
         questions:
           type: array
           items: { $ref: '#/components/schemas/HomeQuestionStatus' }

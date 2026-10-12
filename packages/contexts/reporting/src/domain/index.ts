@@ -69,9 +69,22 @@ export {
 } from './surprise-payments.js';
 export {
   evaluateReadModelAlert,
+  SPENDABLE_DURATION_METRIC,
   UPCOMING_PAYMENTS_DURATION_METRIC,
   UPCOMING_PAYMENTS_ROWS_METRIC,
   UPCOMING_READ_MODEL_ALERT,
   type ReadModelAlertState,
   type UpcomingMetricSample,
 } from './upcoming-read-model-alert.js';
+export {
+  SpendableCalculator,
+  type SpendableAccount,
+  type SpendableCommittedItem,
+  type SpendableConsolidation,
+  type SpendableInput,
+  type SpendablePlanned,
+  type SpendableReservation,
+  type SpendableReservedLine,
+  type SpendableResult,
+  type SpendableTerms,
+} from './spendable-calculator.js';

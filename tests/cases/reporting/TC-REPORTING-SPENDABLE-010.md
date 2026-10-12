@@ -5,16 +5,18 @@ spec: reporting/dashboard
 related_specs: ["planning/budgets"]
 requirement: "Disponible según el presupuesto del periodo"
 scenario: "Las dos vistas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "budget"]
@@ -32,7 +34,7 @@ expected_result:
   - "spendable.consolidated 5521.00 BOB y budgetView {status: AVAILABLE, amount: 3750.00 BOB}"
   - "Sin plan: budgetView {status: NO_PLAN, action: CREATE_BUDGET} y la cifra principal sigue en 5521.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-010 — La segunda vista muestra el disponible del presupuesto del periodo o la acción de crear el plan

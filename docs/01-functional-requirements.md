@@ -241,7 +241,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-PLANNING-021 | Tipos `zero-based` (todo ingreso esperado se asigna; indicador "por asignar" = 0), `average-based` (promedio de últimos N periodos cerrados) y `historical-based` (igual periodo del año anterior ± ajuste %). | Could | 2 (zero-based) / 7 (average/historical) | planning/budgets |
 | FR-PLANNING-022 | Umbrales de alerta por presupuesto: 50, 75, 90, 100 % y personalizados; al cruzar un umbral el sistema DEBE emitir `planning.BudgetThresholdReached.v1` **una sola vez por umbral y periodo**. | Must | 2 | planning/budgets |
 | FR-PLANNING-023 | El cálculo de presupuesto vs real DEBE hacerse en moneda base; gastos en otra moneda se convierten con la tasa histórica asociada a la transacción (ConversionDetail o tasa de referencia de la fecha), nunca con la tasa actual. | Must | 2 | planning/budgets |
-| FR-PLANNING-024 | El sistema DEBE mostrar por presupuesto: planificado, gastado, restante, % y proyección lineal al fin de periodo; y un "disponible para gastar" agregado (insumo de Q5). | Must | 2 | planning/budgets |
+| FR-PLANNING-024 | El sistema DEBE mostrar por presupuesto: planificado, gastado, restante, % y proyección lineal al fin de periodo; y un "disponible para gastar" agregado (insumo de Q5). *Nota (add-spendable-amount, Phase 4, D209):* este agregado es la **vista de presupuesto** de Q5 ("según tu presupuesto") y no cambia; la vista completa "libre de compromisos" (saldo líquido − reservado por metas − comprometido − aportes planificados − reserva mínima) la calcula `reporting/dashboard`. | Must | 2 | planning/budgets |
 
 ## 9. COMMITMENTS — Recurrence & Subscriptions
 
@@ -382,7 +382,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | ID | Requerimiento | Prioridad | Fase | Capability |
 |----|---------------|-----------|------|------------|
 | FR-REPORTING-001 | El Home/dashboard DEBE responder progresivamente las 9 preguntas de [00-product-vision §6](./00-product-vision.md#6-las-9-preguntas-del-home-contrato-del-dashboard); un widget sin datos suficientes DEBE indicarlo explícitamente (nunca valores inventados). | Must | 1 (Q1,Q2,Q3,Q6,Q7 básico) → 7 | reporting/dashboard |
-| FR-REPORTING-002 | KPIs del dashboard: liquidez total (base y por moneda), ingresos del periodo, gastos del periodo, ahorro neto y tasa de ahorro, comprometido, disponible para gastar, net worth, ratio deuda/activos, utilización de presupuesto, metas en curso. Cada KPI muestra periodo, moneda y frescura. | Must | 1 → 7 | reporting/dashboard |
+| FR-REPORTING-002 | KPIs del dashboard: liquidez total (base y por moneda), ingresos del periodo, gastos del periodo, ahorro neto y tasa de ahorro, comprometido, disponible para gastar, net worth, ratio deuda/activos, utilización de presupuesto, metas en curso. Cada KPI muestra periodo, moneda y frescura. *Nota (add-spendable-amount, Phase 4):* el KPI "disponible para gastar" (Q5) se habilita en Phase 4 con el periodo financiero vigente como horizonte. | Must | 1 → 7 | reporting/dashboard |
 | FR-REPORTING-003 | Saldos por cuenta y totales por moneda y en moneda base. | Must | 1 | reporting/dashboard |
 | FR-REPORTING-004 | Ingresos y gastos del mes por categoría (top N) y comparación básica con el mes anterior. *Nota (rev. 2026-10-05, [D50](./31-phase-1-consolidation-decisions.md)):* el owner movió el FR a `reporting/dashboard` en Phase 1: lo sirve `GET /reports/summary` en el Home (Q2, Q3, Q7 básico: totales del mes, top N de categorías de gasto y comparación "a la fecha", [14-reporting.md §9.1](./14-reporting.md)), con la ubicación en el Home que dé la mejor jerarquía visual. | Must | 1 | reporting/dashboard |
 | FR-REPORTING-005 | Net worth actual (activos − pasivos, cuentas con `includeInNetWorth`) en moneda base con desglose por moneda y tipo de cuenta. | Must | 1 | reporting/net-worth |
@@ -476,7 +476,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | Q2 ¿Cuánto ingresó? | FR-TRANSACTIONS-001, FR-REPORTING-004 |
 | Q3 ¿Cuánto gasté? | FR-TRANSACTIONS-016, FR-TRANSACTIONS-023, FR-REPORTING-004 |
 | Q4 ¿Cuánto está comprometido? | FR-COMMITMENTS-011, FR-LEDGER-013 |
-| Q5 ¿Cuánto puedo gastar? | FR-PLANNING-024, FR-GOALS-009, FR-COMMITMENTS-011 |
+| Q5 ¿Cuánto puedo gastar? | FR-PLANNING-024, FR-GOALS-009, FR-GOALS-004, FR-COMMITMENTS-011, FR-IDENTITY-005, FR-REPORTING-002 (`reporting/dashboard`) |
 | Q6 ¿Cuánto ahorré? | FR-REPORTING-002, FR-GOALS-002, FR-GOALS-003 |
 | Q7 ¿Cómo estoy vs mes pasado? | FR-REPORTING-018, FR-REPORTING-009 |
 | Q8 ¿Qué pagos vienen? | FR-REPORTING-016, FR-REPORTING-014, FR-DEBT-013 |

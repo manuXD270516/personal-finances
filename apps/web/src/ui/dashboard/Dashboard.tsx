@@ -8,6 +8,7 @@ import { localized, useSession } from '../session-context';
 import { DebtSummaryCard } from '../debt/summary/DebtSummaryCard';
 import { NetWorthEvolutionCard } from '../networth/NetWorthEvolution';
 import { BudgetProgressWidget } from '../planning/BudgetProgressWidget';
+import { BUDGETS_PATH, SPENDABLE_PATH, UPCOMING_PATH } from '../spendable/logic';
 import { HomeCommitments } from '../upcoming/UpcomingPage';
 import { DashboardSkeleton, DashboardView } from './DashboardView';
 import type { ReportSummary } from './types';
@@ -77,6 +78,9 @@ export function Dashboard() {
       createAccountHref={localized(uiLocale, '/cuentas/nueva')}
       registerRateHref={localized(uiLocale, '/fx')}
       registerExpenseHref={localized(uiLocale, '/transacciones/nueva')}
+      spendableDetailHref={localized(uiLocale, SPENDABLE_PATH)}
+      createBudgetHref={localized(uiLocale, BUDGETS_PATH)}
+      upcomingHref={localized(uiLocale, UPCOMING_PATH)}
       goalsHref={localized(uiLocale, '/goals')}
       createGoalHref={localized(uiLocale, '/goals/nuevo')}
       goalHref={(goalId) => localized(uiLocale, `/goals/${goalId}`)}

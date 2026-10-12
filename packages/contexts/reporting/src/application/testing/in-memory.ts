@@ -10,8 +10,12 @@ import type { AccountBalanceDto } from '@pf/ledger/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
 import type { NominalFlowRowDto } from '@pf/transactions/contracts';
 import type {
+  AccountReservationRow,
+  BudgetAvailabilityRow,
   ClosingSnapshotsPort,
   CommittedRangeRow,
+  GoalPlanRow,
+  SpendableCommittedRow,
   GoalFlowRow,
   GoalHomeSummaryRow,
   NetWorthHistoryDeps,
@@ -114,6 +118,20 @@ export class InMemoryReporting {
   /** Flujos netos de metas (GOALS, `GoalFlowsQuery`); `null` = puerto no cableado. */
   goalFlowRows: GoalFlowRow[] | null = null;
   readonly goalRequests: { kind: 'home' | 'flows'; from?: string; to?: string; limit?: number }[] = [];
+
+  /** Q5 (add-spendable-amount): `true` cablea los puertos de COMMITMENTS, GOALS, IDENTITY y PLANNING del disponible. */
+  spendableEnabled = false;
+  /** Ítems de egreso para Q5 (`CommittedQuery.listForSpendable`). */
+  readonly spendableItems: SpendableCommittedRow[] = [];
+  /** Reservado por metas por cuenta (`GoalReservationsQuery`). */
+  readonly reservations: AccountReservationRow[] = [];
+  /** Aportes planificados del periodo (`GoalPlansQuery`). */
+  readonly goalPlans: GoalPlanRow[] = [];
+  /** Reserva mínima de liquidez (`WorkspaceSettingsQuery`). */
+  minimumReserve: { amount: string; currency: string } | null = null;
+  /** Disponible del plan por periodo (`BudgetVsActualQuery`, por `periodId`). */
+  readonly budgets = new Map<string, BudgetAvailabilityRow>();
+  readonly spendableRequests: { periodFrom: string; periodTo: string }[] = [];
 
   addPeriod(label: string, periodStart: string, periodEnd: string, status = 'CLOSED') {
     this.periods.push({ id: `period-${label}`, label, periodStart, periodEnd, status });
@@ -246,6 +264,46 @@ export class InMemoryReporting {
               (input.accountIds === undefined || input.accountIds.includes(p.accountId)),
           ),
       },
+      ...(this.spendableEnabled
+        ? {
+            spendable: {
+              commitments: {
+                listForSpendable: async ({
+                  periodFrom,
+                  periodTo,
+                }: {
+                  periodFrom: string;
+                  periodTo: string;
+                }) => {
+                  this.spendableRequests.push({ periodFrom, periodTo });
+                  const items = this.spendableItems
+                    .filter((i) => i.date <= periodTo)
+                    .map((i) => ({
+                      ...i,
+                      overdueFromPrevious: i.source === 'OCCURRENCE' && i.date < periodFrom,
+                    }));
+                  return { items, withoutAmountCount: items.filter((i) => i.amount === null).length };
+                },
+              },
+              reservations: {
+                getReservedByAccount: async ({ accountIds }: { accountIds?: readonly string[] }) =>
+                  this.reservations.filter(
+                    (r) => accountIds === undefined || accountIds.includes(r.accountId),
+                  ),
+              },
+              goalPlans: { getForPeriod: async () => [...this.goalPlans] },
+              minimumReserve: { getMinimumLiquidityReserve: async () => this.minimumReserve },
+              budgets: {
+                getForPeriod: async ({ periodId }: { periodId: string }) =>
+                  this.budgets.get(periodId) ?? null,
+              },
+              periods: { listPeriods: async () => [...this.periods] },
+              metrics: {
+                observe: (name: string, value: number) => void this.metricSamples.push({ name, value }),
+              },
+            },
+          }
+        : {}),
       ...(this.goalHome
         ? {
             goalSummary: {

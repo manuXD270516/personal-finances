@@ -248,12 +248,56 @@ export interface CommittedRangeDto {
   readonly items: readonly CommittedItemDto[];
 }
 
+/**
+ * Ítem de egreso para el disponible para gastar (Q5, `add-spendable-amount`): ocurrencia no resuelta o transacción
+ * `PENDING` con la liquidez de su cuenta de origen y de destino y quién la administra. Los ingresos nunca se informan.
+ */
+export interface CommittedForSpendableItemDto {
+  readonly source: 'OCCURRENCE' | 'PENDING';
+  /** `occurrenceId` o `transactionId` según `source`. */
+  readonly id: string;
+  readonly definitionId: string | null;
+  readonly name: string | null;
+  /** `EXPENSE`, `TRANSFER`, `LOAN_PAYMENT` o `CARD_PAYMENT`. */
+  readonly kind: string;
+  /** Vencimiento (ocurrencia) o fecha de negocio (pendiente). */
+  readonly date: string;
+  readonly accountId: string;
+  readonly toAccountId: string | null;
+  /** La cuenta de origen es `ASSET` + `LIQUID` (D35). */
+  readonly sourceLiquid: boolean;
+  /** La cuenta de destino es líquida; `null` si el ítem no tiene destino. */
+  readonly targetLiquid: boolean | null;
+  /** Quién administra la definición (`GOAL` ⇒ el aporte cuenta como aporte planificado); `null` en una pendiente. */
+  readonly managedBy: ManagedByDto | null;
+  /** Monto que suma (máximo en `MIN_MAX`); `null` si es `VARIABLE` (D115). */
+  readonly amount: MoneyDto | null;
+  /** Ocurrencia no resuelta con vencimiento anterior al inicio del periodo. */
+  readonly overdueFromPrevious: boolean;
+}
+
+export interface CommittedForSpendableDto {
+  /** Ocurrencias de egreso no resueltas y pendientes de egreso con fecha ≤ `periodTo`, por fecha e id. */
+  readonly items: readonly CommittedForSpendableItemDto[];
+  /** Ítems devueltos sin monto (`VARIABLE`). */
+  readonly withoutAmountCount: number;
+}
+
 export interface CommittedQuery {
   getForRange(input: {
     readonly workspaceId: string;
     readonly from: string;
     readonly to: string;
   }): Promise<CommittedRangeDto>;
+  /**
+   * Insumo del disponible para gastar (aditivo): el comprometido sin las exclusiones de Q4 para que REPORTING las aplique
+   * (`SpendableCalculator`). Lectura directa en la unidad de trabajo del llamador (RISK-022).
+   */
+  listForSpendable(input: {
+    readonly workspaceId: string;
+    readonly periodFrom: string;
+    readonly periodTo: string;
+  }): Promise<CommittedForSpendableDto>;
 }
 
 /** Pago próximo (egreso sin resolver de cualquier antigüedad con vencimiento ≤ `through`; D127). */

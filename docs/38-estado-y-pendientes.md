@@ -23,7 +23,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 33 | `add-savings-goals` | Archivado (#105) | — |
 | 34 | `add-loan-amortization-advanced` | Fusionado (#107), tareas completas | Archivar **justo después** de `add-loans`: agrega requisitos a `debt/loans` y `debt/amortization`, que crea el archive de `add-loans` |
 | 35 | `add-debt-summary` | Fusionado (#109), tareas completas | Archivar **después** de `add-loans` y `add-loan-amortization-advanced`: sus specs `debt/loans` son ADDED y chocarían con el archive de `add-loans`. Pendientes de docs: `docs/14` §10, `docs/28`, `docs/03` §7 |
-| 36 | `add-spendable-amount` | Especificado | Implementar al final de la fase (compone metas, compromisos, tarjetas y préstamos) |
+| 36 | `add-spendable-amount` | Implementado (rama `claude/gallant-brahmagupta-mli8th`, PR pendiente de fusión), tareas completas | Fusionar y luego archivar en un PR aparte (`chore(openspec)`). Antes de fusionar, CI debe validar `integration`, `e2e`, `stack` y `contract:breaking` (no corrieron en la sesión sin Docker). Supuestos a confirmar: sin periodo financiero que cubra hoy se usa el mes calendario (sin plan de presupuesto); "N tarjetas sin pago programado" cuenta tarjetas con saldo adeudado sin ocurrencia ni pendiente hacia ellas; benchmark nightly TC-REPORTING-SPENDABLE-014 en BOB (`apps/api/test/perf/spendable.perf.ts`) |
 
 Después de Phase 4: informe de cierre de fase, criterios de salida (docs/24 §5.4) y diseño de Phase 5 con el agente `arquitecto`.
 
@@ -59,6 +59,12 @@ Ninguna sesión puede cerrarlos por su cuenta.
 **Metas**
 - Anular un aporte del que ya se retiró una parte deja el fondo real en negativo; no se bloquea.
 - El job diario corre cada hora (`GOALS_DAILY_CRON`); es idempotente.
+
+**Disponible para gastar (Q5)**
+- Sin un periodo financiero que cubra hoy (workspace sin actividad en el ledger) Q5 usa el mes calendario y no consulta el plan; la spec no define ese caso (supuesto a confirmar).
+- "N tarjetas sin pago programado" cuenta las tarjetas con saldo adeudado a las que no llega ninguna transferencia ni pago de tarjeta (ocurrencia o pendiente) hasta el fin del periodo; no distingue pagos mínimos de totales.
+- Un aporte manual pendiente hacia una cuenta no líquida de una meta con plan puede contar dos veces hasta postearse (riesgo aceptado en el diseño).
+- Fuera de Phase 4: horizonte "hasta el próximo ingreso", categorías esenciales y alertas de déficit (Phase 7, D218).
 
 **Importación CSV**
 - `getImport` no devuelve las filas de muestra: al retomar una importación no se ve la muestra.

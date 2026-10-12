@@ -990,6 +990,30 @@ describe('permisos, idempotencia y aislamiento', () => {
       await app.end();
     }
   });
+
+  it('[TC-REPORTING-SPENDABLE-013] un VIEWER ve el mismo disponible que el OWNER y los datos de otro workspace no lo afectan', async () => {
+    const spendable = async (u: User) => checked('getSpendable', 200, await get(u, '/reports/spendable'));
+    const withoutMeta = (body: Record<string, any>) => {
+      const { meta: _meta, ...rest } = body;
+      return rest;
+    };
+    const owner = await spendable(s.owner);
+    const viewer = await spendable(s.viewer);
+    expect(withoutMeta(viewer)).toEqual(withoutMeta(owner));
+    // Una reserva en otro workspace no cambia el disponible de este.
+    await ok(
+      contribute(other.owner, (await create(other.owner, laptop({ name: 'Otra laptop' })))['id'], {
+        fund: 'EARMARK',
+        amount: bob('1000.00'),
+        sourceAccountId: other.banco,
+      }),
+    );
+    expect(withoutMeta(await spendable(s.owner))).toEqual(withoutMeta(owner));
+    const foreign = await call('GET', `/api/v1/workspaces/${s.owner.ws}/reports/spendable`, {
+      token: other.owner.token,
+    });
+    expect([403, 404]).toContain(foreign.status);
+  });
 });
 
 // ───────────────────────────────────────────── objetivo, revisión, retiro vinculado y resumen del Home
@@ -1135,11 +1159,33 @@ describe('cambio de objetivo, revisión de la transferencia, retiro vinculado y 
     expect(block.items[0]).toHaveProperty('percent');
     const q = Object.fromEntries((summary['questions'] as any[]).map((x) => [x.question, x.status]));
     expect(q['Q9']).toBe('AVAILABLE');
-    expect(q['Q5']).toBe('NOT_AVAILABLE_IN_PHASE');
+    // add-spendable-amount: Q5 se habilita con el disponible para gastar (bloque `spendable`).
+    expect(q['Q5']).toBe('AVAILABLE');
+    expect(summary['spendable'].consolidated.total.currency).toBe('BOB');
     expect(summary['goalContributions'].base.currency).toBe('BOB');
     const empty = await scenario('misc-empty');
     const none = checked('getReportSummary', 200, await get(empty.owner, '/reports/summary?month=2026-10'));
     expect(none['goals']).toMatchObject({ status: 'NO_DATA', action: 'CREATE_GOAL', items: [] });
+  });
+
+  it('[TC-REPORTING-SPENDABLE-012] una reserva recién registrada se refleja en la siguiente consulta del disponible, con periodo, moneda y frescura', async () => {
+    const t = await scenario('spendable');
+    const goal = await create(t.owner, laptop({ name: 'Laptop spendable' }));
+    const before = checked('getSpendable', 200, await get(t.owner, '/reports/spendable'));
+    expect(before['period']).toMatchObject({ label: '2026-10', start: '2026-10-01', end: '2026-10-31' });
+    expect(before['reportingCurrency']).toBe('BOB');
+    expect(before['byCurrency'][0]).toMatchObject({ currency: 'BOB', reservedForGoals: bob('0.00') });
+    await ok(reserve(t, goal['id'], '500.00'));
+    const after = checked('getSpendable', 200, await get(t.owner, '/reports/spendable'));
+    const total = (b: Record<string, any>) => Number(b['consolidated'].total.amount);
+    expect(total(before) - total(after)).toBe(500);
+    expect(after['byCurrency'][0]['reservedForGoals']).toEqual(bob('500.00'));
+    expect(after['meta']).toHaveProperty('generatedAt');
+    expect(after['meta']).toHaveProperty('dataFreshness');
+    expect(after['budgetView']).toMatchObject({ status: 'NO_PLAN', action: 'CREATE_BUDGET' });
+    // El mismo bloque viaja en el resumen del Home.
+    const summary = checked('getReportSummary', 200, await get(t.owner, '/reports/summary?month=2026-10'));
+    expect(summary['spendable'].consolidated).toEqual(after['consolidated']);
   });
 });
 

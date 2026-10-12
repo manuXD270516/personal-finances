@@ -166,6 +166,91 @@ export interface GoalContributionsDto {
   readonly complete: boolean;
 }
 
+// ───────────────────────────────────────────── reporting/dashboard: disponible para gastar (add-spendable-amount, Q5)
+
+/** Términos del disponible de una moneda (design.md decisión 2); sin redondeo intermedio, a la escala de la moneda. */
+export interface SpendableCurrencyTermsDto {
+  readonly currency: string;
+  readonly liquid: MoneyDto;
+  readonly reservedForGoals: MoneyDto;
+  readonly committed: MoneyDto;
+  readonly plannedGoalContributions: MoneyDto;
+  /** `null` si el workspace no tiene reserva mínima en esta moneda (el término no se muestra). */
+  readonly minimumReserve: MoneyDto | null;
+  readonly spendable: MoneyDto;
+}
+
+/** Segunda vista "según tu presupuesto" (FR-PLANNING-024, sin cambios): sin plan del periodo ofrece crearlo. */
+export interface SpendableBudgetViewDto {
+  readonly status: 'AVAILABLE' | 'NO_PLAN';
+  readonly action: 'CREATE_BUDGET' | null;
+  readonly budgetId: string | null;
+  readonly amount: MoneyDto | null;
+  readonly complete: boolean | null;
+}
+
+/** Bloque `spendable` de `ReportSummary` y base de `Spendable` (sin el detalle de ítems). */
+export interface SpendableSummaryDto {
+  /** `id` es `null` si ningún periodo financiero cubre hoy (se usa el mes calendario; ver design.md, pendientes). */
+  readonly period: { readonly id: string | null; readonly label: string; readonly start: string; readonly end: string };
+  readonly reportingCurrency: string;
+  readonly byCurrency: readonly SpendableCurrencyTermsDto[];
+  readonly consolidated: {
+    readonly total: MoneyDto;
+    readonly complete: boolean;
+    readonly unconverted: readonly MoneyDto[];
+  };
+  /** Monedas con disponible negativo mientras el consolidado no lo es ("conviene convertir"). */
+  readonly shortfalls: readonly MoneyDto[];
+  readonly status: 'OK' | 'WARNING';
+  /** Ocurrencias y pendientes `VARIABLE` que no restan (D115). */
+  readonly withoutAmountCount: number;
+  /** Tarjetas con saldo adeudado y sin pago programado ni pendiente hacia ellas (D213). */
+  readonly cardsWithoutPaymentCount: number;
+  readonly budgetView: SpendableBudgetViewDto;
+}
+
+export interface SpendableCommittedItemDto {
+  readonly source: 'OCCURRENCE' | 'PENDING';
+  readonly id: string;
+  readonly definitionId: string | null;
+  readonly name: string | null;
+  readonly kind: string;
+  readonly date: string;
+  readonly accountId: string;
+  readonly amount: MoneyDto;
+  readonly overdueFromPrevious: boolean;
+}
+
+export interface SpendableReservedAccountDto {
+  readonly accountId: string;
+  readonly name: string;
+  readonly balance: MoneyDto;
+  readonly reserved: MoneyDto;
+  /** Lo que resta del disponible: `min(max(saldo, 0), reservado)` (D216). */
+  readonly counted: MoneyDto;
+}
+
+export interface SpendablePlannedGoalDto {
+  readonly goalId: string;
+  readonly goalName: string;
+  readonly pending: MoneyDto;
+}
+
+/** `Spendable` del contrato (`GET /workspaces/{workspaceId}/reports/spendable`). */
+export interface SpendableDto extends SpendableSummaryDto {
+  readonly committedItems: readonly SpendableCommittedItemDto[];
+  readonly reservedByAccount: readonly SpendableReservedAccountDto[];
+  readonly plannedByGoal: readonly SpendablePlannedGoalDto[];
+  readonly meta: {
+    readonly generatedAt: string;
+    readonly rateWindowDays: number;
+    readonly dataFreshness?: string;
+    readonly ratesUsed: readonly ResolvedRateDto[];
+    readonly attributions: readonly RateAttributionDto[];
+  };
+}
+
 /** `ReportSummary` del contrato (`GET /workspaces/{workspaceId}/reports/summary`). */
 export interface ReportSummaryDto {
   readonly period: { readonly from: string; readonly to: string };
@@ -188,6 +273,8 @@ export interface ReportSummaryDto {
   readonly goals: GoalsBlockDto;
   /** Aportes netos a metas del periodo junto al ahorro (Q6); no alteran el ahorro ni la tasa de ahorro. */
   readonly goalContributions: GoalContributionsDto;
+  /** Disponible para gastar (Q5, add-spendable-amount); `null` si el workspace no tiene cuentas líquidas. */
+  readonly spendable: SpendableSummaryDto | null;
   readonly meta: {
     readonly generatedAt: string;
     readonly reportingCurrency: string;

@@ -245,11 +245,13 @@ describe('Home: ingresos, gastos, ahorro y comparación (tarea 6.1)', () => {
 });
 
 describe('Home: "Este mes" con categorías y comparación con el mes anterior (FR-REPORTING-004, D50)', () => {
-  it('jerarquía: h2 dinero disponible → h2 "Este mes" (h3 ingresos, gastos, ahorro, categorías) → h2 patrimonio → h2 próximamente', () => {
+  it('jerarquía: h2 dinero disponible → h2 "¿Cuánto puedo gastar?" → h2 "Este mes" (h3 ingresos, gastos, ahorro, categorías) → h2 patrimonio → h2 próximamente', () => {
     const html = render(SUMMARY);
     const headings = [...html.matchAll(/<(h[1-6])[^>]*>([^<]*)<\/h[1-6]>/g)].map((m) => `${m[1]} ${m[2]}`);
     expect(headings).toEqual([
       'h2 ¿Cuánto dinero tengo?',
+      // add-spendable-amount: Q5 justo después del dinero disponible.
+      'h2 ¿Cuánto puedo gastar?',
       'h2 Este mes',
       'h3 ¿Cuánto ingresó?',
       'h3 ¿Cuánto gasté?',
@@ -260,7 +262,6 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
       'h3 Patrimonio neto',
       'h3 Saldos por cuenta',
       'h2 Próximamente',
-      'h3 ¿Cuánto puedo gastar?',
       'h3 ¿Voy a cumplir mis metas?',
     ]);
     // "Este mes" va justo después del dinero disponible y antes del patrimonio.
@@ -409,23 +410,18 @@ describe('Home: "Este mes" con categorías y comparación con el mes anterior (F
 });
 
 describe('Home: preguntas no disponibles y estados vacíos (tarea 6.2)', () => {
-  it('[TC-REPORTING-DASHBOARD-005] Q5 y Q9 dicen que aún no están disponibles, con acción sugerida y sin montos', () => {
+  it('[TC-REPORTING-DASHBOARD-005] con Q5 habilitada solo Q9 (sin bloque de metas) dice que aún no está disponible, con acción sugerida y sin montos', () => {
     const html = render(SUMMARY);
-    const expected = {
-      Q5: ['¿Cuánto puedo gastar?', 'fase 2'],
-      Q9: ['¿Voy a cumplir mis metas?', 'fase 4'],
-    } as const;
-    for (const [q, [title, phase]] of Object.entries(expected)) {
-      const widget = section(html, `question-${q}`);
-      expect(widget).toContain('data-status="NOT_AVAILABLE_IN_PHASE"');
-      expect(text(widget)).toContain(title);
-      expect(text(widget)).toContain('Aún no disponible');
-      expect(text(widget)).toContain(phase);
-      expect(text(widget)).not.toMatch(/\d+[.,]\d{2}|BOB|USDT/);
-    }
-    // Las preguntas habilitadas (incluidas Q4 y Q8 desde Phase 3) no se muestran como "no disponibles".
+    const widget = section(html, 'question-Q9');
+    expect(widget).toContain('data-status="NOT_AVAILABLE_IN_PHASE"');
+    expect(text(widget)).toContain('¿Voy a cumplir mis metas?');
+    expect(text(widget)).toContain('Aún no disponible');
+    expect(text(widget)).toContain('fase 4');
+    expect(text(widget)).not.toMatch(/\d+[.,]\d{2}|BOB|USDT/);
+    // Las preguntas habilitadas (Q4 y Q8 desde Phase 3, Q5 desde add-spendable-amount) no se muestran como "no disponibles".
     for (const q of ['Q1', 'Q4', 'Q8']) expect(html).not.toContain(`data-testid="question-${q}" `);
-    expect(html.match(/Aún no disponible/g)).toHaveLength(2);
+    expect(section(html, 'question-Q5')).toContain('data-status="AVAILABLE"');
+    expect(html.match(/Aún no disponible/g)).toHaveLength(1);
   });
 
   it('[TC-REPORTING-DASHBOARD-005] las tarjetas de Q4 y Q8 llegan por la sección de compromisos, entre el dinero disponible y el mes', () => {

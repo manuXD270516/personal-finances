@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Disponible por moneda y consolidado"
 scenario: "Faltante en BOB con excedente en USD"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-001", "FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "fx", "shortfall"]
@@ -31,7 +34,7 @@ expected_result:
   - "byCurrency −200.00 BOB y 100.00 USD; consolidated 1000.00 BOB"
   - "shortfalls [{currency: BOB, amount: 200.00}] y status OK"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-007 — Un faltante en BOB con excedente en USD se indica por moneda con la sugerencia de convertir

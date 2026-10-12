@@ -5,16 +5,18 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Aportes planificados pendientes a metas descontados"
 scenario: "Aporte parcial del periodo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-009", "FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "goals", "plan"]
@@ -30,7 +32,7 @@ steps:
 expected_result:
   - "plannedGoalContributions 600.00 BOB"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-009 — Solo las metas activas con plan aportan su pendiente del periodo al disponible

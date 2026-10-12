@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Periodo del disponible en la zona del workspace"
 scenario: "Mes financiero que empieza el día 25"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024"]
 nfr: ["NFR-USAB-004"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "periods", "timezone"]
@@ -31,7 +34,7 @@ expected_result:
   - "committed 499.00 BOB y spendable 8201.00 BOB"
   - "A las 23:30 del 24 en La Paz sigue el periodo \"2026-09\""
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-011 — Con día de inicio 25 el disponible usa el periodo vigente en La Paz y no resta vencimientos posteriores

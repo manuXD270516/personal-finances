@@ -19,10 +19,12 @@ import type {
   NetWorthHistoryDeps,
   PendingTransactionsPort,
   ReportingMetricsPort,
+  SpendableDeps,
   UpcomingCommitmentsPort,
   UpcomingPaymentsDeps,
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
+import { SpendableQueries } from '../application/spendable.queries.js';
 import { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import {
   DEFAULT_RATE_VALIDITY_WINDOW_DAYS,
@@ -41,6 +43,7 @@ import {
   NET_WORTH_HISTORY_QUERIES,
   REPORT_SUMMARY_QUERIES,
   ReportingController,
+  SPENDABLE_QUERIES,
   UPCOMING_PAYMENTS_QUERIES,
 } from './reporting-http.js';
 
@@ -78,6 +81,13 @@ export interface ReportingRuntimeOptions {
    */
   readonly goalSummary?: GoalSummaryPort;
   readonly goalFlows?: GoalFlowsPort;
+  /**
+   * Q5 del Home (add-spendable-amount): contratos públicos de COMMITMENTS (`CommittedQuery.listForSpendable`), GOALS
+   * (`GoalReservationsQuery`, `GoalPlansQuery`), IDENTITY (`WorkspaceSettingsQuery`) y PLANNING (`BudgetVsActualQuery`).
+   * Se componen después de REPORTING, así que la composición los entrega con resolución tardía. Los periodos y las
+   * métricas son los de las demás consultas.
+   */
+  readonly spendable: Omit<SpendableDeps, 'periods' | 'metrics'>;
   /** Histogramas de la consulta de próximos pagos (docs/35 D117); opcional. */
   readonly metrics?: ReportingMetricsPort;
   /**
@@ -93,6 +103,8 @@ export interface ReportingRuntime {
   readonly history: NetWorthHistoryQueries;
   /** Próximos pagos, comprometido del periodo, saldo proyectado y pagos sorpresa (add-upcoming-payments). */
   readonly upcoming: UpcomingPaymentsQueries;
+  /** Detalle del disponible para gastar (`GET /reports/spendable`, add-spendable-amount). */
+  readonly spendable: SpendableQueries;
   /** Flujos del periodo para el cierre de mes (contrato público `PeriodFlowsQuery`; sin ruta HTTP). */
   readonly periodFlows: PeriodFlowsQuery;
   /** Patrimonio a una fecha de corte para el cierre de mes (contrato público `NetWorthQuery`; sin ruta HTTP). */
@@ -123,12 +135,18 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     ...(options.goalSummary ? { goalSummary: options.goalSummary } : {}),
     ...(options.goalFlows ? { goalFlows: options.goalFlows } : {}),
     ...(options.metrics ? { metrics: options.metrics } : {}),
+    spendable: {
+      ...options.spendable,
+      periods: options.periods,
+      ...(options.metrics ? { metrics: options.metrics } : {}),
+    },
   };
   return {
     rateValidityWindowDays,
     summary: new ReportSummaryQueries(deps),
     history: new NetWorthHistoryQueries(deps),
     upcoming: new UpcomingPaymentsQueries(deps),
+    spendable: new SpendableQueries(deps, deps.spendable as SpendableDeps),
     periodFlows: new PeriodFlowsQueries(deps),
     netWorth: new NetWorthAtQueries(deps),
   };
@@ -164,6 +182,7 @@ export class ReportingModule {
         { provide: REPORT_SUMMARY_QUERIES, useValue: options.runtime.summary },
         { provide: NET_WORTH_HISTORY_QUERIES, useValue: options.runtime.history },
         { provide: UPCOMING_PAYMENTS_QUERIES, useValue: options.runtime.upcoming },
+        { provide: SPENDABLE_QUERIES, useValue: options.runtime.spendable },
       ],
     };
   }

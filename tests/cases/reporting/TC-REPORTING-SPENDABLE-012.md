@@ -5,16 +5,20 @@ spec: reporting/dashboard
 related_specs: ["goals/savings-goals"]
 requirement: "Frescura y lectura inmediata del disponible"
 scenario: "Reserva recién registrada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-007", "FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - tests/e2e/specs/dashboard.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "freshness"]
@@ -32,7 +36,7 @@ expected_result:
   - "Antes 5521.00 BOB; después 5021.00 BOB"
   - "La respuesta indica periodo \"2026-10\", moneda BOB, generatedAt y dataFreshness"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-012 — Una reserva recién registrada se refleja en la siguiente consulta del disponible con periodo, moneda y frescura

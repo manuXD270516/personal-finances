@@ -322,7 +322,7 @@ describe('GET /reports/upcoming-payments (reporting/cash-flow-calendar)', () => 
     const q = Object.fromEntries((s.body['questions'] as Json[]).map((x) => [x['question'], x]));
     expect(q['Q4']).toMatchObject({ status: 'AVAILABLE', actionHint: null });
     expect(q['Q8']).toMatchObject({ status: 'AVAILABLE', actionHint: null });
-    expect(q['Q5']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
+    expect(q['Q5']).toMatchObject({ status: 'AVAILABLE', actionHint: null });
   });
 
   it('[TC-REPORTING-UPCOMING-018] un workspace con cuentas pero sin compromisos ni pendientes declara Q4 y Q8 NO_DATA con CREATE_COMMITMENT', async () => {

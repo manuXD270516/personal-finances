@@ -64,6 +64,7 @@ import {
   identityWorkspaceCalendarDirectory,
   identityWorkspaceSettings,
   identityWorkspaceSettingsDirectory,
+  identityWorkspaceSettingsQuery,
   identityUserDisplayNames,
   identityWorkspaceTimeZones,
   type DemoDataOptions,
@@ -74,7 +75,12 @@ import {
   createNotificationsApiRuntime,
   NotificationsModule,
 } from '@pf/notifications/interface/notifications.module';
-import { PLANNING_AUDIT_POLICY, type ClosingSnapshotQuery, type PeriodQuery } from '@pf/planning/contracts';
+import {
+  PLANNING_AUDIT_POLICY,
+  type BudgetVsActualQuery,
+  type ClosingSnapshotQuery,
+  type PeriodQuery,
+} from '@pf/planning/contracts';
 import {
   createPlanningRuntime,
   FINANCIAL_PERIOD_LIFECYCLE_MACHINE,
@@ -363,6 +369,7 @@ export function financeRuntimes(input: {
     categoryUsage?: CounterpartyCategoryUsageQuery;
     periods?: PeriodQuery;
     closingSnapshots?: ClosingSnapshotQuery;
+    budgetVsActual?: BudgetVsActualQuery;
     commitments?: CommitmentsRuntime;
     goals?: GoalsRuntime;
   } = {};
@@ -474,6 +481,26 @@ export function financeRuntimes(input: {
     goalFlows: {
       netForRange: (query) => deferred.goals?.queries.netForRange(query) ?? Promise.resolve([]),
     },
+    // add-spendable-amount: Q5 compone COMMITMENTS, GOALS, IDENTITY y PLANNING por sus contratos públicos (los que se
+    // componen después de REPORTING se enlazan con resolución tardía).
+    spendable: {
+      commitments: {
+        listForSpendable: (query) =>
+          deferred.commitments?.committed.listForSpendable(query) ??
+          Promise.resolve({ items: [], withoutAmountCount: 0 }),
+      },
+      reservations: {
+        getReservedByAccount: (query) =>
+          deferred.goals?.queries.getReservedByAccount(query) ?? Promise.resolve([]),
+      },
+      goalPlans: {
+        getForPeriod: (query) => deferred.goals?.queries.getForPeriod(query) ?? Promise.resolve([]),
+      },
+      minimumReserve: identityWorkspaceSettingsQuery(input.pool),
+      budgets: {
+        getForPeriod: (query) => deferred.budgetVsActual?.getForPeriod(query) ?? Promise.resolve(null),
+      },
+    },
     metrics: { observe: (name, value) => reportingHistograms.record(name, value, {}) },
     rateValidityWindowDays,
   });
@@ -525,6 +552,7 @@ export function financeRuntimes(input: {
     locales: identityUserLocaleTags(input.pool),
   });
   deferred.periods = planning.periodQuery;
+  if (planning.budgets) deferred.budgetVsActual = planning.budgets.vsActual;
   if (planning.closing) deferred.closingSnapshots = planning.closing.snapshots;
   // COMMITMENTS (add-recurrence-engine): no importa `@pf/planning/contracts` (evita un ciclo cuando Planning consuma
   // compromisos); el adapter del periodo vive aquí, en la composición.

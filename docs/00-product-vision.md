@@ -102,6 +102,8 @@ El dashboard (capability `reporting/dashboard`, a especificar en Phase 1) existe
 | Q8 | **¿Qué pagos vienen?** | Próximos N días de ocurrencias recurrentes, cuotas de préstamo, vencimientos de tarjeta, con saldo esperado. | Commitments + Debt + Reporting (cash-flow calendar) | Phase 3 / Phase 7 |
 | Q9 | **¿Voy a cumplir mis metas?** | Por meta: % completado, aporte mensual requerido, fecha esperada, estado `behind/on-track/ahead`. | Goals | Phase 4 |
 
+> **As-built de Phase 4 (`add-spendable-amount`, D209–D218):** Q5 muestra **ambas vistas**: la cifra principal "libre de compromisos" (líquido − reservado por metas − comprometido pagadero desde cuentas líquidas − aportes planificados pendientes − reserva mínima, por moneda y consolidado, sin sumar ingresos esperados) y, como segunda vista, el disponible "según tu presupuesto" del plan del periodo. El horizonte es el periodo financiero que contiene hoy; "hasta el próximo ingreso" y las categorías esenciales llegan en Phase 7.
+
 Regla de UX: si una pregunta todavía no puede responderse (fase no implementada o datos insuficientes), el widget lo **dice explícitamente** y sugiere la acción para habilitarlo; nunca muestra un número inventado.
 
 ## 7. Alcance por fase (vista rápida)
@@ -182,7 +184,7 @@ PFOS **no** hará (al menos en el horizonte de este roadmap):
 
 1. ¿Se confirma BOB como moneda base del workspace inicial y `America/La_Paz` como zona horaria? ¿El locale de formato es `es-BO` (separador decimal coma) o se prefiere punto decimal?
 2. ¿Cuál es el presupuesto mensual máximo aceptable para cloud (SM-14)? ¿Se acepta operar Phase 1–8 solo en local con backups, desplegando a cloud recién en Phase 9?
-3. ¿Q5 "¿Cuánto puedo gastar?" debe basarse en presupuesto restante, en liquidez libre de compromisos, o mostrar ambas vistas?
+3. ~~¿Q5 "¿Cuánto puedo gastar?" debe basarse en presupuesto restante, en liquidez libre de compromisos, o mostrar ambas vistas?~~ Resuelta por el owner ([docs/37 D209](./37-phase-4-consolidation-decisions.md), 2026-10-12): **ambas vistas**, libre de compromisos como cifra principal y "según tu presupuesto" como segunda; horizonte = periodo financiero en Phase 4 (D210).
 4. ¿Inversiones (acciones, fondos) son relevantes para el owner en el corto plazo o basta con cuentas `investment` con valoración manual?
 5. ¿El rol "asesor/viewer" debe soportar acceso a un subconjunto de cuentas (scoping fino) o es suficiente acceso de lectura a todo el workspace?
 6. ¿Es deseable una PWA instalable para captura rápida desde el teléfono antes del track de Colaboración?

@@ -112,4 +112,21 @@ export interface WorkspaceRecipientsQuery {
   emailFor(userId: string): Promise<string | null>;
 }
 
+/** Monto con su moneda (`{amount: "<decimal>", currency}`; nunca `number`, ADR-0006). */
+export interface MoneyDto {
+  readonly amount: string;
+  readonly currency: string;
+}
+
+/**
+ * Ajustes del workspace que consumen otros contextos (openspec add-spendable-amount, S2; ampliación aditiva).
+ * `getMinimumLiquidityReserve` devuelve la reserva mínima de liquidez (FR-IDENTITY-005) en su moneda y a su escala, o
+ * `null` si el workspace no la configuró. Se invoca dentro de la unidad de trabajo del llamador (RLS de membresía).
+ */
+export interface WorkspaceSettingsQuery {
+  getMinimumLiquidityReserve(input: { readonly workspaceId: string }): Promise<MoneyDto | null>;
+}
+
+export const WORKSPACE_SETTINGS_QUERY = Symbol.for('pf.identity.WorkspaceSettingsQuery');
+
 export * from './portability.js';

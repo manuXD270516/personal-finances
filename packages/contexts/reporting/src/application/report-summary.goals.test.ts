@@ -107,7 +107,7 @@ describe('GetReportSummary: metas en curso (Q9, reporting/dashboard)', () => {
     expect((await summary()).goals.complete).toBe(false);
   });
 
-  it('[TC-GOALS-SAVINGS-047] sin metas Q9 es NO_DATA con CREATE_GOAL, sin items ni 0 %; Q5 sigue no disponible', async () => {
+  it('[TC-GOALS-SAVINGS-047] sin metas Q9 es NO_DATA con CREATE_GOAL, sin items ni 0 %; Q5 está disponible', async () => {
     mem.goalHome = { goalCount: 0, moreCount: 0, ratesUsed: [], items: [] };
     const s = await summary();
     expect(s.goals).toEqual({
@@ -120,7 +120,7 @@ describe('GetReportSummary: metas en curso (Q9, reporting/dashboard)', () => {
     });
     const by = Object.fromEntries(s.questions.map((q) => [q.question, q]));
     expect(by['Q9']).toEqual({ question: 'Q9', status: 'NO_DATA', actionHint: 'CREATE_GOAL' });
-    expect(by['Q5']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
+    expect(by['Q5']).toMatchObject({ status: 'AVAILABLE' });
   });
 
   it('[TC-GOALS-SAVINGS-047] sin el puerto de metas cableado Q9 es NO_DATA con CREATE_GOAL', async () => {

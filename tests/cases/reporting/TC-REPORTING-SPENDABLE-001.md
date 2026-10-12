@@ -5,16 +5,20 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Disponible para gastar libre de compromisos"
 scenario: "Disponible de octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-PLANNING-024", "FR-GOALS-009", "FR-COMMITMENTS-011", "FR-REPORTING-002"]
 nfr: ["NFR-DATA-002"]
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/identity/src/application/workspace-settings.queries.test.ts
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5"]
@@ -33,7 +37,7 @@ expected_result:
   - "\"Sueldo\" no suma"
   - "Sin reserva mínima: 7021.00 BOB y sin término minimumReserve"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-001 — El disponible del periodo resta reservas de metas, comprometido, aportes planificados y reserva mínima, sin sumar ingresos esperados

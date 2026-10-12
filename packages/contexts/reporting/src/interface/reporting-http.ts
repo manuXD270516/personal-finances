@@ -4,10 +4,12 @@ import { ValidatedQuery, principalOf, type ApiRequest, type ApiResponse } from '
 import type { CompareMode } from '../domain/index.js';
 import type { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
 import type { ReportSummaryQueries } from '../application/report-summary.queries.js';
+import type { SpendableQueries } from '../application/spendable.queries.js';
 import type { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import type {
   NetWorthHistoryDto,
   ReportSummaryDto,
+  SpendableDto,
   SurprisePaymentsDto,
   UpcomingPaymentsDto,
 } from '../contracts/index.js';
@@ -15,6 +17,7 @@ import type {
 export const REPORT_SUMMARY_QUERIES = Symbol('REPORT_SUMMARY_QUERIES');
 export const NET_WORTH_HISTORY_QUERIES = Symbol('NET_WORTH_HISTORY_QUERIES');
 export const UPCOMING_PAYMENTS_QUERIES = Symbol('UPCOMING_PAYMENTS_QUERIES');
+export const SPENDABLE_QUERIES = Symbol('SPENDABLE_QUERIES');
 
 type Json = Record<string, unknown>;
 const str = (q: Json, k: string): string | undefined =>
@@ -63,6 +66,16 @@ export function upcomingEtag(upcoming: UpcomingPaymentsDto, dataVersion: string)
   return `W/"${dataVersion}-${hash}"`;
 }
 
+/** ETag débil del disponible para gastar: versión de datos + hash del contenido (sin `generatedAt`). */
+export function spendableEtag(spendable: SpendableDto, dataVersion: string): string {
+  const { generatedAt: _generatedAt, ...meta } = spendable.meta;
+  const hash = createHash('sha256')
+    .update(JSON.stringify({ ...spendable, meta }))
+    .digest('base64url')
+    .slice(0, 22);
+  return `W/"${dataVersion}-${hash}"`;
+}
+
 /**
  * `GET /api/v1/workspaces/{workspaceId}/reports/summary` (`getReportSummary`, VIEWER). Autenticación, rol y validación
  * de contrato (incl. `topCategories` 0..20) los aplican las convenciones globales; `If-None-Match` ⇒ 304 lo resuelve
@@ -74,6 +87,7 @@ export class ReportingController {
     @Inject(REPORT_SUMMARY_QUERIES) private readonly queries: ReportSummaryQueries,
     @Inject(NET_WORTH_HISTORY_QUERIES) private readonly history: NetWorthHistoryQueries,
     @Inject(UPCOMING_PAYMENTS_QUERIES) private readonly upcoming: UpcomingPaymentsQueries,
+    @Inject(SPENDABLE_QUERIES) private readonly spendable: SpendableQueries,
   ) {}
 
   @Get('workspaces/:workspaceId/reports/summary')
@@ -149,6 +163,29 @@ export class ReportingController {
     res.setHeader('etag', upcomingEtag(upcoming, dataVersion));
     res.setHeader('cache-control', 'private, no-cache');
     return upcoming;
+  }
+
+  /**
+   * `GET /api/v1/workspaces/{workspaceId}/reports/spendable` (`getSpendable`, VIEWER): el disponible para gastar libre de
+   * compromisos con el detalle de sus términos (add-spendable-amount). Mismo manejo de `ETag`/`If-None-Match`.
+   */
+  @Get('workspaces/:workspaceId/reports/spendable')
+  async getSpendable(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ValidatedQuery() query: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<SpendableDto> {
+    const { spendable, dataVersion } = await this.spendable.getSpendable({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      ...(str(query, 'reportingCurrency')
+        ? { reportingCurrency: str(query, 'reportingCurrency') as string }
+        : {}),
+    });
+    res.setHeader('etag', spendableEtag(spendable, dataVersion));
+    res.setHeader('cache-control', 'private, no-cache');
+    return spendable;
   }
 
   /** `GET /api/v1/workspaces/{workspaceId}/reports/surprise-payments` (`getSurprisePayments`, VIEWER, SM-07). */

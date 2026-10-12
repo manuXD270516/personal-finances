@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Disponible para todos los miembros y aislado por workspace"
 scenario: "VIEWER consulta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-006", "FR-REPORTING-001"]
 nfr: ["NFR-SEC-003"]
 invariants: ["INV-025"]
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/identity/src/application/workspace-settings.queries.test.ts
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "rbac", "rls"]
@@ -33,7 +36,7 @@ expected_result:
   - "Respuestas iguales (5521.00 BOB y mismo desglose)"
   - "Nada de W2 afecta a W1"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-013 — El VIEWER ve el mismo disponible que el OWNER y los datos de otro workspace no lo afectan

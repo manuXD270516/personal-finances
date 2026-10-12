@@ -655,7 +655,7 @@ describe('GET /reports/summary — flujos del mes (PG real)', () => {
 });
 
 describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
-  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1, Q4, Q8 y Q9 NO_DATA; Q5 NOT_AVAILABLE_IN_PHASE', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] workspace sin cuentas: Q1, Q4, Q5, Q8 y Q9 NO_DATA y sin bloque spendable', async () => {
     const r = await summary(empty);
     expect(r.status).toBe(200);
     const q = Object.fromEntries(
@@ -664,14 +664,19 @@ describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
     expect(q).toMatchObject({
       Q1: 'NO_DATA',
       Q4: 'NO_DATA',
-      Q5: 'NOT_AVAILABLE_IN_PHASE',
+      Q5: 'NO_DATA',
       Q8: 'NO_DATA',
       Q9: 'NO_DATA',
     });
     expect(r.body['accounts']).toEqual([]);
+    expect(r.body['spendable'] ?? null).toBeNull();
+    const q5 = (r.body['questions'] as { question: string; actionHint: string | null }[]).find(
+      (x) => x.question === 'Q5',
+    );
+    expect(q5?.actionHint).toBe('CREATE_ACCOUNT');
   });
 
-  it('[TC-REPORTING-DASHBOARD-005] con una transacción pendiente de egreso Q4 y Q8 están disponibles; Q5 sigue sin estarlo y Q9 pide crear una meta', async () => {
+  it('[TC-REPORTING-DASHBOARD-005] con una transacción pendiente de egreso Q4, Q5 y Q8 están disponibles y Q9 pide crear una meta', async () => {
     // El workspace canónico tiene un gasto PENDING (INV-023): basta una pendiente para habilitar Q4/Q8.
     const r = await summary(canonical);
     expect(r.status).toBe(200);
@@ -683,7 +688,8 @@ describe('GET /reports/summary — aislamiento y preguntas del Home', () => {
     );
     expect(q['Q4']).toEqual({ question: 'Q4', status: 'AVAILABLE', actionHint: null });
     expect(q['Q8']).toEqual({ question: 'Q8', status: 'AVAILABLE', actionHint: null });
-    expect(q['Q5']).toMatchObject({ status: 'NOT_AVAILABLE_IN_PHASE' });
+    expect(q['Q5']).toEqual({ question: 'Q5', status: 'AVAILABLE', actionHint: null });
+    expect(r.body['spendable']).not.toBeNull();
     expect(q['Q9']).toMatchObject({ status: 'NO_DATA', actionHint: 'CREATE_GOAL' });
   });
 

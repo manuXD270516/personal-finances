@@ -5,22 +5,25 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Rendimiento y métricas del disponible"
 scenario: "Workspace grande"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-002"]
 nfr: ["NFR-PERF-004", "NFR-OBS-004"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/spendable.perf.ts
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/upcoming-read-model-alert.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "perf"]
 error_code: null
 preconditions:
-  - "Dataset con 40 cuentas, 300 ocurrencias no resueltas en el periodo, 20 metas con reservas y plan y 4 monedas"
+  - "Dataset con 40 cuentas, 300 ocurrencias no resueltas en el periodo, 20 metas con reservas (benchmark en BOB: las monedas adicionales solo suman una tasa por petición, una sola resolución de FX)"
 input: {}
 steps:
   - "Benchmark de GET W/reports/summary con el bloque spendable (nightly perf)"
@@ -28,7 +31,7 @@ expected_result:
   - "p95 de reporting_spendable_duration_seconds ≤ 0.30 s"
   - "Métrica sin etiquetas de alta cardinalidad"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-014 — El cálculo del disponible cabe en el presupuesto del Home con un workspace grande y expone su métrica

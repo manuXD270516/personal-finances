@@ -5,16 +5,19 @@ spec: reporting/dashboard
 related_specs: ["reporting/cash-flow-calendar", "goals/savings-goals"]
 requirement: "Reservas de metas descontadas del disponible"
 scenario: "Cuenta sobre-asignada descuenta como máximo su saldo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-004", "FR-PLANNING-024"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/spendable/spendable.test.tsx
+  - packages/contexts/reporting/src/application/spendable.queries.test.ts
+  - packages/contexts/reporting/src/domain/spendable-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ["spendable", "q5", "goals", "earmark"]
@@ -32,7 +35,7 @@ expected_result:
   - "reservedForGoals 1500.00 BOB"
   - "spendable 0.00 BOB (no −500.00 BOB)"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-REPORTING-SPENDABLE-005 — Lo reservado por metas en una cuenta sobre-asignada resta como máximo su saldo y las reservas en cuentas no líquidas no restan

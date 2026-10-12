@@ -64,7 +64,7 @@ async function ok(
 }
 
 test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, reporting/net-worth)', () => {
-  test('[TC-REPORTING-DASHBOARD-005] salario, gastos, reembolso y conversión canónica se ven en el Home con la tasa paralela y su atribución; providers caídos marcan la tasa obsoleta; móvil', async ({
+  test('[TC-REPORTING-DASHBOARD-005] [TC-REPORTING-SPENDABLE-015] salario, gastos, reembolso y conversión canónica se ven en el Home con la tasa paralela y su atribución; providers caídos marcan la tasa obsoleta; móvil', async ({
     browser,
   }, testInfo) => {
     const username = `dash-${randomUUID().slice(0, 8)}`;
@@ -78,14 +78,14 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     const W = `/workspaces/${ws}`;
 
     // Workspace nuevo y sin cuentas: Q1, Q4 y Q8 NO_DATA (sin 0.00 BOB; piden crear la primera cuenta) y Q9 NO_DATA (ofrece crear una meta,
-    // sin 0 %) y Q5 aún no disponible, sin montos.
+    // sin 0 %) y Q5 NO_DATA (add-spendable-amount: pide crear una cuenta, sin 0.00 BOB).
     await page.reload();
     await expect(page.getByTestId('dashboard')).toBeVisible();
     await expect(page.getByTestId('liquid-balance-no-accounts')).toBeVisible();
     await expect(page.getByTestId('liquid-balance-amount')).toHaveCount(0);
     const q5 = page.getByTestId('question-Q5');
-    await expect(q5).toHaveAttribute('data-status', 'NOT_AVAILABLE_IN_PHASE');
-    await expect(q5).toContainText('Aún no disponible');
+    await expect(q5).toHaveAttribute('data-status', 'NO_DATA');
+    await expect(q5.getByTestId('spendable-action')).toHaveAttribute('data-action', 'CREATE_ACCOUNT');
     await expect(q5).not.toContainText(/\d+,\d{2}/);
     const q9 = page.getByTestId('question-Q9');
     await expect(q9).toHaveAttribute('data-status', 'NO_DATA');
@@ -191,7 +191,9 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Inicio');
     await expect(dash.locator('h2')).toHaveText([
       '¿Cuánto dinero tengo?',
-      // add-upcoming-payments: tarjetas Q4 y Q8 justo después del dinero disponible.
+      // add-spendable-amount: Q5 "¿Cuánto puedo gastar?" justo después del dinero disponible.
+      '¿Cuánto puedo gastar?',
+      // add-upcoming-payments: tarjetas Q4 y Q8 justo después del disponible para gastar.
       'Pagos y compromisos',
       'Este mes',
       // add-budgets 6.2: widget del plan del mes (disponible para gastar), entre "Este mes" y el patrimonio.
@@ -201,7 +203,7 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
       // add-debt-summary: tarjeta "Deudas" entre las metas y el patrimonio.
       'Deudas',
       'Patrimonio y cuentas',
-      'Próximamente',
+      // Con Q5 habilitada ninguna pregunta queda "no disponible": ya no hay sección "Próximamente".
     ]);
     // Con cuentas pero sin definiciones recurrentes ni pendientes de egreso: Q4 y Q8 piden crear un compromiso.
     for (const q of ['Q4', 'Q8']) {
@@ -248,6 +250,14 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     await expect(badge.getByTestId('rate-stale')).toHaveText('obsoleta');
     await expect(badge.getByTestId('rate-age')).toContainText(/hace (2|3) h/);
 
+    // Q5 (add-spendable-amount): sin compromisos, reservas ni reserva mínima el disponible es el dinero líquido
+    // (8385.00 BOB + 50.000000 USDT × 12.02), con el desglose por moneda y sin plan de presupuesto.
+    const q5card = page.getByTestId('question-Q5');
+    await expect(q5card).toHaveAttribute('data-status', 'AVAILABLE');
+    await expect(q5card.getByTestId('spendable-amount')).toHaveText(/8\.986,00\s*BOB/);
+    await expect(q5card.getByTestId('spendable-term-liquid-amount').first()).toHaveText(/8\.385,00\s*BOB/);
+    await expect(q5card.getByTestId('spendable-budget-view')).toHaveAttribute('data-status', 'NO_PLAN');
+
     // El provider vuelve: muestra de hace 5 min ⇒ ya no obsoleta, mismo consolidado.
     await providerRate(ws, 'USDT', '12.02', new Date(Date.now() - 5 * 60_000));
     await page.reload();
@@ -266,6 +276,77 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
     await page.screenshot({ path: testInfo.outputPath('home-mobile.png'), fullPage: true });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+
+    // Detalle del disponible (add-spendable-amount, tarea 6.2): desde la tarjeta del Home.
+    await page.getByTestId('spendable-detail-link').click();
+    await expect(page.getByTestId('spendable-detail')).toBeVisible();
+    await expect(page.getByTestId('spendable-committed')).toBeVisible();
+    await expect(page.getByTestId('spendable-rates-used')).toBeVisible();
+    await context.close();
+  });
+});
+
+test.describe('Home: disponible para gastar libre de compromisos (reporting/dashboard, Q5)', () => {
+  test('[TC-REPORTING-SPENDABLE-012] un pendiente y una reserva de meta recién registrados bajan el disponible en la siguiente lectura, con el desglose', async ({
+    browser,
+  }) => {
+    const username = `spend-${randomUUID().slice(0, 8)}`;
+    const password = `Pw-${randomUUID()}`;
+    await createKeycloakUser(username, password);
+    const context = await browser.newContext({ baseURL: env()['WEB_PUBLIC_URL']! });
+    const page = await context.newPage();
+    await login(page, username, password);
+    const me = await bff(page, 'GET', '/api/bff/v1/me');
+    const ws = (me.body?.['memberships'] as { workspaceId: string }[])[0]!.workspaceId;
+    const W = `/workspaces/${ws}`;
+    const today = todayLaPaz();
+    const bob = (amount: string) => ({ amount, currency: 'BOB' });
+    const banco = (
+      await ok(page, 'POST', `${W}/accounts`, {
+        name: 'Banco BOB',
+        type: 'BANK',
+        currency: 'BOB',
+        openingBalance: { amount: bob('2000.00'), date: today },
+      })
+    )['id'];
+
+    await page.reload();
+    const q5 = page.getByTestId('question-Q5');
+    await expect(q5.getByTestId('spendable-amount')).toHaveText(/2\.000,00\s*BOB/);
+    await expect(q5.getByTestId('spendable-term-liquid-amount')).toHaveText(/2\.000,00\s*BOB/);
+    // Sin reserva mínima el término no se muestra (no un 0,00 en el desglose).
+    await expect(q5.getByTestId('spendable-term-minimumReserve')).toHaveCount(0);
+
+    // Un gasto pendiente de 300.00 BOB es comprometido: resta del disponible.
+    await ok(page, 'POST', `${W}/transactions`, {
+      kind: 'EXPENSE',
+      status: 'PENDING',
+      transactionDate: today,
+      accountId: banco,
+      description: 'Cena',
+      amount: bob('300.00'),
+    });
+    await page.reload();
+    await expect(q5.getByTestId('spendable-amount')).toHaveText(/1\.700,00\s*BOB/);
+    await expect(q5.getByTestId('spendable-term-committed-amount')).toHaveText(/-300,00\s*BOB/);
+
+    // Reservar 500.00 BOB para una meta (EARMARK) se refleja de inmediato en la siguiente lectura.
+    const goal = await ok(page, 'POST', `${W}/goals`, {
+      name: 'Laptop',
+      type: 'PURCHASE',
+      target: bob('9000.00'),
+      startDate: today,
+      priority: 2,
+    });
+    await ok(page, 'POST', `${W}/goals/${goal['id']}/contributions`, {
+      fund: 'EARMARK',
+      amount: bob('500.00'),
+      sourceAccountId: banco,
+    });
+    await page.reload();
+    await expect(q5.getByTestId('spendable-amount')).toHaveText(/1\.200,00\s*BOB/);
+    await expect(q5.getByTestId('spendable-term-reservedForGoals-amount')).toHaveText(/-500,00\s*BOB/);
+    await expect(q5.getByTestId('spendable-term-spendable-amount')).toHaveText(/1\.200,00\s*BOB/);
     await context.close();
   });
 });

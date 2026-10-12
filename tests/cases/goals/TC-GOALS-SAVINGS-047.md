@@ -1,6 +1,6 @@
 ---
 id: TC-GOALS-SAVINGS-047
-title: "Con metas habilitadas solo Q5 sigue no disponible y un workspace sin metas ofrece crear una sin mostrar 0 %"
+title: "Con metas y disponible habilitados ninguna pregunta queda no disponible y un workspace sin metas ofrece crear una sin mostrar 0 %"
 spec: reporting/dashboard
 related_specs: ["goals/savings-goals"]
 requirement: "Preguntas del Home sin datos o no disponibles"
@@ -30,13 +30,13 @@ steps:
   - "Abrir el Home de A"
   - "Abrir el Home de B"
 expected_result:
-  - "A: Q9 NO_DATA con acción CREATE_GOAL, sin 0 %; Q5 NOT_AVAILABLE_IN_PHASE"
-  - "B: Q9 AVAILABLE; Q5 sigue NOT_AVAILABLE_IN_PHASE hasta add-spendable-amount"
+  - "A: Q9 NO_DATA con acción CREATE_GOAL, sin 0 %; Q5 AVAILABLE (add-spendable-amount)"
+  - "B: Q9 AVAILABLE; ninguna pregunta queda NOT_AVAILABLE_IN_PHASE desde add-spendable-amount"
 created: 2026-10-10
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
-# TC-GOALS-SAVINGS-047 — Con metas habilitadas solo Q5 sigue no disponible y un workspace sin metas ofrece crear una sin mostrar 0 %
+# TC-GOALS-SAVINGS-047 — Con metas y disponible habilitados ninguna pregunta queda no disponible y un workspace sin metas ofrece crear una sin mostrar 0 %
 
 ## Intención
 
