@@ -1,6 +1,6 @@
 # 38: Estado del proyecto y pendientes
 
-> **Actualizado:** 2026-10-11 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md)
+> **Actualizado:** 2026-10-12 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md)
 
 Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cuando cambia el estado de un change o se resuelve un pendiente.
 
@@ -22,7 +22,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 32 | `add-credit-cards` | Archivado (#103) | — |
 | 33 | `add-savings-goals` | Archivado (#105) | — |
 | 34 | `add-loan-amortization-advanced` | Fusionado (#107), tareas completas | Archivar **justo después** de `add-loans`: agrega requisitos a `debt/loans` y `debt/amortization`, que crea el archive de `add-loans` |
-| 35 | `add-debt-summary` | Especificado | Implementar (usa `LoanPortfolioQuery` y `CardPortfolioQuery`, ya expuestas) |
+| 35 | `add-debt-summary` | Implementado (PR pendiente) | Fusionar; archivar después de `add-loans` (agrega requisitos a `debt/loans`) |
 | 36 | `add-spendable-amount` | Especificado | Implementar al final de la fase (compone metas, compromisos, tarjetas y préstamos) |
 
 Después de Phase 4: informe de cierre de fase, criterios de salida (docs/24 §5.4) y diseño de Phase 5 con el agente `arquitecto`.

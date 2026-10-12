@@ -4153,6 +4153,7 @@
     },
     "tabs": {
       "label": "Debts",
+      "summary": "Summary",
       "loans": "Loans",
       "cards": "Cards"
     },
@@ -5034,6 +5035,101 @@
     "transaction": {
       "title": "Savings goal",
       "reverted": "reversed"
+    }
+  },
+  "DebtSummary": {
+    "card": {
+      "title": "Debts",
+      "owedLabel": "Total owed",
+      "owed": "{amount} owed",
+      "interest": "{amount} of interest in {year}",
+      "debtFree": "debt-free by {month}",
+      "debtFreeExcluding": "debt-free by {month} (not counting {names})",
+      "debtFreeUnknown": "We cannot estimate when you finish paying: {names} has no schedule.",
+      "debtFreeAssumption": "Assumes you pay the billed amount of your cards and make no new purchases.",
+      "nextDue": "Next due date",
+      "nextDueValue": "{name} · {date} · {amount}",
+      "estimatedTag": "(estimated)",
+      "overdueDays": "{days, plural, one {# day overdue} other {# days overdue}}",
+      "unconverted": "not converted: {amounts}",
+      "incompleteHint": "A valuation rate is missing for some currency; the total leaves those amounts out.",
+      "noLiabilities": "No debts registered.",
+      "registerLoan": "Register a loan",
+      "registerCard": "Register a card",
+      "noDebt": "No outstanding debts.",
+      "viewAll": "View debt summary",
+      "loadError": "We could not load the debt summary."
+    },
+    "panel": {
+      "title": "Debt summary",
+      "intro": "How much do you owe and when will you finish? Computed on request from your liability account balances.",
+      "loading": "Loading…",
+      "asOf": "As of {date}",
+      "noLiabilities": "You have not registered loans or cards yet. Register one to see how much you owe and when you finish.",
+      "noDebt": "No outstanding debts.",
+      "totals": {
+        "title": "Total owed",
+        "caption": "Total owed by currency",
+        "currency": "Currency",
+        "amount": "Owed",
+        "consolidated": "Consolidated in {currency}: {amount}",
+        "unconverted": "Not converted (no valuation rate): {amounts}. Amounts are never converted 1:1."
+      },
+      "debts": {
+        "title": "Debts",
+        "caption": "Debts by type and currency with their estimated end date",
+        "region": "Debts table",
+        "debt": "Debt",
+        "kind": "Type",
+        "account": "Account",
+        "outstanding": "Owed",
+        "payoff": "Estimated end",
+        "notEstimable": "Not estimable",
+        "notInNetWorth": "Not included in net worth",
+        "kinds": {
+          "LOAN": "Loan",
+          "CREDIT_CARD": "Card",
+          "OTHER_LIABILITY": "Other liability"
+        }
+      },
+      "credits": {
+        "title": "Credit balances",
+        "note": "Shown apart: they do not reduce what you owe.",
+        "item": "{name}: {amount} in your favor"
+      },
+      "interest": {
+        "title": "Interest paid in {year}",
+        "range": "From {from} to {to}",
+        "caption": "Interest paid this year by currency",
+        "currency": "Currency",
+        "amount": "Interest",
+        "consolidated": "Consolidated in {currency}: {amount}",
+        "none": "You paid no interest this year.",
+        "attributionCaption": "Interest breakdown by debt",
+        "attributionRegion": "Interest breakdown table",
+        "source": "Source",
+        "other": "Other interest",
+        "inconsistent": "The breakdown does not match the total (interest was recorded in other accounts); \"Other interest\" shows the difference as is."
+      },
+      "debtFree": {
+        "title": "Estimated debt-free date",
+        "date": "{date}",
+        "none": "A date cannot be estimated.",
+        "assumptions": "Assumptions: loans end with the last unpaid installment of their schedule; cards, paying the billed total with no new purchases.",
+        "excluded": "Could not be estimated and not counted in the date: {names}."
+      },
+      "dues": {
+        "title": "Upcoming due dates",
+        "caption": "Next due date of each debt",
+        "region": "Upcoming due dates table",
+        "debt": "Debt",
+        "due": "Due",
+        "amount": "Amount",
+        "minimum": "Minimum",
+        "overdue": "Overdue",
+        "estimated": "estimated",
+        "none": "No debt has a known due date."
+      }
     }
   }
 }

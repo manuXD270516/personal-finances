@@ -26,6 +26,8 @@ export interface DashboardViewProps extends FormatContext {
   readonly goalsHref?: string | undefined;
   readonly createGoalHref?: string | undefined;
   readonly goalHref?: ((goalId: string) => string) | undefined;
+  /** Tarjeta "Deudas" (add-debt-summary), junto a la de metas en "Metas y deudas". */
+  readonly debtWidget?: ReactNode;
   /** Tarjeta compacta de la evolución del patrimonio (add-net-worth-evolution, D104), dentro de "Patrimonio y cuentas". */
   readonly evolutionCard?: ReactNode;
 }
@@ -51,6 +53,7 @@ export function DashboardView({
   createGoalHref,
   goalHref,
   budgetWidget,
+  debtWidget,
   evolutionCard,
   commitmentsSection,
   ...ctx
@@ -136,6 +139,8 @@ export function DashboardView({
         createGoalHref={createGoalHref}
         goalHref={goalHref}
       />
+
+      {debtWidget ?? null}
 
       <section data-testid="wealth" aria-labelledby="wealth-title" className="pf-home-group">
         <h2 id="wealth-title">{t('sections.wealth')}</h2>

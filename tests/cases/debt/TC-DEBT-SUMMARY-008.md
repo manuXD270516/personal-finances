@@ -5,16 +5,18 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Permisos y aislamiento del resumen de deudas'
 scenario: 'Deudas de otro workspace'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018']
 nfr: ['NFR-SEC-003']
 invariants: ['INV-025']
 priority: critical
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/debt-summary.api.test.ts
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'rbac', 'rls']
@@ -34,7 +36,7 @@ expected_result:
   - 'VIEWER: 200 con 49100.50 BOB consolidado'
   - 'El total de A no incluye los 9000.00 BOB de B'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-008 — El resumen es visible para VIEWER y aislado por workspace

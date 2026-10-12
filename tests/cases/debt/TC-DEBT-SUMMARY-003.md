@@ -5,16 +5,21 @@ spec: debt/loans
 related_specs: ['debt/credit-cards']
 requirement: 'Total adeudado por moneda y en moneda base'
 scenario: 'Saldo a favor en la tarjeta en dólares'
-requirement_status: provisional
+requirement_status: confirmed
 fr: ['FR-DEBT-018']
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/debt-summary.api.test.ts
+  - apps/web/src/ui/debt/summary/summary.test.tsx
+  - packages/contexts/debt/src/application/debt-summary.queries.test.ts
+  - packages/contexts/debt/src/domain/debt-summary.test.ts
+  - tests/e2e/specs/debt-summary.spec.ts
+status: automated
 regression_suite: false
 phase: 4
 tags: ['debt-summary', 'credit-balance']
@@ -33,7 +38,7 @@ expected_result:
   - 'USD total 0.00, consolidado 48120.50 BOB, saldo a favor 30.00 USD aparte'
   - 'Tras el pago: BOB total 47000.00 y "Visa Oro BOB" ya no se lista'
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # TC-DEBT-SUMMARY-003 — Saldo a favor aparte y pago reflejado de inmediato

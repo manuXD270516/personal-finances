@@ -198,6 +198,8 @@ test.describe('Home: preguntas del dinero en Phase 1 (reporting/dashboard, repor
       'Presupuesto del mes',
       // add-savings-goals: Q9 "¿Voy a cumplir mis metas?" justo antes del patrimonio.
       '¿Voy a cumplir mis metas?',
+      // add-debt-summary: tarjeta "Deudas" entre las metas y el patrimonio.
+      'Deudas',
       'Patrimonio y cuentas',
       'Próximamente',
     ]);

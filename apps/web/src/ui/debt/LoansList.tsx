@@ -10,6 +10,7 @@ import { formatMoney } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { CardsPanel } from './cards/CardsList';
+import { DebtSummaryPanel } from './summary/DebtSummaryPanel';
 import { debtHref, loanPath, loansPath } from './logic';
 import { debtText, LoanStatusBadge } from './Tables';
 import type { Loan, LoanDetail } from './types';
@@ -102,7 +103,7 @@ export function LoansTable({
   );
 }
 
-/** `/debts`: pestañas Préstamos y Tarjetas (`?vista=tarjetas` abre la segunda). */
+/** `/debts`: pestañas Resumen, Préstamos y Tarjetas (`?vista=resumen` o `?vista=tarjetas` abren esa pestaña). */
 export function LoansListPage({ initialTab }: { initialTab?: string | undefined } = {}) {
   return <WithWorkspace>{(ctx) => <DebtsHome ctx={ctx} initialTab={initialTab} />}</WithWorkspace>;
 }
@@ -117,6 +118,7 @@ function DebtsHome({ ctx, initialTab }: { ctx: WorkspaceContext; initialTab: str
         idPrefix="debts"
         {...(initialTab ? { initial: initialTab } : {})}
         tabs={[
+          { id: 'resumen', label: f.t('tabs.summary'), content: <DebtSummaryPanel ctx={ctx} /> },
           { id: 'prestamos', label: f.t('tabs.loans'), content: <LoansList ctx={ctx} /> },
           { id: 'tarjetas', label: f.t('tabs.cards'), content: <CardsPanel ctx={ctx} /> },
         ]}

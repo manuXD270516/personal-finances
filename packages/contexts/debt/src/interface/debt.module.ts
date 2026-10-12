@@ -1,7 +1,11 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery, AccountProvisioningPort, AccountsQueryPort } from '@pf/accounts/contracts';
 import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
-import type { ClassificationValidator, CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import type {
+  CategoryCatalogQuery,
+  ClassificationValidator,
+  CounterpartyCatalogQuery,
+} from '@pf/classification/contracts';
 import type { RecurringDefinitionPort, RecurringDefinitionQuery } from '@pf/commitments/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
@@ -14,6 +18,7 @@ import type { Clock } from '@pf/shared-kernel';
 import type {
   AccountMovementsQuery,
   LoanTransactionsPort,
+  NominalFlowQuery,
   PendingFlowQuery,
   TransactionLinkQuery,
 } from '@pf/transactions/contracts';
@@ -22,6 +27,11 @@ import { CardActivityService } from '../application/card-activity.handler.js';
 import { CardDailyService } from '../application/card-daily.runner.js';
 import type { CardBalancePort, CardDeps, CardSettings } from '../application/card-ports.js';
 import { CardsQueries } from '../application/cards.queries.js';
+import {
+  DebtSummaryQueries,
+  type DebtSummaryDeps,
+  type WorkspaceSettingsPort,
+} from '../application/debt-summary.queries.js';
 import { CardsService } from '../application/cards.service.js';
 import { InstallmentsService } from '../application/installments.service.js';
 import { AmortizationQueries } from '../application/amortization.queries.js';
@@ -39,7 +49,7 @@ import type {
 } from '../application/ports/index.js';
 import { ReferencesService } from '../application/references.service.js';
 import { LOAN_LIFECYCLE } from '../domain/index.js';
-import { DEBT_CARD_DAILY_JOB, DEBT_CONSUMERS } from '../contracts/index.js';
+import { DEBT_CARD_DAILY_JOB, DEBT_CONSUMERS, type DebtSummaryQuery } from '../contracts/index.js';
 import {
   PgCardRepository,
   PgInstallmentPlanRepository,
@@ -57,6 +67,7 @@ import {
   pgCurrencyCatalog,
   uuidV7Ids,
 } from '../infrastructure/pg-debt.js';
+import { DEBT_SUMMARY_QUERIES, DebtSummaryController } from './debt-summary-http.js';
 import { CARDS_QUERIES, CARDS_SERVICE, CreditCardsController, INSTALLMENTS_SERVICE } from './cards-http.js';
 import {
   AMORTIZATION_QUERIES,
@@ -302,6 +313,43 @@ export function createCardsRuntime(options: CardsRuntimeOptions): CardsRuntime {
   };
 }
 
+export interface DebtSummaryRuntimeOptions {
+  readonly pool: Pool;
+  readonly clock: Clock;
+  /** Moneda base y zona horaria del workspace (IDENTITY). */
+  readonly workspaces: WorkspaceSettingsPort;
+  readonly accountCatalog: Pick<AccountCatalogQuery, 'listAccounts'>;
+  readonly balances: AccountBalancesQuery;
+  readonly flows: NominalFlowQuery;
+  readonly movements: AccountMovementsQuery;
+  readonly categories: Pick<CategoryCatalogQuery, 'categoryTree'>;
+  readonly rates: Pick<FxValuationPort, 'resolveValuationRates'>;
+  /** Préstamos y tarjetas del propio contexto (`LoanPortfolioQuery`, `CardPortfolioQuery`). */
+  readonly loans: DebtSummaryDeps['loans'];
+  readonly cards: DebtSummaryDeps['cards'];
+  /** Ventana de vigencia de las tasas de valoración (`REPORTING_RATE_VALIDITY_WINDOW`). */
+  readonly rateValidityWindowDays: number;
+}
+
+/** Composición del resumen de deudas (add-debt-summary): solo lectura, sin tablas ni eventos propios. */
+export function createDebtSummaryRuntime(options: DebtSummaryRuntimeOptions): DebtSummaryQuery {
+  return new DebtSummaryQueries({
+    uow: new PgDebtUnitOfWork(options.pool),
+    loans: options.loans,
+    cards: options.cards,
+    accountCatalog: options.accountCatalog,
+    balances: options.balances,
+    flows: options.flows,
+    movements: options.movements,
+    categories: options.categories,
+    rates: options.rates,
+    workspaces: options.workspaces,
+    currencies: pgCurrencyCatalog,
+    clock: options.clock,
+    rateValidityWindowDays: options.rateValidityWindowDays,
+  });
+}
+
 /**
  * Consumidor del worker (inbox en la misma transacción, INV-028): `debt.card-activity` reacciona a los movimientos de
  * las cuentas de tarjeta (compras, pagos, reversas) y a las compras pendientes, anuladas o corregidas. Filtra en
@@ -389,6 +437,7 @@ export async function runCardDaily(
 export interface DebtModuleOptions {
   readonly runtime: DebtRuntime;
   readonly cards: CardsRuntime;
+  readonly summary: DebtSummaryQuery;
   readonly conventions: ApiConventionsOptions;
 }
 
@@ -398,7 +447,7 @@ export class DebtModule {
   static register(options: DebtModuleOptions): DynamicModule {
     return {
       module: DebtModule,
-      controllers: [LoansController, CreditCardsController],
+      controllers: [LoansController, CreditCardsController, DebtSummaryController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: LOANS_SERVICE, useValue: options.runtime.loans },
@@ -410,6 +459,7 @@ export class DebtModule {
         { provide: CARDS_SERVICE, useValue: options.cards.cards },
         { provide: CARDS_QUERIES, useValue: options.cards.queries },
         { provide: INSTALLMENTS_SERVICE, useValue: options.cards.installments },
+        { provide: DEBT_SUMMARY_QUERIES, useValue: options.summary },
       ],
     };
   }
@@ -421,6 +471,7 @@ export const LOAN_LIFECYCLE_MACHINE: LifecycleMachineDto = LOAN_LIFECYCLE.defini
 export {
   CARD_PORTFOLIO_QUERY,
   DEBT_AUDIT_POLICY,
+  DEBT_SUMMARY_QUERY,
   DEBT_CARD_DAILY_JOB,
   DEBT_CONSUMERS,
   DEBT_EVENTS,

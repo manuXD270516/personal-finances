@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { FinanceApiError, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { localized, useSession } from '../session-context';
+import { DebtSummaryCard } from '../debt/summary/DebtSummaryCard';
 import { NetWorthEvolutionCard } from '../networth/NetWorthEvolution';
 import { BudgetProgressWidget } from '../planning/BudgetProgressWidget';
 import { HomeCommitments } from '../upcoming/UpcomingPage';
@@ -89,6 +90,13 @@ export function Dashboard() {
       commitmentsSection={
         <HomeCommitments
           questions={loaded.summary.questions}
+          locale={loaded.formatLocale}
+          timeZone={loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE}
+          uiLocale={uiLocale}
+        />
+      }
+      debtWidget={
+        <DebtSummaryCard
           locale={loaded.formatLocale}
           timeZone={loaded.summary.meta.timeZone || DEFAULT_TIME_ZONE}
           uiLocale={uiLocale}

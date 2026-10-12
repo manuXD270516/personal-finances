@@ -301,7 +301,7 @@ Capabilities: `planning/financial-periods`, `planning/budgets`, `planning/budget
 | FR-DEBT-015 | Utilización de crédito (saldo adeudado más compras pendientes, sobre el límite) con alerta configurable (default 30 % y 80 %). | Should | 4 | debt/credit-cards |
 | FR-DEBT-016 | Tarjetas bimoneda (p.ej. BOB + USD) modeladas como una tarjeta con una cuenta LIABILITY por moneda y límite compartido o separado. | Must | 4 | debt/credit-cards |
 | FR-DEBT-017 | Compras en cuotas (sin/con interés) en tarjeta, con calendario de cargos futuros. | Could | 4 | debt/credit-cards |
-| FR-DEBT-018 | Resumen de deudas: total adeudado por moneda y en base, interés pagado YTD, fecha estimada libre de deudas. | Could | 4 | debt/loans |
+| FR-DEBT-018 | Resumen de deudas: total adeudado por moneda y en base (todas las cuentas de pasivo con saldo; el saldo a favor va aparte y no resta), interés pagado en el año calendario con su atribución a préstamos, tarjetas y otros, fecha estimada libre de deudas (con sus supuestos y las deudas no estimables) y próximos vencimientos; tarjeta "Deudas" del Home. | Could | 4 | debt/loans |
 
 ## 12. FX — FX & Market Data
 
