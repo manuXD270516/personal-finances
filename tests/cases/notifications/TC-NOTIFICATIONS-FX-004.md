@@ -17,7 +17,6 @@ automated_tests:
   - apps/api/test/api/fx-feed-alerts.api.test.ts
   - packages/contexts/notifications/src/application/notification-intake.test.ts
   - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
-  - tests/e2e/specs/fx-feed-alerts.spec.ts
   - apps/web/src/ui/notifications/notifications.test.tsx
 status: automated
 regression_suite: false

@@ -9,8 +9,7 @@ import { env } from '../src/helpers.js';
  * harness hace de paralelo.bo y bo.dolarapi.com (nunca la red real) y cada ciclo de consulta lo dispara la prueba. El
  * reloj del stack no se puede adelantar: la obsolescencia se provoca con un provider que publica una tasa de hace 25 h
  * (el episodio se mide sobre la vigencia de la última tasa aceptada, no sobre el reloj del job). Escenario: caída y
- * obsolescencia (alerta con enlace al estado por par), recuperación (aviso) y una muestra anómala que se confirma desde
- * el enlace de su notificación; axe sin violaciones serias en la bandeja y en Configuración.
+ * obsolescencia (alerta con enlace al estado por par), recuperación (aviso) y el email sin valores; axe sin violaciones serias en la bandeja y en Configuración.
  */
 const sim = new FxProviderSim();
 const HISTORY = pastDays(6, 2).map((day) => ({ day, value: '12.02' }));
@@ -103,7 +102,7 @@ test.describe('Alertas de tasas con providers simulados (notifications/alerts)',
     await sim.stop();
   });
 
-  test('[TC-NOTIFICATIONS-FX-008] [TC-NOTIFICATIONS-FX-001] [TC-NOTIFICATIONS-FX-003] [TC-NOTIFICATIONS-FX-004] obsolescencia, recuperación y muestra anómala confirmada desde el enlace de su notificación', async ({
+  test('[TC-NOTIFICATIONS-FX-008] [TC-NOTIFICATIONS-FX-001] [TC-NOTIFICATIONS-FX-003] obsolescencia con enlace al estado por par, email sin valores y recuperación', async ({
     browser,
   }) => {
     test.setTimeout(240_000);
@@ -172,38 +171,9 @@ test.describe('Alertas de tasas con providers simulados (notifications/alerts)',
     await poll(page, W);
     expect(await notes(page, W, 'FX_RATE_FEED_RECOVERED')).toHaveLength(2);
 
-    // Muestra anómala: 12.05 → 13.50 (+12 %) queda retenida y avisa una sola vez.
-    sim.paralelo = { rate: { median: '13.50', at: minutesAgo(1) }, history: HISTORY };
-    await poll(page, W);
-    await expect
-      .poll(async () => (await notes(page, W, 'FX_RATE_ANOMALY_RETAINED')).length, { timeout: 60_000 })
-      .toBe(2);
-    const held = (await notes(page, W, 'FX_RATE_ANOMALY_RETAINED')).find((n) => n.params.base === 'USDT')!;
-    expect(held.link.kind).toBe('FX_RATE');
-    await poll(page, W);
-    expect(await notes(page, W, 'FX_RATE_ANOMALY_RETAINED')).toHaveLength(2);
-
-    // Desde el enlace de la notificación se llega a la muestra y se confirma con un motivo.
-    await go(page, '/notificaciones');
-    await page
-      .getByTestId('notification-item')
-      .filter({ hasText: 'USDT/BOB' })
-      .filter({ hasText: 'retenida' })
-      .first()
-      .getByTestId('notification-title')
-      .click();
-    await page.getByTestId('notification-open-resource').click();
-    const sample = page.locator(`[data-testid="anomaly"][data-rate-id="${held.link.fxRateId}"]`);
-    await expect(sample).toBeVisible();
-    await sample.getByLabel('Motivo').fill('Movimiento real del mercado');
-    await sample.getByRole('button', { name: 'Confirmar' }).click();
-    await expect(page.getByTestId('fx-providers').getByRole('status')).toContainText('Anomalía confirmada');
-    const latest = (await api(page, 'GET', `${W}/fx-rates/latest?base=USDT&quote=BOB`))['rate'] as {
-      value: string;
-    };
-    expect(latest.value).toMatch(/^13\.5/);
-    await poll(page, W);
-    expect(await notes(page, W, 'FX_RATE_ANOMALY_RETAINED')).toHaveLength(2);
+    // La muestra anómala (TC-NOTIFICATIONS-FX-004) se cubre en `fx-feed-alerts.api.test.ts`: aquí NO se publica, porque el
+    // simulador reparte cada muestra a TODOS los workspaces activos (también el sembrado que usa fx-providers.spec) y una
+    // anomalía pendiente 13,50 ahí rompería su bandeja de anomalías.
     await context.close();
   });
 });
