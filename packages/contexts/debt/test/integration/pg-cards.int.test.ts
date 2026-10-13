@@ -454,3 +454,20 @@ describe('purga demo', () => {
     before('card_utilization_crossing', 'credit_card');
   });
 });
+
+describe('saldo inicial en el ciclo (fix-phase-4-gaps)', () => {
+  it('[TC-DEBT-CARD-040] el ciclo con el saldo inicial cuadra y la tarjeta informa el próximo vencimiento del ciclo abierto', async () => {
+    const ws = await freshWorkspace();
+    const s = setup(ws, '2026-10-20T14:00:00.000Z');
+    const account = s.cardAccount('Visa Oro BOB');
+    s.world.addOpening(account, '2026-10-05', '1200.00');
+    s.world.addEntry({ accountId: account, date: '2026-10-08', cls: 'PURCHASE', amount: '350.00' });
+    const { id } = await s.run(() => s.svc.register(s.register(account)));
+    const view = (await s.run(() => s.queries.get(ws, id))).accounts[0];
+    expect(view?.openCycle.current.otherNet.amount).toBe('1200.00');
+    expect(view?.openCycle.current.closingBalance.amount).toBe('1550.00');
+    expect(view?.openCycle.consistent).toBe(true);
+    expect(view?.nextDueDate).toBe('2026-11-15');
+    expect(view?.overdueStatements).toEqual([]);
+  }, 60_000);
+});

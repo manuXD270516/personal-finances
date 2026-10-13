@@ -1189,6 +1189,102 @@ describe('cambio de objetivo, revisión de la transferencia, retiro vinculado y 
   });
 });
 
+describe('anular un aporte con retiros posteriores (fix-phase-4-gaps, D222)', () => {
+  it('[TC-GOALS-SAVINGS-052] [TC-GOALS-SAVINGS-051] la vista previa avisa −400.00 BOB, no cambia nada, y tras anular la meta informa el faltante', async () => {
+    const s = await scenario('void-impact');
+    const fund = await create(s.owner, emergency(s));
+    const aporte = await ok(
+      contribute(s.owner, fund['id'], {
+        fund: 'REAL',
+        amount: bob('1000.00'),
+        sourceAccountId: s.banco,
+        destinationAccountId: s.ahorro,
+      }),
+    );
+    await ok(
+      post(s.owner, `/goals/${fund['id']}/withdrawals`, {
+        fund: 'REAL',
+        accountId: s.ahorro,
+        amount: bob('400.00'),
+        mode: { type: 'TRANSFER', toAccountId: s.banco },
+      }),
+    );
+    const movementsBefore = await count(s.owner, 'goals.goal_movement');
+
+    const preview = checked(
+      'previewTransactionVoidImpact',
+      200,
+      await get(s.viewer, `/goals/void-impact?transactionId=${aporte['transactionId']}`),
+    );
+    expect(preview['goals']).toEqual([
+      {
+        goalId: fund['id'],
+        goalName: 'Fondo de emergencia',
+        accountId: s.ahorro,
+        accountName: 'Ahorro BOB',
+        fund: 'REAL',
+        currency: 'BOB',
+        currentFunds: bob('600.00'),
+        fundsAfterVoid: bob('-400.00'),
+        negative: true,
+      },
+    ]);
+    expect(await count(s.owner, 'goals.goal_movement')).toBe(movementsBefore);
+    expect((await detail(s.owner, fund['id']))['negativeFunds']).toEqual([]);
+
+    // Una transferencia que ninguna meta respalda: lista vacía.
+    const free = await ok(
+      post(s.owner, '/transfers', {
+        transactionDate: '2026-10-20',
+        fromAccountId: s.banco,
+        toAccountId: s.efectivo,
+        amount: bob('50.00'),
+      }),
+    );
+    const empty = checked(
+      'previewTransactionVoidImpact',
+      200,
+      await get(s.owner, `/goals/void-impact?transactionId=${free['id']}`),
+    );
+    expect(empty['goals']).toEqual([]);
+
+    // Aislamiento: la transacción de otro workspace es 404.
+    const other = await scenario('void-impact-other');
+    const foreign = await ok(
+      post(other.owner, '/transfers', {
+        transactionDate: '2026-10-20',
+        fromAccountId: other.banco,
+        toAccountId: other.efectivo,
+        amount: bob('10.00'),
+      }),
+    );
+    problem(
+      await get(s.owner, `/goals/void-impact?transactionId=${foreign['id']}`),
+      404,
+      'RESOURCE_NOT_FOUND',
+    );
+
+    // La anulación no se rechaza; la meta informa el faltante de 400.00 BOB.
+    const tx = await get(s.owner, `/transactions/${aporte['transactionId']}`);
+    await ok(
+      post(
+        s.owner,
+        `/transactions/${aporte['transactionId']}/void`,
+        { reason: 'error' },
+        { 'if-match': `"${tx.body['version']}"` },
+      ),
+      200,
+    );
+    const voided = (await outboxOf(s.owner.ws, 'transactions.TransactionVoided')).find(
+      (e) => (e.payload as any).transactionId === aporte['transactionId'],
+    )!;
+    await deliver('goals.transaction-changes', voided);
+    const after = await detail(s.owner, fund['id']);
+    expect(after['progress'].total).toEqual(bob('-400.00'));
+    expect(after['negativeFunds']).toEqual([{ accountId: s.ahorro, amount: bob('-400.00') }]);
+  });
+});
+
 describe('concurrencia', () => {
   it('[TC-GOALS-SAVINGS-021] dos vínculos paralelos de la misma transferencia a dos metas: exactamente uno gana', async () => {
     const s = await scenario('conc');

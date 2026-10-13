@@ -4030,10 +4030,10 @@
     },
     "edit": {
       "title": "Editar empréstimo",
-      "draftNote": "Enquanto for rascunho, você pode cancelá-lo e registrar um novo para mudar as condições.",
       "locked": "As condições financeiras de um empréstimo ativo estão bloqueadas; você pode mudar o nome, o credor e a conta de pagamento.",
       "save": "Salvar alterações",
-      "done": "Alterações salvas."
+      "done": "Alterações salvas.",
+      "draftEditable": "Enquanto for rascunho, você pode mudar todas as condições; a prévia do cronograma é recalculada e nenhuma transação é criada."
     },
     "compare": {
       "title": "Comparar com a tabela do banco",
@@ -4424,7 +4424,8 @@
       "nextDue": "Próximo vencimento",
       "missing": "Falta para não gerar juros",
       "planActive": "Pagamento automático ativo",
-      "sharedRef": "Ver limite compartilhado"
+      "sharedRef": "Ver limite compartilhado",
+      "overdue": "{count, plural, one {# fatura em atraso} other {# faturas em atraso}}"
     },
     "form": {
       "title": "Novo cartão de crédito",
@@ -4553,7 +4554,11 @@
       "openCycleDates": "Desde {start} · fecha em {closing} · vence em {due}",
       "pendingPurchases": "Compras pendentes",
       "lastStatement": "Última fatura",
-      "missing": "faltam {amount}"
+      "missing": "faltam {amount}",
+      "overdue": {
+        "title": "Faturas em atraso",
+        "item": "Fechamento {closing} · venceu em {due} · faltam {amount} para não gerar juros (mínimo pendente {minimum})"
+      }
     },
     "terms": {
       "edit": "Editar termos",
@@ -5085,6 +5090,16 @@
     "transaction": {
       "title": "Meta de poupança",
       "reverted": "estornado"
+    },
+    "voidImpact": {
+      "title": "Esta anulação afeta suas metas",
+      "item": "\"{goal}\" ficará com {funds} em \"{account}\".",
+      "negative": "Ficará um valor a regularizar; a anulação não é bloqueada."
+    },
+    "negativeFunds": {
+      "title": "Fundos negativos a regularizar",
+      "item": "Falta de {amount} em \"{account}\".",
+      "hint": "Aporte à meta nessa conta para voltar a zero ou positivo."
     }
   },
   "DebtSummary": {

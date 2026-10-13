@@ -1,7 +1,7 @@
 import type { AuditPort } from '@pf/audit/contracts';
 import type { RecurringDefinitionPort, RecurringDefinitionQuery } from '@pf/commitments/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
-import type { AccountBalanceHistoryQuery } from '@pf/ledger/contracts';
+import type { AccountBalanceHistoryQuery, LedgerOpeningEntriesQuery } from '@pf/ledger/contracts';
 import type { Clock } from '@pf/shared-kernel';
 import type {
   AccountMovementsQuery,
@@ -167,6 +167,8 @@ export interface CardDeps {
   readonly accounts: AccountsPort;
   readonly balances: CardBalancePort;
   readonly movements: AccountMovementsQuery;
+  /** Asientos de apertura de las cuentas (el saldo inicial no tiene transacción: entra en "otros movimientos"). */
+  readonly openings: LedgerOpeningEntriesQuery;
   readonly pending: PendingFlowQuery;
   readonly links: TransactionLinkQuery;
   readonly recurring: RecurringDefinitionPort;

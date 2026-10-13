@@ -36,6 +36,336 @@ export function NewLoanPage() {
 }
 
 /** Campos del alta (presentacional): cambia entre "Préstamo nuevo" y "Préstamo en curso" y muestra errores por campo. */
+/**
+ * Condiciones del préstamo (nombre, moneda, principal, tasa, plazo, sistema y fechas). La usan el alta y la edición del
+ * borrador (`mode = 'edit'`: la moneda queda fija porque fija la escala del cronograma).
+ */
+export function LoanTermsFields({
+  f,
+  form,
+  set,
+  errors,
+  currencies,
+  disabled,
+  mode = 'create',
+}: {
+  f: FormatContext;
+  form: LoanForm;
+  set: (patch: Partial<LoanForm>) => void;
+  errors: LoanFormErrors;
+  disabled?: boolean;
+  currencies: readonly string[];
+  mode?: 'create' | 'edit';
+}) {
+  const err = (key: string) => (errors[key] ? f.t(`errors.${errors[key]}`) : undefined);
+  const existing = form.origin === 'EXISTING';
+  return (
+    <fieldset style={{ ...formStyle, margin: 0 }} disabled={disabled}>
+      <legend>{f.t('form.terms')}</legend>
+      <div style={rowStyle}>
+        <Field label={f.t('form.name')} error={err('name')}>
+          {(p) => (
+            <input
+              {...p}
+              style={inputStyle}
+              value={form.name}
+              maxLength={120}
+              data-testid="loan-name"
+              onChange={(e) => set({ name: e.target.value })}
+            />
+          )}
+        </Field>
+        <Field label={f.t('form.currency')}>
+          {(p) => (
+            <select
+              {...p}
+              style={inputStyle}
+              value={form.currency}
+              disabled={mode === 'edit'}
+              data-testid="loan-currency"
+              onChange={(e) => set({ currency: e.target.value })}
+            >
+              {currencies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field
+          label={existing ? f.t('form.outstanding') : f.t('form.principal')}
+          error={err('principal')}
+          hint={existing ? f.t('form.outstandingHint') : undefined}
+        >
+          {(p) => (
+            <input
+              {...p}
+              style={inputStyle}
+              inputMode="decimal"
+              value={form.principal}
+              data-testid="loan-principal"
+              onChange={(e) => set({ principal: e.target.value })}
+            />
+          )}
+        </Field>
+      </div>
+      <div style={rowStyle}>
+        <Field label={f.t('form.rate')} error={err('ratePct')} hint={f.t('form.rateHint')}>
+          {(p) => (
+            <input
+              {...p}
+              style={inputStyle}
+              inputMode="decimal"
+              value={form.ratePct}
+              data-testid="loan-rate"
+              onChange={(e) => set({ ratePct: e.target.value })}
+            />
+          )}
+        </Field>
+        <Field label={f.t('form.dayCount')}>
+          {(p) => (
+            <select
+              {...p}
+              style={inputStyle}
+              value={form.dayCount}
+              data-testid="loan-daycount"
+              onChange={(e) => set({ dayCount: e.target.value as LoanForm['dayCount'] })}
+            >
+              {DAY_COUNTS.map((d) => (
+                <option key={d} value={d}>
+                  {f.t(`dayCount.${d}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={f.t('form.frequency')}>
+          {(p) => (
+            <select
+              {...p}
+              style={inputStyle}
+              value={form.frequency}
+              data-testid="loan-frequency"
+              onChange={(e) => set({ frequency: e.target.value as LoanForm['frequency'] })}
+            >
+              {FREQUENCIES.map((d) => (
+                <option key={d} value={d}>
+                  {f.t(`frequency.${d}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field
+          label={existing ? f.t('form.remaining') : f.t('form.term')}
+          error={err('termInstallments')}
+          hint={f.t('form.termHint')}
+        >
+          {(p) => (
+            <input
+              {...p}
+              style={inputStyle}
+              inputMode="numeric"
+              value={form.termInstallments}
+              data-testid="loan-term"
+              onChange={(e) => set({ termInstallments: e.target.value })}
+            />
+          )}
+        </Field>
+      </div>
+      <div style={rowStyle}>
+        <Field label={f.t('form.method')} hint={f.t(`form.methodHint.${form.method}`)}>
+          {(p) => (
+            <select
+              {...p}
+              style={inputStyle}
+              value={form.method}
+              data-testid="loan-method"
+              onChange={(e) => set({ method: e.target.value as LoanForm['method'] })}
+            >
+              {LOAN_METHODS.filter((m) => !(existing && m === 'CUSTOM')).map((m) => (
+                <option key={m} value={m}>
+                  {f.t(`form.methods.${m}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        {form.method === 'FIXED_PRINCIPAL' ? (
+          <Field
+            label={f.t('form.fixedPrincipal')}
+            error={err('fixedPrincipal')}
+            hint={f.t('form.fixedPrincipalHint')}
+          >
+            {(p) => (
+              <input
+                {...p}
+                style={inputStyle}
+                inputMode="decimal"
+                value={form.fixedPrincipal}
+                data-testid="loan-fixed-principal"
+                onChange={(e) => set({ fixedPrincipal: e.target.value })}
+              />
+            )}
+          </Field>
+        ) : null}
+        <Field label={f.t('form.rateType')} hint={f.t(`form.rateTypeHint.${form.rateType}`)}>
+          {(p) => (
+            <select
+              {...p}
+              style={inputStyle}
+              value={form.rateType}
+              data-testid="loan-rate-type"
+              onChange={(e) => set({ rateType: e.target.value as LoanForm['rateType'] })}
+            >
+              {(['FIXED', 'VARIABLE'] as const).map((t) => (
+                <option key={t} value={t}>
+                  {f.t(`form.rateTypes.${t}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+      </div>
+      <div style={rowStyle}>
+        {existing ? (
+          <>
+            <Field label={f.t('form.asOf')} error={err('asOf')}>
+              {(p) => (
+                <input
+                  {...p}
+                  type="date"
+                  style={inputStyle}
+                  value={form.asOf}
+                  data-testid="loan-as-of"
+                  onChange={(e) => set({ asOf: e.target.value })}
+                />
+              )}
+            </Field>
+            <Field label={f.t('form.nextNo')} error={err('nextInstallmentNo')}>
+              {(p) => (
+                <input
+                  {...p}
+                  style={inputStyle}
+                  inputMode="numeric"
+                  value={form.nextInstallmentNo}
+                  data-testid="loan-next-no"
+                  onChange={(e) => set({ nextInstallmentNo: e.target.value })}
+                />
+              )}
+            </Field>
+            <Field label={f.t('form.nextDue')} error={err('firstDueDate')}>
+              {(p) => (
+                <input
+                  {...p}
+                  type="date"
+                  style={inputStyle}
+                  value={form.firstDueDate}
+                  data-testid="loan-first-due"
+                  onChange={(e) => set({ firstDueDate: e.target.value })}
+                />
+              )}
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label={f.t('form.disbursementDate')} error={err('disbursementDate')}>
+              {(p) => (
+                <input
+                  {...p}
+                  type="date"
+                  style={inputStyle}
+                  value={form.disbursementDate}
+                  data-testid="loan-disbursement-date"
+                  onChange={(e) => set({ disbursementDate: e.target.value })}
+                />
+              )}
+            </Field>
+            <Field label={f.t('form.firstDue')} error={err('firstDueDate')}>
+              {(p) => (
+                <input
+                  {...p}
+                  type="date"
+                  style={inputStyle}
+                  value={form.firstDueDate}
+                  data-testid="loan-first-due"
+                  onChange={(e) => set({ firstDueDate: e.target.value })}
+                />
+              )}
+            </Field>
+          </>
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Cargos opcionales por cuota (comisión, seguro, impuestos). */
+export function LoanChargesFields({
+  f,
+  form,
+  set,
+  errors,
+  disabled,
+}: {
+  f: FormatContext;
+  form: LoanForm;
+  set: (patch: Partial<LoanForm>) => void;
+  errors: LoanFormErrors;
+  disabled?: boolean;
+}) {
+  const err = (key: string) => (errors[key] ? f.t(`errors.${errors[key]}`) : undefined);
+  const setCharge = (key: ChargeKey, patch: Partial<ChargeForm>) =>
+    set({ charges: { ...form.charges, [key]: { ...form.charges[key], ...patch } } });
+  return (
+    <fieldset style={{ ...formStyle, margin: 0 }} disabled={disabled}>
+      <legend>{f.t('form.charges')}</legend>
+      <p style={{ ...mutedStyle, margin: 0 }}>{f.t('form.chargesHint')}</p>
+      {CHARGE_KEYS.map((key) => {
+        const c = form.charges[key];
+        return (
+          <div key={key} style={rowStyle}>
+            <Field label={f.t(`form.chargeKind.${key}`)}>
+              {(p) => (
+                <select
+                  {...p}
+                  style={inputStyle}
+                  value={c.mode}
+                  data-testid={`charge-${key}-mode`}
+                  onChange={(e) => setCharge(key, { mode: e.target.value as ChargeForm['mode'] })}
+                >
+                  <option value="NONE">{f.t('form.chargeModes.NONE')}</option>
+                  <option value="FIXED">{f.t('form.chargeModes.FIXED')}</option>
+                  <option value="RATE_ON_BALANCE">{f.t('form.chargeModes.RATE_ON_BALANCE')}</option>
+                </select>
+              )}
+            </Field>
+            {c.mode !== 'NONE' ? (
+              <Field
+                label={c.mode === 'FIXED' ? f.t('form.chargeFixed') : f.t('form.chargeRate')}
+                error={err(`charges.${key}`)}
+                hint={c.mode === 'RATE_ON_BALANCE' ? f.t('form.chargeRateHint') : undefined}
+              >
+                {(p) => (
+                  <input
+                    {...p}
+                    style={inputStyle}
+                    inputMode="decimal"
+                    value={c.value}
+                    data-testid={`charge-${key}-value`}
+                    onChange={(e) => setCharge(key, { value: e.target.value })}
+                  />
+                )}
+              </Field>
+            ) : null}
+          </div>
+        );
+      })}
+    </fieldset>
+  );
+}
+
 export function LoanFields({
   f,
   form,
@@ -60,8 +390,6 @@ export function LoanFields({
   const sameCurrency = accounts.filter((a) => a.currency === form.currency && a.status === 'ACTIVE');
   const loanAccounts = sameCurrency.filter((a) => a.type === 'LOAN');
   const funding = sameCurrency.filter((a) => a.type !== 'LOAN' && a.classification === 'ASSET');
-  const setCharge = (key: ChargeKey, patch: Partial<ChargeForm>) =>
-    set({ charges: { ...form.charges, [key]: { ...form.charges[key], ...patch } } });
 
   return (
     <>
@@ -85,288 +413,22 @@ export function LoanFields({
         <p style={{ ...mutedStyle, margin: 0 }}>{f.t(`form.originHint.${form.origin}`)}</p>
       </fieldset>
 
-      <fieldset style={{ ...formStyle, margin: 0 }} disabled={disabled}>
-        <legend>{f.t('form.terms')}</legend>
-        <div style={rowStyle}>
-          <Field label={f.t('form.name')} error={err('name')}>
-            {(p) => (
-              <input
-                {...p}
-                style={inputStyle}
-                value={form.name}
-                maxLength={120}
-                data-testid="loan-name"
-                onChange={(e) => set({ name: e.target.value })}
-              />
-            )}
-          </Field>
-          <Field label={f.t('form.currency')}>
-            {(p) => (
-              <select
-                {...p}
-                style={inputStyle}
-                value={form.currency}
-                data-testid="loan-currency"
-                onChange={(e) => set({ currency: e.target.value })}
-              >
-                {currencies.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field
-            label={existing ? f.t('form.outstanding') : f.t('form.principal')}
-            error={err('principal')}
-            hint={existing ? f.t('form.outstandingHint') : undefined}
-          >
-            {(p) => (
-              <input
-                {...p}
-                style={inputStyle}
-                inputMode="decimal"
-                value={form.principal}
-                data-testid="loan-principal"
-                onChange={(e) => set({ principal: e.target.value })}
-              />
-            )}
-          </Field>
-        </div>
-        <div style={rowStyle}>
-          <Field label={f.t('form.rate')} error={err('ratePct')} hint={f.t('form.rateHint')}>
-            {(p) => (
-              <input
-                {...p}
-                style={inputStyle}
-                inputMode="decimal"
-                value={form.ratePct}
-                data-testid="loan-rate"
-                onChange={(e) => set({ ratePct: e.target.value })}
-              />
-            )}
-          </Field>
-          <Field label={f.t('form.dayCount')}>
-            {(p) => (
-              <select
-                {...p}
-                style={inputStyle}
-                value={form.dayCount}
-                data-testid="loan-daycount"
-                onChange={(e) => set({ dayCount: e.target.value as LoanForm['dayCount'] })}
-              >
-                {DAY_COUNTS.map((d) => (
-                  <option key={d} value={d}>
-                    {f.t(`dayCount.${d}`)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field label={f.t('form.frequency')}>
-            {(p) => (
-              <select
-                {...p}
-                style={inputStyle}
-                value={form.frequency}
-                data-testid="loan-frequency"
-                onChange={(e) => set({ frequency: e.target.value as LoanForm['frequency'] })}
-              >
-                {FREQUENCIES.map((d) => (
-                  <option key={d} value={d}>
-                    {f.t(`frequency.${d}`)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field
-            label={existing ? f.t('form.remaining') : f.t('form.term')}
-            error={err('termInstallments')}
-            hint={f.t('form.termHint')}
-          >
-            {(p) => (
-              <input
-                {...p}
-                style={inputStyle}
-                inputMode="numeric"
-                value={form.termInstallments}
-                data-testid="loan-term"
-                onChange={(e) => set({ termInstallments: e.target.value })}
-              />
-            )}
-          </Field>
-        </div>
-        <div style={rowStyle}>
-          <Field label={f.t('form.method')} hint={f.t(`form.methodHint.${form.method}`)}>
-            {(p) => (
-              <select
-                {...p}
-                style={inputStyle}
-                value={form.method}
-                data-testid="loan-method"
-                onChange={(e) => set({ method: e.target.value as LoanForm['method'] })}
-              >
-                {LOAN_METHODS.filter((m) => !(existing && m === 'CUSTOM')).map((m) => (
-                  <option key={m} value={m}>
-                    {f.t(`form.methods.${m}`)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          {form.method === 'FIXED_PRINCIPAL' ? (
-            <Field
-              label={f.t('form.fixedPrincipal')}
-              error={err('fixedPrincipal')}
-              hint={f.t('form.fixedPrincipalHint')}
-            >
-              {(p) => (
-                <input
-                  {...p}
-                  style={inputStyle}
-                  inputMode="decimal"
-                  value={form.fixedPrincipal}
-                  data-testid="loan-fixed-principal"
-                  onChange={(e) => set({ fixedPrincipal: e.target.value })}
-                />
-              )}
-            </Field>
-          ) : null}
-          <Field label={f.t('form.rateType')} hint={f.t(`form.rateTypeHint.${form.rateType}`)}>
-            {(p) => (
-              <select
-                {...p}
-                style={inputStyle}
-                value={form.rateType}
-                data-testid="loan-rate-type"
-                onChange={(e) => set({ rateType: e.target.value as LoanForm['rateType'] })}
-              >
-                {(['FIXED', 'VARIABLE'] as const).map((t) => (
-                  <option key={t} value={t}>
-                    {f.t(`form.rateTypes.${t}`)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-        </div>
-        <div style={rowStyle}>
-          {existing ? (
-            <>
-              <Field label={f.t('form.asOf')} error={err('asOf')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    type="date"
-                    style={inputStyle}
-                    value={form.asOf}
-                    data-testid="loan-as-of"
-                    onChange={(e) => set({ asOf: e.target.value })}
-                  />
-                )}
-              </Field>
-              <Field label={f.t('form.nextNo')} error={err('nextInstallmentNo')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    style={inputStyle}
-                    inputMode="numeric"
-                    value={form.nextInstallmentNo}
-                    data-testid="loan-next-no"
-                    onChange={(e) => set({ nextInstallmentNo: e.target.value })}
-                  />
-                )}
-              </Field>
-              <Field label={f.t('form.nextDue')} error={err('firstDueDate')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    type="date"
-                    style={inputStyle}
-                    value={form.firstDueDate}
-                    data-testid="loan-first-due"
-                    onChange={(e) => set({ firstDueDate: e.target.value })}
-                  />
-                )}
-              </Field>
-            </>
-          ) : (
-            <>
-              <Field label={f.t('form.disbursementDate')} error={err('disbursementDate')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    type="date"
-                    style={inputStyle}
-                    value={form.disbursementDate}
-                    data-testid="loan-disbursement-date"
-                    onChange={(e) => set({ disbursementDate: e.target.value })}
-                  />
-                )}
-              </Field>
-              <Field label={f.t('form.firstDue')} error={err('firstDueDate')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    type="date"
-                    style={inputStyle}
-                    value={form.firstDueDate}
-                    data-testid="loan-first-due"
-                    onChange={(e) => set({ firstDueDate: e.target.value })}
-                  />
-                )}
-              </Field>
-            </>
-          )}
-        </div>
-      </fieldset>
+      <LoanTermsFields
+        f={f}
+        form={form}
+        set={set}
+        errors={errors}
+        currencies={currencies}
+        {...(disabled !== undefined ? { disabled } : {})}
+      />
 
-      <fieldset style={{ ...formStyle, margin: 0 }} disabled={disabled}>
-        <legend>{f.t('form.charges')}</legend>
-        <p style={{ ...mutedStyle, margin: 0 }}>{f.t('form.chargesHint')}</p>
-        {CHARGE_KEYS.map((key) => {
-          const c = form.charges[key];
-          return (
-            <div key={key} style={rowStyle}>
-              <Field label={f.t(`form.chargeKind.${key}`)}>
-                {(p) => (
-                  <select
-                    {...p}
-                    style={inputStyle}
-                    value={c.mode}
-                    data-testid={`charge-${key}-mode`}
-                    onChange={(e) => setCharge(key, { mode: e.target.value as ChargeForm['mode'] })}
-                  >
-                    <option value="NONE">{f.t('form.chargeModes.NONE')}</option>
-                    <option value="FIXED">{f.t('form.chargeModes.FIXED')}</option>
-                    <option value="RATE_ON_BALANCE">{f.t('form.chargeModes.RATE_ON_BALANCE')}</option>
-                  </select>
-                )}
-              </Field>
-              {c.mode !== 'NONE' ? (
-                <Field
-                  label={c.mode === 'FIXED' ? f.t('form.chargeFixed') : f.t('form.chargeRate')}
-                  error={err(`charges.${key}`)}
-                  hint={c.mode === 'RATE_ON_BALANCE' ? f.t('form.chargeRateHint') : undefined}
-                >
-                  {(p) => (
-                    <input
-                      {...p}
-                      style={inputStyle}
-                      inputMode="decimal"
-                      value={c.value}
-                      data-testid={`charge-${key}-value`}
-                      onChange={(e) => setCharge(key, { value: e.target.value })}
-                    />
-                  )}
-                </Field>
-              ) : null}
-            </div>
-          );
-        })}
-      </fieldset>
+      <LoanChargesFields
+        f={f}
+        form={form}
+        set={set}
+        errors={errors}
+        {...(disabled !== undefined ? { disabled } : {})}
+      />
 
       <fieldset style={{ ...formStyle, margin: 0 }} disabled={disabled}>
         <legend>{f.t('form.accounts')}</legend>
@@ -523,41 +585,22 @@ export function LoanFields({
   );
 }
 
-type PreviewState =
+export type PreviewState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
   | { readonly status: 'ready'; readonly preview: SchedulePreview }
   | { readonly status: 'error'; readonly problem: ApiProblemBody };
 
-function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
-  const f = useFormat('Debt', ctx);
-  const catalogs = useCatalogs(ctx);
-  const today = todayIn(ctx.timeZone);
-  const [form, setForm] = useState<LoanForm>(() => emptyLoanForm(ctx.ws.baseCurrency, today));
-  const [errors, setErrors] = useState<LoanFormErrors>({});
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<ApiProblemBody | undefined>();
+/**
+ * Vista previa en vivo del cronograma (sin persistir): se pide cuando las condiciones están completas y válidas y se
+ * recalcula al cambiarlas. La usan el alta y la edición del borrador.
+ */
+export function useSchedulePreview(
+  ctx: Pick<WorkspaceContext, 'api' | 'base'>,
+  form: LoanForm,
+  opts: { readonly locale: string; readonly scale: number },
+): PreviewState {
   const [preview, setPreview] = useState<PreviewState>({ status: 'idle' });
-  const attemptKey = useRef(uuidv7());
-  const errorsRef = useRef<HTMLDivElement>(null);
-  // El foco se aplica tras el render que muestra los errores (un `setTimeout` puede ganarle a React).
-  const [focusTick, setFocusTick] = useState(0);
-  useEffect(() => {
-    if (focusTick > 0) errorsRef.current?.focus();
-  }, [focusTick]);
-  const set = (patch: Partial<LoanForm>) => setForm((prev) => ({ ...prev, ...patch }));
-
-  const currencies = useMemo(() => {
-    const codes = ctx.currencies.filter((c) => c.enabled && c.kind === 'FIAT').map((c) => c.code);
-    return codes.length > 0 ? codes : [ctx.ws.baseCurrency];
-  }, [ctx.currencies, ctx.ws.baseCurrency]);
-
-  const opts = useMemo(
-    () => ({ locale: ctx.formatLocale, scale: scaleFor(form.currency, ctx.scales) }),
-    [ctx.formatLocale, ctx.scales, form.currency],
-  );
-
-  // Vista previa en vivo (sin persistir): se pide cuando las condiciones están completas y válidas.
   const previewBody = useMemo(() => buildPreviewInput(form, opts), [form, opts]);
   const previewKey = previewBody ? JSON.stringify(previewBody) : '';
   useEffect(() => {
@@ -583,6 +626,65 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
     };
     // `previewKey` resume `previewBody`: evita repetir la petición por cambios que no alteran las condiciones.
   }, [ctx.api, ctx.base, previewKey]);
+  return preview;
+}
+
+/** Vista previa del cronograma con su título, estados de carga y error (alta y edición del borrador). */
+export function SchedulePreviewSection({
+  f,
+  ctx,
+  preview,
+}: {
+  f: FormatContext;
+  ctx: Pick<WorkspaceContext, 'uiLocale'>;
+  preview: PreviewState;
+}) {
+  return (
+    <section aria-labelledby="loan-preview-title" aria-live="polite" data-testid="loan-preview">
+      <h2 id="loan-preview-title" style={{ fontSize: '1.125rem' }}>
+        {f.t('preview.title')}
+      </h2>
+      {preview.status === 'ready' ? (
+        <SchedulePreviewTable f={f} preview={preview.preview} />
+      ) : preview.status === 'error' ? (
+        <ProblemMessage problem={preview.problem} locale={ctx.uiLocale} />
+      ) : (
+        <p style={mutedStyle} aria-busy={preview.status === 'loading'}>
+          {preview.status === 'loading' ? f.t('preview.loading') : f.t('preview.waiting')}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
+  const f = useFormat('Debt', ctx);
+  const catalogs = useCatalogs(ctx);
+  const today = todayIn(ctx.timeZone);
+  const [form, setForm] = useState<LoanForm>(() => emptyLoanForm(ctx.ws.baseCurrency, today));
+  const [errors, setErrors] = useState<LoanFormErrors>({});
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblemBody | undefined>();
+  const attemptKey = useRef(uuidv7());
+  const errorsRef = useRef<HTMLDivElement>(null);
+  // El foco se aplica tras el render que muestra los errores (un `setTimeout` puede ganarle a React).
+  const [focusTick, setFocusTick] = useState(0);
+  useEffect(() => {
+    if (focusTick > 0) errorsRef.current?.focus();
+  }, [focusTick]);
+  const set = (patch: Partial<LoanForm>) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const currencies = useMemo(() => {
+    const codes = ctx.currencies.filter((c) => c.enabled && c.kind === 'FIAT').map((c) => c.code);
+    return codes.length > 0 ? codes : [ctx.ws.baseCurrency];
+  }, [ctx.currencies, ctx.ws.baseCurrency]);
+
+  const opts = useMemo(
+    () => ({ locale: ctx.formatLocale, scale: scaleFor(form.currency, ctx.scales) }),
+    [ctx.formatLocale, ctx.scales, form.currency],
+  );
+
+  const preview = useSchedulePreview(ctx, form, opts);
 
   async function submit() {
     setProblem(undefined);
@@ -641,20 +743,7 @@ function NewLoan({ ctx }: { ctx: WorkspaceContext }) {
           currencies={currencies}
           disabled={busy}
         />
-        <section aria-labelledby="loan-preview-title" aria-live="polite" data-testid="loan-preview">
-          <h2 id="loan-preview-title" style={{ fontSize: '1.125rem' }}>
-            {f.t('preview.title')}
-          </h2>
-          {preview.status === 'ready' ? (
-            <SchedulePreviewTable f={f} preview={preview.preview} />
-          ) : preview.status === 'error' ? (
-            <ProblemMessage problem={preview.problem} locale={ctx.uiLocale} />
-          ) : (
-            <p style={mutedStyle} aria-busy={preview.status === 'loading'}>
-              {preview.status === 'loading' ? f.t('preview.loading') : f.t('preview.waiting')}
-            </p>
-          )}
-        </section>
+        <SchedulePreviewSection f={f} ctx={ctx} preview={preview} />
         <div ref={errorsRef} tabIndex={-1} data-testid="loan-form-errors">
           {errorList.length > 0 ? (
             <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>

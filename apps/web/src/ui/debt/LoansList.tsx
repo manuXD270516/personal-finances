@@ -11,23 +11,20 @@ import type { FormatContext } from '../dashboard/types';
 import { formatBusinessDate } from '../planning/logic';
 import { CardsPanel } from './cards/CardsList';
 import { DebtSummaryPanel } from './summary/DebtSummaryPanel';
-import { debtHref, loanPath, loansPath } from './logic';
+import { debtHref, loansPath } from './logic';
 import { debtText, LoanStatusBadge } from './Tables';
-import type { Loan, LoanDetail } from './types';
+import type { LoanListItem } from './types';
 
-export interface LoanRowData {
-  readonly loan: Loan;
-  /** Detalle con el principal pendiente y la próxima cuota (puede faltar si su carga falló). */
-  readonly detail?: LoanDetail | undefined;
-}
-
-/** Lista de préstamos: nombre, estado, deuda (principal pendiente), próxima cuota con su fecha y atraso. */
+/**
+ * Lista de préstamos: nombre, estado, deuda (principal pendiente), próxima cuota con su fecha y atraso. Todas las
+ * cifras vienen en la fila de `GET …/loans` (las mismas que el detalle): no hay una llamada por préstamo.
+ */
 export function LoansTable({
   items,
   f,
   href,
 }: {
-  items: readonly LoanRowData[];
+  items: readonly LoanListItem[];
   f: FormatContext;
   href: (path: string) => string;
 }) {
@@ -55,9 +52,9 @@ export function LoansTable({
           </tr>
         </thead>
         <tbody>
-          {items.map(({ loan, detail }) => {
-            const next = detail?.nextInstallment ?? null;
-            const outstanding = detail?.outstandingPrincipal ?? null;
+          {items.map((loan) => {
+            const next = loan.nextInstallment ?? null;
+            const outstanding = loan.outstandingPrincipal ?? null;
             return (
               <tr key={loan.id} data-testid="loan-row" data-status={loan.status} data-name={loan.name}>
                 <th scope="row" style={cellStyle}>
@@ -127,38 +124,25 @@ function DebtsHome({ ctx, initialTab }: { ctx: WorkspaceContext; initialTab: str
   );
 }
 
-const MAX_DETAILS = 50;
-
 function LoansList({ ctx }: { ctx: WorkspaceContext }) {
   const f = useFormat('Debt', ctx);
-  const [items, setItems] = useState<readonly LoanRowData[] | undefined>();
+  const [items, setItems] = useState<readonly LoanListItem[] | undefined>();
   const [problem, setProblem] = useState<ApiProblemBody | undefined>();
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const list = (await ctx.api.get<{ data: Loan[] }>(loansPath(ctx.base))).data?.data ?? [];
-        // El listado trae solo las condiciones: el principal pendiente y la próxima cuota salen del detalle.
-        const rows = await Promise.all(
-          list.map(async (loan, index): Promise<LoanRowData> => {
-            if (index >= MAX_DETAILS || (loan.status !== 'ACTIVE' && loan.status !== 'PAID_OFF'))
-              return { loan };
-            try {
-              return { loan, detail: (await ctx.api.get<LoanDetail>(loanPath(ctx.base, loan.id))).data };
-            } catch {
-              return { loan };
-            }
-          }),
-        );
-        if (!cancelled) setItems(rows);
-      } catch (err) {
+    // Una sola llamada: la lista ya trae el principal pendiente, el saldo de la cuenta y la próxima cuota.
+    ctx.api
+      .get<{ data: LoanListItem[] }>(loansPath(ctx.base))
+      .then((r) => {
+        if (!cancelled) setItems(r.data?.data ?? []);
+      })
+      .catch((err: unknown) => {
         if (!cancelled) {
           setItems([]);
           setProblem(problemOf(err));
         }
-      }
-    })();
+      });
     return () => {
       cancelled = true;
     };

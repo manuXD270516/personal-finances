@@ -209,6 +209,16 @@ export interface NextInstallmentView {
   readonly overdueDays: number;
 }
 
+/** Fila de la lista de préstamos: condiciones más las cifras vivas del detalle (una sola llamada, sin N+1). */
+export interface LoanListItemView extends LoanView {
+  /** Principal pendiente según el cronograma; `null` en borrador o cancelado. */
+  readonly outstandingPrincipal: MoneyView | null;
+  /** Saldo adeudado según la cuenta del préstamo. */
+  readonly accountBalance: MoneyView;
+  /** Próxima cuota con su pendiente y atraso; `null` si no está activo o no queda nada. */
+  readonly nextInstallment: NextInstallmentView | null;
+}
+
 export interface LoanDetailView extends LoanView {
   /** Principal pendiente según el cronograma; `null` en borrador o cancelado. */
   readonly outstandingPrincipal: MoneyView | null;

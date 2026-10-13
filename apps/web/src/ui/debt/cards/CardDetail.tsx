@@ -30,7 +30,7 @@ import {
   type TermsForm,
 } from './logic';
 import { StatementStatusBadge, UtilizationMeter } from './parts';
-import { WEEKEND_ADJUSTMENTS, type CardAccount, type CreditCard } from './types';
+import { WEEKEND_ADJUSTMENTS, type CardAccount, type CardOverdueStatement, type CreditCard } from './types';
 
 export function CardDetailPage({ cardId, statementId }: { cardId: string; statementId?: string }) {
   return (
@@ -96,6 +96,45 @@ export function CardOverview({ card, f }: { card: CreditCard; f: FormatContext }
   );
 }
 
+/**
+ * Estados de cuenta vencidos con faltante: cada uno con su estado (texto + icono), cierre, vencimiento y lo que falta
+ * para no generar intereses y para el mínimo. Aparte del próximo vencimiento, que nunca es una fecha pasada.
+ */
+export function OverdueStatements({
+  statements,
+  f,
+}: {
+  statements: readonly CardOverdueStatement[];
+  f: FormatContext;
+}) {
+  if (statements.length === 0) return null;
+  return (
+    <section
+      aria-label={f.t('detail.overdue.title')}
+      role="region"
+      style={{ display: 'grid', gap: 'var(--pf-space-1)' }}
+      data-testid="overdue-statements"
+    >
+      <strong>
+        <span aria-hidden="true">⚠</span> {f.t('detail.overdue.title')}
+      </strong>
+      <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+        {statements.map((o) => (
+          <li key={o.closingDate} data-testid="overdue-statement" data-closing={o.closingDate}>
+            <StatementStatusBadge status={o.status} f={f} />{' '}
+            {f.t('detail.overdue.item', {
+              closing: formatBusinessDate(o.closingDate),
+              due: formatBusinessDate(o.dueDate),
+              amount: formatMoney(o.remainingNoInterest, f.locale),
+              minimum: formatMoney(o.remainingMinimum, f.locale),
+            })}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function OpenCycle({ account, f }: { account: CardAccount; f: FormatContext }) {
   const cycle = account.openCycle;
   return (
@@ -150,6 +189,7 @@ function OpenCycle({ account, f }: { account: CardAccount; f: FormatContext }) {
           </div>
         ) : null}
       </dl>
+      <OverdueStatements statements={account.overdueStatements ?? []} f={f} />
       <FiguresTable statement={cycle} f={f} />
     </section>
   );
@@ -192,7 +232,10 @@ export function TermsEditor({
     }
     setBusy(true);
     try {
-      await ctx.api.command('PATCH', cardPath(ctx.base, card.id), built.patch, { ifMatch: card.version });
+      await ctx.api.command('PATCH', cardPath(ctx.base, card.id), built.patch, {
+        ifMatch: card.version,
+        contentType: 'application/json',
+      });
       onDone(f.t('terms.saved'));
     } catch (e) {
       setProblem(problemOf(e));

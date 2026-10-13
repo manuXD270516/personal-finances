@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { scaleFor } from '../common/money';
+import { LoanChargesFields, LoanTermsFields, SchedulePreviewSection, useSchedulePreview } from './LoanForm';
 import { ConfirmPanel, Field, formStyle, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
 import { problemOf, type WorkspaceContext } from '../common/workspace';
 import type { Account, Counterparty } from '../common/types';
@@ -14,9 +15,13 @@ import {
   BREAKDOWN_FIELDS,
   breakdownDelta,
   breakdownSum,
+  buildLoanEdit,
   buildPaymentInput,
+  editLoan,
+  loanFormFromLoan,
   loanPath,
   parseDisburseFee,
+  type LoanForm,
   type LoanFormErrors,
   type PaymentForm,
 } from './logic';
@@ -425,8 +430,156 @@ export function ReasonPanel({
   );
 }
 
+/**
+ * Edición de un préstamo en BORRADOR (fix-phase-4-gaps, decisión 5): todas las condiciones sobre `PATCH
+ * …/loans/{id}` con `If-Match` (conducta de "Registrar un préstamo con sus condiciones"), con la vista previa del
+ * cronograma recalculada al cambiar los datos. No crea asientos: el borrador no tiene transacciones.
+ */
+export function DraftEditPanel({
+  ctx,
+  f,
+  loan,
+  accounts,
+  counterparties,
+  onCancel,
+  onDone,
+}: PanelProps & { accounts: readonly Account[]; counterparties: readonly Counterparty[] }) {
+  const [form, setForm] = useState<LoanForm>(() => loanFormFromLoan(loan, ctx.formatLocale));
+  const [errors, setErrors] = useState<LoanFormErrors>({});
+  const [problem, setProblem] = useState<ApiProblemBody | undefined>();
+  const [busy, setBusy] = useState(false);
+  const alertRef = useRef<HTMLDivElement>(null);
+  const [focusTick, setFocusTick] = useState(0);
+  useEffect(() => {
+    if (focusTick > 0) alertRef.current?.focus();
+  }, [focusTick]);
+  const set = (patch: Partial<LoanForm>) => setForm((prev) => ({ ...prev, ...patch }));
+  const currency = loan.principal.currency;
+  const opts = useMemo(
+    () => ({ locale: ctx.formatLocale, scale: scaleFor(currency, ctx.scales) }),
+    [ctx.formatLocale, ctx.scales, currency],
+  );
+  const preview = useSchedulePreview(ctx, form, opts);
+  const funding = accounts.filter(
+    (a) => a.status === 'ACTIVE' && a.currency === currency && a.type !== 'LOAN',
+  );
+
+  async function save() {
+    setProblem(undefined);
+    const built = buildLoanEdit(form, loan, opts);
+    if (!built.ok) {
+      setErrors(built.errors);
+      setFocusTick((n) => n + 1);
+      return;
+    }
+    setErrors({});
+    setBusy(true);
+    try {
+      await editLoan(ctx.api, ctx.base, loan, built.input);
+      onDone(f.t('edit.done'));
+    } catch (err) {
+      setProblem(problemOf(err));
+      setBusy(false);
+      setFocusTick((n) => n + 1);
+    }
+  }
+
+  const errorCount = Object.keys(errors).length;
+  return (
+    <form
+      style={{ display: 'grid', gap: 'var(--pf-space-4)' }}
+      noValidate
+      data-testid="loan-edit-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <h2 style={{ fontSize: '1.125rem', margin: 0 }}>{f.t('edit.title')}</h2>
+      <p style={{ ...mutedStyle, margin: 0 }} data-testid="loan-draft-edit-note">
+        {f.t('edit.draftEditable')}
+      </p>
+      <LoanTermsFields
+        f={f}
+        form={form}
+        set={set}
+        errors={errors}
+        currencies={[currency]}
+        disabled={busy}
+        mode="edit"
+      />
+      <LoanChargesFields f={f} form={form} set={set} errors={errors} disabled={busy} />
+      <fieldset style={{ ...formStyle, margin: 0 }} disabled={busy}>
+        <legend>{f.t('form.accounts')}</legend>
+        <div style={rowStyle}>
+          <Field label={f.t('form.lender')}>
+            {(p) => (
+              <select
+                {...p}
+                style={inputStyle}
+                value={form.lenderCounterpartyId}
+                data-testid="edit-lender"
+                onChange={(e) => set({ lenderCounterpartyId: e.target.value })}
+              >
+                <option value="">{f.t('form.none')}</option>
+                {counterparties
+                  .filter((c) => !c.archivedAt || c.id === loan.lenderCounterpartyId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </Field>
+          <Field label={f.t('form.paymentAccount')}>
+            {(p) => (
+              <select
+                {...p}
+                style={inputStyle}
+                value={form.paymentAccountId}
+                data-testid="edit-payment-account"
+                onChange={(e) => set({ paymentAccountId: e.target.value })}
+              >
+                {funding.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.currency})
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        </div>
+      </fieldset>
+      <SchedulePreviewSection f={f} ctx={ctx} preview={preview} />
+      <div ref={alertRef} tabIndex={-1} data-testid="loan-edit-errors">
+        {errorCount > 0 ? (
+          <p role="alert" style={{ color: 'var(--pf-error)', margin: 0 }}>
+            {f.t('form.fixErrors', { count: errorCount })}
+          </p>
+        ) : null}
+        {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
+      </div>
+      <div style={rowStyle}>
+        <button type="submit" disabled={busy} data-testid="edit-submit">
+          {f.t('edit.save')}
+        </button>
+        <button type="button" disabled={busy} onClick={onCancel}>
+          {f.t('cancelAction')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** Edición con el loan activo: nombre, prestamista y cuenta de pago; las condiciones quedan bloqueadas (`LOAN_TERMS_LOCKED`). */
-export function EditPanel({
+export function EditPanel(
+  props: PanelProps & { accounts: readonly Account[]; counterparties: readonly Counterparty[] },
+) {
+  return props.loan.status === 'DRAFT' ? <DraftEditPanel {...props} /> : <ActiveEditPanel {...props} />;
+}
+
+function ActiveEditPanel({
   ctx,
   f,
   loan,
@@ -452,7 +605,7 @@ export function EditPanel({
       body['lenderCounterpartyId'] = lender === '' ? null : lender;
     if (payment !== loan.paymentAccountId) body['paymentAccountId'] = payment;
     try {
-      await ctx.api.command('PATCH', loanPath(ctx.base, loan.id), body, { ifMatch: loan.version });
+      await editLoan(ctx.api, ctx.base, loan, body);
       onDone(f.t('edit.done'));
     } catch (err) {
       setProblem(problemOf(err));
@@ -471,7 +624,7 @@ export function EditPanel({
     >
       <h2 style={{ fontSize: '1.125rem', margin: 0 }}>{f.t('edit.title')}</h2>
       <p style={{ ...warningStyle, margin: 0 }} data-testid="loan-terms-locked">
-        {loan.status === 'DRAFT' ? f.t('edit.draftNote') : f.t('edit.locked')}
+        {f.t('edit.locked')}
       </p>
       <div style={rowStyle}>
         <Field label={f.t('form.name')}>

@@ -137,6 +137,12 @@ export function CardSummary({
                   </td>
                   <td style={cellStyle} data-testid="card-next-due">
                     {formatBusinessDate(a.nextDueDate)}
+                    {(a.overdueStatements?.length ?? 0) > 0 ? (
+                      <div style={{ color: 'var(--pf-error)' }} data-testid="card-overdue">
+                        <span aria-hidden="true">⚠</span>{' '}
+                        {f.t('list.overdue', { count: a.overdueStatements?.length ?? 0 })}
+                      </div>
+                    ) : null}
                   </td>
                   <td style={numCellStyle} data-testid="card-missing">
                     {last ? (

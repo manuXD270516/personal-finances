@@ -26,6 +26,7 @@ import { CustomFieldValuesView } from '../custom-fields/CustomFieldValuesView';
 import { ConversionDetailView } from '../fx/ConversionDetailView';
 import { LoanTransactionInfo } from '../debt/LoanTransactionInfo';
 import { TransactionGoalInfo } from '../goals/TransactionGoalInfo';
+import { VoidImpactNotice } from '../goals/VoidImpact';
 import { LifecycleTab } from '../lifecycle/LifecycleTab';
 import { MatchSuggestionsNotice } from '../recurring/MatchSuggestionsPanel';
 import { useCatalogs } from './catalogs';
@@ -528,6 +529,9 @@ function Detail({
                           )
                     }
                   >
+                    {pending === 'void' && (tx.kind === 'TRANSFER' || tx.kind === 'EXPENSE') ? (
+                      <VoidImpactNotice ctx={ctx} transactionId={tx.id} />
+                    ) : null}
                     {pending !== 'reconcile' ? (
                       <Field label={t('detail.confirm.reason')}>
                         {(p) => (

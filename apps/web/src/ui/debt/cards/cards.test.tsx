@@ -7,7 +7,7 @@ import type { RecurringOccurrence } from '../../recurring/types';
 import { esContext, textOf } from '../../test-support';
 import { ItemName } from '../../upcoming/UpcomingParts';
 import type { UpcomingPaymentItem } from '../../upcoming/types';
-import { CardOverview } from './CardDetail';
+import { CardOverview, OverdueStatements } from './CardDetail';
 import { ConflictNotice, firstStepWithErrors, StepFields, stepOfField } from './CardForm';
 import { CardPaymentHint } from './CardPaymentHint';
 import {
@@ -718,5 +718,46 @@ describe('i18n', () => {
       expect(types['CARD_PAYMENT_DUE']).toBeTruthy();
       expect(types['CARD_UTILIZATION']).toBeTruthy();
     }
+  });
+});
+
+describe('próximo vencimiento y estados atrasados (fix-phase-4-gaps)', () => {
+  const overdue = [
+    {
+      closingDate: '2026-10-25',
+      dueDate: '2026-11-15',
+      status: 'PARTIALLY_PAID' as const,
+      remainingNoInterest: bob('620.50'),
+      remainingMinimum: bob('0.00'),
+    },
+  ];
+
+  it('[TC-DEBT-CARD-039] el detalle lista el estado atrasado con su estado y el faltante, aparte del próximo vencimiento', () => {
+    const c = card({
+      accounts: [cardAccount({ nextDueDate: '2026-12-15', overdueStatements: overdue })],
+    });
+    const html = renderToStaticMarkup(<CardOverview card={c} f={f} />);
+    expect(html).toMatch(/data-testid="detail-next-due"[^>]*>15\/12\/2026</);
+    expect(html).toContain('data-testid="overdue-statements"');
+    const text = textOf(html);
+    expect(text).toContain('Estados de cuenta atrasados');
+    expect(text).toContain('Pago parcial');
+    expect(text).toContain(
+      'Cierre 25/10/2026 · venció el 15/11/2026 · faltan 620,50 BOB para no generar intereses',
+    );
+  });
+
+  it('[TC-DEBT-CARD-038] sin estados atrasados el detalle no muestra la sección y el listado no marca atraso', () => {
+    const c = card({ accounts: [cardAccount({ nextDueDate: '2026-11-15', overdueStatements: [] })] });
+    expect(renderToStaticMarkup(<OverdueStatements statements={[]} f={f} />)).toBe('');
+    expect(renderToStaticMarkup(<CardOverview card={c} f={f} />)).not.toContain('overdue-statements');
+    expect(renderToStaticMarkup(<CardSummary card={c} f={f} href={href} />)).not.toContain('card-overdue');
+  });
+
+  it('[TC-DEBT-CARD-039] el listado marca con texto e icono que la cuenta tiene un estado atrasado', () => {
+    const c = card({ accounts: [cardAccount({ nextDueDate: '2026-12-15', overdueStatements: overdue })] });
+    const html = renderToStaticMarkup(<CardSummary card={c} f={f} href={href} />);
+    expect(html).toMatch(/data-testid="card-next-due"[^>]*>15\/12\/2026/);
+    expect(textOf(html)).toContain('1 estado atrasado');
   });
 });

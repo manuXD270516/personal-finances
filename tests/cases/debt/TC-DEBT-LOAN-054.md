@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: ["debt/amortization"]
 requirement: "Registrar un préstamo con sus condiciones"
 scenario: "Préstamo vehicular en borrador"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-001"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/debt/debt.test.tsx
+  - apps/web/src/ui/debt/logic.test.ts
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["loans", "draft", "ui", "fix-phase-4-gaps"]

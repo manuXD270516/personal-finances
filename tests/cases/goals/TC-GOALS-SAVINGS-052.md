@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: []
 requirement: "Anulación o revisión de la transacción de un movimiento"
 scenario: "Aviso antes de anular un aporte con un retiro posterior"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/void-impact.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["goals", "void", "preview", "fix-phase-4-gaps"]
