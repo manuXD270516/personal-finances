@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Email único por grupo de tasas retenidas"
 scenario: "Email del grupo sin detalles"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-006"]
 nfr: ["NFR-COMP-001"]
 invariants: []
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/fx-rate-email.test.ts
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "email", "privacy"]
@@ -49,4 +51,4 @@ Entonces no ve valores, monedas, providers ni cantidad
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

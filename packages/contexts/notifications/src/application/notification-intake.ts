@@ -36,6 +36,7 @@ export class NotificationIntake implements NotificationIntakePort {
       },
       {
         recipients: definition.recipients,
+        refreshable: definition.refreshable === true,
         plan: (payload) => definition.plan(payload, fact.factKey),
       },
     );

@@ -29,7 +29,7 @@ describe('NotifyFromEvent: umbral de presupuesto', () => {
     const { env, notify } = setup();
     env.recipients.members = [];
     const outcome = await notify.handle(event(thresholdPayload()), threshold);
-    expect(outcome).toEqual({ created: 0, deliveries: 0 });
+    expect(outcome).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(0);
     expect(env.deliveries.rows.size).toBe(0);
     expect(env.scheduler.jobs).toHaveLength(0);
@@ -38,7 +38,7 @@ describe('NotifyFromEvent: umbral de presupuesto', () => {
   it('[TC-NOTIFICATIONS-INAPP-001] cada miembro activo recibe una notificación UNREAD con el contenido del hecho', async () => {
     const { env, notify } = setup();
     const outcome = await notify.handle(event(thresholdPayload()), threshold);
-    expect(outcome).toEqual({ created: 3, deliveries: 3 });
+    expect(outcome).toEqual({ created: 3, refreshed: 0, deliveries: 3 });
     for (const userId of [OWNER, EDITOR, VIEWER]) {
       const [n, ...rest] = forUser(env, userId);
       expect(rest).toHaveLength(0);
@@ -81,7 +81,7 @@ describe('NotifyFromEvent: umbral de presupuesto', () => {
     const { env, notify } = setup();
     await notify.handle(event(thresholdPayload()), threshold);
     const second = await notify.handle(event(thresholdPayload()), threshold);
-    expect(second).toEqual({ created: 0, deliveries: 0 });
+    expect(second).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(3);
     expect(env.deliveries.rows.size).toBe(3);
     expect(env.scheduler.jobs).toHaveLength(3);
@@ -226,7 +226,7 @@ describe('NotifyFromEvent: ocurrencia recurrente próxima', () => {
   it('[TC-COMMITMENTS-RECUR-043] OWNER y EDITOR reciben "por aprobar" enlazada a la ocurrencia; el VIEWER no', async () => {
     const { env, notify } = setup();
     const outcome = await notify.handle(event(occurrenceDuePayload()), occurrenceDue);
-    expect(outcome).toEqual({ created: 2, deliveries: 2 });
+    expect(outcome).toEqual({ created: 2, refreshed: 0, deliveries: 2 });
     expect(forUser(env, VIEWER)).toHaveLength(0);
     for (const userId of [OWNER, EDITOR]) {
       const [n, ...rest] = forUser(env, userId);
@@ -253,7 +253,7 @@ describe('NotifyFromEvent: ocurrencia recurrente próxima', () => {
       event(occurrenceDuePayload(), '01928c4e-7a3b-7c11-8f00-000000000777'),
       occurrenceDue,
     );
-    expect(second).toEqual({ created: 0, deliveries: 0 });
+    expect(second).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(2);
     expect(env.deliveries.rows.size).toBe(2);
     expect(env.scheduler.jobs).toHaveLength(2);
@@ -276,7 +276,7 @@ describe('NotifyFromEvent: ocurrencia recurrente próxima', () => {
       ),
       occurrenceDue,
     );
-    expect(outcome).toEqual({ created: 0, deliveries: 0 });
+    expect(outcome).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(0);
     expect(env.deliveries.rows.size).toBe(0);
     // Con aprobación requerida sí se avisa aunque la gestione una suscripción.

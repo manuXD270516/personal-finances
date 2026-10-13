@@ -31,6 +31,7 @@ import {
   type FxRateSource,
   type FxRateType,
   type RateCandidate,
+  type RetainedSample,
 } from '../domain/index.js';
 
 /** Tablas del schema `fx` (montos/tasas NUMERIC como string, instantes como texto ISO). */
@@ -419,6 +420,61 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .limit(1)
       .executeTakeFirst();
     return row ? toStored(row as RateRow) : null;
+  }
+
+  async retainedOfPair(workspaceId: string, base: string, quote: string): Promise<RetainedSample[]> {
+    // Una sola pasada por el índice parcial `exchange_rate_retained_ix`: `prev_decided` es la mayor fecha de revisión de
+    // las muestras anteriores (`infinity` si alguna sigue pendiente); una muestra abre grupo si su `created_at` es mayor o
+    // igual. El ancla es la última de esas y se devuelve desde ella (el grupo vigente, con sus revisadas y pendientes).
+    const { rows } = await sql<{
+      rate_id: string;
+      created_at: string;
+      decided_at: string | null;
+      provider: string;
+      rate_type: string;
+      value: string;
+      baseline_rate_id: string;
+      variation_pct: string;
+    }>`
+      WITH retained AS (
+        SELECT r.id, r.created_at, rv.decided_at,
+               max(COALESCE(rv.decided_at, 'infinity'::timestamptz))
+                 OVER (ORDER BY r.created_at, r.id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prev_decided
+          FROM fx.exchange_rate r
+          LEFT JOIN fx.rate_anomaly_review rv ON rv.exchange_rate_id = r.id
+         WHERE r.workspace_id = ${workspaceId} AND r.base_currency = ${base} AND r.quote_currency = ${quote}
+           AND r.anomaly_flagged),
+      anchor AS (
+        SELECT id, created_at FROM retained
+         WHERE prev_decided IS NULL OR prev_decided <= created_at
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1)
+      SELECT r.id::text AS rate_id, ${iso('r.created_at')} AS created_at,
+             CASE WHEN rv.decided_at IS NULL THEN NULL ELSE ${iso('rv.decided_at')} END AS decided_at,
+             r.provider, r.rate_type, trim_scale(r.rate)::text AS value,
+             r.anomaly_baseline_rate_id::text AS baseline_rate_id, r.anomaly_variation_pct::text AS variation_pct
+        FROM fx.exchange_rate r
+        LEFT JOIN fx.rate_anomaly_review rv ON rv.exchange_rate_id = r.id
+        JOIN anchor a ON (r.created_at, r.id) >= (a.created_at, a.id)
+       WHERE r.workspace_id = ${workspaceId} AND r.base_currency = ${base} AND r.quote_currency = ${quote}
+         AND r.anomaly_flagged
+       ORDER BY r.created_at, r.id`.execute(db());
+    return rows.map((r) => ({
+      rateId: r.rate_id,
+      createdAt: r.created_at,
+      decidedAt: r.decided_at,
+      provider: r.provider,
+      rateType: r.rate_type,
+      value: r.value,
+      baselineRateId: r.baseline_rate_id,
+      variationPct: r.variation_pct,
+    }));
+  }
+
+  async lockAnomalyGroups(workspaceId: string): Promise<void> {
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`fx-anomaly-group:${workspaceId}`}, 0))`.execute(
+      db(),
+    );
   }
 
   async providerDays(

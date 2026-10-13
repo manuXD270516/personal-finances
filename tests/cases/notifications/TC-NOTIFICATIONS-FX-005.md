@@ -29,7 +29,7 @@ steps:
   - "Leer los emails en Mailpit"
   - "Activar el opt-in y repetir con otro hecho"
 expected_result:
-  - "Sin opt-in: el email dice que una tasa quedó retenida y enlaza a la app autenticada; no contiene 72000.00, 65000.00, 10.77, BTC, USDT, BOB ni el nombre del provider"
+  - "Sin opt-in: el email de anomalía dice que una o más tasas automáticas quedaron retenidas (sin cantidad) y enlaza a la app autenticada; no contiene 72000.00, 65000.00, 10.77, BTC, USDT, BOB ni el nombre del provider"
   - "Con opt-in: el email incluye el par y los valores"
 created: 2026-10-13
 updated: 2026-10-13

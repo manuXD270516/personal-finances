@@ -31,8 +31,9 @@ afterEach(() => {
 class FakeParalelo implements MarketRateProvider {
   latest: ProviderSample[] = [];
   failure: ProviderError | null = null;
+  constructor(private readonly id: 'PARALELO_BO' | 'DOLARAPI_BO' = 'PARALELO_BO') {}
   descriptor() {
-    return providerDescriptor('PARALELO_BO') as NonNullable<ReturnType<typeof providerDescriptor>>;
+    return providerDescriptor(this.id) as NonNullable<ReturnType<typeof providerDescriptor>>;
   }
   async fetchLatest() {
     if (this.failure) throw this.failure;
@@ -62,6 +63,8 @@ interface SetupOptions {
   readonly now?: string;
   readonly withCrypto?: boolean;
   readonly withNotifications?: boolean;
+  /** Registra también el adapter del provider de respaldo (bo.dolarapi.com). */
+  readonly withBackup?: boolean;
 }
 
 function setup(options: SetupOptions = {}) {
@@ -79,6 +82,7 @@ function setup(options: SetupOptions = {}) {
     mem.state.enabled.set(ws, new Set(['BOB', 'USD', 'USDT', 'EUR', 'BTC']));
   }
   const paralelo = new FakeParalelo();
+  const dolarapi = new FakeParalelo('DOLARAPI_BO');
   const ingestion = new MarketRateIngestion({
     uow: mem.deps.uow,
     rates: mem.deps.rates,
@@ -90,9 +94,11 @@ function setup(options: SetupOptions = {}) {
     ids: mem.deps.ids,
     clock: mem.clock,
     settings,
-    providers: { PARALELO_BO: paralelo, [CRYPTO]: crypto } as unknown as Partial<
-      Record<FxRateProvider, MarketRateProvider>
-    >,
+    providers: {
+      PARALELO_BO: paralelo,
+      ...(options.withBackup ? { DOLARAPI_BO: dolarapi } : {}),
+      [CRYPTO]: crypto,
+    } as unknown as Partial<Record<FxRateProvider, MarketRateProvider>>,
     pairs: mem.deps.pairs,
     historyCache: mem.historyCache,
     firstBalance: mem.firstBalance,
@@ -116,7 +122,20 @@ function setup(options: SetupOptions = {}) {
   };
   const episodes = (ws = WS) => mem.state.episodes.filter((e) => e.workspaceId === ws);
   const events = (type: string) => mem.state.outbox.filter((e) => e.eventType === type);
-  return { mem, paralelo, crypto, settings, ingestion, service, configure, advance, down, episodes, events };
+  return {
+    mem,
+    paralelo,
+    dolarapi,
+    crypto,
+    settings,
+    ingestion,
+    service,
+    configure,
+    advance,
+    down,
+    episodes,
+    events,
+  };
 }
 
 /** USDT/BOB con su última tasa PARALLEL de vigencia 08:00Z y los providers caídos desde las 08:10Z (TC-FX-PROVIDER-038). */
@@ -400,10 +419,18 @@ describe('Hecho por muestra retenida como anómala (fx/market-rate-providers)', 
       },
     });
     expect(String((fact?.payload as { value: string }).value).replace(/\.0+$/, '')).toBe('72000');
+    // Un solo aviso por par (agrupado): el ancla del grupo es esta muestra y el pico, la misma muestra.
     expect(mem.state.notified.at(-1)).toMatchObject({
       type: 'FX_RATE_ANOMALY_RETAINED',
       factKey: held?.id,
-      payload: { rateId: held?.id, variationPct: '10.7692', timeZone: 'America/La_Paz' },
+      payload: {
+        anchorRateId: held?.id,
+        reviewRateId: held?.id,
+        pendingCount: 1,
+        retainedCount: 1,
+        peak: { rateId: held?.id, variationPct: '10.7692', baselineValue: '65000' },
+        timeZone: 'America/La_Paz',
+      },
     });
   });
 
@@ -429,5 +456,256 @@ describe('Hecho por muestra retenida como anómala (fx/market-rate-providers)', 
     ctx.crypto.prices = { BTC: { price: '65500.00', asOf: '2026-10-13T14:10:00.000Z' } };
     await ctx.ingestion.poll();
     expect(ctx.events('fx.RateAnomalyRetained')).toHaveLength(0);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────── aviso agrupado (refine-rate-anomaly-alert-grouping)
+
+type PRateType = 'PARALLEL' | 'PARALLEL_BUY' | 'PARALLEL_SELL';
+const usdt = (
+  provider: 'PARALELO_BO' | 'DOLARAPI_BO',
+  rateType: PRateType,
+  value: string,
+  asOf: string,
+  fetchedAt: string,
+  base = 'USDT',
+) =>
+  ProviderSample.of({
+    provider,
+    base,
+    quote: 'BOB',
+    rateType,
+    value,
+    asOf,
+    fetchedAt,
+    rawPayload: RAW,
+    sourceLabel: `${provider} (${base}/BOB)`,
+  });
+
+describe('Aviso agrupado de muestras retenidas del par (fx/market-rate-providers, notifications/alerts)', () => {
+  /** USDT/BOB con las líneas base 12.05, 12.00 y 12.10 en ambos providers a las 08:00Z. */
+  async function withBaselines(options: SetupOptions = {}) {
+    const ctx = setup({ withBackup: true, now: '2026-10-13T08:05:00Z', ...options });
+    await ctx.configure(WS, ['USDT/BOB', 'USD/BOB']);
+    const fetchedAt = ctx.mem.clock.now().toString();
+    const base = (p: 'PARALELO_BO' | 'DOLARAPI_BO') => [
+      usdt(p, 'PARALLEL', '12.05', '2026-10-13T08:00:00Z', fetchedAt),
+      usdt(p, 'PARALLEL_BUY', '12.00', '2026-10-13T08:00:00Z', fetchedAt),
+      usdt(p, 'PARALLEL_SELL', '12.10', '2026-10-13T08:00:00Z', fetchedAt),
+    ];
+    ctx.paralelo.latest = base('PARALELO_BO');
+    ctx.dolarapi.latest = base('DOLARAPI_BO');
+    await ctx.ingestion.poll();
+    expect(ctx.mem.state.notified.filter((f) => f.type === 'FX_RATE_ANOMALY_RETAINED')).toHaveLength(0);
+    return ctx;
+  }
+  /** El salto de las 14:00Z de paralelo.bo: 12.80, 12.70 y 12.90 (+6.22 %, +5.83 % y +6.61 %). */
+  const jump = (ctx: Awaited<ReturnType<typeof withBaselines>>, cycleAt: string, asOf: string) => {
+    ctx.advance(cycleAt);
+    const fetchedAt = ctx.mem.clock.now().toString();
+    ctx.paralelo.latest = [
+      usdt('PARALELO_BO', 'PARALLEL', '12.80', asOf, fetchedAt),
+      usdt('PARALELO_BO', 'PARALLEL_BUY', '12.70', asOf, fetchedAt),
+      usdt('PARALELO_BO', 'PARALLEL_SELL', '12.90', asOf, fetchedAt),
+    ];
+    ctx.dolarapi.latest = [];
+  };
+  const anomalyFacts = (ctx: Awaited<ReturnType<typeof withBaselines>>) =>
+    ctx.mem.state.notified.filter((f) => f.type === 'FX_RATE_ANOMALY_RETAINED');
+
+  it('[TC-NOTIFICATIONS-FX-010] un salto con mediana, compra y venta entrega UN aviso del par con 3 pendientes y publica tres eventos', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    await ctx.ingestion.poll();
+    const facts = anomalyFacts(ctx);
+    expect(facts).toHaveLength(1);
+    const held = ctx.mem.state.rates
+      .filter((r) => r.snapshot.anomaly !== null)
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    expect(held).toHaveLength(3);
+    expect(facts[0]).toMatchObject({
+      factKey: held[0]?.id,
+      payload: {
+        anchorRateId: held[0]?.id,
+        reviewRateId: held[0]?.id,
+        base: 'USDT',
+        quote: 'BOB',
+        pendingCount: 3,
+        retainedCount: 3,
+        providers: ['PARALELO_BO'],
+        firstRetainedAt: '2026-10-13T14:00:00.000Z',
+        lastRetainedAt: '2026-10-13T14:00:00.000Z',
+        peak: {
+          rateType: 'PARALLEL_SELL',
+          provider: 'PARALELO_BO',
+          value: '12.9',
+          baselineValue: '12.1',
+          variationPct: '6.6116',
+          thresholdPct: '5',
+        },
+      },
+    });
+    // El evento sigue siendo uno por muestra retenida, con el mismo esquema.
+    expect(ctx.events('fx.RateAnomalyRetained')).toHaveLength(3);
+    expect(
+      ctx
+        .events('fx.RateAnomalyRetained')
+        .map((e) => (e.payload as { rateType: string }).rateType)
+        .sort(),
+    ).toEqual(['PARALLEL', 'PARALLEL_BUY', 'PARALLEL_SELL']);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-011] el respaldo del mismo ciclo actualiza el MISMO aviso (misma clave): 5 pendientes y los dos providers', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    const fetchedAt = ctx.mem.clock.now().toString();
+    ctx.dolarapi.latest = [
+      usdt('DOLARAPI_BO', 'PARALLEL', '12.82', '2026-10-13T13:56:00Z', fetchedAt),
+      usdt('DOLARAPI_BO', 'PARALLEL_BUY', '12.72', '2026-10-13T13:56:00Z', fetchedAt),
+    ];
+    await ctx.ingestion.poll();
+    const facts = anomalyFacts(ctx);
+    // Una llamada al puerto por provider (cada uno en su transacción), con la misma clave de grupo.
+    expect(facts.map((f) => f.factKey)).toHaveLength(2);
+    expect(new Set(facts.map((f) => f.factKey)).size).toBe(1);
+    expect(facts.at(-1)?.payload).toMatchObject({
+      pendingCount: 5,
+      retainedCount: 5,
+      providers: ['DOLARAPI_BO', 'PARALELO_BO'],
+    });
+    expect(ctx.events('fx.RateAnomalyRetained')).toHaveLength(5);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-012] el salto que persiste en el ciclo siguiente conserva la clave y sube a 6 pendientes', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    await ctx.ingestion.poll();
+    jump(ctx, '2026-10-13T14:15:00Z', '2026-10-13T14:10:00Z');
+    await ctx.ingestion.poll();
+    const facts = anomalyFacts(ctx);
+    expect(facts).toHaveLength(2);
+    expect(facts[1]?.factKey).toBe(facts[0]?.factKey);
+    expect(facts[1]?.payload).toMatchObject({
+      pendingCount: 6,
+      firstRetainedAt: '2026-10-13T14:00:00.000Z',
+      lastRetainedAt: '2026-10-13T14:15:00.000Z',
+    });
+  });
+
+  it('[TC-NOTIFICATIONS-FX-013] confirmar la muestra más antigua no abre otro aviso: misma clave, solo las pendientes y enlace a la pendiente más antigua', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    await ctx.ingestion.poll();
+    const [oldest, second] = ctx.mem.state.rates
+      .filter((r) => r.snapshot.anomaly !== null)
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    ctx.mem.state.reviews.push({
+      rateId: oldest?.id as string,
+      workspaceId: WS,
+      decision: 'CONFIRMED',
+      reason: 'verificado',
+      decidedBy: 'u1',
+      decidedAt: '2026-10-13T14:30:00.000Z',
+    });
+    jump(ctx, '2026-10-13T14:45:00Z', '2026-10-13T14:40:00Z');
+    await ctx.ingestion.poll();
+    const facts = anomalyFacts(ctx);
+    expect(facts.at(-1)?.factKey).toBe(facts[0]?.factKey);
+    expect(facts.at(-1)?.payload).toMatchObject({
+      anchorRateId: oldest?.id,
+      reviewRateId: second?.id,
+      // 2 pendientes que quedaban + 2 nuevas: la mediana confirmada (12.80) es la nueva línea base de su feed, así que
+      // la muestra repetida de 12.80 ya no es anómala.
+      pendingCount: 4,
+      retainedCount: 5,
+    });
+  });
+
+  it('[TC-NOTIFICATIONS-FX-014] tras revisar todo el grupo, un salto nuevo abre un grupo con otra clave y 1 pendiente', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    await ctx.ingestion.poll();
+    for (const r of ctx.mem.state.rates.filter((x) => x.snapshot.anomaly !== null)) {
+      ctx.mem.state.reviews.push({
+        rateId: r.id,
+        workspaceId: WS,
+        decision: 'CONFIRMED',
+        reason: 'verificado',
+        decidedBy: 'u1',
+        decidedAt: '2026-10-13T15:00:00.000Z',
+      });
+    }
+    ctx.advance('2026-10-13T18:00:00Z');
+    // 12.80 (confirmada) → 13.60 (+6.25 %): anómala frente a la nueva línea base.
+    ctx.paralelo.latest = [
+      usdt('PARALELO_BO', 'PARALLEL', '13.60', '2026-10-13T17:55:00Z', ctx.mem.clock.now().toString()),
+    ];
+    await ctx.ingestion.poll();
+    const facts = anomalyFacts(ctx);
+    expect(facts).toHaveLength(2);
+    expect(facts[1]?.factKey).not.toBe(facts[0]?.factKey);
+    expect(facts[1]?.payload).toMatchObject({ pendingCount: 1, retainedCount: 1 });
+  });
+
+  it('[TC-NOTIFICATIONS-FX-015] muestras de dos pares en el mismo ciclo entregan un aviso por par con claves distintas', async () => {
+    const ctx = await withBaselines();
+    ctx.advance('2026-10-13T14:00:00Z');
+    const fetchedAt = ctx.mem.clock.now().toString();
+    // USD/BOB solo tenía línea base si se publicó: se siembra en un ciclo previo.
+    ctx.paralelo.latest = [usdt('PARALELO_BO', 'PARALLEL', '6.96', '2026-10-13T08:30:00Z', fetchedAt, 'USD')];
+    await ctx.ingestion.poll();
+    ctx.advance('2026-10-13T14:30:00Z');
+    const f2 = ctx.mem.clock.now().toString();
+    ctx.paralelo.latest = [
+      usdt('PARALELO_BO', 'PARALLEL', '12.80', '2026-10-13T14:25:00Z', f2),
+      usdt('PARALELO_BO', 'PARALLEL', '7.50', '2026-10-13T14:25:00Z', f2, 'USD'),
+    ];
+    await ctx.ingestion.poll();
+    const facts = anomalyFacts(ctx);
+    expect(facts).toHaveLength(2);
+    expect(new Set(facts.map((f) => f.factKey)).size).toBe(2);
+    expect(facts.map((f) => `${(f.payload as { base: string }).base}/BOB`).sort()).toEqual([
+      'USD/BOB',
+      'USDT/BOB',
+    ]);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-016] reprocesar el mismo ciclo no inserta muestras ni llama al puerto otra vez', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    await ctx.ingestion.poll();
+    const before = anomalyFacts(ctx).length;
+    const events = ctx.events('fx.RateAnomalyRetained').length;
+    await ctx.ingestion.poll();
+    expect(anomalyFacts(ctx)).toHaveLength(before);
+    expect(ctx.events('fx.RateAnomalyRetained')).toHaveLength(events);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-010] un fallo del puerto revierte muestras, eventos y aviso de ese workspace y el ciclo siguiente los reintenta con el mismo grupo', async () => {
+    const ctx = await withBaselines();
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    ctx.mem.faults.notify = new Error('NOTIFY caído');
+    await ctx.ingestion.poll();
+    expect(ctx.mem.state.rates.filter((r) => r.snapshot.anomaly !== null)).toHaveLength(0);
+    expect(ctx.events('fx.RateAnomalyRetained')).toHaveLength(0);
+    delete ctx.mem.faults.notify;
+    ctx.advance('2026-10-13T14:15:00Z');
+    await ctx.ingestion.poll();
+    expect(anomalyFacts(ctx)).toHaveLength(1);
+    expect(anomalyFacts(ctx)[0]?.payload).toMatchObject({ pendingCount: 3 });
+  });
+
+  it('[TC-NOTIFICATIONS-FX-010] la ingesta con detección toma el bloqueo consultivo del workspace antes de leer `now`; la carga histórica no avisa', async () => {
+    const ctx = await withBaselines();
+    const locks: string[] = [];
+    const original = ctx.mem.deps.rates.lockAnomalyGroups.bind(ctx.mem.deps.rates);
+    ctx.mem.deps.rates.lockAnomalyGroups = async (ws) => {
+      locks.push(ws);
+      return original(ws);
+    };
+    jump(ctx, '2026-10-13T14:00:00Z', '2026-10-13T13:55:00Z');
+    await ctx.ingestion.poll();
+    expect(locks).toContain(WS);
+    expect(locks.every((ws) => ws === WS)).toBe(true);
   });
 });

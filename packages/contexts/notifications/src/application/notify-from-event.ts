@@ -7,11 +7,16 @@ import {
 import type { NotifyDeps, SourceEvent } from './ports/index.js';
 
 /** Lo que la entrega necesita de un tipo: destinatarios y plan (los consumidores de eventos y la entrega directa). */
-export type DeliveryDefinition = Pick<NotificationTypeDefinition, 'recipients' | 'plan' | 'suppressed'>;
+export type DeliveryDefinition = Pick<NotificationTypeDefinition, 'recipients' | 'plan' | 'suppressed'> & {
+  /** `true`: un hecho posterior con la misma clave actualiza el aviso existente en lugar de ignorarse (`insertOrRefresh`). */
+  readonly refreshable?: boolean;
+};
 
 export interface NotifyOutcome {
   /** Notificaciones in-app nuevas (una por destinatario sin notificación previa de ese hecho). */
   readonly created: number;
+  /** Notificaciones existentes actualizadas con una foto más nueva (tipos actualizables; sin email nuevo). */
+  readonly refreshed: number;
   /** Entregas por email programadas (solo para las notificaciones nuevas). */
   readonly deliveries: number;
 }
@@ -24,7 +29,7 @@ export interface NotifyOutcome {
  * Idempotencia en dos capas (INV-028): el consumidor ya registró `(consumer, eventId)` en `platform.inbox` en su
  * transacción; además `notification` tiene UNIQUE `(workspace_id, user_id, dedupe_key)` y se inserta con
  * `ON CONFLICT DO NOTHING`, de modo que un segundo evento del mismo hecho (otro `eventId`) o un worker concurrente no
- * duplican. La entrega por email se crea SOLO si la notificación se insertó, y su trabajo se encola en la misma
+ * duplican (los tipos `refreshable` usan `insertOrRefresh`: crean o actualizan el aviso, sin otro email). La entrega por email se crea SOLO si la notificación se insertó, y su trabajo se encola en la misma
  * transacción. Debe ejecutarse dentro de la unidad de trabajo del consumidor (reutiliza su transacción).
  *
  * No es un `*.service.ts`: no audita (no es dato financiero ni de configuración, docs/33 D92).
@@ -37,7 +42,7 @@ export class NotifyFromEvent {
     // Lanza ante un payload mal formado: el consumidor reintenta y termina en dead-letter (observable).
     const plan = definition.plan(event.payload, { aggregateVersion: event.aggregateVersion });
     // Hecho que otro contexto avisa por su cuenta (D119): se consume (inbox) sin crear notificaciones.
-    if (definition.suppressed?.(event.payload)) return { created: 0, deliveries: 0 };
+    if (definition.suppressed?.(event.payload)) return { created: 0, refreshed: 0, deliveries: 0 };
     return deps.uow.run(event.workspaceId, async () => {
       const now = deps.clock.now();
       const members = (await deps.recipients.activeMembers(event.workspaceId)).filter((m) =>
@@ -48,6 +53,7 @@ export class NotifyFromEvent {
         members.map((m) => m.userId),
       );
       let created = 0;
+      let refreshed = 0;
       let deliveries = 0;
       for (const member of members) {
         const prefs = preferences.get(member.userId);
@@ -62,7 +68,17 @@ export class NotifyFromEvent {
           createdAt: now.toString(),
           plan,
         });
-        if (!(await deps.notifications.insertIfAbsent(notification))) continue;
+        if (definition.refreshable) {
+          // Crear o actualizar (aviso agrupado): actualizar nunca programa otro email ni cambia la lectura.
+          const result = await deps.notifications.insertOrRefresh(notification);
+          if (result === 'REFRESHED') {
+            refreshed += 1;
+            deps.metrics.refreshed(plan.type);
+          }
+          if (result !== 'CREATED') continue;
+        } else if (!(await deps.notifications.insertIfAbsent(notification))) {
+          continue;
+        }
         created += 1;
         deps.metrics.created(plan.type);
         const emailOn = prefs ? prefs.isEnabled(plan.type, 'EMAIL') : true;
@@ -86,7 +102,7 @@ export class NotifyFromEvent {
         deliveries += 1;
       }
       deps.metrics.lagSeconds(plan.type, lagSeconds(event.occurredAt, now));
-      return { created, deliveries };
+      return { created, refreshed, deliveries };
     });
   }
 }

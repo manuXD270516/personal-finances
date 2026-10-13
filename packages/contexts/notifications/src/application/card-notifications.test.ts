@@ -33,6 +33,7 @@ describe('NotifyFromEvent: tarjetas de crédito', () => {
     const notify = new NotifyFromEvent(env.notifyDeps());
     expect(await notify.handle(event(cardPaymentDuePayload()), cardDue)).toEqual({
       created: 2,
+      refreshed: 0,
       deliveries: 2,
     });
     expect(
@@ -40,7 +41,7 @@ describe('NotifyFromEvent: tarjetas de crédito', () => {
         event(cardPaymentDuePayload({ daysBefore: 1 }), '01928c4e-7a3b-7c11-8f00-000000000c99'),
         cardDue,
       ),
-    ).toEqual({ created: 0, deliveries: 0 });
+    ).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(forUser(env, VIEWER)).toHaveLength(0);
     for (const userId of [OWNER, EDITOR]) {
       const [n, ...rest] = forUser(env, userId);
@@ -124,7 +125,7 @@ describe('NotifyFromEvent: tarjetas de crédito', () => {
       cardDue,
     );
     // OWNER: solo in-app (sin entrega por email); EDITOR: sin in-app, por lo tanto sin notificación ni email.
-    expect(outcome).toEqual({ created: 1, deliveries: 0 });
+    expect(outcome).toEqual({ created: 1, refreshed: 0, deliveries: 0 });
     expect(forUser(env, EDITOR)).toHaveLength(0);
   });
 
@@ -133,6 +134,7 @@ describe('NotifyFromEvent: tarjetas de crédito', () => {
     const notify = new NotifyFromEvent(env.notifyDeps());
     expect(await notify.handle(event(cardUtilizationPayload()), cardUtilization)).toEqual({
       created: 2,
+      refreshed: 0,
       deliveries: 2,
     });
     expect(
@@ -140,7 +142,7 @@ describe('NotifyFromEvent: tarjetas de crédito', () => {
         event(cardUtilizationPayload(), '01928c4e-7a3b-7c11-8f00-000000000c98'),
         cardUtilization,
       ),
-    ).toEqual({ created: 0, deliveries: 0 });
+    ).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(forUser(env, VIEWER)).toHaveLength(0);
     const [n] = forUser(env, OWNER);
     expect(n).toMatchObject({
@@ -205,7 +207,7 @@ describe('NotifyFromEvent: tarjetas de crédito', () => {
       ),
       occurrenceDue,
     );
-    expect(outcome).toEqual({ created: 0, deliveries: 0 });
+    expect(outcome).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(0);
   });
 

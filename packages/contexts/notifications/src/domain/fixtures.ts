@@ -244,19 +244,72 @@ export const feedRecoveredPayload = (overrides: Record<string, unknown> = {}): R
   ...overrides,
 });
 
-/** Hecho de muestra retenida BTC/USDT 72000.00 (línea base 65000.00, +10.7692 %). */
-export const anomalyRetainedPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-  rateId: FX_RATE_ID,
+const FX_ANCHOR_ID = FX_RATE_ID;
+
+/**
+ * Foto de un grupo de muestras retenidas de BTC/USDT con 1 pendiente: 72000.00 sobre 65000.00 (+10.7692 %). El ancla
+ * es `FX_RATE_ID`; `peak` es el hecho de la muestra con mayor variación.
+ */
+export const anomalyGroupPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  anchorRateId: FX_ANCHOR_ID,
   base: 'BTC',
   quote: 'USDT',
-  rateType: 'MARKET',
-  provider: 'CRYPTO_EXAMPLE',
-  value: '72000.00',
-  baselineRateId: FX_BASELINE_RATE_ID,
-  baselineValue: '65000.00',
-  variationPct: '10.7692',
-  thresholdPct: '10',
+  pendingCount: 1,
+  retainedCount: 1,
+  providers: ['CRYPTO_EXAMPLE'],
+  reviewRateId: FX_RATE_ID,
+  peak: {
+    rateId: FX_RATE_ID,
+    base: 'BTC',
+    quote: 'USDT',
+    rateType: 'MARKET',
+    provider: 'CRYPTO_EXAMPLE',
+    value: '72000.00',
+    baselineRateId: FX_BASELINE_RATE_ID,
+    baselineValue: '65000.00',
+    variationPct: '10.7692',
+    thresholdPct: '10',
+    detectedAt: '2026-10-13T14:02:10.000Z',
+    timeZone: 'America/La_Paz',
+  },
+  firstRetainedAt: '2026-10-13T14:02:10.000Z',
+  lastRetainedAt: '2026-10-13T14:02:10.000Z',
   detectedAt: '2026-10-13T14:02:10.000Z',
   timeZone: 'America/La_Paz',
   ...overrides,
 });
+
+/** Mismo grupo con campos del `peak` distintos (valor, línea base o variación). */
+export const anomalyGroupWithPeak = (
+  peak: Record<string, unknown>,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => {
+  const base = anomalyGroupPayload();
+  return { ...base, peak: { ...(base['peak'] as Record<string, unknown>), ...peak }, ...overrides };
+};
+
+/**
+ * Grupo de USDT/BOB con 3 muestras pendientes de paralelo.bo (TC-NOTIFICATIONS-FX-010): el pico es PARALLEL_SELL
+ * 12.90 frente a 12.10 (+6.6116 %).
+ */
+export const usdtBobGroupPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> =>
+  anomalyGroupWithPeak(
+    {
+      base: 'USDT',
+      quote: 'BOB',
+      rateType: 'PARALLEL_SELL',
+      provider: 'PARALELO_BO',
+      value: '12.90',
+      baselineValue: '12.10',
+      variationPct: '6.6116',
+      thresholdPct: '5',
+    },
+    {
+      base: 'USDT',
+      quote: 'BOB',
+      pendingCount: 3,
+      retainedCount: 3,
+      providers: ['PARALELO_BO'],
+      ...overrides,
+    },
+  );

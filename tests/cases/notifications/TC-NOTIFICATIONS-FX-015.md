@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de muestra anómala retenida"
 scenario: "Varios pares en el mismo ciclo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/rate-feed-alerts.test.ts
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "anomaly", "grouping"]
@@ -48,4 +50,4 @@ Entonces hay un aviso por par
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

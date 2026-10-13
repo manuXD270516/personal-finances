@@ -264,6 +264,29 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
           .sort(byAsOfDesc);
         return accepted[0] ? stored(accepted[0]) : null;
       },
+      async retainedOfPair(ws, base, quote) {
+        return state.rates
+          .filter(
+            (r) =>
+              r.snapshot.workspaceId === ws &&
+              r.rate.base.code === base &&
+              r.rate.quote.code === quote &&
+              r.snapshot.anomaly !== null,
+          )
+          .map((r) => ({
+            rateId: r.id,
+            createdAt: r.snapshot.createdAt,
+            decidedAt: reviewOf(r.id)?.decidedAt ?? null,
+            provider: String(r.snapshot.provider),
+            rateType: r.snapshot.rateType,
+            value: r.valueText,
+            baselineRateId: r.snapshot.anomaly?.baselineRateId ?? '',
+            variationPct: r.snapshot.anomaly?.variationPct ?? '0',
+          }));
+      },
+      async lockAnomalyGroups() {
+        // Sin concurrencia entre transacciones en el doble en memoria.
+      },
       async providerDays(ws, feed, from, to) {
         return new Set(
           ofFeed(ws, feed)
@@ -542,7 +565,7 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     async notify(fact) {
       if (faults.notify) throw faults.notify;
       state.notified.push(fact);
-      return { created: 2, deliveries: 2 };
+      return { created: 2, refreshed: 0, deliveries: 2 };
     },
   };
   return {

@@ -1,5 +1,6 @@
 import { dec, DomainError, MoneyDecimal } from '@pf/shared-kernel';
 import {
+  FX_RATE_ANOMALY_GROUP_MESSAGE_KEY,
   FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY,
   FX_RATE_FEED_RECOVERED_MESSAGE_KEY,
   FX_RATE_FEED_STALE_MESSAGE_KEY,
@@ -141,7 +142,8 @@ type MessageKind =
   | 'goal_milestone'
   | 'fx_rate_feed_stale'
   | 'fx_rate_feed_recovered'
-  | 'fx_rate_anomaly_retained';
+  | 'fx_rate_anomaly_retained'
+  | 'fx_rate_anomaly_group';
 
 const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
   `${formatDecimal(value.amount, locale)} ${value.currency}`;
@@ -188,6 +190,7 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === FX_RATE_FEED_STALE_MESSAGE_KEY) return 'fx_rate_feed_stale';
   if (messageKey === FX_RATE_FEED_RECOVERED_MESSAGE_KEY) return 'fx_rate_feed_recovered';
   if (messageKey === FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY) return 'fx_rate_anomaly_retained';
+  if (messageKey === FX_RATE_ANOMALY_GROUP_MESSAGE_KEY) return 'fx_rate_anomaly_group';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
 }
 
@@ -396,10 +399,42 @@ function valuesOf(
       variation: signedVariation(str(params, 'variationPct'), locale),
     };
   }
+  if (kind === 'fx_rate_anomaly_group') {
+    const peak = recordOf(params, 'peak');
+    return {
+      pair: `${str(params, 'base')}/${str(params, 'quote')}`,
+      count: String(params['pendingCount'] ?? ''),
+      rateType: str(peak, 'rateType'),
+      provider: providerLabel(str(peak, 'provider')),
+      providers: listOf(strings(params, 'providers').map(providerLabel), locale),
+      value: rateText(str(peak, 'value'), locale),
+      baseline: rateText(str(peak, 'baselineValue'), locale),
+      variation: signedVariation(str(peak, 'variationPct'), locale),
+    };
+  }
   return {
     period: str(params, 'periodLabel'),
     periodEnd: formatDate(str(params, 'periodEnd'), locale),
   };
+}
+
+/** Objeto anidado de los params (vacío si falta o no es un objeto). */
+function recordOf(params: NotificationParams, key: string): NotificationParams {
+  const value = params[key];
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as NotificationParams)
+    : {};
+}
+
+/**
+ * Sufijo de plural de las plantillas que lo llevan (`_one` / `_other`, reglas `Intl.PluralRules` del locale) según la
+ * cantidad `pendingCount` del aviso; vacío para el resto.
+ */
+function pluralSuffix(kind: MessageKind, params: NotificationParams, locale: NotificationLocale): string {
+  if (kind !== 'fx_rate_anomaly_group') return '';
+  const count = params['pendingCount'];
+  const category = new Intl.PluralRules(FORMAT_LOCALE[locale]).select(typeof count === 'number' ? count : 0);
+  return category === 'one' ? '_one' : '_other';
 }
 
 export function renderInApp(
@@ -410,14 +445,15 @@ export function renderInApp(
 ): RenderedInApp {
   const kind = kindOf(messageKey);
   const values = valuesOf(kind, params, names, locale);
-  const title = fill(message(locale, `inapp.${kind}.title`), values);
+  const plural = pluralSuffix(kind, params, locale);
+  const title = fill(message(locale, `inapp.${kind}.title${plural}`), values);
   const bodyKey =
     isRecurring(kind) && values['amount'] === ''
       ? 'body_variable'
       : kind === 'fx_rate_feed_stale' && values['lastRate'] === ''
         ? 'body_never'
         : 'body';
-  let body = fill(message(locale, `inapp.${kind}.${bodyKey}`), values);
+  let body = fill(message(locale, `inapp.${kind}.${bodyKey}${plural}`), values);
   if (kind === 'subscription_renewal') {
     if (values['plan'] !== '')
       body = `${fill(message(locale, 'inapp.subscription_renewal.plan'), values)} ${body}`;
@@ -475,7 +511,9 @@ export function renderEmail(input: EmailRenderInput): RenderedEmail {
       ? 'detailed_variable'
       : variant === 'detailed' && kind === 'fx_rate_feed_stale' && values['lastRate'] === ''
         ? 'detailed_never'
-        : variant;
+        : variant === 'detailed'
+          ? `detailed${pluralSuffix(kind, input.params, locale)}`
+          : variant;
   const line = fill(message(locale, `email.${kind}.${variantKey}`), values);
   const cta = message(locale, 'email.cta');
   const footer = message(locale, 'email.footer');

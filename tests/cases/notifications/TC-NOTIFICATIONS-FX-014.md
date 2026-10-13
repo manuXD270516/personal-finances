@@ -5,16 +5,19 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de muestra anómala retenida"
 scenario: "Salto nuevo tras revisar todo el grupo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-NOTIFY-005"]
 nfr: []
 invariants: ["INV-028"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/rate-feed-alerts.test.ts
+  - packages/contexts/fx/test/integration/rate-feed-alerts.int.test.ts
+  - packages/contexts/fx/src/domain/anomaly-group-resolver.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "anomaly", "grouping"]
@@ -49,4 +52,4 @@ Entonces cada destinatario recibe un aviso nuevo
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

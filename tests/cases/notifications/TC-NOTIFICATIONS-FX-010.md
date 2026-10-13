@@ -5,16 +5,21 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de muestra anómala retenida"
 scenario: "Salto con mediana, compra y venta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-NOTIFY-005", "FR-FX-010"]
 nfr: []
 invariants: ["INV-028"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/rate-feed-alerts.test.ts
+  - packages/contexts/fx/test/integration/rate-feed-alerts.int.test.ts
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+  - apps/api/test/api/fx-feed-alerts.api.test.ts
+  - packages/contexts/fx/src/domain/anomaly-group-resolver.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "anomaly", "grouping"]
@@ -52,4 +57,4 @@ Entonces OWNER y EDITOR tienen un solo aviso con 3 muestras pendientes y se publ
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

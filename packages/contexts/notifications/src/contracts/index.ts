@@ -40,6 +40,8 @@ export interface NotificationsMaintenanceJob {
 /** Instrumentos OTel (el exportador Prometheus agrega `_total`): docs/18 §5, design decisión 12. */
 export const NOTIFICATION_METRICS = {
   created: 'notifications.created',
+  /** Avisos existentes actualizados por una muestra posterior del mismo grupo (refine-rate-anomaly-alert-grouping). */
+  refreshed: 'notifications.refreshed',
   emailDeliveries: 'notifications.email_deliveries',
   eventLag: 'notifications.event_lag',
 } as const;
@@ -59,9 +61,9 @@ export const NOTIFICATIONS_AUDIT_POLICY = {
 
 /**
  * Entrega directa de alertas desde otro contexto (openspec add-rate-feed-alerts; D249). Hoy solo FX (job de providers de
- * tasas): tasa sin actualizar, tasa recuperada y muestra retenida como anómala. NOTIFY resuelve destinatarios (OWNER y
+ * tasas): tasa sin actualizar, tasa recuperada y muestras retenidas como anómalas (agrupadas por par). NOTIFY resuelve destinatarios (OWNER y
  * EDITOR activos), preferencias, idioma, horario de silencio y email, y deduplica por `(tipo, factKey, destinatario)`
- * (FR-NOTIFY-005). Sin consumidor de eventos: no crea colas `events.notifications.*` ni conexiones nuevas.
+ * (FR-NOTIFY-005); el aviso de anomalías, además, se actualiza con cada foto nueva del grupo. Sin consumidor de eventos: no crea colas `events.notifications.*` ni conexiones nuevas.
  */
 export type NotificationIntakeType =
   'FX_RATE_FEED_STALE' | 'FX_RATE_FEED_RECOVERED' | 'FX_RATE_ANOMALY_RETAINED';
@@ -91,7 +93,7 @@ export interface RateFeedRecoveredFact {
   readonly timeZone: string;
 }
 
-/** `FX_RATE_ANOMALY_RETAINED`: una muestra de provider quedó retenida como anómala y espera su revisión. */
+/** Una muestra de provider retenida como anómala que espera su revisión (el "pico" del grupo). */
 export interface RateAnomalyRetainedFact {
   readonly rateId: string;
   readonly base: string;
@@ -108,9 +110,35 @@ export interface RateAnomalyRetainedFact {
   readonly timeZone: string;
 }
 
+/**
+ * `FX_RATE_ANOMALY_RETAINED` (refine-rate-anomaly-alert-grouping): foto del grupo de muestras retenidas pendientes de un
+ * par en un workspace (de cualquier provider y tipo de tasa). `factKey` = `anchorRateId`, la primera muestra del grupo:
+ * un aviso por grupo y destinatario que las muestras siguientes ACTUALIZAN (sin volverlo a no leído ni otro email).
+ */
+export interface RateAnomalyGroupFact {
+  readonly anchorRateId: string;
+  readonly base: string;
+  readonly quote: string;
+  /** Muestras del grupo pendientes de revisión ahora (≥ 1). */
+  readonly pendingCount: number;
+  /** Todas las muestras del grupo (≥ `pendingCount`). */
+  readonly retainedCount: number;
+  /** Providers distintos de las pendientes, en orden alfabético. */
+  readonly providers: readonly string[];
+  /** La pendiente más antigua: destino del enlace. */
+  readonly reviewRateId: string;
+  /** La pendiente con mayor variación absoluta (empate ⇒ la más reciente). */
+  readonly peak: RateAnomalyRetainedFact;
+  readonly firstRetainedAt: string;
+  /** Instante de la foto: una foto más vieja nunca reemplaza a una más nueva. */
+  readonly lastRetainedAt: string;
+  readonly detectedAt: string;
+  readonly timeZone: string;
+}
+
 interface IntakeFactBase {
   readonly workspaceId: string;
-  /** Clave de negocio del hecho: `episodeId` (obsolescencia y recuperación) o `rateId` (anomalía). */
+  /** Clave de negocio del hecho: `episodeId` (obsolescencia y recuperación) o `anchorRateId` (grupo de anomalías). */
   readonly factKey: string;
   /** Id del evento de dominio que FX escribió en el outbox en la misma unidad de trabajo (origen de la notificación). */
   readonly sourceEventId: string;
@@ -122,12 +150,14 @@ export type NotificationIntakeFact =
   | (IntakeFactBase & { readonly type: 'FX_RATE_FEED_RECOVERED'; readonly payload: RateFeedRecoveredFact })
   | (IntakeFactBase & {
       readonly type: 'FX_RATE_ANOMALY_RETAINED';
-      readonly payload: RateAnomalyRetainedFact;
+      readonly payload: RateAnomalyGroupFact;
     });
 
 export interface NotificationIntakeOutcome {
   /** Notificaciones in-app nuevas (una por destinatario sin notificación previa de ese hecho). */
   readonly created: number;
+  /** Notificaciones existentes actualizadas con una foto más nueva del grupo (sin email nuevo). */
+  readonly refreshed: number;
   /** Entregas por email programadas. */
   readonly deliveries: number;
 }

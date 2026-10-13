@@ -649,9 +649,14 @@ describe('Detalle', () => {
       id: uuid(1031),
       type: 'FX_RATE_ANOMALY_RETAINED',
       severity: 'WARNING',
+      // Aviso agrupado por par (refine-rate-anomaly-alert-grouping): título con la cantidad y cuerpo con la mayor variación.
+      title: 'USDT/BOB: 3 tasas automáticas retenidas',
+      body: 'La mayor variación es PARALLEL_SELL 12,90 frente a 12,10 (+6,61 %) de paralelo.bo. Providers con muestras pendientes: paralelo.bo.',
       link: { kind: 'FX_RATE', periodId: rateId, periodLabel: '2026-10', fxRateId: rateId },
     });
     const heldHtml = render({ status: 'ready', notification: held });
+    expect(textOf(heldHtml)).toContain('USDT/BOB: 3 tasas automáticas retenidas');
+    expect(textOf(heldHtml)).toContain('PARALLEL_SELL 12,90 frente a 12,10 (+6,61 %)');
     expect(tagOf(heldHtml, 'notification-open-resource')).toContain(
       `href="/es/fx?vista=proveedores#anomalia-${rateId}"`,
     );

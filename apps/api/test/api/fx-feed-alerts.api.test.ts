@@ -47,6 +47,8 @@ let providerServer: Server;
 let providerUrl: string;
 let worker: Pool;
 let notifications: ReturnType<typeof createNotificationsWorkerRuntime>;
+/** Corridas de `fx.provider_run` (tabla de instalación compartida entre suites) que ya existían antes de esta suite. */
+let preexistingRuns: string[] = [];
 const routes = new Map<string, string>();
 const clock = new FixedClock(Instant.parse('2026-10-02T09:00:00Z'));
 const contract = ApiContract.fromFile(resolveContractPath());
@@ -169,6 +171,9 @@ beforeAll(async () => {
   await new Promise<void>((r) => providerServer.listen(0, '127.0.0.1', r));
   providerUrl = `http://127.0.0.1:${(providerServer.address() as AddressInfo).port}`;
   worker = new Pool({ connectionString: deps.workerDatabaseUrl, max: 6 });
+  preexistingRuns = (await worker.query<{ id: string }>('SELECT id::text FROM fx.provider_run')).rows.map(
+    (r) => r.id,
+  );
   const pair = await generateKeyPair('RS256', { extractable: true });
   signingKey = pair.privateKey;
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
@@ -224,6 +229,11 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
+  // Las corridas de esta suite (reloj fijo, hasta las 17:05Z del 2 de octubre) se ordenarían antes que las de otras suites
+  // del mismo PostgreSQL y falsearían su estado de providers: se borran las que esta suite creó (pf_worker puede purgar).
+  await worker
+    ?.query('DELETE FROM fx.provider_run WHERE NOT (id::text = ANY($1::text[]))', [preexistingRuns])
+    .catch(() => undefined);
   await runtime?.close();
   await worker?.end();
   await new Promise<void>((r) => providerServer?.close(() => r()));
@@ -292,28 +302,62 @@ describe('Alertas de tasas por HTTP (notifications/alerts, fx/market-rate-provid
     });
   });
 
-  it('[TC-NOTIFICATIONS-FX-004] una muestra anómala retenida avisa una sola vez y se confirma desde el enlace de su notificación', async () => {
-    // 12.05 → 13.50 (+12.03 %): supera el 5 % de fiat y estables.
+  it('[TC-NOTIFICATIONS-FX-004] [TC-NOTIFICATIONS-FX-010] [TC-NOTIFICATIONS-FX-012] [TC-NOTIFICATIONS-FX-017] un salto retenido avisa UN solo aviso por par con 3 muestras pendientes, los ciclos siguientes lo actualizan y se confirma desde su enlace', async () => {
+    // Líneas base: PARALLEL 12.05, compra 12.12 y venta 11.92. 13.50 / 13.6 / 13.4 superan el 5 % de fiat y estables.
     routes.set('/api/v1/rate', paralelo('13.50', '2026-10-02T16:30:00.000Z', '13.6', '13.4'));
     await poll('2026-10-02T16:35:00Z');
+    // Reprocesar el ciclo con las mismas vigencias no crea ni cambia nada.
     await poll('2026-10-02T16:50:00Z');
     const rows = byType(await inbox(editor), 'FX_RATE_ANOMALY_RETAINED');
-    // Una notificación por muestra retenida (D234): la mediana y la compra y venta de cada par, sin repetirse al repetir el ciclo.
-    expect(rows).toHaveLength(6);
-    expect(pairsOf(rows)).toEqual(['USD/BOB', 'USD/BOB', 'USD/BOB', 'USDT/BOB', 'USDT/BOB', 'USDT/BOB']);
-    const usdt = rows.find(
-      (n) => (n['params'] as Json)['base'] === 'USDT' && (n['params'] as Json)['rateType'] === 'PARALLEL',
-    )!;
+    // Un aviso por par (USD/BOB y USDT/BOB), no uno por muestra (refine-rate-anomaly-alert-grouping).
+    expect(rows).toHaveLength(2);
+    expect(pairsOf(rows)).toEqual(['USD/BOB', 'USDT/BOB']);
+    const ownerRows = byType(await inbox(owner), 'FX_RATE_ANOMALY_RETAINED');
+    expect(ownerRows).toHaveLength(2);
+    const usdt = ownerRows.find((n) => (n['params'] as Json)['base'] === 'USDT')!;
     expect(usdt).toMatchObject({ severity: 'WARNING', status: 'UNREAD', link: { kind: 'FX_RATE' } });
     expect(usdt['params']).toMatchObject({
-      provider: 'PARALELO_BO',
-      value: '13.5',
-      baselineValue: '12.05',
-      variationPct: '12.0332',
+      pendingCount: 3,
+      retainedCount: 3,
+      providers: ['PARALELO_BO'],
+      peak: { rateType: 'PARALLEL_SELL', provider: 'PARALELO_BO', value: '13.4', baselineValue: '11.92' },
     });
-    expect(String(usdt['title'])).toContain('+12,03 %');
-    expect(byType(await inbox(owner), 'FX_RATE_ANOMALY_RETAINED')).toHaveLength(6);
+    expect(usdt['title']).toBe('USDT/BOB: 3 tasas automáticas retenidas');
+    expect(String(usdt['body'])).toContain('+12,42 %');
+    // El EDITOR lo lee en portugués.
+    const editorUsdt = rows.find((n) => (n['params'] as Json)['base'] === 'USDT')!;
+    expect(editorUsdt['title']).toBe('USDT/BOB: 3 taxas automáticas retidas');
     expect(await inbox(viewer)).toHaveLength(0);
+    // El hecho de dominio sigue siendo uno por muestra retenida: 3 por par y 2 pares.
+    const retainedEvents = async () =>
+      Number(
+        (
+          await worker.query<{ n: string }>(
+            `SELECT count(*)::text AS n FROM platform.outbox WHERE workspace_id = $1 AND event_type = 'fx.RateAnomalyRetained'`,
+            [owner.ws],
+          )
+        ).rows[0]?.n,
+      );
+    expect(await retainedEvents()).toBe(6);
+
+    // El EDITOR lo lee; un ciclo siguiente con vigencia nueva actualiza el MISMO aviso (6 pendientes) y sigue leído.
+    const read = await call('POST', `${W(editor)}/notifications/${String(editorUsdt['id'])}/read`, {
+      token: editor.token,
+    });
+    expect(read.status, JSON.stringify(read.body)).toBe(200);
+    routes.set('/api/v1/rate', paralelo('13.50', '2026-10-02T16:55:00.000Z', '13.6', '13.4'));
+    await poll('2026-10-02T17:00:00Z');
+    const updated = byType(await inbox(editor), 'FX_RATE_ANOMALY_RETAINED');
+    expect(updated).toHaveLength(2);
+    const editorUsdtAfter = updated.find((n) => (n['params'] as Json)['base'] === 'USDT')!;
+    expect(editorUsdtAfter).toMatchObject({
+      id: editorUsdt['id'],
+      status: 'READ',
+      createdAt: editorUsdt['createdAt'],
+      params: { pendingCount: 6, retainedCount: 6 },
+    });
+    expect(editorUsdtAfter['title']).toBe('USDT/BOB: 6 taxas automáticas retidas');
+    expect(await retainedEvents()).toBe(12);
 
     // Antes de confirmar, la valoración sigue con 12.05.
     const before = await call('GET', `${W(viewer)}/fx-rates/latest?base=USDT&quote=BOB&rateType=PARALLEL`, {
@@ -321,21 +365,26 @@ describe('Alertas de tasas por HTTP (notifications/alerts, fx/market-rate-provid
     });
     expect((before.body['rate'] as { value: string }).value).toBe('12.05');
 
-    // El enlace trae la tasa: el EDITOR la confirma con un motivo y la valoración la usa.
-    const rateId = String((usdt['link'] as Json)['fxRateId']);
+    // El enlace lleva a la pendiente más antigua del grupo: el EDITOR la confirma con un motivo y la valoración la usa.
+    const rateId = String((editorUsdtAfter['link'] as Json)['fxRateId']);
+    const held = await call('GET', `${W(editor)}/fx-rates/${rateId}`, { token: editor.token });
+    expect(held.status, JSON.stringify(held.body)).toBe(200);
+    const heldRate = (held.body['rate'] ?? held.body) as { rateType: string; value: string };
     const confirmed = await call('POST', `${W(editor)}/fx-rates/${rateId}/anomaly-review`, {
       token: editor.token,
       body: { decision: 'CONFIRM', reason: 'movimiento real del mercado' },
       headers: { 'idempotency-key': randomUUID() },
     });
     expect(confirmed.status, JSON.stringify(confirmed.body)).toBe(200);
-    const after = await call('GET', `${W(viewer)}/fx-rates/latest?base=USDT&quote=BOB&rateType=PARALLEL`, {
-      token: viewer.token,
-    });
-    expect((after.body['rate'] as { value: string }).value).toBe('13.5');
-    // La notificación no se duplica tras confirmar.
+    const after = await call(
+      'GET',
+      `${W(viewer)}/fx-rates/latest?base=USDT&quote=BOB&rateType=${heldRate.rateType}`,
+      { token: viewer.token },
+    );
+    expect(Number((after.body['rate'] as { value: string }).value)).toBe(Number(heldRate.value));
+    // Revisar no abre otro aviso ni cambia el existente: siguen dos, uno por par.
     await poll('2026-10-02T17:05:00Z');
-    expect(byType(await inbox(editor), 'FX_RATE_ANOMALY_RETAINED')).toHaveLength(6);
+    expect(byType(await inbox(editor), 'FX_RATE_ANOMALY_RETAINED')).toHaveLength(2);
     expect(workerLog.records().filter((r) => String(r['msg']).includes('failed'))).toEqual([]);
   });
 });

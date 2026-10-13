@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Email único por grupo de tasas retenidas"
 scenario: "Muestras posteriores sin otro email"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-005", "FR-NOTIFY-006"]
 nfr: []
 invariants: ["INV-028"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/fx-rate-email.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "email", "grouping"]
@@ -48,4 +49,4 @@ Entonces el OWNER recibió un solo email
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

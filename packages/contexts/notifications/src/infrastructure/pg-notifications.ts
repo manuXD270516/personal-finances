@@ -102,6 +102,29 @@ export class PgNotificationRepository implements NotificationRepository {
     return rows.length > 0;
   }
 
+  async insertOrRefresh(n: NotificationState): Promise<'CREATED' | 'REFRESHED' | 'UNCHANGED'> {
+    // Solo el aviso agrupado de tasas retenidas se actualiza, y nunca con una foto más vieja (`lastRetainedAt`). El
+    // estado de lectura, la fecha de creación y el origen no se tocan (el GRANT de `pf_worker` solo cubre estas columnas).
+    const { rows } = await sql<{ inserted: boolean }>`
+      INSERT INTO notifications.notification
+        (id, workspace_id, user_id, notification_type, severity, message_key, params, link, dedupe_key,
+         source_event_id, status, created_at)
+      VALUES (${n.id}, ${n.workspaceId}, ${n.userId}, ${n.type}, ${n.severity}, ${n.messageKey},
+              ${JSON.stringify(n.params)}::jsonb, ${JSON.stringify(n.link)}::jsonb, ${n.dedupeKey},
+              ${n.sourceEventId}, 'UNREAD', ${n.createdAt}::timestamptz)
+      ON CONFLICT (workspace_id, user_id, dedupe_key) DO UPDATE
+         SET params = EXCLUDED.params, message_key = EXCLUDED.message_key, link = EXCLUDED.link
+       WHERE notification.notification_type = 'FX_RATE_ANOMALY_RETAINED'
+         AND EXCLUDED.notification_type = 'FX_RATE_ANOMALY_RETAINED'
+         AND (notification.params->>'lastRetainedAt' IS NULL
+              OR (notification.params->>'lastRetainedAt')::timestamptz
+                 <= (EXCLUDED.params->>'lastRetainedAt')::timestamptz)
+      RETURNING (xmax = 0) AS inserted`.execute(db());
+    const row = rows[0];
+    if (!row) return 'UNCHANGED';
+    return row.inserted ? 'CREATED' : 'REFRESHED';
+  }
+
   async findOwn(workspaceId: string, userId: string, id: string): Promise<NotificationState | null> {
     const { rows } = await sql<NotificationRow>`
       SELECT ${notificationColumns} FROM notifications.notification

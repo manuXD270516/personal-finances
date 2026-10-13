@@ -16908,7 +16908,9 @@ components:
         fxRateId:
           description: >-
             Held exchange rate (only `FX_RATE`, add-rate-feed-alerts): the app opens the review of that rate (Rates →
-            Providers, where an EDITOR or OWNER confirms or rejects it). In that kind `periodId` is the rate id and
+            Providers, where an EDITOR or OWNER confirms or rejects it). For a held-rate notice, which is grouped per
+            pair (refine-rate-anomaly-alert-grouping), it is the oldest pending sample of the pair's group at its last
+            update; the notice can be updated while the group stays open. In that kind `periodId` is the rate id and
             `periodLabel` the month of the fact in the workspace time zone. `FX_FEED_STATUS` opens Settings → Automatic
             rates (status per pair); there `periodId` is the stale-rate episode id and `periodLabel` the month of the fact.
           $ref: '#/components/schemas/Uuid'
