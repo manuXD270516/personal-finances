@@ -13,7 +13,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 2 Planificación y control | 10 de 11 archivados; `add-month-closing` fusionado, espera la evidencia del owner (§2) |
 | 3 Compromisos e importación | Completa y archivada (persistencia del import ≤ 20 s diferida a Phase 6, D152) |
 | 4 Metas y deudas | Completa salvo evidencias del owner (D219): implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
-| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Changes 37 y 40 implementados y archivados (#121, #122, #123); changes 38 y 39 con spec fusionada (#118, #119), sin implementar. Siguiente a implementar: 38 (§1.2) |
+| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Changes 37 y 40 implementados y archivados (#121, #122, #123); change 38 implementado sin adapters reales (#126) y change 39 implementado (#128); 45 con spec fusionada (#127). Siguiente: adapters cripto (espera al owner, §2) y el change 45 (§1.2) |
 
 ### 1.1 Phase 4
 
@@ -30,18 +30,18 @@ Informe de cierre de Phase 4 y criterios de salida (docs/24 §5.4): [docs/39](39
 
 ### 1.2 Phase 5
 
-Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados; 37 y 40 están implementados y archivados. Siguiente a implementar: 38 `add-crypto-rate-providers`; el 39 va después del 38.
+Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados; 37 y 40 están implementados y archivados; 38 y 39 implementados (sin archivar). El 45 tiene la spec fusionada.
 
 | # | Change | Estado |
 |---|---|---|
 | 37 | `fix-phase-4-gaps` | Implementado y archivado (#121, #122; D222) |
-| 38 | `add-crypto-rate-providers` | Spec fusionada (#118); implementación pendiente. Sin adapters hasta verificar los términos de uso (ADR-0029 nuevo, D225) y hasta que el owner nombre el exchange |
-| 39 | `add-rate-feed-alerts` | Spec fusionada (#119); se implementa después de 38 (D233–D236) |
+| 38 | `add-crypto-rate-providers` | Implementado (#126) **sin adapters reales**: faltan 1.1, 1.2, 4.1–4.3, 7.1 y 7.2, que esperan al owner (nombrar su exchange y verificar términos, ADR-0029, D225). No se archiva hasta entonces (o hasta diferirlas por escrito) |
+| 39 | `add-rate-feed-alerts` | Implementado (#128), tareas completas. Archivar **después** de 38 (D233–D236). Decisiones a confirmar: un aviso por muestra anómala (hasta 3 por par y salto), y el par sin tasa aceptada abre su episodio en el primer ciclo |
 | 40 | `add-conversion-cost-analysis` | Implementado (#123) y archivado (D231, D244–D247). Trajo el único consumidor nuevo (`fx.user-conversion-observations`); subir `max_connections` antes del despliegue (D249) |
 | 41 | `add-exchange-house-rate-providers` | En espera de P14 (D232) |
 | 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
 | 44 | `add-phase-4-demo-data` | Could, último y opcional (D223) |
-| 45 | `add-dependency-updates` | Platform track (D224) |
+| 45 | `add-dependency-updates` | Spec fusionada (#127). Preguntas abiertas en su `design.md` (11); la ejecución de Renovate necesita que el owner instale la app (recomendada: GitHub App de Mend) |
 
 ## 2. Esperan al owner
 
