@@ -1,6 +1,6 @@
 # 38: Estado del proyecto y pendientes
 
-> **Actualizado:** 2026-10-12 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md)
+> **Actualizado:** 2026-10-13 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md), cierre de Phase 4 y diseño de Phase 5 [39](39-phase-4-closure-and-phase-5-design.md), preguntas de Phase 5 [40](40-phase-5-consolidation-questions.md)
 
 Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cuando cambia el estado de un change o se resuelve un pendiente.
 
@@ -12,7 +12,8 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 1 Núcleo (cuentas, transacciones, ledger, FX, clasificación, dashboard) | Completa y archivada |
 | 2 Planificación y control | 10 de 11 archivados; `add-month-closing` fusionado, espera la evidencia del owner (§2) |
 | 3 Compromisos e importación | Completa y archivada (persistencia del import ≤ 20 s diferida a Phase 6, D152) |
-| 4 Metas y deudas | En curso (§1.1) |
+| 4 Metas y deudas | Implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
+| 5 FX y cripto avanzado | **Diseño: preguntas al owner** ([docs/40](40-phase-5-consolidation-questions.md), 32 preguntas, 9 bloqueantes). Plan provisional de changes 37–44 en [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte B; no hay changes de OpenSpec todavía |
 
 ### 1.1 Phase 4
 
@@ -25,7 +26,11 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 35 | `add-debt-summary` | Fusionado (#109), tareas completas | Archivar **después** de `add-loans` y `add-loan-amortization-advanced`: sus specs `debt/loans` son ADDED y chocarían con el archive de `add-loans`. Pendientes de docs: `docs/14` §10, `docs/28`, `docs/03` §7 |
 | 36 | `add-spendable-amount` | Archivado (#112 fusionado; PR de archivado: #113) | Ninguna. Supuestos a confirmar por el owner: sin periodo financiero que cubra hoy se usa el mes calendario (sin plan de presupuesto); "N tarjetas sin pago programado" cuenta tarjetas con saldo adeudado sin ocurrencia ni pendiente hacia ellas; benchmark nightly TC-REPORTING-SPENDABLE-014 en BOB (`apps/api/test/perf/spendable.perf.ts`) |
 
-Después de Phase 4: informe de cierre de fase, criterios de salida (docs/24 §5.4) y diseño de Phase 5 con el agente `arquitecto`.
+Informe de cierre de Phase 4 y criterios de salida (docs/24 §5.4): [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A. Cumplidos: Σ principal = principal (TC-DEBT-AMORT-004/005) y pagos de tarjeta fuera del gasto (TC-DEBT-CARD-015, TC-TRANSACTIONS-CARDPAYMENT-001). Pendientes del owner: tabla del banco y metas reales (§2).
+
+### 1.2 Phase 5
+
+Siguiente paso: el owner responde [docs/40](40-phase-5-consolidation-questions.md); sus respuestas van a `docs/41-phase-5-consolidation-decisions.md` (pregunta N → D(218+N)) y después el agente `arquitecto` redacta los changes que queden en el plan.
 
 ## 2. Esperan al owner
 
