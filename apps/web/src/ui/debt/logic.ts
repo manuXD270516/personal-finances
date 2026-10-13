@@ -1,3 +1,4 @@
+import type { FinanceApiClient } from '../../bff/finance-api-client';
 import {
   isZeroAmount,
   normalizeDecimalInput,
@@ -39,6 +40,22 @@ import {
 
 export const loansPath = (base: string): string => `${base}/loans`;
 export const loanPath = (base: string, id: string): string => `${base}/loans/${id}`;
+
+/**
+ * `PATCH …/loans/{id}` con `If-Match`. El contrato (`updateLoan`) declara SOLO `application/json`; el cliente envía
+ * `application/merge-patch+json` por defecto en un PATCH y la API lo rechazaría con 400 `VALIDATION_FAILED`
+ * (el panel de edición no llegaba a mostrar «Cambios guardados.»).
+ */
+export const editLoan = (
+  api: Pick<FinanceApiClient, 'command'>,
+  base: string,
+  loan: Pick<Loan, 'id' | 'version'>,
+  body: Record<string, unknown>,
+) =>
+  api.command('PATCH', loanPath(base, loan.id), body, {
+    ifMatch: loan.version,
+    contentType: 'application/json',
+  });
 export const previewPath = (base: string): string => `${base}/loans/schedule-preview`;
 export const debtHref = (id?: string, suffix = ''): string => (id ? `/debts/${id}${suffix}` : '/debts');
 

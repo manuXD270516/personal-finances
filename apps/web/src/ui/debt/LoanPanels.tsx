@@ -17,6 +17,7 @@ import {
   breakdownSum,
   buildLoanEdit,
   buildPaymentInput,
+  editLoan,
   loanFormFromLoan,
   loanPath,
   parseDisburseFee,
@@ -474,7 +475,7 @@ export function DraftEditPanel({
     setErrors({});
     setBusy(true);
     try {
-      await ctx.api.command('PATCH', loanPath(ctx.base, loan.id), built.input, { ifMatch: loan.version });
+      await editLoan(ctx.api, ctx.base, loan, built.input);
       onDone(f.t('edit.done'));
     } catch (err) {
       setProblem(problemOf(err));
@@ -604,7 +605,7 @@ function ActiveEditPanel({
       body['lenderCounterpartyId'] = lender === '' ? null : lender;
     if (payment !== loan.paymentAccountId) body['paymentAccountId'] = payment;
     try {
-      await ctx.api.command('PATCH', loanPath(ctx.base, loan.id), body, { ifMatch: loan.version });
+      await editLoan(ctx.api, ctx.base, loan, body);
       onDone(f.t('edit.done'));
     } catch (err) {
       setProblem(problemOf(err));

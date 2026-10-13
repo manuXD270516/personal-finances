@@ -190,7 +190,7 @@ function ReportedForm({
         'PATCH',
         `${cardPath(ctx.base, card.id)}/statements/${statement.id}`,
         built.patch,
-        { ifMatch: statement.version ?? 0, idempotencyKey: key.current },
+        { ifMatch: statement.version ?? 0, idempotencyKey: key.current, contentType: 'application/json' },
       );
       key.current = uuidv7();
       onChanged();

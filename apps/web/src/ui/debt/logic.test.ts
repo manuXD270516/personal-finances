@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createFinanceApiClient } from '../../bff/finance-api-client';
 import {
   autoMapping,
   breakdownDelta,
@@ -11,6 +12,7 @@ import {
   buildReferenceInput,
   emptyLoanForm,
   emptyManualRow,
+  editLoan,
   emptyPaymentForm,
   fractionToPercent,
   guessDateFormat,
@@ -457,6 +459,34 @@ describe('edición del borrador: formulario y PATCH', () => {
       paymentAccountId: 'acc-bank',
     });
     expect(form.charges.insurance).toEqual({ mode: 'RATE_ON_BALANCE', value: '0,04' });
+  });
+
+  it('[TC-DEBT-LOAN-054] el PATCH del préstamo viaja como application/json con If-Match, el único tipo que declara el contrato (updateLoan)', async () => {
+    const seen: { method?: string; url?: string; headers: Record<string, string>; body?: string }[] = [];
+    const api = createFinanceApiClient({
+      baseUrl: 'http://api',
+      headers: () => ({}),
+      fetch: ((url: string, init: RequestInit) => {
+        seen.push({
+          method: init.method,
+          url,
+          headers: Object.fromEntries(new Headers(init.headers).entries()),
+          body: init.body as string,
+        });
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 'loan-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json', etag: '"2"' },
+          }),
+        );
+      }) as typeof fetch,
+    });
+    await editLoan(api, '/w/ws-1', draft, { termInstallments: 36 });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.method).toBe('PATCH');
+    expect(seen[0]?.headers['content-type']).toBe('application/json');
+    expect(seen[0]?.headers['if-match']).toBe('"1"');
+    expect(JSON.parse(seen[0]?.body ?? '{}')).toEqual({ termInstallments: 36 });
   });
 
   it('[TC-DEBT-LOAN-054] sin cambios no envía nada y el plazo de 36 cuotas envía solo termInstallments', () => {

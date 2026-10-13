@@ -232,7 +232,10 @@ export function TermsEditor({
     }
     setBusy(true);
     try {
-      await ctx.api.command('PATCH', cardPath(ctx.base, card.id), built.patch, { ifMatch: card.version });
+      await ctx.api.command('PATCH', cardPath(ctx.base, card.id), built.patch, {
+        ifMatch: card.version,
+        contentType: 'application/json',
+      });
       onDone(f.t('terms.saved'));
     } catch (e) {
       setProblem(problemOf(e));

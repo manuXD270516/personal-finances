@@ -969,6 +969,7 @@ export function EditPanel({
         .command('PATCH', goalPath(ctx.base, goal.id), input, {
           ifMatch: etag ?? goal.version,
           idempotencyKey: key,
+          contentType: 'application/json',
         })
         .then(() => undefined),
     onDone: () => onDone(f.t('edit.done')),
