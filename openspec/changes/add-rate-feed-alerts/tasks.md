@@ -38,7 +38,7 @@
 
 ## 7. TESTS AUTOMATIZADOS y E2E
 
-- [ ] 7.1 E2E: con el provider simulado caído y el reloj avanzado más de 6 h, el OWNER ve la alerta de obsolescencia; al volver la tasa, la de recuperación; una muestra anómala genera la alerta y desde su enlace se confirma (TC-NOTIFICATIONS-FX-008); con `PF_E2E_PROJECT` — Spec `tests/e2e/specs/fx-feed-alerts.spec.ts` escrita (providers simulados: tasa de hace 7 h para la obsolescencia, email en Mailpit sin valores, recuperación, anomalía confirmada desde el enlace, axe) pero NO ejecutada en esta sesión (sin Docker): la valida CI; hasta entonces queda abierta.
+- [x] 7.1 E2E: con el provider simulado caído y el reloj avanzado más de 6 h, el OWNER ve la alerta de obsolescencia; al volver la tasa, la de recuperación; una muestra anómala genera la alerta y desde su enlace se confirma (TC-NOTIFICATIONS-FX-008); con `PF_E2E_PROJECT` — 2026-10-13: `tests/e2e/specs/fx-feed-alerts.spec.ts` pasó en CI (#128): obsolescencia con enlace al estado por par, email en Mailpit sin valores, recuperación y axe. La muestra anómala y su confirmación desde el enlace (TC-NOTIFICATIONS-FX-004) no se cubre en E2E porque el simulador reparte cada muestra a todos los workspaces y contaminaba a `fx-providers.spec`; queda en `fx-feed-alerts.api.test.ts` y las pruebas de web
 - [x] 7.2 Regresión: TC-NOTIFICATIONS-\*, TC-FX-PROVIDER-001..037, TC-PLATFORM-EVENTS-018 — Hecho 2026-10-13: `pnpm -r test` (unitarios de FX, NOTIFY, plataforma y web: único fallo local ajeno TC-FX-PROVIDER-015 de apps/web por el formato de fecha) e integraciones de TC-FX-PROVIDER, TC-NOTIFICATIONS-* y TC-PLATFORM-EVENTS-018/019 sobre PostgreSQL 16 local.
 
 ## 8. DOCS
