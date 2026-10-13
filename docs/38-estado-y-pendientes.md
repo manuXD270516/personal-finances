@@ -13,7 +13,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 2 Planificación y control | 10 de 11 archivados; `add-month-closing` fusionado, espera la evidencia del owner (§2) |
 | 3 Compromisos e importación | Completa y archivada (persistencia del import ≤ 20 s diferida a Phase 6, D152) |
 | 4 Metas y deudas | Completa salvo evidencias del owner (D219): implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
-| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Changes 37 y 40 implementados y archivados (#121, #122, #123); change 38 implementado sin adapters reales (#126) y change 39 implementado (#128); 45 con spec fusionada (#127). Siguiente: adapters cripto (espera al owner, §2) y el change 45 (§1.2) |
+| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Changes 37 y 40 implementados y archivados (#121, #122, #123); change 38 implementado sin adapters reales (#126) y change 39 implementado (#128); specs fusionadas de 41 (#132), 45 (#127) y de la agrupación de avisos (#131); ADR-0029 propuesto (#130). Siguiente: implementar la agrupación de avisos; los adapters cripto y el 45 esperan al owner (§2) |
 
 ### 1.1 Phase 4
 
@@ -30,18 +30,19 @@ Informe de cierre de Phase 4 y criterios de salida (docs/24 §5.4): [docs/39](39
 
 ### 1.2 Phase 5
 
-Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados; 37 y 40 están implementados y archivados; 38 y 39 implementados (sin archivar). El 45 tiene la spec fusionada.
+Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados; 37 y 40 están implementados y archivados; 38 y 39 implementados (sin archivar). Respuestas del owner del 2026-10-13: [docs/42](42-phase-5-owner-answers-and-decisions.md) (D251–D255).
 
 | # | Change | Estado |
 |---|---|---|
 | 37 | `fix-phase-4-gaps` | Implementado y archivado (#121, #122; D222) |
-| 38 | `add-crypto-rate-providers` | Implementado (#126) **sin adapters reales**: faltan 1.1, 1.2, 4.1–4.3, 7.1 y 7.2, que esperan al owner (nombrar su exchange y verificar términos, ADR-0029, D225). No se archiva hasta entonces (o hasta diferirlas por escrito) |
-| 39 | `add-rate-feed-alerts` | Implementado (#128), tareas completas. Archivar **después** de 38 (D233–D236). Decisiones a confirmar: un aviso por muestra anómala (hasta 3 por par y salto), y el par sin tasa aceptada abre su episodio en el primer ciclo |
+| 38 | `add-crypto-rate-providers` | Implementado (#126) **sin adapters reales**. Exchanges del owner: Binance, Bitget y Bybit (D251). ADR-0029 **Propuesto** (#130): Binance principal y Bybit respaldo, aptas con condiciones; Bitget no verificada. Los términos de uso no se pudieron leer directamente: la tarea 1.5 (leerlos y grabar fixtures) bloquea habilitar los providers; 4.1–4.3, 7.1 y 7.2 siguen pendientes. No se archiva hasta entonces (o hasta diferirlas por escrito) |
+| 39 | `add-rate-feed-alerts` | Implementado (#128), tareas completas. Archivar **después** de 38 (D233–D236). El owner pidió agrupar los avisos de anomalía (D253): lo hace `refine-rate-anomaly-alert-grouping` |
+| 39b | `refine-rate-anomaly-alert-grouping` | Spec fusionada (#131), sin implementar: un aviso por par y grupo de muestras retenidas pendientes de revisión. Se archiva después de 39 |
 | 40 | `add-conversion-cost-analysis` | Implementado (#123) y archivado (D231, D244–D247). Trajo el único consumidor nuevo (`fx.user-conversion-observations`); subir `max_connections` antes del despliegue (D249) |
-| 41 | `add-exchange-house-rate-providers` | En espera de P14 (D232) |
+| 41 | `add-exchange-house-rate-providers` | Spec fusionada (#132) con el alcance "todos los bancos y billeteras de Bolivia" (D252) como catálogo de instituciones con estado de soporte medible. Falta verificar el censo de ASFI y los términos de las fuentes (tarea 1.1: los sitios de ASFI y BCB no se pudieron abrir). Preguntas P2 (publicar nombres reales) y P6 (parsers de extractos) bloquean partes |
 | 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
 | 44 | `add-phase-4-demo-data` | Could, último y opcional (D223) |
-| 45 | `add-dependency-updates` | Spec fusionada (#127). Preguntas abiertas en su `design.md` (11); la ejecución de Renovate necesita que el owner instale la app (recomendada: GitHub App de Mend) |
+| 45 | `add-dependency-updates` | Spec fusionada (#127). El owner eligió la GitHub App hospedada de Mend Renovate (D254); falta que la instale solo en este repositorio. Quedan 10 preguntas abiertas en su `design.md` con recomendación por omisión |
 
 ## 2. Esperan al owner
 
@@ -49,7 +50,9 @@ Ninguna sesión puede cerrarlos por su cuenta.
 
 - **Cierre de mes real (Phase 2, `add-month-closing` 7.4, TC-PLANNING-EXIT-001):** cerrar un mes real con todas las cuentas conciliadas. Al tenerlo, se marca la tarea con la evidencia, se automatiza el TC y se archiva el change. Es la advertencia R3 que hoy muestra `traceability:check`.
 - **Tabla del banco (Phase 4, `add-loans` 8.4, D154):** el owner carga en la app la tabla de amortización real de su préstamo (nunca en el repositorio) y registra la comparación como `MATCH` o `EXPLAINED`. Si la tabla tiene fechas distintas a las del sistema en cuotas pendientes, revisar la adopción de cronogramas custom (§4).
-- **Casas de cambio o bancos (Phase 5, P14, D232):** indicar cuáles usa para verificar sus términos; hasta entonces el change 41 queda en espera.
+- **Exchanges cripto (Phase 5, ADR-0029):** aceptar el ADR; confirmar uso personal; leer directamente los términos de Binance y Bybit (o que una sesión lo haga desde su máquina o el VPS N1) y grabar los fixtures (tarea 1.5 del change 38).
+- **Renovate (change 45):** instalar la GitHub App de Mend solo en este repositorio, sin permisos de administración.
+- **Change 41 (bancos y billeteras de Bolivia):** responder P2 y P6, y descargar los listados de ASFI y BCB o dar acceso (tarea 1.1). Compartir PDF de extractos de distintos bancos solo en la conversación (nunca en el repositorio; D255).
 - **Despliegue N1 (Phase 5, D248, ADR-0027):** hacerlo antes de abrir la ventana de 30 días del criterio de salida de Phase 5.
 - **Decisiones por omisión de Phase 5** ([docs/41](41-phase-5-consolidation-decisions.md)): el owner puede revertir cualquiera antes de que se redacte el change que la usa.
 - **Criterios de salida de uso real:** Phase 2 (uso del owner, exportar e importar el workspace); Phase 3 (registrar sus suscripciones reales y un mes sin recurrentes sorpresa, indicador en `/pagos-proximos`); Phase 4 (metas del owner con estado calculado).
