@@ -9,7 +9,11 @@ import type {
 import type { RecurringDefinitionPort, RecurringDefinitionQuery } from '@pf/commitments/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
-import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
+import type {
+  AccountBalanceHistoryQuery,
+  AccountBalancesQuery,
+  LedgerOpeningEntriesQuery,
+} from '@pf/ledger/contracts';
 import { runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
@@ -213,6 +217,8 @@ export interface CardsRuntimeOptions {
   /** Saldos presentados a varias fechas (INV-022). */
   readonly balanceHistory: AccountBalanceHistoryQuery;
   readonly movements: AccountMovementsQuery;
+  /** Asientos de apertura por cuenta y rango (LEDGER). */
+  readonly openingEntries: LedgerOpeningEntriesQuery;
   readonly pending: PendingFlowQuery;
   readonly links: TransactionLinkQuery;
   readonly recurring: RecurringDefinitionPort;
@@ -285,6 +291,7 @@ export function createCardsRuntime(options: CardsRuntimeOptions): CardsRuntime {
     accounts,
     balances,
     movements: options.movements,
+    openings: options.openingEntries,
     pending: options.pending,
     links: options.links,
     recurring: options.recurring,

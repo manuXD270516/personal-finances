@@ -4030,10 +4030,10 @@
     },
     "edit": {
       "title": "Edit loan",
-      "draftNote": "While it is a draft you can cancel it and register a new one to change its terms.",
       "locked": "The financial terms of an active loan are locked; you can change the name, the lender and the payment account.",
       "save": "Save changes",
-      "done": "Changes saved."
+      "done": "Changes saved.",
+      "draftEditable": "While it is a draft you can change all its terms; the schedule preview is recalculated and no transaction is created."
     },
     "compare": {
       "title": "Compare with the bank table",
@@ -4424,7 +4424,8 @@
       "nextDue": "Next due date",
       "missing": "Missing to avoid interest",
       "planActive": "Automatic payment on",
-      "sharedRef": "See shared limit"
+      "sharedRef": "See shared limit",
+      "overdue": "{count, plural, one {# overdue statement} other {# overdue statements}}"
     },
     "form": {
       "title": "New credit card",
@@ -4553,7 +4554,11 @@
       "openCycleDates": "From {start} · closes {closing} · due {due}",
       "pendingPurchases": "Pending purchases",
       "lastStatement": "Last statement",
-      "missing": "{amount} missing"
+      "missing": "{amount} missing",
+      "overdue": {
+        "title": "Overdue statements",
+        "item": "Closed {closing} · was due {due} · {amount} missing to avoid interest (minimum still due {minimum})"
+      }
     },
     "terms": {
       "edit": "Edit terms",
@@ -5085,6 +5090,16 @@
     "transaction": {
       "title": "Savings goal",
       "reverted": "reversed"
+    },
+    "voidImpact": {
+      "title": "Voiding this will affect your goals",
+      "item": "\"{goal}\" will be left with {funds} in \"{account}\".",
+      "negative": "A shortfall will be left to regularise; the void is not blocked."
+    },
+    "negativeFunds": {
+      "title": "Negative funds to regularise",
+      "item": "Shortfall of {amount} in \"{account}\".",
+      "hint": "Contribute to the goal in that account to get back to zero or above."
     }
   },
   "DebtSummary": {

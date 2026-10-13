@@ -16,6 +16,7 @@ import { GoalStatusBadge, RatesUsed } from './parts';
 import { ReservationsTable } from './Reservations';
 import { SuggestionRow, SuggestionsView } from './Suggestions';
 import { TransactionGoalView } from './TransactionGoalInfo';
+import { NegativeFundsNotice, VoidImpactView } from './VoidImpact';
 import { bob, goal, homeItem, IDS, movement, plan, reservation, suggestion, tracking, usd } from './fixtures';
 import type { BudgetGoalContributions, GoalsHomeBlock, GoalSimulation } from './types';
 
@@ -806,5 +807,60 @@ describe('Plan mensual: aportes a metas', () => {
     expect(html).toContain('data-testid="budget-goal-exceeded"');
     expect(textOf(html)).toContain('500,00 BOB, 10,00 USD');
     expect(html).toContain('data-testid="budget-goal-incomplete"');
+  });
+});
+
+describe('anulación con retiros posteriores (D222, fix-phase-4-gaps)', () => {
+  const item = {
+    goalId: IDS.trip,
+    goalName: 'Fondo de emergencia',
+    accountId: IDS.savings,
+    accountName: 'Ahorro BOB',
+    fund: 'REAL' as const,
+    currency: 'BOB',
+    currentFunds: bob('600.00'),
+    fundsAfterVoid: bob('-400.00'),
+    negative: true,
+  };
+
+  it('[TC-GOALS-SAVINGS-053] el aviso previo nombra la meta, la cuenta y los fondos que quedarán, sin bloquear', () => {
+    const html = render(<VoidImpactView f={f} impact={{ transactionId: 'tx-1', goals: [item] }} />);
+    const text = textOf(html);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('data-testid="void-impact"');
+    expect(text).toContain('Esta anulación afecta a tus metas');
+    expect(text).toContain(
+      '&quot;Fondo de emergencia&quot; quedará con -400,00 BOB en &quot;Ahorro BOB&quot;.',
+    );
+    expect(text).toContain('la anulación no se bloquea');
+  });
+
+  it('[TC-GOALS-SAVINGS-053] sin fondos negativos informa el resultado sin la advertencia de faltante y sin metas no muestra nada', () => {
+    const ok = render(
+      <VoidImpactView
+        f={f}
+        impact={{
+          transactionId: 'tx-1',
+          goals: [{ ...item, fundsAfterVoid: bob('0.00'), negative: false }],
+        }}
+      />,
+    );
+    expect(textOf(ok)).toContain('quedará con 0,00 BOB');
+    expect(textOf(ok)).not.toContain('faltante');
+    expect(render(<VoidImpactView f={f} impact={{ transactionId: 'tx-1', goals: [] }} />)).toBe('');
+  });
+
+  it('[TC-GOALS-SAVINGS-053] la meta muestra el faltante de 400,00 BOB en "Ahorro BOB" y nada si no hay fondos negativos', () => {
+    const html = render(
+      <NegativeFundsNotice
+        f={f}
+        accountName={name}
+        negativeFunds={[{ accountId: IDS.savings, amount: bob('-400.00') }]}
+      />,
+    );
+    expect(html).toContain('data-testid="goal-negative-funds"');
+    expect(textOf(html)).toContain('Fondos negativos a regularizar');
+    expect(textOf(html)).toContain('Faltante de 400,00 BOB en &quot;Ahorro BOB&quot;.');
+    expect(render(<NegativeFundsNotice f={f} accountName={name} negativeFunds={[]} />)).toBe('');
   });
 });

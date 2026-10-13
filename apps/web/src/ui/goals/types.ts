@@ -91,6 +91,32 @@ export interface GoalLinkedAccount {
   readonly overAllocated: boolean;
 }
 
+/** Fondo real negativo de la meta en una cuenta (faltante a regularizar, p. ej. tras anular un aporte con retiros). */
+export interface GoalNegativeFunds {
+  readonly accountId: string;
+  /** Monto negativo (`-400.00`). */
+  readonly amount: Money;
+}
+
+/** Efecto de anular una transacción sobre una meta y cuenta (`GET …/goals/void-impact`). */
+export interface GoalVoidImpactItem {
+  readonly goalId: string;
+  readonly goalName: string;
+  readonly accountId: string;
+  readonly accountName: string;
+  readonly fund: 'REAL' | 'EARMARK';
+  readonly currency: string;
+  readonly currentFunds: Money;
+  readonly fundsAfterVoid: Money;
+  /** Los fondos quedarían por debajo de cero. */
+  readonly negative: boolean;
+}
+
+export interface GoalVoidImpact {
+  readonly transactionId: string;
+  readonly goals: readonly GoalVoidImpactItem[];
+}
+
 export interface Goal {
   readonly id: string;
   readonly name: string;
@@ -122,6 +148,8 @@ export interface Goal {
   /** Alguna cuenta vinculada tiene más reservado que su saldo. */
   readonly overAllocated: boolean;
   readonly linkedAccounts: readonly GoalLinkedAccount[];
+  /** Cuentas con el fondo real en negativo; vacío si ninguna. */
+  readonly negativeFunds?: readonly GoalNegativeFunds[];
   readonly plan: GoalPlan | null;
 }
 

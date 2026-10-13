@@ -170,7 +170,7 @@ export class CardsService {
   ): Promise<CreditCardView> {
     const views = await this.engine.loadViews(card, clock);
     const scopes = await this.engine.utilizationScopes(card, views, clock);
-    return cardView(card.snapshot, views, scopes, conflicts);
+    return cardView(card.snapshot, views, scopes, clock.today, conflicts);
   }
 
   // ───────────────────────────────────────────────────────────── registrar

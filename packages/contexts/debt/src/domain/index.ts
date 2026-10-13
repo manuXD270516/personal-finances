@@ -11,6 +11,7 @@ export * from './card-cycle-calendar.js';
 export * from './minimum-payment-rule.js';
 export * from './installment-scheduler.js';
 export * from './card-cycle-calculator.js';
+export * from './next-due-resolver.js';
 export * from './utilization.js';
 export * from './payment-plan-expectation.js';
 export * from './credit-card.js';

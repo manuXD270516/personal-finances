@@ -33,6 +33,7 @@ import {
   type GoalFormErrors,
 } from './logic';
 import { GoalStatusBadge, OverAllocatedMark, RatesUsed } from './parts';
+import { NegativeFundsNotice } from './VoidImpact';
 import type { Goal, GoalDetail, GoalList, GoalMovement, GoalMovementPage, GoalSimulation } from './types';
 
 export interface GoalPrefill {
@@ -346,6 +347,7 @@ function Detail({ ctx, goalId, prefill }: { ctx: WorkspaceContext; goalId: strin
         {f.t(`types.${goal.type}`)} · {f.t('list.priority', { priority: goal.priority })}
         {goal.archivedAt ? ` · ${f.t('list.archived')}` : ''}
       </p>
+      <NegativeFundsNotice negativeFunds={goal.negativeFunds ?? []} f={f} accountName={accountName} />
       {goal.tracking.status === null && goal.status === 'PAUSED' ? (
         <p role="note" style={mutedStyle} data-testid="goal-paused-note">
           {f.t('pausedNote')}

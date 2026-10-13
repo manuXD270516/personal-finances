@@ -5,16 +5,19 @@ spec: debt/loans
 related_specs: []
 requirement: "Detalle y estado del préstamo"
 scenario: "Detalle tras la primera cuota"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-007"]
 nfr: ["NFR-PERF-004"]
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/loans.api.test.ts
+  - apps/web/src/ui/debt/debt.test.tsx
+  - tests/e2e/specs/loans.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["loans", "list", "n-plus-one", "fix-phase-4-gaps"]

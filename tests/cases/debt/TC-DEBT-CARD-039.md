@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: []
 requirement: "Próximo vencimiento de la tarjeta"
 scenario: "Estado de cuenta vencido con saldo pendiente"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/next-due-resolver.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["credit-cards", "due-date", "overdue", "fix-phase-4-gaps"]

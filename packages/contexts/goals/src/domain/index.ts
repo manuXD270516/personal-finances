@@ -7,3 +7,4 @@ export * from './goal-tracking-evaluator.js';
 export * from './goal-types.js';
 export * from './required-contribution-calculator.js';
 export * from './savings-goal.js';
+export * from './void-impact-calculator.js';

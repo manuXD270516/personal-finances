@@ -229,6 +229,31 @@ export interface LedgerOpeningBalanceQuery {
   }): Promise<MoneyDto | null>;
 }
 
+/**
+ * Asientos de apertura de cuentas del usuario en un rango de fechas (openspec fix-phase-4-gaps, decisión 1): el asiento
+ * de apertura no tiene transacción, así que ningún contexto que clasifica movimientos por `AccountMovementsQuery` lo
+ * ve. Devuelve, por cuenta y fecha de negocio, el saldo inicial como efecto PRESENTADO (deuda positiva en un pasivo,
+ * FR-LEDGER-012) de los asientos `entry_type = OPENING` con fecha en `[from, to]` (inclusivos). Sin efectos; en la
+ * unidad de trabajo del llamador (RLS del workspace). Sin cuentas ⇒ lista vacía.
+ */
+export interface LedgerOpeningEntriesQuery {
+  listOpeningEntries(input: {
+    readonly workspaceId: string;
+    readonly accountIds: readonly string[];
+    /** Inclusivos, `YYYY-MM-DD`. */
+    readonly from: string;
+    readonly to: string;
+  }): Promise<readonly OpeningEntryDto[]>;
+}
+
+export interface OpeningEntryDto {
+  readonly accountId: string;
+  /** Fecha de negocio del asiento `YYYY-MM-DD`. */
+  readonly entryDate: string;
+  /** Efecto presentado sobre el saldo de la cuenta (positivo aumenta lo presentado). */
+  readonly amount: MoneyDto;
+}
+
 export const LEDGER_POSTING_PORT = Symbol.for('pf.ledger.LedgerPostingPort');
 export const LEDGER_PERIOD_LOCK_PORT = Symbol.for('pf.ledger.LedgerPeriodLockPort');
 export const BALANCE_QUERY = Symbol.for('pf.ledger.BalanceQuery');

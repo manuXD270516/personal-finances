@@ -702,6 +702,34 @@ describe('pagos, imputación y diferencias', () => {
   });
 });
 
+describe('lista de préstamos con las cifras del detalle (fix-phase-4-gaps)', () => {
+  it('[TC-DEBT-LOAN-053] cada fila de GET /loans trae principal pendiente, saldo de la cuenta y próxima cuota iguales a las del detalle', async () => {
+    const loan = await activeLoan();
+    const draft = await register({ name: 'Préstamo en borrador' });
+    setToday('2026-11-15');
+    await payOk(loan['id']);
+    // Hoy 2026-12-16: la cuota 2 del 2026-12-15 figura atrasada.
+    setToday('2026-12-16');
+    const list = checked('listLoans', 200, await get(owner, '/loans'));
+    const rows = list['data'] as any[];
+    const row = rows.find((r) => r['id'] === loan['id']);
+    const d = await detail(loan['id']);
+    expect(row['outstandingPrincipal']).toEqual(bob('48137.15'));
+    expect(row['accountBalance']).toEqual(bob('48137.15'));
+    expect(row['nextInstallment']).toEqual(d['nextInstallment']);
+    expect(row['nextInstallment'].n).toBe(2);
+    expect(row['nextInstallment'].overdueDays).toBeGreaterThan(0);
+    expect(row['outstandingPrincipal']).toEqual(d['outstandingPrincipal']);
+    expect(row['accountBalance']).toEqual(d['accountBalance']);
+    // Un borrador no tiene cronograma vigente: principal pendiente y próxima cuota nulos, saldo cero.
+    const draftRow = rows.find((r) => r['id'] === draft['id']);
+    expect(draftRow['outstandingPrincipal']).toBeNull();
+    expect(draftRow['nextInstallment']).toBeNull();
+    expect(draftRow['accountBalance']).toEqual(bob('0.00'));
+    setToday('2026-11-15');
+  });
+});
+
 describe('anulación, saldado y cancelación', () => {
   it('[TC-DEBT-LOAN-020] [TC-DEBT-LOAN-026] anular el último pago revierte el asiento, devuelve la cuota a no pagada y la ocurrencia a atrasada', async () => {
     const loan = await activeLoan();

@@ -272,3 +272,72 @@ describe('Recalculado vs emitido (decisión 5)', () => {
     expect(diff.minimumDue.toFixed()).toBe('2.26');
   });
 });
+
+describe('CardCycleCalculator: saldo inicial de la cuenta (fix-phase-4-gaps, decisión 1)', () => {
+  it('[TC-DEBT-CARD-040] el saldo inicial entra en otros movimientos y el ciclo se informa cuadrado', () => {
+    // Visa Oro BOB abierta el 2026-10-05 con 1200.00 BOB adeudados (sin transacción) y una compra de 350.00 el 10-08.
+    const input = {
+      currency: BOB,
+      previousBalance: bob('0.00'),
+      closingBalance: bob('1550.00'),
+      movements: [mov('2026-10-08', 'PURCHASE', '350.00')],
+      unbilledInstallments: bob('0.00'),
+      minimumRule: rule,
+    } as const;
+    const withOpening = computeCycleFigures({ ...input, openingNet: bob('1200.00') });
+    expect(withOpening.previousBalance.toFixed()).toBe('0.00');
+    expect(withOpening.purchases.toFixed()).toBe('350.00');
+    expect(withOpening.refunds.toFixed()).toBe('0.00');
+    expect(withOpening.payments.toFixed()).toBe('0.00');
+    expect(withOpening.otherNet.toFixed()).toBe('1200.00');
+    expect(withOpening.closingBalance.toFixed()).toBe('1550.00');
+    expect(withOpening.consistent).toBe(true);
+    // Sin el saldo inicial (el defecto de Phase 4) el ciclo salía descuadrado.
+    expect(computeCycleFigures(input).consistent).toBe(false);
+  });
+
+  it('[TC-DEBT-CARD-040] el saldo inicial se suma a otros movimientos que ya existían en el ciclo', () => {
+    const f = computeCycleFigures({
+      currency: BOB,
+      previousBalance: bob('0.00'),
+      closingBalance: bob('1250.00'),
+      movements: [mov('2026-10-09', 'OTHER', '50.00')],
+      unbilledInstallments: bob('0.00'),
+      minimumRule: rule,
+      openingNet: bob('1200.00'),
+    });
+    expect(f.otherNet.toFixed()).toBe('1250.00');
+    expect(f.consistent).toBe(true);
+  });
+
+  it('[TC-DEBT-CARD-040] PBT: con saldos iniciales aleatorios la identidad del ciclo se cumple siempre', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 20_000_000 }),
+        fc.integer({ min: -5_000_000, max: 20_000_000 }),
+        fc.array(fc.integer({ min: 1, max: 1_000_000 }), { maxLength: 20 }),
+        (previousCents, openingCents, purchaseCents) => {
+          const movements = purchaseCents.map((c) =>
+            mov('2026-10-08', 'PURCHASE', Money.ofMinorUnits(BigInt(c), BOB).toFixed()),
+          );
+          const purchases = purchaseCents.reduce((a, c) => a + BigInt(c), 0n);
+          const previous = Money.ofMinorUnits(BigInt(previousCents), BOB);
+          const opening = Money.ofMinorUnits(BigInt(openingCents), BOB);
+          const closing = previous.add(Money.ofMinorUnits(purchases, BOB)).add(opening);
+          const f = computeCycleFigures({
+            currency: BOB,
+            previousBalance: previous,
+            closingBalance: closing,
+            movements,
+            unbilledInstallments: Money.zero(BOB),
+            minimumRule: rule,
+            openingNet: opening,
+          });
+          expect(f.consistent).toBe(true);
+          expect(f.otherNet.equals(opening)).toBe(true);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  }, 30_000);
+});

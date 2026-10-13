@@ -167,6 +167,81 @@ test.describe('Préstamos (debt/loans)', () => {
     await context.close();
   });
 
+  test('[TC-DEBT-LOAN-053] la lista de préstamos se obtiene en una sola llamada con las cifras del detalle', async ({
+    browser,
+  }) => {
+    test.setTimeout(240_000);
+    const { context, page, W } = await newFinanceUser(browser, 'lista');
+    const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '10000.00');
+    const active = await api(
+      page,
+      'POST',
+      `${W}/loans`,
+      vehicleLoan({ bank }, { disburseNow: true, name: 'Vehículo' }),
+    );
+    for (const name of ['Moto', 'Computadora']) {
+      await api(
+        page,
+        'POST',
+        `${W}/loans`,
+        vehicleLoan({ bank }, { name, account: { create: { name: `Préstamo ${name}` } } }),
+      );
+    }
+
+    // Cuenta las llamadas de la API que hace la pantalla: una sola a la lista y ninguna a un préstamo concreto.
+    const calls: string[] = [];
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url());
+      if (request.method() === 'GET' && /\/loans(\/[0-9a-f-]{36})?$/.test(pathname)) calls.push(pathname);
+    });
+    await go(page, '/debts');
+    await expect(page.getByTestId('loans-table')).toBeVisible();
+    await expect(page.getByTestId('loan-row')).toHaveCount(3);
+    expect(calls.filter((c) => /\/loans$/.test(c))).toHaveLength(1);
+    expect(calls.filter((c) => /\/loans\/[0-9a-f-]{36}$/.test(c))).toHaveLength(0);
+
+    // La fila del préstamo activo muestra las cifras del detalle.
+    const detail = await api(page, 'GET', `${W}/loans/${String(active['id'])}`);
+    expect((detail['outstandingPrincipal'] as { amount: string }).amount).toBe('50000.00');
+    const row = page.locator('[data-testid="loan-row"][data-name="Vehículo"]');
+    await expect(row.getByTestId('loan-outstanding')).toContainText('50.000,00 BOB');
+    await expect(row.getByTestId('loan-next')).toContainText('Cuota 1');
+    await context.close();
+  });
+
+  test('[TC-DEBT-LOAN-054] un préstamo en borrador se edita desde la pantalla y la vista previa se recalcula', async ({
+    browser,
+  }) => {
+    test.setTimeout(240_000);
+    const { context, page, W } = await newFinanceUser(browser, 'editar');
+    const bank = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '10000.00');
+    const draft = await api(page, 'POST', `${W}/loans`, vehicleLoan({ bank }));
+    const loanId = String(draft['id']);
+
+    await go(page, `/debts/${loanId}`);
+    await expect(page.getByTestId('loan-detail')).toHaveAttribute('data-status', 'DRAFT');
+    await page.getByTestId('loan-edit').click();
+    const form = page.getByTestId('loan-edit-form');
+    await expect(form).toBeVisible();
+    await expect(form.getByTestId('preview-row')).toHaveCount(24);
+    expect(await seriousViolations(page)).toEqual([]);
+
+    // El plazo de 24 a 36 cuotas recalcula la vista previa antes de guardar.
+    await form.getByTestId('loan-term').fill('36');
+    await expect(form.getByTestId('preview-row')).toHaveCount(36);
+    await page.getByTestId('edit-submit').click();
+    await expect(page.getByTestId('loan-status-message')).toHaveText('Cambios guardados.');
+    await expect(page.getByTestId('loan-detail')).toHaveAttribute('data-status', 'DRAFT');
+    await expect(page.getByTestId('preview-row')).toHaveCount(36);
+
+    // Sigue en borrador, sin deuda y sin transacciones del préstamo.
+    const loan = await api(page, 'GET', `${W}/loans/${loanId}`);
+    expect(loan).toMatchObject({ status: 'DRAFT', termInstallments: 36 });
+    expect((loan['accountBalance'] as { amount: string }).amount).toBe('0.00');
+    expect(loan['disbursementTransactionId']).toBeNull();
+    await context.close();
+  });
+
   test('[TC-DEBT-AMORT-014] [TC-DEBT-AMORT-017] [TC-DEBT-AMORT-018] [TC-DEBT-AMORT-019] comparar con una tabla del banco con un centavo de diferencia en la cuota 24, ver el reporte y explicar la diferencia', async ({
     browser,
   }) => {

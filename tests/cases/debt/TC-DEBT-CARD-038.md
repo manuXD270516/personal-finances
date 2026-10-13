@@ -5,16 +5,20 @@ spec: debt/credit-cards
 related_specs: ["reporting/cash-flow-calendar", "reporting/dashboard"]
 requirement: "Próximo vencimiento de la tarjeta"
 scenario: "Tarjeta recién registrada con deuda previa"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - apps/web/src/ui/debt/cards/cards.test.tsx
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/next-due-resolver.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["credit-cards", "due-date", "fix-phase-4-gaps"]

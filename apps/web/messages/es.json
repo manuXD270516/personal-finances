@@ -4030,10 +4030,10 @@
     },
     "edit": {
       "title": "Editar préstamo",
-      "draftNote": "Mientras sea un borrador puedes cancelarlo y registrar uno nuevo para cambiar sus condiciones.",
       "locked": "Las condiciones financieras de un préstamo activo están bloqueadas; puedes cambiar el nombre, el prestamista y la cuenta de pago.",
       "save": "Guardar cambios",
-      "done": "Cambios guardados."
+      "done": "Cambios guardados.",
+      "draftEditable": "Mientras sea un borrador puedes cambiar todas sus condiciones; la vista previa del cronograma se recalcula y no se crea ninguna transacción."
     },
     "compare": {
       "title": "Comparar con la tabla del banco",
@@ -4424,7 +4424,8 @@
       "nextDue": "Próximo vencimiento",
       "missing": "Falta para no generar intereses",
       "planActive": "Pago automático activo",
-      "sharedRef": "Ver límite compartido"
+      "sharedRef": "Ver límite compartido",
+      "overdue": "{count, plural, one {# estado atrasado} other {# estados atrasados}}"
     },
     "form": {
       "title": "Nueva tarjeta de crédito",
@@ -4553,7 +4554,11 @@
       "openCycleDates": "Desde el {start} · cierra el {closing} · vence el {due}",
       "pendingPurchases": "Compras pendientes",
       "lastStatement": "Último estado de cuenta",
-      "missing": "falta {amount}"
+      "missing": "falta {amount}",
+      "overdue": {
+        "title": "Estados de cuenta atrasados",
+        "item": "Cierre {closing} · venció el {due} · faltan {amount} para no generar intereses (mínimo pendiente {minimum})"
+      }
     },
     "terms": {
       "edit": "Editar términos",
@@ -5085,6 +5090,16 @@
     "transaction": {
       "title": "Meta de ahorro",
       "reverted": "revertido"
+    },
+    "voidImpact": {
+      "title": "Esta anulación afecta a tus metas",
+      "item": "\"{goal}\" quedará con {funds} en \"{account}\".",
+      "negative": "Quedará un faltante a regularizar; la anulación no se bloquea."
+    },
+    "negativeFunds": {
+      "title": "Fondos negativos a regularizar",
+      "item": "Faltante de {amount} en \"{account}\".",
+      "hint": "Aporta a la meta en esa cuenta para volver a cero o a positivo."
     }
   },
   "DebtSummary": {

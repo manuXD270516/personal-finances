@@ -5,16 +5,18 @@ spec: debt/amortization
 related_specs: []
 requirement: "Estrategias avalanche y snowball entre préstamos"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-010"]
 nfr: ["NFR-PERF-004"]
 invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/loan-simulator.perf.ts
+  - packages/contexts/debt/src/domain/payoff-simulator.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["amortization", "simulator", "perf", "fix-phase-4-gaps"]
