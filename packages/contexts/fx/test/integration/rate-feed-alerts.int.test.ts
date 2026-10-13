@@ -216,6 +216,8 @@ async function setPairs(ws: string, user: string, pairs: [string, string][]) {
 
 let u1: string;
 let u2: string;
+/** Corridas de `fx.provider_run` (tabla de instalación compartida) que ya existían antes de esta suite. */
+let preexistingRuns: string[] = [];
 
 beforeAll(async () => {
   app = new Pool({ connectionString: deps.databaseUrl, max: 4 });
@@ -223,6 +225,9 @@ beforeAll(async () => {
   migrator = new Pool({ connectionString: deps.migratorUrl, max: 2 });
   appUow = new PgUnitOfWork(app);
   registry = EventSchemaRegistry.fromDirectory(EVENTS_DIR);
+  preexistingRuns = (await worker.query<{ id: string }>('SELECT id::text FROM fx.provider_run')).rows.map(
+    (r) => r.id,
+  );
   u1 = await provision('fxa-w1', w1);
   u2 = await provision('fxa-w2', w2);
   crypto = new FakeCryptoProvider({ id: CRYPTO, symbols: ['BTC'] }, () => clock.now().toString());
@@ -242,6 +247,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   unregister?.();
+  // Los relojes de esta suite (octubre 2026, hasta el 23) dejarían corridas "futuras" que `recent` ordena primero y
+  // romperían a las demás suites de la corrida: se borran las que esta suite creó (pf_worker puede purgar).
+  await worker
+    ?.query('DELETE FROM fx.provider_run WHERE NOT (id::text = ANY($1::text[]))', [preexistingRuns])
+    .catch(() => undefined);
   await migrator?.query('DROP TABLE IF EXISTS fx.exchange_rate_probe_notified').catch(() => undefined);
   await app?.end();
   await worker?.end();
