@@ -194,6 +194,7 @@ export function toRatePairStatusDto(p: RatePairStatus) {
     lastAutomaticRateAt: p.lastAutomaticRateAt,
     ageSeconds: p.ageSeconds,
     stale: p.stale,
+    ...(p.openEpisode !== undefined ? { openEpisode: p.openEpisode } : {}),
   };
 }
 

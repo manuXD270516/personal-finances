@@ -2439,7 +2439,9 @@
       "openSubscription": "Ver a assinatura",
       "openCreditCard": "Ver o cartão",
       "openGoal": "Ver a meta",
-      "openGoalReservations": "Ver as reservas da conta"
+      "openGoalReservations": "Ver as reservas da conta",
+      "openFxFeedStatus": "Ver o estado das taxas automáticas",
+      "openFxRate": "Revisar a taxa retida"
     },
     "prefs": {
       "title": "Notificações",
@@ -2467,7 +2469,10 @@
         "CARD_UTILIZATION": "Utilização do cartão",
         "GOAL_OVER_ALLOCATED": "Meta superalocada (reservas acima do saldo)",
         "GOAL_REACHED": "Meta alcançada",
-        "GOAL_MILESTONE": "Marco de uma meta (25 %, 50 %, 75 %)"
+        "GOAL_MILESTONE": "Marco de uma meta (25 %, 50 %, 75 %)",
+        "FX_RATE_FEED_STALE": "Taxa automática sem atualização",
+        "FX_RATE_FEED_RECOVERED": "Taxa automática recuperada",
+        "FX_RATE_ANOMALY_RETAINED": "Taxa retida por variação anômala"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Incluir detalhes (valores e nomes) nos e-mails",
@@ -5312,6 +5317,9 @@
       "DUPLICATE": "Esse par já está na lista.",
       "TOO_MANY": "No máximo 50 pares.",
       "INVALID": "Escolha uma moeda e a moeda contra a qual ela cota."
-    }
+    },
+    "episode": "Sem taxa automática desde {since}",
+    "episodeNever": "Nenhuma taxa automática aceita (aberto em {since})",
+    "episodeLabel": "Alerta de taxa desatualizada"
   }
 }

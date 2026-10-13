@@ -368,7 +368,14 @@ describe('ReviewRateAnomaly (fx/market-rate-providers)', () => {
     const { mem, queries, jumpId, baseId } = await withAnomaly();
     const stored = await queries.getRate(WS, jumpId);
     expect(stored.rate.snapshot.anomaly).toEqual({ baselineRateId: baseId, variationPct: '12.3128' });
-    expect(mem.state.outbox.at(-1)?.payload).toMatchObject({ anomalyFlagged: true, value: '13.5' });
+    // add-rate-feed-alerts: la muestra retenida publica además `fx.RateAnomalyRetained.v1` (después de `RateRecorded`).
+    expect(mem.state.outbox.filter((e) => e.eventType === 'fx.RateRecorded').at(-1)?.payload).toMatchObject({
+      anomalyFlagged: true,
+      value: '13.5',
+    });
+    expect(
+      mem.state.outbox.filter((e) => e.eventType === 'fx.RateAnomalyRetained' && e.aggregateId === jumpId),
+    ).toHaveLength(1);
     mem.clock.set(at('2026-10-02T09:20:00Z'));
     const valued = await queries.convertForValuation({
       workspaceId: WS,

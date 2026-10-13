@@ -68,7 +68,10 @@ contracts/events/
 │  ├─ GoalReached.v1.schema.json         # la meta alcanzó su objetivo (cada vez que pasa a ACHIEVED; lo consume NOTIFY)
 │  └─ EarmarkExceedsBalance.v1.schema.json  # cuenta sobre-asignada, una vez por episodio (aggregateType Account; lo consume NOTIFY)
 ├─ fx/
-│  └─ RateRecorded.v1.schema.json
+│  ├─ RateRecorded.v1.schema.json
+│  ├─ RateFeedStale.v1.schema.json          # add-rate-feed-alerts: episodio de obsolescencia abierto (par sin tasa aceptada por más de N horas)
+│  ├─ RateFeedRecovered.v1.schema.json      # add-rate-feed-alerts: llegó una tasa fresca y el episodio se cerró
+│  └─ RateAnomalyRetained.v1.schema.json    # add-rate-feed-alerts: muestra de provider retenida como anómala (un hecho por muestra)
 └─ ledger/
    └─ JournalEntryPosted.v1.schema.json
 ```
@@ -152,3 +155,13 @@ Notas: el agregado de cada evento es `RecurringDefinition` (`OccurrencesGenerate
 | `goals.EarmarkExceedsBalance.v1` | GOALS | NOTIFY (`GOAL_OVER_ALLOCATED`) |
 
 Notas: el agregado de `SavingsContributionRecorded` y `GoalReached` es `SavingsGoal` (`aggregateId` = `goalId`); el de `EarmarkExceedsBalance` es `Account` (`aggregateId` = `accountId`, un hecho por `episodeId`). Los montos de movimiento van firmados con `Money` (nunca `PositiveMoney`): aporte y entrada de reasignación positivos, retiro y salida negativos, la reversa con el signo opuesto del movimiento que revierte. `percentBefore` y `percentAfter` son porcentajes con 2 decimales y pueden superar 100. `progressComplete = false` indica fondos sin tasa vigente (no se emiten hitos con progreso incompleto). Los payloads no repiten `workspaceId` (viaja en el envelope). Reemplaza el `SavingsContributionRecorded` de docs/11 (aún no publicado).
+
+## Eventos Phase 5 — FX (`add-rate-feed-alerts`)
+
+| Evento | Productor | Consumidores |
+|---|---|---|
+| `fx.RateFeedStale.v1` | FX (job de providers, actor SYSTEM `fx-provider:<ciclo>`) | Ninguno en Phase 5 (catálogo y trazabilidad); NOTIFY recibe el aviso `FX_RATE_FEED_STALE` por su puerto síncrono `NotificationIntakePort` en la misma unidad de trabajo (D249) |
+| `fx.RateFeedRecovered.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_FEED_RECOVERED` por el puerto |
+| `fx.RateAnomalyRetained.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_ANOMALY_RETAINED` por el puerto |
+
+Un consumidor futuro tendría su propia justificación de conexiones (presupuesto de conexiones del worker, D249).

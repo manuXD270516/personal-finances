@@ -18,6 +18,11 @@ export const NOTIFICATION_TYPES = [
   'GOAL_OVER_ALLOCATED',
   'GOAL_REACHED',
   'GOAL_MILESTONE',
+  // Phase 5 (add-rate-feed-alerts, FR-NOTIFY-004): par sin tasa automática, par recuperado y muestra retenida como
+  // anómala. Se entregan por `NotificationIntakePort` desde el job de providers de FX, sin consumidor de eventos (D249).
+  'FX_RATE_FEED_STALE',
+  'FX_RATE_FEED_RECOVERED',
+  'FX_RATE_ANOMALY_RETAINED',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -123,6 +128,22 @@ export type NotificationLink =
   | {
       readonly kind: 'GOAL_RESERVATIONS';
       readonly accountId: string;
+      readonly periodId: string;
+      readonly periodLabel: string;
+    }
+  | FxNotificationLink;
+
+/**
+ * Alertas de tasas (add-rate-feed-alerts): `FX_FEED_STATUS` abre el estado de las tasas automáticas (Configuración →
+ * Tasas automáticas) y `FX_RATE` la revisión de una tasa retenida (Tasas → Proveedores). En `FX_FEED_STATUS`
+ * `periodId` es el id del episodio y en `FX_RATE` el de la tasa; `periodLabel` es el mes del hecho en la zona del
+ * workspace (el contrato HTTP del enlace los exige en todos sus tipos).
+ */
+export type FxNotificationLink =
+  | { readonly kind: 'FX_FEED_STATUS'; readonly periodId: string; readonly periodLabel: string }
+  | {
+      readonly kind: 'FX_RATE';
+      readonly fxRateId: string;
       readonly periodId: string;
       readonly periodLabel: string;
     };

@@ -108,6 +108,33 @@ const es: MessageCatalog = {
   'email.goal_milestone.basic': 'Una de tus metas de ahorro llegó al {milestone} % de su objetivo.',
   'email.goal_milestone.detailed':
     '{goal} llegó al {milestone} % de su objetivo: llevas {progress} de {target}.',
+  // in-app y email: alertas de tasas (add-rate-feed-alerts; los emails `basic` no llevan valores, monedas ni providers)
+  'inapp.fx_rate_feed_stale.title': '{pair} lleva más de {hours} horas sin tasa automática',
+  'inapp.fx_rate_feed_stale.body':
+    'La última tasa automática es del {lastRate} (hace {elapsed}). Revisa el estado de las tasas automáticas.',
+  'inapp.fx_rate_feed_stale.body_never':
+    'Este par todavía no tiene ninguna tasa automática aceptada. Revisa el estado de las tasas automáticas.',
+  'inapp.fx_rate_feed_recovered.title': '{pair} volvió a tener tasa automática',
+  'inapp.fx_rate_feed_recovered.body': 'Llegó una tasa automática con vigencia {asOf}.',
+  'inapp.fx_rate_anomaly_retained.title': 'Tasa {pair} retenida: variación de {variation} %',
+  'inapp.fx_rate_anomaly_retained.body':
+    '{provider} publicó {value} frente a {baseline} de la tasa anterior. La muestra no se usa hasta que la confirmes o la rechaces.',
+  'email.fx_rate_feed_stale.subject': 'Una tasa automática lleva horas sin actualizarse',
+  'email.fx_rate_feed_stale.basic':
+    'Un par de tasas automáticas lleva más de {hours} horas sin una tasa nueva. Revisa su estado en la app.',
+  'email.fx_rate_feed_stale.detailed':
+    '{pair} lleva más de {hours} horas sin tasa automática. Última tasa: {lastRate}.',
+  'email.fx_rate_feed_stale.detailed_never':
+    '{pair} lleva más de {hours} horas sin tasa automática y todavía no tiene ninguna aceptada.',
+  'email.fx_rate_feed_recovered.subject': 'Una tasa automática volvió a actualizarse',
+  'email.fx_rate_feed_recovered.basic':
+    'Un par de tasas automáticas volvió a recibir tasas. Puedes verlo en la app.',
+  'email.fx_rate_feed_recovered.detailed': '{pair} volvió a tener tasa automática (vigencia {asOf}).',
+  'email.fx_rate_anomaly_retained.subject': 'Tienes una tasa retenida por revisar',
+  'email.fx_rate_anomaly_retained.basic':
+    'Una tasa automática quedó retenida y necesita tu revisión en la app.',
+  'email.fx_rate_anomaly_retained.detailed':
+    '{pair}: {provider} publicó {value} (tasa anterior {baseline}, {variation} %). Confírmala o recházala en la app.',
   // email: común
   'email.cta': 'Ver la notificación',
   'email.footer':
@@ -207,6 +234,32 @@ const en: MessageCatalog = {
   'email.goal_milestone.basic': 'One of your savings goals reached {milestone} % of its target.',
   'email.goal_milestone.detailed':
     '{goal} reached {milestone} % of its target: you have {progress} of {target}.',
+  // in-app and email: rate alerts (add-rate-feed-alerts; `basic` emails carry no values, currencies or providers)
+  'inapp.fx_rate_feed_stale.title': '{pair} has had no automatic rate for more than {hours} hours',
+  'inapp.fx_rate_feed_stale.body':
+    'The last automatic rate is from {lastRate} ({elapsed} ago). Check the status of the automatic rates.',
+  'inapp.fx_rate_feed_stale.body_never':
+    'This pair has no accepted automatic rate yet. Check the status of the automatic rates.',
+  'inapp.fx_rate_feed_recovered.title': '{pair} has an automatic rate again',
+  'inapp.fx_rate_feed_recovered.body': 'An automatic rate arrived, effective {asOf}.',
+  'inapp.fx_rate_anomaly_retained.title': 'Rate {pair} held: {variation} % change',
+  'inapp.fx_rate_anomaly_retained.body':
+    '{provider} published {value} against {baseline} for the previous rate. The sample is not used until you confirm or reject it.',
+  'email.fx_rate_feed_stale.subject': 'An automatic rate has not been updated for hours',
+  'email.fx_rate_feed_stale.basic':
+    'A pair of automatic rates has gone more than {hours} hours without a new rate. Check its status in the app.',
+  'email.fx_rate_feed_stale.detailed':
+    '{pair} has had no automatic rate for more than {hours} hours. Last rate: {lastRate}.',
+  'email.fx_rate_feed_stale.detailed_never':
+    '{pair} has had no automatic rate for more than {hours} hours and has no accepted one yet.',
+  'email.fx_rate_feed_recovered.subject': 'An automatic rate is being updated again',
+  'email.fx_rate_feed_recovered.basic':
+    'A pair of automatic rates is receiving rates again. You can see it in the app.',
+  'email.fx_rate_feed_recovered.detailed': '{pair} has an automatic rate again (effective {asOf}).',
+  'email.fx_rate_anomaly_retained.subject': 'You have a held rate to review',
+  'email.fx_rate_anomaly_retained.basic': 'An automatic rate was held and needs your review in the app.',
+  'email.fx_rate_anomaly_retained.detailed':
+    '{pair}: {provider} published {value} (previous rate {baseline}, {variation} %). Confirm or reject it in the app.',
   'email.cta': 'View the notification',
   'email.footer':
     'You receive this notice because email notifications are turned on. You can change it in your preferences.',
@@ -304,6 +357,32 @@ const pt: MessageCatalog = {
   'email.goal_milestone.basic': 'Uma das suas metas de poupança chegou a {milestone} % do objetivo.',
   'email.goal_milestone.detailed':
     '{goal} chegou a {milestone} % do objetivo: você tem {progress} de {target}.',
+  // in-app e email: alertas de taxas (add-rate-feed-alerts; os emails `basic` não levam valores, moedas nem provedores)
+  'inapp.fx_rate_feed_stale.title': '{pair} está há mais de {hours} horas sem taxa automática',
+  'inapp.fx_rate_feed_stale.body':
+    'A última taxa automática é de {lastRate} (há {elapsed}). Confira o estado das taxas automáticas.',
+  'inapp.fx_rate_feed_stale.body_never':
+    'Este par ainda não tem nenhuma taxa automática aceita. Confira o estado das taxas automáticas.',
+  'inapp.fx_rate_feed_recovered.title': '{pair} voltou a ter taxa automática',
+  'inapp.fx_rate_feed_recovered.body': 'Chegou uma taxa automática com vigência {asOf}.',
+  'inapp.fx_rate_anomaly_retained.title': 'Taxa {pair} retida: variação de {variation} %',
+  'inapp.fx_rate_anomaly_retained.body':
+    '{provider} publicou {value} contra {baseline} da taxa anterior. A amostra não é usada até você confirmá-la ou rejeitá-la.',
+  'email.fx_rate_feed_stale.subject': 'Uma taxa automática está há horas sem atualização',
+  'email.fx_rate_feed_stale.basic':
+    'Um par de taxas automáticas está há mais de {hours} horas sem uma taxa nova. Confira o estado no app.',
+  'email.fx_rate_feed_stale.detailed':
+    '{pair} está há mais de {hours} horas sem taxa automática. Última taxa: {lastRate}.',
+  'email.fx_rate_feed_stale.detailed_never':
+    '{pair} está há mais de {hours} horas sem taxa automática e ainda não tem nenhuma aceita.',
+  'email.fx_rate_feed_recovered.subject': 'Uma taxa automática voltou a ser atualizada',
+  'email.fx_rate_feed_recovered.basic':
+    'Um par de taxas automáticas voltou a receber taxas. Você pode ver no app.',
+  'email.fx_rate_feed_recovered.detailed': '{pair} voltou a ter taxa automática (vigência {asOf}).',
+  'email.fx_rate_anomaly_retained.subject': 'Você tem uma taxa retida para revisar',
+  'email.fx_rate_anomaly_retained.basic': 'Uma taxa automática ficou retida e precisa da sua revisão no app.',
+  'email.fx_rate_anomaly_retained.detailed':
+    '{pair}: {provider} publicou {value} (taxa anterior {baseline}, {variation} %). Confirme ou rejeite no app.',
   'email.cta': 'Ver a notificação',
   'email.footer':
     'Você recebe este aviso porque as notificações por email estão ativadas. Você pode alterá-lo nas suas preferências.',

@@ -1,4 +1,5 @@
 import type { Clock } from '@pf/shared-kernel';
+import type { RateFeedOpenEpisodeDto } from '../contracts/index.js';
 import {
   providerDescriptor,
   StalenessPolicy,
@@ -6,7 +7,7 @@ import {
   type FxRateProvider,
   type FxRateType,
 } from '../domain/index.js';
-import type { ExchangeRateRepository, UnitOfWork } from './ports/index.js';
+import type { ExchangeRateRepository, RateFeedEpisodeRepository, UnitOfWork } from './ports/index.js';
 import { enabledProviders, valuationPolicyOf, type FxProviderSettings } from './provider-settings.js';
 import type { EffectiveRatePair, RatePairResolver } from './rate-pairs.js';
 
@@ -34,6 +35,11 @@ export interface RatePairStatus {
   readonly lastAutomaticRateAt: string | null;
   readonly ageSeconds: number | null;
   readonly stale: boolean;
+  /**
+   * Episodio de obsolescencia abierto del par (add-rate-feed-alerts, D233): solo con cobertura automática; `null` si no
+   * hay. Ausente si el proceso no lee episodios (tests sin alertas).
+   */
+  readonly openEpisode?: RateFeedOpenEpisodeDto | null;
 }
 
 export interface RatePairViewsDeps {
@@ -42,9 +48,11 @@ export interface RatePairViewsDeps {
   readonly pairs: RatePairResolver;
   readonly clock: Clock;
   readonly settings: FxProviderSettings;
+  /** Episodios de obsolescencia abiertos (D233); sin él el estado no informa `openEpisode`. */
+  readonly episodes?: RateFeedEpisodeRepository;
 }
 
-interface Cover {
+export interface Cover {
   readonly provider: FxRateProvider;
   readonly rateType: FxRateType;
 }
@@ -74,10 +82,10 @@ export class RatePairViews {
         mode: effective.mode,
         version: effective.version,
         pairs: effective.pairs.map((p) => {
-          const covers = this.covers(p);
+          const covers = coversOf(this.deps.settings, p);
           return {
             ...p,
-            defaultRateType: this.defaultRateType(p),
+            defaultRateType: defaultRateTypeOf(this.deps.settings, p),
             coverage: covers.length > 0 ? 'AUTOMATIC' : 'MANUAL_ONLY',
             providers: [...new Set(covers.map((c) => c.provider))],
           };
@@ -91,8 +99,9 @@ export class RatePairViews {
     const effective = await this.deps.pairs.effective(workspaceId);
     const now = this.deps.clock.now();
     const out: RatePairStatus[] = [];
+    const open = this.deps.episodes ? await this.deps.episodes.listOpen(workspaceId) : null;
     for (const p of effective.pairs) {
-      const covers = this.covers(p);
+      const covers = coversOf(this.deps.settings, p);
       let newest: Awaited<ReturnType<ExchangeRateRepository['latestAccepted']>> = null;
       for (const c of covers) {
         const found = await this.deps.rates.latestAccepted(workspaceId, {
@@ -118,38 +127,51 @@ export class RatePairViews {
           ? Math.max(0, Math.floor((now.epochMillis - Date.parse(newest.rate.snapshot.asOf)) / 1000))
           : null,
         stale: newest ? this.staleness.isStale(newest.rate.snapshot, now) : true,
+        ...(open
+          ? {
+              openEpisode:
+                covers.length > 0
+                  ? (() => {
+                      const episode = open.find((e) => e.base === p.base && e.quote === p.quote);
+                      return episode
+                        ? { openedAt: episode.openedAt, lastRateAsOf: episode.lastRateAsOf }
+                        : null;
+                    })()
+                  : null,
+            }
+          : {}),
       });
     }
     return out;
   }
+}
 
-  /** Feeds de los providers habilitados que publican este par exacto (con el rol que cada tipo exige). */
-  private covers(pair: EffectiveRatePair): Cover[] {
-    const s = this.deps.settings;
-    const serves = (provider: FxRateProvider, rateType: FxRateType): boolean => {
-      if (rateType === 'PARALLEL') return provider === s.primary || provider === s.fallback;
-      if (rateType === 'OFFICIAL') return provider === s.official;
-      if (rateType === 'MARKET') return provider === s.cryptoPrimary || provider === s.cryptoFallback;
-      return false;
-    };
-    const out: Cover[] = [];
-    for (const provider of enabledProviders(s)) {
-      const descriptor = providerDescriptor(provider);
-      if (!descriptor) continue;
-      for (const feed of descriptor.feeds) {
-        if (feed.base === pair.base && feed.quote === pair.quote && serves(provider, feed.rateType)) {
-          out.push({ provider, rateType: feed.rateType });
-        }
+/**
+ * Feeds de los providers HABILITADOS que publican este par exacto (con el rol que cada tipo exige): la cobertura
+ * automática del par (`AUTOMATIC` si hay alguno, `MANUAL_ONLY` si no).
+ */
+export function coversOf(s: FxProviderSettings, pair: EffectiveRatePair): Cover[] {
+  const serves = (provider: FxRateProvider, rateType: FxRateType): boolean => {
+    if (rateType === 'PARALLEL') return provider === s.primary || provider === s.fallback;
+    if (rateType === 'OFFICIAL') return provider === s.official;
+    if (rateType === 'MARKET') return provider === s.cryptoPrimary || provider === s.cryptoFallback;
+    return false;
+  };
+  const out: Cover[] = [];
+  for (const provider of enabledProviders(s)) {
+    const descriptor = providerDescriptor(provider);
+    if (!descriptor) continue;
+    for (const feed of descriptor.feeds) {
+      if (feed.base === pair.base && feed.quote === pair.quote && serves(provider, feed.rateType)) {
+        out.push({ provider, rateType: feed.rateType });
       }
     }
-    return out;
   }
+  return out;
+}
 
-  /** Tipo de un par sin preferencia: MARKET si su base es cripto volátil cotizada frente a una estable. */
-  private defaultRateType(pair: EffectiveRatePair): FxRateType {
-    const volatile: AssetClass = 'VOLATILE_CRYPTO';
-    return pair.assetClass === volatile && this.deps.settings.stablecoinCodes.includes(pair.quote)
-      ? 'MARKET'
-      : 'PARALLEL';
-  }
+/** Tipo de un par sin preferencia: MARKET si su base es cripto volátil cotizada frente a una estable. */
+export function defaultRateTypeOf(s: FxProviderSettings, pair: EffectiveRatePair): FxRateType {
+  const volatile: AssetClass = 'VOLATILE_CRYPTO';
+  return pair.assetClass === volatile && s.stablecoinCodes.includes(pair.quote) ? 'MARKET' : 'PARALLEL';
 }

@@ -1,5 +1,6 @@
 export * from './ports/index.js';
 export { NotifyFromEvent, type NotifyOutcome } from './notify-from-event.js';
+export { NotificationIntake } from './notification-intake.js';
 export { DispatchEmailDelivery, type DispatchOutcome } from './dispatch-email-delivery.js';
 export { InboxActions } from './inbox.actions.js';
 export { InboxQueries } from './inbox.queries.js';

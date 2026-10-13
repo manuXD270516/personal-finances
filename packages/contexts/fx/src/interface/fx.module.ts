@@ -3,6 +3,7 @@ import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } fr
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import { Instant, type Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
+import type { NotificationIntakePort } from '@pf/notifications/contracts';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import {
   FX_USER_CONVERSION_CONSUMER,
@@ -53,6 +54,7 @@ import {
 } from '../infrastructure/pg-fx.js';
 import { PgProviderHistoryCache } from '../infrastructure/pg-provider-history.js';
 import { PgProviderRunRepository } from '../infrastructure/pg-provider-runs.js';
+import { PgRateFeedEpisodeRepository } from '../infrastructure/pg-rate-feed-episodes.js';
 import { DolarApiBoProvider } from '../infrastructure/providers/dolarapi-bo.provider.js';
 import { ParaleloBoProvider } from '../infrastructure/providers/paralelo-bo.provider.js';
 import {
@@ -244,6 +246,7 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
     pairs: new RatePairResolver(deps),
     clock: options.clock,
     settings,
+    episodes: new PgRateFeedEpisodeRepository(),
   });
   return {
     service,
@@ -397,6 +400,12 @@ export interface FxMarketRateJobsOptions {
    * no existe ningún adapter real: en producción esta opción no se usa y `CRYPTO_ADAPTER_FACTORIES` está vacío.
    */
   readonly cryptoProviders?: Partial<Record<FxRateProvider, CryptoRateProvider>>;
+  /**
+   * Puerto síncrono de NOTIFY (`@pf/notifications/contracts`, add-rate-feed-alerts, D249) para las alertas de
+   * obsolescencia y de muestra retenida: el composition root del worker lo cablea. Sin él se escriben igual los
+   * episodios y los eventos de dominio.
+   */
+  readonly notifications?: NotificationIntakePort;
   /** Tests: servidor HTTP local en lugar de los providers reales (nunca red en CI). */
   readonly endpoints?: {
     readonly baseUrls?: Partial<Record<FxRateProvider, string>>;
@@ -453,6 +462,9 @@ export function createFxMarketRateJobs(options: FxMarketRateJobsOptions): FxMark
     pairs: new PgRatePairListRepository(),
     historyCache: new PgProviderHistoryCache(options.pool),
     ...(options.firstBalance ? { firstBalance: options.firstBalance } : {}),
+    // Alertas de obsolescencia por par y de muestra retenida (add-rate-feed-alerts, D233, D234, D249).
+    episodes: new PgRateFeedEpisodeRepository(),
+    ...(options.notifications ? { notifications: options.notifications } : {}),
   });
   return { settings, enabled: enabledProviders(settings).length > 0, ingestion };
 }

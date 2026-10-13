@@ -434,6 +434,56 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
       await runtime.close();
     }
   }, 120_000);
+
+  it('[TC-NOTIFICATIONS-FX-009] las alertas de tasas no agregan consumidores ni colas events.notifications.* y el pool del worker no cambia (add-rate-feed-alerts, D249)', async () => {
+    const env = readFileSync(
+      fileURLToPath(new URL('../../../../deploy/host/etc-pfos/pfos.env.example', import.meta.url)),
+      'utf8',
+    );
+    const value = (name: string): string => {
+      const found = new RegExp(`^${name}=([0-9]+)\\s*$`, 'mu').exec(env);
+      if (!found) throw new Error(`${name} no está en la plantilla del host`);
+      return found[1] as string;
+    };
+    // El presupuesto de conexiones de Phase 5 (D249): pool 34 del worker + 22 de la API = 56 sobre max_connections 70.
+    expect(Number(value('DATABASE_POOL_MAX'))).toBe(34);
+    const runtime = await createWorkerRuntime(
+      workerConfig(
+        baseEnv(deps, {
+          EVENT_CONSUMER_CONCURRENCY: value('EVENT_CONSUMER_CONCURRENCY'),
+          EVENT_CONSUMER_BATCH_SIZE: value('EVENT_CONSUMER_BATCH_SIZE'),
+          DATABASE_POOL_MAX: value('DATABASE_POOL_MAX'),
+        }),
+      ),
+      quiet,
+      {
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+        lifecycleBackfillOnStart: false,
+        planningPeriodsOnStart: false,
+        commitmentsOnStart: false,
+        userConversionBackfillOnStart: false,
+      },
+    );
+    try {
+      const consumers = runtime.subscriptions.definitions().map((d) => d.consumer);
+      const notifications = consumers.filter((c) => c.startsWith('notifications.')).sort();
+      // Los once consumidores de NOTIFY de las fases 2 a 4: ninguno para las tres alertas de tasas.
+      expect(notifications).toHaveLength(11);
+      expect(notifications.filter((c) => /fx|rate|feed|anomal/u.test(c))).toEqual([]);
+      const events = runtime.subscriptions
+        .definitions()
+        .flatMap((d) => d.events.map((e) => `${d.consumer}:${e.type}`));
+      for (const type of ['fx.RateFeedStale', 'fx.RateFeedRecovered', 'fx.RateAnomalyRetained']) {
+        expect(
+          events.filter((e) => e.endsWith(`:${type}`)),
+          type,
+        ).toEqual([]);
+      }
+    } finally {
+      await runtime.close();
+    }
+  }, 120_000);
 });
 
 type Meter = NonNullable<ConstructorParameters<typeof EventDeliveryMetrics>[1]>;

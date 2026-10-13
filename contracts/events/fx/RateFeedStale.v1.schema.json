@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/fx/RateFeedStale.v1.schema.json",
+  "title": "fx.RateFeedStale.v1",
+  "description": "Un par configurado del workspace con cobertura automática abrió un episodio de obsolescencia: lleva más de N horas (`FX_FEED_STALE_ALERT_AFTER`, 6 h por defecto, D233) sin una tasa aceptada de ningún provider en su tipo automático (PARALLEL para fiat y estables, MARKET para cripto volátil; las manuales y las muestras retenidas o rechazadas no cuentan). Un único hecho por episodio aunque la verificación se repita; el cierre lo publica `fx.RateFeedRecovered.v1`. Productor: FX (actor SYSTEM `fx-provider:<id del ciclo>`, correlationId = id del ciclo, aggregateType RateFeedEpisode, aggregateId = episodeId). Sin consumidores en Phase 5 (catálogo y trazabilidad): NOTIFY recibe el aviso por su puerto síncrono `NotificationIntakePort` en la misma unidad de trabajo (D249). Idempotencia natural: episodeId. Sin PII (los pares revelan las tenencias del owner: no se copian a emails sin opt-in).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "fx.RateFeedStale"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "RateFeedEpisode"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episodeId",
+        "base",
+        "quote",
+        "lastRateAsOf",
+        "staleAfterSeconds",
+        "detectedAt"
+      ],
+      "properties": {
+        "episodeId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "base": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "quote": {
+          "$ref": "../envelope.v1.schema.json#/$defs/CurrencyCode"
+        },
+        "lastRateAsOf": {
+          "description": "Vigencia de la última tasa aceptada del par; null si el par nunca tuvo una.",
+          "oneOf": [
+            {
+              "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "staleAfterSeconds": {
+          "description": "Umbral N vigente (FX_FEED_STALE_ALERT_AFTER) en segundos.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "detectedAt": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Instant"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000501",
+      "eventType": "fx.RateFeedStale",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-13T14:15:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RateFeedEpisode",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fe001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "fx-provider:01928c4e-7a3b-7c11-8f00-0000000000f1"
+      },
+      "payload": {
+        "episodeId": "01928c4e-0000-7000-8000-0000000fe001",
+        "base": "USDT",
+        "quote": "BOB",
+        "lastRateAsOf": "2026-10-13T08:00:00.000Z",
+        "staleAfterSeconds": 21600,
+        "detectedAt": "2026-10-13T14:15:00.000Z"
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000502",
+      "eventType": "fx.RateFeedStale",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-13T14:15:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "RateFeedEpisode",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fe002",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "fx-provider:01928c4e-7a3b-7c11-8f00-0000000000f1"
+      },
+      "payload": {
+        "episodeId": "01928c4e-0000-7000-8000-0000000fe002",
+        "base": "BTC",
+        "quote": "USDT",
+        "lastRateAsOf": null,
+        "staleAfterSeconds": 21600,
+        "detectedAt": "2026-10-13T14:15:00.000Z"
+      }
+    }
+  ]
+}

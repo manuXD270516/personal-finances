@@ -112,7 +112,20 @@ export async function registerFxMarketRateJobs(
 
   await queue.work<{ trigger: string }>(FX_POLL_QUEUE, { concurrency: 1 }, async () => {
     const results = await asWorker(FX_POLL_QUEUE, () => jobs.ingestion.poll());
-    logger.info({ 'job.queue': FX_POLL_QUEUE, results }, 'fx market rates polled');
+    const { lastFeedCheck: feedCheck, lastWorkspaceFailures: workspaceFailures } = jobs.ingestion;
+    logger.info({ 'job.queue': FX_POLL_QUEUE, results, feedCheck }, 'fx market rates polled');
+    // La transacción de un workspace que falló (p. ej. NOTIFY caído) se revirtió completa y el ciclo siguiente la reintenta;
+    // solo el nombre del error, nunca datos del workspace.
+    if (workspaceFailures.length > 0 || feedCheck.failed > 0) {
+      logger.warn(
+        {
+          'job.queue': FX_POLL_QUEUE,
+          recordFailures: workspaceFailures,
+          feedCheckFailures: feedCheck.errors,
+        },
+        'fx market rates failed in some workspaces; retried next cycle',
+      );
+    }
   });
   await queue.schedule(FX_POLL_QUEUE, settings.pollCron, { trigger: 'cron' }, { tz: 'UTC' });
 

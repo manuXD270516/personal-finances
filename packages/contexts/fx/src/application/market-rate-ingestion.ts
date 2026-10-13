@@ -8,18 +8,21 @@ import {
   type ProviderSample,
 } from '../domain/index.js';
 import { CryptoHistorySync } from './crypto-history.js';
+import { CheckFeedFreshness, EMPTY_FEED_CHECK, type FeedCheckSummary } from './feed-freshness-check.js';
 import type {
   ActiveWorkspacesPort,
   CurrencyRepository,
   ExchangeRateRepository,
   FirstBalanceDatePort,
   IdGenerator,
+  NotificationIntakePort,
   OutboxPort,
   ProviderHistoryCache,
   ProviderRun,
   ProviderRunKind,
   ProviderRunOutcome,
   ProviderRunRepository,
+  RateFeedEpisodeRepository,
   RatePairListRepository,
   RatePreference,
   RatePreferenceRepository,
@@ -66,6 +69,13 @@ export interface FxIngestionDeps {
   /** Caché de cierres diarios cripto de la instalación y primera fecha con saldo (histórico cripto, D229). */
   readonly historyCache?: ProviderHistoryCache;
   readonly firstBalance?: FirstBalanceDatePort;
+  /**
+   * Episodios de obsolescencia por par (add-rate-feed-alerts, D233): con ellos cada ciclo de `PollMarketRates` termina
+   * con la verificación de frescura. Sin ellos (tests de ingesta sin alertas) no se verifica.
+   */
+  readonly episodes?: RateFeedEpisodeRepository;
+  /** Puerto síncrono de NOTIFY (D249) para las alertas de tasas; sin él se escriben episodios y eventos igual. */
+  readonly notifications?: NotificationIntakePort;
 }
 
 type Target = RecordTarget;
@@ -82,6 +92,9 @@ export class MarketRateIngestion {
   private readonly recorder: SampleRecorder;
   private readonly runLog: ProviderRunLog;
   private readonly cryptoHistory: CryptoHistorySync | null;
+  private readonly feedCheck: CheckFeedFreshness | null;
+  private lastFeedCheckSummary: FeedCheckSummary = EMPTY_FEED_CHECK;
+  private workspaceFailures: string[] = [];
 
   constructor(private readonly deps: FxIngestionDeps) {
     const pairs = new RatePairResolver({
@@ -104,7 +117,22 @@ export class MarketRateIngestion {
       clock: deps.clock,
       thresholds: anomalyThresholdsOf(deps.settings),
       pairs,
+      notifications: deps.notifications,
     });
+    this.feedCheck = deps.episodes
+      ? new CheckFeedFreshness({
+          uow: deps.uow,
+          rates: deps.rates,
+          pairs,
+          episodes: deps.episodes,
+          workspaces: deps.workspaces,
+          outbox: deps.outbox,
+          ids: deps.ids,
+          clock: deps.clock,
+          settings: deps.settings,
+          notifications: deps.notifications,
+        })
+      : null;
     this.cryptoHistory =
       deps.historyCache && deps.firstBalance
         ? new CryptoHistorySync({
@@ -125,13 +153,29 @@ export class MarketRateIngestion {
         : null;
   }
 
-  /** `PollMarketRates`: un ciclo de consulta de todos los providers habilitados. */
+  /** Resumen de la verificación de frescura del último ciclo de `poll()` (para la bitácora del job). */
+  get lastFeedCheck(): FeedCheckSummary {
+    return this.lastFeedCheckSummary;
+  }
+
+  /** Nombre del error de cada workspace cuya copia de muestras falló en el último ciclo (se reintenta en el siguiente). */
+  get lastWorkspaceFailures(): readonly string[] {
+    return this.workspaceFailures;
+  }
+
+  /**
+   * `PollMarketRates`: un ciclo de consulta de todos los providers habilitados. Termina SIEMPRE con la verificación de
+   * frescura de los pares (`CheckFeedFreshness`), también cuando todos los intentos fallaron: es justo el caso de la
+   * alerta de obsolescencia.
+   */
   async poll(): Promise<ProviderCycleResult[]> {
     const correlationId = this.deps.ids.next();
     const results: ProviderCycleResult[] = [];
+    this.workspaceFailures = [];
     for (const provider of enabledProviders(this.deps.settings)) {
       results.push(await this.pollProvider(provider, correlationId));
     }
+    this.lastFeedCheckSummary = this.feedCheck ? await this.feedCheck.run(correlationId) : EMPTY_FEED_CHECK;
     await this.deps.runs.purgeBefore(
       new Date(this.deps.clock.now().epochMillis - RUN_RETENTION_MS).toISOString(),
     );
@@ -199,12 +243,18 @@ export class MarketRateIngestion {
     }
     let inserted = 0;
     for (const target of await this.deps.workspaces.list()) {
-      inserted += await this.recorder.recordIn(target, samples, {
-        detectAnomalies: true,
-        eventPerRate: true,
-        correlationId,
-        skipDaysWithRates: false,
-      });
+      try {
+        inserted += await this.recorder.recordIn(target, samples, {
+          detectAnomalies: true,
+          eventPerRate: true,
+          correlationId,
+          skipDaysWithRates: false,
+        });
+      } catch (err) {
+        // La transacción del workspace (muestras, eventos y avisos a NOTIFY) se revirtió completa: el resto de los
+        // workspaces sigue y el ciclo siguiente reintenta (design.md add-rate-feed-alerts, riesgos).
+        this.workspaceFailures.push(err instanceof Error ? err.name : typeof err);
+      }
     }
     const fromCache =
       samples.length > 0 && samples.every((s) => Date.parse(s.fetchedAt) < startedAt.epochMillis);

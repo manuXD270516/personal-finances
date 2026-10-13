@@ -5,16 +5,22 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de par sin tasa fresca"
 scenario: "USDT/BOB sin tasa fresca"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-FX-010"]
 nfr: []
 invariants: []
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+  - packages/contexts/notifications/test/integration/notification-intake.int.test.ts
+  - tests/e2e/specs/fx-feed-alerts.spec.ts
+  - apps/web/src/ui/fx/rate-pairs.test.tsx
+  - apps/web/src/ui/notifications/notifications.test.tsx
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "staleness"]

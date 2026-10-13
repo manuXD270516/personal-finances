@@ -57,4 +57,90 @@ export const NOTIFICATIONS_AUDIT_POLICY = {
   },
 } as const satisfies AuditFieldPoliciesDto;
 
+/**
+ * Entrega directa de alertas desde otro contexto (openspec add-rate-feed-alerts; D249). Hoy solo FX (job de providers de
+ * tasas): tasa sin actualizar, tasa recuperada y muestra retenida como anómala. NOTIFY resuelve destinatarios (OWNER y
+ * EDITOR activos), preferencias, idioma, horario de silencio y email, y deduplica por `(tipo, factKey, destinatario)`
+ * (FR-NOTIFY-005). Sin consumidor de eventos: no crea colas `events.notifications.*` ni conexiones nuevas.
+ */
+export type NotificationIntakeType =
+  'FX_RATE_FEED_STALE' | 'FX_RATE_FEED_RECOVERED' | 'FX_RATE_ANOMALY_RETAINED';
+
+/** `FX_RATE_FEED_STALE`: un par configurado lleva más de N horas sin tasa aceptada de ningún provider. */
+export interface RateFeedStaleFact {
+  readonly episodeId: string;
+  readonly base: string;
+  readonly quote: string;
+  /** Vigencia de la última tasa aceptada del par; `null` si nunca tuvo una. */
+  readonly lastRateAsOf: string | null;
+  readonly staleAfterSeconds: number;
+  readonly detectedAt: string;
+  /** Zona IANA del workspace: las horas del aviso se muestran en ella. */
+  readonly timeZone: string;
+}
+
+/** `FX_RATE_FEED_RECOVERED`: llegó una tasa fresca y el episodio de obsolescencia se cerró. */
+export interface RateFeedRecoveredFact {
+  readonly episodeId: string;
+  readonly base: string;
+  readonly quote: string;
+  readonly rateId: string;
+  readonly asOf: string;
+  readonly openedAt: string;
+  readonly detectedAt: string;
+  readonly timeZone: string;
+}
+
+/** `FX_RATE_ANOMALY_RETAINED`: una muestra de provider quedó retenida como anómala y espera su revisión. */
+export interface RateAnomalyRetainedFact {
+  readonly rateId: string;
+  readonly base: string;
+  readonly quote: string;
+  readonly rateType: string;
+  readonly provider: string;
+  readonly value: string;
+  readonly baselineRateId: string;
+  readonly baselineValue: string;
+  /** Variación con signo, 4 decimales (`"10.7692"`). */
+  readonly variationPct: string;
+  readonly thresholdPct: string;
+  readonly detectedAt: string;
+  readonly timeZone: string;
+}
+
+interface IntakeFactBase {
+  readonly workspaceId: string;
+  /** Clave de negocio del hecho: `episodeId` (obsolescencia y recuperación) o `rateId` (anomalía). */
+  readonly factKey: string;
+  /** Id del evento de dominio que FX escribió en el outbox en la misma unidad de trabajo (origen de la notificación). */
+  readonly sourceEventId: string;
+  readonly occurredAt: string;
+}
+
+export type NotificationIntakeFact =
+  | (IntakeFactBase & { readonly type: 'FX_RATE_FEED_STALE'; readonly payload: RateFeedStaleFact })
+  | (IntakeFactBase & { readonly type: 'FX_RATE_FEED_RECOVERED'; readonly payload: RateFeedRecoveredFact })
+  | (IntakeFactBase & {
+      readonly type: 'FX_RATE_ANOMALY_RETAINED';
+      readonly payload: RateAnomalyRetainedFact;
+    });
+
+export interface NotificationIntakeOutcome {
+  /** Notificaciones in-app nuevas (una por destinatario sin notificación previa de ese hecho). */
+  readonly created: number;
+  /** Entregas por email programadas. */
+  readonly deliveries: number;
+}
+
+/**
+ * Puerto síncrono que FX llama desde su job de providers, DENTRO de la unidad de trabajo del workspace (la
+ * transacción del llamador se reutiliza: episodio, evento y notificación se confirman o se revierten juntos). Un
+ * hecho mal formado o un fallo de NOTIFY lanza y revierte la transacción del llamador (se reintenta en el ciclo siguiente).
+ */
+export interface NotificationIntakePort {
+  notify(fact: NotificationIntakeFact): Promise<NotificationIntakeOutcome>;
+}
+
+export const NOTIFICATION_INTAKE_PORT = Symbol.for('pf.notifications.NotificationIntakePort');
+
 export * from './portability.js';

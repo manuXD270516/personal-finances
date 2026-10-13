@@ -1,4 +1,5 @@
 import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
+import type { NotificationIntakePort } from '@pf/notifications/contracts';
 import type { Clock, Instant } from '@pf/shared-kernel';
 import type {
   AnomalyStatus,
@@ -12,9 +13,12 @@ import type {
   FxRateSource,
   FxRateType,
   RateCandidate,
+  OpenFeedEpisode,
   RatePairListState,
   ValuationPolicy,
 } from '../../domain/index.js';
+
+export type { NotificationIntakePort };
 
 /** Transacción PG + `SET LOCAL app.workspace_id`; reutiliza la del llamador si existe (Transactions, idempotencia). */
 export interface UnitOfWork {
@@ -134,6 +138,35 @@ export interface ExchangeRateRepository {
 export interface RateAnomalyReviewRepository {
   /** `FX_RATE_ANOMALY_ALREADY_REVIEWED` si la tasa ya tiene una decisión (carrera resuelta por la PK). */
   insert(review: AnomalyReview): Promise<void>;
+}
+
+/** Motivo del cierre de un episodio de obsolescencia (`fx.rate_feed_episode.closed_reason`). */
+export type FeedEpisodeClosedReason = 'RECOVERED' | 'PAIR_REMOVED' | 'COVERAGE_LOST';
+
+/**
+ * Episodios de obsolescencia por workspace y par configurado (`fx.rate_feed_episode`, WS con RLS forzada; D233). Un solo
+ * episodio abierto por par: lo garantiza el índice único parcial, también con dos réplicas del worker.
+ */
+export interface RateFeedEpisodeRepository {
+  /** Episodios abiertos del workspace. */
+  listOpen(workspaceId: string): Promise<OpenFeedEpisode[]>;
+  /** Abre un episodio; `false` si el par ya tiene uno abierto (otra réplica se adelantó): no se publica otro hecho. */
+  open(input: {
+    readonly id: string;
+    readonly workspaceId: string;
+    readonly base: string;
+    readonly quote: string;
+    readonly openedAt: string;
+    readonly lastRateAsOf: string | null;
+  }): Promise<boolean>;
+  /** Cierra un episodio abierto; `false` si ya estaba cerrado (no se publica otro hecho de recuperación). */
+  close(input: {
+    readonly id: string;
+    readonly workspaceId: string;
+    readonly closedAt: string;
+    readonly recoveredRateId: string | null;
+    readonly reason: FeedEpisodeClosedReason;
+  }): Promise<boolean>;
 }
 
 export type ProviderRunKind = 'POLL' | 'BACKFILL' | 'GAP_FILL';

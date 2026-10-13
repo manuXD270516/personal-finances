@@ -18,6 +18,8 @@ export interface NotificationLink {
     | 'CREDIT_CARD'
     | 'GOAL'
     | 'GOAL_RESERVATIONS'
+    | 'FX_FEED_STATUS'
+    | 'FX_RATE'
     | (string & {});
   readonly periodId: string;
   readonly periodLabel: string;
@@ -33,6 +35,11 @@ export interface NotificationLink {
   readonly goalId?: string;
   /** Cuenta sobre-asignada (solo `GOAL_RESERVATIONS`): abre las reservas de la cuenta (`/goals/reservas?accountId=`). */
   readonly accountId?: string;
+  /**
+   * Tasa retenida como anómala (solo `FX_RATE`, add-rate-feed-alerts): abre su revisión (Tasas → Proveedores, donde se
+   * confirma o se rechaza). `FX_FEED_STATUS` abre Configuración → Tasas automáticas (estado por par).
+   */
+  readonly fxRateId?: string;
   readonly budgetId?: string;
   readonly budgetLineId?: string;
   readonly targetKind?: string;
@@ -101,6 +108,10 @@ export function severityPresentation(severity: string): SeverityPresentation {
   }
 }
 
+/** Ancla de Configuración → Tasas automáticas (estado por par) y de cada muestra retenida en Tasas → Proveedores. */
+export const FX_FEED_STATUS_ANCHOR = 'tasas-automaticas';
+export const fxAnomalyAnchor = (rateId: string): string => `anomalia-${rateId}`;
+
 /**
  * Ruta (sin prefijo de locale) del recurso que originó la notificación; `undefined` si el tipo de enlace no se
  * conoce (el enum es abierto). `BUDGET_LINE` abre el plan del periodo con la línea resaltada; si la línea ya no
@@ -139,6 +150,12 @@ export function resourcePath(link: NotificationLink): string | undefined {
   if (link.kind === 'GOAL_RESERVATIONS') {
     const accountId = link.accountId ?? link.periodId;
     return accountId ? `/goals/reservas?${new URLSearchParams({ accountId }).toString()}` : undefined;
+  }
+  if (link.kind === 'FX_FEED_STATUS') return `/configuracion#${FX_FEED_STATUS_ANCHOR}`;
+  if (link.kind === 'FX_RATE') {
+    // En este tipo `periodId` es el id de la tasa (contrato): vale como respaldo si falta `fxRateId`.
+    const rateId = link.fxRateId ?? link.periodId;
+    return rateId ? `/fx?vista=proveedores#${fxAnomalyAnchor(rateId)}` : undefined;
   }
   return undefined;
 }

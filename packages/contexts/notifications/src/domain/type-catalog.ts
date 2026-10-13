@@ -47,11 +47,11 @@ export interface NotificationTypeDefinition {
 
 // ──────────────────────────────────────────────────────────────────────────── lectura defensiva del payload
 
-const fail = (what: string): never => {
+export const fail = (what: string): never => {
   throw new DomainError('VALIDATION_FAILED', `invalid event payload: ${what}`);
 };
 
-function recordOf(value: unknown, what: string): Record<string, unknown> {
+export function recordOf(value: unknown, what: string): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : fail(what);
@@ -61,7 +61,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PERIOD_LABEL = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
-function uuidOf(source: Record<string, unknown>, key: string): string {
+export function uuidOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   return typeof value === 'string' && UUID.test(value) ? value : fail(key);
 }
@@ -71,7 +71,7 @@ function labelOf(source: Record<string, unknown>, key: string): string {
   return typeof value === 'string' && PERIOD_LABEL.test(value) ? value : fail(key);
 }
 
-function decimalOf(source: Record<string, unknown>, key: string): string {
+export function decimalOf(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   return typeof value === 'string' && DECIMAL.test(value) ? value : fail(key);
 }

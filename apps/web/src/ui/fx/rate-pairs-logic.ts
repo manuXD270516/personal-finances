@@ -35,6 +35,8 @@ export interface FxRatePairStatus extends FxPair {
   readonly lastAutomaticRateAt: string | null;
   readonly ageSeconds: number | null;
   readonly stale: boolean;
+  /** Episodio de obsolescencia abierto (add-rate-feed-alerts, D233); `null` o ausente si no hay. */
+  readonly openEpisode?: { readonly openedAt: string; readonly lastRateAsOf: string | null } | null;
 }
 
 /** Máximo de pares de una lista (contrato `FxRatePairListInput`). */

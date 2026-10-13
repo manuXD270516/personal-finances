@@ -232,6 +232,59 @@ export async function createWorkerRuntime(
     runOnStart: options.lifecycleBackfillOnStart ?? true,
   });
 
+  // NOTIFY se compone ANTES que los providers de FX: el job de providers le entrega por un puerto síncrono las alertas de
+  // obsolescencia y de muestra retenida (add-rate-feed-alerts, D249: sin consumidor ni cola nuevos).
+  // NOTIFY (add-alerts): consumidores de `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`, despacho
+  // del email (adaptador por EMAIL_DRIVER: smtp → Mailpit en local/CI, none → solo in-app), barrido y purga. La cola de
+  // despacho se crea antes de arrancar los consumidores: estos encolan en la transacción de la notificación.
+  const notificationsClock = options.clock ?? systemClock;
+  const emailDriver = config.EMAIL_DRIVER ?? 'none';
+  const notifications = createNotificationsWorkerRuntime({
+    pool,
+    clock: notificationsClock,
+    queue,
+    logger,
+    recipients: identityWorkspaceRecipients(pool),
+    catalog: createCategoryCatalogQuery({ pool, clock: notificationsClock }),
+    sender:
+      options.emailSender ??
+      createEmailSender({
+        driver: emailDriver,
+        ...(emailDriver === 'smtp' && config.SMTP_HOST
+          ? {
+              smtp: {
+                host: config.SMTP_HOST,
+                port: config.SMTP_PORT,
+                secure: config.SMTP_SECURE,
+                user: config.SMTP_USER,
+                password: config.SMTP_PASSWORD,
+                from: config.EMAIL_FROM,
+              },
+            }
+          : {}),
+      }),
+    counters: otelCounters('@pf/notifications'),
+    histograms: otelHistograms('@pf/notifications'),
+    appPublicUrl: config.APP_PUBLIC_URL,
+    emailFrom: config.EMAIL_FROM,
+    maxAttempts: config.NOTIFY_EMAIL_MAX_ATTEMPTS,
+    retentionMonths: config.NOTIFY_RETENTION,
+    ...(options.notifications?.backoffMs ? { backoffMs: options.notifications.backoffMs } : {}),
+    ...(options.notifications?.leaseMs ? { leaseMs: options.notifications.leaseMs } : {}),
+  });
+  await registerNotificationsJobs(queue, {
+    dispatch: notifications.dispatch,
+    purge: notifications.purge,
+    workspaces: activeWorkspaces,
+    logger,
+    ...(options.notifications?.scheduleCrons !== undefined
+      ? { scheduleCrons: options.notifications.scheduleCrons }
+      : {}),
+    ...(options.notifications?.sweepOnStart !== undefined
+      ? { sweepOnStart: options.notifications.sweepOnStart }
+      : {}),
+  });
+
   // Providers de tasas de mercado (add-market-rate-providers): polling, carga histórica y relleno; la configuración
   // inválida o `none` no impide arrancar el worker (degradación).
   const fxClock = options.clock ?? systemClock;
@@ -252,6 +305,8 @@ export async function createWorkerRuntime(
       settings: parseFxProviderSettings(config),
       // Histórico de cierres cripto desde la primera fecha con saldo (add-crypto-rate-providers, D229).
       firstBalance: firstBalanceDatePort(ledgerFirstBalanceDates()),
+      // Alertas de obsolescencia por par y de muestra retenida (add-rate-feed-alerts, D233, D234, D249).
+      notifications: notifications.intake,
       ...(fxEndpoints ? { endpoints: fxEndpoints } : {}),
     }),
     logger,
@@ -485,57 +540,6 @@ export async function createWorkerRuntime(
   await registerImportsJobs(queue, imports.maintenance, activeWorkspaces, logger, {
     cron: config.IMPORT_MAINTENANCE_CRON,
     runOnStart: options.importsOnStart ?? true,
-  });
-
-  // NOTIFY (add-alerts): consumidores de `planning.BudgetThresholdReached.v1` y `planning.MonthClosePending.v1`, despacho
-  // del email (adaptador por EMAIL_DRIVER: smtp → Mailpit en local/CI, none → solo in-app), barrido y purga. La cola de
-  // despacho se crea antes de arrancar los consumidores: estos encolan en la transacción de la notificación.
-  const notificationsClock = options.clock ?? systemClock;
-  const emailDriver = config.EMAIL_DRIVER ?? 'none';
-  const notifications = createNotificationsWorkerRuntime({
-    pool,
-    clock: notificationsClock,
-    queue,
-    logger,
-    recipients: identityWorkspaceRecipients(pool),
-    catalog: createCategoryCatalogQuery({ pool, clock: notificationsClock }),
-    sender:
-      options.emailSender ??
-      createEmailSender({
-        driver: emailDriver,
-        ...(emailDriver === 'smtp' && config.SMTP_HOST
-          ? {
-              smtp: {
-                host: config.SMTP_HOST,
-                port: config.SMTP_PORT,
-                secure: config.SMTP_SECURE,
-                user: config.SMTP_USER,
-                password: config.SMTP_PASSWORD,
-                from: config.EMAIL_FROM,
-              },
-            }
-          : {}),
-      }),
-    counters: otelCounters('@pf/notifications'),
-    histograms: otelHistograms('@pf/notifications'),
-    appPublicUrl: config.APP_PUBLIC_URL,
-    emailFrom: config.EMAIL_FROM,
-    maxAttempts: config.NOTIFY_EMAIL_MAX_ATTEMPTS,
-    retentionMonths: config.NOTIFY_RETENTION,
-    ...(options.notifications?.backoffMs ? { backoffMs: options.notifications.backoffMs } : {}),
-    ...(options.notifications?.leaseMs ? { leaseMs: options.notifications.leaseMs } : {}),
-  });
-  await registerNotificationsJobs(queue, {
-    dispatch: notifications.dispatch,
-    purge: notifications.purge,
-    workspaces: activeWorkspaces,
-    logger,
-    ...(options.notifications?.scheduleCrons !== undefined
-      ? { scheduleCrons: options.notifications.scheduleCrons }
-      : {}),
-    ...(options.notifications?.sweepOnStart !== undefined
-      ? { sweepOnStart: options.notifications.sweepOnStart }
-      : {}),
   });
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);

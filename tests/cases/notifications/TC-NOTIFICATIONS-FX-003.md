@@ -5,16 +5,20 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Notificación de recuperación de un par"
 scenario: "USDT/BOB recuperado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-NOTIFY-005"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-feed-alerts.api.test.ts
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+  - tests/e2e/specs/fx-feed-alerts.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "recovery"]

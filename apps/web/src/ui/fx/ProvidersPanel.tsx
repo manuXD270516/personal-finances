@@ -20,6 +20,7 @@ import {
 } from '../common/ui';
 import { listAll, problemOf, useFormat, type WorkspaceContext } from '../common/workspace';
 import { formatAge, formatInstant, formatLocalDate } from '../dashboard/format';
+import { fxAnomalyAnchor } from '../notifications/logic';
 import { RateAttributionLink, RateSourceBadge } from '../dashboard/RateSourceBadge';
 import type { FormatContext, ResolvedRate } from '../dashboard/types';
 import {
@@ -394,6 +395,12 @@ export function AnomalyInbox({
   onReview: (rate: FxRate, decision: 'CONFIRM' | 'REJECT', reason: string) => Promise<boolean>;
 }) {
   const { t, locale, timeZone } = f;
+  // El enlace de la notificación de una muestra retenida (`/fx?vista=proveedores#anomalia-<id>`) lleva a su revisión: la
+  // lista se carga después de montar, así que se desplaza a la muestra cuando ya está en pantalla.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash.startsWith('anomalia-')) document.getElementById(hash)?.scrollIntoView?.({ block: 'center' });
+  }, [pending.length]);
   return (
     <section aria-labelledby="fx-anomalies-title" style={cardStyle} data-testid="anomaly-inbox">
       <h3 id="fx-anomalies-title" style={{ fontSize: '1rem', marginTop: 0 }}>
@@ -407,7 +414,13 @@ export function AnomalyInbox({
       ) : (
         <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'grid', gap: '0.75rem' }}>
           {pending.map((r) => (
-            <li key={r.id} data-testid="anomaly" data-rate-id={r.id} data-pair={`${r.base}/${r.quote}`}>
+            <li
+              key={r.id}
+              id={fxAnomalyAnchor(r.id)}
+              data-testid="anomaly"
+              data-rate-id={r.id}
+              data-pair={`${r.base}/${r.quote}`}
+            >
               <AnomalyLine rate={r} f={f} />
               {canReview ? <ReviewForm rate={r} f={f} onReview={onReview} /> : null}
             </li>

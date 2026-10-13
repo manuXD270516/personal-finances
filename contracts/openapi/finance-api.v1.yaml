@@ -13107,6 +13107,24 @@ components:
         lastAutomaticRateAt: { type: [string, 'null'], format: date-time }
         ageSeconds: { type: [integer, 'null'], minimum: 0 }
         stale: { type: boolean, description: 'True when the last automatic rate is stale or there is none' }
+        openEpisode:
+          description: >-
+            Open stale-rate episode of the pair (add-rate-feed-alerts, D233): the pair has gone more than the alert
+            threshold without an accepted rate from any provider. Null when there is none or the pair has no automatic
+            coverage; absent for clients of earlier versions.
+          oneOf:
+            - $ref: '#/components/schemas/FxRateFeedOpenEpisode'
+            - type: 'null'
+    FxRateFeedOpenEpisode:
+      type: object
+      additionalProperties: false
+      required: [openedAt, lastRateAsOf]
+      properties:
+        openedAt: { type: string, format: date-time }
+        lastRateAsOf:
+          description: Effective instant of the last accepted rate when the episode opened; null when the pair never had one.
+          type: [string, 'null']
+          format: date-time
     FxProviderStatusList:
       type: object
       additionalProperties: false
@@ -16861,7 +16879,7 @@ components:
       description: Open set; later phases add types (upcoming payments, goals, cards, stale rates, imports, deficit).
       pattern: '^[A-Z][A-Z0-9_]*$'
       examples: [BUDGET_THRESHOLD]
-      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE]
+      x-extensible-enum: [BUDGET_THRESHOLD, MONTH_CLOSE_PENDING, RECURRING_PAYMENT_UPCOMING, RECURRING_APPROVAL_REQUIRED, SUBSCRIPTION_RENEWAL, SUBSCRIPTION_TRIAL_ENDING, SUBSCRIPTION_PRICE_CHANGE, CARD_PAYMENT_DUE, CARD_UTILIZATION, GOAL_OVER_ALLOCATED, GOAL_REACHED, GOAL_MILESTONE, FX_RATE_FEED_STALE, FX_RATE_FEED_RECOVERED, FX_RATE_ANOMALY_RETAINED]
     NotificationSeverity:
       type: string
       description: INFO below 100 % of a budget line; WARNING at 100 % or more and for a month pending close.
@@ -16886,7 +16904,14 @@ components:
       properties:
         kind:
           type: string
-          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS]
+          x-extensible-enum: [BUDGET_LINE, PERIOD_CLOSE, RECURRING_OCCURRENCE, SUBSCRIPTION, CREDIT_CARD, GOAL, GOAL_RESERVATIONS, FX_FEED_STATUS, FX_RATE]
+        fxRateId:
+          description: >-
+            Held exchange rate (only `FX_RATE`, add-rate-feed-alerts): the app opens the review of that rate (Rates →
+            Providers, where an EDITOR or OWNER confirms or rejects it). In that kind `periodId` is the rate id and
+            `periodLabel` the month of the fact in the workspace time zone. `FX_FEED_STATUS` opens Settings → Automatic
+            rates (status per pair); there `periodId` is the stale-rate episode id and `periodLabel` the month of the fact.
+          $ref: '#/components/schemas/Uuid'
         occurrenceId:
           description: >-
             Recurring occurrence (only `RECURRING_OCCURRENCE`, add-recurrence-engine): the app opens

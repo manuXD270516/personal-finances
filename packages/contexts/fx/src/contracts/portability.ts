@@ -2,7 +2,7 @@ import type { PortabilitySection } from '@pf/shared-kernel';
 
 /**
  * Secciones de exportación/importación del workspace que pertenecen a FX (openspec add-workspace-export): monedas
- * habilitadas, preferencias de tasa, la lista de pares automáticos (add-crypto-rate-providers) y las tasas PROPIAS del workspace (las globales de provider, sin workspace, no son
+ * habilitadas, preferencias de tasa, la lista de pares automáticos (add-crypto-rate-providers), los episodios de obsolescencia por par (add-rate-feed-alerts) y las tasas PROPIAS del workspace (las globales de provider, sin workspace, no son
  * del usuario) con sus revisiones de anomalía y las marcas de anulada de las observaciones de conversiones propias. Las tasas viajan como decimal exacto sin ceros de relleno.
  */
 export const FX_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
@@ -75,5 +75,14 @@ export const FX_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     order: 225,
     orderBy: ['exchange_rate_id'],
     idColumns: [],
+  },
+  {
+    // Episodios de obsolescencia por par (add-rate-feed-alerts, D233): después de las tasas, porque `recovered_rate_id`
+    // referencia la tasa que cerró el episodio (el id se remapea con el de la tasa importada).
+    name: 'fx-rate-feed-episodes',
+    context: 'fx',
+    table: 'fx.rate_feed_episode',
+    order: 226,
+    orderBy: ['opened_at', 'id'],
   },
 ];

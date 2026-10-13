@@ -785,6 +785,9 @@ importers:
       '@pf/audit':
         specifier: workspace:*
         version: link:../audit
+      '@pf/notifications':
+        specifier: workspace:*
+        version: link:../notifications
       '@pf/platform':
         specifier: workspace:*
         version: link:../../platform

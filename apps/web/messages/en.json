@@ -2439,7 +2439,9 @@
       "openSubscription": "View the subscription",
       "openCreditCard": "View the card",
       "openGoal": "View the goal",
-      "openGoalReservations": "View the account reservations"
+      "openGoalReservations": "View the account reservations",
+      "openFxFeedStatus": "View the status of the automatic rates",
+      "openFxRate": "Review the held rate"
     },
     "prefs": {
       "title": "Notifications",
@@ -2467,7 +2469,10 @@
         "CARD_UTILIZATION": "Card utilization",
         "GOAL_OVER_ALLOCATED": "Over-allocated goal (reservations above the balance)",
         "GOAL_REACHED": "Goal reached",
-        "GOAL_MILESTONE": "Goal milestone (25 %, 50 %, 75 %)"
+        "GOAL_MILESTONE": "Goal milestone (25 %, 50 %, 75 %)",
+        "FX_RATE_FEED_STALE": "Automatic rate not updated",
+        "FX_RATE_FEED_RECOVERED": "Automatic rate recovered",
+        "FX_RATE_ANOMALY_RETAINED": "Rate held for an abnormal change"
       },
       "checkbox": "{type} · {channel}",
       "includeDetails": "Include details (amounts and names) in emails",
@@ -5312,6 +5317,9 @@
       "DUPLICATE": "That pair is already in the list.",
       "TOO_MANY": "At most 50 pairs.",
       "INVALID": "Choose a currency and the currency it is quoted against."
-    }
+    },
+    "episode": "No automatic rate since {since}",
+    "episodeNever": "No accepted automatic rate at all (opened {since})",
+    "episodeLabel": "Stale-rate alert"
   }
 }

@@ -10,6 +10,10 @@ export const FX_CONTEXT = 'fx' as const;
 /** Eventos publicados por el outbox (contracts/events/fx/*.v1.schema.json). */
 export const FX_EVENTS = {
   rateRecorded: { eventType: 'fx.RateRecorded', eventVersion: 1 },
+  // add-rate-feed-alerts (D233, D234): sin consumidores en Phase 5 (catálogo y trazabilidad; NOTIFY recibe el aviso por su puerto).
+  rateFeedStale: { eventType: 'fx.RateFeedStale', eventVersion: 1 },
+  rateFeedRecovered: { eventType: 'fx.RateFeedRecovered', eventVersion: 1 },
+  rateAnomalyRetained: { eventType: 'fx.RateAnomalyRetained', eventVersion: 1 },
 } as const;
 
 export type FxRateTypeDto =
@@ -231,6 +235,16 @@ export interface RatePairsQuery {
 }
 
 export const FX_RATE_PAIRS_QUERY = Symbol.for('pf.fx.RatePairsQuery');
+
+/**
+ * Episodio abierto de obsolescencia de un par configurado (`fx.rate_feed_episode` sin `closed_at`; add-rate-feed-alerts,
+ * D233), tal como lo expone el estado de providers (`FxRatePairStatus.openEpisode`).
+ */
+export interface RateFeedOpenEpisodeDto {
+  readonly openedAt: string;
+  /** Vigencia de la última tasa aceptada al abrirse; `null` si el par nunca tuvo una. */
+  readonly lastRateAsOf: string | null;
+}
 
 /**
  * Allow-list de auditoría de FX (add-audit-trail, NFR-SEC-015): las tasas son datos de mercado (valor como texto

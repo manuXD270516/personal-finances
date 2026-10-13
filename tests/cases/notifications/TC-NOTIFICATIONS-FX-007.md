@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Emails de tasas sin valores salvo opt-in"
 scenario: "Email de obsolescencia desactivado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-003", "FR-NOTIFY-006"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/fx-rate-email.test.ts
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "preferences"]

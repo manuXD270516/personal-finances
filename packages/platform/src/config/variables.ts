@@ -656,6 +656,12 @@ export const VARIABLES = {
       'Umbral de obsolescencia propio del provider cripto de respaldo para `MARKET` (`60m`, D228).',
     default: '60m',
   }),
+  FX_FEED_STALE_ALERT_AFTER: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Horas sin tasa aceptada de ningún provider (`6h`, D233) a partir de las cuales un par configurado con cobertura automática abre un episodio de obsolescencia y avisa al OWNER y a los EDITOR (una vez por episodio; aviso de recuperación al volver la tasa). No puede ser menor que `FX_POLL_INTERVAL` ni que los umbrales de obsolescencia `FX_STALE_AFTER_*` de `PARALLEL` y `MARKET`; un valor inválido deshabilita los providers con `FX_PROVIDER_CONFIG_INVALID`.',
+    default: '6h',
+  }),
   FX_ANOMALY_THRESHOLD_VOLATILE_PCT: variable(z.string().min(1).max(16), {
     group: 'FX (tasas de mercado)',
     description:
@@ -1040,6 +1046,7 @@ const FX_PROVIDERS = [
   'FX_PROVIDER_CRYPTO_FALLBACK',
   'FX_STALE_AFTER_MARKET',
   'FX_STALE_AFTER_MARKET_FALLBACK',
+  'FX_FEED_STALE_ALERT_AFTER',
   'FX_ANOMALY_THRESHOLD_VOLATILE_PCT',
   'FX_STABLECOIN_CODES',
   'FX_CRYPTO_HISTORY_FROM',
