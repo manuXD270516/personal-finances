@@ -1078,7 +1078,7 @@ describe('Rendimiento de la generación (NFR-PERF-009)', () => {
     expect(result.definitions).toBe(60);
     expect(result.generated).toBeGreaterThan(20 * 30);
     expect(elapsed).toBeLessThanOrEqual(10_000);
-  });
+  }, 60_000);
 });
 
 describe('Insumo del disponible para gastar (CommittedQuery.listForSpendable; add-spendable-amount, S1)', () => {
