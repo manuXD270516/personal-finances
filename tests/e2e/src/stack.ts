@@ -55,6 +55,9 @@ export function createEnvFile(): string {
     ['FX_PROVIDER_FALLBACK', 'dolarapi_bo'],
     ['FX_PROVIDER_OFFICIAL', 'dolarapi_bo'],
     ['FX_POLL_INTERVAL', '24h'],
+    // La alerta de obsolescencia no puede ser menor que el intervalo de consulta (add-rate-feed-alerts): sin esto la
+    // validación deja los providers deshabilitados y la cola `fx.poll-market-rates` no se registra.
+    ['FX_FEED_STALE_ALERT_AFTER', '24h'],
     ['FX_BACKFILL_ENABLED', 'true'],
     // El job de recurrencia pasa las ocurrencias a próxima/atrasada: cada minuto para no esperar al cron horario.
     ['COMMITMENTS_SCHEDULER_CRON', '* * * * *'],

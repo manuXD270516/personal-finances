@@ -1,4 +1,5 @@
 import type { AuditEntry, LifecycleStepInput } from '@pf/audit/contracts';
+import type { NotificationIntakeFact } from '@pf/notifications/contracts';
 import { DomainError, FixedClock, Instant, Money } from '@pf/shared-kernel';
 import {
   CurrencyDefinition,
@@ -13,15 +14,18 @@ import type {
   ActiveWorkspacesPort,
   AnomalyReview,
   FirstBalanceDatePort,
+  FeedEpisodeClosedReason,
   FxDeps,
   HistoryClose,
   ProviderFeedKey,
   ProviderHistoryCache,
   ProviderRun,
   ProviderRunRepository,
+  RateFeedEpisodeRepository,
   RatePreference,
   RateWithdrawal,
   StoredRate,
+  NotificationIntakePort,
 } from '../ports/index.js';
 
 /** Igual que `AuditPort` real: solo valores planos (string/boolean/entero/null) o `Money` (`AUDIT_INVALID_VALUE`). */
@@ -83,8 +87,22 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     historyCloses: [] as HistoryClose[],
     /** Primera fecha con saldo por moneda (doble de `FirstBalanceDateQuery` de LEDGER). */
     firstBalance: new Map<string, Map<string, string>>(),
+    /** Episodios de obsolescencia (`fx.rate_feed_episode`). */
+    episodes: [] as {
+      id: string;
+      workspaceId: string;
+      base: string;
+      quote: string;
+      openedAt: string;
+      lastRateAsOf: string | null;
+      closedAt: string | null;
+      recoveredRateId: string | null;
+      closedReason: FeedEpisodeClosedReason | null;
+    }[],
+    /** Hechos entregados al puerto de NOTIFY (doble de `NotificationIntakePort`). */
+    notified: [] as NotificationIntakeFact[],
   };
-  const faults: { audit?: Error } = {};
+  const faults: { audit?: Error; notify?: Error } = {};
   let depth = 0;
   const snapshot = () => ({
     rates: [...state.rates],
@@ -101,6 +119,8 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     pairLists: new Map(state.pairLists),
     historyCloses: [...state.historyCloses],
     firstBalance: new Map(state.firstBalance),
+    episodes: state.episodes.map((e) => ({ ...e })),
+    notified: [...state.notified],
   });
   const definitions = new Map(
     CATALOG.map(([code, kind, scale]) => [
@@ -482,5 +502,59 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
       return state.firstBalance.get(ws) ?? new Map();
     },
   };
-  return { deps, state, faults, clock, runs, workspaces, historyCache, firstBalance };
+  const episodes: RateFeedEpisodeRepository = {
+    async listOpen(ws) {
+      return state.episodes
+        .filter((e) => e.workspaceId === ws && e.closedAt === null)
+        .map((e) => ({
+          id: e.id,
+          base: e.base,
+          quote: e.quote,
+          openedAt: e.openedAt,
+          lastRateAsOf: e.lastRateAsOf,
+        }));
+    },
+    async open(input) {
+      const duplicate = state.episodes.some(
+        (e) =>
+          e.workspaceId === input.workspaceId &&
+          e.base === input.base &&
+          e.quote === input.quote &&
+          e.closedAt === null,
+      );
+      if (duplicate) return false;
+      state.episodes.push({ ...input, closedAt: null, recoveredRateId: null, closedReason: null });
+      return true;
+    },
+    async close(input) {
+      const row = state.episodes.find(
+        (e) => e.id === input.id && e.workspaceId === input.workspaceId && e.closedAt === null,
+      );
+      if (!row) return false;
+      row.closedAt = input.closedAt;
+      row.recoveredRateId = input.recoveredRateId;
+      row.closedReason = input.reason;
+      return true;
+    },
+  };
+  /** Doble del puerto de NOTIFY: registra los hechos (y se revierte con la unidad de trabajo) o falla a pedido. */
+  const notifications: NotificationIntakePort = {
+    async notify(fact) {
+      if (faults.notify) throw faults.notify;
+      state.notified.push(fact);
+      return { created: 2, deliveries: 2 };
+    },
+  };
+  return {
+    deps,
+    state,
+    faults,
+    clock,
+    runs,
+    workspaces,
+    historyCache,
+    firstBalance,
+    episodes,
+    notifications,
+  };
 }

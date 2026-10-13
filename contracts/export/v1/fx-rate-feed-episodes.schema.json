@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/fx-rate-feed-episodes.schema.json",
+  "title": "pfos-export v1 — fx-rate-feed-episodes",
+  "description": "Registro de la sección «fx-rate-feed-episodes» (tabla fx.rate_feed_episode, contexto fx). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "workspace_id",
+    "base_currency",
+    "quote_currency",
+    "opened_at",
+    "last_rate_as_of",
+    "closed_at",
+    "recovered_rate_id",
+    "closed_reason"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "base_currency": {
+      "type": "string"
+    },
+    "quote_currency": {
+      "type": "string"
+    },
+    "opened_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "last_rate_as_of": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "closed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "recovered_rate_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "closed_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "x-pfos-table": "fx.rate_feed_episode",
+  "x-pfos-context": "fx"
+}

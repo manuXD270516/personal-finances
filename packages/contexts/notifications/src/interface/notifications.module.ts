@@ -2,6 +2,7 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort } from '@pf/audit/contracts';
 import type { CategoryCatalogQuery } from '@pf/classification/contracts';
 import type { WorkspaceRecipientsQuery } from '@pf/identity/contracts';
+import type { NotificationIntakePort } from '../contracts/index.js';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -12,6 +13,7 @@ import type { Pool } from 'pg';
 import { DispatchEmailDelivery } from '../application/dispatch-email-delivery.js';
 import { InboxActions } from '../application/inbox.actions.js';
 import { InboxQueries } from '../application/inbox.queries.js';
+import { NotificationIntake } from '../application/notification-intake.js';
 import { NotifyFromEvent } from '../application/notify-from-event.js';
 import {
   DEFAULT_BACKOFF_MS,
@@ -19,6 +21,7 @@ import {
   type DispatchConfig,
   type EmailSender,
   type InboxDeps,
+  type NotifyDeps,
   type UserLocaleQuery,
 } from '../application/ports/index.js';
 import { PreferencesService } from '../application/preferences.service.js';
@@ -169,6 +172,11 @@ export interface NotificationsWorkerRuntimeOptions {
 
 export interface NotificationsWorkerRuntime {
   readonly notify: NotifyFromEvent;
+  /**
+   * Entrega directa de las alertas de tasas del job de providers de FX (add-rate-feed-alerts, D249): mismo camino que
+   * `notify` pero sin consumidor de eventos ni cola.
+   */
+  readonly intake: NotificationIntakePort;
   readonly dispatch: DispatchEmailDelivery;
   readonly purge: PurgeExpiredNotifications;
 }
@@ -190,18 +198,20 @@ export function createNotificationsWorkerRuntime(
     backoffMs: options.backoffMs ?? DEFAULT_BACKOFF_MS,
     leaseMs: options.leaseMs ?? DEFAULT_LEASE_MS,
   };
+  const notifyDeps: NotifyDeps = {
+    uow,
+    notifications,
+    deliveries,
+    preferences,
+    recipients: options.recipients,
+    scheduler,
+    ids: uuidV7Ids,
+    clock: options.clock,
+    metrics,
+  };
   return {
-    notify: new NotifyFromEvent({
-      uow,
-      notifications,
-      deliveries,
-      preferences,
-      recipients: options.recipients,
-      scheduler,
-      ids: uuidV7Ids,
-      clock: options.clock,
-      metrics,
-    }),
+    notify: new NotifyFromEvent(notifyDeps),
+    intake: new NotificationIntake(notifyDeps),
     dispatch: new DispatchEmailDelivery({
       uow,
       notifications,

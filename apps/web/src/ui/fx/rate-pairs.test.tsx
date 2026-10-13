@@ -120,6 +120,49 @@ const view = (over: { canEdit?: boolean; list?: FxRatePairList; conflict?: boole
     />,
   );
 
+describe('Configuración → Tasas automáticas: episodio de obsolescencia (add-rate-feed-alerts 6.1)', () => {
+  const withEpisode = (episode: FxRatePairStatus['openEpisode'], pair = 'USDT'): FxRatePairStatus[] =>
+    STATUSES.map((s) => (s.base === pair ? { ...s, stale: true, openEpisode: episode } : s));
+  const render = (statuses: FxRatePairStatus[]) =>
+    renderToStaticMarkup(
+      <RatePairsView
+        list={LIST}
+        statuses={statuses}
+        providers={PROVIDERS}
+        f={f}
+        dash={dash}
+        fx={fx}
+        baseCurrency="BOB"
+        enabledCurrencies={['BOB', 'USD', 'USDT', 'BTC', 'ETH']}
+        canEdit
+      />,
+    );
+
+  it('[TC-NOTIFICATIONS-FX-001] el par con episodio abierto lo muestra desde la vigencia de su última tasa; el resto, no', () => {
+    const html = render(
+      withEpisode({ openedAt: '2026-10-13T14:15:00.000Z', lastRateAsOf: '2026-10-13T08:00:00.000Z' }),
+    );
+    const usdt = /data-pair="USDT\/BOB"[\s\S]*?<\/tr>/.exec(html)?.[0] ?? '';
+    expect(tagOf(usdt, 'rate-pair-episode')).toContain('data-opened-at="2026-10-13T14:15:00.000Z"');
+    expect(textOf(usdt)).toContain('Aviso de obsolescencia');
+    expect(textOf(usdt)).toMatch(/Sin tasa automática desde el .*\b0?4:00/);
+    const btc = /data-pair="BTC\/USDT"[\s\S]*?<\/tr>/.exec(html)?.[0] ?? '';
+    expect(btc).not.toContain('rate-pair-episode');
+    // El formulario es el destino del enlace "estado de las tasas automáticas" de la notificación.
+    expect(html).toContain('id="tasas-automaticas"');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-001] un par que nunca tuvo tasa automática lo dice con la fecha de apertura', () => {
+    const html = render(withEpisode({ openedAt: '2026-10-13T14:15:00.000Z', lastRateAsOf: null }));
+    expect(textOf(html)).toMatch(/Sin ninguna tasa automática aceptada \(abierto el .*\b10:15/);
+  });
+
+  it('un estado sin openEpisode (clientes de versiones anteriores o par sin episodio) no muestra aviso', () => {
+    expect(render(STATUSES)).not.toContain('rate-pair-episode');
+    expect(render(withEpisode(null))).not.toContain('rate-pair-episode');
+  });
+});
+
 describe('Configuración → Tasas automáticas (add-crypto-rate-providers 6.1)', () => {
   it('[TC-FX-PROVIDER-025] cada par muestra su cobertura, sus fuentes con atribución y la antigüedad de su última tasa', () => {
     const html = view();

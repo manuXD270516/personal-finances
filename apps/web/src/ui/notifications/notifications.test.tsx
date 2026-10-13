@@ -146,6 +146,25 @@ describe('Notificaciones: lógica pura', () => {
     ).toBeUndefined();
   });
 
+  it('[TC-NOTIFICATIONS-FX-001] [TC-NOTIFICATIONS-FX-004] los enlaces FX_FEED_STATUS y FX_RATE abren el estado de tasas automáticas y la revisión de la tasa', () => {
+    const rateId = '0198f0aa-0000-7000-8000-00000000fa51';
+    expect(resourcePath({ kind: 'FX_FEED_STATUS', periodId: PERIOD_ID, periodLabel: '2026-10' })).toBe(
+      '/configuracion#tasas-automaticas',
+    );
+    expect(
+      resourcePath({
+        kind: 'FX_RATE',
+        periodId: rateId,
+        periodLabel: '2026-10',
+        fxRateId: rateId,
+      }),
+    ).toBe(`/fx?vista=proveedores#anomalia-${rateId}`);
+    // En FX_RATE `periodId` es el id de la tasa: respaldo si faltara `fxRateId`.
+    expect(resourcePath({ kind: 'FX_RATE', periodId: rateId, periodLabel: '2026-10' })).toBe(
+      `/fx?vista=proveedores#anomalia-${rateId}`,
+    );
+  });
+
   it('[TC-NOTIFICATIONS-EMAIL-003] la ruta del detalle lleva solo el id opaco (sin query, montos ni nombres)', () => {
     expect(detailPath(NOTE_A)).toBe(`/notificaciones/${NOTE_A}`);
     expect(detailPath(NOTE_A)).not.toMatch(/[?=&]/);
@@ -609,6 +628,34 @@ describe('Detalle', () => {
       `href="/es/recurring/occurrences/${occurrenceId}"`,
     );
     expect(textOf(html)).toContain('Ver el pago recurrente de octubre de 2026');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-001] [TC-NOTIFICATIONS-FX-004] las alertas de tasas ofrecen el enlace al estado de tasas automáticas o a la revisión de la tasa', () => {
+    const rateId = '0198f0aa-0000-7000-8000-00000000fa51';
+    const stale = note({
+      id: uuid(1030),
+      type: 'FX_RATE_FEED_STALE',
+      severity: 'WARNING',
+      title: 'USDT/BOB lleva más de 6 horas sin tasa automática',
+      link: { kind: 'FX_FEED_STATUS', periodId: PERIOD_ID, periodLabel: '2026-10' },
+    });
+    const staleHtml = render({ status: 'ready', notification: stale });
+    expect(tagOf(staleHtml, 'notification-open-resource')).toContain(
+      'href="/es/configuracion#tasas-automaticas"',
+    );
+    expect(textOf(staleHtml)).toContain('Ver el estado de las tasas automáticas');
+    expect(textOf(staleHtml)).toContain('USDT/BOB lleva más de 6 horas sin tasa automática');
+    const held = note({
+      id: uuid(1031),
+      type: 'FX_RATE_ANOMALY_RETAINED',
+      severity: 'WARNING',
+      link: { kind: 'FX_RATE', periodId: rateId, periodLabel: '2026-10', fxRateId: rateId },
+    });
+    const heldHtml = render({ status: 'ready', notification: held });
+    expect(tagOf(heldHtml, 'notification-open-resource')).toContain(
+      `href="/es/fx?vista=proveedores#anomalia-${rateId}"`,
+    );
+    expect(textOf(heldHtml)).toContain('Revisar la tasa retenida');
   });
 
   it('un tipo de enlace desconocido no ofrece destino y la notificación sigue visible', () => {

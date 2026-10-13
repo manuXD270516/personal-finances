@@ -214,3 +214,49 @@ export const contributionRecordedPayload = (
   progressComplete: true,
   ...overrides,
 });
+
+export const EPISODE_ID = '01928c4e-0000-7000-8000-0000000fe001';
+export const FX_RATE_ID = '01928c4e-0000-7000-8000-0000000fa501';
+export const FX_BASELINE_RATE_ID = '01928c4e-0000-7000-8000-0000000fa500';
+
+/** Hecho de obsolescencia de USDT/BOB (TC-NOTIFICATIONS-FX-001): última tasa 08:00Z, detectada 14:15Z (6 h 15 min). */
+export const feedStalePayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  episodeId: EPISODE_ID,
+  base: 'USDT',
+  quote: 'BOB',
+  lastRateAsOf: '2026-10-13T08:00:00.000Z',
+  staleAfterSeconds: 21600,
+  detectedAt: '2026-10-13T14:15:00.000Z',
+  timeZone: 'America/La_Paz',
+  ...overrides,
+});
+
+/** Hecho de recuperación de USDT/BOB (TC-NOTIFICATIONS-FX-003): nueva vigencia 15:58Z. */
+export const feedRecoveredPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  episodeId: EPISODE_ID,
+  base: 'USDT',
+  quote: 'BOB',
+  rateId: FX_RATE_ID,
+  asOf: '2026-10-13T15:58:00.000Z',
+  openedAt: '2026-10-13T14:15:00.000Z',
+  detectedAt: '2026-10-13T16:00:00.000Z',
+  timeZone: 'America/La_Paz',
+  ...overrides,
+});
+
+/** Hecho de muestra retenida BTC/USDT 72000.00 (línea base 65000.00, +10.7692 %). */
+export const anomalyRetainedPayload = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  rateId: FX_RATE_ID,
+  base: 'BTC',
+  quote: 'USDT',
+  rateType: 'MARKET',
+  provider: 'CRYPTO_EXAMPLE',
+  value: '72000.00',
+  baselineRateId: FX_BASELINE_RATE_ID,
+  baselineValue: '65000.00',
+  variationPct: '10.7692',
+  thresholdPct: '10',
+  detectedAt: '2026-10-13T14:02:10.000Z',
+  timeZone: 'America/La_Paz',
+  ...overrides,
+});

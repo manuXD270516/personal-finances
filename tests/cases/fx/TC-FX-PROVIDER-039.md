@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Episodios de obsolescencia por par configurado"
 scenario: "Recuperación del par"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-010"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/rate-feed-alerts.test.ts
+  - packages/contexts/fx/src/domain/feed-freshness.test.ts
+  - packages/contexts/fx/test/integration/rate-feed-alerts.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "staleness", "recovery"]

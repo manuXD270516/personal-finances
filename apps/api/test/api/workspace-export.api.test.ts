@@ -162,7 +162,7 @@ describe('Exportación del workspace', () => {
       (e) => e['action'] === 'identity.export.requested',
     )!;
     expect(requested['category']).toBe('SECURITY');
-    expect(JSON.stringify(audit.body)).not.toMatch(/Bank A|3099/u);
+    expect(JSON.stringify(audit.body)).not.toMatch(/Bank A|(?<![0-9A-Za-z])3099(?![0-9A-Za-z])/u);
   });
 
   it('[TC-IDENTITY-EXPORT-003] manifiesto, SHA-256 por archivo, esquema de cada registro, montos exactos y CSV neutralizado', async () => {

@@ -14,7 +14,8 @@ import {
   tableWrapStyle,
 } from '../common/ui';
 import { problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
-import { formatAge } from '../dashboard/format';
+import { formatAge, formatInstant } from '../dashboard/format';
+import { FX_FEED_STATUS_ANCHOR } from '../notifications/logic';
 import { RateAttributionLink } from '../dashboard/RateSourceBadge';
 import type { FormatContext } from '../dashboard/types';
 import { providerName, type FxProviderStatus } from './providers-logic';
@@ -203,6 +204,7 @@ export function RatePairsView({
 
   return (
     <form
+      id={FX_FEED_STATUS_ANCHOR}
       aria-labelledby="rate-pairs-title"
       style={{ ...cardStyle, display: 'grid', gap: 'var(--pf-space-3)', maxWidth: '64rem' }}
       data-testid="rate-pairs"
@@ -322,6 +324,22 @@ export function RatePairsView({
                       ) : (
                         f.t('noRate')
                       )}
+                      {st?.openEpisode ? (
+                        <span
+                          style={{ ...mutedStyle, display: 'block' }}
+                          data-testid="rate-pair-episode"
+                          data-opened-at={st.openEpisode.openedAt}
+                        >
+                          <strong>{f.t('episodeLabel')}</strong>{' '}
+                          {st.openEpisode.lastRateAsOf
+                            ? f.t('episode', {
+                                since: formatInstant(st.openEpisode.lastRateAsOf, f.locale, f.timeZone),
+                              })
+                            : f.t('episodeNever', {
+                                since: formatInstant(st.openEpisode.openedAt, f.locale, f.timeZone),
+                              })}
+                        </span>
+                      ) : null}
                     </td>
                     {canEdit && mode === 'CUSTOM' ? (
                       <td style={cellStyle}>

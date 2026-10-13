@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Idioma de las notificaciones de tasas"
 scenario: "Obsolescencia en portugués"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-002"]
 nfr: ["NFR-USAB-001", "NFR-USAB-002"]
 invariants: []
 priority: medium
 type: unit
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "i18n"]

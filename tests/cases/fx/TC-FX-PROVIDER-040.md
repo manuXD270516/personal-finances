@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Hecho publicado por cada muestra retenida como anómala"
 scenario: "Muestra de bitcoin retenida"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-010", "FR-NOTIFY-005"]
 nfr: []
 invariants: ["INV-011"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/rate-feed-alerts.test.ts
+  - packages/contexts/fx/test/integration/rate-feed-alerts.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "anomaly", "event"]

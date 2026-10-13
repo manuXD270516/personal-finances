@@ -15,6 +15,7 @@ import type {
   CurrencyRepository,
   ExchangeRateRepository,
   IdGenerator,
+  NotificationIntakePort,
   OutboxPort,
   UnitOfWork,
 } from './ports/index.js';
@@ -52,6 +53,11 @@ export interface SampleRecorderDeps {
   readonly clock: Clock;
   readonly thresholds?: AnomalyThresholds;
   readonly pairs: RatePairResolver;
+  /**
+   * Puerto síncrono de NOTIFY (add-rate-feed-alerts, D234, D249): cada muestra retenida como anómala se avisa en la
+   * misma unidad de trabajo que su inserción. Sin él se escribe igual el evento del outbox.
+   */
+  readonly notifications?: NotificationIntakePort | undefined;
 }
 
 /**
@@ -119,15 +125,18 @@ export class SampleRecorder {
           if (days.has(effectiveDate)) continue;
         }
         let anomaly = null;
+        let baselineFact: { readonly value: string; readonly thresholdPct: string } | null = null;
         if (options.detectAnomalies) {
           const baseline = await this.deps.rates.latestAccepted(workspaceId, feed);
           if (baseline && Date.parse(baseline.rate.snapshot.asOf) < Date.parse(sample.asOf)) {
             const cls = this.deps.pairs.policy.classOf({ code: base.code, kind: base.kind });
+            const detector = detectorFor(cls);
             anomaly =
-              detectorFor(cls).assess(sample.value, {
+              detector.assess(sample.value, {
                 rateId: baseline.rate.id,
                 value: baseline.rate.valueText,
               })?.mark ?? null;
+            baselineFact = { value: baseline.rate.valueText, thresholdPct: detector.thresholdPct };
           }
         }
         const rate = ExchangeRate.fromProviderSample(sample, {
@@ -143,9 +152,65 @@ export class SampleRecorder {
         inserted++;
         if (options.eventPerRate) await this.publish(rate, options.correlationId);
         else last = rate;
+        // Un único hecho por muestra retenida: la inserción es idempotente (misma vigencia ⇒ `continue` arriba).
+        if (options.detectAnomalies && rate.snapshot.anomaly !== null && baselineFact !== null) {
+          await this.publishRetained(rate, baselineFact, timeZone, options.correlationId);
+        }
       }
       if (last) await this.publish(last, options.correlationId);
       return inserted;
+    });
+  }
+
+  /**
+   * `fx.RateAnomalyRetained.v1` (D234) y aviso a NOTIFY por su puerto, en la misma unidad de trabajo que la inserción de
+   * la muestra. Actor `SYSTEM fx-provider:<ciclo>`; la muestra sigue retenida hasta su revisión (D236).
+   */
+  private async publishRetained(
+    rate: ExchangeRate,
+    baseline: { readonly value: string; readonly thresholdPct: string },
+    timeZone: string,
+    correlationId: string,
+  ): Promise<void> {
+    const s = rate.snapshot;
+    const anomaly = s.anomaly;
+    if (!anomaly) return;
+    const workspaceId = s.workspaceId as string;
+    const eventId = this.deps.ids.next();
+    const occurredAt = this.deps.clock.now().toString();
+    const provider = String(s.provider);
+    const fact = {
+      rateId: s.id,
+      base: s.rate.base.code,
+      quote: s.rate.quote.code,
+      rateType: s.rateType,
+      provider,
+      value: rate.valueText,
+      baselineRateId: anomaly.baselineRateId,
+      baselineValue: baseline.value,
+      variationPct: anomaly.variationPct,
+      thresholdPct: baseline.thresholdPct,
+    };
+    await this.deps.outbox.append({
+      eventId,
+      eventType: FX_EVENTS.rateAnomalyRetained.eventType,
+      eventVersion: FX_EVENTS.rateAnomalyRetained.eventVersion,
+      occurredAt,
+      workspaceId,
+      aggregateType: 'ExchangeRate',
+      aggregateId: s.id,
+      aggregateVersion: 1,
+      actor: { type: 'SYSTEM', id: `fx-provider:${correlationId}` },
+      correlationId,
+      payload: fact,
+    });
+    await this.deps.notifications?.notify({
+      workspaceId,
+      type: 'FX_RATE_ANOMALY_RETAINED',
+      factKey: s.id,
+      sourceEventId: eventId,
+      occurredAt,
+      payload: { ...fact, detectedAt: occurredAt, timeZone },
     });
   }
 

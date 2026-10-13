@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: []
 requirement: "Notificación de par sin tasa fresca"
 scenario: "Hecho reentregado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-005"]
 nfr: ["NFR-REL-007"]
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+  - packages/contexts/notifications/test/integration/notification-intake.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "dedup"]

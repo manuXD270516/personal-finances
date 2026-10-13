@@ -1,4 +1,9 @@
-import { DomainError } from '@pf/shared-kernel';
+import { dec, DomainError, MoneyDecimal } from '@pf/shared-kernel';
+import {
+  FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY,
+  FX_RATE_FEED_RECOVERED_MESSAGE_KEY,
+  FX_RATE_FEED_STALE_MESSAGE_KEY,
+} from './fx-rate-notifications.js';
 import {
   BUDGET_THRESHOLD_MESSAGE_KEY,
   CARD_PAYMENT_DUE_MESSAGE_KEY,
@@ -133,7 +138,10 @@ type MessageKind =
   | 'card_utilization'
   | 'goal_over_allocated'
   | 'goal_reached'
-  | 'goal_milestone';
+  | 'goal_milestone'
+  | 'fx_rate_feed_stale'
+  | 'fx_rate_feed_recovered'
+  | 'fx_rate_anomaly_retained';
 
 const moneyText = (value: { amount: string; currency: string }, locale: NotificationLocale): string =>
   `${formatDecimal(value.amount, locale)} ${value.currency}`;
@@ -177,7 +185,74 @@ function kindOf(messageKey: string): MessageKind {
   if (messageKey === GOAL_OVER_ALLOCATED_MESSAGE_KEY) return 'goal_over_allocated';
   if (messageKey === GOAL_REACHED_MESSAGE_KEY) return 'goal_reached';
   if (messageKey === GOAL_MILESTONE_MESSAGE_KEY) return 'goal_milestone';
+  if (messageKey === FX_RATE_FEED_STALE_MESSAGE_KEY) return 'fx_rate_feed_stale';
+  if (messageKey === FX_RATE_FEED_RECOVERED_MESSAGE_KEY) return 'fx_rate_feed_recovered';
+  if (messageKey === FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY) return 'fx_rate_anomaly_retained';
   throw new DomainError('VALIDATION_FAILED', `unknown message key ${messageKey}`);
+}
+
+/**
+ * Fecha y hora de un instante en la zona del workspace con el orden de fecha del locale y 24 h (es/pt
+ * `13/10/2026 04:00`, en `10/13/2026 04:00`): nunca la zona del servidor (NFR-USAB-002).
+ */
+export function formatInstantInZone(iso: string, locale: NotificationLocale, timeZone: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  const day =
+    locale === 'en'
+      ? `${get('month')}/${get('day')}/${get('year')}`
+      : `${get('day')}/${get('month')}/${get('year')}`;
+  return `${day} ${get('hour')}:${get('minute')}`;
+}
+
+/** Nombre mostrable de un provider (los ids cripto `CRYPTO_<NOMBRE>` se muestran tal cual). */
+const PROVIDER_LABELS: Readonly<Record<string, string>> = {
+  PARALELO_BO: 'paralelo.bo',
+  DOLARAPI_BO: 'bo.dolarapi.com',
+};
+const providerLabel = (id: string): string => PROVIDER_LABELS[id] ?? id;
+
+/** `6 h 15 min` entre dos instantes (sin pasar por el locale: h y min valen en es, en y pt). */
+function elapsedText(fromIso: string, toIso: string): string {
+  const minutes = Math.max(0, Math.floor((Date.parse(toIso) - Date.parse(fromIso)) / 60_000));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/**
+ * Valor de una tasa con al menos 2 decimales (`72000` → `72.000,00`, `12.5` → `12,50`) y sin recortar los de más: la
+ * tasa se guarda sin ceros de relleno, pero se presenta como la publica el provider.
+ */
+function rateText(value: string, locale: NotificationLocale): string {
+  const m = /^(-?\d+)(?:\.(\d+))?$/.exec(value);
+  if (!m) return formatDecimal(value, locale);
+  const fraction = (m[2] ?? '').padEnd(2, '0');
+  return formatDecimal(`${m[1] ?? ''}.${fraction}`, locale);
+}
+
+/** Variación con signo explícito y 2 decimales HALF_EVEN: `10.7692` → `+10,77`. */
+function signedVariation(value: string, locale: NotificationLocale): string {
+  const rounded = dec(value).toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_EVEN);
+  const text = rounded.abs().toFixed(2);
+  const sign = rounded.isNegative() && !rounded.isZero() ? '-' : '+';
+  return `${sign}${formatDecimal(text, locale)}`;
+}
+
+/** Horas de un umbral en segundos (`21600` → `6`; `5400` → `1,5`). */
+function hoursText(seconds: number, locale: NotificationLocale): string {
+  const hours = dec(String(seconds)).div(3600).toDecimalPlaces(2, MoneyDecimal.ROUND_HALF_EVEN);
+  return formatDecimal(hours.toFixed(), locale);
 }
 
 /** Valores de los marcadores de un tipo, ya formateados para el locale. */
@@ -295,6 +370,32 @@ function valuesOf(
       ),
     };
   }
+  if (kind === 'fx_rate_feed_stale') {
+    const lastRateAsOf = typeof params['lastRateAsOf'] === 'string' ? params['lastRateAsOf'] : null;
+    const zone = str(params, 'timeZone');
+    const seconds = typeof params['staleAfterSeconds'] === 'number' ? params['staleAfterSeconds'] : 0;
+    return {
+      pair: `${str(params, 'base')}/${str(params, 'quote')}`,
+      hours: hoursText(seconds, locale),
+      lastRate: lastRateAsOf === null ? '' : formatInstantInZone(lastRateAsOf, locale, zone),
+      elapsed: lastRateAsOf === null ? '' : elapsedText(lastRateAsOf, str(params, 'detectedAt')),
+    };
+  }
+  if (kind === 'fx_rate_feed_recovered') {
+    return {
+      pair: `${str(params, 'base')}/${str(params, 'quote')}`,
+      asOf: formatInstantInZone(str(params, 'asOf'), locale, str(params, 'timeZone')),
+    };
+  }
+  if (kind === 'fx_rate_anomaly_retained') {
+    return {
+      pair: `${str(params, 'base')}/${str(params, 'quote')}`,
+      provider: providerLabel(str(params, 'provider')),
+      value: rateText(str(params, 'value'), locale),
+      baseline: rateText(str(params, 'baselineValue'), locale),
+      variation: signedVariation(str(params, 'variationPct'), locale),
+    };
+  }
   return {
     period: str(params, 'periodLabel'),
     periodEnd: formatDate(str(params, 'periodEnd'), locale),
@@ -310,7 +411,12 @@ export function renderInApp(
   const kind = kindOf(messageKey);
   const values = valuesOf(kind, params, names, locale);
   const title = fill(message(locale, `inapp.${kind}.title`), values);
-  const bodyKey = isRecurring(kind) && values['amount'] === '' ? 'body_variable' : 'body';
+  const bodyKey =
+    isRecurring(kind) && values['amount'] === ''
+      ? 'body_variable'
+      : kind === 'fx_rate_feed_stale' && values['lastRate'] === ''
+        ? 'body_never'
+        : 'body';
   let body = fill(message(locale, `inapp.${kind}.${bodyKey}`), values);
   if (kind === 'subscription_renewal') {
     if (values['plan'] !== '')
@@ -365,7 +471,11 @@ export function renderEmail(input: EmailRenderInput): RenderedEmail {
   const subject = message(locale, `email.${kind}.subject`);
   // Variante `basic`: sin montos ni nombres (FR-NOTIFY-006). Una ocurrencia de monto variable no tiene monto que mostrar.
   const variantKey =
-    variant === 'detailed' && isRecurring(kind) && values['amount'] === '' ? 'detailed_variable' : variant;
+    variant === 'detailed' && isRecurring(kind) && values['amount'] === ''
+      ? 'detailed_variable'
+      : variant === 'detailed' && kind === 'fx_rate_feed_stale' && values['lastRate'] === ''
+        ? 'detailed_never'
+        : variant;
   const line = fill(message(locale, `email.${kind}.${variantKey}`), values);
   const cta = message(locale, 'email.cta');
   const footer = message(locale, 'email.footer');

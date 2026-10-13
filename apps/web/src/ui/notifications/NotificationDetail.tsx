@@ -158,7 +158,11 @@ export function NotificationDetailView({
                       ? f.t('detail.openGoal')
                       : n.link.kind === 'GOAL_RESERVATIONS'
                         ? f.t('detail.openGoalReservations')
-                        : f.t('detail.openBudgetLine', { period })}
+                        : n.link.kind === 'FX_FEED_STATUS'
+                          ? f.t('detail.openFxFeedStatus')
+                          : n.link.kind === 'FX_RATE'
+                            ? f.t('detail.openFxRate')
+                            : f.t('detail.openBudgetLine', { period })}
           </a>
         </p>
       ) : null}

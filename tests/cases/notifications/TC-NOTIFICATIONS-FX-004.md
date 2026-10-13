@@ -5,16 +5,20 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de muestra anómala retenida"
 scenario: "Bitcoin retenido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-FX-010"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-feed-alerts.api.test.ts
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+  - apps/web/src/ui/notifications/notifications.test.tsx
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "anomaly"]

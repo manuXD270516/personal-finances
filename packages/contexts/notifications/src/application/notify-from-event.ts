@@ -6,6 +6,9 @@ import {
 } from '../domain/index.js';
 import type { NotifyDeps, SourceEvent } from './ports/index.js';
 
+/** Lo que la entrega necesita de un tipo: destinatarios y plan (los consumidores de eventos y la entrega directa). */
+export type DeliveryDefinition = Pick<NotificationTypeDefinition, 'recipients' | 'plan' | 'suppressed'>;
+
 export interface NotifyOutcome {
   /** Notificaciones in-app nuevas (una por destinatario sin notificación previa de ese hecho). */
   readonly created: number;
@@ -29,7 +32,7 @@ export interface NotifyOutcome {
 export class NotifyFromEvent {
   constructor(private readonly deps: NotifyDeps) {}
 
-  async handle(event: SourceEvent, definition: NotificationTypeDefinition): Promise<NotifyOutcome> {
+  async handle(event: SourceEvent, definition: DeliveryDefinition): Promise<NotifyOutcome> {
     const { deps } = this;
     // Lanza ante un payload mal formado: el consumidor reintenta y termina en dead-letter (observable).
     const plan = definition.plan(event.payload, { aggregateVersion: event.aggregateVersion });

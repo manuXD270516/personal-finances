@@ -5,16 +5,18 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de par sin tasa fresca"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004", "FR-FX-010"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-feed-alerts.api.test.ts
+  - tests/e2e/specs/fx-feed-alerts.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "e2e"]

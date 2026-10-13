@@ -34,6 +34,8 @@ export interface FxProviderEnv {
   readonly FX_ANOMALY_THRESHOLD_VOLATILE_PCT?: string;
   readonly FX_STABLECOIN_CODES?: string;
   readonly FX_CRYPTO_HISTORY_FROM?: string;
+  // add-rate-feed-alerts (D233)
+  readonly FX_FEED_STALE_ALERT_AFTER?: string;
 }
 
 /** Configuración validada de los providers (design.md decisión 5). */
@@ -76,6 +78,12 @@ export interface FxProviderSettings {
   readonly cryptoConfigError: string | null;
   /** Ids de providers cripto nombrados por la configuración (también si no pudieron habilitarse). */
   readonly cryptoRequested: readonly FxRateProvider[];
+  /**
+   * Tiempo sin tasa aceptada de ningún provider a partir del cual un par configurado abre un episodio de obsolescencia
+   * (`FX_FEED_STALE_ALERT_AFTER`, 6 h; D233). Nunca menor que el intervalo de polling ni que los umbrales de
+   * obsolescencia de `PARALLEL` y `MARKET`.
+   */
+  readonly feedStaleAlertAfterMs: number;
 }
 
 export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
@@ -98,6 +106,7 @@ export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
   FX_ANOMALY_THRESHOLD_VOLATILE_PCT: '10',
   FX_STABLECOIN_CODES: 'USDT',
   FX_CRYPTO_HISTORY_FROM: '2020-01-01',
+  FX_FEED_STALE_ALERT_AFTER: '6h',
 };
 
 const PROVIDER_VALUES: Readonly<Record<string, FxRateProvider | null>> = {
@@ -214,6 +223,7 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
   const manualFallbackMaxAgeMs = duration('FX_MANUAL_FALLBACK_MAX_AGE');
   const timeoutMs = duration('FX_PROVIDER_TIMEOUT');
   if (timeoutMs > MAX_TIMEOUT_MS) errors.push('FX_PROVIDER_TIMEOUT must be at most 30s');
+  const feedStaleAlertAfterMs = duration('FX_FEED_STALE_ALERT_AFTER');
   const threshold = raw.FX_ANOMALY_THRESHOLD_PCT.trim();
   if (!/^\d{1,4}(\.\d{1,4})?$/.test(threshold) || dec(threshold).lte(0)) {
     errors.push('FX_ANOMALY_THRESHOLD_PCT must be a decimal > 0');
@@ -257,6 +267,20 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
   if (!isCalendarDate(historyFrom)) {
     cryptoErrors.push('FX_CRYPTO_HISTORY_FROM must be a date like 2020-01-01');
   }
+  // El umbral de alerta no puede ser menor que el intervalo de polling ni que la obsolescencia de la valoración del
+  // tipo automático (PARALLEL / MARKET): alertaría de tasas que la valoración aún considera frescas (design.md dec. 1).
+  const alertFloorMs = Math.max(
+    pollIntervalMs,
+    staleAfterParallelMs,
+    staleAfterFallbackMs,
+    staleAfterMarketMs,
+    staleAfterMarketFallbackMs,
+  );
+  if (feedStaleAlertAfterMs > 0 && feedStaleAlertAfterMs < alertFloorMs) {
+    errors.push(
+      'FX_FEED_STALE_ALERT_AFTER must not be shorter than FX_POLL_INTERVAL nor than the FX_STALE_AFTER_PARALLEL / FX_STALE_AFTER_FALLBACK / FX_STALE_AFTER_MARKET thresholds',
+    );
+  }
   const cryptoRequested = [raw.FX_PROVIDER_CRYPTO_PRIMARY, raw.FX_PROVIDER_CRYPTO_FALLBACK]
     .map((v) => v.trim().toUpperCase())
     .filter((v): v is FxRateProvider => isCryptoProviderId(v));
@@ -285,6 +309,7 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
     cryptoHistoryFrom: cryptoConfigError === null ? historyFrom : '2020-01-01',
     cryptoConfigError,
     cryptoRequested: [...new Set(cryptoRequested)],
+    feedStaleAlertAfterMs: feedStaleAlertAfterMs || 6 * HOUR_MS,
   };
   if (errors.length > 0) return disabled(base, errors.join('; '));
   return { ...base, primary, fallback, official, configError: null };

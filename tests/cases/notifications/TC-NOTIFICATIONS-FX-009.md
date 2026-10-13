@@ -5,16 +5,21 @@ spec: notifications/alerts
 related_specs: ["platform/event-delivery"]
 requirement: "Notificación de par sin tasa fresca"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-004"]
 nfr: ["NFR-PERF-008", "NFR-REL-007"]
 invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/rate-feed-alerts.test.ts
+  - packages/contexts/fx/test/integration/rate-feed-alerts.int.test.ts
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+  - packages/contexts/notifications/test/integration/notification-intake.int.test.ts
+  - apps/api/test/events/event-throughput.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "connections", "worker"]
