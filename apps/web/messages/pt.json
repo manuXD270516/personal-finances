@@ -5230,6 +5230,7 @@
     "range": "De {from} a {to}, em {currency}. Só contam as conversões lançadas, com a revisão vigente.",
     "incomplete": "Algum custo está incompleto: uma tarifa não tem taxa para a moeda de relatório e não foi estimada.",
     "caption": "Custo das conversões por período, canal e par, em {currency}",
+    "tableRegion": "Tabela do custo das conversões, rolável",
     "columns": {
       "period": "Período",
       "channel": "Canal",

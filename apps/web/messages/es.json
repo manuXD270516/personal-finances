@@ -5230,6 +5230,7 @@
     "range": "Del {from} al {to}, en {currency}. Solo cuentan las conversiones posteadas, con su revisión vigente.",
     "incomplete": "Algún costo está incompleto: una comisión no tiene tasa a la moneda de reporte y no se estimó.",
     "caption": "Costo de conversiones por periodo, canal y par, en {currency}",
+    "tableRegion": "Tabla del costo de conversiones, desplazable",
     "columns": {
       "period": "Periodo",
       "channel": "Canal",

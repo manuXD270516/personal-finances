@@ -181,7 +181,7 @@ function Results({ f, analysis }: { f: FormatContext; analysis: ConversionCostAn
           {f.t('incomplete')}
         </p>
       ) : null}
-      <div style={tableWrapStyle}>
+      <div style={tableWrapStyle} tabIndex={0} role="region" aria-label={f.t('tableRegion')}>
         <table style={tableStyle} data-testid="costs-table">
           <caption
             style={{ ...mutedStyle, textAlign: 'left', padding: 'var(--pf-space-2) var(--pf-space-3)' }}

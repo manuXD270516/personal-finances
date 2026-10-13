@@ -5230,6 +5230,7 @@
     "range": "From {from} to {to}, in {currency}. Only posted conversions count, with their current revision.",
     "incomplete": "Some cost is incomplete: a fee has no rate to the reporting currency and was not estimated.",
     "caption": "Conversion costs by period, channel and pair, in {currency}",
+    "tableRegion": "Conversion cost table, scrollable",
     "columns": {
       "period": "Period",
       "channel": "Channel",
