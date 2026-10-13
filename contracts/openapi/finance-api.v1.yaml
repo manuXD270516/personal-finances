@@ -9636,6 +9636,36 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/goals/void-impact:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Goals]
+      operationId: previewTransactionVoidImpact
+      summary: Effect on the goals of voiding a transaction
+      description: |
+        For a transaction that backs goal contributions or withdrawals, the funds each affected goal holds in each account today and the funds it would hold after the void. Voiding is never blocked (D222): this preview only lets the caller warn the user before confirming, and the goal then reports the negative funds as a shortfall. Empty `goals` when the transaction backs no goal movement. 404 when the transaction does not exist in the workspace. Read only.
+      x-openspec-capability: [goals/savings-goals]
+      x-required-role: VIEWER
+      parameters:
+        - name: transactionId
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Effect of voiding the transaction on each affected goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalVoidImpact' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /workspaces/{workspaceId}/goals/contribution-suggestions:
     parameters:
       - $ref: '#/components/parameters/WorkspaceId'
@@ -15889,6 +15919,10 @@ components:
         linkedAccounts:
           type: array
           items: { $ref: '#/components/schemas/GoalLinkedAccount' }
+        negativeFunds:
+          description: Accounts where the real fund of the goal is negative (for example after voiding a contribution that had later withdrawals), as a shortfall to regularise. Empty when none.
+          type: array
+          items: { $ref: '#/components/schemas/GoalNegativeFunds' }
         plan:
           oneOf:
             - $ref: '#/components/schemas/GoalPlan'
@@ -16115,6 +16149,39 @@ components:
                   - $ref: '#/components/schemas/Uuid'
                   - type: 'null'
               active: { type: boolean, description: False once a reversal cancels the movement. }
+    GoalVoidImpact:
+      type: object
+      additionalProperties: false
+      required: [transactionId, goals]
+      properties:
+        transactionId: { $ref: '#/components/schemas/Uuid' }
+        goals:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [goalId, goalName, accountId, accountName, fund, currency, currentFunds, fundsAfterVoid, negative]
+            properties:
+              goalId: { $ref: '#/components/schemas/Uuid' }
+              goalName: { type: string }
+              accountId: { $ref: '#/components/schemas/Uuid' }
+              accountName: { type: string }
+              fund: { type: string, enum: [REAL, EARMARK] }
+              currency: { $ref: '#/components/schemas/CurrencyCode' }
+              currentFunds: { $ref: '#/components/schemas/Money' }
+              fundsAfterVoid: { $ref: '#/components/schemas/Money' }
+              negative:
+                type: boolean
+                description: The funds of the goal in that account would be below zero after the void.
+    GoalNegativeFunds:
+      type: object
+      additionalProperties: false
+      required: [accountId, amount]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        amount:
+          description: Negative amount of the real fund of the goal in that account (shortfall to regularise).
+          $ref: '#/components/schemas/Money'
     GoalTransactionLinkList:
       type: object
       additionalProperties: false
@@ -18254,6 +18321,20 @@ components:
         version: { $ref: '#/components/schemas/Version' }
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
+    LoanListItem:
+      description: A loan with the live figures of its detail so a list needs one call (same values and rules as `GET /loans/{loanId}`).
+      allOf:
+        - $ref: '#/components/schemas/Loan'
+        - type: object
+          properties:
+            outstandingPrincipal:
+              description: Principal pending according to the schedule; null for a draft or a cancelled loan.
+              oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+            accountBalance:
+              description: Balance owed according to the loan account.
+              $ref: '#/components/schemas/Money'
+            nextInstallment:
+              oneOf: [{ $ref: '#/components/schemas/LoanNextInstallment' }, { type: 'null' }]
     LoanList:
       type: object
       additionalProperties: false
@@ -18261,7 +18342,7 @@ components:
       properties:
         data:
           type: array
-          items: { $ref: '#/components/schemas/Loan' }
+          items: { $ref: '#/components/schemas/LoanListItem' }
     ScheduleInstallment:
       type: object
       required: [n, dueDate, periodStart, periodEnd, principal, interest, fees, insurance, taxes, total, openingBalance, closingBalance]
@@ -19201,12 +19282,26 @@ components:
             - $ref: '#/components/schemas/CardStatement'
             - type: 'null'
         nextDueDate:
-          description: Due date of the oldest issued statement with something missing, or the one of the open cycle.
+          description: Nearest due date not before today (workspace time zone) among the issued statements with something missing and the open cycle. Never a past date and never the one of a closed cycle without an issued statement.
           $ref: '#/components/schemas/LocalDate'
+        overdueStatements:
+          description: Issued statements already past their due date with something missing for no interest, oldest first.
+          type: array
+          items: { $ref: '#/components/schemas/CardOverdueStatement' }
         paymentPlan:
           oneOf:
             - $ref: '#/components/schemas/CardPaymentPlan'
             - type: 'null'
+    CardOverdueStatement:
+      type: object
+      additionalProperties: false
+      required: [closingDate, dueDate, status, remainingNoInterest, remainingMinimum]
+      properties:
+        closingDate: { $ref: '#/components/schemas/LocalDate' }
+        dueDate: { $ref: '#/components/schemas/LocalDate' }
+        status: { type: string, enum: [PARTIALLY_PAID, OVERDUE] }
+        remainingNoInterest: { $ref: '#/components/schemas/Money' }
+        remainingMinimum: { $ref: '#/components/schemas/Money' }
     CardPaymentPlanConflict:
       type: object
       additionalProperties: false

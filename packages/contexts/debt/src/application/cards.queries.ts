@@ -58,7 +58,10 @@ export class CardsQueries implements CardPortfolioQuery {
     const views = await this.engine.loadViews(card, clock, cycles);
     const scopes = await this.engine.utilizationScopes(card, views, clock);
     const ratesUsed = scopes.flatMap((s) => s.ratesUsed);
-    return { ...cardView(card.snapshot, views, scopes), ...(ratesUsed.length > 0 ? { ratesUsed } : {}) };
+    return {
+      ...cardView(card.snapshot, views, scopes, clock.today),
+      ...(ratesUsed.length > 0 ? { ratesUsed } : {}),
+    };
   }
 
   list(
@@ -77,7 +80,7 @@ export class CardsQueries implements CardPortfolioQuery {
   get(workspaceId: string, id: string): Promise<CreditCardView & { ratesUsed?: unknown }> {
     return this.deps.uow.run(workspaceId, async () => {
       const clock = await this.engine.clockOf(workspaceId);
-      return this.detail(await this.card(workspaceId, id), clock, 2);
+      return this.detail(await this.card(workspaceId, id), clock, this.deps.settings.historyCycles);
     });
   }
 

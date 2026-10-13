@@ -3,6 +3,7 @@ import {
   autoMapping,
   breakdownDelta,
   breakdownSum,
+  buildLoanEdit,
   buildLoanInput,
   buildManualRows,
   buildPaymentInput,
@@ -16,6 +17,7 @@ import {
   guessDecimal,
   installmentView,
   lastActivePaymentId,
+  loanFormFromLoan,
   missingMapping,
   parseDisburseFee,
   paymentHref,
@@ -406,5 +408,103 @@ describe('comparar con la tabla del banco: mapeo y payload', () => {
     ).toEqual([{ row: 3, field: 'interest', code: 'VALUE_MISSING', message: 'vacío' }]);
     expect(referenceRowErrors({ code: 'X' })).toEqual([]);
     expect(referenceRowErrors({ details: { rows: 'no' } })).toEqual([]);
+  });
+});
+
+describe('edición del borrador: formulario y PATCH', () => {
+  const draft = {
+    id: 'L-draft',
+    name: 'Préstamo vehicular',
+    status: 'DRAFT',
+    origin: 'NEW',
+    accountId: 'acc-loan',
+    disbursementAccountId: 'acc-bank',
+    paymentAccountId: 'acc-bank',
+    lenderCounterpartyId: null,
+    lenderName: null,
+    principal: { amount: '50000.00', currency: 'BOB' },
+    annualRate: '0.115',
+    rateType: 'FIXED',
+    dayCount: 'D30_360',
+    frequency: 'MONTHLY',
+    termInstallments: 24,
+    method: 'FRENCH',
+    disbursementDate: '2026-10-15',
+    firstDueDate: '2026-11-15',
+    charges: { insurance: { mode: 'RATE_ON_BALANCE', value: '0.0004' } },
+    retainedFee: { amount: '0.00', currency: 'BOB' },
+    existing: null,
+    currentScheduleVersion: null,
+    recurringDefinitionId: null,
+    disbursementTransactionId: null,
+    cancelledReason: null,
+    version: 1,
+    createdAt: '2026-10-10T10:00:00Z',
+    updatedAt: '2026-10-10T10:00:00Z',
+  } as const;
+
+  it('[TC-DEBT-LOAN-054] el formulario parte de las condiciones del borrador, con la tasa en porcentaje y el seguro mensual', () => {
+    const form = loanFormFromLoan(draft, 'es-BO');
+    expect(form).toMatchObject({
+      origin: 'NEW',
+      name: 'Préstamo vehicular',
+      principal: '50000,00',
+      ratePct: '11,50',
+      termInstallments: '24',
+      dayCount: 'D30_360',
+      disbursementDate: '2026-10-15',
+      firstDueDate: '2026-11-15',
+      paymentAccountId: 'acc-bank',
+    });
+    expect(form.charges.insurance).toEqual({ mode: 'RATE_ON_BALANCE', value: '0,04' });
+  });
+
+  it('[TC-DEBT-LOAN-054] sin cambios no envía nada y el plazo de 36 cuotas envía solo termInstallments', () => {
+    const form = loanFormFromLoan(draft, 'es-BO');
+    expect(buildLoanEdit(form, draft, o)).toEqual({ ok: true, input: {} });
+    expect(buildLoanEdit({ ...form, termInstallments: '36' }, draft, o)).toEqual({
+      ok: true,
+      input: { termInstallments: 36 },
+    });
+  });
+
+  it('[TC-DEBT-LOAN-054] principal, tasa y cargos cambiados viajan como contrato: monto, fracción y cargos completos', () => {
+    const form = loanFormFromLoan(draft, 'es-BO');
+    const r = buildLoanEdit(
+      {
+        ...form,
+        principal: '45.000,50',
+        ratePct: '12',
+        charges: { ...form.charges, fees: { mode: 'FIXED', value: '15,00' } },
+      },
+      draft,
+      o,
+    );
+    expect(r).toEqual({
+      ok: true,
+      input: {
+        principal: { amount: '45000.50', currency: 'BOB' },
+        annualRate: '0.12',
+        charges: {
+          fees: { mode: 'FIXED', value: '15.00' },
+          insurance: { mode: 'RATE_ON_BALANCE', value: '0.0004' },
+        },
+      },
+    });
+  });
+
+  it('[TC-DEBT-LOAN-054] un dato inválido no se envía y se marca por campo', () => {
+    const form = loanFormFromLoan(draft, 'es-BO');
+    const r = buildLoanEdit({ ...form, termInstallments: '0', name: ' ' }, draft, o);
+    expect(r).toEqual({ ok: false, errors: { name: 'REQUIRED', termInstallments: 'RANGE' } });
+  });
+
+  it('[TC-DEBT-LOAN-054] la vista previa del borrador editado se arma con las condiciones nuevas', () => {
+    const form = loanFormFromLoan(draft, 'es-BO');
+    expect(buildPreviewInput({ ...form, termInstallments: '36' }, o)).toMatchObject({
+      termInstallments: 36,
+      principal: { amount: '50000.00', currency: 'BOB' },
+      annualRate: '0.115',
+    });
   });
 });

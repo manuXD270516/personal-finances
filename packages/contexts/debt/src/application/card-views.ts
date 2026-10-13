@@ -1,4 +1,4 @@
-import type { Money } from '@pf/shared-kernel';
+import type { LocalDate, Money } from '@pf/shared-kernel';
 import type {
   CardAccountState,
   CardInstallmentPlanState,
@@ -6,6 +6,7 @@ import type {
   CycleFigures,
   MinimumPaymentRuleSpec,
 } from '../domain/index.js';
+import { resolveNextDue, type NextDue } from '../domain/index.js';
 import type { AccountView, CycleView, UtilizationScope } from './card-engine.js';
 import type { StatementRecord } from './card-ports.js';
 
@@ -83,9 +84,22 @@ export interface CardAccountView {
   readonly utilization: CardUtilizationView | null;
   readonly openCycle: CardStatementView;
   readonly lastStatement: CardStatementView | null;
-  /** Próximo vencimiento con algo por pagar (estado emitido con faltante, o el ciclo abierto). */
+  /**
+   * Próximo vencimiento: la fecha más cercana no anterior a hoy entre los estados emitidos con faltante y el ciclo
+   * abierto (`NextDueResolver`); nunca una fecha pasada.
+   */
   readonly nextDueDate: string;
+  /** Estados de cuenta emitidos, vencidos y con faltante, del más antiguo al más reciente. */
+  readonly overdueStatements: readonly OverdueStatementView[];
   readonly paymentPlan: CardPaymentPlanView | null;
+}
+
+export interface OverdueStatementView {
+  readonly closingDate: string;
+  readonly dueDate: string;
+  readonly status: string;
+  readonly remainingNoInterest: MoneyView;
+  readonly remainingMinimum: MoneyView;
 }
 
 export type MinimumRuleView =
@@ -226,17 +240,31 @@ function planView(account: CardAccountState): CardPaymentPlanView | null {
     : null;
 }
 
-/** Próximo vencimiento relevante: el del estado emitido más antiguo con faltante, o el del ciclo abierto. */
-function nextDue(view: AccountView): string {
-  const pending = view.cycles.filter((c) => !c.open && c.standing?.remainingNoInterest.isPositive());
-  const first = pending[0];
-  return first ? first.cycle.dueDate.toString() : (view.cycles.at(-1) as CycleView).cycle.dueDate.toString();
+/** Próximo vencimiento y estados atrasados de una cuenta (`NextDueResolver`, fix-phase-4-gaps). */
+export function nextDueOf(view: AccountView, today: LocalDate): NextDue {
+  return resolveNextDue({
+    today,
+    cycles: view.cycles.map((c) => ({
+      closingDate: c.cycle.closing,
+      dueDate: c.cycle.dueDate,
+      open: c.open,
+      issued: c.record !== null,
+      standing: c.standing
+        ? {
+            status: c.standing.status,
+            remainingNoInterest: c.standing.remainingNoInterest,
+            remainingMinimum: c.standing.remainingMinimum,
+          }
+        : null,
+    })),
+  });
 }
 
 export function cardView(
   state: CreditCardState,
   views: readonly AccountView[],
   scopes: readonly UtilizationScope[],
+  today: LocalDate,
   conflicts?: CreditCardView['paymentPlanConflicts'],
 ): CreditCardView {
   const accounts = views.map((v): CardAccountView => {
@@ -246,6 +274,7 @@ export function cardView(
     const open = v.cycles.at(-1) as CycleView;
     const closed = v.cycles.filter((c) => !c.open && c.record);
     const last = closed.at(-1);
+    const due = nextDueOf(v, today);
     const sharedNote = scope && scope.scope === 'SHARED' ? utilizationView(scope) : null;
     return {
       id: v.account.id,
@@ -260,7 +289,14 @@ export function cardView(
       utilization: scope && scope.scope === 'ACCOUNT' ? utilizationView(scope) : sharedNote,
       openCycle: statementView(v, open, null, null),
       lastStatement: last ? statementView(v, last, null) : null,
-      nextDueDate: nextDue(v),
+      nextDueDate: due.nextDueDate.toString(),
+      overdueStatements: due.overdue.map((o): OverdueStatementView => ({
+        closingDate: o.closingDate.toString(),
+        dueDate: o.dueDate.toString(),
+        status: o.status,
+        remainingNoInterest: m(o.remainingNoInterest),
+        remainingMinimum: m(o.remainingMinimum),
+      })),
       paymentPlan: planView(v.account),
     };
   });

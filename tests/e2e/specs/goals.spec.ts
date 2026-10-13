@@ -1,3 +1,4 @@
+import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { api, bob, go, newFinanceUser, openAccount, todayLaPaz } from '../src/finance.js';
 
@@ -87,6 +88,65 @@ test.describe('Metas de ahorro (goals/savings-goals)', () => {
     await expect(page.getByTestId('question-Q9')).toHaveAttribute('data-status', 'AVAILABLE');
     await expect(page.getByTestId('home-goal')).toHaveCount(2);
 
+    await context.close();
+  });
+
+  test('[TC-GOALS-SAVINGS-053] anular un aporte con un retiro posterior avisa antes de confirmar y la meta muestra el faltante', async ({
+    browser,
+  }) => {
+    test.setTimeout(240_000);
+    const { context, page, W } = await newFinanceUser(browser, 'anular-aporte');
+    const banco = await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '8000.00');
+    const ahorro = await openAccount(page, W, 'Ahorro BOB', 'SAVINGS', 'BOB', '0.00');
+    const goal = await api(page, 'POST', `${W}/goals`, {
+      name: 'Fondo de emergencia',
+      type: 'EMERGENCY_FUND',
+      target: bob('15000.00'),
+      linkedAccountIds: [ahorro],
+      priority: 1,
+    });
+    const goalId = String(goal['id']);
+    const contribution = await api(page, 'POST', `${W}/goals/${goalId}/contributions`, {
+      fund: 'REAL',
+      amount: bob('1000.00'),
+      sourceAccountId: banco,
+      destinationAccountId: ahorro,
+    });
+    await api(page, 'POST', `${W}/goals/${goalId}/withdrawals`, {
+      fund: 'REAL',
+      accountId: ahorro,
+      amount: bob('400.00'),
+      mode: { type: 'TRANSFER', toAccountId: banco },
+    });
+    const transactionId = String(contribution['transactionId']);
+
+    // Diálogo de anulación: avisa de los fondos que quedarán y deja confirmar.
+    await go(page, `/transacciones/${transactionId}`);
+    await page.getByRole('button', { name: 'Anular' }).click();
+    const warning = page.getByTestId('void-impact');
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText('Fondo de emergencia');
+    await expect(warning).toContainText('-400,00 BOB');
+    await expect(warning).toContainText('Ahorro BOB');
+    await page.getByLabel('Motivo').fill('Aporte equivocado');
+    await page.getByTestId('confirm-panel').getByRole('button', { name: 'Sí, anular' }).click();
+    await expect(page.getByTestId('transaction-detail')).toHaveAttribute('data-status', 'VOIDED');
+
+    // La meta reacciona (consumidor del worker) y muestra el faltante de 400,00 BOB en "Ahorro BOB".
+    await expect
+      .poll(
+        async () =>
+          ((await api(page, 'GET', `${W}/goals/${goalId}`))['negativeFunds'] as unknown[] | undefined)
+            ?.length ?? 0,
+        { timeout: 60_000 },
+      )
+      .toBe(1);
+    await go(page, `/goals/${goalId}`);
+    const shortfall = page.getByTestId('goal-negative-funds');
+    await expect(shortfall).toContainText('400,00 BOB');
+    await expect(shortfall).toContainText('Ahorro BOB');
+    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);
     await context.close();
   });
 });

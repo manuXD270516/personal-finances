@@ -40,6 +40,12 @@ export function computeCycleFigures(input: {
   readonly closingBalance: Money;
   /** Movimientos de las fechas del ciclo (el llamador ya filtró por rango y por asiento activo). */
   readonly movements: readonly CardMovement[];
+  /**
+   * Efecto presentado de los asientos de apertura de la cuenta con fecha en el ciclo (fix-phase-4-gaps): el saldo
+   * inicial no tiene transacción y no está en `movements`; se cuenta en "otros movimientos" del ciclo que contiene su
+   * fecha para que la identidad del ciclo cuadre.
+   */
+  readonly openingNet?: Money;
   readonly unbilledInstallments: Money;
   readonly minimumRule: MinimumPaymentRuleSpec;
 }): CycleFigures {
@@ -48,7 +54,7 @@ export function computeCycleFigures(input: {
   let purchases = zero;
   let refunds = zero;
   let payments = zero;
-  let otherNet = zero;
+  let otherNet = input.openingNet ?? zero;
   for (const m of input.movements) {
     const amount = Money.parse(m.amount, currency);
     switch (m.movementClass) {

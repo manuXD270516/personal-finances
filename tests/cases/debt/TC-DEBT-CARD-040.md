@@ -5,16 +5,21 @@ spec: debt/credit-cards
 related_specs: ["ledger/balances"]
 requirement: "Resumen del ciclo y saldo al cierre"
 scenario: "Ciclo que contiene el saldo inicial de la cuenta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-DEBT-013", "FR-LEDGER-012"]
 nfr: []
 invariants: ["INV-022"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/credit-cards.api.test.ts
+  - packages/contexts/debt/src/application/cards.service.test.ts
+  - packages/contexts/debt/src/domain/card-cycle-calculator.test.ts
+  - packages/contexts/debt/test/integration/pg-cards.int.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["credit-cards", "cycle", "opening-balance", "fix-phase-4-gaps"]

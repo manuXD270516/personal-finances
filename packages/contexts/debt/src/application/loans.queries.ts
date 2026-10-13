@@ -18,7 +18,7 @@ import {
   toScheduleView,
   type InstallmentView,
   type LoanDetailView,
-  type LoanView,
+  type LoanListItemView,
   type PaymentView,
   type SchedulePreviewView,
 } from './views.js';
@@ -98,20 +98,96 @@ export class LoansQueries implements LoanPortfolioQuery {
 
   // ───────────────────────────────────────────────────────────── lectura
 
+  /**
+   * Cifras vivas de un préstamo que comparten la lista y el detalle (así coinciden por construcción): principal pendiente
+   * del cronograma, saldo de la cuenta, cuota vigente, próxima cuota con su atraso y cuotas vencidas.
+   */
+  private figuresOf(
+    loan: Loan,
+    input: {
+      readonly scale: number;
+      readonly today: LocalDate;
+      readonly balance: string;
+      readonly states: readonly InstallmentState[];
+    },
+  ) {
+    const s = loan.snapshot;
+    const { scale, today, balance, states } = input;
+    const hasSchedule = states.length > 0 && (s.status === 'ACTIVE' || s.status === 'PAID_OFF');
+    // Un préstamo saldado por un pago extraordinario conserva sus cuotas sin pagar en el cronograma, pero ya no debe nada.
+    const paidOff = s.status === 'PAID_OFF';
+    const outstanding = hasSchedule
+      ? paidOff
+        ? dec('0').toFixed(scale)
+        : outstandingPrincipal(states, scale)
+      : null;
+    const open = paidOff ? [] : states.filter((x) => x.status !== 'PAID');
+    const overdue = open
+      .filter((x) => x.installment.dueDate < today.toString())
+      .map((x) => ({
+        n: x.installment.n,
+        dueDate: x.installment.dueDate,
+        outstanding: money(x.pendingTotal, s.currency),
+        overdueDays: daysBetween(x.installment.dueDate, today),
+      }));
+    const next = open[0];
+    return {
+      outstandingPrincipal: outstanding === null ? null : money(outstanding, s.currency),
+      accountBalance: money(balance, s.currency),
+      unreconciledDifference:
+        outstanding === null || s.status !== 'ACTIVE'
+          ? null
+          : money(dec(outstanding).minus(balance).toFixed(scale), s.currency),
+      installmentAmount: next ? money(next.installment.total, s.currency) : null,
+      nextInstallment:
+        s.status === 'ACTIVE' && next
+          ? {
+              n: next.installment.n,
+              dueDate: next.installment.dueDate,
+              outstanding: money(next.pendingTotal, s.currency),
+              overdueDays: daysBetween(next.installment.dueDate, today),
+            }
+          : null,
+      overdueInstallments: s.status === 'ACTIVE' ? overdue : [],
+    };
+  }
+
+  /**
+   * Lista de préstamos con las cifras que la pantalla necesita (principal pendiente, saldo de la cuenta y próxima
+   * cuota con su atraso), calculadas con las mismas reglas que el detalle: la web hace UNA llamada en vez de una por
+   * préstamo (fix-phase-4-gaps, decisión 4). Los saldos de las cuentas se leen en lote.
+   */
   async list(
     workspaceId: string,
     filter: { statuses?: readonly LoanStatusDto[] } = {},
-  ): Promise<readonly LoanView[]> {
+  ): Promise<readonly LoanListItemView[]> {
     return this.deps.uow.run(workspaceId, async () => {
       const loans = await this.deps.loans.list(
         workspaceId,
         filter.statuses ? { statuses: filter.statuses } : {},
       );
+      if (loans.length === 0) return [];
       const names = await this.lenderNames(workspaceId, loans);
-      return loans.map((l) => {
+      const today = await this.today(workspaceId);
+      const balances = await this.deps.balances.presentedBalances(
+        workspaceId,
+        loans.map((l) => l.snapshot.accountId),
+      );
+      const out: LoanListItemView[] = [];
+      for (const l of loans) {
         const s = l.snapshot;
-        return toLoanView(s, s.lenderCounterpartyId ? (names.get(s.lenderCounterpartyId) ?? null) : null);
-      });
+        const scale = await this.scaleOf(s.currency);
+        const balance = dec(balances.get(s.accountId) ?? '0').toFixed(scale);
+        const states = await this.states(l, scale);
+        const figures = this.figuresOf(l, { scale, today, balance, states });
+        out.push({
+          ...toLoanView(s, s.lenderCounterpartyId ? (names.get(s.lenderCounterpartyId) ?? null) : null),
+          outstandingPrincipal: figures.outstandingPrincipal,
+          accountBalance: figures.accountBalance,
+          nextInstallment: figures.nextInstallment,
+        });
+      }
+      return out;
     });
   }
 
@@ -136,43 +212,10 @@ export class LoansQueries implements LoanPortfolioQuery {
         insurance: money(paid?.insurance ?? zero.amount, s.currency),
         taxes: money(paid?.taxes ?? zero.amount, s.currency),
       };
-      const hasSchedule = states.length > 0 && (s.status === 'ACTIVE' || s.status === 'PAID_OFF');
-      // Un préstamo saldado por un pago extraordinario conserva sus cuotas sin pagar en el cronograma, pero ya no debe nada.
-      const paidOff = s.status === 'PAID_OFF';
-      const outstanding = hasSchedule
-        ? paidOff
-          ? dec('0').toFixed(scale)
-          : outstandingPrincipal(states, scale)
-        : null;
-      const open = paidOff ? [] : states.filter((x) => x.status !== 'PAID');
-      const overdue = open
-        .filter((x) => x.installment.dueDate < today.toString())
-        .map((x) => ({
-          n: x.installment.n,
-          dueDate: x.installment.dueDate,
-          outstanding: money(x.pendingTotal, s.currency),
-          overdueDays: daysBetween(x.installment.dueDate, today),
-        }));
-      const next = open[0];
+      const figures = this.figuresOf(loan, { scale, today, balance, states });
       return {
         ...base,
-        outstandingPrincipal: outstanding === null ? null : money(outstanding, s.currency),
-        accountBalance: money(balance, s.currency),
-        unreconciledDifference:
-          outstanding === null || s.status !== 'ACTIVE'
-            ? null
-            : money(dec(outstanding).minus(balance).toFixed(scale), s.currency),
-        installmentAmount: next ? money(next.installment.total, s.currency) : null,
-        nextInstallment:
-          s.status === 'ACTIVE' && next
-            ? {
-                n: next.installment.n,
-                dueDate: next.installment.dueDate,
-                outstanding: money(next.pendingTotal, s.currency),
-                overdueDays: daysBetween(next.installment.dueDate, today),
-              }
-            : null,
-        overdueInstallments: s.status === 'ACTIVE' ? overdue : [],
+        ...figures,
         paidTotals,
         preview: s.status === 'DRAFT' && !awaitsCustom(s) ? this.previewOf(loan, scale) : null,
       };

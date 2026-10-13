@@ -16,7 +16,7 @@ import {
   ReferenceErrors,
 } from './CompareParts';
 import { LoanBalances, LoanSummary, NextInstallments } from './LoanDetail';
-import { LoanFields } from './LoanForm';
+import { LoanChargesFields, LoanFields, LoanTermsFields } from './LoanForm';
 import { PaymentFields } from './LoanPanels';
 import { LoansTable } from './LoansList';
 import { LoanTransactionView } from './LoanTransactionInfo';
@@ -165,19 +165,16 @@ function loanDetail(over: Partial<LoanDetail> = {}): LoanDetail {
 }
 
 describe('lista de préstamos', () => {
-  it('muestra estado, la deuda como "Deuda …", la próxima cuota y el atraso con tabla accesible', () => {
+  it('[TC-DEBT-LOAN-053] muestra estado, la deuda como "Deuda …", la próxima cuota y el atraso con tabla accesible', () => {
     const html = renderToStaticMarkup(
       <LoansTable
         f={f}
         href={href}
         items={[
-          {
-            loan: loanDetail(),
-            detail: loanDetail({
-              nextInstallment: { n: 2, dueDate: '2026-12-15', outstanding: bob('2342.02'), overdueDays: 5 },
-            }),
-          },
-          { loan: loanDetail({ id: 'L2', name: 'Borrador', status: 'DRAFT' }) },
+          loanDetail({
+            nextInstallment: { n: 2, dueDate: '2026-12-15', outstanding: bob('2342.02'), overdueDays: 5 },
+          }),
+          loanDetail({ id: 'L2', name: 'Borrador', status: 'DRAFT', outstandingPrincipal: null }),
         ]}
       />,
     );
@@ -214,6 +211,25 @@ describe('alta de préstamo', () => {
     expect(textOf(curso)).toContain('Saldo pendiente');
     expect(textOf(curso)).toContain('Cuotas restantes');
     expect(curso).not.toContain('data-testid="loan-disburse-now"');
+  });
+
+  it('[TC-DEBT-LOAN-054] la edición del borrador muestra las condiciones con la moneda fija y los cargos', () => {
+    const form = {
+      ...emptyLoanForm('BOB', '2026-10-15'),
+      name: 'Préstamo vehicular',
+      termInstallments: '36',
+    };
+    const html = renderToStaticMarkup(
+      <>
+        <LoanTermsFields f={f} form={form} set={noop} errors={{}} currencies={['BOB']} mode="edit" />
+        <LoanChargesFields f={f} form={form} set={noop} errors={{}} />
+      </>,
+    );
+    expect(html).toContain('data-testid="loan-term"');
+    expect(html).toContain('value="36"');
+    expect(html).toContain('data-testid="charge-insurance-mode"');
+    expect(html).toMatch(/<select[^>]*disabled=""[^>]*data-testid="loan-currency"/);
+    expect(html).not.toContain('data-testid="loan-origin-NEW"');
   });
 
   it('la tasa se captura en porcentaje y los errores salen asociados al campo', () => {

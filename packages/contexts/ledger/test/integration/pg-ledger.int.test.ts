@@ -926,6 +926,41 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     ).toBeNull();
   });
 
+  it('[TC-DEBT-CARD-040] LedgerOpeningEntriesQuery (fix-phase-4-gaps 4.1): saldo inicial presentado por cuenta y rango, con aislamiento por workspace', async () => {
+    const ws = randomUUID();
+    const other = randomUUID();
+    await createWorkspace(ws);
+    await createWorkspace(other);
+    const card = randomUUID();
+    const liability = (accountId: string, amount: string): PostingLineDto => ({
+      target: { kind: 'USER_ACCOUNT', accountId, nature: 'LIABILITY' },
+      amount: { amount, currency: 'BOB' },
+    });
+    // Visa Oro BOB abierta el 2026-10-05 con 1200.00 BOB adeudados (crédito de pasivo = −1200.00 contable).
+    await post(ws, [liability(card, '-1200.00'), sysLine('OPENING_BALANCE', '1200.00')], {
+      entryType: 'OPENING',
+      entryDate: '2026-10-05',
+    });
+    // Una compra posterior no es un asiento de apertura y no debe salir.
+    await post(ws, [liability(card, '-350.00'), sysLine('EXPENSE', '350.00', 'BOB', randomUUID())], {
+      entryDate: '2026-10-08',
+    });
+    const uow = new PgUnitOfWork(app);
+    const list = (workspaceId: string, ctxWs: string, from: string, to: string, ids = [card]) =>
+      asUser(() =>
+        uow.run({ userId: u1, workspaceId: ctxWs }, () =>
+          ledger.openingEntries.listOpeningEntries({ workspaceId, accountIds: ids, from, to }),
+        ),
+      );
+    expect(await list(ws, ws, '2026-09-26', '2026-10-25')).toEqual([
+      { accountId: card, entryDate: '2026-10-05', amount: { amount: '1200', currency: 'BOB' } },
+    ]);
+    expect(await list(ws, ws, '2026-10-06', '2026-10-25')).toEqual([]);
+    expect(await list(ws, ws, '2026-09-26', '2026-10-25', [])).toEqual([]);
+    // RLS: con el contexto de otro workspace los asientos no existen.
+    expect(await list(ws, other, '2026-09-26', '2026-10-25')).toEqual([]);
+  });
+
   it('mapeo de SQLSTATE: PF001 → LEDGER_UNBALANCED_ENTRY y 42501 → INTERNAL_ERROR conservando la causa', async () => {
     const uow = new PgLedgerUnitOfWork(app);
     const run = (fn: () => Promise<unknown>) => asUser(() => uow.run(w1, fn).catch((e: unknown) => e));

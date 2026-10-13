@@ -2,6 +2,7 @@ import {
   isZeroAmount,
   normalizeDecimalInput,
   parseAmount,
+  separatorsOf,
   subtractAmounts,
   sumAmounts,
 } from '../common/money';
@@ -15,6 +16,7 @@ import {
   type InstallmentStatus,
   type LoanCharges,
   type LoanDayCount,
+  type Loan,
   type LoanFrequency,
   type LoanInstallment,
   type LoanMethod,
@@ -315,6 +317,93 @@ export function buildLoanInput(form: LoanForm, o: Opts): BuildResult<Record<stri
     },
   };
 }
+
+/** Monto canónico de la API (`"50000.00"`) → texto que el formulario entiende en el locale (`"50000,00"` en es-BO). */
+function amountToInput(value: string, locale: string): string {
+  const decimal = separatorsOf(locale).decimal;
+  return decimal === '.' ? value : value.replace('.', decimal);
+}
+
+/** Fracción decimal de la API → porcentaje del formulario en el locale (`"0.115"` → `"11,50"`). */
+function fractionToInput(fraction: string, locale: string, minDecimals = 2): string {
+  return amountToInput(fractionToPercent(fraction, minDecimals), locale);
+}
+
+/**
+ * Formulario de edición de un préstamo en BORRADOR (fix-phase-4-gaps, decisión 5): las condiciones vigentes del
+ * préstamo en el formato que el alta entiende, para editarlas con la misma lógica y la misma vista previa.
+ */
+export function loanFormFromLoan(loan: Loan, locale: string): LoanForm {
+  const charge = (key: ChargeKey): ChargeForm => {
+    const spec = loan.charges[key];
+    if (!spec) return EMPTY_CHARGE;
+    return spec.mode === 'FIXED'
+      ? { mode: 'FIXED', value: amountToInput(spec.value, locale) }
+      : { mode: 'RATE_ON_BALANCE', value: fractionToInput(spec.value, locale, 2) };
+  };
+  return {
+    ...emptyLoanForm(loan.principal.currency, loan.disbursementDate ?? ''),
+    origin: 'NEW',
+    name: loan.name,
+    principal: amountToInput(loan.principal.amount, locale),
+    currency: loan.principal.currency,
+    ratePct: fractionToInput(loan.annualRate, locale),
+    dayCount: loan.dayCount,
+    frequency: loan.frequency,
+    termInstallments: String(loan.termInstallments),
+    method: loan.method,
+    fixedPrincipal: loan.fixedPrincipalAmount ? amountToInput(loan.fixedPrincipalAmount.amount, locale) : '',
+    rateType: loan.rateType,
+    disbursementDate: loan.disbursementDate ?? '',
+    firstDueDate: loan.firstDueDate,
+    charges: { fees: charge('fees'), insurance: charge('insurance'), taxes: charge('taxes') },
+    lenderCounterpartyId: loan.lenderCounterpartyId ?? '',
+    accountMode: 'EXISTING',
+    accountId: loan.accountId,
+    disbursementAccountId: loan.disbursementAccountId,
+    paymentAccountId: loan.paymentAccountId,
+  };
+}
+
+/**
+ * Cuerpo de `PATCH …/loans/{id}` de un borrador: solo lo que cambió respecto del préstamo (nombre, prestamista, cuenta
+ * de pago y las condiciones que fijan el cronograma). Sin cambios ⇒ `{}`. Los errores se acumulan por campo.
+ */
+export function buildLoanEdit(form: LoanForm, loan: Loan, o: Opts): BuildResult<Record<string, unknown>> {
+  const errors: Record<string, FormErrorCode> = {};
+  if (form.name.trim() === '') errors['name'] = 'REQUIRED';
+  const t = buildTerms({ ...form, origin: 'NEW' }, o, errors);
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  const body: Record<string, unknown> = {};
+  if (form.name.trim() !== loan.name) body['name'] = form.name.trim();
+  if (form.lenderCounterpartyId !== (loan.lenderCounterpartyId ?? ''))
+    body['lenderCounterpartyId'] = form.lenderCounterpartyId === '' ? null : form.lenderCounterpartyId;
+  if (form.paymentAccountId !== '' && form.paymentAccountId !== loan.paymentAccountId)
+    body['paymentAccountId'] = form.paymentAccountId;
+  if (t.principal !== undefined && t.principal !== loan.principal.amount)
+    body['principal'] = { amount: t.principal, currency: form.currency };
+  if (t.annualRate !== undefined && t.annualRate !== loan.annualRate) body['annualRate'] = t.annualRate;
+  if (form.rateType !== loan.rateType) body['rateType'] = form.rateType;
+  if (form.dayCount !== loan.dayCount) body['dayCount'] = form.dayCount;
+  if (form.frequency !== loan.frequency) body['frequency'] = form.frequency;
+  if (t.term !== loan.termInstallments) body['termInstallments'] = t.term;
+  if (form.method !== loan.method) body['method'] = form.method;
+  if (
+    form.method === 'FIXED_PRINCIPAL' &&
+    t.fixedPrincipal !== undefined &&
+    t.fixedPrincipal !== (loan.fixedPrincipalAmount?.amount ?? '')
+  )
+    body['fixedPrincipalAmount'] = { amount: t.fixedPrincipal, currency: form.currency };
+  if (form.disbursementDate !== (loan.disbursementDate ?? ''))
+    body['disbursementDate'] = form.disbursementDate;
+  if (form.firstDueDate !== loan.firstDueDate) body['firstDueDate'] = form.firstDueDate;
+  if (JSON.stringify(sortedCharges(t.charges)) !== JSON.stringify(sortedCharges(loan.charges)))
+    body['charges'] = t.charges;
+  return { ok: true, input: body };
+}
+
+const sortedCharges = (c: LoanCharges): Record<string, unknown> =>
+  Object.fromEntries(CHARGE_KEYS.filter((k) => c[k]).map((k) => [k, c[k]]));
 
 // ───────────────────────────── Pago ─────────────────────────────
 

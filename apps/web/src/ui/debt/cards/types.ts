@@ -102,6 +102,15 @@ export interface CardUtilization {
   readonly missingRates: readonly string[];
 }
 
+/** Estado de cuenta emitido, ya vencido y con algo por pagar para no generar intereses (fix-phase-4-gaps). */
+export interface CardOverdueStatement {
+  readonly closingDate: string;
+  readonly dueDate: string;
+  readonly status: 'PARTIALLY_PAID' | 'OVERDUE';
+  readonly remainingNoInterest: Money;
+  readonly remainingMinimum: Money;
+}
+
 export interface CardAccount {
   readonly id: string;
   readonly accountId: string;
@@ -114,7 +123,10 @@ export interface CardAccount {
   readonly utilization: CardUtilization | null;
   readonly openCycle: CardStatement;
   readonly lastStatement: CardStatement | null;
+  /** Fecha más cercana no anterior a hoy (nunca pasada) entre los estados con faltante y el ciclo abierto. */
   readonly nextDueDate: string;
+  /** Estados vencidos con faltante, del más antiguo al más reciente. */
+  readonly overdueStatements?: readonly CardOverdueStatement[];
   readonly paymentPlan: CardPaymentPlan | null;
 }
 

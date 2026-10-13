@@ -568,6 +568,72 @@ const monthFlows = async (u: User, month: string) => {
   };
 };
 
+describe('próximo vencimiento y saldo inicial (debt/credit-cards, fix-phase-4-gaps)', () => {
+  it('[TC-DEBT-CARD-038] una tarjeta recién registrada con deuda previa informa el vencimiento del ciclo abierto, nunca uno pasado', async () => {
+    setDay('2026-10-20');
+    const s = await scenario('next-due');
+    const visa = await visaAccount(s.owner, 'Visa Oro BOB', 'BOB', '1200.00');
+    const created = await registerCard(s.owner, {
+      accounts: [{ accountId: visa, creditLimit: bob('10000.00'), minimumRule: percent5 }],
+    });
+    const detail = await cardOf(s.owner, created['id']);
+    expect(detail['accounts'][0].nextDueDate).toBe('2026-11-15');
+    expect(detail['accounts'][0].overdueStatements).toEqual([]);
+    const listed = checked('listCreditCards', 200, await get(s.owner, '/credit-cards'))['data'] as any[];
+    expect(listed.find((c) => c.id === created['id']).accounts[0].nextDueDate).toBe('2026-11-15');
+  }, 120_000);
+
+  it('[TC-DEBT-CARD-039] un estado de cuenta vencido con 620.50 BOB pendientes se informa atrasado y el próximo vencimiento pasa al 2026-12-15', async () => {
+    setDay('2026-10-20');
+    const s = await scenario('overdue');
+    const visa = await visaAccount(s.owner, 'Visa Oro BOB', 'BOB', '1000.00');
+    await spend(s, visa, '120.50', '2026-10-12');
+    const created = await registerCard(s.owner, {
+      accounts: [{ accountId: visa, creditLimit: bob('10000.00'), minimumRule: percent5 }],
+    });
+    setDay('2026-10-26');
+    expect(await runDaily(s.owner.ws)).toMatchObject({ issued: 1, failed: 0 });
+    setDay('2026-10-28');
+    expect((await cardOf(s.owner, created['id']))['accounts'][0].nextDueDate).toBe('2026-11-15');
+    setDay('2026-11-01');
+    await transfer(s, s.bank, visa, '500.00', '2026-11-01');
+    setDay('2026-11-20');
+    const account = (await cardOf(s.owner, created['id']))['accounts'][0];
+    expect(account.nextDueDate).toBe('2026-12-15');
+    expect(account.overdueStatements).toEqual([
+      {
+        closingDate: '2026-10-25',
+        dueDate: '2026-11-15',
+        status: 'PARTIALLY_PAID',
+        remainingNoInterest: bob('620.50'),
+        remainingMinimum: bob('0.00'),
+      },
+    ]);
+  }, 180_000);
+
+  it('[TC-DEBT-CARD-040] el ciclo que contiene el saldo inicial lo cuenta en otros movimientos y se informa cuadrado', async () => {
+    setDay('2026-10-20');
+    const s = await scenario('opening');
+    // Visa Oro BOB abierta el 2026-10-05 con 1200.00 BOB adeudados (asiento de apertura sin transacción).
+    const visa = await account(s.owner, 'Visa Oro BOB', 'CREDIT_CARD', 'BOB', '1200.00', '2026-10-05');
+    await spend(s, visa, '350.00', '2026-10-08');
+    const created = await registerCard(s.owner, {
+      accounts: [{ accountId: visa, creditLimit: bob('10000.00'), minimumRule: percent5 }],
+    });
+    const open = (await cardOf(s.owner, created['id']))['accounts'][0].openCycle;
+    expect(open.cycleStart).toBe('2026-09-26');
+    expect(open.current).toMatchObject({
+      previousBalance: bob('0.00'),
+      purchases: bob('350.00'),
+      refunds: bob('0.00'),
+      payments: bob('0.00'),
+      otherNet: bob('1200.00'),
+      closingBalance: bob('1550.00'),
+    });
+    expect(open.consistent).toBe(true);
+  }, 120_000);
+});
+
 describe('plan de pago administrado, estado de cuenta y pago (debt/credit-cards)', () => {
   let s: Scenario;
   let visa: string;

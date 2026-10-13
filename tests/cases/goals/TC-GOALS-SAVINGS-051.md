@@ -5,16 +5,19 @@ spec: goals/savings-goals
 related_specs: ["transactions/transaction-recording"]
 requirement: "Anulación o revisión de la transacción de un movimiento"
 scenario: "Fondos negativos después de anular"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-002", "FR-GOALS-005"]
 nfr: []
 invariants: ["INV-018"]
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/goals.api.test.ts
+  - packages/contexts/goals/src/application/void-impact.test.ts
+  - packages/contexts/goals/src/domain/void-impact-calculator.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["goals", "void", "negative-funds", "fix-phase-4-gaps"]

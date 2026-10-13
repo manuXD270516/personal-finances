@@ -31,6 +31,8 @@ export const suggestionsPath = (base: string, status?: string): string =>
   status
     ? `${base}/goals/contribution-suggestions?${new URLSearchParams({ status }).toString()}`
     : `${base}/goals/contribution-suggestions`;
+export const voidImpactPath = (base: string, transactionId: string): string =>
+  `${base}/goals/void-impact?${new URLSearchParams({ transactionId }).toString()}`;
 export const transactionLinksPath = (base: string, transactionIds: readonly string[]): string =>
   `${base}/goals/transaction-links?${new URLSearchParams(transactionIds.map((id) => ['transactionIds', id])).toString()}`;
 

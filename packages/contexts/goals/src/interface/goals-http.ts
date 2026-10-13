@@ -199,6 +199,14 @@ export class GoalsController {
     return { data: await this.queries.transactionLinks(workspaceId, ids) };
   }
 
+  /** `previewTransactionVoidImpact`: efecto de anular una transacción sobre las metas (sin efectos; D222 avisa, no bloquea). */
+  @Get('workspaces/:workspaceId/goals/void-impact')
+  previewTransactionVoidImpact(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
+    const transactionId = str(query, 'transactionId');
+    if (!transactionId) throw new ApiProblem('VALIDATION_FAILED', 'transactionId is required');
+    return this.queries.previewVoidImpact(workspaceId, transactionId);
+  }
+
   @Get('workspaces/:workspaceId/goals/:goalId')
   getGoal(@Param('workspaceId') workspaceId: string, @Param('goalId') goalId: string) {
     return this.queries.get(workspaceId, goalId);

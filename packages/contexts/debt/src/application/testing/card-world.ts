@@ -63,6 +63,8 @@ export class CardWorld {
   readonly workspaceId = 'ws-1';
   readonly timeZone = 'America/La_Paz';
   readonly entries: Entry[] = [];
+  /** Asientos de apertura (saldo inicial de la cuenta, presentados): sin transacción, no salen en los movimientos. */
+  readonly openings: { accountId: string; date: string; amount: string }[] = [];
   readonly pending: PendingFlowRowDto[] = [];
   readonly outbox: { eventType: string; aggregateVersion: number; payload: Record<string, unknown> }[] = [];
   readonly audit: {
@@ -224,7 +226,7 @@ export class CardWorld {
         new Map(
           dates.map((d) => [
             d,
-            world.entries
+            [...world.entries, ...world.openings.map((o) => ({ ...o, cls: 'OTHER' as const }))]
               .filter((e) => e.accountId === accountId && e.date <= d)
               .reduce((acc, e) => acc.plus(e.amount), dec('0'))
               .toFixed(SCALES[world.currencyOf(accountId)] ?? 2),
@@ -352,6 +354,18 @@ export class CardWorld {
               amount: { amount: e.amount, currency: world.currencyOf(e.accountId) },
             })),
       },
+      openings: {
+        listOpeningEntries: async (input) =>
+          world.openings
+            .filter(
+              (o) => input.accountIds.includes(o.accountId) && o.date >= input.from && o.date <= input.to,
+            )
+            .map((o) => ({
+              accountId: o.accountId,
+              entryDate: o.date,
+              amount: { amount: o.amount, currency: world.currencyOf(o.accountId) },
+            })),
+      },
       pending: {
         listPending: async (input) =>
           world.pending.filter((p) => !input.accountIds || input.accountIds.includes(p.accountId)),
@@ -450,6 +464,11 @@ export class CardWorld {
 
   addEntry(entry: Entry): void {
     this.entries.push(entry);
+  }
+
+  /** Saldo inicial de la cuenta (asiento de apertura sin transacción). */
+  addOpening(accountId: string, date: string, amount: string): void {
+    this.openings.push({ accountId, date, amount });
   }
 
   occurrence(definitionId: string, key: string): FakeOccurrence {

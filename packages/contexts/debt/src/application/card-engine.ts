@@ -165,6 +165,12 @@ export class CardEngine {
       dateTo: todayText,
       groupBy: 'DAY',
     });
+    const openingRows = await deps.openings.listOpeningEntries({
+      workspaceId,
+      accountIds: [account.accountId],
+      from: first.start.toString(),
+      to: todayText,
+    });
     const pendingRows = await deps.pending.listPending({ workspaceId, accountIds: [account.accountId] });
     const records = options.records
       ? options.records.filter((r) => r.cardAccountId === account.id)
@@ -196,8 +202,16 @@ export class CardEngine {
       const isOpen = cycle.closing.compare(clock.today) >= 0;
       const upTo = isOpen ? clock.today : cycle.closing;
       const inCycle = movements.filter((m) => m.date.compare(cycle.start) >= 0 && m.date.compare(upTo) <= 0);
+      const openingNet = openingRows
+        .filter((o) => o.accountId === account.accountId && o.amount.currency === currency.code)
+        .filter((o) => {
+          const date = LocalDate.parse(o.entryDate);
+          return date.compare(cycle.start) >= 0 && date.compare(upTo) <= 0;
+        })
+        .reduce((acc, o) => acc.add(money(o.amount.amount)), Money.zero(currency));
       const current = computeCycleFigures({
         currency,
+        openingNet,
         previousBalance: balanceOn(cycle.start.plusDays(-1).toString()),
         closingBalance: isOpen ? balance : balanceOn(cycle.closing.toString()),
         movements: inCycle,

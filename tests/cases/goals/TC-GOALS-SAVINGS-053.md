@@ -5,16 +5,18 @@ spec: goals/savings-goals
 related_specs: ["transactions/transaction-recording"]
 requirement: "Anulación o revisión de la transacción de un movimiento"
 scenario: "Aviso antes de anular un aporte con un retiro posterior"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-GOALS-005"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/goals/goals.test.tsx
+  - tests/e2e/specs/goals.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["goals", "void", "ui", "fix-phase-4-gaps"]

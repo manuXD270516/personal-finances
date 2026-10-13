@@ -36,6 +36,7 @@ import {
   type GoalView,
   type GoalsMeta,
   type LinkedAccountView,
+  type NegativeFundsView,
 } from './views.js';
 
 export interface CalendarInfo {
@@ -363,6 +364,11 @@ export class GoalAssembler {
         overAllocated: overAllocatedAccounts.has(accountId) && dec(sum('REAL').plus(sum('EARMARK'))).gt(0),
       });
     }
+    const negativeFunds: NegativeFundsView[] = [];
+    for (const row of linked) {
+      if (dec(row.funds.real.amount).isNegative())
+        negativeFunds.push({ accountId: row.accountId, amount: row.funds.real });
+    }
     return {
       id: s.id,
       name: s.name,
@@ -393,6 +399,7 @@ export class GoalAssembler {
       tracking: trackingView(c.tracking),
       overAllocated: c.overAllocated,
       linkedAccounts: linked,
+      negativeFunds,
       plan: plan ? planView(plan, waiting) : null,
     };
   }

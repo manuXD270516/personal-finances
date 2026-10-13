@@ -707,3 +707,67 @@ describe('Cuotas (decisión 13)', () => {
     expect(october(world)?.unbilledInstallments).toBe('666.67');
   });
 });
+
+describe('Próximo vencimiento y saldo inicial (fix-phase-4-gaps)', () => {
+  it('[TC-DEBT-CARD-038] tarjeta recién registrada con deuda previa: próximo vencimiento 2026-11-15, nunca el 2026-10-15', async () => {
+    const { world, svc, queries } = setup('2026-10-20T14:00:00.000Z');
+    world.addOpening('acct-bob', '2026-09-01', '1200.00');
+    const { id } = await svc.register(registerBob());
+    const card = await queries.get(WS, id);
+    const account = card.accounts[0];
+    expect(account?.balance).toEqual({ amount: '1200.00', currency: 'BOB' });
+    expect(account?.nextDueDate).toBe('2026-11-15');
+    expect(account?.overdueStatements).toEqual([]);
+    const listed = (await queries.list(WS))[0]?.accounts[0];
+    expect(listed?.nextDueDate).toBe('2026-11-15');
+  });
+
+  it('[TC-DEBT-CARD-039] estado de cuenta emitido aún no vencido: el próximo vencimiento es el suyo', async () => {
+    const { world, svc, daily, queries } = setup('2026-09-20T14:00:00.000Z');
+    octoberHistory(world);
+    const { id } = await svc.register(registerBob());
+    world.setNow('2026-10-26T14:00:00.000Z');
+    await daily.runWorkspace(WS);
+    world.setNow('2026-10-28T14:00:00.000Z');
+    const account = (await queries.get(WS, id)).accounts[0];
+    expect(account?.nextDueDate).toBe('2026-11-15');
+    expect(account?.overdueStatements).toEqual([]);
+  });
+
+  it('[TC-DEBT-CARD-039] estado vencido con 620.50 BOB pendientes: se informa atrasado y el próximo vencimiento es 2026-12-15', async () => {
+    const { world, svc, daily, queries } = setup('2026-09-20T14:00:00.000Z');
+    octoberHistory(world);
+    const { id } = await svc.register(registerBob());
+    world.setNow('2026-10-26T14:00:00.000Z');
+    await daily.runWorkspace(WS);
+    world.addEntry({ accountId: 'acct-bob', date: '2026-11-01', cls: 'PAYMENT', amount: '-500.00' });
+    world.setNow('2026-11-20T14:00:00.000Z');
+    const account = (await queries.get(WS, id)).accounts[0];
+    expect(account?.nextDueDate).toBe('2026-12-15');
+    expect(account?.overdueStatements).toEqual([
+      {
+        closingDate: '2026-10-25',
+        dueDate: '2026-11-15',
+        status: 'PARTIALLY_PAID',
+        remainingNoInterest: { amount: '620.50', currency: 'BOB' },
+        remainingMinimum: { amount: '0.00', currency: 'BOB' },
+      },
+    ]);
+  });
+
+  it('[TC-DEBT-CARD-040] el ciclo con el saldo inicial lo cuenta en otros movimientos y se informa cuadrado', async () => {
+    const { world, svc, queries } = setup('2026-10-20T14:00:00.000Z');
+    world.addOpening('acct-bob', '2026-10-05', '1200.00');
+    world.addEntry({ accountId: 'acct-bob', date: '2026-10-08', cls: 'PURCHASE', amount: '350.00' });
+    const { id } = await svc.register(registerBob());
+    const account = (await queries.get(WS, id)).accounts[0];
+    const f = account?.openCycle.current;
+    expect(f?.previousBalance.amount).toBe('0.00');
+    expect(f?.purchases.amount).toBe('350.00');
+    expect(f?.refunds.amount).toBe('0.00');
+    expect(f?.payments.amount).toBe('0.00');
+    expect(f?.otherNet.amount).toBe('1200.00');
+    expect(f?.closingBalance.amount).toBe('1550.00');
+    expect(account?.openCycle.consistent).toBe(true);
+  });
+});

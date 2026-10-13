@@ -109,6 +109,13 @@ export interface NextInstallment {
   readonly overdueDays: number;
 }
 
+/** Fila de `GET …/loans`: las condiciones y las cifras vivas del detalle (una sola llamada, sin N+1). */
+export interface LoanListItem extends Loan {
+  readonly outstandingPrincipal?: Money | null;
+  readonly accountBalance?: Money;
+  readonly nextInstallment?: NextInstallment | null;
+}
+
 export interface LoanDetail extends Loan {
   readonly outstandingPrincipal: Money | null;
   readonly accountBalance: Money;

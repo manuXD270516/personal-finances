@@ -10,7 +10,14 @@ import type {
   GoalReservationsQuery,
   GoalSummaryQuery,
 } from '../contracts/index.js';
-import { GOAL_LIFECYCLE, RESERVING_STATUSES, type GoalStatus, type SavingsGoal } from '../domain/index.js';
+import {
+  GOAL_LIFECYCLE,
+  RESERVING_STATUSES,
+  calculateVoidImpact,
+  type GoalMovement,
+  type GoalStatus,
+  type SavingsGoal,
+} from '../domain/index.js';
 import { GoalAssembler, type SimulationOverrides } from './goal-assembler.js';
 import type { FundRow, GoalsDeps, SuggestionStatus } from './ports/index.js';
 import { RateBook } from './rate-book.js';
@@ -32,6 +39,7 @@ import {
   type GoalView,
   type GoalsMeta,
   type SuggestionView,
+  type VoidImpactView,
 } from './views.js';
 
 const LIVE: readonly GoalStatus[] = ['ACTIVE', 'PAUSED', 'ACHIEVED'];
@@ -110,6 +118,56 @@ export class GoalsQueries implements GoalReservationsQuery, GoalPlansQuery, Goal
           nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
         },
       };
+    });
+  }
+
+  /**
+   * `PreviewTransactionVoidImpact` (fix-phase-4-gaps, decisión 3): efecto sobre los fondos de cada meta de anular la
+   * transacción, antes de confirmar. Sin efectos; vacío si la transacción no respalda movimientos de metas; 404 si la
+   * transacción no existe en el workspace.
+   */
+  async previewVoidImpact(workspaceId: string, transactionId: string): Promise<VoidImpactView> {
+    return this.deps.uow.run(workspaceId, async () => {
+      const { deps } = this;
+      const link = await deps.links.getForLink({ workspaceId, transactionId });
+      if (!link) throw notFound('transaction', transactionId);
+      const live = await deps.movements.liveByTransaction(workspaceId, transactionId);
+      if (live.length === 0) return { transactionId, goals: [] };
+      const goalIds = [...new Set(live.map((m) => m.goalId))].sort();
+      const movementsByGoal = new Map<string, readonly GoalMovement[]>();
+      for (const goalId of goalIds)
+        movementsByGoal.set(goalId, await deps.movements.listAll(workspaceId, goalId));
+      const lines = calculateVoidImpact(live, movementsByGoal);
+      const names = new Map<string, string>();
+      for (const goalId of goalIds) {
+        const goal = await deps.goals.findById(workspaceId, goalId);
+        if (goal) names.set(goalId, goal.snapshot.name);
+      }
+      const accountIds = [...new Set(lines.map((l) => l.accountId))];
+      const accounts = new Map(
+        (await deps.accounts.find(workspaceId, accountIds)).map((a) => [a.accountId, a] as const),
+      );
+      const goals: VoidImpactView['goals'][number][] = [];
+      for (const line of lines) {
+        const account = accounts.get(line.accountId);
+        const currency = await this.assembler.currencyOf(
+          account?.currency ??
+            live.find((m) => m.accountId === line.accountId)?.amount.currency.code ??
+            'BOB',
+        );
+        goals.push({
+          goalId: line.goalId,
+          goalName: names.get(line.goalId) ?? '',
+          accountId: line.accountId,
+          accountName: account?.name ?? '',
+          fund: line.fund,
+          currency: currency.code,
+          currentFunds: moneyDto(Money.roundToScale(line.currentFunds, currency)),
+          fundsAfterVoid: moneyDto(Money.roundToScale(line.fundsAfterVoid, currency)),
+          negative: line.negative,
+        });
+      }
+      return { transactionId, goals };
     });
   }
 
