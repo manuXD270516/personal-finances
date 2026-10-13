@@ -5,16 +5,18 @@ spec: fx/market-rates
 related_specs: []
 requirement: "Registro manual de tasas de referencia"
 scenario: "Precio manual de bitcoin"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-002"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - apps/api/test/api/fx-rate-pairs.api.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "market", "manual"]

@@ -6,9 +6,10 @@ export interface Money {
 }
 
 export type FxRateType =
-  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL';
+  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL' | 'MARKET';
 export type FxRateSource = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
-export type FxRateProvider = 'PARALELO_BO' | 'DOLARAPI_BO';
+/** Conjunto abierto: los providers cripto (`CRYPTO_<NOMBRE>`) se agregan tras verificar sus términos (ADR-0029). */
+export type FxRateProvider = 'PARALELO_BO' | 'DOLARAPI_BO' | `CRYPTO_${string}`;
 export type RateSelection = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
 
 export interface RateAttribution {
@@ -37,4 +38,10 @@ export interface ResolvedRate {
   readonly attribution?: RateAttribution | null;
   /** Fuente declarada de una tasa manual (p. ej. "Casa de cambio centro"). */
   readonly sourceLabel?: string | null;
+  /** Tasas almacenadas usadas por una inversa o cruzada (cada una con su atribución de provider, si la tiene). */
+  readonly components?: readonly {
+    readonly base?: string;
+    readonly quote?: string;
+    readonly attribution?: RateAttribution | null;
+  }[];
 }

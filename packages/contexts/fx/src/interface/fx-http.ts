@@ -18,8 +18,9 @@ import {
   type StoredRate,
 } from '../application/ports/index.js';
 import type { ProviderStatus, ProviderStatusQueries } from '../application/provider-status.queries.js';
+import type { RatePairListView, RatePairStatus, RatePairViews } from '../application/rate-pair-views.js';
 import {
-  attributionOf,
+  findAttribution,
   ExchangeRate,
   type CurrencyKind,
   type ExchangeRateState,
@@ -32,6 +33,7 @@ import {
 export const FX_SERVICE = Symbol('FX_SERVICE');
 export const FX_QUERIES = Symbol('FX_QUERIES');
 export const FX_PROVIDER_STATUS = Symbol('FX_PROVIDER_STATUS');
+export const FX_RATE_PAIR_VIEWS = Symbol('FX_RATE_PAIR_VIEWS');
 /** Umbral informado en `FxRate.anomaly.thresholdPct` cuando no se configuró otro (design.md decisión 5). */
 const DEFAULT_THRESHOLD_PCT = '5';
 
@@ -57,10 +59,15 @@ function userIdOf(req: ApiRequest): string {
   return principal.userId;
 }
 
+/** Umbral informado: uno fijo o el de la clase de activo de la moneda base de cada tasa (D228). */
+export type ThresholdOf = string | ((baseCurrency: string) => string);
+
 /** `FxRateAnomaly` del contrato (`null` si la tasa no está marcada). */
-function anomalyDto(stored: StoredRate, thresholdPct: string) {
+function anomalyDto(stored: StoredRate, threshold: ThresholdOf) {
   const mark = stored.rate.snapshot.anomaly;
   if (!mark) return null;
+  const thresholdPct =
+    typeof threshold === 'string' ? threshold : threshold(stored.rate.snapshot.rate.base.code);
   const review = stored.anomalyReview ?? null;
   return {
     baselineRateId: mark.baselineRateId,
@@ -74,7 +81,7 @@ function anomalyDto(stored: StoredRate, thresholdPct: string) {
 }
 
 /** `FxRate` del contrato (valor exacto como string decimal, nunca `number`; sin la respuesta cruda). */
-export function toFxRateDto(stored: StoredRate, thresholdPct: string = DEFAULT_THRESHOLD_PCT) {
+export function toFxRateDto(stored: StoredRate, thresholdPct: ThresholdOf = DEFAULT_THRESHOLD_PCT) {
   const s: ExchangeRateState = stored.rate.snapshot;
   return {
     id: s.id,
@@ -93,7 +100,7 @@ export function toFxRateDto(stored: StoredRate, thresholdPct: string = DEFAULT_T
     ...(s.createdBy ? { createdBy: s.createdBy } : {}),
     provider: s.provider,
     fetchedAt: s.fetchedAt,
-    attribution: s.provider ? attributionOf(s.provider) : null,
+    attribution: s.provider ? findAttribution(s.provider) : null,
     anomaly: anomalyDto(stored, thresholdPct),
     // Observaciones de conversiones propias (D231): la conversión de origen y, si se anuló, la marca de anulada.
     ...(s.conversionRef ? { conversionRef: { ...s.conversionRef } } : {}),
@@ -130,12 +137,12 @@ export function toResolvedRateDto(r: ResolvedRate) {
     provider: r.provider,
     selection: r.selection,
     stale: r.stale,
-    attribution: r.provider ? attributionOf(r.provider) : null,
+    attribution: r.provider ? findAttribution(r.provider) : null,
   };
 }
 
 /** `FxProviderStatus` del contrato. */
-export function toProviderStatusDto(p: ProviderStatus, thresholdPct: string = DEFAULT_THRESHOLD_PCT) {
+export function toProviderStatusDto(p: ProviderStatus, thresholdPct: ThresholdOf = DEFAULT_THRESHOLD_PCT) {
   return {
     provider: p.provider,
     enabled: p.enabled,
@@ -161,6 +168,35 @@ export function toProviderStatusDto(p: ProviderStatus, thresholdPct: string = DE
   };
 }
 
+/** `FxRatePairList` del contrato: modo, versión y los pares con su clase, tipo por defecto y cobertura. */
+export function toRatePairListDto(view: RatePairListView) {
+  return {
+    mode: view.mode,
+    version: view.version,
+    pairs: view.pairs.map((p) => ({
+      base: p.base,
+      quote: p.quote,
+      assetClass: p.assetClass,
+      defaultRateType: p.defaultRateType,
+      coverage: p.coverage,
+      providers: [...p.providers],
+    })),
+  };
+}
+
+/** `FxRatePairStatus` del contrato. */
+export function toRatePairStatusDto(p: RatePairStatus) {
+  return {
+    base: p.base,
+    quote: p.quote,
+    coverage: p.coverage,
+    providers: [...p.providers],
+    lastAutomaticRateAt: p.lastAutomaticRateAt,
+    ageSeconds: p.ageSeconds,
+    stale: p.stale,
+  };
+}
+
 /** Rehidratación local de una componente (solo para serializarla): el estado ya es inmutable. */
 const rehydrated = (s: ExchangeRateState) => ExchangeRate.rehydrate(s);
 
@@ -175,11 +211,13 @@ export class FxController {
     @Inject(FX_SERVICE) private readonly service: FxService,
     @Inject(FX_QUERIES) private readonly queries: FxQueries,
     @Inject(FX_PROVIDER_STATUS) private readonly providers: ProviderStatusQueries,
+    @Inject(FX_RATE_PAIR_VIEWS) private readonly pairViews: RatePairViews,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
   ) {}
 
-  private get threshold(): string {
-    return this.queries.anomalyThresholdPct;
+  /** Umbral de anomalía por clase de activo de la moneda base de cada tasa (5 % fiat y estables, 10 % cripto). */
+  private threshold(workspaceId: string): Promise<(baseCurrency: string) => string> {
+    return this.queries.anomalyThresholdResolver(workspaceId);
   }
 
   @Get('workspaces/:workspaceId/currencies')
@@ -242,7 +280,8 @@ export class FxController {
       (r) => [r.at],
       (position) => this.options.cursors.encode(scope, position),
     );
-    return { data: page.data.map((r) => toFxRateDto(r.s, this.threshold)), page: page.page };
+    const threshold = await this.threshold(workspaceId);
+    return { data: page.data.map((r) => toFxRateDto(r.s, threshold)), page: page.page };
   }
 
   @Post('workspaces/:workspaceId/fx-rates')
@@ -290,7 +329,7 @@ export class FxController {
     const stored = await this.queries.getRate(workspaceId, fxRateId);
     // Inmutable: el ETag solo cambia cuando la tasa queda reemplazada (supersededByRateId).
     res.setHeader('etag', stored.supersededById ? '"2"' : '"1"');
-    return toFxRateDto(stored, this.threshold);
+    return toFxRateDto(stored, await this.threshold(workspaceId));
   }
 
   /**
@@ -323,13 +362,52 @@ export class FxController {
       decision: body['decision'] as 'CONFIRM' | 'REJECT',
       reason: str(body, 'reason') ?? '',
     });
-    return toFxRateDto(stored, this.threshold);
+    return toFxRateDto(stored, await this.threshold(workspaceId));
   }
 
   @Get('workspaces/:workspaceId/fx-providers/status')
   async getFxProviderStatus(@Param('workspaceId') workspaceId: string) {
-    const statuses = await this.providers.status(workspaceId);
-    return { data: statuses.map((p) => toProviderStatusDto(p, this.threshold)) };
+    const report = await this.providers.statusReport(workspaceId);
+    const threshold = await this.threshold(workspaceId);
+    return {
+      data: report.providers.map((p) => toProviderStatusDto(p, threshold)),
+      pairs: report.pairs.map(toRatePairStatusDto),
+    };
+  }
+
+  @Get('workspaces/:workspaceId/fx-rate-pairs')
+  async getFxRatePairs(
+    @Param('workspaceId') workspaceId: string,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const view = await this.pairViews.list(workspaceId);
+    res.setHeader('etag', `"${view.version}"`);
+    return toRatePairListDto(view);
+  }
+
+  @Put('workspaces/:workspaceId/fx-rate-pairs')
+  async replaceFxRatePairs(
+    @Param('workspaceId') workspaceId: string,
+    @ExpectedVersion() expected: number,
+    @Body() body: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ) {
+    const mode = body['mode'] as 'DEFAULT' | 'CUSTOM';
+    const pairs = Array.isArray(body['pairs'])
+      ? (body['pairs'] as { base?: unknown; quote?: unknown }[]).map((p) => ({
+          base: String(p.base ?? ''),
+          quote: String(p.quote ?? ''),
+        }))
+      : undefined;
+    await this.service.replaceRatePairs({
+      workspaceId,
+      expectedVersion: expected,
+      mode,
+      ...(pairs ? { pairs } : {}),
+    });
+    const view = await this.pairViews.list(workspaceId);
+    res.setHeader('etag', `"${view.version}"`);
+    return toRatePairListDto(view);
   }
 
   @Post('workspaces/:workspaceId/fx-rates/:fxRateId/supersede')

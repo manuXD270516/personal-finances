@@ -1,7 +1,6 @@
 import { DomainError, type Instant, Rate, type Currency } from '@pf/shared-kernel';
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
-  DEFAULT_RATE_TYPE,
   DEFAULT_RATE_WINDOW_DAYS,
   isQuoteSideRateType,
   type FxRateProvider,
@@ -9,6 +8,7 @@ import {
   type FxRateType,
   type RateSelection,
 } from './fx-types.js';
+import { defaultRateTypeFor, type AssetClass } from './rate-pairs.js';
 import {
   DEFAULT_VALUATION_POLICY,
   newestState,
@@ -84,7 +84,15 @@ export interface ResolveQuery {
   readonly windowDays?: number;
   /** Solo valoración (FR-FX-005); nunca para la referencia de una conversión real. */
   readonly allowCross?: boolean;
+  /** Pivote por defecto (USD) cuando la moneda no tiene un par automático configurado hacia otra moneda. */
   readonly pivot?: Currency | null;
+  /**
+   * Pivote del par automático configurado de una moneda (la quote de su par: USDT para BTC/USDT; add-crypto-rate-providers
+   * decisión 8). Se usa solo si no es la moneda destino; si no, el pivote por defecto.
+   */
+  readonly pivotOf?: (code: string) => Currency | null;
+  /** Clase de activo de una moneda (default `MARKET` para cripto volátil frente a estable); sin ella, `PARALLEL`. */
+  readonly assetClassOf?: (code: string) => AssetClass | null;
 }
 
 interface Pick extends ValuationChoice {
@@ -141,14 +149,20 @@ export class RateResolver {
       throw new DomainError('VALIDATION_FAILED', 'base and quote must differ').at('/quote');
     }
     const windowDays = query.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
-    // Tipo pedido > preferencia del par > PARALLEL (docs/31 D48: el default de los pares BOB para todo par).
+    // Tipo pedido > preferencia del par > default: MARKET para cripto volátil frente a USDT y PARALLEL en los demás
+    // casos (docs/31 D48: el default de los pares BOB para todo par; D226 para los pares cripto).
+    const classOf = query.assetClassOf ?? (() => null);
     const typeFor = (a: string, b: string): FxRateType =>
-      query.rateType ?? query.preferenceOf?.(a, b) ?? DEFAULT_RATE_TYPE;
+      query.rateType ?? query.preferenceOf?.(a, b) ?? defaultRateTypeFor(a, b, classOf);
     const requested = typeFor(base.code, quote.code);
     const direct = this.pick(base.code, quote.code, at, windowDays, requested, mode);
     if (direct) return this.single(direct, base, at, requested);
     if (!query.allowCross) return null;
-    const pivot = query.pivot;
+    const configured = query.pivotOf?.(base.code) ?? null;
+    const pivot =
+      configured && configured.code !== quote.code && configured.code !== base.code
+        ? configured
+        : (query.pivot ?? null);
     if (!pivot || pivot.code === base.code || pivot.code === quote.code) return null;
     const first = this.pick(base.code, pivot.code, at, windowDays, typeFor(base.code, pivot.code), mode);
     const second = this.pick(pivot.code, quote.code, at, windowDays, typeFor(pivot.code, quote.code), mode);

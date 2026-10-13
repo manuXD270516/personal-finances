@@ -360,6 +360,55 @@ describe('GetReportSummary — patrimonio neto (reporting/net-worth)', () => {
     expect(s.meta.ratesUsed[0]?.attribution?.text).toBe('Fuente: paralelo.bo');
   });
 
+  it('[TC-REPORTING-NETWORTH-013] [TC-FX-PROVIDER-035] el patrimonio incluye 0.01500000 BTC valorados con la cruzada BTC/USDT × USDT/BOB: 12404.50 BOB con ambas atribuciones', async () => {
+    mem = new InMemoryReporting(); // escenario propio: sin las cuentas canónicas del bloque
+    mem.clock.set(Instant.parse('2026-10-13T14:05:00Z'));
+    mem.addAccount({ accountId: 'banco', name: 'Banco BOB', type: 'BANK', currency: 'BOB' }, '685.00');
+    mem.addAccount(
+      { accountId: 'btc', name: 'Wallet BTC', type: 'CRYPTO_WALLET', currency: 'BTC' },
+      '0.01500000',
+    );
+    mem.rates.push({
+      base: 'BTC',
+      quote: 'BOB',
+      value: '781300',
+      asOf: '2026-10-13T14:00:00Z',
+      provider: 'CRYPTO_TEST_PRIMARY',
+      rateType: 'MARKET',
+      cross: [
+        {
+          base: 'BTC',
+          quote: 'USDT',
+          value: '65000.00',
+          rateType: 'MARKET',
+          provider: 'CRYPTO_TEST_PRIMARY',
+        },
+        { base: 'USDT', quote: 'BOB', value: '12.02', rateType: 'PARALLEL', provider: 'PARALELO_BO' },
+      ],
+    });
+    const s = await summary();
+    expect(amount(s.netWorth.assets)).toBe('12404.50 BOB');
+    expect(amount(s.netWorth.netWorth)).toBe('12404.50 BOB');
+    expect(s.netWorth.complete).toBe(true);
+    expect(s.meta.ratesUsed[0]).toMatchObject({ derivation: 'CROSS', approx: true, ageSeconds: 300 });
+    expect(s.meta.attributions.map((a) => a.provider).sort()).toEqual(['CRYPTO_TEST_PRIMARY', 'PARALELO_BO']);
+    expect(s.meta.attributions.find((a) => a.provider === 'PARALELO_BO')?.license).toBe('CC BY 4.0');
+  });
+
+  it('[TC-REPORTING-NETWORTH-013] sin tasa BTC/USDT vigente, 0.01500000 BTC se listan sin convertir (sin 1:1) y el patrimonio queda incompleto', async () => {
+    mem = new InMemoryReporting(); // escenario propio: sin las cuentas canónicas del bloque
+    mem.clock.set(Instant.parse('2026-10-13T14:05:00Z'));
+    mem.addAccount({ accountId: 'banco', name: 'Banco BOB', type: 'BANK', currency: 'BOB' }, '685.00');
+    mem.addAccount(
+      { accountId: 'btc', name: 'Wallet BTC', type: 'CRYPTO_WALLET', currency: 'BTC' },
+      '0.01500000',
+    );
+    const s = await summary();
+    expect(amount(s.netWorth.assets)).toBe('685.00 BOB');
+    expect(s.netWorth.unvalued.map(amount)).toEqual(['0.01500000 BTC']);
+    expect(s.netWorth.complete).toBe(false);
+  });
+
   it('[TC-REPORTING-NETWORTH-002] desglose por moneda y por tipo en el contrato', async () => {
     const s = await summary();
     expect(s.netWorth.byCurrency).toEqual([

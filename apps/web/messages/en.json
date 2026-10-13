@@ -327,7 +327,8 @@
       "asOf": "valid as of: {date}",
       "stale": "stale",
       "lastKnown": "last known",
-      "requested": "requested type: {type}"
+      "requested": "requested type: {type}",
+      "components": "Components"
     },
     "age": {
       "now": "less than 1 min ago",
@@ -1061,7 +1062,8 @@
       "BANK": "Bank",
       "CUSTOM": "Custom",
       "PARALLEL_BUY": "Buy",
-      "PARALLEL_SELL": "Sell"
+      "PARALLEL_SELL": "Sell",
+      "MARKET": "Market"
     },
     "detail": {
       "title": "Conversion detail (revision {revision})",
@@ -5259,5 +5261,57 @@
     "totals": "Total",
     "excludedTotal": "{count} excluded",
     "method": "The average spread weights each conversion by its converted amount (sum of the spread over the sum of what was converted). A conversion without a recorded reference, without a quoted rate or without a valuation rate is never estimated: it is counted apart."
+  },
+  "RatePairs": {
+    "title": "Automatic rates",
+    "intro": "Pairs whose rates the system records by itself, every 15 minutes, for this workspace. Without your own list, those of your enabled currencies are used: fiat and stablecoins against your base currency and cryptocurrencies against USDT. Removing a pair only stops recording it; its history is not touched.",
+    "loading": "Loading the automatic pairs…",
+    "tableRegion": "Automatic rate pairs with their coverage and the age of their last rate",
+    "columns": {
+      "pair": "Pair",
+      "class": "Class",
+      "rateType": "Default type",
+      "coverage": "Coverage",
+      "providers": "Sources",
+      "lastRate": "Last automatic rate",
+      "actions": "Actions"
+    },
+    "mode": {
+      "legend": "Pair list",
+      "DEFAULT": "Default (from my enabled currencies)",
+      "CUSTOM": "Custom"
+    },
+    "assetClass": {
+      "FIAT": "Fiat",
+      "STABLE": "Stablecoin",
+      "VOLATILE_CRYPTO": "Volatile crypto"
+    },
+    "coverage": {
+      "AUTOMATIC": "Automatic",
+      "MANUAL_ONLY": "Manual rates only"
+    },
+    "manualOnlyHint": "No enabled provider publishes this pair: it is valued with the rates you record by hand.",
+    "noProviders": "none",
+    "lastRate": "{age}",
+    "stale": "stale",
+    "noRate": "no automatic rate",
+    "empty": "No pairs configured.",
+    "readOnly": "Only an editor or owner can change the pair list.",
+    "add": {
+      "legend": "Add a pair",
+      "base": "Currency",
+      "quote": "Against",
+      "button": "Add pair",
+      "baseHint": "Only currencies enabled in the workspace."
+    },
+    "remove": "Remove {pair}",
+    "save": "Save list",
+    "saved": "Pair list saved.",
+    "reload": "Reload the list",
+    "errors": {
+      "DUPLICATE": "That pair is already in the list.",
+      "TOO_MANY": "At most 50 pairs.",
+      "INVALID": "Choose a currency and the currency it is quoted against."
+    }
   }
 }

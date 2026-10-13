@@ -53,6 +53,7 @@ import {
   createLedgerMaintenance,
   createLedgerRuntime,
   ledgerActivityRange,
+  ledgerFirstBalanceDates,
 } from '@pf/ledger/interface/ledger.module';
 import {
   createPlanningRuntime,
@@ -78,6 +79,7 @@ import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
 import {
   conversionBackfillSource,
+  firstBalanceDatePort,
   fxEndpointsFromConfig,
   registerFxMarketRateJobs,
   registerFxUserConversionJobs,
@@ -248,6 +250,8 @@ export async function createWorkerRuntime(
       },
       workspaces: activeWorkspaces,
       settings: parseFxProviderSettings(config),
+      // Histórico de cierres cripto desde la primera fecha con saldo (add-crypto-rate-providers, D229).
+      firstBalance: firstBalanceDatePort(ledgerFirstBalanceDates()),
       ...(fxEndpoints ? { endpoints: fxEndpoints } : {}),
     }),
     logger,

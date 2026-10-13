@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Providers habilitados solo con términos verificados"
 scenario: "Provider sin verificación registrada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-015"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: critical
 type: unit
 level: architecture
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/providers.architecture.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "terms-of-use", "config"]

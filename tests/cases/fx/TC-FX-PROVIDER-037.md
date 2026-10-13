@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Estado de los providers consultable"
 scenario: "Pares configurados en el estado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-016"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/src/interface/fx-http.test.ts
+  - apps/api/test/api/fx-rate-pairs.api.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "status", "rate-pairs"]

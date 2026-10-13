@@ -5,16 +5,17 @@ spec: identity/workspace-portability
 related_specs: ["fx/market-rate-providers"]
 requirement: "Pares de tasa configurados en el export"
 scenario: "Ida y vuelta con pares cripto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010", "FR-IDENTITY-017"]
 nfr: ["NFR-COMP-002"]
 invariants: ["INV-011"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/workspace-export.api.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["portability", "fx", "rate-pairs"]

@@ -5,7 +5,7 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Respeto de los límites de uso y la caché de los providers"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-017"]
 nfr: ["NFR-COMP-007"]
 invariants: []
@@ -14,7 +14,7 @@ type: integration
 level: contract
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "rate-limit", "retry-after"]
@@ -50,4 +50,4 @@ Entonces no consulta al provider antes de 120 s
 ```
 
 ## Notas
-
+- Pendiente (2026-10-13): el límite publicado, la caché y el 429 reales dependen del adapter y de ADR-0029 (tareas 4.1 y 4.3). Que un `Retry-After` persistido bloquee los ciclos y el backfill cripto, y que una falla a mitad del backfill paginado continúe sin huecos, ya está cubierto con el doble en `crypto-rate-providers.test.ts`.

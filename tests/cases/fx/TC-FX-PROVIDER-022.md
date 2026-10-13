@@ -5,16 +5,20 @@ spec: fx/market-rate-providers
 related_specs: ["security/access-control"]
 requirement: "Pares de tasa configurados por workspace"
 scenario: "VIEWER sin permiso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-pairs.test.ts
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - apps/api/test/api/fx-rate-pairs.api.test.ts
+  - apps/web/src/ui/fx/rate-pairs.test.tsx
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "rate-pairs", "authorization", "validation"]
@@ -29,7 +33,7 @@ steps:
 expected_result:
   - "VIEWER: 403 INSUFFICIENT_ROLE"
   - "ETH/USDT: 422 CURRENCY_NOT_ENABLED"
-  - "BTC/USD: 422 VALIDATION_FAILED"
+  - "BTC/USD: 400 VALIDATION_FAILED"
   - "En los tres casos la lista y su versión no cambian"
 created: 2026-10-13
 updated: 2026-10-13

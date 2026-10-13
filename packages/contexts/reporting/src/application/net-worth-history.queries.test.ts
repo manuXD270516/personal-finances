@@ -80,6 +80,51 @@ describe('GetNetWorthHistory — serie mensual (reporting/net-worth)', () => {
     expect(mem.rateRequests.every((r) => r.at < '2026-04-01')).toBe(true);
   });
 
+  it('[TC-REPORTING-NETWORTH-014] el punto de marzo valora la wallet de bitcoin con el cierre histórico (12546.00 BOB), no con el precio de hoy', async () => {
+    mem.clock.set(Instant.parse('2026-10-13T16:00:00Z'));
+    mem.addAccount({ accountId: 'btc', name: 'Wallet BTC', type: 'CRYPTO_WALLET', currency: 'BTC' }, null);
+    mem.addPeriod('2026-03', '2026-03-01', '2026-03-31');
+    mem.setBalances('2026-03-31', { btc: { amount: '0.01500000', currency: 'BTC' } });
+    const components = (btc: string, usdt: string) =>
+      [
+        { base: 'BTC', quote: 'USDT', value: btc, rateType: 'MARKET', provider: 'CRYPTO_TEST_PRIMARY' },
+        { base: 'USDT', quote: 'BOB', value: usdt, rateType: 'PARALLEL', provider: 'PARALELO_BO' },
+      ] as const;
+    mem.rates.push(
+      // Cierre del 2026-03-31 (vigente al 2026-03-31T23:59:59Z) × USDT/BOB 10.20 de esa fecha.
+      {
+        base: 'BTC',
+        quote: 'BOB',
+        value: '836400',
+        asOf: '2026-03-31T23:59:59Z',
+        provider: 'CRYPTO_TEST_PRIMARY',
+        rateType: 'MARKET',
+        cross: components('82000.00', '10.20'),
+      },
+      // Hoy: 65000.00 × 12.02 = 781300.00 (no debe usarse para marzo).
+      {
+        base: 'BTC',
+        quote: 'BOB',
+        value: '781300',
+        asOf: '2026-10-13T14:00:00Z',
+        provider: 'CRYPTO_TEST_PRIMARY',
+        rateType: 'MARKET',
+        cross: components('65000.00', '12.02'),
+      },
+    );
+    const h = await history({ from: '2026-03', to: '2026-03' });
+    expect(h.points[0]).toMatchObject({
+      period: '2026-03',
+      netWorth: '12546.00',
+      assets: '12546.00',
+      complete: true,
+    });
+    expect(h.points[0]?.ratesUsed.map((r) => [r.rate.value, r.asOf])).toEqual([
+      ['836400', '2026-03-31T23:59:59Z'],
+    ]);
+    expect(h.meta.attributions.map((a) => a.provider).sort()).toEqual(['CRYPTO_TEST_PRIMARY', 'PARALELO_BO']);
+  });
+
   it('[TC-REPORTING-NETWORTH-007] usa la ventana de vigencia del ajuste de Reporting (D53)', async () => {
     threeMonths();
     mem.rateValidityWindowDays = 3;

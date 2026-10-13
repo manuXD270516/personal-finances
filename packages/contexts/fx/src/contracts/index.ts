@@ -13,13 +13,7 @@ export const FX_EVENTS = {
 } as const;
 
 export type FxRateTypeDto =
-  | 'OFFICIAL'
-  | 'PARALLEL'
-  | 'P2P'
-  | 'BANK'
-  | 'CUSTOM'
-  | 'PARALLEL_BUY'
-  | 'PARALLEL_SELL';
+  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL' | 'MARKET';
 export type FxRateSourceDto = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
 export type CurrencyKindDto = 'FIAT' | 'CRYPTO' | 'COMMODITY' | 'CUSTOM';
 
@@ -127,7 +121,8 @@ export interface FxQuoteSideRatesPort {
 
 export const FX_QUOTE_SIDE_RATES_PORT = Symbol.for('pf.fx.FxQuoteSideRatesPort');
 
-export type FxRateProviderDto = 'PARALELO_BO' | 'DOLARAPI_BO';
+/** Providers de tasa paralela/oficial y de precios cripto (`CRYPTO_<NOMBRE>`, ids fijados en ADR-0029). */
+export type FxRateProviderDto = 'PARALELO_BO' | 'DOLARAPI_BO' | `CRYPTO_${string}`;
 export type RateSelectionDto = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
 export type RateDerivationDto = 'DIRECT' | 'INVERSE' | 'CROSS';
 
@@ -138,6 +133,20 @@ export interface RateAttributionDto {
   readonly url: string;
   readonly license: string | null;
   readonly licenseUrl: string | null;
+}
+
+/**
+ * Atribuciones de una tasa resuelta: la de su provider y, en una tasa cruzada o inversa, la de cada tasa componente
+ * que venga de un provider (FR-FX-014), sin repetir. Cada componente es un `FxRate` del contrato con su `attribution`.
+ */
+export function attributionsOf(resolved: ResolvedRateDto): RateAttributionDto[] {
+  const byProvider = new Map<string, RateAttributionDto>();
+  if (resolved.attribution) byProvider.set(resolved.attribution.provider, resolved.attribution);
+  for (const component of resolved.components) {
+    const attribution = (component as { readonly attribution?: RateAttributionDto | null }).attribution;
+    if (attribution) byProvider.set(attribution.provider, attribution);
+  }
+  return [...byProvider.values()];
 }
 
 /** `ResolvedRate` del contrato HTTP (fx/market-rates + fx/market-rate-providers), listo para serializar. */
@@ -204,6 +213,25 @@ export interface FxValuationPort {
 
 export const FX_VALUATION_PORT = Symbol.for('pf.fx.FxValuationPort');
 
+export type FxAssetClassDto = 'FIAT' | 'STABLE' | 'VOLATILE_CRYPTO';
+
+/** Par de tasa automático configurado de un workspace (fx/market-rate-providers). */
+export interface RatePairDto {
+  readonly base: string;
+  readonly quote: string;
+  readonly assetClass: FxAssetClassDto;
+}
+
+/**
+ * Lectura de los pares de tasa automáticos de un workspace (lista fijada o por defecto), para otros contextos (p. ej.
+ * las alertas de obsolescencia del change 39). Corre en la unidad de trabajo del llamador. Sin efectos.
+ */
+export interface RatePairsQuery {
+  listRatePairs(workspaceId: string): Promise<readonly RatePairDto[]>;
+}
+
+export const FX_RATE_PAIRS_QUERY = Symbol.for('pf.fx.RatePairsQuery');
+
 /**
  * Allow-list de auditoría de FX (add-audit-trail, NFR-SEC-015): las tasas son datos de mercado (valor como texto
  * decimal exacto); lo no listado nunca se copia a `audit.audit_log`.
@@ -223,6 +251,10 @@ export const FX_AUDIT_POLICY = {
   },
   RatePreferences: {
     preferences: 'plain',
+  },
+  RatePairs: {
+    mode: 'plain',
+    pairs: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
 

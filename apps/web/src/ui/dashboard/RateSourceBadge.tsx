@@ -35,6 +35,31 @@ export function RateAttributionLink({ attribution }: { attribution: RateAttribut
 }
 
 /**
+ * Atribución de cada tasa componente de una tasa cruzada (BTC/USDT del provider cripto y USDT/BOB de paralelo.bo;
+ * FR-FX-014, add-crypto-rate-providers): sin repetir y solo las componentes que vienen de un provider.
+ */
+function ComponentAttributions({ rate, ctx }: { rate: ResolvedRate; ctx: FormatContext }) {
+  const byProvider = new Map<string, RateAttribution>();
+  for (const c of rate.components ?? [])
+    if (c.attribution) byProvider.set(c.attribution.provider, c.attribution);
+  if (byProvider.size === 0) return null;
+  return (
+    <>
+      {' · '}
+      <span data-testid="rate-components">
+        {ctx.t('rate.components')}:{' '}
+        {[...byProvider.values()].map((a, i) => (
+          <span key={a.provider} data-testid="rate-component-attribution" data-provider={a.provider}>
+            {i > 0 ? ' · ' : null}
+            <RateAttributionLink attribution={a} />
+          </span>
+        ))}
+      </span>
+    </>
+  );
+}
+
+/**
  * Tasa usada en una valoración (FR-FX-014, FR-REPORTING-003): par, valor y tipo, fuente con atribución enlazada
  * (y licencia, p. ej. CC BY 4.0), vigencia en la zona del workspace, antigüedad e indicador textual de tasa
  * obsoleta. Una tasa manual muestra su origen.
@@ -69,6 +94,7 @@ export function RateSourceBadge({ rate, ctx }: { rate: ResolvedRate; ctx: Format
           {t(`rate.origin.${rate.source}`)}
         </span>
       )}
+      {rate.derivation === 'CROSS' ? <ComponentAttributions rate={rate} ctx={ctx} /> : null}
       {rate.selection === 'FALLBACK' ? (
         <>
           {' · '}

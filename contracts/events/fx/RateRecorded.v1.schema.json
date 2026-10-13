@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/fx/RateRecorded.v1.schema.json",
   "title": "fx.RateRecorded.v1",
-  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged. Con source = USER_CONVERSION es la observación de una conversión propia (add-conversion-cost-analysis, D231): rateType CUSTOM, actor SYSTEM 'fx-user-conversion', value = tasa efectiva de la conversión y supersedesRateId = la observación de la revisión anterior; nunca se usa para valorar.",
+  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged. Con rateType = MARKET (add-crypto-rate-providers, D226) es el precio spot de una criptomoneda frente a USDT, manual o de un provider cripto (`CRYPTO_<NOMBRE>`, ids fijados en ADR-0029 tras verificar los términos de uso de cada fuente). Con source = USER_CONVERSION es la observación de una conversión propia (add-conversion-cost-analysis, D231): rateType CUSTOM, actor SYSTEM 'fx-user-conversion', value = tasa efectiva de la conversión y supersedesRateId = la observación de la revisión anterior; nunca se usa para valorar.",
   "type": "object",
   "allOf": [
     {
@@ -60,7 +60,8 @@
             "BANK",
             "CUSTOM",
             "PARALLEL_BUY",
-            "PARALLEL_SELL"
+            "PARALLEL_SELL",
+            "MARKET"
           ]
         },
         "source": {
@@ -94,13 +95,17 @@
           ]
         },
         "provider": {
-          "description": "Provider que originó la tasa (source = PROVIDER); null para tasas manuales. Aditivo (opcional).",
+          "description": "Provider que originó la tasa (source = PROVIDER); null para tasas manuales. Los providers cripto usan el id `CRYPTO_<NOMBRE>`. Aditivo (opcional).",
           "oneOf": [
             {
               "enum": [
                 "PARALELO_BO",
                 "DOLARAPI_BO"
               ]
+            },
+            {
+              "type": "string",
+              "pattern": "^CRYPTO_[A-Z0-9_]{1,32}$"
             },
             {
               "type": "null"
@@ -200,6 +205,64 @@
         "effectiveDate": "2026-10-05",
         "supersedesRateId": null,
         "provider": null
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000401",
+      "eventType": "fx.RateRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-13T14:00:01.320Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ExchangeRate",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa401",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000e1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "fx-provider:CRYPTO_EXAMPLE"
+      },
+      "payload": {
+        "rateId": "01928c4e-0000-7000-8000-0000000fa401",
+        "base": "BTC",
+        "quote": "USDT",
+        "value": "65000.01",
+        "rateType": "MARKET",
+        "source": "PROVIDER",
+        "sourceLabel": "CRYPTO_EXAMPLE (precio spot BTC/USDT)",
+        "asOf": "2026-10-13T14:00:00.000Z",
+        "effectiveDate": "2026-10-13",
+        "supersedesRateId": null,
+        "provider": "CRYPTO_EXAMPLE",
+        "anomalyFlagged": false
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000402",
+      "eventType": "fx.RateRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-13T14:02:10.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ExchangeRate",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa402",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000e2",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "rateId": "01928c4e-0000-7000-8000-0000000fa402",
+        "base": "BTC",
+        "quote": "USDT",
+        "value": "64990.5",
+        "rateType": "MARKET",
+        "source": "MANUAL",
+        "sourceLabel": "Precio del exchange",
+        "asOf": "2026-10-13T14:00:00Z",
+        "effectiveDate": "2026-10-13",
+        "supersedesRateId": null
       }
     }
   ]

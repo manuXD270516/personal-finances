@@ -327,7 +327,8 @@
       "asOf": "vigência: {date}",
       "stale": "desatualizada",
       "lastKnown": "última conhecida",
-      "requested": "tipo pedido: {type}"
+      "requested": "tipo pedido: {type}",
+      "components": "Componentes"
     },
     "age": {
       "now": "há menos de 1 min",
@@ -1061,7 +1062,8 @@
       "BANK": "Bancária",
       "CUSTOM": "Personalizada",
       "PARALLEL_BUY": "Compra",
-      "PARALLEL_SELL": "Venda"
+      "PARALLEL_SELL": "Venda",
+      "MARKET": "Mercado"
     },
     "detail": {
       "title": "Detalhe da conversão (revisão {revision})",
@@ -5259,5 +5261,57 @@
     "totals": "Total",
     "excludedTotal": "{count} excluídas",
     "method": "O spread médio pondera cada conversão pelo valor convertido (soma do spread sobre a soma do convertido). Uma conversão sem referência registrada, sem taxa cotada ou sem taxa de avaliação nunca é estimada: é contada à parte."
+  },
+  "RatePairs": {
+    "title": "Taxas automáticas",
+    "intro": "Pares cujas taxas o sistema registra sozinho, a cada 15 minutos, para este workspace. Sem lista própria, usam-se os das suas moedas habilitadas: fiat e estáveis contra a sua moeda base e criptomoedas contra USDT. Remover um par apenas deixa de registrá-lo; o histórico não é alterado.",
+    "loading": "Carregando os pares automáticos…",
+    "tableRegion": "Pares de taxa automáticos com a sua cobertura e a idade da última taxa",
+    "columns": {
+      "pair": "Par",
+      "class": "Classe",
+      "rateType": "Tipo padrão",
+      "coverage": "Cobertura",
+      "providers": "Fontes",
+      "lastRate": "Última taxa automática",
+      "actions": "Ações"
+    },
+    "mode": {
+      "legend": "Lista de pares",
+      "DEFAULT": "Padrão (segundo as minhas moedas habilitadas)",
+      "CUSTOM": "Personalizada"
+    },
+    "assetClass": {
+      "FIAT": "Fiat",
+      "STABLE": "Estável",
+      "VOLATILE_CRYPTO": "Cripto volátil"
+    },
+    "coverage": {
+      "AUTOMATIC": "Automática",
+      "MANUAL_ONLY": "Somente taxas manuais"
+    },
+    "manualOnlyHint": "Nenhum provedor habilitado publica este par: ele é avaliado com as taxas que você registrar à mão.",
+    "noProviders": "nenhum",
+    "lastRate": "{age}",
+    "stale": "desatualizada",
+    "noRate": "sem taxa automática",
+    "empty": "Não há pares configurados.",
+    "readOnly": "Somente um editor ou proprietário pode alterar a lista de pares.",
+    "add": {
+      "legend": "Adicionar um par",
+      "base": "Moeda",
+      "quote": "Contra",
+      "button": "Adicionar par",
+      "baseHint": "Somente moedas habilitadas no workspace."
+    },
+    "remove": "Remover {pair}",
+    "save": "Salvar lista",
+    "saved": "Lista de pares salva.",
+    "reload": "Recarregar a lista",
+    "errors": {
+      "DUPLICATE": "Esse par já está na lista.",
+      "TOO_MANY": "No máximo 50 pares.",
+      "INVALID": "Escolha uma moeda e a moeda contra a qual ela cota."
+    }
   }
 }

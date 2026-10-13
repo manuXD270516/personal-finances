@@ -48,8 +48,9 @@ export const DEFAULT_VALUATION_POLICY: ValuationPolicy = Object.freeze({
     PARALLEL: Object.freeze({ primary: 'PARALELO_BO', fallback: 'DOLARAPI_BO' }),
     OFFICIAL: Object.freeze({ primary: 'DOLARAPI_BO', fallback: null }),
   }),
-  staleAfterMs: Object.freeze({ PARALLEL: 60 * MINUTE_MS, OFFICIAL: 48 * HOUR_MS }),
-  fallbackStaleAfterMs: Object.freeze({ PARALLEL: 180 * MINUTE_MS }),
+  // MARKET (D228): 60 min para el principal y para el respaldo; sin provider cripto habilitado los roles quedan vacíos.
+  staleAfterMs: Object.freeze({ PARALLEL: 60 * MINUTE_MS, OFFICIAL: 48 * HOUR_MS, MARKET: 60 * MINUTE_MS }),
+  fallbackStaleAfterMs: Object.freeze({ PARALLEL: 180 * MINUTE_MS, MARKET: 60 * MINUTE_MS }),
   manualFallbackMaxAgeMs: 24 * HOUR_MS,
   manualFallbackMaxDeviationPct: '5',
 }) as ValuationPolicy;

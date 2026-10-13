@@ -4,19 +4,26 @@ import type {
   CurrencyInfoDto,
   FxConversionPricingPort,
   MoneyDto,
+  RatePairDto,
+  RatePairsQuery,
   ReferenceRateDto,
 } from '../contracts/index.js';
 import {
+  anomalyThresholdFor,
+  type AssetClassPolicy,
+  DEFAULT_ANOMALY_THRESHOLDS,
   DEFAULT_PIVOT_CURRENCY,
   DEFAULT_RATE_WINDOW_DAYS,
   RateResolver,
   totalCost,
+  type AssetClass,
   type CurrencyDefinition,
   type CurrencyKind,
   type FxRateType,
   type ResolvedRate,
 } from '../domain/index.js';
 import type { CurrencyRow, FxDeps, RateListFilter, RatePreferenceSet, StoredRate } from './ports/index.js';
+import { RatePairResolver, type EffectiveRatePairs } from './rate-pairs.js';
 
 const DAY_MS = 86_400_000;
 
@@ -42,8 +49,14 @@ export function toReferenceDto(stored: StoredRate): ReferenceRateDto {
  * Consultas de FX (sin efectos) y el puerto `FxConversionPricingPort` que consume TRANSACTIONS: catálogo, tasas,
  * resolución *as-of* (`RateResolver`), valoración (`ConvertForValuation`) y costo total de una conversión.
  */
-export class FxQueries implements FxConversionPricingPort {
-  constructor(private readonly deps: FxDeps) {}
+export class FxQueries implements FxConversionPricingPort, RatePairsQuery {
+  private readonly pairResolver: RatePairResolver;
+  private readonly assetClasses: AssetClassPolicy;
+
+  constructor(private readonly deps: FxDeps) {
+    this.pairResolver = new RatePairResolver(deps);
+    this.assetClasses = this.pairResolver.policy;
+  }
 
   /**
    * Ventana de vigencia (días) de la resolución *as-of*. El valor es un ajuste de REPORTING (docs/31 D53,
@@ -53,9 +66,69 @@ export class FxQueries implements FxConversionPricingPort {
     return this.deps.windowDays ?? DEFAULT_RATE_WINDOW_DAYS;
   }
 
-  /** Umbral de anomalía vigente (`FX_ANOMALY_THRESHOLD_PCT`), para `FxRate.anomaly.thresholdPct`. */
+  /** Umbral de anomalía de fiat y estables (`FX_ANOMALY_THRESHOLD_PCT`), para `FxRate.anomaly.thresholdPct`. */
   get anomalyThresholdPct(): string {
-    return this.deps.anomalyThresholdPct ?? '5';
+    return (this.deps.anomalyThresholds ?? DEFAULT_ANOMALY_THRESHOLDS).fiatStablePct;
+  }
+
+  /**
+   * Umbral de anomalía que aplica a la moneda base de cada tasa (5 % fiat y estables, 10 % cripto volátil; D228) para
+   * informar `FxRate.anomaly.thresholdPct`: una lectura del catálogo y una función por código.
+   */
+  anomalyThresholdResolver(workspaceId: string): Promise<(baseCurrency: string) => string> {
+    return this.deps.uow.run(workspaceId, async () => {
+      const thresholds = this.deps.anomalyThresholds ?? DEFAULT_ANOMALY_THRESHOLDS;
+      const kinds = new Map(
+        (await this.deps.currencies.list(workspaceId, {})).map(
+          (r) => [r.definition.code, r.definition.kind] as const,
+        ),
+      );
+      return (code: string) =>
+        anomalyThresholdFor(thresholds, this.assetClasses.classOf({ code, kind: kinds.get(code) ?? 'FIAT' }));
+    });
+  }
+
+  /** Lista efectiva de pares de tasa automáticos del workspace (la fijada o la derivada de sus monedas). */
+  effectiveRatePairs(workspaceId: string): Promise<EffectiveRatePairs> {
+    return this.deps.uow.run(workspaceId, () => this.pairResolver.effective(workspaceId));
+  }
+
+  /** `RatePairsQuery` (`@pf/fx/contracts`): pares configurados con su clase de activo. */
+  async listRatePairs(workspaceId: string): Promise<readonly RatePairDto[]> {
+    const effective = await this.effectiveRatePairs(workspaceId);
+    return effective.pairs.map((p) => ({ base: p.base, quote: p.quote, assetClass: p.assetClass }));
+  }
+
+  /**
+   * Contexto de valoración de un workspace: pivote por moneda a partir de su lista de pares (la quote del par de la
+   * moneda, USDT para BTC/USDT) y clase de activo por código (default `MARKET` de los pares cripto). Dentro de la
+   * unidad de trabajo del llamador.
+   */
+  private async valuationContext(
+    workspaceId: string,
+    definitions: Map<string, CurrencyDefinition | null>,
+  ): Promise<{
+    readonly pivotOf: (code: string) => Currency | null;
+    readonly assetClassOf: (code: string) => AssetClass | null;
+  }> {
+    const effective = await this.pairResolver.effective(workspaceId);
+    const quoteOf = new Map(effective.pairs.map((p) => [p.base, p.quote] as const));
+    // Las monedas de los pares configurados entran al mapa (sus definiciones dan la clase y la escala del pivote).
+    for (const p of effective.pairs) {
+      for (const code of [p.base, p.quote]) {
+        if (!definitions.has(code)) definitions.set(code, await this.deps.currencies.find(code));
+      }
+    }
+    return {
+      pivotOf: (code) => {
+        const quote = quoteOf.get(code);
+        return quote ? (definitions.get(quote)?.toCurrency() ?? null) : null;
+      },
+      assetClassOf: (code) => {
+        const def = definitions.get(code);
+        return def ? this.assetClasses.classOf({ code: def.code, kind: def.kind }) : null;
+      },
+    };
   }
 
   listCurrencies(
@@ -109,9 +182,20 @@ export class FxQueries implements FxConversionPricingPort {
       const quote = await this.requireCurrency(input.quote, '/quote');
       const at = input.asOf ? Instant.parse(input.asOf) : this.deps.clock.now();
       const pivot = input.allowCross ? await this.deps.currencies.find(DEFAULT_PIVOT_CURRENCY) : null;
+      const definitions = new Map<string, CurrencyDefinition | null>();
+      for (const code of [base.code, quote.code, ...(pivot ? [pivot.code] : [])]) {
+        definitions.set(code, await this.deps.currencies.find(code));
+      }
+      const context = await this.valuationContext(input.workspaceId, definitions);
+      // Las componentes de una cruzada usan el pivote del par configurado (USDT para BTC/USDT).
+      const pivots = new Set<string>();
+      if (input.allowCross) {
+        const configured = context.pivotOf(base.code);
+        if (configured) pivots.add(configured.code);
+      }
       const { resolver, preferenceOf } = await this.resolverFor(
         input.workspaceId,
-        [base.code, quote.code, ...(pivot ? [pivot.code] : [])],
+        [base.code, quote.code, ...(pivot ? [pivot.code] : []), ...pivots],
         at,
       );
       return resolver.resolve({
@@ -123,6 +207,8 @@ export class FxQueries implements FxConversionPricingPort {
         windowDays: this.windowDays,
         allowCross: input.allowCross ?? false,
         pivot: pivot?.toCurrency() ?? null,
+        pivotOf: context.pivotOf,
+        assetClassOf: context.assetClassOf,
       });
     });
   }
@@ -172,16 +258,23 @@ export class FxQueries implements FxConversionPricingPort {
     }
     return this.deps.uow.run(workspaceId, async () => {
       if (requests.length === 0) return [];
-      const defs = new Map<string, Currency | null>();
+      const definitions = new Map<string, CurrencyDefinition | null>();
       const currencyOf = async (code: string) => {
-        if (!defs.has(code)) defs.set(code, (await this.deps.currencies.find(code))?.toCurrency() ?? null);
-        return defs.get(code) ?? null;
+        if (!definitions.has(code)) definitions.set(code, await this.deps.currencies.find(code));
+        return definitions.get(code)?.toCurrency() ?? null;
       };
       const pivot = await currencyOf(DEFAULT_PIVOT_CURRENCY);
       for (const r of requests) {
         await currencyOf(r.base);
         await currencyOf(r.quote);
       }
+      const context = await this.valuationContext(workspaceId, definitions);
+      // Pivotes de los pares configurados de las monedas valoradas (USDT para BTC/USDT): también son candidatas.
+      for (const r of requests) {
+        const configured = context.pivotOf(r.base);
+        if (configured) await currencyOf(configured.code);
+      }
+      const defs = new Map([...definitions].map(([code, d]) => [code, d?.toCurrency() ?? null] as const));
       const codes = [...defs.entries()].filter(([, c]) => c !== null).map(([code]) => code);
       const times = requests.map((r) => r.at.epochMillis);
       const from = Instant.ofEpochMillis(Math.min(...times) - windowDays * DAY_MS);
@@ -203,6 +296,8 @@ export class FxQueries implements FxConversionPricingPort {
           windowDays,
           allowCross: true,
           pivot,
+          pivotOf: context.pivotOf,
+          assetClassOf: context.assetClassOf,
         });
       });
     });
@@ -298,6 +393,7 @@ export class FxQueries implements FxConversionPricingPort {
       at,
       preferenceOf,
       windowDays: this.windowDays,
+      assetClassOf: this.classLookup([base, quote]),
     });
     if (!found || found.fxRateId === null) return null;
     const stored = await this.deps.rates.findById(input.workspaceId, found.fxRateId);
@@ -343,6 +439,7 @@ export class FxQueries implements FxConversionPricingPort {
         at,
         preferenceOf,
         windowDays: this.windowDays,
+        assetClassOf: this.classLookup(await this.definitionsOf([code, reporting.code])),
       });
       rates.set(code, found?.rate ?? null);
     }
@@ -355,6 +452,22 @@ export class FxQueries implements FxConversionPricingPort {
   }
 
   // ------------------------------------------------------------------ helpers
+
+  /** Clase de activo por código a partir de definiciones ya leídas del catálogo. */
+  private classLookup(defs: readonly (CurrencyDefinition | null)[]): (code: string) => AssetClass | null {
+    const byCode = new Map(defs.filter((d): d is CurrencyDefinition => d !== null).map((d) => [d.code, d]));
+    return (code) => {
+      const def = byCode.get(code);
+      return def ? this.assetClasses.classOf({ code: def.code, kind: def.kind }) : null;
+    };
+  }
+
+  /** Definiciones del catálogo en SECUENCIA (nunca consultas en paralelo sobre el mismo cliente pg). */
+  private async definitionsOf(codes: readonly string[]): Promise<(CurrencyDefinition | null)[]> {
+    const out: (CurrencyDefinition | null)[] = [];
+    for (const code of codes) out.push(await this.deps.currencies.find(code));
+    return out;
+  }
 
   private async requireCurrency(code: string, pointer: string): Promise<Currency> {
     const def: CurrencyDefinition | null = await this.deps.currencies.find(code);

@@ -1,7 +1,7 @@
 import type { Clock } from '@pf/shared-kernel';
 import {
   FX_RATE_PROVIDERS,
-  PROVIDER_DESCRIPTORS,
+  providerDescriptor,
   StalenessPolicy,
   type FxProviderErrorCode,
   type FxRateProvider,
@@ -15,6 +15,7 @@ import type {
   StoredRate,
   UnitOfWork,
 } from './ports/index.js';
+import type { RatePairStatus, RatePairViews } from './rate-pair-views.js';
 import { enabledProviders, valuationPolicyOf, type FxProviderSettings } from './provider-settings.js';
 
 export type ProviderHealth = 'HEALTHY' | 'DEGRADED' | 'DOWN' | 'DISABLED';
@@ -63,6 +64,14 @@ export interface ProviderStatusDeps {
   readonly runs: ProviderRunRepository;
   readonly clock: Clock;
   readonly settings: FxProviderSettings;
+  /** Vistas de los pares configurados del workspace (cobertura y antigüedad por par); sin ellas, `pairs` va vacío. */
+  readonly pairViews?: RatePairViews;
+}
+
+/** Estado de los providers y de los pares configurados del workspace (`FxProviderStatusList`). */
+export interface ProviderStatusReport {
+  readonly providers: readonly ProviderStatus[];
+  readonly pairs: readonly RatePairStatus[];
 }
 
 const SUCCESS = new Set(['OK', 'NO_NEW_SAMPLE', 'SKIPPED_CACHE']);
@@ -80,30 +89,45 @@ export class ProviderStatusQueries {
   }
 
   status(workspaceId: string): Promise<ProviderStatus[]> {
-    return this.deps.uow.run(workspaceId, async () => {
-      const out: ProviderStatus[] = [];
-      for (const provider of FX_RATE_PROVIDERS) out.push(await this.statusOf(workspaceId, provider));
-      return out;
-    });
+    return this.deps.uow.run(workspaceId, () => this.providers(workspaceId));
+  }
+
+  /** Providers y, para cada par configurado del workspace, su cobertura y la antigüedad de su última tasa. */
+  statusReport(workspaceId: string): Promise<ProviderStatusReport> {
+    return this.deps.uow.run(workspaceId, async () => ({
+      providers: await this.providers(workspaceId),
+      pairs: this.deps.pairViews ? await this.deps.pairViews.status(workspaceId) : [],
+    }));
+  }
+
+  /** Los providers de Bolivia y los cripto que la configuración nombra (habilitados o no) con descriptor registrado. */
+  private async providers(workspaceId: string): Promise<ProviderStatus[]> {
+    const out: ProviderStatus[] = [];
+    const ids: FxRateProvider[] = [...FX_RATE_PROVIDERS, ...this.deps.settings.cryptoRequested];
+    for (const provider of [...new Set(ids)]) {
+      if (providerDescriptor(provider)) out.push(await this.statusOf(workspaceId, provider));
+    }
+    return out;
   }
 
   private async statusOf(workspaceId: string, provider: FxRateProvider): Promise<ProviderStatus> {
     const s = this.deps.settings;
     const now = this.deps.clock.now();
-    const descriptor = PROVIDER_DESCRIPTORS[provider];
+    const descriptor = providerDescriptor(provider) as NonNullable<ReturnType<typeof providerDescriptor>>;
     const enabled = enabledProviders(s).includes(provider);
     const feeds: ProviderFeedStatus[] = [];
+    // Con pares configurados, los feeds del estado son los de los pares del workspace (la salud de un provider no
+    // depende de un par que el workspace no registra).
+    const configured = this.deps.pairViews ? await this.deps.pairViews.pairKeys(workspaceId) : null;
     for (const feed of descriptor.feeds) {
-      const role =
-        feed.rateType === 'OFFICIAL'
-          ? s.official === provider
-            ? 'PRIMARY'
-            : null
-          : s.primary === provider
-            ? 'PRIMARY'
-            : s.fallback === provider
-              ? 'FALLBACK'
-              : null;
+      if (configured && !configured.has(`${feed.base}/${feed.quote}`)) continue;
+      const [primary, fallback] =
+        feed.rateType === 'MARKET'
+          ? [s.cryptoPrimary, s.cryptoFallback]
+          : feed.rateType === 'OFFICIAL'
+            ? [s.official, null]
+            : [s.primary, s.fallback];
+      const role = primary === provider ? 'PRIMARY' : fallback === provider ? 'FALLBACK' : null;
       if (!enabled || role === null) continue;
       const lastRate = await this.deps.rates.latestAccepted(workspaceId, { provider, ...feed });
       const asOf = lastRate ? Date.parse(lastRate.rate.snapshot.asOf) : null;
@@ -128,9 +152,11 @@ export class ProviderStatusQueries {
       (r) => r.retryAfterUntil !== null && Date.parse(r.retryAfterUntil) > now.epochMillis,
     );
     const retryAfterUntil = retryAfter?.retryAfterUntil ?? null;
-    const configError = s.configError
-      ? { code: 'FX_PROVIDER_CONFIG_INVALID' as const, httpStatus: null, at: now.toString() }
-      : null;
+    // Una configuración general inválida afecta a todos; la de los providers cripto, solo a los cripto.
+    const configError =
+      s.configError || (descriptor.kind === 'CRYPTO' && s.cryptoConfigError)
+        ? { code: 'FX_PROVIDER_CONFIG_INVALID' as const, httpStatus: null, at: now.toString() }
+        : null;
     const lastError =
       configError ??
       (lastFailure && lastFailure.errorCode
@@ -166,10 +192,16 @@ export class ProviderStatusQueries {
 
   private async backfillOf(provider: FxRateProvider, enabled: boolean): Promise<ProviderStatus['backfill']> {
     const s = this.deps.settings;
-    const historyProvider = [s.primary, s.fallback].find(
-      (p) => p !== null && PROVIDER_DESCRIPTORS[p].history,
-    );
-    if (!enabled || !s.backfillEnabled || historyProvider !== provider) return { status: 'NOT_APPLICABLE' };
+    const descriptor = providerDescriptor(provider);
+    if (descriptor?.dailyCloses) {
+      // Histórico cripto (D229): cada provider cripto habilitado mantiene su caché de cierres diarios.
+      if (!enabled || !s.backfillEnabled) return { status: 'NOT_APPLICABLE' };
+    } else {
+      const historyProvider = [s.primary, s.fallback].find(
+        (p) => p !== null && providerDescriptor(p)?.history,
+      );
+      if (!enabled || !s.backfillEnabled || historyProvider !== provider) return { status: 'NOT_APPLICABLE' };
+    }
     const [last] = await this.deps.runs.recent(provider, 1, ['BACKFILL', 'GAP_FILL']);
     if (!last) return { status: 'PENDING', pointsImported: 0, from: null, to: null, lastRunAt: null };
     return backfillFrom(last);

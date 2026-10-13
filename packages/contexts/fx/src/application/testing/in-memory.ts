@@ -4,14 +4,19 @@ import {
   CurrencyDefinition,
   DEFAULT_WORKSPACE_CURRENCIES,
   EXCHANGE_RATE_LIFECYCLE,
+  RatePairList,
   type CurrencyKind,
   type ExchangeRate,
+  type RatePairListState,
 } from '../../domain/index.js';
 import type {
   ActiveWorkspacesPort,
   AnomalyReview,
+  FirstBalanceDatePort,
   FxDeps,
+  HistoryClose,
   ProviderFeedKey,
+  ProviderHistoryCache,
   ProviderRun,
   ProviderRunRepository,
   RatePreference,
@@ -70,6 +75,14 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     runs: [] as ProviderRun[],
     /** Workspaces activos (worker): id → zona horaria. */
     workspaces: new Map<string, string>(),
+    /** Moneda base de los workspaces activos del worker (por defecto la de la composición). */
+    workspaceBase: new Map<string, string>(),
+    /** Listas de pares fijadas (`fx.rate_pair_list`); sin entrada = lista por defecto, versión 1. */
+    pairLists: new Map<string, RatePairListState>(),
+    /** Cierres diarios cripto de la instalación (`fx.provider_history_point`). */
+    historyCloses: [] as HistoryClose[],
+    /** Primera fecha con saldo por moneda (doble de `FirstBalanceDateQuery` de LEDGER). */
+    firstBalance: new Map<string, Map<string, string>>(),
   };
   const faults: { audit?: Error } = {};
   let depth = 0;
@@ -84,6 +97,10 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     withdrawals: [...state.withdrawals],
     runs: [...state.runs],
     workspaces: new Map(state.workspaces),
+    workspaceBase: new Map(state.workspaceBase),
+    pairLists: new Map(state.pairLists),
+    historyCloses: [...state.historyCloses],
+    firstBalance: new Map(state.firstBalance),
   });
   const definitions = new Map(
     CATALOG.map(([code, kind, scale]) => [
@@ -233,6 +250,24 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
             .map((r) => r.snapshot.effectiveDate)
             .filter((d) => d >= from && d <= to),
         );
+      },
+      async providerAsOfs(ws, feed, from, to) {
+        return new Set(
+          ofFeed(ws, feed)
+            .map((r) => r.snapshot.asOf)
+            .filter((a) => a >= from && a <= to),
+        );
+      },
+    },
+    pairs: {
+      async get(ws) {
+        return state.pairLists.get(ws) ?? RatePairList.defaults().snapshot;
+      },
+      async replace(ws, next, expectedVersion) {
+        const current = state.pairLists.get(ws)?.version ?? 1;
+        if (current !== expectedVersion) return false;
+        state.pairLists.set(ws, next);
+        return true;
       },
     },
     reviews: {
@@ -396,8 +431,56 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
   };
   const workspaces: ActiveWorkspacesPort = {
     async list() {
-      return [...state.workspaces].map(([workspaceId, timeZone]) => ({ workspaceId, timeZone }));
+      return [...state.workspaces].map(([workspaceId, timeZone]) => ({
+        workspaceId,
+        timeZone,
+        baseCurrency: state.workspaceBase.get(workspaceId) ?? options.baseCurrency ?? 'BOB',
+      }));
     },
   };
-  return { deps, state, faults, clock, runs, workspaces };
+  const historyCache: ProviderHistoryCache = {
+    async insertCloses(closes) {
+      let inserted = 0;
+      for (const c of closes) {
+        const exists = state.historyCloses.some(
+          (h) => h.provider === c.provider && h.base === c.base && h.quote === c.quote && h.day === c.day,
+        );
+        if (exists) continue;
+        state.historyCloses.push(c);
+        inserted++;
+      }
+      return inserted;
+    },
+    async lastDay(provider, base, quote) {
+      const days = state.historyCloses
+        .filter((h) => h.provider === provider && h.base === base && h.quote === quote)
+        .map((h) => h.day)
+        .sort();
+      return days.at(-1) ?? null;
+    },
+    async summary(provider) {
+      const days = [
+        ...new Set(state.historyCloses.filter((h) => h.provider === provider).map((h) => h.day)),
+      ].sort();
+      return { points: days.length, from: days[0] ?? null, to: days.at(-1) ?? null };
+    },
+    async closes(provider, filter) {
+      return state.historyCloses
+        .filter(
+          (h) =>
+            h.provider === provider &&
+            filter.bases.includes(h.base) &&
+            h.quote === filter.quote &&
+            h.day >= filter.from &&
+            h.day <= filter.to,
+        )
+        .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+    },
+  };
+  const firstBalance: FirstBalanceDatePort = {
+    async byCurrency(ws) {
+      return state.firstBalance.get(ws) ?? new Map();
+    },
+  };
+  return { deps, state, faults, clock, runs, workspaces, historyCache, firstBalance };
 }

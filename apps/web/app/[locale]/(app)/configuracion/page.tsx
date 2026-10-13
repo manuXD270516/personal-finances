@@ -3,6 +3,7 @@ import { use } from 'react';
 import { AuditSettingsLink } from '../../../../src/ui/audit/AuditLink';
 import { DemoDataPanel } from '../../../../src/ui/DemoDataPanel';
 import { WorkspaceSettingsForm } from '../../../../src/ui/forms';
+import { RatePairsPanel } from '../../../../src/ui/fx/RatePairsPanel';
 import { ClosingPolicyPanel } from '../../../../src/ui/planning/ClosingPolicyPanel';
 import { ExportPanel, ImportPanel } from '../../../../src/ui/portability/PortabilityPanels';
 
@@ -12,6 +13,7 @@ export default function WorkspaceSettingsPage({ params }: { params: Promise<{ lo
     <>
       <WorkspaceSettingsForm />
       <AuditSettingsLink />
+      <RatePairsPanel />
       <ClosingPolicyPanel />
       <ExportPanel />
       <ImportPanel />

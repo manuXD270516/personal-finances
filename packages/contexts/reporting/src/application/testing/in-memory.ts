@@ -2,6 +2,7 @@ import type { AccountSummaryDto } from '@pf/accounts/contracts';
 import type { CategorySummaryDto } from '@pf/classification/contracts';
 import type {
   FxValuationPort,
+  RateAttributionDto,
   WorkspaceCurrencyDto,
   ResolvedRateDto,
   ValuationRateDto,
@@ -39,9 +40,20 @@ export interface FakeRate {
   readonly selection?: ResolvedRateDto['selection'];
   readonly stale?: boolean;
   readonly fxRateId?: string;
+  /**
+   * Tasa CRUZADA por un pivote (BTC/BOB = BTC/USDT × USDT/BOB; add-crypto-rate-providers): `value` es el producto y
+   * cada componente lleva su tipo, valor y provider (con su atribución, como el `FxRate` del contrato).
+   */
+  readonly cross?: readonly {
+    readonly base: string;
+    readonly quote: string;
+    readonly value: string;
+    readonly rateType: ResolvedRateDto['rateType'];
+    readonly provider: NonNullable<ResolvedRateDto['provider']>;
+  }[];
 }
 
-const ATTRIBUTION = {
+const ATTRIBUTION: Readonly<Record<string, RateAttributionDto>> = {
   PARALELO_BO: {
     provider: 'PARALELO_BO',
     text: 'Fuente: paralelo.bo',
@@ -56,7 +68,17 @@ const ATTRIBUTION = {
     license: null,
     licenseUrl: null,
   },
-} as const;
+};
+
+/** Atribución de un provider; los providers cripto (`CRYPTO_<NOMBRE>`) usan la que registra su verificación. */
+const attributionFor = (provider: string): RateAttributionDto =>
+  ATTRIBUTION[provider] ?? {
+    provider: provider as RateAttributionDto['provider'],
+    text: `Fuente: ${provider.toLowerCase()}`,
+    url: 'https://example.invalid/crypto',
+    license: null,
+    licenseUrl: null,
+  };
 
 /**
  * Dobles en memoria de los puertos de REPORTING (contratos públicos de los otros contextos). El doble de FX NO elige
@@ -206,8 +228,15 @@ export class InMemoryReporting {
     const resolved: ResolvedRateDto = {
       rate: { base: r.base, quote: r.quote, value: r.value },
       fxRateId: r.fxRateId ?? `rate-${r.base}-${r.quote}-${r.asOf}`,
-      derivation: r.base === req.base ? 'DIRECT' : 'INVERSE',
-      components: [],
+      derivation: r.cross ? 'CROSS' : r.base === req.base ? 'DIRECT' : 'INVERSE',
+      components: (r.cross ?? []).map((c) => ({
+        base: c.base,
+        quote: c.quote,
+        value: c.value,
+        rateType: c.rateType,
+        provider: c.provider,
+        attribution: attributionFor(c.provider),
+      })),
       rateType: r.rateType ?? 'PARALLEL',
       requestedRateType: r.rateType ?? 'PARALLEL',
       source: r.source ?? (provider ? 'PROVIDER' : 'MANUAL'),
@@ -215,11 +244,11 @@ export class InMemoryReporting {
       asOf: r.asOf,
       ageDays: Math.floor(ageMs / 86_400_000),
       ageSeconds: Math.floor(ageMs / 1000),
-      approx: false,
+      approx: r.cross !== undefined,
       provider,
       selection: r.selection ?? (provider ? 'PRIMARY' : 'MANUAL'),
       stale: r.stale ?? false,
-      attribution: provider ? ATTRIBUTION[provider] : null,
+      attribution: provider ? attributionFor(provider) : null,
     };
     return { resolved, exact: { base: r.base, quote: r.quote, value: r.value } };
   }

@@ -12,10 +12,14 @@ import {
   EXCHANGE_RATE_LIFECYCLE,
   ExchangeRate,
   isFxRateType,
+  RatePairList,
   type FxRateType,
+  type RatePair,
+  type RatePairMode,
 } from '../domain/index.js';
 import { notFound } from './fx.queries.js';
 import type { FxDeps, RatePreference, RatePreferenceSet, StoredRate } from './ports/index.js';
+import { RatePairResolver } from './rate-pairs.js';
 
 export interface RecordManualRateCommand {
   readonly workspaceId: string;
@@ -51,15 +55,26 @@ export interface ReplacePreferencesCommand {
   readonly preferences: readonly RatePreference[];
 }
 
+export interface ReplaceRatePairsCommand {
+  readonly workspaceId: string;
+  readonly expectedVersion: number;
+  readonly mode: RatePairMode;
+  readonly pairs?: readonly RatePair[];
+}
+
 /**
  * Comandos de FX (fx/market-rates; design.md decisiones 5, 6, 8, 9). Cada uno corre en UNA unidad de trabajo:
  * validación → agregado inmutable → repositorio append-only → outbox `fx.RateRecorded.v1` → auditoría (INV-029).
  */
 export class FxService {
+  private readonly pairResolver: RatePairResolver;
+
   constructor(
     private readonly deps: FxDeps,
     private readonly audit: AuditPort = deps.audit,
-  ) {}
+  ) {
+    this.pairResolver = new RatePairResolver(deps);
+  }
 
   /** `RecordManualRate` (FR-FX-002): tasa del workspace con origen MANUAL; el valor se guarda exacto. */
   recordManualRate(cmd: RecordManualRateCommand): Promise<StoredRate> {
@@ -252,6 +267,59 @@ export class FxService {
         ],
       });
       return next;
+    });
+  }
+
+  /**
+   * `ConfigureRatePairs` (fx/market-rate-providers, FR-FX-009; D220, D230, D250): fija la lista de pares automáticos
+   * del workspace (`CUSTOM`) o vuelve a la lista por defecto (`DEFAULT`), con `If-Match` sobre la versión. Sin máquina de
+   * estados: solo auditoría con la lista efectiva anterior y la nueva, en la misma unidad de trabajo. Quitar un par solo
+   * deja de registrarlo: no toca `fx.exchange_rate` (INV-011).
+   */
+  replaceRatePairs(
+    cmd: ReplaceRatePairsCommand,
+  ): Promise<{ readonly mode: RatePairMode; readonly version: number }> {
+    return this.deps.uow.run(cmd.workspaceId, async () => {
+      const current = RatePairList.rehydrate(await this.deps.pairs.get(cmd.workspaceId, { forUpdate: true }));
+      if (current.version !== cmd.expectedVersion) {
+        throw new DomainError('PRECONDITION_FAILED', 'If-Match does not match the current version', {
+          details: { currentVersion: current.version },
+        });
+      }
+      const before = await this.pairResolver.effective(cmd.workspaceId);
+      const baseCurrency = await this.pairResolver.baseCurrencyOf(cmd.workspaceId);
+      if (baseCurrency === null)
+        throw new Error('the workspace base currency is required to change the pairs');
+      const rows = await this.deps.currencies.list(cmd.workspaceId, {});
+      const next = current.replace(
+        { mode: cmd.mode, ...(cmd.pairs ? { pairs: cmd.pairs } : {}) },
+        {
+          baseCurrency,
+          enabledCodes: new Set(rows.filter((r) => r.enabled).map((r) => r.definition.code)),
+          catalogCodes: new Set(rows.map((r) => r.definition.code)),
+        },
+      );
+      if (!(await this.deps.pairs.replace(cmd.workspaceId, next.snapshot, cmd.expectedVersion))) {
+        throw new DomainError('CONCURRENCY_CONFLICT', 'the rate pairs were modified concurrently');
+      }
+      const after = await this.pairResolver.effective(cmd.workspaceId);
+      await this.audit.append({
+        workspaceId: cmd.workspaceId,
+        action: 'fx.rate_pairs.replaced',
+        aggregateType: 'RatePairs',
+        aggregateId: cmd.workspaceId,
+        aggregateVersion: next.version,
+        // JSON canónico: la auditoría solo admite valores planos o `Money`.
+        changes: [
+          { field: 'mode', before: before.mode, after: after.mode },
+          {
+            field: 'pairs',
+            before: JSON.stringify(before.pairs.map((p) => `${p.base}/${p.quote}`)),
+            after: JSON.stringify(after.pairs.map((p) => `${p.base}/${p.quote}`)),
+          },
+        ],
+      });
+      return { mode: next.mode, version: next.version };
     });
   }
 

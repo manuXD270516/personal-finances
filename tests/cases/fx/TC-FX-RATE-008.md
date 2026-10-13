@@ -5,16 +5,19 @@ spec: fx/market-rates
 related_specs: []
 requirement: "Tipo de tasa preferido por par para valoración"
 scenario: "Par cripto sin preferencia usa el precio de mercado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-006"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-pairs.test.ts
+  - packages/contexts/fx/src/domain/crypto-valuation.test.ts
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "preference", "market"]

@@ -2,6 +2,8 @@ import type { AuditPort, LifecyclePort, LifecycleQuery } from '@pf/audit/contrac
 import type { Clock, Instant } from '@pf/shared-kernel';
 import type {
   AnomalyStatus,
+  AnomalyThresholds,
+  AssetClassPolicy,
   CurrencyDefinition,
   CurrencyKind,
   ExchangeRate,
@@ -10,6 +12,7 @@ import type {
   FxRateSource,
   FxRateType,
   RateCandidate,
+  RatePairListState,
   ValuationPolicy,
 } from '../../domain/index.js';
 
@@ -108,6 +111,11 @@ export interface ExchangeRateRepository {
   /** Fechas efectivas (YYYY-MM-DD) con alguna tasa del feed en [from, to] (relleno de días faltantes). */
   providerDays(workspaceId: string, feed: ProviderFeedKey, from: string, to: string): Promise<Set<string>>;
   /**
+   * Vigencias exactas (`asOf` ISO) de las tasas del feed entre dos instantes (cierres diarios ya registrados del
+   * histórico cripto: relleno sin una consulta por día).
+   */
+  providerAsOfs(workspaceId: string, feed: ProviderFeedKey, from: string, to: string): Promise<Set<string>>;
+  /**
    * Inserta una observación de conversión propia si no existe otra de la misma conversión y revisión (índice único
    * parcial `exchange_rate_conversion_uk`, `ON CONFLICT DO NOTHING`; idempotencia de negocio). `true` si se insertó.
    * `FX_RATE_ALREADY_SUPERSEDED` si otra observación ya reemplazó a la que esta reemplaza.
@@ -159,9 +167,78 @@ export interface ProviderRunRepository {
   purgeBefore(before: string): Promise<number>;
 }
 
-/** Workspaces activos (IDENTITY vía composition root) a los que el worker copia las tasas de provider. */
+/**
+ * Workspaces activos (IDENTITY vía composition root) a los que el worker copia las tasas de provider. `baseCurrency` es
+ * la moneda base del workspace, que decide su lista de pares por defecto (add-crypto-rate-providers).
+ */
 export interface ActiveWorkspacesPort {
-  list(): Promise<readonly { readonly workspaceId: string; readonly timeZone: string }[]>;
+  list(): Promise<
+    readonly {
+      readonly workspaceId: string;
+      readonly timeZone: string;
+      readonly baseCurrency?: string;
+    }[]
+  >;
+}
+
+/**
+ * Lista de pares automáticos del workspace (`fx.rate_pair_list` + `fx.rate_pair`, WS con RLS forzada; D220, D230). Sin
+ * fila de lista ⇒ `DEFAULT`, versión 1. Quitar un par solo cambia esta lista: nunca toca `fx.exchange_rate`.
+ */
+export interface RatePairListRepository {
+  get(workspaceId: string, options?: { readonly forUpdate?: boolean }): Promise<RatePairListState>;
+  /** Reemplazo completo con optimistic locking sobre la versión: `false` si la versión cambió. */
+  replace(workspaceId: string, next: RatePairListState, expectedVersion: number): Promise<boolean>;
+}
+
+/**
+ * Primera fecha con saldo por moneda del workspace (`@pf/ledger/contracts` `FirstBalanceDateQuery`, cableada por el
+ * composition root): base del histórico cripto (D229). Mapa vacío si no hay movimientos.
+ */
+export interface FirstBalanceDatePort {
+  byCurrency(workspaceId: string): Promise<ReadonlyMap<string, string>>;
+}
+
+/** Cierre diario publicado por un provider cripto (`fx.provider_history_point`, tabla de instalación). */
+export interface HistoryClose {
+  readonly provider: FxRateProvider;
+  readonly base: string;
+  readonly quote: string;
+  /** Día UTC completo (`YYYY-MM-DD`). */
+  readonly day: string;
+  /** Texto decimal exacto del cierre (nunca `number`). */
+  readonly close: string;
+  /** Cierre del día publicado (`D T23:59:59Z`). */
+  readonly closeAt: string;
+  readonly fetchedAt: string;
+  readonly rawPayload: string;
+}
+
+/**
+ * Caché de los cierres diarios cripto de la INSTALACIÓN (sin `workspace_id`, sin datos de usuario; como
+ * `fx.provider_run`): se pide con rangos fijos de la instalación y de ella copia cada workspace las filas de sus pares.
+ */
+export interface ProviderHistoryCache {
+  /** Inserta los cierres que faltan (`ON CONFLICT DO NOTHING`); devuelve cuántos eran nuevos. */
+  insertCloses(closes: readonly HistoryClose[]): Promise<number>;
+  /** Último día en caché de un feed (`null` si ninguno). */
+  lastDay(provider: FxRateProvider, base: string, quote: string): Promise<string | null>;
+  /** Días distintos en caché de un provider y su rango (estado de la carga histórica). */
+  summary(provider: FxRateProvider): Promise<{
+    readonly points: number;
+    readonly from: string | null;
+    readonly to: string | null;
+  }>;
+  /** Cierres de un provider y quote entre dos días UTC inclusivos, de las bases indicadas. */
+  closes(
+    provider: FxRateProvider,
+    filter: {
+      readonly bases: readonly string[];
+      readonly quote: string;
+      readonly from: string;
+      readonly to: string;
+    },
+  ): Promise<HistoryClose[]>;
 }
 
 export interface CurrencyRow {
@@ -250,6 +327,17 @@ export interface FxDeps {
   readonly windowDays?: number;
   /** Revisiones de anomalías (fx/market-rate-providers). */
   readonly reviews: RateAnomalyReviewRepository;
+  /** Lista de pares de tasa automáticos del workspace (add-crypto-rate-providers). */
+  readonly pairs: RatePairListRepository;
+  /** Clases de activo (`FX_STABLECOIN_CODES`); por defecto solo USDT es estable. */
+  readonly assetClasses?: AssetClassPolicy;
+  /** Umbrales de anomalía por clase (informe `FxRate.anomaly.thresholdPct`); por defecto 5 % y 10 %. */
+  readonly anomalyThresholds?: AnomalyThresholds;
+  /**
+   * `true` en procesos de solo valoración sin acceso a la moneda base del workspace (el worker de PLANNING): la lista
+   * por defecto se deriva solo con los pares cripto contra USDT.
+   */
+  readonly valuationOnly?: boolean;
   /** Roles de providers y obsolescencia de la valoración (por defecto, los de design.md decisión 5). */
   readonly policy?: ValuationPolicy;
   /** Umbral de anomalía vigente (`FX_ANOMALY_THRESHOLD_PCT`), informado en `FxRate.anomaly.thresholdPct`. */

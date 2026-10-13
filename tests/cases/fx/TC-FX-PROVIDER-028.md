@@ -5,7 +5,7 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Precios de mercado de criptomonedas desde providers de exchange"
 scenario: "Precio con más de 18 decimales"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009"]
 nfr: ["NFR-DATA-001"]
 invariants: []
@@ -14,7 +14,7 @@ type: integration
 level: contract
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "adapter", "payload"]
@@ -47,4 +47,4 @@ Entonces no registra tasa y marca PROVIDER_PAYLOAD_INVALID
 ```
 
 ## Notas
-
+- Pendiente (2026-10-13): las variantes de la respuesta grabada del provider (JSON truncado, campo renombrado) dependen del adapter real (tarea 4.1, ADR-0029). La validación del precio (19 decimales, nulo, cero) y su registro como falla `PROVIDER_PAYLOAD_INVALID` ya están cubiertos con el doble en `crypto-rate-providers.test.ts`.

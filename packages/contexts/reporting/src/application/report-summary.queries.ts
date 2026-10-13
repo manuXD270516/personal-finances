@@ -1,4 +1,5 @@
 import type { ResolvedRateDto, RateAttributionDto, ValuationRateDto } from '@pf/fx/contracts';
+import { attributionsOf } from '@pf/fx/contracts';
 import {
   currency as makeCurrency,
   dec,
@@ -449,7 +450,7 @@ export class ReportSummaryQueries {
     const consolidatedComplete = liquid.complete && income.complete && expense.complete && nw.complete;
     const ratesUsed = [...used.values()];
     const attributions = new Map<string, RateAttributionDto>();
-    for (const r of ratesUsed) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+    for (const r of ratesUsed) for (const a of attributionsOf(r)) attributions.set(a.provider, a);
     const show = (v: Decimal) => present(v, reporting).toJSON();
     const zero = dec('0');
     const topLine =

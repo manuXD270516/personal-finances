@@ -1,29 +1,41 @@
 import { Instant, LocalDate, type Clock } from '@pf/shared-kernel';
-import { FX_EVENTS } from '../contracts/index.js';
 import {
-  AnomalyDetector,
-  ExchangeRate,
   marketOf,
   ProviderError,
   type FxRateProvider,
   type MarketRateProvider,
+  type PollableProvider,
   type ProviderSample,
 } from '../domain/index.js';
+import { CryptoHistorySync } from './crypto-history.js';
 import type {
   ActiveWorkspacesPort,
   CurrencyRepository,
   ExchangeRateRepository,
+  FirstBalanceDatePort,
   IdGenerator,
   OutboxPort,
+  ProviderHistoryCache,
   ProviderRun,
   ProviderRunKind,
   ProviderRunOutcome,
   ProviderRunRepository,
+  RatePairListRepository,
   RatePreference,
   RatePreferenceRepository,
   UnitOfWork,
 } from './ports/index.js';
-import { enabledProviders, type FxProviderSettings } from './provider-settings.js';
+import { ProviderRunLog, type ProviderCycleResult } from './provider-run-log.js';
+import {
+  anomalyThresholdsOf,
+  assetClassPolicyOf,
+  enabledProviders,
+  type FxProviderSettings,
+} from './provider-settings.js';
+import { RatePairResolver } from './rate-pairs.js';
+import { SampleRecorder, type RecordTarget } from './sample-recorder.js';
+
+export type { ProviderCycleResult } from './provider-run-log.js';
 
 const HOUR_MS = 3_600_000;
 const RUN_RETENTION_MS = 90 * 24 * HOUR_MS;
@@ -47,31 +59,16 @@ export interface FxIngestionDeps {
   readonly ids: IdGenerator;
   readonly clock: Clock;
   readonly settings: FxProviderSettings;
-  /** Adapters por provider (solo los habilitados se consultan). */
-  readonly providers: Partial<Record<FxRateProvider, MarketRateProvider>>;
+  /** Adapters por provider (solo los habilitados se consultan). Los cripto implementan `CryptoRateProvider`. */
+  readonly providers: Partial<Record<FxRateProvider, PollableProvider>>;
+  /** Lista de pares automáticos de cada workspace: solo esos pares se registran (add-crypto-rate-providers). */
+  readonly pairs: RatePairListRepository;
+  /** Caché de cierres diarios cripto de la instalación y primera fecha con saldo (histórico cripto, D229). */
+  readonly historyCache?: ProviderHistoryCache;
+  readonly firstBalance?: FirstBalanceDatePort;
 }
 
-export interface ProviderCycleResult {
-  readonly provider: FxRateProvider;
-  readonly outcome: ProviderRunOutcome;
-  readonly newSamples: number;
-  readonly errorCode: string | null;
-}
-
-interface Target {
-  readonly workspaceId: string;
-  readonly timeZone: string;
-}
-
-interface RecordOptions {
-  /** La carga histórica no detecta anomalías (design.md decisión 8). */
-  readonly detectAnomalies: boolean;
-  /** Un evento por tasa (polling) o uno por workspace y ejecución (carga histórica; design.md decisión 13). */
-  readonly eventPerRate: boolean;
-  readonly correlationId: string;
-  /** Solo relleno: omite muestras de días que ya tienen alguna tasa del feed. */
-  readonly skipDaysWithRates: boolean;
-}
+type Target = RecordTarget;
 
 /**
  * Ingesta de tasas de mercado (fx/market-rate-providers; design.md decisiones 3, 4, 8, 12 y 13): `PollMarketRates`,
@@ -82,7 +79,51 @@ interface RecordOptions {
  * `SYSTEM`): se trazan con `fx.RateRecorded.v1` y `fx.provider_run`, no con auditoría de usuario.
  */
 export class MarketRateIngestion {
-  constructor(private readonly deps: FxIngestionDeps) {}
+  private readonly recorder: SampleRecorder;
+  private readonly runLog: ProviderRunLog;
+  private readonly cryptoHistory: CryptoHistorySync | null;
+
+  constructor(private readonly deps: FxIngestionDeps) {
+    const pairs = new RatePairResolver({
+      pairs: deps.pairs,
+      currencies: deps.currencies,
+      assetClasses: assetClassPolicyOf(deps.settings),
+      valuationOnly: true,
+      // La moneda base siempre llega con el destino (`RecordTarget`): este puerto nunca se consulta.
+      workspaces: {
+        settingsOf: () => Promise.reject(new Error('workspace settings are not available to the worker')),
+      },
+    });
+    this.runLog = new ProviderRunLog(deps.runs, deps.ids, deps.clock);
+    this.recorder = new SampleRecorder({
+      uow: deps.uow,
+      rates: deps.rates,
+      currencies: deps.currencies,
+      outbox: deps.outbox,
+      ids: deps.ids,
+      clock: deps.clock,
+      thresholds: anomalyThresholdsOf(deps.settings),
+      pairs,
+    });
+    this.cryptoHistory =
+      deps.historyCache && deps.firstBalance
+        ? new CryptoHistorySync({
+            uow: deps.uow,
+            rates: deps.rates,
+            runs: deps.runs,
+            runLog: this.runLog,
+            cache: deps.historyCache,
+            firstBalance: deps.firstBalance,
+            recorder: this.recorder,
+            pairs,
+            workspaces: deps.workspaces,
+            ids: deps.ids,
+            clock: deps.clock,
+            settings: deps.settings,
+            providers: deps.providers,
+          })
+        : null;
+  }
 
   /** `PollMarketRates`: un ciclo de consulta de todos los providers habilitados. */
   async poll(): Promise<ProviderCycleResult[]> {
@@ -100,6 +141,16 @@ export class MarketRateIngestion {
   /** `BackfillHistoricalRates` de un workspace recién creado (consumidor de `identity.WorkspaceCreated.v1`). */
   async backfill(target: Target): Promise<ProviderCycleResult | null> {
     return this.history('BACKFILL', [target]);
+  }
+
+  /** `BackfillCryptoHistory` de un workspace: cierres diarios cripto desde la primera fecha con saldo hasta ayer. */
+  async cryptoBackfill(target: Target): Promise<ProviderCycleResult[]> {
+    return this.cryptoHistory ? this.cryptoHistory.backfill(target) : [];
+  }
+
+  /** `FillCryptoGaps` diario: actualiza la caché de instalación y completa los días cripto faltantes de cada workspace. */
+  async cryptoFillGaps(): Promise<ProviderCycleResult[]> {
+    return this.cryptoHistory ? this.cryptoHistory.fillGaps() : [];
   }
 
   /** `FillRateGaps` diario: relee el histórico y rellena los días sin tasa del provider en todos los workspaces. */
@@ -148,7 +199,7 @@ export class MarketRateIngestion {
     }
     let inserted = 0;
     for (const target of await this.deps.workspaces.list()) {
-      inserted += await this.recordIn(target, samples, {
+      inserted += await this.recorder.recordIn(target, samples, {
         detectAnomalies: true,
         eventPerRate: true,
         correlationId,
@@ -169,6 +220,7 @@ export class MarketRateIngestion {
     const s = this.deps.settings;
     if (marketOf(sample.rateType) === 'PARALLEL') return provider === s.primary || provider === s.fallback;
     if (sample.rateType === 'OFFICIAL') return provider === s.official;
+    if (sample.rateType === 'MARKET') return provider === s.cryptoPrimary || provider === s.cryptoFallback;
     return false;
   }
 
@@ -210,7 +262,7 @@ export class MarketRateIngestion {
     const correlationId = this.deps.ids.next();
     let inserted = 0;
     for (const target of targets) {
-      inserted += await this.recordIn(target, samples, {
+      inserted += await this.recorder.recordIn(target, samples, {
         detectAnomalies: false,
         eventPerRate: false,
         correlationId,
@@ -227,120 +279,18 @@ export class MarketRateIngestion {
     });
   }
 
-  // ------------------------------------------------------------------ registro por workspace
-
-  private recordIn(
-    target: Target,
-    samples: readonly ProviderSample[],
-    options: RecordOptions,
-  ): Promise<number> {
-    if (samples.length === 0) return Promise.resolve(0);
-    const { workspaceId, timeZone } = target;
-    return this.deps.uow.run(workspaceId, async () => {
-      const detector = new AnomalyDetector(this.deps.settings.anomalyThresholdPct);
-      const now = this.deps.clock.now().toString();
-      const daysWithRates = new Map<string, Set<string>>();
-      let inserted = 0;
-      let last: ExchangeRate | null = null;
-      const catalog = new Map<string, Awaited<ReturnType<CurrencyRepository['find']>>>();
-      const currency = async (code: string) => {
-        if (!catalog.has(code)) catalog.set(code, await this.deps.currencies.find(code));
-        return catalog.get(code) ?? null;
-      };
-      for (const sample of samples) {
-        const base = await currency(sample.base);
-        const quote = await currency(sample.quote);
-        if (!base || !quote) continue;
-        const feed = {
-          provider: sample.provider,
-          base: sample.base,
-          quote: sample.quote,
-          rateType: sample.rateType,
-        };
-        const effectiveDate = LocalDate.ofInstant(Instant.parse(sample.asOf), timeZone).toString();
-        if (options.skipDaysWithRates) {
-          const key = `${feed.base}/${feed.quote}/${feed.rateType}`;
-          let days = daysWithRates.get(key);
-          if (!days) {
-            days = await this.deps.rates.providerDays(workspaceId, feed, '0001-01-01', '9999-12-31');
-            daysWithRates.set(key, days);
-          }
-          if (days.has(effectiveDate)) continue;
-        }
-        let anomaly = null;
-        if (options.detectAnomalies) {
-          const baseline = await this.deps.rates.latestAccepted(workspaceId, feed);
-          if (baseline && Date.parse(baseline.rate.snapshot.asOf) < Date.parse(sample.asOf)) {
-            anomaly =
-              detector.assess(sample.value, { rateId: baseline.rate.id, value: baseline.rate.valueText })
-                ?.mark ?? null;
-          }
-        }
-        const rate = ExchangeRate.fromProviderSample(sample, {
-          id: this.deps.ids.next(),
-          workspaceId,
-          base: base.toCurrency(),
-          quote: quote.toCurrency(),
-          effectiveDate,
-          createdAt: now,
-          anomaly,
-        });
-        if (!(await this.deps.rates.insertProviderRate(rate))) continue;
-        inserted++;
-        if (options.eventPerRate) await this.publish(rate, options.correlationId);
-        else last = rate;
-      }
-      if (last) await this.publish(last, options.correlationId);
-      return inserted;
-    });
-  }
-
-  /** `fx.RateRecorded.v1` (aditivo: `provider`, `anomalyFlagged`) con actor `SYSTEM fx-provider:<id>`. */
-  private publish(rate: ExchangeRate, correlationId: string): Promise<void> {
-    const s = rate.snapshot;
-    return this.deps.outbox.append({
-      eventId: this.deps.ids.next(),
-      eventType: FX_EVENTS.rateRecorded.eventType,
-      eventVersion: FX_EVENTS.rateRecorded.eventVersion,
-      occurredAt: this.deps.clock.now().toString(),
-      workspaceId: s.workspaceId as string,
-      aggregateType: 'ExchangeRate',
-      aggregateId: s.id,
-      aggregateVersion: 1,
-      actor: { type: 'SYSTEM', id: `fx-provider:${String(s.provider)}` },
-      correlationId,
-      payload: {
-        rateId: s.id,
-        base: s.rate.base.code,
-        quote: s.rate.quote.code,
-        value: rate.valueText,
-        rateType: s.rateType,
-        source: s.source,
-        sourceLabel: s.sourceLabel,
-        asOf: s.asOf,
-        effectiveDate: s.effectiveDate,
-        supersedesRateId: null,
-        provider: s.provider,
-        anomalyFlagged: s.anomaly !== null,
-      },
-    });
-  }
-
   // ------------------------------------------------------------------ bitácora
 
-  private async failure(
+  private failure(
     provider: FxRateProvider,
     kind: ProviderRunKind,
     startedAt: Instant,
     err: unknown,
   ): Promise<ProviderCycleResult> {
-    if (!(err instanceof ProviderError)) throw err;
-    return this.finish(provider, kind, startedAt, 'FAILED', 0, err, {
-      retryAfterUntil: err.retryAfterUntil,
-    });
+    return this.runLog.failure(provider, kind, startedAt, err);
   }
 
-  private async finish(
+  private finish(
     provider: FxRateProvider,
     kind: ProviderRunKind,
     startedAt: Instant,
@@ -349,24 +299,7 @@ export class MarketRateIngestion {
     error: ProviderError | null,
     extra: Partial<Pick<ProviderRun, 'retryAfterUntil' | 'historyPoints' | 'historyFrom' | 'historyTo'>> = {},
   ): Promise<ProviderCycleResult> {
-    const finishedAt = this.deps.clock.now();
-    await this.deps.runs.record({
-      id: this.deps.ids.next(),
-      provider,
-      kind,
-      startedAt: startedAt.toString(),
-      finishedAt: finishedAt.toString(),
-      outcome,
-      errorCode: error?.code ?? null,
-      httpStatus: error?.httpStatus ?? null,
-      latencyMs: Math.max(0, finishedAt.epochMillis - startedAt.epochMillis),
-      newSamples,
-      retryAfterUntil: extra.retryAfterUntil ?? null,
-      historyPoints: extra.historyPoints ?? null,
-      historyFrom: extra.historyFrom ?? null,
-      historyTo: extra.historyTo ?? null,
-    });
-    return { provider, outcome, newSamples, errorCode: error?.code ?? null };
+    return this.runLog.finish(provider, kind, startedAt, outcome, newSamples, error, extra);
   }
 }
 

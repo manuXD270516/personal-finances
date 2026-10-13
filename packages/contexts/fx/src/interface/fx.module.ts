@@ -9,6 +9,7 @@ import {
   type FxConversionPricingPort,
   type FxQuoteSideRatesPort,
   type FxValuationPort,
+  type RatePairsQuery,
   type ValuationRateDto,
 } from '../contracts/index.js';
 import { FxQueries } from '../application/fx.queries.js';
@@ -16,11 +17,14 @@ import { FxService } from '../application/fx.service.js';
 import { MarketRateIngestion } from '../application/market-rate-ingestion.js';
 import type {
   ActiveWorkspacesPort,
+  FirstBalanceDatePort,
   FxDeps,
   OutboxPort,
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
 import {
+  anomalyThresholdsOf,
+  assetClassPolicyOf,
   DEFAULT_FX_PROVIDER_SETTINGS,
   enabledProviders,
   parseFxProviderSettings,
@@ -29,21 +33,25 @@ import {
   type FxProviderSettings,
 } from '../application/provider-settings.js';
 import { ProviderStatusQueries } from '../application/provider-status.queries.js';
+import { RatePairViews } from '../application/rate-pair-views.js';
+import { RatePairResolver } from '../application/rate-pairs.js';
 import {
   observationFactOf,
   UserConversionObservations,
   type ConversionBackfillSource,
 } from '../application/user-conversion-observations.js';
 import { EXCHANGE_RATE_LIFECYCLE } from '../domain/index.js';
-import type { FxRateProvider, MarketRateProvider, ResolvedRate } from '../domain/index.js';
+import type { CryptoRateProvider, FxRateProvider, PollableProvider, ResolvedRate } from '../domain/index.js';
 import {
   PgCurrencyRepository,
   PgExchangeRateRepository,
   PgFxUnitOfWork,
   PgRateAnomalyReviewRepository,
+  PgRatePairListRepository,
   PgRatePreferenceRepository,
   uuidV7Ids,
 } from '../infrastructure/pg-fx.js';
+import { PgProviderHistoryCache } from '../infrastructure/pg-provider-history.js';
 import { PgProviderRunRepository } from '../infrastructure/pg-provider-runs.js';
 import { DolarApiBoProvider } from '../infrastructure/providers/dolarapi-bo.provider.js';
 import { ParaleloBoProvider } from '../infrastructure/providers/paralelo-bo.provider.js';
@@ -52,7 +60,14 @@ import {
   ProviderHttpClient,
   type HttpTransport,
 } from '../infrastructure/providers/provider-http-client.js';
-import { FX_PROVIDER_STATUS, FX_QUERIES, FX_SERVICE, FxController, toResolvedRateDto } from './fx-http.js';
+import {
+  FX_PROVIDER_STATUS,
+  FX_QUERIES,
+  FX_RATE_PAIR_VIEWS,
+  FX_SERVICE,
+  FxController,
+  toResolvedRateDto,
+} from './fx-http.js';
 
 export interface FxRuntimeOptions {
   readonly pool: Pool;
@@ -78,6 +93,10 @@ export interface FxRuntime {
   readonly queries: FxQueries;
   /** `GetProviderStatus` (solo lectura; nunca llama a un provider). */
   readonly providerStatus: ProviderStatusQueries;
+  /** Pares de tasa automáticos del workspace con su cobertura (`GET/PUT fx-rate-pairs`). */
+  readonly ratePairViews: RatePairViews;
+  /** Lectura pública de los pares configurados (`@pf/fx/contracts` `RatePairsQuery`, para el change 39). */
+  readonly ratePairs: RatePairsQuery;
   /** Puerto in-process para TRANSACTIONS (`@pf/fx/contracts`): referencia y costo de conversiones. */
   readonly pricing: FxConversionPricingPort;
   /** Valoración por lote para REPORTING (`@pf/fx/contracts`, add-basic-dashboard). */
@@ -173,6 +192,7 @@ export function createFxValuation(options: {
     currencies: new PgCurrencyRepository(),
     preferences: new PgRatePreferenceRepository(),
     reviews: new PgRateAnomalyReviewRepository(),
+    pairs: new PgRatePairListRepository(),
     workspaces: unavailable('workspace settings'),
     outbox: unavailable('outbox'),
     audit: unavailable('audit'),
@@ -182,6 +202,10 @@ export function createFxValuation(options: {
     clock: options.clock,
     policy: valuationPolicyOf(settings),
     anomalyThresholdPct: settings.anomalyThresholdPct,
+    anomalyThresholds: anomalyThresholdsOf(settings),
+    assetClasses: assetClassPolicyOf(settings),
+    // Sin acceso a la moneda base del workspace: la lista por defecto se deriva solo con los pares cripto.
+    valuationOnly: true,
     ...(options.windowDays ? { windowDays: options.windowDays } : {}),
   };
   return valuationPort(new FxQueries(deps));
@@ -198,6 +222,7 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
     currencies: new PgCurrencyRepository(),
     preferences: new PgRatePreferenceRepository(),
     reviews: new PgRateAnomalyReviewRepository(),
+    pairs: new PgRatePairListRepository(),
     workspaces: options.workspaces,
     outbox: options.outbox,
     audit: options.audit,
@@ -207,10 +232,19 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
     clock: options.clock,
     policy: valuationPolicyOf(settings),
     anomalyThresholdPct: settings.anomalyThresholdPct,
+    anomalyThresholds: anomalyThresholdsOf(settings),
+    assetClasses: assetClassPolicyOf(settings),
     ...(options.windowDays ? { windowDays: options.windowDays } : {}),
   };
   const service = new FxService(deps);
   const queries = new FxQueries(deps);
+  const ratePairViews = new RatePairViews({
+    uow,
+    rates,
+    pairs: new RatePairResolver(deps),
+    clock: options.clock,
+    settings,
+  });
   return {
     service,
     queries,
@@ -220,7 +254,10 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
       runs: new PgProviderRunRepository(options.pool),
       clock: options.clock,
       settings,
+      pairViews: ratePairViews,
     }),
+    ratePairViews,
+    ratePairs: queries,
     pricing: queries,
     valuation: valuationPort(queries),
     quoteSide: quoteSidePort(queries),
@@ -236,7 +273,7 @@ export interface FxModuleOptions {
   readonly conventions: ApiConventionsOptions;
 }
 
-/** Módulo HTTP de FX (`/currencies`, `/fx-rates*`, `/fx-rate-preferences`, `/fx-providers/status`). */
+/** Módulo HTTP de FX (`/currencies`, `/fx-rates*`, `/fx-rate-preferences`, `/fx-rate-pairs`, `/fx-providers/status`). */
 @Module({})
 export class FxModule {
   static register(options: FxModuleOptions): DynamicModule {
@@ -248,6 +285,7 @@ export class FxModule {
         { provide: FX_SERVICE, useValue: options.runtime.service },
         { provide: FX_QUERIES, useValue: options.runtime.queries },
         { provide: FX_PROVIDER_STATUS, useValue: options.runtime.providerStatus },
+        { provide: FX_RATE_PAIR_VIEWS, useValue: options.runtime.ratePairViews },
       ],
     };
   }
@@ -315,6 +353,22 @@ export const EXCHANGE_RATE_LIFECYCLE_MACHINE: LifecycleMachineDto = EXCHANGE_RAT
 
 // ------------------------------------------------------------------ worker: providers de tasas de mercado
 
+/**
+ * Fábricas de los adapters REALES de providers cripto por id (`CRYPTO_<NOMBRE>`). Vacío a propósito: ningún adapter se
+ * escribe antes de verificar y registrar en ADR-0029 los términos de uso y la licencia de su fuente (NFR-COMP-007,
+ * RISK-023, D225). Cada adapter nuevo se agrega aquí junto con su descriptor `VERIFIED` del dominio.
+ */
+export const CRYPTO_ADAPTER_FACTORIES: Readonly<
+  Record<
+    string,
+    (deps: {
+      readonly http: ProviderHttpClient;
+      readonly clock: Clock;
+      readonly baseUrl: string | undefined;
+    }) => CryptoRateProvider
+  >
+> = Object.freeze({});
+
 /** Colas pg-boss de los providers (design.md decisión 4). */
 export const FX_POLL_QUEUE = 'fx.poll-market-rates';
 export const FX_BACKFILL_QUEUE = 'fx.backfill-historical-rates';
@@ -333,6 +387,16 @@ export interface FxMarketRateJobsOptions {
   /** Workspaces activos (IDENTITY, vía composition root). */
   readonly workspaces: ActiveWorkspacesPort;
   readonly settings: FxProviderSettings;
+  /**
+   * Primera fecha con saldo por moneda del workspace (LEDGER, vía el composition root): base del histórico de cierres
+   * cripto. Sin él no se carga el histórico cripto.
+   */
+  readonly firstBalance?: FirstBalanceDatePort;
+  /**
+   * Adapters de providers cripto inyectados (dobles de prueba). Hasta que ADR-0029 registre los términos de una fuente
+   * no existe ningún adapter real: en producción esta opción no se usa y `CRYPTO_ADAPTER_FACTORIES` está vacío.
+   */
+  readonly cryptoProviders?: Partial<Record<FxRateProvider, CryptoRateProvider>>;
   /** Tests: servidor HTTP local en lugar de los providers reales (nunca red en CI). */
   readonly endpoints?: {
     readonly baseUrls?: Partial<Record<FxRateProvider, string>>;
@@ -362,10 +426,18 @@ export function createFxMarketRateJobs(options: FxMarketRateJobsOptions): FxMark
     ...(options.endpoints?.transport ? { transport: options.endpoints.transport } : {}),
     allowedHosts,
   });
-  const providers: Partial<Record<FxRateProvider, MarketRateProvider>> = {
+  const providers: Partial<Record<FxRateProvider, PollableProvider>> = {
     PARALELO_BO: new ParaleloBoProvider(http, options.clock, urls.PARALELO_BO),
     DOLARAPI_BO: new DolarApiBoProvider(http, urls.DOLARAPI_BO),
   };
+  // Providers cripto: solo los verificados (la configuración rechaza el resto) y con adapter registrado.
+  for (const id of [settings.cryptoPrimary, settings.cryptoFallback]) {
+    if (id === null) continue;
+    const injected = options.cryptoProviders?.[id];
+    const factory = CRYPTO_ADAPTER_FACTORIES[id];
+    if (injected) providers[id] = injected;
+    else if (factory) providers[id] = factory({ http, clock: options.clock, baseUrl: urls[id] });
+  }
   const ingestion = new MarketRateIngestion({
     uow: new PgFxUnitOfWork(options.pool),
     rates: new PgExchangeRateRepository(),
@@ -378,6 +450,9 @@ export function createFxMarketRateJobs(options: FxMarketRateJobsOptions): FxMark
     clock: options.clock,
     settings,
     providers,
+    pairs: new PgRatePairListRepository(),
+    historyCache: new PgProviderHistoryCache(options.pool),
+    ...(options.firstBalance ? { firstBalance: options.firstBalance } : {}),
   });
   return { settings, enabled: enabledProviders(settings).length > 0, ingestion };
 }
@@ -395,4 +470,4 @@ export function providerHostsFor(baseUrls: Partial<Record<FxRateProvider, string
 
 export { FX_AUDIT_POLICY, type FxConversionPricingPort } from '../contracts/index.js';
 export { parseFxProviderSettings, type FxProviderEnv, type FxProviderSettings };
-export type { ActiveWorkspacesPort, OutboxPort, WorkspaceSettingsPort };
+export type { ActiveWorkspacesPort, FirstBalanceDatePort, OutboxPort, WorkspaceSettingsPort };
