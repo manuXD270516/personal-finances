@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Selección de la tasa de valoración con fallback entre providers"
 scenario: "Precio cripto del respaldo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-010", "FR-FX-006"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/crypto-valuation.test.ts
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "staleness", "fallback"]

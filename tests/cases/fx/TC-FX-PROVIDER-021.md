@@ -5,16 +5,21 @@ spec: fx/market-rate-providers
 related_specs: ["audit/audit-trail"]
 requirement: "Pares de tasa configurados por workspace"
 scenario: "El EDITOR agrega ETH"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009", "FR-AUDIT-001"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-pairs.test.ts
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/src/interface/fx-http.test.ts
+  - packages/contexts/fx/test/integration/crypto-rates.int.test.ts
+  - apps/api/test/api/fx-rate-pairs.api.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "rate-pairs", "audit"]

@@ -14,8 +14,10 @@ import {
   type ConversionBackfillSource,
   type UserConversionObservations,
 } from '@pf/fx/interface/fx.module';
+import type { FirstBalanceDateQuery } from '@pf/ledger/contracts';
 import { runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
+import type { FirstBalanceDatePort } from '@pf/fx/interface/fx.module';
 import type { Logger } from '@pf/platform/logging';
 import type { JobQueue } from '@pf/platform/queue';
 import type { ConversionDetailQuery } from '@pf/transactions/contracts';
@@ -28,6 +30,21 @@ export interface FxJobsOptions {
 interface BackfillPayload {
   readonly workspaceId: string;
   readonly timeZone: string;
+  /** Moneda base del workspace (decide su lista de pares por defecto); ausente en jobs encolados antes del cambio. */
+  readonly baseCurrency?: string;
+}
+
+/**
+ * `FirstBalanceDatePort` de FX sobre la consulta pública de LEDGER (add-crypto-rate-providers, D229): primera fecha con
+ * saldo por moneda, en la unidad de trabajo del workspace que abre FX. Sin tocar tablas de LEDGER desde FX.
+ */
+export function firstBalanceDatePort(query: FirstBalanceDateQuery): FirstBalanceDatePort {
+  return {
+    async byCurrency(workspaceId) {
+      const rows = await query.byCurrency({ workspaceId });
+      return new Map(rows.map((r) => [r.currency, r.firstDate] as const));
+    },
+  };
 }
 
 /**
@@ -82,6 +99,11 @@ export async function registerFxMarketRateJobs(
         { code: 'FX_PROVIDER_CONFIG_INVALID', reason: settings.configError },
         'fx market rate providers not started: invalid configuration',
       );
+    } else if (settings.cryptoConfigError) {
+      logger.error(
+        { code: 'FX_PROVIDER_CONFIG_INVALID', reason: settings.cryptoConfigError },
+        'fx crypto rate providers not started: invalid configuration',
+      );
     } else {
       logger.info('fx market rate providers disabled (FX_PROVIDER_* = none)');
     }
@@ -96,18 +118,29 @@ export async function registerFxMarketRateJobs(
 
   await queue.work<BackfillPayload>(FX_BACKFILL_QUEUE, { concurrency: 1 }, async (job) => {
     const result = await asWorker(FX_BACKFILL_QUEUE, () => jobs.ingestion.backfill(job.payload));
-    logger.info({ 'job.queue': FX_BACKFILL_QUEUE, result }, 'fx historical rates backfilled');
+    // Histórico de cierres cripto desde la primera fecha con saldo (D229): sin providers cripto no hace nada.
+    const crypto = await asWorker(FX_BACKFILL_QUEUE, () => jobs.ingestion.cryptoBackfill(job.payload));
+    logger.info({ 'job.queue': FX_BACKFILL_QUEUE, result, crypto }, 'fx historical rates backfilled');
   });
 
   await queue.work<{ trigger: string }>(FX_GAP_FILL_QUEUE, { concurrency: 1 }, async () => {
     const result = await asWorker(FX_GAP_FILL_QUEUE, () => jobs.ingestion.fillGaps());
-    logger.info({ 'job.queue': FX_GAP_FILL_QUEUE, result }, 'fx rate gaps filled');
+    // Caché de instalación de cierres cripto y días faltantes de cada workspace (D229).
+    const crypto = await asWorker(FX_GAP_FILL_QUEUE, () => jobs.ingestion.cryptoFillGaps());
+    logger.info({ 'job.queue': FX_GAP_FILL_QUEUE, result, crypto }, 'fx rate gaps filled');
   });
   if (settings.backfillEnabled) {
     await queue.schedule(FX_GAP_FILL_QUEUE, FX_GAP_FILL_CRON, { trigger: 'cron' }, { tz: FX_GAP_FILL_TZ });
     if (options.gapFillOnStart ?? true) await queue.send(FX_GAP_FILL_QUEUE, { trigger: 'startup' });
   } else {
     await queue.unschedule(FX_GAP_FILL_QUEUE);
+  }
+  if (settings.cryptoConfigError) {
+    // Solo los providers cripto quedan deshabilitados: los de tasa paralela siguen (NFR-COMP-007).
+    logger.error(
+      { code: 'FX_PROVIDER_CONFIG_INVALID', reason: settings.cryptoConfigError },
+      'fx crypto rate providers not started: invalid configuration',
+    );
   }
   logger.info(
     {
@@ -116,6 +149,8 @@ export async function registerFxMarketRateJobs(
       primary: settings.primary,
       fallback: settings.fallback,
       official: settings.official,
+      cryptoPrimary: settings.cryptoPrimary,
+      cryptoFallback: settings.cryptoFallback,
     },
     'fx market rate providers scheduled',
   );
@@ -131,14 +166,19 @@ export async function registerFxMarketRateJobs(
       handler: async (event, ctx) => {
         await jobs.ingestion.seedPreferences(event.workspaceId);
         if (!settings.backfillEnabled) return;
-        const payload = event.payload as { readonly timeZone?: unknown };
+        const payload = event.payload as { readonly timeZone?: unknown; readonly baseCurrency?: unknown };
         const timeZone = typeof payload.timeZone === 'string' ? payload.timeZone : 'America/La_Paz';
+        const baseCurrency = typeof payload.baseCurrency === 'string' ? payload.baseCurrency : undefined;
         await queue.enqueueInTransaction<BackfillPayload>(
           FX_BACKFILL_QUEUE,
           [
             {
               id: event.eventId,
-              payload: { workspaceId: event.workspaceId, timeZone },
+              payload: {
+                workspaceId: event.workspaceId,
+                timeZone,
+                ...(baseCurrency ? { baseCurrency } : {}),
+              },
               correlationId: event.correlationId,
               traceContext: {},
             },

@@ -5,16 +5,17 @@ spec: reporting/net-worth
 related_specs: ["fx/market-rates", "fx/market-rate-providers"]
 requirement: "Patrimonio neto actual en la moneda de reporte"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-005", "FR-FX-006", "FR-FX-014"]
 nfr: []
 invariants: ["INV-001", "INV-002"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["net-worth", "crypto", "cross-rate"]

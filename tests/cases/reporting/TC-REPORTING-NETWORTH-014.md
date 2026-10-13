@@ -5,16 +5,18 @@ spec: reporting/net-worth
 related_specs: ["fx/market-rate-providers"]
 requirement: "Valoración histórica con la tasa de cada fin de mes"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-REPORTING-006", "FR-FX-013"]
 nfr: []
 invariants: ["INV-012"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/net-worth-history.queries.test.ts
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["net-worth", "crypto", "history", "backfill"]

@@ -322,7 +322,7 @@ export async function buildW1(h: Harness, label: string): Promise<W1> {
     await h.user(`kc-ex-${label}-viewer-${randomUUID()}`),
     'VIEWER',
   );
-  await enableCurrencies(h.deps.databaseUrl, { userId: owner.id, workspaceId: ws }, ['USDT']);
+  await enableCurrencies(h.deps.databaseUrl, { userId: owner.id, workspaceId: ws }, ['USDT', 'BTC', 'ETH']);
   const api = w1Api(h, { ws });
 
   const bank = ok(
@@ -358,6 +358,39 @@ export async function buildW1(h: Harness, label: string): Promise<W1> {
       asOf: '2026-11-03T12:00:00Z',
       sourceLabel: 'Paralelo',
     }),
+  );
+  // Pares de tasa configurados y precios MARKET manuales (add-crypto-rate-providers, TC-IDENTITY-EXPORT-013).
+  for (const [asOf, value] of [
+    ['2026-10-01T23:59:59Z', '82000.00'],
+    ['2026-10-12T23:59:59Z', '65000.00'],
+  ] as const) {
+    ok(
+      await api.post(owner, '/fx-rates', {
+        base: 'BTC',
+        quote: 'USDT',
+        value,
+        rateType: 'MARKET',
+        asOf,
+        sourceLabel: 'Precio manual',
+      }),
+    );
+  }
+  ok(
+    await api.put(
+      owner,
+      '/fx-rate-pairs',
+      {
+        mode: 'CUSTOM',
+        pairs: [
+          { base: 'USD', quote: 'BOB' },
+          { base: 'USDT', quote: 'BOB' },
+          { base: 'BTC', quote: 'USDT' },
+          { base: 'ETH', quote: 'USDT' },
+        ],
+      },
+      1,
+    ),
+    200,
   );
   ok(await api.post(owner, '/periods', { through: '2026-12-31' }), 200);
 

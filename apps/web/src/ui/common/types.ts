@@ -326,6 +326,7 @@ export const FX_RATE_TYPES: readonly FxRateType[] = [
   'P2P',
   'BANK',
   'CUSTOM',
+  'MARKET',
 ];
 
 export interface FxRateAnomaly {

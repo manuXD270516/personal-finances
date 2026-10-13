@@ -571,6 +571,38 @@ describe('Importación en un workspace nuevo (ida y vuelta)', () => {
     expect(leaked).toEqual([]);
   });
 
+  it('[TC-IDENTITY-EXPORT-013] la ida y vuelta conserva la lista de pares (cuatro, personalizada) y las tasas MARKET con sus valores y vigencias, sin consultar providers', async () => {
+    const b = w1Api(h, copy);
+    const restoredList = await b.get(w.owner, '/fx-rate-pairs');
+    expect(restoredList.status, JSON.stringify(restoredList.body)).toBe(200);
+    expect(restoredList.body['mode']).toBe('CUSTOM');
+    expect(
+      (restoredList.body['pairs'] as { base: string; quote: string }[]).map((p) => `${p.base}/${p.quote}`),
+    ).toEqual(['USD/BOB', 'USDT/BOB', 'BTC/USDT', 'ETH/USDT']);
+    const original = await w1Api(h, w).get(w.owner, '/fx-rate-pairs');
+    expect(restoredList.body['version']).toBe(original.body['version']);
+    const market = (ws: string) =>
+      asAdmin(
+        h,
+        async (c) =>
+          (
+            await c.query<{ rate: string; as_of: string }>(
+              `SELECT trim_scale(rate)::text AS rate,
+                      to_char(as_of AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS as_of
+                 FROM fx.exchange_rate
+                WHERE workspace_id = $1 AND rate_type = 'MARKET' AND base_currency = 'BTC' ORDER BY as_of`,
+              [ws],
+            )
+          ).rows,
+      );
+    expect(await market(restored)).toEqual(await market(w.ws));
+    expect(await market(restored)).toEqual([
+      { rate: '82000', as_of: '2026-10-01T23:59:59Z' },
+      { rate: '65000', as_of: '2026-10-12T23:59:59Z' },
+    ]);
+    // La importación restaura filas de las tablas del workspace: nunca consulta a un provider (FX_PROVIDER_* = none).
+  });
+
   it('[TC-IDENTITY-EXPORT-012] datos de Phase 2: mes cerrado dos veces, reapertura, template v3, plan, cruce de umbral, aviso y preferencias; sin notificaciones', async () => {
     const b = w1Api(h, copy);
     const periods = await b.get(w.owner, '/periods?limit=100');

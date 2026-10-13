@@ -12,6 +12,7 @@ import type {
   ProviderFeedKey,
   RateAnomalyReviewRepository,
   RateListFilter,
+  RatePairListRepository,
   RatePreference,
   RatePreferenceRepository,
   RatePreferenceSet,
@@ -23,6 +24,8 @@ import {
   CurrencyDefinition,
   DEFAULT_WORKSPACE_CURRENCIES,
   ExchangeRate,
+  type RatePairListState,
+  type RatePairMode,
   type CurrencyKind,
   type FxRateProvider,
   type FxRateSource,
@@ -93,6 +96,19 @@ interface FxDb {
     version: number;
   };
   'fx.rate_preference_set': { workspace_id: string; version: number };
+  'fx.rate_pair_list': {
+    workspace_id: string;
+    mode: RatePairMode;
+    version: number;
+    updated_by: string | null;
+    updated_at: Generated<string>;
+  };
+  'fx.rate_pair': {
+    workspace_id: string;
+    base_currency: string;
+    quote_currency: string;
+    sort_order: number;
+  };
 }
 
 const db = (): Kysely<FxDb> => unitOfWorkKysely<FxDb>();
@@ -426,6 +442,26 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
     return new Set(rows.map((r) => r.day));
   }
 
+  async providerAsOfs(
+    workspaceId: string,
+    feed: ProviderFeedKey,
+    from: string,
+    to: string,
+  ): Promise<Set<string>> {
+    const rows = await db()
+      .selectFrom('fx.exchange_rate')
+      .select(iso('as_of').as('as_of'))
+      .where('workspace_id', '=', workspaceId)
+      .where('provider', '=', feed.provider)
+      .where('base_currency', '=', feed.base)
+      .where('quote_currency', '=', feed.quote)
+      .where('rate_type', '=', feed.rateType)
+      .where('as_of', '>=', from)
+      .where('as_of', '<=', to)
+      .execute();
+    return new Set(rows.map((r) => r.as_of));
+  }
+
   async list(
     _workspaceId: string,
     filter: RateListFilter,
@@ -624,6 +660,76 @@ export class PgRatePreferenceRepository implements RatePreferenceRepository {
             quote_currency: p.quote,
             rate_type: p.rateType,
             version: next,
+          })),
+        )
+        .execute();
+    }
+    return true;
+  }
+}
+
+/**
+ * Lista de pares de tasa automáticos (`fx.rate_pair_list` + `fx.rate_pair`, WS con RLS forzada; D220, D230). Sin fila de
+ * lista = `DEFAULT`, versión 1. El reemplazo es completo con optimistic locking sobre la versión; quitar un par solo
+ * borra su fila aquí (nunca toca `fx.exchange_rate`).
+ */
+export class PgRatePairListRepository implements RatePairListRepository {
+  async get(workspaceId: string, options: { readonly forUpdate?: boolean } = {}): Promise<RatePairListState> {
+    let listQ = db()
+      .selectFrom('fx.rate_pair_list')
+      .select(['mode', 'version'])
+      .where('workspace_id', '=', workspaceId);
+    if (options.forUpdate) listQ = listQ.forUpdate();
+    const list = await listQ.executeTakeFirst();
+    if (!list) return { mode: 'DEFAULT', pairs: [], version: 1 };
+    const rows = await db()
+      .selectFrom('fx.rate_pair')
+      .select(['base_currency', 'quote_currency'])
+      .where('workspace_id', '=', workspaceId)
+      .orderBy('sort_order')
+      .execute();
+    return {
+      mode: list.mode,
+      version: Number(list.version),
+      pairs: rows.map((r) => ({ base: r.base_currency, quote: r.quote_currency })),
+    };
+  }
+
+  async replace(workspaceId: string, next: RatePairListState, expectedVersion: number): Promise<boolean> {
+    const actor = currentRequestContext()?.actor;
+    const updatedBy = actor && actor.type === 'USER' ? actor.userId : null;
+    const k = db();
+    if (expectedVersion === 1) {
+      const inserted = await k
+        .insertInto('fx.rate_pair_list')
+        .values({ workspace_id: workspaceId, mode: next.mode, version: next.version, updated_by: updatedBy })
+        .onConflict((oc) => oc.column('workspace_id').doNothing())
+        .executeTakeFirst();
+      if (Number(inserted.numInsertedOrUpdatedRows ?? 0n) !== 1) return false;
+    } else {
+      const updated = await k
+        .updateTable('fx.rate_pair_list')
+        .set({
+          mode: next.mode,
+          version: next.version,
+          updated_by: updatedBy,
+          updated_at: sql<string>`now()`,
+        })
+        .where('workspace_id', '=', workspaceId)
+        .where('version', '=', expectedVersion)
+        .executeTakeFirst();
+      if (Number(updated.numUpdatedRows) !== 1) return false;
+    }
+    await k.deleteFrom('fx.rate_pair').where('workspace_id', '=', workspaceId).execute();
+    if (next.mode === 'CUSTOM' && next.pairs.length > 0) {
+      await k
+        .insertInto('fx.rate_pair')
+        .values(
+          next.pairs.map((p, i) => ({
+            workspace_id: workspaceId,
+            base_currency: p.base,
+            quote_currency: p.quote,
+            sort_order: i,
           })),
         )
         .execute();

@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Detección de tasas anómalas"
 scenario: "Variación de cripto volátil sobre su umbral"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-010"]
 nfr: []
 invariants: []
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/rate-pairs.test.ts
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/src/interface/fx-http.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "anomaly", "asset-class", "pbt"]

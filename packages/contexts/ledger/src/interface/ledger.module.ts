@@ -10,12 +10,14 @@ import type {
   AccountBalanceHistoryQuery,
   AccountBalancesQuery,
   BalanceQuery,
+  FirstBalanceDateQuery,
   LedgerActivityRangeQuery,
   LedgerOpeningBalanceQuery,
   LedgerOpeningEntriesQuery,
   LedgerPeriodLockPort,
   LedgerPostingPort,
 } from '../contracts/index.js';
+import { PgFirstBalanceDateQuery } from '../infrastructure/pg-first-balance.queries.js';
 import { PgLedgerActivityRangeQuery } from '../infrastructure/pg-activity-range.queries.js';
 import { PgLedgerOpeningBalanceQuery } from '../infrastructure/pg-opening-balance.queries.js';
 import { PgLedgerOpeningEntriesQuery } from '../infrastructure/pg-opening-entries.queries.js';
@@ -56,6 +58,8 @@ export interface LedgerRuntime {
   readonly openingBalance: LedgerOpeningBalanceQuery;
   /** Asientos de apertura por cuenta y rango (Debt, fix-phase-4-gaps: el saldo inicial entra en el ciclo de la tarjeta). */
   readonly openingEntries: LedgerOpeningEntriesQuery;
+  /** Primera fecha con saldo por moneda (FX, add-crypto-rate-providers: histórico de precios cripto). */
+  readonly firstBalanceDates: FirstBalanceDateQuery;
 }
 
 /**
@@ -89,6 +93,7 @@ export function createLedgerRuntime(options: LedgerRuntimeOptions): LedgerRuntim
     activityRange: ledgerActivityRange(),
     openingBalance: ledgerOpeningBalance(),
     openingEntries: new PgLedgerOpeningEntriesQuery(),
+    firstBalanceDates: ledgerFirstBalanceDates(),
   };
 }
 
@@ -106,6 +111,14 @@ export function ledgerOpeningBalance(): LedgerOpeningBalanceQuery {
  */
 export function ledgerActivityRange(): LedgerActivityRangeQuery {
   return new PgLedgerActivityRangeQuery();
+}
+
+/**
+ * `FirstBalanceDateQuery` sin pool propio: corre en la unidad de trabajo del llamador (el job del worker de FX, con el
+ * RLS del workspace ya fijado).
+ */
+export function ledgerFirstBalanceDates(): FirstBalanceDateQuery {
+  return new PgFirstBalanceDateQuery();
 }
 
 export interface LedgerMaintenanceOptions {
@@ -138,6 +151,7 @@ export {
 } from '../application/ledger-maintenance.js';
 export type {
   BalanceQuery,
+  FirstBalanceDateQuery,
   LedgerActivityRangeQuery,
   LedgerOpeningBalanceQuery,
   LedgerOpeningEntriesQuery,

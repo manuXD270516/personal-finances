@@ -1,4 +1,5 @@
 import type { RateAttributionDto, ResolvedRateDto, ValuationRateDto } from '@pf/fx/contracts';
+import { attributionsOf } from '@pf/fx/contracts';
 import {
   currency as makeCurrency,
   dec,
@@ -249,8 +250,7 @@ export class NetWorthHistoryQueries {
       };
     });
     const attributions = new Map<string, RateAttributionDto>();
-    for (const r of allRates.values())
-      if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+    for (const r of allRates.values()) for (const a of attributionsOf(r)) attributions.set(a.provider, a);
     return {
       history: {
         reportingCurrency: reporting.code,

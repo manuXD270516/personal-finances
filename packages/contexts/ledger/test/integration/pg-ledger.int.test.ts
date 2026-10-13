@@ -926,6 +926,43 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
     ).toBeNull();
   });
 
+  it('[TC-FX-PROVIDER-031] FirstBalanceDateQuery (add-crypto-rate-providers 3.3): primera fecha con saldo por moneda en cuentas del usuario; sin movimientos la moneda no figura; aislamiento por workspace', async () => {
+    const w5 = randomUUID();
+    const w6 = randomUUID();
+    await createWorkspace(w5);
+    await createWorkspace(w6);
+    const bank = randomUUID();
+    const wallet = randomUUID();
+    // BTC desde el 2026-03-10; un movimiento posterior en BOB y otro anterior (2026-03-01) que adelanta la fecha de BOB.
+    await post(
+      w5,
+      [userLine(wallet, '0.01500000', 'BTC'), sysLine('INCOME', '-0.01500000', 'BTC', randomUUID())],
+      {
+        entryDate: '2026-03-10',
+      },
+    );
+    await post(w5, [userLine(bank, '-10.00'), sysLine('EXPENSE', '10.00', 'BOB', randomUUID())], {
+      entryDate: '2026-07-01',
+    });
+    await post(w5, [userLine(bank, '-5.00'), sysLine('EXPENSE', '5.00', 'BOB', randomUUID())], {
+      entryDate: '2026-03-01',
+    });
+    const uow = new PgUnitOfWork(app);
+    const first = (ws: string, ctxWs: string) =>
+      asUser(() =>
+        uow.run({ userId: u1, workspaceId: ctxWs }, () =>
+          ledger.firstBalanceDates.byCurrency({ workspaceId: ws }),
+        ),
+      );
+    expect(await first(w5, w5)).toEqual([
+      { currency: 'BOB', firstDate: '2026-03-01' },
+      { currency: 'BTC', firstDate: '2026-03-10' },
+    ]);
+    expect(await first(w6, w6)).toEqual([]);
+    // RLS: con el contexto de w6, los asientos de w5 no existen.
+    expect(await first(w5, w6)).toEqual([]);
+  });
+
   it('[TC-DEBT-CARD-040] LedgerOpeningEntriesQuery (fix-phase-4-gaps 4.1): saldo inicial presentado por cuenta y rango, con aislamiento por workspace', async () => {
     const ws = randomUUID();
     const other = randomUUID();

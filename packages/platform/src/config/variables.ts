@@ -629,6 +629,52 @@ export const VARIABLES = {
     default: 'true',
   }),
 
+  // ── FX: providers de precios cripto (openspec add-crypto-rate-providers, D225–D229) ──
+  // Ninguna fuente cripto se habilita sin la verificación de sus términos de uso y licencia registrada en un ADR
+  // (NFR-COMP-007, RISK-023; ADR-0029): un id sin verificación deja SOLO a los providers cripto deshabilitados.
+  FX_PROVIDER_CRYPTO_PRIMARY: variable(z.string().min(1).max(40), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Provider principal de precios de criptomonedas (`MARKET`, cada cripto frente a USDT): el id de un provider con términos de uso verificados (ADR-0029) o `none` (deshabilitado). Una fuente sin verificación registrada se rechaza: los providers cripto quedan deshabilitados con `FX_PROVIDER_CONFIG_INVALID` y los de tasa paralela siguen funcionando. Por defecto `none` hasta que exista un provider verificado.',
+    default: 'none',
+  }),
+  FX_PROVIDER_CRYPTO_FALLBACK: variable(z.string().min(1).max(40), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Provider de respaldo de precios de criptomonedas, de otro operador que el principal (distinto de él): un id verificado o `none`. Por defecto `none`.',
+    default: 'none',
+  }),
+  FX_STALE_AFTER_MARKET: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Antigüedad a partir de la cual una tasa `MARKET` del provider cripto principal se considera obsoleta (`60m`, D228).',
+    default: '60m',
+  }),
+  FX_STALE_AFTER_MARKET_FALLBACK: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Umbral de obsolescencia propio del provider cripto de respaldo para `MARKET` (`60m`, D228).',
+    default: '60m',
+  }),
+  FX_ANOMALY_THRESHOLD_VOLATILE_PCT: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Variación porcentual (decimal > 0) a partir de la cual una muestra de una criptomoneda volátil queda retenida como anómala (`10`, D228); fiat y estables usan `FX_ANOMALY_THRESHOLD_PCT`.',
+    default: '10',
+  }),
+  FX_STABLECOIN_CODES: variable(z.string().min(1).max(200), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Códigos de las criptomonedas estables, separados por comas (`USDT`): se tratan como fiat para el umbral de anomalía (`FX_ANOMALY_THRESHOLD_PCT`) y como moneda pivote natural de los pares cripto.',
+    default: 'USDT',
+  }),
+  FX_CRYPTO_HISTORY_FROM: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Primer día (`AAAA-MM-DD`, UTC) del histórico de cierres diarios cripto que la instalación pide a los providers (`2020-01-01`, D229): un rango fijo de la instalación, nunca la fecha de un workspace (FR-FX-015). Los workspaces copian de ahí los cierres desde su primera fecha con saldo.',
+    default: '2020-01-01',
+  }),
+
   FX_PROVIDER_PARALELO_BO_URL: variable(httpOrigin, {
     group: 'FX (tasas de mercado)',
     description:
@@ -990,6 +1036,13 @@ const FX_PROVIDERS = [
   'FX_ANOMALY_THRESHOLD_PCT',
   'FX_PROVIDER_TIMEOUT',
   'FX_BACKFILL_ENABLED',
+  'FX_PROVIDER_CRYPTO_PRIMARY',
+  'FX_PROVIDER_CRYPTO_FALLBACK',
+  'FX_STALE_AFTER_MARKET',
+  'FX_STALE_AFTER_MARKET_FALLBACK',
+  'FX_ANOMALY_THRESHOLD_VOLATILE_PCT',
+  'FX_STABLECOIN_CODES',
+  'FX_CRYPTO_HISTORY_FROM',
 ] as const;
 const QUEUE = [
   'JOB_QUEUE_DRIVER',

@@ -5,7 +5,7 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Las consultas a providers no envían datos del usuario"
 scenario: "Solicitudes cripto independientes de los pares configurados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-015"]
 nfr: ["NFR-COMP-001"]
 invariants: []
@@ -14,7 +14,7 @@ type: security
 level: contract
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "privacy"]
@@ -50,4 +50,4 @@ Entonces las solicitudes son las mismas que sin pares cripto
 ```
 
 ## Notas
-
+- Pendiente (2026-10-13): la comparación byte a byte de las solicitudes HTTP espera al adapter real (tarea 4.3). Que los símbolos y los rangos del doble no dependan de los pares ni de las fechas de ningún workspace ya está cubierto en `crypto-rate-providers.test.ts` y la regla estática en `providers.architecture.test.ts`.

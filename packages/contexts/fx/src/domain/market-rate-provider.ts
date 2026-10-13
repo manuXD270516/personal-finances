@@ -1,5 +1,11 @@
 import { dec, DomainError, Instant, type Decimal } from '@pf/shared-kernel';
-import type { FxProviderErrorCode, FxRateProvider, FxRateType } from './fx-types.js';
+import {
+  isCryptoProviderId,
+  type FxFiatRateProvider,
+  type FxProviderErrorCode,
+  type FxRateProvider,
+  type FxRateType,
+} from './fx-types.js';
 
 /** Igual que NUMERIC(38,18) de `fx.exchange_rate.rate`: ≤ 20 dígitos enteros y ≤ 18 decimales, sin signo. */
 const DECIMAL_TEXT = /^(?:0|[1-9]\d{0,19})(?:\.\d{1,18})?$/;
@@ -16,7 +22,7 @@ export interface RateAttribution {
   readonly licenseUrl: string | null;
 }
 
-const ATTRIBUTIONS: Readonly<Record<FxRateProvider, RateAttribution>> = Object.freeze({
+const ATTRIBUTIONS: Readonly<Record<FxFiatRateProvider, RateAttribution>> = Object.freeze({
   PARALELO_BO: Object.freeze({
     provider: 'PARALELO_BO',
     text: 'Fuente: paralelo.bo',
@@ -33,9 +39,22 @@ const ATTRIBUTIONS: Readonly<Record<FxRateProvider, RateAttribution>> = Object.f
   }),
 });
 
-/** Atribución de un provider (CC BY 4.0 para paralelo.bo; cortesía para bo.dolarapi.com). */
+/**
+ * Atribución de un provider (CC BY 4.0 para paralelo.bo; cortesía para bo.dolarapi.com; la de un provider cripto, la
+ * que exijan sus términos según su verificación registrada, tomada de su descriptor).
+ */
 export function attributionOf(provider: FxRateProvider): RateAttribution {
-  return ATTRIBUTIONS[provider];
+  const found = findAttribution(provider);
+  if (!found) throw new RangeError(`unknown provider ${provider}`);
+  return found;
+}
+
+/**
+ * Atribución de un provider o `null` si no está registrado (p. ej. una tasa histórica de un provider cripto cuyo
+ * adapter ya no existe): la API no falla por eso, la tasa se informa sin atribución.
+ */
+export function findAttribution(provider: FxRateProvider): RateAttribution | null {
+  return ATTRIBUTIONS[provider as FxFiatRateProvider] ?? providerDescriptor(provider)?.attribution ?? null;
 }
 
 /**
@@ -155,8 +174,28 @@ export interface ProviderFeed {
   readonly rateType: FxRateType;
 }
 
+/**
+ * Verificación de términos de uso y licencia de una fuente (NFR-COMP-007, RISK-023; D225): sin `VERIFIED` con su fecha
+ * y el ADR que la registra, la configuración no habilita al provider. `REJECTED` = la fuente no califica.
+ */
+export interface ProviderTerms {
+  readonly status: 'VERIFIED' | 'REJECTED' | 'UNVERIFIED';
+  /** Fecha de la verificación (`YYYY-MM-DD`); `null` si aún no se verificó. */
+  readonly verifiedOn: string | null;
+  /** ADR que registra el resultado, la atribución exigida y los límites (p. ej. `ADR-0025`); `null` si no hay. */
+  readonly adr: string | null;
+}
+
+/** Clase de provider: tasa paralela/oficial de Bolivia (Phase 1) o precios spot de criptomonedas (D225). */
+export type ProviderKind = 'PARALLEL' | 'CRYPTO';
+
 export interface ProviderDescriptor {
   readonly id: FxRateProvider;
+  readonly kind: ProviderKind;
+  /** Verificación de términos registrada; la configuración rechaza providers sin `VERIFIED`. */
+  readonly terms: ProviderTerms;
+  /** ¿Publica cierres diarios por rango para el histórico cripto (`CryptoRateProvider.fetchDailyCloses`)? */
+  readonly dailyCloses: boolean;
   /** Feeds de valoración (mediana/punto medio y oficial): los que informa el estado del provider. */
   readonly feeds: readonly ProviderFeed[];
   /**
@@ -172,17 +211,42 @@ export interface ProviderDescriptor {
 }
 
 /**
- * Puerto `MarketRateProvider` (design.md decisión 1): el único contrato del provider que conoce el dominio. Cada
- * adapter es un *anti-corruption layer* que traduce el modelo del tercero a `ProviderSample` y falla con
- * `ProviderError` (nunca devuelve una tasa inválida).
+ * Parte común de todo provider (design.md decisión 1): el único contrato que conoce el dominio. Cada adapter es un
+ * *anti-corruption layer* que traduce el modelo del tercero a `ProviderSample` y falla con `ProviderError` (nunca
+ * devuelve una tasa inválida). Las solicitudes no llevan datos del usuario ni del workspace (FR-FX-015).
  */
-export interface MarketRateProvider {
+export interface PollableProvider {
   descriptor(): ProviderDescriptor;
-  /** Muestras vigentes (una solicitud). */
+  /** Muestras vigentes (una solicitud por ciclo). */
   fetchLatest(): Promise<ProviderSample[]>;
+}
+
+/** Puerto `MarketRateProvider` de la tasa paralela/oficial: añade el histórico diario completo del provider. */
+export interface MarketRateProvider extends PollableProvider {
   /** Histórico diario de días COMPLETOS (vacío si el provider no publica histórico). */
   fetchHistory(): Promise<ProviderSample[]>;
 }
+
+/** Rango de días UTC (`YYYY-MM-DD`, inclusivos) de un histórico cripto, fijado por la instalación (FR-FX-015). */
+export interface DailyCloseRange {
+  readonly from: string;
+  readonly to: string;
+}
+
+/**
+ * Puerto del provider de precios cripto (D225, D226): `fetchLatest` entrega muestras `MARKET` de cada criptomoneda del
+ * catálogo global frente a USDT (precio spot = último precio publicado; `asOf` = instante publicado) y
+ * `fetchDailyCloses` los cierres diarios UTC de días completos del rango pedido, con `asOf` = cierre del día
+ * (`D T23:59:59Z`). Los símbolos y los rangos dependen solo del catálogo y de la configuración de la instalación, nunca
+ * de los pares ni de las fechas de un workspace. Un adapter real solo se escribe tras verificar los términos de su
+ * fuente (ADR-0029); hasta entonces solo existen dobles de prueba.
+ */
+export interface CryptoRateProvider extends PollableProvider {
+  fetchDailyCloses(range: DailyCloseRange): Promise<ProviderSample[]>;
+}
+
+export const isCryptoRateProvider = (p: PollableProvider): p is CryptoRateProvider =>
+  typeof (p as Partial<CryptoRateProvider>).fetchDailyCloses === 'function';
 
 const QUOTE_SIDE_FEEDS: readonly ProviderFeed[] = Object.freeze([
   { base: 'USD', quote: 'BOB', rateType: 'PARALLEL_BUY' as const },
@@ -191,10 +255,20 @@ const QUOTE_SIDE_FEEDS: readonly ProviderFeed[] = Object.freeze([
   { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL_SELL' as const },
 ]);
 
+/** Verificación de ADR-0025 (paralelo.bo CC BY 4.0 y bo.dolarapi.com MIT; 2026-10-02). */
+const PARALLEL_TERMS: ProviderTerms = Object.freeze({
+  status: 'VERIFIED' as const,
+  verifiedOn: '2026-10-02',
+  adr: 'ADR-0025',
+});
+
 /** Catálogo de providers (ADR-0025): feeds, atribución, límite de uso e histórico. Lo exponen los adapters. */
-export const PROVIDER_DESCRIPTORS: Readonly<Record<FxRateProvider, ProviderDescriptor>> = Object.freeze({
+export const PROVIDER_DESCRIPTORS: Readonly<Record<FxFiatRateProvider, ProviderDescriptor>> = Object.freeze({
   PARALELO_BO: Object.freeze({
     id: 'PARALELO_BO',
+    kind: 'PARALLEL' as const,
+    terms: PARALLEL_TERMS,
+    dailyCloses: false,
     feeds: [
       { base: 'USD', quote: 'BOB', rateType: 'PARALLEL' as const },
       { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL' as const },
@@ -206,6 +280,9 @@ export const PROVIDER_DESCRIPTORS: Readonly<Record<FxRateProvider, ProviderDescr
   }),
   DOLARAPI_BO: Object.freeze({
     id: 'DOLARAPI_BO',
+    kind: 'PARALLEL' as const,
+    terms: PARALLEL_TERMS,
+    dailyCloses: false,
     feeds: [
       { base: 'USD', quote: 'BOB', rateType: 'PARALLEL' as const },
       { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL' as const },
@@ -218,3 +295,36 @@ export const PROVIDER_DESCRIPTORS: Readonly<Record<FxRateProvider, ProviderDescr
     history: false,
   }),
 });
+
+/**
+ * Registro de descriptores de providers cripto. Los ids y descriptores reales (con su verificación de términos) se
+ * declaran aquí tras ADR-0029; hasta entonces el registro está vacío y solo los tests registran dobles
+ * (`registerProviderDescriptor`, que devuelve su baja). Nunca se enciende un provider sin `terms.status = VERIFIED`
+ * (`parseFxProviderSettings`).
+ */
+const registered = new Map<string, ProviderDescriptor>();
+
+/** Registra un descriptor (dobles de prueba o, tras ADR-0029, adapters reales); devuelve la función que lo da de baja. */
+export function registerProviderDescriptor(descriptor: ProviderDescriptor): () => void {
+  if (!isCryptoProviderId(descriptor.id)) {
+    throw new RangeError(`crypto provider ids must match CRYPTO_<NAME>: ${descriptor.id}`);
+  }
+  registered.set(descriptor.id, descriptor);
+  return () => {
+    if (registered.get(descriptor.id) === descriptor) registered.delete(descriptor.id);
+  };
+}
+
+/** Descriptor de un provider conocido (los de Bolivia y los cripto registrados); `null` si no existe. */
+export function providerDescriptor(provider: string): ProviderDescriptor | null {
+  return (
+    (PROVIDER_DESCRIPTORS as Readonly<Record<string, ProviderDescriptor>>)[provider] ??
+    registered.get(provider) ??
+    null
+  );
+}
+
+/** Descriptores de los providers cripto registrados. */
+export function registeredCryptoDescriptors(): ProviderDescriptor[] {
+  return [...registered.values()];
+}

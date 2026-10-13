@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/export/v1/rate-pairs.schema.json",
+  "title": "pfos-export v1 — rate-pairs",
+  "description": "Registro de la sección «rate-pairs» (tabla fx.rate_pair, contexto fx). Montos como texto decimal exacto; instantes ISO-8601 UTC.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_id",
+    "base_currency",
+    "quote_currency",
+    "sort_order"
+  ],
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "base_currency": {
+      "type": "string"
+    },
+    "quote_currency": {
+      "type": "string"
+    },
+    "sort_order": {
+      "type": "integer"
+    }
+  },
+  "x-pfos-table": "fx.rate_pair",
+  "x-pfos-context": "fx"
+}

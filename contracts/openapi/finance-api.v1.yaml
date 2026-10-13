@@ -3347,7 +3347,7 @@ paths:
         - name: provider
           in: query
           description: Filter provider rates by provider (fx/market-rate-providers)
-          schema: { $ref: '#/components/schemas/FxRateProvider' }
+          schema: { $ref: '#/components/schemas/FxRateProviderInput' }
       responses:
         '200':
           description: Fx rates page
@@ -3758,6 +3758,93 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'VALIDATION_FAILED (duplicate pair), CURRENCY_NOT_ENABLED.'
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/fx-rate-pairs:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [FX]
+      operationId: getFxRatePairs
+      summary: Automatic rate pairs of the workspace (the list it fixed or the default one) with their coverage by providers
+      description: |
+        Pairs whose rates the scheduled process records automatically for this workspace (`DEFAULT`: each enabled fiat
+        or stable currency against the workspace base currency, each enabled volatile crypto against USDT and, if there
+        is any, USDT against the base currency; `CUSTOM`: the list the workspace fixed). `coverage` is `MANUAL_ONLY` when
+        no enabled provider publishes the pair. VIEWER+.
+      x-openspec-capability: fx/market-rate-providers
+      x-required-role: VIEWER
+      responses:
+        '200':
+          description: Automatic rate pairs
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRatePairList' }
+              examples:
+                defaultList:
+                  summary: Default list of a BOB workspace with BOB, USD, USDT and BTC enabled
+                  value:
+                    mode: DEFAULT
+                    version: 1
+                    pairs:
+                      - { base: USD, quote: BOB, assetClass: FIAT, defaultRateType: PARALLEL, coverage: AUTOMATIC, providers: [PARALELO_BO, DOLARAPI_BO] }
+                      - { base: USDT, quote: BOB, assetClass: STABLE, defaultRateType: PARALLEL, coverage: AUTOMATIC, providers: [PARALELO_BO, DOLARAPI_BO] }
+                      - { base: BTC, quote: USDT, assetClass: VOLATILE_CRYPTO, defaultRateType: MARKET, coverage: MANUAL_ONLY, providers: [] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [FX]
+      operationId: replaceFxRatePairs
+      summary: Fix the automatic rate pairs of the workspace or go back to the default list
+      description: |
+        `CUSTOM` stores the given list; `DEFAULT` removes the explicit list (the previous one stays in the audit trail).
+        Each pair needs its base currency enabled in the workspace (`CURRENCY_NOT_ENABLED`) and its quote currency to be
+        the workspace base currency or USDT, base different from quote and no repeated pairs (`VALIDATION_FAILED`).
+        Removing a pair only stops recording it: its history is never touched. OWNER and EDITOR; audited with the
+        previous and the new list; no state machine.
+      x-openspec-capability: fx/market-rate-providers
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FxRatePairListInput' }
+            examples:
+              addEth:
+                summary: Add ETH/USDT to the list
+                value:
+                  mode: CUSTOM
+                  pairs:
+                    - { base: USD, quote: BOB }
+                    - { base: USDT, quote: BOB }
+                    - { base: BTC, quote: USDT }
+                    - { base: ETH, quote: USDT }
+      responses:
+        '200':
+          description: Saved automatic rate pairs
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FxRatePairList' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (body does not match the contract, quote not allowed, repeated pair, more than 50).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'CURRENCY_NOT_ENABLED (the base currency of a pair is not enabled in the workspace).'
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -12861,23 +12948,33 @@ components:
         Rate types of FR-FX-002 (docs/31 D13). PARALLEL_BUY / PARALLEL_SELL are the published parallel-market buy and
         sell quotes from the trader's perspective (BUY = price paid to buy the base currency, SELL = price received
         when selling it), recorded by market rate providers in addition to the PARALLEL median/midpoint; they are only
-        used for valuation when explicitly requested (rateType or pair preference). Open set — clients must handle
-        unknown values; the server rejects unknown values in requests with VALIDATION_FAILED.
+        used for valuation when explicitly requested (rateType or pair preference). MARKET is the spot market price of
+        a cryptocurrency against USDT (add-crypto-rate-providers, D226) and the default type of the volatile crypto
+        pairs; PARALLEL keeps its meaning of the parallel dollar. Open set — clients must handle unknown values; the
+        server rejects unknown values in requests with VALIDATION_FAILED.
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de tipos crece de forma
       # aditiva (PARALLEL_BUY / PARALLEL_SELL, decisión del owner 2026-10-03; docs/10 §9.1).
-      x-extensible-enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL]
+      x-extensible-enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL, MARKET]
     FxRateTypeInput:
       type: string
       description: >-
         FxRateType accepted in requests (closed set; responses use the open set `FxRateType`). PARALLEL_BUY /
-        PARALLEL_SELL added by the owner decision of 2026-10-03.
-      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL]
+        PARALLEL_SELL added by the owner decision of 2026-10-03; MARKET by add-crypto-rate-providers (D226).
+      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL, MARKET]
     FxRateSource:
       type: string
       enum: [MANUAL, PROVIDER, USER_CONVERSION]
     FxRateProvider:
       type: string
-      description: Market rate providers (fx/market-rate-providers, ADR-0025)
+      description: >-
+        Market rate providers (fx/market-rate-providers, ADR-0025). Open set — clients must handle unknown values:
+        the crypto price providers (`CRYPTO_<NAME>`) are added, once their terms of use are verified and recorded
+        (ADR-0029, NFR-COMP-007), as additive values.
+      # x-extensible-enum (como FxRateType): los providers cripto verificados se agregan de forma aditiva.
+      x-extensible-enum: [PARALELO_BO, DOLARAPI_BO]
+    FxRateProviderInput:
+      type: string
+      description: FxRateProvider accepted in requests (closed set; responses use the open set `FxRateProvider`).
       enum: [PARALELO_BO, DOLARAPI_BO]
     RateAttribution:
       type: object
@@ -12987,6 +13084,29 @@ components:
             to: { type: [string, 'null'], format: date }
             lastRunAt: { type: [string, 'null'], format: date-time }
         attribution: { $ref: '#/components/schemas/RateAttribution' }
+    FxRatePairAssetClass:
+      type: string
+      description: Asset class of the base currency of a pair (drives the default rate type and the anomaly threshold)
+      enum: [FIAT, STABLE, VOLATILE_CRYPTO]
+    FxRatePairCoverage:
+      type: string
+      description: AUTOMATIC when an enabled provider publishes the pair; MANUAL_ONLY otherwise (only manual rates)
+      enum: [AUTOMATIC, MANUAL_ONLY]
+    FxRatePairStatus:
+      type: object
+      description: Coverage and freshness of the last automatic rate of a configured pair of the workspace
+      additionalProperties: false
+      required: [base, quote, coverage, providers, lastAutomaticRateAt, ageSeconds, stale]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        coverage: { $ref: '#/components/schemas/FxRatePairCoverage' }
+        providers:
+          type: array
+          items: { $ref: '#/components/schemas/FxRateProvider' }
+        lastAutomaticRateAt: { type: [string, 'null'], format: date-time }
+        ageSeconds: { type: [integer, 'null'], minimum: 0 }
+        stale: { type: boolean, description: 'True when the last automatic rate is stale or there is none' }
     FxProviderStatusList:
       type: object
       additionalProperties: false
@@ -12995,6 +13115,59 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/FxProviderStatus' }
+        pairs:
+          type: array
+          description: >-
+            Configured pairs of the workspace with their coverage and the age of their last automatic rate
+            (add-crypto-rate-providers); optional for clients of earlier versions.
+          items: { $ref: '#/components/schemas/FxRatePairStatus' }
+    FxRatePairInput:
+      type: object
+      additionalProperties: false
+      required: [base, quote]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+    FxRatePairListInput:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      description: Request body of replaceFxRatePairs. `pairs` is required with `CUSTOM` (at most 50) and ignored with `DEFAULT`.
+      properties:
+        mode:
+          type: string
+          enum: [DEFAULT, CUSTOM]
+        pairs:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/FxRatePairInput' }
+    FxRatePair:
+      type: object
+      additionalProperties: false
+      required: [base, quote, assetClass, defaultRateType, coverage, providers]
+      properties:
+        base: { $ref: '#/components/schemas/CurrencyCode' }
+        quote: { $ref: '#/components/schemas/CurrencyCode' }
+        assetClass: { $ref: '#/components/schemas/FxRatePairAssetClass' }
+        defaultRateType:
+          $ref: '#/components/schemas/FxRateType'
+          description: Rate type used to value the pair when the workspace has no preference for it (MARKET for volatile crypto against USDT, PARALLEL otherwise)
+        coverage: { $ref: '#/components/schemas/FxRatePairCoverage' }
+        providers:
+          type: array
+          items: { $ref: '#/components/schemas/FxRateProvider' }
+    FxRatePairList:
+      type: object
+      additionalProperties: false
+      required: [mode, version, pairs]
+      properties:
+        mode:
+          type: string
+          enum: [DEFAULT, CUSTOM]
+        version: { type: integer, minimum: 1, description: Same value as the ETag }
+        pairs:
+          type: array
+          items: { $ref: '#/components/schemas/FxRatePair' }
     FxRate:
       type: object
       description: Immutable historical rate; 1 `base` = `value` `quote`. Corrections create a superseding version.

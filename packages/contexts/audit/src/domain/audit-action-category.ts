@@ -66,6 +66,8 @@ export const DATA_ACTION_ENTITIES = [
   'goals.reservation',
   'goals.suggestion',
   'fx.rate_preferences',
+  // add-crypto-rate-providers (Phase 5): lista de pares de tasa automáticos del workspace.
+  'fx.rate_pairs',
   'identity.demo',
   'identity.user',
   'identity.workspace',

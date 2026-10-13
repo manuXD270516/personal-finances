@@ -1,4 +1,5 @@
 import type { RateAttributionDto, ResolvedRateDto, ValuationRateDto } from '@pf/fx/contracts';
+import { attributionsOf } from '@pf/fx/contracts';
 import {
   currency as makeCurrency,
   dec,
@@ -209,7 +210,7 @@ export class ConversionCostQueries {
     });
 
     const attributions = new Map<string, RateAttributionDto>();
-    for (const r of used.values()) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+    for (const r of used.values()) for (const a of attributionsOf(r)) attributions.set(a.provider, a);
     return {
       reportingCurrency: reporting.code,
       grouping,

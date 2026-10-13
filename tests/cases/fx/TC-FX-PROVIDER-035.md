@@ -5,16 +5,20 @@ spec: fx/market-rate-providers
 related_specs: ["reporting/net-worth"]
 requirement: "Atribución visible de la fuente de la tasa"
 scenario: "Bitcoin valorado con una tasa cruzada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-014"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/src/interface/fx-http.test.ts
+  - packages/contexts/reporting/src/application/report-summary.queries.test.ts
+  - apps/web/src/ui/fx/rate-pairs.test.tsx
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "attribution", "cross-rate"]

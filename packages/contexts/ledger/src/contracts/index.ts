@@ -215,6 +215,18 @@ export interface LedgerActivityRangeQuery {
 }
 
 /**
+ * Primera fecha con saldo por moneda del workspace (openspec add-crypto-rate-providers, decisión 6; D229): la fecha de
+ * negocio más antigua de un posting sobre una cuenta del usuario (activo o pasivo) en cada moneda. FX la usa para cargar
+ * el histórico de precios cripto desde esa fecha; sin movimientos en una moneda, esa moneda no figura. Aditivo; sin
+ * efectos; en la unidad de trabajo del llamador (RLS del workspace).
+ */
+export interface FirstBalanceDateQuery {
+  byCurrency(input: {
+    readonly workspaceId: string;
+  }): Promise<readonly { readonly currency: string; readonly firstDate: string }[]>;
+}
+
+/**
  * Saldo inicial de una cuenta del usuario (openspec add-reconciliation, design decisión 1): Σ postings con signo
  * contable (débito +, crédito −) sobre la cuenta contable de la cuenta del usuario de sus asientos de apertura
  * (`entry_type = OPENING`) con fecha ≤ `asOf`. El asiento de apertura no tiene fila en `txn`, así que la reconciliación
@@ -254,6 +266,7 @@ export interface OpeningEntryDto {
   readonly amount: MoneyDto;
 }
 
+export const FIRST_BALANCE_DATE_QUERY = Symbol.for('pf.ledger.FirstBalanceDateQuery');
 export const LEDGER_POSTING_PORT = Symbol.for('pf.ledger.LedgerPostingPort');
 export const LEDGER_PERIOD_LOCK_PORT = Symbol.for('pf.ledger.LedgerPeriodLockPort');
 export const BALANCE_QUERY = Symbol.for('pf.ledger.BalanceQuery');

@@ -1,5 +1,6 @@
 import type { AccountSummaryDto } from '@pf/accounts/contracts';
 import type { RateAttributionDto, ResolvedRateDto, ValuationRateDto } from '@pf/fx/contracts';
+import { attributionsOf } from '@pf/fx/contracts';
 import {
   currency as makeCurrency,
   DomainError,
@@ -302,8 +303,7 @@ export class SpendableQueries {
       windowDays,
     });
     const attributions = new Map<string, RateAttributionDto>();
-    for (const r of calculation.ratesUsed)
-      if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+    for (const r of calculation.ratesUsed) for (const a of attributionsOf(r)) attributions.set(a.provider, a);
     const spendable: SpendableDto = {
       ...calculation.summary,
       ...calculation.detail,

@@ -14,6 +14,7 @@ import {
   PgExchangeRateRepository,
   PgFxUnitOfWork,
   PgRateAnomalyReviewRepository,
+  PgRatePairListRepository,
   PgRatePreferenceRepository,
   uuidV7Ids,
 } from '../../src/infrastructure/pg-fx.js';
@@ -102,6 +103,7 @@ function ingestion(workspaces: () => string[] = () => [...active]) {
     rates: new PgExchangeRateRepository(),
     currencies: new PgCurrencyRepository(),
     preferences: new PgRatePreferenceRepository(),
+    pairs: new PgRatePairListRepository(),
     runs: new PgProviderRunRepository(worker),
     workspaces: {
       list: async () => workspaces().map((workspaceId) => ({ workspaceId, timeZone: 'America/La_Paz' })),
@@ -293,6 +295,7 @@ describe('PollMarketRates sobre PostgreSQL (fx/market-rate-providers)', () => {
       rates: new PgExchangeRateRepository(),
       currencies: new PgCurrencyRepository(),
       preferences: new PgRatePreferenceRepository(),
+      pairs: new PgRatePairListRepository(),
       reviews: new PgRateAnomalyReviewRepository(),
       workspaces: { settingsOf: async () => ({ baseCurrency: 'BOB', timeZone: 'America/La_Paz' }) },
       outbox: { append: async () => undefined },

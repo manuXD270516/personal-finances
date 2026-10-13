@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Histórico diario de precios cripto desde la primera fecha con saldo"
 scenario: "Movimiento con fecha anterior"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-013"]
 nfr: []
 invariants: ["INV-011"]
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/crypto-rates.int.test.ts
+  - packages/contexts/ledger/test/integration/pg-ledger.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "gap-fill"]

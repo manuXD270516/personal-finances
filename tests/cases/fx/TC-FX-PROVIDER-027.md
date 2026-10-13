@@ -5,7 +5,7 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Precios de mercado de criptomonedas desde providers de exchange"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009", "FR-FX-010"]
 nfr: ["NFR-COMP-007"]
 invariants: []
@@ -14,7 +14,7 @@ type: integration
 level: contract
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "adapter", "fallback", "no-network"]
@@ -49,4 +49,4 @@ Entonces se registran las tasas MARKET del respaldo
 ```
 
 ## Notas
-
+- Pendiente (2026-10-13): espera al adapter cripto de respaldo real (tarea 4.2), que depende de ADR-0029 y de la decisión del owner sobre su exchange. El fallback entre providers cripto ya se prueba con dobles (TC-FX-PROVIDER-033).

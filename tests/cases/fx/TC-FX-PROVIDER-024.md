@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Registro automático solo para los pares configurados"
 scenario: "Workspace sin USD/BOB"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/application/crypto-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/crypto-rates.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "rate-pairs", "ingestion"]

@@ -1,4 +1,5 @@
 import type { RateAttributionDto, ResolvedRateDto, ValuationRateDto } from '@pf/fx/contracts';
+import { attributionsOf } from '@pf/fx/contracts';
 import {
   currency as makeCurrency,
   DomainError,
@@ -250,7 +251,7 @@ export class UpcomingPaymentsQueries {
     );
     const used = collector.used();
     const attributions = new Map<string, RateAttributionDto>();
-    for (const r of used) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+    for (const r of used) for (const a of attributionsOf(r)) attributions.set(a.provider, a);
 
     const upcoming: UpcomingPaymentsDto = {
       window: { from: today, to: through, days: window.days },

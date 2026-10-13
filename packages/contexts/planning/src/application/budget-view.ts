@@ -1,4 +1,5 @@
 import type { RateAttributionDto, ResolvedRateDto } from '@pf/fx/contracts';
+import { attributionsOf } from '@pf/fx/contracts';
 import type { Money } from '@pf/shared-kernel';
 import type {
   BudgetLineKindDto,
@@ -213,7 +214,7 @@ export function toBudgetDto(
   const ratesUsed = [...view.ratesUsed];
   const known = new Set(ratesUsed.map(rateKey));
   for (const r of goals.ratesUsed) if (!known.has(rateKey(r))) ratesUsed.push(r);
-  for (const r of ratesUsed) if (r.attribution) attributions.set(r.attribution.provider, r.attribution);
+  for (const r of ratesUsed) for (const a of attributionsOf(r)) attributions.set(a.provider, a);
   const t = view.totals;
   return {
     id: snapshot.id,

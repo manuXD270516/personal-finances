@@ -1,5 +1,13 @@
 import { dec } from '@pf/shared-kernel';
-import type { FxRateProvider, ValuationPolicy } from '../domain/index.js';
+import {
+  AssetClassPolicy,
+  DEFAULT_STABLECOIN_CODES,
+  isCryptoProviderId,
+  providerDescriptor,
+  type AnomalyThresholds,
+  type FxRateProvider,
+  type ValuationPolicy,
+} from '../domain/index.js';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -18,6 +26,14 @@ export interface FxProviderEnv {
   readonly FX_ANOMALY_THRESHOLD_PCT?: string;
   readonly FX_PROVIDER_TIMEOUT?: string;
   readonly FX_BACKFILL_ENABLED?: string;
+  // add-crypto-rate-providers (D225, D228, D229)
+  readonly FX_PROVIDER_CRYPTO_PRIMARY?: string;
+  readonly FX_PROVIDER_CRYPTO_FALLBACK?: string;
+  readonly FX_STALE_AFTER_MARKET?: string;
+  readonly FX_STALE_AFTER_MARKET_FALLBACK?: string;
+  readonly FX_ANOMALY_THRESHOLD_VOLATILE_PCT?: string;
+  readonly FX_STABLECOIN_CODES?: string;
+  readonly FX_CRYPTO_HISTORY_FROM?: string;
 }
 
 /** Configuración validada de los providers (design.md decisión 5). */
@@ -39,6 +55,27 @@ export interface FxProviderSettings {
   readonly backfillEnabled: boolean;
   /** `FX_PROVIDER_CONFIG_INVALID`: los providers no se inician y el estado informa el error. */
   readonly configError: string | null;
+  /** Provider cripto principal (`CRYPTO_<NOMBRE>` con términos verificados) o `null` (`none`). */
+  readonly cryptoPrimary: FxRateProvider | null;
+  /** Provider cripto de respaldo, de otro operador, o `null`. */
+  readonly cryptoFallback: FxRateProvider | null;
+  /** Obsolescencia de `MARKET` del principal cripto (60 min, D228) y propia del respaldo cripto (60 min). */
+  readonly staleAfterMarketMs: number;
+  readonly staleAfterMarketFallbackMs: number;
+  /** Umbral de anomalía de la cripto volátil (10 %, D228); `anomalyThresholdPct` es el de fiat y estables (5 %). */
+  readonly anomalyThresholdVolatilePct: string;
+  /** Criptomonedas tratadas como estables (`USDT`): umbral de fiat y pivote natural. */
+  readonly stablecoinCodes: readonly string[];
+  /** Inicio (`YYYY-MM-DD`, UTC) del histórico de cierres cripto de la instalación (D229; FR-FX-015). */
+  readonly cryptoHistoryFrom: string;
+  /**
+   * Error de configuración SOLO de los providers cripto (provider sin verificación de términos registrada, duración o
+   * umbral inválidos): los providers cripto quedan deshabilitados y el estado informa `FX_PROVIDER_CONFIG_INVALID`;
+   * los de tasa paralela y el resto del sistema siguen funcionando.
+   */
+  readonly cryptoConfigError: string | null;
+  /** Ids de providers cripto nombrados por la configuración (también si no pudieron habilitarse). */
+  readonly cryptoRequested: readonly FxRateProvider[];
 }
 
 export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
@@ -53,6 +90,14 @@ export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
   FX_ANOMALY_THRESHOLD_PCT: '5',
   FX_PROVIDER_TIMEOUT: '10s',
   FX_BACKFILL_ENABLED: 'true',
+  // Hasta que exista un provider cripto verificado (ADR-0029) el default es `none`.
+  FX_PROVIDER_CRYPTO_PRIMARY: 'none',
+  FX_PROVIDER_CRYPTO_FALLBACK: 'none',
+  FX_STALE_AFTER_MARKET: '60m',
+  FX_STALE_AFTER_MARKET_FALLBACK: '60m',
+  FX_ANOMALY_THRESHOLD_VOLATILE_PCT: '10',
+  FX_STABLECOIN_CODES: 'USDT',
+  FX_CRYPTO_HISTORY_FROM: '2020-01-01',
 };
 
 const PROVIDER_VALUES: Readonly<Record<string, FxRateProvider | null>> = {
@@ -94,8 +139,39 @@ const disabled = (
   primary: null,
   fallback: null,
   official: null,
+  // Una configuración general inválida detiene todos los providers, también los cripto.
+  cryptoPrimary: null,
+  cryptoFallback: null,
   configError: error,
 });
+
+/**
+ * Provider cripto de una variable: `none` o un id `CRYPTO_<NOMBRE>` registrado cuya verificación de términos de uso
+ * esté registrada como `VERIFIED` con su fecha y su ADR (NFR-COMP-007, RISK-023; D225). Cualquier otro caso es un error
+ * de configuración que deshabilita solo a los providers cripto.
+ */
+function cryptoProvider(name: string, value: string, errors: string[]): FxRateProvider | null {
+  const v = value.trim();
+  if (v.toLowerCase() === 'none') return null;
+  const id = v.toUpperCase();
+  if (!isCryptoProviderId(id)) {
+    errors.push(`${name} must be none or a verified crypto provider id (CRYPTO_<NAME>)`);
+    return null;
+  }
+  const descriptor = providerDescriptor(id);
+  if (!descriptor || descriptor.kind !== 'CRYPTO') {
+    errors.push(`${name}: provider ${id} has no registered adapter and terms verification (ADR-0029)`);
+    return null;
+  }
+  const { terms } = descriptor;
+  if (terms.status !== 'VERIFIED' || !terms.verifiedOn || !terms.adr) {
+    errors.push(
+      `${name}: provider ${id} cannot be enabled, its terms of use are ${terms.status === 'REJECTED' ? 'rejected' : 'not verified'} (NFR-COMP-007)`,
+    );
+    return null;
+  }
+  return id;
+}
 
 /**
  * Valida las variables `FX_*` (design.md decisión 5). Un error NO detiene el proceso: deja los providers
@@ -145,6 +221,51 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
   const backfill = raw.FX_BACKFILL_ENABLED.trim().toLowerCase();
   if (!['true', 'false'].includes(backfill)) errors.push('FX_BACKFILL_ENABLED must be true or false');
 
+  // Providers cripto (add-crypto-rate-providers): su error deshabilita solo a los cripto.
+  const cryptoErrors: string[] = [];
+  let cryptoPrimary = cryptoProvider(
+    'FX_PROVIDER_CRYPTO_PRIMARY',
+    raw.FX_PROVIDER_CRYPTO_PRIMARY,
+    cryptoErrors,
+  );
+  let cryptoFallback = cryptoProvider(
+    'FX_PROVIDER_CRYPTO_FALLBACK',
+    raw.FX_PROVIDER_CRYPTO_FALLBACK,
+    cryptoErrors,
+  );
+  if (cryptoPrimary !== null && cryptoPrimary === cryptoFallback) {
+    cryptoErrors.push('FX_PROVIDER_CRYPTO_FALLBACK must differ from FX_PROVIDER_CRYPTO_PRIMARY');
+  }
+  const cryptoDuration = (name: keyof FxProviderEnv) => {
+    const ms = parseDuration(raw[name]);
+    if (ms === null || ms <= 0) cryptoErrors.push(`${name} must be a duration like 30s, 15m or 48h`);
+    return ms ?? 0;
+  };
+  const staleAfterMarketMs = cryptoDuration('FX_STALE_AFTER_MARKET');
+  const staleAfterMarketFallbackMs = cryptoDuration('FX_STALE_AFTER_MARKET_FALLBACK');
+  const volatileThreshold = raw.FX_ANOMALY_THRESHOLD_VOLATILE_PCT.trim();
+  if (!/^\d{1,4}(\.\d{1,4})?$/.test(volatileThreshold) || dec(volatileThreshold).lte(0)) {
+    cryptoErrors.push('FX_ANOMALY_THRESHOLD_VOLATILE_PCT must be a decimal > 0');
+  }
+  const stablecoinCodes = raw.FX_STABLECOIN_CODES.split(',')
+    .map((c) => c.trim().toUpperCase())
+    .filter((c) => c !== '');
+  if (stablecoinCodes.length === 0 || !stablecoinCodes.every((c) => /^[A-Z0-9]{2,16}$/.test(c))) {
+    cryptoErrors.push('FX_STABLECOIN_CODES must be a comma-separated list of currency codes');
+  }
+  const historyFrom = raw.FX_CRYPTO_HISTORY_FROM.trim();
+  if (!isCalendarDate(historyFrom)) {
+    cryptoErrors.push('FX_CRYPTO_HISTORY_FROM must be a date like 2020-01-01');
+  }
+  const cryptoRequested = [raw.FX_PROVIDER_CRYPTO_PRIMARY, raw.FX_PROVIDER_CRYPTO_FALLBACK]
+    .map((v) => v.trim().toUpperCase())
+    .filter((v): v is FxRateProvider => isCryptoProviderId(v));
+  const cryptoConfigError = cryptoErrors.length > 0 ? cryptoErrors.join('; ') : null;
+  if (cryptoConfigError) {
+    cryptoPrimary = null;
+    cryptoFallback = null;
+  }
+
   const base = {
     pollIntervalMs,
     pollCron,
@@ -155,9 +276,24 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
     anomalyThresholdPct: errors.length === 0 ? dec(threshold).toFixed() : '5',
     timeoutMs: timeoutMs || 10_000,
     backfillEnabled: backfill === 'true',
+    cryptoPrimary,
+    cryptoFallback,
+    staleAfterMarketMs: staleAfterMarketMs || 60 * MINUTE_MS,
+    staleAfterMarketFallbackMs: staleAfterMarketFallbackMs || 60 * MINUTE_MS,
+    anomalyThresholdVolatilePct: cryptoConfigError === null ? dec(volatileThreshold).toFixed() : '10',
+    stablecoinCodes: cryptoConfigError === null ? stablecoinCodes : [...DEFAULT_STABLECOIN_CODES],
+    cryptoHistoryFrom: cryptoConfigError === null ? historyFrom : '2020-01-01',
+    cryptoConfigError,
+    cryptoRequested: [...new Set(cryptoRequested)],
   };
   if (errors.length > 0) return disabled(base, errors.join('; '));
   return { ...base, primary, fallback, official, configError: null };
+}
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value;
 }
 
 function stripUndefined(env: FxProviderEnv): Partial<Record<keyof FxProviderEnv, string>> {
@@ -169,9 +305,30 @@ function stripUndefined(env: FxProviderEnv): Partial<Record<keyof FxProviderEnv,
   return out;
 }
 
-/** Providers habilitados en algún rol (únicos), en orden principal → respaldo → oficial. */
+/** Providers habilitados en algún rol (únicos), en orden principal → respaldo → oficial → cripto principal → cripto respaldo. */
 export function enabledProviders(s: FxProviderSettings): FxRateProvider[] {
-  return [...new Set([s.primary, s.fallback, s.official].filter((p): p is FxRateProvider => p !== null))];
+  return [
+    ...new Set(
+      [s.primary, s.fallback, s.official, s.cryptoPrimary, s.cryptoFallback].filter(
+        (p): p is FxRateProvider => p !== null,
+      ),
+    ),
+  ];
+}
+
+/** Providers cripto habilitados, principal primero. */
+export function enabledCryptoProviders(s: FxProviderSettings): FxRateProvider[] {
+  return [...new Set([s.cryptoPrimary, s.cryptoFallback].filter((p): p is FxRateProvider => p !== null))];
+}
+
+/** Umbrales de anomalía por clase de activo (D228). */
+export function anomalyThresholdsOf(s: FxProviderSettings): AnomalyThresholds {
+  return { fiatStablePct: s.anomalyThresholdPct, volatilePct: s.anomalyThresholdVolatilePct };
+}
+
+/** Política de clases de activo derivada de `FX_STABLECOIN_CODES`. */
+export function assetClassPolicyOf(s: FxProviderSettings): AssetClassPolicy {
+  return new AssetClassPolicy(s.stablecoinCodes);
 }
 
 /** Política de valoración derivada de la configuración (roles, obsolescencia por tipo y umbral del respaldo). */
@@ -180,10 +337,21 @@ export function valuationPolicyOf(s: FxProviderSettings): ValuationPolicy {
     roles: {
       PARALLEL: { primary: s.primary, fallback: s.fallback },
       OFFICIAL: { primary: s.official, fallback: null },
+      // Precios cripto (D225, D226): solo con providers cripto habilitados.
+      ...(s.cryptoPrimary !== null || s.cryptoFallback !== null
+        ? { MARKET: { primary: s.cryptoPrimary, fallback: s.cryptoFallback } }
+        : {}),
     },
-    staleAfterMs: { PARALLEL: s.staleAfterParallelMs, OFFICIAL: s.staleAfterOfficialMs },
-    // Solo el provider con rol de respaldo de PARALLEL (StalenessPolicy.thresholdFor).
-    fallbackStaleAfterMs: { PARALLEL: s.staleAfterFallbackMs },
+    staleAfterMs: {
+      PARALLEL: s.staleAfterParallelMs,
+      OFFICIAL: s.staleAfterOfficialMs,
+      MARKET: s.staleAfterMarketMs,
+    },
+    // Solo el provider con rol de respaldo de PARALLEL / MARKET (StalenessPolicy.thresholdFor).
+    fallbackStaleAfterMs: {
+      PARALLEL: s.staleAfterFallbackMs,
+      ...(s.cryptoFallback !== null ? { MARKET: s.staleAfterMarketFallbackMs } : {}),
+    },
     // Último recurso con manuales de otro tipo (docs/31 D34): antigüedad máxima y desvío = umbral de anomalía.
     manualFallbackMaxAgeMs: s.manualFallbackMaxAgeMs,
     manualFallbackMaxDeviationPct: s.anomalyThresholdPct,

@@ -422,7 +422,9 @@ export function identityWorkspaceRecipients(pool: Pool): WorkspaceRecipientsQuer
  * `pf_workspace_directory` solo dentro de la transacción de la consulta (migración 20261003230100).
  */
 export function identityActiveWorkspaces(pool: Pool): {
-  list(): Promise<readonly { readonly workspaceId: string; readonly timeZone: string }[]>;
+  list(): Promise<
+    readonly { readonly workspaceId: string; readonly timeZone: string; readonly baseCurrency: string }[]
+  >;
 } {
   return {
     async list() {
@@ -430,12 +432,16 @@ export function identityActiveWorkspaces(pool: Pool): {
       try {
         await client.query('BEGIN READ ONLY');
         await client.query('SET LOCAL ROLE pf_workspace_directory');
-        const { rows } = await client.query<{ id: string; time_zone: string }>(
-          `SELECT id::text AS id, time_zone FROM iam.workspace
+        const { rows } = await client.query<{ id: string; time_zone: string; base_currency: string }>(
+          `SELECT id::text AS id, time_zone, base_currency FROM iam.workspace
             WHERE status = 'ACTIVE' AND archived_at IS NULL ORDER BY id`,
         );
         await client.query('COMMIT');
-        return rows.map((r) => ({ workspaceId: r.id, timeZone: r.time_zone }));
+        return rows.map((r) => ({
+          workspaceId: r.id,
+          timeZone: r.time_zone,
+          baseCurrency: r.base_currency,
+        }));
       } catch (err) {
         await client.query('ROLLBACK').catch(() => undefined);
         throw err;

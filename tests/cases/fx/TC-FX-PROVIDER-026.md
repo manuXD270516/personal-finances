@@ -5,7 +5,7 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Precios de mercado de criptomonedas desde providers de exchange"
 scenario: "Muestra del provider cripto principal"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009"]
 nfr: ["NFR-DATA-001", "NFR-COMP-007"]
 invariants: ["INV-001"]
@@ -14,7 +14,7 @@ type: integration
 level: contract
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["fx", "crypto", "adapter", "contract", "no-network"]
@@ -51,3 +51,4 @@ Entonces registra BTC/USDT MARKET 65000.01000000 exacto
 ## Notas
 
 - Los fixtures se graban tras la verificación de términos (tarea 1.1), con el texto exacto y sin datos de usuario.
+- Pendiente (2026-10-13): espera al adapter cripto principal real. La tarea 1.1 (verificar términos de uso y registrar ADR-0029, NFR-COMP-007) requiere una decisión del owner, que aún no nombró su exchange; hasta entonces no se escribe ningún adapter ni se graba ningún fixture. El flujo de ingesta MARKET exacto con un doble en memoria ya está cubierto en `packages/contexts/fx/src/application/crypto-rate-providers.test.ts`.

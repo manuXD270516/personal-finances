@@ -1,7 +1,7 @@
 import { DomainError, Instant } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import {
-  PROVIDER_DESCRIPTORS,
+  providerDescriptor,
   ProviderError,
   ProviderSample,
   type FxRateProvider,
@@ -41,7 +41,7 @@ class FakeProvider implements MarketRateProvider {
   ) {}
 
   descriptor() {
-    return PROVIDER_DESCRIPTORS[this.id];
+    return providerDescriptor(this.id) as NonNullable<ReturnType<typeof providerDescriptor>>;
   }
 
   async fetchLatest(): Promise<ProviderSample[]> {
@@ -102,6 +102,9 @@ function setup(settings: FxProviderSettings = DEFAULT_FX_PROVIDER_SETTINGS, work
     clock: mem.clock,
     settings,
     providers: { PARALELO_BO: paralelo, DOLARAPI_BO: dolarapi },
+    pairs: mem.deps.pairs,
+    historyCache: mem.historyCache,
+    firstBalance: mem.firstBalance,
   });
   const service = new FxService(mem.deps);
   const queries = new FxQueries(mem.deps);
