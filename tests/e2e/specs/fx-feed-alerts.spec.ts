@@ -7,7 +7,7 @@ import { env } from '../src/helpers.js';
 /**
  * Alertas de tasas con providers SIMULADOS (add-rate-feed-alerts 7.1; TC-NOTIFICATIONS-FX-008): un servidor HTTP local del
  * harness hace de paralelo.bo y bo.dolarapi.com (nunca la red real) y cada ciclo de consulta lo dispara la prueba. El
- * reloj del stack no se puede adelantar: la obsolescencia se provoca con un provider que publica una tasa de hace 7 h
+ * reloj del stack no se puede adelantar: la obsolescencia se provoca con un provider que publica una tasa de hace 25 h
  * (el episodio se mide sobre la vigencia de la última tasa aceptada, no sobre el reloj del job). Escenario: caída y
  * obsolescencia (alerta con enlace al estado por par), recuperación (aviso) y una muestra anómala que se confirma desde
  * el enlace de su notificación; axe sin violaciones serias en la bandeja y en Configuración.
@@ -107,8 +107,8 @@ test.describe('Alertas de tasas con providers simulados (notifications/alerts)',
     browser,
   }) => {
     test.setTimeout(240_000);
-    // Los providers solo publican una tasa de hace 7 h (y la casa de respaldo está caída): más de 6 h sin tasa fresca.
-    sim.paralelo = { rate: { median: '12.02', at: minutesAgo(7 * 60) }, history: HISTORY };
+    // Los providers solo publican una tasa de hace 25 h (y la casa de respaldo está caída): más de 24 h sin tasa fresca.
+    sim.paralelo = { rate: { median: '12.02', at: minutesAgo(25 * 60) }, history: HISTORY };
     sim.dolarapi = { binance: null, oficial: { compra: '12', venta: '12', at: minutesAgo(60) } };
     const { context, page, W } = await newFinanceUser(browser, 'fxfa');
     await poll(page, W);
@@ -118,7 +118,7 @@ test.describe('Alertas de tasas con providers simulados (notifications/alerts)',
       .poll(async () => (await notes(page, W, 'FX_RATE_FEED_STALE')).length, { timeout: 60_000 })
       .toBe(2);
     const stale = await notes(page, W, 'FX_RATE_FEED_STALE');
-    expect(titleOf(stale, 'USDT/BOB')).toBe('USDT/BOB lleva más de 6 horas sin tasa automática');
+    expect(titleOf(stale, 'USDT/BOB')).toBe('USDT/BOB lleva más de 24 horas sin tasa automática');
     expect(stale.every((n) => n.severity === 'WARNING' && n.link.kind === 'FX_FEED_STATUS')).toBe(true);
     await poll(page, W);
     expect(await notes(page, W, 'FX_RATE_FEED_STALE')).toHaveLength(2);
@@ -145,7 +145,7 @@ test.describe('Alertas de tasas con providers simulados (notifications/alerts)',
     await go(page, '/notificaciones');
     const item = page
       .getByTestId('notification-item')
-      .filter({ hasText: 'USDT/BOB lleva más de 6 horas sin tasa automática' });
+      .filter({ hasText: 'USDT/BOB lleva más de 24 horas sin tasa automática' });
     await expect(item).toHaveCount(1);
     expect(await seriousViolations(page)).toEqual([]);
     await item.getByTestId('notification-title').click();

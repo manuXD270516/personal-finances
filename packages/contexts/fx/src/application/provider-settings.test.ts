@@ -88,3 +88,16 @@ describe('Configuración FX_* de providers (design.md decisión 5)', () => {
     expect(valuationPolicyOf(s).manualFallbackMaxDeviationPct).toBe('3');
   });
 });
+
+describe('FX_FEED_STALE_ALERT_AFTER frente al intervalo de la pila E2E (add-rate-feed-alerts)', () => {
+  it('[TC-FX-PROVIDER-041] con consulta cada 24 h la alerta de 6 h es inválida; la pila E2E fija 24 h y los providers quedan habilitados', () => {
+    const e2e = {
+      FX_POLL_INTERVAL: '24h',
+      FX_PROVIDER_PRIMARY: 'paralelo_bo',
+      FX_PROVIDER_FALLBACK: 'dolarapi_bo',
+    };
+    expect(parseFxProviderSettings(e2e).configError).toMatch(/FX_FEED_STALE_ALERT_AFTER/);
+    const ok = parseFxProviderSettings({ ...e2e, FX_FEED_STALE_ALERT_AFTER: '24h' });
+    expect([ok.configError, ok.primary, ok.pollCron]).toEqual([null, 'PARALELO_BO', '0 0 * * *']);
+  });
+});
