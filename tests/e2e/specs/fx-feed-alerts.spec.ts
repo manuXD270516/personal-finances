@@ -107,9 +107,12 @@ test.describe('Alertas de tasas con providers simulados (notifications/alerts)',
     browser,
   }) => {
     test.setTimeout(240_000);
-    // Los providers solo publican una tasa de hace 25 h (y la casa de respaldo está caída): más de 24 h sin tasa fresca.
+    // Los providers solo publican una tasa de hace 25 h y la casa de respaldo publica otra igual de vieja: más de 24 h sin tasa fresca. La casa de respaldo NO se deja caída: `fx.provider_run` es de la instalación y 5 fallas seguidas la ponen en espera (`SKIPPED_RATE_LIMIT`, que no cuenta como intento en el estado), con lo que `poll()` de esta y de las demás specs de FX nunca vería un intento nuevo.
     sim.paralelo = { rate: { median: '12.02', at: minutesAgo(25 * 60) }, history: HISTORY };
-    sim.dolarapi = { binance: null, oficial: { compra: '12', venta: '12', at: minutesAgo(60) } };
+    sim.dolarapi = {
+      binance: { compra: '12.04', venta: '12.07', at: minutesAgo(26 * 60) },
+      oficial: { compra: '12', venta: '12', at: minutesAgo(60) },
+    };
     const { context, page, W } = await newFinanceUser(browser, 'fxfa');
     await poll(page, W);
 
