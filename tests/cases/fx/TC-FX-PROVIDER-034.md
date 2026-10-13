@@ -50,4 +50,4 @@ Entonces las solicitudes son las mismas que sin pares cripto
 ```
 
 ## Notas
-- Pendiente (2026-10-13): la comparación byte a byte de las solicitudes HTTP espera al adapter real (tarea 4.3). Que los símbolos y los rangos del doble no dependan de los pares ni de las fechas de ningún workspace ya está cubierto en `crypto-rate-providers.test.ts` y la regla estática en `providers.architecture.test.ts`.
+- Pendiente (2026-10-13): la comparación byte a byte de las solicitudes HTTP espera a los adapters (tarea 4.3). Las queries son fijas por instalación: `symbols` de Binance y `symbol` de Bybit derivados del catálogo global, y `startTime`/`endTime` o `start`/`end` derivados de `FX_CRYPTO_HISTORY_FROM` por mes calendario UTC. Que los símbolos y los rangos del doble no dependan de los pares ni de las fechas de ningún workspace ya está cubierto en `crypto-rate-providers.test.ts` y la regla estática en `providers.architecture.test.ts`.
