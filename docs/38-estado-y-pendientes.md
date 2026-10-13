@@ -13,7 +13,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 2 Planificación y control | 10 de 11 archivados; `add-month-closing` fusionado, espera la evidencia del owner (§2) |
 | 3 Compromisos e importación | Completa y archivada (persistencia del import ≤ 20 s diferida a Phase 6, D152) |
 | 4 Metas y deudas | Completa salvo evidencias del owner (D219): implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
-| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Change 37 implementado y archivado; changes 38, 39 y 40 con spec fusionada (#118, #119, #120). Siguientes a implementar: 40 y 38 (§1.2) |
+| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Changes 37 y 40 implementados y archivados (#121, #122, #123); changes 38 y 39 con spec fusionada (#118, #119), sin implementar. Siguiente a implementar: 38 (§1.2) |
 
 ### 1.1 Phase 4
 
@@ -30,14 +30,14 @@ Informe de cierre de Phase 4 y criterios de salida (docs/24 §5.4): [docs/39](39
 
 ### 1.2 Phase 5
 
-Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados. Siguientes a implementar: 40 `add-conversion-cost-analysis` y 38 `add-crypto-rate-providers`.
+Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados; 37 y 40 están implementados y archivados. Siguiente a implementar: 38 `add-crypto-rate-providers`; el 39 va después del 38.
 
 | # | Change | Estado |
 |---|---|---|
-| 37 | `fix-phase-4-gaps` | Implementado (#121) y archivado (D222) |
+| 37 | `fix-phase-4-gaps` | Implementado y archivado (#121, #122; D222) |
 | 38 | `add-crypto-rate-providers` | Spec fusionada (#118); implementación pendiente. Sin adapters hasta verificar los términos de uso (ADR-0029 nuevo, D225) y hasta que el owner nombre el exchange |
 | 39 | `add-rate-feed-alerts` | Spec fusionada (#119); se implementa después de 38 (D233–D236) |
-| 40 | `add-conversion-cost-analysis` | Spec fusionada (#120); siguiente a implementar (D231, D244–D247). Trae el único consumidor nuevo: subir `max_connections` antes (D249) |
+| 40 | `add-conversion-cost-analysis` | Implementado (#123) y archivado (D231, D244–D247). Trajo el único consumidor nuevo (`fx.user-conversion-observations`); subir `max_connections` antes del despliegue (D249) |
 | 41 | `add-exchange-house-rate-providers` | En espera de P14 (D232) |
 | 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
 | 44 | `add-phase-4-demo-data` | Could, último y opcional (D223) |
@@ -68,6 +68,13 @@ Ninguna sesión puede cerrarlos por su cuenta.
 - La métrica `debt_card_cycle_mismatch_total` no existe en el código (solo `consistent`).
 - Conexiones: la plantilla del host suma API 22 + worker 33 = 55 sobre 60 de Postgres. Antes del despliegue, subir `max_connections` o revisar consumidores de concurrencia 1 que podrían agruparse.
 - Limitador de tasa en memoria: con más de una réplica de la API hace falta un adaptador sobre Valkey.
+
+**Análisis del costo de conversiones (change 40)**
+- Memoria de Postgres justa: con 56 conexiones frente al límite de 384 MiB; vigilar tras el despliegue.
+- Cada observación `USER_CONVERSION` dispara una reevaluación de presupuestos por workspace (`planning.budget-thresholds` está suscrito a `fx.RateRecorded`).
+- Una observación no tiene recorrido ni auditoría de usuario.
+- Los tests de integración, API y e2e del change se escribieron sin Docker y se validaron en CI.
+- Configuración nueva: variables `FX_*`, consumidor `fx.user-conversion-observations` y job de carga inicial.
 
 **Préstamos y amortización**
 - Adoptar una tabla del banco cuyas fechas difieren de las del sistema en una cuota pendiente no está probado (la clave de la ocurrencia es el número de cuota).
@@ -109,5 +116,7 @@ Investigar si reaparecen en CI; todos pasan aislados.
 - `TC-CLASSIFICATION-CUSTOMFIELD-010`: "inconsistent types deduced for parameter $2".
 - Suite de `month-closing` y `imports.api`: `ECONNRESET`/503 bajo carga local.
 - `a11y.spec`: el login inicial no completó en 30 s (arranque en frío del stack E2E).
+- `recurring.spec.ts` [TC-COMMITMENTS-RECUR-021/023/031]: falló una vez en CI (`recurring-approval-count` no aparecía) y pasó al repetir.
+- TC-AUDIT-LIFECYCLE-001 y TC-COMMITMENTS-RECUR-017 recibieron timeout explícito (#124).
 
 Corregidos: orden de eventos TC-PLATFORM-EVENTS-015 y aviso de guardado TC-PLATFORM-API-014 (#98); consultas pg concurrentes y aserciones con números sueltos (#106); auditoría de periodos en TC-IDENTITY-RESTORE-001 (#102).
