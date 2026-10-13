@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: []
 requirement: "Exportación CSV del análisis de costo"
 scenario: "Exportar octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: ["NFR-SEC-015", "NFR-SEC-011"]
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/conversion-costs.api.test.ts
+  - packages/contexts/reporting/src/application/conversion-cost.queries.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "csv", "security"]

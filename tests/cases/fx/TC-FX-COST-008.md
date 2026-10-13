@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: []
 requirement: "Spread recalculado contra la compra o venta paralela del día"
 scenario: "Venta comparada con la venta paralela"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: []
 invariants: []
 priority: low
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/conversion-cost.queries.test.ts
+  - packages/contexts/reporting/src/domain/conversion-cost.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "could"]

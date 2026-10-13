@@ -32,6 +32,43 @@ export interface ExchangeRateState {
   readonly rawPayload: string | null;
   /** Marca de anomalía inmutable de la fila (la decisión vive en `fx.rate_anomaly_review`). */
   readonly anomaly: AnomalyMark | null;
+  /**
+   * Conversión propia que originó la observación (`source = USER_CONVERSION`, D231); `null`/ausente en tasas
+   * manuales y de provider.
+   */
+  readonly conversionRef?: ConversionRef | null;
+}
+
+/** Conversión (transacción y revisión) a la que pertenece una observación `USER_CONVERSION`. */
+export interface ConversionRef {
+  readonly transactionId: string;
+  readonly revision: number;
+}
+
+/** Etiqueta de origen de las observaciones de conversión propias (`source_label`). */
+export const USER_CONVERSION_SOURCE_LABEL = 'Conversión';
+/** Motivo del reemplazo de una observación cuando la conversión se revisa financieramente. */
+export const USER_CONVERSION_REVISED_REASON = 'conversión revisada';
+/**
+ * Tipo de las observaciones de conversión: `CUSTOM` con `source = USER_CONVERSION` (add-conversion-cost-analysis,
+ * pregunta abierta 2): el tipo es obligatorio en la tasa y en `fx.RateRecorded.v1`; la exclusión de la valoración es por
+ * ORIGEN, no por tipo.
+ */
+export const USER_CONVERSION_RATE_TYPE: FxRateType = 'CUSTOM';
+
+/** Datos de una observación de conversión propia (`RecordUserConversionObservation`, D231). */
+export interface UserConversionObservationInput {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly base: Currency;
+  readonly quote: Currency;
+  /** Tasa efectiva registrada de la conversión (1 base = value quote, orientación de visualización). */
+  readonly value: string;
+  readonly executedAt: string;
+  /** Fecha de negocio de la conversión. */
+  readonly effectiveDate: string;
+  readonly conversion: ConversionRef;
+  readonly createdAt: string;
 }
 
 /** Variación de una muestra de provider que superó el umbral respecto de la tasa aceptada anterior (design.md 8). */
@@ -136,6 +173,7 @@ export class ExchangeRate {
       fetchedAt: null,
       rawPayload: null,
       anomaly: null,
+      conversionRef: null,
     });
   }
 
@@ -164,6 +202,39 @@ export class ExchangeRate {
       fetchedAt: sample.fetchedAt,
       rawPayload: sample.rawPayload,
       anomaly: input.anomaly,
+    });
+  }
+
+  /**
+   * Observación de una conversión propia (D231; `source = USER_CONVERSION`): la tasa efectiva de una conversión
+   * posteada como historial del par, inmutable y NUNCA usada para valorar. `replaces` es la observación de la
+   * revisión anterior de la misma conversión (reemplazo con el motivo "conversión revisada").
+   */
+  static userConversionObservation(
+    input: UserConversionObservationInput,
+    replaces: ExchangeRate | null = null,
+  ): ExchangeRate {
+    if (!Number.isInteger(input.conversion.revision) || input.conversion.revision < 1) {
+      throw invalid('conversion revision must be an integer >= 1', '/conversion/revision');
+    }
+    return new ExchangeRate({
+      id: input.id,
+      workspaceId: input.workspaceId,
+      rate: parseRateValue(input.base, input.quote, input.value),
+      rateType: USER_CONVERSION_RATE_TYPE,
+      source: 'USER_CONVERSION',
+      sourceLabel: USER_CONVERSION_SOURCE_LABEL,
+      asOf: Instant.parse(input.executedAt).toString(),
+      effectiveDate: input.effectiveDate,
+      supersedesId: replaces ? replaces.id : null,
+      supersedeReason: replaces ? USER_CONVERSION_REVISED_REASON : null,
+      createdAt: input.createdAt,
+      createdBy: null,
+      provider: null,
+      fetchedAt: null,
+      rawPayload: null,
+      anomaly: null,
+      conversionRef: { ...input.conversion },
     });
   }
 
@@ -199,6 +270,14 @@ export class ExchangeRate {
     const s = this.state;
     if (s.workspaceId === null) {
       throw new DomainError('VALIDATION_FAILED', 'global provider rates cannot be superseded by a workspace');
+    }
+    // Una observación de conversión propia solo se reemplaza al revisar la conversión (D231): corregirla a mano la
+    // convertiría en una tasa MANUAL que sí valora.
+    if (s.source === 'USER_CONVERSION') {
+      throw invalid(
+        'an observation of an own conversion cannot be corrected: revise the conversion',
+        '/rateId',
+      );
     }
     // Paso declarado RECORDED → SUPERSEDED (add-lifecycle-timeline decisión 4; la máquina es la única fuente).
     EXCHANGE_RATE_LIFECYCLE.transition('SUPERSEDE', 'RECORDED');

@@ -21,12 +21,16 @@ import {
 import type { Logger } from '@pf/platform/logging';
 import {
   createFxMarketRateJobs,
+  createUserConversionObservations,
   createFxValuation,
   parseFxProviderSettings,
   type FxMarketRateJobsOptions,
 } from '@pf/fx/interface/fx.module';
 import { DEFAULT_RATE_VALIDITY_WINDOW_DAYS } from '@pf/reporting/interface/reporting.module';
-import { createNominalFlowQuery } from '@pf/transactions/interface/transactions.module';
+import {
+  createConversionDetailQuery,
+  createNominalFlowQuery,
+} from '@pf/transactions/interface/transactions.module';
 import { createAuditRuntime, createLifecycleBackfill } from '@pf/audit/interface/audit.module';
 import { createCategoryCatalogQuery } from '@pf/classification/interface/classification.module';
 import {
@@ -72,7 +76,12 @@ import { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { createJobQueue } from '../runtime/platform-resources.js';
 import { registerLifecycleBackfillJob, verifyLifecycleConsistency } from './audit-jobs.js';
-import { fxEndpointsFromConfig, registerFxMarketRateJobs } from './fx-jobs.js';
+import {
+  conversionBackfillSource,
+  fxEndpointsFromConfig,
+  registerFxMarketRateJobs,
+  registerFxUserConversionJobs,
+} from './fx-jobs.js';
 import { registerLedgerDailyJob } from './ledger-jobs.js';
 import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-jobs.js';
 import { registerDebtCardsJob } from './debt-jobs.js';
@@ -125,6 +134,8 @@ export interface WorkerRuntimeOptions {
   readonly fxEndpoints?: FxMarketRateJobsOptions['endpoints'];
   /** Encola un relleno de días faltantes de tasas al arrancar (por defecto sí). */
   readonly fxGapFillOnStart?: boolean;
+  /** Encola la carga inicial de observaciones de conversiones propias al arrancar (por defecto sí; D231, idempotente). */
+  readonly userConversionBackfillOnStart?: boolean;
   /** Encola la reconstrucción del recorrido desde la auditoría al arrancar (por defecto sí; add-lifecycle-timeline). */
   readonly lifecycleBackfillOnStart?: boolean;
   /** Tests (add-demo-data): falla inyectada del cargador demo (`<módulo>/<YYYY-MM>`). */
@@ -241,6 +252,25 @@ export async function createWorkerRuntime(
     }),
     logger,
     { gapFillOnStart: options.fxGapFillOnStart ?? true },
+  );
+  // Observaciones de las conversiones propias (add-conversion-cost-analysis, D231, D249): el consumidor entra DESPUÉS de
+  // subir `max_connections` y el pool del worker (plantilla del host: 34 + API 22 = 56 sobre 70) y valida el arranque
+  // con `assertConsumerConnectionBudget` (TC-PLATFORM-EVENTS-019). Concurrencia 1.
+  const fxUserConversionConsumers = await registerFxUserConversionJobs(
+    queue,
+    createUserConversionObservations({
+      pool,
+      clock: fxClock,
+      outbox: {
+        append: async (event) => {
+          await fxOutbox.append(event);
+        },
+      },
+    }),
+    conversionBackfillSource(createConversionDetailQuery(pool)),
+    activeWorkspaces,
+    logger,
+    { runOnStart: options.userConversionBackfillOnStart ?? true },
   );
 
   // Datos de demostración (add-demo-data): carga por casos de uso (`demo.load`) y purga acotada (`demo.purge`).
@@ -509,6 +539,7 @@ export async function createWorkerRuntime(
   const subscriptions = new EventSubscriptions([
     ...(options.eventConsumers ?? []),
     ...fxConsumers,
+    ...fxUserConversionConsumers,
     reportingDataVersionConsumer(),
     ...planningEventConsumers(planning),
     ...commitmentsEventConsumers(commitments),

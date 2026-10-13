@@ -5,16 +5,18 @@ spec: platform/event-delivery
 related_specs: ["fx/market-rates"]
 requirement: "Rendimiento sostenido de los consumidores"
 scenario: "Configuración que excede el pool de conexiones"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: ["NFR-PERF-008", "NFR-REL-008"]
 invariants: []
 priority: high
 type: platform
 level: container-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/event-throughput.int.test.ts
+  - packages/platform/src/events/consumers.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["platform", "connections", "worker", "fx"]

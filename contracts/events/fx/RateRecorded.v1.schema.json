@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/fx/RateRecorded.v1.schema.json",
   "title": "fx.RateRecorded.v1",
-  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged.",
+  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged. Con source = USER_CONVERSION es la observación de una conversión propia (add-conversion-cost-analysis, D231): rateType CUSTOM, actor SYSTEM 'fx-user-conversion', value = tasa efectiva de la conversión y supersedesRateId = la observación de la revisión anterior; nunca se usa para valorar.",
   "type": "object",
   "allOf": [
     {
@@ -171,6 +171,35 @@
         "supersedesRateId": null,
         "provider": "PARALELO_BO",
         "anomalyFlagged": false
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000301",
+      "eventType": "fx.RateRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-05T14:00:02.410Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ExchangeRate",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa301",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000d1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "fx-user-conversion"
+      },
+      "payload": {
+        "rateId": "01928c4e-0000-7000-8000-0000000fa301",
+        "base": "USDT",
+        "quote": "BOB",
+        "value": "11.9",
+        "rateType": "CUSTOM",
+        "source": "USER_CONVERSION",
+        "sourceLabel": "Conversión",
+        "asOf": "2026-10-05T14:00:00Z",
+        "effectiveDate": "2026-10-05",
+        "supersedesRateId": null,
+        "provider": null
       }
     }
   ]

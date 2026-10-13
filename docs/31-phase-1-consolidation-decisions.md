@@ -33,7 +33,7 @@ Prioridad de fuentes ante contradicción: ARCHITECTURE.md > ADRs aceptados > spe
 | D23 | Identity en docs/08/docs/12 | Agregar `iam.bff_session`, `iam.user.time_zone` (columna; el campo de API es `timezone`), `iam.workspace.fiscal_month_start_day` y `minimum_liquidity_reserve`; rol de BD `pf_bff` en docs/12. |
 | D24 | Orden de implementación (docs/03 §7) | 1 `add-api-conventions` · 2 `add-workspace-identity` (incluye como primer grupo de tareas la migración del catálogo `fx.currency` + seed, porque `iam.workspace.base_currency` lo referencia; el comportamiento del catálogo sigue especificado en `fx/market-rates`) · 3 `add-audit-trail` · 4 `add-ledger-core` · 5 `add-classification` · 6 `add-accounts-management` · 7 `add-transaction-recording` · 8 `add-transfers` · 9 `add-manual-conversions` · 10 `add-basic-dashboard`. |
 | D25 | Catálogo de invariantes en tests/cases/README | Rango INV-001..034. |
-| D26 | Valoración USDT↔BOB en el dashboard | Phase 1: última tasa manual a la fecha (explícita y auditable). El promedio de conversiones propias queda como pregunta abierta para el owner (Phase 5). |
+| D26 | Valoración USDT↔BOB en el dashboard | Phase 1: última tasa manual a la fecha (explícita y auditable). El promedio de conversiones propias queda como pregunta abierta para el owner (Phase 5). **Cerrada por D231** (docs/41; `add-conversion-cost-analysis`): cada conversión posteada se registra como observación `USER_CONVERSION` del par, visible en el historial y usada por el análisis de costo, nunca para valorar (esta valoración de D26 no cambia). |
 
 ## Decisiones del owner (2026-10-02)
 

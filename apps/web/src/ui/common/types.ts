@@ -357,6 +357,10 @@ export interface FxRate {
   readonly fetchedAt?: string | null;
   readonly attribution?: RateAttribution | null;
   readonly anomaly?: FxRateAnomaly | null;
+  /** Solo observaciones `USER_CONVERSION` (D231): la conversión de origen (historial; nunca valora). */
+  readonly conversionRef?: { readonly transactionId: string; readonly revision: number };
+  /** Solo observaciones: marca de la conversión anulada; `null` mientras vale. */
+  readonly withdrawn?: { readonly at: string; readonly reason: string } | null;
 }
 
 export interface FxRatePreference {

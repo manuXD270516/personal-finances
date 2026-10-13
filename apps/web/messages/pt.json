@@ -1160,7 +1160,14 @@
       "correctTitle": "Corrigir taxa",
       "newValue": "Valor corrigido",
       "correctReason": "Motivo da correção",
-      "saveCorrection": "Salvar correção"
+      "saveCorrection": "Salvar correção",
+      "costs": "Ver custo das conversões",
+      "sourceFilter": "Origem",
+      "sourceAll": "Todos",
+      "observation": "Conversão",
+      "viewConversion": "Ver conversão",
+      "withdrawn": "conversão anulada",
+      "observationHint": "Observação de uma conversão própria: é histórico do par e nunca é usada para avaliar."
     },
     "screen": {
       "title": "Cripto e câmbio",
@@ -5196,5 +5203,60 @@
         "none": "Nenhuma dívida tem vencimento conhecido."
       }
     }
+  },
+  "ConversionCosts": {
+    "title": "Custo das conversões",
+    "subtitle": "Quanto custa converter por cada canal: o spread contra a referência e as tarifas, por período e par.",
+    "backToFx": "Voltar às taxas de câmbio",
+    "loading": "Calculando o custo das suas conversões…",
+    "filters": {
+      "title": "Filtros da análise",
+      "from": "De (data de negócio)",
+      "to": "Até (data de negócio)",
+      "grouping": "Agrupar por",
+      "compare": "Comparar com a compra ou venda paralela do dia",
+      "apply": "Aplicar"
+    },
+    "grouping": {
+      "FINANCIAL_PERIOD": "Período financeiro",
+      "CALENDAR_MONTH": "Mês calendário"
+    },
+    "errors": {
+      "DATE": "Use datas válidas (AAAA-MM-DD).",
+      "RANGE": "A data inicial não pode ser posterior à final."
+    },
+    "export": "Exportar CSV",
+    "empty": "Não há conversões lançadas entre {from} e {to}.",
+    "range": "De {from} a {to}, em {currency}. Só contam as conversões lançadas, com a revisão vigente.",
+    "incomplete": "Algum custo está incompleto: uma tarifa não tem taxa para a moeda de relatório e não foi estimada.",
+    "caption": "Custo das conversões por período, canal e par, em {currency}",
+    "columns": {
+      "period": "Período",
+      "channel": "Canal",
+      "pair": "Par",
+      "conversions": "Conversões",
+      "converted": "Valor convertido",
+      "spreadPct": "Spread médio",
+      "alternative": "Spread vs. paralela",
+      "spreadAmount": "Valor do spread",
+      "fees": "Tarifas",
+      "costTotal": "Custo total",
+      "excluded": "Excluídas"
+    },
+    "channel": {
+      "none": "Sem canal"
+    },
+    "accounts": "{source} → {target}",
+    "noValue": "—",
+    "alternativeExcluded": "({count} sem taxa paralela)",
+    "unvaluedFees": "Sem taxa para: {fees}",
+    "excluded": {
+      "NO_REFERENCE": "{count} sem taxa de referência ({amount})",
+      "NO_QUOTED_RATE": "{count} sem taxa cotada ({amount})",
+      "NO_REPORTING_RATE": "{count} sem taxa para a moeda de relatório ({amount})"
+    },
+    "totals": "Total",
+    "excludedTotal": "{count} excluídas",
+    "method": "O spread médio pondera cada conversão pelo valor convertido (soma do spread sobre a soma do convertido). Uma conversão sem referência registrada, sem taxa cotada ou sem taxa de avaliação nunca é estimada: é contada à parte."
   }
 }

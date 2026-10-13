@@ -99,6 +99,34 @@ export interface FxConversionPricingPort {
 
 export const FX_CONVERSION_PRICING_PORT = Symbol.for('pf.fx.FxConversionPricingPort');
 
+/** Consumidor de FX de las conversiones propias (D231, D249): observación de tasa por cada conversión posteada. */
+export const FX_USER_CONVERSION_CONSUMER = 'fx.user-conversion-observations';
+/** Job de la carga inicial idempotente de las observaciones de las conversiones anteriores al cambio. */
+export const FX_USER_CONVERSION_BACKFILL_JOB = 'fx.backfill-user-conversion-observations';
+
+/** Lado publicado de la cotización paralela (`PARALLEL_BUY` / `PARALLEL_SELL`). */
+export type FxQuoteSideDto = 'PARALLEL_BUY' | 'PARALLEL_SELL';
+
+/**
+ * Tasa de un solo lado (compra o venta paralela) vigente a un instante, para el spread alternativo del análisis de
+ * costo de conversiones (add-conversion-cost-analysis, Could, D247). Directa o inversa, nunca cruzada, con el selector
+ * de providers; `null` si no hay tasa de ese lado en la ventana. Sin efectos.
+ */
+export interface FxQuoteSideRatesPort {
+  resolveQuoteSideRates(input: {
+    readonly workspaceId: string;
+    readonly requests: readonly {
+      readonly base: string;
+      readonly quote: string;
+      readonly at: string;
+      readonly side: FxQuoteSideDto;
+    }[];
+    readonly windowDays?: number;
+  }): Promise<readonly (ValuationRateDto | null)[]>;
+}
+
+export const FX_QUOTE_SIDE_RATES_PORT = Symbol.for('pf.fx.FxQuoteSideRatesPort');
+
 export type FxRateProviderDto = 'PARALELO_BO' | 'DOLARAPI_BO';
 export type RateSelectionDto = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
 export type RateDerivationDto = 'DIRECT' | 'INVERSE' | 'CROSS';

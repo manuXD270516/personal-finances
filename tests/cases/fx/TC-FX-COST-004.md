@@ -5,16 +5,19 @@ spec: fx/conversion-pricing
 related_specs: ["planning/financial-periods"]
 requirement: "Periodo financiero o mes calendario en el análisis de costo"
 scenario: "Mes financiero que empieza el día 25"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011", "FR-PLANNING-001"]
 nfr: []
 invariants: []
 priority: medium
 type: unit
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/conversion-costs.api.test.ts
+  - packages/contexts/reporting/src/application/conversion-cost.queries.test.ts
+  - packages/contexts/reporting/src/domain/cost-periods.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "period", "timezone"]

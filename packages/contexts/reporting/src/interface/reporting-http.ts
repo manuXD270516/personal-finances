@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
-import { Controller, Get, Inject, Param, Req, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Req, Res, StreamableFile } from '@nestjs/common';
 import { ValidatedQuery, principalOf, type ApiRequest, type ApiResponse } from '@pf/platform/nest';
 import type { CompareMode } from '../domain/index.js';
+import type { ConversionCostQueries } from '../application/conversion-cost.queries.js';
 import type { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
 import type { ReportSummaryQueries } from '../application/report-summary.queries.js';
 import type { SpendableQueries } from '../application/spendable.queries.js';
 import type { UpcomingPaymentsQueries } from '../application/upcoming-payments.queries.js';
 import type {
+  ConversionCostAnalysisDto,
+  ConversionCostGroupingDto,
   NetWorthHistoryDto,
   ReportSummaryDto,
   SpendableDto,
@@ -18,6 +21,7 @@ export const REPORT_SUMMARY_QUERIES = Symbol('REPORT_SUMMARY_QUERIES');
 export const NET_WORTH_HISTORY_QUERIES = Symbol('NET_WORTH_HISTORY_QUERIES');
 export const UPCOMING_PAYMENTS_QUERIES = Symbol('UPCOMING_PAYMENTS_QUERIES');
 export const SPENDABLE_QUERIES = Symbol('SPENDABLE_QUERIES');
+export const CONVERSION_COST_QUERIES = Symbol('CONVERSION_COST_QUERIES');
 
 type Json = Record<string, unknown>;
 const str = (q: Json, k: string): string | undefined =>
@@ -28,6 +32,19 @@ const int = (q: Json, k: string): number | undefined => {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isInteger(n) ? n : Number.NaN;
 };
+
+/** Filtros comunes del análisis de costo de conversiones y su exportación. */
+function conversionCostFilters(query: Json): {
+  from?: string;
+  to?: string;
+  grouping?: ConversionCostGroupingDto;
+} {
+  return {
+    ...(str(query, 'from') ? { from: str(query, 'from') as string } : {}),
+    ...(str(query, 'to') ? { to: str(query, 'to') as string } : {}),
+    ...(str(query, 'grouping') ? { grouping: str(query, 'grouping') as ConversionCostGroupingDto } : {}),
+  };
+}
 
 /**
  * ETag débil del resumen: versión derivada del workspace + hash del contenido (sin `generatedAt`). El contenido se
@@ -88,6 +105,7 @@ export class ReportingController {
     @Inject(NET_WORTH_HISTORY_QUERIES) private readonly history: NetWorthHistoryQueries,
     @Inject(UPCOMING_PAYMENTS_QUERIES) private readonly upcoming: UpcomingPaymentsQueries,
     @Inject(SPENDABLE_QUERIES) private readonly spendable: SpendableQueries,
+    @Inject(CONVERSION_COST_QUERIES) private readonly conversionCosts: ConversionCostQueries,
   ) {}
 
   @Get('workspaces/:workspaceId/reports/summary')
@@ -186,6 +204,51 @@ export class ReportingController {
     res.setHeader('etag', spendableEtag(spendable, dataVersion));
     res.setHeader('cache-control', 'private, no-cache');
     return spendable;
+  }
+
+  /**
+   * `GET /api/v1/workspaces/{workspaceId}/reports/conversion-costs` (`getConversionCostAnalysis`, VIEWER): spread y fees
+   * por periodo, canal y par de las conversiones posteadas (add-conversion-cost-analysis, FR-FX-011). Solo lectura.
+   */
+  @Get('workspaces/:workspaceId/reports/conversion-costs')
+  async getConversionCostAnalysis(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ValidatedQuery() query: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<ConversionCostAnalysisDto> {
+    const analysis = await this.conversionCosts.getAnalysis({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      ...conversionCostFilters(query),
+      ...(str(query, 'compareWith') === 'PARALLEL_SIDE' ? { compareWith: 'PARALLEL_SIDE' as const } : {}),
+    });
+    res.setHeader('cache-control', 'private, no-cache');
+    return analysis;
+  }
+
+  /**
+   * `GET /api/v1/workspaces/{workspaceId}/reports/conversion-costs/export` (`exportConversionCostAnalysis`, VIEWER): el
+   * mismo análisis como CSV (una fila por grupo, celdas de texto neutralizadas). La cuota de operaciones costosas
+   * (`x-rate-limit: costly`) la aplica la plataforma.
+   */
+  @Get('workspaces/:workspaceId/reports/conversion-costs/export')
+  async exportConversionCostAnalysis(
+    @Req() req: ApiRequest,
+    @Param('workspaceId') workspaceId: string,
+    @ValidatedQuery() query: Json,
+    @Res({ passthrough: true }) res: ApiResponse,
+  ): Promise<StreamableFile> {
+    const file = await this.conversionCosts.exportCsv({
+      userId: principalOf(req)?.userId ?? null,
+      workspaceId,
+      ...conversionCostFilters(query),
+    });
+    res.setHeader('content-type', file.contentType);
+    res.setHeader('content-disposition', `attachment; filename="${file.fileName}"`);
+    res.setHeader('cache-control', 'no-store');
+    res.setHeader('x-content-type-options', 'nosniff');
+    return new StreamableFile(file.body, { length: file.body.byteLength });
   }
 
   /** `GET /api/v1/workspaces/{workspaceId}/reports/surprise-payments` (`getSurprisePayments`, VIEWER, SM-07). */

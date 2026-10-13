@@ -15,6 +15,7 @@ import type {
   ProviderRun,
   ProviderRunRepository,
   RatePreference,
+  RateWithdrawal,
   StoredRate,
 } from '../ports/index.js';
 
@@ -64,6 +65,8 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     /** Pasos del recorrido (doble de `LifecyclePort`). */
     lifecycle: [] as (LifecycleStepInput & { aggregateId: string; action: string })[],
     reviews: [] as AnomalyReview[],
+    /** Marcas de observaciones anuladas (`fx.rate_withdrawal`, append-only). */
+    withdrawals: [] as RateWithdrawal[],
     runs: [] as ProviderRun[],
     /** Workspaces activos (worker): id → zona horaria. */
     workspaces: new Map<string, string>(),
@@ -78,6 +81,7 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
     audit: [...state.audit],
     lifecycle: [...state.lifecycle],
     reviews: [...state.reviews],
+    withdrawals: [...state.withdrawals],
     runs: [...state.runs],
     workspaces: new Map(state.workspaces),
   });
@@ -89,10 +93,12 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
   );
   const supersededBy = (id: string) => state.rates.find((r) => r.snapshot.supersedesId === id)?.id ?? null;
   const reviewOf = (id: string) => state.reviews.find((r) => r.rateId === id) ?? null;
+  const withdrawalOf = (id: string) => state.withdrawals.find((w) => w.rateId === id) ?? null;
   const stored = (rate: ExchangeRate): StoredRate => ({
     rate,
     supersededById: supersededBy(rate.id),
     anomalyReview: reviewOf(rate.id),
+    withdrawal: withdrawalOf(rate.id),
   });
   const ofFeed = (ws: string, feed: ProviderFeedKey) =>
     state.rates.filter(
@@ -135,18 +141,22 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
         return rate ? stored(rate) : null;
       },
       async candidates(ws, currencies, from, to) {
-        return state.rates
-          .filter((r) => (r.snapshot.workspaceId ?? ws) === ws)
-          .filter((r) => currencies.includes(r.rate.base.code) && currencies.includes(r.rate.quote.code))
-          .filter((r) => {
-            const t = Date.parse(r.snapshot.asOf);
-            return t >= from.epochMillis && t <= to.epochMillis;
-          })
-          .map((r) => ({
-            state: r.snapshot,
-            supersededById: supersededBy(r.id),
-            anomalyDecision: reviewOf(r.id)?.decision ?? null,
-          }));
+        return (
+          state.rates
+            .filter((r) => (r.snapshot.workspaceId ?? ws) === ws)
+            // Como PgExchangeRateRepository: las observaciones de conversiones propias nunca son candidatas (D231).
+            .filter((r) => r.snapshot.source !== 'USER_CONVERSION')
+            .filter((r) => currencies.includes(r.rate.base.code) && currencies.includes(r.rate.quote.code))
+            .filter((r) => {
+              const t = Date.parse(r.snapshot.asOf);
+              return t >= from.epochMillis && t <= to.epochMillis;
+            })
+            .map((r) => ({
+              state: r.snapshot,
+              supersededById: supersededBy(r.id),
+              anomalyDecision: reviewOf(r.id)?.decision ?? null,
+            }))
+        );
       },
       async list(ws, filter, page) {
         return state.rates
@@ -174,6 +184,41 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
         );
         if (duplicate) return false;
         state.rates.push(rate);
+        return true;
+      },
+      async insertUserConversionObservation(rate) {
+        const s = rate.snapshot;
+        const ref = s.conversionRef;
+        if (!ref) throw new Error('an observation needs a conversionRef');
+        const duplicate = state.rates.some(
+          (r) =>
+            r.snapshot.workspaceId === s.workspaceId &&
+            r.snapshot.conversionRef?.transactionId === ref.transactionId &&
+            r.snapshot.conversionRef.revision === ref.revision,
+        );
+        if (duplicate) return false;
+        if (s.supersedesId && supersededBy(s.supersedesId)) {
+          throw new DomainError('FX_RATE_ALREADY_SUPERSEDED', `rate ${s.supersedesId} already superseded`);
+        }
+        state.rates.push(rate);
+        return true;
+      },
+      async currentUserConversionObservation(ws, transactionId) {
+        const found = state.rates
+          .filter(
+            (r) =>
+              r.snapshot.workspaceId === ws &&
+              r.snapshot.source === 'USER_CONVERSION' &&
+              r.snapshot.conversionRef?.transactionId === transactionId,
+          )
+          .sort(
+            (a, b) => (b.snapshot.conversionRef?.revision ?? 0) - (a.snapshot.conversionRef?.revision ?? 0),
+          )[0];
+        return found ? stored(found) : null;
+      },
+      async insertWithdrawal(withdrawal) {
+        if (withdrawalOf(withdrawal.rateId)) return false;
+        state.withdrawals.push(withdrawal);
         return true;
       },
       async latestAccepted(ws, feed) {

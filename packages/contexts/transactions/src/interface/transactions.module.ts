@@ -26,6 +26,7 @@ import {
   pgCurrencyCatalog,
   uuidV7Ids,
 } from '../infrastructure/pg-transactions.js';
+import { PgConversionDetailQuery } from '../infrastructure/pg-conversion-cost.js';
 import { PgCounterpartyCategoryUsage, PgNominalFlowQuery } from '../infrastructure/pg-nominal-flows.js';
 import { PgTransactionsClosingQuery } from '../infrastructure/pg-closing.js';
 import { PgPendingFlowQuery, PgTransactionLinkQuery } from '../infrastructure/pg-recurring.js';
@@ -52,6 +53,7 @@ import type {
   RecurringTransactionPort,
   TransactionLinkQuery,
   TransactionStatusQuery,
+  ConversionDetailQuery,
   NominalFlowQuery,
   ReconciliationStatusQuery,
   TransactionsClosingQuery,
@@ -94,6 +96,8 @@ export interface TransactionsRuntime {
   readonly reconciliationStatus: ReconciliationStatusQuery;
   /** Query pública `SummarizeNominalFlows` para Reporting (add-basic-dashboard). */
   readonly flows: NominalFlowQuery;
+  /** Query pública `ConversionDetailQuery` para REPORTING (análisis de costo) y FX (carga inicial de observaciones). */
+  readonly conversionDetails: ConversionDetailQuery;
   /** Última categoría usada con una counterparty, para la sugerencia de CLASSIFICATION (add-classification). */
   readonly categoryUsage: CounterpartyCategoryUsageQuery;
   /** Query pública `TransactionsClosingQuery` para el checklist y el snapshot del cierre de PLANNING (add-month-closing). */
@@ -124,6 +128,14 @@ export interface TransactionsRuntime {
  */
 export function createNominalFlowQuery(pool: Pool): NominalFlowQuery {
   return new PgNominalFlowQuery(new PgTransactionsUnitOfWork(pool), pgCurrencyCatalog);
+}
+
+/**
+ * `ConversionDetailQuery` para procesos sin comandos (el worker de FX: carga inicial de observaciones de conversión;
+ * add-conversion-cost-analysis): solo lee la revisión vigente en la unidad de trabajo del llamador.
+ */
+export function createConversionDetailQuery(pool: Pool): ConversionDetailQuery {
+  return new PgConversionDetailQuery(new PgTransactionsUnitOfWork(pool));
 }
 
 /** Composición de TRANSACTIONS sobre PostgreSQL. */
@@ -165,6 +177,7 @@ export function createTransactionsRuntime(options: TransactionsRuntimeOptions): 
     reconciliations,
     reconciliationStatus: reconciliations,
     flows: new PgNominalFlowQuery(deps.uow, deps.currencies),
+    conversionDetails: new PgConversionDetailQuery(deps.uow),
     categoryUsage: new PgCounterpartyCategoryUsage(deps.uow),
     closing: new PgTransactionsClosingQuery(deps.uow, deps.currencies, deps.categories),
     recurring: new RecurringTransactionAdapter(service),

@@ -487,3 +487,65 @@ export interface SurprisePaymentsDto {
   /** Los pagos no vinculados a ningún compromiso no se detectan. */
   readonly note: 'UNLINKED_PAYMENTS_NOT_DETECTED';
 }
+
+// ───────────────────────────────────────────── fx/conversion-pricing: costo de conversiones (add-conversion-cost-analysis)
+
+export type ConversionCostGroupingDto = 'FINANCIAL_PERIOD' | 'CALENDAR_MONTH';
+export type ConversionCostExclusionReasonDto = 'NO_REFERENCE' | 'NO_QUOTED_RATE' | 'NO_REPORTING_RATE';
+
+/** Grupo del análisis: periodo, canal (contraparte + cuentas) y par, con cifras en la moneda de reporte. */
+export interface ConversionCostGroupDto {
+  readonly period: { readonly label: string; readonly from: string; readonly to: string };
+  /** `NONE` = "Sin canal" (sin contraparte, D244). */
+  readonly channel: {
+    readonly kind: 'COUNTERPARTY' | 'NAMED' | 'NONE';
+    readonly counterpartyId: string | null;
+    readonly name: string | null;
+  };
+  readonly sourceAccountId: string;
+  readonly sourceAccountName: string;
+  readonly targetAccountId: string;
+  readonly targetAccountName: string;
+  readonly pair: { readonly base: string; readonly quote: string };
+  readonly conversions: number;
+  readonly converted: MoneyDto;
+  /** Promedio ponderado por el monto convertido, 4 decimales; `null` si no hay conversiones contadas. */
+  readonly spreadPct: string | null;
+  readonly spreadAmount: MoneyDto;
+  readonly fees: MoneyDto;
+  readonly costTotal: MoneyDto;
+  /** `false` si algún fee no pudo valorarse en la moneda de reporte (listado en `unvaluedFees`, nunca 1:1). */
+  readonly costComplete: boolean;
+  readonly unvaluedFees: readonly MoneyDto[];
+  readonly excluded: readonly {
+    readonly reason: ConversionCostExclusionReasonDto;
+    readonly count: number;
+    readonly amounts: readonly MoneyDto[];
+  }[];
+  readonly alternative: { readonly spreadPct: string | null; readonly excludedCount: number } | null;
+}
+
+/** `ConversionCostAnalysis` del contrato (`GET /workspaces/{workspaceId}/reports/conversion-costs`). */
+export interface ConversionCostAnalysisDto {
+  readonly reportingCurrency: string;
+  readonly grouping: ConversionCostGroupingDto;
+  readonly from: string;
+  readonly to: string;
+  readonly groups: readonly ConversionCostGroupDto[];
+  readonly totals: {
+    readonly conversions: number;
+    readonly converted: MoneyDto;
+    readonly spreadAmount: MoneyDto;
+    readonly fees: MoneyDto;
+    readonly costTotal: MoneyDto;
+    readonly excludedCount: number;
+    readonly costComplete: boolean;
+  };
+  readonly meta: {
+    readonly generatedAt: string;
+    readonly timeZone: string;
+    readonly rateWindowDays: number;
+    readonly ratesUsed: readonly ResolvedRateDto[];
+    readonly attributions: readonly RateAttributionDto[];
+  };
+}

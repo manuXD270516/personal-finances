@@ -383,6 +383,57 @@ describe('platform/event-delivery: rendimiento sostenido de los consumidores', (
       await runtime.close();
     }
   }, 120_000);
+
+  it('[TC-PLATFORM-EVENTS-019] con la plantilla del host (pool 34, max_connections 70) el worker arranca y registra fx.user-conversion-observations con concurrencia 1', async () => {
+    // D249: el único consumidor nuevo de Phase 5 entra después de subir max_connections y el pool del worker.
+    const env = readFileSync(
+      fileURLToPath(new URL('../../../../deploy/host/etc-pfos/pfos.env.example', import.meta.url)),
+      'utf8',
+    );
+    const compose = readFileSync(
+      fileURLToPath(new URL('../../../../deploy/compose/compose.prod.yaml', import.meta.url)),
+      'utf8',
+    );
+    const value = (name: string): string => {
+      const found = new RegExp(`^${name}=([0-9]+)\\s*$`, 'mu').exec(env);
+      if (!found) throw new Error(`${name} no está en la plantilla del host`);
+      return found[1] as string;
+    };
+    const maxConnections = Number(/- max_connections=(\d+)/u.exec(compose)?.[1]);
+    expect([Number(value('DATABASE_POOL_MAX')), maxConnections]).toEqual([34, 70]);
+    expect(Number(value('DATABASE_POOL_MAX')) + 22).toBeLessThan(maxConnections);
+    const runtime = await createWorkerRuntime(
+      workerConfig(
+        baseEnv(deps, {
+          EVENT_CONSUMER_CONCURRENCY: value('EVENT_CONSUMER_CONCURRENCY'),
+          EVENT_CONSUMER_BATCH_SIZE: value('EVENT_CONSUMER_BATCH_SIZE'),
+          DATABASE_POOL_MAX: value('DATABASE_POOL_MAX'),
+        }),
+      ),
+      quiet,
+      {
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+        lifecycleBackfillOnStart: false,
+        planningPeriodsOnStart: false,
+        commitmentsOnStart: false,
+        userConversionBackfillOnStart: false,
+      },
+    );
+    try {
+      const consumer = runtime.subscriptions
+        .definitions()
+        .find((d) => d.consumer === 'fx.user-conversion-observations');
+      expect(consumer?.concurrency).toBe(1);
+      expect(consumer?.events.map((e) => e.type).sort()).toEqual([
+        'transactions.ConversionRecorded',
+        'transactions.ConversionRevised',
+        'transactions.TransactionVoided',
+      ]);
+    } finally {
+      await runtime.close();
+    }
+  }, 120_000);
 });
 
 type Meter = NonNullable<ConstructorParameters<typeof EventDeliveryMetrics>[1]>;

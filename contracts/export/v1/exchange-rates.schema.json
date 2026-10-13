@@ -25,7 +25,9 @@
     "raw_payload",
     "anomaly_flagged",
     "anomaly_baseline_rate_id",
-    "anomaly_variation_pct"
+    "anomaly_variation_pct",
+    "conversion_transaction_id",
+    "conversion_revision"
   ],
   "properties": {
     "id": {
@@ -128,6 +130,19 @@
         "null"
       ],
       "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "conversion_transaction_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "conversion_revision": {
+      "type": [
+        "integer",
+        "null"
+      ]
     }
   },
   "x-pfos-table": "fx.exchange_rate",

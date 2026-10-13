@@ -28,11 +28,25 @@ export interface AnomalyReview {
   readonly decidedAt: string;
 }
 
+/**
+ * Marca append-only de una observación `USER_CONVERSION` como anulada (`fx.rate_withdrawal`): la conversión se anuló;
+ * la tasa no cambia (INV-011).
+ */
+export interface RateWithdrawal {
+  readonly rateId: string;
+  readonly workspaceId: string;
+  readonly transactionId: string;
+  readonly reason: string;
+  readonly withdrawnAt: string;
+}
+
 /** Tasa con su estado de reemplazo (la versión que la reemplazó, si existe) y la revisión de su anomalía. */
 export interface StoredRate {
   readonly rate: ExchangeRate;
   readonly supersededById: string | null;
   readonly anomalyReview?: AnomalyReview | null;
+  /** Marca de anulada de una observación de conversión; `null`/ausente en el resto. */
+  readonly withdrawal?: RateWithdrawal | null;
 }
 
 /** Estado de la anomalía de una tasa almacenada (`null` si no está marcada). */
@@ -93,6 +107,19 @@ export interface ExchangeRateRepository {
   latestAccepted(workspaceId: string, feed: ProviderFeedKey): Promise<StoredRate | null>;
   /** Fechas efectivas (YYYY-MM-DD) con alguna tasa del feed en [from, to] (relleno de días faltantes). */
   providerDays(workspaceId: string, feed: ProviderFeedKey, from: string, to: string): Promise<Set<string>>;
+  /**
+   * Inserta una observación de conversión propia si no existe otra de la misma conversión y revisión (índice único
+   * parcial `exchange_rate_conversion_uk`, `ON CONFLICT DO NOTHING`; idempotencia de negocio). `true` si se insertó.
+   * `FX_RATE_ALREADY_SUPERSEDED` si otra observación ya reemplazó a la que esta reemplaza.
+   */
+  insertUserConversionObservation(rate: ExchangeRate): Promise<boolean>;
+  /**
+   * Observación VIGENTE de una conversión: la de mayor revisión (con o sin marca de anulada); `null` si la conversión
+   * aún no tiene observaciones.
+   */
+  currentUserConversionObservation(workspaceId: string, transactionId: string): Promise<StoredRate | null>;
+  /** Marca una observación como anulada (idempotente: `ON CONFLICT DO NOTHING`). `true` si se insertó. */
+  insertWithdrawal(withdrawal: RateWithdrawal): Promise<boolean>;
 }
 
 /** Revisiones de anomalías (append-only; PK = tasa). */

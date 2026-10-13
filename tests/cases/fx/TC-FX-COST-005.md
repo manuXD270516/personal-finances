@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: []
 requirement: "Análisis de costo solo de lectura y aislado por workspace"
 scenario: "Otro workspace"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: ["NFR-SEC-003"]
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/conversion-costs.api.test.ts
+  - packages/contexts/reporting/src/application/conversion-cost.queries.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "authorization", "isolation"]
@@ -29,7 +31,7 @@ steps:
 expected_result:
   - "200 con los grupos de W1 y ninguna conversión de W2"
   - "Mismas cifras para VIEWER y OWNER"
-  - "Ningún dato cambia; rango de más de 24 periodos: 422 VALIDATION_FAILED"
+  - "Ningún dato cambia; rango de más de 24 periodos o invertido: 400 VALIDATION_FAILED (el catálogo de errores mapea VALIDATION_FAILED a 400)"
 created: 2026-10-13
 updated: 2026-10-13
 ---

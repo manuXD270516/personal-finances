@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: []
 requirement: "Análisis de costo de conversiones por canal, par y periodo"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: ["NFR-USAB-001"]
 invariants: []
 priority: medium
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/fx/conversion-costs.test.tsx
+  - tests/e2e/specs/fx-conversion-costs.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "ui", "e2e"]

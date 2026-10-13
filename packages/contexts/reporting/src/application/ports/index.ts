@@ -1,9 +1,9 @@
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
-import type { CategoryCatalogQuery } from '@pf/classification/contracts';
-import type { FxValuationPort, ResolvedRateDto } from '@pf/fx/contracts';
+import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import type { FxQuoteSideRatesPort, FxValuationPort, ResolvedRateDto } from '@pf/fx/contracts';
 import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { Clock } from '@pf/shared-kernel';
-import type { NominalFlowQuery } from '@pf/transactions/contracts';
+import type { ConversionDetailQuery, NominalFlowQuery } from '@pf/transactions/contracts';
 
 /**
  * Unidad de trabajo de LECTURA: una transacción PG con `SET LOCAL app.workspace_id` (RLS, INV-025) en la que corren
@@ -148,6 +148,8 @@ export interface FinancialPeriodsPort {
       readonly periodStart: string;
       readonly periodEnd: string;
       readonly status: string;
+      /** Día de inicio con que se calculó el periodo (`FinancialPeriodDto.startDay`). */
+      readonly startDay?: number;
     }[]
   >;
 }
@@ -174,6 +176,34 @@ export interface NetWorthHistoryDeps extends ReportingDeps {
   readonly periods: FinancialPeriodsPort;
   readonly snapshots: ClosingSnapshotsPort;
   readonly balanceHistory: AccountBalanceHistoryQuery;
+}
+
+/**
+ * Puertos de `GetConversionCostAnalysis` (add-conversion-cost-analysis, D245): REPORTING compone el análisis desde los
+ * contratos públicos de TRANSACTIONS (`ConversionDetailQuery`), ACCOUNTS (nombres de cuentas), CLASSIFICATION (nombres
+ * de contrapartes), FX (valoración y, para el Could, compra/venta paralela) y PLANNING (periodos financieros).
+ */
+export interface ConversionCostDeps {
+  readonly uow: ReportingUnitOfWork;
+  readonly workspaces: WorkspaceSettingsPort;
+  readonly accounts: AccountCatalogQuery;
+  readonly counterparties: CounterpartyCatalogQuery;
+  readonly conversions: ConversionDetailQuery;
+  readonly rates: FxValuationPort;
+  /** Compra/venta paralela para el spread alternativo (Could); sin él, el alternativo excluye todo. */
+  readonly quoteSide?: FxQuoteSideRatesPort;
+  readonly periods: FinancialPeriodsPort;
+  /**
+   * Día de inicio del mes financiero del workspace (IDENTITY): para asignar una fecha que aún no tiene periodo en la
+   * tabla con la regla del día de inicio. Sin él, el de los periodos existentes más cercanos (o 1).
+   */
+  readonly calendar?: {
+    calendarOf(
+      workspaceId: string,
+    ): Promise<{ readonly timeZone: string; readonly fiscalMonthStartDay: number }>;
+  };
+  readonly clock: Clock;
+  readonly rateValidityWindowDays?: number;
 }
 
 // ───────────────────────────────────────────── reporting/cash-flow-calendar (add-upcoming-payments)

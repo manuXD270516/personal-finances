@@ -95,6 +95,15 @@ export function toFxRateDto(stored: StoredRate, thresholdPct: string = DEFAULT_T
     fetchedAt: s.fetchedAt,
     attribution: s.provider ? attributionOf(s.provider) : null,
     anomaly: anomalyDto(stored, thresholdPct),
+    // Observaciones de conversiones propias (D231): la conversión de origen y, si se anuló, la marca de anulada.
+    ...(s.conversionRef ? { conversionRef: { ...s.conversionRef } } : {}),
+    ...(s.source === 'USER_CONVERSION'
+      ? {
+          withdrawn: stored.withdrawal
+            ? { at: stored.withdrawal.withdrawnAt, reason: stored.withdrawal.reason }
+            : null,
+        }
+      : {}),
   };
 }
 

@@ -1,15 +1,16 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AccountCatalogQuery } from '@pf/accounts/contracts';
-import type { CategoryCatalogQuery } from '@pf/classification/contracts';
-import type { FxValuationPort } from '@pf/fx/contracts';
+import type { CategoryCatalogQuery, CounterpartyCatalogQuery } from '@pf/classification/contracts';
+import type { FxQuoteSideRatesPort, FxValuationPort } from '@pf/fx/contracts';
 import type { AccountBalanceHistoryQuery, AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { Clock } from '@pf/shared-kernel';
-import type { NominalFlowQuery } from '@pf/transactions/contracts';
+import type { ConversionDetailQuery, NominalFlowQuery } from '@pf/transactions/contracts';
 import type { Pool } from 'pg';
 import { DataVersionProjector } from '../application/data-version-projector.js';
 import { NetWorthAtQueries, PeriodFlowsQueries } from '../application/closing-figures.queries.js';
+import { ConversionCostQueries } from '../application/conversion-cost.queries.js';
 import { NetWorthHistoryQueries } from '../application/net-worth-history.queries.js';
 import type {
   ClosingSnapshotsPort,
@@ -40,6 +41,7 @@ import {
 } from '../contracts/index.js';
 import { PgDataVersionStore, PgReportingUnitOfWork } from '../infrastructure/pg-reporting.js';
 import {
+  CONVERSION_COST_QUERIES,
   NET_WORTH_HISTORY_QUERIES,
   REPORT_SUMMARY_QUERIES,
   ReportingController,
@@ -58,6 +60,19 @@ export interface ReportingRuntimeOptions {
   readonly flows: NominalFlowQuery;
   readonly categories: CategoryCatalogQuery;
   readonly rates: FxValuationPort;
+  /**
+   * Análisis de costo de conversiones (add-conversion-cost-analysis, D245): nombres de contrapartes (CLASSIFICATION),
+   * revisión vigente de las conversiones (TRANSACTIONS), compra/venta paralela para el Could (FX) y día de inicio del
+   * mes financiero (IDENTITY). Los dos últimos son opcionales.
+   */
+  readonly counterparties: CounterpartyCatalogQuery;
+  readonly conversions: ConversionDetailQuery;
+  readonly quoteSide?: FxQuoteSideRatesPort;
+  readonly financialCalendar?: {
+    calendarOf(
+      workspaceId: string,
+    ): Promise<{ readonly timeZone: string; readonly fiscalMonthStartDay: number }>;
+  };
   /** Saldos por cuenta a varias fechas (LEDGER, add-net-worth-evolution). */
   readonly balanceHistory: AccountBalanceHistoryQuery;
   /**
@@ -101,6 +116,8 @@ export interface ReportingRuntime {
   readonly summary: ReportSummaryQueries;
   /** Evolución del patrimonio por periodo financiero (`GET /reports/net-worth/history`, add-net-worth-evolution). */
   readonly history: NetWorthHistoryQueries;
+  /** Análisis de costo de conversiones y su CSV (`GET /reports/conversion-costs[/export]`, add-conversion-cost-analysis). */
+  readonly conversionCosts: ConversionCostQueries;
   /** Próximos pagos, comprometido del periodo, saldo proyectado y pagos sorpresa (add-upcoming-payments). */
   readonly upcoming: UpcomingPaymentsQueries;
   /** Detalle del disponible para gastar (`GET /reports/spendable`, add-spendable-amount). */
@@ -149,6 +166,19 @@ export function createReportingRuntime(options: ReportingRuntimeOptions): Report
     spendable: new SpendableQueries(deps, deps.spendable as SpendableDeps),
     periodFlows: new PeriodFlowsQueries(deps),
     netWorth: new NetWorthAtQueries(deps),
+    conversionCosts: new ConversionCostQueries({
+      uow: deps.uow,
+      workspaces: options.workspaces,
+      accounts: options.accounts,
+      counterparties: options.counterparties,
+      conversions: options.conversions,
+      rates: options.rates,
+      ...(options.quoteSide ? { quoteSide: options.quoteSide } : {}),
+      periods: options.periods,
+      ...(options.financialCalendar ? { calendar: options.financialCalendar } : {}),
+      clock: options.clock,
+      rateValidityWindowDays,
+    }),
   };
 }
 
@@ -183,6 +213,7 @@ export class ReportingModule {
         { provide: NET_WORTH_HISTORY_QUERIES, useValue: options.runtime.history },
         { provide: UPCOMING_PAYMENTS_QUERIES, useValue: options.runtime.upcoming },
         { provide: SPENDABLE_QUERIES, useValue: options.runtime.spendable },
+        { provide: CONVERSION_COST_QUERIES, useValue: options.runtime.conversionCosts },
       ],
     };
   }

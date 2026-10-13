@@ -132,12 +132,12 @@ Notas: el agregado de cada evento es `RecurringDefinition` (`OccurrencesGenerate
 | `transactions.TransactionCreated.v1` | TRANSACTIONS | RULES, COMMITMENTS, REPORTING |
 | `transactions.TransactionUpdated.v1` | TRANSACTIONS | REPORTING |
 | `transactions.TransactionPosted.v1` | TRANSACTIONS | PLANNING, REPORTING |
-| `transactions.TransactionVoided.v1` | TRANSACTIONS | PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS |
+| `transactions.TransactionVoided.v1` | TRANSACTIONS | PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS, FX (solo conversiones: marca anulada su observación) |
 | `transactions.TransactionCategorized.v1` | TRANSACTIONS | PLANNING, REPORTING |
 | `transactions.TransferCompleted.v1` | TRANSACTIONS | GOALS, DEBT, REPORTING |
 | `transactions.TransferRevised.v1` | TRANSACTIONS | REPORTING (GOALS, DEBT en Phase 4) |
-| `transactions.ConversionRecorded.v1` | TRANSACTIONS | FX, REPORTING |
-| `transactions.ConversionRevised.v1` | TRANSACTIONS | REPORTING (FX) |
+| `transactions.ConversionRecorded.v1` | TRANSACTIONS | FX (consumidor `fx.user-conversion-observations`: observación `USER_CONVERSION`, D231), REPORTING |
+| `transactions.ConversionRevised.v1` | TRANSACTIONS | FX (`fx.user-conversion-observations`: la observación de la revisión nueva reemplaza a la anterior), REPORTING |
 | `fx.RateRecorded.v1` | FX | REPORTING |
 | `ledger.JournalEntryPosted.v1` | LEDGER | REPORTING, GOALS |
 

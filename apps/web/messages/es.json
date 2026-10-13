@@ -1160,7 +1160,14 @@
       "correctTitle": "Corregir tasa",
       "newValue": "Valor corregido",
       "correctReason": "Motivo de la corrección",
-      "saveCorrection": "Guardar corrección"
+      "saveCorrection": "Guardar corrección",
+      "costs": "Ver costo de conversiones",
+      "sourceFilter": "Origen",
+      "sourceAll": "Todos",
+      "observation": "Conversión",
+      "viewConversion": "Ver conversión",
+      "withdrawn": "conversión anulada",
+      "observationHint": "Observación de una conversión propia: es historial del par y nunca se usa para valorar."
     },
     "screen": {
       "title": "Cripto y FX",
@@ -5196,5 +5203,60 @@
         "none": "Ninguna deuda tiene un vencimiento conocido."
       }
     }
+  },
+  "ConversionCosts": {
+    "title": "Costo de conversiones",
+    "subtitle": "Cuánto te cuesta convertir por cada canal: el spread contra la referencia y las comisiones, por periodo y par.",
+    "backToFx": "Volver a tasas de cambio",
+    "loading": "Calculando el costo de tus conversiones…",
+    "filters": {
+      "title": "Filtros del análisis",
+      "from": "Desde (fecha de negocio)",
+      "to": "Hasta (fecha de negocio)",
+      "grouping": "Agrupar por",
+      "compare": "Comparar con la compra o venta paralela del día",
+      "apply": "Aplicar"
+    },
+    "grouping": {
+      "FINANCIAL_PERIOD": "Periodo financiero",
+      "CALENDAR_MONTH": "Mes calendario"
+    },
+    "errors": {
+      "DATE": "Usa fechas válidas (AAAA-MM-DD).",
+      "RANGE": "La fecha inicial no puede ser posterior a la final."
+    },
+    "export": "Exportar CSV",
+    "empty": "No hay conversiones posteadas entre {from} y {to}.",
+    "range": "Del {from} al {to}, en {currency}. Solo cuentan las conversiones posteadas, con su revisión vigente.",
+    "incomplete": "Algún costo está incompleto: una comisión no tiene tasa a la moneda de reporte y no se estimó.",
+    "caption": "Costo de conversiones por periodo, canal y par, en {currency}",
+    "columns": {
+      "period": "Periodo",
+      "channel": "Canal",
+      "pair": "Par",
+      "conversions": "Conversiones",
+      "converted": "Monto convertido",
+      "spreadPct": "Spread promedio",
+      "alternative": "Spread vs. paralela",
+      "spreadAmount": "Monto del spread",
+      "fees": "Comisiones",
+      "costTotal": "Costo total",
+      "excluded": "Excluidas"
+    },
+    "channel": {
+      "none": "Sin canal"
+    },
+    "accounts": "{source} → {target}",
+    "noValue": "—",
+    "alternativeExcluded": "({count} sin tasa paralela)",
+    "unvaluedFees": "Sin tasa para: {fees}",
+    "excluded": {
+      "NO_REFERENCE": "{count} sin tasa de referencia ({amount})",
+      "NO_QUOTED_RATE": "{count} sin tasa cotizada ({amount})",
+      "NO_REPORTING_RATE": "{count} sin tasa a la moneda de reporte ({amount})"
+    },
+    "totals": "Total",
+    "excludedTotal": "{count} excluidas",
+    "method": "El spread promedio pondera cada conversión por su monto convertido (suma del spread entre suma de lo convertido). Una conversión sin referencia registrada, sin tasa cotizada o sin tasa de valoración no se estima: se cuenta aparte."
   }
 }
