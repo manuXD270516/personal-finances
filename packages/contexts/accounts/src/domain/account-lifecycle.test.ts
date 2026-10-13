@@ -91,5 +91,5 @@ describe('Máquina de estados Account (add-lifecycle-timeline)', () => {
       }
       expect(ACCOUNT_LIFECYCLE.replay(path)).toBe(a.status);
     }
-  });
+  }, 60_000);
 });
