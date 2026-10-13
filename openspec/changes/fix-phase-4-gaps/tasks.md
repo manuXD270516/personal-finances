@@ -26,7 +26,7 @@
 
 ## 5. API
 
-- [x] 5.1 OpenAPI: `previewTransactionVoidImpact` (`GET W/goals/void-impact`), `CardAccount.overdueStatements[]`, `GoalDetail.negativeFunds[]` e ítems de `LoanList` ampliados; `pnpm contract:lint` y `pnpm contract:breaking` sin rupturas Nota 2026-10-13: OpenAPI aditivo (`previewTransactionVoidImpact`, `CardOverdueStatement`, `Goal.negativeFunds`, `LoanListItem`); Spectral y Redocly sin errores; `pnpm contract:breaking` no corrió (requiere Docker), valida CI.
+- [x] 5.1 OpenAPI: `previewTransactionVoidImpact` (`GET W/goals/void-impact`), `CardAccount.overdueStatements[]`, `GoalDetail.negativeFunds[]` e ítems de `LoanList` ampliados; `pnpm contract:lint` y `pnpm contract:breaking` sin rupturas Nota 2026-10-13: OpenAPI aditivo (`previewTransactionVoidImpact`, `CardOverdueStatement`, `Goal.negativeFunds` y tres propiedades opcionales en `Loan`: con `allOf` oasdiff las contaba como rotura, por eso no hay esquema `LoanListItem`); Spectral y Redocly sin errores; `pnpm contract:breaking` lo valida CI.
 - [x] 5.2 Tests de API: TC-DEBT-CARD-038, TC-DEBT-CARD-039, TC-GOALS-SAVINGS-052, TC-DEBT-LOAN-053 Nota 2026-10-13: tests de API escritos en credit-cards, goals y loans `api.test.ts`; sin Docker, los valida CI.
 
 ## 6. UI

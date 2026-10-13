@@ -18321,20 +18321,15 @@ components:
         version: { $ref: '#/components/schemas/Version' }
         createdAt: { $ref: '#/components/schemas/Instant' }
         updatedAt: { $ref: '#/components/schemas/Instant' }
-    LoanListItem:
-      description: A loan with the live figures of its detail so a list needs one call (same values and rules as `GET /loans/{loanId}`).
-      allOf:
-        - $ref: '#/components/schemas/Loan'
-        - type: object
-          properties:
-            outstandingPrincipal:
-              description: Principal pending according to the schedule; null for a draft or a cancelled loan.
-              oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
-            accountBalance:
-              description: Balance owed according to the loan account.
-              $ref: '#/components/schemas/Money'
-            nextInstallment:
-              oneOf: [{ $ref: '#/components/schemas/LoanNextInstallment' }, { type: 'null' }]
+        outstandingPrincipal:
+          description: Live figure present in `GET /loans` items (same values and rules as `GET /loans/{loanId}`); null for a draft or a cancelled loan.
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+        accountBalance:
+          description: Live figure present in `GET /loans` items; balance owed according to the loan account.
+          $ref: '#/components/schemas/Money'
+        nextInstallment:
+          description: Live figure present in `GET /loans` items.
+          oneOf: [{ $ref: '#/components/schemas/LoanNextInstallment' }, { type: 'null' }]
     LoanList:
       type: object
       additionalProperties: false
@@ -18342,7 +18337,7 @@ components:
       properties:
         data:
           type: array
-          items: { $ref: '#/components/schemas/LoanListItem' }
+          items: { $ref: '#/components/schemas/Loan' }
     ScheduleInstallment:
       type: object
       required: [n, dueDate, periodStart, periodEnd, principal, interest, fees, insurance, taxes, total, openingBalance, closingBalance]
