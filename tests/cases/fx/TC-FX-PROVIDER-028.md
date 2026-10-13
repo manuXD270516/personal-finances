@@ -47,4 +47,4 @@ Entonces no registra tasa y marca PROVIDER_PAYLOAD_INVALID
 ```
 
 ## Notas
-- Pendiente (2026-10-13): las variantes de la respuesta grabada del provider (JSON truncado, campo renombrado) dependen del adapter real (tarea 4.1, ADR-0029). La validación del precio (19 decimales, nulo, cero) y su registro como falla `PROVIDER_PAYLOAD_INVALID` ya están cubiertos con el doble en `crypto-rate-providers.test.ts`.
+- Pendiente (2026-10-13): las variantes de la respuesta grabada del provider (JSON truncado, campo renombrado) dependen de los adapters `CRYPTO_BINANCE` y `CRYPTO_BYBIT` (tareas 4.1 y 4.2) y de sus fixtures (tarea 1.5). Ambos publican el precio como texto JSON; también se cubre un `retCode` distinto de 0 en Bybit. La validación del precio (19 decimales, nulo, cero) y su registro como falla `PROVIDER_PAYLOAD_INVALID` ya están cubiertos con el doble en `crypto-rate-providers.test.ts`.

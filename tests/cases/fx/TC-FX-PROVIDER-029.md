@@ -20,7 +20,7 @@ phase: 5
 tags: ["fx", "crypto", "rate-limit", "retry-after"]
 error_code: null
 preconditions:
-  - "Límite publicado del provider registrado en ADR-0029"
+  - "Límites de ADR-0029: Binance por peso e IP con 429/418 y Retry-After; Bybit 600 solicitudes por 5 s y 403 sin Retry-After (espera persistida de 30 min); presupuesto de PFOS ≤ 10 solicitudes/min por exchange"
   - "Servidor local que responde 429 con Retry-After 120"
 input: {"retryAfterSeconds": 120}
 steps:
@@ -50,4 +50,4 @@ Entonces no consulta al provider antes de 120 s
 ```
 
 ## Notas
-- Pendiente (2026-10-13): el límite publicado, la caché y el 429 reales dependen del adapter y de ADR-0029 (tareas 4.1 y 4.3). Que un `Retry-After` persistido bloquee los ciclos y el backfill cripto, y que una falla a mitad del backfill paginado continúe sin huecos, ya está cubierto con el doble en `crypto-rate-providers.test.ts`.
+- Pendiente (2026-10-13): los límites ya están fijados en ADR-0029; falta aplicarlos en los adapters (tareas 4.1–4.3). La variante de Bybit (403 sin `Retry-After`) se prueba igual que el 429, con la espera de 30 min persistida. Que un `Retry-After` persistido bloquee los ciclos y el backfill cripto, y que una falla a mitad del backfill paginado continúe sin huecos, ya está cubierto con el doble en `crypto-rate-providers.test.ts`.
