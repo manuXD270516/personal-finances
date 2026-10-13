@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: ["transactions/conversions"]
 requirement: "Análisis de costo de conversiones por canal, par y periodo"
 scenario: "Conversión revisada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011", "FR-FX-007"]
 nfr: []
 invariants: []
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/conversion-costs.api.test.ts
+  - packages/contexts/reporting/src/domain/conversion-cost.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "revision", "void"]

@@ -3,7 +3,14 @@ import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } fr
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import { Instant, type Clock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
-import type { FxConversionPricingPort, FxValuationPort, ValuationRateDto } from '../contracts/index.js';
+import type { EventConsumerDefinition } from '@pf/platform/events';
+import {
+  FX_USER_CONVERSION_CONSUMER,
+  type FxConversionPricingPort,
+  type FxQuoteSideRatesPort,
+  type FxValuationPort,
+  type ValuationRateDto,
+} from '../contracts/index.js';
 import { FxQueries } from '../application/fx.queries.js';
 import { FxService } from '../application/fx.service.js';
 import { MarketRateIngestion } from '../application/market-rate-ingestion.js';
@@ -22,6 +29,11 @@ import {
   type FxProviderSettings,
 } from '../application/provider-settings.js';
 import { ProviderStatusQueries } from '../application/provider-status.queries.js';
+import {
+  observationFactOf,
+  UserConversionObservations,
+  type ConversionBackfillSource,
+} from '../application/user-conversion-observations.js';
 import { EXCHANGE_RATE_LIFECYCLE } from '../domain/index.js';
 import type { FxRateProvider, MarketRateProvider, ResolvedRate } from '../domain/index.js';
 import {
@@ -70,6 +82,8 @@ export interface FxRuntime {
   readonly pricing: FxConversionPricingPort;
   /** Valoración por lote para REPORTING (`@pf/fx/contracts`, add-basic-dashboard). */
   readonly valuation: FxValuationPort;
+  /** Tasas de compra/venta paralela por lote para el spread alternativo de REPORTING (add-conversion-cost-analysis). */
+  readonly quoteSide: FxQuoteSideRatesPort;
   /** Gancho síncrono de `CreateWorkspace`: habilita las monedas por defecto. */
   readonly provisioner: {
     onWorkspaceCreated(input: { readonly workspaceId: string; readonly userId: string }): Promise<void>;
@@ -112,6 +126,20 @@ function valuationPort(queries: FxQueries): FxValuationPort {
         scale: r.definition.scale,
         enabled: r.enabled,
       }));
+    },
+  };
+}
+
+/** `FxQuoteSideRatesPort` sobre las consultas de FX (misma unidad de trabajo del llamador si existe). */
+function quoteSidePort(queries: FxQueries): FxQuoteSideRatesPort {
+  return {
+    async resolveQuoteSideRates({ workspaceId, requests, windowDays }) {
+      const found = await queries.resolveQuoteSideRates(
+        workspaceId,
+        requests.map((r) => ({ base: r.base, quote: r.quote, at: Instant.parse(r.at), side: r.side })),
+        windowDays,
+      );
+      return found.map((r) => (r ? { resolved: toResolvedRateDto(r), exact: exactRate(r) } : null));
     },
   };
 }
@@ -195,6 +223,7 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
     }),
     pricing: queries,
     valuation: valuationPort(queries),
+    quoteSide: quoteSidePort(queries),
     provisioner: {
       // Sin consultar IDENTITY: el workspace aún se está creando en la misma transacción (BOB, USD, USDT).
       onWorkspaceCreated: ({ workspaceId }) => service.onWorkspaceCreated({ workspaceId }),
@@ -223,6 +252,63 @@ export class FxModule {
     };
   }
 }
+
+// ------------------------------------------------------------------ worker: observaciones de conversiones propias
+
+export interface FxUserConversionOptions {
+  /** Pool del worker (`pf_worker`). */
+  readonly pool: Pool;
+  readonly clock: Clock;
+  readonly outbox: OutboxPort;
+}
+
+/** Composición del registro de observaciones de conversiones propias para el worker (D231; tareas 4.4 y 5.2). */
+export function createUserConversionObservations(
+  options: FxUserConversionOptions,
+): UserConversionObservations {
+  return new UserConversionObservations({
+    uow: new PgFxUnitOfWork(options.pool),
+    rates: new PgExchangeRateRepository(),
+    currencies: new PgCurrencyRepository(),
+    outbox: options.outbox,
+    ids: uuidV7Ids,
+    clock: options.clock,
+  });
+}
+
+/**
+ * Consumidor `fx.user-conversion-observations` (D231, D249): el único consumidor nuevo de Phase 5. Concurrencia 1 (no
+ * reserva conexiones del pool del worker). En la transacción del consumidor (inbox + RLS del workspace, INV-028):
+ * `ConversionRecorded.v1` registra la observación de la conversión, `ConversionRevised.v1` registra la de la revisión
+ * nueva reemplazando a la anterior y `TransactionVoided.v1` (solo conversiones) marca la vigente como anulada.
+ */
+export function userConversionConsumers(observations: UserConversionObservations): EventConsumerDefinition[] {
+  return [
+    {
+      consumer: FX_USER_CONVERSION_CONSUMER,
+      concurrency: 1,
+      events: [
+        { type: 'transactions.ConversionRecorded', version: 1 },
+        { type: 'transactions.ConversionRevised', version: 1 },
+        { type: 'transactions.TransactionVoided', version: 1 },
+      ],
+      handler: async (event) => {
+        if (event.eventType === 'transactions.TransactionVoided') {
+          const payload = event.payload as { readonly kind?: unknown; readonly transactionId?: unknown };
+          if (payload.kind !== 'CONVERSION' || typeof payload.transactionId !== 'string') return;
+          await observations.withdraw({
+            workspaceId: event.workspaceId,
+            transactionId: payload.transactionId,
+          });
+          return;
+        }
+        await observations.record(observationFactOf(event.workspaceId, event.payload));
+      },
+    },
+  ];
+}
+
+export { UserConversionObservations, type ConversionBackfillSource };
 
 /** Máquina de estados `ExchangeRate` (tasas manuales; add-lifecycle-timeline), para AUDIT en el composition root. */
 export const EXCHANGE_RATE_LIFECYCLE_MACHINE: LifecycleMachineDto = EXCHANGE_RATE_LIFECYCLE.definition;

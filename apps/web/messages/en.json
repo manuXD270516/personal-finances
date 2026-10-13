@@ -1160,7 +1160,14 @@
       "correctTitle": "Correct rate",
       "newValue": "Corrected value",
       "correctReason": "Correction reason",
-      "saveCorrection": "Save correction"
+      "saveCorrection": "Save correction",
+      "costs": "View conversion costs",
+      "sourceFilter": "Origin",
+      "sourceAll": "All",
+      "observation": "Conversion",
+      "viewConversion": "View conversion",
+      "withdrawn": "conversion voided",
+      "observationHint": "Observation of an own conversion: it is history of the pair and is never used to value."
     },
     "screen": {
       "title": "Crypto and FX",
@@ -5196,5 +5203,61 @@
         "none": "No debt has a known due date."
       }
     }
+  },
+  "ConversionCosts": {
+    "title": "Conversion costs",
+    "subtitle": "What it costs you to convert through each channel: the spread against the reference and the fees, by period and pair.",
+    "backToFx": "Back to exchange rates",
+    "loading": "Calculating the cost of your conversions…",
+    "filters": {
+      "title": "Analysis filters",
+      "from": "From (business date)",
+      "to": "To (business date)",
+      "grouping": "Group by",
+      "compare": "Compare with the parallel buy or sell rate of the day",
+      "apply": "Apply"
+    },
+    "grouping": {
+      "FINANCIAL_PERIOD": "Financial period",
+      "CALENDAR_MONTH": "Calendar month"
+    },
+    "errors": {
+      "DATE": "Use valid dates (YYYY-MM-DD).",
+      "RANGE": "The start date cannot be after the end date."
+    },
+    "export": "Export CSV",
+    "empty": "There are no posted conversions between {from} and {to}.",
+    "range": "From {from} to {to}, in {currency}. Only posted conversions count, with their current revision.",
+    "incomplete": "Some cost is incomplete: a fee has no rate to the reporting currency and was not estimated.",
+    "caption": "Conversion costs by period, channel and pair, in {currency}",
+    "tableRegion": "Conversion cost table, scrollable",
+    "columns": {
+      "period": "Period",
+      "channel": "Channel",
+      "pair": "Pair",
+      "conversions": "Conversions",
+      "converted": "Converted amount",
+      "spreadPct": "Average spread",
+      "alternative": "Spread vs. parallel",
+      "spreadAmount": "Spread amount",
+      "fees": "Fees",
+      "costTotal": "Total cost",
+      "excluded": "Excluded"
+    },
+    "channel": {
+      "none": "No channel"
+    },
+    "accounts": "{source} → {target}",
+    "noValue": "—",
+    "alternativeExcluded": "({count} without a parallel rate)",
+    "unvaluedFees": "No rate for: {fees}",
+    "excluded": {
+      "NO_REFERENCE": "{count} without a reference rate ({amount})",
+      "NO_QUOTED_RATE": "{count} without a quoted rate ({amount})",
+      "NO_REPORTING_RATE": "{count} without a rate to the reporting currency ({amount})"
+    },
+    "totals": "Total",
+    "excludedTotal": "{count} excluded",
+    "method": "The average spread weights each conversion by its converted amount (sum of the spread over the sum of what was converted). A conversion without a recorded reference, without a quoted rate or without a valuation rate is never estimated: it is counted apart."
   }
 }

@@ -5,16 +5,18 @@ spec: fx/market-rates
 related_specs: ["platform/event-delivery"]
 requirement: "Observación de tasa por cada conversión propia"
 scenario: "Venta de USDT observada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011", "FR-FX-003"]
 nfr: ["NFR-REL-007"]
 invariants: ["INV-011"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/conversion-costs.api.test.ts
+  - packages/contexts/fx/src/application/user-conversion-observations.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "user-conversion", "observation", "idempotency"]

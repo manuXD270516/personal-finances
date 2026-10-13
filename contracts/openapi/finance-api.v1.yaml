@@ -3342,7 +3342,7 @@ paths:
           schema: { type: boolean, default: false }
         - name: source
           in: query
-          description: Filter by origin (MANUAL or PROVIDER)
+          description: Filter by origin (MANUAL, PROVIDER or USER_CONVERSION, the observations of own conversions)
           schema: { $ref: '#/components/schemas/FxRateSource' }
         - name: provider
           in: query
@@ -4158,6 +4158,114 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
           description: 'CURRENCY_NOT_ENABLED (reportingCurrency).'
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/conversion-costs:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: getConversionCostAnalysis
+      summary: Real cost of converting (spread and fees) by period, channel and pair
+      description: |
+        Answers "how much does it cost me to convert through each channel?" (FR-FX-011, US-183) from the source of
+        truth, in one read transaction with the workspace RLS: the CURRENT revision of the posted conversions (never
+        voided or pending ones) whose business date falls in `[from, to]`, grouped by period, channel and pair. The
+        channel is the counterparty of the conversion plus its source and target accounts (`NONE` = "Sin canal": no
+        counterparty, never inferred). Per group, in the reporting currency (the workspace base currency): the
+        converted amount (the converted quantity of the pair base currency valued with the reference rate recorded
+        on each conversion and, when the pair quote is not the reporting currency, with the valuation rate in force at
+        the instant of the conversion), the spread weighted by that amount (`spreadPct` = sum of the spread amounts /
+        sum of the converted amounts, 4 decimals HALF_EVEN only when presenting), the spread amount (signed: a favorable
+        spread subtracts), the fees and the total cost (spread plus fees). A conversion without a recorded reference,
+        without a quoted rate or whose amount cannot be valued in the reporting currency inside the validity window
+        (REPORTING_RATE_VALIDITY_WINDOW) is excluded from the averages and totals of its group and counted apart in
+        `excluded[]` with its reason and its amount in the original currency (never estimated, never 1:1); a fee
+        without a valuation rate leaves `costComplete=false` with the fee in `unvaluedFees[]`. `grouping` defaults
+        to `FINANCIAL_PERIOD` (the workspace financial periods, with the start-day rule for dates whose period does
+        not exist yet) and may be `CALENDAR_MONTH`; each conversion is assigned by its business date, never by the
+        UTC instant. Without `from` and `to` it covers the last 12 periods up to today; at most 24 periods per
+        query. `compareWith=PARALLEL_SIDE` (optional) adds `alternative` per group: the spread recomputed against the
+        parallel buy rate (conversions that buy the pair base currency) or sell rate (those that sell it) in force at
+        the instant of each conversion, counting apart the conversions without that rate; it never changes the
+        spread against the recorded reference. Read-only for every member (OWNER, EDITOR or VIEWER).
+      x-openspec-capability: [fx/conversion-pricing]
+      x-required-role: VIEWER
+      parameters:
+        - name: from
+          in: query
+          description: First business date (inclusive). Defaults to the start of the 11th period before the one containing `to`.
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          description: Last business date (inclusive). Defaults to today in the workspace time zone.
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - $ref: '#/components/parameters/ConversionCostGrouping'
+        - name: compareWith
+          in: query
+          description: Adds the spread recomputed against the parallel buy or sell rate of the day (Could).
+          schema: { type: string, enum: [PARALLEL_SIDE] }
+      responses:
+        '200':
+          description: Conversion cost analysis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversionCostAnalysis' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (inverted range, malformed date, unknown grouping or more than 24 periods).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/reports/conversion-costs/export:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Reporting]
+      operationId: exportConversionCostAnalysis
+      summary: Export the conversion cost analysis to CSV
+      description: |
+        Synchronous CSV of the same query as `getConversionCostAnalysis` (without `compareWith`): one row per group
+        with the columns `periodo`, `canal`, `cuenta_origen`, `cuenta_destino`, `par`, `conversiones`,
+        `monto_convertido`, `spread_promedio_pct`, `monto_spread`, `fees`, `costo_total`, `conversiones_excluidas` and
+        `moneda_reporte`. RFC 4180, UTF-8 with BOM, comma separator, amounts as decimal strings in the reporting
+        currency and text cells that start with `=`, `+`, `-`, `@`, tab or CR neutralized against CSV injection.
+        Read-only for every member. Costly operation (`x-rate-limit: costly`): at most 10 per user and minute (429
+        `RATE_LIMITED`).
+      x-openspec-capability: [fx/conversion-pricing]
+      x-required-role: VIEWER
+      x-rate-limit: costly
+      parameters:
+        - name: from
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - name: to
+          in: query
+          schema: { $ref: '#/components/schemas/LocalDate' }
+        - $ref: '#/components/parameters/ConversionCostGrouping'
+      responses:
+        '200':
+          description: >-
+            Conversion cost CSV as an attachment (`Content-Disposition: attachment; filename="conversion-costs-<from>-<to>.csv"`).
+          headers:
+            Content-Disposition:
+              description: Always `attachment` with a safe ASCII file name.
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV RFC 4180 (comma, CRLF, header) with UTF-8 BOM.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 'VALIDATION_FAILED (inverted range, malformed date, unknown grouping or more than 24 periods).'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
@@ -10395,6 +10503,11 @@ components:
         talks to the API directly (BFF pattern, ADR-0010/ADR-0019).
 
   parameters:
+    ConversionCostGrouping:
+      name: grouping
+      in: query
+      description: Groups by the workspace financial period (default) or by calendar month; each conversion is assigned by its business date.
+      schema: { $ref: '#/components/schemas/ConversionCostGrouping' }
     AuditAggregateType:
       name: aggregateType
       in: query
@@ -12922,6 +13035,27 @@ components:
           oneOf:
             - $ref: '#/components/schemas/FxRateAnomaly'
             - type: 'null'
+        conversionRef:
+          description: >-
+            Own conversion (and revision) that originated the observation (`source = USER_CONVERSION`, D231); absent on
+            manual and provider rates. Observations are history of the pair and are never used to value or as a reference.
+          type: object
+          additionalProperties: false
+          required: [transactionId, revision]
+          properties:
+            transactionId: { type: string, format: uuid }
+            revision: { type: integer, minimum: 1 }
+        withdrawn:
+          description: >-
+            Only on observations: set when the conversion was voided (the rate and its value do not change); null while valid.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [at, reason]
+              properties:
+                at: { $ref: '#/components/schemas/Instant' }
+                reason: { type: string }
+            - type: 'null'
     FxRateCreate:
       type: object
       additionalProperties: false
@@ -14994,6 +15128,144 @@ components:
               type: integer
               description: Rate validity window (REPORTING_RATE_VALIDITY_WINDOW), the same as `/reports/summary`.
             dataFreshness: { $ref: '#/components/schemas/Instant' }
+            ratesUsed:
+              type: array
+              items: { $ref: '#/components/schemas/ResolvedRate' }
+            attributions:
+              type: array
+              items: { $ref: '#/components/schemas/RateAttribution' }
+    ConversionCostGrouping:
+      type: string
+      description: Period grouping of the conversion cost analysis.
+      enum: [FINANCIAL_PERIOD, CALENDAR_MONTH]
+    ConversionCostGroup:
+      type: object
+      additionalProperties: false
+      required:
+        - period
+        - channel
+        - sourceAccountId
+        - sourceAccountName
+        - targetAccountId
+        - targetAccountName
+        - pair
+        - conversions
+        - converted
+        - spreadPct
+        - spreadAmount
+        - fees
+        - costTotal
+        - costComplete
+        - unvaluedFees
+        - excluded
+        - alternative
+      properties:
+        period:
+          type: object
+          additionalProperties: false
+          required: [label, from, to]
+          properties:
+            label: { type: string, description: 'Period label (YYYY-MM of its start).' }
+            from: { $ref: '#/components/schemas/LocalDate' }
+            to: { $ref: '#/components/schemas/LocalDate' }
+        channel:
+          type: object
+          description: Counterparty of the conversion (`COUNTERPARTY` registered, `NAMED` free text) or `NONE` ("Sin canal").
+          additionalProperties: false
+          required: [kind, counterpartyId, name]
+          properties:
+            kind: { type: string, enum: [COUNTERPARTY, NAMED, NONE] }
+            counterpartyId: { type: [string, 'null'], format: uuid }
+            name: { type: [string, 'null'] }
+        sourceAccountId: { type: string, format: uuid }
+        sourceAccountName: { type: string }
+        targetAccountId: { type: string, format: uuid }
+        targetAccountName: { type: string }
+        pair:
+          type: object
+          additionalProperties: false
+          required: [base, quote]
+          properties:
+            base: { $ref: '#/components/schemas/CurrencyCode' }
+            quote: { $ref: '#/components/schemas/CurrencyCode' }
+        conversions:
+          type: integer
+          description: Conversions counted in the figures (the excluded ones are not).
+        converted: { $ref: '#/components/schemas/Money' }
+        spreadPct:
+          description: Spread weighted by the converted amount (4 decimals); null when no conversion is counted.
+          oneOf:
+            - $ref: '#/components/schemas/DecimalString'
+            - type: 'null'
+        spreadAmount: { $ref: '#/components/schemas/Money' }
+        fees: { $ref: '#/components/schemas/Money' }
+        costTotal: { $ref: '#/components/schemas/Money' }
+        costComplete:
+          type: boolean
+          description: false when some fee could not be valued in the reporting currency (never converted 1:1).
+        unvaluedFees:
+          type: array
+          items: { $ref: '#/components/schemas/Money' }
+        excluded:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [reason, count, amounts]
+            properties:
+              reason: { type: string, enum: [NO_REFERENCE, NO_QUOTED_RATE, NO_REPORTING_RATE] }
+              count: { type: integer }
+              amounts:
+                type: array
+                description: Converted quantity of the pair base currency in its original currency, summed per currency.
+                items: { $ref: '#/components/schemas/Money' }
+        alternative:
+          description: Spread against the parallel buy or sell rate of the day (only with `compareWith=PARALLEL_SIDE`); null otherwise.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [spreadPct, excludedCount]
+              properties:
+                spreadPct:
+                  oneOf:
+                    - $ref: '#/components/schemas/DecimalString'
+                    - type: 'null'
+                excludedCount: { type: integer }
+            - type: 'null'
+    ConversionCostAnalysis:
+      type: object
+      additionalProperties: false
+      required: [reportingCurrency, grouping, from, to, groups, totals, meta]
+      properties:
+        reportingCurrency: { $ref: '#/components/schemas/CurrencyCode' }
+        grouping: { $ref: '#/components/schemas/ConversionCostGrouping' }
+        from: { $ref: '#/components/schemas/LocalDate' }
+        to: { $ref: '#/components/schemas/LocalDate' }
+        groups:
+          type: array
+          items: { $ref: '#/components/schemas/ConversionCostGroup' }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [conversions, converted, spreadAmount, fees, costTotal, excludedCount, costComplete]
+          properties:
+            conversions: { type: integer }
+            converted: { $ref: '#/components/schemas/Money' }
+            spreadAmount: { $ref: '#/components/schemas/Money' }
+            fees: { $ref: '#/components/schemas/Money' }
+            costTotal: { $ref: '#/components/schemas/Money' }
+            excludedCount: { type: integer }
+            costComplete: { type: boolean }
+        meta:
+          type: object
+          additionalProperties: false
+          required: [generatedAt, timeZone, rateWindowDays, ratesUsed, attributions]
+          properties:
+            generatedAt: { $ref: '#/components/schemas/Instant' }
+            timeZone: { type: string }
+            rateWindowDays:
+              type: integer
+              description: Rate validity window (REPORTING_RATE_VALIDITY_WINDOW), the same as `/reports/summary`.
             ratesUsed:
               type: array
               items: { $ref: '#/components/schemas/ResolvedRate' }

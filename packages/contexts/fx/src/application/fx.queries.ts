@@ -208,6 +208,55 @@ export class FxQueries implements FxConversionPricingPort {
     });
   }
 
+  /**
+   * Tasa de un solo lado (`PARALLEL_BUY` / `PARALLEL_SELL`) vigente a cada instante, por lote (add-conversion-cost-analysis,
+   * Could, D247): el tipo se pide explícitamente, directa o inversa, nunca cruzada, con el selector de providers.
+   * `null` = sin tasa de ese lado dentro de la ventana (nunca se sustituye por otra).
+   */
+  resolveQuoteSideRates(
+    workspaceId: string,
+    requests: readonly {
+      readonly base: string;
+      readonly quote: string;
+      readonly at: Instant;
+      readonly side: 'PARALLEL_BUY' | 'PARALLEL_SELL';
+    }[],
+    windowDaysOverride?: number,
+  ): Promise<(ResolvedRate | null)[]> {
+    const windowDays = windowDaysOverride ?? this.windowDays;
+    if (!Number.isInteger(windowDays) || windowDays < 1) {
+      return Promise.reject(
+        new DomainError('VALIDATION_FAILED', 'windowDays must be a positive integer').at('/windowDays'),
+      );
+    }
+    return this.deps.uow.run(workspaceId, async () => {
+      if (requests.length === 0) return [];
+      const defs = new Map<string, Currency | null>();
+      for (const code of new Set(requests.flatMap((r) => [r.base, r.quote]))) {
+        defs.set(code, (await this.deps.currencies.find(code))?.toCurrency() ?? null);
+      }
+      const codes = [...defs.entries()].filter(([, c]) => c !== null).map(([code]) => code);
+      const times = requests.map((r) => r.at.epochMillis);
+      const from = Instant.ofEpochMillis(Math.min(...times) - windowDays * DAY_MS);
+      const to = Instant.ofEpochMillis(Math.max(...times));
+      const candidates = await this.deps.rates.candidates(workspaceId, codes, from, to);
+      const resolver = new RateResolver(candidates, this.deps.policy);
+      return requests.map((r) => {
+        const base = defs.get(r.base) ?? null;
+        const quote = defs.get(r.quote) ?? null;
+        if (!base || !quote || base.code === quote.code) return null;
+        return resolver.tryResolve({
+          base,
+          quote,
+          at: r.at,
+          rateType: r.side,
+          windowDays,
+          allowCross: false,
+        });
+      });
+    });
+  }
+
   // ------------------------------------------------------------------ FxConversionPricingPort
 
   async currency(code: string): Promise<CurrencyInfoDto | null> {

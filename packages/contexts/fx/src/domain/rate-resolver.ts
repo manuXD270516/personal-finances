@@ -29,10 +29,14 @@ export interface RateCandidate {
 
 /**
  * ¿Puede usarse para valorar o como referencia? No reemplazada y, si es anómala, confirmada (una anomalía pendiente
- * o rechazada nunca se usa; fx/market-rate-providers).
+ * o rechazada nunca se usa; fx/market-rate-providers). Una observación de conversión propia (`USER_CONVERSION`, D231)
+ * NUNCA se usa: ni para valorar, ni como referencia, ni como componente de una tasa cruzada, aunque sea la más
+ * reciente del par (TC-FX-USERCONV-002). El repositorio ya las excluye en la consulta; esta es la segunda barrera.
  */
 export const isUsableCandidate = (c: RateCandidate): boolean =>
-  c.supersededById === null && (c.state.anomaly === null || c.anomalyDecision === 'CONFIRMED');
+  c.supersededById === null &&
+  c.state.source !== 'USER_CONVERSION' &&
+  (c.state.anomaly === null || c.anomalyDecision === 'CONFIRMED');
 
 export type RateDerivation = 'DIRECT' | 'INVERSE' | 'CROSS';
 

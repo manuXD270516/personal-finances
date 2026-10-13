@@ -8,12 +8,13 @@ import type {
 } from '@pf/fx/contracts';
 import type { AccountBalanceDto } from '@pf/ledger/contracts';
 import { FixedClock, Instant } from '@pf/shared-kernel';
-import type { NominalFlowRowDto } from '@pf/transactions/contracts';
+import type { ConversionCostRowDto, NominalFlowRowDto } from '@pf/transactions/contracts';
 import type {
   AccountReservationRow,
   BudgetAvailabilityRow,
   ClosingSnapshotsPort,
   CommittedRangeRow,
+  ConversionCostDeps,
   GoalPlanRow,
   SpendableCommittedRow,
   GoalFlowRow,
@@ -95,6 +96,17 @@ export class InMemoryReporting {
   readonly snapshots: Awaited<ReturnType<ClosingSnapshotsPort['listCurrent']>>[number][] = [];
   /** Saldo PRESENTADO por cuenta a cada fecha de corte (`asOf` → cuenta → saldo); sin entrada = cuenta sin saldo. */
   readonly balancesByDate = new Map<string, Map<string, { amount: string; currency: string }>>();
+
+  /** Revisión vigente de las conversiones posteadas (TRANSACTIONS, `ConversionDetailQuery`; add-conversion-cost-analysis). */
+  readonly conversionRows: ConversionCostRowDto[] = [];
+  /** Nombres vigentes de contrapartes (CLASSIFICATION, `CounterpartyCatalogQuery`). */
+  readonly counterpartyNames = new Map<string, string>();
+  /** Compra/venta paralela publicada (FX, `FxQuoteSideRatesPort`); `null` = puerto no cableado. */
+  parallelRates:
+    | { base: string; quote: string; side: 'PARALLEL_BUY' | 'PARALLEL_SELL'; value: string; asOf: string }[]
+    | null = null;
+  /** Día de inicio del mes financiero (IDENTITY); `null` = puerto no cableado. */
+  fiscalMonthStartDay: number | null = null;
 
   /** Definiciones recurrentes activas (COMMITMENTS, `DefinitionStatsQuery`). */
   hasActiveDefinitions = false;
@@ -376,6 +388,88 @@ export class InMemoryReporting {
         hasActiveDefinitions: async () => this.hasActiveDefinitions,
       },
       metrics: { observe: (name, value) => void this.metricSamples.push({ name, value }) },
+    };
+  }
+
+  /** Puertos de `GetConversionCostAnalysis` (add-conversion-cost-analysis): los de `deps()` más conversiones y nombres. */
+  conversionCostDeps(): ConversionCostDeps {
+    const base = this.deps();
+    return {
+      uow: base.uow,
+      workspaces: base.workspaces,
+      accounts: base.accounts,
+      counterparties: {
+        counterpartiesByIds: async ({ counterpartyIds }) =>
+          counterpartyIds.flatMap((id) => {
+            const name = this.counterpartyNames.get(id);
+            return name === undefined ? [] : [{ counterpartyId: id, name, archived: false }];
+          }),
+      },
+      conversions: {
+        listForCostAnalysis: async ({ from, to, includeVoided }) =>
+          this.conversionRows.filter(
+            (r) => r.businessDate >= from && r.businessDate <= to && (includeVoided === true || !r.voided),
+          ),
+      },
+      rates: base.rates,
+      ...(this.parallelRates
+        ? {
+            quoteSide: {
+              resolveQuoteSideRates: async ({ requests }) =>
+                requests.map((req) => {
+                  const at = Date.parse(req.at);
+                  const found = (this.parallelRates ?? [])
+                    .filter(
+                      (r) =>
+                        r.base === req.base &&
+                        r.quote === req.quote &&
+                        r.side === req.side &&
+                        Date.parse(r.asOf) <= at,
+                    )
+                    .sort((a, b) => Date.parse(a.asOf) - Date.parse(b.asOf))
+                    .at(-1);
+                  if (!found) return null;
+                  const exact = { base: found.base, quote: found.quote, value: found.value };
+                  return {
+                    exact,
+                    resolved: {
+                      rate: exact,
+                      fxRateId: `parallel-${found.side}-${found.asOf}`,
+                      derivation: 'DIRECT' as const,
+                      components: [],
+                      rateType: found.side,
+                      requestedRateType: found.side,
+                      source: 'PROVIDER' as const,
+                      sourceLabel: null,
+                      asOf: found.asOf,
+                      ageDays: 0,
+                      ageSeconds: 0,
+                      approx: false,
+                      provider: 'PARALELO_BO' as const,
+                      selection: 'PRIMARY' as const,
+                      stale: false,
+                      attribution: null,
+                    },
+                  };
+                }),
+            },
+          }
+        : {}),
+      periods: { listPeriods: async () => [...this.periods] },
+      ...(this.fiscalMonthStartDay === null
+        ? {}
+        : {
+            calendar: {
+              calendarOf: async () => ({
+                timeZone: this.settings.timeZone,
+                fiscalMonthStartDay: this.fiscalMonthStartDay as number,
+              }),
+            },
+          }),
+      clock: this.clock,
+      ...(this.rateValidityWindowDays === undefined
+        ? {}
+        : { rateValidityWindowDays: this.rateValidityWindowDays }),
     };
   }
 }

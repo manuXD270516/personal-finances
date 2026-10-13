@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: []
 requirement: "Conversiones sin contraparte agrupadas como Sin canal"
 scenario: "Compra de USDT sin contraparte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: []
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/conversion-cost.queries.test.ts
+  - packages/contexts/reporting/src/domain/conversion-cost.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "channel"]

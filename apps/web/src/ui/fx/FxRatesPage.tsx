@@ -92,6 +92,7 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
   const enabled = ctx.currencies.filter((c) => c.enabled).map((c) => c.code);
   const currencies = enabled.length ? enabled : [ctx.ws.baseCurrency];
   const [showSuperseded, setShowSuperseded] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<'' | FxRate['source']>('');
   const [rates, setRates] = useState<readonly FxRate[] | undefined>();
   const [prefs, setPrefs] = useState<{ data: readonly FxRatePreference[]; etag?: string }>({ data: [] });
   const [form, setForm] = useState({
@@ -112,7 +113,10 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
     listAll<FxRate>(
       ctx.api,
       `${ctx.base}/fx-rates`,
-      new URLSearchParams(showSuperseded ? { includeSuperseded: 'true' } : {}),
+      new URLSearchParams({
+        ...(showSuperseded ? { includeSuperseded: 'true' } : {}),
+        ...(sourceFilter ? { source: sourceFilter } : {}),
+      }),
       3,
     )
       .then(setRates)
@@ -121,7 +125,7 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
       .get<{ data: FxRatePreference[] }>(`${ctx.base}/fx-rate-preferences`)
       .then((r) => setPrefs({ data: r.data?.data ?? [], ...(r.etag ? { etag: r.etag } : {}) }))
       .catch(() => setPrefs({ data: [] }));
-  }, [ctx.api, ctx.base, showSuperseded]);
+  }, [ctx.api, ctx.base, showSuperseded, sourceFilter]);
   useEffect(load, [load]);
 
   async function create(e: FormEvent) {
@@ -199,6 +203,7 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
       <nav aria-label={t('rates.actions')} style={rowStyle}>
         {ctx.canEdit ? <a href={ctx.href('/fx/conversiones/nueva')}>{t('rates.newConversion')}</a> : null}
         <a href={ctx.href('/transacciones?tipo=CONVERSION')}>{t('rates.conversions')}</a>
+        <a href={ctx.href('/fx/costos')}>{t('rates.costs')}</a>
       </nav>
       {ctx.canEdit ? (
         <form
@@ -315,6 +320,24 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
         />
         {t('rates.showSuperseded')}
       </label>
+      <Field label={t('rates.sourceFilter')} style={{ maxWidth: '16rem' }}>
+        {(p) => (
+          <select
+            {...p}
+            name="sourceFilter"
+            style={inputStyle}
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value as '' | FxRate['source'])}
+          >
+            <option value="">{t('rates.sourceAll')}</option>
+            {(['MANUAL', 'PROVIDER', 'USER_CONVERSION'] as const).map((s) => (
+              <option key={s} value={s}>
+                {t(`sources.${s}`)}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
       {status ? <p role="status">{status}</p> : null}
       {problem ? <ProblemMessage problem={problem} locale={ctx.uiLocale} /> : null}
       {rates && groups.length === 0 ? <p data-testid="rates-empty">{t('rates.empty')}</p> : null}
@@ -324,6 +347,7 @@ function FxRates({ ctx, base, quote }: { ctx: WorkspaceContext; base?: string; q
           group={g}
           f={f}
           canEdit={ctx.canEdit}
+          href={ctx.href}
           onSupersede={supersede}
           onPreference={(rt) => void setPreference(g, rt)}
         />
@@ -336,12 +360,14 @@ function RatePairSection({
   group: g,
   f,
   canEdit,
+  href,
   onSupersede,
   onPreference,
 }: {
   group: RatePairGroup;
   f: FormatContext;
   canEdit: boolean;
+  href: (path: string) => string;
   onSupersede: (rate: FxRate, value: string, reason: string) => Promise<boolean>;
   onPreference: (rateType: FxRateType | '') => void;
 }) {
@@ -421,6 +447,27 @@ function RatePairSection({
                 <td style={cellStyle}>
                   {r.attribution ? (
                     <RateAttributionLink attribution={r.attribution} />
+                  ) : r.source === 'USER_CONVERSION' ? (
+                    <>
+                      <span
+                        style={badgeStyle}
+                        data-testid="rate-observation"
+                        title={t('rates.observationHint')}
+                      >
+                        {t('rates.observation')}
+                      </span>{' '}
+                      {r.conversionRef ? (
+                        <a href={href(`/transacciones/${r.conversionRef.transactionId}`)}>
+                          {t('rates.viewConversion')}
+                        </a>
+                      ) : null}
+                      {r.withdrawn ? (
+                        <span style={badgeStyle} data-testid="rate-withdrawn">
+                          {' '}
+                          {t('rates.withdrawn')}
+                        </span>
+                      ) : null}
+                    </>
                   ) : (
                     <>
                       {t(`sources.${r.source}`)}

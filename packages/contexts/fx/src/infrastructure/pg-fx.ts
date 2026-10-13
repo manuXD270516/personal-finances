@@ -15,6 +15,7 @@ import type {
   RatePreference,
   RatePreferenceRepository,
   RatePreferenceSet,
+  RateWithdrawal,
   StoredRate,
   UnitOfWork,
 } from '../application/ports/index.js';
@@ -66,6 +67,15 @@ interface FxDb {
     anomaly_flagged: Generated<boolean>;
     anomaly_baseline_rate_id: string | null;
     anomaly_variation_pct: string | null;
+    conversion_transaction_id: string | null;
+    conversion_revision: number | null;
+  };
+  'fx.rate_withdrawal': {
+    exchange_rate_id: string;
+    workspace_id: string;
+    transaction_id: string;
+    reason: string;
+    withdrawn_at: string;
   };
   'fx.rate_anomaly_review': {
     exchange_rate_id: string;
@@ -117,6 +127,11 @@ interface RateRow {
   review_reason: string | null;
   review_decided_by: string | null;
   review_decided_at: string | null;
+  conversion_transaction_id: string | null;
+  conversion_revision: number | null;
+  withdrawal_reason: string | null;
+  withdrawal_transaction_id: string | null;
+  withdrawn_at: string | null;
 }
 
 /** Selección común: tasa con escalas de sus monedas y la versión que la reemplazó (si existe). */
@@ -126,6 +141,7 @@ function selectRates() {
     .innerJoin('fx.currency as b', 'b.code', 'r.base_currency')
     .innerJoin('fx.currency as q', 'q.code', 'r.quote_currency')
     .leftJoin('fx.rate_anomaly_review as rv', 'rv.exchange_rate_id', 'r.id')
+    .leftJoin('fx.rate_withdrawal as wd', 'wd.exchange_rate_id', 'r.id')
     .select([
       'r.id',
       'r.workspace_id',
@@ -157,6 +173,11 @@ function selectRates() {
       'rv.reason as review_reason',
       'rv.decided_by as review_decided_by',
       iso('rv.decided_at').as('review_decided_at'),
+      'r.conversion_transaction_id',
+      'r.conversion_revision',
+      'wd.reason as withdrawal_reason',
+      'wd.transaction_id as withdrawal_transaction_id',
+      iso('wd.withdrawn_at').as('withdrawn_at'),
     ]);
 }
 
@@ -184,6 +205,10 @@ function toStored(row: RateRow): StoredRate {
         row.anomaly_flagged && row.anomaly_baseline_rate_id && row.anomaly_variation_pct
           ? { baselineRateId: row.anomaly_baseline_rate_id, variationPct: row.anomaly_variation_pct }
           : null,
+      conversionRef:
+        row.conversion_transaction_id !== null && row.conversion_revision !== null
+          ? { transactionId: row.conversion_transaction_id, revision: Number(row.conversion_revision) }
+          : null,
     }),
     supersededById: row.superseded_by,
     anomalyReview:
@@ -195,6 +220,16 @@ function toStored(row: RateRow): StoredRate {
             reason: row.review_reason ?? '',
             decidedBy: row.review_decided_by,
             decidedAt: row.review_decided_at,
+          }
+        : null,
+    withdrawal:
+      row.withdrawal_reason !== null && row.withdrawal_transaction_id !== null && row.withdrawn_at !== null
+        ? {
+            rateId: row.id,
+            workspaceId: row.workspace_id ?? '',
+            transactionId: row.withdrawal_transaction_id,
+            reason: row.withdrawal_reason,
+            withdrawnAt: row.withdrawn_at,
           }
         : null,
   };
@@ -223,6 +258,8 @@ const rateValues = (rate: ExchangeRate) => {
     anomaly_flagged: s.anomaly !== null,
     anomaly_baseline_rate_id: s.anomaly?.baselineRateId ?? null,
     anomaly_variation_pct: s.anomaly?.variationPct ?? null,
+    conversion_transaction_id: s.conversionRef?.transactionId ?? null,
+    conversion_revision: s.conversionRef?.revision ?? null,
   };
 };
 
@@ -271,6 +308,8 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .where('r.quote_currency', 'in', codes)
       .where('r.as_of', '>=', from.toString())
       .where('r.as_of', '<=', to.toString())
+      // D231: las observaciones de conversiones propias nunca valoran ni son referencia: se excluyen en la consulta.
+      .where('r.source', '<>', 'USER_CONVERSION')
       .execute();
     return rows.map((r) => {
       const stored = toStored(r as RateRow);
@@ -292,6 +331,61 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
           .where('provider', 'is not', null)
           .doNothing(),
       )
+      .executeTakeFirst();
+    return Number(result.numInsertedOrUpdatedRows ?? 0n) === 1;
+  }
+
+  async insertUserConversionObservation(rate: ExchangeRate): Promise<boolean> {
+    const s = rate.snapshot;
+    try {
+      const result = await db()
+        .insertInto('fx.exchange_rate')
+        .values(rateValues(rate))
+        .onConflict((oc) =>
+          oc
+            .columns(['workspace_id', 'conversion_transaction_id', 'conversion_revision'])
+            .where('conversion_transaction_id', 'is not', null)
+            .doNothing(),
+        )
+        .executeTakeFirst();
+      return Number(result.numInsertedOrUpdatedRows ?? 0n) === 1;
+    } catch (err) {
+      if (isUniqueViolation(err, 'exchange_rate_supersedes_uk')) {
+        throw new DomainError(
+          'FX_RATE_ALREADY_SUPERSEDED',
+          `rate ${String(s.supersedesId)} already superseded`,
+          { cause: err },
+        );
+      }
+      throw err;
+    }
+  }
+
+  async currentUserConversionObservation(
+    workspaceId: string,
+    transactionId: string,
+  ): Promise<StoredRate | null> {
+    const row = await selectRates()
+      .where('r.workspace_id', '=', workspaceId)
+      .where('r.source', '=', 'USER_CONVERSION')
+      .where('r.conversion_transaction_id', '=', transactionId)
+      .orderBy('r.conversion_revision', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return row ? toStored(row as RateRow) : null;
+  }
+
+  async insertWithdrawal(withdrawal: RateWithdrawal): Promise<boolean> {
+    const result = await db()
+      .insertInto('fx.rate_withdrawal')
+      .values({
+        exchange_rate_id: withdrawal.rateId,
+        workspace_id: withdrawal.workspaceId,
+        transaction_id: withdrawal.transactionId,
+        reason: withdrawal.reason,
+        withdrawn_at: withdrawal.withdrawnAt,
+      })
+      .onConflict((oc) => oc.column('exchange_rate_id').doNothing())
       .executeTakeFirst();
     return Number(result.numInsertedOrUpdatedRows ?? 0n) === 1;
   }

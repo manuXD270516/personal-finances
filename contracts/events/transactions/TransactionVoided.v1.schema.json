@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/transactions/TransactionVoided.v1.schema.json",
   "title": "transactions.TransactionVoided.v1",
-  "description": "La transacción fue anulada; si estaba posteada se creó un asiento de reversa. Incluye legs/splits vigentes para que los consumidores reviertan efectos sin consultar. Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS. Idempotencia natural: transactionId. PII baja: reason. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
+  "description": "La transacción fue anulada; si estaba posteada se creó un asiento de reversa. Incluye legs/splits vigentes para que los consumidores reviertan efectos sin consultar. Productor: TRANSACTIONS. Consumidores: PLANNING, REPORTING, GOALS, DEBT, COMMITMENTS, FX (solo conversiones: marca como anulada la observación de tasa de la conversión, add-conversion-cost-analysis). Idempotencia natural: transactionId. PII baja: reason. Campo opcional aditivo `transition` (openspec add-lifecycle-timeline, decisión 10): la transición de la máquina de estados que originó el evento; los consumidores existentes lo ignoran.",
   "type": "object",
   "allOf": [
     {

@@ -88,3 +88,21 @@ export {
   type SpendableResult,
   type SpendableTerms,
 } from './spendable-calculator.js';
+export {
+  channelKey,
+  channelOf,
+  ConversionCostAggregator,
+  percentage,
+  type ChannelKind,
+  type CostAnalysis,
+  type CostConversion,
+  type CostGroup,
+  type CostPeriod,
+  type CostTotals,
+  type CostValuation,
+  type ConversionChannel,
+  type ConversionCostGrouping,
+  type ExcludedBucket,
+  type ExclusionReason,
+} from './conversion-cost.js';
+export { CostPeriodCalendar, MAX_COST_PERIODS, type KnownPeriod } from './cost-periods.js';

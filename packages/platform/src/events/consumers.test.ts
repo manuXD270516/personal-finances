@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_EVENT_CONSUMER_BATCH_SIZE,
@@ -61,5 +63,44 @@ describe('configuración de consumidores (improve-event-throughput)', () => {
         poolMax: 10,
       }),
     ).toThrow(/concurrencia total de 3 consumidores de eventos es 12 .*DATABASE_POOL_MAX=10/);
+  });
+});
+
+/** Archivo del repositorio (`deploy/...`) leído como texto: la plantilla del host es la fuente del presupuesto. */
+const repoFile = (path: string): string =>
+  readFileSync(fileURLToPath(new URL(`../../../../${path}`, import.meta.url)), 'utf8');
+
+describe('presupuesto de conexiones de la plantilla del host (add-conversion-cost-analysis, D249)', () => {
+  const env = repoFile('deploy/host/etc-pfos/pfos.env.example');
+  const compose = repoFile('deploy/compose/compose.prod.yaml');
+  const poolMax = Number(/^DATABASE_POOL_MAX=(\d+)\s*$/mu.exec(env)?.[1]);
+  const maxConnections = Number(/- max_connections=(\d+)/u.exec(compose)?.[1]);
+  /** Pool de la API en la plantilla del host (add-basic-csv-import y posteriores: 22). */
+  const apiPool = 22;
+
+  it('[TC-PLATFORM-EVENTS-019] el worker con 28 consumidores de concurrencia 1 y 4 reservadas cabe en el pool de 34', () => {
+    expect(poolMax).toBe(34);
+    expect(() =>
+      assertConsumerConnectionBudget({
+        consumers: defs(...Array.from({ length: 28 }, () => 1)),
+        poolMax,
+      }),
+    ).not.toThrow();
+    expect(28 + RESERVED_WORKER_CONNECTIONS).toBe(32);
+  });
+
+  it('[TC-PLATFORM-EVENTS-019] con una concurrencia mayor que el pool el arranque falla indicando la concurrencia total y el pool', () => {
+    expect(() =>
+      assertConsumerConnectionBudget({
+        consumers: defs(...Array.from({ length: 28 }, () => 1), 4),
+        poolMax,
+      }),
+    ).toThrow(/concurrencia total de 29 consumidores de eventos es 32 .*DATABASE_POOL_MAX=34/);
+  });
+
+  it('[TC-PLATFORM-EVENTS-019] API 22 + worker 34 = 56 cabe en max_connections = 70 con margen', () => {
+    expect(maxConnections).toBe(70);
+    expect(apiPool + poolMax).toBe(56);
+    expect(apiPool + poolMax).toBeLessThan(maxConnections);
   });
 });

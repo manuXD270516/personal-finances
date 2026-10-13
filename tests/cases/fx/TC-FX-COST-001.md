@@ -5,16 +5,18 @@ spec: fx/conversion-pricing
 related_specs: []
 requirement: "Análisis de costo de conversiones por canal, par y periodo"
 scenario: "Canal Binance P2P en octubre"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-011"]
 nfr: []
 invariants: ["INV-001", "INV-002"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/reporting/src/application/conversion-cost.queries.test.ts
+  - packages/contexts/reporting/src/domain/conversion-cost.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversion-cost", "weighted-average", "pbt"]

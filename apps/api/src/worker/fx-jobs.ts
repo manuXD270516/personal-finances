@@ -1,3 +1,4 @@
+import { FX_USER_CONVERSION_BACKFILL_JOB } from '@pf/fx/contracts';
 import {
   FX_BACKFILL_QUEUE,
   FX_GAP_FILL_CRON,
@@ -8,10 +9,16 @@ import {
   type FxMarketRateJobs,
   type FxMarketRateJobsOptions,
 } from '@pf/fx/interface/fx.module';
+import {
+  userConversionConsumers,
+  type ConversionBackfillSource,
+  type UserConversionObservations,
+} from '@pf/fx/interface/fx.module';
 import { runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import type { JobQueue } from '@pf/platform/queue';
+import type { ConversionDetailQuery } from '@pf/transactions/contracts';
 
 export interface FxJobsOptions {
   /** Encola un relleno de días faltantes al arrancar (workspaces previos a los providers). Por defecto sí. */
@@ -141,4 +148,88 @@ export async function registerFxMarketRateJobs(
       },
     },
   ];
+}
+
+export interface UserConversionBackfillPayload {
+  readonly trigger: 'startup' | 'manual';
+}
+
+/**
+ * `ConversionBackfillSource` sobre la consulta pública de TRANSACTIONS (D231): la revisión vigente de todas las
+ * conversiones del workspace con asiento (anuladas incluidas, marcadas), con la tasa efectiva en la orientación de
+ * visualización de la conversión. Sin tocar tablas de TRANSACTIONS desde FX.
+ */
+export function conversionBackfillSource(details: ConversionDetailQuery): ConversionBackfillSource {
+  return {
+    async listCurrentConversions(workspaceId) {
+      const rows = await details.listForCostAnalysis({
+        workspaceId,
+        from: '1970-01-01',
+        to: '2999-12-31',
+        includeVoided: true,
+      });
+      return rows.map((r) => ({
+        transactionId: r.transactionId,
+        revision: r.revision,
+        base: r.effectiveRate.base,
+        quote: r.effectiveRate.quote,
+        value: r.effectiveRate.value,
+        executedAt: r.executedAt,
+        businessDate: r.businessDate,
+        voided: r.voided,
+      }));
+    },
+  };
+}
+
+/**
+ * Observaciones de las conversiones propias (add-conversion-cost-analysis, D231, D249): registra el consumidor
+ * `fx.user-conversion-observations` (concurrencia 1) y el job `fx.backfill-user-conversion-observations`, la carga
+ * inicial IDEMPOTENTE de las conversiones anteriores al cambio (se encola al arrancar; repetirla no registra nada más).
+ * Un workspace que falla no detiene a los demás; el siguiente arranque lo reintenta. Devuelve los consumidores de
+ * eventos a suscribir.
+ */
+export async function registerFxUserConversionJobs(
+  queue: JobQueue,
+  observations: UserConversionObservations,
+  source: ConversionBackfillSource,
+  workspaces: { list(): Promise<readonly { readonly workspaceId: string }[]> },
+  logger: Logger,
+  options: { readonly runOnStart: boolean },
+): Promise<EventConsumerDefinition[]> {
+  await queue.work<UserConversionBackfillPayload>(
+    FX_USER_CONVERSION_BACKFILL_JOB,
+    { concurrency: 1 },
+    async (job) => {
+      await asWorker(`${FX_USER_CONVERSION_BACKFILL_JOB}:${job.payload.trigger}`, async () => {
+        let recorded = 0;
+        let withdrawn = 0;
+        let failed = 0;
+        for (const { workspaceId } of await workspaces.list()) {
+          try {
+            const result = await observations.backfill(workspaceId, source);
+            recorded += result.recorded;
+            withdrawn += result.withdrawn;
+          } catch (err) {
+            failed += 1;
+            logger.error(
+              {
+                workspaceId,
+                err: { type: err instanceof Error ? err.name : typeof err, message: String(err) },
+              },
+              'user conversion observations backfill failed for workspace',
+            );
+          }
+        }
+        logger.info(
+          { job: FX_USER_CONVERSION_BACKFILL_JOB, recorded, withdrawn, failed },
+          'user conversion observations backfilled',
+        );
+      });
+    },
+  );
+  if (options.runOnStart) {
+    await queue.send<UserConversionBackfillPayload>(FX_USER_CONVERSION_BACKFILL_JOB, { trigger: 'startup' });
+  }
+  return userConversionConsumers(observations);
 }

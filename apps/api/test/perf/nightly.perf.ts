@@ -559,6 +559,29 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
   });
 
+  it('NFR-PERF-006 (add-conversion-cost-analysis 8.2): GET /reports/conversion-costs con 12 meses del Large Seed', async () => {
+    // Los periodos ya existen (la prueba anterior los provisiona hasta hoy); el rango son los últimos 12 periodos.
+    const today = new Date().toISOString().slice(0, 10);
+    const first = await ok('GET', `${W}/reports/conversion-costs?grouping=CALENDAR_MONTH&to=${today}`);
+    const groups = first['groups'] as unknown[];
+    const totals = first['totals'] as { conversions: number };
+    dataset['grupos del costo de conversiones'] = groups.length;
+    dataset['conversiones del costo de conversiones'] = totals.conversions;
+    const samples = await timed(Math.max(20, Math.round(ITERATIONS / 4)), async () => {
+      const r = await call('GET', `${W}/reports/conversion-costs?grouping=CALENDAR_MONTH&to=${today}`);
+      if (r.status !== 200) throw new Error(`conversion-costs: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id: 'conversion-costs',
+        nfr: 'NFR-PERF-006',
+        title: `GET /reports/conversion-costs (12 meses, ${groups.length} grupos, ${totals.conversions} conversiones)`,
+        samples,
+        limitMs: PERF_THRESHOLDS['NFR-PERF-006'].limitMs,
+      }),
+    );
+  });
+
   it('RLS: overhead < 10 % en la consulta real de saldos (PgBalanceQuery) y las de índice; agregado sintético informativo (docs/31 D43)', async () => {
     const card = ids.accounts.get('Tarjeta Andina Demo')!;
     const { rows } = await superuser.query<{ id: string }>(

@@ -548,6 +548,74 @@ export interface GoalTransferPort {
 
 export const GOAL_TRANSFER_PORT = Symbol.for('pf.transactions.GoalTransferPort');
 
+/** Tasa `1 base = value quote` de un `ConversionDetail` (decimal exacto como texto). */
+export interface ConversionRateDto {
+  readonly base: string;
+  readonly quote: string;
+  readonly value: string;
+}
+
+/**
+ * Revisión vigente de una conversión con el detalle que necesita el análisis de costo (add-conversion-cost-analysis,
+ * D245): fecha de negocio, ejecución, cuentas, contraparte, montos, tasas, spread registrado y fees. Montos y tasas como
+ * decimales exactos; `effectiveRate` está en la orientación de visualización del par.
+ */
+export interface ConversionCostRowDto {
+  readonly transactionId: string;
+  /** Revisión vigente del `ConversionDetail` (la de la transacción). */
+  readonly revision: number;
+  readonly businessDate: string;
+  readonly executedAt: string;
+  /** `true` si la transacción fue anulada (solo con `includeVoided`). */
+  readonly voided: boolean;
+  readonly sourceAccountId: string;
+  readonly targetAccountId: string;
+  readonly counterparty: { readonly counterpartyId: string | null; readonly name: string | null };
+  /** Bruto entregado. */
+  readonly sourceAmount: FlowMoneyDto;
+  /** Bruto entregado menos los fees descontados en moneda origen. */
+  readonly convertedSourceAmount: FlowMoneyDto;
+  /** Neto recibido más los fees descontados en moneda destino. */
+  readonly grossTargetAmount: FlowMoneyDto;
+  /** Neto recibido. */
+  readonly targetAmount: FlowMoneyDto;
+  readonly quotedRate: ConversionRateDto | null;
+  readonly effectiveRate: ConversionRateDto;
+  /** Referencia registrada (versión exacta, en su orientación almacenada); `null` si no se registró una. */
+  readonly referenceRate: {
+    readonly rate: ConversionRateDto;
+    readonly fxRateId: string;
+    readonly source: string;
+    readonly rateType: string | null;
+    readonly asOf: string | null;
+  } | null;
+  /** Spread registrado: `percentage` con signo (positivo = desfavorable) y `amount` absoluto en la moneda quote. */
+  readonly spread: { readonly percentage: string; readonly amount: FlowMoneyDto } | null;
+  readonly fees: readonly {
+    readonly type: string;
+    readonly amount: FlowMoneyDto;
+    readonly paidFromAccountId: string | null;
+  }[];
+}
+
+/**
+ * Query pública `ConversionDetailQuery` (add-conversion-cost-analysis, D245; sin efectos, en la unidad de trabajo del
+ * llamador si existe): la REVISIÓN VIGENTE de las conversiones con asiento activo (`POSTED | CLEARED | RECONCILED`)
+ * cuya fecha de negocio cae en `[from, to]`; nunca las pendientes. Con `includeVoided` incluye también las anuladas
+ * (marcadas `voided`), para la carga inicial de observaciones de FX.
+ */
+export interface ConversionDetailQuery {
+  listForCostAnalysis(input: {
+    readonly workspaceId: string;
+    /** Rango inclusivo de fechas de negocio `YYYY-MM-DD`. */
+    readonly from: string;
+    readonly to: string;
+    readonly includeVoided?: boolean;
+  }): Promise<readonly ConversionCostRowDto[]>;
+}
+
+export const CONVERSION_DETAIL_QUERY = Symbol.for('pf.transactions.ConversionDetailQuery');
+
 /**
  * Allow-list de auditoría de TRANSACTIONS (add-audit-trail, NFR-SEC-015): montos exactos (`money`); lo no listado
  * nunca se copia a `audit.audit_log`.

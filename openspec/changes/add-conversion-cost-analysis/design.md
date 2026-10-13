@@ -78,6 +78,9 @@ Decisiones que se aplican:
 
 ## Preguntas abiertas
 
+> **Resueltas al implementar (2026-10-13), adoptando las recomendaciones:** 1 → (a) el Could se implementó; 2 → (a) `rateType = CUSTOM` con `source = USER_CONVERSION`; 3 → (a) la anulación se marca en `fx.rate_withdrawal` (append-only) sin tocar la tasa; 4 → (a) `max_connections = 70` y pool del worker 34. Revertibles por el owner (D231, D245–D247, D249).
+
+
 1. **Prioridad del Could (spread contra la paralela del día).** (a) **Implementarlo en este change si el resto está terminado**; (b) dejarlo para Phase 7. **Recomendación: (a)**; no bloquea.
 2. **Tipo de tasa de las observaciones.** `rateType` es obligatorio en la tasa y en `fx.RateRecorded.v1`. Opciones: (a) **`CUSTOM` con `source = USER_CONVERSION`** (sin contrato nuevo; la exclusión es por origen); (b) un tipo nuevo `USER_CONVERSION`/`EFFECTIVE` (aditivo, pero mezcla origen y tipo); (c) el tipo de la referencia de la conversión. **Recomendación: (a)**; no bloquea.
 3. **Observación de una conversión anulada.** D231 no lo dice. Opciones: (a) **marcarla como anulada en una tabla append-only, sin tocar la tasa** (este diseño; el consumidor suscribe también `TransactionVoided.v1`); (b) dejarla sin marca; (c) reemplazarla. **Recomendación: (a)**; confirmar antes de implementar el grupo 3.

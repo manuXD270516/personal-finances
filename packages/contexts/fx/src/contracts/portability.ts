@@ -3,7 +3,7 @@ import type { PortabilitySection } from '@pf/shared-kernel';
 /**
  * Secciones de exportación/importación del workspace que pertenecen a FX (openspec add-workspace-export): monedas
  * habilitadas, preferencias de tasa y las tasas PROPIAS del workspace (las globales de provider, sin workspace, no son
- * del usuario) con sus revisiones de anomalía. Las tasas viajan como decimal exacto sin ceros de relleno.
+ * del usuario) con sus revisiones de anomalía y las marcas de anulada de las observaciones de conversiones propias. Las tasas viajan como decimal exacto sin ceros de relleno.
  */
 export const FX_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
   {
@@ -43,6 +43,16 @@ export const FX_PORTABILITY_SECTIONS: readonly PortabilitySection[] = [
     context: 'fx',
     table: 'fx.rate_anomaly_review',
     order: 220,
+    orderBy: ['exchange_rate_id'],
+    idColumns: [],
+  },
+  {
+    // Marca de anulada de una observación de conversión propia (add-conversion-cost-analysis, D231): después de las
+    // tasas que referencia; `transaction_id` se remapea con el id de la conversión importada (sin FK cross-schema).
+    name: 'rate-withdrawals',
+    context: 'fx',
+    table: 'fx.rate_withdrawal',
+    order: 225,
     orderBy: ['exchange_rate_id'],
     idColumns: [],
   },

@@ -74,6 +74,10 @@ services:
     # Memoria acotada para 2 GB + archivado continuo de WAL a B2 (docs/30 §4.1). `archive_timeout` fuerza un
     # segmento cada 5 min como máximo si hubo escrituras → RPO ≤ 5 min (objetivo ≤ 15 min, docs/30 §2) con ~5× menos
     # objetos en B2 que con 60 s (el polling de pg-boss genera WAL casi continuo).
+    # max_connections=70 (add-conversion-cost-analysis, D249): API 22 + worker 34 = 56, con 14 de margen para el
+    # superusuario, las migraciones, pgBackRest y `pf_bff`. Cada backend ocioso cuesta unos pocos MiB: con el límite de
+    # 384 MiB del contenedor el margen es estrecho si las 56 conexiones se abren a la vez (el pool las abre bajo demanda);
+    # vigilar la memoria del contenedor tras el despliegue.
     command:
       - postgres
       - -c
@@ -85,7 +89,7 @@ services:
       - -c
       - maintenance_work_mem=64MB
       - -c
-      - max_connections=60
+      - max_connections=70
       - -c
       - wal_level=replica
       - -c

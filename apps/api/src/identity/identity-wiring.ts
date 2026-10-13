@@ -445,6 +445,11 @@ export function financeRuntimes(input: {
     flows: transactions.flows,
     categories: classification.categories,
     rates: fx.valuation,
+    // add-conversion-cost-analysis: análisis de costo de conversiones por contratos públicos (D245).
+    counterparties: classification.counterparties,
+    conversions: transactions.conversionDetails,
+    quoteSide: fx.quoteSide,
+    financialCalendar: actorCalendar,
     balanceHistory: ledger.accountBalanceHistory,
     // add-net-worth-evolution: PLANNING depende de REPORTING (cifras de cierre), así que sus consultas públicas
     // (`PeriodQuery`, `ClosingSnapshotQuery`) se enlazan tras componerlo.

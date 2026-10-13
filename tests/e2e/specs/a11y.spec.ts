@@ -27,6 +27,8 @@ const PAGES: readonly { readonly path: string; readonly name: string }[] = [
   // add-custom-fields 6.1: pestaña Campos personalizados (lista, formulario de definición).
   { path: '/clasificacion?vista=campos', name: 'Clasificación: campos personalizados' },
   { path: '/fx?vista=proveedores', name: 'FX: proveedores' },
+  // add-conversion-cost-analysis 7.1: costo de conversiones por canal, par y periodo (sin conversiones: estado vacío).
+  { path: '/fx/costos', name: 'Costo de conversiones' },
   // add-workspace-identity 8.4: preferencias personales y alta de workspace.
   { path: '/preferencias', name: 'Mis preferencias' },
   { path: '/workspaces/nuevo', name: 'Nuevo espacio de trabajo' },

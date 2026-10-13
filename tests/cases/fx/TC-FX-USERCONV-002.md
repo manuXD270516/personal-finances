@@ -5,16 +5,19 @@ spec: fx/market-rates
 related_specs: []
 requirement: "Las observaciones de conversiones nunca se usan para valorar"
 scenario: "Observación más reciente que la tasa del provider"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-006", "FR-FX-008"]
 nfr: []
 invariants: []
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/conversion-costs.api.test.ts
+  - packages/contexts/fx/src/application/user-conversion-observations.test.ts
+  - packages/contexts/fx/src/domain/user-conversion.properties.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "user-conversion", "valuation", "pbt"]
