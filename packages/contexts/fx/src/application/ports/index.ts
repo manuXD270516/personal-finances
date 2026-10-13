@@ -15,6 +15,7 @@ import type {
   RateCandidate,
   OpenFeedEpisode,
   RatePairListState,
+  RetainedSample,
   ValuationPolicy,
 } from '../../domain/index.js';
 
@@ -112,6 +113,19 @@ export interface ExchangeRateRepository {
    * la detección de anomalías y "última tasa" del estado de providers.
    */
   latestAccepted(workspaceId: string, feed: ProviderFeedKey): Promise<StoredRate | null>;
+  /**
+   * Muestras retenidas como anómalas (`anomaly_flagged`) de un par en el workspace, de cualquier provider y tipo de
+   * tasa, con la fecha de su revisión (`null` si siguen pendientes), de la más antigua a la más reciente. Puede
+   * devolver solo desde el inicio del grupo vigente (la isla actual de pendencia): el `AnomalyGroupResolver` calcula el
+   * grupo con lo recibido y obtiene el mismo resultado que con todo el historial (refine-rate-anomaly-alert-grouping).
+   */
+  retainedOfPair(workspaceId: string, base: string, quote: string): Promise<RetainedSample[]>;
+  /**
+   * Bloqueo consultivo de la transacción por workspace (`pg_advisory_xact_lock`, clave `fx-anomaly-group:<workspace>`):
+   * serializa las transacciones de ingesta del mismo workspace para que el orden `(created_at, id)` de las muestras
+   * retenidas coincida con el de confirmación. Se libera al terminar la transacción.
+   */
+  lockAnomalyGroups(workspaceId: string): Promise<void>;
   /** Fechas efectivas (YYYY-MM-DD) con alguna tasa del feed en [from, to] (relleno de días faltantes). */
   providerDays(workspaceId: string, feed: ProviderFeedKey, from: string, to: string): Promise<Set<string>>;
   /**

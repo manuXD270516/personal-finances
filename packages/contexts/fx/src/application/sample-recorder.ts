@@ -1,3 +1,4 @@
+import type { RateAnomalyGroupFact } from '@pf/notifications/contracts';
 import { Instant, LocalDate, type Clock } from '@pf/shared-kernel';
 import { FX_EVENTS } from '../contracts/index.js';
 import {
@@ -5,6 +6,7 @@ import {
   DEFAULT_ANOMALY_THRESHOLDS,
   ExchangeRate,
   pairKey,
+  resolveAnomalyGroup,
   type AnomalyDetector,
   type AnomalyThresholds,
   type AssetClass,
@@ -54,8 +56,9 @@ export interface SampleRecorderDeps {
   readonly thresholds?: AnomalyThresholds;
   readonly pairs: RatePairResolver;
   /**
-   * Puerto síncrono de NOTIFY (add-rate-feed-alerts, D234, D249): cada muestra retenida como anómala se avisa en la
-   * misma unidad de trabajo que su inserción. Sin él se escribe igual el evento del outbox.
+   * Puerto síncrono de NOTIFY (add-rate-feed-alerts, D249; refine-rate-anomaly-alert-grouping): las muestras retenidas
+   * como anómalas se avisan agrupadas, un aviso por par al final de la misma unidad de trabajo que su inserción. Sin él
+   * se escribe igual el evento del outbox (uno por muestra).
    */
   readonly notifications?: NotificationIntakePort | undefined;
 }
@@ -79,6 +82,10 @@ export class SampleRecorder {
     if (samples.length === 0) return Promise.resolve(0);
     const { workspaceId, timeZone } = target;
     return this.deps.uow.run(workspaceId, async () => {
+      // Con detección de anomalías, las transacciones del mismo workspace se serializan (el orden `(created_at, id)` de
+      // las muestras retenidas coincide con el de confirmación) y `now` se lee DESPUÉS del bloqueo. El ciclo normal ya
+      // es secuencial, así que en una sola réplica nunca espera.
+      if (options.detectAnomalies) await this.deps.rates.lockAnomalyGroups(workspaceId);
       const configured = await this.deps.pairs.effective(
         workspaceId,
         target.baseCurrency ?? DEFAULT_WORKSPACE_BASE_CURRENCY,
@@ -98,6 +105,11 @@ export class SampleRecorder {
       const daysWithRates = new Map<string, Set<string>>();
       let inserted = 0;
       let last: ExchangeRate | null = null;
+      // Pares con alguna muestra retenida nueva en esta transacción (en orden de aparición): un aviso por par al final.
+      const retainedPairs = new Map<
+        string,
+        { base: string; quote: string; thresholdPct: string; sourceEventId: string }
+      >();
       const catalog = new Map<string, CurrencyDefinition | null>();
       const currency = async (code: string) => {
         if (!catalog.has(code)) catalog.set(code, await this.deps.currencies.find(code));
@@ -154,43 +166,95 @@ export class SampleRecorder {
         else last = rate;
         // Un único hecho por muestra retenida: la inserción es idempotente (misma vigencia ⇒ `continue` arriba).
         if (options.detectAnomalies && rate.snapshot.anomaly !== null && baselineFact !== null) {
-          await this.publishRetained(rate, baselineFact, timeZone, options.correlationId);
+          const eventId = await this.publishRetained(rate, baselineFact, options.correlationId);
+          retainedPairs.set(pairKey(sample), {
+            base: sample.base,
+            quote: sample.quote,
+            thresholdPct: baselineFact.thresholdPct,
+            sourceEventId: eventId,
+          });
         }
       }
       if (last) await this.publish(last, options.correlationId);
+      // Consultas y avisos secuenciales: nunca en paralelo sobre el mismo cliente pg de la unidad de trabajo.
+      for (const retained of retainedPairs.values()) {
+        await this.notifyGroup(workspaceId, timeZone, now, retained);
+      }
       return inserted;
     });
   }
 
   /**
-   * `fx.RateAnomalyRetained.v1` (D234) y aviso a NOTIFY por su puerto, en la misma unidad de trabajo que la inserción de
-   * la muestra. Actor `SYSTEM fx-provider:<ciclo>`; la muestra sigue retenida hasta su revisión (D236).
+   * Un aviso por par con muestras retenidas nuevas (refine-rate-anomaly-alert-grouping): calcula el grupo vigente del par
+   * (`AnomalyGroupResolver` sobre las retenidas del par con sus revisiones) y entrega su foto a NOTIFY, que crea el aviso
+   * del grupo o lo actualiza. La clave es el ancla del grupo: determinista, la misma en cualquier reintento.
+   */
+  private async notifyGroup(
+    workspaceId: string,
+    timeZone: string,
+    now: string,
+    retained: { base: string; quote: string; thresholdPct: string; sourceEventId: string },
+  ): Promise<void> {
+    if (!this.deps.notifications) return;
+    const group = resolveAnomalyGroup(
+      await this.deps.rates.retainedOfPair(workspaceId, retained.base, retained.quote),
+    );
+    if (!group) return;
+    const baseline = await this.deps.rates.findById(workspaceId, group.peak.baselineRateId);
+    if (!baseline) return;
+    const fact: RateAnomalyGroupFact = {
+      anchorRateId: group.anchorRateId,
+      base: retained.base,
+      quote: retained.quote,
+      pendingCount: group.pendingCount,
+      retainedCount: group.retainedCount,
+      providers: group.providers,
+      reviewRateId: group.reviewRateId,
+      peak: {
+        rateId: group.peak.rateId,
+        base: retained.base,
+        quote: retained.quote,
+        rateType: group.peak.rateType,
+        provider: group.peak.provider,
+        value: group.peak.value,
+        baselineRateId: group.peak.baselineRateId,
+        baselineValue: baseline.rate.valueText,
+        variationPct: group.peak.variationPct,
+        thresholdPct: retained.thresholdPct,
+        detectedAt: now,
+        timeZone,
+      },
+      firstRetainedAt: group.firstRetainedAt,
+      lastRetainedAt: now,
+      detectedAt: now,
+      timeZone,
+    };
+    await this.deps.notifications.notify({
+      workspaceId,
+      type: 'FX_RATE_ANOMALY_RETAINED',
+      factKey: group.anchorRateId,
+      sourceEventId: retained.sourceEventId,
+      occurredAt: now,
+      payload: fact,
+    });
+  }
+
+  /**
+   * `fx.RateAnomalyRetained.v1`: uno por muestra retenida, en la misma unidad de trabajo que su inserción (sin cambios;
+   * el aviso se agrupa por par en `notifyGroup`). Actor `SYSTEM fx-provider:<ciclo>`; la muestra sigue retenida hasta su
+   * revisión (D236). Devuelve el id del evento (origen del aviso).
    */
   private async publishRetained(
     rate: ExchangeRate,
     baseline: { readonly value: string; readonly thresholdPct: string },
-    timeZone: string,
     correlationId: string,
-  ): Promise<void> {
+  ): Promise<string> {
     const s = rate.snapshot;
     const anomaly = s.anomaly;
-    if (!anomaly) return;
+    if (!anomaly) throw new Error('a retained sample needs its anomaly mark');
     const workspaceId = s.workspaceId as string;
     const eventId = this.deps.ids.next();
     const occurredAt = this.deps.clock.now().toString();
-    const provider = String(s.provider);
-    const fact = {
-      rateId: s.id,
-      base: s.rate.base.code,
-      quote: s.rate.quote.code,
-      rateType: s.rateType,
-      provider,
-      value: rate.valueText,
-      baselineRateId: anomaly.baselineRateId,
-      baselineValue: baseline.value,
-      variationPct: anomaly.variationPct,
-      thresholdPct: baseline.thresholdPct,
-    };
     await this.deps.outbox.append({
       eventId,
       eventType: FX_EVENTS.rateAnomalyRetained.eventType,
@@ -202,16 +266,20 @@ export class SampleRecorder {
       aggregateVersion: 1,
       actor: { type: 'SYSTEM', id: `fx-provider:${correlationId}` },
       correlationId,
-      payload: fact,
+      payload: {
+        rateId: s.id,
+        base: s.rate.base.code,
+        quote: s.rate.quote.code,
+        rateType: s.rateType,
+        provider: String(s.provider),
+        value: rate.valueText,
+        baselineRateId: anomaly.baselineRateId,
+        baselineValue: baseline.value,
+        variationPct: anomaly.variationPct,
+        thresholdPct: baseline.thresholdPct,
+      },
     });
-    await this.deps.notifications?.notify({
-      workspaceId,
-      type: 'FX_RATE_ANOMALY_RETAINED',
-      factKey: s.id,
-      sourceEventId: eventId,
-      occurredAt,
-      payload: { ...fact, detectedAt: occurredAt, timeZone },
-    });
+    return eventId;
   }
 
   /** `fx.RateRecorded.v1` (aditivo: `provider`, `anomalyFlagged`) con actor `SYSTEM fx-provider:<id>`. */

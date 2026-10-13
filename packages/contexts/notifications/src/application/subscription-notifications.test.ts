@@ -34,7 +34,7 @@ describe('NotifyFromEvent: suscripciones', () => {
   it('[TC-COMMITMENTS-SUBS-030] la renovación próxima crea una notificación por miembro y una sola aunque se reentregue', async () => {
     const { env, notify } = setup();
     const outcome = await notify.handle(event(renewalPayload()), renewal);
-    expect(outcome).toEqual({ created: 3, deliveries: 3 });
+    expect(outcome).toEqual({ created: 3, refreshed: 0, deliveries: 3 });
     for (const userId of [OWNER, EDITOR, VIEWER]) {
       const [n, ...rest] = forUser(env, userId);
       expect(rest).toHaveLength(0);
@@ -53,10 +53,14 @@ describe('NotifyFromEvent: suscripciones', () => {
       expect(n?.link).toMatchObject({ kind: 'SUBSCRIPTION', subscriptionId: SUBSCRIPTION_ID });
     }
     // el mismo evento y otro eventId con la misma suscripción y fecha no duplican
-    expect(await notify.handle(event(renewalPayload()), renewal)).toEqual({ created: 0, deliveries: 0 });
+    expect(await notify.handle(event(renewalPayload()), renewal)).toEqual({
+      created: 0,
+      refreshed: 0,
+      deliveries: 0,
+    });
     expect(
       await notify.handle(event(renewalPayload(), '01928c4e-7a3b-7c11-8f00-000000000999'), renewal),
-    ).toEqual({ created: 0, deliveries: 0 });
+    ).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(3);
     // otra fecha de renovación es otro hecho
     expect(
@@ -111,7 +115,7 @@ describe('NotifyFromEvent: suscripciones', () => {
       ),
       priceChange,
     );
-    expect(manual).toEqual({ created: 0, deliveries: 0 });
+    expect(manual).toEqual({ created: 0, refreshed: 0, deliveries: 0 });
     expect(env.notifications.rows.size).toBe(2);
   });
 

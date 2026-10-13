@@ -17,6 +17,10 @@ export class OtelNotificationMetrics implements NotificationMetricsPort {
     this.counters.increment(NOTIFICATION_METRICS.created, { type });
   }
 
+  refreshed(type: string): void {
+    this.counters.increment(NOTIFICATION_METRICS.refreshed, { type });
+  }
+
   emailDelivery(status: 'sent' | 'retry' | 'failed' | 'suppressed'): void {
     this.counters.increment(NOTIFICATION_METRICS.emailDeliveries, { status });
   }

@@ -52,6 +52,29 @@ export class InMemoryNotifications implements NotificationRepository {
     return Promise.resolve(true);
   }
 
+  insertOrRefresh(n: NotificationState): Promise<'CREATED' | 'REFRESHED' | 'UNCHANGED'> {
+    const existing = [...this.rows.values()].find(
+      (r) => r.workspaceId === n.workspaceId && r.userId === n.userId && r.dedupeKey === n.dedupeKey,
+    );
+    if (!existing) {
+      this.rows.set(n.id, n);
+      return Promise.resolve('CREATED');
+    }
+    // Misma regla que PostgreSQL: solo el mismo tipo y sin retroceder ante una foto más vieja.
+    const stored = existing.params['lastRetainedAt'];
+    const incoming = n.params['lastRetainedAt'];
+    const older =
+      typeof stored === 'string' && typeof incoming === 'string' && Date.parse(incoming) < Date.parse(stored);
+    if (existing.type !== n.type || older) return Promise.resolve('UNCHANGED');
+    this.rows.set(existing.id, {
+      ...existing,
+      params: n.params,
+      messageKey: n.messageKey,
+      link: n.link,
+    });
+    return Promise.resolve('REFRESHED');
+  }
+
   findOwn(workspaceId: string, userId: string, id: string): Promise<NotificationState | null> {
     const row = this.rows.get(id);
     return Promise.resolve(row && row.workspaceId === workspaceId && row.userId === userId ? row : null);
@@ -350,10 +373,14 @@ export class FakeEmailSender implements EmailSender {
 
 export class RecordingMetrics implements NotificationMetricsPort {
   readonly created_: string[] = [];
+  readonly refreshed_: string[] = [];
   readonly emailDeliveries: string[] = [];
   readonly lags: { type: string; seconds: number }[] = [];
   created(type: string): void {
     this.created_.push(type);
+  }
+  refreshed(type: string): void {
+    this.refreshed_.push(type);
   }
   emailDelivery(status: 'sent' | 'retry' | 'failed' | 'suppressed'): void {
     this.emailDeliveries.push(status);

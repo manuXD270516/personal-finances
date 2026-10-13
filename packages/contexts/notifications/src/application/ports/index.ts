@@ -25,6 +25,14 @@ export interface InboxPosition {
 export interface NotificationRepository {
   /** `INSERT … ON CONFLICT (workspace_id, user_id, dedupe_key) DO NOTHING`: `true` si se insertó (decisión 2). */
   insertIfAbsent(notification: NotificationState): Promise<boolean>;
+  /**
+   * Solo para tipos "actualizables" (aviso agrupado de tasas retenidas; refine-rate-anomaly-alert-grouping):
+   * `INSERT … ON CONFLICT (workspace_id, user_id, dedupe_key) DO UPDATE SET params, message_key, link WHERE
+   * notification_type = <el mismo tipo> AND la foto entrante no es más vieja` (`params.lastRetainedAt`). Nunca cambia
+   * `status`, `read_at`, `archived_at`, `created_at`, `severity` ni `source_event_id`. `CREATED` si insertó,
+   * `REFRESHED` si actualizó una existente, `UNCHANGED` si la foto entrante era más vieja que la guardada.
+   */
+  insertOrRefresh(notification: NotificationState): Promise<'CREATED' | 'REFRESHED' | 'UNCHANGED'>;
   findOwn(workspaceId: string, userId: string, id: string): Promise<NotificationState | null>;
   findById(workspaceId: string, id: string): Promise<NotificationState | null>;
   /** Más reciente primero (`created_at DESC, id DESC`); el llamador pide `limit + 1` para saber si hay más. */
@@ -183,6 +191,8 @@ export interface EmailDispatchScheduler {
 /** Métricas de baja cardinalidad (docs/18 §5): nunca workspace, usuario ni notificación como etiqueta. */
 export interface NotificationMetricsPort {
   created(type: string): void;
+  /** Aviso existente actualizado con una foto más nueva de su grupo (sin notificación ni email nuevos). */
+  refreshed(type: string): void;
   emailDelivery(status: 'sent' | 'retry' | 'failed' | 'suppressed'): void;
   /** Retraso evento → notificación in-app, en segundos (NFR-PERF-008). */
   lagSeconds(type: string, seconds: number): void;

@@ -1,7 +1,14 @@
 import { Instant } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import type { NotificationIntakeFact } from '../contracts/index.js';
-import { anomalyRetainedPayload, EPISODE_ID, feedStalePayload, FX_RATE_ID, WS } from '../domain/fixtures.js';
+import {
+  anomalyGroupPayload,
+  EPISODE_ID,
+  feedStalePayload,
+  FX_RATE_ID,
+  usdtBobGroupPayload,
+  WS,
+} from '../domain/fixtures.js';
 import { DispatchEmailDelivery } from './dispatch-email-delivery.js';
 import { NotificationIntake } from './notification-intake.js';
 import { EDITOR, NotificationsTestEnv, OWNER } from './testing/in-memory.js';
@@ -14,7 +21,7 @@ const anomalyFact = {
   factKey: FX_RATE_ID,
   sourceEventId: '01928c4e-7a3b-7c11-8f00-000000000901',
   occurredAt: '2026-10-13T14:02:10.000Z',
-  payload: anomalyRetainedPayload(),
+  payload: anomalyGroupPayload(),
 } as unknown as NotificationIntakeFact;
 const staleFact = {
   workspaceId: WS,
@@ -73,8 +80,9 @@ describe('Email de las alertas de tasas', () => {
     // Locale del destinatario: OWNER es-BO en español, EDITOR pt-BR en portugués.
     const owner = env.sender.sent.find((m) => m.to === 'owner@pfos.test');
     const editor = env.sender.sent.find((m) => m.to === 'editor@pfos.test');
-    expect(owner?.subject).toBe('Tienes una tasa retenida por revisar');
-    expect(editor?.subject).toBe('Você tem uma taxa retida para revisar');
+    expect(owner?.text).toContain('Una o más tasas automáticas quedaron retenidas');
+    expect(owner?.subject).toBe('Tienes tasas automáticas retenidas por revisar');
+    expect(editor?.subject).toBe('Você tem taxas automáticas retidas para revisar');
   });
 
   it('[TC-NOTIFICATIONS-FX-005] con opt-in de detalles el email incluye el par y los valores', async () => {
@@ -105,5 +113,84 @@ describe('Email de las alertas de tasas', () => {
     const mine = [...env.notifications.rows.values()].filter((n) => n.userId === EDITOR);
     expect(mine).toHaveLength(1);
     expect(env.deliveries.byNotification(mine[0]?.id ?? '')).toBeUndefined();
+  });
+
+  it('[TC-NOTIFICATIONS-FX-020] sin opt-in el email del grupo de USDT/BOB dice "una o más tasas" y no incluye valores, monedas, provider ni la cantidad', async () => {
+    const group = {
+      ...anomalyFact,
+      factKey: FX_RATE_ID,
+      payload: usdtBobGroupPayload(),
+    } as unknown as NotificationIntakeFact;
+    const { env, dispatch, deliveryOf } = await setup([group]);
+    const delivery = deliveryOf(OWNER, 'FX_RATE_ANOMALY_RETAINED');
+    expect(await dispatch.run({ workspaceId: WS, deliveryId: delivery?.id ?? '' })).toBe('sent');
+    const [mail] = env.sender.sent;
+    const content = withoutUrls(`${mail?.subject}\n${mail?.text}\n${mail?.html}`);
+    expect(content).toContain('Una o más tasas automáticas quedaron retenidas');
+    for (const secret of ['12.90', '12,90', '12.10', '12,10', '6.61', '6,61', 'USDT', 'BOB', 'paralelo.bo']) {
+      expect(content, secret).not.toContain(secret);
+    }
+    expect(content).not.toMatch(/(^|[^\d.,])3([^\d.,]|$)/);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-021] las muestras posteriores del grupo no programan otro email: el OWNER recibe uno solo', async () => {
+    const first = {
+      ...anomalyFact,
+      payload: usdtBobGroupPayload(),
+    } as unknown as NotificationIntakeFact;
+    const { env, dispatch, deliveryOf } = await setup([first]);
+    const intake = new NotificationIntake(env.notifyDeps());
+    for (const [pending, at] of [
+      [5, '2026-10-13T14:15:00.000Z'],
+      [8, '2026-10-13T14:30:00.000Z'],
+    ] as const) {
+      const out = await intake.notify({
+        ...first,
+        sourceEventId: `01928c4e-7a3b-7c11-8f00-0000000009${pending}1`,
+        payload: usdtBobGroupPayload({ pendingCount: pending, retainedCount: pending, lastRetainedAt: at }),
+      } as unknown as NotificationIntakeFact);
+      expect(out).toEqual({ created: 0, refreshed: 2, deliveries: 0 });
+    }
+    expect(env.scheduler.jobs).toHaveLength(2);
+    expect(env.deliveries.rows.size).toBe(2);
+    const delivery = deliveryOf(OWNER, 'FX_RATE_ANOMALY_RETAINED');
+    expect(await dispatch.run({ workspaceId: WS, deliveryId: delivery?.id ?? '' })).toBe('sent');
+    expect(env.sender.sent.filter((m) => m.to === 'owner@pfos.test')).toHaveLength(1);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-022] con silencio de 22:00 a 07:00 el único email del grupo se envía a las 11:00Z con el estado de ese momento (5 muestras)', async () => {
+    const env = new NotificationsTestEnv();
+    // 2026-10-13 23:30 en La Paz = 2026-10-14T03:30Z.
+    env.clock.set(Instant.parse('2026-10-14T03:30:00Z'));
+    const owner = await env.preferences.load(WS, OWNER);
+    owner.update({ types: [], quietHours: { start: '22:00', end: '07:00' }, includeDetailsInEmail: true });
+    await env.preferences.save(owner);
+    const intake = new NotificationIntake(env.notifyDeps());
+    const fact = (pending: number, at: string, eventId: string) =>
+      ({
+        ...anomalyFact,
+        sourceEventId: eventId,
+        occurredAt: at,
+        payload: usdtBobGroupPayload({
+          pendingCount: pending,
+          retainedCount: pending,
+          lastRetainedAt: at,
+          detectedAt: at,
+          firstRetainedAt: '2026-10-14T03:30:00.000Z',
+        }),
+      }) as unknown as NotificationIntakeFact;
+    await intake.notify(fact(3, '2026-10-14T03:30:00.000Z', '01928c4e-7a3b-7c11-8f00-000000000911'));
+    env.clock.set(Instant.parse('2026-10-14T05:00:00Z'));
+    await intake.notify(fact(5, '2026-10-14T05:00:00.000Z', '01928c4e-7a3b-7c11-8f00-000000000912'));
+    const delivery = [...env.deliveries.rows.values()].find(
+      (d) => env.notifications.rows.get(d.notificationId)?.userId === OWNER,
+    );
+    expect(delivery).toMatchObject({ status: 'PENDING', notBefore: '2026-10-14T11:00:00.000Z' });
+    env.clock.set(Instant.parse('2026-10-14T11:00:00Z'));
+    const dispatch = new DispatchEmailDelivery(env.dispatchDeps());
+    expect(await dispatch.run({ workspaceId: WS, deliveryId: delivery?.id ?? '' })).toBe('sent');
+    const mails = env.sender.sent.filter((m) => m.to === 'owner@pfos.test');
+    expect(mails).toHaveLength(1);
+    expect(mails[0]?.text).toContain('USDT/BOB: 5 tasas automáticas retenidas pendientes de revisión');
   });
 });

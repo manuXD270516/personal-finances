@@ -38,10 +38,12 @@ describe('NotifyFromEvent: sobre-asignación de metas', () => {
     const notify = new NotifyFromEvent(env.notifyDeps());
     expect(await notify.handle(event(earmarkExceedsPayload()), overAllocated)).toEqual({
       created: 2,
+      refreshed: 0,
       deliveries: 2,
     });
     expect(await notify.handle(event(earmarkExceedsPayload()), overAllocated)).toEqual({
       created: 0,
+      refreshed: 0,
       deliveries: 0,
     });
     expect(forUser(env, VIEWER)).toHaveLength(0);
@@ -88,7 +90,7 @@ describe('NotifyFromEvent: sobre-asignación de metas', () => {
       event(earmarkExceedsPayload()),
       overAllocated,
     );
-    expect(outcome).toEqual({ created: 1, deliveries: 1 });
+    expect(outcome).toEqual({ created: 1, refreshed: 0, deliveries: 1 });
     expect(forUser(env, OWNER)).toHaveLength(0);
   });
 });
@@ -130,10 +132,12 @@ describe('NotifyFromEvent: meta alcanzada', () => {
     const notify = new NotifyFromEvent(env.notifyDeps());
     expect(await notify.handle(event(goalReachedPayload(), 5), reached)).toEqual({
       created: 3,
+      refreshed: 0,
       deliveries: 3,
     });
     expect(await notify.handle(event(goalReachedPayload(), 5), reached)).toEqual({
       created: 0,
+      refreshed: 0,
       deliveries: 0,
     });
     expect((await notify.handle(event(goalReachedPayload(), 9), reached)).created).toBe(3);
@@ -239,7 +243,7 @@ describe('Tolerancia de managedBy = GOAL (N6)', () => {
       event(goalOccurrence({ requiresApproval: false, mode: 'NOTIFY_ONLY' })),
       occurrenceDue,
     );
-    expect(first).toEqual({ created: 2, deliveries: 2 });
+    expect(first).toEqual({ created: 2, refreshed: 0, deliveries: 2 });
     expect(forUser(env, OWNER)[0]).toMatchObject({ type: 'RECURRING_PAYMENT_UPCOMING' });
     // reentrega con otro eventId: no duplica
     const again = await notify.handle(

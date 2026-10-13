@@ -198,10 +198,12 @@ describe('PgNotificationRepository', () => {
     });
     // El worker (sin usuario en contexto) lee por workspace, p. ej. para renderizar el email.
     expect((await inWorker(ws, () => notifications.findById(ws, mine.id)))?.status).toBe('UNREAD');
-    // Pero no puede cambiar el estado de lectura de nadie: la política de UPDATE exige el usuario.
+    // Pero no puede cambiar el estado de lectura de nadie: el único UPDATE del worker es el del aviso agrupado
+    // (`params`, `message_key`, `link`) y el disparador de la migración refine-rate-anomaly-alert-grouping rechaza
+    // (42501) cualquier otra columna.
     await expect(
       inWorker(ws, () => notifications.markRead(ws, owner, mine.id, '2026-11-12T16:00:00.000Z')),
-    ).rejects.toMatchObject({ code: 'PF002' });
+    ).rejects.toMatchObject({ code: '42501' });
     // Otro workspace: ni el worker con su contexto ve la fila.
     const other = await newWorkspace();
     expect(await inWorker(other, () => notifications.findById(other, mine.id))).toBeNull();

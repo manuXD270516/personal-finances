@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Email único por grupo de tasas retenidas"
 scenario: "Email diferido con el estado al enviarse"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-006"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/fx-rate-email.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "email", "quiet-hours"]
@@ -49,4 +50,4 @@ Entonces el email de las 07:00 muestra el estado vigente
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

@@ -9,3 +9,4 @@ export * from './anomaly-detector.js';
 export * from './exchange-rate-lifecycle.js';
 export * from './rate-pairs.js';
 export * from './feed-freshness.js';
+export * from './anomaly-group-resolver.js';

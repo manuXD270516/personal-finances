@@ -5,16 +5,19 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de muestra anómala retenida"
 scenario: "Aviso creado antes de la agrupación"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-005"]
 nfr: []
 invariants: ["INV-028"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/notifications/src/application/notification-intake.test.ts
+  - packages/contexts/notifications/test/integration/notification-intake.int.test.ts
+  - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "anomaly", "migration"]
@@ -50,4 +53,4 @@ Entonces el aviso de la más antigua pasa a ser el del grupo
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.

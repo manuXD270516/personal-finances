@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  anomalyRetainedPayload,
+  anomalyGroupPayload,
+  anomalyGroupWithPeak,
+  usdtBobGroupPayload,
   EPISODE_ID,
   feedRecoveredPayload,
   feedStalePayload,
@@ -21,7 +23,7 @@ const links = {
 type Locale = 'es' | 'en' | 'pt';
 const stalePlan = stale.plan(feedStalePayload(), EPISODE_ID);
 const recoveredPlan = recovered.plan(feedRecoveredPayload(), EPISODE_ID);
-const anomalyPlan = anomaly.plan(anomalyRetainedPayload(), FX_RATE_ID);
+const anomalyPlan = anomaly.plan(anomalyGroupPayload(), FX_RATE_ID);
 const inApp = (l: Locale, plan: typeof stalePlan) => renderInApp(l, plan.messageKey, plan.params, names);
 const email = (l: Locale, variant: 'basic' | 'detailed', plan: typeof stalePlan) =>
   renderEmail({ locale: l, variant, messageKey: plan.messageKey, params: plan.params, names, ...links });
@@ -80,45 +82,89 @@ describe('Catálogo de alertas de tasas (sin consumidor de eventos)', () => {
     expect(body).toContain('13/10/2026 11:58');
   });
 
-  it('[TC-NOTIFICATIONS-FX-004] anomalía: WARNING, deduplicada por tasa, con enlace a su revisión y valores con signo', () => {
+  it('[TC-NOTIFICATIONS-FX-004] anomalía: WARNING, deduplicada por ancla del grupo, con enlace a la pendiente más antigua y valores con signo', () => {
     expect(anomalyPlan).toMatchObject({
       type: 'FX_RATE_ANOMALY_RETAINED',
       severity: 'WARNING',
+      messageKey: 'notifications.fx_rate_anomaly_retained.v2',
       dedupeKey: `fx-rate-anomaly-retained:${FX_RATE_ID}`,
       link: { kind: 'FX_RATE', fxRateId: FX_RATE_ID, periodId: FX_RATE_ID, periodLabel: '2026-10' },
     });
+    expect(anomaly.refreshable).toBe(true);
+    expect(anomalyPlan.params).toMatchObject({
+      pendingCount: 1,
+      retainedCount: 1,
+      providers: ['CRYPTO_EXAMPLE'],
+    });
     const { title, body } = inApp('es', anomalyPlan);
-    expect(title).toContain('BTC/USDT');
-    expect(title).toContain('+10,77 %');
+    expect(title).toBe('BTC/USDT: 1 tasa automática retenida');
     expect(body).toContain('72.000,00');
     expect(body).toContain('65.000,00');
+    expect(body).toContain('+10,77 %');
     expect(body).toContain('CRYPTO_EXAMPLE');
     // La variación es exacta: 10.7692 → +10,77 (HALF_EVEN a 2 decimales) y en inglés usa el punto decimal.
-    expect(inApp('en', anomalyPlan).title).toContain('+10.77 %');
+    expect(inApp('en', anomalyPlan).body).toContain('+10.77 %');
+    expect(inApp('en', anomalyPlan).title).toBe('BTC/USDT: 1 automatic rate held');
   });
 
-  it('[TC-NOTIFICATIONS-FX-004] la tasa guardada sin ceros de relleno se presenta con al menos 2 decimales', () => {
+  it('[TC-NOTIFICATIONS-FX-010] el aviso de un salto de USDT/BOB con 3 muestras muestra la cantidad, la mayor variación y el provider', () => {
+    const plan = anomaly.plan(usdtBobGroupPayload(), FX_RATE_ID);
+    const { title, body } = inApp('es', plan);
+    expect(title).toBe('USDT/BOB: 3 tasas automáticas retenidas');
+    expect(body).toContain('PARALLEL_SELL 12,90 frente a 12,10 (+6,61 %)');
+    expect(body).toContain('paralelo.bo');
+    expect(inApp('en', plan).title).toBe('USDT/BOB: 3 automatic rates held');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-011] varios providers se listan por su nombre y la cantidad cambia con la foto', () => {
     const plan = anomaly.plan(
-      anomalyRetainedPayload({ value: '72000', baselineValue: '65000.5', variationPct: '10.7' }),
+      usdtBobGroupPayload({ pendingCount: 5, retainedCount: 5, providers: ['DOLARAPI_BO', 'PARALELO_BO'] }),
       FX_RATE_ID,
     );
-    const { body } = inApp('es', plan);
-    expect(body).toContain('72.000,00');
-    expect(body).toContain('65.000,50');
-    // Sin recortar los decimales de más.
-    const fine = anomaly.plan(
-      anomalyRetainedPayload({ value: '0.00001234', baselineValue: '0.00001' }),
-      FX_RATE_ID,
-    );
-    expect(inApp('en', fine).body).toContain('0.00001234');
+    expect(inApp('es', plan).title).toBe('USDT/BOB: 5 tasas automáticas retenidas');
+    expect(inApp('es', plan).body).toContain('bo.dolarapi.com y paralelo.bo');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-019] el aviso agrupado en portugués usa el plural de 3 muestras y +6,61 % con la coma decimal', () => {
+    const plan = anomaly.plan(usdtBobGroupPayload(), FX_RATE_ID);
+    const { title, body } = inApp('pt', plan);
+    expect(title).toBe('USDT/BOB: 3 taxas automáticas retidas');
+    expect(body).toContain('+6,61 %');
+    expect(body).toContain('12,90 contra 12,10');
+    expect(inApp('pt', anomalyPlan).title).toBe('BTC/USDT: 1 taxa automática retida');
   });
 
   it('[TC-NOTIFICATIONS-FX-004] una variación negativa conserva su signo', () => {
     const plan = anomaly.plan(
-      anomalyRetainedPayload({ value: '58000.00', variationPct: '-10.7692' }),
+      anomalyGroupWithPeak({ value: '58000.00', variationPct: '-10.7692' }),
       FX_RATE_ID,
     );
-    expect(inApp('es', plan).title).toContain('-10,77 %');
+    expect(inApp('es', plan).body).toContain('-10,77 %');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-018] una notificación v1 (una por muestra) se sigue renderizando con su mensaje v1', () => {
+    const v1 = {
+      rateId: FX_RATE_ID,
+      base: 'BTC',
+      quote: 'USDT',
+      rateType: 'MARKET',
+      provider: 'CRYPTO_EXAMPLE',
+      value: '72000.00',
+      baselineRateId: FX_RATE_ID,
+      baselineValue: '65000.00',
+      variationPct: '10.7692',
+      thresholdPct: '10',
+      detectedAt: '2026-10-13T14:02:10.000Z',
+      timeZone: 'America/La_Paz',
+    };
+    const { title, body } = renderInApp(
+      'es',
+      'notifications.fx_rate_anomaly_retained.v1',
+      v1 as never,
+      names,
+    );
+    expect(title).toBe('Tasa BTC/USDT retenida: variación de +10,77 %');
+    expect(body).toContain('72.000,00');
   });
 
   it('rechaza hechos mal formados (el puerto falla y la transacción de FX se revierte)', () => {
@@ -127,9 +173,21 @@ describe('Catálogo de alertas de tasas (sin consumidor de eventos)', () => {
     expect(() => stale.plan(feedStalePayload({ timeZone: 'Mars/Base' }), EPISODE_ID)).toThrow(/timeZone/);
     expect(() => stale.plan(feedStalePayload(), 'no-uuid')).toThrow(/factKey/);
     expect(() => recovered.plan(feedRecoveredPayload({ rateId: 'x' }), EPISODE_ID)).toThrow(/rateId/);
-    expect(() => anomaly.plan(anomalyRetainedPayload({ value: '7x' }), FX_RATE_ID)).toThrow(/value/);
-    expect(() => anomaly.plan(anomalyRetainedPayload({ variationPct: '' }), FX_RATE_ID)).toThrow(
+    expect(() => anomaly.plan(anomalyGroupWithPeak({ value: '7x' }), FX_RATE_ID)).toThrow(/value/);
+    expect(() => anomaly.plan(anomalyGroupWithPeak({ variationPct: '' }), FX_RATE_ID)).toThrow(
       /variationPct/,
+    );
+    expect(() => anomaly.plan(anomalyGroupPayload({ pendingCount: 0 }), FX_RATE_ID)).toThrow(/pendingCount/);
+    expect(() =>
+      anomaly.plan(anomalyGroupPayload({ pendingCount: 2, retainedCount: 1 }), FX_RATE_ID),
+    ).toThrow(/retainedCount/);
+    expect(() => anomaly.plan(anomalyGroupPayload({ providers: [] }), FX_RATE_ID)).toThrow(/providers/);
+    expect(() => anomaly.plan(anomalyGroupPayload({ lastRetainedAt: 'ayer' }), FX_RATE_ID)).toThrow(
+      /lastRetainedAt/,
+    );
+    // La clave del grupo es su ancla: un factKey distinto al del hecho es un hecho mal formado.
+    expect(() => anomaly.plan(anomalyGroupPayload({ anchorRateId: EPISODE_ID }), FX_RATE_ID)).toThrow(
+      /anchorRateId/,
     );
   });
 });
@@ -194,8 +252,34 @@ describe('Emails de tasas sin valores salvo opt-in', () => {
         expect(e.text).toContain(links.notificationUrl);
       }
     }
-    expect(email('es', 'basic', anomalyPlan).text).toContain('retenida');
+    // El email del grupo no dice cuántas muestras hay: "una o más tasas automáticas".
+    expect(email('es', 'basic', anomalyPlan).text).toContain(
+      'Una o más tasas automáticas quedaron retenidas',
+    );
     expect(email('es', 'basic', anomalyPlan).text).toContain('revisión');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-020] el email del grupo sin opt-in no contiene valores, variación, monedas, providers ni la cantidad', () => {
+    const plan = anomaly.plan(usdtBobGroupPayload(), FX_RATE_ID);
+    for (const l of ['es', 'en', 'pt'] as const) {
+      const e = email(l, 'basic', plan);
+      const content = withoutUrls(`${e.subject}\n${e.text}\n${e.html}`);
+      for (const secret of [
+        '12.90',
+        '12,90',
+        '12.10',
+        '12,10',
+        '6.61',
+        '6,61',
+        'USDT',
+        'BOB',
+        'paralelo.bo',
+      ]) {
+        expect(content, `${l} ${secret}`).not.toContain(secret);
+      }
+      expect(content, `${l} cantidad`).not.toMatch(/(^|[^\d.,])3([^\d.,]|$)/);
+    }
+    expect(email('es', 'basic', plan).text).toContain('Una o más tasas automáticas quedaron retenidas');
   });
 
   it('[TC-NOTIFICATIONS-FX-005] con opt-in el email incluye el par y los valores', () => {
@@ -204,5 +288,15 @@ describe('Emails de tasas sin valores salvo opt-in', () => {
     expect(e.text).toContain('72.000,00');
     expect(e.text).toContain('65.000,00');
     expect(email('es', 'detailed', stalePlan).text).toContain('USDT/BOB');
+  });
+
+  it('[TC-NOTIFICATIONS-FX-020] con opt-in el email del grupo muestra su estado: cantidad, mayor variación y provider', () => {
+    const e = email(
+      'es',
+      'detailed',
+      anomaly.plan(usdtBobGroupPayload({ pendingCount: 5, retainedCount: 5 }), FX_RATE_ID),
+    );
+    expect(e.text).toContain('USDT/BOB: 5 tasas automáticas retenidas pendientes de revisión');
+    expect(e.text).toContain('PARALLEL_SELL 12,90 frente a 12,10 (+6,61 %, paralelo.bo)');
   });
 });

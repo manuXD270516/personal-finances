@@ -10,15 +10,23 @@ import type { NotificationType, WorkspaceRoleName } from './types.js';
  */
 export const FX_RATE_FEED_STALE_MESSAGE_KEY = 'notifications.fx_rate_feed_stale.v1';
 export const FX_RATE_FEED_RECOVERED_MESSAGE_KEY = 'notifications.fx_rate_feed_recovered.v1';
+/** Aviso por muestra (anterior a la agrupación): las notificaciones ya creadas se siguen renderizando con él. */
 export const FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY = 'notifications.fx_rate_anomaly_retained.v1';
+/** Aviso por grupo de muestras pendientes del par (refine-rate-anomaly-alert-grouping). */
+export const FX_RATE_ANOMALY_GROUP_MESSAGE_KEY = 'notifications.fx_rate_anomaly_retained.v2';
 
 /** Tipo de entrega directa: sin `consumer` ni `event` (no es un consumidor de eventos). */
 export interface IntakeTypeDefinition {
   readonly type: NotificationType;
   /** Roles con membresía activa que reciben el tipo (D235: OWNER y EDITOR; el VIEWER no actúa sobre las tasas). */
   readonly recipients: readonly WorkspaceRoleName[];
-  /** `factKey` = clave de negocio del hecho (episodio o tasa): la deduplicación por destinatario. */
+  /** `factKey` = clave de negocio del hecho (episodio o ancla del grupo): la deduplicación por destinatario. */
   plan(payload: unknown, factKey: string): NotificationPlan;
+  /**
+   * `true` si un hecho posterior con la misma clave ACTUALIZA el aviso existente (cantidad, mayor variación y enlace) en
+   * lugar de ignorarse; nunca cambia su estado de lectura ni su fecha de creación y no programa otro email.
+   */
+  readonly refreshable?: boolean;
 }
 
 const CURRENCY = /^[A-Z0-9]{2,16}$/;
@@ -135,38 +143,67 @@ const FX_RATE_FEED_RECOVERED: IntakeTypeDefinition = {
   },
 };
 
+function countOf(source: Record<string, unknown>, key: string): number {
+  const value = source[key];
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : fail(key);
+}
+
+function providersOf(source: Record<string, unknown>, key: string): string[] {
+  const value = source[key];
+  if (!Array.isArray(value) || value.length === 0 || value.length > 50) return fail(key);
+  return value.map((v) => (typeof v === 'string' && v.length > 0 && v.length <= 60 ? v : fail(key)));
+}
+
 const FX_RATE_ANOMALY_RETAINED: IntakeTypeDefinition = {
   type: 'FX_RATE_ANOMALY_RETAINED',
   recipients: ['OWNER', 'EDITOR'],
+  refreshable: true,
   plan(payload, factKey) {
-    const rateId = factKeyOf(factKey);
+    const anchorRateId = factKeyOf(factKey);
     const p = recordOf(payload, 'payload');
+    if (p['anchorRateId'] !== anchorRateId) fail('anchorRateId');
     const detectedAt = instantOf(p, 'detectedAt');
     const timeZone = zoneOf(p, 'timeZone');
+    const firstRetainedAt = instantOf(p, 'firstRetainedAt');
+    const peak = recordOf(p['peak'], 'peak');
+    const pendingCount = countOf(p, 'pendingCount');
+    const retainedCount = countOf(p, 'retainedCount');
+    if (retainedCount < pendingCount) fail('retainedCount');
+    const reviewRateId = uuidOf(p, 'reviewRateId');
     return {
       type: 'FX_RATE_ANOMALY_RETAINED',
-      dedupeKey: `fx-rate-anomaly-retained:${rateId}`,
+      dedupeKey: `fx-rate-anomaly-retained:${anchorRateId}`,
       severity: 'WARNING',
-      messageKey: FX_RATE_ANOMALY_RETAINED_MESSAGE_KEY,
+      messageKey: FX_RATE_ANOMALY_GROUP_MESSAGE_KEY,
       params: {
-        rateId,
+        anchorRateId,
         base: currencyOf(p, 'base'),
         quote: currencyOf(p, 'quote'),
-        rateType: nonEmptyTextOf(p, 'rateType', 20),
-        provider: nonEmptyTextOf(p, 'provider', 60),
-        value: decimalOf(p, 'value'),
-        baselineRateId: uuidOf(p, 'baselineRateId'),
-        baselineValue: decimalOf(p, 'baselineValue'),
-        variationPct: signedDecimalOf(p, 'variationPct'),
-        thresholdPct: decimalOf(p, 'thresholdPct'),
+        pendingCount,
+        retainedCount,
+        providers: providersOf(p, 'providers'),
+        reviewRateId,
+        peak: {
+          rateId: uuidOf(peak, 'rateId'),
+          rateType: nonEmptyTextOf(peak, 'rateType', 20),
+          provider: nonEmptyTextOf(peak, 'provider', 60),
+          value: decimalOf(peak, 'value'),
+          baselineRateId: uuidOf(peak, 'baselineRateId'),
+          baselineValue: decimalOf(peak, 'baselineValue'),
+          variationPct: signedDecimalOf(peak, 'variationPct'),
+          thresholdPct: decimalOf(peak, 'thresholdPct'),
+        },
+        firstRetainedAt,
+        lastRetainedAt: instantOf(p, 'lastRetainedAt'),
         detectedAt,
         timeZone,
       },
+      // El enlace lleva a la pendiente más antigua del grupo en su última actualización (Tasas → Proveedores).
       link: {
         kind: 'FX_RATE',
-        fxRateId: rateId,
-        periodId: rateId,
-        periodLabel: monthLabelIn(detectedAt, timeZone),
+        fxRateId: reviewRateId,
+        periodId: reviewRateId,
+        periodLabel: monthLabelIn(firstRetainedAt, timeZone),
       },
     };
   },

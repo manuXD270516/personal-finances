@@ -15,6 +15,7 @@ import {
   PgCurrencyRepository,
   PgExchangeRateRepository,
   PgFxUnitOfWork,
+  PgRateAnomalyReviewRepository,
   PgRatePairListRepository,
   PgRatePreferenceRepository,
   uuidV7Ids,
@@ -84,7 +85,7 @@ const intake: NotificationIntakePort = {
       [fact.factKey, fact.type],
     );
     notified.push(fact);
-    return { created: 2, deliveries: 2 };
+    return { created: 2, refreshed: 0, deliveries: 2 };
   },
 };
 
@@ -519,5 +520,167 @@ describe('Muestra retenida sobre PostgreSQL (fx/market-rate-providers)', () => {
         ).rows[0],
     );
     expect(held).toEqual({ anomaly_flagged: true, reviews: '0' });
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────── aviso agrupado (refine-rate-anomaly-alert-grouping)
+
+describe('Aviso agrupado de muestras retenidas sobre PostgreSQL (refine-rate-anomaly-alert-grouping)', () => {
+  type PRateType = 'PARALLEL' | 'PARALLEL_BUY' | 'PARALLEL_SELL';
+  const typed = (rateType: PRateType, value: string, asOf: string) =>
+    ProviderSample.of({
+      provider: 'PARALELO_BO',
+      base: 'USDT',
+      quote: 'BOB',
+      rateType,
+      value,
+      asOf,
+      fetchedAt: clock.now().toString(),
+      rawPayload: RAW,
+      sourceLabel: 'paralelo.bo (P2P USDT/BOB)',
+    });
+  const jump = (asOf: string, values: [string, string, string] = ['12.80', '12.70', '12.90']) => [
+    typed('PARALLEL', values[0], asOf),
+    typed('PARALLEL_BUY', values[1], asOf),
+    typed('PARALLEL_SELL', values[2], asOf),
+  ];
+  const usdtFacts = () =>
+    notified.filter(
+      (f) => f.type === 'FX_RATE_ANOMALY_RETAINED' && (f.payload as { base?: string }).base === 'USDT',
+    );
+  const group = (f: NotificationIntakeFact | undefined) =>
+    f?.payload as unknown as {
+      anchorRateId: string;
+      reviewRateId: string;
+      pendingCount: number;
+      retainedCount: number;
+      providers: string[];
+      peak: { rateType: string; value: string; baselineValue: string; variationPct: string };
+    };
+  const heldIds = (ws: string) =>
+    inTx(app, ws, async (c) =>
+      (
+        await c.query<{ id: string }>(
+          `SELECT id::text FROM fx.exchange_rate WHERE workspace_id = $1 AND anomaly_flagged AND base_currency = 'USDT' ORDER BY created_at, id`,
+          [ws],
+        )
+      ).rows.map((r) => r.id),
+    );
+  const review = (ws: string, user: string, rateId: string, decidedAt: string) =>
+    appUow.run({ userId: user, workspaceId: ws }, () =>
+      new PgRateAnomalyReviewRepository().insert({
+        rateId,
+        workspaceId: ws,
+        decision: 'CONFIRMED',
+        reason: 'verificado',
+        decidedBy: user,
+        decidedAt,
+      }),
+    );
+
+  it('[TC-NOTIFICATIONS-FX-010] [TC-NOTIFICATIONS-FX-012] [TC-NOTIFICATIONS-FX-013] [TC-NOTIFICATIONS-FX-014] [TC-NOTIFICATIONS-FX-016] salto, ciclo siguiente, revisión parcial y grupo nuevo: una clave por grupo, el ancla estable y la lectura SQL de la isla vigente', async () => {
+    active.clear();
+    active.add(w2);
+    paralelo.failure = null;
+    await setPairs(w2, u2, [['USDT', 'BOB']]);
+    // Líneas base a las 08:00Z de ese día.
+    clock.set(Instant.parse('2026-10-27T08:05:00Z'));
+    paralelo.latest = jump('2026-10-27T08:00:00Z', ['12.05', '12.00', '12.10']);
+    await ingestion().poll();
+    expect(usdtFacts()).toHaveLength(0);
+
+    // Ciclo del salto: tres muestras retenidas ⇒ UN aviso con 3 pendientes y tres eventos.
+    clock.set(Instant.parse('2026-10-27T14:00:00Z'));
+    paralelo.latest = jump('2026-10-27T13:55:00Z');
+    await ingestion().poll();
+    expect(usdtFacts()).toHaveLength(1);
+    const first = group(usdtFacts()[0]);
+    expect(first).toMatchObject({
+      pendingCount: 3,
+      retainedCount: 3,
+      providers: ['PARALELO_BO'],
+      peak: { rateType: 'PARALLEL_SELL', variationPct: '6.6116' },
+    });
+    expect(Number(first.peak.value)).toBe(12.9);
+    expect(Number(first.peak.baselineValue)).toBe(12.1);
+    const ids = await heldIds(w2);
+    expect(ids).toHaveLength(3);
+    expect(first.anchorRateId).toBe(ids[0]);
+    expect(
+      (await events(w2, 'fx.RateAnomalyRetained')).filter(
+        (e) => (e.payload as { base?: string }).base === 'USDT',
+      ),
+    ).toHaveLength(3);
+
+    // Reproceso del ciclo: sin muestras nuevas ni otra llamada al puerto.
+    await ingestion().poll();
+    expect(usdtFacts()).toHaveLength(1);
+
+    // Ciclo siguiente con vigencia nueva: misma clave, 6 pendientes.
+    clock.set(Instant.parse('2026-10-27T14:15:00Z'));
+    paralelo.latest = jump('2026-10-27T14:10:00Z');
+    await ingestion().poll();
+    expect(usdtFacts()).toHaveLength(2);
+    expect(group(usdtFacts()[1])).toMatchObject({ anchorRateId: first.anchorRateId, pendingCount: 6 });
+
+    // Revisión parcial: la más antigua se confirma; el grupo no se corta y el enlace va a la pendiente más antigua.
+    await review(w2, u2, ids[0] as string, '2026-10-27T14:20:00.000Z');
+    clock.set(Instant.parse('2026-10-27T14:30:00Z'));
+    paralelo.latest = jump('2026-10-27T14:25:00Z', ['13.60', '13.50', '13.70']);
+    await ingestion().poll();
+    const partial = group(usdtFacts()[2]);
+    expect(partial.anchorRateId).toBe(first.anchorRateId);
+    expect(partial.reviewRateId).toBe(ids[1]);
+    expect(partial.pendingCount).toBeGreaterThanOrEqual(5);
+    expect(partial.retainedCount).toBeGreaterThan(partial.pendingCount);
+
+    // Se revisa TODO el grupo; un salto nuevo abre otro con otra clave y 1 pendiente.
+    for (const id of await heldIds(w2)) {
+      if (id === ids[0]) continue;
+      await review(w2, u2, id, '2026-10-27T15:00:00.000Z');
+    }
+    clock.set(Instant.parse('2026-10-27T18:00:00Z'));
+    paralelo.latest = [typed('PARALLEL', '16.00', '2026-10-27T17:55:00Z')];
+    await ingestion().poll();
+    const fresh = group(usdtFacts().at(-1));
+    expect(fresh.anchorRateId).not.toBe(first.anchorRateId);
+    expect(fresh).toMatchObject({ pendingCount: 1, retainedCount: 1 });
+  }, 60_000);
+
+  it('[TC-NOTIFICATIONS-FX-010] retainedOfPair devuelve solo desde el ancla del grupo vigente y existe el índice parcial', async () => {
+    const rates = new PgExchangeRateRepository();
+    const rows = await new PgFxUnitOfWork(worker).run(w2, () => rates.retainedOfPair(w2, 'USDT', 'BOB'));
+    // El grupo anterior (todo revisado antes de las 18:00Z) queda fuera: solo la muestra del grupo nuevo.
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ decidedAt: null, rateType: 'PARALLEL' });
+    const { rows: plan } = await migrator.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes WHERE schemaname = 'fx' AND indexname = 'exchange_rate_retained_ix'`,
+    );
+    expect(plan[0]?.indexdef).toMatch(/WHERE anomaly_flagged/);
+  });
+
+  it('[TC-NOTIFICATIONS-FX-010] el bloqueo consultivo serializa las transacciones del mismo workspace y no bloquea a otro', async () => {
+    const uow = new PgFxUnitOfWork(worker);
+    const rates = new PgExchangeRateRepository();
+    const order: string[] = [];
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const a = uow.run(w2, async () => {
+      await rates.lockAnomalyGroups(w2);
+      order.push('a-lock');
+      await sleep(300);
+      order.push('a-done');
+    });
+    await sleep(80);
+    const b = uow.run(w2, async () => {
+      await rates.lockAnomalyGroups(w2);
+      order.push('b-lock');
+    });
+    const other = uow.run(w1, async () => {
+      await rates.lockAnomalyGroups(w1);
+      order.push('other-lock');
+    });
+    await Promise.all([a, b, other]);
+    expect(order.indexOf('other-lock')).toBeLessThan(order.indexOf('a-done'));
+    expect(order.indexOf('b-lock')).toBeGreaterThan(order.indexOf('a-done'));
   });
 });

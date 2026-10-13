@@ -162,6 +162,6 @@ Notas: el agregado de `SavingsContributionRecorded` y `GoalReached` es `SavingsG
 |---|---|---|
 | `fx.RateFeedStale.v1` | FX (job de providers, actor SYSTEM `fx-provider:<ciclo>`) | Ninguno en Phase 5 (catálogo y trazabilidad); NOTIFY recibe el aviso `FX_RATE_FEED_STALE` por su puerto síncrono `NotificationIntakePort` en la misma unidad de trabajo (D249) |
 | `fx.RateFeedRecovered.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_FEED_RECOVERED` por el puerto |
-| `fx.RateAnomalyRetained.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_ANOMALY_RETAINED` por el puerto |
+| `fx.RateAnomalyRetained.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_ANOMALY_RETAINED` por el puerto, agrupado por par |
 
 Un consumidor futuro tendría su propia justificación de conexiones (presupuesto de conexiones del worker, D249).

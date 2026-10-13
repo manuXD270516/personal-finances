@@ -136,6 +136,20 @@ const es: MessageCatalog = {
   'email.fx_rate_anomaly_retained.detailed':
     '{pair}: {provider} publicó {value} (tasa anterior {baseline}, {variation} %). Confírmala o recházala en la app.',
   // email: común
+  // aviso agrupado por par (refine-rate-anomaly-alert-grouping): plural `_one` / `_other` según las muestras pendientes
+  'inapp.fx_rate_anomaly_group.title_one': '{pair}: {count} tasa automática retenida',
+  'inapp.fx_rate_anomaly_group.title_other': '{pair}: {count} tasas automáticas retenidas',
+  'inapp.fx_rate_anomaly_group.body_one':
+    '{provider} publicó {rateType} {value} frente a {baseline} ({variation} %). La muestra no se usa hasta que la confirmes o la rechaces.',
+  'inapp.fx_rate_anomaly_group.body_other':
+    'La mayor variación es {rateType} {value} frente a {baseline} ({variation} %) de {provider}. Providers con muestras pendientes: {providers}. Las muestras no se usan hasta que las confirmes o las rechaces.',
+  'email.fx_rate_anomaly_group.subject': 'Tienes tasas automáticas retenidas por revisar',
+  'email.fx_rate_anomaly_group.basic':
+    'Una o más tasas automáticas quedaron retenidas y necesitan tu revisión en la app.',
+  'email.fx_rate_anomaly_group.detailed_one':
+    '{pair}: {provider} publicó {rateType} {value} (tasa anterior {baseline}, {variation} %). Confírmala o recházala en la app.',
+  'email.fx_rate_anomaly_group.detailed_other':
+    '{pair}: {count} tasas automáticas retenidas pendientes de revisión. La mayor variación es {rateType} {value} frente a {baseline} ({variation} %, {provider}). Confírmalas o recházalas en la app.',
   'email.cta': 'Ver la notificación',
   'email.footer':
     'Recibes este aviso porque tienes activadas las notificaciones por email. Puedes cambiarlo en tus preferencias.',
@@ -260,6 +274,19 @@ const en: MessageCatalog = {
   'email.fx_rate_anomaly_retained.basic': 'An automatic rate was held and needs your review in the app.',
   'email.fx_rate_anomaly_retained.detailed':
     '{pair}: {provider} published {value} (previous rate {baseline}, {variation} %). Confirm or reject it in the app.',
+  'inapp.fx_rate_anomaly_group.title_one': '{pair}: {count} automatic rate held',
+  'inapp.fx_rate_anomaly_group.title_other': '{pair}: {count} automatic rates held',
+  'inapp.fx_rate_anomaly_group.body_one':
+    '{provider} published {rateType} {value} against {baseline} ({variation} %). The sample is not used until you confirm or reject it.',
+  'inapp.fx_rate_anomaly_group.body_other':
+    'The largest change is {rateType} {value} against {baseline} ({variation} %) from {provider}. Providers with pending samples: {providers}. The samples are not used until you confirm or reject them.',
+  'email.fx_rate_anomaly_group.subject': 'You have automatic rates held for review',
+  'email.fx_rate_anomaly_group.basic':
+    'One or more automatic rates were held and need your review in the app.',
+  'email.fx_rate_anomaly_group.detailed_one':
+    '{pair}: {provider} published {rateType} {value} (previous rate {baseline}, {variation} %). Confirm or reject it in the app.',
+  'email.fx_rate_anomaly_group.detailed_other':
+    '{pair}: {count} automatic rates held for review. The largest change is {rateType} {value} against {baseline} ({variation} %, {provider}). Confirm or reject them in the app.',
   'email.cta': 'View the notification',
   'email.footer':
     'You receive this notice because email notifications are turned on. You can change it in your preferences.',
@@ -383,6 +410,19 @@ const pt: MessageCatalog = {
   'email.fx_rate_anomaly_retained.basic': 'Uma taxa automática ficou retida e precisa da sua revisão no app.',
   'email.fx_rate_anomaly_retained.detailed':
     '{pair}: {provider} publicou {value} (taxa anterior {baseline}, {variation} %). Confirme ou rejeite no app.',
+  'inapp.fx_rate_anomaly_group.title_one': '{pair}: {count} taxa automática retida',
+  'inapp.fx_rate_anomaly_group.title_other': '{pair}: {count} taxas automáticas retidas',
+  'inapp.fx_rate_anomaly_group.body_one':
+    '{provider} publicou {rateType} {value} contra {baseline} ({variation} %). A amostra não é usada até você confirmá-la ou rejeitá-la.',
+  'inapp.fx_rate_anomaly_group.body_other':
+    'A maior variação é {rateType} {value} contra {baseline} ({variation} %) de {provider}. Providers com amostras pendentes: {providers}. As amostras não são usadas até você confirmá-las ou rejeitá-las.',
+  'email.fx_rate_anomaly_group.subject': 'Você tem taxas automáticas retidas para revisar',
+  'email.fx_rate_anomaly_group.basic':
+    'Uma ou mais taxas automáticas ficaram retidas e precisam da sua revisão no app.',
+  'email.fx_rate_anomaly_group.detailed_one':
+    '{pair}: {provider} publicou {rateType} {value} (taxa anterior {baseline}, {variation} %). Confirme ou rejeite no app.',
+  'email.fx_rate_anomaly_group.detailed_other':
+    '{pair}: {count} taxas automáticas retidas para revisar. A maior variação é {rateType} {value} contra {baseline} ({variation} %, {provider}). Confirme ou rejeite no app.',
   'email.cta': 'Ver a notificação',
   'email.footer':
     'Você recebe este aviso porque as notificações por email estão ativadas. Você pode alterá-lo nas suas preferências.',

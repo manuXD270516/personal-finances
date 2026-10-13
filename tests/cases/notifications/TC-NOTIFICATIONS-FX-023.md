@@ -5,16 +5,17 @@ spec: notifications/alerts
 related_specs: ["fx/market-rate-providers"]
 requirement: "Notificación de muestra anómala retenida"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-NOTIFY-005"]
 nfr: []
 invariants: ["INV-028"]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/fx/src/domain/anomaly-group-resolver.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["notifications", "fx", "anomaly", "pbt"]
@@ -50,4 +51,4 @@ Entonces se cumplen las propiedades
 
 ## Notas
 
-- Change: `refine-rate-anomaly-alert-grouping` (borrador).
+- Change: `refine-rate-anomaly-alert-grouping`.
