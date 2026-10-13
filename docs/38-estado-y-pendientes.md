@@ -13,7 +13,7 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 2 Planificación y control | 10 de 11 archivados; `add-month-closing` fusionado, espera la evidencia del owner (§2) |
 | 3 Compromisos e importación | Completa y archivada (persistencia del import ≤ 20 s diferida a Phase 6, D152) |
 | 4 Metas y deudas | Completa salvo evidencias del owner (D219): implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
-| 5 FX y cripto avanzado | **Decisiones registradas** ([docs/41](41-phase-5-consolidation-decisions.md), D219–D250); siguiente: changes 37, 38, 39, 40. Plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3; no hay changes de OpenSpec todavía |
+| 5 FX y cripto avanzado | **En curso.** Decisiones en [docs/41](41-phase-5-consolidation-decisions.md) (D219–D250), plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3. Change 37 implementado y archivado; changes 38, 39 y 40 con spec fusionada (#118, #119, #120). Siguientes a implementar: 40 y 38 (§1.2) |
 
 ### 1.1 Phase 4
 
@@ -30,14 +30,14 @@ Informe de cierre de Phase 4 y criterios de salida (docs/24 §5.4): [docs/39](39
 
 ### 1.2 Phase 5
 
-Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Siguiente: el agente `arquitecto` redacta los changes 37, 38, 39 y 40.
+Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Los changes 37 a 40 ya están redactados. Siguientes a implementar: 40 `add-conversion-cost-analysis` y 38 `add-crypto-rate-providers`.
 
 | # | Change | Estado |
 |---|---|---|
-| 37 | `fix-phase-4-gaps` | Por redactar (D222) |
-| 38 | `add-crypto-rate-providers` | Por redactar; antes del adapter, verificación de ToS de las fuentes (D225) |
-| 39 | `add-rate-feed-alerts` | Por redactar, después de 38 (D233–D236) |
-| 40 | `add-conversion-cost-analysis` | Por redactar (D231, D244–D247); trae el único consumidor nuevo: subir `max_connections` antes (D249) |
+| 37 | `fix-phase-4-gaps` | Implementado (#121) y archivado (D222) |
+| 38 | `add-crypto-rate-providers` | Spec fusionada (#118); implementación pendiente. Sin adapters hasta verificar los términos de uso (ADR-0029 nuevo, D225) y hasta que el owner nombre el exchange |
+| 39 | `add-rate-feed-alerts` | Spec fusionada (#119); se implementa después de 38 (D233–D236) |
+| 40 | `add-conversion-cost-analysis` | Spec fusionada (#120); siguiente a implementar (D231, D244–D247). Trae el único consumidor nuevo: subir `max_connections` antes (D249) |
 | 41 | `add-exchange-house-rate-providers` | En espera de P14 (D232) |
 | 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
 | 44 | `add-phase-4-demo-data` | Could, último y opcional (D223) |
@@ -64,12 +64,15 @@ Ninguna sesión puede cerrarlos por su cuenta.
 ## 4. Deuda técnica y mejoras conocidas
 
 **Plataforma**
+- `overdueStatements[]` del listado de tarjetas puede quedar incompleto; el detalle de la tarjeta sí es completo (change 37).
+- La métrica `debt_card_cycle_mismatch_total` no existe en el código (solo `consistent`).
 - Conexiones: la plantilla del host suma API 22 + worker 33 = 55 sobre 60 de Postgres. Antes del despliegue, subir `max_connections` o revisar consumidores de concurrencia 1 que podrían agruparse.
 - Limitador de tasa en memoria: con más de una réplica de la API hace falta un adaptador sobre Valkey.
 
 **Préstamos y amortización**
 - Adoptar una tabla del banco cuyas fechas difieren de las del sistema en una cuota pendiente no está probado (la clave de la ocurrencia es el número de cuota).
 - El simulador de pago anticipado no tiene benchmark del p95 < 300 ms; el test usa 3 s.
+- La lista de préstamos hace 2 consultas a BD por préstamo (change 37).
 - UI: la lista de préstamos consulta cada detalle por separado (máx. 50); un borrador no se edita desde la pantalla (sí por `PATCH`); notas y etiquetas de transacciones `LOAN_*` no se editan desde la UI.
 
 **Tarjetas**
@@ -80,6 +83,8 @@ Ninguna sesión puede cerrarlos por su cuenta.
 **Metas**
 - Anular un aporte del que ya se retiró una parte deja el fondo real en negativo; no se bloquea.
 - El job diario corre cada hora (`GOALS_DAILY_CRON`); es idempotente.
+
+**Deuda de Phase 4 fuera de D222** (sigue abierta): notas `LOAN_*`, rótulo de cuotas en Q8, supuestos de Q5, job horario de metas y la decisión «Phase 7».
 
 **Disponible para gastar (Q5)**
 - Sin un periodo financiero que cubra hoy (workspace sin actividad en el ledger) Q5 usa el mes calendario y no consulta el plan; la spec no define ese caso (supuesto a confirmar).
