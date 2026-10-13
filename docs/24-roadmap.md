@@ -152,6 +152,7 @@ flowchart LR
 - **As-built `add-loans` (primer change de deuda):** préstamos con cronograma francés, desembolso y pago como transacciones administradas, cuotas como compromisos y comparación con la tabla del banco (FR-DEBT-001..003, 006, 007, 011); decisiones del owner D153–D164 (docs/37). Morosidad (D159) y feriados (D160) quedan fuera de la fase.
 - **As-built `add-savings-goals`:** metas de ahorro con aportes reales (transferencias a cuentas vinculadas) y reservas, progreso multi-moneda, aporte requerido, fecha esperada, estado de avance, simulación, aporte recurrente administrado, hitos y meta alcanzada, Q9 en el Home y aportes netos en Q6 (FR-GOALS-001..010); decisiones del owner D179–D193 (docs/37). Exit criterion "metas del owner con estado calculado": el owner registra sus metas reales en `/goals` (fondo de emergencia en una cuenta de ahorro, compras con dinero reservado en la cuenta corriente, viaje cotizado en USD con ahorro en BOB y USD) y cada una muestra porcentaje, aporte requerido, fecha esperada y estado; Q5 completo llega con `add-spendable-amount`.
 - **Procedimiento del exit criterion "cronograma French coincide con la tabla del banco":** el owner carga la tabla real de su préstamo **fuera del repositorio** (pantalla Deudas → Préstamo → "Comparar con la tabla del banco": CSV, texto pegado o filas), compara con el cronograma del sistema y el resultado queda persistido como `MATCH` (coincide al centavo) o `EXPLAINED` (diferencia con explicación escrita por el owner; `UNEXPLAINED` no cierra el criterio). En el informe de cierre de la fase solo se anota el estado (`MATCH` o `EXPLAINED`) y, si aplica, la causa en términos generales (convención de días, cargos, fechas), **sin cifras personales**: el repositorio es público y las fixtures usan montos inventados.
+- **Informe de cierre (2026-10-13):** [39-phase-4-closure-and-phase-5-design.md](./39-phase-4-closure-and-phase-5-design.md) Parte A. Cumplidos con tests automatizados: Σ principal = principal y pagos de tarjeta fuera del gasto. Pendientes del owner: la comparación con la tabla del banco (estado aún sin registrar) y las metas reales con estado calculado.
 
 ### 5.5 Phase 5 — FX y cripto avanzado
 
@@ -161,6 +162,7 @@ flowchart LR
 - **Exit criteria:** tasas diarias de todos los pares del owner (incl. cripto) sin intervención manual por 30 días; ninguna tasa histórica modificada (test de inmutabilidad); alertas de staleness funcionando.
 - **Dependencias:** Phase 1 (FX manual, providers de tasa paralela, conversiones), Phase 2 (NOTIFY para alertas).
 - **Riesgos clave:** RISK-023 (fuentes FX/ToS), RISK-003.
+- **Diseño (2026-10-13):** plan provisional de changes 37–44 en [39-phase-4-closure-and-phase-5-design.md](./39-phase-4-closure-and-phase-5-design.md) Parte B; las preguntas al owner que fijan su alcance (pares, tenencias, fuentes, alertas, valoración) están en [40-phase-5-consolidation-questions.md](./40-phase-5-consolidation-questions.md).
 
 ### 5.6 Phase 6 — Documentos, imports y reglas
 
