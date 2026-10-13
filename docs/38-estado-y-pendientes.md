@@ -1,6 +1,6 @@
 # 38: Estado del proyecto y pendientes
 
-> **Actualizado:** 2026-10-13 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md), cierre de Phase 4 y diseño de Phase 5 [39](39-phase-4-closure-and-phase-5-design.md), preguntas de Phase 5 [40](40-phase-5-consolidation-questions.md)
+> **Actualizado:** 2026-10-13 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md), [41](41-phase-5-consolidation-decisions.md), cierre de Phase 4 y diseño de Phase 5 [39](39-phase-4-closure-and-phase-5-design.md), preguntas de Phase 5 [40](40-phase-5-consolidation-questions.md) y sus decisiones [41](41-phase-5-consolidation-decisions.md)
 
 Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cuando cambia el estado de un change o se resuelve un pendiente.
 
@@ -12,8 +12,8 @@ Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cua
 | 1 Núcleo (cuentas, transacciones, ledger, FX, clasificación, dashboard) | Completa y archivada |
 | 2 Planificación y control | 10 de 11 archivados; `add-month-closing` fusionado, espera la evidencia del owner (§2) |
 | 3 Compromisos e importación | Completa y archivada (persistencia del import ≤ 20 s diferida a Phase 6, D152) |
-| 4 Metas y deudas | Implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
-| 5 FX y cripto avanzado | **Diseño: preguntas al owner** ([docs/40](40-phase-5-consolidation-questions.md), 32 preguntas, 9 bloqueantes). Plan provisional de changes 37–44 en [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte B; no hay changes de OpenSpec todavía |
+| 4 Metas y deudas | Completa salvo evidencias del owner (D219): implementada y fusionada; 3 de 6 archivados. Espera evidencias del owner (§2) y el archivado encadenado (§1.1). Informe de cierre: [docs/39](39-phase-4-closure-and-phase-5-design.md) Parte A |
+| 5 FX y cripto avanzado | **Decisiones registradas** ([docs/41](41-phase-5-consolidation-decisions.md), D219–D250); siguiente: changes 37, 38, 39, 40. Plan en [docs/39](39-phase-4-closure-and-phase-5-design.md) §B.3; no hay changes de OpenSpec todavía |
 
 ### 1.1 Phase 4
 
@@ -30,7 +30,18 @@ Informe de cierre de Phase 4 y criterios de salida (docs/24 §5.4): [docs/39](39
 
 ### 1.2 Phase 5
 
-Siguiente paso: el owner responde [docs/40](40-phase-5-consolidation-questions.md); sus respuestas van a `docs/41-phase-5-consolidation-decisions.md` (pregunta N → D(218+N)) y después el agente `arquitecto` redacta los changes que queden en el plan.
+Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (respuestas del owner a P1–P3, P7, P8, P15 y P30; 17 por omisión con la recomendación de docs/40, revertibles; P19–P25 sin efecto). Siguiente: el agente `arquitecto` redacta los changes 37, 38, 39 y 40.
+
+| # | Change | Estado |
+|---|---|---|
+| 37 | `fix-phase-4-gaps` | Por redactar (D222) |
+| 38 | `add-crypto-rate-providers` | Por redactar; antes del adapter, verificación de ToS de las fuentes (D225) |
+| 39 | `add-rate-feed-alerts` | Por redactar, después de 38 (D233–D236) |
+| 40 | `add-conversion-cost-analysis` | Por redactar (D231, D244–D247); trae el único consumidor nuevo: subir `max_connections` antes (D249) |
+| 41 | `add-exchange-house-rate-providers` | En espera de P14 (D232) |
+| 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
+| 44 | `add-phase-4-demo-data` | Could, último y opcional (D223) |
+| 45 | `add-dependency-updates` | Platform track (D224) |
 
 ## 2. Esperan al owner
 
@@ -38,12 +49,17 @@ Ninguna sesión puede cerrarlos por su cuenta.
 
 - **Cierre de mes real (Phase 2, `add-month-closing` 7.4, TC-PLANNING-EXIT-001):** cerrar un mes real con todas las cuentas conciliadas. Al tenerlo, se marca la tarea con la evidencia, se automatiza el TC y se archiva el change. Es la advertencia R3 que hoy muestra `traceability:check`.
 - **Tabla del banco (Phase 4, `add-loans` 8.4, D154):** el owner carga en la app la tabla de amortización real de su préstamo (nunca en el repositorio) y registra la comparación como `MATCH` o `EXPLAINED`. Si la tabla tiene fechas distintas a las del sistema en cuotas pendientes, revisar la adopción de cronogramas custom (§4).
+- **Casas de cambio o bancos (Phase 5, P14, D232):** indicar cuáles usa para verificar sus términos; hasta entonces el change 41 queda en espera.
+- **Despliegue N1 (Phase 5, D248, ADR-0027):** hacerlo antes de abrir la ventana de 30 días del criterio de salida de Phase 5.
+- **Decisiones por omisión de Phase 5** ([docs/41](41-phase-5-consolidation-decisions.md)): el owner puede revertir cualquiera antes de que se redacte el change que la usa.
 - **Criterios de salida de uso real:** Phase 2 (uso del owner, exportar e importar el workspace); Phase 3 (registrar sus suscripciones reales y un mes sin recurrentes sorpresa, indicador en `/pagos-proximos`); Phase 4 (metas del owner con estado calculado).
 
 ## 3. Diferidos por decisión
 
 - **Persistencia del import CSV ≤ 20 s para 5 000 filas** (hoy ~120 s): Phase 6, con la escritura masiva de `RecordImportedTransactions` (D152). `PF_PERF_STRICT_IMPORT=1` exige la meta.
-- **Datos de demostración** de suscripciones, tarjetas, metas y préstamos: tareas Could no hechas; se pueden agrupar en un change de datos demo.
+- **Datos de demostración** de suscripciones, tarjetas, metas y préstamos: tareas Could no hechas; se agrupan en `add-phase-4-demo-data` (44), último y opcional de Phase 5 (D223).
+- **Commodities y valoración de inversiones** (changes 42 y 43): Phase 7 o backlog; el owner no tiene esos activos (D221).
+- **Alerta por falla no transitoria de un provider:** no entra en Phase 5 (D233); sigue visible en el estado de providers.
 
 ## 4. Deuda técnica y mejoras conocidas
 
