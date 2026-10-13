@@ -1,0 +1,170 @@
+# Diseño: add-exchange-house-rate-providers
+
+## Contexto
+
+D232 dejó este change en espera de P14. El owner respondió el 2026-10-13: el sistema **debe soportar todos los bancos y billeteras disponibles en Bolivia a la fecha de hoy**, y puede compartir PDFs de extractos de distintos bancos, que nunca van al repositorio. Hasta esa respuesta el alcance previsto (docs/39 §B.4) eran adapters de tasas para las pocas casas de cambio o bancos que el owner usara, con descarte del change si ninguno calificaba.
+
+Este design reinterpreta "soportar todas" sin contradecir decisiones previas:
+
+- **FR-ACCOUNTS-012:** ninguna institución está fija en el código; un catálogo inicial opcional es editable. El catálogo de referencia es **dato versionado**, y la institución del workspace es una copia normal y editable.
+- **NFR-COMP-007, RISK-023, D225 (como criterio del change 38):** ninguna fuente sin términos verificados y registrados en un ADR. "Soportar todas" **no** autoriza el scraping.
+- **D29 y ADR-0025:** `PARALLEL` sigue valorando USD/BOB; las tasas por institución no cambian la valoración por defecto.
+- **D39:** compra y venta como tipos propios "desde el lado del owner".
+- **D249:** sin consumidores de eventos nuevos.
+- **D232 (opción (b) como resultado parcial):** mientras una entidad no tenga una fuente apta, el owner sigue registrando tasas `BANK` manuales.
+- **FR-IMPORTS-005 (Phase 6) y FR-IMPORTS-016 (Phase 11, Could):** los perfiles por institución y los parsers de PDF no se adelantan sin decisión del owner (pregunta 6).
+
+### Qué significa "soportar todas"
+
+| Dimensión | Qué se puede prometer hoy | Qué no |
+|---|---|---|
+| Catálogo para cuentas | Toda entidad del registro oficial de ASFI en las categorías del alcance, con fuente y fecha de corte, adoptable en un clic. Medible: cobertura del censo = 100 %. | Entidades no reguladas ni marcas comerciales sin verificar. |
+| Tasas de cambio por entidad | Un estado **resuelto** por entidad: `SUPPORTED` si existe una fuente apta; si no, `NOT_ELIGIBLE` con la razón o `NOT_APPLICABLE` (la entidad no opera divisas). Medible: 0 entidades `IN_VERIFICATION`. | Una tasa automática por entidad: depende de lo que cada fuente publique y permita. |
+| Importación de extractos | Línea base: el CSV básico (Phase 3) para toda entidad que exporte CSV; un estado por entidad según las muestras del owner. Medible: 0 entidades `PENDING_SAMPLE`. | Un parser de PDF por banco en este change (Phase 6/11, pregunta 6). |
+
+"Soporte completo" = cobertura del censo al 100 % **y** ninguna entidad activa pendiente (`IN_VERIFICATION` o `PENDING_SAMPLE`) en ninguna dimensión. Una entidad `NOT_ELIGIBLE` cuenta como resuelta pero se informa aparte, con su razón, para no presentarla como soportada (pregunta 1: el owner puede pedir un criterio más estricto).
+
+### Investigación (2026-10-13)
+
+La sesión que redactó este design **no pudo abrir** los sitios de ASFI ni del BCB: el proxy de salida rechaza `asfi.gob.bo` y `bcb.gob.bo`. Todo lo siguiente sale de resultados de búsqueda que citan esos documentos, y queda **por verificar contra la fuente primaria** en la tarea 1.1. No se agregó ninguna entidad que no aparezca en una fuente; lo que no se pudo confirmar dice "por verificar".
+
+**Censo de entidades de intermediación financiera (ASFI).** El reporte de inclusión financiera de ASFI a diciembre de 2025 da 67 entidades: 11 bancos múltiples, 2 bancos PYME, 1 banco público, 1 banco de desarrollo productivo, 3 entidades financieras de vivienda, 41 cooperativas de ahorro y crédito y 8 instituciones financieras de desarrollo. El listado de siglas de ASFI con información al 30-04-2026 confirma los bancos múltiples, PYME y de vivienda. Fuentes: [Siglas de EIF 04/2026](https://www.asfi.gob.bo/sites/default/files/2026-05/Siglas%20de%20Entidades%20de%20Intermediaci%C3%B3n%20Financiera%2004_2026.pdf), [Listado general de EIF con licencia](https://www.asfi.gob.bo/sites/default/files/2026-01/Listado%20general%20de%20las%20entidades%20de%20intermediaci%C3%B3n%20financiera%20con%20licencia%20de%20funcionamiento_0.pdf), [Inclusión financiera a diciembre de 2025](https://www.asfi.gob.bo/sites/default/files/2026-01/Inclusi%C3%B3n%20Financiera%20a%20Diciembre%202025.pdf), [consulta de entidades autorizadas](https://appweb2.asfi.gob.bo/Paginaspublicas2/VistaEntidades/ConsultaEIF.aspx).
+
+| Categoría | Censo | Entidades (sigla ASFI) | Estado de la verificación |
+|---|---|---|---|
+| Banco múltiple | 11 | Banco Nacional de Bolivia (BNB), Banco Mercantil Santa Cruz (BME), Banco BISA (BIS), Banco de Crédito de Bolivia (BCR), Banco Económico (BEC), Banco Ganadero (BGA), Banco Solidario (BSO), Banco de la Nación Argentina (BNA), Banco FIE (BIE), Banco Fortaleza (BFO), Banco Prodem (BPR) | Siglas del listado al 30-04-2026 vistas en el resultado de búsqueda; nombres legales completos por verificar |
+| Banco PYME | 2 | Banco PYME de la Comunidad (PCO), Banco PYME Ecofuturo (PEF) | Igual que la fila anterior |
+| Banco público | 1 | Banco Unión | Nombre por fuentes secundarias; sigla por verificar |
+| Banco de desarrollo productivo | 1 | Banco de Desarrollo Productivo (BDP) | Por verificar si ofrece cuentas a personas (si no, queda fuera del alcance o `NOT_APPLICABLE`) |
+| Entidad financiera de vivienda | 3 | La Primera (VL1), La Promotora (VPR), El Progreso (VPG) | Listado al 30-04-2026 |
+| Cooperativa de ahorro y crédito abierta | 41 | — | **Nombres por verificar** (no se obtuvieron) |
+| Institución financiera de desarrollo | 8 | CIDRE, CRECER, Diaconía, Fondeco, Fubode, Idepro, Impro, Pro Mujer (siglas ICI, ICR, IDI, IFO, IFU, IID, IIM, IPM) | Nombres y siglas del listado de mayo de 2026; correspondencia exacta nombre ↔ sigla por verificar |
+
+**Empresas de servicios financieros complementarios (ASFI).** El listado de ASFI con información al 11-02-2026 ([Siglas ESFC](https://www.asfi.gob.bo/sites/default/files/2026-02/Siglas%20ESFC.pdf)) incluye las empresas de servicios de pago móvil (ESPM) y las casas de cambio con licencia.
+
+- **ESPM:** E-Fectivo ESPM S.A. (marca Tigo Money) figura en ese listado. Otras ESPM: **por verificar** (no se confirmó ninguna otra).
+- **Casas de cambio:** el listado incluye casas de cambio con licencia (p. ej. "Casa de Cambio MCM", "Money Exchange International S.R.L."), pero no se obtuvo la lista completa ni el número actual; la cifra de 183 de 2024 está desactualizada. **Por verificar.**
+- **Empresas de tecnología financiera (ETF):** categoría nueva (DS 5384 de 2025-05-07 y Resolución ASFI/540/2025 de 2025-07-03, según fuentes secundarias); entidades con licencia: **por verificar**.
+
+**Billeteras.** ASFI informó más de 3,1 millones de billeteras habilitadas y la norma permite ofrecerlas a las ESPM y a las entidades financieras autorizadas ([Editorial ASFI 04/2024](https://asfi.gob.bo/images/INT_FINANCIERA/DOCS/Publicaciones/EditorialBoletin/Editorial042024.pdf)). Prensa de octubre de 2025 cuenta "al menos 8" billeteras y nombra Tigo Money, la Billetera Móvil del BCP, la billetera del BNB, Yape (BCP), Soli, Unimovil Plus, "Yo lo pago" (Banco Ganadero) y Entel Financiera ([Visión 360, 2025-10-07](https://www.vision360.bo/noticias/2025/10/07/32771-billeteras-moviles-en-auge-existen-al-menos-8-en-bolivia-y-crecen-las-operaciones), [Urgente.bo](https://www.urgente.bo/noticia/la-billetera-movil-rompe-record-de-crecimiento-en-bolivia-porque-es-inclusiva)). Salvo las de BCP con sus términos publicados ([Billetera Móvil BCP](https://www.bcp.com.bo/Personas/CanalesAtencion/BilleteraMovil)), **todas por verificar**, incluida la entidad que ofrece cada una. Modelo propuesto: la billetera de un banco es un **producto** de esa entidad (cuenta de tipo `digital_wallet` asociada a la institución del banco), no una institución aparte; la billetera de una ESPM es una institución `WALLET_PROVIDER`. Mercado Pago aparece solo en un comparador comercial: **por verificar** si opera con licencia en Bolivia.
+
+**QR interbancario.** El BCB exige un estándar común de QR y el servicio "Simple" funciona entre bancos desde 2019; en 2025 los pagos QR fueron el 94 % de las órdenes interbancarias según Asoban ([ABI](https://abi.bo/transacciones-por-qr-mueve-mas-de-us-51-mil-millones-y-se-consolida-como-principal-metodo-de-pago/)). El QR es un **canal**, no una institución: no entra al catálogo. Importa para la importación (las glosas de los extractos lo nombran) y queda como nota para los perfiles de Phase 6.
+
+**Régimen cambiario y fuentes de tasas.**
+
+- Desde el 2026-06-29 el tipo de cambio oficial es flexible (Resolución de Directorio BCB N.º 88/2026 del 2026-06-26; [RD 88/2026](https://www.bcb.gob.bo/webdocs/01_resoluciones/RD%20N%C2%B0%2088-2026%20%2826-06-2026%29%20%283%29.pdf), [conferencia del BCB del 2026-06-30](https://www.bcb.gob.bo/webdocs/Documentos%20Adjuntos/Conferencia%20flexibilizaci%C3%B3n_%2030.6.2026.pdf)). Según las fuentes secundarias, el TCO se calcula a diario a partir de las compras de dólares de los bancos con sus clientes; si es promedio o mediana ponderada está **por verificar** (las fuentes difieren).
+- El BCB publica una tabla de **cotización de compra por entidad**, con monto y número de operaciones ([última cotización](https://www.bcb.gob.bo/tco_reporte_ultima_cotizacion.php), [versión pública](https://www.bcb.gob.bo/bcb_tco_publico_ultima_cotizacion.php)). Es la candidata principal: una sola fuente pública cubre a todos los bancos que operan divisas. Formato (HTML, sin API documentada), términos de uso del sitio, `robots.txt`, horario de publicación y si incluye la venta: **por verificar**.
+- No se encontró una API pública de tasas en ningún banco boliviano. Un directorio de open banking no muestra recursos de desarrollo de los bancos consultados ([Open Banking Tracker](https://www.openbankingtracker.com/country/bolivia,-plurinational-state-of)); no hay norma de open banking vigente confirmada. **Por verificar** banco por banco.
+- Agregadores de terceros que republican al BCB: CUCU API (sin clave, 120 solicitudes por hora, se declara no afiliada al BCB; [docs](https://docs.cucu.bo/bcb-api)), api.factura.bo ([tipo de cambio](https://api.factura.bo/tipo-de-cambio)) y dolarparalelobolivia.net (pide token; [API](https://dolarparalelobolivia.net/api)). Licencia de los datos: **por verificar**. Son secundarias por definición: si el BCB califica, se prefiere la fuente primaria.
+- Casas de cambio: según la prensa, desde julio de 2026 ASFI controla que operen con un margen de 0,10 BOB entre compra y venta y clausura las que no tienen licencia ([eju.tv, 2026-07](https://eju.tv/2026/07/la-asfi-controla-casas-de-cambio-deben-vender-dolares-con-una-ganancia-de-10-centavos-de-boliviano/), [Visión 360, 2026-07-01](https://www.vision360.bo/amp/noticias/2026/07/01/56056-asfi-despliega-controles-en-casas-de-cambio-para-garantizar-cumplimiento-del-tipo-de-cambio-oficial-del-dolar)). No se encontró ninguna casa de cambio que publique sus tasas con API o con términos que permitan la consulta automática. La norma exacta: **por verificar**.
+- **Consecuencia para un provider existente:** bo.dolarapi.com registra hoy `OFFICIAL` USD/BOB (ADR-0025). Con el régimen flexible, hay que comprobar que su casa `oficial` refleje el TCO diario y no el valor fijo anterior. No es alcance de este change: queda como pregunta 5.
+
+### Elementos afectados
+
+| Contexto | Elemento | Capa | Cambio |
+|---|---|---|---|
+| ACCOUNTS | Archivo de catálogo por país (`reference/institutions/<país>.json`) y su JSON Schema | datos | Nuevo |
+| ACCOUNTS | Puerto `InstitutionCatalogReader` y lector sobre archivo (caché en memoria por versión) | application / infrastructure | Nuevo |
+| ACCOUNTS | VO `CatalogRef` (país, código, versión); `Institution` con `catalogRef` opcional | domain | Ampliado (TDD) |
+| ACCOUNTS | DS `CatalogValidator` (censo, códigos únicos, razones, proveedores verificados) | domain | Nuevo (TDD, PBT) |
+| ACCOUNTS | DS `SupportCoverage` (cobertura y porcentajes HALF_EVEN) | domain | Nuevo (TDD, PBT) |
+| ACCOUNTS | `AdoptCatalogInstitutions`, `GetInstitutionCatalog` | application | Nuevo |
+| FX | `BANK_BUY`, `BANK_SELL`; `institutionCode` en la tasa | domain | Ampliado |
+| FX | Puerto `InstitutionRateProvider`; descriptores con `terms` (como el change 38) | domain / application | Nuevo |
+| FX | `RateResolver`: excluir `BANK_*` sin preferencia | application | Ampliado |
+| FX | Adapter `BcbInstitutionRatesProvider` y otros **solo tras la verificación** | infrastructure | Nuevo (condicionado) |
+| FX | `GetProviderStatus` con `institutions[]` | application | Ampliado |
+| Identity | Portabilidad: `catalogRef` de instituciones y `institutionCode` de tasas | infrastructure | Aditivo |
+| apps/api | Controllers `institution-catalog` y `institutions/adopt`; estado de providers | interface | Nuevo / ampliado |
+| apps/web | "Agregar desde el catálogo" en Instituciones, estado de soporte, panel de cobertura | interface | Nuevo |
+
+## Objetivos / No objetivos
+
+**Objetivos:**
+- Que el owner encuentre su banco o billetera en un catálogo completo y actual, con la fecha del registro del que sale.
+- Que el soporte de cada entidad sea explícito y verificable, y que "soporte completo" sea un número, no una afirmación.
+- Tasas por entidad con procedencia, lectura exacta y términos verificados, como referencia de conversiones y del análisis de costo.
+- Un procedimiento para usar los extractos del owner sin que ningún dato suyo entre al repositorio.
+
+**No objetivos:**
+- Parsers de PDF o XLS y perfiles de mapeo por institución (Phase 6/11, salvo la pregunta 6).
+- Conexión a APIs bancarias o agregadores con credenciales (NFR-COMP-008).
+- Cambiar la valoración por defecto (D29) o el provider oficial actual (pregunta 5).
+- Instituciones de otros países (el modelo admite más archivos por país; no se redactan).
+
+## Decisiones
+
+1. **Catálogo de referencia como archivo de datos versionado, no como tabla ni código.** `reference/institutions/BO.json` (ruta exacta a fijar en la implementación, fuera de `src/`) con `country`, `catalogVersion` (= fecha de corte), `source {name, url, cutoffDate, retrievedOn}`, `census [{category, count, source}]` y `entries[]`. Cada entrada: `code` (sigla ASFI; si la fuente no da sigla, un código propio `X-<slug>` marcado), `name`, `legalName`, `category` (conjunto cerrado: `MULTIPLE_BANK`, `SME_BANK`, `PUBLIC_BANK`, `DEVELOPMENT_BANK`, `HOUSING_FINANCE`, `SAVINGS_COOP`, `DEVELOPMENT_FINANCE`, `MOBILE_PAYMENT`, `FINTECH`, `EXCHANGE_HOUSE`), `kind` (el `InstitutionKind` existente), `website`, `listing {status: ACTIVE|DELISTED, since}`, `verification {status: CONFIRMED|PENDING, note}` y `support {rates, statementImport}`. Un JSON Schema propio valida el archivo. La aplicación lo lee al arrancar (caché en memoria) y lo sirve. **Por qué no una tabla:** no hay datos del usuario, cambia por PR revisado (con la evidencia de cada estado) y no exige migraciones ni jobs de carga; **por qué no código:** FR-ACCOUNTS-012. Los datos de demostración (`seed/minimal/institutions.json`) siguen siendo ficticios (docs/29) y los tests usan un catálogo ficticio. Publicar nombres reales en el repositorio: pregunta 2.
+2. **Mapeo de categoría a `InstitutionKind`.** El enum `InstitutionKind` es cerrado en las respuestas: no se amplía (sería un cambio incompatible). Bancos múltiples, PYME, público, de desarrollo, entidades de vivienda, cooperativas e IFD → `BANK` (todas captan o prestan con cuentas); ESPM → `WALLET_PROVIDER`; ETF → `FINTECH`; casas de cambio → `OTHER`. La categoría regulatoria se muestra aparte. Pregunta 4.
+3. **Alcance del catálogo.** Entran las entidades donde una persona puede tener una cuenta, una billetera o un crédito: bancos, EFV, cooperativas abiertas, IFD y ESPM; ETF según la pregunta 3. Las casas de cambio **no** entran como entradas adoptables (nadie tiene cuenta en ellas); su soporte de tasas se declara una sola vez para la categoría (decisión 7). Las billeteras de bancos son productos de la entidad (sección Investigación).
+4. **Adopción.** `POST W/institutions/adopt` con `codes[]` (1..100) y `links[]` opcional (`{code, institutionId}` para vincular una institución existente). En una unidad de trabajo: se validan todos los códigos (si alguno no existe o está `DELISTED` → 422 sin cambios), se crean las instituciones con `catalog_country`, `catalog_code` y `catalog_version`, y se audita una vez (`accounts.institutions.adopted`, con los códigos). Índice único parcial `(workspace_id, catalog_country, catalog_code) WHERE archived_at IS NULL`: adoptar un código ya vinculado devuelve la existente (`alreadyLinked`). Un nombre ya usado por una institución activa sin vínculo → `conflicts[{code, reason: NAME_TAKEN, institutionId}]` sin abortar las demás. El vínculo no se edita desde `PATCH` (se conserva aunque el usuario renombre); se desvincula archivando.
+5. **Estado de soporte.** Valores por dimensión: `rates` ∈ {`SUPPORTED`, `IN_VERIFICATION`, `NOT_ELIGIBLE`, `NOT_APPLICABLE`}; `statementImport` ∈ esos más `GENERIC_ONLY` y `PENDING_SAMPLE`. Razones de `NOT_ELIGIBLE` (conjunto cerrado): `NO_PUBLICATION`, `TERMS_PROHIBIT_AUTOMATION`, `TERMS_UNAVAILABLE`, `REQUIRES_CREDENTIALS`, `UNSTABLE_FORMAT`, `IMAGE_ONLY_STATEMENT`, `OTHER` (con nota). Cada estado lleva `evaluatedOn` y, si aplica, `adr` y `providerIds[]`. Líneas base al crear el catálogo: tasas `IN_VERIFICATION` para las entidades que operan divisas y `NOT_APPLICABLE` para las que no (por verificar caso a caso); importación `PENDING_SAMPLE` para todas.
+6. **Cobertura (`SupportCoverage`).** Por categoría: `census`, `entries`, `censusCoveragePct`; por dimensión: `resolved`, `pending`, `resolvedPct` y desglose por estado y razón. Porcentajes con Decimal, HALF_EVEN a 2 decimales. `complete = censusCoveragePct == 100.00 && pending == 0` en ambas dimensiones, contando solo entradas `ACTIVE`. Se expone en `GET W/institution-catalog` y lo valida un test unitario sobre el **archivo real** (TC-ACCOUNTS-INSTCATALOG-010): la validación estructural debe pasar siempre; la cobertura se informa en la salida del test (no falla mientras haya pendientes, para no bloquear CI; la meta se sigue en docs/38).
+7. **Fuentes de tasas, en orden de evaluación.** Cada una pasa una verificación de términos registrada en un **ADR nuevo** (número siguiente libre; ADR-0029 está reservado para las fuentes cripto) que extiende ADR-0025. Ninguna está verificada hoy.
+   1. **BCB, cotización de compra por entidad** (`BCB_BO`, candidata principal): si califica, registra `BANK_SELL` por entidad (lo que el owner recibe al vender USD; D39) y, si la tabla publica la venta, `BANK_BUY`. Cubre de una vez a todas las entidades que reportan al BCB; las que no aparecen en la tabla en N días hábiles se informan sin tasa reciente.
+   2. **BCB, TCO diario** como `OFFICIAL` USD/BOB: misma verificación; si califica, la pregunta 5 decide si reemplaza o respalda a bo.dolarapi.com.
+   3. **Sitio de cada entidad** (venta de ventanilla): solo si sus términos permiten la consulta automática; si no, `NOT_ELIGIBLE` con `TERMS_PROHIBIT_AUTOMATION` o `NO_PUBLICATION`.
+   4. **Agregadores de terceros** (republican al BCB): solo con licencia explícita y si el BCB no califica.
+   5. **Casas de cambio:** sin publicación verificable conocida; se declaran `NOT_ELIGIBLE` (`NO_PUBLICATION`) como categoría salvo evidencia contraria; el owner registra `BANK` manual (D232).
+8. **Ingesta.** Puerto `InstitutionRateProvider.fetchLatest()` → muestras `{institutionCode, base, quote, rateType: BANK_BUY|BANK_SELL, value (texto exacto), asOf}`. Solicitud anónima, sin datos del workspace (FR-FX-015), en la cola `fx.poll-market-rates` con intervalo propio (`FX_INSTITUTION_RATES_INTERVAL`, default 60 min, mínimo 60 s) porque la fuente publica una vez por día hábil. Se registra en cada workspace (copias inmutables por workspace, decisión 3 de Phase 1) **todas** las entidades publicadas, no solo las adoptadas: la lista es pequeña y así el historial existe si el owner adopta una entidad después (pregunta 7). Idempotencia: el índice único de `fx.exchange_rate` se amplía con `institution_code` (`COALESCE` a cadena vacía). Anomalía: umbral fiat (5 %) por entidad y lado. Obsolescencia: `FX_STALE_AFTER_INSTITUTION` (default 72 h, para cubrir fines de semana). Sin histórico retroactivo en este change (la fuente no lo ofrece de forma verificada).
+9. **Valoración y referencias.** `RateResolver` descarta `BANK_BUY`/`BANK_SELL` salvo preferencia explícita del par (como `PARALLEL_BUY`/`SELL`, D39). La conversión puede elegir una tasa por institución como referencia (FR-FX-008, sin cambios en TRANSACTIONS: la referencia ya es id y versión). El análisis de costo del change 40 las usa sin cambios de contrato.
+10. **Importación de extractos y muestras del owner.** Este change no escribe parsers. Procedimiento (tareas 1.5 y 8.3): el owner comparte un PDF **fuera del repositorio**; quien implemente describe el formato (columnas, fechas, separadores, glosas de QR, saldo) en una ficha por entidad **sin datos reales**, fabrica un fixture sintético con montos y nombres inventados que reproduce el formato, y el PDF se borra del entorno de trabajo al terminar. Con la ficha, el estado pasa a `GENERIC_ONLY` (si existe un CSV o XLS exportable compatible con el CSV básico), `NOT_ELIGIBLE` (`IMAGE_ONLY_STATEMENT`) o queda `PENDING_SAMPLE`. `SUPPORTED` exige un perfil o parser, que llega con Phase 6/11.
+11. **Configuración (contrato único, ADR-0012).** `FX_PROVIDER_INSTITUTION_RATES` (id verificado o `none`, default `none`), `FX_INSTITUTION_RATES_INTERVAL`, `FX_STALE_AFTER_INSTITUTION`. Allowlist de hosts del `ProviderHttpClient` ampliada solo con los hosts de las fuentes verificadas (egress del worker, docs/31 D33). CI y tests con `none` (sin red).
+12. **Sin consumidores nuevos (D249).** Todo corre en las colas existentes; presupuesto 55/60 sin cambios; TC-PLATFORM-EVENTS-018 como regresión.
+13. **Portabilidad y RLS.** `accounts.institution` ya tiene RLS y portabilidad: se agregan columnas. `fx.exchange_rate` igual. El catálogo no tiene `workspace_id` ni filas en la BD.
+
+## Contratos
+
+**`contracts/openapi/finance-api.v1.yaml`** (aditivo; `pnpm contract:breaking`, Spectral y Redocly sin errores):
+
+| Operación | Método y ruta | Rol | Notas |
+|---|---|---|---|
+| `getInstitutionCatalog` | `GET W/institution-catalog` | VIEWER | Query: `country` (requerido, `^[A-Z]{2}$`), `category` (repetible), `q`, `includeDelisted` (default `false`). 200 `InstitutionCatalog`; 404 `RESOURCE_NOT_FOUND` si no hay catálogo para el país. Sin paginación (≤ 500 entradas por país) |
+| `adoptCatalogInstitutions` | `POST W/institutions/adopt` | EDITOR | `IdempotencyKeyOptional`. Body `InstitutionAdoptionInput`. 200 `InstitutionAdoptionResult`; 422 (`VALIDATION_FAILED`, `INSTITUTION_CATALOG_ENTRY_UNKNOWN`); 403 `INSUFFICIENT_ROLE` |
+
+Schemas nuevos:
+- `InstitutionCatalog`: `country`, `catalogVersion`, `source {name, url, cutoffDate, retrievedOn}`, `entries: InstitutionCatalogEntry[]`, `coverage: InstitutionSupportCoverage`.
+- `InstitutionCatalogEntry`: `code`, `name`, `legalName`, `category` (`x-extensible-enum`), `kind` (`InstitutionKind`), `website` (nullable), `listingStatus` (`ACTIVE|DELISTED`, `x-extensible-enum`), `delistedSince` (nullable date), `verification` (`CONFIRMED|PENDING`), `support {rates: InstitutionSupportStatus, statementImport: InstitutionSupportStatus}`, `adoptedInstitutionId` (nullable, del workspace que consulta).
+- `InstitutionSupportStatus`: `status` (`x-extensible-enum`: `SUPPORTED`, `GENERIC_ONLY`, `IN_VERIFICATION`, `PENDING_SAMPLE`, `NOT_ELIGIBLE`, `NOT_APPLICABLE`), `reason` (nullable, `x-extensible-enum` de la decisión 5), `evaluatedOn` (date), `providerIds` (`FxRateProvider[]`).
+- `InstitutionSupportCoverage`: `complete` (boolean), `byCategory[{category, census, entries, censusCoveragePct}]`, `byDimension[{dimension: rates|statementImport, resolved, pending, resolvedPct, byStatus[{status, reason, count}]}]`; porcentajes como string decimal con 2 decimales.
+- `InstitutionAdoptionInput` (`additionalProperties: false`): `country`, `codes` (1..100, únicos), `links[{code, institutionId}]` (opcional, máx. 100).
+- `InstitutionAdoptionResult`: `adopted: Institution[]`, `alreadyLinked: Institution[]`, `conflicts[{code, reason: NAME_TAKEN, institutionId}]`.
+
+Schemas modificados: `Institution` gana `catalogRef` (opcional, nullable: `{country, code, catalogVersion, listingStatus, delistedSince}`); `FxRateType` (`x-extensible-enum`) y `FxRateTypeInput` y `FxRatePreferenceListInput` con `BANK_BUY`/`BANK_SELL`; `FxRate` gana `institutionCode` (opcional, nullable); `FxRateProvider` gana `BCB_BO` (y otros ids) **solo** cuando su verificación queda registrada; `FxProviderStatusList` gana `institutions[{code, rateTypes[], lastRateAsOf, ageSeconds, stale, supportStatus, reason}]` (opcional). `ErrorCode` gana `INSTITUTION_CATALOG_ENTRY_UNKNOWN` (422). Tags `Accounts` (`x-openspec-capability: accounts/institutions`) y `FX` (`fx/market-rate-providers`).
+
+**`contracts/events/fx/RateRecorded.v1.schema.json`** (aditivo, misma versión): `rateType` agrega `BANK_BUY`/`BANK_SELL`; propiedad opcional `institutionCode` (`^[A-Z0-9-]{2,40}$`); ejemplo con `BANK_SELL` de una entidad ficticia. Consumidores existentes (`planning.budget-thresholds`) ignoran el campo.
+
+**JSON Schema del catálogo** (`reference/institutions/catalog.schema.json`, nuevo, no es contrato público): valida la estructura de la decisión 1; lo usa `CatalogValidator`.
+
+## Riesgos / Trade-offs
+
+- [La fuente principal (BCB) no califica por términos o formato] → las entidades quedan `IN_VERIFICATION` hasta evaluar las siguientes candidatas; si ninguna califica, `NOT_ELIGIBLE` con su razón y el owner sigue con tasas `BANK` manuales (D232). El catálogo y la medición no dependen de esto.
+- [Scraping de una página HTML del BCB] → se permite solo si los términos y `robots.txt` no lo prohíben, con frecuencia baja, `User-Agent` identificable y JSON Schema propio del contenido extraído; alternativa preferida: pedir al BCB un formato estructurado (pregunta 8).
+- [Catálogo desactualizado] → la fecha de corte se muestra siempre; revisión del censo en cada release y al menos trimestral (pregunta 9); las entidades retiradas no rompen nada (requirement de entrada retirada).
+- ["Soporte completo" con muchas `NOT_ELIGIBLE`] → el informe las muestra aparte con su razón; el owner puede exigir un criterio más estricto (pregunta 1).
+- [Nombres reales de entidades en un repositorio público] → son datos públicos de registro, sin logos; ningún dato del owner (qué entidades usa vive solo en su workspace). Pregunta 2.
+- [Extractos del owner con PII] → nunca en el repositorio ni en fixtures; solo fichas de formato y fixtures sintéticos; gitleaks y revisión del PR.
+- [Régimen flexible y provider `OFFICIAL` actual] → pregunta 5; fuera de este change.
+- [Volumen] → ~70 entidades × 1–2 tasas por día hábil por workspace: despreciable frente a las tasas de 15 min existentes.
+
+## Plan de migración
+
+Expand-only, timestamps posteriores a la última migración de `main`:
+- `ALTER TABLE accounts.institution ADD COLUMN catalog_country char(2) NULL, ADD COLUMN catalog_code text NULL, ADD COLUMN catalog_version text NULL` con CHECK de "los tres o ninguno" e índice único parcial `(workspace_id, catalog_country, catalog_code) WHERE archived_at IS NULL AND catalog_code IS NOT NULL`. RLS y `platform.workspace_scoped_table` sin cambios (la tabla ya está registrada).
+- `ALTER TABLE fx.exchange_rate ADD COLUMN institution_code text NULL`; ampliar los CHECK de `rate_type` en `fx.exchange_rate`, `fx.rate_preference` y `txn.conversion_detail` con `BANK_BUY`/`BANK_SELL`; nuevo índice único de idempotencia con `COALESCE(institution_code, '')` creado antes de retirar el anterior (el retiro, en un change contract posterior o en el mismo si el índice anterior queda redundante sin riesgo; se decide en la tarea 4.1).
+- Despliegue: migraciones → API con el catálogo → worker con `FX_PROVIDER_INSTITUTION_RATES=none` → activar el proveedor verificado. Rollback: `none`; las tasas registradas quedan como históricas válidas.
+
+## Preguntas abiertas
+
+Ninguna bloquea el catálogo ni el framework (grupos 2, 3, 5 y 6 sin adapters). Las marcadas **[B]** bloquean la parte indicada.
+
+1. **Criterio de "soporte completo".** Opciones: (a) **censo cubierto al 100 % y ninguna entidad pendiente; `NOT_ELIGIBLE` cuenta como resuelta y se informa aparte con su razón**; (b) además, un mínimo de entidades con tasa automática (p. ej. todos los bancos múltiples); (c) solo la cobertura del catálogo. **Recomendación: (a)**: es honesto (no promete lo que las fuentes no permiten) y medible; (b) depende de terceros que no controlamos.
+2. **[B para el archivo real del catálogo] Nombres reales de entidades en el repositorio público.** Opciones: (a) **sí, solo datos públicos de registro (nombre, sigla, categoría, sitio web), sin logos ni marcas, con fuente y fecha de corte**; (b) el catálogo real vive fuera del repositorio y se carga en el despliegue (el repositorio solo tiene el ficticio); (c) solo siglas. **Recomendación: (a)**: es información pública de ASFI, no es dato personal ni revela qué entidades usa el owner; los tests siguen con datos ficticios.
+3. **Empresas de tecnología financiera (ETF) en el catálogo.** Categoría nueva desde 2025; lista de entidades por verificar. Opciones: (a) **incluirlas cuando ASFI publique la lista de ETF con licencia (categoría vacía hasta entonces)**; (b) excluirlas; (c) incluir fintechs sin licencia conocidas. **Recomendación: (a)**; (c) contradice "supervisadas".
+4. **Tipo de institución de cooperativas, IFD y EFV.** El enum `InstitutionKind` es cerrado. Opciones: (a) **`BANK` con la categoría regulatoria visible aparte**; (b) `OTHER`; (c) ampliar el enum (cambio incompatible en las respuestas: exige versión de la API). **Recomendación: (a).**
+5. **Fuente `OFFICIAL` con el régimen flexible.** bo.dolarapi.com (ADR-0025) da hoy la oficial; con el TCO diario hay que comprobar que la refleje. Opciones: (a) **verificar en la tarea 1.1 si la casa `oficial` sigue al TCO; si el BCB califica, usarlo como principal de `OFFICIAL` y dolarapi como respaldo, con un change o corrección aparte**; (b) mantener dolarapi sin revisar; (c) incluir el cambio en este change. **Recomendación: (a)**: corrige un riesgo de datos sin ampliar este change.
+6. **[B para los perfiles o parsers de importación] Adelantar la importación por institución.** Hoy: perfiles por institución en Phase 6 (FR-IMPORTS-005) y PDF en Phase 11 (FR-IMPORTS-016, Could). Opciones: (a) **recoger ahora las muestras del owner y hacer las fichas de formato (este change, tarea 8.3); implementar perfiles en Phase 6 y PDF en un change propio cuando haya fichas de al menos 3 entidades**; (b) adelantar los parsers de PDF a Phase 5 en un change nuevo; (c) dejar todo como está. **Recomendación: (a)**: las fichas reducen el riesgo del parser sin desordenar el plan; si el owner prioriza PDF, (b) como change aparte, nunca dentro de este.
+7. **Qué entidades registrar por workspace.** Opciones: (a) **todas las que publique la fuente** (historial disponible si se adopta después); (b) solo las adoptadas por el workspace (menos filas, sin historial previo). **Recomendación: (a)**: son ~70 tasas por día; el volumen es despreciable.
+8. **Contacto con el BCB.** Si los términos del sitio no son claros, ¿se pide al BCB por escrito un formato estructurado o la autorización? Opciones: (a) **sí, el owner (o quien él designe) escribe al BCB; la entidad queda `IN_VERIFICATION` mientras tanto**; (b) se marca `NOT_ELIGIBLE` (`TERMS_UNAVAILABLE`) sin contacto. **Recomendación: (a)**: es la única fuente que cubre a todos los bancos.
+9. **Frecuencia de revisión del censo.** Opciones: (a) **en cada release que toque el catálogo y como mínimo trimestral, con la fecha de corte del listado de ASFI**; (b) solo a pedido del owner. **Recomendación: (a)**, con un recordatorio en docs/38.
+10. **Muestras de extractos del owner.** Qué entidades primero y cómo se entregan. Opciones: (a) **el owner comparte un PDF por entidad que usa, por un canal fuera del repositorio; se hace la ficha de formato y se borra el PDF; ningún dato real se copia**; (b) el owner hace él mismo la ficha con la plantilla. **Recomendación: (a)**, empezando por las entidades donde tiene cuentas activas.
