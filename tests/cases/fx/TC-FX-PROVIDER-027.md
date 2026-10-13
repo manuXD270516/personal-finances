@@ -20,8 +20,8 @@ phase: 5
 tags: ["fx", "crypto", "adapter", "fallback", "no-network"]
 error_code: null
 preconditions:
-  - "Verificación de términos del respaldo registrada como apta en ADR-0029"
-  - "Respuesta grabada del respaldo servida localmente"
+  - "Descriptor de CRYPTO_BYBIT VERIFIED tras la lectura directa de la tarea 1.5 (ADR-0029)"
+  - "Respuesta grabada de GET api.bybit.com/v5/market/tickers?category=spot servida localmente"
 input: {"pair": "BTC/USDT"}
 steps:
   - "Ejecutar fetchLatest del adapter de respaldo"
@@ -49,4 +49,4 @@ Entonces se registran las tasas MARKET del respaldo
 ```
 
 ## Notas
-- Pendiente (2026-10-13): espera al adapter cripto de respaldo real (tarea 4.2), que depende de ADR-0029 y de la decisión del owner sobre su exchange. El fallback entre providers cripto ya se prueba con dobles (TC-FX-PROVIDER-033).
+- Pendiente (2026-10-13): respaldo `CRYPTO_BYBIT`, otro operador que `CRYPTO_BINANCE` (D251, ADR-0029 propuesto). Mapeo: `lastPrice` → valor y `time` → vigencia. Falta el adapter (tarea 4.2) y su fixture, que se graba en la tarea 1.5. El fallback entre providers cripto ya se prueba con dobles (TC-FX-PROVIDER-033).

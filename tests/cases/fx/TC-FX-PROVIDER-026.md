@@ -20,8 +20,8 @@ phase: 5
 tags: ["fx", "crypto", "adapter", "contract", "no-network"]
 error_code: null
 preconditions:
-  - "Verificación de términos del provider registrada como apta en ADR-0029"
-  - "Respuesta grabada del provider servida por un servidor HTTP local (sin red)"
+  - "Descriptor de CRYPTO_BINANCE VERIFIED tras la lectura directa de la tarea 1.5 (ADR-0029)"
+  - "Respuesta grabada de GET data-api.binance.vision/api/v3/ticker/24hr?type=MINI servida por un servidor HTTP local (sin red)"
 input: {"pair": "BTC/USDT", "price": "65000.01000000", "asOf": "2026-10-13T14:00:00.000Z"}
 steps:
   - "Ejecutar fetchLatest del adapter contra la respuesta grabada"
@@ -51,4 +51,4 @@ Entonces registra BTC/USDT MARKET 65000.01000000 exacto
 ## Notas
 
 - Los fixtures se graban tras la verificación de términos (tarea 1.1), con el texto exacto y sin datos de usuario.
-- Pendiente (2026-10-13): espera al adapter cripto principal real. La tarea 1.1 (verificar términos de uso y registrar ADR-0029, NFR-COMP-007) requiere una decisión del owner, que aún no nombró su exchange; hasta entonces no se escribe ningún adapter ni se graba ningún fixture. El flujo de ingesta MARKET exacto con un doble en memoria ya está cubierto en `packages/contexts/fx/src/application/crypto-rate-providers.test.ts`.
+- Pendiente (2026-10-13): provider principal `CRYPTO_BINANCE` (D251, ADR-0029 propuesto). Mapeo: `lastPrice` → valor y `closeTime` → vigencia. Falta el adapter (tarea 4.1) y su fixture, que se graba en la tarea 1.5. El flujo de ingesta MARKET exacto con un doble en memoria ya está cubierto en `packages/contexts/fx/src/application/crypto-rate-providers.test.ts`.
