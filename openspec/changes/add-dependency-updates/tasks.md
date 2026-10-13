@@ -1,6 +1,6 @@
 # Tareas
 
-> Sin dominio, aplicación, API, UI ni migraciones: el change es configuración del repositorio y un benchmark del nightly. Confirmar las preguntas 3, 4 y 6 de design.md antes del grupo 2 y la pregunta 1 (acción del owner) antes del grupo 3. No cambia la protección de `main` ni los checks requeridos (D224).
+> Sin dominio, aplicación, API, UI ni migraciones: el change es configuración del repositorio y un benchmark del nightly. Confirmar las preguntas 3, 4 y 6 de design.md antes del grupo 2. La pregunta 1 está resuelta (owner, 2026-10-13: GitHub App hospedada de Mend Renovate); el grupo 3 espera solo a que el owner la instale. No cambia la protección de `main` ni los checks requeridos (D224).
 
 ## 1. SPEC y TEST CASES
 
@@ -16,7 +16,7 @@
 
 ## 3. ACTIVACIÓN (acción del owner)
 
-- [ ] 3.1 El owner instala o habilita el ejecutor elegido en la pregunta 1, limitado a este repositorio, y, si adopta la pregunta 5 (a), activa Dependabot alerts; ninguna sesión cambia la configuración de seguridad del repositorio
+- [ ] 3.1 El owner instala la GitHub App hospedada de Mend Renovate (pregunta 1, resuelta), limitada a este repositorio, y, si adopta la pregunta 5 (a), activa Dependabot alerts; ninguna sesión cambia la configuración de seguridad del repositorio — 2026-10-13: a cargo del owner (instalación en GitHub con acceso solo a este repositorio y sin permisos de administración); ninguna sesión puede hacerla. Se marca cuando el owner confirme la instalación
 - [ ] 3.2 Primera corrida: cerrar la PR de onboarding si aparece, revisar el Dependency Dashboard y comprobar que la protección de `main` sigue con los 17 checks, `strict` y `enforce_admins` (TC-PLATFORM-PIPELINE-005)
 - [ ] 3.3 Primera ventana semanal: una PR de grupo pasa los 17 checks; una major (si hay) queda abierta sin auto-merge (TC-PLATFORM-PIPELINE-006)
 
