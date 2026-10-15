@@ -10,7 +10,7 @@ import {
   withDay,
   ymd,
 } from '../calendar.js';
-import type { AccountKey, CategoryRef, CounterpartyKey, DemoCurrency, DemoMoney } from '../demo-plan.js';
+import type { AccountKey, CategoryRef, CounterpartyKey, DemoCurrency, DemoMoney } from '../plan-types.js';
 import type {
   DefinitionKey,
   ModuleOp,

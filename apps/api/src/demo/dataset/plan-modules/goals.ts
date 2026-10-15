@@ -1,6 +1,6 @@
 import { dec } from '@pf/shared-kernel';
 import { addDays, addMonthsClamped, dayOfMonth, epochDay, withDay } from '../calendar.js';
-import type { DemoCurrency, DemoMoney, PlanOp } from '../demo-plan.js';
+import type { DemoCurrency, DemoMoney, PlanOp } from '../plan-types.js';
 import type { ModuleOp } from '../module-ops.js';
 import { renewalDates } from './commitments.js';
 

@@ -71,6 +71,32 @@ describe('dataset Demo v2 (docs/29 §2.2, generación determinista)', () => {
     expect(loans.every((o) => o.op === 'loan' && o.reference.startsWith('DEMO-LOAN-'))).toBe(true);
   });
 
+  it('[TC-IDENTITY-DEMO-020] fechas de referencia de la tabla de design.md decisión 4 con la ancla 2026-09-30', () => {
+    const ops = opsOf(FIXED);
+    const first = <T extends DemoOp['op']>(name: T) =>
+      ops.find((o): o is Extract<DemoOp, { op: T }> => o.op === name);
+    // Tarjeta Andina Demo: cierre = día de A − 5, vencimiento = día de A + 15.
+    expect(first('card')).toMatchObject({ key: 'andina', statementDay: 25, dueDay: 15 });
+    // Fondo de emergencia: inicio A − 364, aportes el día de A − 25 y objetivo inicio + 607 días.
+    const emergency = ops.find((o) => o.op === 'goal' && o.key === 'emergency');
+    expect(emergency).toMatchObject({ startDate: '2025-10-01', targetDate: '2027-05-31' });
+    expect(ops.find((o) => o.op === 'goalPlan' && o.goal === 'emergency')).toMatchObject({ dayOfMonth: 5 });
+    // Viaje: inicio A − 182 y objetivo inicio + 274 días; última reserva en A.
+    const travel = ops.find((o) => o.op === 'goal' && o.key === 'travel');
+    expect(travel).toMatchObject({ startDate: '2026-04-01', targetDate: '2026-12-31' });
+    const reserves = ops.filter((o) => o.op === 'goalMovement' && o.goal === 'travel');
+    expect(reserves.at(-1)).toMatchObject({ date: FIXED });
+    // Curso Kantuta Demo: fin de trial = A + 5.
+    expect(ops.find((o) => o.op === 'subscription' && o.key === 'course')).toMatchObject({
+      trialEndsOn: '2026-10-05',
+    });
+    // Regalos: billetera abierta en A − 91 con 600.00 BOB, reserva en A − 90, gasto en A − 72 y recarga en A − 56.
+    const wallet = buildDemoPlan(FIXED).accounts.find((a) => a.key === 'wallet');
+    expect(wallet).toMatchObject({ openedOn: '2026-07-01', opening: money(60_000n, 'BOB') });
+    expect(ops.find((o) => o.op === 'goalMovement' && o.goal === 'gifts')?.date).toBe('2026-07-02');
+    expect(ops.find((o) => o.op === 'transfer' && o.to === 'wallet')?.date).toBe('2026-08-05');
+  });
+
   it('[TC-IDENTITY-DEMO-015] las ocho suscripciones: cinco activas, una en trial, una pausada y una cancelada, con costo 412.94 y 4955.25 BOB', () => {
     const modules = summarizeModules(FIXED);
     expect(modules.subscriptions).toMatchObject({

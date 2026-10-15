@@ -311,6 +311,8 @@ describe('metas de ahorro (TC-IDENTITY-DEMO-017)', () => {
     expect(rows).toHaveLength(12);
     expect(rows.every((m) => m.amount.amount === '1500.00' && m.fund === 'REAL')).toBe(true);
     expect(goal.plan).toMatchObject({ monthlyAmount: { amount: '1500.00' }, automation: 'RECURRING' });
+    // Los aportes recurrentes no dejan sugerencias de aporte pendientes (ya están respaldados por la meta).
+    expect((await read(() => q.r.goals.queries.suggestions(ws))).pendingCount).toBe(0);
   });
 
   it('[TC-IDENTITY-DEMO-017] Viaje en riesgo, Laptop alcanzada y Regalos con una sola sobre-asignación resuelta', async () => {

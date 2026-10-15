@@ -390,6 +390,28 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
     expect(purged['purgedAt']).toEqual(expect.any(String));
     const left = await countsOf(demoId);
     expect(Object.entries(left).filter(([, n]) => n > 0)).toEqual([]);
+    // El registro de purga informa las filas eliminadas por tabla (dataset v2: compromisos, deudas y metas).
+    const purgeLog = await inTx(
+      app,
+      { userId: owner.id },
+      async () =>
+        (
+          await app.query<{ rows_deleted: Record<string, number> }>(
+            `SELECT rows_deleted FROM platform.demo_workspace_run WHERE workspace_id = $1`,
+            [demoId],
+          )
+        ).rows[0],
+    );
+    for (const t of [
+      'commitments.subscription',
+      'commitments.recurring_occurrence',
+      'debt.loan',
+      'debt.credit_card',
+      'goals.savings_goal',
+      'goals.goal_movement',
+    ]) {
+      expect(purgeLog?.rows_deleted[t], t).toBeGreaterThan(0);
+    }
     // TC-013: la evidencia vive en el origen y sobrevive a la purga.
     expect(await auditActions(w1)).toEqual([
       { action: 'identity.demo.load_requested', actor: 'USER', demo: demoId },

@@ -1,4 +1,4 @@
-import type { AccountKey, CategoryRef, CounterpartyKey, DemoMoney } from './demo-plan.js';
+import type { AccountKey, CategoryRef, CounterpartyKey, DemoMoney } from './plan-types.js';
 
 /**
  * Operaciones del dataset Demo v2 (openspec add-phase-4-demo-data, design.md decisión 2): unión cerrada, solo de la
