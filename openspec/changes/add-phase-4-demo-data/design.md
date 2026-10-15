@@ -118,7 +118,7 @@ Reglas que se respetan (docs/29 §1 y §3): datos 100 % ficticios; generación *
 
 8. **Resumen de deudas y Q5 no triviales.** Con A = 2026-09-30 (periodo de septiembre, sin plan de presupuesto):
    - Deudas en USD: 1007.15 + 200.00 = **1207.15 USD**, consolidadas a 7.00 = **8450.05 BOB**. En BOB: 25288.74 (vehicular) + 8000.00 (consumo) + 4770.50 (Kantuta) + el saldo de "Tarjeta Andina Demo" del resumen de referencia. "Préstamo familiar" no se lista. Fecha libre de deudas **2028-02-01**.
-   - Interés pagado en 2026: 2166.91 + 420.00 + 10.07 = **2597.98 BOB** y **536.67 USD**.
+   - Interés pagado en 2026: 2166.91 + 420.00 + 10.07 = **2596.98 BOB** y **536.67 USD**.
    - Q5 comprometido en BOB: 1080.00 + 1070.00 (cuotas en mora, de una cuenta líquida a una no líquida) + 199.00 (ocurrencia atrasada) = **2349.00 BOB**; en USD y USDT 0 (todo lo del periodo está resuelto; las compras con tarjeta y las suscripciones cargadas a ella no cuentan).
    - Reservado para metas: 18000.00 (Caja de ahorro) + 8000.00 (cuenta corriente) + 500.00 (billetera) = **26500.00 BOB** y **550.00 USD**; aportes planificados pendientes **100.00 USD**.
    - Los saldos líquidos y el disponible consolidado quedan en el resumen de referencia (dependen del generador aleatorio sembrado de v1).
