@@ -8,12 +8,13 @@ import type {
 import type { CurrencyKindDto } from '@pf/fx/contracts';
 import { DomainError, FixedClock, Instant } from '@pf/shared-kernel';
 import type { AccountOpeningBalancePort, MoneyDto } from '../../contracts/index.js';
-import { ACCOUNT_LIFECYCLE, Account, Institution } from '../../domain/index.js';
+import { ACCOUNT_LIFECYCLE, Account, Institution, type InstitutionCatalog } from '../../domain/index.js';
 import type {
   AccountListFilter,
   AccountRepository,
   AccountsDeps,
   CurrencyInfo,
+  InstitutionCatalogReader,
   InstitutionListFilter,
   InstitutionRepository,
   LedgerAccountBalance,
@@ -363,7 +364,37 @@ export class InMemoryAccounts {
               (!f.query || i.snapshot.name.toLowerCase().includes(f.query.toLowerCase())),
           )
           .map(fresh),
+      findActiveByName: async (ws, name) => {
+        const found = [...this.institutions.values()].find(
+          (i) =>
+            i.snapshot.workspaceId === ws && !i.isArchived && i.snapshot.name.toLowerCase() === name.toLowerCase(),
+        );
+        return found ? fresh(found) : null;
+      },
+      listLinked: async (ws, country) =>
+        [...this.institutions.values()]
+          .filter(
+            (i) => i.snapshot.workspaceId === ws && !i.isArchived && i.snapshot.catalogRef?.country === country,
+          )
+          .map(fresh),
     };
+  }
+}
+
+/** Doble en memoria de `InstitutionCatalogReader`: catálogos ya validados por país (los de las pruebas son ficticios). */
+export class InMemoryCatalogReader implements InstitutionCatalogReader {
+  private readonly catalogs = new Map<string, InstitutionCatalog>();
+  /** Cuántas veces se leyó cada país (verifica la caché y que consultar no modifica nada). */
+  readonly reads: string[] = [];
+
+  set(catalog: InstitutionCatalog): this {
+    this.catalogs.set(catalog.country, catalog);
+    return this;
+  }
+
+  async get(country: string): Promise<InstitutionCatalog | null> {
+    this.reads.push(country);
+    return this.catalogs.get(country) ?? null;
   }
 }
 

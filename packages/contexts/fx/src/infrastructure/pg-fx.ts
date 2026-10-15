@@ -73,6 +73,7 @@ interface FxDb {
     anomaly_variation_pct: string | null;
     conversion_transaction_id: string | null;
     conversion_revision: number | null;
+    institution_code: string | null;
   };
   'fx.rate_withdrawal': {
     exchange_rate_id: string;
@@ -146,6 +147,7 @@ interface RateRow {
   review_decided_at: string | null;
   conversion_transaction_id: string | null;
   conversion_revision: number | null;
+  institution_code: string | null;
   withdrawal_reason: string | null;
   withdrawal_transaction_id: string | null;
   withdrawn_at: string | null;
@@ -192,6 +194,7 @@ function selectRates() {
       iso('rv.decided_at').as('review_decided_at'),
       'r.conversion_transaction_id',
       'r.conversion_revision',
+      'r.institution_code',
       'wd.reason as withdrawal_reason',
       'wd.transaction_id as withdrawal_transaction_id',
       iso('wd.withdrawn_at').as('withdrawn_at'),
@@ -222,6 +225,7 @@ function toStored(row: RateRow): StoredRate {
         row.anomaly_flagged && row.anomaly_baseline_rate_id && row.anomaly_variation_pct
           ? { baselineRateId: row.anomaly_baseline_rate_id, variationPct: row.anomaly_variation_pct }
           : null,
+      institutionCode: row.institution_code,
       conversionRef:
         row.conversion_transaction_id !== null && row.conversion_revision !== null
           ? { transactionId: row.conversion_transaction_id, revision: Number(row.conversion_revision) }
@@ -277,6 +281,7 @@ const rateValues = (rate: ExchangeRate) => {
     anomaly_variation_pct: s.anomaly?.variationPct ?? null,
     conversion_transaction_id: s.conversionRef?.transactionId ?? null,
     conversion_revision: s.conversionRef?.revision ?? null,
+    institution_code: s.institutionCode ?? null,
   };
 };
 
@@ -342,14 +347,35 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
     const result = await db()
       .insertInto('fx.exchange_rate')
       .values(rateValues(rate))
+      // Índice único `exchange_rate_provider_inst_uk`: además de provider, par, tipo y vigencia, la institución (las
+      // tasas por institución comparten todo lo demás; `COALESCE('')` para las que no tienen).
       .onConflict((oc) =>
         oc
-          .columns(['workspace_id', 'provider', 'base_currency', 'quote_currency', 'rate_type', 'as_of'])
+          .expression(
+            sql`(workspace_id, provider, base_currency, quote_currency, rate_type, COALESCE(institution_code, ''), as_of)`,
+          )
           .where('provider', 'is not', null)
           .doNothing(),
       )
       .executeTakeFirst();
     return Number(result.numInsertedOrUpdatedRows ?? 0n) === 1;
+  }
+
+  async latestInstitutionRates(workspaceId: string, provider: FxRateProvider): Promise<StoredRate[]> {
+    const rows = await selectRates()
+      .where('r.workspace_id', '=', workspaceId)
+      .where('r.provider', '=', provider)
+      .where('r.institution_code', 'is not', null)
+      .where((eb) => eb.or([eb('r.anomaly_flagged', '=', false), eb('rv.decision', '=', 'CONFIRMED')]))
+      .distinctOn(['r.institution_code', 'r.base_currency', 'r.quote_currency', 'r.rate_type'])
+      .orderBy('r.institution_code')
+      .orderBy('r.base_currency')
+      .orderBy('r.quote_currency')
+      .orderBy('r.rate_type')
+      .orderBy('r.as_of', 'desc')
+      .orderBy('r.id', 'desc')
+      .execute();
+    return rows.map((r) => toStored(r as RateRow));
   }
 
   async insertUserConversionObservation(rate: ExchangeRate): Promise<boolean> {
@@ -414,6 +440,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .where('r.base_currency', '=', feed.base)
       .where('r.quote_currency', '=', feed.quote)
       .where('r.rate_type', '=', feed.rateType)
+      .where(sql<boolean>`COALESCE(r.institution_code, '') = ${feed.institutionCode ?? ''}`)
       .where((eb) => eb.or([eb('r.anomaly_flagged', '=', false), eb('rv.decision', '=', 'CONFIRMED')]))
       .orderBy('r.as_of', 'desc')
       .orderBy('r.id', 'desc')
@@ -492,6 +519,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .where('base_currency', '=', feed.base)
       .where('quote_currency', '=', feed.quote)
       .where('rate_type', '=', feed.rateType)
+      .where(sql<boolean>`COALESCE(institution_code, '') = ${feed.institutionCode ?? ''}`)
       .where('as_of_date', '>=', from)
       .where('as_of_date', '<=', to)
       .execute();
@@ -512,6 +540,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .where('base_currency', '=', feed.base)
       .where('quote_currency', '=', feed.quote)
       .where('rate_type', '=', feed.rateType)
+      .where(sql<boolean>`COALESCE(institution_code, '') = ${feed.institutionCode ?? ''}`)
       .where('as_of', '>=', from)
       .where('as_of', '<=', to)
       .execute();
@@ -529,6 +558,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
     if (filter.rateType) q = q.where('r.rate_type', '=', filter.rateType);
     if (filter.source) q = q.where('r.source', '=', filter.source);
     if (filter.provider) q = q.where('r.provider', '=', filter.provider);
+    if (filter.institutionCode) q = q.where('r.institution_code', '=', filter.institutionCode);
     if (filter.asOfFrom) q = q.where('r.as_of', '>=', filter.asOfFrom);
     if (filter.asOfTo) q = q.where('r.as_of', '<=', filter.asOfTo);
     if (!filter.includeSuperseded) {

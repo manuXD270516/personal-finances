@@ -1,0 +1,236 @@
+{
+  "$schema": "../catalog.schema.json",
+  "fictitious": true,
+  "country": "BO",
+  "catalogVersion": "2026-09-30",
+  "source": {
+    "name": "Registro Demo (catálogo FICTICIO de pruebas, no es el registro oficial)",
+    "url": "https://example.invalid/registro-demo",
+    "cutoffDate": "2026-09-30",
+    "retrievedOn": "2026-10-15"
+  },
+  "census": [
+    { "category": "MULTIPLE_BANK", "count": 2, "source": "Registro Demo, sección bancos múltiples" },
+    { "category": "SME_BANK", "count": 1, "source": "Registro Demo, sección bancos PYME" },
+    { "category": "PUBLIC_BANK", "count": 1, "source": "Registro Demo, sección banco público" },
+    { "category": "DEVELOPMENT_BANK", "count": 1, "source": "Registro Demo, sección banco de desarrollo" },
+    { "category": "HOUSING_FINANCE", "count": 1, "source": "Registro Demo, sección vivienda" },
+    { "category": "SAVINGS_COOP", "count": 2, "source": "Registro Demo, sección cooperativas abiertas" },
+    { "category": "DEVELOPMENT_FINANCE", "count": 1, "source": "Registro Demo, sección IFD" },
+    { "category": "MOBILE_PAYMENT", "count": 2, "source": "Registro Demo, sección pago móvil" },
+    { "category": "FINTECH", "count": 1, "source": "Registro Demo, sección tecnología financiera" },
+    { "category": "EXCHANGE_HOUSE", "count": 1, "source": "Registro Demo, sección casas de cambio" }
+  ],
+  "entries": [
+    {
+      "code": "BAD",
+      "name": "Banco Andino Demo",
+      "legalName": "Banco Andino Demo S.A. (ficticio)",
+      "category": "MULTIPLE_BANK",
+      "kind": "BANK",
+      "website": "https://banco-andino.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "IN_VERIFICATION", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "PENDING_SAMPLE", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "BBD",
+      "name": "Banco Boliviano Demo",
+      "legalName": "Banco Boliviano Demo S.A. (ficticio)",
+      "category": "MULTIPLE_BANK",
+      "kind": "BANK",
+      "website": "https://banco-boliviano.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": {
+          "status": "SUPPORTED",
+          "evaluatedOn": "2026-10-15",
+          "adr": "ADR-TEST",
+          "providerIds": ["INSTRATE_DEMO"]
+        },
+        "statementImport": { "status": "GENERIC_ONLY", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "BPY",
+      "name": "Banco PYME Demo",
+      "legalName": "Banco PYME Demo S.A. (ficticio)",
+      "category": "SME_BANK",
+      "kind": "BANK",
+      "website": "https://banco-pyme.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_ELIGIBLE", "reason": "TERMS_PROHIBIT_AUTOMATION", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "NOT_ELIGIBLE", "reason": "IMAGE_ONLY_STATEMENT", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "BED",
+      "name": "Banco Estatal Demo",
+      "legalName": "Banco Estatal Demo S.A.M. (ficticio)",
+      "category": "PUBLIC_BANK",
+      "kind": "BANK",
+      "website": "https://banco-estatal.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_ELIGIBLE", "reason": "REQUIRES_CREDENTIALS", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "PENDING_SAMPLE", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "BFD",
+      "name": "Banco Fomento Demo",
+      "legalName": "Banco de Fomento Demo S.A.M. (ficticio)",
+      "category": "DEVELOPMENT_BANK",
+      "kind": "BANK",
+      "website": null,
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_APPLICABLE", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "NOT_APPLICABLE", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "MVD",
+      "name": "Mutual Vivienda Demo",
+      "legalName": "Mutual de Vivienda Demo (ficticia)",
+      "category": "HOUSING_FINANCE",
+      "kind": "BANK",
+      "website": "https://mutual-vivienda.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_ELIGIBLE", "reason": "UNSTABLE_FORMAT", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "GENERIC_ONLY", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "CID",
+      "name": "Cooperativa Illimani Demo",
+      "legalName": "Cooperativa de Ahorro y Crédito Illimani Demo R.L. (ficticia)",
+      "category": "SAVINGS_COOP",
+      "kind": "BANK",
+      "website": "https://coop-illimani.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_ELIGIBLE", "reason": "NO_PUBLICATION", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "PENDING_SAMPLE", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "CAD",
+      "name": "Cooperativa Altiplano Demo",
+      "legalName": "Cooperativa de Ahorro y Crédito Altiplano Demo R.L. (ficticia)",
+      "category": "SAVINGS_COOP",
+      "kind": "BANK",
+      "website": null,
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_ELIGIBLE", "reason": "TERMS_UNAVAILABLE", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "GENERIC_ONLY", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "CAN",
+      "name": "Cooperativa Antigua Demo",
+      "legalName": "Cooperativa de Ahorro y Crédito Antigua Demo R.L. (ficticia)",
+      "category": "SAVINGS_COOP",
+      "kind": "BANK",
+      "website": null,
+      "listing": { "status": "DELISTED", "since": "2026-06-30" },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "IN_VERIFICATION", "evaluatedOn": "2026-06-30" },
+        "statementImport": { "status": "PENDING_SAMPLE", "evaluatedOn": "2026-06-30" }
+      }
+    },
+    {
+      "code": "IVD",
+      "name": "IFD Valle Demo",
+      "legalName": "Institución Financiera de Desarrollo Valle Demo (ficticia)",
+      "category": "DEVELOPMENT_FINANCE",
+      "kind": "BANK",
+      "website": "https://ifd-valle.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": {
+          "status": "NOT_ELIGIBLE",
+          "reason": "OTHER",
+          "note": "Solo publica tasas en sucursal (caso ficticio del motivo OTHER)",
+          "evaluatedOn": "2026-10-15"
+        },
+        "statementImport": { "status": "GENERIC_ONLY", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "BAL",
+      "name": "Billetera Altiplano Demo",
+      "legalName": "Billetera Altiplano Demo ESPM S.A. (ficticia)",
+      "category": "MOBILE_PAYMENT",
+      "kind": "WALLET_PROVIDER",
+      "website": "https://billetera-altiplano.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_APPLICABLE", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "GENERIC_ONLY", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "BPD",
+      "name": "Billetera Pacha Demo",
+      "legalName": "Billetera Pacha Demo ESPM S.A. (ficticia)",
+      "category": "MOBILE_PAYMENT",
+      "kind": "WALLET_PROVIDER",
+      "website": null,
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_APPLICABLE", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "PENDING_SAMPLE", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "FQD",
+      "name": "Fintech Quipu Demo",
+      "legalName": "Fintech Quipu Demo S.A. (ficticia)",
+      "category": "FINTECH",
+      "kind": "FINTECH",
+      "website": "https://fintech-quipu.example.invalid",
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": {
+        "status": "PENDING",
+        "note": "Licencia por confirmar en la fuente (caso ficticio de entidad pendiente de verificación)"
+      },
+      "support": {
+        "rates": { "status": "IN_VERIFICATION", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "PENDING_SAMPLE", "evaluatedOn": "2026-10-15" }
+      }
+    },
+    {
+      "code": "CCS",
+      "name": "Casa de Cambio Sol Demo",
+      "legalName": "Casa de Cambio Sol Demo S.R.L. (ficticia)",
+      "category": "EXCHANGE_HOUSE",
+      "kind": "OTHER",
+      "adoptable": false,
+      "website": null,
+      "listing": { "status": "ACTIVE", "since": null },
+      "verification": { "status": "CONFIRMED", "note": null },
+      "support": {
+        "rates": { "status": "NOT_ELIGIBLE", "reason": "NO_PUBLICATION", "evaluatedOn": "2026-10-15" },
+        "statementImport": { "status": "NOT_APPLICABLE", "evaluatedOn": "2026-10-15" }
+      }
+    }
+  ]
+}

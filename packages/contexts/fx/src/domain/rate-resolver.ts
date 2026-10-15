@@ -2,7 +2,7 @@ import { DomainError, type Instant, Rate, type Currency } from '@pf/shared-kerne
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
   DEFAULT_RATE_WINDOW_DAYS,
-  isQuoteSideRateType,
+  isOneSidedRateType,
   type FxRateProvider,
   type FxRateSource,
   type FxRateType,
@@ -230,7 +230,7 @@ export class RateResolver {
       });
     // Compra/venta solo si se piden explícitamente (sin tipo nunca entran; design.md decisión 29).
     const ofType = (s: ExchangeRateState) =>
-      type === null ? !isQuoteSideRateType(s.rateType) : s.rateType === type;
+      type === null ? !isOneSidedRateType(s.rateType) : s.rateType === type;
     const eligible = usable.filter(ofType);
     const others = type === null ? [] : usable.filter((s) => s.rateType !== type);
     const samePair = (s: ExchangeRateState) =>

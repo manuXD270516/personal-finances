@@ -125,10 +125,11 @@ export class SampleRecorder {
           base: sample.base,
           quote: sample.quote,
           rateType: sample.rateType,
+          institutionCode: sample.institutionCode,
         };
         const effectiveDate = LocalDate.ofInstant(Instant.parse(sample.asOf), timeZone).toString();
         if (options.skipDaysWithRates) {
-          const key = `${feed.base}/${feed.quote}/${feed.rateType}`;
+          const key = `${feed.base}/${feed.quote}/${feed.rateType}/${feed.institutionCode ?? ''}`;
           let days = daysWithRates.get(key);
           if (!days) {
             days = await this.deps.rates.providerDays(workspaceId, feed, '0001-01-01', '9999-12-31');
@@ -309,6 +310,8 @@ export class SampleRecorder {
         supersedesRateId: null,
         provider: s.provider,
         anomalyFlagged: s.anomaly !== null,
+        // Aditivo (add-exchange-house-rate-providers): solo las tasas por institución llevan su código.
+        ...(s.institutionCode ? { institutionCode: s.institutionCode } : {}),
       },
     });
   }

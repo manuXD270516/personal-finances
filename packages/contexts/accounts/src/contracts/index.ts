@@ -168,6 +168,15 @@ export const ACCOUNTS_AUDIT_POLICY = {
     notes: 'plain',
     archivedAt: 'plain',
   },
+  // Adopción desde el catálogo de referencia (add-exchange-house-rate-providers): una entrada por operación; los
+  // compuestos (`adopted`, `linked`, `codes`) se guardan como texto JSON.
+  InstitutionAdoption: {
+    country: 'plain',
+    catalogVersion: 'plain',
+    adopted: 'plain',
+    linked: 'plain',
+    codes: 'plain',
+  },
 } as const satisfies AuditFieldPoliciesDto;
 
 export * from './portability.js';

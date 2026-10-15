@@ -1,7 +1,7 @@
 import { dec, type Instant } from '@pf/shared-kernel';
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
-  isQuoteSideRateType,
+  isOneSidedRateType,
   marketOf,
   type FxRateProvider,
   type FxRateType,
@@ -104,7 +104,7 @@ export interface SelectOptions {
   /**
    * Tasas usables (no reemplazadas, sin anomalía pendiente/rechazada, dentro de la ventana) del par de OTROS tipos.
    * El selector solo admite manuales con `asOf ≤ t`, `t − asOf ≤ manualFallbackMaxAgeMs` y desvío respecto de
-   * `providerReference` ≤ `manualFallbackMaxDeviationPct`; nunca de compra/venta y solo si el tipo pedido lo alimentan
+   * `providerReference` ≤ `manualFallbackMaxDeviationPct`; nunca de compra/venta (paralela o por institución) y solo si el tipo pedido lo alimentan
    * providers (tiene umbral de obsolescencia) (docs/31 D34; design.md decisión 31).
    */
   readonly otherTypes?: readonly ExchangeRateState[];
@@ -176,7 +176,7 @@ export class ValuationRateSelector {
       if (
         s.source === 'PROVIDER' ||
         s.rateType === requested ||
-        isQuoteSideRateType(s.rateType) ||
+        isOneSidedRateType(s.rateType) ||
         age < 0 ||
         age > maxAge
       )

@@ -69,6 +69,8 @@ export interface ProviderFeedKey {
   readonly base: string;
   readonly quote: string;
   readonly rateType: FxRateType;
+  /** Institución que publica el feed (`BANK_BUY`/`BANK_SELL`, add-exchange-house-rate-providers); ausente o `null` = sin institución. */
+  readonly institutionCode?: string | null;
 }
 
 export interface RateListFilter {
@@ -77,6 +79,8 @@ export interface RateListFilter {
   readonly rateType?: FxRateType;
   readonly source?: FxRateSource;
   readonly provider?: FxRateProvider;
+  /** Solo tasas de esa institución (add-exchange-house-rate-providers). */
+  readonly institutionCode?: string;
   readonly asOfFrom?: string;
   readonly asOfTo?: string;
   readonly includeSuperseded: boolean;
@@ -133,6 +137,11 @@ export interface ExchangeRateRepository {
    * histórico cripto: relleno sin una consulta por día).
    */
   providerAsOfs(workspaceId: string, feed: ProviderFeedKey, from: string, to: string): Promise<Set<string>>;
+  /**
+   * Última tasa ACEPTADA de cada (institución, tipo, par) de un provider por institución en el workspace
+   * (add-exchange-house-rate-providers; estado de las tasas por institución). Una fila por combinación, sin orden fijo.
+   */
+  latestInstitutionRates(workspaceId: string, provider: FxRateProvider): Promise<StoredRate[]>;
   /**
    * Inserta una observación de conversión propia si no existe otra de la misma conversión y revisión (índice único
    * parcial `exchange_rate_conversion_uk`, `ON CONFLICT DO NOTHING`; idempotencia de negocio). `true` si se insertó.
@@ -327,6 +336,22 @@ export interface RatePreferenceRepository {
    * preferencia (`ON CONFLICT DO NOTHING`); no cambia la versión.
    */
   seedDefaults(workspaceId: string, preferences: readonly RatePreference[]): Promise<void>;
+}
+
+/**
+ * Estado de soporte en tasas de las instituciones ADOPTADAS por el workspace (las entradas del catálogo de referencia de
+ * ACCOUNTS vinculadas a una institución activa): lo compone el composition root con `@pf/accounts/contracts`, así FX no
+ * depende de ACCOUNTS. Corre en la unidad de trabajo del llamador. Texto plano: el estado y la razón del catálogo.
+ */
+export interface InstitutionSupportPort {
+  adoptedRatesSupport(workspaceId: string): Promise<
+    readonly {
+      readonly code: string;
+      /** `SUPPORTED` | `IN_VERIFICATION` | `NOT_ELIGIBLE` | `NOT_APPLICABLE` (estado de `rates` del catálogo). */
+      readonly status: string;
+      readonly reason: string | null;
+    }[]
+  >;
 }
 
 /** Ajustes del workspace (IDENTITY vía composition root): moneda de reporte y zona horaria. */

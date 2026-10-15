@@ -1,5 +1,6 @@
 import { Instant, LocalDate, type Clock } from '@pf/shared-kernel';
 import {
+  isInstitutionRateType,
   marketOf,
   ProviderError,
   type FxRateProvider,
@@ -173,6 +174,8 @@ export class MarketRateIngestion {
     const results: ProviderCycleResult[] = [];
     this.workspaceFailures = [];
     for (const provider of enabledProviders(this.deps.settings)) {
+      // El provider por institución tiene su propio intervalo (FX_INSTITUTION_RATES_INTERVAL): fuera de turno no se consulta.
+      if (!(await this.dueForCycle(provider))) continue;
       results.push(await this.pollProvider(provider, correlationId));
     }
     this.lastFeedCheckSummary = this.feedCheck ? await this.feedCheck.run(correlationId) : EMPTY_FEED_CHECK;
@@ -217,6 +220,21 @@ export class MarketRateIngestion {
   }
 
   // ------------------------------------------------------------------ polling
+
+  /**
+   * ¿Toca consultar al provider en este ciclo? Todos los providers corren con el intervalo del ciclo
+   * (`FX_POLL_INTERVAL`) salvo el de tasas por institución, que publica una vez por día hábil: se consulta cuando pasó
+   * `FX_INSTITUTION_RATES_INTERVAL` desde su último intento (acierto o falla; los saltos por límite no cuentan). Con un
+   * intervalo no mayor que el del ciclo, siempre toca. Un ciclo omitido no deja registro en `fx.provider_run`.
+   */
+  private async dueForCycle(provider: FxRateProvider): Promise<boolean> {
+    const s = this.deps.settings;
+    if (provider !== s.institutionProvider || s.institutionPollIntervalMs <= s.pollIntervalMs) return true;
+    const recent = await this.deps.runs.recent(provider, 20, ['POLL']);
+    const last = recent.find((r) => r.outcome !== 'SKIPPED_RATE_LIMIT');
+    if (!last) return true;
+    return Date.parse(last.startedAt) + s.institutionPollIntervalMs <= this.deps.clock.now().epochMillis;
+  }
 
   private async pollProvider(provider: FxRateProvider, correlationId: string): Promise<ProviderCycleResult> {
     const startedAt = this.deps.clock.now();
@@ -271,6 +289,7 @@ export class MarketRateIngestion {
     if (marketOf(sample.rateType) === 'PARALLEL') return provider === s.primary || provider === s.fallback;
     if (sample.rateType === 'OFFICIAL') return provider === s.official;
     if (sample.rateType === 'MARKET') return provider === s.cryptoPrimary || provider === s.cryptoFallback;
+    if (isInstitutionRateType(sample.rateType)) return provider === s.institutionProvider;
     return false;
   }
 

@@ -1,6 +1,9 @@
 import { dec, DomainError, Instant, type Decimal } from '@pf/shared-kernel';
 import {
+  INSTITUTION_CODE_PATTERN,
   isCryptoProviderId,
+  isInstitutionProviderId,
+  isInstitutionRateType,
   type FxFiatRateProvider,
   type FxProviderErrorCode,
   type FxRateProvider,
@@ -86,6 +89,11 @@ export interface ProviderSampleInput {
   readonly rawPayload: string;
   /** Descripción legible de la metodología (p. ej. "paralelo.bo (mediana P2P USDT/BOB)"). */
   readonly sourceLabel: string;
+  /**
+   * Código de catálogo de la institución que publica la cotización (`BANK_BUY`/`BANK_SELL`; obligatorio en esos tipos y
+   * prohibido en los demás). add-exchange-house-rate-providers.
+   */
+  readonly institutionCode?: string | null;
 }
 
 /**
@@ -105,6 +113,8 @@ export class ProviderSample {
     readonly fetchedAt: string,
     readonly rawPayload: string,
     readonly sourceLabel: string,
+    /** `null` salvo en las tasas por institución. */
+    readonly institutionCode: string | null,
   ) {
     Object.freeze(this);
   }
@@ -124,6 +134,17 @@ export class ProviderSample {
       }
       throw err;
     }
+    const institutionCode = input.institutionCode ?? null;
+    if (isInstitutionRateType(input.rateType)) {
+      if (institutionCode === null || !INSTITUTION_CODE_PATTERN.test(institutionCode)) {
+        throw new ProviderError(
+          'PROVIDER_PAYLOAD_INVALID',
+          `${input.rateType} samples need the institution code (${INSTITUTION_CODE_PATTERN.source})`,
+        );
+      }
+    } else if (institutionCode !== null) {
+      throw new ProviderError('PROVIDER_PAYLOAD_INVALID', 'only BANK_BUY and BANK_SELL carry an institution code');
+    }
     return new ProviderSample(
       input.provider,
       input.base,
@@ -134,6 +155,7 @@ export class ProviderSample {
       fetchedAt,
       input.rawPayload,
       input.sourceLabel,
+      institutionCode,
     );
   }
 
@@ -141,9 +163,9 @@ export class ProviderSample {
     return dec(this.value);
   }
 
-  /** Clave de idempotencia natural (índice único `exchange_rate_provider_uk`). */
+  /** Clave de idempotencia natural (índice único `exchange_rate_provider_inst_uk`). */
   get key(): string {
-    return `${this.provider}|${this.base}/${this.quote}|${this.rateType}|${this.asOf}`;
+    return `${this.provider}|${this.base}/${this.quote}|${this.rateType}|${this.institutionCode ?? ''}|${this.asOf}`;
   }
 }
 
@@ -186,8 +208,11 @@ export interface ProviderTerms {
   readonly adr: string | null;
 }
 
-/** Clase de provider: tasa paralela/oficial de Bolivia (Phase 1) o precios spot de criptomonedas (D225). */
-export type ProviderKind = 'PARALLEL' | 'CRYPTO';
+/**
+ * Clase de provider: tasa paralela/oficial de Bolivia (Phase 1), precios spot de criptomonedas (D225) o cotizaciones
+ * publicadas por cada institución (add-exchange-house-rate-providers).
+ */
+export type ProviderKind = 'PARALLEL' | 'CRYPTO' | 'INSTITUTION';
 
 export interface ProviderDescriptor {
   readonly id: FxRateProvider;
@@ -248,6 +273,20 @@ export interface CryptoRateProvider extends PollableProvider {
 export const isCryptoRateProvider = (p: PollableProvider): p is CryptoRateProvider =>
   typeof (p as Partial<CryptoRateProvider>).fetchDailyCloses === 'function';
 
+/**
+ * Puerto `InstitutionRateProvider` (add-exchange-house-rate-providers, design.md decisión 8): `fetchLatest` entrega las
+ * cotizaciones vigentes de las instituciones que la fuente publica, como muestras `BANK_BUY`/`BANK_SELL` con su código
+ * de institución (valor en texto exacto, `asOf` = vigencia publicada). La solicitud es anónima y sin datos del workspace
+ * (FR-FX-015). Un adapter real solo se escribe tras registrar en un ADR la verificación de los términos de su fuente;
+ * hasta entonces solo existen dobles de prueba y el simulador de local/CI.
+ */
+export interface InstitutionRateProvider extends PollableProvider {
+  descriptor(): ProviderDescriptor;
+}
+
+export const isInstitutionRateProvider = (p: PollableProvider): p is InstitutionRateProvider =>
+  p.descriptor().kind === 'INSTITUTION';
+
 const QUOTE_SIDE_FEEDS: readonly ProviderFeed[] = Object.freeze([
   { base: 'USD', quote: 'BOB', rateType: 'PARALLEL_BUY' as const },
   { base: 'USDT', quote: 'BOB', rateType: 'PARALLEL_BUY' as const },
@@ -306,7 +345,11 @@ const registered = new Map<string, ProviderDescriptor>();
 
 /** Registra un descriptor (dobles de prueba o, tras ADR-0029, adapters reales); devuelve la función que lo da de baja. */
 export function registerProviderDescriptor(descriptor: ProviderDescriptor): () => void {
-  if (!isCryptoProviderId(descriptor.id)) {
+  if (descriptor.kind === 'INSTITUTION') {
+    if (!isInstitutionProviderId(descriptor.id)) {
+      throw new RangeError(`institution provider ids must match INSTRATE_<NAME>: ${descriptor.id}`);
+    }
+  } else if (!isCryptoProviderId(descriptor.id)) {
     throw new RangeError(`crypto provider ids must match CRYPTO_<NAME>: ${descriptor.id}`);
   }
   registered.set(descriptor.id, descriptor);
@@ -326,5 +369,10 @@ export function providerDescriptor(provider: string): ProviderDescriptor | null 
 
 /** Descriptores de los providers cripto registrados. */
 export function registeredCryptoDescriptors(): ProviderDescriptor[] {
-  return [...registered.values()];
+  return [...registered.values()].filter((d) => d.kind === 'CRYPTO');
+}
+
+/** Descriptores de los providers de tasas por institución registrados. */
+export function registeredInstitutionDescriptors(): ProviderDescriptor[] {
+  return [...registered.values()].filter((d) => d.kind === 'INSTITUTION');
 }

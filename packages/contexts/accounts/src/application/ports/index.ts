@@ -8,6 +8,7 @@ import type {
   AccountType,
   CurrencyKind,
   Institution,
+  InstitutionCatalog,
   InstitutionKind,
   Liquidity,
 } from '../../domain/index.js';
@@ -57,6 +58,19 @@ export interface InstitutionRepository {
   update(institution: Institution): Promise<boolean>;
   findById(workspaceId: string, id: string): Promise<Institution | null>;
   list(workspaceId: string, filter: InstitutionListFilter): Promise<Institution[]>;
+  /** Institución NO archivada del workspace con ese nombre (sin distinguir mayúsculas); `null` si ninguna. */
+  findActiveByName(workspaceId: string, name: string): Promise<Institution | null>;
+  /** Instituciones NO archivadas vinculadas al catálogo de un país (a lo más una por código: índice único parcial). */
+  listLinked(workspaceId: string, country: string): Promise<Institution[]>;
+}
+
+/**
+ * Puerto `InstitutionCatalogReader` (add-exchange-house-rate-providers): catálogo de referencia de un país, de solo
+ * lectura y sin datos de usuario. `null` si la instalación no tiene catálogo para el país. La implementación sobre
+ * archivo (ruta configurable) valida con `CatalogValidator` y guarda en memoria el resultado.
+ */
+export interface InstitutionCatalogReader {
+  get(country: string): Promise<InstitutionCatalog | null>;
 }
 
 export interface CurrencyInfo {
