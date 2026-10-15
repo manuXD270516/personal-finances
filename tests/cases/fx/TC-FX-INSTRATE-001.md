@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Proveedores de tasas por institución solo con términos verificados"
 scenario: "Proveedor sin verificación configurado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009", "FR-FX-015"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: critical
 type: unit
 level: architecture
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/src/worker/fx-jobs.test.ts
+  - packages/contexts/fx/src/application/institution-rate-providers.test.ts
+  - packages/contexts/fx/src/infrastructure/providers/providers.architecture.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "terms-of-use", "config"]
@@ -31,7 +34,7 @@ expected_result:
   - "Todo adapter por institución registrado tiene descriptor VERIFIED con fecha y ADR"
   - "Cero solicitudes"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-001 — Un proveedor de tasas por institución sin verificación registrada queda deshabilitado sin enviar solicitudes

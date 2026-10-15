@@ -246,6 +246,7 @@ Content-Type: application/json
 | accounts | `ACCOUNT_CURRENCY_KIND_MISMATCH` | 422 | La moneda no es compatible con el tipo de cuenta (p. ej. moneda fiat en `CRYPTO_WALLET`) |
 | accounts | `ACCOUNT_NAME_TAKEN` | 409 | Nombre duplicado entre cuentas activas |
 | accounts | `INSTITUTION_ARCHIVED` | 409 | Institución archivada: no asignable a cuentas (las existentes la conservan) |
+| accounts | `INSTITUTION_CATALOG_ENTRY_UNKNOWN` | 422 | Un código de la adopción no existe en el catálogo de referencia del país (no se crea ninguna institución; `details.codes`) |
 | ledger | `LEDGER_UNBALANCED_ENTRY` | 422 | Σ por moneda ≠ 0 (no debería llegar al cliente: indica bug) |
 | ledger | `LEDGER_ENTRY_TOO_FEW_POSTINGS` | 422 | Asiento con menos de 2 postings (SQLSTATE `PF005`, docs/31 D19) |
 | ledger | `LEDGER_ZERO_AMOUNT_POSTING` | 422 | Posting con monto cero |
@@ -401,7 +402,7 @@ Prefijo `W` = `/api/v1/workspaces/{workspaceId}`.
 | workspaces | `GET/POST /api/v1/workspaces`, `GET/PATCH /api/v1/workspaces/{id}` | `identity/workspace-membership` | 1 |
 | members, invitations | `GET W/members`, `PATCH W/members/{userId}`, `POST W/invitations`, `POST /api/v1/invitations/{token}/accept` | `identity/workspace-membership` | 9 |
 | accounts | `GET/POST W/accounts`, `PUT W/accounts/order` (`reorderAccounts`), `GET/PATCH W/accounts/{id}`, `POST …/archive`, `POST …/close` (saldo cero, si no `409 ACCOUNT_BALANCE_NOT_ZERO`), `POST …/reactivate` (estados `ACTIVE`/`CLOSED`/`ARCHIVED`), `GET …/balance-history` (P7) | `accounts/account-management` | 1 |
-| institutions | `GET/POST W/institutions`, `GET/PATCH …/{id}`, `POST …/archive` | `accounts/institutions` | 1 |
+| institutions | `GET/POST W/institutions`, `GET/PATCH …/{id}`, `POST …/archive`; catálogo de referencia (`add-exchange-house-rate-providers`): `GET W/institution-catalog?country=` (solo lectura, con fuente, fecha de corte, soporte y cobertura) y `POST W/institutions/adopt` (adopción múltiple con conflictos `NAME_TAKEN` y `links[]`; código desconocido o dado de baja ⇒ 400 `VALIDATION_FAILED`, `INSTITUTION_CATALOG_ENTRY_UNKNOWN`) | `accounts/institutions` | 1 |
 | transactions | `GET/POST W/transactions`, `GET/PATCH …/{id}`, `POST …/{id}/post` (pending → posted), `POST …/{id}/void`, `GET …/{id}/history` (`getTransactionHistory`, revisiones), `POST W/transactions/duplicate-check` (`checkTransactionDuplicates`, EDITOR, sin efectos), `POST W/transactions/mark-cleared` (`markTransactionsCleared`, en lote), `POST …/{id}/unreconcile` (`unreconcileTransaction`) | `transactions/transaction-recording`, `transactions/splits`, `transactions/reconciliation`, `transactions/duplicate-detection` | 1 |
 | transactions bulk | `POST W/transactions/bulk-edit` (`bulkEditTransactions`), `POST W/transactions/bulk-edit/preview` (`previewBulkEditTransactions`, sin efectos); EDITOR | `transactions/bulk-edit` | 2 |
 | transfers | `POST W/transfers` (fachada: crea transacción `TRANSFER`) | `transactions/transfers` | 1 |

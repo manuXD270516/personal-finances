@@ -670,7 +670,89 @@
       }
     },
     "reconcile": "Conciliar conta",
-    "reconciliations": "Ver conciliações"
+    "reconciliations": "Ver conciliações",
+    "catalog": {
+      "title": "Adicionar do catálogo",
+      "intro": "Entidades do registro oficial do país, com o seu estado de suporte. Escolha várias e adicione de uma vez.",
+      "show": "Ver catálogo",
+      "hide": "Ocultar catálogo",
+      "unavailable": "O catálogo de entidades não está disponível nesta instalação.",
+      "fictitious": "Catálogo de teste com entidades fictícias: não corresponde ao registro oficial.",
+      "source": "Fonte: {name} · data de corte {cutoff} · versão {version}.",
+      "sourceLink": "Ver fonte",
+      "search": "Buscar por nome ou sigla",
+      "category": "Categoria",
+      "allCategories": "Todas as categorias",
+      "noResults": "Nenhuma entidade corresponde à busca.",
+      "select": "Selecionar {name}",
+      "adopted": "Já adicionada",
+      "adoptedFrom": "Do catálogo: {code} (versão {version})",
+      "adoptSelected": "Adicionar selecionadas ({count})",
+      "adoptedCount": "Instituições adicionadas: {count}.",
+      "delisted": "Já não consta no registro",
+      "delistedSince": "Não consta no registro desde {date}",
+      "notInCatalog": "Não consta no catálogo desta instalação",
+      "notAdoptable": "Só taxas",
+      "notAdoptableHint": "Não é usada como instituição de contas: apenas declara o seu suporte de taxas.",
+      "verificationPending": "Pendente de confirmação na fonte",
+      "conflictsTitle": "Estas entidades não foram adicionadas porque já existe uma instituição com esse nome:",
+      "nameTaken": "«{entry}» já existe como «{name}».",
+      "linkExisting": "Vincular a existente",
+      "categories": {
+        "MULTIPLE_BANK": "Banco múltiplo",
+        "SME_BANK": "Banco para pequenas empresas",
+        "PUBLIC_BANK": "Banco público",
+        "DEVELOPMENT_BANK": "Banco de desenvolvimento produtivo",
+        "HOUSING_FINANCE": "Entidade financeira de habitação",
+        "SAVINGS_COOP": "Cooperativa de poupança e crédito",
+        "DEVELOPMENT_FINANCE": "Instituição financeira de desenvolvimento",
+        "MOBILE_PAYMENT": "Pagamentos móveis",
+        "FINTECH": "Fintech",
+        "EXCHANGE_HOUSE": "Casa de câmbio"
+      }
+    },
+    "support": {
+      "title": "Estado de suporte",
+      "dimensions": {
+        "rates": "Taxas",
+        "statementImport": "Extratos"
+      },
+      "states": {
+        "SUPPORTED": "Suportado",
+        "GENERIC_ONLY": "Só formato genérico",
+        "IN_VERIFICATION": "Em verificação",
+        "PENDING_SAMPLE": "Pendente de amostra",
+        "NOT_ELIGIBLE": "Não elegível",
+        "NOT_APPLICABLE": "Não se aplica",
+        "UNKNOWN": "Desconhecido"
+      },
+      "reasons": {
+        "NO_PUBLICATION": "Não elegível: não publica taxas",
+        "TERMS_PROHIBIT_AUTOMATION": "Não elegível: os termos proíbem a automação",
+        "TERMS_UNAVAILABLE": "Não elegível: termos indisponíveis",
+        "REQUIRES_CREDENTIALS": "Não elegível: exige credenciais",
+        "UNSTABLE_FORMAT": "Não elegível: formato instável",
+        "IMAGE_ONLY_STATEMENT": "Não elegível: extrato só em imagem",
+        "OTHER": "Não elegível: outro motivo"
+      }
+    },
+    "coverage": {
+      "title": "Cobertura de suporte das entidades",
+      "intro": "Quanto do registro oficial o catálogo cobre e que suporte cada entidade tem.",
+      "show": "Ver cobertura",
+      "hide": "Ocultar cobertura",
+      "source": "Fonte: {name} · data de corte {cutoff} · versão {version}.",
+      "complete": "Cobertura completa.",
+      "incomplete": "Cobertura incompleta.",
+      "census": "Censo coberto: {pct}.",
+      "byCategory": "Censo por categoria",
+      "census_": "Censo oficial",
+      "entries": "No catálogo",
+      "coveragePct": "Cobertura",
+      "resolved": "Resolvidas: {resolved} · pendentes: {pending} · {pct}",
+      "notEligibleApart": "Não elegíveis, à parte:",
+      "tableLabel": "Cobertura do censo por categoria"
+    }
   },
   "Transactions": {
     "backToList": "← Voltar para transações",
@@ -1063,7 +1145,9 @@
       "CUSTOM": "Personalizada",
       "PARALLEL_BUY": "Compra",
       "PARALLEL_SELL": "Venda",
-      "MARKET": "Mercado"
+      "MARKET": "Mercado",
+      "BANK_BUY": "Compra na entidade",
+      "BANK_SELL": "Venda à entidade"
     },
     "detail": {
       "title": "Detalhe da conversão (revisão {revision})",
@@ -1169,7 +1253,8 @@
       "observation": "Conversão",
       "viewConversion": "Ver conversão",
       "withdrawn": "conversão anulada",
-      "observationHint": "Observação de uma conversão própria: é histórico do par e nunca é usada para avaliar."
+      "observationHint": "Observação de uma conversão própria: é histórico do par e nunca é usada para avaliar.",
+      "institution": "Entidade {code}"
     },
     "screen": {
       "title": "Cripto e câmbio",

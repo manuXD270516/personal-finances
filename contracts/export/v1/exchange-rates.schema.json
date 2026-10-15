@@ -27,7 +27,8 @@
     "anomaly_baseline_rate_id",
     "anomaly_variation_pct",
     "conversion_transaction_id",
-    "conversion_revision"
+    "conversion_revision",
+    "institution_code"
   ],
   "properties": {
     "id": {
@@ -141,6 +142,12 @@
     "conversion_revision": {
       "type": [
         "integer",
+        "null"
+      ]
+    },
+    "institution_code": {
+      "type": [
+        "string",
         "null"
       ]
     }

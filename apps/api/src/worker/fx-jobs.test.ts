@@ -90,6 +90,29 @@ describe('registerFxMarketRateJobs (fx/market-rate-providers)', () => {
   });
 });
 
+describe('providers por institución en el worker (add-exchange-house-rate-providers)', () => {
+  it('[TC-FX-INSTRATE-001] el default (none) no cambia los jobs: sin provider por institución no se consulta ninguna fuente nueva y el presupuesto de conexiones no cambia', async () => {
+    const { queue, calls } = fakeQueue();
+    const jobs = jobsFor({});
+    expect(jobs.settings.institutionProvider).toBeNull();
+    const consumers = await registerFxMarketRateJobs(queue, jobs, logger);
+    // Mismas colas y mismo consumidor que antes del change: ningún consumidor nuevo (D249).
+    expect(calls.work).toEqual(['fx.poll-market-rates', 'fx.backfill-historical-rates', 'fx.fill-rate-gaps']);
+    expect(consumers.map((c) => c.consumer)).toEqual(['fx.market-rate-provisioning']);
+  });
+
+  it('[TC-FX-INSTRATE-001] un provider por institución sin verificación deja los demás providers funcionando y el registro no falla', async () => {
+    const { queue, calls } = fakeQueue();
+    const jobs = jobsFor({ FX_PROVIDER_INSTITUTION_RATES: 'instrate_sin_verificar' });
+    expect(jobs.settings.institutionConfigError).toMatch(/no registered adapter/);
+    expect(jobs.settings.configError).toBeNull();
+    expect(jobs.enabled).toBe(true);
+    await registerFxMarketRateJobs(queue, jobs, logger);
+    expect(calls.work).toContain('fx.poll-market-rates');
+    expect(calls.schedule[0]).toEqual(['fx.poll-market-rates', '*/15 * * * *', 'UTC']);
+  });
+});
+
 describe('fxEndpointsFromConfig (providers simulados en E2E, solo local/ci)', () => {
   it('sin URL alternativas usa los providers reales; con URL, la allowlist suma su host', () => {
     expect(fxEndpointsFromConfig({})).toBeUndefined();

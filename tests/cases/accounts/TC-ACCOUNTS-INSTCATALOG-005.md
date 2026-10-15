@@ -5,16 +5,19 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Entrada retirada del registro oficial"
 scenario: "Entidad retirada con cuentas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012", "FR-ACCOUNTS-013"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog"]
@@ -32,7 +35,7 @@ expected_result:
   - "Se informa 'no figura en el registro desde 2026-12-31'"
   - "La adopción se rechaza con VALIDATION_FAILED"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-005 — Una entrada retirada del registro no altera la institución adoptada ni sus cuentas y no se puede adoptar

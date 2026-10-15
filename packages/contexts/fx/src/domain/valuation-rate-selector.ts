@@ -1,7 +1,8 @@
 import { dec, type Instant } from '@pf/shared-kernel';
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
-  isQuoteSideRateType,
+  isInstitutionRateType,
+  isOneSidedRateType,
   marketOf,
   type FxRateProvider,
   type FxRateType,
@@ -104,7 +105,7 @@ export interface SelectOptions {
   /**
    * Tasas usables (no reemplazadas, sin anomalía pendiente/rechazada, dentro de la ventana) del par de OTROS tipos.
    * El selector solo admite manuales con `asOf ≤ t`, `t − asOf ≤ manualFallbackMaxAgeMs` y desvío respecto de
-   * `providerReference` ≤ `manualFallbackMaxDeviationPct`; nunca de compra/venta y solo si el tipo pedido lo alimentan
+   * `providerReference` ≤ `manualFallbackMaxDeviationPct`; nunca de compra/venta (paralela o por institución) y solo si el tipo pedido lo alimentan
    * providers (tiene umbral de obsolescencia) (docs/31 D34; design.md decisión 31).
    */
   readonly otherTypes?: readonly ExchangeRateState[];
@@ -165,7 +166,10 @@ export class ValuationRateSelector {
    */
   freshSubstitutes(options: SelectOptions, at: Instant): ExchangeRateState[] {
     const requested = options.requestedType ?? null;
-    if (requested === null || this.staleness.staleAfterMs(requested) === null) return [];
+    // Una tasa por institución (BANK_BUY/BANK_SELL) solo se valora con tasas de ese tipo: nunca se sustituye por una
+    // manual de otro tipo (pedirla es pedir la cotización de una institución, no un valor aproximado).
+    if (requested === null || isInstitutionRateType(requested)) return [];
+    if (this.staleness.staleAfterMs(requested) === null) return [];
     const maxAge = this.policy.manualFallbackMaxAgeMs ?? DEFAULT_MANUAL_FALLBACK_MAX_AGE_MS;
     const maxDeviation = dec(
       this.policy.manualFallbackMaxDeviationPct ?? DEFAULT_MANUAL_FALLBACK_MAX_DEVIATION_PCT,
@@ -176,7 +180,7 @@ export class ValuationRateSelector {
       if (
         s.source === 'PROVIDER' ||
         s.rateType === requested ||
-        isQuoteSideRateType(s.rateType) ||
+        isOneSidedRateType(s.rateType) ||
         age < 0 ||
         age > maxAge
       )

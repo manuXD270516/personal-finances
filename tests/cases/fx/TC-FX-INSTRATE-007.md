@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Estado de las tasas por institución consultable"
 scenario: "Institución cubierta y obsoleta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-016"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-institution-rates.api.test.ts
+  - packages/contexts/fx/src/application/institution-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/institution-rates.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "provider-status", "bank-rates"]
@@ -29,7 +32,7 @@ expected_result:
   - "institutions[] incluye BAD con BANK_SELL, antigüedad 80 h y stale = true"
   - "No se llama a ningún proveedor"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-007 — El estado de providers informa la última tasa por institución y su obsolescencia

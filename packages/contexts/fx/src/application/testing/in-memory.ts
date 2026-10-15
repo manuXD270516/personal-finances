@@ -144,7 +144,8 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
         r.snapshot.provider === feed.provider &&
         r.rate.base.code === feed.base &&
         r.rate.quote.code === feed.quote &&
-        r.snapshot.rateType === feed.rateType,
+        r.snapshot.rateType === feed.rateType &&
+        (r.snapshot.institutionCode ?? null) === (feed.institutionCode ?? null),
     );
   const byAsOfDesc = (a: ExchangeRate, b: ExchangeRate) =>
     Date.parse(b.snapshot.asOf) - Date.parse(a.snapshot.asOf) || (b.id > a.id ? 1 : -1);
@@ -204,6 +205,7 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
           .filter((r) => !filter.rateType || r.snapshot.rateType === filter.rateType)
           .filter((r) => !filter.source || r.snapshot.source === filter.source)
           .filter((r) => !filter.provider || r.snapshot.provider === filter.provider)
+          .filter((r) => !filter.institutionCode || r.snapshot.institutionCode === filter.institutionCode)
           .sort((a, b) => Date.parse(b.snapshot.asOf) - Date.parse(a.snapshot.asOf))
           .slice(page.offset, page.offset + page.limit)
           .map(stored);
@@ -217,6 +219,7 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
             r.rate.base.code === s.rate.base.code &&
             r.rate.quote.code === s.rate.quote.code &&
             r.snapshot.rateType === s.rateType &&
+            (r.snapshot.institutionCode ?? null) === (s.institutionCode ?? null) &&
             r.snapshot.asOf === s.asOf,
         );
         if (duplicate) return false;
@@ -263,6 +266,18 @@ export function inMemoryFxDeps(options: { readonly baseCurrency?: string; readon
           .filter((r) => r.snapshot.anomaly === null || reviewOf(r.id)?.decision === 'CONFIRMED')
           .sort(byAsOfDesc);
         return accepted[0] ? stored(accepted[0]) : null;
+      },
+      async latestInstitutionRates(ws, provider) {
+        const latest = new Map<string, ExchangeRate>();
+        for (const r of state.rates) {
+          const s = r.snapshot;
+          if (s.workspaceId !== ws || s.provider !== provider || !s.institutionCode) continue;
+          if (s.anomaly !== null && reviewOf(r.id)?.decision !== 'CONFIRMED') continue;
+          const key = `${s.institutionCode}|${r.rate.base.code}/${r.rate.quote.code}|${s.rateType}`;
+          const current = latest.get(key);
+          if (!current || byAsOfDesc(r, current) < 0) latest.set(key, r);
+        }
+        return [...latest.values()].map(stored);
       },
       async retainedOfPair(ws, base, quote) {
         return state.rates

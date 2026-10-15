@@ -33,6 +33,11 @@ export interface ExchangeRateState {
   /** Marca de anomalía inmutable de la fila (la decisión vive en `fx.rate_anomaly_review`). */
   readonly anomaly: AnomalyMark | null;
   /**
+   * Código de catálogo de la institución que publicó la cotización (`BANK_BUY`/`BANK_SELL` de un provider por
+   * institución, add-exchange-house-rate-providers); `null`/ausente en el resto.
+   */
+  readonly institutionCode?: string | null;
+  /**
    * Conversión propia que originó la observación (`source = USER_CONVERSION`, D231); `null`/ausente en tasas
    * manuales y de provider.
    */
@@ -173,6 +178,7 @@ export class ExchangeRate {
       fetchedAt: null,
       rawPayload: null,
       anomaly: null,
+      institutionCode: null,
       conversionRef: null,
     });
   }
@@ -202,6 +208,7 @@ export class ExchangeRate {
       fetchedAt: sample.fetchedAt,
       rawPayload: sample.rawPayload,
       anomaly: input.anomaly,
+      institutionCode: sample.institutionCode,
     });
   }
 
@@ -234,6 +241,7 @@ export class ExchangeRate {
       fetchedAt: null,
       rawPayload: null,
       anomaly: null,
+      institutionCode: null,
       conversionRef: { ...input.conversion },
     });
   }
@@ -295,6 +303,7 @@ export class ExchangeRate {
       fetchedAt: null,
       rawPayload: null,
       anomaly: null,
+      institutionCode: null,
     });
   }
 }

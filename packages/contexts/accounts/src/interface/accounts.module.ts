@@ -7,6 +7,10 @@ import type { Pool } from 'pg';
 import { AccountProvisioningAdapter } from '../application/account-provisioning.adapter.js';
 import { AccountCatalogQueries } from '../application/account-catalog.queries.js';
 import { AccountsService } from '../application/accounts.service.js';
+import {
+  AdoptCatalogInstitutions,
+  InstitutionCatalogQueries,
+} from '../application/institution-catalog.service.js';
 import { InstitutionsService } from '../application/institutions.service.js';
 import { ACCOUNT_LIFECYCLE } from '../domain/index.js';
 import type {
@@ -14,6 +18,7 @@ import type {
   BaseCurrencyValuationDeps,
   CustomFieldCatalogPort,
   CustomFieldValueInput,
+  InstitutionCatalogReader,
   OutboxPort,
   TagCatalogPort,
   ValidatedCustomFieldValue,
@@ -23,11 +28,17 @@ import type {
 import {
   ACCOUNT_PROVISIONING_PORT,
   ACCOUNTS_QUERY_PORT,
+  INSTITUTION_SUPPORT_QUERY,
   type AccountCatalogQuery,
   type AccountProvisioningPort,
   type AccountOpeningBalancePort,
   type AccountsQueryPort,
+  type InstitutionSupportQuery,
 } from '../contracts/index.js';
+import {
+  FileInstitutionCatalogReader,
+  type FileInstitutionCatalogOptions,
+} from '../infrastructure/file-institution-catalog.js';
 import {
   LedgerBalancesAdapter,
   PgAccountRepository,
@@ -38,8 +49,11 @@ import {
 } from '../infrastructure/pg-accounts.js';
 import {
   ACCOUNTS_SERVICE,
+  ADOPT_CATALOG_INSTITUTIONS,
   AccountsController,
+  INSTITUTION_CATALOG_QUERIES,
   INSTITUTIONS_SERVICE,
+  InstitutionCatalogController,
   InstitutionsController,
 } from './accounts-http.js';
 
@@ -74,7 +88,16 @@ export interface AccountsRuntimeOptions {
    * Ausente ⇒ solo se exige la moneda activa en el catálogo global.
    */
   readonly workspaceCurrencies?: WorkspaceCurrenciesPort;
+  /**
+   * Catálogo de referencia de instituciones (archivo de datos de la instalación, `ACCOUNTS_INSTITUTION_CATALOG_DIR`;
+   * add-exchange-house-rate-providers). Ausente ⇒ la instalación no tiene catálogo para ningún país (el listado y la
+   * adopción responden 404 y las instituciones se crean a mano).
+   */
+  readonly catalog?: InstitutionCatalogReader;
 }
+
+/** Sin catálogo compuesto: ningún país tiene catálogo. */
+const noCatalog: InstitutionCatalogReader = { get: async () => null };
 
 /** Sin CLASSIFICATION compuesto no hay definiciones: no se aceptan valores. */
 const noCustomFields: CustomFieldCatalogPort = {
@@ -95,6 +118,12 @@ export interface AccountsRuntime {
   readonly catalog: AccountCatalogQuery;
   /** Alta de cuentas en la unidad de trabajo del llamador (openspec add-loans). */
   readonly provisioning: AccountProvisioningPort;
+  /** Consulta del catálogo de referencia de instituciones y estado de sus vínculos (add-exchange-house-rate-providers). */
+  readonly catalogQueries: InstitutionCatalogQueries;
+  /** Adopción de instituciones desde el catálogo (una operación auditada). */
+  readonly adoption: AdoptCatalogInstitutions;
+  /** Soporte en tasas de las instituciones adoptadas, para el estado de providers de FX. */
+  readonly institutionSupport: InstitutionSupportQuery;
 }
 
 /** Composición de ACCOUNTS sobre PostgreSQL (misma transacción que la `PgUnitOfWork` de cada comando). */
@@ -119,9 +148,23 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
     ...(options.valuation ? { valuation: options.valuation } : {}),
   };
   const accounts = new AccountsService(deps);
+  const catalog = options.catalog ?? noCatalog;
+  const catalogQueries = new InstitutionCatalogQueries({
+    uow: deps.uow,
+    institutions: deps.institutions,
+    catalog,
+  });
   return {
     accounts,
     institutions: new InstitutionsService(deps, options.audit),
+    catalogQueries,
+    adoption: new AdoptCatalogInstitutions(
+      { uow: deps.uow, institutions: deps.institutions, catalog, ids: deps.ids, clock: deps.clock },
+      options.audit,
+    ),
+    institutionSupport: {
+      adoptedRatesSupport: (workspaceId) => catalogQueries.adoptedRatesSupport(workspaceId),
+    },
     query: {
       getPostingEligibility: (input) => accounts.getPostingEligibility(input.workspaceId, input.accountIds),
       assertCanPost: (input) => accounts.assertCanPost(input.workspaceId, input.accounts),
@@ -142,11 +185,14 @@ export class AccountsModule {
   static register(options: AccountsModuleOptions): DynamicModule {
     return {
       module: AccountsModule,
-      controllers: [AccountsController, InstitutionsController],
+      controllers: [AccountsController, InstitutionsController, InstitutionCatalogController],
       providers: [
         { provide: API_CONVENTIONS, useValue: options.conventions },
         { provide: ACCOUNTS_SERVICE, useValue: options.runtime.accounts },
         { provide: INSTITUTIONS_SERVICE, useValue: options.runtime.institutions },
+        { provide: INSTITUTION_CATALOG_QUERIES, useValue: options.runtime.catalogQueries },
+        { provide: ADOPT_CATALOG_INSTITUTIONS, useValue: options.runtime.adoption },
+        { provide: INSTITUTION_SUPPORT_QUERY, useValue: options.runtime.institutionSupport },
         { provide: ACCOUNTS_QUERY_PORT, useValue: options.runtime.query },
         { provide: ACCOUNT_PROVISIONING_PORT, useValue: options.runtime.provisioning },
       ],
@@ -157,6 +203,8 @@ export class AccountsModule {
 
 /** Máquina de estados `Account` declarada por el dominio (add-lifecycle-timeline), para AUDIT en el composition root. */
 export const ACCOUNT_LIFECYCLE_MACHINE: LifecycleMachineDto = ACCOUNT_LIFECYCLE.definition;
+
+export { FileInstitutionCatalogReader, type FileInstitutionCatalogOptions, type InstitutionCatalogReader };
 
 export type {
   AccountOpeningBalancePort,

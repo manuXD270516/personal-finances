@@ -17,7 +17,16 @@ export const FX_EVENTS = {
 } as const;
 
 export type FxRateTypeDto =
-  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL' | 'MARKET';
+  | 'OFFICIAL'
+  | 'PARALLEL'
+  | 'P2P'
+  | 'BANK'
+  | 'CUSTOM'
+  | 'PARALLEL_BUY'
+  | 'PARALLEL_SELL'
+  | 'MARKET'
+  | 'BANK_BUY'
+  | 'BANK_SELL';
 export type FxRateSourceDto = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
 export type CurrencyKindDto = 'FIAT' | 'CRYPTO' | 'COMMODITY' | 'CUSTOM';
 
@@ -42,6 +51,8 @@ export interface ReferenceRateDto {
   readonly source: FxRateSourceDto;
   readonly sourceLabel: string | null;
   readonly asOf: string;
+  /** Código de catálogo de la institución que publicó la tasa (`BANK_BUY`/`BANK_SELL`); `null` en el resto. */
+  readonly institutionCode?: string | null;
 }
 
 export interface ConversionCostDto {
@@ -125,8 +136,11 @@ export interface FxQuoteSideRatesPort {
 
 export const FX_QUOTE_SIDE_RATES_PORT = Symbol.for('pf.fx.FxQuoteSideRatesPort');
 
-/** Providers de tasa paralela/oficial y de precios cripto (`CRYPTO_<NOMBRE>`, ids fijados en ADR-0029). */
-export type FxRateProviderDto = 'PARALELO_BO' | 'DOLARAPI_BO' | `CRYPTO_${string}`;
+/**
+ * Providers de tasa paralela/oficial, de precios cripto (`CRYPTO_<NOMBRE>`, ids fijados en ADR-0029) y de tasas por
+ * institución (`INSTRATE_<NOMBRE>`, ids fijados en el ADR de sus fuentes).
+ */
+export type FxRateProviderDto = 'PARALELO_BO' | 'DOLARAPI_BO' | `CRYPTO_${string}` | `INSTRATE_${string}`;
 export type RateSelectionDto = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
 export type RateDerivationDto = 'DIRECT' | 'INVERSE' | 'CROSS';
 

@@ -5,16 +5,20 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Estado de soporte por institución y dimensión"
 scenario: "No apta sin razón"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012", "FR-FX-009", "FR-IMPORTS-005"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+  - packages/contexts/accounts/src/domain/institution-catalog.test.ts
+  - tests/e2e/specs/institution-catalog.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog", "terms-of-use"]
@@ -30,7 +34,7 @@ expected_result:
   - "Las dos primeras versiones fallan la validación"
   - "La versión correcta devuelve los estados por entrada (BAD tasas IN_VERIFICATION, importación PENDING_SAMPLE)"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-006 — El estado de soporte por dimensión exige razón en NOT_ELIGIBLE y proveedor verificado en SUPPORTED

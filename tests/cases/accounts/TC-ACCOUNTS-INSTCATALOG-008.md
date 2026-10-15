@@ -5,16 +5,18 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Medición del soporte completo"
 scenario: "Las entradas retiradas no cuentan"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012"]
 nfr: []
 invariants: []
 priority: medium
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/domain/support-coverage.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog", "coverage"]
@@ -28,7 +30,7 @@ expected_result:
   - "complete = true con el desglose por estado y razón"
   - "CID no cuenta como pendiente"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-008 — Sin pendientes activos el soporte es completo y las entradas retiradas no cuentan

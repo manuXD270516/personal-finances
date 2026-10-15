@@ -3,6 +3,7 @@ import {
   AssetClassPolicy,
   DEFAULT_STABLECOIN_CODES,
   isCryptoProviderId,
+  isInstitutionProviderId,
   providerDescriptor,
   type AnomalyThresholds,
   type FxRateProvider,
@@ -36,6 +37,10 @@ export interface FxProviderEnv {
   readonly FX_CRYPTO_HISTORY_FROM?: string;
   // add-rate-feed-alerts (D233)
   readonly FX_FEED_STALE_ALERT_AFTER?: string;
+  // add-exchange-house-rate-providers (design.md decisión 11)
+  readonly FX_PROVIDER_INSTITUTION_RATES?: string;
+  readonly FX_INSTITUTION_RATES_INTERVAL?: string;
+  readonly FX_STALE_AFTER_INSTITUTION?: string;
 }
 
 /** Configuración validada de los providers (design.md decisión 5). */
@@ -84,6 +89,27 @@ export interface FxProviderSettings {
    * obsolescencia de `PARALLEL` y `MARKET`.
    */
   readonly feedStaleAlertAfterMs: number;
+  /**
+   * Provider de tasas por institución (`INSTRATE_<NOMBRE>` con términos verificados) o `null` (`none`, el default hasta
+   * que exista una fuente verificada; add-exchange-house-rate-providers).
+   */
+  readonly institutionProvider: FxRateProvider | null;
+  /**
+   * Cada cuánto se consulta el provider por institución (`FX_INSTITUTION_RATES_INTERVAL`, 60 min; mínimo 60 s). El ciclo
+   * de `fx.poll-market-rates` corre con `FX_POLL_INTERVAL`: el provider se consulta en el primer ciclo con al menos este
+   * tiempo desde su último intento (nunca más seguido que el ciclo).
+   */
+  readonly institutionPollIntervalMs: number;
+  /** Antigüedad a partir de la cual una tasa por institución está obsoleta (`FX_STALE_AFTER_INSTITUTION`, 72 h). */
+  readonly staleAfterInstitutionMs: number;
+  /**
+   * Error de configuración SOLO del provider por institución (sin verificación de términos registrada, fuente
+   * rechazada, duración inválida): queda deshabilitado con `FX_PROVIDER_CONFIG_INVALID` y no envía solicitudes; los
+   * providers de tasa paralela, oficial y cripto siguen funcionando.
+   */
+  readonly institutionConfigError: string | null;
+  /** Ids de providers por institución nombrados por la configuración (también si no pudieron habilitarse). */
+  readonly institutionRequested: readonly FxRateProvider[];
 }
 
 export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
@@ -107,6 +133,10 @@ export const DEFAULT_FX_PROVIDER_ENV: Required<FxProviderEnv> = {
   FX_STABLECOIN_CODES: 'USDT',
   FX_CRYPTO_HISTORY_FROM: '2020-01-01',
   FX_FEED_STALE_ALERT_AFTER: '6h',
+  // Hasta que exista una fuente verificada por institución el default es `none` (sin solicitudes a ninguna fuente).
+  FX_PROVIDER_INSTITUTION_RATES: 'none',
+  FX_INSTITUTION_RATES_INTERVAL: '60m',
+  FX_STALE_AFTER_INSTITUTION: '72h',
 };
 
 const PROVIDER_VALUES: Readonly<Record<string, FxRateProvider | null>> = {
@@ -148,9 +178,10 @@ const disabled = (
   primary: null,
   fallback: null,
   official: null,
-  // Una configuración general inválida detiene todos los providers, también los cripto.
+  // Una configuración general inválida detiene todos los providers, también los cripto y los de instituciones.
   cryptoPrimary: null,
   cryptoFallback: null,
+  institutionProvider: null,
   configError: error,
 });
 
@@ -170,6 +201,34 @@ function cryptoProvider(name: string, value: string, errors: string[]): FxRatePr
   const descriptor = providerDescriptor(id);
   if (!descriptor || descriptor.kind !== 'CRYPTO') {
     errors.push(`${name}: provider ${id} has no registered adapter and terms verification (ADR-0029)`);
+    return null;
+  }
+  const { terms } = descriptor;
+  if (terms.status !== 'VERIFIED' || !terms.verifiedOn || !terms.adr) {
+    errors.push(
+      `${name}: provider ${id} cannot be enabled, its terms of use are ${terms.status === 'REJECTED' ? 'rejected' : 'not verified'} (NFR-COMP-007)`,
+    );
+    return null;
+  }
+  return id;
+}
+
+/**
+ * Provider por institución de una variable: `none` o un id `INSTRATE_<NOMBRE>` registrado cuya verificación de términos
+ * de uso esté registrada como `VERIFIED` con su fecha y su ADR (NFR-COMP-007, RISK-023). Sin ella NO se habilita ni se
+ * envía ninguna solicitud a la fuente: el error deshabilita solo a los providers por institución.
+ */
+function institutionProvider(name: string, value: string, errors: string[]): FxRateProvider | null {
+  const v = value.trim();
+  if (v.toLowerCase() === 'none') return null;
+  const id = v.toUpperCase();
+  if (!isInstitutionProviderId(id)) {
+    errors.push(`${name} must be none or a verified institution rates provider id (INSTRATE_<NAME>)`);
+    return null;
+  }
+  const descriptor = providerDescriptor(id);
+  if (!descriptor || descriptor.kind !== 'INSTITUTION') {
+    errors.push(`${name}: provider ${id} has no registered adapter and terms verification (NFR-COMP-007)`);
     return null;
   }
   const { terms } = descriptor;
@@ -281,6 +340,37 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
       'FX_FEED_STALE_ALERT_AFTER must not be shorter than FX_POLL_INTERVAL nor than the FX_STALE_AFTER_PARALLEL / FX_STALE_AFTER_FALLBACK / FX_STALE_AFTER_MARKET thresholds',
     );
   }
+  // Provider por institución (add-exchange-house-rate-providers): su error deshabilita solo a ese provider.
+  const institutionErrors: string[] = [];
+  let institutionProviderId = institutionProvider(
+    'FX_PROVIDER_INSTITUTION_RATES',
+    raw.FX_PROVIDER_INSTITUTION_RATES,
+    institutionErrors,
+  );
+  const institutionDuration = (name: keyof FxProviderEnv) => {
+    const ms = parseDuration(raw[name]);
+    if (ms === null || ms <= 0) institutionErrors.push(`${name} must be a duration like 30s, 15m or 72h`);
+    return ms ?? 0;
+  };
+  const institutionPollIntervalMs = institutionDuration('FX_INSTITUTION_RATES_INTERVAL');
+  if (institutionPollIntervalMs > 0 && institutionPollIntervalMs < MINUTE_MS) {
+    institutionErrors.push('FX_INSTITUTION_RATES_INTERVAL must be at least 60 seconds (1m)');
+  }
+  const staleAfterInstitutionMs = institutionDuration('FX_STALE_AFTER_INSTITUTION');
+  // Una tasa por institución se publica una vez por día hábil: un umbral menor que lo que tarda el ciclo en consultar la
+  // fuente la marcaría obsoleta antes de poder renovarse.
+  const institutionFloorMs = Math.max(pollIntervalMs, institutionPollIntervalMs);
+  if (staleAfterInstitutionMs > 0 && staleAfterInstitutionMs < institutionFloorMs) {
+    institutionErrors.push(
+      'FX_STALE_AFTER_INSTITUTION must not be shorter than FX_POLL_INTERVAL nor than FX_INSTITUTION_RATES_INTERVAL',
+    );
+  }
+  const institutionConfigError = institutionErrors.length > 0 ? institutionErrors.join('; ') : null;
+  if (institutionConfigError) institutionProviderId = null;
+  const institutionRequested = [raw.FX_PROVIDER_INSTITUTION_RATES]
+    .map((v) => v.trim().toUpperCase())
+    .filter((v): v is FxRateProvider => isInstitutionProviderId(v));
+
   const cryptoRequested = [raw.FX_PROVIDER_CRYPTO_PRIMARY, raw.FX_PROVIDER_CRYPTO_FALLBACK]
     .map((v) => v.trim().toUpperCase())
     .filter((v): v is FxRateProvider => isCryptoProviderId(v));
@@ -310,6 +400,11 @@ export function parseFxProviderSettings(env: FxProviderEnv = {}): FxProviderSett
     cryptoConfigError,
     cryptoRequested: [...new Set(cryptoRequested)],
     feedStaleAlertAfterMs: feedStaleAlertAfterMs || 6 * HOUR_MS,
+    institutionProvider: institutionProviderId,
+    institutionPollIntervalMs: institutionPollIntervalMs || 60 * MINUTE_MS,
+    staleAfterInstitutionMs: staleAfterInstitutionMs || 72 * HOUR_MS,
+    institutionConfigError,
+    institutionRequested: [...new Set(institutionRequested)],
   };
   if (errors.length > 0) return disabled(base, errors.join('; '));
   return { ...base, primary, fallback, official, configError: null };
@@ -330,11 +425,14 @@ function stripUndefined(env: FxProviderEnv): Partial<Record<keyof FxProviderEnv,
   return out;
 }
 
-/** Providers habilitados en algún rol (únicos), en orden principal → respaldo → oficial → cripto principal → cripto respaldo. */
+/**
+ * Providers habilitados en algún rol (únicos), en orden principal → respaldo → oficial → cripto principal → cripto
+ * respaldo → por institución.
+ */
 export function enabledProviders(s: FxProviderSettings): FxRateProvider[] {
   return [
     ...new Set(
-      [s.primary, s.fallback, s.official, s.cryptoPrimary, s.cryptoFallback].filter(
+      [s.primary, s.fallback, s.official, s.cryptoPrimary, s.cryptoFallback, s.institutionProvider].filter(
         (p): p is FxRateProvider => p !== null,
       ),
     ),
@@ -366,11 +464,21 @@ export function valuationPolicyOf(s: FxProviderSettings): ValuationPolicy {
       ...(s.cryptoPrimary !== null || s.cryptoFallback !== null
         ? { MARKET: { primary: s.cryptoPrimary, fallback: s.cryptoFallback } }
         : {}),
+      // Compra y venta por institución: solo con el provider habilitado; valoran únicamente si el par las prefiere.
+      ...(s.institutionProvider !== null
+        ? {
+            BANK_BUY: { primary: s.institutionProvider, fallback: null },
+            BANK_SELL: { primary: s.institutionProvider, fallback: null },
+          }
+        : {}),
     },
     staleAfterMs: {
       PARALLEL: s.staleAfterParallelMs,
       OFFICIAL: s.staleAfterOfficialMs,
       MARKET: s.staleAfterMarketMs,
+      ...(s.institutionProvider !== null
+        ? { BANK_BUY: s.staleAfterInstitutionMs, BANK_SELL: s.staleAfterInstitutionMs }
+        : {}),
     },
     // Solo el provider con rol de respaldo de PARALLEL / MARKET (StalenessPolicy.thresholdFor).
     fallbackStaleAfterMs: {

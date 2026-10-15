@@ -5,16 +5,19 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Compra y venta por institución como tipos de tasa propios"
 scenario: "La fuente publica solo la compra de cada entidad"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-002", "FR-FX-009"]
 nfr: ["NFR-DATA-006"]
 invariants: ["INV-011"]
 priority: critical
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-institution-rates.api.test.ts
+  - packages/contexts/fx/src/application/institution-rate-providers.test.ts
+  - packages/contexts/fx/test/integration/institution-rates.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "bank-rates"]
@@ -31,7 +34,7 @@ expected_result:
   - "Ninguna BANK_BUY ni BANK"
   - "El segundo ciclo no duplica (idempotencia)"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-003 — La compra publicada por entidad se registra como BANK_SELL con su código sin inventar el otro lado

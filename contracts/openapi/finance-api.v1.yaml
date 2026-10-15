@@ -1116,6 +1116,95 @@ paths:
         '500': { $ref: '#/components/responses/InternalServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /workspaces/{workspaceId}/institution-catalog:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Accounts]
+      operationId: getInstitutionCatalog
+      summary: Get the reference catalog of institutions of a country
+      description: |
+        Read-only reference catalog of the installation (add-exchange-house-rate-providers, FR-ACCOUNTS-012): official
+        registry entries of a country with their category, kind, registry status and support status per dimension
+        (`rates`, `statementImport`), plus the source, its cutoff date and the support coverage. It holds no user or
+        workspace data; only `adoptedInstitutionId` is the caller workspace's. Entries with `DELISTED` registry status
+        are listed only with `includeDelisted`. `404 RESOURCE_NOT_FOUND` when the installation has no catalog for the
+        country. Not paginated (at most 500 entries per country).
+      x-openspec-capability: accounts/institutions
+      x-required-role: VIEWER
+      parameters:
+        - name: country
+          in: query
+          required: true
+          description: ISO 3166-1 alpha-2 country of the catalog
+          schema: { type: string, pattern: '^[A-Z]{2}$' }
+        - name: category
+          in: query
+          description: Filter by regulatory category (repeatable)
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/InstitutionCatalogCategory' }
+          style: form
+          explode: true
+        - $ref: '#/components/parameters/Query'
+        - name: includeDelisted
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Institution catalog
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstitutionCatalog' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /workspaces/{workspaceId}/institutions/adopt:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Accounts]
+      operationId: adoptCatalogInstitutions
+      summary: Adopt institutions from the reference catalog
+      description: |
+        Each adopted entry creates a normal, editable institution in the workspace (name, kind, country and website of
+        the entry) linked to its catalog code and version, in one audited operation. Adopting an entry already linked to
+        an active institution does not create another (`alreadyLinked`); an entry whose name is used by another active
+        institution is a `NAME_TAKEN` conflict that does not prevent the others; `links` links an existing institution
+        instead of creating one. An unknown code answers 422 `INSTITUTION_CATALOG_ENTRY_UNKNOWN`, and a `DELISTED` or
+        non-adoptable entry 400 `VALIDATION_FAILED`, both without creating anything.
+      x-openspec-capability: accounts/institutions
+      x-required-role: EDITOR
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstitutionAdoptionInput' }
+      responses:
+        '200':
+          description: Adoption result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstitutionAdoptionResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: 'INSTITUTION_ARCHIVED (a link to an archived institution), IDEMPOTENCY_REQUEST_IN_PROGRESS.'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'INSTITUTION_CATALOG_ENTRY_UNKNOWN, IDEMPOTENCY_KEY_REUSED.'
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   # ─────────────────────────── Transactions ───────────────────────────
   /workspaces/{workspaceId}/transactions:
     parameters:
@@ -3348,6 +3437,10 @@ paths:
           in: query
           description: Filter provider rates by provider (fx/market-rate-providers)
           schema: { $ref: '#/components/schemas/FxRateProviderInput' }
+        - name: institutionCode
+          in: query
+          description: Only the rates published by this institution (catalog code; BANK_BUY / BANK_SELL)
+          schema: { type: string, pattern: '^[A-Z0-9-]{2,40}$' }
       responses:
         '200':
           description: Fx rates page
@@ -11218,6 +11311,7 @@ components:
         - ACCOUNT_CURRENCY_KIND_MISMATCH    # 422
         - ACCOUNT_NAME_TAKEN                # 409
         - INSTITUTION_ARCHIVED              # 409
+        - INSTITUTION_CATALOG_ENTRY_UNKNOWN # 422 (add-exchange-house-rate-providers: código inexistente en el catálogo)
         # transactions
         - SPLITS_DO_NOT_SUM                 # 422
         - INVALID_STATUS_TRANSITION         # 409
@@ -11798,6 +11892,13 @@ components:
         icon: { type: [string, 'null'], maxLength: 40 }
         color: { type: [string, 'null'], maxLength: 20 }
         notes: { type: [string, 'null'] }
+        catalogRef:
+          description: >-
+            Link with the reference catalog when the institution was adopted from it (add-exchange-house-rate-providers);
+            absent or null for institutions created by hand. Renaming the institution does not change it.
+          oneOf:
+            - $ref: '#/components/schemas/InstitutionCatalogRef'
+            - type: 'null'
         archivedAt: { type: [string, 'null'], format: date-time }
         version: { $ref: '#/components/schemas/Version' }
     InstitutionCreate:
@@ -11832,6 +11933,250 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Institution' }
         page: { $ref: '#/components/schemas/PageInfo' }
+    InstitutionCatalogCategory:
+      type: string
+      description: >-
+        Regulatory category of a catalog entry. Open set — clients must handle unknown values. The institution `kind`
+        of each category is fixed (banks, cooperatives, housing and development finance map to BANK; mobile payment to
+        WALLET_PROVIDER; fintech to FINTECH; exchange houses to OTHER): `InstitutionKind` is not extended.
+      x-extensible-enum:
+        - MULTIPLE_BANK
+        - SME_BANK
+        - PUBLIC_BANK
+        - DEVELOPMENT_BANK
+        - HOUSING_FINANCE
+        - SAVINGS_COOP
+        - DEVELOPMENT_FINANCE
+        - MOBILE_PAYMENT
+        - FINTECH
+        - EXCHANGE_HOUSE
+    InstitutionListingStatus:
+      type: string
+      description: Registry status of the entry in the catalog. Open set.
+      x-extensible-enum: [ACTIVE, DELISTED]
+    InstitutionSupportState:
+      type: string
+      description: >-
+        Support status of an entry in one dimension. `GENERIC_ONLY` and `PENDING_SAMPLE` apply only to `statementImport`.
+        Open set — clients must handle unknown values.
+      x-extensible-enum: [SUPPORTED, GENERIC_ONLY, IN_VERIFICATION, PENDING_SAMPLE, NOT_ELIGIBLE, NOT_APPLICABLE]
+    InstitutionSupportReason:
+      type: string
+      description: Reason of a `NOT_ELIGIBLE` status (closed set of the design). Open set — clients must handle unknown values.
+      x-extensible-enum:
+        - NO_PUBLICATION
+        - TERMS_PROHIBIT_AUTOMATION
+        - TERMS_UNAVAILABLE
+        - REQUIRES_CREDENTIALS
+        - UNSTABLE_FORMAT
+        - IMAGE_ONLY_STATEMENT
+        - OTHER
+    InstitutionSupportStatus:
+      type: object
+      additionalProperties: false
+      required: [status, reason, evaluatedOn, providerIds]
+      properties:
+        status: { $ref: '#/components/schemas/InstitutionSupportState' }
+        reason:
+          description: Only with `NOT_ELIGIBLE`; null otherwise
+          oneOf:
+            - $ref: '#/components/schemas/InstitutionSupportReason'
+            - type: 'null'
+        evaluatedOn: { $ref: '#/components/schemas/LocalDate' }
+        providerIds:
+          type: array
+          description: Rate providers backing a `SUPPORTED` status in `rates` (verified terms only)
+          items: { type: string }
+    InstitutionCatalogEntry:
+      type: object
+      additionalProperties: false
+      required: [code, name, legalName, category, kind, adoptable, website, listingStatus, delistedSince, verification, support, adoptedInstitutionId]
+      properties:
+        code: { type: string, description: Registry acronym (or an own `X-<slug>` code), pattern: '^[A-Z0-9][A-Z0-9-]{1,39}$' }
+        name: { type: string }
+        legalName: { type: [string, 'null'] }
+        category: { $ref: '#/components/schemas/InstitutionCatalogCategory' }
+        kind: { $ref: '#/components/schemas/InstitutionKind' }
+        adoptable:
+          type: boolean
+          description: Whether the entry can be adopted. False for exchange houses (nobody holds an account in them; they only declare their rates support).
+        website: { type: [string, 'null'], format: uri }
+        listingStatus: { $ref: '#/components/schemas/InstitutionListingStatus' }
+        delistedSince: { type: [string, 'null'], format: date }
+        verification:
+          type: string
+          description: Whether the entry was confirmed in the primary source (`PENDING` entries are never invented, only marked)
+          enum: [CONFIRMED, PENDING]
+        support:
+          type: object
+          additionalProperties: false
+          required: [rates, statementImport]
+          properties:
+            rates: { $ref: '#/components/schemas/InstitutionSupportStatus' }
+            statementImport: { $ref: '#/components/schemas/InstitutionSupportStatus' }
+        adoptedInstitutionId:
+          description: Active institution of the caller workspace linked to this entry; null if none
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+    InstitutionCatalogSource:
+      type: object
+      additionalProperties: false
+      required: [name, url, cutoffDate, retrievedOn]
+      properties:
+        name: { type: string }
+        url: { type: [string, 'null'], format: uri }
+        cutoffDate: { $ref: '#/components/schemas/LocalDate' }
+        retrievedOn: { $ref: '#/components/schemas/LocalDate' }
+    InstitutionSupportCoverage:
+      type: object
+      description: >-
+        Support measurement of the whole country catalog (it does not depend on the query filters). Percentages are
+        decimal strings with 2 decimals, rounded HALF_EVEN. `complete` is true only when the census coverage is 100.00 %
+        and no ACTIVE entry is pending (`IN_VERIFICATION` or `PENDING_SAMPLE`) in any dimension.
+      additionalProperties: false
+      required: [complete, censusCoveragePct, byCategory, byDimension]
+      properties:
+        complete: { type: boolean }
+        censusCoveragePct: { type: string, pattern: '^\d{1,3}\.\d{2}$' }
+        byCategory:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [category, census, entries, censusCoveragePct]
+            properties:
+              category: { $ref: '#/components/schemas/InstitutionCatalogCategory' }
+              census: { type: integer, minimum: 0, description: Entities of the category declared by the official source at the cutoff date }
+              entries: { type: integer, minimum: 0, description: ACTIVE entries of the category in the catalog }
+              censusCoveragePct: { type: string, pattern: '^\d{1,3}\.\d{2}$' }
+        byDimension:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [dimension, resolved, pending, resolvedPct, byStatus, notEligible]
+            properties:
+              dimension:
+                type: string
+                enum: [rates, statementImport]
+              resolved: { type: integer, minimum: 0, description: 'ACTIVE entries SUPPORTED, GENERIC_ONLY, NOT_ELIGIBLE or NOT_APPLICABLE' }
+              pending: { type: integer, minimum: 0, description: 'ACTIVE entries IN_VERIFICATION or PENDING_SAMPLE' }
+              resolvedPct: { type: string, pattern: '^\d{1,3}\.\d{2}$' }
+              byStatus:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [status, reason, count]
+                  properties:
+                    status: { $ref: '#/components/schemas/InstitutionSupportState' }
+                    reason:
+                      oneOf:
+                        - $ref: '#/components/schemas/InstitutionSupportReason'
+                        - type: 'null'
+                    count: { type: integer, minimum: 1 }
+              notEligible:
+                type: array
+                description: The NOT_ELIGIBLE entries reported apart, by reason, so they are never presented as supported
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [reason, count]
+                  properties:
+                    reason: { $ref: '#/components/schemas/InstitutionSupportReason' }
+                    count: { type: integer, minimum: 1 }
+    InstitutionCatalog:
+      type: object
+      additionalProperties: false
+      required: [country, catalogVersion, fictitious, source, entries, coverage]
+      properties:
+        country: { type: string, pattern: '^[A-Z]{2}$' }
+        catalogVersion: { type: string, description: Catalog version (equal to the cutoff date of its source) }
+        fictitious:
+          type: boolean
+          description: True for a TEST catalog with invented entities; the real registry catalog is never fictitious.
+        source: { $ref: '#/components/schemas/InstitutionCatalogSource' }
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/InstitutionCatalogEntry' }
+        coverage: { $ref: '#/components/schemas/InstitutionSupportCoverage' }
+    InstitutionCatalogRef:
+      type: object
+      additionalProperties: false
+      required: [country, code, catalogVersion, listingStatus, delistedSince]
+      properties:
+        country: { type: string, pattern: '^[A-Z]{2}$' }
+        code: { type: string }
+        catalogVersion: { type: string, description: Catalog version the institution was adopted from }
+        listingStatus:
+          description: >-
+            Status of the entry in the CURRENT catalog of the installation; null when the entry is no longer in that
+            catalog (for example after importing a workspace into an installation whose catalog lacks it).
+          oneOf:
+            - $ref: '#/components/schemas/InstitutionListingStatus'
+            - type: 'null'
+        delistedSince: { type: [string, 'null'], format: date }
+        support:
+          description: Current support status of the entry per dimension; null when the entry is not in the current catalog
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [rates, statementImport]
+              properties:
+                rates: { $ref: '#/components/schemas/InstitutionSupportStatus' }
+                statementImport: { $ref: '#/components/schemas/InstitutionSupportStatus' }
+            - type: 'null'
+    InstitutionAdoptionInput:
+      type: object
+      additionalProperties: false
+      required: [country, codes]
+      properties:
+        country: { type: string, pattern: '^[A-Z]{2}$' }
+        codes:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,39}$' }
+        links:
+          type: array
+          maxItems: 100
+          description: Link an existing institution of the workspace to an entry instead of creating one
+          items:
+            type: object
+            additionalProperties: false
+            required: [code, institutionId]
+            properties:
+              code: { type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,39}$' }
+              institutionId: { $ref: '#/components/schemas/Uuid' }
+    InstitutionAdoptionResult:
+      type: object
+      additionalProperties: false
+      required: [adopted, alreadyLinked, conflicts]
+      properties:
+        adopted:
+          type: array
+          description: Institutions created by this operation
+          items: { $ref: '#/components/schemas/Institution' }
+        alreadyLinked:
+          type: array
+          description: Institutions already linked to the requested entries (or linked by `links` in this operation)
+          items: { $ref: '#/components/schemas/Institution' }
+        conflicts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [code, reason, institutionId]
+            properties:
+              code: { type: string }
+              reason:
+                type: string
+                enum: [NAME_TAKEN]
+              institutionId:
+                $ref: '#/components/schemas/Uuid'
+                description: The existing institution that uses the name; it can be linked explicitly with `links`
 
     # ── Transactions ──
     TransactionKind:
@@ -12948,19 +13293,24 @@ components:
         Rate types of FR-FX-002 (docs/31 D13). PARALLEL_BUY / PARALLEL_SELL are the published parallel-market buy and
         sell quotes from the trader's perspective (BUY = price paid to buy the base currency, SELL = price received
         when selling it), recorded by market rate providers in addition to the PARALLEL median/midpoint; they are only
-        used for valuation when explicitly requested (rateType or pair preference). MARKET is the spot market price of
+        used for valuation when explicitly requested (rateType or pair preference). BANK_BUY / BANK_SELL are the buy and
+        sell quotes published by each institution (add-exchange-house-rate-providers), from the owner's perspective
+        like the parallel sides (BANK_BUY = price the owner pays to buy the base currency, BANK_SELL = price received
+        when selling it); they carry the institution code, never value by default and stay available as the reference
+        of a conversion and for the conversion cost analysis. MARKET is the spot market price of
         a cryptocurrency against USDT (add-crypto-rate-providers, D226) and the default type of the volatile crypto
         pairs; PARALLEL keeps its meaning of the parallel dollar. Open set — clients must handle unknown values; the
         server rejects unknown values in requests with VALIDATION_FAILED.
       # x-extensible-enum (convención reconocida por oasdiff, como ErrorCode): el catálogo de tipos crece de forma
       # aditiva (PARALLEL_BUY / PARALLEL_SELL, decisión del owner 2026-10-03; docs/10 §9.1).
-      x-extensible-enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL, MARKET]
+      x-extensible-enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL, MARKET, BANK_BUY, BANK_SELL]
     FxRateTypeInput:
       type: string
       description: >-
         FxRateType accepted in requests (closed set; responses use the open set `FxRateType`). PARALLEL_BUY /
-        PARALLEL_SELL added by the owner decision of 2026-10-03; MARKET by add-crypto-rate-providers (D226).
-      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL, MARKET]
+        PARALLEL_SELL added by the owner decision of 2026-10-03; MARKET by add-crypto-rate-providers (D226); BANK_BUY /
+        BANK_SELL by add-exchange-house-rate-providers.
+      enum: [OFFICIAL, PARALLEL, P2P, BANK, CUSTOM, PARALLEL_BUY, PARALLEL_SELL, MARKET, BANK_BUY, BANK_SELL]
     FxRateSource:
       type: string
       enum: [MANUAL, PROVIDER, USER_CONVERSION]
@@ -12968,8 +13318,9 @@ components:
       type: string
       description: >-
         Market rate providers (fx/market-rate-providers, ADR-0025). Open set — clients must handle unknown values:
-        the crypto price providers (`CRYPTO_<NAME>`) are added, once their terms of use are verified and recorded
-        (ADR-0029, NFR-COMP-007), as additive values.
+        the crypto price providers (`CRYPTO_<NAME>`) and the per-institution rate providers (`INSTRATE_<NAME>`) are
+        added, once their terms of use are verified and recorded (ADR-0029 and the institution sources ADR,
+        NFR-COMP-007), as additive values.
       # x-extensible-enum (como FxRateType): los providers cripto verificados se agregan de forma aditiva.
       x-extensible-enum: [PARALELO_BO, DOLARAPI_BO]
     FxRateProviderInput:
@@ -13139,6 +13490,37 @@ components:
             Configured pairs of the workspace with their coverage and the age of their last automatic rate
             (add-crypto-rate-providers); optional for clients of earlier versions.
           items: { $ref: '#/components/schemas/FxRatePairStatus' }
+        institutions:
+          type: array
+          description: >-
+            Per-institution rates (add-exchange-house-rate-providers): one entry per institution covered by the enabled
+            per-institution provider and per institution adopted by the workspace (its rates support status and reason,
+            also without an enabled provider). Optional for clients of earlier versions. Never calls a provider.
+          items: { $ref: '#/components/schemas/FxInstitutionRateStatus' }
+    FxInstitutionRateStatus:
+      type: object
+      additionalProperties: false
+      required: [code, rateTypes, lastRateAsOf, ageSeconds, stale, supportStatus, reason]
+      properties:
+        code: { type: string, pattern: '^[A-Z0-9-]{2,40}$' }
+        rateTypes:
+          type: array
+          description: Rate types received from the institution (empty without automatic rates)
+          items: { $ref: '#/components/schemas/FxRateType' }
+        lastRateAsOf: { type: [string, 'null'], format: date-time }
+        ageSeconds: { type: [integer, 'null'], minimum: 0 }
+        stale:
+          type: boolean
+          description: True when the last rate is older than the per-institution staleness threshold (72 h by default)
+        supportStatus:
+          description: Rates support status of the catalog entry when the institution is adopted by the workspace; null otherwise
+          oneOf:
+            - $ref: '#/components/schemas/InstitutionSupportState'
+            - type: 'null'
+        reason:
+          oneOf:
+            - $ref: '#/components/schemas/InstitutionSupportReason'
+            - type: 'null'
     FxRatePairInput:
       type: object
       additionalProperties: false
@@ -13218,6 +13600,10 @@ components:
           type: [string, 'null']
           format: date-time
           description: When the worker fetched the sample (provider rates); `asOf` is the instant published by the provider
+        institutionCode:
+          type: [string, 'null']
+          pattern: '^[A-Z0-9-]{2,40}$'
+          description: Catalog code of the institution that published the quote (`BANK_BUY` / `BANK_SELL` of a per-institution provider); null otherwise
         attribution:
           oneOf:
             - $ref: '#/components/schemas/RateAttribution'

@@ -5,16 +5,21 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Adopción de instituciones desde el catálogo"
 scenario: "Nombre ya usado por una institución propia"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+  - packages/contexts/accounts/src/domain/catalog-ref.test.ts
+  - packages/contexts/accounts/test/integration/institution-catalog.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog"]
@@ -31,7 +36,7 @@ expected_result:
   - "BAD aparece en conflicts con NAME_TAKEN y el id de la existente"
   - "Con links la institución existente queda vinculada a BAD sin crear otra"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-004 — Un nombre ya usado por una institución propia se informa como conflicto sin impedir las demás

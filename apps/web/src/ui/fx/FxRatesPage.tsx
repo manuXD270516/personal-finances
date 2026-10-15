@@ -437,6 +437,12 @@ function RatePairSection({
                 </td>
                 <td style={cellStyle}>
                   {rateTypeLabel(f, r.rateType)}
+                  {r.institutionCode ? (
+                    <span style={mutedStyle} data-testid="rate-institution">
+                      {' '}
+                      · {t('rates.institution', { code: r.institutionCode })}
+                    </span>
+                  ) : null}
                   {r.anomaly ? (
                     <span style={badgeStyle} data-testid="rate-anomaly">
                       {' '}

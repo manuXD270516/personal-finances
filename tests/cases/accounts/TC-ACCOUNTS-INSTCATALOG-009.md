@@ -5,16 +5,17 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Completitud del catálogo frente al censo oficial"
 scenario: "Falta una entidad del censo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: high
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/institution-catalog.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog"]
@@ -31,7 +32,7 @@ expected_result:
   - "Falla por código repetido"
   - "Falla por falta de fecha de corte"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-009 — La validación del catálogo detecta censo incompleto, códigos repetidos y falta de fecha de corte

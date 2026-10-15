@@ -681,6 +681,37 @@ export const VARIABLES = {
     default: '2020-01-01',
   }),
 
+  // ── FX: tasas por institución (openspec add-exchange-house-rate-providers, design.md decisión 11) ──
+  // Ninguna fuente por institución se habilita sin la verificación de sus términos de uso y licencia registrada en un
+  // ADR (NFR-COMP-007, RISK-023): un id sin verificación deja SOLO a ese provider deshabilitado, sin enviar solicitudes.
+  FX_PROVIDER_INSTITUTION_RATES: variable(z.string().min(1).max(40), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Provider de tasas por institución (`BANK_BUY` / `BANK_SELL`, la compra y la venta que publica cada entidad): el id (`INSTRATE_<NOMBRE>`) de un provider con términos de uso verificados y registrados en un ADR, o `none` (deshabilitado). Una fuente sin verificación registrada se rechaza: el provider queda deshabilitado con `FX_PROVIDER_CONFIG_INVALID`, no envía ninguna solicitud y los providers de tasa paralela, oficial y cripto siguen funcionando. Por defecto `none` hasta que exista una fuente verificada; CI y tests usan `none` (sin red).',
+    default: 'none',
+  }),
+  FX_INSTITUTION_RATES_INTERVAL: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Cada cuánto se consulta el provider de tasas por institución (`60m`; mínimo `60s`): la fuente publica una vez por día hábil. El ciclo de `fx.poll-market-rates` corre con `FX_POLL_INTERVAL`; el provider se consulta en el primer ciclo en que pasó al menos este tiempo desde su último intento (nunca con más frecuencia que el ciclo).',
+    default: '60m',
+  }),
+  FX_STALE_AFTER_INSTITUTION: variable(z.string().min(1).max(16), {
+    group: 'FX (tasas de mercado)',
+    description:
+      'Antigüedad a partir de la cual una tasa por institución se considera obsoleta (`72h`, para cubrir los fines de semana). No puede ser menor que `FX_POLL_INTERVAL` ni que `FX_INSTITUTION_RATES_INTERVAL`; un valor inválido deshabilita solo al provider por institución con `FX_PROVIDER_CONFIG_INVALID`.',
+    default: '72h',
+  }),
+
+  // ── ACCOUNTS: catálogo de referencia de instituciones (openspec add-exchange-house-rate-providers) ──
+  ACCOUNTS_INSTITUTION_CATALOG_DIR: variable(z.string().min(1).max(500), {
+    group: 'Producto',
+    description:
+      'Directorio con un archivo `<PAÍS>.json` por país del catálogo de referencia de instituciones (dato versionado de la instalación, sin datos de usuarios). Una ruta relativa se resuelve contra el directorio del paquete de la API (`/app` en la imagen). Sin valor: `reference/institutions` (catálogo real; sin archivo, el catálogo del país no está disponible y `GET /institution-catalog` responde 404). El catálogo FICTICIO de pruebas está en `reference/institutions/demo` (solo desarrollo y CI; nunca con `PFOS_ENV=staging|production`).',
+    optional: true,
+    example: 'reference/institutions/demo',
+  }),
+
   FX_PROVIDER_PARALELO_BO_URL: variable(httpOrigin, {
     group: 'FX (tasas de mercado)',
     description:
@@ -1050,6 +1081,9 @@ const FX_PROVIDERS = [
   'FX_ANOMALY_THRESHOLD_VOLATILE_PCT',
   'FX_STABLECOIN_CODES',
   'FX_CRYPTO_HISTORY_FROM',
+  'FX_PROVIDER_INSTITUTION_RATES',
+  'FX_INSTITUTION_RATES_INTERVAL',
+  'FX_STALE_AFTER_INSTITUTION',
 ] as const;
 const QUEUE = [
   'JOB_QUEUE_DRIVER',
@@ -1088,6 +1122,7 @@ export const APP_VARIABLES = {
     'OIDC_AUTHORIZED_PARTIES',
     'OIDC_JWKS_FALLBACK_MAX_AGE',
     'DEMO_DATA_ENABLED',
+    'ACCOUNTS_INSTITUTION_CATALOG_DIR',
     ...FX_PROVIDERS,
     'REPORTING_RATE_VALIDITY_WINDOW',
     'PLANNING_PERIOD_LOOKAHEAD',

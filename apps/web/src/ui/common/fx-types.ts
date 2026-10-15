@@ -6,10 +6,22 @@ export interface Money {
 }
 
 export type FxRateType =
-  'OFFICIAL' | 'PARALLEL' | 'P2P' | 'BANK' | 'CUSTOM' | 'PARALLEL_BUY' | 'PARALLEL_SELL' | 'MARKET';
+  | 'OFFICIAL'
+  | 'PARALLEL'
+  | 'P2P'
+  | 'BANK'
+  | 'CUSTOM'
+  | 'PARALLEL_BUY'
+  | 'PARALLEL_SELL'
+  | 'MARKET'
+  | 'BANK_BUY'
+  | 'BANK_SELL';
 export type FxRateSource = 'MANUAL' | 'PROVIDER' | 'USER_CONVERSION';
-/** Conjunto abierto: los providers cripto (`CRYPTO_<NOMBRE>`) se agregan tras verificar sus términos (ADR-0029). */
-export type FxRateProvider = 'PARALELO_BO' | 'DOLARAPI_BO' | `CRYPTO_${string}`;
+/**
+ * Conjunto abierto: los providers cripto (`CRYPTO_<NOMBRE>`, ADR-0029) y los de tasas por institución
+ * (`INSTRATE_<NOMBRE>`) se agregan tras verificar los términos de sus fuentes.
+ */
+export type FxRateProvider = 'PARALELO_BO' | 'DOLARAPI_BO' | `CRYPTO_${string}` | `INSTRATE_${string}`;
 export type RateSelection = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';
 
 export interface RateAttribution {

@@ -43,6 +43,7 @@
   "ACCOUNT_CURRENCY_KIND_MISMATCH": "Essa moeda não é permitida para este tipo de conta.",
   "ACCOUNT_NAME_TAKEN": "Você já tem uma conta ativa com esse nome.",
   "INSTITUTION_ARCHIVED": "A instituição está arquivada.",
+  "INSTITUTION_CATALOG_ENTRY_UNKNOWN": "A entrada não existe no catálogo de instituições.",
   "SPLITS_DO_NOT_SUM": "A soma das partes não corresponde ao valor total.",
   "INVALID_STATUS_TRANSITION": "A transação não pode passar para esse estado.",
   "TRANSACTION_RECONCILED": "A transação está conciliada. Desfaça a conciliação antes de editá-la.",

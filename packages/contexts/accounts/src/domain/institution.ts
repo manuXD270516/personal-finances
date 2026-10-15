@@ -1,4 +1,5 @@
 import { DomainError } from '@pf/shared-kernel';
+import { type CatalogRef } from './catalog-ref.js';
 
 /** Clases de institución (docs/01 FR-ACCOUNTS-012, docs/31 D3). */
 export const INSTITUTION_KINDS = [
@@ -63,6 +64,8 @@ export interface InstitutionState {
   readonly icon: string | null;
   readonly color: string | null;
   readonly notes: string | null;
+  /** Vínculo con el catálogo de referencia (add-exchange-house-rate-providers); `null` si se creó a mano. */
+  readonly catalogRef: CatalogRef | null;
   readonly archivedAt: string | null;
   readonly version: number;
 }
@@ -99,7 +102,7 @@ export class Institution {
       readonly workspaceId: string;
       readonly name: string;
       readonly kind: string;
-    } & Omit<InstitutionFields, 'name' | 'kind'>,
+    } & Omit<InstitutionFields, 'name' | 'kind'> & { readonly catalogRef?: CatalogRef | null },
   ): Institution {
     return new Institution(
       {
@@ -112,6 +115,7 @@ export class Institution {
         icon: text(input.icon, 40, '/icon'),
         color: text(input.color, 20, '/color'),
         notes: text(input.notes, 2000, '/notes'),
+        catalogRef: input.catalogRef ?? null,
         archivedAt: null,
         version: 1,
       },
@@ -151,6 +155,21 @@ export class Institution {
     if (changes.notes !== undefined) set('notes', text(changes.notes, 2000, '/notes'));
     if (changed.length > 0) this.state = { ...next, version: s.version + 1 };
     return changed;
+  }
+
+  /**
+   * Vincula de forma explícita una institución creada a mano con una entrada del catálogo (`links[]` de la adopción).
+   * Solo si aún no tiene vínculo: devuelve `false` (sin cambios) si ya está vinculada a la misma entrada y
+   * `VALIDATION_FAILED` si lo está a otra. El vínculo es inmutable: renombrar no lo cambia.
+   */
+  linkToCatalog(ref: CatalogRef): boolean {
+    const current = this.state.catalogRef;
+    if (current !== null) {
+      if (current.equals(ref)) return false;
+      throw invalid('/institutionId', 'the institution is already linked to another catalog entry');
+    }
+    this.state = { ...this.state, catalogRef: ref, version: this.state.version + 1 };
+    return true;
   }
 
   /** Idempotente: archivar una institución ya archivada no cambia nada (devuelve `false`). */

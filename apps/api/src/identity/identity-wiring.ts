@@ -8,6 +8,7 @@ import {
   type LifecyclePort,
 } from '@pf/audit/interface/audit.module';
 import { ACCOUNTS_AUDIT_POLICY } from '@pf/accounts/contracts';
+import type { AccountsRuntime } from '@pf/accounts/interface/accounts.module';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
 import { CLASSIFICATION_AUDIT_POLICY, type CounterpartyCatalogQuery } from '@pf/classification/contracts';
 import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
@@ -120,6 +121,7 @@ import {
   accountCustomFields,
   accountsImports,
   accountsRuntime,
+  institutionCatalogReader,
   workspaceCalendar,
 } from '../accounts/accounts-wiring.js';
 import { LedgerHttpModule } from '../ledger/ledger-http.js';
@@ -334,6 +336,7 @@ export function financeRuntimes(input: {
         | 'IMPORT_PERSIST_BATCH_SIZE'
         | 'IMPORT_REVIEW_TTL'
         | 'IMPORT_FUTURE_DATE_TOLERANCE_DAYS'
+        | 'ACCOUNTS_INSTITUTION_CATALOG_DIR'
       >
     > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>> &
@@ -372,6 +375,7 @@ export function financeRuntimes(input: {
     budgetVsActual?: BudgetVsActualQuery;
     commitments?: CommitmentsRuntime;
     goals?: GoalsRuntime;
+    accounts?: AccountsRuntime;
   } = {};
   const classification = createClassificationRuntime({
     pool: input.pool,
@@ -397,6 +401,12 @@ export function financeRuntimes(input: {
     // add-market-rate-providers: roles, obsolescencia y umbral de anomalía (la API nunca llama a un provider).
     providers: parseFxProviderSettings(input.config),
     windowDays: rateValidityWindowDays,
+    // add-exchange-house-rate-providers: el estado de providers informa el soporte en tasas de las instituciones
+    // adoptadas (ACCOUNTS se compone después: referencia diferida a su consulta pública).
+    institutionSupport: {
+      adoptedRatesSupport: (workspaceId) =>
+        deferred.accounts?.institutionSupport.adoptedRatesSupport(workspaceId) ?? Promise.resolve([]),
+    },
   });
   // ACCOUNTS (add-accounts-management).
   const { accounts, ledger } = accountsRuntime({
@@ -414,7 +424,10 @@ export function financeRuntimes(input: {
     workspaceCurrencies: fx.valuation,
     // add-custom-fields: valores de custom fields de cuenta validados por CLASSIFICATION.
     customFields: accountCustomFields(classification.validator),
+    // add-exchange-house-rate-providers: catálogo de referencia de instituciones (ruta configurable, sin hardcodear).
+    catalog: institutionCatalogReader(input.config),
   });
+  deferred.accounts = accounts;
   // TRANSACTIONS (add-transaction-recording): ledger/accounts/classification/fx vía sus puertos públicos.
   const transactions = createTransactionsRuntime({
     pool: input.pool,

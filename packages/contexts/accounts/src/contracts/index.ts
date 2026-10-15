@@ -131,6 +131,24 @@ export const ACCOUNT_EVENTS = {
 } as const;
 
 /**
+ * Estado de soporte en tasas de las instituciones adoptadas de un workspace (add-exchange-house-rate-providers): lo
+ * consume FX para `institutions[]` del estado de providers, compuesto en `apps/api` (FX no depende de ACCOUNTS). Corre
+ * en la unidad de trabajo del llamador. Solo las instituciones vinculadas a una entrada del catálogo vigente.
+ */
+export interface InstitutionSupportQuery {
+  adoptedRatesSupport(workspaceId: string): Promise<
+    readonly {
+      readonly code: string;
+      /** `SUPPORTED` | `IN_VERIFICATION` | `NOT_ELIGIBLE` | `NOT_APPLICABLE` (`rates` del catálogo). */
+      readonly status: string;
+      readonly reason: string | null;
+    }[]
+  >;
+}
+
+export const INSTITUTION_SUPPORT_QUERY = Symbol.for('pf.accounts.InstitutionSupportQuery');
+
+/**
  * Allow-list de auditoría de ACCOUNTS (add-audit-trail, NFR-SEC-015): `accountNumberLast4` se enmascara (`last4`);
  * lo no listado nunca se copia a `audit.audit_log`.
  */
@@ -167,6 +185,15 @@ export const ACCOUNTS_AUDIT_POLICY = {
     color: 'plain',
     notes: 'plain',
     archivedAt: 'plain',
+  },
+  // Adopción desde el catálogo de referencia (add-exchange-house-rate-providers): una entrada por operación; los
+  // compuestos (`adopted`, `linked`, `codes`) se guardan como texto JSON.
+  InstitutionAdoption: {
+    country: 'plain',
+    catalogVersion: 'plain',
+    adopted: 'plain',
+    linked: 'plain',
+    codes: 'plain',
   },
 } as const satisfies AuditFieldPoliciesDto;
 

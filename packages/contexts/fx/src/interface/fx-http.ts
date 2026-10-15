@@ -17,7 +17,11 @@ import {
   type RatePreference,
   type StoredRate,
 } from '../application/ports/index.js';
-import type { ProviderStatus, ProviderStatusQueries } from '../application/provider-status.queries.js';
+import type {
+  InstitutionRateStatus,
+  ProviderStatus,
+  ProviderStatusQueries,
+} from '../application/provider-status.queries.js';
 import type { RatePairListView, RatePairStatus, RatePairViews } from '../application/rate-pair-views.js';
 import {
   findAttribution,
@@ -100,6 +104,8 @@ export function toFxRateDto(stored: StoredRate, thresholdPct: ThresholdOf = DEFA
     ...(s.createdBy ? { createdBy: s.createdBy } : {}),
     provider: s.provider,
     fetchedAt: s.fetchedAt,
+    // Solo las tasas por institución (BANK_BUY/BANK_SELL de un provider) llevan el código de la institución.
+    ...(s.institutionCode ? { institutionCode: s.institutionCode } : {}),
     attribution: s.provider ? findAttribution(s.provider) : null,
     anomaly: anomalyDto(stored, thresholdPct),
     // Observaciones de conversiones propias (D231): la conversión de origen y, si se anuló, la marca de anulada.
@@ -138,6 +144,19 @@ export function toResolvedRateDto(r: ResolvedRate) {
     selection: r.selection,
     stale: r.stale,
     attribution: r.provider ? findAttribution(r.provider) : null,
+  };
+}
+
+/** `FxInstitutionRateStatus` del contrato (add-exchange-house-rate-providers). */
+export function toInstitutionRateStatusDto(i: InstitutionRateStatus) {
+  return {
+    code: i.code,
+    rateTypes: [...i.rateTypes],
+    lastRateAsOf: i.lastRateAsOf,
+    ageSeconds: i.ageSeconds,
+    stale: i.stale,
+    supportStatus: i.supportStatus,
+    reason: i.reason,
   };
 }
 
@@ -259,6 +278,7 @@ export class FxController {
       ...(str(query, 'rateType') ? { rateType: str(query, 'rateType') as FxRateType } : {}),
       ...(str(query, 'source') ? { source: str(query, 'source') as FxRateSource } : {}),
       ...(str(query, 'provider') ? { provider: str(query, 'provider') as FxRateProvider } : {}),
+      ...(str(query, 'institutionCode') ? { institutionCode: str(query, 'institutionCode') as string } : {}),
       ...(str(query, 'asOfFrom') ? { asOfFrom: str(query, 'asOfFrom') as string } : {}),
       ...(str(query, 'asOfTo') ? { asOfTo: str(query, 'asOfTo') as string } : {}),
       includeSuperseded: bool(query, 'includeSuperseded') ?? false,
@@ -373,6 +393,7 @@ export class FxController {
     return {
       data: report.providers.map((p) => toProviderStatusDto(p, threshold)),
       pairs: report.pairs.map(toRatePairStatusDto),
+      institutions: report.institutions.map(toInstitutionRateStatusDto),
     };
   }
 

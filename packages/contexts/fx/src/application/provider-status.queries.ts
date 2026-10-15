@@ -10,6 +10,7 @@ import {
 } from '../domain/index.js';
 import type {
   ExchangeRateRepository,
+  InstitutionSupportPort,
   ProviderRun,
   ProviderRunRepository,
   StoredRate,
@@ -66,12 +67,33 @@ export interface ProviderStatusDeps {
   readonly settings: FxProviderSettings;
   /** Vistas de los pares configurados del workspace (cobertura y antigüedad por par); sin ellas, `pairs` va vacío. */
   readonly pairViews?: RatePairViews;
+  /** Estado de soporte en tasas de las instituciones adoptadas (ACCOUNTS vía composition root); sin él no se informa. */
+  readonly institutionSupport?: InstitutionSupportPort;
+}
+
+/**
+ * `FxProviderStatusList.institutions[]` del contrato (add-exchange-house-rate-providers, FR-FX-016): una entrada por
+ * institución cubierta por el provider por institución habilitado y por institución ADOPTADA del workspace.
+ */
+export interface InstitutionRateStatus {
+  readonly code: string;
+  /** Tipos de tasa recibidos de la institución (`BANK_BUY`/`BANK_SELL`); vacío si no hay tasas automáticas. */
+  readonly rateTypes: readonly FxRateType[];
+  /** Vigencia de la última tasa aceptada de la institución; `null` si no hay. */
+  readonly lastRateAsOf: string | null;
+  readonly ageSeconds: number | null;
+  /** `true` si la última tasa supera `FX_STALE_AFTER_INSTITUTION` (72 h por defecto). */
+  readonly stale: boolean;
+  /** Estado de la dimensión de tasas de la entrada del catálogo si la institución está adoptada; `null` si no. */
+  readonly supportStatus: string | null;
+  readonly reason: string | null;
 }
 
 /** Estado de los providers y de los pares configurados del workspace (`FxProviderStatusList`). */
 export interface ProviderStatusReport {
   readonly providers: readonly ProviderStatus[];
   readonly pairs: readonly RatePairStatus[];
+  readonly institutions: readonly InstitutionRateStatus[];
 }
 
 const SUCCESS = new Set(['OK', 'NO_NEW_SAMPLE', 'SKIPPED_CACHE']);
@@ -97,13 +119,69 @@ export class ProviderStatusQueries {
     return this.deps.uow.run(workspaceId, async () => ({
       providers: await this.providers(workspaceId),
       pairs: this.deps.pairViews ? await this.deps.pairViews.status(workspaceId) : [],
+      institutions: await this.institutions(workspaceId),
     }));
+  }
+
+  /**
+   * Tasas por institución del workspace: para cada institución cubierta por el provider habilitado, sus tipos, la
+   * vigencia de la última tasa, su antigüedad y si está obsoleta (`FX_STALE_AFTER_INSTITUTION`); para cada institución
+   * adoptada, el estado de soporte en tasas y su razón (también sin provider habilitado). Solo lectura: nunca llama a un
+   * provider. Consultas secuenciales (misma unidad de trabajo).
+   */
+  private async institutions(workspaceId: string): Promise<InstitutionRateStatus[]> {
+    const s = this.deps.settings;
+    const now = this.deps.clock.now().epochMillis;
+    const byCode = new Map<string, { types: Set<FxRateType>; lastAsOf: string | null }>();
+    const entry = (code: string) => {
+      let e = byCode.get(code);
+      if (!e) {
+        e = { types: new Set(), lastAsOf: null };
+        byCode.set(code, e);
+      }
+      return e;
+    };
+    if (s.institutionProvider !== null) {
+      for (const stored of await this.deps.rates.latestInstitutionRates(workspaceId, s.institutionProvider)) {
+        const snapshot = stored.rate.snapshot;
+        if (!snapshot.institutionCode) continue;
+        const e = entry(snapshot.institutionCode);
+        e.types.add(snapshot.rateType);
+        if (e.lastAsOf === null || Date.parse(snapshot.asOf) > Date.parse(e.lastAsOf))
+          e.lastAsOf = snapshot.asOf;
+      }
+    }
+    const support = new Map<string, { status: string; reason: string | null }>();
+    if (this.deps.institutionSupport) {
+      for (const adopted of await this.deps.institutionSupport.adoptedRatesSupport(workspaceId)) {
+        entry(adopted.code);
+        support.set(adopted.code, { status: adopted.status, reason: adopted.reason });
+      }
+    }
+    return [...byCode.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([code, e]) => {
+        const ageMs = e.lastAsOf === null ? null : Math.max(0, now - Date.parse(e.lastAsOf));
+        return {
+          code,
+          rateTypes: [...e.types].sort(),
+          lastRateAsOf: e.lastAsOf,
+          ageSeconds: ageMs === null ? null : Math.floor(ageMs / 1000),
+          stale: ageMs !== null && ageMs > s.staleAfterInstitutionMs,
+          supportStatus: support.get(code)?.status ?? null,
+          reason: support.get(code)?.reason ?? null,
+        };
+      });
   }
 
   /** Los providers de Bolivia y los cripto que la configuración nombra (habilitados o no) con descriptor registrado. */
   private async providers(workspaceId: string): Promise<ProviderStatus[]> {
     const out: ProviderStatus[] = [];
-    const ids: FxRateProvider[] = [...FX_RATE_PROVIDERS, ...this.deps.settings.cryptoRequested];
+    const ids: FxRateProvider[] = [
+      ...FX_RATE_PROVIDERS,
+      ...this.deps.settings.cryptoRequested,
+      ...this.deps.settings.institutionRequested,
+    ];
     for (const provider of [...new Set(ids)]) {
       if (providerDescriptor(provider)) out.push(await this.statusOf(workspaceId, provider));
     }
@@ -119,7 +197,8 @@ export class ProviderStatusQueries {
     // Con pares configurados, los feeds del estado son los de los pares del workspace (la salud de un provider no
     // depende de un par que el workspace no registra).
     const configured = this.deps.pairViews ? await this.deps.pairViews.pairKeys(workspaceId) : null;
-    for (const feed of descriptor.feeds) {
+    // El estado de un provider por institución se informa por institución (`institutions[]`), no por feed.
+    for (const feed of descriptor.kind === 'INSTITUTION' ? [] : descriptor.feeds) {
       if (configured && !configured.has(`${feed.base}/${feed.quote}`)) continue;
       const [primary, fallback] =
         feed.rateType === 'MARKET'
@@ -154,7 +233,9 @@ export class ProviderStatusQueries {
     const retryAfterUntil = retryAfter?.retryAfterUntil ?? null;
     // Una configuración general inválida afecta a todos; la de los providers cripto, solo a los cripto.
     const configError =
-      s.configError || (descriptor.kind === 'CRYPTO' && s.cryptoConfigError)
+      s.configError ||
+      (descriptor.kind === 'CRYPTO' && s.cryptoConfigError) ||
+      (descriptor.kind === 'INSTITUTION' && s.institutionConfigError)
         ? { code: 'FX_PROVIDER_CONFIG_INVALID' as const, httpStatus: null, at: now.toString() }
         : null;
     const lastError =
@@ -181,9 +262,20 @@ export class ProviderStatusQueries {
       lastError,
       consecutiveFailures,
       nextAttemptAt: enabled
-        ? nextTick(Math.max(now.epochMillis, Date.parse(retryAfterUntil ?? '') || 0), s.pollIntervalMs)
+        ? nextTick(
+            Math.max(now.epochMillis, Date.parse(retryAfterUntil ?? '') || 0),
+            provider === s.institutionProvider
+              ? Math.max(s.pollIntervalMs, s.institutionPollIntervalMs)
+              : s.pollIntervalMs,
+          )
         : null,
-      pollIntervalSeconds: enabled ? Math.round(s.pollIntervalMs / 1000) : null,
+      pollIntervalSeconds: enabled
+        ? Math.round(
+            (provider === s.institutionProvider
+              ? Math.max(s.pollIntervalMs, s.institutionPollIntervalMs)
+              : s.pollIntervalMs) / 1000,
+          )
+        : null,
       rateLimit: { limitPerMinute: descriptor.limitPerMinute, retryAfterUntil },
       backfill: await this.backfillOf(provider, enabled),
       attribution: descriptor.attribution,

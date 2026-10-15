@@ -43,6 +43,7 @@
   "ACCOUNT_CURRENCY_KIND_MISMATCH": "That currency is not allowed for this account type.",
   "ACCOUNT_NAME_TAKEN": "You already have an active account with that name.",
   "INSTITUTION_ARCHIVED": "The institution is archived.",
+  "INSTITUTION_CATALOG_ENTRY_UNKNOWN": "The entry does not exist in the institution catalog.",
   "SPLITS_DO_NOT_SUM": "The parts do not add up to the total amount.",
   "INVALID_STATUS_TRANSITION": "The transaction cannot move to that status.",
   "TRANSACTION_RECONCILED": "The transaction is reconciled. Unreconcile it before editing.",

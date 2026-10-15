@@ -17,6 +17,7 @@ import type {
 } from '../application/ports/index.js';
 import {
   Account,
+  CatalogRef,
   Institution,
   type AccountCustomFieldValue,
   type AccountType,
@@ -72,6 +73,9 @@ interface AccountsDb {
     icon: string | null;
     color: string | null;
     notes: string | null;
+    catalog_country: string | null;
+    catalog_code: string | null;
+    catalog_version: string | null;
     archived_at: string | null;
     version: number;
     created_at: string;
@@ -112,6 +116,16 @@ function mapUnique(err: unknown): unknown {
     return new DomainError('NAME_TAKEN', 'an active institution already uses this name', { cause: err }).at(
       '/name',
     );
+  }
+  // Dos adopciones simultáneas de la misma entrada del catálogo en el workspace (la segunda ya no la ve vinculada).
+  if (constraint === 'institution_catalog_uk') {
+    return new DomainError(
+      'VALIDATION_FAILED',
+      'the catalog entry is already linked to another institution',
+      {
+        cause: err,
+      },
+    ).at('/codes');
   }
   return err;
 }
@@ -442,6 +456,9 @@ const institutionColumns = [
   'i.icon',
   'i.color',
   'i.notes',
+  'i.catalog_country',
+  'i.catalog_code',
+  'i.catalog_version',
   'i.version',
   sql<string | null>`to_char(i.archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`.as(
     'archived_at',
@@ -459,6 +476,7 @@ function toInstitution(row: AccountsDb['accounts.institution']): Institution {
     icon: row.icon,
     color: row.color,
     notes: row.notes,
+    catalogRef: CatalogRef.fromColumns(row.catalog_country, row.catalog_code, row.catalog_version),
     archivedAt: row.archived_at,
     version: row.version,
   });
@@ -474,6 +492,9 @@ function institutionValues(i: Institution) {
     icon: s.icon,
     color: s.color,
     notes: s.notes,
+    catalog_country: s.catalogRef?.country ?? null,
+    catalog_code: s.catalogRef?.code ?? null,
+    catalog_version: s.catalogRef?.version ?? null,
     archived_at: s.archivedAt,
     version: s.version,
   };
@@ -536,6 +557,29 @@ export class PgInstitutionRepository implements InstitutionRepository {
       .orderBy(sql`lower(i.name)`)
       .orderBy('i.id')
       .execute();
+    return rows.map((r) => toInstitution(r as never));
+  }
+
+  async findActiveByName(workspaceId: string, name: string): Promise<Institution | null> {
+    const row = await db()
+      .selectFrom('accounts.institution as i')
+      .select(institutionColumns)
+      .where('i.workspace_id', '=', workspaceId)
+      .where('i.archived_at', 'is', null)
+      .where(sql<string>`lower(i.name)`, '=', name.toLowerCase())
+      .executeTakeFirst();
+    return row ? toInstitution(row as never) : null;
+  }
+
+  async listLinked(workspaceId: string, country?: string): Promise<Institution[]> {
+    let q = db()
+      .selectFrom('accounts.institution as i')
+      .select(institutionColumns)
+      .where('i.workspace_id', '=', workspaceId)
+      .where('i.archived_at', 'is', null)
+      .where('i.catalog_code', 'is not', null);
+    if (country !== undefined) q = q.where('i.catalog_country', '=', country);
+    const rows = await q.orderBy('i.catalog_country').orderBy('i.catalog_code').execute();
     return rows.map((r) => toInstitution(r as never));
   }
 }

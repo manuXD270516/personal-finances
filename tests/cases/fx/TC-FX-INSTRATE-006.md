@@ -5,16 +5,20 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Las tasas por institución no valoran por defecto"
 scenario: "Referencia de una conversión"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-008", "FR-FX-011"]
 nfr: []
 invariants: ["INV-011"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-institution-rates.api.test.ts
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/fx/src/domain/institution-rates.test.ts
+  - tests/e2e/specs/institution-catalog.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "conversions", "bank-rates"]
@@ -29,7 +33,7 @@ expected_result:
   - "La conversión guarda id y versión de la tasa"
   - "El análisis compara 11.80 efectiva contra 11.85"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-006 — Una tasa por institución puede ser la referencia de una conversión y del análisis de costo

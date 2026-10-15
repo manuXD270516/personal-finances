@@ -58,11 +58,13 @@
             "CUSTOM",
             "PARALLEL_BUY",
             "PARALLEL_SELL",
-            "MARKET"
+            "MARKET",
+            "BANK_BUY",
+            "BANK_SELL"
           ]
         },
         "provider": {
-          "description": "Provider que publicó la muestra (los cripto usan el id `CRYPTO_<NOMBRE>`).",
+          "description": "Provider que publicó la muestra (los cripto usan el id `CRYPTO_<NOMBRE>` y los de tasas por institución `INSTRATE_<NOMBRE>`).",
           "oneOf": [
             {
               "enum": [
@@ -73,6 +75,10 @@
             {
               "type": "string",
               "pattern": "^CRYPTO_[A-Z0-9_]{1,32}$"
+            },
+            {
+              "type": "string",
+              "pattern": "^INSTRATE_[A-Z0-9_]{1,32}$"
             }
           ]
         },
