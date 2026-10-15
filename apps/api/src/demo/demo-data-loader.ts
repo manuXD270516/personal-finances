@@ -306,14 +306,17 @@ export class DemoDataLoader {
       loanAccounts,
     });
     const at = (date: string) => (date === plan.anchorDate ? startOfDay(date) : noon(date));
-    for (const month of plan.months) {
-      this.maybeFail(`transactions/${month.month}`);
-      for (const mod of ['commitments', 'debt', 'goals'] as const) {
-        if (month.ops.some((op) => isModuleOp(op) && moduleOf(op) === mod)) {
-          this.maybeFail(`${mod}/${month.month}`);
+    // TODA la ejecución del plan corre en UNA unidad de trabajo: los hechos del outbox solo se publican al confirmar,
+    // así los consumidores asíncronos (tarjetas, suscripciones, metas, periodos) no compiten por los mismos bloqueos
+    // con el cargador (deadlocks) y una falla a mitad de la carga no deja datos parciales (`FAILED`, nunca `READY`).
+    await inDemo(async () => {
+      for (const month of plan.months) {
+        this.maybeFail(`transactions/${month.month}`);
+        for (const mod of ['commitments', 'debt', 'goals'] as const) {
+          if (month.ops.some((op) => isModuleOp(op) && moduleOf(op) === mod)) {
+            this.maybeFail(`${mod}/${month.month}`);
+          }
         }
-      }
-      await inDemo(async () => {
         for (const op of month.ops) {
           clock.set(op.op === 'tick' && op.late ? endOfAnchor(op.date) : at(op.date));
           if (isModuleOp(op)) await executor.apply(op);
@@ -329,8 +332,20 @@ export class DemoDataLoader {
               recorded,
             });
         }
+      }
+      // Resumen estructural por módulo (cualquier ancla) con el reloj simulado al final del día A (decisión 9).
+      clock.set(endOfAnchor(plan.anchorDate));
+      const ids = executor.idsOf();
+      await verifyModules({
+        r,
+        ws,
+        anchor: plan.anchorDate,
+        summary: summarizeModules(plan.anchorDate),
+        cards: ids.cards,
+        loans: ids.loans,
+        goals: ids.goals,
       });
-    }
+    });
     await progress('fx');
     await progress('transactions');
     await progress('commitments');
@@ -340,7 +355,12 @@ export class DemoDataLoader {
     // ── ledger: golden summary + invariantes (Σ = 0 por moneda) acotadas al workspace demo.
     this.maybeFail('ledger');
     const expected = summarizeDemoPlan(plan);
-    if (JSON.stringify(expected.balances) !== JSON.stringify(golden.balances)) {
+    // Con la ancla fija, el resumen de referencia del dataset (`golden-summary.json`); con otra ancla los saldos
+    // dependen de cuántas ocurrencias y ciclos caen en la ventana y solo se comparan contra el oráculo del plan.
+    if (
+      plan.anchorDate === DEMO_MANIFEST.anchorDate &&
+      JSON.stringify(expected.balances) !== JSON.stringify(golden.balances)
+    ) {
       throw new DemoLoadError(
         'DEMO_GOLDEN_MISMATCH',
         'the dataset generator does not match its golden summary',
@@ -361,20 +381,6 @@ export class DemoDataLoader {
         );
       }
     }
-    // Resumen estructural por módulo (cualquier ancla) con el reloj simulado al final del día A (decisión 9).
-    clock.set(endOfAnchor(plan.anchorDate));
-    const ids = executor.idsOf();
-    await inDemo(() =>
-      verifyModules({
-        r,
-        ws,
-        anchor: plan.anchorDate,
-        summary: summarizeModules(plan.anchorDate),
-        cards: ids.cards,
-        loans: ids.loans,
-        goals: ids.goals,
-      }),
-    );
     const trial = await inDemo(() => r.ledger.balances.getTrialBalance({ workspaceId: ws }));
     for (const c of trial.currencies) {
       if (!/^0(\.0+)?$/.test(c.total.amount.replace('-', ''))) {

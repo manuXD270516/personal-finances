@@ -907,10 +907,10 @@ function composeDemoPlan(anchorDate: string): { plan: DemoPlan<DemoKeys, DemoOp>
         dropped.has((op as { of: string }).of)
       ),
   );
-  const powerExpenseByMonth = new Map<string, string>();
+  const powerExpenseByMonth = new Map<string, { key: string; date: string }>();
   for (const op of flows) {
     if (op.op === 'expense' && op.key.endsWith(':power') && !powerExpenseByMonth.has(op.date.slice(0, 7))) {
-      powerExpenseByMonth.set(op.date.slice(0, 7), op.key);
+      powerExpenseByMonth.set(op.date.slice(0, 7), { key: op.key, date: op.date });
     }
   }
   const windowStart = at(startDate);

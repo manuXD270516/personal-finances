@@ -186,8 +186,8 @@ export interface CommitmentsContext {
   readonly shift: number;
   /** Primer día de la ventana (alta de las suscripciones heredadas). */
   readonly startDate: string;
-  /** Gasto de luz de v1 por mes calendario (`YYYY-MM` → clave del gasto), para vincular la ocurrencia. */
-  readonly powerExpenseByMonth: ReadonlyMap<string, string>;
+  /** Gasto de luz de v1 por mes calendario (`YYYY-MM` → clave y fecha del gasto), para vincular la ocurrencia. */
+  readonly powerExpenseByMonth: ReadonlyMap<string, { readonly key: string; readonly date: string }>;
 }
 
 /**
@@ -444,11 +444,12 @@ export function buildCommitments(ctx: CommitmentsContext): CommitmentsPlan {
     if (powerDate <= anchor) {
       const linked = ctx.powerExpenseByMonth.get(`${y}-${String(m).padStart(2, '0')}`);
       occurrence({
-        date: powerDate,
+        // Se vincula cuando el gasto de v1 ya está registrado (con otras anclas queda días después del nominal).
+        date: linked && linked.date > powerDate ? linked.date : powerDate,
         target: { type: 'definition', key: 'power' },
         occurrenceDate: powerDate,
         action: linked ? 'link' : 'approve',
-        ...(linked ? { linkTo: linked } : {}),
+        ...(linked ? { linkTo: linked.key } : {}),
         effect: linked ? null : { kind: 'expense', account: 'bank_bob', amount: money(18_000n, 'BOB') },
       });
     }

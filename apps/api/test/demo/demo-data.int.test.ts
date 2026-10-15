@@ -12,7 +12,7 @@ import { Pool, type Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import golden from '../../src/demo/dataset/golden-summary.json' with { type: 'json' };
-import { DEMO_MANIFEST } from '../../src/demo/dataset/demo-plan.js';
+import { buildDemoPlan, DEMO_MANIFEST, summarizeDemoPlan } from '../../src/demo/dataset/demo-plan.js';
 import { DemoDataLoader } from '../../src/demo/demo-data-loader.js';
 import { AUDIT_POLICIES, outboxPort } from '../../src/identity/identity-wiring.js';
 import { seedWorkspaceProvisioning } from '../../src/identity/workspace-provisioning.js';
@@ -136,10 +136,14 @@ async function settledCountsOf(workspaceId: string, timeoutMs = 60_000) {
 }
 
 /** Carga en proceso con un ancla fija (como `pnpm db:seed -- --profile=demo`, rol de la app). */
+/** Cargas en proceso hechas por el archivo: se limpian y purgan en `afterAll` (la instalación queda como estaba). */
+const inProcessLoads: { token: string; originId: string; demoId: string }[] = [];
+
 async function loadInProcess(input: {
   readonly ownerId: string;
   readonly originId: string;
   readonly anchor: string;
+  readonly token: string;
   readonly failAt?: string;
 }): Promise<{ job: DemoLoadJob; outcome: string }> {
   const pool = new Pool({ connectionString: deps.databaseUrl, max: 2 });
@@ -166,7 +170,7 @@ async function loadInProcess(input: {
       demo: {
         settings: {
           enabled: true,
-          datasetVersion: '1',
+          datasetVersion: DEMO_MANIFEST.datasetVersion,
           workspaceName: DEMO_MANIFEST.workspaceName,
           modules: DEMO_MANIFEST.modules,
         },
@@ -192,6 +196,7 @@ async function loadInProcess(input: {
       ...(input.failAt ? { failAt: input.failAt } : {}),
     });
     const outcome = await loader.load(job!);
+    inProcessLoads.push({ token: input.token, originId: input.originId, demoId: job!.demoWorkspaceId });
     return { job: job!, outcome };
   } finally {
     await pool.end();
@@ -213,7 +218,14 @@ const GOLDEN_BY_NAME: Record<string, string> = {
   'P2P Exchange Demo — Billetera USDT': golden.balances.usdt,
   'Cold Wallet BTC': golden.balances.btc,
   'Tarjeta Andina Demo': golden.balances.card,
-  'Préstamo vehicular': golden.balances.loan,
+  'Banco Andino Demo — Caja de ahorro BOB': golden.balances.savings_bob,
+  'Tarjeta Kantuta Demo BOB': golden.balances.kantuta_bob,
+  'Tarjeta Kantuta Demo USD': golden.balances.kantuta_usd,
+  'Billetera Altiplano Demo': golden.balances.wallet,
+  'Préstamo vehicular': golden.balances.loan_vehicular,
+  'Préstamo de consumo': golden.balances.loan_consumo,
+  'Préstamo familiar': golden.balances.loan_familiar,
+  'Crédito educativo': golden.balances.loan_educativo,
 };
 
 beforeAll(async () => {
@@ -238,6 +250,13 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
+  // Limpia y purga los demos que cargó el archivo (los de la prueba de falla ya los limpió su propio caso).
+  for (const load of inProcessLoads.splice(0)) {
+    const status = await call(baseUrl, 'GET', `/api/v1/workspaces/${load.originId}/demo-data`, load.token);
+    if (status.body['status'] === 'PURGED') continue;
+    await call(baseUrl, 'POST', `/api/v1/workspaces/${load.demoId}/demo-data/cleanup`, load.token);
+    await waitStatus(load.token, load.originId, 'PURGED', 240_000);
+  }
   await worker?.close();
   await api?.close();
   await app?.end();
@@ -268,7 +287,7 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
 
     const requested = await call(baseUrl, 'POST', `/api/v1/workspaces/${w1}/demo-data`, owner.token);
     expect(requested.status).toBe(202);
-    expect(requested.body).toMatchObject({ originWorkspaceId: w1, status: 'LOADING', datasetVersion: '1' });
+    expect(requested.body).toMatchObject({ originWorkspaceId: w1, status: 'LOADING', datasetVersion: '2' });
     const demoId = requested.body['demoWorkspaceId'] as string;
 
     const ready = await waitStatus(owner.token, demoId, 'READY');
@@ -288,11 +307,42 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
     expect(Object.fromEntries(listed.map((w) => [w.id, w.isDemo]))).toEqual({ [w1]: false, [demoId]: true });
     const demoCounts = await countsOf(demoId);
     expect(demoCounts['iam.workspace_membership']).toBe(1);
-    for (const t of ['txn.transaction', 'ledger.posting', 'fx.exchange_rate', 'txn.conversion_detail']) {
+    for (const t of [
+      'txn.transaction',
+      'ledger.posting',
+      'fx.exchange_rate',
+      'txn.conversion_detail',
+      // Dataset v2: compromisos, deudas y metas (la purga debe poder borrarlas respetando sus claves foráneas).
+      'commitments.subscription',
+      'commitments.recurring_definition',
+      'commitments.recurring_occurrence',
+      'debt.loan',
+      'debt.loan_installment',
+      'debt.loan_payment',
+      'debt.credit_card',
+      'debt.card_statement',
+      'debt.card_installment_plan',
+      'goals.savings_goal',
+      'goals.goal_movement',
+      'notifications.notification_preference',
+    ]) {
       expect(demoCounts[t], t).toBeGreaterThan(0);
     }
     // Saldos iguales al golden summary (las fechas se desplazan a hoy; los saldos no).
-    expect(await balancesOf(owner.token, demoId)).toEqual(GOLDEN_BY_NAME);
+    // La ancla de la carga desde la app es "hoy": los saldos son los del plan de esa ancla (el resumen de referencia
+    // del dataset solo vale con la ancla fija 2026-09-30, que cubren las pruebas del dataset v2).
+    const anchor = ready['anchorDate'] as string;
+    const expectedBalances = summarizeDemoPlan(buildDemoPlan(anchor)).balances;
+    expect(await balancesOf(owner.token, demoId)).toEqual(
+      Object.fromEntries(
+        Object.entries(GOLDEN_BY_NAME).map(([name, fixed]) => [
+          name,
+          (expectedBalances as Record<string, string>)[
+            Object.entries(golden.balances).find(([, v]) => v === fixed)![0]
+          ],
+        ]),
+      ),
+    );
     expect(await unbalancedEntries(migrator, demoId)).toEqual([]);
 
     // TC-014: W1 no cambia salvo la auditoría de la acción de carga.
@@ -356,8 +406,18 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
   it('[TC-IDENTITY-DEMO-007] dos cargas con la ancla 2026-09-30 dan los mismos saldos (golden) y asientos balanceados', async () => {
     const a = await user(`kc-demo-a-${randomUUID()}`);
     const b = await user(`kc-demo-b-${randomUUID()}`);
-    const loadA = await loadInProcess({ ownerId: a.id, originId: a.personal, anchor: '2026-09-30' });
-    const loadB = await loadInProcess({ ownerId: b.id, originId: b.personal, anchor: '2026-09-30' });
+    const loadA = await loadInProcess({
+      ownerId: a.id,
+      originId: a.personal,
+      anchor: '2026-09-30',
+      token: a.token,
+    });
+    const loadB = await loadInProcess({
+      ownerId: b.id,
+      originId: b.personal,
+      anchor: '2026-09-30',
+      token: b.token,
+    });
     expect([loadA.outcome, loadB.outcome]).toEqual(['READY', 'READY']);
     expect(loadA.job.anchorDate).toBe('2026-09-30');
     const balancesA = await balancesOf(a.token, loadA.job.demoWorkspaceId);
@@ -387,6 +447,7 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
       ownerId: u.id,
       originId: u.personal,
       anchor: '2026-09-30',
+      token: u.token,
       failAt: 'transactions/2025-06',
     });
     expect(outcome).toBe('FAILED');
@@ -404,4 +465,26 @@ describe('datos de demostración de extremo a extremo (identity/demo-data)', () 
     await waitStatus(u.token, u.personal, 'PURGED');
     expect(Object.values(await countsOf(job.demoWorkspaceId)).every((n) => n === 0)).toBe(true);
   }, 300_000);
+
+  it('[TC-IDENTITY-DEMO-008] una falla en el lote de compromisos, deudas o metas deja FAILED sin datos parciales', async () => {
+    for (const failAt of ['commitments/2026-04', 'debt/2026-05', 'goals/2026-06']) {
+      const u = await user(`kc-demo-fail-mod-${randomUUID()}`);
+      const { job, outcome } = await loadInProcess({
+        ownerId: u.id,
+        originId: u.personal,
+        anchor: '2026-09-30',
+        token: u.token,
+        failAt,
+      });
+      expect(outcome, failAt).toBe('FAILED');
+      const status = await call(baseUrl, 'GET', `/api/v1/workspaces/${u.personal}/demo-data`, u.token);
+      expect(status.body, failAt).toMatchObject({ status: 'FAILED', loadedAt: null });
+      // La ejecución del plan es atómica: lo ya generado del módulo no queda a medias.
+      const counts = await countsOf(job.demoWorkspaceId);
+      expect(counts['txn.transaction'], failAt).toBe(0);
+      expect(counts['commitments.recurring_definition'], failAt).toBe(0);
+      expect(counts['debt.loan'], failAt).toBe(0);
+      expect(counts['goals.savings_goal'], failAt).toBe(0);
+    }
+  }, 600_000);
 });

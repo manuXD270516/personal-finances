@@ -1,6 +1,6 @@
 import { loadConfig } from '@pf/platform/config';
 import { describe, expect, inject, it } from 'vitest';
-import golden from '../../src/demo/dataset/golden-summary.json' with { type: 'json' };
+import { buildDemoPlan, summarizeDemoPlan } from '../../src/demo/dataset/demo-plan.js';
 import { MINIMAL_USERS, MINIMAL_WORKSPACES, runSeed, SeedRejectedError } from '../../src/seed/run-seed.js';
 import { connect, inTx } from '../support/db.js';
 import { rowsByTable, unbalancedEntries } from '../support/demo-db.js';
@@ -62,9 +62,24 @@ describe('seed --profile=demo (add-demo-data)', () => {
       );
       // Saldo contable (pasivo negativo); la escala exacta se compara por valor.
       const byName = Object.fromEntries(balances.map((b) => [b.name, b.balance]));
-      expect(byName['Banco Andino Demo — Cuenta corriente']).toBe(golden.balances.bank_bob);
-      expect(byName['Tarjeta Andina Demo']).toBe(`-${golden.balances.card}`);
-      expect(byName['Préstamo vehicular']).toBe(`-${golden.balances.loan}`);
+      // La seed usa el reloj real: la ancla es "hoy" y los saldos son los del plan de esa ancla (el golden summary
+      // solo vale con la ancla fija 2026-09-30).
+      const anchor = await inTx(
+        app,
+        { userId: owner, workspaceId: demoId },
+        async () =>
+          (
+            await app.query<{ anchor: string }>(
+              `SELECT anchor_date::text AS anchor FROM platform.demo_workspace_run WHERE workspace_id = $1`,
+              [demoId],
+            )
+          ).rows[0]!.anchor,
+      );
+      const expected = summarizeDemoPlan(buildDemoPlan(anchor)).balances;
+      expect(byName['Banco Andino Demo — Cuenta corriente']).toBe(expected.bank_bob);
+      expect(byName['Tarjeta Andina Demo']).toBe(`-${expected.card}`);
+      expect(byName['Préstamo vehicular']).toBe(`-${expected.loan_vehicular}`);
+      expect(byName['Préstamo de consumo']).toBe(`-${expected.loan_consumo}`);
       expect(await unbalancedEntries(migrator, demoId)).toEqual([]);
       expect([await rowsByTable(migrator, w1), await rowsByTable(migrator, w2)].map(strip)).toEqual(
         before.map(strip),

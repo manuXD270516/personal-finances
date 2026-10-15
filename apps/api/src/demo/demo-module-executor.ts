@@ -391,6 +391,11 @@ export class DemoModuleExecutor {
     });
     this.loans.set(op.key, registered.id);
     this.ctx.loanAccounts.set(op.key, registered.accountId);
+    // Identificador ficticio `DEMO-LOAN-000N` en las notas de la cuenta que DEBT creó (caso de uso público de ACCOUNTS).
+    const created = await r.accounts.accounts.getAccount(ws, registered.accountId);
+    await r.accounts.accounts.updateAccount(ws, registered.accountId, created.account.version, {
+      notes: op.reference,
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────── metas
