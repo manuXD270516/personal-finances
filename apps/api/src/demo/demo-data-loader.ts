@@ -10,7 +10,7 @@ import { PgUnitOfWork, runWithRequestContext } from '@pf/platform/api';
 import type { ApiConfig } from '@pf/platform/config';
 import { PgOutboxWriter, type OutboxWriter } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
-import { FixedClock, systemClock } from '@pf/shared-kernel';
+import { FixedClock, Instant, systemClock } from '@pf/shared-kernel';
 import type { Pool } from 'pg';
 import { AUDIT_POLICIES, financeRuntimes, LIFECYCLE_MACHINES } from '../identity/identity-wiring.js';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
@@ -21,11 +21,17 @@ import {
   toDecimal,
   type AccountKey,
   type CategoryRef,
+  type DemoKeys,
   type DemoMoney,
+  type DemoOp,
   type DemoPlan,
 } from './dataset/demo-plan.js';
 import golden from './dataset/golden-summary.json' with { type: 'json' };
-import { applyPlanOp, noon } from './plan-executor.js';
+import type { LoanKey, ModuleOp } from './dataset/module-ops.js';
+import { summarizeModules } from './dataset/module-summary.js';
+import { DemoModuleError, DemoModuleExecutor } from './demo-module-executor.js';
+import { verifyModules } from './demo-verification.js';
+import { applyPlanOp, noon, startOfDay } from './plan-executor.js';
 
 export interface DemoDataLoaderOptions {
   /** Pool del proceso (worker: `pf_worker`; seed CLI: `pf_app`). */
@@ -52,6 +58,59 @@ class DemoLoadError extends Error {
 }
 
 const dto = (m: DemoMoney) => ({ amount: toDecimal(m), currency: m.currency });
+
+/** Reloj de los ticks de la ancla y de la verificación final: la tarde del día A en la zona del workspace. */
+const endOfAnchor = (date: string) => Instant.parse(`${date}T23:00:00.000Z`);
+
+/** Operaciones de módulo (v2): las ejecuta `DemoModuleExecutor`; el resto es de `applyPlanOp`. */
+const MODULE_OPS: ReadonlySet<string> = new Set([
+  'subscription',
+  'subscriptionPrice',
+  'subscriptionStatus',
+  'recurring',
+  'occurrence',
+  'card',
+  'installments',
+  'loan',
+  'loanPayment',
+  'loanPrepayment',
+  'goal',
+  'goalPlan',
+  'goalMovement',
+  'notificationPrefs',
+  'tick',
+]);
+const isModuleOp = (op: DemoOp): op is ModuleOp => MODULE_OPS.has(op.op);
+
+/** Módulo del dataset al que pertenece una operación (progreso y `failAt` por lote). */
+function moduleOf(op: ModuleOp): 'commitments' | 'debt' | 'goals' {
+  switch (op.op) {
+    case 'subscription':
+    case 'subscriptionPrice':
+    case 'subscriptionStatus':
+    case 'recurring':
+    case 'notificationPrefs':
+      return 'commitments';
+    case 'card':
+    case 'installments':
+    case 'loan':
+    case 'loanPayment':
+    case 'loanPrepayment':
+      return 'debt';
+    case 'goal':
+    case 'goalPlan':
+    case 'goalMovement':
+      return 'goals';
+    case 'occurrence':
+      return op.target.type === 'goalPlan'
+        ? 'goals'
+        : op.target.type === 'cardPayment'
+          ? 'debt'
+          : 'commitments';
+    case 'tick':
+      return op.runner === 'cards' ? 'debt' : op.runner === 'goals' ? 'goals' : 'commitments';
+  }
+}
 
 /**
  * `DemoDataLoader` (job `demo.load`; openspec add-demo-data design.md decisión 2): ejecuta el plan determinista del
@@ -88,7 +147,8 @@ export class DemoDataLoader {
           log.info({ 'demo.duration_ms': ms }, 'demo data loaded');
           return 'READY';
         } catch (err) {
-          const code = err instanceof DemoLoadError ? err.code : 'DEMO_LOAD_FAILED';
+          const code =
+            err instanceof DemoLoadError || err instanceof DemoModuleError ? err.code : 'DEMO_LOAD_FAILED';
           log.error(
             {
               err: {
@@ -105,7 +165,7 @@ export class DemoDataLoader {
     );
   }
 
-  private async execute(job: DemoLoadJob, plan: DemoPlan): Promise<void> {
+  private async execute(job: DemoLoadJob, plan: DemoPlan<DemoKeys, DemoOp>): Promise<void> {
     const { pool, logger, config, demo } = this.options;
     const ws = job.demoWorkspaceId;
     const user = job.requestedBy;
@@ -193,8 +253,8 @@ export class DemoDataLoader {
     // ── accounts: instituciones y cuentas con saldo de apertura (asiento OPENING por el caso de uso).
     this.maybeFail('accounts');
     const accounts = new Map<AccountKey, string>();
+    const institutions = new Map<string, string>();
     await inDemo(async () => {
-      const institutions = new Map<string, string>();
       for (const inst of plan.institutions) {
         const created = await r.accounts.institutions.createInstitution({
           workspaceId: ws,
@@ -230,19 +290,52 @@ export class DemoDataLoader {
     const account = (key: AccountKey): string => accounts.get(key) as string;
     await progress('accounts');
 
-    // ── fx + transactions: lotes por mes (una transacción BD por mes).
+    // ── fx + transactions + commitments + debt + goals: lotes por mes (una transacción BD por mes). Las operaciones de
+    //    módulo usan los casos de uso públicos de su contexto con el reloj simulado (design.md decisiones 2 y 3).
     const recorded = new Map<string, { id: string; version: number }>();
+    const loanAccounts = new Map<LoanKey, string>();
+    const executor = new DemoModuleExecutor({
+      r,
+      ws,
+      user,
+      account,
+      category,
+      counterparties,
+      institutions,
+      recorded,
+      loanAccounts,
+    });
+    const at = (date: string) => (date === plan.anchorDate ? startOfDay(date) : noon(date));
     for (const month of plan.months) {
       this.maybeFail(`transactions/${month.month}`);
+      for (const mod of ['commitments', 'debt', 'goals'] as const) {
+        if (month.ops.some((op) => isModuleOp(op) && moduleOf(op) === mod)) {
+          this.maybeFail(`${mod}/${month.month}`);
+        }
+      }
       await inDemo(async () => {
         for (const op of month.ops) {
-          clock.set(noon(op.date));
-          await applyPlanOp(op, { r, ws, user, account, category, counterparties, tags, recorded });
+          clock.set(op.op === 'tick' && op.late ? endOfAnchor(op.date) : at(op.date));
+          if (isModuleOp(op)) await executor.apply(op);
+          else
+            await applyPlanOp<DemoKeys>(op, {
+              r,
+              ws,
+              user,
+              account,
+              category,
+              counterparties,
+              tags,
+              recorded,
+            });
         }
       });
     }
     await progress('fx');
     await progress('transactions');
+    await progress('commitments');
+    await progress('debt');
+    await progress('goals');
 
     // ── ledger: golden summary + invariantes (Σ = 0 por moneda) acotadas al workspace demo.
     this.maybeFail('ledger');
@@ -254,15 +347,34 @@ export class DemoDataLoader {
       );
     }
     const actual = await inDemo(() => r.accounts.accounts.listAccounts({ workspaceId: ws }));
-    for (const a of plan.accounts) {
-      const view = actual.data.find((v) => v.account.id === account(a.key));
-      if (view?.balance.amount !== expected.balances[a.key]) {
+    const balanceTargets: [string, string][] = [
+      ...plan.accounts.map((a): [string, string] => [a.key, account(a.key)]),
+      ...[...loanAccounts].map(([key, id]): [string, string] => [`loan_${key}`, id]),
+    ];
+    for (const [key, id] of balanceTargets) {
+      const view = actual.data.find((v) => v.account.id === id);
+      const wanted = (expected.balances as Record<string, string>)[key];
+      if (view?.balance.amount !== wanted) {
         throw new DemoLoadError(
           'DEMO_GOLDEN_MISMATCH',
-          `balance of ${a.key}: expected ${expected.balances[a.key]}, got ${String(view?.balance.amount)}`,
+          `balance of ${key}: expected ${String(wanted)}, got ${String(view?.balance.amount)}`,
         );
       }
     }
+    // Resumen estructural por módulo (cualquier ancla) con el reloj simulado al final del día A (decisión 9).
+    clock.set(endOfAnchor(plan.anchorDate));
+    const ids = executor.idsOf();
+    await inDemo(() =>
+      verifyModules({
+        r,
+        ws,
+        anchor: plan.anchorDate,
+        summary: summarizeModules(plan.anchorDate),
+        cards: ids.cards,
+        loans: ids.loans,
+        goals: ids.goals,
+      }),
+    );
     const trial = await inDemo(() => r.ledger.balances.getTrialBalance({ workspaceId: ws }));
     for (const c of trial.currencies) {
       if (!/^0(\.0+)?$/.test(c.total.amount.replace('-', ''))) {
