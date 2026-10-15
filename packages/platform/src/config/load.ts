@@ -231,6 +231,19 @@ export function loadConfig<A extends AppName>(app: A, env: EnvSource = process.e
     }
   }
 
+  // El catálogo FICTICIO de pruebas nunca se sirve en cloud: la ruta configurada no puede apuntar a `demo`.
+  if (
+    names.includes('ACCOUNTS_INSTITUTION_CATALOG_DIR') &&
+    cloud &&
+    typeof values['ACCOUNTS_INSTITUTION_CATALOG_DIR'] === 'string' &&
+    /(^|[\\/])demo([\\/]|$)/i.test(values['ACCOUNTS_INSTITUTION_CATALOG_DIR'])
+  ) {
+    problems.push({
+      variable: 'ACCOUNTS_INSTITUTION_CATALOG_DIR',
+      reason: 'el catálogo ficticio de pruebas (demo) solo se permite con PFOS_ENV=local|ci',
+    });
+  }
+
   if (problems.length > 0) throw new ConfigError(app, problems);
   return Object.freeze(values) as AppConfig<A>;
 }

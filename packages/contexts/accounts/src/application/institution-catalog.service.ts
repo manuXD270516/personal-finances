@@ -141,6 +141,25 @@ export class InstitutionCatalogQueries {
   }
 
   /**
+   * Estado de soporte en tasas de las instituciones ADOPTADAS del workspace (las vinculadas a una entrada presente en el
+   * catálogo vigente): lo consume FX para su estado de providers (puerto compuesto en el composition root).
+   */
+  async adoptedRatesSupport(
+    workspaceId: string,
+  ): Promise<readonly { readonly code: string; readonly status: string; readonly reason: string | null }[]> {
+    const linked = await this.deps.uow.run(workspaceId, () =>
+      this.deps.institutions.listLinked(workspaceId),
+    );
+    const refs = await this.describeRefs(linked.map((i) => i.snapshot));
+    const out: { code: string; status: string; reason: string | null }[] = [];
+    for (const ref of refs.values()) {
+      if (!ref.support) continue;
+      out.push({ code: ref.code, status: ref.support.rates.status, reason: ref.support.rates.reason });
+    }
+    return out.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+  }
+
+  /**
    * Estado de cada vínculo frente al catálogo vigente (para mostrar "no figura en el registro desde …", los estados
    * de soporte y "no figura en el catálogo de esta instalación"). Una consulta por país, no por institución.
    */

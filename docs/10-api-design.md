@@ -246,6 +246,7 @@ Content-Type: application/json
 | accounts | `ACCOUNT_CURRENCY_KIND_MISMATCH` | 422 | La moneda no es compatible con el tipo de cuenta (p. ej. moneda fiat en `CRYPTO_WALLET`) |
 | accounts | `ACCOUNT_NAME_TAKEN` | 409 | Nombre duplicado entre cuentas activas |
 | accounts | `INSTITUTION_ARCHIVED` | 409 | Institución archivada: no asignable a cuentas (las existentes la conservan) |
+| accounts | `INSTITUTION_CATALOG_ENTRY_UNKNOWN` | 422 | Un código de la adopción no existe en el catálogo de referencia del país (no se crea ninguna institución; `details.codes`) |
 | ledger | `LEDGER_UNBALANCED_ENTRY` | 422 | Σ por moneda ≠ 0 (no debería llegar al cliente: indica bug) |
 | ledger | `LEDGER_ENTRY_TOO_FEW_POSTINGS` | 422 | Asiento con menos de 2 postings (SQLSTATE `PF005`, docs/31 D19) |
 | ledger | `LEDGER_ZERO_AMOUNT_POSTING` | 422 | Posting con monto cero |

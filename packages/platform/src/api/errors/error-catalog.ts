@@ -58,6 +58,7 @@ export const ERROR_CATALOG = {
   ACCOUNT_CURRENCY_KIND_MISMATCH: { status: 422, title: 'Currency kind not allowed for this account type' },
   ACCOUNT_NAME_TAKEN: { status: 409, title: 'Account name already in use' },
   INSTITUTION_ARCHIVED: { status: 409, title: 'Institution is archived' },
+  INSTITUTION_CATALOG_ENTRY_UNKNOWN: { status: 422, title: 'Institution catalog entry does not exist' },
   // transactions
   SPLITS_DO_NOT_SUM: { status: 422, title: 'Splits do not sum to the transaction amount' },
   INVALID_STATUS_TRANSITION: { status: 409, title: 'Invalid status transition' },

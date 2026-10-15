@@ -567,15 +567,15 @@ export class PgInstitutionRepository implements InstitutionRepository {
     return row ? toInstitution(row as never) : null;
   }
 
-  async listLinked(workspaceId: string, country: string): Promise<Institution[]> {
-    const rows = await db()
+  async listLinked(workspaceId: string, country?: string): Promise<Institution[]> {
+    let q = db()
       .selectFrom('accounts.institution as i')
       .select(institutionColumns)
       .where('i.workspace_id', '=', workspaceId)
       .where('i.archived_at', 'is', null)
-      .where('i.catalog_country', '=', country)
-      .orderBy('i.catalog_code')
-      .execute();
+      .where('i.catalog_code', 'is not', null);
+    if (country !== undefined) q = q.where('i.catalog_country', '=', country);
+    const rows = await q.orderBy('i.catalog_country').orderBy('i.catalog_code').execute();
     return rows.map((r) => toInstitution(r as never));
   }
 }

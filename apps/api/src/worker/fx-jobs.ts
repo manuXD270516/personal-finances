@@ -104,6 +104,11 @@ export async function registerFxMarketRateJobs(
         { code: 'FX_PROVIDER_CONFIG_INVALID', reason: settings.cryptoConfigError },
         'fx crypto rate providers not started: invalid configuration',
       );
+    } else if (settings.institutionConfigError) {
+      logger.error(
+        { code: 'FX_PROVIDER_CONFIG_INVALID', reason: settings.institutionConfigError },
+        'fx institution rate providers not started: invalid configuration',
+      );
     } else {
       logger.info('fx market rate providers disabled (FX_PROVIDER_* = none)');
     }
@@ -155,6 +160,13 @@ export async function registerFxMarketRateJobs(
       'fx crypto rate providers not started: invalid configuration',
     );
   }
+  if (settings.institutionConfigError) {
+    // Solo el provider por institución queda deshabilitado y no envía solicitudes (NFR-COMP-007).
+    logger.error(
+      { code: 'FX_PROVIDER_CONFIG_INVALID', reason: settings.institutionConfigError },
+      'fx institution rate providers not started: invalid configuration',
+    );
+  }
   logger.info(
     {
       queues: [FX_POLL_QUEUE, FX_BACKFILL_QUEUE, FX_GAP_FILL_QUEUE],
@@ -164,6 +176,7 @@ export async function registerFxMarketRateJobs(
       official: settings.official,
       cryptoPrimary: settings.cryptoPrimary,
       cryptoFallback: settings.cryptoFallback,
+      institutionProvider: settings.institutionProvider,
     },
     'fx market rate providers scheduled',
   );

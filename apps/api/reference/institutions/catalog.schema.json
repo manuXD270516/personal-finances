@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/reference/institutions/catalog.schema.json",
+  "title": "Catálogo de referencia de instituciones por país",
+  "description": "Estructura de `<PAÍS>.json` (add-exchange-house-rate-providers, design.md decisión 1). NO es un contrato público de la API: lo validan `CatalogValidator` (reglas de dominio: censo, códigos únicos, razones, proveedores verificados) y los tests. Solo datos públicos de registro (nombre, sigla, categoría, sitio web), sin logos, marcas ni datos de ningún usuario. Un catálogo con `fictitious: true` es de PRUEBA con entidades inventadas y vive en `demo/`; nunca se confunde con el registro real.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["country", "catalogVersion", "source", "census", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "fictitious": {
+      "description": "`true` solo en el catálogo de prueba con entidades inventadas. El catálogo real no lo declara.",
+      "type": "boolean"
+    },
+    "country": { "type": "string", "pattern": "^[A-Z]{2}$" },
+    "catalogVersion": {
+      "description": "Versión del catálogo (= fecha de corte del listado oficial).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "cutoffDate", "retrievedOn"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "type": ["string", "null"], "pattern": "^https?://" },
+        "cutoffDate": { "$ref": "#/$defs/Date" },
+        "retrievedOn": { "$ref": "#/$defs/Date" }
+      }
+    },
+    "census": {
+      "description": "Entidades del censo oficial por categoría a la fecha de corte.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "count"],
+        "properties": {
+          "category": { "$ref": "#/$defs/Category" },
+          "count": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "source": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/Entry" }
+    }
+  },
+  "$defs": {
+    "Date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "Category": {
+      "enum": [
+        "MULTIPLE_BANK",
+        "SME_BANK",
+        "PUBLIC_BANK",
+        "DEVELOPMENT_BANK",
+        "HOUSING_FINANCE",
+        "SAVINGS_COOP",
+        "DEVELOPMENT_FINANCE",
+        "MOBILE_PAYMENT",
+        "FINTECH",
+        "EXCHANGE_HOUSE"
+      ]
+    },
+    "Entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "name", "category", "kind", "listing", "verification", "support"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9-]{1,39}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "legalName": { "type": ["string", "null"], "maxLength": 200 },
+        "category": { "$ref": "#/$defs/Category" },
+        "kind": { "enum": ["BANK", "FINTECH", "EXCHANGE", "BROKER", "WALLET_PROVIDER", "OTHER"] },
+        "adoptable": {
+          "description": "`false` en las casas de cambio: nadie tiene cuenta en ellas, solo declaran su soporte de tasas.",
+          "type": "boolean"
+        },
+        "website": { "type": ["string", "null"], "pattern": "^https?://" },
+        "listing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["ACTIVE", "DELISTED"] },
+            "since": { "oneOf": [{ "$ref": "#/$defs/Date" }, { "type": "null" }] }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["CONFIRMED", "PENDING"] },
+            "note": { "type": ["string", "null"] }
+          }
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rates", "statementImport"],
+          "properties": {
+            "rates": { "$ref": "#/$defs/RatesSupport" },
+            "statementImport": { "$ref": "#/$defs/ImportSupport" }
+          }
+        }
+      }
+    },
+    "SupportBase": {
+      "type": "object",
+      "required": ["status", "evaluatedOn"],
+      "properties": {
+        "evaluatedOn": { "$ref": "#/$defs/Date" },
+        "reason": {
+          "enum": [
+            "NO_PUBLICATION",
+            "TERMS_PROHIBIT_AUTOMATION",
+            "TERMS_UNAVAILABLE",
+            "REQUIRES_CREDENTIALS",
+            "UNSTABLE_FORMAT",
+            "IMAGE_ONLY_STATEMENT",
+            "OTHER"
+          ]
+        },
+        "adr": { "type": ["string", "null"] },
+        "providerIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "note": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "NOT_ELIGIBLE" } }, "required": ["status"] },
+          "then": { "required": ["reason"] },
+          "else": { "not": { "required": ["reason"] } }
+        }
+      ]
+    },
+    "RatesSupport": {
+      "allOf": [{ "$ref": "#/$defs/SupportBase" }],
+      "properties": {
+        "status": { "enum": ["SUPPORTED", "IN_VERIFICATION", "NOT_ELIGIBLE", "NOT_APPLICABLE"] }
+      },
+      "unevaluatedProperties": false
+    },
+    "ImportSupport": {
+      "allOf": [{ "$ref": "#/$defs/SupportBase" }],
+      "properties": {
+        "status": {
+          "enum": [
+            "SUPPORTED",
+            "GENERIC_ONLY",
+            "IN_VERIFICATION",
+            "PENDING_SAMPLE",
+            "NOT_ELIGIBLE",
+            "NOT_APPLICABLE"
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

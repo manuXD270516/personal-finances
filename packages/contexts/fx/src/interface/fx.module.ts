@@ -20,6 +20,7 @@ import type {
   ActiveWorkspacesPort,
   FirstBalanceDatePort,
   FxDeps,
+  InstitutionSupportPort,
   OutboxPort,
   WorkspaceSettingsPort,
 } from '../application/ports/index.js';
@@ -41,8 +42,14 @@ import {
   UserConversionObservations,
   type ConversionBackfillSource,
 } from '../application/user-conversion-observations.js';
-import { EXCHANGE_RATE_LIFECYCLE } from '../domain/index.js';
-import type { CryptoRateProvider, FxRateProvider, PollableProvider, ResolvedRate } from '../domain/index.js';
+import { EXCHANGE_RATE_LIFECYCLE, providerDescriptor } from '../domain/index.js';
+import type {
+  CryptoRateProvider,
+  FxRateProvider,
+  InstitutionRateProvider,
+  PollableProvider,
+  ResolvedRate,
+} from '../domain/index.js';
 import {
   PgCurrencyRepository,
   PgExchangeRateRepository,
@@ -88,6 +95,12 @@ export interface FxRuntimeOptions {
   readonly windowDays?: number;
   /** Configuración `FX_*` validada (roles, obsolescencia, umbral de anomalía); por defecto la de design.md. */
   readonly providers?: FxProviderSettings;
+  /**
+   * Estado de soporte en tasas de las instituciones adoptadas del workspace (ACCOUNTS vía `@pf/accounts/contracts`,
+   * compuesto en `apps/api`): alimenta `institutions[]` del estado de providers. Sin él solo se informan las instituciones
+   * cubiertas por el provider habilitado.
+   */
+  readonly institutionSupport?: InstitutionSupportPort;
 }
 
 export interface FxRuntime {
@@ -258,6 +271,7 @@ export function createFxRuntime(options: FxRuntimeOptions): FxRuntime {
       clock: options.clock,
       settings,
       pairViews: ratePairViews,
+      ...(options.institutionSupport ? { institutionSupport: options.institutionSupport } : {}),
     }),
     ratePairViews,
     ratePairs: queries,
@@ -372,6 +386,23 @@ export const CRYPTO_ADAPTER_FACTORIES: Readonly<
   >
 > = Object.freeze({});
 
+/**
+ * Fábricas de los adapters REALES de providers por institución por id (`INSTRATE_<NOMBRE>`). Vacío a propósito: ningún
+ * adapter se escribe antes de verificar y registrar en su ADR los términos de uso y la licencia de la fuente
+ * (NFR-COMP-007, RISK-023; add-exchange-house-rate-providers). Cada adapter nuevo se agrega aquí junto con su
+ * descriptor `VERIFIED` del dominio.
+ */
+export const INSTITUTION_ADAPTER_FACTORIES: Readonly<
+  Record<
+    string,
+    (deps: {
+      readonly http: ProviderHttpClient;
+      readonly clock: Clock;
+      readonly baseUrl: string | undefined;
+    }) => InstitutionRateProvider
+  >
+> = Object.freeze({});
+
 /** Colas pg-boss de los providers (design.md decisión 4). */
 export const FX_POLL_QUEUE = 'fx.poll-market-rates';
 export const FX_BACKFILL_QUEUE = 'fx.backfill-historical-rates';
@@ -400,6 +431,12 @@ export interface FxMarketRateJobsOptions {
    * no existe ningún adapter real: en producción esta opción no se usa y `CRYPTO_ADAPTER_FACTORIES` está vacío.
    */
   readonly cryptoProviders?: Partial<Record<FxRateProvider, CryptoRateProvider>>;
+  /**
+   * Adapters de providers por institución inyectados (dobles de prueba). Hasta que el ADR de sus fuentes registre los
+   * términos de una fuente no existe ningún adapter real: en producción esta opción no se usa e
+   * `INSTITUTION_ADAPTER_FACTORIES` está vacío.
+   */
+  readonly institutionProviders?: Partial<Record<FxRateProvider, InstitutionRateProvider>>;
   /**
    * Puerto síncrono de NOTIFY (`@pf/notifications/contracts`, add-rate-feed-alerts, D249) para las alertas de
    * obsolescencia y de muestra retenida: el composition root del worker lo cablea. Sin él se escriben igual los
@@ -447,6 +484,14 @@ export function createFxMarketRateJobs(options: FxMarketRateJobsOptions): FxMark
     if (injected) providers[id] = injected;
     else if (factory) providers[id] = factory({ http, clock: options.clock, baseUrl: urls[id] });
   }
+  // Provider por institución: solo el verificado (la configuración rechaza el resto) y con adapter registrado.
+  if (settings.institutionProvider !== null) {
+    const id = settings.institutionProvider;
+    const injected = options.institutionProviders?.[id];
+    const factory = INSTITUTION_ADAPTER_FACTORIES[id];
+    if (injected) providers[id] = injected;
+    else if (factory) providers[id] = factory({ http, clock: options.clock, baseUrl: urls[id] });
+  }
   const ingestion = new MarketRateIngestion({
     uow: new PgFxUnitOfWork(options.pool),
     rates: new PgExchangeRateRepository(),
@@ -480,6 +525,33 @@ export function providerHostsFor(baseUrls: Partial<Record<FxRateProvider, string
   return [...new Set([...PROVIDER_HOSTS, ...extra])];
 }
 
+/**
+ * Estado de la verificación de términos de un provider de tasas por su id (para `CatalogValidator` de ACCOUNTS vía el
+ * composition root): `VERIFIED` solo con su fecha y su ADR registrados; `null` si el id no existe.
+ */
+export function providerTermsStatus(id: string): 'VERIFIED' | 'REJECTED' | 'UNVERIFIED' | null {
+  const terms = providerDescriptor(id)?.terms;
+  if (!terms) return null;
+  if (terms.status === 'VERIFIED') return terms.verifiedOn && terms.adr ? 'VERIFIED' : 'UNVERIFIED';
+  return terms.status;
+}
+
 export { FX_AUDIT_POLICY, type FxConversionPricingPort } from '../contracts/index.js';
 export { parseFxProviderSettings, type FxProviderEnv, type FxProviderSettings };
-export type { ActiveWorkspacesPort, FirstBalanceDatePort, OutboxPort, WorkspaceSettingsPort };
+/**
+ * Piezas del dominio que el composition root y las pruebas de integración de `apps/api` necesitan para enchufar un
+ * provider (dobles de prueba; ningún adapter real existe sin su verificación de términos): el descriptor y la muestra.
+ */
+export {
+  ProviderSample,
+  registerProviderDescriptor,
+  type InstitutionRateProvider,
+  type ProviderDescriptor,
+} from '../domain/index.js';
+export type {
+  ActiveWorkspacesPort,
+  FirstBalanceDatePort,
+  InstitutionSupportPort,
+  OutboxPort,
+  WorkspaceSettingsPort,
+};

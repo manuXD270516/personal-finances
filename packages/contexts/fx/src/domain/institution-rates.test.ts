@@ -240,6 +240,30 @@ describe('las tasas por institución no valoran por defecto (fx/market-rate-prov
     expect(ref?.components).toEqual([]);
   });
 
+  it('[TC-FX-INSTRATE-005] pedir BANK_BUY/BANK_SELL sin tasa de ese tipo nunca se sustituye por una manual fresca de otro tipo (FX_RATE_NOT_FOUND)', () => {
+    const manual = ExchangeRate.record({
+      id: 'm1',
+      workspaceId: 'w1',
+      base: USD,
+      quote: BOB,
+      value: '11.9',
+      rateType: 'P2P',
+      asOf: '2026-10-08T17:00:00Z',
+      effectiveDate: '2026-10-08',
+      createdAt: '2026-10-08T17:00:00Z',
+      createdBy: 'u1',
+    });
+    const resolver = new RateResolver(
+      [{ state: manual.snapshot, supersededById: null }, ...candidates.filter((c) => c.state.rateType === 'PARALLEL')],
+      policy,
+    );
+    for (const type of ['BANK_BUY', 'BANK_SELL'] as const) {
+      expect(resolver.tryResolve({ base: USD, quote: BOB, at, preferenceOf: () => type })).toBeNull();
+    }
+    // Con PARALLEL como preferencia la valoración por defecto sigue intacta.
+    expect(resolver.resolve({ base: USD, quote: BOB, at }).rateType).toBe('PARALLEL');
+  });
+
   it('una tasa de institución obsoleta (más de FX_STALE_AFTER_INSTITUTION) se marca como última conocida obsoleta', () => {
     const later = Instant.parse('2026-10-11T18:00:00Z'); // ~74 h después
     const found = new RateResolver(candidates, policy).resolve({

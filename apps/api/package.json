@@ -58,6 +58,7 @@
   "files": [
     "dist",
     "db",
-    "contract"
+    "contract",
+    "reference"
   ]
 }

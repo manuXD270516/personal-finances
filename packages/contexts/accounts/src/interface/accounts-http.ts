@@ -15,6 +15,12 @@ import type {
   AccountUpdateChanges,
   AccountView,
 } from '../application/accounts.service.js';
+import type {
+  AdoptCatalogInstitutions,
+  CatalogRefView,
+  InstitutionCatalogQueries,
+  InstitutionCatalogView,
+} from '../application/institution-catalog.service.js';
 import type { InstitutionsService } from '../application/institutions.service.js';
 import type { CustomFieldValueInput } from '../application/ports/index.js';
 import type {
@@ -28,6 +34,8 @@ import type {
 
 export const ACCOUNTS_SERVICE = Symbol('ACCOUNTS_SERVICE');
 export const INSTITUTIONS_SERVICE = Symbol('INSTITUTIONS_SERVICE');
+export const INSTITUTION_CATALOG_QUERIES = Symbol('INSTITUTION_CATALOG_QUERIES');
+export const ADOPT_CATALOG_INSTITUTIONS = Symbol('ADOPT_CATALOG_INSTITUTIONS');
 
 type Json = Record<string, unknown>;
 const str = (b: Json, k: string): string | undefined =>
@@ -99,7 +107,12 @@ export function toAccountDto(v: AccountView) {
   };
 }
 
-export function toInstitutionDto(s: InstitutionState) {
+/**
+ * `Institution` del contrato. `catalogRef` solo aparece en las instituciones adoptadas del catálogo de referencia (con su
+ * estado frente al catálogo vigente de la instalación: `listingStatus` nulo si la entrada ya no figura en él).
+ */
+export function toInstitutionDto(s: InstitutionState, ref?: CatalogRefView | undefined) {
+  const link = s.catalogRef;
   return {
     id: s.id,
     name: s.name,
@@ -109,6 +122,18 @@ export function toInstitutionDto(s: InstitutionState) {
     icon: s.icon,
     color: s.color,
     notes: s.notes,
+    ...(link
+      ? {
+          catalogRef: {
+            country: link.country,
+            code: link.code,
+            catalogVersion: link.version,
+            listingStatus: ref?.listingStatus ?? null,
+            delistedSince: ref?.delistedSince ?? null,
+            support: ref?.support ?? null,
+          },
+        }
+      : {}),
     archivedAt: s.archivedAt,
     version: s.version,
   };
@@ -321,8 +346,16 @@ const INSTITUTION_KEYS = ['name', 'kind', 'countryCode', 'website', 'icon', 'col
 export class InstitutionsController {
   constructor(
     @Inject(INSTITUTIONS_SERVICE) private readonly service: InstitutionsService,
+    @Inject(INSTITUTION_CATALOG_QUERIES) private readonly catalog: InstitutionCatalogQueries,
+    @Inject(ADOPT_CATALOG_INSTITUTIONS) private readonly adoption: AdoptCatalogInstitutions,
     @Inject(API_CONVENTIONS) private readonly options: ApiConventionsOptions,
   ) {}
+
+  /** DTO con el estado del vínculo frente al catálogo vigente (una lectura por país, no por institución). */
+  private async dtos(states: readonly InstitutionState[]) {
+    const refs = await this.catalog.describeRefs(states);
+    return states.map((s) => toInstitutionDto(s, refs.get(s.id)));
+  }
 
   @Get('workspaces/:workspaceId/institutions')
   async listInstitutions(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
@@ -355,7 +388,7 @@ export class InstitutionsController {
       (r) => [r.at],
       (position) => this.options.cursors.encode(scope, position),
     );
-    return { data: page.data.map((r) => toInstitutionDto(r.s)), page: page.page };
+    return { data: await this.dtos(page.data.map((r) => r.s)), page: page.page };
   }
 
   @Post('workspaces/:workspaceId/institutions')
@@ -373,12 +406,35 @@ export class InstitutionsController {
       kind: str(body, 'kind') ?? '',
     });
     res.setHeader('location', `/api/v1/workspaces/${workspaceId}/institutions/${created.id}`);
-    return toInstitutionDto(created);
+    return (await this.dtos([created]))[0];
+  }
+
+  /** Adopción desde el catálogo de referencia (EDITOR): una operación auditada; ver `AdoptCatalogInstitutions`. */
+  @Post('workspaces/:workspaceId/institutions/adopt')
+  @HttpCode(200)
+  async adoptCatalogInstitutions(@Param('workspaceId') workspaceId: string, @Body() body: Json) {
+    const links = Array.isArray(body['links'])
+      ? (body['links'] as Json[]).map((l) => ({
+          code: str(l, 'code') ?? '',
+          institutionId: str(l, 'institutionId') ?? '',
+        }))
+      : undefined;
+    const result = await this.adoption.execute({
+      workspaceId,
+      country: str(body, 'country') ?? '',
+      codes: Array.isArray(body['codes']) ? (body['codes'] as unknown[]).map(String) : [],
+      ...(links ? { links } : {}),
+    });
+    return {
+      adopted: await this.dtos(result.adopted),
+      alreadyLinked: await this.dtos(result.alreadyLinked),
+      conflicts: result.conflicts.map((c) => ({ ...c })),
+    };
   }
 
   @Get('workspaces/:workspaceId/institutions/:institutionId')
   async getInstitution(@Param('workspaceId') workspaceId: string, @Param('institutionId') id: string) {
-    return toInstitutionDto(await this.service.getInstitution(workspaceId, id));
+    return (await this.dtos([await this.service.getInstitution(workspaceId, id)]))[0];
   }
 
   @Patch('workspaces/:workspaceId/institutions/:institutionId')
@@ -388,14 +444,13 @@ export class InstitutionsController {
     @ExpectedVersion() expected: number,
     @Body() body: Json,
   ) {
-    return toInstitutionDto(
-      await this.service.updateInstitution(
-        workspaceId,
-        id,
-        expected,
-        pick<InstitutionFields>(body, INSTITUTION_KEYS),
-      ),
+    const updated = await this.service.updateInstitution(
+      workspaceId,
+      id,
+      expected,
+      pick<InstitutionFields>(body, INSTITUTION_KEYS),
     );
+    return (await this.dtos([updated]))[0];
   }
 
   @Post('workspaces/:workspaceId/institutions/:institutionId/archive')
@@ -405,6 +460,59 @@ export class InstitutionsController {
     @Param('institutionId') id: string,
     @ExpectedVersion() expected: number,
   ) {
-    return toInstitutionDto(await this.service.archiveInstitution(workspaceId, id, expected));
+    return (await this.dtos([await this.service.archiveInstitution(workspaceId, id, expected)]))[0];
+  }
+}
+
+/** `InstitutionCatalog` del contrato: el catálogo con sus estados de soporte y la cobertura (solo lectura). */
+export function toInstitutionCatalogDto(view: InstitutionCatalogView) {
+  return {
+    country: view.country,
+    catalogVersion: view.catalogVersion,
+    fictitious: view.fictitious,
+    source: { ...view.source },
+    entries: view.entries.map((e) => ({
+      ...e,
+      support: {
+        rates: { ...e.support.rates, providerIds: [...e.support.rates.providerIds] },
+        statementImport: {
+          ...e.support.statementImport,
+          providerIds: [...e.support.statementImport.providerIds],
+        },
+      },
+    })),
+    coverage: {
+      complete: view.coverage.complete,
+      censusCoveragePct: view.coverage.censusCoveragePct,
+      byCategory: view.coverage.byCategory.map((c) => ({ ...c })),
+      byDimension: view.coverage.byDimension.map((d) => ({
+        dimension: d.dimension,
+        resolved: d.resolved,
+        pending: d.pending,
+        resolvedPct: d.resolvedPct,
+        byStatus: d.byStatus.map((s) => ({ ...s })),
+        notEligible: d.notEligible.map((n) => ({ ...n })),
+      })),
+    },
+  };
+}
+
+/** `GET /api/v1/workspaces/{workspaceId}/institution-catalog` (accounts/institutions): catálogo de referencia por país. */
+@Controller()
+export class InstitutionCatalogController {
+  constructor(@Inject(INSTITUTION_CATALOG_QUERIES) private readonly catalog: InstitutionCatalogQueries) {}
+
+  @Get('workspaces/:workspaceId/institution-catalog')
+  async getInstitutionCatalog(@Param('workspaceId') workspaceId: string, @ValidatedQuery() query: Json) {
+    const categories = list(query, 'category');
+    return toInstitutionCatalogDto(
+      await this.catalog.getCatalog({
+        workspaceId,
+        country: str(query, 'country') ?? '',
+        ...(categories ? { categories } : {}),
+        ...(str(query, 'q') ? { q: str(query, 'q') as string } : {}),
+        includeDelisted: bool(query, 'includeDelisted'),
+      }),
+    );
   }
 }

@@ -374,7 +374,11 @@ export class InMemoryAccounts {
       listLinked: async (ws, country) =>
         [...this.institutions.values()]
           .filter(
-            (i) => i.snapshot.workspaceId === ws && !i.isArchived && i.snapshot.catalogRef?.country === country,
+            (i) =>
+              i.snapshot.workspaceId === ws &&
+              !i.isArchived &&
+              i.snapshot.catalogRef !== null &&
+              (country === undefined || i.snapshot.catalogRef.country === country),
           )
           .map(fresh),
     };

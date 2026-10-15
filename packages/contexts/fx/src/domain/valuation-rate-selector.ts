@@ -1,6 +1,7 @@
 import { dec, type Instant } from '@pf/shared-kernel';
 import type { ExchangeRateState } from './exchange-rate.js';
 import {
+  isInstitutionRateType,
   isOneSidedRateType,
   marketOf,
   type FxRateProvider,
@@ -165,7 +166,10 @@ export class ValuationRateSelector {
    */
   freshSubstitutes(options: SelectOptions, at: Instant): ExchangeRateState[] {
     const requested = options.requestedType ?? null;
-    if (requested === null || this.staleness.staleAfterMs(requested) === null) return [];
+    // Una tasa por institución (BANK_BUY/BANK_SELL) solo se valora con tasas de ese tipo: nunca se sustituye por una
+    // manual de otro tipo (pedirla es pedir la cotización de una institución, no un valor aproximado).
+    if (requested === null || isInstitutionRateType(requested)) return [];
+    if (this.staleness.staleAfterMs(requested) === null) return [];
     const maxAge = this.policy.manualFallbackMaxAgeMs ?? DEFAULT_MANUAL_FALLBACK_MAX_AGE_MS;
     const maxDeviation = dec(
       this.policy.manualFallbackMaxDeviationPct ?? DEFAULT_MANUAL_FALLBACK_MAX_DEVIATION_PCT,

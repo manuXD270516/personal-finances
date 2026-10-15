@@ -60,8 +60,11 @@ export interface InstitutionRepository {
   list(workspaceId: string, filter: InstitutionListFilter): Promise<Institution[]>;
   /** Institución NO archivada del workspace con ese nombre (sin distinguir mayúsculas); `null` si ninguna. */
   findActiveByName(workspaceId: string, name: string): Promise<Institution | null>;
-  /** Instituciones NO archivadas vinculadas al catálogo de un país (a lo más una por código: índice único parcial). */
-  listLinked(workspaceId: string, country: string): Promise<Institution[]>;
+  /**
+   * Instituciones NO archivadas vinculadas al catálogo de un país (a lo más una por código: índice único parcial); sin
+   * país, las de todos los países.
+   */
+  listLinked(workspaceId: string, country?: string): Promise<Institution[]>;
 }
 
 /**
