@@ -98,7 +98,11 @@ describe('Vínculo de la institución con el catálogo sobre PostgreSQL', () => 
     const bad = adopted(w1, 'Banco Andino Demo', 'BAD');
     await inWs(w1, () => institutions.insert(bad));
     const loaded = (await inWs(w1, () => institutions.findById(w1, bad.id)))!;
-    expect(loaded.snapshot.catalogRef?.toJSON()).toEqual({ country: 'BO', code: 'BAD', version: '2026-09-30' });
+    expect(loaded.snapshot.catalogRef?.toJSON()).toEqual({
+      country: 'BO',
+      code: 'BAD',
+      version: '2026-09-30',
+    });
     loaded.update({ name: 'Mi banco' });
     expect(await inWs(w1, () => institutions.update(loaded))).toBe(true);
     const renamed = (await inWs(w1, () => institutions.findById(w1, bad.id)))!;
@@ -112,9 +116,9 @@ describe('Vínculo de la institución con el catálogo sobre PostgreSQL', () => 
   it('[TC-ACCOUNTS-INSTCATALOG-002] el único parcial impide dos instituciones activas con la misma entrada; archivar libera el código; otro workspace puede adoptar la misma', async () => {
     const first = adopted(w1, 'Cooperativa Illimani Demo', 'CID');
     await inWs(w1, () => institutions.insert(first));
-    expect(
-      await code(inWs(w1, () => institutions.insert(adopted(w1, 'Otro nombre', 'CID')))),
-    ).toBe('VALIDATION_FAILED');
+    expect(await code(inWs(w1, () => institutions.insert(adopted(w1, 'Otro nombre', 'CID'))))).toBe(
+      'VALIDATION_FAILED',
+    );
     const loaded = (await inWs(w1, () => institutions.findById(w1, first.id)))!;
     loaded.archive('2026-10-15T14:00:00Z');
     expect(await inWs(w1, () => institutions.update(loaded))).toBe(true);
@@ -143,9 +147,9 @@ describe('Vínculo de la institución con el catálogo sobre PostgreSQL', () => 
     expect(linked.map((i) => i.snapshot.catalogRef?.code).sort()).toEqual(['BAD', 'CID']);
     expect(linked.every((i) => !i.isArchived)).toBe(true);
     expect(await inWs(w1, () => institutions.listLinked(w1, 'AR'))).toEqual([]);
-    expect((await inWs(w1, () => institutions.findActiveByName(w1, 'MI BANCO')))?.snapshot.catalogRef?.code).toBe(
-      'BAD',
-    );
+    expect(
+      (await inWs(w1, () => institutions.findActiveByName(w1, 'MI BANCO')))?.snapshot.catalogRef?.code,
+    ).toBe('BAD');
     expect(await inWs(w1, () => institutions.findActiveByName(w1, 'Inexistente'))).toBeNull();
     // W2 solo ve su propia adopción de CID (la de W1 no se filtra).
     const other = await inWs(w2, () => institutions.listLinked(w2, 'BO'));
@@ -181,27 +185,35 @@ describe('AdoptCatalogInstitutions sobre PostgreSQL', () => {
         [w3, u1],
       );
     });
-    const result = await asUser(w3, () => adopt.execute({ workspaceId: w3, country: 'BO', codes: ['BAD', 'BAL'] }));
+    const result = await asUser(w3, () =>
+      adopt.execute({ workspaceId: w3, country: 'BO', codes: ['BAD', 'BAL'] }),
+    );
     expect(result.adopted.map((i) => [i.name, i.kind, i.countryCode, i.catalogRef?.code])).toEqual([
       ['Banco Andino Demo', 'BANK', 'BO', 'BAD'],
       ['Billetera Altiplano Demo', 'WALLET_PROVIDER', 'BO', 'BAL'],
     ]);
-    expect(audits.filter((a) => a.action === 'accounts.institutions.adopted' && a.workspaceId === w3)).toHaveLength(1);
+    expect(
+      audits.filter((a) => a.action === 'accounts.institutions.adopted' && a.workspaceId === w3),
+    ).toHaveLength(1);
     const again = await asUser(w3, () => adopt.execute({ workspaceId: w3, country: 'BO', codes: ['BAD'] }));
     expect([again.adopted.length, again.alreadyLinked.map((i) => i.catalogRef?.code)]).toEqual([0, ['BAD']]);
     const view = await asUser(w3, () => queries.getCatalog({ workspaceId: w3, country: 'BO' }));
-    expect(view.entries.filter((e) => e.adoptedInstitutionId !== null).map((e) => e.code).sort()).toEqual([
-      'BAD',
-      'BAL',
-    ]);
+    expect(
+      view.entries
+        .filter((e) => e.adoptedInstitutionId !== null)
+        .map((e) => e.code)
+        .sort(),
+    ).toEqual(['BAD', 'BAL']);
   });
 
   it('[TC-ACCOUNTS-INSTCATALOG-003] un código desconocido no crea ninguna institución (sin filas parciales)', async () => {
     const before = await asUser(w3, () => institutions.list(w3, { includeArchived: true }));
-    expect(await code(asUser(w3, () => adopt.execute({ workspaceId: w3, country: 'BO', codes: ['CID', 'ZZZ'] })))).toBe(
-      'INSTITUTION_CATALOG_ENTRY_UNKNOWN',
+    expect(
+      await code(asUser(w3, () => adopt.execute({ workspaceId: w3, country: 'BO', codes: ['CID', 'ZZZ'] }))),
+    ).toBe('INSTITUTION_CATALOG_ENTRY_UNKNOWN');
+    expect((await asUser(w3, () => institutions.list(w3, { includeArchived: true }))).length).toBe(
+      before.length,
     );
-    expect((await asUser(w3, () => institutions.list(w3, { includeArchived: true }))).length).toBe(before.length);
   });
 
   it('[TC-ACCOUNTS-INSTCATALOG-004] con un nombre ya usado por una institución propia: conflicto NAME_TAKEN y la otra entrada se adopta', async () => {
@@ -223,7 +235,9 @@ describe('AdoptCatalogInstitutions sobre PostgreSQL', () => {
     const mine = await asUser(w4, () =>
       svc.createInstitution({ workspaceId: w4, name: 'Banco Andino Demo', kind: 'BANK' }),
     );
-    const result = await asUser(w4, () => adopt.execute({ workspaceId: w4, country: 'BO', codes: ['BAD', 'CID'] }));
+    const result = await asUser(w4, () =>
+      adopt.execute({ workspaceId: w4, country: 'BO', codes: ['BAD', 'CID'] }),
+    );
     expect(result.conflicts).toEqual([{ code: 'BAD', reason: 'NAME_TAKEN', institutionId: mine.id }]);
     expect(result.adopted.map((i) => i.catalogRef?.code)).toEqual(['CID']);
     const linked = await asUser(w4, () =>

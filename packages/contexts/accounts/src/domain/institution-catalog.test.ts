@@ -189,9 +189,9 @@ describe('CatalogValidator (accounts/institutions: estado de soporte y completit
   it('las entradas DELISTED no cuentan para el censo y exigen la fecha del retiro', () => {
     const delisted = demoEntry('CAN', { listing: { status: 'DELISTED', since: '2026-06-30' } });
     // Censo 1 con 1 activa + 1 retirada: cumple.
-    expect(codesOf(demoCatalog([demoEntry('BAD'), delisted], [{ category: 'MULTIPLE_BANK', count: 1 }]))).toEqual(
-      [],
-    );
+    expect(
+      codesOf(demoCatalog([demoEntry('BAD'), delisted], [{ category: 'MULTIPLE_BANK', count: 1 }])),
+    ).toEqual([]);
     // Censo 2 con 1 activa + 1 retirada: las retiradas no completan el censo.
     expect(
       codesOf(demoCatalog([demoEntry('BAD'), delisted], [{ category: 'MULTIPLE_BANK', count: 2 }])),
@@ -234,19 +234,23 @@ describe('CatalogValidator (accounts/institutions: estado de soporte y completit
   it('las casas de cambio no son adoptables y las demás categorías sí', () => {
     const house = demoEntry('CCS', { category: 'EXCHANGE_HOUSE', kind: 'OTHER' });
     const r = validateCatalog(
-      demoCatalog([demoEntry('BAD'), house], [
-        { category: 'MULTIPLE_BANK', count: 1 },
-        { category: 'EXCHANGE_HOUSE', count: 1 },
-      ]),
+      demoCatalog(
+        [demoEntry('BAD'), house],
+        [
+          { category: 'MULTIPLE_BANK', count: 1 },
+          { category: 'EXCHANGE_HOUSE', count: 1 },
+        ],
+      ),
       { terms: demoTerms },
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.catalog.entries.find((e) => e.code === 'CCS')?.adoptable).toBe(false);
     expect(r.catalog.entries.find((e) => e.code === 'BAD')?.adoptable).toBe(true);
-    const bad = demoCatalog([demoEntry('CCS', { category: 'EXCHANGE_HOUSE', kind: 'OTHER', adoptable: true })], [
-      { category: 'EXCHANGE_HOUSE', count: 1 },
-    ]);
+    const bad = demoCatalog(
+      [demoEntry('CCS', { category: 'EXCHANGE_HOUSE', kind: 'OTHER', adoptable: true })],
+      [{ category: 'EXCHANGE_HOUSE', count: 1 }],
+    );
     expect(codesOf(bad)).toContain('EXCHANGE_HOUSE_NOT_ADOPTABLE');
   });
 

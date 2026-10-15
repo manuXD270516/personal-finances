@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { uuidv7, type ApiProblemBody } from '../../bff/finance-api-client';
 import { ProblemMessage } from '../../errors/ProblemMessage';
 import { INSTITUTION_KINDS, type Institution, type InstitutionKind } from '../common/types';
@@ -14,6 +14,8 @@ import {
   pageStyle,
   rowStyle,
 } from '../common/ui';
+import { InstitutionCatalogPanel } from './InstitutionCatalogPanel';
+import { CatalogStanding } from './SupportBadges';
 import { listAll, problemOf, useFormat, WithWorkspace, type WorkspaceContext } from '../common/workspace';
 
 export function InstitutionsPage() {
@@ -22,7 +24,8 @@ export function InstitutionsPage() {
 
 /** Pantalla Instituciones (add-accounts-management 7.3): crear, renombrar, icono/color y archivar. */
 function Institutions({ ctx }: { ctx: WorkspaceContext }) {
-  const { t } = useFormat('Accounts', ctx);
+  const f = useFormat('Accounts', ctx);
+  const { t } = f;
   const [list, setList] = useState<readonly Institution[] | undefined>();
   const [showArchived, setShowArchived] = useState(false);
   const [form, setForm] = useState({ name: '', kind: 'BANK' as InstitutionKind, color: '', icon: '' });
@@ -174,6 +177,14 @@ function Institutions({ ctx }: { ctx: WorkspaceContext }) {
           </div>
         </form>
       ) : null}
+      <InstitutionCatalogPanel
+        ctx={ctx}
+        institutions={list ?? []}
+        onAdopted={(message) => {
+          setStatus(message);
+          load();
+        }}
+      />
       <label style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
         <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
         {t('filters.showArchived')}
@@ -195,6 +206,7 @@ function Institutions({ ctx }: { ctx: WorkspaceContext }) {
                 archive: t('archive'),
                 name: t('institutions.name'),
               }}
+              standing={i.catalogRef ? <CatalogStanding catalogRef={i.catalogRef} f={f} /> : null}
               onRename={(name) => void rename(i, name)}
               onArchive={() => void archive(i)}
             />
@@ -209,12 +221,14 @@ function InstitutionRow({
   institution: i,
   canEdit,
   labels,
+  standing,
   onRename,
   onArchive,
 }: {
   institution: Institution;
   canEdit: boolean;
   labels: Record<'kind' | 'archived' | 'rename' | 'save' | 'archive' | 'name', string>;
+  standing: ReactNode;
   onRename: (name: string) => void;
   onArchive: () => void;
 }) {
@@ -265,6 +279,7 @@ function InstitutionRow({
           </button>
         </>
       ) : null}
+      {standing ? <div style={{ flexBasis: '100%' }}>{standing}</div> : null}
     </div>
   );
 }

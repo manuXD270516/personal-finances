@@ -367,7 +367,9 @@ export class InMemoryAccounts {
       findActiveByName: async (ws, name) => {
         const found = [...this.institutions.values()].find(
           (i) =>
-            i.snapshot.workspaceId === ws && !i.isArchived && i.snapshot.name.toLowerCase() === name.toLowerCase(),
+            i.snapshot.workspaceId === ws &&
+            !i.isArchived &&
+            i.snapshot.name.toLowerCase() === name.toLowerCase(),
         );
         return found ? fresh(found) : null;
       },

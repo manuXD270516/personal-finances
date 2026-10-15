@@ -232,7 +232,9 @@ describe('Configuración del provider por institución solo con términos verifi
     const base = { FX_PROVIDER_INSTITUTION_RATES: 'instrate_test' };
     setup(); // registra el doble
     const bad = (env: Record<string, string>) => parseFxProviderSettings({ ...base, ...env });
-    expect(bad({ FX_INSTITUTION_RATES_INTERVAL: '30s' }).institutionConfigError).toMatch(/at least 60 seconds/);
+    expect(bad({ FX_INSTITUTION_RATES_INTERVAL: '30s' }).institutionConfigError).toMatch(
+      /at least 60 seconds/,
+    );
     expect(bad({ FX_INSTITUTION_RATES_INTERVAL: 'rápido' }).institutionConfigError).toMatch(/duration/);
     expect(bad({ FX_STALE_AFTER_INSTITUTION: '0h' }).institutionConfigError).toMatch(/duration/);
     expect(bad({ FX_STALE_AFTER_INSTITUTION: '30m' }).institutionConfigError).toMatch(
@@ -270,7 +272,9 @@ describe('Ingesta de tasas por institución (fx/market-rate-providers)', () => {
     expect(rates.every((r) => r.snapshot.source === 'PROVIDER' && r.snapshot.provider === ID)).toBe(true);
     expect(rates.every((r) => r.rate.base.code === 'USD' && r.rate.quote.code === 'BOB')).toBe(true);
     // Ninguna BANK_BUY ni BANK para esas entidades.
-    expect(mem.state.rates.some((r) => r.snapshot.rateType === 'BANK_BUY' || r.snapshot.rateType === 'BANK')).toBe(false);
+    expect(
+      mem.state.rates.some((r) => r.snapshot.rateType === 'BANK_BUY' || r.snapshot.rateType === 'BANK'),
+    ).toBe(false);
 
     // Mismo ciclo con la misma publicación: idempotente (otra hora del mismo intervalo, mismo asOf).
     mem.clock.set(at('2026-10-08T17:10:00Z'));
@@ -284,9 +288,7 @@ describe('Ingesta de tasas por institución (fx/market-rate-providers)', () => {
     institution.quotes = { BAD: { compra: '11.8537', venta: '11.95' } };
     await ingestion.poll();
     const rates = institutionRates(mem);
-    expect(
-      rates.map((r) => [r.snapshot.institutionCode, r.snapshot.rateType, r.valueText]).sort(),
-    ).toEqual([
+    expect(rates.map((r) => [r.snapshot.institutionCode, r.snapshot.rateType, r.valueText]).sort()).toEqual([
       ['BAD', 'BANK_BUY', '11.95'],
       ['BAD', 'BANK_SELL', '11.8537'],
     ]);
@@ -405,7 +407,11 @@ describe('Intervalo propio del provider por institución (FX_INSTITUTION_RATES_I
 
   it('con un intervalo no mayor que el del ciclo (pila E2E con ciclo de 24 h) se consulta en cada ciclo', async () => {
     const { mem, institution, ingestion } = setup({
-      env: { FX_POLL_INTERVAL: '24h', FX_FEED_STALE_ALERT_AFTER: '24h', FX_INSTITUTION_RATES_INTERVAL: '60m' },
+      env: {
+        FX_POLL_INTERVAL: '24h',
+        FX_FEED_STALE_ALERT_AFTER: '24h',
+        FX_INSTITUTION_RATES_INTERVAL: '60m',
+      },
     });
     institution.quotes = { BAD: { compra: '11.85' } };
     await ingestion.poll();
@@ -435,9 +441,10 @@ describe('Estado de las tasas por institución (fx/market-rate-providers, Should
     expect(institution.calls).toBe(callsBefore);
     // Dentro del umbral no está obsoleta.
     mem.clock.set(at('2026-10-10T16:00:00Z'));
-    expect(
-      (await status.statusReport(WS)).institutions.find((i) => i.code === 'BAD'),
-    ).toMatchObject({ ageSeconds: 48 * 3600, stale: false });
+    expect((await status.statusReport(WS)).institutions.find((i) => i.code === 'BAD')).toMatchObject({
+      ageSeconds: 48 * 3600,
+      stale: false,
+    });
   });
 
   it('[TC-FX-INSTRATE-008] una institución adoptada sin proveedor informa su estado de soporte en tasas y la razón, sin tasas automáticas', async () => {

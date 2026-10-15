@@ -46,6 +46,8 @@ export const SECURITY_ACTIONS = [
 export const DATA_ACTION_ENTITIES = [
   'accounts.account',
   'accounts.institution',
+  // add-exchange-house-rate-providers: adopción de entidades desde el catálogo de referencia.
+  'accounts.institutions',
   'classification.catalog',
   'classification.category',
   'classification.category_group',

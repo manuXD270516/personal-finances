@@ -35,7 +35,8 @@ export const isInstitutionRateType = (t: FxRateType): t is InstitutionRateType =
 export const INSTITUTION_CODE_PATTERN = /^[A-Z0-9-]{2,40}$/;
 
 /** Tipos de un solo lado (compra o venta, de la fuente paralela o de una institución): jamás se eligen sin pedirlos. */
-export const isOneSidedRateType = (t: FxRateType): boolean => isQuoteSideRateType(t) || isInstitutionRateType(t);
+export const isOneSidedRateType = (t: FxRateType): boolean =>
+  isQuoteSideRateType(t) || isInstitutionRateType(t);
 
 /**
  * Cotizaciones de un solo lado (compra/venta publicadas por la fuente, tal como la fuente las nombra). Se registran
@@ -120,7 +121,9 @@ export const isCryptoProviderId = (v: unknown): v is FxCryptoProviderId =>
 /** ¿Id con la forma de un provider conocido (fiat o cripto)? La habilitación real la decide el catálogo de términos. */
 export const isFxRateProvider = (v: unknown): v is FxRateProvider =>
   typeof v === 'string' &&
-  ((FX_RATE_PROVIDERS as readonly string[]).includes(v) || isCryptoProviderId(v) || isInstitutionProviderId(v));
+  ((FX_RATE_PROVIDERS as readonly string[]).includes(v) ||
+    isCryptoProviderId(v) ||
+    isInstitutionProviderId(v));
 
 /** Cómo se eligió la tasa de valoración (`RateSelection` del contrato; design.md decisión 6). */
 export type RateSelection = 'PRIMARY' | 'FALLBACK' | 'LAST_KNOWN_STALE' | 'MANUAL';

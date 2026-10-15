@@ -233,7 +233,12 @@ describe('Tasas por institución sobre PostgreSQL (fx/market-rate-providers)', (
     );
     expect(
       latest
-        .map((s) => [s.rate.snapshot.institutionCode, s.rate.snapshot.rateType, s.rate.valueText, s.rate.snapshot.asOf])
+        .map((s) => [
+          s.rate.snapshot.institutionCode,
+          s.rate.snapshot.rateType,
+          s.rate.valueText,
+          s.rate.snapshot.asOf,
+        ])
         .sort(),
     ).toEqual([
       ['BAD', 'BANK_BUY', '11.95', '2026-10-09T16:00:00.000Z'],
@@ -256,7 +261,9 @@ describe('Tasas por institución sobre PostgreSQL (fx/market-rate-providers)', (
 
   it('RLS: cada workspace solo ve sus copias; sin workspace en contexto la app no ve ninguna', async () => {
     const repo = new PgExchangeRateRepository();
-    const mine = await appUow.run({ userId: owner, workspaceId: w1 }, () => repo.latestInstitutionRates(w1, ID));
+    const mine = await appUow.run({ userId: owner, workspaceId: w1 }, () =>
+      repo.latestInstitutionRates(w1, ID),
+    );
     expect(mine.every((s) => s.rate.snapshot.workspaceId === w1)).toBe(true);
     const crossed = await appUow.run({ userId: owner, workspaceId: w2 }, () =>
       repo.latestInstitutionRates(w1, ID),

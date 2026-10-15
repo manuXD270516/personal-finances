@@ -92,6 +92,35 @@ export const INSTITUTION_KINDS: readonly InstitutionKind[] = [
   'OTHER',
 ];
 
+/** Estado de soporte de una entrada del catálogo de referencia en una dimensión (conjunto abierto). */
+export type SupportState =
+  'SUPPORTED' | 'GENERIC_ONLY' | 'IN_VERIFICATION' | 'PENDING_SAMPLE' | 'NOT_ELIGIBLE' | 'NOT_APPLICABLE';
+
+export interface SupportStatus {
+  readonly status: SupportState;
+  /** Solo con `NOT_ELIGIBLE` (conjunto cerrado de razones, abierto para el cliente). */
+  readonly reason?: string | null;
+  readonly evaluatedOn?: string;
+  readonly providerIds?: readonly string[];
+}
+
+/** Soporte por dimensión de una entrada: tasas de cambio e importación de extractos. */
+export interface SupportByDimension {
+  readonly rates: SupportStatus;
+  readonly statementImport: SupportStatus;
+}
+
+/** Vínculo de una institución con el catálogo de referencia (`Institution.catalogRef`). */
+export interface InstitutionCatalogRef {
+  readonly country: string;
+  readonly code: string;
+  readonly catalogVersion: string;
+  /** Estado en el catálogo VIGENTE de la instalación; `null` si la entrada ya no figura en él. */
+  readonly listingStatus: 'ACTIVE' | 'DELISTED' | null;
+  readonly delistedSince: string | null;
+  readonly support?: SupportByDimension | null;
+}
+
 export interface Institution {
   readonly id: string;
   readonly name: string;
@@ -101,6 +130,8 @@ export interface Institution {
   readonly icon?: string | null;
   readonly color?: string | null;
   readonly notes?: string | null;
+  /** Presente solo en las instituciones adoptadas del catálogo de referencia. */
+  readonly catalogRef?: InstitutionCatalogRef | null;
   readonly archivedAt?: string | null;
   readonly version: number;
 }
@@ -327,6 +358,8 @@ export const FX_RATE_TYPES: readonly FxRateType[] = [
   'BANK',
   'CUSTOM',
   'MARKET',
+  'BANK_BUY',
+  'BANK_SELL',
 ];
 
 export interface FxRateAnomaly {
@@ -356,6 +389,8 @@ export interface FxRate {
   readonly createdAt: string;
   readonly provider?: string | null;
   readonly fetchedAt?: string | null;
+  /** Solo las tasas por institución (`BANK_BUY`/`BANK_SELL`): código de catálogo de la institución que las publicó. */
+  readonly institutionCode?: string | null;
   readonly attribution?: RateAttribution | null;
   readonly anomaly?: FxRateAnomaly | null;
   /** Solo observaciones `USER_CONVERSION` (D231): la conversión de origen (historial; nunca valora). */

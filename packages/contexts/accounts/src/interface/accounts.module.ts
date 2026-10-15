@@ -162,7 +162,9 @@ export function createAccountsRuntime(options: AccountsRuntimeOptions): Accounts
       { uow: deps.uow, institutions: deps.institutions, catalog, ids: deps.ids, clock: deps.clock },
       options.audit,
     ),
-    institutionSupport: { adoptedRatesSupport: (workspaceId) => catalogQueries.adoptedRatesSupport(workspaceId) },
+    institutionSupport: {
+      adoptedRatesSupport: (workspaceId) => catalogQueries.adoptedRatesSupport(workspaceId),
+    },
     query: {
       getPostingEligibility: (input) => accounts.getPostingEligibility(input.workspaceId, input.accountIds),
       assertCanPost: (input) => accounts.assertCanPost(input.workspaceId, input.accounts),

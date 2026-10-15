@@ -33,7 +33,11 @@ beforeEach(() => {
   mem = new InMemoryAccounts();
   reader = new InMemoryCatalogReader().set(validated(threeEntryCatalog()));
   const deps = mem.deps();
-  queries = new InstitutionCatalogQueries({ uow: deps.uow, institutions: deps.institutions, catalog: reader });
+  queries = new InstitutionCatalogQueries({
+    uow: deps.uow,
+    institutions: deps.institutions,
+    catalog: reader,
+  });
   adopt = new AdoptCatalogInstitutions({ ...deps, catalog: reader }, deps.audit);
   institutions = new InstitutionsService(deps, deps.audit);
   accounts = new AccountsService(deps);
@@ -94,9 +98,9 @@ describe('GetInstitutionCatalog (accounts/institutions: catálogo de referencia 
         ),
       ),
     );
-    expect((await queries.getCatalog({ workspaceId: W1, country: 'BO' })).entries.map((e) => e.code)).toEqual([
-      'BAD',
-    ]);
+    expect((await queries.getCatalog({ workspaceId: W1, country: 'BO' })).entries.map((e) => e.code)).toEqual(
+      ['BAD'],
+    );
     const all = await queries.getCatalog({ workspaceId: W1, country: 'BO', includeDelisted: true });
     expect(all.entries.map((e) => [e.code, e.listingStatus, e.delistedSince])).toEqual([
       ['BAD', 'ACTIVE', null],
@@ -123,7 +127,9 @@ describe('GetInstitutionCatalog (accounts/institutions: catálogo de referencia 
 describe('AdoptCatalogInstitutions (accounts/institutions: adopción desde el catálogo)', () => {
   it('[TC-ACCOUNTS-INSTCATALOG-002] adopta dos entradas: instituciones normales vinculadas, con una sola auditoría con los códigos', async () => {
     const result = await adopt.execute({ workspaceId: W1, country: 'BO', codes: ['BAD', 'BAL'] });
-    expect(result.adopted.map((i) => [i.name, i.kind, i.countryCode, i.catalogRef?.code, i.catalogRef?.version])).toEqual([
+    expect(
+      result.adopted.map((i) => [i.name, i.kind, i.countryCode, i.catalogRef?.code, i.catalogRef?.version]),
+    ).toEqual([
       ['Banco Andino Demo', 'BANK', 'BO', 'BAD', '2026-09-30'],
       ['Billetera Altiplano Demo', 'WALLET_PROVIDER', 'BO', 'BAL', '2026-09-30'],
     ]);
@@ -133,7 +139,10 @@ describe('AdoptCatalogInstitutions (accounts/institutions: adopción desde el ca
     expect(audits).toHaveLength(1);
     const changes = Object.fromEntries((audits[0]?.changes ?? []).map((c) => [c.field, c.after]));
     expect(JSON.parse(changes['codes'] as string)).toEqual(['BAD', 'BAL']);
-    expect(JSON.parse(changes['adopted'] as string).map((a: { code: string }) => a.code)).toEqual(['BAD', 'BAL']);
+    expect(JSON.parse(changes['adopted'] as string).map((a: { code: string }) => a.code)).toEqual([
+      'BAD',
+      'BAL',
+    ]);
     expect(changes['country']).toBe('BO');
     // Las instituciones adoptadas se listan como cualquier otra.
     const listed = await institutions.listInstitutions({ workspaceId: W1 });
@@ -181,7 +190,11 @@ describe('AdoptCatalogInstitutions (accounts/institutions: adopción desde el ca
   });
 
   it('[TC-ACCOUNTS-INSTCATALOG-004] un nombre usado por una institución propia es conflicto NAME_TAKEN sin impedir las demás', async () => {
-    const mine = await institutions.createInstitution({ workspaceId: W1, name: 'Banco Andino Demo', kind: 'BANK' });
+    const mine = await institutions.createInstitution({
+      workspaceId: W1,
+      name: 'Banco Andino Demo',
+      kind: 'BANK',
+    });
     const result = await adopt.execute({ workspaceId: W1, country: 'BO', codes: ['BAD', 'CID'] });
     expect(result.adopted.map((i) => [i.name, i.catalogRef?.code])).toEqual([
       ['Cooperativa Illimani Demo', 'CID'],
@@ -191,7 +204,11 @@ describe('AdoptCatalogInstitutions (accounts/institutions: adopción desde el ca
   });
 
   it('[TC-ACCOUNTS-INSTCATALOG-004] con links la institución existente queda vinculada sin crear otra, y el vínculo no cambia su nombre', async () => {
-    const mine = await institutions.createInstitution({ workspaceId: W1, name: 'Banco Andino Demo', kind: 'BANK' });
+    const mine = await institutions.createInstitution({
+      workspaceId: W1,
+      name: 'Banco Andino Demo',
+      kind: 'BANK',
+    });
     const result = await adopt.execute({
       workspaceId: W1,
       country: 'BO',
@@ -275,9 +292,9 @@ describe('AdoptCatalogInstitutions (accounts/institutions: adopción desde el ca
     const second = await adopt.execute({ workspaceId: W2, country: 'BO', codes: ['BAD'] });
     expect(second.adopted).toHaveLength(1);
     expect(mem.institutions.size).toBe(2);
-    expect((await queries.getCatalog({ workspaceId: W2, country: 'BO' })).entries[0]?.adoptedInstitutionId).toBe(
-      second.adopted[0]?.id,
-    );
+    expect(
+      (await queries.getCatalog({ workspaceId: W2, country: 'BO' })).entries[0]?.adoptedInstitutionId,
+    ).toBe(second.adopted[0]?.id);
   });
 });
 
@@ -297,7 +314,10 @@ describe('Entrada retirada del registro (accounts/institutions)', () => {
       validated(
         demoCatalog(
           [
-            demoEntry('BAD', { name: 'Banco Andino Demo', listing: { status: 'DELISTED', since: '2026-12-31' } }),
+            demoEntry('BAD', {
+              name: 'Banco Andino Demo',
+              listing: { status: 'DELISTED', since: '2026-12-31' },
+            }),
             demoEntry('CID', { name: 'Cooperativa Illimani Demo', category: 'SAVINGS_COOP' }),
           ],
           [
@@ -358,7 +378,10 @@ describe('estado de soporte (accounts/institutions)', () => {
     const byCode = new Map([...refs.values()].map((r) => [r.code, r]));
     expect(byCode.get('BAD')?.support?.rates.status).toBe('IN_VERIFICATION');
     expect(byCode.get('BAD')?.support?.statementImport.status).toBe('PENDING_SAMPLE');
-    expect(byCode.get('CID')?.support?.rates).toMatchObject({ status: 'NOT_ELIGIBLE', reason: 'NO_PUBLICATION' });
+    expect(byCode.get('CID')?.support?.rates).toMatchObject({
+      status: 'NOT_ELIGIBLE',
+      reason: 'NO_PUBLICATION',
+    });
   });
 
   it('[TC-ACCOUNTS-INSTCATALOG-007] la cobertura de la consulta informa soporte incompleto con 66.67 % de tasas resueltas', async () => {

@@ -119,9 +119,13 @@ function mapUnique(err: unknown): unknown {
   }
   // Dos adopciones simultáneas de la misma entrada del catálogo en el workspace (la segunda ya no la ve vinculada).
   if (constraint === 'institution_catalog_uk') {
-    return new DomainError('VALIDATION_FAILED', 'the catalog entry is already linked to another institution', {
-      cause: err,
-    }).at('/codes');
+    return new DomainError(
+      'VALIDATION_FAILED',
+      'the catalog entry is already linked to another institution',
+      {
+        cause: err,
+      },
+    ).at('/codes');
   }
   return err;
 }

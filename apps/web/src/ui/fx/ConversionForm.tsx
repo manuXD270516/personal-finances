@@ -377,7 +377,8 @@ function ConversionForm({
                 <option value="">{t('form.referenceAuto')}</option>
                 {rates.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {formatDecimal(trimRate(r.value), locale)} {r.quote}/{r.base} · {r.rateType} ·{' '}
+                    {formatDecimal(trimRate(r.value), locale)} {r.quote}/{r.base} · {r.rateType}
+                    {r.institutionCode ? ` (${r.institutionCode})` : ''} ·{' '}
                     {formatInstant(r.asOf, locale, ctx.timeZone)}
                     {r.sourceLabel ? ` · ${r.sourceLabel}` : ''}
                   </option>

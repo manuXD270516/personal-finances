@@ -54,10 +54,11 @@ export const SUPPORT_STATUSES = [
 export type SupportStatus = (typeof SUPPORT_STATUSES)[number];
 
 /** `rates` no admite `GENERIC_ONLY` ni `PENDING_SAMPLE` (solo importación de extractos; design.md decisión 5). */
-export const STATUSES_OF_DIMENSION: Readonly<Record<SupportDimension, readonly SupportStatus[]>> = Object.freeze({
-  rates: ['SUPPORTED', 'IN_VERIFICATION', 'NOT_ELIGIBLE', 'NOT_APPLICABLE'],
-  statementImport: SUPPORT_STATUSES,
-});
+export const STATUSES_OF_DIMENSION: Readonly<Record<SupportDimension, readonly SupportStatus[]>> =
+  Object.freeze({
+    rates: ['SUPPORTED', 'IN_VERIFICATION', 'NOT_ELIGIBLE', 'NOT_APPLICABLE'],
+    statementImport: SUPPORT_STATUSES,
+  });
 
 /** Estados resueltos (cuentan como soporte decidido) y pendientes (siguen abiertos). */
 export const RESOLVED_STATUSES: readonly SupportStatus[] = [
@@ -201,7 +202,11 @@ export function validateCatalog(raw: unknown, options: ValidateCatalogOptions): 
   if (!isString(raw['country']) || !/^[A-Z]{2}$/.test(raw['country'])) {
     add('COUNTRY_INVALID', '/country', 'country must be ISO 3166-1 alpha-2');
   }
-  if (!isString(raw['catalogVersion']) || raw['catalogVersion'].length < 1 || raw['catalogVersion'].length > 40) {
+  if (
+    !isString(raw['catalogVersion']) ||
+    raw['catalogVersion'].length < 1 ||
+    raw['catalogVersion'].length > 40
+  ) {
     add('CATALOG_VERSION_REQUIRED', '/catalogVersion', 'catalogVersion is required (1..40 characters)');
   }
 
@@ -386,7 +391,8 @@ function validateEntry(
   }
   let adoptable = true;
   if (raw['adoptable'] !== undefined) {
-    if (typeof raw['adoptable'] !== 'boolean') fail('ADOPTABLE_INVALID', '/adoptable', 'adoptable must be a boolean');
+    if (typeof raw['adoptable'] !== 'boolean')
+      fail('ADOPTABLE_INVALID', '/adoptable', 'adoptable must be a boolean');
     else adoptable = raw['adoptable'];
   }
   if (category === 'EXCHANGE_HOUSE') {
@@ -412,7 +418,11 @@ function validateEntry(
       fail('LISTING_INVALID', '/listing/since', 'listing.since must be a date (YYYY-MM-DD)');
     } else if (isString(rawSince)) since = rawSince;
     if (listingStatus === 'DELISTED' && since === null) {
-      fail('DELISTED_SINCE_REQUIRED', '/listing/since', 'a DELISTED entry needs the date it left the registry');
+      fail(
+        'DELISTED_SINCE_REQUIRED',
+        '/listing/since',
+        'a DELISTED entry needs the date it left the registry',
+      );
     }
   }
 
@@ -490,7 +500,11 @@ function validateSupportState(
     );
   }
   if (!isCalendarDate(raw['evaluatedOn'])) {
-    fail('EVALUATED_ON_REQUIRED', '/evaluatedOn', 'evaluatedOn (YYYY-MM-DD) is required in every support status');
+    fail(
+      'EVALUATED_ON_REQUIRED',
+      '/evaluatedOn',
+      'evaluatedOn (YYYY-MM-DD) is required in every support status',
+    );
   }
   const note = isString(raw['note']) && raw['note'].trim() !== '' ? raw['note'] : null;
   const rawReason = raw['reason'];

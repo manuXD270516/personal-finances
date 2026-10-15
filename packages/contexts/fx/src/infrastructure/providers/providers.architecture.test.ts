@@ -3,11 +3,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   FX_CRYPTO_PROVIDER_IDS,
+  FX_INSTITUTION_PROVIDER_IDS,
   FX_RATE_PROVIDERS,
   providerDescriptor,
   registeredCryptoDescriptors,
+  registeredInstitutionDescriptors,
 } from '../../domain/index.js';
-import { CRYPTO_ADAPTER_FACTORIES } from '../../interface/fx.module.js';
+import { CRYPTO_ADAPTER_FACTORIES, INSTITUTION_ADAPTER_FACTORIES } from '../../interface/fx.module.js';
 import { ProviderHttpClient } from './provider-http-client.js';
 
 // Test de arquitectura (tarea 4.5; design.md decisiones 2 y 10): el código de los adapters y del cliente HTTP no
@@ -70,6 +72,27 @@ describe('Arquitectura de infrastructure/providers (fx/market-rate-providers)', 
       expect(FX_CRYPTO_PROVIDER_IDS as readonly string[]).toContain(id);
     }
     expect(registeredCryptoDescriptors()).toEqual([]);
+  });
+
+  it('[TC-FX-INSTRATE-001] todo adapter por institución registrado tiene un descriptor VERIFIED con su fecha y ADR (hoy no hay ninguno: ningún adapter real antes de verificar los términos de su fuente)', () => {
+    // add-exchange-house-rate-providers: sin ids ni fábricas reales hasta el ADR de las fuentes por institución.
+    expect(FX_INSTITUTION_PROVIDER_IDS).toEqual([]);
+    expect(Object.keys(INSTITUTION_ADAPTER_FACTORIES)).toEqual([]);
+    for (const id of FX_INSTITUTION_PROVIDER_IDS) {
+      const terms = providerDescriptor(id)?.terms;
+      expect(terms?.status, id).toBe('VERIFIED');
+      expect(terms?.verifiedOn, id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(terms?.adr, id).toMatch(/^ADR-\d{4}$/);
+    }
+    for (const id of Object.keys(INSTITUTION_ADAPTER_FACTORIES)) {
+      expect(FX_INSTITUTION_PROVIDER_IDS as readonly string[]).toContain(id);
+    }
+    // Ningún archivo de adapters de esta carpeta declara un provider por institución sin factoría verificada.
+    for (const { file, text } of sources) {
+      expect(text, file).not.toMatch(/INSTRATE_/);
+    }
+    // En producción no hay ningún descriptor registrado: solo los tests registran dobles (y los dan de baja).
+    expect(registeredInstitutionDescriptors()).toEqual([]);
   });
 
   it('[TC-FX-PROVIDER-034] ningún adapter ni el cliente HTTP recibe pares ni fechas de un workspace', () => {

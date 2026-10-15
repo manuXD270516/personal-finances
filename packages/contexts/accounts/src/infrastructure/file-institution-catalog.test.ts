@@ -88,7 +88,9 @@ describe('FileInstitutionCatalogReader (accounts/institutions: catálogo como ar
     };
     const none = () => null;
     await write('BO.json', supported({}));
-    expect((await new FileInstitutionCatalogReader({ directory: dir, terms: none }).get('BO'))?.fictitious).toBe(true);
+    expect(
+      (await new FileInstitutionCatalogReader({ directory: dir, terms: none }).get('BO'))?.fictitious,
+    ).toBe(true);
     await write('BO.json', supported({ fictitious: false }));
     await expect(new FileInstitutionCatalogReader({ directory: dir, terms: none }).get('BO')).rejects.toThrow(
       /PROVIDER_TERMS_NOT_VERIFIED/,

@@ -37,11 +37,7 @@ export class CatalogRef {
   }
 
   /** Reconstruye desde las tres columnas: todas nulas ⇒ sin vínculo; parcial ⇒ dato corrupto. */
-  static fromColumns(
-    country: string | null,
-    code: string | null,
-    version: string | null,
-  ): CatalogRef | null {
+  static fromColumns(country: string | null, code: string | null, version: string | null): CatalogRef | null {
     if (country === null && code === null && version === null) return null;
     if (country === null || code === null || version === null) {
       throw invalid('/catalogRef', 'catalog country, code and version must be set together or not at all');

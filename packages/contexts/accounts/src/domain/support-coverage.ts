@@ -110,7 +110,10 @@ export function computeSupportCoverage(catalog: InstitutionCatalog): SupportCove
         reasonRank(a.reason) - reasonRank(b.reason),
     );
     const notEligible = byStatus
-      .filter((s): s is StatusCount & { reason: NotEligibleReason } => s.status === 'NOT_ELIGIBLE' && s.reason !== null)
+      .filter(
+        (s): s is StatusCount & { reason: NotEligibleReason } =>
+          s.status === 'NOT_ELIGIBLE' && s.reason !== null,
+      )
       .map((s) => ({ reason: s.reason, count: s.count }));
     return {
       dimension,

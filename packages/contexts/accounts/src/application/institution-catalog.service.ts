@@ -13,7 +13,12 @@ import {
   type SupportDimension,
   type SupportState,
 } from '../domain/index.js';
-import type { IdGenerator, InstitutionCatalogReader, InstitutionRepository, UnitOfWork } from './ports/index.js';
+import type {
+  IdGenerator,
+  InstitutionCatalogReader,
+  InstitutionRepository,
+  UnitOfWork,
+} from './ports/index.js';
 
 /** Estado de soporte de una entrada tal como lo expone la consulta (`InstitutionSupportStatus` del contrato). */
 export interface SupportStateView {
@@ -147,9 +152,7 @@ export class InstitutionCatalogQueries {
   async adoptedRatesSupport(
     workspaceId: string,
   ): Promise<readonly { readonly code: string; readonly status: string; readonly reason: string | null }[]> {
-    const linked = await this.deps.uow.run(workspaceId, () =>
-      this.deps.institutions.listLinked(workspaceId),
-    );
+    const linked = await this.deps.uow.run(workspaceId, () => this.deps.institutions.listLinked(workspaceId));
     const refs = await this.describeRefs(linked.map((i) => i.snapshot));
     const out: { code: string; status: string; reason: string | null }[] = [];
     for (const ref of refs.values()) {
@@ -178,7 +181,10 @@ export class InstitutionCatalogQueries {
         listingStatus: entry ? entry.listing.status : null,
         delistedSince: entry && entry.listing.status === 'DELISTED' ? entry.listing.since : null,
         support: entry
-          ? { rates: supportView(entry.support.rates), statementImport: supportView(entry.support.statementImport) }
+          ? {
+              rates: supportView(entry.support.rates),
+              statementImport: supportView(entry.support.statementImport),
+            }
           : null,
       });
     }
@@ -198,7 +204,11 @@ export interface AdoptionResult {
   readonly adopted: readonly InstitutionState[];
   /** Entradas ya vinculadas a una institución activa del workspace, o vinculadas por `links[]` en esta operación. */
   readonly alreadyLinked: readonly InstitutionState[];
-  readonly conflicts: readonly { readonly code: string; readonly reason: 'NAME_TAKEN'; readonly institutionId: string }[];
+  readonly conflicts: readonly {
+    readonly code: string;
+    readonly reason: 'NAME_TAKEN';
+    readonly institutionId: string;
+  }[];
 }
 
 /**
@@ -246,7 +256,9 @@ export class AdoptCatalogInstitutions {
         ).at(`/codes/${i}`);
       }
       if (!entry.adoptable) {
-        throw new DomainError('VALIDATION_FAILED', `catalog entry ${code} is not adoptable`).at(`/codes/${i}`);
+        throw new DomainError('VALIDATION_FAILED', `catalog entry ${code} is not adoptable`).at(
+          `/codes/${i}`,
+        );
       }
     });
 

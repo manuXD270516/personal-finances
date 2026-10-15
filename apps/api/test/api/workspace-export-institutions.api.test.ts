@@ -108,8 +108,9 @@ describe('Exportación e importación del vínculo con el catálogo y de las tas
     expect(restoredBad?.catalogRef?.catalogVersion).toBe('2026-09-30');
     expect(restoredBad?.id).not.toBe(source.bad['id']);
     // El catálogo de la instalación sigue mostrando su nombre; la institución importada no lo toma.
-    const entries = (await h.call('GET', `${api(restored)}/institution-catalog?country=BO`, { token: owner.token }))
-      .body['entries'] as { code: string; name: string; adoptedInstitutionId: string | null }[];
+    const entries = (
+      await h.call('GET', `${api(restored)}/institution-catalog?country=BO`, { token: owner.token })
+    ).body['entries'] as { code: string; name: string; adoptedInstitutionId: string | null }[];
     expect(entries.find((e) => e.code === 'BAD')).toMatchObject({
       name: 'Banco Andino Demo',
       adoptedInstitutionId: restoredBad?.id,
@@ -128,7 +129,9 @@ describe('Exportación e importación del vínculo con el catálogo y de las tas
     expect(rates[29]?.rate).toBe('11.8203');
     // El export y la importación no consultaron ninguna fuente: no hay provider por institución configurado.
     const status = await h.call('GET', `${api(restored)}/fx-providers/status`, { token: owner.token });
-    expect((status.body['data'] as { provider: string }[]).some((p) => p.provider.startsWith('INSTRATE_'))).toBe(false);
+    expect(
+      (status.body['data'] as { provider: string }[]).some((p) => p.provider.startsWith('INSTRATE_')),
+    ).toBe(false);
   }, 240_000);
 
   it('[TC-IDENTITY-EXPORT-014] una institución vinculada a un código ausente del catálogo de la instalación se importa con su vínculo y sus datos y se informa como ausente', async () => {
@@ -137,9 +140,11 @@ describe('Exportación e importación del vínculo con el catálogo y de las tas
     expect(foreign?.name).toBe('Entidad Ajena Demo');
     expect(foreign?.catalogRef).toMatchObject({ catalogVersion: '2026-03-31', listingStatus: null });
     // Las instituciones del original no cambiaron.
-    expect((await institutions(owner.ws)).filter((i) => i.catalogRef).map((i) => i.catalogRef?.code).sort()).toEqual([
-      'BAD',
-      'ZZZ',
-    ]);
+    expect(
+      (await institutions(owner.ws))
+        .filter((i) => i.catalogRef)
+        .map((i) => i.catalogRef?.code)
+        .sort(),
+    ).toEqual(['BAD', 'ZZZ']);
   });
 });

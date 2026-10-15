@@ -143,7 +143,10 @@ export class ProviderSample {
         );
       }
     } else if (institutionCode !== null) {
-      throw new ProviderError('PROVIDER_PAYLOAD_INVALID', 'only BANK_BUY and BANK_SELL carry an institution code');
+      throw new ProviderError(
+        'PROVIDER_PAYLOAD_INVALID',
+        'only BANK_BUY and BANK_SELL carry an institution code',
+      );
     }
     return new ProviderSample(
       input.provider,

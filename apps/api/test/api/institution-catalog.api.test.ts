@@ -126,11 +126,13 @@ const adopt = (u: User, body: Record<string, unknown>, key?: string) =>
     ...(key ? { headers: { 'idempotency-key': key } } : {}),
   });
 const institutionsOf = async (u: User) =>
-  (await call('GET', `/api/v1/workspaces/${u.ws}/institutions?includeArchived=true&limit=200`, {
-    token: u.token,
-  })).body['data'] as Institution[];
+  (
+    await call('GET', `/api/v1/workspaces/${u.ws}/institutions?includeArchived=true&limit=200`, {
+      token: u.token,
+    })
+  ).body['data'] as Institution[];
 const catalogEntries = async (u: User, query?: string) =>
-  ((await call('GET', catalogPath(u, query), { token: u.token })).body['entries'] as Entry[]);
+  (await call('GET', catalogPath(u, query), { token: u.token })).body['entries'] as Entry[];
 
 async function asUser<T>(u: User, fn: (c: Client) => Promise<T>, commit = false): Promise<T> {
   const app = await connect(deps.databaseUrl);
@@ -235,14 +237,25 @@ describe('catálogo de referencia de instituciones', () => {
 
   it('[TC-ACCOUNTS-INSTCATALOG-001] filtra por categoría (repetible) y por texto; sin país o con un país sin catálogo falla', async () => {
     const coops = await catalogEntries(viewer, 'country=BO&category=SAVINGS_COOP');
-    expect(coops.map((e) => e.name).sort()).toEqual(['Cooperativa Altiplano Demo', 'Cooperativa Illimani Demo']);
+    expect(coops.map((e) => e.name).sort()).toEqual([
+      'Cooperativa Altiplano Demo',
+      'Cooperativa Illimani Demo',
+    ]);
     const two = await catalogEntries(viewer, 'country=BO&category=SAVINGS_COOP&category=MOBILE_PAYMENT');
     expect(two.map((e) => e.code).sort()).toEqual(['BAL', 'BPD', 'CAD', 'CID']);
     expect((await catalogEntries(viewer, 'country=BO&q=pacha')).map((e) => e.code)).toEqual(['BPD']);
-    expectProblem(await call('GET', catalogPath(viewer, 'country=AR'), { token: viewer.token }), 404, 'RESOURCE_NOT_FOUND');
+    expectProblem(
+      await call('GET', catalogPath(viewer, 'country=AR'), { token: viewer.token }),
+      404,
+      'RESOURCE_NOT_FOUND',
+    );
     expect((await call('GET', catalogPath(viewer, 'q=banco'), { token: viewer.token })).status).toBe(400);
-    expect((await call('GET', catalogPath(viewer, 'country=Bolivia'), { token: viewer.token })).status).toBe(400);
-    expect((await call('GET', `/api/v1/workspaces/${editor.ws}/institution-catalog?country=BO`)).status).toBe(401);
+    expect((await call('GET', catalogPath(viewer, 'country=Bolivia'), { token: viewer.token })).status).toBe(
+      400,
+    );
+    expect((await call('GET', `/api/v1/workspaces/${editor.ws}/institution-catalog?country=BO`)).status).toBe(
+      401,
+    );
   });
 
   it('[TC-ACCOUNTS-INSTCATALOG-007] la cobertura del catálogo informa censo, resueltas y pendientes por dimensión y las NOT_ELIGIBLE con su razón', async () => {
@@ -262,7 +275,9 @@ describe('catálogo de referencia de instituciones', () => {
     expect(coverage.complete).toBe(false);
     expect(coverage.censusCoveragePct).toBe('100.00');
     expect(coverage.byCategory).toHaveLength(10);
-    expect(coverage.byCategory.every((c) => c.censusCoveragePct === '100.00' && c.entries === c.census)).toBe(true);
+    expect(coverage.byCategory.every((c) => c.censusCoveragePct === '100.00' && c.entries === c.census)).toBe(
+      true,
+    );
     const rates = coverage.byDimension.find((d) => d.dimension === 'rates')!;
     // 13 activas: pendientes = BAD (IN_VERIFICATION) y FQD (IN_VERIFICATION).
     expect([rates.resolved, rates.pending, rates.resolvedPct]).toEqual([11, 2, '84.62']);
@@ -284,7 +299,9 @@ describe('adopción desde el catálogo', () => {
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(contract().validateResponse('adoptCatalogInstitutions', 200, res.body)).toEqual([]);
     const adopted = res.body['adopted'] as Institution[];
-    expect(adopted.map((i) => [i.name, i.kind, i.countryCode, i.catalogRef?.code, i.catalogRef?.catalogVersion])).toEqual([
+    expect(
+      adopted.map((i) => [i.name, i.kind, i.countryCode, i.catalogRef?.code, i.catalogRef?.catalogVersion]),
+    ).toEqual([
       ['Banco Andino Demo', 'BANK', 'BO', 'BAD', '2026-09-30'],
       ['Billetera Altiplano Demo', 'WALLET_PROVIDER', 'BO', 'BAL', '2026-09-30'],
     ]);
@@ -417,9 +434,16 @@ describe('adopción desde el catálogo', () => {
       delistedSince: '2026-06-30',
     });
     const foreign = list.find((i) => i.id === ids[1])!;
-    expect(foreign.catalogRef).toMatchObject({ code: 'ZZZ', listingStatus: null, delistedSince: null, support: null });
+    expect(foreign.catalogRef).toMatchObject({
+      code: 'ZZZ',
+      listingStatus: null,
+      delistedSince: null,
+      support: null,
+    });
     expect(contract().validateResponse('getInstitution', 200, delisted)).toEqual([]);
-    const one = await call('GET', `/api/v1/workspaces/${owner.ws}/institutions/${ids[1]}`, { token: owner.token });
+    const one = await call('GET', `/api/v1/workspaces/${owner.ws}/institutions/${ids[1]}`, {
+      token: owner.token,
+    });
     expect(contract().validateResponse('getInstitution', 200, one.body)).toEqual([]);
     // La institución retirada conserva su cuenta y su saldo.
     const account = await call('POST', `/api/v1/workspaces/${owner.ws}/accounts`, {
@@ -434,7 +458,9 @@ describe('adopción desde el catálogo', () => {
       headers: { 'idempotency-key': randomUUID() },
     });
     expect(account.status, JSON.stringify(account.body)).toBe(201);
-    const inst = await call('GET', `/api/v1/workspaces/${owner.ws}/institutions/${ids[0]}`, { token: owner.token });
+    const inst = await call('GET', `/api/v1/workspaces/${owner.ws}/institutions/${ids[0]}`, {
+      token: owner.token,
+    });
     expect(inst.body['archivedAt']).toBeNull();
     expect((account.body['balance'] as { amount: string }).amount).toBe('1000.00');
   });

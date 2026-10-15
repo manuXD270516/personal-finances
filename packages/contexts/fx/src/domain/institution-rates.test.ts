@@ -120,12 +120,16 @@ describe('tipos de tasa por institución (fx/market-rate-providers)', () => {
         return scale === 0 ? digits : `${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
       });
     fc.assert(
-      fc.property(decimalText, fc.constantFrom('BANK_BUY', 'BANK_SELL') as fc.Arbitrary<FxRateType>, (value, type) => {
-        const s = sample('BAD', value, type);
-        expect(s.value).toBe(dec(value).toFixed());
-        expect(s.decimal.eq(dec(value))).toBe(true);
-        expect(codeOf(() => sample(null, value, type))).toBe('PROVIDER_PAYLOAD_INVALID');
-      }),
+      fc.property(
+        decimalText,
+        fc.constantFrom('BANK_BUY', 'BANK_SELL') as fc.Arbitrary<FxRateType>,
+        (value, type) => {
+          const s = sample('BAD', value, type);
+          expect(s.value).toBe(dec(value).toFixed());
+          expect(s.decimal.eq(dec(value))).toBe(true);
+          expect(codeOf(() => sample(null, value, type))).toBe('PROVIDER_PAYLOAD_INVALID');
+        },
+      ),
       { numRuns: 100 },
     );
   }, 30_000);
@@ -138,7 +142,13 @@ describe('tipos de tasa por institución (fx/market-rate-providers)', () => {
       dailyCloses: false,
       feeds: [{ base: 'USD', quote: 'BOB', rateType: 'BANK_SELL' }],
       quoteSideFeeds: [],
-      attribution: { provider: id as FxRateProvider, text: 't', url: 'https://example.invalid', license: null, licenseUrl: null },
+      attribution: {
+        provider: id as FxRateProvider,
+        text: 't',
+        url: 'https://example.invalid',
+        license: null,
+        licenseUrl: null,
+      },
       limitPerMinute: 10,
       history: false,
     });
@@ -163,7 +173,15 @@ describe('las tasas por institución no valoran por defecto (fx/market-rate-prov
       rawPayload: '{}',
       sourceLabel: 'paralelo.bo',
     }),
-    { id: 'p1', workspaceId: 'w1', base: USD, quote: BOB, effectiveDate: '2026-10-08', createdAt: FETCHED, anomaly: null },
+    {
+      id: 'p1',
+      workspaceId: 'w1',
+      base: USD,
+      quote: BOB,
+      effectiveDate: '2026-10-08',
+      createdAt: FETCHED,
+      anomaly: null,
+    },
   );
   const bankSell = ExchangeRate.fromProviderSample(sample('BAD', '11.85'), {
     id: 'b1',
@@ -225,7 +243,9 @@ describe('las tasas por institución no valoran por defecto (fx/market-rate-prov
     // La referencia de una conversión sin tipo explícito sigue el mismo criterio (preferencia o PARALLEL).
     expect(resolver.resolveForConversion({ base: USD, quote: BOB, at })).toBeNull();
     // Pedida explícitamente sí se resuelve (referencia de una conversión).
-    expect(resolver.resolveForConversion({ base: USD, quote: BOB, at, rateType: 'BANK_SELL' })?.fxRateId).toBe('b1');
+    expect(
+      resolver.resolveForConversion({ base: USD, quote: BOB, at, rateType: 'BANK_SELL' })?.fxRateId,
+    ).toBe('b1');
   });
 
   it('[TC-FX-INSTRATE-006] la tasa por institución es la referencia elegible de una conversión: id y versión exactos', () => {
@@ -254,7 +274,10 @@ describe('las tasas por institución no valoran por defecto (fx/market-rate-prov
       createdBy: 'u1',
     });
     const resolver = new RateResolver(
-      [{ state: manual.snapshot, supersededById: null }, ...candidates.filter((c) => c.state.rateType === 'PARALLEL')],
+      [
+        { state: manual.snapshot, supersededById: null },
+        ...candidates.filter((c) => c.state.rateType === 'PARALLEL'),
+      ],
       policy,
     );
     for (const type of ['BANK_BUY', 'BANK_SELL'] as const) {

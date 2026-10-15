@@ -24,7 +24,10 @@ function catalogOf(
 ): InstitutionCatalog {
   const entries = rows.map((r) =>
     demoEntry(r.code, {
-      listing: r.listing === 'DELISTED' ? { status: 'DELISTED', since: '2026-06-30' } : { status: 'ACTIVE', since: null },
+      listing:
+        r.listing === 'DELISTED'
+          ? { status: 'DELISTED', since: '2026-06-30' }
+          : { status: 'ACTIVE', since: null },
       support: {
         rates: status(r.rates, {
           ...(r.rates === 'NOT_ELIGIBLE' ? { reason: r.reason ?? 'NO_PUBLICATION' } : {}),
@@ -119,7 +122,10 @@ describe('SupportCoverage (accounts/institutions: medición del soporte completo
   it('cobertura del censo parcial y catálogo vacío: porcentajes HALF_EVEN a 2 decimales', () => {
     // Censo de 3 con 2 entradas = 66.67 %; no es válido para publicar, pero la medición lo informa.
     const partial = computeSupportCoverage({
-      ...catalogOf([{ code: 'AAA', rates: 'SUPPORTED' }, { code: 'BBB', rates: 'SUPPORTED' }]),
+      ...catalogOf([
+        { code: 'AAA', rates: 'SUPPORTED' },
+        { code: 'BBB', rates: 'SUPPORTED' },
+      ]),
       census: [{ category: 'MULTIPLE_BANK', count: 3, source: null }],
     });
     expect(partial.byCategory[0]).toMatchObject({ census: 3, entries: 2, censusCoveragePct: '66.67' });

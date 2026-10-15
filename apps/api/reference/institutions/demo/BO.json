@@ -65,8 +65,16 @@
       "listing": { "status": "ACTIVE", "since": null },
       "verification": { "status": "CONFIRMED", "note": null },
       "support": {
-        "rates": { "status": "NOT_ELIGIBLE", "reason": "TERMS_PROHIBIT_AUTOMATION", "evaluatedOn": "2026-10-15" },
-        "statementImport": { "status": "NOT_ELIGIBLE", "reason": "IMAGE_ONLY_STATEMENT", "evaluatedOn": "2026-10-15" }
+        "rates": {
+          "status": "NOT_ELIGIBLE",
+          "reason": "TERMS_PROHIBIT_AUTOMATION",
+          "evaluatedOn": "2026-10-15"
+        },
+        "statementImport": {
+          "status": "NOT_ELIGIBLE",
+          "reason": "IMAGE_ONLY_STATEMENT",
+          "evaluatedOn": "2026-10-15"
+        }
       }
     },
     {

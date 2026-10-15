@@ -357,7 +357,9 @@ describe('tasas por institución por HTTP', () => {
       referenceRate: { fxRateId: bad.id, rateType: 'BANK_SELL', rate: { value: '11.8537' } },
     });
     // 100.00 USD a 11.8537 = 1185.37 BOB de referencia frente a los 1180.00 recibidos: el spread es de 5.37 BOB.
-    expect((conv.body['conversion'] as { spread: { amount: { amount: string } } }).spread.amount.amount).toBe('5.37');
+    expect((conv.body['conversion'] as { spread: { amount: { amount: string } } }).spread.amount.amount).toBe(
+      '5.37',
+    );
     // El análisis de costo compara la tasa cotizada contra esa referencia (sin cambios de contrato).
     const cost = await call('GET', `${W(u)}/reports/conversion-costs?from=2026-10-01&to=2026-10-31`, {
       token: u.token,

@@ -670,7 +670,88 @@
       }
     },
     "reconcile": "Reconcile account",
-    "reconciliations": "View reconciliations"
+    "reconciliations": "View reconciliations",
+    "catalog": {
+      "title": "Add from the catalog",
+      "intro": "Entities of the official registry of the country, with their support status. Pick several and add them at once.",
+      "show": "Show catalog",
+      "hide": "Hide catalog",
+      "unavailable": "The entity catalog is not available in this installation.",
+      "fictitious": "Test catalog with fictitious entities: it is not the official registry.",
+      "source": "Source: {name} · cutoff {cutoff} · version {version}.",
+      "sourceLink": "View source",
+      "search": "Search by name or code",
+      "category": "Category",
+      "allCategories": "All categories",
+      "noResults": "No entity matches the search.",
+      "select": "Select {name}",
+      "adopted": "Already added",
+      "adoptedFrom": "From the catalog: {code} (version {version})",
+      "adoptSelected": "Add selected ({count})",
+      "adoptedCount": "Institutions added: {count}.",
+      "delisted": "No longer in the registry",
+      "delistedSince": "Not in the registry since {date}",
+      "notInCatalog": "Not in the catalog of this installation",
+      "notAdoptable": "Rates only",
+      "notAdoptableHint": "Not used as an accounts institution: it only declares its rates support.",
+      "verificationPending": "Pending confirmation in the source",
+      "conflictsTitle": "These entities were not added because an institution with that name already exists:",
+      "nameTaken": "\"{entry}\" already exists as \"{name}\".",
+      "linkExisting": "Link the existing one",
+      "categories": {
+        "MULTIPLE_BANK": "Multiple bank",
+        "SME_BANK": "SME bank",
+        "PUBLIC_BANK": "Public bank",
+        "DEVELOPMENT_BANK": "Productive development bank",
+        "HOUSING_FINANCE": "Housing finance entity",
+        "SAVINGS_COOP": "Savings and credit cooperative",
+        "DEVELOPMENT_FINANCE": "Development finance institution",
+        "MOBILE_PAYMENT": "Mobile payments",
+        "FINTECH": "Fintech",
+        "EXCHANGE_HOUSE": "Exchange house"
+      }
+    },
+    "support": {
+      "title": "Support status",
+      "dimensions": {
+        "rates": "Rates",
+        "statementImport": "Statements"
+      },
+      "states": {
+        "SUPPORTED": "Supported",
+        "GENERIC_ONLY": "Generic format only",
+        "IN_VERIFICATION": "In verification",
+        "PENDING_SAMPLE": "Pending sample",
+        "NOT_ELIGIBLE": "Not eligible",
+        "NOT_APPLICABLE": "Not applicable",
+        "UNKNOWN": "Unknown"
+      },
+      "reasons": {
+        "NO_PUBLICATION": "Not eligible: publishes no rates",
+        "TERMS_PROHIBIT_AUTOMATION": "Not eligible: its terms prohibit automation",
+        "TERMS_UNAVAILABLE": "Not eligible: terms unavailable",
+        "REQUIRES_CREDENTIALS": "Not eligible: requires credentials",
+        "UNSTABLE_FORMAT": "Not eligible: unstable format",
+        "IMAGE_ONLY_STATEMENT": "Not eligible: image-only statement",
+        "OTHER": "Not eligible: other reason"
+      }
+    },
+    "coverage": {
+      "title": "Entity support coverage",
+      "intro": "How much of the official registry the catalog covers and what support each entity has.",
+      "show": "Show coverage",
+      "hide": "Hide coverage",
+      "source": "Source: {name} · cutoff {cutoff} · version {version}.",
+      "complete": "Complete coverage.",
+      "incomplete": "Incomplete coverage.",
+      "census": "Census covered: {pct}.",
+      "byCategory": "Census by category",
+      "census_": "Official census",
+      "entries": "In the catalog",
+      "coveragePct": "Coverage",
+      "resolved": "Resolved: {resolved} · pending: {pending} · {pct}",
+      "notEligibleApart": "Not eligible, reported apart:"
+    }
   },
   "Transactions": {
     "backToList": "← Back to transactions",
@@ -1063,7 +1144,9 @@
       "CUSTOM": "Custom",
       "PARALLEL_BUY": "Buy",
       "PARALLEL_SELL": "Sell",
-      "MARKET": "Market"
+      "MARKET": "Market",
+      "BANK_BUY": "Bought at institution",
+      "BANK_SELL": "Sold to institution"
     },
     "detail": {
       "title": "Conversion detail (revision {revision})",
@@ -1169,7 +1252,8 @@
       "observation": "Conversion",
       "viewConversion": "View conversion",
       "withdrawn": "conversion voided",
-      "observationHint": "Observation of an own conversion: it is history of the pair and is never used to value."
+      "observationHint": "Observation of an own conversion: it is history of the pair and is never used to value.",
+      "institution": "Institution {code}"
     },
     "screen": {
       "title": "Crypto and FX",

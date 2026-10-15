@@ -1,5 +1,5 @@
 import { DomainError } from '@pf/shared-kernel';
-import { CatalogRef } from './catalog-ref.js';
+import { type CatalogRef } from './catalog-ref.js';
 
 /** Clases de institución (docs/01 FR-ACCOUNTS-012, docs/31 D3). */
 export const INSTITUTION_KINDS = [

@@ -147,7 +147,8 @@ export class ProviderStatusQueries {
         if (!snapshot.institutionCode) continue;
         const e = entry(snapshot.institutionCode);
         e.types.add(snapshot.rateType);
-        if (e.lastAsOf === null || Date.parse(snapshot.asOf) > Date.parse(e.lastAsOf)) e.lastAsOf = snapshot.asOf;
+        if (e.lastAsOf === null || Date.parse(snapshot.asOf) > Date.parse(e.lastAsOf))
+          e.lastAsOf = snapshot.asOf;
       }
     }
     const support = new Map<string, { status: string; reason: string | null }>();
