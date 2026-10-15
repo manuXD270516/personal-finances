@@ -344,6 +344,17 @@ describe('catálogo de instituciones: vistas', () => {
   });
 });
 
+describe('presentación móvil', () => {
+  it('[TC-ACCOUNTS-INSTCATALOG-006] las insignias de soporte se parten en líneas y la tabla de cobertura tiene scroll propio accesible', () => {
+    const html = view();
+    expect(html).toMatch(/style="[^"]*white-space:normal[^"]*"[^>]*data-testid="support-rates"/);
+    expect(html).not.toMatch(/white-space:nowrap/);
+    const cov = renderToStaticMarkup(<CoverageView catalog={CATALOG} f={f} />);
+    expect(cov).toMatch(/role="region"[^>]*aria-label="Cobertura del censo por categoría"/);
+    expect(cov).toContain('tabindex="0"');
+  });
+});
+
 describe('instituciones con vínculo al catálogo', () => {
   it('[TC-ACCOUNTS-INSTCATALOG-002] el tipo Institution admite catalogRef opcional', () => {
     const plain: Institution = { id: 'a', name: 'Manual', kind: 'BANK', version: 1 };

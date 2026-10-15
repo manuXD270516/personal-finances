@@ -4,6 +4,15 @@ import { formatLocalDate } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import { catalogStanding, supportLabelKey, supportTone } from './catalog-logic';
 
+/** Insignia que puede partirse en varias líneas: los textos de soporte con razón son largos y en móvil no caben en una. */
+export const wrapBadgeStyle = {
+  ...badgeStyle,
+  whiteSpace: 'normal',
+  overflowWrap: 'anywhere',
+  maxWidth: '100%',
+  minWidth: 0,
+} as const;
+
 const TONE_STYLE = {
   ok: { borderColor: 'var(--pf-success-border, var(--pf-border-strong))' },
   pending: { borderColor: 'var(--pf-warning-border, var(--pf-border-strong))' },
@@ -28,7 +37,7 @@ export function SupportBadges({ support, f }: { support: SupportByDimension; f: 
       {dims.map(([dim, s]) => (
         <li
           key={dim}
-          style={{ ...badgeStyle, ...TONE_STYLE[supportTone(s)] }}
+          style={{ ...wrapBadgeStyle, ...TONE_STYLE[supportTone(s)] }}
           data-testid={`support-${dim}`}
           data-state={s.status}
         >
@@ -51,14 +60,14 @@ export function CatalogStanding({ catalogRef, f }: { catalogRef: InstitutionCata
         {f.t('catalog.adoptedFrom', { code: catalogRef.code, version: catalogRef.catalogVersion })}
       </span>
       {standing === 'DELISTED' ? (
-        <span role="note" style={badgeStyle} data-testid="delisted-notice">
+        <span role="note" style={wrapBadgeStyle} data-testid="delisted-notice">
           {catalogRef.delistedSince
             ? f.t('catalog.delistedSince', { date: formatLocalDate(catalogRef.delistedSince, f.locale) })
             : f.t('catalog.delisted')}
         </span>
       ) : null}
       {standing === 'NOT_IN_CATALOG' ? (
-        <span role="note" style={badgeStyle} data-testid="not-in-catalog-notice">
+        <span role="note" style={wrapBadgeStyle} data-testid="not-in-catalog-notice">
           {f.t('catalog.notInCatalog')}
         </span>
       ) : null}

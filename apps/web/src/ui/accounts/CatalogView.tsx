@@ -1,4 +1,4 @@
-import { badgeStyle, cardStyle, Field, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
+import { cardStyle, Field, inputStyle, mutedStyle, rowStyle, warningStyle } from '../common/ui';
 import { formatLocalDate } from '../dashboard/format';
 import type { FormatContext } from '../dashboard/types';
 import {
@@ -9,7 +9,7 @@ import {
   type CatalogFilters,
   type InstitutionCatalogData,
 } from './catalog-logic';
-import { SupportBadges } from './SupportBadges';
+import { SupportBadges, wrapBadgeStyle } from './SupportBadges';
 
 export interface CatalogViewProps {
   readonly catalog: InstitutionCatalogData;
@@ -143,12 +143,12 @@ export function CatalogView(p: CatalogViewProps) {
                   {e.code} · {categoryLabel(f, e.category)}
                 </span>
                 {e.adoptedInstitutionId ? (
-                  <span style={badgeStyle} data-testid="catalog-adopted">
+                  <span style={wrapBadgeStyle} data-testid="catalog-adopted">
                     {f.t('catalog.adopted')}
                   </span>
                 ) : null}
                 {e.listingStatus === 'DELISTED' ? (
-                  <span style={badgeStyle} data-testid="catalog-delisted">
+                  <span style={wrapBadgeStyle} data-testid="catalog-delisted">
                     {e.delistedSince
                       ? f.t('catalog.delistedSince', { date: formatLocalDate(e.delistedSince, f.locale) })
                       : f.t('catalog.delisted')}
@@ -156,7 +156,7 @@ export function CatalogView(p: CatalogViewProps) {
                 ) : null}
                 {!e.adoptable ? (
                   <span
-                    style={badgeStyle}
+                    style={wrapBadgeStyle}
                     data-testid="catalog-not-adoptable"
                     title={f.t('catalog.notAdoptableHint')}
                   >
@@ -164,7 +164,7 @@ export function CatalogView(p: CatalogViewProps) {
                   </span>
                 ) : null}
                 {e.verification === 'PENDING' ? (
-                  <span style={badgeStyle} data-testid="catalog-pending-verification">
+                  <span style={wrapBadgeStyle} data-testid="catalog-pending-verification">
                     {f.t('catalog.verificationPending')}
                   </span>
                 ) : null}

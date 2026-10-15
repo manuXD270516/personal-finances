@@ -750,7 +750,8 @@
       "entries": "In the catalog",
       "coveragePct": "Coverage",
       "resolved": "Resolved: {resolved} · pending: {pending} · {pct}",
-      "notEligibleApart": "Not eligible, reported apart:"
+      "notEligibleApart": "Not eligible, reported apart:",
+      "tableLabel": "Census coverage by category"
     }
   },
   "Transactions": {

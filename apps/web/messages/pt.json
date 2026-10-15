@@ -750,7 +750,8 @@
       "entries": "No catálogo",
       "coveragePct": "Cobertura",
       "resolved": "Resolvidas: {resolved} · pendentes: {pending} · {pct}",
-      "notEligibleApart": "Não elegíveis, à parte:"
+      "notEligibleApart": "Não elegíveis, à parte:",
+      "tableLabel": "Cobertura do censo por categoria"
     }
   },
   "Transactions": {
