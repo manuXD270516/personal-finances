@@ -231,7 +231,9 @@
             "BANK",
             "CUSTOM",
             "PARALLEL_BUY",
-            "PARALLEL_SELL"
+            "PARALLEL_SELL",
+            "BANK_BUY",
+            "BANK_SELL"
           ],
           "description": "FxRateType (opcional, cambio aditivo)."
         }

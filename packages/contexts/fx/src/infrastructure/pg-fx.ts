@@ -352,7 +352,7 @@ export class PgExchangeRateRepository implements ExchangeRateRepository {
       .onConflict((oc) =>
         oc
           .expression(
-            sql`(workspace_id, provider, base_currency, quote_currency, rate_type, COALESCE(institution_code, ''), as_of)`,
+            sql`workspace_id, provider, base_currency, quote_currency, rate_type, (COALESCE(institution_code, '')), as_of`,
           )
           .where('provider', 'is not', null)
           .doNothing(),

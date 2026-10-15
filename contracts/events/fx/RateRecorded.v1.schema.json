@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/fx/RateRecorded.v1.schema.json",
   "title": "fx.RateRecorded.v1",
-  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged. Con rateType = MARKET (add-crypto-rate-providers, D226) es el precio spot de una criptomoneda frente a USDT, manual o de un provider cripto (`CRYPTO_<NOMBRE>`, ids fijados en ADR-0029 tras verificar los términos de uso de cada fuente). Con source = USER_CONVERSION es la observación de una conversión propia (add-conversion-cost-analysis, D231): rateType CUSTOM, actor SYSTEM 'fx-user-conversion', value = tasa efectiva de la conversión y supersedesRateId = la observación de la revisión anterior; nunca se usa para valorar.",
+  "description": "Se registró una tasa histórica inmutable (manual, o de un provider de mercado desde Phase 1: paralelo.bo / bo.dolarapi.com, ADR-0025) o una versión que corrige (supersede) a otra. 1 base = value quote. Productor: FX (manual: actor USER; provider: actor SYSTEM 'fx-provider:<id>', un evento por workspace en cuyo historial se registró la tasa). Consumidores: REPORTING. Idempotencia natural: rateId. Sin PII. Campos agregados de forma aditiva (opcionales): provider, anomalyFlagged. Con rateType = MARKET (add-crypto-rate-providers, D226) es el precio spot de una criptomoneda frente a USDT, manual o de un provider cripto (`CRYPTO_<NOMBRE>`, ids fijados en ADR-0029 tras verificar los términos de uso de cada fuente). Con source = USER_CONVERSION es la observación de una conversión propia (add-conversion-cost-analysis, D231): rateType CUSTOM, actor SYSTEM 'fx-user-conversion', value = tasa efectiva de la conversión y supersedesRateId = la observación de la revisión anterior; nunca se usa para valorar. Con rateType = BANK_BUY o BANK_SELL (add-exchange-house-rate-providers) es la compra o la venta que publica una institución, \"desde el lado del owner\" (D39): BANK_BUY = lo que el owner paga al comprar la moneda base, BANK_SELL = lo que recibe al venderla; la tasa lleva `institutionCode` (código de catálogo de la institución) y el id de un provider por institución (`INSTRATE_<NOMBRE>`, ids fijados en el ADR de sus fuentes). Nunca valora por defecto.",
   "type": "object",
   "allOf": [
     {
@@ -61,7 +61,9 @@
             "CUSTOM",
             "PARALLEL_BUY",
             "PARALLEL_SELL",
-            "MARKET"
+            "MARKET",
+            "BANK_BUY",
+            "BANK_SELL"
           ]
         },
         "source": {
@@ -95,7 +97,7 @@
           ]
         },
         "provider": {
-          "description": "Provider que originó la tasa (source = PROVIDER); null para tasas manuales. Los providers cripto usan el id `CRYPTO_<NOMBRE>`. Aditivo (opcional).",
+          "description": "Provider que originó la tasa (source = PROVIDER); null para tasas manuales. Los providers cripto usan el id `CRYPTO_<NOMBRE>` y los de tasas por institución `INSTRATE_<NOMBRE>`. Aditivo (opcional).",
           "oneOf": [
             {
               "enum": [
@@ -108,6 +110,10 @@
               "pattern": "^CRYPTO_[A-Z0-9_]{1,32}$"
             },
             {
+              "type": "string",
+              "pattern": "^INSTRATE_[A-Z0-9_]{1,32}$"
+            },
+            {
               "type": "null"
             }
           ]
@@ -115,6 +121,11 @@
         "anomalyFlagged": {
           "description": "true si la muestra del provider superó el umbral de variación y no se usa hasta que un editor la confirme. Aditivo (opcional).",
           "type": "boolean"
+        },
+        "institutionCode": {
+          "description": "Código de catálogo (sigla del registro oficial) de la institución que publicó la cotización: solo con rateType BANK_BUY o BANK_SELL de un provider por institución. Aditivo (opcional).",
+          "type": "string",
+          "pattern": "^[A-Z0-9-]{2,40}$"
         }
       }
     }
@@ -263,6 +274,37 @@
         "asOf": "2026-10-13T14:00:00Z",
         "effectiveDate": "2026-10-13",
         "supersedesRateId": null
+      }
+    },
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000501",
+      "eventType": "fx.RateRecorded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-08T16:05:02.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ExchangeRate",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000fa501",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f1",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": "fx-provider:INSTRATE_EXAMPLE"
+      },
+      "payload": {
+        "rateId": "01928c4e-0000-7000-8000-0000000fa501",
+        "base": "USD",
+        "quote": "BOB",
+        "value": "11.85",
+        "rateType": "BANK_SELL",
+        "source": "PROVIDER",
+        "sourceLabel": "INSTRATE_EXAMPLE (compra de BAD)",
+        "asOf": "2026-10-08T16:00:00.000Z",
+        "effectiveDate": "2026-10-08",
+        "supersedesRateId": null,
+        "provider": "INSTRATE_EXAMPLE",
+        "anomalyFlagged": false,
+        "institutionCode": "BAD"
       }
     }
   ]
