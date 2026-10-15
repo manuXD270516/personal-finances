@@ -40,7 +40,8 @@ function sources(dir: string): string[] {
     const path = join(dir, entry);
     if (statSync(path).isDirectory())
       return entry === 'node_modules' || entry === 'dist' ? [] : sources(path);
-    return /\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) ? [path] : [];
+    // Los apoyos de test (`*.test-support.ts`) no se compilan en el producto (tsconfig.build los excluye).
+    return /\.tsx?$/.test(entry) && !/\.test(-support)?\.tsx?$/.test(entry) ? [path] : [];
   });
 }
 
