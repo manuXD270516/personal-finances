@@ -283,8 +283,8 @@ describe('las tasas por institución no valoran por defecto (fx/market-rate-prov
     for (const type of ['BANK_BUY', 'BANK_SELL'] as const) {
       expect(resolver.tryResolve({ base: USD, quote: BOB, at, preferenceOf: () => type })).toBeNull();
     }
-    // Con PARALLEL como preferencia la valoración por defecto sigue intacta.
-    expect(resolver.resolve({ base: USD, quote: BOB, at }).rateType).toBe('PARALLEL');
+    // Sin preferencia la valoración por defecto sigue su regla (la manual fresca gana) y nunca usa un tipo de entidad.
+    expect(resolver.resolve({ base: USD, quote: BOB, at }).rateType).toBe('P2P');
   });
 
   it('una tasa de institución obsoleta (más de FX_STALE_AFTER_INSTITUTION) se marca como última conocida obsoleta', () => {

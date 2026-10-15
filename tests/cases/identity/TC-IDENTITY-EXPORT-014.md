@@ -5,16 +5,19 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Vínculo con el catálogo de referencia en el export"
 scenario: "Ida y vuelta con una institución adoptada y renombrada"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-010", "FR-IDENTITY-017", "FR-ACCOUNTS-012"]
 nfr: []
 invariants: ["INV-011"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - apps/api/test/api/workspace-export-institutions.api.test.ts
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["identity", "export", "institutions", "bank-rates"]
@@ -31,7 +34,7 @@ expected_result:
   - "Ninguna solicitud a proveedores"
   - "Sin BAD en el catálogo destino la institución se importa igual y se informa 'no figura en el catálogo de esta instalación'"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-IDENTITY-EXPORT-014 — El export conserva el vínculo con el catálogo y las tasas por institución sin consultar fuentes

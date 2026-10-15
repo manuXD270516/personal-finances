@@ -5,16 +5,20 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Catálogo de referencia de instituciones por país"
 scenario: "Consultar el catálogo de un país"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+  - packages/contexts/accounts/src/infrastructure/file-institution-catalog.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog"]
@@ -32,7 +36,7 @@ expected_result:
   - "Con el filtro solo aparece Cooperativa Illimani Demo"
   - "El listado de instituciones del workspace sigue vacío"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-001 — El catálogo de referencia de un país se consulta con fuente, fecha de corte y filtros

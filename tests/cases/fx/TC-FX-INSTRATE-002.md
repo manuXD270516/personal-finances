@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Proveedores de tasas por institución solo con términos verificados"
 scenario: "Fuente con términos que prohíben la automatización"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-009"]
 nfr: ["NFR-COMP-007"]
 invariants: []
 priority: high
 type: unit
 level: architecture
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/accounts/src/domain/institution-catalog.test.ts
+  - packages/contexts/fx/src/application/institution-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "terms-of-use"]
@@ -29,7 +31,7 @@ expected_result:
   - "La fuente no se habilita"
   - "La validación del catálogo falla; la entidad debe quedar NOT_ELIGIBLE o IN_VERIFICATION"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-002 — Una fuente cuyos términos prohíben la automatización queda no apta y no se consulta

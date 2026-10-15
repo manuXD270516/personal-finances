@@ -5,16 +5,22 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Adopción de instituciones desde el catálogo"
 scenario: "Adoptar dos entradas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012"]
 nfr: []
 invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+  - packages/contexts/accounts/src/domain/catalog-ref.test.ts
+  - packages/contexts/accounts/test/integration/institution-catalog.int.test.ts
+  - tests/e2e/specs/institution-catalog.spec.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog", "audit"]
@@ -33,7 +39,7 @@ expected_result:
   - "La repetición no crea otra institución y la informa en alreadyLinked"
   - "Tras renombrar conserva el vínculo con BAD y el catálogo sigue mostrando Banco Andino Demo"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-002 — Adoptar entradas del catálogo crea instituciones normales vinculadas y auditadas, sin duplicar

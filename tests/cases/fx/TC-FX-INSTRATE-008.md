@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Estado de las tasas por institución consultable"
 scenario: "Institución adoptada sin proveedor"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-016"]
 nfr: []
 invariants: []
 priority: low
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-institution-rates.api.test.ts
+  - packages/contexts/fx/src/application/institution-rate-providers.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "provider-status"]
@@ -27,7 +29,7 @@ steps:
 expected_result:
   - "institutions[] incluye CID sin tasas automáticas, con estado NOT_ELIGIBLE y razón NO_PUBLICATION"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-008 — El estado informa la razón de las instituciones adoptadas sin proveedor

@@ -5,16 +5,18 @@ spec: fx/market-rate-providers
 related_specs: []
 requirement: "Las tasas por institución no valoran por defecto"
 scenario: "Valoración sin preferencia"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-FX-006"]
 nfr: []
 invariants: ["INV-012"]
 priority: critical
 type: domain
 level: domain
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/fx-institution-rates.api.test.ts
+  - packages/contexts/fx/src/domain/institution-rates.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["fx", "valuation", "bank-rates"]
@@ -30,7 +32,7 @@ expected_result:
   - "Sin preferencia: 1202.00 BOB con PARALLEL"
   - "Con preferencia: 1185.00 BOB con BANK_SELL de BAD"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-FX-INSTRATE-005 — La valoración ignora las tasas por institución salvo preferencia explícita del par

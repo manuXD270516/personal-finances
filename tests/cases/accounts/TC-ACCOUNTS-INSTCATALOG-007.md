@@ -5,16 +5,20 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Medición del soporte completo"
 scenario: "Soporte incompleto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012", "FR-FX-009"]
 nfr: []
 invariants: []
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - apps/web/src/ui/accounts/catalog.test.tsx
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+  - packages/contexts/accounts/src/domain/support-coverage.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog", "coverage"]
@@ -30,7 +34,7 @@ expected_result:
   - "Tasas: 2 resueltas, 1 pendiente, 66.67 %; 1 NOT_ELIGIBLE informada aparte con su razón"
   - "complete = false"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-007 — La cobertura informa resueltas, pendientes y porcentajes HALF_EVEN y marca el soporte como no completo

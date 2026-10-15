@@ -5,16 +5,19 @@ spec: accounts/institutions
 related_specs: []
 requirement: "Adopción de instituciones desde el catálogo"
 scenario: "Código desconocido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-ACCOUNTS-012"]
 nfr: []
 invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/institution-catalog.api.test.ts
+  - packages/contexts/accounts/src/application/institution-catalog.service.test.ts
+  - packages/contexts/accounts/test/integration/institution-catalog.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["accounts", "institutions", "catalog"]
@@ -30,7 +33,7 @@ expected_result:
   - "422 INSTITUTION_CATALOG_ENTRY_UNKNOWN y ninguna institución creada"
   - "El VIEWER recibe INSUFFICIENT_ROLE"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # TC-ACCOUNTS-INSTCATALOG-003 — Un código inexistente rechaza toda la adopción sin crear instituciones
