@@ -1,23 +1,172 @@
 {
-  "datasetVersion": "1",
+  "datasetVersion": "2",
   "anchorDate": "2026-09-30",
   "balances": {
-    "bank_bob": "132486.57",
-    "bank_usd": "2181.70",
+    "bank_bob": "117519.90",
+    "bank_usd": "2617.68",
     "cash": "9073.69",
-    "usdt": "3975.726532",
+    "usdt": "3930.726532",
     "btc": "0.01108761",
-    "card": "1572.65",
-    "loan": "27200.00"
+    "card": "2380.86",
+    "savings_bob": "18000.00",
+    "kantuta_bob": "4770.50",
+    "kantuta_usd": "200.00",
+    "wallet": "700.00",
+    "loan_vehicular": "25288.74",
+    "loan_familiar": "0.00",
+    "loan_educativo": "1007.15",
+    "loan_consumo": "8000.00"
   },
   "counts": {
-    "accounts": 7,
-    "transactions": 560,
+    "accounts": 10,
+    "transactions": 600,
     "pending": 2,
-    "transfers": 61,
+    "transfers": 55,
     "conversions": 34,
-    "rates": 210,
-    "edits": 2,
+    "rates": 213,
+    "edits": 1,
     "voids": 1
+  },
+  "modules": {
+    "subscriptions": {
+      "count": 8,
+      "active": 5,
+      "trial": 1,
+      "paused": 1,
+      "cancelled": 1,
+      "monthlyBase": "412.94",
+      "yearlyBase": "4955.25",
+      "trialMonthlyBase": "105.00"
+    },
+    "overdueOccurrences": {
+      "recurring": 1,
+      "loanInstallments": 2
+    },
+    "loans": {
+      "vehicular": {
+        "status": "ACTIVE",
+        "paid": 19,
+        "overdue": 0,
+        "outstanding": "25288.74",
+        "scheduleVersion": 1,
+        "nextInstallmentNo": 20,
+        "nextDue": "2026-10-01",
+        "lastDue": "2028-02-01",
+        "interestInAnchorYear": "2166.91"
+      },
+      "consumo": {
+        "status": "ACTIVE",
+        "paid": 4,
+        "overdue": 2,
+        "outstanding": "8000.00",
+        "scheduleVersion": 1,
+        "nextInstallmentNo": 5,
+        "nextDue": "2026-08-21",
+        "lastDue": "2027-03-21",
+        "interestInAnchorYear": "420.00"
+      },
+      "familiar": {
+        "status": "PAID_OFF",
+        "paid": 3,
+        "overdue": 0,
+        "outstanding": "0.00",
+        "scheduleVersion": 1,
+        "nextInstallmentNo": null,
+        "nextDue": null,
+        "lastDue": "2026-02-10",
+        "interestInAnchorYear": "10.07"
+      },
+      "educativo": {
+        "status": "ACTIVE",
+        "paid": 8,
+        "overdue": 0,
+        "outstanding": "1007.15",
+        "scheduleVersion": 2,
+        "nextInstallmentNo": 9,
+        "nextDue": "2026-10-10",
+        "lastDue": "2026-10-10",
+        "interestInAnchorYear": "536.67"
+      }
+    },
+    "cards": {
+      "kantuta": {
+        "bobK1": {
+          "status": "PARTIALLY_PAID",
+          "billed": "1120.50",
+          "minimum": "56.02",
+          "pending": "620.50"
+        },
+        "usdK1": {
+          "status": "OVERDUE",
+          "billed": "200.00",
+          "minimum": "10.00",
+          "pending": "10.00"
+        },
+        "bobK2": {
+          "status": "ISSUED",
+          "billed": "1570.50",
+          "minimum": "78.52",
+          "pending": "1570.50"
+        },
+        "usdK2": {
+          "status": "ISSUED",
+          "billed": "200.00",
+          "minimum": "10.00",
+          "pending": "200.00"
+        },
+        "futureCharges": [
+          {
+            "due": "2026-11-08",
+            "amount": "800.00"
+          },
+          {
+            "due": "2026-12-08",
+            "amount": "800.00"
+          },
+          {
+            "due": "2027-01-08",
+            "amount": "800.00"
+          },
+          {
+            "due": "2027-02-08",
+            "amount": "800.00"
+          }
+        ]
+      },
+      "andina": {
+        "statements": 21,
+        "last": {
+          "closing": "2026-09-25",
+          "due": "2026-10-15",
+          "billed": "2380.86"
+        },
+        "payments": 20
+      }
+    },
+    "goals": {
+      "emergencyContributions": 12,
+      "emergencySaved": "18000.00",
+      "reserved": {
+        "travel": "550.00",
+        "laptop": "8000.00",
+        "gifts": "500.00"
+      }
+    }
+  },
+  "reference": {
+    "debtSummary": {
+      "totalBob": "40440.10",
+      "totalUsd": "1207.15",
+      "consolidatedBob": "48890.15",
+      "interestBob": "2596.98",
+      "interestUsd": "536.67",
+      "debtFree": "2028-02-01"
+    },
+    "spendable": {
+      "committedBob": "2349.00",
+      "reservedBob": "26500.00",
+      "reservedUsd": "550.00",
+      "plannedPendingUsd": "100.00"
+    }
   }
 }

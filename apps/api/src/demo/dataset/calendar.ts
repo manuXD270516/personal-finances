@@ -50,3 +50,35 @@ export function monthAt(
   const index = startYear * 12 + (startMonth - 1) + i;
   return { y: Math.floor(index / 12), m: (index % 12) + 1 };
 }
+
+/** Último día de un mes (`YYYY-MM-DD` de `y`-`m`). */
+export function monthEnd(y: number, m: number): string {
+  return ymd(y, m, daysInMonth(y, m));
+}
+
+/**
+ * Paso de `months` meses (negativo = hacia atrás) con el mismo día del mes; si el mes destino no tiene ese día,
+ * el último día del mes (misma regla que los cronogramas de los motores; design.md decisión 4).
+ */
+export function addMonthsClamped(value: string, months: number): string {
+  const { y, m, d } = parseDate(value);
+  const target = monthAt(y, m, months);
+  return ymd(target.y, target.m, Math.min(d, daysInMonth(target.y, target.m)));
+}
+
+/** Primer día del mes de `value`. */
+export function monthStart(value: string): string {
+  const { y, m } = parseDate(value);
+  return ymd(y, m, 1);
+}
+
+/** Día del mes de `value` (1..31). */
+export function dayOfMonth(value: string): number {
+  return parseDate(value).d;
+}
+
+/** `YYYY-MM-DD` con el día `day` del mes de `value` (último día si no existe). */
+export function withDay(value: string, day: number): string {
+  const { y, m } = parseDate(value);
+  return ymd(y, m, Math.min(day, daysInMonth(y, m)));
+}

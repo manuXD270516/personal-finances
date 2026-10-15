@@ -9,6 +9,8 @@ import {
 } from './dataset/demo-plan.js';
 
 export const noon = (date: string): Instant => Instant.parse(`${date}T16:00:00.000Z`);
+/** Inicio del día en America/La_Paz (UTC−4), para las operaciones fechadas en la ancla (design.md decisión 4). */
+export const startOfDay = (date: string): Instant => Instant.parse(`${date}T04:00:00.000Z`);
 const dto = (m: DemoMoney) => ({ amount: toDecimal(m), currency: m.currency });
 
 export class PlanLoadError extends Error {
