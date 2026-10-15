@@ -13,26 +13,26 @@ priority: high
 type: integration
 level: database-integration
 automation_status: automated
-automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/test/db/seed-demo.int.test.ts","apps/api/test/demo/demo-data.int.test.ts"]
+automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/test/db/seed-demo.int.test.ts","apps/api/test/demo/demo-data.int.test.ts","apps/api/test/demo/demo-v2.int.test.ts"]
 status: automated
 regression_suite: false
 phase: 1
 tags: ["demo-data","determinism","golden"]
 error_code: null
 preconditions:
-  - "Dataset demo versión 1 con golden summary"
+  - "Dataset demo versión 2 (suscripciones, tarjetas, préstamos y metas) con resumen de referencia v2: saldos de las 14 cuentas, conteos y bloque modules (golden-summary.json)"
   - "FixedClock; ancla 2026-09-30"
-input: {"datasetVersion":"1","anchorDate":"2026-09-30","loads":2}
+input: {"datasetVersion":"2","anchorDate":"2026-09-30","loads":2}
 steps:
   - "Cargar la demo en un workspace demo A"
   - "Limpiar A y cargar la demo en un workspace demo B con la misma ancla"
   - "Comparar saldos por cuenta y moneda con el golden summary"
 expected_result:
-  - "A y B tienen las mismas cuentas con los mismos saldos por moneda, iguales al golden summary"
+  - "A y B tienen las mismas cuentas con los mismos saldos por moneda, iguales al resumen de referencia v2 (golden summary), y los mismos estados por módulo"
   - "Cada asiento de A y de B suma 0 por moneda"
   - "Las instituciones son ficticias (p. ej. \"Banco Andino Demo\") y los identificadores de cuenta empiezan con DEMO-"
 created: 2026-10-03
-updated: 2026-10-04
+updated: 2026-10-15
 ---
 
 # TC-IDENTITY-DEMO-007 — Dos cargas con la misma ancla producen los mismos saldos y asientos balanceados
@@ -53,4 +53,5 @@ Entonces ambos tienen los mismos saldos que el golden summary
 ## Notas
 
 - Cubre también el scenario "Instituciones ficticias".
+- Dataset v2 (`add-phase-4-demo-data`): el resumen de referencia incluye el bloque `modules`; con otra ancla solo se comparan los estados por módulo (las cifras exactas son las de la ancla fija).
 - La segunda carga exige limpiar la primera (límite de un demo por usuario).

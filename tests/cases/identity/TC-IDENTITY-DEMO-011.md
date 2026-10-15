@@ -20,18 +20,18 @@ phase: 1
 tags: ["demo-data","purge"]
 error_code: null
 preconditions:
-  - "Workspace demo cargado y limpiado (CLEANING)"
+  - "Workspace demo cargado con el dataset v2 (8 suscripciones, 6 definiciones recurrentes con sus ocurrencias, 2 tarjetas con estados de cuenta y un plan de cuotas, 4 préstamos con cronograma y pagos, 4 metas con movimientos, preferencias de notificaciones) y limpiado (CLEANING)"
   - "platform.workspace_scoped_table contiene todas las tablas con workspace_id"
 input: {"job":"demo.purge"}
 steps:
   - "Ejecutar el job de purga"
   - "Contar filas con el workspace_id del demo en cada tabla registrada"
 expected_result:
-  - "Todas las tablas registradas tienen 0 filas con ese workspace_id (ledger, transacciones, tasas, clasificación, auditoría, outbox/inbox, read models)"
+  - "Todas las tablas registradas tienen 0 filas con ese workspace_id (ledger, transacciones, tasas, clasificación, compromisos, deudas, metas, notificaciones, auditoría, outbox/inbox, read models) y el registro de purga informa filas eliminadas mayores que cero en compromisos, deudas y metas"
   - "iam.workspace conserva la lápida con status PURGED sin datos de negocio"
   - "platform.demo_workspace_run registra purged_at y las filas eliminadas por tabla"
 created: 2026-10-03
-updated: 2026-10-04
+updated: 2026-10-15
 ---
 
 # TC-IDENTITY-DEMO-011 — La purga elimina todas las filas del workspace demo y deja solo la lápida

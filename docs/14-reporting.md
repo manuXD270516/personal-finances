@@ -360,6 +360,7 @@ Exports grandes son jobs BullMQ (`reporting.export`) con notificación al termin
 - Proyección vs ledger: test de integración que reproduce eventos fuera de orden y duplicados y verifica igualdad con recomputación directa.
 - Rebuild: proyección reconstruida == proyección incremental.
 - Golden reports sobre seed `demo` (29-seed-datasets.md).
+- **Oráculo del resumen de deudas y de Q5 (dataset Demo v2, add-phase-4-demo-data; ancla 2026-09-30, tasa de cierre USD/BOB 7.00).** Deuda en USD 1207.15 (1007.15 del crédito educativo + 200.00 de Tarjeta Kantuta Demo) consolidada en 8450.05 BOB; en BOB 25288.74 + 8000.00 + 4770.50 + el saldo de Tarjeta Andina Demo (2380.86) = 40440.10; interés pagado en 2026 de 2596.98 BOB (2166.91 + 420.00 + 10.07) y 536.67 USD; fecha libre de deudas 2028-02-01. Q5 del periodo de septiembre de 2026: comprometido 2349.00 BOB (cuotas en mora de 1080.00 y 1070.00 BOB y la ocurrencia de internet de 199.00 BOB; 0 en USD y USDT), reservado para metas 26500.00 BOB y 550.00 USD y aportes planificados pendientes 100.00 USD. Las cifras están en `apps/api/src/demo/dataset/golden-summary.json` (`reference`) y las verifica `apps/api/test/demo/demo-v2.int.test.ts`.
 
 ## Preguntas abiertas
 

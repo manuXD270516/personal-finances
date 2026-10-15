@@ -1626,7 +1626,7 @@
   },
   "Demo": {
     "title": "Demo data",
-    "description": "Loads realistic-looking fictitious financial data into a NEW demo workspace. This workspace is not modified.",
+    "description": "Loads realistic-looking fictitious financial data into a NEW demo workspace: accounts and transactions, subscriptions and recurring commitments, credit cards with their statements, loans and savings goals. This workspace is not modified.",
     "inDemo": "This is a demo workspace. You can fully clean it up at any time.",
     "load": "Load demo data",
     "loadConfirmTitle": "Load demo data?",

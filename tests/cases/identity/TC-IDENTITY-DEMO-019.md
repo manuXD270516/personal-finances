@@ -5,16 +5,16 @@ spec: identity/demo-data
 related_specs: ["debt/loans", "reporting/dashboard"]
 requirement: "Resumen de deudas y disponible para gastar con la demo"
 scenario: "Resumen de deudas de la demo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-014", "FR-DEBT-018", "FR-PLANNING-024"]
 nfr: []
 invariants: ["INV-001", "INV-002"]
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/test/demo/demo-v2.int.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 5
 tags: ["demo-data", "debt-summary", "spendable"]

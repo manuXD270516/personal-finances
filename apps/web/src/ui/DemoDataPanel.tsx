@@ -128,7 +128,7 @@ export function DemoDataPanel() {
       style={{ ...cardStyle, display: 'grid', gap: '0.5rem' }}
     >
       <h2 id="demo-data-title">{t('title')}</h2>
-      <p style={{ margin: 0 }}>{isDemo ? t('inDemo') : t('description')}</p>
+      <p style={{ margin: 0, overflowWrap: 'anywhere' }}>{isDemo ? t('inDemo') : t('description')}</p>
       {current?.status === 'LOADING' ? (
         <div role="status" data-testid="demo-data-status">
           <p style={{ margin: 0 }}>{t('loading')}</p>

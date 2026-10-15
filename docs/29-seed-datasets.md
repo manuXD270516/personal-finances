@@ -66,11 +66,11 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
 
 | Elemento | Detalle |
 |---|---|
-| Cuentas | Banco Andino Demo (BOB checking), Banco Andino Demo USD savings, Cash BOB, P2P Exchange Demo USDT wallet, Cold Wallet BTC, Tarjeta Andina Demo (LIABILITY BOB), Préstamo vehicular (LIABILITY BOB) |
+| Cuentas | Banco Andino Demo (BOB checking), Banco Andino Demo USD savings y Caja de ahorro BOB, Cash BOB, P2P Exchange Demo USDT wallet, Cold Wallet BTC, Billetera Altiplano Demo, Tarjeta Andina Demo y Tarjeta Kantuta Demo BOB/USD (LIABILITY), y las cuentas de pasivo de los 4 préstamos (v2) |
 | Salario | 12 000.00 BOB el último día hábil del mes; aguinaldo en diciembre; aumento del 5 % en 2026-01 |
 | Alquiler | 3 500.00 BOB el día 5; ajuste a 3 700.00 BOB en 2026-02 |
 | Servicios | Luz, agua, gas, internet con estacionalidad (invierno junio–agosto +25 % en luz/gas) |
-| Suscripciones | Streaming 9.99 USD → **11.99 USD** desde 2025-10 (cambio de precio); música 5.99 USD; cloud storage 2.99 USD; cargo a tarjeta |
+| Suscripciones | v2: 8 suscripciones de COMMITMENTS en distintos estados y monedas; streaming 9.99 USD → **11.99 USD** desde 2025-10 (cambio de precio); NubeSegura con una propuesta de precio pendiente; gimnasio cargado a la tarjeta |
 | Préstamo | Desembolso 50 000.00 BOB el 2025-02-01, 9 % anual, 36 cuotas francesas ≈ 1 589.99 BOB (calculadas por el motor de amortización; la última cuota ajusta el redondeo), desglose principal/interés/seguro |
 | Tarjeta de crédito | 15–30 compras/mes; pago total mensual desde la cuenta BOB (transferencia ASSET→LIABILITY); un mes con pago parcial |
 | Conversiones | 1–3 compras P2P de USDT con BOB al mes (quoted 6.88–7.05 BOB/USDT, spread y fee variables); 4 conversiones USDT→BTC con network fee; 2 ventas USDT→BOB |
@@ -89,6 +89,30 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
 > pago total y uno parcial, conversiones P2P con fees, reembolsos, split, ajuste, 2 ediciones, 1 anulación, 2 pendientes) y 210 tasas
 > manuales "Demo". Se carga desde la app ("Cargar datos de demostración", job `demo.load`) o con `pnpm db:seed -- --profile=demo`
 > (mismo cargador, workspace demo de `owner@demo.pfos.test` con origen W1). Metas, presupuestos y cierres llegarán con sus fases.
+
+> **As-built (add-phase-4-demo-data, 2026-10-15).** Dataset Demo **v2** (`datasetVersion: '2'`, `generatorVersion: '2.0.0'`, 9 módulos:
+> `identity`, `classification`, `accounts`, `fx`, `transactions`, `commitments`, `debt`, `goals`, `ledger`). Todo lo nuevo lo crean los
+> casos de uso públicos de cada contexto (`DemoModuleExecutor`, nunca SQL ni repositorios) con el reloj simulado, y los runners de
+> tiempo (generación de ocurrencias, suscripciones, estados de cuenta de tarjetas, evaluación de metas) se ejecutan con operaciones
+> `tick` en las fechas donde algo cambia. La carga completa corre en UNA unidad de trabajo (los hechos del outbox se publican al
+> confirmar, así los consumidores asíncronos no compiten por bloqueos con el cargador) y termina con una verificación por módulo
+> (`verifyModules`): una discrepancia deja la demo en `FAILED`, nunca en `READY` parcial.
+>
+> | Módulo | Contenido (ancla 2026-09-30) |
+> |---|---|
+> | Suscripciones y recurrentes | 8 suscripciones (5 activas, 1 en trial, 1 pausada, 1 cancelada) en BOB, USD y USDT; costo 412.94 BOB/mes y 4955.25 BOB/año (trial aparte, 105.00 BOB/mes); StreamFlix sube a 11.99 USD desde 2025-10-03; NubeSegura con propuesta de precio pendiente de 3.49 USD; 6 definiciones recurrentes (sueldo, alquiler, internet, luz, retiro de efectivo, seguro trimestral) con 6 meses de ocurrencias resueltas y la de internet del 2026-09-28 atrasada |
+> | Tarjetas | "Tarjeta Andina Demo" con perfil (cierre 25, vence 15, límite 15000.00 BOB, pago administrado por el total facturado y 60 % en 2025-09) y "Tarjeta Kantuta Demo" bimoneda BOB/USD (límite compartido 20000.00 BOB) con una compra en 6 cuotas, un estado de cuenta parcialmente pagado, uno vencido (USD) y uno emitido |
+> | Préstamos | Vehicular (francés, 19 cuotas pagadas), de consumo (alemán, 2 cuotas en mora), familiar (saldado) y crédito educativo en USD (pago extraordinario de 3000.00 USD reduciendo plazo, versión 2 del cronograma) |
+> | Metas | Fondo de emergencia (12 aportes recurrentes de 1500.00 BOB), Viaje (550.00 USD reservados, en riesgo), Laptop (alcanzada) y Regalos (un episodio de sobre-asignación ya resuelto) |
+>
+> Fechas respecto de la ancla `A` (`A − n` días y pasos de un mes con el mismo día, design.md decisión 4), de modo que los estados se
+> conservan con cualquier ancla; las cifras exactas solo se garantizan con la ancla fija (`golden-summary.json`, con el bloque
+> `modules` y las cifras de referencia del resumen de deudas y del disponible para gastar). Instituciones y contrapartes ficticias (se
+> agregan Cooperativa Illimani Demo y Billetera Altiplano Demo); las instituciones NO se toman del catálogo de referencia del entorno
+> (que en staging o producción sería real) y las tasas son manuales ficticias (más las de cierre en `A − 1`: USD/BOB 7.00, USDT/BOB
+> 6.95 y BTC/USD 60000.00), sin observaciones de proveedores. Se apaga el canal email de las preferencias del usuario del demo (el
+> in-app queda activo). Presupuestos y cierres de mes demo (Phase 2) siguen fuera. Carga medida: ~30 s en una PostgreSQL local (límite
+> de 2 min, D41). Los demos v1 ya cargados siguen como están hasta que el usuario los limpie y recargue.
 
 ### 2.3 Large Dataset Seed
 

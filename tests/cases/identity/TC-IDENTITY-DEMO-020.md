@@ -5,16 +5,16 @@ spec: identity/demo-data
 related_specs: ["accounts/institutions"]
 requirement: "Contenido demo ficticio, realista y determinista"
 scenario: "Otra fecha ancla conserva los estados"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-014", "FR-LEDGER-001"]
 nfr: []
 invariants: ["INV-004", "INV-025"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/src/demo/dataset/plan-modules/cards.test.ts","apps/api/src/demo/dataset/plan-modules/loans.test.ts","apps/api/test/demo/demo-v2.int.test.ts"]
+status: automated
 regression_suite: false
 phase: 5
 tags: ["demo-data", "determinism"]

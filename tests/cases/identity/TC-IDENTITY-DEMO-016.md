@@ -5,16 +5,16 @@ spec: identity/demo-data
 related_specs: ["debt/credit-cards"]
 requirement: "Tarjetas de crédito de demostración"
 scenario: "Tarjeta bimoneda con cuotas y un estado de cuenta vencido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-014", "FR-DEBT-012", "FR-DEBT-013", "FR-DEBT-016", "FR-DEBT-017"]
 nfr: []
 invariants: ["INV-020"]
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/src/demo/dataset/plan-modules/cards.test.ts","apps/api/test/demo/demo-v2.int.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 5
 tags: ["demo-data", "credit-cards"]
