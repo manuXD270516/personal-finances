@@ -1,0 +1,33 @@
+*** SINTETICO: extracto inventado para pruebas (formato imitado, ningun dato real). Institucion ficticia "Banco Sierra Demo". ***
+                                                                                                                                                 Página: 1 de 1
+
+
+
+
+                                                                                                                          Estado de Cuenta
+TITULAR FICTICIO UNO DEMO                                                     000
+
+
+   PERIODO DEL ESTADO                                                               SALDOS                                                 Saldo Prom:                          250,75
+
+            Marzo 2026                                     FECHA                    FINAL                 DISPONIBLE                        Monto Ret:                           0,00
+
+                                                          31-03-2026                 250,75                  250,75                             *TEP:                           0,00
+
+  Nro. Cuenta: 0000000001                          000-Cuenta Demo NEO                  M/E                $US                 Situación de la Cuenta: ACTIVA
+
+        Saldo Inicial              Depósitos / Créditos              Retiros / Débitos              Cargos por Servicios             Interés Pagado               Interés Cobrado
+            250,75                          0,00                           0,00                             0,00                          0,00                         0,00
+
+
+                              Comprobante
+Fecha   Sucursal    Hora                           C/T                    Descripción                                Débitos                 Créditos                  Saldos
+                               N° Cheque
+                                                   000   Sin Actividad en el Periodo
+     Total              Total Operaciones
+                                                     Monto sujeto a ITF                 Total ITF                  Total Débitos          Total Créditos             Saldo Actual
+  Operaciones             sujetas a ITF
+        1                      0                            0,00                          0,00                         0,00                      0,00                   250,75
+
+
+El importe del saldo disponible estará sujeto a la confirmación de acreditación de cheques otro banco u otra plaza, en caso de que corresponda.

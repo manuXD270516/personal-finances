@@ -1,0 +1,47 @@
+{
+  "synthetic": true,
+  "formatId": "BCP",
+  "institution": "Banco Cumbre Demo",
+  "currency": "BOB",
+  "numberFormat": { "decimalSeparator": ".", "thousandsSeparator": "" },
+  "dateFormat": "YYYYMMDD",
+  "layout": "SIGNED_AMOUNT_RUNNING_BALANCE",
+  "statement": {
+    "openingBalance": "155.00",
+    "closingBalance": "1019.32",
+    "periodFrom": "2026-03-01",
+    "periodTo": "2026-03-31"
+  },
+  "movements": [
+    {
+      "date": "2026-03-01",
+      "time": "00:00:00",
+      "description": "Interesganado",
+      "amount": "0.07",
+      "balance": "155.07",
+      "kind": "INTEREST"
+    },
+    {
+      "date": "2026-03-05",
+      "time": "09:12:44",
+      "description": "Transferencia Qr Sin Referencia - Banco Pampa Demo - Persona Ficticia Alfa - 0000000001",
+      "amount": "1250.00",
+      "balance": "1405.07",
+      "multiline": true
+    },
+    {
+      "date": "2026-03-05",
+      "time": "09:40:10",
+      "description": "Compra Comercio Demo Uno",
+      "amount": "-85.50",
+      "balance": "1319.57"
+    },
+    {
+      "date": "2026-03-12",
+      "time": "18:05:31",
+      "description": "Pago Servicio Demo Dos",
+      "amount": "-300.25",
+      "balance": "1019.32"
+    }
+  ]
+}

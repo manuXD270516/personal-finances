@@ -1,0 +1,122 @@
+{
+  "synthetic": true,
+  "formatId": "GANADERO",
+  "institution": "Banco Pampa Demo",
+  "currency": "BOB",
+  "numberFormat": {
+    "decimalSeparator": ".",
+    "thousandsSeparator": ","
+  },
+  "dateFormat": "DD/MM/YYYY",
+  "layout": "DEBIT_CREDIT_COLUMNS_RUNNING_BALANCE",
+  "statement": {
+    "openingBalance": "2640.00",
+    "closingBalance": "12050.66",
+    "periodFrom": "2026-03-01",
+    "periodTo": "2026-03-31"
+  },
+  "movements": [
+    {
+      "date": "2026-03-01",
+      "time": "10:15:00",
+      "description": "Seguro 3-2026 000000-XXXXXX-0000",
+      "amount": "-26.00",
+      "balance": "2614.00",
+      "reference": "900000001"
+    },
+    {
+      "date": "2026-03-02",
+      "time": "11:30:12",
+      "description": "TRANSF. QR ACH Nro. 9000000001 BANCO DEMO UNO 0000000001 PERSONA FICTICIA ALFA Sin informacion",
+      "amount": "-33.00",
+      "balance": "2581.00",
+      "reference": "900000002",
+      "multiline": true
+    },
+    {
+      "date": "2026-03-03",
+      "time": "12:00:00",
+      "description": "Transferencia de 0000000002. PERSONA FICTICIA BETA Aún falta 350",
+      "amount": "350.00",
+      "balance": "2931.00",
+      "reference": "900000003",
+      "multiline": true,
+      "statusAnnotation": "Aún falta 350"
+    },
+    {
+      "date": "2026-03-03",
+      "time": "12:05:30",
+      "description": "Transferencia de 0000000002. PERSONA FICTICIA BETA Completado",
+      "amount": "350.00",
+      "balance": "3281.00",
+      "reference": "900000004",
+      "multiline": true,
+      "pageBreakCut": true,
+      "statusAnnotation": "Completado"
+    },
+    {
+      "date": "2026-03-04",
+      "time": "14:00:00",
+      "description": "GNT - Pago de Servicios SERVICIO DEMO Nro. 000000001",
+      "amount": "-187.00",
+      "balance": "3094.00",
+      "reference": "800000005",
+      "multiline": true
+    },
+    {
+      "date": "2026-03-05",
+      "time": "16:21:09",
+      "description": "TRANSF. QR ACH Nro. 9000000002 BANCO DEMO DOS 10000000001 PERSONA FICTICIA GAMMA pago",
+      "amount": "10500.75",
+      "balance": "13594.75",
+      "reference": "900000006",
+      "multiline": true
+    },
+    {
+      "date": "2026-03-06",
+      "time": "19:48:51",
+      "description": "Deposito ATM",
+      "amount": "175.00",
+      "balance": "13769.75",
+      "reference": "1000007"
+    },
+    {
+      "date": "2026-03-07",
+      "time": "09:30:00",
+      "description": "Transferencia a 0000000003. COMERCIO DEMO TRES Qr Pedido 15",
+      "amount": "-1200.50",
+      "balance": "12569.25",
+      "reference": "900000008",
+      "multiline": true
+    },
+    {
+      "date": "2026-03-31",
+      "time": "23:10:00",
+      "description": "Transferencia a 0000000003. COMERCIO DEMO TRES",
+      "amount": "-520.00",
+      "balance": "12049.25",
+      "reference": "900000009",
+      "multiline": true
+    },
+    {
+      "date": "2026-03-31",
+      "time": "03:12:07",
+      "description": "Intereses Ganados 0000000001",
+      "amount": "1.62",
+      "balance": "12050.87",
+      "reference": "517000001",
+      "kind": "INTEREST",
+      "outOfOrder": true
+    },
+    {
+      "date": "2026-03-31",
+      "time": "03:12:07",
+      "description": "Retencion de Impuestos IVA",
+      "amount": "-0.21",
+      "balance": "12050.66",
+      "reference": "517000001",
+      "kind": "TAX_WITHHOLDING",
+      "outOfOrder": true
+    }
+  ]
+}

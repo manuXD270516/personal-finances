@@ -1,0 +1,29 @@
+*** SINTETICO: extracto inventado para pruebas (formato imitado, ningun dato real). Institucion ficticia "Banco Cumbre Demo". ***
+                                                                   Extracto de Cuenta por Mes
+
+Nro. Cuenta:        000-00000001-0-00                                                                          Periodo:       Marzo 2026
+
+Cliente:            Titular Ficticio Uno Demo                                                                  Moneda:        Bolivianos
+
+Saldo Inicial:      155.00                                                                                     Saldo Final:   1019.32
+
+Fecha Consulta:     02/04/2026 - 10:00:00                                                                      Tipo Cuenta:   Caja Ahorro
+
+    Fecha           Hora                 Descripción                     Medio de Atención                   Lugar              Monto              Saldo
+   20260301       00:00:00    Interesganado                       Automático                    Agencia Demo Central                    0.07           155.07
+
+   20260305       09:12:44    Transferencia Qr Sin Referencia -   Transferencia Interbancaria   Agencia Demo Central                 1250.00          1405.07
+                              Banco Pampa Demo - Persona
+                              Ficticia Alfa -
+                              0000000001
+   20260305       09:40:10    Compra Comercio Demo Uno            Tarjeta de Debito             Agencia Demo Central                  -85.50          1319.57
+   20260312       18:05:31    Pago Servicio Demo Dos              Banca por Internet            Agencia Demo Central                 -300.25           1019.32
+
+
+
+Esta información está sujeta a verificación y confirmación del Banco por lo que carece de valor legal.
+
+
+
+
+                                                                                                                                               Página 1 de 1
