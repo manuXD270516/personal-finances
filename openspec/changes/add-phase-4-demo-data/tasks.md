@@ -38,7 +38,7 @@
 - [x] 4.6 Dos anclas (2026-09-30 y 2026-10-05) conservan los estados e instituciones independientes del catálogo de referencia (TC-IDENTITY-DEMO-020) _(2026-10-15)_
 - [x] 4.7 Determinismo con v2 (TC-IDENTITY-DEMO-007) y aislamiento del workspace real (TC-IDENTITY-DEMO-014) en verde _(2026-10-15)_
 - [x] 4.8 Purga con el dataset v2: cero filas del workspace demo en todas las tablas registradas y filas eliminadas > 0 en compromisos, deudas y metas (TC-IDENTITY-DEMO-011); si falla por el orden de borrado, migración expand que corrige el orden en `platform.workspace_scoped_table` (timestamp posterior a la última de `main`) y TC-IDENTITY-DEMO-005 en verde _(2026-10-15: la purga con filas v2 borra todo respetando las claves foráneas (registro de purga con filas > 0 en compromisos, deudas y metas): NO hizo falta migración (RISK-026 cerrado); TC-IDENTITY-DEMO-005 sigue en verde)_
-- [x] 4.9 Medir la duración de la carga (`demo.duration_ms`) en CI y anotarla aquí; si supera 2 min, aplicar design.md decisión 11 y pregunta 5 _(2026-10-15: carga medida en una PostgreSQL 16 local: 27.9–33.7 s (límite de 2 min); CI la registra en `demo.duration_ms`)_
+- [x] 4.9 Medir la duración de la carga (`demo.duration_ms`) en CI y anotarla aquí; si supera 2 min, aplicar design.md decisión 11 y pregunta 5 _(2026-10-15: carga medida en una PostgreSQL 16 local: 27.3–33.7 s con ocho anclas distintas (límite de 2 min); CI la registra en `demo.duration_ms`)_
 
 ## 5. API
 
@@ -51,7 +51,7 @@
 ## 7. TESTS AUTOMATIZADOS Y E2E
 
 - [ ] 7.1 E2E (`tests/e2e/specs/demo-data.spec.ts`, con `PF_E2E_PROJECT`): con la demo cargada, el indicador "Datos de demostración" está en `/recurring/suscripciones`, `/debts`, `/debts/tarjetas`, `/goals` y `/disponible`, y se ven "StreamFlix Demo", "Tarjeta Kantuta Demo" con un estado de cuenta vencido, "Préstamo de consumo" en mora y "Viaje" atrasada (TC-IDENTITY-DEMO-015..019 en su parte de UI) _(2026-10-15: especificación escrita (indicador y elementos de la demo en suscripciones, deudas, tarjetas, metas y disponible), sin ejecutar: sin Docker `pnpm test:e2e` no corre; lo valida CI)_
-- [ ] 7.2 `pnpm test:integration` dos veces seguidas en verde y `pnpm test:e2e`; marcar TC-IDENTITY-DEMO-015..020 `automated` con sus `automated_tests` _(2026-10-15: TC-IDENTITY-DEMO-015..020 marcados `automated` con sus pruebas; la integración se ejecutó en una PostgreSQL 16 local (sin Docker) y falta la doble corrida en verde y el E2E en CI)_
+- [ ] 7.2 `pnpm test:integration` dos veces seguidas en verde y `pnpm test:e2e`; marcar TC-IDENTITY-DEMO-015..020 `automated` con sus `automated_tests` _(2026-10-15: TC-IDENTITY-DEMO-015..020 marcados `automated` con sus pruebas. Integración ejecutada en una PostgreSQL 16 local (sin Docker): el subconjunto de la demo (`test/demo`, `seed-demo`, `demo-purge`) en verde dos veces seguidas y la suite completa de la API una vez con solo 22 fallos de entorno (sin SeaweedFS, Valkey ni Testcontainers: salud, export/import, eventos con Mailpit). Falta `pnpm test:integration` completo y `pnpm test:e2e` en CI, por eso queda sin marcar)_
 
 ## 8. DOCUMENTACIÓN
 
