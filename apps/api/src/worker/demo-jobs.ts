@@ -13,14 +13,20 @@ import { ensureDemoQueues } from '../demo/demo-jobs-port.js';
  */
 export async function registerDemoJobs(
   queue: JobQueue,
-  input: { readonly loader: DemoDataLoader; readonly demo: DemoDataService; readonly logger: Logger },
+  input: {
+    readonly loader: DemoDataLoader;
+    readonly demo: DemoDataService;
+    readonly logger: Logger;
+    /** Espera a los consumidores asíncronos del workspace antes de purgarlo (los hechos del dataset v2 son miles). */
+    readonly settle?: (workspaceId: string) => Promise<unknown>;
+  },
 ): Promise<void> {
   await ensureDemoQueues(queue);
   await queue.work<DemoLoadJob>(DEMO_LOAD_QUEUE, { concurrency: 1 }, async (job) => {
     await input.loader.load(job.payload);
   });
   await queue.work<DemoPurgeJob>(DEMO_PURGE_QUEUE, { concurrency: 1 }, (job) =>
-    runDemoPurge(input.demo, job.payload, input.logger, job.attempt),
+    runDemoPurge(input.demo, job.payload, input.logger, job.attempt, input.settle),
   );
 }
 
@@ -29,9 +35,13 @@ export async function runDemoPurge(
   payload: DemoPurgeJob,
   logger: Logger,
   attempt = 1,
+  settle?: (workspaceId: string) => Promise<unknown>,
 ): Promise<void> {
   const log = logger.child({ 'demo.workspace_id': payload.demoWorkspaceId });
   try {
+    // El demo ya está archivado: los consumidores ignoran sus hechos nuevos; esperar a los que están en vuelo evita
+    // filas que reaparecen después de la purga (TC-IDENTITY-DEMO-011).
+    await settle?.(payload.demoWorkspaceId);
     const rows = await runWithRequestContext(
       { actor: { type: 'WORKER', process: DEMO_PURGE_QUEUE }, origin: 'system' },
       () => demo.purgeDemoWorkspace(payload),

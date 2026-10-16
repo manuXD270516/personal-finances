@@ -95,7 +95,7 @@ Trace: FR-IDENTITY-014, FR-DEBT-018, FR-PLANNING-024 · Priority: Could
 - **CUANDO** se consulta el resumen de deudas de la demo el 2026-09-30 con la tasa de cierre USD/BOB 7.00
 - **ENTONCES** el total adeudado en USD es 1207.15 USD (1007.15 del "Crédito educativo" y 200.00 de "Tarjeta Kantuta Demo") y su parte consolidada es 8450.05 BOB
 - **Y** lista "Préstamo vehicular" con 25288.74 BOB, "Préstamo de consumo" con 8000.00 BOB y "Tarjeta Kantuta Demo" con 4770.50 BOB, y no lista "Préstamo familiar"
-- **Y** el interés pagado en 2026 es 2597.98 BOB y 536.67 USD, del que 2166.91 BOB corresponden a "Préstamo vehicular" y 420.00 BOB a "Préstamo de consumo"
+- **Y** el interés pagado en 2026 es 2596.98 BOB y 536.67 USD, del que 2166.91 BOB corresponden a "Préstamo vehicular" y 420.00 BOB a "Préstamo de consumo"
 - **Y** la fecha estimada libre de deudas es 2028-02-01
 
 #### Scenario: Disponible para gastar de la demo

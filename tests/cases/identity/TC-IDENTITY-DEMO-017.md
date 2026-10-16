@@ -5,16 +5,16 @@ spec: identity/demo-data
 related_specs: ["goals/savings-goals"]
 requirement: "Metas de ahorro de demostración"
 scenario: "Metas de la demo al 2026-09-30"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-014", "FR-GOALS-001", "FR-GOALS-003", "FR-GOALS-004", "FR-GOALS-009"]
 nfr: []
 invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/test/demo/demo-v2.int.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 5
 tags: ["demo-data", "goals"]

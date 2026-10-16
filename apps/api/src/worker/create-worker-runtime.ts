@@ -95,6 +95,7 @@ import { registerDemoJobs } from './demo-jobs.js';
 import { registerPortabilityJobs } from './portability-jobs.js';
 import { portabilityOptions } from '../portability/portability-wiring.js';
 import { DemoDataLoader } from '../demo/demo-data-loader.js';
+import { settleWorkspaceEvents } from '../demo/settle-events.js';
 import {
   AUDIT_POLICIES,
   counterpartyNamesOf,
@@ -356,6 +357,8 @@ export async function createWorkerRuntime(
   await registerDemoJobs(queue, {
     demo,
     logger,
+    // La purga espera a los consumidores en vuelo del workspace (sin filas sueltas después de borrar).
+    settle: (workspaceId) => settleWorkspaceEvents(pool, workspaceId, logger),
     loader: new DemoDataLoader({
       pool,
       logger,

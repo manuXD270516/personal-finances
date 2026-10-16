@@ -11525,7 +11525,7 @@ components:
         demoWorkspaceId: { $ref: '#/components/schemas/Uuid' }
         originWorkspaceId: { $ref: '#/components/schemas/Uuid' }
         status: { $ref: '#/components/schemas/DemoStatus' }
-        datasetVersion: { type: string, examples: ['1'] }
+        datasetVersion: { type: string, examples: ['2'] }
         anchorDate: { $ref: '#/components/schemas/LocalDate' }
         progress:
           description: Load progress (LOADING/FAILED); null otherwise

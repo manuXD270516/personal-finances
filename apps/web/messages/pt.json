@@ -1626,7 +1626,7 @@
   },
   "Demo": {
     "title": "Dados de demonstração",
-    "description": "Carrega dados financeiros fictícios com aparência real em um NOVO espaço de trabalho de demonstração. Este espaço de trabalho não é modificado.",
+    "description": "Carrega dados financeiros fictícios com aparência real em um NOVO espaço de trabalho de demonstração: contas e movimentos, assinaturas e compromissos recorrentes, cartões de crédito com seus extratos, empréstimos e metas de poupança. Este espaço de trabalho não é modificado.",
     "inDemo": "Este é um espaço de trabalho de demonstração. Você pode limpá-lo por completo quando quiser.",
     "load": "Carregar dados de demonstração",
     "loadConfirmTitle": "Carregar dados de demonstração?",

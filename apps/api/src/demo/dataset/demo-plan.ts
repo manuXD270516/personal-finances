@@ -1,8 +1,58 @@
-import { addDays, daysInMonth, epochDay, lastBusinessDay, monthAt, ymd } from './calendar.js';
+import {
+  addDays,
+  addMonthsClamped,
+  dayOfMonth,
+  daysInMonth,
+  epochDay,
+  lastBusinessDay,
+  monthAt,
+  monthStart,
+  ymd,
+} from './calendar.js';
+import type { ModuleOp } from './module-ops.js';
+import type {
+  AccountKey,
+  BalanceKey,
+  CategoryRef,
+  CounterpartyKey,
+  DemoCurrency,
+  DemoKeys,
+  DemoMoney,
+  DemoSplit,
+  InstitutionKey,
+  PaymentMethod,
+  PlanKeys,
+  PlanOp,
+} from './plan-types.js';
+
+export type {
+  AccountKey,
+  BalanceKey,
+  CategoryRef,
+  CounterpartyKey,
+  DemoCurrency,
+  DemoKeys,
+  DemoMoney,
+  DemoSplit,
+  InstitutionKey,
+  PaymentMethod,
+  PlanKeys,
+  PlanOp,
+} from './plan-types.js';
+import { buildCommitments, type CommitmentsPlan, type SubscriptionPlan } from './plan-modules/commitments.js';
+import {
+  cardDue,
+  closingsBetween,
+  kantutaPlan,
+  statementFigures,
+  type CardMovement,
+} from './plan-modules/cards.js';
+import { buildGoals } from './plan-modules/goals.js';
+import { loanDefinitions, loanOps } from './plan-modules/loans.js';
 import { SeededRandom } from './prng.js';
 
 /**
- * Dataset Demo v1 de Phase 1 (docs/29 §2.2; openspec add-demo-data design.md decisión 3). Personas, instituciones,
+ * Dataset Demo v2 (docs/29 §2.2; openspec add-demo-data design.md decisión 3 y add-phase-4-demo-data). Personas, instituciones,
  * comercios y contrapartes FICTICIOS con apariencia real (nunca entidades reales); identificadores con prefijo
  * `DEMO-`. Generación determinista: PRNG sembrado, montos como enteros de unidades mínimas (`bigint`) convertidos a
  * strings decimales, fechas calculadas sobre el ancla fija y desplazadas a la ancla pedida (`--anchor=today`), sin
@@ -10,63 +60,29 @@ import { SeededRandom } from './prng.js';
  */
 export const DEMO_MANIFEST = {
   profile: 'demo',
-  datasetVersion: '1',
-  generatorVersion: '1.0.0',
+  datasetVersion: '2',
+  generatorVersion: '2.0.0',
   prngSeed: 20260930,
   /** Ancla fija del dataset (golden summary). `anchor=today` desplaza todas las fechas. */
   anchorDate: '2026-09-30',
   /** Ventana de 21 meses (docs/29; owner D41): 2025-01-01 → 2026-09-30. */
   windowMonths: 21,
   timezone: 'America/La_Paz',
-  modules: ['identity', 'classification', 'accounts', 'fx', 'transactions', 'ledger'],
+  modules: [
+    'identity',
+    'classification',
+    'accounts',
+    'fx',
+    'transactions',
+    'commitments',
+    'debt',
+    'goals',
+    'ledger',
+  ],
   workspaceName: 'Demo — Finanzas de Valeria',
 } as const;
 
-export type DemoCurrency = 'BOB' | 'USD' | 'USDT' | 'BTC';
 export const DEMO_SCALES: Readonly<Record<DemoCurrency, number>> = { BOB: 2, USD: 2, USDT: 6, BTC: 8 };
-
-export type AccountKey = 'bank_bob' | 'bank_usd' | 'cash' | 'usdt' | 'btc' | 'card' | 'loan';
-export type InstitutionKey = 'andino' | 'p2p' | 'cold';
-export type CounterpartyKey =
-  | 'employer'
-  | 'landlord'
-  | 'power'
-  | 'water'
-  | 'gas'
-  | 'internet'
-  | 'streaming'
-  | 'music'
-  | 'cloud'
-  | 'market'
-  | 'cafe'
-  | 'fuel'
-  | 'pharmacy'
-  | 'taxi'
-  | 'bank';
-
-/** Categoría por nombre del catálogo es-BO.v1 o por código de sistema (CLASSIFICATION). */
-export type CategoryRef = { readonly name: string } | { readonly system: 'INTEREST' | 'FX_FEES' };
-
-export interface DemoMoney {
-  /** Unidades mínimas de la moneda (escala de `DEMO_SCALES`). */
-  readonly minor: bigint;
-  readonly currency: DemoCurrency;
-}
-
-/**
- * Claves de un plan: el dataset Demo usa uniones cerradas; otros datasets deterministas (`large`, docs/29 §2.3)
- * reutilizan los mismos tipos de operación con claves `string`.
- */
-export interface PlanKeys {
-  readonly account: string;
-  readonly counterparty: string;
-  readonly institution: string;
-}
-export interface DemoKeys extends PlanKeys {
-  readonly account: AccountKey;
-  readonly counterparty: CounterpartyKey;
-  readonly institution: InstitutionKey;
-}
 
 export interface DemoInstitution<K extends PlanKeys = DemoKeys> {
   readonly key: K['institution'];
@@ -77,7 +93,7 @@ export interface DemoInstitution<K extends PlanKeys = DemoKeys> {
 export interface DemoAccount<K extends PlanKeys = DemoKeys> {
   readonly key: K['account'];
   readonly name: string;
-  readonly type: 'BANK' | 'SAVINGS' | 'CASH' | 'CRYPTO_WALLET' | 'CREDIT_CARD' | 'LOAN';
+  readonly type: 'BANK' | 'SAVINGS' | 'CASH' | 'CRYPTO_WALLET' | 'CREDIT_CARD' | 'LOAN' | 'DIGITAL_WALLET';
   readonly currency: DemoCurrency;
   readonly institution: K['institution'] | null;
   readonly openedOn: string;
@@ -93,93 +109,17 @@ export interface DemoCounterparty<K extends PlanKeys = DemoKeys> {
   readonly kind: 'MERCHANT' | 'PERSON' | 'SERVICE_PROVIDER' | 'FINANCIAL_INSTITUTION' | 'EMPLOYER';
 }
 
-export interface DemoSplit {
-  readonly category: CategoryRef;
-  readonly amount: DemoMoney;
-  readonly tag?: 'reembolsable' | 'hogar';
-}
+/** Operación del dataset Demo v2: las comunes (`PlanOp`) más las de módulo (`ModuleOp`, solo de la demo). */
+export type DemoOp = PlanOp | ModuleOp;
+export type IncomeExpenseOp = Extract<PlanOp, { op: 'income' | 'expense' }>;
 
-export type PaymentMethod = 'CASH' | 'QR' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'BANK_TRANSFER';
-
-export type PlanOp<K extends PlanKeys = DemoKeys> =
-  | {
-      readonly op: 'rate';
-      readonly date: string;
-      readonly base: DemoCurrency;
-      readonly quote: DemoCurrency;
-      readonly value: string;
-      readonly rateType: 'PARALLEL' | 'OFFICIAL';
-    }
-  | {
-      readonly op: 'income' | 'expense';
-      readonly key: string;
-      readonly date: string;
-      readonly account: K['account'];
-      readonly amount: DemoMoney;
-      readonly splits: readonly DemoSplit[];
-      readonly counterparty: K['counterparty'] | null;
-      readonly paymentMethod: PaymentMethod;
-      readonly description: string;
-      readonly pending?: boolean;
-    }
-  | {
-      readonly op: 'refund';
-      readonly key: string;
-      readonly date: string;
-      readonly of: string;
-      readonly account: K['account'];
-      readonly amount: DemoMoney;
-      readonly description: string;
-    }
-  | {
-      readonly op: 'adjustment';
-      readonly date: string;
-      readonly account: K['account'];
-      readonly amount: DemoMoney;
-      readonly direction: 'INCREASE' | 'DECREASE';
-      readonly reason: string;
-    }
-  | {
-      readonly op: 'transfer';
-      readonly date: string;
-      readonly from: K['account'];
-      readonly to: K['account'];
-      readonly amount: DemoMoney;
-      readonly paymentMethod: PaymentMethod;
-      readonly description: string;
-    }
-  | {
-      readonly op: 'conversion';
-      readonly date: string;
-      readonly from: K['account'];
-      readonly to: K['account'];
-      readonly source: DemoMoney;
-      readonly target: DemoMoney;
-      /** 1 base = value quote (orientación de la cotización P2P). */
-      readonly quoted: { readonly base: DemoCurrency; readonly quote: DemoCurrency; readonly value: string };
-      readonly fee: { readonly type: 'PROVIDER' | 'NETWORK'; readonly amount: DemoMoney } | null;
-      readonly description: string;
-    }
-  | {
-      /** Edición financiera (cambio de monto) de una transacción ya registrada. */
-      readonly op: 'edit';
-      readonly date: string;
-      readonly of: string;
-      readonly amount: DemoMoney;
-      readonly category: CategoryRef;
-    }
-  | { readonly op: 'void'; readonly date: string; readonly of: string; readonly reason: string };
-
-export type DemoOp = PlanOp;
-export type IncomeExpenseOp = Extract<DemoOp, { op: 'income' | 'expense' }>;
-
-export interface DemoMonth<K extends PlanKeys = DemoKeys> {
+export interface DemoMonth<K extends PlanKeys = DemoKeys, O = PlanOp<K>> {
   /** `YYYY-MM` del mes (ya desplazado a la ancla pedida). */
   readonly month: string;
-  readonly ops: readonly PlanOp<K>[];
+  readonly ops: readonly O[];
 }
 
-export interface DemoPlan<K extends PlanKeys = DemoKeys> {
+export interface DemoPlan<K extends PlanKeys = DemoKeys, O = PlanOp<K>> {
   readonly datasetVersion: string;
   readonly anchorDate: string;
   readonly startDate: string;
@@ -187,7 +127,7 @@ export interface DemoPlan<K extends PlanKeys = DemoKeys> {
   readonly accounts: readonly DemoAccount<K>[];
   readonly counterparties: readonly DemoCounterparty<K>[];
   readonly tags: readonly { readonly key: 'reembolsable' | 'hogar'; readonly name: string }[];
-  readonly months: readonly DemoMonth<K>[];
+  readonly months: readonly DemoMonth<K, O>[];
 }
 
 // ------------------------------------------------------------------ helpers de dinero (enteros, nunca `number`)
@@ -217,6 +157,8 @@ const INSTITUTIONS: readonly DemoInstitution[] = [
   { key: 'andino', name: 'Banco Andino Demo', kind: 'BANK' },
   { key: 'p2p', name: 'P2P Exchange Demo', kind: 'EXCHANGE' },
   { key: 'cold', name: 'Cold Wallet Demo', kind: 'WALLET_PROVIDER' },
+  { key: 'illimani', name: 'Cooperativa Illimani Demo', kind: 'BANK' },
+  { key: 'altiplano', name: 'Billetera Altiplano Demo', kind: 'WALLET_PROVIDER' },
 ];
 
 const COUNTERPARTIES: readonly DemoCounterparty[] = [
@@ -235,6 +177,17 @@ const COUNTERPARTIES: readonly DemoCounterparty[] = [
   { key: 'pharmacy', name: 'Farmacia Chacaltaya Demo', kind: 'MERCHANT' },
   { key: 'taxi', name: 'TaxiYa Demo', kind: 'MERCHANT' },
   { key: 'bank', name: 'Banco Andino Demo', kind: 'FINANCIAL_INSTITUTION' },
+  { key: 'gym', name: 'Gimnasio Sajama Demo', kind: 'MERCHANT' },
+  { key: 'antivirus', name: 'Antivirus Escudo Demo', kind: 'MERCHANT' },
+  { key: 'magazine', name: 'Revista Andina Demo', kind: 'MERCHANT' },
+  { key: 'course', name: 'Curso Kantuta Demo', kind: 'MERCHANT' },
+  { key: 'vpn', name: 'VPN Cóndor Demo', kind: 'MERCHANT' },
+  { key: 'insurer', name: 'Seguros Illampu Demo', kind: 'SERVICE_PROVIDER' },
+  { key: 'hotel', name: 'Hotel Salar Demo', kind: 'MERCHANT' },
+  { key: 'appliances', name: 'Electro Kantuta Demo', kind: 'MERCHANT' },
+  { key: 'eduFund', name: 'Fondo Educativo Demo', kind: 'FINANCIAL_INSTITUTION' },
+  { key: 'aunt', name: 'Tía Carmen (ficticia)', kind: 'PERSON' },
+  { key: 'illimani', name: 'Cooperativa Illimani Demo', kind: 'FINANCIAL_INSTITUTION' },
 ];
 
 /** Compras con tarjeta: categoría, contraparte y rango de montos (centavos BOB). */
@@ -261,19 +214,47 @@ const CARD_SPENDING: readonly {
   { category: 'Ropa y calzado', counterparty: null, min: 12_000n, max: 48_000n, description: 'Ropa' },
 ];
 
-const LOAN_PRINCIPAL = 120_000n; // 1 200.00 BOB/mes (pago simple; amortización en fases posteriores)
-
 /**
  * Plan determinista de comandos (mismo `anchorDate` ⇒ mismo plan, bit a bit). `anchorDate` = ancla pedida (por
  * defecto la fija del dataset); las fechas se calculan sobre la ancla fija y se desplazan `anchor − 2026-09-30` días.
  */
-export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): DemoPlan {
+export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): DemoPlan<DemoKeys, DemoOp> {
+  return composeDemoPlan(anchorDate).plan;
+}
+
+/** Cifras esperadas de los módulos que el plan calculó con sus propios cálculos (oráculo del cargador y de las pruebas). */
+export function buildDemoOracle(anchorDate: string = DEMO_MANIFEST.anchorDate): DemoOracle {
+  return composeDemoPlan(anchorDate).oracle;
+}
+
+export interface AndinaStatement {
+  readonly closing: string;
+  readonly due: string;
+  readonly billed: bigint;
+  readonly minimum: bigint;
+  /** Monto que el plan paga el día del vencimiento (`null` si el vencimiento es posterior a la ancla). */
+  readonly payment: bigint | null;
+}
+
+export interface DemoOracle {
+  readonly subscriptions: readonly SubscriptionPlan[];
+  /** Ocurrencias de definiciones recurrentes sin resolver al llegar a la ancla. */
+  readonly unresolved: CommitmentsPlan['unresolved'];
+  readonly andina: readonly AndinaStatement[];
+  readonly emergencyContributions: readonly string[];
+  /** Reservas por meta (unidades mínimas de la moneda de la meta). */
+  readonly reserved: Readonly<Record<'travel' | 'laptop' | 'gifts', bigint>>;
+}
+
+function composeDemoPlan(anchorDate: string): { plan: DemoPlan<DemoKeys, DemoOp>; oracle: DemoOracle } {
   const shift = epochDay(anchorDate) - epochDay(DEMO_MANIFEST.anchorDate);
   const at = (date: string) => addDays(date, shift);
   const seed = DEMO_MANIFEST.prngSeed;
   const startDate = ymd(2025, 1, 1);
 
-  const accounts: DemoAccount[] = [
+  const kantuta = kantutaPlan(anchorDate);
+  const goals = buildGoals(anchorDate);
+  const v1Accounts: DemoAccount[] = [
     acc(
       'bank_bob',
       'Banco Andino Demo — Cuenta corriente',
@@ -330,8 +311,55 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
       'DEMO-TAD-0001',
       'D777',
     ),
-    acc('loan', 'Préstamo vehicular', 'LOAN', 'BOB', 'andino', ymd(2025, 2, 1), null, 'DEMO-LOAN-0001', null),
+    acc(
+      'savings_bob',
+      'Banco Andino Demo — Caja de ahorro BOB',
+      'SAVINGS',
+      'BOB',
+      'andino',
+      startDate,
+      null,
+      'DEMO-BAD-0003',
+      'D003',
+    ),
   ].map((a) => ({ ...a, openedOn: at(a.openedOn) }));
+  // Cuentas de Phases 3 y 4, fechadas respecto de la ancla (design.md decisión 4).
+  const accounts: DemoAccount[] = [
+    ...v1Accounts,
+    acc(
+      'kantuta_bob',
+      'Tarjeta Kantuta Demo BOB',
+      'CREDIT_CARD',
+      'BOB',
+      'illimani',
+      kantuta.openedOn,
+      null,
+      'DEMO-TKD-0001',
+      'K777',
+    ),
+    acc(
+      'kantuta_usd',
+      'Tarjeta Kantuta Demo USD',
+      'CREDIT_CARD',
+      'USD',
+      'illimani',
+      kantuta.openedOn,
+      null,
+      'DEMO-TKD-0002',
+      'K778',
+    ),
+    acc(
+      'wallet',
+      'Billetera Altiplano Demo',
+      'DIGITAL_WALLET',
+      'BOB',
+      'altiplano',
+      goals.dates.walletOpenedOn,
+      bob(60_000n),
+      'DEMO-BAL-0001',
+      null,
+    ),
+  ];
 
   const rates = SeededRandom.derive(seed, 'fx');
   const salary = SeededRandom.derive(seed, 'income');
@@ -340,9 +368,7 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
   const cash = SeededRandom.derive(seed, 'cash');
   const conv = SeededRandom.derive(seed, 'conversions');
 
-  const months: DemoMonth[] = [];
-  let cardOwed = 0n; // saldo de la tarjeta al cierre del mes anterior (para el pago del mes)
-  let loanOwed = 0n;
+  const flat: DemoOp[] = [];
   let usdBob = 696; // centésimos de BOB por USD (paralelo)
   let usdtBob = 694;
   let btcUsd = 62_000; // USD por BTC
@@ -406,45 +432,6 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
       value: String(btcUsd),
       rateType: 'PARALLEL',
     });
-
-    // ── Préstamo vehicular: desembolso 2025-02-01; desde 2025-03, capital fijo + interés simple 0.75 %/mes.
-    if (i === 1) {
-      ops.push({
-        op: 'transfer',
-        date: d(1),
-        from: 'loan',
-        to: 'bank_bob',
-        amount: bob(5_000_000n),
-        paymentMethod: 'BANK_TRANSFER',
-        description: 'Desembolso préstamo vehicular DEMO-LOAN-0001',
-      });
-      loanOwed += 5_000_000n;
-    } else if (i >= 2 && loanOwed > 0n) {
-      const interest = scaleBy(loanOwed, 75n, 10_000n);
-      const principal = loanOwed < LOAN_PRINCIPAL ? loanOwed : LOAN_PRINCIPAL;
-      ops.push({
-        op: 'transfer',
-        date: d(1),
-        from: 'bank_bob',
-        to: 'loan',
-        amount: bob(principal),
-        paymentMethod: 'BANK_TRANSFER',
-        description: 'Cuota préstamo vehicular (capital)',
-      });
-      ops.push(
-        expense(
-          'loan-interest',
-          d(1),
-          'bank_bob',
-          bob(interest),
-          { system: 'INTEREST' },
-          'bank',
-          'BANK_TRANSFER',
-          'Cuota préstamo vehicular (interés)',
-        ),
-      );
-      loanOwed -= principal;
-    }
 
     // ── Efectivo: retiro mensual y gastos menudos (mercado, minibús).
     ops.push({
@@ -538,59 +525,7 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
       ),
     );
 
-    // ── Suscripciones en USD (streaming 9.99 → 11.99 desde 2025-10).
-    const streaming = y > 2025 || m >= 10 ? 1_199n : 999n;
-    ops.push(
-      expense(
-        'streaming',
-        d(3),
-        'bank_usd',
-        usd(streaming),
-        { name: 'Suscripciones digitales' },
-        'streaming',
-        'DEBIT_CARD',
-        'StreamFlix Demo',
-      ),
-    );
-    ops.push(
-      expense(
-        'music',
-        d(8),
-        'bank_usd',
-        usd(599n),
-        { name: 'Suscripciones digitales' },
-        'music',
-        'DEBIT_CARD',
-        'MúsicaYa Demo',
-      ),
-    );
-    ops.push(
-      expense(
-        'cloud',
-        d(15),
-        'bank_usd',
-        usd(299n),
-        { name: 'Suscripciones digitales' },
-        'cloud',
-        'DEBIT_CARD',
-        'NubeSegura Demo',
-      ),
-    );
-
-    // ── Tarjeta de crédito: pago del saldo del mes anterior (un mes con pago parcial) y compras del mes.
-    if (cardOwed > 0n) {
-      const payment = i === 8 ? scaleBy(cardOwed, 60n, 100n) : cardOwed;
-      ops.push({
-        op: 'transfer',
-        date: d(10),
-        from: 'bank_bob',
-        to: 'card',
-        amount: bob(payment),
-        paymentMethod: 'QR',
-        description: i === 8 ? 'Pago parcial Tarjeta Andina Demo' : 'Pago total Tarjeta Andina Demo',
-      });
-      cardOwed -= payment;
-    }
+    // ── Tarjeta de crédito: sus pagos son ocurrencias del pago administrado (se calculan tras generar las compras).
     const last = i === DEMO_MANIFEST.windowMonths - 1;
     const purchases = card.int(8, 11);
     const cardOps: IncomeExpenseOp[] = [];
@@ -648,7 +583,6 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
     }
     cardOps.sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key));
     ops.push(...cardOps);
-    for (const c of cardOps) cardOwed += c.amount.minor;
     if (last) {
       // Dos compras pendientes al final de la ventana (no afectan saldos).
       ops.push(
@@ -691,7 +625,6 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
         amount: original.amount,
         description: 'Reembolso compra devuelta',
       });
-      cardOwed -= original.amount.minor;
     }
     if (i === 12 && cardOps[1]) {
       const original = cardOps[1];
@@ -705,7 +638,6 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
         amount: half,
         description: 'Reembolso parcial',
       });
-      cardOwed -= half.minor;
     }
     if (i === 9) {
       ops.push({
@@ -721,7 +653,6 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
       const original = cardOps[2];
       const amount = bob(original.amount.minor + 1_500n);
       ops.push({ op: 'edit', date: d(28), of: original.key, amount, category: original.splits[0]!.category });
-      cardOwed += 1_500n;
     }
     if (i === 15) {
       ops.push({
@@ -734,7 +665,6 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
     }
     if (i === 13) {
       ops.push({ op: 'void', date: d(17), of: k('card-dup'), reason: 'Cargo duplicado' });
-      cardOwed -= 18_990n;
     }
 
     // ── Conversiones P2P: compra mensual de USDT con BOB (fee del proveedor en USDT), BTC trimestral con fee de
@@ -839,30 +769,287 @@ export function buildDemoPlan(anchorDate: string = DEMO_MANIFEST.anchorDate): De
       });
     }
 
-    const shifted = ops
-      .map((op) => ({ ...op, date: at(op.date) }) as DemoOp)
-      .sort((a, b) => a.date.localeCompare(b.date) || rank(a) - rank(b));
-    months.push({ month: at(d(1)).slice(0, 7), ops: shifted });
+    flat.push(...ops.map((op) => ({ ...op, date: at(op.date) }) as DemoOp));
   }
 
+  // ── Dataset v2: los flujos que ahora crean los casos de uso de COMMITMENTS y DEBT reemplazan a los gastos sueltos
+  //    de los últimos 6 meses (sueldo, alquiler, internet y retiro de efectivo).
+  const replaceFrom = monthStart(addMonthsClamped(anchorDate, -5));
+  const dropped = new Set<string>();
+  const kept = flat.filter((op) => {
+    if (op.date < replaceFrom) return true;
+    const isReplaced =
+      ((op.op === 'income' || op.op === 'expense') && /:(rent|salary|internet)$/.test(op.key)) ||
+      (op.op === 'transfer' && op.description === 'Retiro de efectivo');
+    if (isReplaced && (op.op === 'income' || op.op === 'expense')) dropped.add(op.key);
+    return !isReplaced;
+  });
+  const flows = kept.filter(
+    (op) =>
+      !(
+        (op.op === 'edit' || op.op === 'void' || op.op === 'refund') &&
+        'of' in op &&
+        dropped.has((op as { of: string }).of)
+      ),
+  );
+  const powerExpenseByMonth = new Map<string, { key: string; date: string }>();
+  for (const op of flows) {
+    if (op.op === 'expense' && op.key.endsWith(':power') && !powerExpenseByMonth.has(op.date.slice(0, 7))) {
+      powerExpenseByMonth.set(op.date.slice(0, 7), { key: op.key, date: op.date });
+    }
+  }
+  const windowStart = at(startDate);
+  const commitments = buildCommitments({
+    anchor: anchorDate,
+    shift,
+    startDate: windowStart,
+    powerExpenseByMonth,
+  });
+  const loans = loanDefinitions(anchorDate);
+  const extra: DemoOp[] = [
+    { op: 'notificationPrefs', date: windowStart },
+    ...commitments.ops,
+    ...loans.flatMap((l) => loanOps(l)),
+    ...goals.ops,
+    ...goals.flows,
+    ...kantuta.flows,
+    kantuta.card,
+    kantuta.installments,
+    ...kantuta.closings.map((c): ModuleOp => ({ op: 'tick', date: addDays(c, 1), runner: 'cards' })),
+    // Tasas de cierre en A − 1 (decisión 7): la valoración de "hoy" queda completa y verificable a mano.
+    {
+      op: 'rate',
+      date: addDays(anchorDate, -1),
+      base: 'USD',
+      quote: 'BOB',
+      value: '7.00',
+      rateType: 'PARALLEL',
+    },
+    {
+      op: 'rate',
+      date: addDays(anchorDate, -1),
+      base: 'USDT',
+      quote: 'BOB',
+      value: '6.95',
+      rateType: 'PARALLEL',
+    },
+    {
+      op: 'rate',
+      date: addDays(anchorDate, -1),
+      base: 'BTC',
+      quote: 'USD',
+      value: '60000.00',
+      rateType: 'PARALLEL',
+    },
+  ];
+  const andina = andinaCard({ anchorDate, windowStart, ops: [...flows, ...extra] });
+  extra.push(...andina.ops);
+
+  // Ticks de los runners de tiempo (decisión 3): generación al empezar cada mes y en cada fecha de creación automática.
+  const tickDates = new Set<string>();
+  let cursor = monthStart(windowStart);
+  while (cursor <= anchorDate) {
+    tickDates.add(cursor > windowStart ? cursor : windowStart);
+    cursor = addMonthsClamped(cursor, 1);
+  }
+  for (const op of extra) if (op.op === 'occurrence' && op.action === 'auto') tickDates.add(op.date);
+  for (const date of tickDates) extra.push({ op: 'tick', date, runner: 'occurrences' });
+  for (const runner of ['occurrences', 'subscriptions', 'cards', 'goals'] as const) {
+    extra.push({ op: 'tick', date: anchorDate, runner, late: true });
+  }
+
+  const all = [...flows, ...extra]
+    .map((op, index) => ({ op, index }))
+    .sort((x, y) => x.op.date.localeCompare(y.op.date) || rank(x.op) - rank(y.op) || x.index - y.index)
+    .map(({ op }) => op);
+  const byMonth = new Map<string, DemoOp[]>();
+  for (const op of all) {
+    const key = op.date.slice(0, 7);
+    byMonth.set(key, [...(byMonth.get(key) ?? []), op]);
+  }
+  const months: DemoMonth<DemoKeys, DemoOp>[] = [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, ops]) => ({ month, ops }));
+
+  const reservedBy = (goal: 'travel' | 'laptop' | 'gifts') =>
+    all.reduce((sum, op) => (op.op === 'goalMovement' && op.goal === goal ? sum + op.amount.minor : sum), 0n);
   return {
-    datasetVersion: DEMO_MANIFEST.datasetVersion,
-    anchorDate,
-    startDate: at(startDate),
-    institutions: INSTITUTIONS,
-    accounts,
-    counterparties: COUNTERPARTIES,
-    tags: [
-      { key: 'reembolsable', name: 'Reembolsable' },
-      { key: 'hogar', name: 'Hogar compartido' },
-    ],
-    months,
+    plan: {
+      datasetVersion: DEMO_MANIFEST.datasetVersion,
+      anchorDate,
+      startDate: at(startDate),
+      institutions: INSTITUTIONS,
+      accounts,
+      counterparties: COUNTERPARTIES,
+      tags: [
+        { key: 'reembolsable', name: 'Reembolsable' },
+        { key: 'hogar', name: 'Hogar compartido' },
+      ],
+      months,
+    },
+    oracle: {
+      subscriptions: commitments.subscriptions,
+      unresolved: commitments.unresolved,
+      andina: andina.statements,
+      emergencyContributions: goals.emergencyContributions,
+      reserved: { travel: reservedBy('travel'), laptop: reservedBy('laptop'), gifts: reservedBy('gifts') },
+    },
   };
 }
 
-/** Orden estable dentro de un día: tasas primero, ediciones/anulaciones al final. */
+/**
+ * Orden estable dentro de un día: preferencias y tasas primero; altas de módulo; generación de ocurrencias; flujos
+ * comunes; resoluciones de módulo; emisión de tarjetas y evaluación de metas; ediciones/anulaciones; y al final los
+ * ticks tardíos de la ancla.
+ */
 function rank(op: DemoOp): number {
-  return op.op === 'rate' ? 0 : op.op === 'edit' || op.op === 'void' ? 2 : 1;
+  switch (op.op) {
+    case 'notificationPrefs':
+      return -1;
+    case 'rate':
+      return 0;
+    case 'subscription':
+    case 'recurring':
+    case 'card':
+    case 'loan':
+    case 'goal':
+    case 'goalPlan':
+      return 1;
+    case 'tick':
+      return op.late ? 9 : op.runner === 'occurrences' ? 2 : 5;
+    case 'income':
+    case 'expense':
+    case 'refund':
+    case 'adjustment':
+    case 'transfer':
+    case 'conversion':
+      return 3;
+    case 'edit':
+    case 'void':
+      return 6;
+    default:
+      return 4;
+  }
+}
+
+/**
+ * "Tarjeta Andina Demo" (design.md decisión 5): perfil con límite separado, mínimo 5.00 % con piso 50.00 BOB y pago
+ * administrado desde la cuenta corriente. Cierre = día de A − 5, vencimiento = día de A + 15. El plan calcula con sus
+ * propias compras el total facturado de cada estado de cuenta (congelado al emitirse, el día siguiente al cierre) y
+ * paga ese total el día del vencimiento; el mes 9 de la ventana paga el 60 %. El cargador compara estos montos con
+ * la expectativa del motor.
+ */
+function andinaCard(input: {
+  readonly anchorDate: string;
+  readonly windowStart: string;
+  readonly ops: readonly DemoOp[];
+}): { ops: DemoOp[]; statements: AndinaStatement[] } {
+  const { anchorDate, windowStart } = input;
+  const statementDay = dayOfMonth(addDays(anchorDate, -5));
+  const dueDay = dayOfMonth(addDays(anchorDate, 15));
+  const registeredOn = addDays(windowStart, 15);
+  const rule = { percent: '5.00', floor: 5_000n, scale: 2 };
+  const ordered = input.ops
+    .map((op, index) => ({ op, index }))
+    .sort((x, y) => x.op.date.localeCompare(y.op.date) || rank(x.op) - rank(y.op) || x.index - y.index)
+    .map(({ op }) => op);
+
+  // Movimientos de la cuenta (pasivo: la compra suma deuda) en el orden en que el plan los ejecuta.
+  const movements: CardMovement[] = [];
+  const known = new Map<string, { date: string; amount: bigint; voided: boolean }>();
+  for (const op of ordered) {
+    if (op.op === 'expense' && op.account === 'card' && !op.pending) {
+      known.set(op.key, { date: op.date, amount: op.amount.minor, voided: false });
+      movements.push({ date: op.date, execDate: op.date, delta: op.amount.minor, kind: 'purchase' });
+    } else if (op.op === 'refund' && op.account === 'card') {
+      movements.push({ date: op.date, execDate: op.date, delta: -op.amount.minor, kind: 'refund' });
+    } else if (op.op === 'edit') {
+      const prev = known.get(op.of);
+      if (prev && !prev.voided) {
+        movements.push({
+          date: prev.date,
+          execDate: op.date,
+          delta: op.amount.minor - prev.amount,
+          kind: 'purchase',
+        });
+        known.set(op.of, { ...prev, amount: op.amount.minor });
+      }
+    } else if (op.op === 'void') {
+      const prev = known.get(op.of);
+      if (prev && !prev.voided) {
+        movements.push({ date: prev.date, execDate: op.date, delta: -prev.amount, kind: 'purchase' });
+        known.set(op.of, { ...prev, voided: true });
+      }
+    } else if (
+      op.op === 'occurrence' &&
+      op.effect?.kind === 'expense' &&
+      op.effect.account === 'card' &&
+      op.action !== 'leave'
+    ) {
+      movements.push({ date: op.date, execDate: op.date, delta: op.effect.amount.minor, kind: 'purchase' });
+    }
+  }
+
+  const partialMonth = addDays('2025-09-15', epochDay(anchorDate) - epochDay(DEMO_MANIFEST.anchorDate)).slice(
+    0,
+    7,
+  );
+  const out: DemoOp[] = [
+    {
+      op: 'card',
+      date: registeredOn,
+      key: 'andina',
+      name: 'Tarjeta Andina Demo',
+      accounts: [
+        {
+          account: 'card',
+          limit: bob(1_500_000n),
+          minPercent: '5.00',
+          minFloor: bob(5_000n),
+          payment: { from: 'bank_bob', policy: 'NO_INTEREST' },
+        },
+      ],
+      sharedLimit: null,
+      statementDay,
+      dueDay,
+    },
+  ];
+  const statements: AndinaStatement[] = [];
+  for (const closing of closingsBetween(statementDay, addDays(registeredOn, -1), anchorDate)) {
+    const tick = addDays(closing, 1);
+    if (tick > anchorDate) break;
+    out.push({ op: 'tick', date: tick, runner: 'cards' });
+    const previous = addMonthsClamped(closing, -1);
+    const figures = statementFigures({
+      movements,
+      closing,
+      previousClosing: previous,
+      dueDay,
+      asOf: tick,
+      unbilledInstallments: 0n,
+      rule,
+    });
+    const due = cardDue(closing, dueDay);
+    if (due > anchorDate || figures.billed <= 0n) {
+      statements.push({ closing, due, billed: figures.billed, minimum: figures.minimum, payment: null });
+      continue;
+    }
+    const partial = due.slice(0, 7) === partialMonth;
+    const amount = partial ? scaleBy(figures.billed, 60n, 100n) : figures.billed;
+    movements.push({ date: due, execDate: due, delta: -amount, kind: 'payment' });
+    statements.push({ closing, due, billed: figures.billed, minimum: figures.minimum, payment: amount });
+    out.push({
+      op: 'occurrence',
+      date: due,
+      target: { type: 'cardPayment', key: 'andina', account: 'card' },
+      occurrenceDate: due,
+      action: 'approve',
+      ...(partial ? { amount: bob(amount) } : {}),
+      expectedFromPlan: bob(figures.billed),
+      effect: { kind: 'transfer', from: 'bank_bob', to: 'card', amount: bob(amount) },
+    });
+  }
+  return { ops: out, statements };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -890,7 +1077,7 @@ function acc(
 
 // ------------------------------------------------------------------ resumen de referencia (golden summary)
 
-const LIABILITY: ReadonlySet<AccountKey> = new Set(['card', 'loan']);
+const LIABILITY: ReadonlySet<AccountKey> = new Set(['card', 'kantuta_bob', 'kantuta_usd']);
 
 export interface PlanSummary<A extends string = string> {
   readonly datasetVersion: string;
@@ -908,20 +1095,81 @@ export interface PlanSummary<A extends string = string> {
   };
 }
 
-export type DemoSummary = PlanSummary<AccountKey>;
+export type DemoSummary = PlanSummary<BalanceKey>;
 
 /**
  * Resumen esperado del plan (oráculo del golden summary): aplica cada operación a los saldos presentados con aritmética
- * entera. Las pendientes no afectan saldos; una edición reemplaza el monto; una anulación lo revierte.
+ * entera. Las pendientes no afectan saldos; una edición reemplaza el monto; una anulación lo revierte. Las operaciones
+ * de módulo (v2) aportan su efecto en el ledger: ocurrencias resueltas, desembolsos, pagos y pagos extraordinarios.
  */
-export function summarizeDemoPlan(plan: DemoPlan): DemoSummary {
-  return summarizePlan(plan, (key) => LIABILITY.has(key));
+export function summarizeDemoPlan(plan: DemoPlan<DemoKeys, DemoOp>): DemoSummary {
+  const loans = new Map<string, { balance: bigint; currency: DemoCurrency }>();
+  const summary = summarizePlan(
+    plan,
+    (key) => LIABILITY.has(key as AccountKey),
+    (op, ctx) => {
+      switch (op.op) {
+        case 'occurrence': {
+          const e = op.effect;
+          if (!e) return;
+          ctx.counts.transactions += 1;
+          if (e.kind === 'transfer') {
+            ctx.counts.transfers += 1;
+            ctx.add(e.from, -e.amount.minor);
+            ctx.add(e.to, e.amount.minor);
+          } else if (e.kind === 'expense') ctx.add(e.account, -e.amount.minor);
+          else ctx.add(e.account, e.amount.minor);
+          return;
+        }
+        case 'loan':
+          ctx.counts.transactions += 1;
+          ctx.add(op.account, op.principal.minor);
+          loans.set(op.key, { balance: op.principal.minor, currency: op.principal.currency });
+          return;
+        case 'loanPayment': {
+          ctx.counts.transactions += 1;
+          ctx.add(op.account, -op.total.minor);
+          const loan = loans.get(op.loan);
+          if (loan) loan.balance -= op.principal.minor;
+          return;
+        }
+        case 'loanPrepayment': {
+          ctx.counts.transactions += 1;
+          ctx.add(op.account, -op.amount.minor);
+          const loan = loans.get(op.loan);
+          if (loan) loan.balance -= op.amount.minor;
+          return;
+        }
+        default:
+          return;
+      }
+    },
+  );
+  const balances = { ...summary.balances } as Record<string, string>;
+  for (const [key, loan] of loans) {
+    balances[`loan_${key}`] = toDecimal(money(loan.balance, loan.currency));
+  }
+  return { ...summary, balances: balances as Record<BalanceKey, string> };
+}
+
+export interface SummaryContext<A extends string> {
+  readonly add: (key: A, assetDelta: bigint) => void;
+  readonly counts: {
+    transactions: number;
+    pending: number;
+    transfers: number;
+    conversions: number;
+    rates: number;
+    edits: number;
+    voids: number;
+  };
 }
 
 /** Igual que `summarizeDemoPlan` para cualquier plan; `isLiability` decide el signo del saldo presentado. */
-export function summarizePlan<K extends PlanKeys>(
-  plan: DemoPlan<K>,
+export function summarizePlan<K extends PlanKeys, O = PlanOp<K>>(
+  plan: DemoPlan<K, O>,
   isLiability: (key: K['account']) => boolean,
+  extra?: (op: Exclude<O, PlanOp<K>>, ctx: SummaryContext<K['account']>) => void,
 ): PlanSummary<K['account']> {
   type A = K['account'];
   const balance = new Map<A, bigint>(plan.accounts.map((a) => [a.key, a.opening?.minor ?? 0n]));
@@ -940,7 +1188,8 @@ export function summarizePlan<K extends PlanKeys>(
     voids: 0,
   };
   for (const month of plan.months) {
-    for (const op of month.ops) {
+    for (const raw of month.ops) {
+      const op = raw as unknown as PlanOp<K>;
       switch (op.op) {
         case 'rate':
           counts.rates += 1;
@@ -1000,6 +1249,8 @@ export function summarizePlan<K extends PlanKeys>(
           recorded.delete(op.of);
           break;
         }
+        default:
+          extra?.(raw as Exclude<O, PlanOp<K>>, { add, counts });
       }
     }
   }

@@ -5,16 +5,16 @@ spec: identity/demo-data
 related_specs: ["commitments/subscriptions", "commitments/recurrence-engine"]
 requirement: "Suscripciones y compromisos recurrentes de demostración"
 scenario: "Suscripciones de la demo al 2026-09-30"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-014", "FR-COMMITMENTS-012", "FR-COMMITMENTS-015"]
 nfr: []
 invariants: ["INV-001", "INV-002"]
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/src/demo/dataset/demo-plan.test.ts","apps/api/test/demo/demo-v2.int.test.ts","tests/e2e/specs/demo-data.spec.ts"]
+status: automated
 regression_suite: false
 phase: 5
 tags: ["demo-data", "subscriptions", "recurring"]
