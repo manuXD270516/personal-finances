@@ -1,0 +1,64 @@
+*** SINTETICO: extracto inventado para pruebas (formato imitado, ningun dato real). Institucion ficticia "Banco Pampa Demo". ***
+                                                                                                            EXTRACTO DE CUENTA
+                                                                                                                             01/03/2026-31/03/2026
+
+
+                                                                                                                               Banco Pampa Demo S.A.
+                                                           EXPRESADO EN BOLIVIANOS                                                Banca por Internet
+
+   NRO. DE CUENTA: 0000000001                              DEL 01/03/2026 AL 31/03/2026                                     Procesado por 00000001
+                                                                                                                                 Fecha: 02/04/2026
+   CLIENTE: TITULAR FICTICIO UNO DEMO                                                                                            Hora: 10:00:00 Hs.
+
+
+
+   FECHA           HORA       OFICINA/CANAL   TRANSACCIÓN    DESCRIPCIÓN                                    DÉBITO    CRÉDITO               SALDO
+
+   -               -          -               -              Saldo anterior                                    0.00       0.00              2,640.00
+
+   01/03/2026      10:15:00   WEB/MOV/DEM     900000001      Seguro 3-2026 000000-XXXXXX-0000                 26.00       0.00              2,614.00
+
+   02/03/2026      11:30:12   WEB/MOV/DEM     900000002      TRANSF. QR ACH Nro. 9000000001 BANCO             33.00       0.00              2,581.00
+                                                             DEMO UNO 0000000001 PERSONA FICTICIA ALFA
+                                                             Sin informacion
+
+   03/03/2026      12:00:00   WEB/MOV/DEM     900000003      Transferencia de 0000000002. PERSONA              0.00     350.00              2,931.00
+                                                             FICTICIA BETA Aún falta 350
+
+   03/03/2026      12:05:30   WEB/MOV/DEM     900000004      Transferencia de 0000000002. PERSONA              0.00     350.00              3,281.00
+
+
+Página Actual: 1                                                                                                                    Total Páginas: 2
+   FECHA           HORA       OFICINA/CANAL   TRANSACCIÓN    DESCRIPCIÓN                                       DÉBITO    CRÉDITO          SALDO
+
+                                                             FICTICIA BETA Completado
+
+   04/03/2026      14:00:00   WEB/MOV/DEM     800000005      GNT - Pago de Servicios SERVICIO DEMO Nro.       187.00       0.00          3,094.00
+                                                             000000001
+
+   05/03/2026      16:21:09   WEB/MOV/DEM     900000006      TRANSF. QR ACH Nro. 9000000002 BANCO DEMO         0.00  10,500.75         13,594.75
+                                                             DOS 10000000001 PERSONA FICTICIA GAMMA pago
+
+   06/03/2026      19:48:51   ATM/POS         1000007        Deposito ATM                                      0.00     175.00         13,769.75
+
+   07/03/2026      09:30:00   WEB/MOV/DEM     900000008      Transferencia a 0000000003. COMERCIO DEMO      1,200.50       0.00         12,569.25
+                                                             TRES Qr Pedido 15
+
+   31/03/2026      23:10:00   WEB/MOV/DEM     900000009      Transferencia a 0000000003. COMERCIO DEMO        520.00       0.00         12,049.25
+                                                             TRES
+
+   31/03/2026      03:12:07   OFICINA DEMO    517000001      Intereses Ganados 0000000001                      0.00         1.62         12,050.87
+
+   31/03/2026      03:12:07   OFICINA DEMO    517000001      Retencion de Impuestos IVA                        0.21         0.00         12,050.66
+
+
+
+                                                                                                                    TOTAL SALDO ACTUAL:          12,050.66
+                                                                                                              TOTAL FONDOS RESERVADOS:               0.00
+                                                                                                                       SALDO DISPONIBLE:         12,050.66
+                                                                                                                DEPOSITO POR CONFIRMAR:              0.00
+
+
+
+
+Página Actual: 2                                                                                                                            Total Páginas: 2
