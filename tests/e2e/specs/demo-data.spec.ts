@@ -52,7 +52,11 @@ test.describe('Datos de demostración (identity/demo-data)', () => {
     for (const screen of screens) {
       await go(page, screen.path);
       await expect(page.getByTestId('demo-indicator'), screen.path).toBeVisible();
-      if (screen.text) await expect(page.getByText(screen.text).first(), screen.path).toBeVisible();
+      // Solo elementos visibles: las pestañas inactivas de /debts quedan montadas con `hidden` (el Resumen repite los
+      // nombres de préstamos y tarjetas) y `.first()` resolvía a esa copia oculta.
+      if (screen.text) {
+        await expect(page.getByText(screen.text).locator('visible=true').first(), screen.path).toBeVisible();
+      }
     }
 
     // TC-014: el workspace real no cambió.
