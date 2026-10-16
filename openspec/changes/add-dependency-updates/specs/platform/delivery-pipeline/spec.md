@@ -65,7 +65,7 @@ Un pipeline programado una vez al día, que NO DEBE (MUST NOT) ser un check requ
 Trace: NFR-PERF-001, NFR-PERF-002, NFR-PERF-003, NFR-PERF-004, NFR-PERF-005, NFR-PERF-006 · Priority: Should
 
 #### Scenario: Búsqueda de texto con el Large Seed
-- **CUANDO** el nightly busca el texto "supermercado" en el workspace principal del Large Seed con al menos 50 000 transacciones, con 50 resultados por página
+- **CUANDO** el nightly busca un texto frecuente de las compras de supermercado ("super", la descripción normalizada que genera el Large Seed) en el workspace principal del Large Seed con al menos 50 000 transacciones, con 50 resultados por página
 - **ENTONCES** el reporte incluye el p95 de la búsqueda frente al umbral de 400 ms
 - **Y** el nightly falla si el p95 supera 400 ms
 

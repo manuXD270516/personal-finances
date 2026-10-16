@@ -5,16 +5,17 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Antigüedad mínima y lockfile verificable"
 scenario: "Versión publicada hace un día"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-SEC-013]
 invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/renovate-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["ci", "dependencies", "renovate", "supply-chain"]
@@ -36,7 +37,7 @@ expected_result:
   - "El bot no puede editar allowBuilds, minimumReleaseAgeExclude ni .trivyignore.yaml"
   - "Una PR cuyo lockfile no pasa la instalación congelada o dependency-scan queda en rojo y no se fusiona"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-16
 ---
 
 # TC-PLATFORM-PIPELINE-007 — El servicio de actualización respeta la antigüedad mínima y no abre excepciones de supply-chain en el lockfile
@@ -57,3 +58,5 @@ Entonces el servicio no la propone
 ## Notas
 
 - El valor de 3 días depende de la pregunta 6 de design.md.
+
+- 2026-10-16: automatizado (`scripts/delivery-policy/test/renovate-policy.test.ts`). La antigüedad mínima de pnpm no está fijada en `pnpm-workspace.yaml`: el test usa el valor por defecto de pnpm (1 día, 1440 min) como cota y compara con el valor del workspace si algún día se declara (docs/23 §10).

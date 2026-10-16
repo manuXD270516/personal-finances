@@ -25,6 +25,21 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     expect(rowOf(id)).toContain(t.docText);
   });
 
+  it('[TC-PLATFORM-PIPELINE-008] NFR-PERF-002 (búsqueda de texto) tiene umbral p95 de 400 ms bloqueante y un p95 de 450 ms es brecha', () => {
+    expect(PERF_THRESHOLDS['NFR-PERF-002']).toMatchObject({ metric: 'p95', limitMs: 400 });
+    const search = latencyResult({
+      id: 'transactions-search',
+      nfr: 'NFR-PERF-002',
+      title: 'Búsqueda de texto',
+      samples: Array.from({ length: 100 }, () => 450),
+      limitMs: PERF_THRESHOLDS['NFR-PERF-002'].limitMs,
+    });
+    expect([search.value, search.limit, search.gate, search.passed]).toEqual([450, 400, true, false]);
+    const report = buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [search] });
+    expect(report.breaches).toEqual(['NFR-PERF-002 transactions-search: 450 ms > 400 ms']);
+    expect(renderMarkdown(report)).toMatch(/NFR-PERF-002/);
+  });
+
   it('[TC-PLATFORM-EVENTS-014] el umbral de throughput por consumidor coincide con docs/02 (NFR-PERF-008)', () => {
     expect(rowOf('NFR-PERF-008')).toContain(PERF_THROUGHPUT.docText);
   });

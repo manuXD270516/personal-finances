@@ -5,16 +5,17 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Actualización de dependencias agrupada y semanal"
 scenario: "Parches y versiones menores de la semana en un solo grupo"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-MAINT-012, NFR-SEC-013]
 invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/renovate-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["ci", "dependencies", "renovate"]
@@ -37,7 +38,7 @@ expected_result:
   - "Las acciones quedan por SHA completo con el tag como comentario; las imágenes por tag y digest"
   - "La protección de main sigue con los mismos checks, strict y enforce_admins; ninguna regla del servicio la toca"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-16
 ---
 
 # TC-PLATFORM-PIPELINE-005 — Las actualizaciones de parches y menores llegan en una PR semanal por grupo, con acciones por SHA y sin tocar la protección de main
@@ -60,3 +61,5 @@ Entonces se abre una sola PR del grupo del workspace con manifiestos y lockfile
 
 - La parte automática es un test de política sobre la configuración (`pnpm test`, job `unit`); la primera corrida real se verifica a mano (tareas 3.2 y 3.3).
 - Ventana y grupos según las preguntas 2 y 3 de design.md.
+
+- 2026-10-16: la parte de política está automatizada (`scripts/delivery-policy/test/renovate-policy.test.ts`, `pnpm test`). Pendiente de verificación manual (tareas 3.1–3.2, no hechas): el número de la PR de configuración (onboarding) de la app de Mend y qué se hizo con ella; la primera corrida real, el Dependency Dashboard y la protección de `main` con 17 checks, `strict` y `enforce_admins`.

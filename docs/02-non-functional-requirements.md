@@ -161,7 +161,7 @@ Detalle en [18-observability.md](./18-observability.md) y ADR-0020.
 | NFR-MAINT-009 | **Contratos**: OpenAPI 3.1 lint (Spectral/Redocly) sin errores; JSON Schemas de eventos versionados; breaking change detectado automáticamente. | 0 breaking changes no versionados. | oasdiff/Spectral en CI. | 1 | Must |
 | NFR-MAINT-010 | **ADRs** para toda decisión arquitectónica significativa (formato MADR). | 100 % de decisiones de stack con ADR aceptado antes de implementarse. | Revisión en DESIGN GATE. | 0 | Must |
 | NFR-MAINT-011 | Conventional Commits + release-please; changelog generado. | 100 % commits válidos (commitlint). | CI. | 1 | Should |
-| NFR-MAINT-012 | Actualización de dependencias. | Dependencias sin parches de seguridad pendientes > 30 días; major upgrades evaluados trimestralmente. | Renovate dashboard. | 1 | Should |
+| NFR-MAINT-012 | Actualización de dependencias. | Dependencias sin parches de seguridad pendientes > 30 días; major upgrades evaluados trimestralmente. | Renovate dashboard (Dependency Dashboard del repositorio) y `renovate.json5`, verificado por el test de política `scripts/delivery-policy` (docs/23 §10.1). | 1 | Should |
 | NFR-MAINT-013 | Complejidad acotada en dominio. | Complejidad ciclomática por función ≤ 10 (warn), ≤ 15 (error). | ESLint `complexity`. | 1 | Could |
 | NFR-MAINT-014 | Documentación viva: cada contexto tiene README con lenguaje ubicuo, agregados, eventos y puertos. | 100 % de contextos implementados. | Checklist de exit de fase. | 1 | Should |
 

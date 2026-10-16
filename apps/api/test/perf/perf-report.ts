@@ -9,6 +9,8 @@ import { join } from 'node:path';
 export const PERF_THRESHOLDS = {
   /** NFR-PERF-001: listado paginado (limit 50, filtros) con ≥ 50 000 transacciones; local ≤ 300 ms (cloud ≤ 200). */
   'NFR-PERF-001': { metric: 'p95', limitMs: 300, cloudLimitMs: 200, docText: 'local ≤ 300 ms p95' },
+  /** NFR-PERF-002: búsqueda de texto en transacciones (`q`, limit 50) con ≥ 50 000 transacciones (add-dependency-updates 4.1). */
+  'NFR-PERF-002': { metric: 'p95', limitMs: 400, docText: 'p95 ≤ 400 ms' },
   /** NFR-PERF-003: comandos de escritura (posting + audit + outbox). */
   'NFR-PERF-003': { metric: 'p95', limitMs: 150, docText: 'p95 ≤ **150 ms** server time' },
   /** NFR-PERF-004: API del dashboard (Home) `GET /reports/summary`. */

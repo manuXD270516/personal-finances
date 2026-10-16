@@ -5,16 +5,17 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Sin fusión automática de versiones mayores ni con checks en rojo"
 scenario: "Versión mayor en su propia pull request"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-SEC-013, NFR-MAINT-012]
 invariants: []
 priority: critical
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/renovate-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["ci", "dependencies", "renovate", "automerge"]
@@ -37,7 +38,7 @@ expected_result:
   - "La fusión automática permitida se delega en el auto-merge nativo, que espera los checks requeridos"
   - "Ninguna PR del bot se fusiona en rojo o con checks pendientes"
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-16
 ---
 
 # TC-PLATFORM-PIPELINE-006 — Una versión mayor llega en su propia PR sin auto-merge y ninguna PR de actualización se fusiona con checks en rojo o pendientes
@@ -58,3 +59,5 @@ Entonces abre una PR propia fuera del grupo semanal
 ## Notas
 
 - Qué clases sí se fusionan solas depende de la pregunta 4 de design.md; este caso cubre lo que no cambia con la respuesta.
+
+- 2026-10-16: la parte de política está automatizada (`scripts/delivery-policy/test/renovate-policy.test.ts`). Pendiente de verificación manual (tarea 3.3): primera ventana semanal con una PR de grupo en verde y, si hay una major, comprobar que queda abierta sin auto-merge.
