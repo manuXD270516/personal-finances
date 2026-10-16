@@ -5,16 +5,17 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Nightly de rendimiento con el Large Seed"
 scenario: "Fallo del nightly de rendimiento abre o comenta un aviso"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-PERF-002]
 invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/nightly-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "ci", "issues"]
@@ -60,3 +61,5 @@ Entonces se abre ese issue con el enlace a la corrida y el resumen del reporte
 
 - La parte estática (permisos y paso de aviso) la cubre un test de política ejecutado por `pnpm test`; la creación y el comentario reales se verifican una vez por `workflow_dispatch` (tarea 4.3) y se anotan aquí.
 - No toca la protección de `main` ni los checks requeridos (D224).
+
+- 2026-10-16: la parte estática está automatizada (`scripts/delivery-policy/test/nightly-policy.test.ts`). Pendiente (tarea 4.3): una verificación manual por `workflow_dispatch` con un umbral forzado, dos veces seguidas, y anotar aquí el número del issue.

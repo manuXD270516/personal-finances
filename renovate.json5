@@ -1,0 +1,142 @@
+// Mend Renovate (GitHub App hospedada, instalada por el owner solo en este repositorio; D254, D261).
+// Change add-dependency-updates (docs/23 §10, NFR-MAINT-012, NFR-SEC-013, RISK-024). Reglas verificadas por el test de
+// política `scripts/delivery-policy` (TC-PLATFORM-PIPELINE-005..007), que corre con `pnpm test` (job `unit`).
+//
+// Esta configuración NO toca la protección de `main` ni los checks requeridos (D224): cada PR del bot pasa los mismos
+// 17 checks, con `strict` y `enforce_admins`. Las fusiones automáticas las hace el auto-merge nativo de GitHub
+// (`platformAutomerge`), que espera esos checks; Renovate nunca fusiona por sí mismo.
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:recommended', 'helpers:pinGitHubActionDigests', ':dependencyDashboard'],
+
+  // Ventana semanal (pregunta 2, D262): lunes antes de las 06:00 America/La_Paz, después del nightly de las 02:00.
+  timezone: 'America/La_Paz',
+  schedule: ['before 6am on monday'],
+  prConcurrentLimit: 5,
+  prHourlyLimit: 5,
+
+  // Antigüedad mínima (pregunta 6, D266): no menor que la de pnpm al instalar (docs/23 §10). El filtro estricto evita
+  // abrir la PR antes de cumplirla.
+  minimumReleaseAge: '3 days',
+  internalChecksFilter: 'strict',
+
+  // Con `strict` una PR atrasada no se fusiona: Renovate la rebasa y eso relanza los checks.
+  rebaseWhen: 'behind-base-branch',
+  platformAutomerge: true,
+  automerge: false,
+  lockFileMaintenance: { enabled: false },
+
+  labels: ['dependencies'],
+
+  // Pregunta 3, D263: `spikes/` fuera (código descartable con sus propios workspaces) y las fixtures de tests. Este
+  // arreglo REEMPLAZA el de `:ignoreModulesAndTests`, que ignora `**/test/**` y dejaría fuera
+  // `apps/api/test/support/images.ts`. `.trivyignore.yaml` (excepciones de vulnerabilidades) nunca es del bot. Los
+  // binarios de Trivy y gitleaks de `pr.yml` (versión + SHA-256) no tienen gestor: se revisan a mano cada trimestre.
+  ignorePaths: ['**/node_modules/**', '**/spikes/**', '**/fixtures/**', '.trivyignore.yaml'],
+
+  // Textos en español donde Renovate lo permite (pregunta 8, D268). Las notas de versión de terceros quedan en su idioma.
+  semanticCommits: 'enabled',
+  semanticCommitType: 'chore',
+  semanticCommitScope: 'deps',
+  commitMessageAction: 'actualizar',
+  commitMessageTopic: '{{depName}}',
+  commitMessageExtra: 'a {{#if isPinDigest}}{{{newDigestShort}}}{{else}}{{#if isMajor}}{{prettyNewMajor}}{{else}}{{#if isSingleVersion}}{{prettyNewVersion}}{{else}}{{#if newValue}}{{{newValue}}}{{else}}{{{newDigestShort}}}{{/if}}{{/if}}{{/if}}{{/if}}',
+  prHeader: 'Actualización de dependencias propuesta por Renovate (change add-dependency-updates). Debe pasar los 17 checks requeridos con la rama al día; las versiones mayores no se fusionan solas.',
+  prFooter: 'Esta PR no modifica la protección de `main` ni los checks requeridos. Si un check falla, se corrige en esta rama o se cierra; nunca se fusiona en rojo.',
+  dependencyDashboardTitle: 'Panel de dependencias (Renovate)',
+  dependencyDashboardHeader: 'Estado de las actualizaciones de dependencias. Ventana semanal: lunes antes de las 06:00 (America/La_Paz). Sin datos sensibles.',
+
+  // Gestores (pregunta 3, D263): el gestor `npm` cubre manifiestos, `catalog:` de pnpm-workspace.yaml, `packageManager` y
+  // `engines`; `nvm` cubre `.nvmrc`; el regex cubre las imágenes de Testcontainers.
+  enabledManagers: ['npm', 'nvm', 'github-actions', 'dockerfile', 'docker-compose', 'custom.regex'],
+
+  customManagers: [
+    {
+      // apps/api/test/support/images.ts: constantes `'imagen:tag@sha256:…'` (tag + digest), mismas que compose.
+      customType: 'regex',
+      description: 'Imágenes fijadas por tag y digest para Testcontainers',
+      managerFilePatterns: ['/^apps/api/test/support/images\\.ts$/'],
+      matchStrings: [
+        "'(?<depName>[a-z0-9][a-z0-9._/-]*):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)@(?<currentDigest>sha256:[a-f0-9]{64})'",
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'docker',
+    },
+  ],
+
+  // Orden: la última regla que coincide gana.
+  packageRules: [
+    // Grupos por ecosistema (pregunta 3): solo parches, menores y digests; las mayores salen de los grupos.
+    {
+      description: 'Dependencias del workspace (manifiestos, catálogo y gestor de paquetes)',
+      matchManagers: ['npm'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+      groupName: 'dependencias del workspace',
+    },
+    {
+      description: 'Acciones de CI fijadas por SHA',
+      matchManagers: ['github-actions'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'pinDigest', 'digest'],
+      groupName: 'acciones de CI',
+    },
+    {
+      description: 'Imágenes (Dockerfiles, compose y Testcontainers): una PR por imagen en todos sus archivos',
+      matchManagers: ['dockerfile', 'docker-compose', 'custom.regex'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'pinDigest', 'digest'],
+      groupName: 'imagen {{{depName}}}',
+    },
+    {
+      description: 'Runtime: Node en .nvmrc, imagen base node y engines, en un mismo grupo (docs/23 §10)',
+      matchDepNames: ['node'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'pinDigest', 'digest'],
+      groupName: 'runtime (Node)',
+    },
+    {
+      description: 'engines no se reescribe: solo se amplía el rango cuando sale una versión fuera de él',
+      matchDepTypes: ['engines'],
+      rangeStrategy: 'widen',
+    },
+
+    // Fusión automática (pregunta 4, D264), delegada en el auto-merge nativo con los 17 checks: solo parches de
+    // dependencias de desarrollo y digests y parches de acciones de CI e imágenes de desarrollo.
+    {
+      description: 'Parches de dependencias de desarrollo',
+      matchManagers: ['npm'],
+      matchDepTypes: ['devDependencies'],
+      matchUpdateTypes: ['patch'],
+      automerge: true,
+    },
+    {
+      description: 'Digests y parches de acciones de CI',
+      matchManagers: ['github-actions'],
+      matchUpdateTypes: ['pin', 'pinDigest', 'digest', 'patch'],
+      automerge: true,
+    },
+    {
+      description: 'Digests y parches de imágenes de desarrollo (compose de desarrollo y Testcontainers)',
+      matchFileNames: ['deploy/compose/compose.yaml', 'apps/api/test/support/images.ts'],
+      matchUpdateTypes: ['pin', 'pinDigest', 'digest', 'patch'],
+      automerge: true,
+    },
+    // Versiones mayores: una PR por paquete, fuera de los grupos y sin fusión automática (D224). Va al final.
+    {
+      description: 'Versiones mayores: PR propia, sin fusión automática',
+      matchUpdateTypes: ['major'],
+      groupName: null,
+      automerge: false,
+      addLabels: ['major'],
+    },
+  ],
+
+  // Pregunta 5, D265: las PR que corrigen un aviso de seguridad se abren fuera de la ventana, con etiqueta `security`,
+  // respetando la antigüedad mínima y sin fusión automática.
+  vulnerabilityAlerts: {
+    enabled: true,
+    groupName: null,
+    schedule: ['at any time'],
+    minimumReleaseAge: '3 days',
+    labels: ['dependencies', 'security'],
+    automerge: false,
+  },
+  osvVulnerabilityAlerts: true,
+}

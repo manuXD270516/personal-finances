@@ -1,0 +1,19 @@
+{
+  "name": "@pf/delivery-policy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test de política del pipeline de entrega: renovate.json5 (TC-PLATFORM-PIPELINE-005..007) y los permisos y el aviso por issue de nightly.yml (TC-PLATFORM-PIPELINE-009).",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "json5": "2.2.3",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "2.9.1"
+  }
+}

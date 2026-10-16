@@ -30,7 +30,7 @@ import {
 /**
  * Benchmarks nightly (docs/16 §5.15, docs/23 §5.5): PostgreSQL 18 real (Testcontainers, mismas imágenes que CI) con el
  * Large Seed (docs/29 §2.3) cargado por los casos de uso, la API en proceso (mismo `createApiRuntime` que producción)
- * y JWT firmados localmente. Mide NFR-PERF-001/003/004/005 y el overhead de RLS (add-ledger-core 5.5), escribe
+ * y JWT firmados localmente. Mide NFR-PERF-001/002/003/004/005/006 y el overhead de RLS (add-ledger-core 5.5), escribe
  * `perf-results.json` + `perf-summary.md` y falla si algún p95 supera su umbral (docs/02).
  *
  * Variables: PF_PERF_SCALE (0..1, por defecto 1), PF_PERF_MONTHS / PF_PERF_SATELLITES (solo corridas rápidas),
@@ -461,6 +461,27 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
         samples: all,
         limitMs: PERF_THRESHOLDS['NFR-PERF-001'].limitMs,
         notes: `umbral local/CI ${PERF_THRESHOLDS['NFR-PERF-001'].limitMs} ms; objetivo cloud ${PERF_THRESHOLDS['NFR-PERF-001'].cloudLimitMs} ms (informativo)`,
+      }),
+    );
+  });
+
+  it('[TC-PLATFORM-PIPELINE-008] NFR-PERF-002: búsqueda de texto (q=super, limit 50) en el workspace principal con ≥ 50 000 transacciones', async () => {
+    // El Large Seed no genera "supermercado": la descripción de las compras de la categoría es "Súper" (search_text la
+    // guarda normalizada, sin tilde ni mayúsculas) y es de las más frecuentes; el término se documenta en el TC.
+    const term = 'super';
+    const first = await ok('GET', `${W}/transactions?q=${term}&limit=50`);
+    expect(dataOf(first).length).toBe(50);
+    const samples = await timed(ITERATIONS, async () => {
+      const r = await call('GET', `${W}/transactions?q=${term}&limit=50`);
+      if (r.status !== 200) throw new Error(`búsqueda q=${term}: ${r.status} ${JSON.stringify(r.body)}`);
+    });
+    results.push(
+      latencyResult({
+        id: 'transactions-search',
+        nfr: 'NFR-PERF-002',
+        title: `Búsqueda de texto q=${term} (limit 50)`,
+        samples,
+        limitMs: PERF_THRESHOLDS['NFR-PERF-002'].limitMs,
       }),
     );
   });

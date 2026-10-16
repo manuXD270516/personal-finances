@@ -4,8 +4,10 @@
 #                  con NIGHTLY=1 (property-based tests a 10 000 corridas, semilla aleatoria impresa en cada falla).
 #   mutation       shared-kernel: cobertura (≥ 95 % líneas / ≥ 90 % ramas) y Stryker (mutation score ≥ 80 %);
 #                  dominio IDENTITY: cobertura ≥ 90 % (add-workspace-identity 4.1).
-#   perf           Large Seed (docs/29 §2.3) + benchmarks NFR-PERF-001/003/004/005 y overhead de RLS (Testcontainers);
-#                  falla si un p95 supera su umbral de docs/02. Reporte JSON + Markdown como artefacto.
+#   perf           Large Seed (docs/29 §2.3) + benchmarks NFR-PERF-001/002/003/004/005/006 y overhead de RLS (Testcontainers);
+#                  falla si un p95 supera su umbral de docs/02 (incluye NFR-PERF-002, búsqueda de texto). Reporte JSON +
+#                  Markdown como artefacto. Si falla abre o comenta el issue "nightly perf: umbral superado" (único job
+#                  de este tipo con `issues: write`, junto con fx-smoke-live; nunca a nivel de workflow).
 #   fx-smoke-live  ÚNICO job con red hacia terceros: smoke de los providers de tasas reales. `continue-on-error`:
 #                  nunca rompe el pipeline; si falla abre o actualiza un issue para revisar el adapter.
 # Acciones fijadas por SHA de commit completo (comentario = tag verificado), igual que pr.yml/main.yml.
@@ -100,6 +102,9 @@ jobs:
     name: perf (Large Seed + NFR-PERF)
     runs-on: ubuntu-latest # Docker para Testcontainers (PostgreSQL 18)
     timeout-minutes: 240
+    permissions:
+      contents: read
+      issues: write # solo para abrir/comentar el aviso "nightly perf: umbral superado" (add-dependency-updates 4.3, D270)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -117,6 +122,24 @@ jobs:
           path: reports/perf
           if-no-files-found: warn
           retention-days: 90
+      # D270: si el job falla (un p95 supera su umbral), abre el issue de aviso o comenta el que ya está abierto con ese
+      # título exacto (nunca duplica). No es check requerido: el rojo avisa sin bloquear PR.
+      - name: Abrir o comentar el aviso de umbral superado
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title='nightly perf: umbral superado'
+          body="$(printf 'El job perf del nightly falló en %s.\n\n%s\n' "$RUN_URL" "$(cat reports/perf/perf-summary.md 2>/dev/null || echo 'sin reporte')")"
+          number="$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
 
   fx-smoke-live:
     name: fx-smoke-live (no bloqueante)
