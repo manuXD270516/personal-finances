@@ -1,6 +1,6 @@
 # 42 — Respuestas del owner de Phase 5 (2026-10-13) y decisiones D251–D255
 
-> **Estado:** Registrado (5 respuestas del owner; 4 preguntas nuevas abiertas) · **Fecha:** 2026-10-13 · **Relacionado:** [41-phase-5-consolidation-decisions.md](41-phase-5-consolidation-decisions.md) (D219–D250), [40-phase-5-consolidation-questions.md](40-phase-5-consolidation-questions.md), [39-phase-4-closure-and-phase-5-design.md](39-phase-4-closure-and-phase-5-design.md) §B.3, [ADR-0025](adr/0025-fuentes-de-tipo-de-cambio-bolivia.md), [ADR-0029](adr/0029-fuentes-de-precios-cripto.md) (propuesto), changes `add-crypto-rate-providers` (38), `add-rate-feed-alerts` (39), `add-exchange-house-rate-providers` (41) y `add-dependency-updates` (45)
+> **Estado:** Registrado (5 respuestas del owner; las 4 preguntas nuevas, respondidas el 2026-10-16 en [docs/43](43-phase-5-owner-answers-2026-10-16.md), D256–D259) · **Fecha:** 2026-10-13 · **Relacionado:** [41-phase-5-consolidation-decisions.md](41-phase-5-consolidation-decisions.md) (D219–D250), [40-phase-5-consolidation-questions.md](40-phase-5-consolidation-questions.md), [39-phase-4-closure-and-phase-5-design.md](39-phase-4-closure-and-phase-5-design.md) §B.3, [ADR-0025](adr/0025-fuentes-de-tipo-de-cambio-bolivia.md), [ADR-0029](adr/0029-fuentes-de-precios-cripto.md) (aceptado el 2026-10-16), changes `add-crypto-rate-providers` (38), `add-rate-feed-alerts` (39), `add-exchange-house-rate-providers` (41) y `add-dependency-updates` (45)
 
 El owner respondió el 2026-10-13 a preguntas abiertas en los designs de los changes de Phase 5 y en [docs/41](41-phase-5-consolidation-decisions.md). La numeración continúa la de docs/41 (último id usado: D250). Este documento registra cada respuesta **tal cual** y su consecuencia en resumen; el detalle lo desarrolla cada change en su design, tasks, specs y TC.
 
@@ -16,6 +16,8 @@ El owner respondió el 2026-10-13 a preguntas abiertas en los designs de los cha
 
 ## Preguntas nuevas
 
+> **Respondidas (2026-10-16):** el owner adoptó la recomendación de las cuatro (opción (a)); ver [docs/43](43-phase-5-owner-answers-2026-10-16.md) D256–D259. ADR-0029 pasa a Aceptado, con las condiciones C1–C4 vigentes.
+
 Surgen de la verificación de términos de ADR-0029. Ninguna bloquea la implementación de los adapters con fixtures; las marcadas **[B]** bloquean **habilitar** los providers cripto en un entorno con red (descriptor `VERIFIED`).
 
 1. **[B] Aceptar ADR-0029: principal y respaldo cripto.** La verificación documental deja a Binance y a Bybit como aptos con condiciones y a Bitget sin evidencia suficiente (su documentación y sus términos no se pudieron leer desde el entorno de diseño). Opciones: (a) **principal Binance (`CRYPTO_BINANCE`, host de solo datos de mercado `data-api.binance.vision`) y respaldo Bybit (`CRYPTO_BYBIT`)**; Bitget queda como candidata siguiente, sin adapter; (b) principal Bybit y respaldo Binance; (c) completar primero la verificación de Bitget y usarlo como respaldo en lugar de Bybit. **Recomendación: (a).** Binance tiene la documentación oficial más completa y verificable (repositorio oficial), un host dedicado a datos públicos sin clave y el ticker de varios símbolos en una solicitud; Bybit es otro operador, con kline diario de hasta 1000 velas y un límite por IP publicado.
@@ -24,6 +26,8 @@ Surgen de la verificación de términos de ADR-0029. Ninguna bloquea la implemen
 4. **Smoke en vivo desde GitHub Actions.** Hay reportes consistentes de que `api.binance.com` responde HTTP 451 ("restricted location") desde IPs de EE. UU. y de nubes, y de que Bybit bloquea a usuarios de EE. UU.; los runners de GitHub corren en EE. UU. Para `data-api.binance.vision` no se encontró evidencia en ningún sentido. Opciones: (a) **el smoke nightly de los providers cripto clasifica 451/403 de origen geográfico como "no concluyente" (no abre el aviso de revisión del adapter) y la salud real se vigila con el estado de providers del VPS N1**; (b) mover el smoke cripto al VPS; (c) sin smoke cripto. **Recomendación: (a).** No bloquea.
 
 ## Pendiente del owner
+
+> **Actualización (2026-10-16, [docs/43](43-phase-5-owner-answers-2026-10-16.md)):** 1 resuelto (D256–D259; los providers siguen en `none` hasta la tarea 1.5 del change 38); 2 resuelto (Renovate instalado, D261); 3 en curso (el owner entregó 4 extractos, D282).
 
 1. Aceptar o cambiar ADR-0029 (preguntas 1–3); hasta entonces `FX_PROVIDER_CRYPTO_PRIMARY` y `FX_PROVIDER_CRYPTO_FALLBACK` siguen en `none`.
 2. Instalar Renovate (D254) cuando el change 45 lo pida.
