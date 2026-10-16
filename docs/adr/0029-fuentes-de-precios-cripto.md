@@ -1,9 +1,9 @@
 # ADR-0029: Fuentes de precios cripto — Binance como principal y Bybit como respaldo, con Bitget sin habilitar
 
-- Estado: Propuesto (2026-10-13; lo acepta el owner, ver [docs/42](../42-phase-5-owner-answers-and-decisions.md) preguntas 1–3)
-- Fecha: 2026-10-13
+- Estado: Aceptado (2026-10-16; el owner adoptó la recomendación de las preguntas 1–4 de [docs/42](../42-phase-5-owner-answers-and-decisions.md), ver [docs/43](../43-phase-5-owner-answers-2026-10-16.md) D256–D260). Aceptado **con las condiciones C1–C4**: ninguna fuente se habilita (descriptor `VERIFIED`) hasta completar la lectura directa de la tarea 1.5
+- Fecha: 2026-10-13 (propuesto); 2026-10-16 (aceptado)
 - Decisores: Owner (Product/Tech Lead)
-- Relacionado: Extiende [ADR-0025](0025-fuentes-de-tipo-de-cambio-bolivia.md); docs/41-phase-5-consolidation-decisions.md (D225–D229); docs/42-phase-5-owner-answers-and-decisions.md (D251); docs/26-risk-register.md (RISK-023); [ADR-0027](0027-destino-de-despliegue-inicial-vps-compose.md) (VPS N1 en `sa-east-1`); OpenSpec change `add-crypto-rate-providers` (capabilities `fx/market-rate-providers`, `fx/market-rates`), tareas 1.1, 1.2 y 1.5
+- Relacionado: Extiende [ADR-0025](0025-fuentes-de-tipo-de-cambio-bolivia.md); docs/41-phase-5-consolidation-decisions.md (D225–D229); docs/42-phase-5-owner-answers-and-decisions.md (D251); docs/43-phase-5-owner-answers-2026-10-16.md (D256–D260); docs/26-risk-register.md (RISK-023); [ADR-0027](0027-destino-de-despliegue-inicial-vps-compose.md) (VPS N1 en `sa-east-1`); OpenSpec change `add-crypto-rate-providers` (capabilities `fx/market-rate-providers`, `fx/market-rates`), tareas 1.1, 1.2 y 1.5
 
 ## Contexto y problema
 
@@ -51,7 +51,9 @@ Hay que decidir, por exchange: si su API pública de datos de mercado sirve sin 
 - **C3. Alcance geográfico:** se comprueba desde el VPS N1 (`sa-east-1`, São Paulo) que ambos hosts responden; un 451 o 403 de origen geográfico se trata como falla del provider, nunca se elude con proxies ni VPN.
 - **C4. Solo datos públicos:** sin claves, cuentas ni endpoints privados; sin P2P.
 
-## Decisión (propuesta)
+## Decisión
+
+Aceptada por el owner el 2026-10-16 (D256–D259), con las condiciones C1–C4 vigentes.
 
 - **Principal — Binance (`CRYPTO_BINANCE`)** sobre el host de solo datos de mercado `https://data-api.binance.vision`.
 - **Respaldo — Bybit (`CRYPTO_BYBIT`)** sobre `https://api.bybit.com`. Es otro operador.
@@ -121,7 +123,7 @@ Si la lectura directa de C2 encuentra un texto exigido, se reemplaza aquí y en 
 **Negativas**
 - Dos dependencias externas más, sin SLA, con términos que pueden cambiar unilateralmente.
 - Hasta cumplir C2, los providers quedan en `none`: los pares cripto siguen `MANUAL_ONLY`.
-- El smoke en vivo desde GitHub Actions probablemente no sea concluyente para Binance y Bybit (bloqueo geográfico de EE. UU.; ver docs/42 pregunta 4).
+- El smoke en vivo desde GitHub Actions probablemente no sea concluyente para Binance y Bybit (bloqueo geográfico de EE. UU.); por D259 ese resultado se clasifica como "no concluyente".
 
 **Riesgos** (RISK-023)
 - Cambio de términos o exigencia de acuerdo → revisión en cada cambio de adapter; un `REJECTED` deshabilita la fuente sin detener el resto (TC-FX-PROVIDER-036).
@@ -140,7 +142,8 @@ Si la lectura directa de C2 encuentra un texto exigido, se reemplaza aquí y en 
 - Tarea 1.5 del change (C2 y C3): lectura directa de los términos vigentes, fixtures grabados desde el VPS N1 o la máquina del owner y registro en estas Notas. Solo después, descriptores `VERIFIED`.
 - Contract tests sin red con los fixtures: TC-FX-PROVIDER-026 (principal), -027 (respaldo), -028 (payloads inválidos), -029 (límites y `Retry-After`) y -034 (solicitudes idénticas).
 - Criterio operativo de 30 días (D248): ≥ 99 % de ciclos con tasa `MARKET` no obsoleta por par cripto configurado.
-- Este ADR pasa a `Aceptado` cuando el owner responda las preguntas 1–3 de docs/42.
+- Aceptado el 2026-10-16 (D256–D259). La aceptación no habilita ninguna fuente: los descriptores pasan a `VERIFIED` solo tras la tarea 1.5 (C2 y C3).
+- Smoke en vivo desde GitHub Actions (D259): un 451 o 403 de origen geográfico se clasifica como "no concluyente" y no abre el aviso de revisión del adapter; la salud real se vigila con el estado de providers del VPS N1.
 
 ## Notas
 
@@ -154,3 +157,4 @@ Si la lectura directa de C2 encuentra un texto exigido, se reemplaza aquí y en 
   - Bitget: extractos de https://www.bitget.com/api-doc/spot/market/Get-Candle-Data ("Frequency limit: 20 times/1s (IP)"), https://www.bitget.com/support/articles/12560603797947 (*API Key Terms*: prohíbe reempaquetar o revender) y https://www.bitget.com/support/articles/360014944032-terms-of-use (lista de países prohibidos no legible). Ninguna página resolvió de forma directa.
   - Bolivia: el BCB levantó en 2024 la prohibición de 2020 sobre criptoactivos (fuente periodística: https://eldeber.com.bo/economia/el-banco-central-de-bolivia-autoriza-el-uso-de-activos-virtuales-entre-ellos-las-criptomonedas_373274/). El owner opera en los tres exchanges desde Bolivia. No se encontró una lista oficial de Binance ni de Bitget que mencione a Bolivia.
 - Pendiente de C2 (tarea 1.5): texto vigente de los términos de Binance y de Bybit, respuesta real de los cuatro endpoints, inicio UTC de la vela `D` de Bybit, cabecera `X-MBX-USED-WEIGHT-1m` y `rateLimits` vigente de Binance, y respuesta desde el VPS N1.
+- **Aceptación, 2026-10-16** (docs/43, D256–D260): el owner adoptó las recomendaciones de las preguntas 1–4 de docs/42 (principal Binance y respaldo Bybit; uso personal sin redistribución; lectura directa por la sesión de implementación desde una red con acceso; smoke desde CI "no concluyente" ante 451/403 geográficos). El 2026-10-15 había escrito: "Doy aprobación para el acceso de términos y condiciones" (D260). La red del entorno de las sesiones en la nube, que solo el owner puede cambiar, sigue sin permitir los dominios de los exchanges, así que la tarea 1.5 sigue abierta y ningún descriptor es `VERIFIED`.
