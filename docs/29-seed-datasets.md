@@ -96,7 +96,7 @@ Ventana: **2025-01-01 → 2026-09-30** (21 meses), anclada a una fecha fija (`an
 > tiempo (generación de ocurrencias, suscripciones, estados de cuenta de tarjetas, evaluación de metas) se ejecutan con operaciones
 > `tick` en las fechas donde algo cambia. La carga completa corre en UNA unidad de trabajo (los hechos del outbox se publican al
 > confirmar, así los consumidores asíncronos no compiten por bloqueos con el cargador) y termina con una verificación por módulo
-> (`verifyModules`): una discrepancia deja la demo en `FAILED`, nunca en `READY` parcial.
+> (`verifyModules`): una discrepancia deja la demo en `FAILED`, nunca en `READY` parcial. Lo que siguen haciendo los consumidores asíncronos (cargos de suscripciones, propuesta de precio) converge después de `READY`; la purga espera a los consumidores en vuelo antes de borrar.
 >
 > | Módulo | Contenido (ancla 2026-09-30) |
 > |---|---|

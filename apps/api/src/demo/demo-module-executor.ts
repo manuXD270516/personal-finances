@@ -309,13 +309,25 @@ export class DemoModuleExecutor {
             );
           }
         }
-        await r.commitments.occurrences.materialize({
+        const { transactionId } = await r.commitments.occurrences.materialize({
           workspaceId: ws,
           userId: user,
           occurrenceId: occurrence.id,
           businessDate: op.date,
           ...(op.amount ? { amount: dto(op.amount) } : {}),
         });
+        if (op.target.type === 'goalPlan') {
+          // El aporte recurrente se registra como movimiento de la meta en esta misma unidad de trabajo: la meta ya
+          // está al día en `READY` y el consumidor asíncrono, que haría lo mismo, lo encuentra registrado (sin
+          // sugerencias de aporte duplicadas por la carrera entre consumidores de GOALS).
+          await r.goals.movements.link({
+            workspaceId: ws,
+            userId: user,
+            goalId: this.goal(op.target.key),
+            transactionId,
+            origin: 'RECURRING',
+          });
+        }
         return;
       }
     }
