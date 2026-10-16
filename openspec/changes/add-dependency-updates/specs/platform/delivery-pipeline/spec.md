@@ -61,7 +61,7 @@ Trace: NFR-SEC-013 · Priority: Must
 - **Y** el servicio no crea una excepción en el archivo de excepciones de vulnerabilidades
 
 ### Requirement: Nightly de rendimiento con el Large Seed
-Un pipeline programado una vez al día, que NO DEBE (MUST NOT) ser un check requerido de la rama principal, DEBE (MUST) cargar el Large Seed a escala completa a través de los casos de uso, medir el p95 del listado paginado de transacciones, de la búsqueda de texto en transacciones, de los comandos de escritura, del dashboard, del saldo as-of y de los reportes agregados, y fallar cuando algún p95 supere su umbral de los requisitos no funcionales. DEBE (MUST) publicar en cada corrida un reporte con el valor medido y el umbral de cada benchmark como artefacto, y un fallo del nightly NO DEBE (MUST NOT) bloquear las pull requests.
+Un pipeline programado una vez al día, que NO DEBE (MUST NOT) ser un check requerido de la rama principal, DEBE (MUST) cargar el Large Seed a escala completa a través de los casos de uso, medir el p95 del listado paginado de transacciones, de la búsqueda de texto en transacciones, de los comandos de escritura, del dashboard, del saldo as-of y de los reportes agregados, y fallar cuando algún p95 supere su umbral de los requisitos no funcionales. DEBE (MUST) publicar en cada corrida un reporte con el valor medido y el umbral de cada benchmark como artefacto, y un fallo del nightly NO DEBE (MUST NOT) bloquear las pull requests. Cuando el job de rendimiento falla, el pipeline DEBE (MUST) abrir un issue de aviso con un título fijo y el resumen de la corrida, o comentar el issue abierto con ese título si ya existe, sin abrir duplicados; el permiso de escritura de issues que esto requiere DEBE (MUST) declararse en ese job y NO DEBE (MUST NOT) concederse a nivel de todo el pipeline.
 Trace: NFR-PERF-001, NFR-PERF-002, NFR-PERF-003, NFR-PERF-004, NFR-PERF-005, NFR-PERF-006 · Priority: Should
 
 #### Scenario: Búsqueda de texto con el Large Seed
@@ -77,3 +77,9 @@ Trace: NFR-PERF-001, NFR-PERF-002, NFR-PERF-003, NFR-PERF-004, NFR-PERF-005, NFR
 #### Scenario: Nightly en rojo no bloquea pull requests
 - **CUANDO** la última corrida del nightly falló
 - **ENTONCES** una pull request con todos los checks requeridos en verde puede fusionarse
+
+#### Scenario: Fallo del nightly de rendimiento abre o comenta un aviso
+- **CUANDO** el job de rendimiento del nightly falla porque el p95 de la búsqueda de texto es 450 ms frente a su umbral de 400 ms y no hay un issue abierto titulado "nightly perf: umbral superado"
+- **ENTONCES** se abre un issue con ese título que incluye el enlace a la corrida y el resumen del reporte con el benchmark y el valor medido
+- **Y** si en la corrida siguiente vuelve a fallar con ese issue abierto, se agrega un comentario al mismo issue y no se abre otro
+- **Y** el permiso de escritura de issues está declarado en el job de rendimiento y no a nivel de todo el pipeline, y los demás jobs que no avisan por issue no lo tienen
