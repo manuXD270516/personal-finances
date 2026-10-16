@@ -41,7 +41,7 @@ Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (resp
 | 40 | `add-conversion-cost-analysis` | Implementado (#123) y archivado (D231, D244–D247). Trajo el único consumidor nuevo (`fx.user-conversion-observations`); subir `max_connections` antes del despliegue (D249) |
 | 41 | `add-exchange-house-rate-providers` | Spec fusionada (#132) e **implementado con catálogo ficticio** (#136): catálogo de instituciones con estado de soporte por dimensión, adopción, cobertura (`apps/api/reference/institutions/demo/BO.json`, marcado ficticio y rechazado en staging y production) y tasas `BANK_BUY`/`BANK_SELL`. Siguen abiertas, esperando la verificación de fuentes y las respuestas del owner (P2, P6): 1.1, 1.2, 1.5, 4.2 (archivo real `BO.json`), 4.3 y 4.4 (adapters), 7.1, 7.3 y 8.3. No se archiva hasta cerrarlas o diferirlas por escrito |
 | 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
-| 44 | `add-phase-4-demo-data` | Could, último y opcional (D223) |
+| 44 | `add-phase-4-demo-data` | Implementado (#139), tareas completas: dataset Demo v2 (suscripciones, tarjetas, metas y préstamos ficticios, carga ~28 s). `demo.purge` ahora espera a los consumidores del worker antes de borrar. Se puede archivar sin esperar la cadena de Phase 4; cubre las tareas Could de `add-recurrence-engine` 8.2, `add-subscriptions` 8.3, `add-credit-cards` 8.3 y `add-savings-goals` 8.3 y la 8.3 de `add-loans` (se marca `[x]` al archivarlo, D223) |
 | 45 | `add-dependency-updates` | Spec fusionada (#127). El owner eligió la GitHub App hospedada de Mend Renovate (D254); falta que la instale solo en este repositorio. Quedan 10 preguntas abiertas en su `design.md` con recomendación por omisión |
 
 ## 2. Esperan al owner
@@ -60,7 +60,7 @@ Ninguna sesión puede cerrarlos por su cuenta.
 ## 3. Diferidos por decisión
 
 - **Persistencia del import CSV ≤ 20 s para 5 000 filas** (hoy ~120 s): Phase 6, con la escritura masiva de `RecordImportedTransactions` (D152). `PF_PERF_STRICT_IMPORT=1` exige la meta.
-- **Datos de demostración** de suscripciones, tarjetas, metas y préstamos: tareas Could no hechas; se agrupan en `add-phase-4-demo-data` (44), último y opcional de Phase 5 (D223).
+- **Datos de demostración** de suscripciones, tarjetas, metas y préstamos: hechos en `add-phase-4-demo-data` (44, #139).
 - **Commodities y valoración de inversiones** (changes 42 y 43): Phase 7 o backlog; el owner no tiene esos activos (D221).
 - **Alerta por falla no transitoria de un provider:** no entra en Phase 5 (D233); sigue visible en el estado de providers.
 
