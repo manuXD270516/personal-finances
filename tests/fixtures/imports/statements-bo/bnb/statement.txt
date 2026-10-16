@@ -1,0 +1,85 @@
+*** SINTETICO: extracto inventado para pruebas (formato imitado, ningun dato real). Institucion ficticia "Banco Altiplano Demo". ***
+                                                                       Información de servicio al cliente
+
+
+                                                                          Contact Center: 0000 0000
+
+                                                                          WhatsApp: 0000 0000
+TITULAR FICTICIO UNO DEMO
+CALLE FICTICIA 000 EDIFICIO DEMO                                          www.ejemplo.invalid
+
+CIUDAD DEMO                                                               Banco Altiplano Demo
+                                                                          Av. Ficticia Esq. Demo
+                                                                          Ciudad Demo, Bolivia
+
+
+
+
+Tu Banca Personal
+del 01 de marzo, 2026 al 31 de marzo, 2026            Número de cuenta: 000-0000001
+TITULAR FICTICIO UNO DEMO                                           Tipo: CAJA DE AHORRO UNICA
+
+
+Resumen de cuenta
+Moneda                                         BOLIVIANOS
+Saldo al 01 de marzo, 2026                        5,000.00
+Total de débitos                                  4,501.79
+Total de créditos                                    12.40
+Total ITF                                            0.00
+Saldo al 31 de marzo, 2026                         510.61
+
+
+
+
+                                                                                               Página 1 de 4
+TITULAR FICTICIO UNO DEMO | Número de cuenta: 000-0000001
+
+Depósitos
+Fecha Hora     Descripción                                          Referencia Comprobante   ITF   Créditos
+
+31/03/2026 23:59 PAGO DE INTERES - DEMO/AGENCIA CENTRAL                       2D0000001               12.40
+
+Total depósitos                                                                                     12.40
+
+
+
+                                                                                               Página 2 de 4
+TITULAR FICTICIO UNO DEMO | Número de cuenta: 000-0000001
+
+Retiros
+Fecha Hora Descripción                                                                                                 Referencia ComprobanteITF      Débitos
+04/03/2026
+           DEB.CTA.P/PGO.SEG. - DEMO/AGENCIA CENTRAL                                                                                2D0000002           23.00
+08:50
+           DEBITO EN CUENTA POR TRANS. INTERBANC. - DEMO NET
+21/03/2026
+           Cuenta Destino: 0000000001. Nombre: PERSONA FICTICIA ALFA. Banco: BANCO DEMO UNO. Dato Adicional: Cuenta: 00 2D0000003            640.00
+10:05
+           CUENTA: 0000000001 NOMBRE(S): TITULAR FICTICIO UNO DEMO
+21/03/2026 DEBITO EN CUENTA POR TRANS. INTERBANC. - DEMO NET
+                                                                                                                        Compra QR2D0000004          1,325.00
+13:40      Cuenta Destino: 0000000002. Nombre: COMERCIO DEMO CUATRO S.A.. Banco: BANCO DEMO DOS. Dato Adicional: COMPRA QR
+23/03/2026 DEBITO  EN  CUENTA  POR TRANS. INTERBANC.  - DEMO  NET
+           Cuenta Destino: 0000000003. Nombre: COMERCIO DEMO CINCO. Banco: BANCO DEMO DOS. Dato           Pago de pr 2D0000005        2,512.18
+17:15
+           Adicional: PAGO DE MERCADERIA
+31/03/2026
+           RETENCION IVA - DEMO/AGENCIA CENTRAL                                                                                     2D0000001            1.61
+23:59
+
+Total retiros                                                                                                                                     4,501.79
+
+
+
+                                                                                               Página 3 de 4
+TITULAR FICTICIO UNO DEMO | Número de cuenta: 000-0000001
+
+
+
+
+                                 Esta página se dejó en blanco intencionalmente
+
+
+
+
+                                                                                  Página 4 de 4

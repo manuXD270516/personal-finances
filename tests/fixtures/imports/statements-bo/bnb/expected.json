@@ -1,0 +1,89 @@
+{
+  "synthetic": true,
+  "formatId": "BNB",
+  "institution": "Banco Altiplano Demo",
+  "currency": "BOB",
+  "numberFormat": { "decimalSeparator": ".", "thousandsSeparator": "," },
+  "dateFormat": "DD/MM/YYYY",
+  "layout": "TWO_SECTIONS_NO_RUNNING_BALANCE",
+  "statement": {
+    "openingBalance": "5000.00",
+    "closingBalance": "510.61",
+    "periodFrom": "2026-03-01",
+    "periodTo": "2026-03-31"
+  },
+  "summary": { "totalDebits": "4501.79", "totalCredits": "12.40", "totalItf": "0.00" },
+  "sections": [
+    { "name": "DEPOSITS", "total": "12.40" },
+    { "name": "WITHDRAWALS", "total": "4501.79" }
+  ],
+  "movements": [
+    {
+      "section": "DEPOSITS",
+      "date": "2026-03-31",
+      "time": "23:59",
+      "description": "PAGO DE INTERES - DEMO/AGENCIA CENTRAL",
+      "amount": "12.40",
+      "balance": null,
+      "reference": "2D0000001",
+      "kind": "INTEREST"
+    },
+    {
+      "section": "WITHDRAWALS",
+      "date": "2026-03-04",
+      "time": "08:50",
+      "description": "DEB.CTA.P/PGO.SEG. - DEMO/AGENCIA CENTRAL",
+      "amount": "-23.00",
+      "balance": null,
+      "reference": "2D0000002"
+    },
+    {
+      "section": "WITHDRAWALS",
+      "date": "2026-03-21",
+      "time": "10:05",
+      "description": "DEBITO EN CUENTA POR TRANS. INTERBANC. - DEMO NET",
+      "amount": "-640.00",
+      "balance": null,
+      "reference": "2D0000003",
+      "multiline": true,
+      "counterparty": { "account": "0000000001", "name": "PERSONA FICTICIA ALFA", "bank": "BANCO DEMO UNO" }
+    },
+    {
+      "section": "WITHDRAWALS",
+      "date": "2026-03-21",
+      "time": "13:40",
+      "description": "DEBITO EN CUENTA POR TRANS. INTERBANC. - DEMO NET",
+      "amount": "-1325.00",
+      "balance": null,
+      "reference": "2D0000004",
+      "multiline": true,
+      "glued": true,
+      "counterparty": {
+        "account": "0000000002",
+        "name": "COMERCIO DEMO CUATRO S.A.",
+        "bank": "BANCO DEMO DOS"
+      }
+    },
+    {
+      "section": "WITHDRAWALS",
+      "date": "2026-03-23",
+      "time": "17:15",
+      "description": "DEBITO EN CUENTA POR TRANS. INTERBANC. - DEMO NET",
+      "amount": "-2512.18",
+      "balance": null,
+      "reference": "2D0000005",
+      "multiline": true,
+      "counterparty": { "account": "0000000003", "name": "COMERCIO DEMO CINCO", "bank": "BANCO DEMO DOS" }
+    },
+    {
+      "section": "WITHDRAWALS",
+      "date": "2026-03-31",
+      "time": "23:59",
+      "description": "RETENCION IVA - DEMO/AGENCIA CENTRAL",
+      "amount": "-1.61",
+      "balance": null,
+      "reference": "2D0000001",
+      "kind": "TAX_WITHHOLDING"
+    }
+  ]
+}

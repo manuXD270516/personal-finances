@@ -1,0 +1,25 @@
+{
+  "synthetic": true,
+  "formatId": "BISA",
+  "institution": "Banco Sierra Demo",
+  "currency": "USD",
+  "numberFormat": { "decimalSeparator": ",", "thousandsSeparator": "" },
+  "dateFormat": "DD-MM-YYYY",
+  "layout": "DEBIT_CREDIT_COLUMNS_RUNNING_BALANCE",
+  "noActivity": true,
+  "statement": {
+    "openingBalance": "250.75",
+    "closingBalance": "250.75",
+    "periodFrom": "2026-03-01",
+    "periodTo": "2026-03-31"
+  },
+  "summary": {
+    "deposits": "0.00",
+    "withdrawals": "0.00",
+    "serviceCharges": "0.00",
+    "interestPaid": "0.00",
+    "interestCharged": "0.00",
+    "totalItf": "0.00"
+  },
+  "movements": []
+}
