@@ -20,6 +20,9 @@ import {
 } from './price-change-detector.js';
 import { RenewalReminderPolicy } from './renewal-reminder-policy.js';
 
+/** Timeout explícito de los tests con fast-check: con `NIGHTLY=1` corren 10 000 casos (TC-PLATFORM-PIPELINE-010). */
+const PBT_TIMEOUT = process.env['NIGHTLY'] ? 300_000 : 15_000;
+
 const USD = currency('USD', 2);
 const BOB = currency('BOB', 2);
 const USDT = currency('USDT', 6);
@@ -168,44 +171,48 @@ describe('Costo mensualizado y anualizado', () => {
     expect(renewalsPerYear(custom, today).toString()).toBe('6');
   });
 
-  it('[TC-COMMITMENTS-SUBS-025] PBT: mensualizado × 12 == anualizado a precisión completa', () => {
-    const cadences: Cadence[] = [
-      'DAILY',
-      'WEEKLY',
-      'BIWEEKLY',
-      'SEMIMONTHLY',
-      'MONTHLY',
-      'BIMONTHLY',
-      'QUARTERLY',
-      'SEMIANNUAL',
-      'ANNUAL',
-    ];
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...cadences),
-        fc.integer({ min: 1, max: 6 }),
-        fc.integer({ min: 1, max: 9_999_999 }),
-        (cadence, interval, cents) => {
-          const price = usd((cents / 100).toFixed(2));
-          const cost = SubscriptionCostCalculator.cost(
-            price,
-            renewalsPerYear(
-              buildSchedule({
-                cadence,
-                interval: cadence === 'SEMIMONTHLY' ? 1 : interval,
-                startDate: '2026-11-15',
-                ...(cadence === 'SEMIMONTHLY' ? { monthDays: [1, 15] } : {}),
-              }),
-              today,
-            ),
-          );
-          // 40 dígitos significativos: la igualdad se verifica hasta la precisión del Decimal
-          expect(cost.monthly.times(12).minus(cost.annual).abs().lt(dec('1e-25'))).toBe(true);
-        },
-      ),
-      { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
-    );
-  });
+  it(
+    '[TC-COMMITMENTS-SUBS-025] PBT: mensualizado × 12 == anualizado a precisión completa',
+    () => {
+      const cadences: Cadence[] = [
+        'DAILY',
+        'WEEKLY',
+        'BIWEEKLY',
+        'SEMIMONTHLY',
+        'MONTHLY',
+        'BIMONTHLY',
+        'QUARTERLY',
+        'SEMIANNUAL',
+        'ANNUAL',
+      ];
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...cadences),
+          fc.integer({ min: 1, max: 6 }),
+          fc.integer({ min: 1, max: 9_999_999 }),
+          (cadence, interval, cents) => {
+            const price = usd((cents / 100).toFixed(2));
+            const cost = SubscriptionCostCalculator.cost(
+              price,
+              renewalsPerYear(
+                buildSchedule({
+                  cadence,
+                  interval: cadence === 'SEMIMONTHLY' ? 1 : interval,
+                  startDate: '2026-11-15',
+                  ...(cadence === 'SEMIMONTHLY' ? { monthDays: [1, 15] } : {}),
+                }),
+                today,
+              ),
+            );
+            // 40 dígitos significativos: la igualdad se verifica hasta la precisión del Decimal
+            expect(cost.monthly.times(12).minus(cost.annual).abs().lt(dec('1e-25'))).toBe(true);
+          },
+        ),
+        { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
+      );
+    },
+    PBT_TIMEOUT,
+  );
 });
 
 describe('Política del recordatorio', () => {

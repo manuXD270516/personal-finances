@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  bootstrapMedianCi,
   buildReport,
   latencyResult,
+  median,
   percentile,
   PERF_THRESHOLDS,
   PERF_THROUGHPUT,
@@ -210,6 +212,97 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
         .verdict,
     ).toBe('OK');
     expect(rlsResult(base).verdict).toBe('OK');
+  });
+
+  it('[TC-PLATFORM-PIPELINE-015] planes iguales salvo los nodos de las tablas de la política (iam.workspace, iam.workspace_membership) no son "plan distinto"', () => {
+    // Falso positivo observado (run 39390841971): el plan con RLS añade los Index Scan de la política, inherentes a RLS.
+    const r = rlsResult({
+      id: 'rls-getBalance',
+      title: 'saldo',
+      plans: {
+        withoutRls: ['Index Only Scan on ledger.posting (posting_balance_ix)'],
+        withRls: [
+          'Index Only Scan on ledger.posting (posting_balance_ix) → Index Scan on iam.workspace (workspace_pkey) → Index Scan on iam.workspace_membership (workspace_membership_user_active_idx)',
+        ],
+      },
+      ...pairsOf(1.02, 0.04, 0.2),
+    });
+    expect(r.verdict).toBe('OK');
+    expect(r.passed).toBe(true);
+    expect(r.notes).toContain('plan: Index Only Scan on ledger.posting (posting_balance_ix)');
+    expect(r.notes).not.toContain('workspace_pkey');
+  });
+
+  it('[TC-PLATFORM-PIPELINE-017] un cambio de índice o de método sobre una tabla de datos sigue siendo "plan distinto" aunque haya nodos de la política', () => {
+    const policy = 'Index Scan on iam.workspace (workspace_pkey)';
+    const changedIndex = rlsResult({
+      id: 'q',
+      title: 't',
+      plans: {
+        withoutRls: ['Index Only Scan on ledger.posting (posting_balance_ix)'],
+        withRls: [`Index Only Scan on ledger.posting (otro_ix) → ${policy}`],
+      },
+      ...pairsOf(2, 0.01, 0.05),
+    });
+    expect(changedIndex.verdict).toBe('plan distinto');
+    const seq = rlsResult({
+      id: 'q',
+      title: 't',
+      plans: {
+        withoutRls: ['Index Only Scan on ledger.posting (posting_balance_ix)'],
+        withRls: [`Seq Scan on ledger.posting → ${policy}`],
+      },
+      ...pairsOf(2, 0.01, 0.05),
+    });
+    expect(seq.verdict).toBe('plan distinto');
+    expect(seq.notes).toContain('Seq Scan on ledger.posting');
+    expect(seq.notes).not.toContain('workspace_pkey');
+  });
+
+  it('una tabla de datos que aparece o desaparece del plan también es "plan distinto"', () => {
+    const r = rlsResult({
+      id: 'q',
+      title: 't',
+      plans: {
+        withoutRls: ['Index Scan on ledger.posting (a_ix)'],
+        withRls: ['Index Scan on ledger.posting (a_ix) → Seq Scan on ledger.ledger_account'],
+      },
+      ...pairsOf(2, 0.01, 0.05),
+    });
+    expect(r.verdict).toBe('plan distinto');
+  });
+
+  it('[TC-PLATFORM-PIPELINE-015] el diagnóstico de RLS (EXPLAIN con y sin política) se incluye en perf-summary.md, que es lo que pega el aviso por issue', () => {
+    const r = rlsResult({ id: 'q', title: 't', ...pairsOf(2, 0.01, 0.05) });
+    const report = buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [r] });
+    const diagnostics =
+      '## saldo por cuenta (índice INCLUDE)\n\n### Con RLS (pf_app)\n\nIndex Only Scan on posting';
+    const md = renderMarkdown(report, diagnostics);
+    expect(md).toContain('## Diagnóstico de RLS (EXPLAIN ANALYZE con y sin política)');
+    expect(md).toContain('Index Only Scan on posting');
+    expect(md.indexOf('## Entorno')).toBeLessThan(md.indexOf('## Diagnóstico de RLS'));
+    expect(renderMarkdown(report)).not.toContain('Diagnóstico de RLS');
+    expect(renderMarkdown(report, '')).not.toContain('Diagnóstico de RLS');
+    const long = renderMarkdown(report, 'x'.repeat(100_000));
+    expect(long.length).toBeLessThan(40_000);
+    expect(long).toContain('[recortado');
+  });
+
+  it('el IC95 por bootstrap tiene el ancho teórico de la mediana (≈ 1.96 · 1.2533 · σ/√n) y no es artificialmente estrecho', () => {
+    // Diferencias normales (Box-Muller con PRNG fijo): σ = 0.3 ms, n = 200 ⇒ semiancho esperado ≈ 0.052 ms.
+    let seed = 12345;
+    const rnd = () => {
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+      return (seed + 1) / 4294967297;
+    };
+    const normal = () => Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
+    const diffs = Array.from({ length: 200 }, () => 0.6 + 0.3 * normal());
+    const [inf, sup] = bootstrapMedianCi(diffs);
+    const half = (sup - inf) / 2;
+    expect(half).toBeGreaterThan(0.035);
+    expect(half).toBeLessThan(0.075);
+    expect(inf).toBeLessThan(median(diffs));
+    expect(sup).toBeGreaterThan(median(diffs));
   });
 
   it('una diferencia observada sobre el piso pero bajo el 10 % de una consulta lenta es "no demostrada sobre el 10 %"', () => {

@@ -121,14 +121,17 @@ async function explain(
   const [root] = rows[0]!['QUERY PLAN'];
   const nodes: string[] = [];
   const walk = (n: PlanNode) => {
-    nodes.push(n['Index Name'] ? `${n['Node Type']} (${n['Index Name']})` : n['Node Type']);
+    const table = n['Relation Name']
+      ? ` on ${n['Schema'] ? `${n['Schema']}.` : ''}${n['Relation Name']}`
+      : '';
+    nodes.push(`${n['Node Type']}${table}${n['Index Name'] ? ` (${n['Index Name']})` : ''}`);
     for (const c of n.Plans ?? []) walk(c);
   };
   walk(root.Plan);
   return { ms: root['Execution Time'], nodes, access: accessSignature(nodes) };
 }
 
-/** Método de acceso e índice de las lecturas de tabla de un plan (`Index Only Scan (posting_balance_ix)`, `Seq Scan`…). */
+/** Método de acceso, tabla e índice de las lecturas de un plan (`Index Only Scan on ledger.posting (posting_balance_ix)`, `Seq Scan on …`). */
 const ACCESS_NODE = /^(Seq Scan|Index Scan|Index Only Scan|Bitmap Heap Scan|Bitmap Index Scan)\b/u;
 const accessSignature = (nodes: readonly string[]): string =>
   nodes.filter((n) => ACCESS_NODE.test(n)).join(' → ');
@@ -143,6 +146,8 @@ async function explainText(client: Client, sql: string, values: readonly unknown
 interface PlanNode {
   'Node Type': string;
   'Index Name'?: string;
+  'Relation Name'?: string;
+  Schema?: string;
   Plans?: PlanNode[];
 }
 
@@ -295,12 +300,15 @@ afterAll(async () => {
     dataset,
     results,
   });
-  const written = writeReport(report, OUT);
-  // Diagnóstico de RLS (tarea 5.3): planes EXPLAIN (ANALYZE, VERBOSE) con y sin política, junto al reporte (artefacto `perf`).
+  // Diagnóstico de RLS (tarea 5.3): planes EXPLAIN (ANALYZE, VERBOSE) con y sin política. Va en `rls-explain.md`
+  // (artefacto `perf`) y dentro de `perf-summary.md`, que es lo que pega el aviso por issue (el artefacto no es
+  // descargable desde las sesiones).
+  const diagnostics = rlsPlanTexts.join('\n');
+  const written = writeReport(report, OUT, diagnostics);
   if (rlsPlanTexts.length > 0) {
     writeFileSync(
       join(OUT, 'rls-explain.md'),
-      `# EXPLAIN (ANALYZE, VERBOSE) con y sin RLS\n\n${rlsPlanTexts.join('\n')}`,
+      `# EXPLAIN (ANALYZE, VERBOSE) con y sin RLS\n\n${diagnostics}`,
       'utf8',
     );
   }
@@ -654,8 +662,16 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
         await run(superuser);
       }
       for (let i = 0; i < RLS_OVERHEAD.pairs; i += 1) {
-        const a = await asApp(() => run(appClient));
-        const b = await run(superuser);
+        // El orden dentro del par se alterna: ejecutar siempre primero el mismo lado sesgaría la diferencia (caché).
+        let a: Awaited<ReturnType<typeof run>>;
+        let b: Awaited<ReturnType<typeof run>>;
+        if (i % 2 === 0) {
+          a = await asApp(() => run(appClient));
+          b = await run(superuser);
+        } else {
+          b = await run(superuser);
+          a = await asApp(() => run(appClient));
+        }
         withRls.push(a.ms);
         withoutRls.push(b.ms);
         plans = { withRls: a.access, withoutRls: b.access };
@@ -665,7 +681,7 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
         const textWith = await asApp(() => explainText(appClient, st.text, st.values));
         const textWithout = await explainText(superuser, st.text, st.values);
         rlsPlanTexts.push(
-          `## ${diagnose}\n\n### Con RLS (pf_app)\n\n${textWith}\n\n### Sin RLS (superusuario)\n\n${textWithout}\n`,
+          `### ${diagnose}\n\n#### Con RLS (pf_app)\n\n\`\`\`\n${textWith}\n\`\`\`\n\n#### Sin RLS (superusuario)\n\n\`\`\`\n${textWithout}\n\`\`\`\n`,
         );
       }
       return { withRls, withoutRls, plans };

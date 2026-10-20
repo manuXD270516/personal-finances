@@ -52,6 +52,28 @@ export const RLS_OVERHEAD = {
   bootstrapSeed: 0x5eed,
 } as const;
 
+/**
+ * Tablas que consulta la POLÍTICA de RLS (`platform.current_workspace_id()` y la pertenencia al workspace). Sus nodos
+ * aparecen solo en el plan con RLS y son inherentes a ella: no cuentan como un cambio de acceso a los datos.
+ */
+export const RLS_POLICY_TABLES: readonly string[] = ['iam.workspace', 'iam.workspace_membership'];
+
+const SIGNATURE_SEPARATOR = ' → ';
+
+/**
+ * Firma de acceso de una sentencia sin los nodos de las tablas de la política. Cada nodo es
+ * `<método> on <esquema.tabla> (<índice>)`; los nodos sin `on <tabla>` se conservan.
+ */
+export function dataAccessSignature(signature: string): string {
+  return signature
+    .split(SIGNATURE_SEPARATOR)
+    .filter((node) => {
+      const table = / on ([\w.]+)/u.exec(node)?.[1];
+      return table === undefined || !RLS_POLICY_TABLES.includes(table);
+    })
+    .join(SIGNATURE_SEPARATOR);
+}
+
 export type NfrId = keyof typeof PERF_THRESHOLDS | 'RLS-OVERHEAD' | 'NFR-PERF-008';
 
 export interface LatencyStats {
@@ -225,7 +247,8 @@ export function bootstrapMedianCi(
 /**
  * Overhead de RLS (fix-nightly-pipeline, decisión 4). `withRls[i]` y `withoutRls[i]` son un par intercalado de
  * `Execution Time` (EXPLAIN ANALYZE) con RLS (pf_app) y sin RLS (superusuario). `plans` lleva, por sentencia, el método
- * de acceso e índice del plan (p. ej. `Index Only Scan (posting_balance_ix)`) con y sin RLS.
+ * de acceso, tabla e índice del plan (p. ej. `Index Only Scan on ledger.posting (posting_balance_ix)`) con y sin RLS;
+ * los nodos de las tablas de la política (`RLS_POLICY_TABLES`) se ignoran al compararlos.
  */
 export function rlsResult(input: {
   id: string;
@@ -249,18 +272,22 @@ export function rlsResult(input: {
   const [inf, sup] = bootstrapMedianCi(diffs);
   const ratio = medWithout > 0 ? medDiff / medWithout : 0;
   const ratioMs = RLS_OVERHEAD.maxRatio * medWithout;
+  const dataPlans = input.plans && {
+    withRls: input.plans.withRls.map(dataAccessSignature),
+    withoutRls: input.plans.withoutRls.map(dataAccessSignature),
+  };
   const planChanged =
-    input.plans !== undefined && input.plans.withRls.join(' | ') !== input.plans.withoutRls.join(' | ');
+    dataPlans !== undefined && dataPlans.withRls.join(' | ') !== dataPlans.withoutRls.join(' | ');
   let verdict: RlsVerdict;
   if (planChanged) verdict = 'plan distinto';
   else if (inf >= ratioMs && inf >= RLS_OVERHEAD.noiseFloorMs) verdict = 'brecha demostrada';
   else if (medDiff < Math.max(ratioMs, RLS_OVERHEAD.noiseFloorMs)) verdict = 'OK';
   else if (inf < ratioMs) verdict = 'no demostrada sobre el 10 %';
   else verdict = 'no demostrada sobre el piso absoluto';
-  const planNote = input.plans
+  const planNote = dataPlans
     ? planChanged
-      ? `; plan distinto: sin RLS ${input.plans.withoutRls.join(' | ')} → con RLS ${input.plans.withRls.join(' | ')}`
-      : `; plan: ${input.plans.withRls.join(' | ')}`
+      ? `; plan distinto: sin RLS ${dataPlans.withoutRls.join(' | ')} → con RLS ${dataPlans.withRls.join(' | ')}`
+      : `; plan: ${dataPlans.withRls.join(' | ')}`
     : '';
   return {
     id: input.id,
@@ -299,7 +326,10 @@ export function buildReport(input: Omit<PerfReport, 'version' | 'breaches'>): Pe
   return { version: 1, ...input, breaches };
 }
 
-export function renderMarkdown(report: PerfReport): string {
+/** El aviso por issue pega `perf-summary.md` (límite de GitHub 65 536 caracteres): el diagnóstico se recorta. */
+export const MAX_DIAGNOSTICS_CHARS = 24_000;
+
+export function renderMarkdown(report: PerfReport, diagnostics?: string): string {
   const fmt = (r: BenchResult) =>
     r.unit === 'ms'
       ? `${r.value} ms`
@@ -340,15 +370,29 @@ export function renderMarkdown(report: PerfReport): string {
     '|---|---|',
     ...Object.entries(report.environment).map(([k, v]) => `| ${k} | ${v} |`),
     '',
+    ...(diagnostics && diagnostics.trim().length > 0
+      ? [
+          '## Diagnóstico de RLS (EXPLAIN ANALYZE con y sin política)',
+          '',
+          diagnostics.length > MAX_DIAGNOSTICS_CHARS
+            ? `${diagnostics.slice(0, MAX_DIAGNOSTICS_CHARS)}\n\n[recortado a ${MAX_DIAGNOSTICS_CHARS} caracteres; el texto completo está en rls-explain.md del artefacto perf]`
+            : diagnostics,
+          '',
+        ]
+      : []),
   ];
   return lines.join('\n');
 }
 
-export function writeReport(report: PerfReport, outDir: string): { json: string; md: string } {
+export function writeReport(
+  report: PerfReport,
+  outDir: string,
+  diagnostics?: string,
+): { json: string; md: string } {
   mkdirSync(outDir, { recursive: true });
   const json = join(outDir, 'perf-results.json');
   const md = join(outDir, 'perf-summary.md');
   writeFileSync(json, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  writeFileSync(md, renderMarkdown(report), 'utf8');
+  writeFileSync(md, renderMarkdown(report, diagnostics), 'utf8');
   return { json, md };
 }
