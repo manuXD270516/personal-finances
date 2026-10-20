@@ -21,6 +21,9 @@ import { ReversalFactory } from './reversal-factory.js';
 const NIGHTLY = Boolean(process.env.NIGHTLY);
 const runs = { numRuns: NIGHTLY ? 10_000 : 100, ...(NIGHTLY ? {} : { seed: 20261003 }) };
 
+/** Timeout explícito de los tests con fast-check: con `NIGHTLY=1` corren 10 000 casos (TC-PLATFORM-PIPELINE-010). */
+const PBT_TIMEOUT = NIGHTLY ? 300_000 : 15_000;
+
 const CURRENCIES = [BOB, USD, USDT] as const;
 /** Plan de cuentas fijo por moneda: dos activos, un pasivo y las cuentas de sistema. */
 const chart = new Map<string, LedgerAccount[]>(
@@ -98,83 +101,95 @@ const unbalance = (postings: PostingInput[]): PostingInput[] => {
 const isRealAccount = (a: LedgerAccount) => a.nature === 'ASSET' || a.nature === 'LIABILITY';
 
 describe('Propiedades del ledger en memoria (fast-check)', () => {
-  it('[TC-LEDGER-BALANCE-003] balance de comprobación en cero por moneda después de cada paso (INV-004)', () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.tuple(arbBalancedEntry, fc.boolean()), { minLength: 1, maxLength: 15 }),
-        (steps) => {
-          const ledger: JournalEntry[] = [];
-          for (const [postings, corrupt] of steps) {
-            const realBefore = realTotals(ledger);
-            const input = entry(corrupt ? unbalance(postings) : postings);
-            if (corrupt) {
-              expect(() => JournalEntry.post(input, OPEN)).toThrow(DomainError);
-              expect(realTotals(ledger)).toEqual(realBefore);
-            } else {
-              ledger.push(JournalEntry.post(input, OPEN));
+  it(
+    '[TC-LEDGER-BALANCE-003] balance de comprobación en cero por moneda después de cada paso (INV-004)',
+    () => {
+      fc.assert(
+        fc.property(
+          fc.array(fc.tuple(arbBalancedEntry, fc.boolean()), { minLength: 1, maxLength: 15 }),
+          (steps) => {
+            const ledger: JournalEntry[] = [];
+            for (const [postings, corrupt] of steps) {
+              const realBefore = realTotals(ledger);
+              const input = entry(corrupt ? unbalance(postings) : postings);
+              if (corrupt) {
+                expect(() => JournalEntry.post(input, OPEN)).toThrow(DomainError);
+                expect(realTotals(ledger)).toEqual(realBefore);
+              } else {
+                ledger.push(JournalEntry.post(input, OPEN));
+              }
+              for (const total of BalanceCalculator.trialBalance(ledger).values())
+                expect(total.isZero()).toBe(true);
+              // ASSET + LIABILITY solo cambia si el asiento toca INCOME/EXPENSE/EQUITY
+              if (!corrupt && postings.every((p) => isRealAccount(p.account as LedgerAccount))) {
+                expect(realTotals(ledger)).toEqual(realBefore);
+              }
             }
-            for (const total of BalanceCalculator.trialBalance(ledger).values())
-              expect(total.isZero()).toBe(true);
-            // ASSET + LIABILITY solo cambia si el asiento toca INCOME/EXPENSE/EQUITY
-            if (!corrupt && postings.every((p) => isRealAccount(p.account as LedgerAccount))) {
-              expect(realTotals(ledger)).toEqual(realBefore);
-            }
-          }
-        },
-      ),
-      runs,
-    );
-  });
+          },
+        ),
+        runs,
+      );
+    },
+    PBT_TIMEOUT,
+  );
 
-  it('[TC-LEDGER-REVERSAL-003] reverse(e) es exacto: balanceado, mismas cuentas/splits y Σ e + Σ r = 0 (INV-008)', () => {
-    fc.assert(
-      fc.property(arbBalancedEntry, (postings) => {
-        const e = JournalEntry.post(entry(postings), OPEN);
-        const r = ReversalFactory.reverse(e, reversalInput(e), OPEN);
-        expect(r.entryType).toBe('REVERSAL');
-        expect(r.reversesEntryId).toBe(e.id);
-        expect(r.postings).toHaveLength(e.postings.length);
-        r.postings.forEach((p, i) => {
-          const o = e.postings[i]!;
-          expect([p.account.id, p.splitId, p.lineNo]).toEqual([o.account.id, o.splitId, o.lineNo]);
-          expect(p.amount.add(o.amount).isZero()).toBe(true);
-        });
-        for (const t of r.totalsByCurrency().values()) expect(t.isZero()).toBe(true);
-        expect(() => ReversalFactory.reverse(r, reversalInput(r), OPEN)).toThrow(/reversal/);
-      }),
-      runs,
-    );
-  });
+  it(
+    '[TC-LEDGER-REVERSAL-003] reverse(e) es exacto: balanceado, mismas cuentas/splits y Σ e + Σ r = 0 (INV-008)',
+    () => {
+      fc.assert(
+        fc.property(arbBalancedEntry, (postings) => {
+          const e = JournalEntry.post(entry(postings), OPEN);
+          const r = ReversalFactory.reverse(e, reversalInput(e), OPEN);
+          expect(r.entryType).toBe('REVERSAL');
+          expect(r.reversesEntryId).toBe(e.id);
+          expect(r.postings).toHaveLength(e.postings.length);
+          r.postings.forEach((p, i) => {
+            const o = e.postings[i]!;
+            expect([p.account.id, p.splitId, p.lineNo]).toEqual([o.account.id, o.splitId, o.lineNo]);
+            expect(p.amount.add(o.amount).isZero()).toBe(true);
+          });
+          for (const t of r.totalsByCurrency().values()) expect(t.isZero()).toBe(true);
+          expect(() => ReversalFactory.reverse(r, reversalInput(r), OPEN)).toThrow(/reversal/);
+        }),
+        runs,
+      );
+    },
+    PBT_TIMEOUT,
+  );
 
-  it('[TC-LEDGER-VALUATION-001] identidad de valoración con tasas aleatorias a precisión 40 (INV-031)', () => {
-    const arbRate = fc
-      .bigInt({ min: 1n, max: 10n ** 12n })
-      .map((u) => new MoneyDecimal(u.toString()).div(1e6));
-    fc.assert(
-      fc.property(
-        fc.array(arbBalancedEntry, { minLength: 1, maxLength: 10 }),
-        fc.tuple(arbRate, arbRate),
-        (entriesPostings, [usdRate, usdtRate]) => {
-          const ledger = entriesPostings.map((p) => JournalEntry.post(entry(p), OPEN));
-          const rateOf = (c: string) =>
-            c === 'BOB' ? new MoneyDecimal(1) : c === 'USD' ? usdRate : usdtRate;
-          let real = new MoneyDecimal(0);
-          let nominalAndEquity = new MoneyDecimal(0);
-          for (const e of ledger) {
-            for (const p of e.postings) {
-              const valued = p.amount.toDecimal().times(rateOf(p.amount.currency.code));
-              if (isRealAccount(p.account as LedgerAccount)) real = real.plus(valued);
-              else nominalAndEquity = nominalAndEquity.plus(valued);
+  it(
+    '[TC-LEDGER-VALUATION-001] identidad de valoración con tasas aleatorias a precisión 40 (INV-031)',
+    () => {
+      const arbRate = fc
+        .bigInt({ min: 1n, max: 10n ** 12n })
+        .map((u) => new MoneyDecimal(u.toString()).div(1e6));
+      fc.assert(
+        fc.property(
+          fc.array(arbBalancedEntry, { minLength: 1, maxLength: 10 }),
+          fc.tuple(arbRate, arbRate),
+          (entriesPostings, [usdRate, usdtRate]) => {
+            const ledger = entriesPostings.map((p) => JournalEntry.post(entry(p), OPEN));
+            const rateOf = (c: string) =>
+              c === 'BOB' ? new MoneyDecimal(1) : c === 'USD' ? usdRate : usdtRate;
+            let real = new MoneyDecimal(0);
+            let nominalAndEquity = new MoneyDecimal(0);
+            for (const e of ledger) {
+              for (const p of e.postings) {
+                const valued = p.amount.toDecimal().times(rateOf(p.amount.currency.code));
+                if (isRealAccount(p.account as LedgerAccount)) real = real.plus(valued);
+                else nominalAndEquity = nominalAndEquity.plus(valued);
+              }
             }
-          }
-          // Σ valorizado = 0 a precisión 40 (tolerancia relativa al último dígito significativo)
-          const scale = real.abs().plus(1);
-          expect(real.plus(nominalAndEquity).abs().lte(scale.times('1e-36'))).toBe(true);
-        },
-      ),
-      runs,
-    );
-  });
+            // Σ valorizado = 0 a precisión 40 (tolerancia relativa al último dígito significativo)
+            const scale = real.abs().plus(1);
+            expect(real.plus(nominalAndEquity).abs().lte(scale.times('1e-36'))).toBe(true);
+          },
+        ),
+        runs,
+      );
+    },
+    PBT_TIMEOUT,
+  );
 
   it('[TC-LEDGER-VALUATION-001] ejemplo: patrimonio neto 10685.00 BOB = −(EQUITY + INCOME + EXPENSE) a 6.95', () => {
     const bankA = userAccount('ASSET', BOB);

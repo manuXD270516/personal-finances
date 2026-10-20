@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { SUBSCRIPTION_LIFECYCLE, SUBSCRIPTION_STATUSES } from './lifecycle.js';
 import { Subscription } from './subscription.js';
 
+/** Timeout explícito de los tests con fast-check: con `NIGHTLY=1` corren 10 000 casos (TC-PLATFORM-PIPELINE-010). */
+const PBT_TIMEOUT = process.env['NIGHTLY'] ? 300_000 : 15_000;
+
 const USD = currency('USD', 2);
 const WS = '0190a000-0000-7000-8000-00000000a001';
 const AT = '2026-10-10T12:00:00.000Z';
@@ -93,32 +96,36 @@ describe('Suscripción: alta y estados', () => {
     expect(active.status).toBe('ACTIVE');
   });
 
-  it('[TC-COMMITMENTS-SUBS-007] PBT: ninguna secuencia de comandos sale de CANCELLED', () => {
-    const commands = ['pause', 'resume', 'cancel', 'schedule', 'undo', 'endTrial'] as const;
-    fc.assert(
-      fc.property(fc.array(fc.constantFrom(...commands), { maxLength: 12 }), (steps) => {
-        const sub = subscription({ trialEndsOn: '2026-11-01', firstRenewalOn: '2026-11-15' });
-        let wasCancelled = false;
-        for (const step of steps) {
-          try {
-            if (step === 'pause') sub.pause(AT, null);
-            else if (step === 'resume') sub.resume(AT, null);
-            else if (step === 'cancel') sub.cancel({ on: '2026-11-01', today: TODAY }, AT, null);
-            else if (step === 'schedule')
-              sub.scheduleCancellation({ on: '2026-12-15', today: TODAY }, AT, null);
-            else if (step === 'undo') sub.undoScheduledCancellation(AT, null);
-            else sub.endTrial(TODAY, AT, null);
-          } catch (err) {
-            expect(err).toBeInstanceOf(DomainError);
+  it(
+    '[TC-COMMITMENTS-SUBS-007] PBT: ninguna secuencia de comandos sale de CANCELLED',
+    () => {
+      const commands = ['pause', 'resume', 'cancel', 'schedule', 'undo', 'endTrial'] as const;
+      fc.assert(
+        fc.property(fc.array(fc.constantFrom(...commands), { maxLength: 12 }), (steps) => {
+          const sub = subscription({ trialEndsOn: '2026-11-01', firstRenewalOn: '2026-11-15' });
+          let wasCancelled = false;
+          for (const step of steps) {
+            try {
+              if (step === 'pause') sub.pause(AT, null);
+              else if (step === 'resume') sub.resume(AT, null);
+              else if (step === 'cancel') sub.cancel({ on: '2026-11-01', today: TODAY }, AT, null);
+              else if (step === 'schedule')
+                sub.scheduleCancellation({ on: '2026-12-15', today: TODAY }, AT, null);
+              else if (step === 'undo') sub.undoScheduledCancellation(AT, null);
+              else sub.endTrial(TODAY, AT, null);
+            } catch (err) {
+              expect(err).toBeInstanceOf(DomainError);
+            }
+            if (wasCancelled) expect(sub.status).toBe('CANCELLED');
+            wasCancelled ||= sub.status === 'CANCELLED';
+            expect(SUBSCRIPTION_STATUSES).toContain(sub.status);
           }
-          if (wasCancelled) expect(sub.status).toBe('CANCELLED');
-          wasCancelled ||= sub.status === 'CANCELLED';
-          expect(SUBSCRIPTION_STATUSES).toContain(sub.status);
-        }
-      }),
-      { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
-    );
-  });
+        }),
+        { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
+      );
+    },
+    PBT_TIMEOUT,
+  );
 
   it('[TC-COMMITMENTS-SUBS-007] la máquina declara CANCELLED como terminal y todos los estados alcanzables', () => {
     expect(SUBSCRIPTION_LIFECYCLE.isTerminal('CANCELLED')).toBe(true);

@@ -7,6 +7,9 @@ import { RecurringOccurrence } from './recurring-occurrence.js';
 import { RevisionPlanner, assertRevisionDate } from './revision-planner.js';
 import { d, definition, version } from './test-fixtures.js';
 
+/** Timeout explícito de los tests con fast-check: con `NIGHTLY=1` corren 10 000 casos (TC-PLATFORM-PIPELINE-010). */
+const PBT_TIMEOUT = process.env['NIGHTLY'] ? 300_000 : 15_000;
+
 const dates = (list: readonly { occurrenceDate: LocalDate }[]) =>
   list.map((c) => c.occurrenceDate.toString());
 const win = (from: string, to: string) => ({ from: d(from), to: d(to) });
@@ -47,46 +50,50 @@ describe('Generación de candidatos (INV-013)', () => {
     expect([...store].sort()).toEqual(['2026-10-05', '2026-11-05', '2026-12-05', '2027-01-05']);
   });
 
-  it('[TC-COMMITMENTS-RECUR-014] propiedad: ventanas solapadas y repetidas nunca duplican fechas nominales', () => {
-    const base = LocalDate.of(2026, 1, 1).toEpochDay();
-    const windowArb = fc
-      .tuple(fc.integer({ min: 0, max: 700 }), fc.integer({ min: 0, max: 400 }))
-      .map(([from, len]) => ({
-        from: LocalDate.ofEpochDay(base + from),
-        to: LocalDate.ofEpochDay(base + from + len),
-      }));
-    const defArb = fc
-      .tuple(
-        fc.constantFrom('DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL'),
-        fc.integer({ min: 1, max: 4 }),
-        fc.integer({ min: 1, max: 31 }),
-        fc.constantFrom('NONE', 'PREVIOUS', 'NEXT'),
-      )
-      .map(([cadence, interval, day, weekendAdjustment]) =>
-        definition('p', {
-          schedule: {
-            cadence,
-            interval,
-            startDate: `2026-01-${String(Math.min(day, 28)).padStart(2, '0')}`,
-            weekendAdjustment,
-          },
-        }),
-      );
-    fc.assert(
-      fc.property(defArb, fc.array(windowArb, { minLength: 1, maxLength: 6 }), (def, windows) => {
-        const store = new Map<string, string>();
-        for (const w of [...windows, ...windows]) {
-          for (const c of OccurrenceGenerator.plan(def, w, new Set(store.keys()))) {
-            store.set(c.occurrenceDate.toString(), c.dueDate.toString());
+  it(
+    '[TC-COMMITMENTS-RECUR-014] propiedad: ventanas solapadas y repetidas nunca duplican fechas nominales',
+    () => {
+      const base = LocalDate.of(2026, 1, 1).toEpochDay();
+      const windowArb = fc
+        .tuple(fc.integer({ min: 0, max: 700 }), fc.integer({ min: 0, max: 400 }))
+        .map(([from, len]) => ({
+          from: LocalDate.ofEpochDay(base + from),
+          to: LocalDate.ofEpochDay(base + from + len),
+        }));
+      const defArb = fc
+        .tuple(
+          fc.constantFrom('DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL'),
+          fc.integer({ min: 1, max: 4 }),
+          fc.integer({ min: 1, max: 31 }),
+          fc.constantFrom('NONE', 'PREVIOUS', 'NEXT'),
+        )
+        .map(([cadence, interval, day, weekendAdjustment]) =>
+          definition('p', {
+            schedule: {
+              cadence,
+              interval,
+              startDate: `2026-01-${String(Math.min(day, 28)).padStart(2, '0')}`,
+              weekendAdjustment,
+            },
+          }),
+        );
+      fc.assert(
+        fc.property(defArb, fc.array(windowArb, { minLength: 1, maxLength: 6 }), (def, windows) => {
+          const store = new Map<string, string>();
+          for (const w of [...windows, ...windows]) {
+            for (const c of OccurrenceGenerator.plan(def, w, new Set(store.keys()))) {
+              store.set(c.occurrenceDate.toString(), c.dueDate.toString());
+            }
           }
-        }
-        const union = new Set<string>();
-        for (const w of windows) for (const c of candidates(def, w)) union.add(c.occurrenceDate.toString());
-        expect([...store.keys()].sort()).toEqual([...union].sort());
-      }),
-      { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
-    );
-  });
+          const union = new Set<string>();
+          for (const w of windows) for (const c of candidates(def, w)) union.add(c.occurrenceDate.toString());
+          expect([...store.keys()].sort()).toEqual([...union].sort());
+        }),
+        { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
+      );
+    },
+    PBT_TIMEOUT,
+  );
 
   it('[TC-COMMITMENTS-RECUR-033] el máximo de 12 ocurrencias termina en 2027-09-15 y la serie es finita', () => {
     const def = definition('d5', { schedule: { startDate: '2026-10-15', maxOccurrences: 12 } });
