@@ -58,6 +58,10 @@ export const RLS_OVERHEAD = {
  */
 export const RLS_POLICY_TABLES: readonly string[] = ['iam.workspace', 'iam.workspace_membership'];
 
+/** Reconoce la tabla con o sin esquema: `EXPLAIN (FORMAT JSON)` sin `VERBOSE` nombra `workspace`, no `iam.workspace`. */
+const isPolicyTable = (table: string): boolean =>
+  RLS_POLICY_TABLES.some((t) => t === table || t.slice(t.indexOf('.') + 1) === table);
+
 const SIGNATURE_SEPARATOR = ' → ';
 
 /**
@@ -69,7 +73,7 @@ export function dataAccessSignature(signature: string): string {
     .split(SIGNATURE_SEPARATOR)
     .filter((node) => {
       const table = / on ([\w.]+)/u.exec(node)?.[1];
-      return table === undefined || !RLS_POLICY_TABLES.includes(table);
+      return table === undefined || !isPolicyTable(table);
     })
     .join(SIGNATURE_SEPARATOR);
 }

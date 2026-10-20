@@ -108,14 +108,14 @@ async function ok(method: string, path: string, body?: unknown): Promise<Record<
 const dataOf = (body: unknown): Record<string, unknown>[] =>
   (Array.isArray(body) ? body : ((body as { data?: unknown[] }).data ?? [])) as Record<string, unknown>[];
 
-/** `EXPLAIN (ANALYZE, FORMAT JSON)` → Execution Time (ms) y nodos del plan. */
+/** `EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON)` → Execution Time (ms) y nodos del plan. VERBOSE hace que cada nodo traiga `Schema` (`esquema.tabla`). */
 async function explain(
   client: Client,
   sql: string,
   values: readonly unknown[] = [],
 ): Promise<{ ms: number; nodes: string[]; access: string }> {
   const { rows } = await client.query<{ 'QUERY PLAN': [{ 'Execution Time': number; Plan: PlanNode }] }>(
-    `EXPLAIN (ANALYZE, FORMAT JSON) ${sql}`,
+    `EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) ${sql}`,
     [...values],
   );
   const [root] = rows[0]!['QUERY PLAN'];

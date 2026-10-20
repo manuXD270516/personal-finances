@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bootstrapMedianCi,
   buildReport,
+  dataAccessSignature,
   latencyResult,
   median,
   percentile,
@@ -231,6 +232,44 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     expect(r.passed).toBe(true);
     expect(r.notes).toContain('plan: Index Only Scan on ledger.posting (posting_balance_ix)');
     expect(r.notes).not.toContain('workspace_pkey');
+  });
+
+  it('[TC-PLATFORM-PIPELINE-015] el filtro reconoce las tablas de la política con y sin esquema (EXPLAIN JSON sin VERBOSE no trae Schema)', () => {
+    expect(
+      dataAccessSignature('Index Scan on workspace (workspace_pkey) → Seq Scan on iam.workspace_membership'),
+    ).toBe('');
+    // Planes reales de PgBalanceQuery (run 39401809245): nombres sin esquema; `workspace` también lo lee la sentencia misma.
+    const r = rlsResult({
+      id: 'rls-getBalance',
+      title: 'getBalance',
+      plans: {
+        withoutRls: [
+          'Seq Scan on workspace → Seq Scan on balance_snapshot → Index Only Scan on posting (posting_balance_ix)',
+        ],
+        withRls: [
+          'Index Scan on workspace (workspace_pkey) → Index Scan on workspace_membership (workspace_membership_user_active_idx) → Seq Scan on balance_snapshot → Index Only Scan on posting (posting_balance_ix)',
+        ],
+      },
+      ...pairsOf(1.02, 0.04, 0.2),
+    });
+    expect(r.verdict).toBe('OK');
+    expect(r.passed).toBe(true);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-017] sin esquema, un cambio sobre una tabla de datos (posting, journal_entry, balance_snapshot, ledger_account) sigue siendo "plan distinto"', () => {
+    const policy = 'Index Scan on workspace (workspace_pkey)';
+    for (const table of ['posting', 'journal_entry', 'balance_snapshot', 'ledger_account']) {
+      const r = rlsResult({
+        id: 'q',
+        title: 't',
+        plans: {
+          withoutRls: [`Seq Scan on workspace → Index Scan on ${table} (a_ix)`],
+          withRls: [`${policy} → Seq Scan on ${table}`],
+        },
+        ...pairsOf(2, 0.01, 0.05),
+      });
+      expect(r.verdict).toBe('plan distinto');
+    }
   });
 
   it('[TC-PLATFORM-PIPELINE-017] un cambio de índice o de método sobre una tabla de datos sigue siendo "plan distinto" aunque haya nodos de la política', () => {
