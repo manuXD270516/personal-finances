@@ -12,10 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "scripts/delivery-policy/test/nightly-policy.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "coverage", "shared-kernel"]
@@ -54,3 +54,4 @@ Entonces el paso de cobertura del nightly falla frente a 95 % y 90 %
 ## Notas
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
+- Automatizado (2026-10-20): `scripts/delivery-policy/test/nightly-policy.test.ts` (paso de cobertura sin `continue-on-error` ni `if`, antes de Stryker). Cobertura medida del shared-kernel tras los tests nuevos: 99.86 % líneas y 94.69 % ramas (antes 89.86 % / 84.07 %). Verificación en GitHub: corrida de `nightly` por `workflow_dispatch` (tarea 7.3).

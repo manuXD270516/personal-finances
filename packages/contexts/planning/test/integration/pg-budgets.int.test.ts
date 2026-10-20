@@ -69,6 +69,34 @@ function newBudget(ws: string, periodId: string): Budget {
   });
 }
 
+/** Asegura (idempotente) el plan del periodo con su línea de la categoría `category`, sin depender de otros tests. */
+async function ensureBudgetWithLine(ws: string): Promise<Budget> {
+  await asUser(() => uow.run(ws, () => budgets.insertIfAbsent(newBudget(ws, periods[ws]!))));
+  const budget = (await asUser(() => uow.run(ws, () => budgets.findByPeriod(ws, periods[ws]!))))!;
+  if (!budget.lines.some((l) => l.target.id === category)) {
+    const line = BudgetLine.create({
+      id: randomUUID(),
+      workspaceId: ws,
+      budgetId: budget.id,
+      target: { kind: 'CATEGORY', id: category },
+      nature: 'EXPENSE',
+      spec: {
+        kind: 'MAXIMUM',
+        planned: '600.00',
+        min: null,
+        max: null,
+        percent: null,
+        incomeBasis: null,
+        rolloverPolicy: 'NONE',
+        rolloverCap: null,
+        thresholds: ['50', '75', '90', '100'],
+      },
+    });
+    await asUser(() => uow.run(ws, () => budgets.insertLine(line)));
+  }
+  return (await asUser(() => uow.run(ws, () => budgets.findByPeriod(ws, periods[ws]!))))!;
+}
+
 beforeAll(async () => {
   app = new Pool({ connectionString: deps.databaseUrl, max: 6 });
   migrator = new Pool({ connectionString: deps.migratorUrl, max: 1 });
@@ -250,13 +278,12 @@ describe('planning.budget_threshold_crossing (append-only)', () => {
   });
 
   it('[TC-PLANNING-THRESHOLD-005] dos evaluaciones concurrentes del mismo umbral registran UN cruce (ON CONFLICT DO NOTHING)', async () => {
-    const budget = (await asUser(() => uow.run(w1, () => budgets.findByPeriod(w1, periods[w1]!))))!;
+    const budget = await ensureBudgetWithLine(w1);
+    const line = budget.lines.find((l) => l.target.id === category)!;
     const attempt = () =>
       asUser(() =>
         uow.run(w1, () =>
-          crossings.insertIfAbsent([
-            { ...row('50'), budgetId: budget.id, budgetLineId: budget.lines[0]!.id },
-          ]),
+          crossings.insertIfAbsent([{ ...row('50'), budgetId: budget.id, budgetLineId: line.id }]),
         ),
       );
     const results = await Promise.all([attempt(), attempt(), attempt()]);

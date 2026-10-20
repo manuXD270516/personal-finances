@@ -6,7 +6,8 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
-import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { apiConfig, capturingLogger } from '../support/harness.js';
+import { perfApiEnv } from './perf-env.js';
 
 /**
  * add-spendable-amount 5.2 (TC-REPORTING-SPENDABLE-014, NFR-PERF-004): el resumen del Home con el bloque `spendable` y
@@ -46,7 +47,7 @@ beforeAll(async () => {
   worker = new Pool({ connectionString: deps.workerDatabaseUrl, max: 2 });
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
-  runtime = await createApiRuntime(apiConfig(baseEnv(deps)), apiLog.logger, {
+  runtime = await createApiRuntime(apiConfig(perfApiEnv(deps)), apiLog.logger, {
     clock,
     identity: {
       jwt: { issuer: ISSUER, audience: AUDIENCE, requiredScope: 'pfos.api', jwks: { keys: [jwk] } },
@@ -157,13 +158,13 @@ async function measure(path: string): Promise<number[]> {
 }
 
 describe('NFR-PERF-004: Home con el bloque spendable (Q5)', () => {
-  it('[TC-REPORTING-SPENDABLE-014] getReportSummary con el bloque spendable: p95 ≤ 300 ms', async () => {
+  it('[TC-REPORTING-SPENDABLE-014] [TC-PLATFORM-PIPELINE-018] getReportSummary con el bloque spendable: p95 ≤ 300 ms', async () => {
     const times = await measure(`/api/v1/workspaces/${workspaceId}/reports/summary`);
     console.info(`home Q5 (summary): p95 ${Math.round(p95(times))} ms (${SAMPLES} muestras)`);
     expect(p95(times)).toBeLessThanOrEqual(BUDGET_MS);
   });
 
-  it('[TC-REPORTING-SPENDABLE-014] getSpendable con el detalle de 300 ocurrencias: p95 ≤ 300 ms', async () => {
+  it('[TC-REPORTING-SPENDABLE-014] [TC-PLATFORM-PIPELINE-018] getSpendable con el detalle de 300 ocurrencias: p95 ≤ 300 ms', async () => {
     const times = await measure(`/api/v1/workspaces/${workspaceId}/reports/spendable`);
     console.info(`spendable: p95 ${Math.round(p95(times))} ms (${SAMPLES} muestras)`);
     expect(p95(times)).toBeLessThanOrEqual(BUDGET_MS);

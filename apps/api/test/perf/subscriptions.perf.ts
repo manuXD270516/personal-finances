@@ -30,7 +30,8 @@ import {
   outboxPort,
 } from '../../src/identity/identity-wiring.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
-import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { apiConfig, capturingLogger } from '../support/harness.js';
+import { perfApiEnv } from './perf-env.js';
 
 /**
  * Presupuestos de rendimiento de suscripciones (openspec add-subscriptions, tarea 5.2; Should):
@@ -80,7 +81,7 @@ beforeAll(async () => {
   worker = new Pool({ connectionString: deps.workerDatabaseUrl, max: 6 });
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
-  runtime = await createApiRuntime(apiConfig(baseEnv(deps)), apiLog.logger, {
+  runtime = await createApiRuntime(apiConfig(perfApiEnv(deps)), apiLog.logger, {
     clock,
     identity: {
       jwt: { issuer: ISSUER, audience: AUDIENCE, requiredScope: 'pfos.api', jwks: { keys: [jwk] } },
@@ -159,7 +160,7 @@ beforeAll(async () => {
     lifecycleQuery: audit.lifecycleQuery,
     history: audit.history,
     logger: workerLog.logger,
-    config: apiConfig(baseEnv(deps)),
+    config: apiConfig(perfApiEnv(deps)),
     outbox: writer,
   });
   const planning = createPlanningRuntime({

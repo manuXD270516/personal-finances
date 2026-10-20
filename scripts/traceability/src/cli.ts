@@ -31,7 +31,8 @@ Comandos:
   regression
            Financial Regression Suite (docs/16 §11.3): deriva de tests/cases los TC con regression_suite: true y sus
            tests, escribe regression-suite.{json,md} (por defecto en tests/traceability/) y, con --run, ejecuta los
-           grupos unit/integration filtrando por TC-ID (NIGHTLY=1 sube los PBT a 10 000 corridas).
+           grupos unit/integration con los archivos COMPLETOS, sin filtro por nombre (NIGHTLY=1 sube los PBT a 10 000
+           corridas); sale con 1 si algún grupo falla y agrega estado y duración por grupo a regression-suite.md.
 
 Opciones:
   --root <dir>          Raíz del repositorio (por defecto: el directorio con pnpm-workspace.yaml).
@@ -136,6 +137,7 @@ export async function main(argv: string[], io: Io): Promise<number> {
       );
       if (!values.run) return 0;
       const outcomes = runRegressionSuite(root, suite, kinds, (line) => io.out(line));
+      writeRegressionSuite(suite, outDir, outcomes);
       const failed = outcomes.filter((o) => o.status === 'failed');
       for (const o of outcomes) {
         io.out(
@@ -143,6 +145,9 @@ export async function main(argv: string[], io: Io): Promise<number> {
         );
       }
       if (failed.length > 0) {
+        for (const o of failed) {
+          io.err(`  en rojo: ${o.group.package} (${o.group.kind}): ${o.group.files.join(', ')}`);
+        }
         io.err(`Financial Regression Suite: ${failed.length} grupo(s) con fallas.`);
         return 1;
       }

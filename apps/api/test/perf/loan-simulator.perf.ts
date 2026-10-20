@@ -5,7 +5,8 @@ import { FixedClock, Instant } from '@pf/shared-kernel';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
-import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { apiConfig, capturingLogger } from '../support/harness.js';
+import { perfApiEnv } from './perf-env.js';
 
 /**
  * fix-phase-4-gaps 7.2 (TC-DEBT-AMORT-045, NFR-PERF-004): `POST W/loans/payoff-simulations` responde con p95 < 300 ms con
@@ -44,7 +45,7 @@ async function api(method: string, path: string, body?: unknown) {
 beforeAll(async () => {
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
-  runtime = await createApiRuntime(apiConfig(baseEnv(deps)), apiLog.logger, {
+  runtime = await createApiRuntime(apiConfig(perfApiEnv(deps)), apiLog.logger, {
     clock,
     identity: {
       jwt: { issuer: ISSUER, audience: AUDIENCE, requiredScope: 'pfos.api', jwks: { keys: [jwk] } },
@@ -117,7 +118,7 @@ async function measure(scenario: Record<string, unknown>): Promise<number[]> {
 }
 
 describe('NFR-PERF-004: simulador de pago anticipado con 10 préstamos de 360 cuotas', () => {
-  it('[TC-DEBT-AMORT-045] estrategias avalanche y snowball con 500.00 BOB extra al mes: p95 < 300 ms', async () => {
+  it('[TC-DEBT-AMORT-045] [TC-PLATFORM-PIPELINE-018] estrategias avalanche y snowball con 500.00 BOB extra al mes: p95 < 300 ms', async () => {
     const times = await measure({
       strategies: ['AVALANCHE', 'SNOWBALL'],
       monthlyExtra: { amount: '500.00', currency: 'BOB' },
@@ -126,7 +127,7 @@ describe('NFR-PERF-004: simulador de pago anticipado con 10 préstamos de 360 cu
     expect(p95(times)).toBeLessThan(BUDGET_MS);
   }, 600_000);
 
-  it('[TC-DEBT-AMORT-045] pagos extra de un préstamo (mensual y único): p95 < 300 ms', async () => {
+  it('[TC-DEBT-AMORT-045] [TC-PLATFORM-PIPELINE-018] pagos extra de un préstamo (mensual y único): p95 < 300 ms', async () => {
     const times = await measure({
       loanId: loanIds[0],
       extras: [

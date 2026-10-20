@@ -6,7 +6,8 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
-import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { apiConfig, capturingLogger } from '../support/harness.js';
+import { perfApiEnv } from './perf-env.js';
 
 /**
  * add-savings-goals 5.2 (design decisión 26, NFR-PERF-004): `GET W/goals` con 20 metas y 2 000 movimientos en 3 monedas
@@ -45,7 +46,7 @@ beforeAll(async () => {
   worker = new Pool({ connectionString: deps.workerDatabaseUrl, max: 2 });
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
-  runtime = await createApiRuntime(apiConfig(baseEnv(deps)), apiLog.logger, {
+  runtime = await createApiRuntime(apiConfig(perfApiEnv(deps)), apiLog.logger, {
     clock,
     identity: {
       jwt: { issuer: ISSUER, audience: AUDIENCE, requiredScope: 'pfos.api', jwks: { keys: [jwk] } },

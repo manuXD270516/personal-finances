@@ -96,12 +96,14 @@ export function workflowFiles(): string[] {
 export interface Step {
   name?: string;
   if?: string;
+  'continue-on-error'?: boolean | string;
   run?: string;
   uses?: string;
   env?: Record<string, string>;
 }
 
 export interface Job {
+  'continue-on-error'?: boolean | string;
   permissions?: Record<string, string>;
   steps?: Step[];
 }

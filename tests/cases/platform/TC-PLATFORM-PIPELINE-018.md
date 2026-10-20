@@ -12,11 +12,12 @@ invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "apps/api/test/perf/loan-simulator.perf.ts"
   - "apps/api/test/perf/spendable.perf.ts"
-status: draft
+  - "scripts/delivery-policy/test/nightly-policy.test.ts"
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "rate-limit"]
@@ -56,3 +57,4 @@ Entonces ninguna respuesta es un rechazo por cuota
 ## Notas
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
+- Automatizado (2026-10-20): `loan-simulator.perf.ts` y `spendable.perf.ts` configuran la API con `perfApiEnv` (`apps/api/test/perf/perf-env.ts`, cuotas en 1 000 000). Guarda estática en `scripts/delivery-policy/test/nightly-policy.test.ts` (los `.perf.ts` no entran en el escáner de trazabilidad). Sin Docker en la sesión de implementación: la ejecución real queda para la corrida de `nightly` por `workflow_dispatch` (tarea 7.3).

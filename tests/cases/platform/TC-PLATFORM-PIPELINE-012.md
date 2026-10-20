@@ -12,10 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "scripts/traceability/test/regression.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "regression-suite", "traceability"]
@@ -51,3 +51,4 @@ Entonces nombra los archivos del grupo
 ## Notas
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
+- Automatizado (2026-10-20): `regression.test.ts` verifica el comando de un grupo unit y de uno integration (sin `-t`, `--testNamePattern` ni TC-ID; `testNamePattern` se eliminó de `regression.ts`).
