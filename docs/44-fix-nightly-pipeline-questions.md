@@ -56,4 +56,6 @@ El nightly falló en sus 12 corridas desde el 2026-10-05 por tres causas indepen
 - (a) Change aparte para optimizar la evaluación de las políticas (p. ej. evaluar el contexto una vez por consulta), con su propia medición y sin debilitar el fail-closed de D43 (sin contexto, `PF002`).
 - (b) Pasar la fila de índice a informativa: D43 solo exige como bloqueantes las consultas reales de la aplicación, que hoy pasan.
 
+**Evidencia nueva (2026-10-20, EXPLAIN del issue #147, run 39401809245).** El sobrecosto es real pero acotado por filas y no por llamadas: `platform.current_workspace_id()` no se evalúa por fila, sino una vez como `One-Time Filter` en un nodo `Result` que el planner coloca sobre el `Index Only Scan`. El `Index Only Scan` cuesta igual con y sin RLS (0,586 vs 0,589 ms, mismos 207 buffers, Heap Fetches 0); la fila pasa de 1,12 a 1,70 ms (+0,599 ms, IC95 [0,596, 0,603]) por el `Result` adicional (≈ 55 ns/fila sobre 10 864 filas), y el agregado sintético de todo el workspace suma +4,7 ms sobre ~200 000 filas. Hipótesis a verificar en el change de la opción (a): escribir la política con `(SELECT platform.current_workspace_id())` (InitPlan) para evitar el nodo `Result`. No se ha creado ese change.
+
 **Recomendación: (a).** Es un costo real por fila en la tabla más grande y crece con el historial. La opción (b) quita la señal que lo detectó.
