@@ -12,10 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "apps/api/test/perf/perf-report.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "rls"]
@@ -55,3 +55,4 @@ Entonces es brecha y el benchmark falla indicando la consulta
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
 - `provisional` hasta que el owner confirme el piso absoluto de 0.5 ms (pregunta 4 de docs/44).
+- Automatizado (2026-10-20): `perf-report.test.ts`; brecha demostrada con IC95 por encima del 10 % y de 0.5 ms; el reporte lista la fila y la diferencia. `provisional` hasta la respuesta a la pregunta 4 de docs/44.

@@ -34,11 +34,23 @@ export const PERF_THRESHOLDS = {
 export const PERF_THROUGHPUT = { minEventsPerSecond: 42, docText: '≥ 42 eventos/s por consumidor' } as const;
 
 /**
- * add-ledger-core 5.5 (criterio docs/31 D43): overhead de RLS < 10 % (EXPLAIN ANALYZE) medido sobre las consultas REALES
- * de la aplicación (las sentencias que emite `PgBalanceQuery`, con sus parámetros) y las de índice; el agregado
- * sintético de todo el workspace se reporta como informativo (no falla). Bajo `noiseFloorMs` la diferencia es ruido.
+ * add-ledger-core 5.5 (criterio docs/31 D43) y fix-nightly-pipeline (decisión 4): overhead de RLS < 10 % (EXPLAIN
+ * ANALYZE) medido sobre las consultas REALES de la aplicación (las sentencias que emite `PgBalanceQuery`, con sus
+ * parámetros) y las de índice; el agregado sintético de todo el workspace se reporta como informativo (no falla).
+ *
+ * Una brecha de tiempo debe estar DEMOSTRADA, no solo observada: 200 pares intercalados (con y sin RLS), diferencia por
+ * par, mediana y un IC del 95 % por bootstrap de percentiles (2 000 remuestreos, semilla fija). Es brecha si el límite
+ * inferior del IC alcanza a la vez el 10 % de la mediana sin RLS y `noiseFloorMs`, o si la política cambia el método de
+ * acceso o el índice del plan.
  */
-export const RLS_OVERHEAD = { maxRatio: 0.1, noiseFloorMs: 0.5 } as const;
+export const RLS_OVERHEAD = {
+  maxRatio: 0.1,
+  noiseFloorMs: 0.5,
+  warmupPairs: 20,
+  pairs: 200,
+  bootstrapResamples: 2000,
+  bootstrapSeed: 0x5eed,
+} as const;
 
 export type NfrId = keyof typeof PERF_THRESHOLDS | 'RLS-OVERHEAD' | 'NFR-PERF-008';
 
@@ -73,6 +85,13 @@ export function stats(samples: readonly number[]): LatencyStats {
   };
 }
 
+export type RlsVerdict =
+  | 'OK'
+  | 'no demostrada sobre el piso absoluto'
+  | 'no demostrada sobre el 10 %'
+  | 'brecha demostrada'
+  | 'plan distinto';
+
 export interface BenchResult {
   readonly id: string;
   readonly nfr: NfrId;
@@ -85,6 +104,12 @@ export interface BenchResult {
   readonly gate: boolean;
   readonly passed: boolean;
   readonly notes?: string;
+  /** Solo filas de RLS: IC del 95 % (ms) de la mediana de la diferencia por par (con − sin RLS). */
+  readonly ci95Ms?: readonly [number, number];
+  /** Solo filas de RLS: pares de ejecuciones intercaladas medidos. */
+  readonly pairs?: number;
+  /** Solo filas de RLS: motivo del veredicto. */
+  readonly verdict?: RlsVerdict;
 }
 
 export interface PerfReport {
@@ -153,46 +178,123 @@ export function throughputResult(input: {
   };
 }
 
-/** Overhead de RLS: medianas de `Execution Time` (EXPLAIN ANALYZE) con RLS (pf_app) vs sin RLS (superusuario). */
+const round3 = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Mediana real (promedio de los dos centrales en muestras pares); no modifica la entrada. */
+export function median(samples: readonly number[]): number {
+  if (samples.length === 0) throw new RangeError('muestra vacía');
+  const sorted = [...samples].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+/** PRNG determinista (mulberry32): el IC se reproduce a partir de las muestras del reporte. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** IC de percentiles (2.5 % y 97.5 %) de la mediana por bootstrap con semilla fija. */
+export function bootstrapMedianCi(
+  samples: readonly number[],
+  resamples: number = RLS_OVERHEAD.bootstrapResamples,
+  seed: number = RLS_OVERHEAD.bootstrapSeed,
+): readonly [number, number] {
+  if (samples.length === 0) throw new RangeError('muestra vacía');
+  const random = seededRandom(seed);
+  const n = samples.length;
+  const medians: number[] = [];
+  const draw = new Array<number>(n);
+  for (let r = 0; r < resamples; r += 1) {
+    for (let i = 0; i < n; i += 1) draw[i] = samples[Math.floor(random() * n)]!;
+    medians.push(median(draw));
+  }
+  medians.sort((a, b) => a - b);
+  return [
+    medians[Math.floor(0.025 * resamples)]!,
+    medians[Math.min(resamples - 1, Math.floor(0.975 * resamples))]!,
+  ];
+}
+
+/**
+ * Overhead de RLS (fix-nightly-pipeline, decisión 4). `withRls[i]` y `withoutRls[i]` son un par intercalado de
+ * `Execution Time` (EXPLAIN ANALYZE) con RLS (pf_app) y sin RLS (superusuario). `plans` lleva, por sentencia, el método
+ * de acceso e índice del plan (p. ej. `Index Only Scan (posting_balance_ix)`) con y sin RLS.
+ */
 export function rlsResult(input: {
   id: string;
   title: string;
   withRls: readonly number[];
   withoutRls: readonly number[];
-  /** Nodos del plan con RLS (p. ej. `Index Only Scan (posting_balance_ix)`). */
-  plan?: string;
+  plans?: { readonly withRls: readonly string[]; readonly withoutRls: readonly string[] };
   /** `false` ⇒ informativo: se reporta pero no es una brecha (agregado sintético, docs/31 D43). */
   gate?: boolean;
 }): BenchResult {
+  if (input.withRls.length === 0 || input.withRls.length !== input.withoutRls.length) {
+    throw new RangeError(
+      'rlsResult necesita el mismo número (> 0) de ejecuciones con y sin RLS: pares intercalados',
+    );
+  }
   const a = stats(input.withRls);
-  const b = stats(input.withoutRls);
-  const ratio = b.p50 > 0 ? (a.p50 - b.p50) / b.p50 : 0;
-  const passed = ratio < RLS_OVERHEAD.maxRatio || a.p50 - b.p50 < RLS_OVERHEAD.noiseFloorMs;
+  const diffs = input.withRls.map((w, i) => w - input.withoutRls[i]!);
+  const medWith = median(input.withRls);
+  const medWithout = median(input.withoutRls);
+  const medDiff = median(diffs);
+  const [inf, sup] = bootstrapMedianCi(diffs);
+  const ratio = medWithout > 0 ? medDiff / medWithout : 0;
+  const ratioMs = RLS_OVERHEAD.maxRatio * medWithout;
+  const planChanged =
+    input.plans !== undefined && input.plans.withRls.join(' | ') !== input.plans.withoutRls.join(' | ');
+  let verdict: RlsVerdict;
+  if (planChanged) verdict = 'plan distinto';
+  else if (inf >= ratioMs && inf >= RLS_OVERHEAD.noiseFloorMs) verdict = 'brecha demostrada';
+  else if (medDiff < Math.max(ratioMs, RLS_OVERHEAD.noiseFloorMs)) verdict = 'OK';
+  else if (inf < ratioMs) verdict = 'no demostrada sobre el 10 %';
+  else verdict = 'no demostrada sobre el piso absoluto';
+  const planNote = input.plans
+    ? planChanged
+      ? `; plan distinto: sin RLS ${input.plans.withoutRls.join(' | ')} → con RLS ${input.plans.withRls.join(' | ')}`
+      : `; plan: ${input.plans.withRls.join(' | ')}`
+    : '';
   return {
     id: input.id,
     nfr: 'RLS-OVERHEAD',
     title: input.title,
     stats: a,
-    value: Math.round(ratio * 1000) / 1000,
+    value: round3(ratio),
     limit: RLS_OVERHEAD.maxRatio,
     unit: 'ratio',
     gate: input.gate ?? true,
-    passed,
-    notes: `mediana con RLS ${a.p50} ms vs sin RLS ${b.p50} ms (p95 ${a.p95} vs ${b.p95})${
-      a.p50 - b.p50 < RLS_OVERHEAD.noiseFloorMs
-        ? `; diferencia bajo el piso de ruido (${RLS_OVERHEAD.noiseFloorMs} ms)`
-        : ''
-    }${input.plan ? `; plan: ${input.plan}` : ''}`,
+    passed: verdict !== 'brecha demostrada' && verdict !== 'plan distinto',
+    ci95Ms: [round3(inf), round3(sup)],
+    pairs: diffs.length,
+    verdict,
+    notes: `mediana con RLS ${round3(medWith)} ms vs sin RLS ${round3(medWithout)} ms; diferencia ${round3(medDiff)} ms, IC95 [${round3(inf)}, ${round3(sup)}] ms (${diffs.length} pares); veredicto: ${verdict}${planNote}`,
   };
 }
+
+/** `sin RLS X → con RLS Y` de las notas de una fila de RLS con el plan cambiado. */
+const planOf = (notes: string | undefined): string =>
+  /plan distinto: sin RLS (.*) → con RLS (.*)$/u
+    .exec(notes ?? '')
+    ?.slice(1, 3)
+    .join(' → ') ?? '';
 
 export function buildReport(input: Omit<PerfReport, 'version' | 'breaches'>): PerfReport {
   const breaches = input.results
     .filter((r) => r.gate && !r.passed)
     .map((r) =>
-      r.unit === 'ev/s'
-        ? `${r.nfr} ${r.id}: ${r.value} ev/s < ${r.limit} ev/s`
-        : `${r.nfr} ${r.id}: ${r.value}${r.unit === 'ms' ? ' ms' : ''} > ${r.limit}${r.unit === 'ms' ? ' ms' : ''}`,
+      r.verdict === 'plan distinto'
+        ? `${r.nfr} ${r.id}: plan distinto (${planOf(r.notes)})`
+        : r.unit === 'ev/s'
+          ? `${r.nfr} ${r.id}: ${r.value} ev/s < ${r.limit} ev/s`
+          : `${r.nfr} ${r.id}: ${r.value}${r.unit === 'ms' ? ' ms' : ''} > ${r.limit}${r.unit === 'ms' ? ' ms' : ''}`,
     );
   return { version: 1, ...input, breaches };
 }

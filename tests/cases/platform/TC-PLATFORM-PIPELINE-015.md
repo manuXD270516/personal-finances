@@ -12,10 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: performance
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "apps/api/test/perf/perf-report.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "rls"]
@@ -60,3 +60,4 @@ Entonces no es brecha porque 0.31 ms no alcanza el piso de 0.5 ms
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
 - `provisional` hasta que el owner confirme el piso absoluto de 0.5 ms (pregunta 4 de docs/44).
+- Automatizado (2026-10-20): `apps/api/test/perf/perf-report.test.ts` con 200 pares sintéticos deterministas (IC95 por bootstrap con semilla fija). `provisional` hasta que el owner confirme el piso de 0.5 ms (pregunta 4 de docs/44; se implementó la recomendación).

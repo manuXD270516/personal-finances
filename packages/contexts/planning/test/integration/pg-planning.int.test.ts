@@ -3,7 +3,7 @@ import type { AuditEntry, LifecycleStepInput } from '@pf/audit/contracts';
 import { PgUnitOfWork, requireSqlExecutor, runWithRequestContext } from '@pf/platform/api';
 import { DomainError, FixedClock, Instant } from '@pf/shared-kernel';
 import { Pool, type PoolClient } from 'pg';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { createPlanningRuntime, type PlanningRuntime } from '../../src/interface/planning.module.js';
 
 declare module 'vitest' {
@@ -23,7 +23,10 @@ let user: string;
 const w1 = randomUUID();
 const w2 = randomUUID();
 const w3 = randomUUID();
-const clock = new FixedClock(Instant.parse('2026-10-05T14:00:00Z'));
+// Workspace exclusivo de TC-PLANNING-AUTOCREATE-002: nadie más lo toca, así que su "primera creación" no depende del orden.
+const w4 = randomUUID();
+const BASE_NOW = '2026-10-05T14:00:00Z';
+const clock = new FixedClock(Instant.parse(BASE_NOW));
 const calendars = new Map<string, { timeZone: string; fiscalMonthStartDay: number }>();
 const audits: AuditEntry[] = [];
 const steps: LifecycleStepInput[] = [];
@@ -65,6 +68,9 @@ async function inCtx<T>(
   }
 }
 
+/** Fixture idempotente: asegura los periodos del workspace (`ensurePeriods` no duplica) para que cada test se baste solo. */
+const ensure = (ws: string) => asUser(() => runtime.service.ensurePeriods({ workspaceId: ws }));
+
 const rows = (ws: string) =>
   inCtx(ws, async (c) => {
     const { rows: r } = await c.query<{
@@ -93,6 +99,7 @@ beforeAll(async () => {
     [w1, 1],
     [w2, 25],
     [w3, 1],
+    [w4, 1],
   ] as const) {
     await inCtx(
       ws,
@@ -128,6 +135,11 @@ beforeAll(async () => {
   });
 });
 
+// Cada test parte del reloj base: los de activación lo mueven y no deben afectar a los siguientes ni depender de ellos.
+beforeEach(() => {
+  clock.set(Instant.parse(BASE_NOW));
+});
+
 afterAll(async () => {
   await app?.end();
   await migrator?.end();
@@ -135,12 +147,10 @@ afterAll(async () => {
 
 describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)', () => {
   it('[TC-PLANNING-AUTOCREATE-002] dos creaciones concurrentes en conexiones distintas dejan exactamente "2026-10".."2027-01" sin errores', async () => {
-    const results = await Promise.all([
-      asUser(() => runtime.service.ensurePeriods({ workspaceId: w1 })),
-      asUser(() => runtime.service.ensurePeriods({ workspaceId: w1 })),
-    ]);
+    const stepsBefore = steps.length;
+    const results = await Promise.all([ensure(w4), ensure(w4)]);
     expect(results.map((r) => r.created.length).sort()).toEqual([0, 4]);
-    const r = await rows(w1);
+    const r = await rows(w4);
     expect(r.map((p) => `${p.label}:${p.status}:${p.range}`)).toEqual([
       '2026-10:ACTIVE:2026-10-01..2026-10-31',
       '2026-11:DRAFT:2026-11-01..2026-11-30',
@@ -148,10 +158,13 @@ describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)
       '2027-01:DRAFT:2027-01-01..2027-01-31',
     ]);
     // El recorrido se escribe en la transacción del comando (CREATE por periodo insertado, una sola vez).
-    expect(steps.filter((s) => s.kind === 'TRANSITION' && s.transition === 'CREATE')).toHaveLength(4);
+    expect(
+      steps.slice(stepsBefore).filter((s) => s.kind === 'TRANSITION' && s.transition === 'CREATE'),
+    ).toHaveLength(4);
   });
 
   it('[TC-PLANNING-PERIOD-002] la BD rechaza un periodo que solapa (etiqueta repetida o rango que se cruza, al COMMIT) y los periodos no cambian', async () => {
+    await ensure(w1);
     const before = await rows(w1);
     const insert = (c: PoolClient, label: string, start: string, end: string) =>
       c.query(
@@ -175,6 +188,7 @@ describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)
   });
 
   it('rango congelado fuera de DRAFT (23514 financial_period_range_frozen); un DRAFT sí puede moverse; pf_app no puede borrar (42501)', async () => {
+    await ensure(w1);
     const [oct, nov] = await rows(w1);
     const frozen = await inCtx(w1, async (c) => {
       try {
@@ -204,11 +218,12 @@ describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)
   });
 
   it('[TC-PLANNING-ACTIVATION-001] (integración, reloj fijo) a las 03:30Z "2026-11" sigue DRAFT en La Paz y a las 04:05Z queda ACTIVE en la BD', async () => {
+    await ensure(w1);
     clock.set(Instant.parse('2026-11-01T03:30:00Z'));
-    await asUser(() => runtime.service.ensurePeriods({ workspaceId: w1 }));
+    await ensure(w1);
     expect((await rows(w1)).find((p) => p.label === '2026-11')?.status).toBe('DRAFT');
     clock.set(Instant.parse('2026-11-01T04:05:00Z'));
-    await asUser(() => runtime.service.ensurePeriods({ workspaceId: w1 }));
+    await ensure(w1);
     const nov = (await rows(w1)).find((p) => p.label === '2026-11');
     expect([nov?.status, nov?.version]).toEqual(['ACTIVE', 2]);
     const active = await asUser(() =>
@@ -218,16 +233,18 @@ describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)
       '2026-10:true',
       '2026-11:false',
     ]);
-    clock.set(Instant.parse('2026-10-05T14:00:00Z'));
+    clock.set(Instant.parse(BASE_NOW));
   });
 
   it('[TC-PLANNING-FISCALDAY-001] (BD) de día 1 a 25 los DRAFT se recalculan en sitio en una transacción (exclusión diferible) conservando su id', async () => {
+    // w3 es de este test y empieza con el calendario de día 1 (se restituye por si el test se repite).
+    calendars.set(w3, { timeZone: 'America/La_Paz', fiscalMonthStartDay: 1 });
     const before = await rows(w3);
     expect(before).toEqual([]);
-    await asUser(() => runtime.service.ensurePeriods({ workspaceId: w3 }));
+    await ensure(w3);
     const ids = new Map((await rows(w3)).map((p) => [p.label, p.id]));
     calendars.set(w3, { timeZone: 'America/La_Paz', fiscalMonthStartDay: 25 });
-    await asUser(() => runtime.service.ensurePeriods({ workspaceId: w3 }));
+    await ensure(w3);
     const after = await rows(w3);
     expect(after.map((p) => `${p.label}:${p.range}:${String(p.is_transition)}`)).toEqual([
       '2026-10:2026-10-01..2026-10-31:false',
@@ -239,7 +256,8 @@ describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)
   });
 
   it('[TC-PLANNING-ISOLATION-001] W1 (día 1) y W2 (día 25) tienen calendarios independientes; desde W1 nunca se ve W2; sin contexto la consulta falla (PF002)', async () => {
-    await asUser(() => runtime.service.ensurePeriods({ workspaceId: w2 }));
+    await ensure(w1);
+    await ensure(w2);
     expect((await rows(w2)).find((p) => p.label === '2026-10')?.range).toBe('2026-10-25..2026-11-24');
     const seen = await inCtx(
       w1,
@@ -263,6 +281,7 @@ describe('planning.financial_period con PostgreSQL 18 real (pf_app, RLS forzada)
   });
 
   it('[TC-PLANNING-PLANGUARD-001] (BD) el guard toma FOR SHARE: closed ⇒ PERIOD_CLOSED; draft ⇒ ok; inexistente ⇒ REFERENCE_NOT_FOUND', async () => {
+    await ensure(w1);
     const draft = (await rows(w1)).find((p) => p.status === 'DRAFT')!;
     const code = async (periodId: string) => {
       try {

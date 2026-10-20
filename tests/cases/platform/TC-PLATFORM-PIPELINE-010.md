@@ -12,10 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "scripts/traceability/test/regression.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "regression-suite", "traceability"]
@@ -55,3 +55,4 @@ Entonces ambos tests corren en ese orden
 ## Notas
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
+- Automatizado (2026-10-20): `scripts/traceability/test/regression.test.ts` ejecuta con `--run` un fixture unit cuyo TC lee el estado de un test anterior sin TC; pasa con el archivo completo. Verificación en GitHub (tarea 7.3): corrida de `nightly` por `workflow_dispatch` tras fusionar.

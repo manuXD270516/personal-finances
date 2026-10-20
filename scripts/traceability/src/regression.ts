@@ -12,7 +12,9 @@ import type { Model } from './types.js';
  *   integration → `vitest run --config vitest.integration.config.ts` (`*.int.test.ts`, `*.api.test.ts`; Testcontainers);
  *   stack       → `*.stack.test.ts` (Compose; corre en `pnpm test:stack`, no aquí);
  *   e2e         → `tests/e2e/**` (Playwright contra el stack `pfos-e2e`; corre en `pnpm test:e2e`, no aquí).
- * Dentro de cada archivo solo se ejecutan los tests cuyo nombre completo contiene alguno de los TC-IDs (`-t`).
+ * Cada grupo ejecuta sus archivos COMPLETOS, sin filtro por nombre (`-t`): es lo que corre el gate de PR, y un TC puede
+ * depender del estado que dejó un test anterior del mismo archivo (nightly #12, change `fix-nightly-pipeline`).
+ * Un test sin TC que falla dentro de un archivo de la suite pone el grupo en rojo.
  */
 export type RegressionKind = 'unit' | 'integration' | 'stack' | 'e2e';
 export const RUNNABLE_KINDS: readonly RegressionKind[] = ['unit', 'integration'];
@@ -124,8 +126,18 @@ export function buildRegressionSuite(model: Model): RegressionSuite {
   };
 }
 
-export function renderRegressionMarkdown(suite: RegressionSuite): string {
+const STATUS_LABEL: Record<RunOutcome['status'], string> = {
+  passed: 'verde',
+  failed: 'rojo',
+  skipped: 'omitido',
+};
+
+/** Reporte en Markdown; con `outcomes` (corrida con `--run`) agrega estado y duración por grupo y lista los grupos en rojo. */
+export function renderRegressionMarkdown(suite: RegressionSuite, outcomes?: readonly RunOutcome[]): string {
   const s = suite.summary;
+  const outcomeOf = (g: RegressionGroup) =>
+    outcomes?.find((o) => o.group.package === g.package && o.group.kind === g.kind);
+  const failed = (outcomes ?? []).filter((o) => o.status === 'failed');
   return [
     '# Financial Regression Suite',
     '',
@@ -137,10 +149,28 @@ export function renderRegressionMarkdown(suite: RegressionSuite): string {
     '',
     '## Grupos de ejecución',
     '',
-    '| Paquete | Tipo | Archivos | TC |',
-    '|---|---|---|---|',
-    ...suite.groups.map((g) => `| \`${g.package}\` | ${g.kind} | ${g.files.length} | ${g.ids.length} |`),
+    outcomes
+      ? '| Paquete | Tipo | Archivos | TC | Estado | Duración |'
+      : '| Paquete | Tipo | Archivos | TC |',
+    outcomes ? '|---|---|---|---|---|---|' : '|---|---|---|---|',
+    ...suite.groups.map((g) => {
+      const base = `| \`${g.package}\` | ${g.kind} | ${g.files.length} | ${g.ids.length}`;
+      const o = outcomeOf(g);
+      if (!outcomes) return `${base} |`;
+      return `${base} | ${o ? STATUS_LABEL[o.status] : 'omitido'} | ${o && o.durationMs ? `${Math.round(o.durationMs / 1000)} s` : '—'} |`;
+    }),
     '',
+    ...(failed.length > 0
+      ? [
+          '## Grupos en rojo',
+          '',
+          ...failed.map(
+            (o) =>
+              `- \`${o.group.package}\` (${o.group.kind}): ${o.group.files.map((f) => `\`${f}\``).join(', ')}`,
+          ),
+          '',
+        ]
+      : []),
     '## TC de la suite sin tests',
     '',
     ...(suite.withoutTests.length > 0 ? suite.withoutTests.map((id) => `- ${id}`) : ['—']),
@@ -148,20 +178,18 @@ export function renderRegressionMarkdown(suite: RegressionSuite): string {
   ].join('\n');
 }
 
-export function writeRegressionSuite(suite: RegressionSuite, outDir: string): { json: string; md: string } {
+export function writeRegressionSuite(
+  suite: RegressionSuite,
+  outDir: string,
+  outcomes?: readonly RunOutcome[],
+): { json: string; md: string } {
   mkdirSync(outDir, { recursive: true });
   const json = join(outDir, 'regression-suite.json');
   const md = join(outDir, 'regression-suite.md');
   writeFileSync(json, `${JSON.stringify(suite, null, 2)}\n`, 'utf8');
-  writeFileSync(md, renderRegressionMarkdown(suite), 'utf8');
+  writeFileSync(md, renderRegressionMarkdown(suite, outcomes), 'utf8');
   return { json, md };
 }
-
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/** Patrón `-t` de vitest: el nombre completo del test contiene `[TC-…]` de alguno de los TC del grupo. */
-export const testNamePattern = (ids: readonly string[]): string =>
-  `\\[(${ids.map(escapeRegex).join('|')})\\]`;
 
 /** Argumentos de `node` para `vitest run` de un grupo; `null` si el tipo no se ejecuta con vitest aquí. */
 export function vitestCommand(root: string, group: RegressionGroup): string[] | null {
@@ -174,8 +202,6 @@ export function vitestCommand(root: string, group: RegressionGroup): string[] | 
     'run',
     ...(group.kind === 'integration' ? ['--config', 'vitest.integration.config.ts'] : []),
     '--passWithNoTests',
-    '-t',
-    testNamePattern(group.ids),
     ...group.files,
   ];
 }

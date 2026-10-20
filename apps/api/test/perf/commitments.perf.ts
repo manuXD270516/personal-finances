@@ -41,7 +41,8 @@ import {
 } from '../../src/identity/identity-wiring.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { connect } from '../support/db.js';
-import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { apiConfig, capturingLogger } from '../support/harness.js';
+import { perfApiEnv } from './perf-env.js';
 
 /**
  * NFR-PERF-009 (TC-COMMITMENTS-RECUR-017, Should): `GenerateOccurrences(workspace)` de 60 definiciones activas
@@ -83,16 +84,12 @@ beforeAll(async () => {
   worker = new Pool({ connectionString: deps.workerDatabaseUrl, max: 6 });
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-1', alg: 'RS256', use: 'sig' };
-  runtime = await createApiRuntime(
-    apiConfig(baseEnv(deps, { RATE_LIMIT_WRITES_PER_MIN: '100000' })),
-    apiLog.logger,
-    {
-      clock,
-      identity: {
-        jwt: { issuer: ISSUER, audience: AUDIENCE, requiredScope: 'pfos.api', jwks: { keys: [jwk] } },
-      },
+  runtime = await createApiRuntime(apiConfig(perfApiEnv(deps)), apiLog.logger, {
+    clock,
+    identity: {
+      jwt: { issuer: ISSUER, audience: AUDIENCE, requiredScope: 'pfos.api', jwks: { keys: [jwk] } },
     },
-  );
+  });
   baseUrl = await runtime.listen(0, '127.0.0.1');
   const now = Math.floor(Date.now() / 1000);
   const token = await new SignJWT({
@@ -145,7 +142,7 @@ beforeAll(async () => {
     lifecycleQuery: audit.lifecycleQuery,
     history: audit.history,
     logger: workerLog.logger,
-    config: apiConfig(baseEnv(deps)),
+    config: apiConfig(perfApiEnv(deps)),
     outbox: writer,
   });
   const planning = createPlanningRuntime({

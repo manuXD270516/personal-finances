@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { createLedgerMaintenance, createLedgerRuntime } from '@pf/ledger/interface/ledger.module';
@@ -21,11 +23,13 @@ import {
   latencyResult,
   PERF_THRESHOLDS,
   PERF_THROUGHPUT,
+  RLS_OVERHEAD,
   rlsResult,
   throughputResult,
   writeReport,
   type BenchResult,
 } from './perf-report.js';
+import { perfApiEnv } from './perf-env.js';
 
 /**
  * Benchmarks nightly (docs/16 §5.15, docs/23 §5.5): PostgreSQL 18 real (Testcontainers, mismas imágenes que CI) con el
@@ -50,6 +54,7 @@ const WS = LARGE_MAIN_WORKSPACE_ID;
 const W = `/api/v1/workspaces/${WS}`;
 
 const results: BenchResult[] = [];
+const rlsPlanTexts: string[] = [];
 const dataset: Record<string, string | number> = {};
 const timings: Record<string, number> = {};
 let runtime: ApiRuntime | undefined;
@@ -108,7 +113,7 @@ async function explain(
   client: Client,
   sql: string,
   values: readonly unknown[] = [],
-): Promise<{ ms: number; nodes: string[] }> {
+): Promise<{ ms: number; nodes: string[]; access: string }> {
   const { rows } = await client.query<{ 'QUERY PLAN': [{ 'Execution Time': number; Plan: PlanNode }] }>(
     `EXPLAIN (ANALYZE, FORMAT JSON) ${sql}`,
     [...values],
@@ -120,7 +125,20 @@ async function explain(
     for (const c of n.Plans ?? []) walk(c);
   };
   walk(root.Plan);
-  return { ms: root['Execution Time'], nodes };
+  return { ms: root['Execution Time'], nodes, access: accessSignature(nodes) };
+}
+
+/** Método de acceso e índice de las lecturas de tabla de un plan (`Index Only Scan (posting_balance_ix)`, `Seq Scan`…). */
+const ACCESS_NODE = /^(Seq Scan|Index Scan|Index Only Scan|Bitmap Heap Scan|Bitmap Index Scan)\b/u;
+const accessSignature = (nodes: readonly string[]): string =>
+  nodes.filter((n) => ACCESS_NODE.test(n)).join(' → ');
+
+/** `EXPLAIN (ANALYZE, VERBOSE)` en texto: diagnóstico de si la política evalúa `current_workspace_id()` por fila. */
+async function explainText(client: Client, sql: string, values: readonly unknown[] = []): Promise<string> {
+  const { rows } = await client.query<{ 'QUERY PLAN': string }>(`EXPLAIN (ANALYZE, VERBOSE) ${sql}`, [
+    ...values,
+  ]);
+  return rows.map((r) => r['QUERY PLAN']).join('\n');
 }
 interface PlanNode {
   'Node Type': string;
@@ -224,14 +242,7 @@ beforeAll(async () => {
   const pair = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'perf-1', alg: 'RS256', use: 'sig' };
   runtime = await createApiRuntime(
-    apiConfig(
-      baseEnv(deps, {
-        LOG_LEVEL: 'warn',
-        RATE_LIMIT_READS_PER_MIN: '1000000',
-        RATE_LIMIT_WRITES_PER_MIN: '1000000',
-        RATE_LIMIT_COSTLY_PER_MIN: '1000000',
-      }),
-    ),
+    apiConfig(perfApiEnv(deps, { LOG_LEVEL: 'warn' })),
     capturingLogger('finance-api', 'api', 'warn').logger,
     {
       identity: {
@@ -285,6 +296,14 @@ afterAll(async () => {
     results,
   });
   const written = writeReport(report, OUT);
+  // Diagnóstico de RLS (tarea 5.3): planes EXPLAIN (ANALYZE, VERBOSE) con y sin política, junto al reporte (artefacto `perf`).
+  if (rlsPlanTexts.length > 0) {
+    writeFileSync(
+      join(OUT, 'rls-explain.md'),
+      `# EXPLAIN (ANALYZE, VERBOSE) con y sin RLS\n\n${rlsPlanTexts.join('\n')}`,
+      'utf8',
+    );
+  }
   console.info(
     `perf: ${written.md}\n${report.breaches.length === 0 ? 'sin brechas' : report.breaches.join('\n')}`,
   );
@@ -611,32 +630,45 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     );
     const ledgerAccount = rows[0]!.id;
     const lit = (v: string) => superuser.escapeLiteral(v);
-    /** EXPLAIN ANALYZE con RLS (pf_app + contexto) vs sin RLS (superusuario), intercalados; Σ de las sentencias. */
-    const measure = async (statements: readonly CapturedSql[]) => {
+    /**
+     * Pares intercalados de EXPLAIN ANALYZE con RLS (pf_app + contexto) y sin RLS (superusuario): 20 pares de
+     * calentamiento y 200 medidos (RLS_OVERHEAD), cada par = Σ de las sentencias. La deriva del host afecta a ambos
+     * lados por igual. Devuelve además el método de acceso e índice de cada sentencia con y sin RLS.
+     */
+    const measure = async (statements: readonly CapturedSql[], diagnose?: string) => {
       const run = async (client: Client) => {
         let total = 0;
-        let nodes: string[] = [];
+        const access: string[] = [];
         for (const st of statements) {
           const r = await explain(client, st.text, st.values);
           total += r.ms;
-          if (r.nodes.length > nodes.length) nodes = r.nodes; // el plan de la sentencia principal
+          access.push(r.access || '(sin lectura de tabla)');
         }
-        return { ms: total, nodes };
+        return { ms: total, access };
       };
       const withRls: number[] = [];
       const withoutRls: number[] = [];
-      let nodes: string[] = [];
-      for (let i = 0; i < 5; i += 1) {
+      let plans = { withRls: [] as string[], withoutRls: [] as string[] };
+      for (let i = 0; i < RLS_OVERHEAD.warmupPairs; i += 1) {
         await asApp(() => run(appClient));
         await run(superuser);
       }
-      for (let i = 0; i < 40; i += 1) {
+      for (let i = 0; i < RLS_OVERHEAD.pairs; i += 1) {
         const a = await asApp(() => run(appClient));
+        const b = await run(superuser);
         withRls.push(a.ms);
-        nodes = a.nodes;
-        withoutRls.push((await run(superuser)).ms);
+        withoutRls.push(b.ms);
+        plans = { withRls: a.access, withoutRls: b.access };
       }
-      return { withRls, withoutRls, plan: nodes.join(' → ') };
+      if (diagnose) {
+        const st = statements[0]!;
+        const textWith = await asApp(() => explainText(appClient, st.text, st.values));
+        const textWithout = await explainText(superuser, st.text, st.values);
+        rlsPlanTexts.push(
+          `## ${diagnose}\n\n### Con RLS (pf_app)\n\n${textWith}\n\n### Sin RLS (superusuario)\n\n${textWithout}\n`,
+        );
+      }
+      return { withRls, withoutRls, plans };
     };
 
     // 1) Gate (D43): las sentencias que emite la aplicación (`PgBalanceQuery`, con snapshots del job diario).
@@ -695,7 +727,7 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
       },
     };
     for (const [name, q] of Object.entries(queries)) {
-      const m = await measure([{ text: q.sql, values: [] }]);
+      const m = await measure([{ text: q.sql, values: [] }], q.gate ? name : undefined);
       results.push(rlsResult({ id: `rls-${name}`, title: `Overhead RLS: ${name}`, gate: q.gate, ...m }));
     }
   });

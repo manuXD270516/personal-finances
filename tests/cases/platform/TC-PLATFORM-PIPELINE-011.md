@@ -12,10 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "scripts/traceability/test/regression.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "regression-suite", "traceability"]
@@ -53,3 +53,4 @@ Entonces el grupo queda en rojo y la corrida falla
 ## Notas
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
+- Automatizado (2026-10-20): mismo archivo de test; un test sin TC con aserción falsa pone el grupo en rojo, la salida es 1 y el reporte (`regression-suite.md`, sección «Grupos en rojo») y stderr nombran paquete y archivo.

@@ -11,6 +11,7 @@ import {
   type Json,
   type User,
 } from '../support/portability.js';
+import { PERF_RATE_LIMITS } from './perf-env.js';
 
 /**
  * NFR-PERF-007 / NFR-PERF-008 (TC-IMPORTS-CSV-029, Should; openspec add-basic-csv-import, decisión 16; docs/33 D112):
@@ -63,7 +64,7 @@ async function consumerBacklog(): Promise<Map<string, number>> {
 beforeAll(async () => {
   h = await startHarness({
     worker: true,
-    apiEnv: { RATE_LIMIT_WRITES_PER_MIN: '1000000', RATE_LIMIT_READS_PER_MIN: '1000000' },
+    apiEnv: PERF_RATE_LIMITS,
   });
   owner = await h.user(`kc-imp-perf-${randomUUID()}`);
   const account = await h.call('POST', `${W()}/accounts`, {

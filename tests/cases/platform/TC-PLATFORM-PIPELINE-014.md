@@ -12,10 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
+automation_status: automated
 automated_tests:
   - "scripts/delivery-policy/test/nightly-policy.test.ts"
-status: draft
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "coverage", "shared-kernel", "policy"]
@@ -50,3 +50,4 @@ Entonces el test de política falla en el gate de PR indicando el umbral
 ## Notas
 
 - Change `fix-nightly-pipeline` (diagnóstico de la corrida nightly #12, 2026-10-17).
+- Automatizado (2026-10-20): `nightly-policy.test.ts` lee los umbrales de `packages/shared-kernel/vitest.config.ts` y falla indicando el umbral rebajado (probado con 89 y 84).
