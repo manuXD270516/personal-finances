@@ -1,6 +1,6 @@
 # 38: Estado del proyecto y pendientes
 
-> **Actualizado:** 2026-10-17 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md), [41](41-phase-5-consolidation-decisions.md), cierre de Phase 4 y diseño de Phase 5 [39](39-phase-4-closure-and-phase-5-design.md), preguntas de Phase 5 [40](40-phase-5-consolidation-questions.md) y sus decisiones [41](41-phase-5-consolidation-decisions.md), respuestas del owner [42](42-phase-5-owner-answers-and-decisions.md) y [43](43-phase-5-owner-answers-2026-10-16.md)
+> **Actualizado:** 2026-10-20 · **Relacionado:** [CLAUDE.md](../CLAUDE.md), [03-openspec-strategy.md](03-openspec-strategy.md) §7, [24-roadmap.md](24-roadmap.md), decisiones [31](31-phase-1-consolidation-decisions.md), [33](33-phase-2-consolidation-decisions.md), [35](35-phase-3-consolidation-decisions.md), [37](37-phase-4-consolidation-decisions.md), [41](41-phase-5-consolidation-decisions.md), cierre de Phase 4 y diseño de Phase 5 [39](39-phase-4-closure-and-phase-5-design.md), preguntas de Phase 5 [40](40-phase-5-consolidation-questions.md) y sus decisiones [41](41-phase-5-consolidation-decisions.md), respuestas del owner [42](42-phase-5-owner-answers-and-decisions.md) y [43](43-phase-5-owner-answers-2026-10-16.md)
 
 Documento vivo. Toda sesión lo lee al empezar y lo actualiza en el mismo PR cuando cambia el estado de un change o se resuelve un pendiente.
 
@@ -43,6 +43,7 @@ Decisiones registradas en [docs/41](41-phase-5-consolidation-decisions.md) (resp
 | 42, 43 | `add-commodity-prices`, `add-asset-valuations` | Diferidos a Phase 7 o al backlog (D221) |
 | 44 | `add-phase-4-demo-data` | Implementado (#139) y archivado:  dataset Demo v2 (suscripciones, tarjetas, metas y préstamos ficticios, carga ~28 s). `demo.purge` ahora espera a los consumidores del worker antes de borrar. Cubre las tareas Could de `add-recurrence-engine` 8.2, `add-subscriptions` 8.3, `add-credit-cards` 8.3 y `add-savings-goals` 8.3 y la 8.3 de `add-loans` (se marca `[x]` al archivarlo, D223) |
 | 45 | `add-dependency-updates` | Implementado y fusionado (#145): `renovate.json5`, test de política (`scripts/delivery-policy`), benchmark NFR-PERF-002 y aviso por issue del job `perf`. Abiertas las tareas del owner: 3.1 (verificar la PR de configuración de la app de Mend, no hecha), 3.2 y 3.3 (primera corrida y primera ventana), 4.2 (corrida de `nightly` a escala 1 y p95 de NFR-PERF-002) y 4.3 (verificación manual del issue). No se archiva hasta cerrarlas |
+| 46 | `fix-nightly-pipeline` | Spec redactada (2026-10-20), sin implementar. El nightly falló en sus 12 corridas desde el 2026-10-05 (diagnóstico de la #12, run 38889989855): (1) `regression` filtraba por nombre y saltaba tests de los que dependen 5 TC de Planning; (2) cobertura del shared-kernel 89.86 % / 84.07 % (umbrales 95/90); (3) `perf`: fila de RLS por ruido a 1 ms y 429 en `loan-simulator` y `spendable`. Corrige las tres sin bajar umbrales (TC-PLATFORM-PIPELINE-010..019). Preguntas en [docs/44](44-fix-nightly-pipeline-questions.md), ninguna bloquea. TC-COMMITMENTS-MATCH-012 queda fuera (§4) |
 
 ## 2. Esperan al owner
 
@@ -56,6 +57,7 @@ Ninguna sesión puede cerrarlos por su cuenta.
 - **Censo trimestral de entidades (D280):** repetir cada trimestre el censo de bancos y billeteras y los binarios de Trivy y gitleaks (revisión manual).
 - **Fuente `OFFICIAL` (D276):** si el BCB califica como fuente oficial, se abre un change aparte; si los términos no están claros, escribir al BCB (D279).
 - **Despliegue N1 (Phase 5, D248, ADR-0027):** hacerlo antes de abrir la ventana de 30 días del criterio de salida de Phase 5.
+- **Nightly (change 46):** responder las preguntas 1 a 5 de [docs/44](44-fix-nightly-pipeline-questions.md): cobertura del shared-kernel en el job `unit` del PR (toca un check requerido), aviso por issue de `regression` y `mutation`, estado del job `perf` mientras siga en rojo TC-COMMITMENTS-MATCH-012, piso de 0.5 ms del criterio de RLS y qué hacer si ese sobrecosto es real. Ninguna bloquea la implementación.
 - **Decisiones por omisión de Phase 5** ([docs/41](41-phase-5-consolidation-decisions.md)): el owner puede revertir cualquiera antes de que se redacte el change que la usa.
 - **Criterios de salida de uso real:** Phase 2 (uso del owner, exportar e importar el workspace); Phase 3 (registrar sus suscripciones reales y un mes sin recurrentes sorpresa, indicador en `/pagos-proximos`); Phase 4 (metas del owner con estado calculado).
 
@@ -73,6 +75,7 @@ Ninguna sesión puede cerrarlos por su cuenta.
 - La métrica `debt_card_cycle_mismatch_total` no existe en el código (solo `consistent`).
 - Conexiones: la plantilla del host suma API 22 + worker 33 = 55 sobre 60 de Postgres. Antes del despliegue, subir `max_connections` o revisar consumidores de concurrencia 1 que podrían agruparse.
 - Limitador de tasa en memoria: con más de una réplica de la API hace falta un adaptador sobre Valkey.
+- **Rendimiento de los consumidores tras el Large Seed (fuera de `fix-nightly-pipeline`):** en la corrida nightly #12 quedaron 470 165 eventos pendientes en el outbox al terminar la carga y los consumidores procesaron 0.1–8 ev/s frente a los 42 de NFR-PERF-008; el matcher de compromisos no drenó su ráfaga a tiempo (`commitments.perf.ts`, TC-COMMITMENTS-MATCH-012). Puede ser un cuello de botella real, o el backlog del Large Seed compitiendo con la suite siguiente, que comparte la base. Propuesta: un change de investigación aparte, `investigate-consumer-throughput` (perfilar el relay y los consumidores con ese backlog, separar el efecto de la carga previa y decidir si se corrige el producto o el benchmark), sin redactar todavía. Mientras tanto el job `perf` del nightly sigue en rojo por esa fila (pregunta 3 de docs/44).
 
 **Análisis del costo de conversiones (change 40)**
 - Memoria de Postgres justa: con 56 conexiones frente al límite de 384 MiB; vigilar tras el despliegue.
