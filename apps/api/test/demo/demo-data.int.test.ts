@@ -241,6 +241,9 @@ beforeAll(async () => {
     workerConfig(baseEnv(deps)),
     capturingLogger('finance-worker', 'worker').logger,
     {
+      // [TC-IDENTITY-DEMO-007] Sin tareas programadas: con el reloj real y la ancla pasada, el cron horario de
+      // commitments materializaba ocurrencias vencidas del demo y alteraba los saldos del golden (nightly 2026-10-20).
+      scheduledJobs: false,
       ledgerMaintenanceOnStart: false,
       fxGapFillOnStart: false,
     },

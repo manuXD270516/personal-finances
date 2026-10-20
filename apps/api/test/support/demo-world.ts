@@ -6,7 +6,7 @@ import {
   identityWorkspaceTimeZones,
   type DemoLoadJob,
 } from '@pf/identity/interface/identity.module';
-import { FixedClock, Instant, systemClock } from '@pf/shared-kernel';
+import { FixedClock, Instant, systemClock, type Clock } from '@pf/shared-kernel';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { Pool } from 'pg';
 import { inject } from 'vitest';
@@ -50,7 +50,10 @@ export class DemoWorld {
   private signingKey!: Awaited<ReturnType<typeof generateKeyPair>>['privateKey'];
   private readonly deps = inject('deps');
 
-  async start(): Promise<void> {
+  /**
+   * `workerClock`: reloj del worker (por omisión, el real). Siempre sin tareas programadas (`scheduledJobs: false`).
+   */
+  async start(options: { readonly workerClock?: Clock } = {}): Promise<void> {
     const pair = await generateKeyPair('RS256', { extractable: true });
     this.signingKey = pair.privateKey;
     const jwks = {
@@ -65,7 +68,14 @@ export class DemoWorld {
     this.worker = await createWorkerRuntime(
       workerConfig(baseEnv(this.deps)),
       capturingLogger('finance-worker', 'worker').logger,
-      { ledgerMaintenanceOnStart: false, fxGapFillOnStart: false },
+      {
+        // Sin tareas programadas: el reloj real y los crons horarios alterarían la demo cargada con una ancla pasada
+        // (fix-demo-golden-clock-dependence).
+        scheduledJobs: false,
+        ...(options.workerClock ? { clock: options.workerClock } : {}),
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+      },
     );
     this.workerPool = new Pool({ connectionString: this.deps.workerDatabaseUrl, max: 2 });
   }
@@ -136,6 +146,7 @@ export class DemoWorld {
     readonly user?: DemoUser;
     readonly catalogDir?: string;
     readonly failAt?: string;
+    readonly afterPlanCommitted?: () => Promise<void>;
   }): Promise<DemoLoad> {
     const user = input.user ?? (await this.user('demo-v2'));
     const pool = new Pool({ connectionString: this.deps.databaseUrl, max: 2 });
@@ -188,6 +199,7 @@ export class DemoWorld {
           ...(input.catalogDir ? { ACCOUNTS_INSTITUTION_CATALOG_DIR: input.catalogDir } : {}),
         },
         ...(input.failAt ? { failAt: input.failAt } : {}),
+        ...(input.afterPlanCommitted ? { afterPlanCommitted: input.afterPlanCommitted } : {}),
       });
       const outcome = await loader.load(job!);
       const records = logs.records();

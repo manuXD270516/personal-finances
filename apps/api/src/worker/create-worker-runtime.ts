@@ -124,6 +124,16 @@ export interface WorkerRuntime {
 }
 
 export interface WorkerRuntimeOptions {
+  /**
+   * Solo pruebas (fix-demo-golden-clock-dependence): `false` deja el worker sin tareas programadas. La cola se crea con
+   * el cron de pg-boss apagado (no dispara ningún schedule de `pgboss.schedule`, ni los configurables `*_CRON` ni los
+   * fijos: gap-fill de FX, barrido y purga de notificaciones, retención de exportaciones) y no se encola ninguna
+   * ejecución de arranque (ledger, backfill del recorrido, gap-fill y backfill de conversiones de FX, barrido de
+   * notificaciones, periodos, commitments/suscripciones/tarjetas/metas, imports). Los manejadores y consumidores siguen
+   * registrados (se pueden ejecutar por envío manual). Prevalece sobre las opciones `*OnStart`. Por omisión `true`;
+   * producción no lo pasa.
+   */
+  readonly scheduledJobs?: boolean;
   /** Consumidores de eventos registrados por los contextos (y por los tests). */
   readonly eventConsumers?: readonly EventConsumerDefinition[];
   /** Ajustes del relay (tests: lote, polling, inyección de fallos). */
@@ -173,9 +183,10 @@ export async function createWorkerRuntime(
   options: WorkerRuntimeOptions = {},
 ): Promise<WorkerRuntime> {
   // pf_worker: relay del outbox entre workspaces, inbox y dead-letter (openspec add-event-outbox, design §4).
+  const scheduledJobs = options.scheduledJobs ?? true;
   const databaseUrl = config.WORKER_DATABASE_URL;
   if (!databaseUrl) throw new Error('WORKER_DATABASE_URL es obligatoria en el worker');
-  const queue = createJobQueue(config, databaseUrl, logger, 'consumer');
+  const queue = createJobQueue(config, databaseUrl, logger, 'consumer', scheduledJobs ? undefined : false);
   const pool = new Pool({
     connectionString: databaseUrl,
     max: config.DATABASE_POOL_MAX,
@@ -222,7 +233,7 @@ export async function createWorkerRuntime(
   await registerLedgerDailyJob(queue, ledgerMaintenance, logger, {
     cron: config.LEDGER_INTEGRITY_CRON,
     tz: config.LEDGER_INTEGRITY_CRON_TZ,
-    runOnStart: options.ledgerMaintenanceOnStart ?? true,
+    runOnStart: scheduledJobs && (options.ledgerMaintenanceOnStart ?? true),
     afterIntegrity: async () => {
       await verifyLifecycleConsistency(pool, activeWorkspaces, logger, auditMetrics);
       // add-month-closing decisión 14: snapshot vigente ↔ ledger, hash y bloqueo por periodo cerrado.
@@ -230,7 +241,7 @@ export async function createWorkerRuntime(
     },
   });
   await registerLifecycleBackfillJob(queue, createLifecycleBackfill(pool), activeWorkspaces, logger, {
-    runOnStart: options.lifecycleBackfillOnStart ?? true,
+    runOnStart: scheduledJobs && (options.lifecycleBackfillOnStart ?? true),
   });
 
   // NOTIFY se compone ANTES que los providers de FX: el job de providers le entrega por un puerto síncrono las alertas de
@@ -281,9 +292,11 @@ export async function createWorkerRuntime(
     ...(options.notifications?.scheduleCrons !== undefined
       ? { scheduleCrons: options.notifications.scheduleCrons }
       : {}),
-    ...(options.notifications?.sweepOnStart !== undefined
-      ? { sweepOnStart: options.notifications.sweepOnStart }
-      : {}),
+    ...(!scheduledJobs
+      ? { sweepOnStart: false }
+      : options.notifications?.sweepOnStart !== undefined
+        ? { sweepOnStart: options.notifications.sweepOnStart }
+        : {}),
   });
 
   // Providers de tasas de mercado (add-market-rate-providers): polling, carga histórica y relleno; la configuración
@@ -311,7 +324,7 @@ export async function createWorkerRuntime(
       ...(fxEndpoints ? { endpoints: fxEndpoints } : {}),
     }),
     logger,
-    { gapFillOnStart: options.fxGapFillOnStart ?? true },
+    { gapFillOnStart: scheduledJobs && (options.fxGapFillOnStart ?? true) },
   );
   // Observaciones de las conversiones propias (add-conversion-cost-analysis, D231, D249): el consumidor entra DESPUÉS de
   // subir `max_connections` y el pool del worker (plantilla del host: 34 + API 22 = 56 sobre 70) y valida el arranque
@@ -330,7 +343,7 @@ export async function createWorkerRuntime(
     conversionBackfillSource(createConversionDetailQuery(pool)),
     activeWorkspaces,
     logger,
-    { runOnStart: options.userConversionBackfillOnStart ?? true },
+    { runOnStart: scheduledJobs && (options.userConversionBackfillOnStart ?? true) },
   );
 
   // Datos de demostración (add-demo-data): carga por casos de uso (`demo.load`) y purga acotada (`demo.purge`).
@@ -458,7 +471,7 @@ export async function createWorkerRuntime(
   if (planning.verifier) closings.verifier = planning.verifier;
   await registerPlanningPeriodsJob(queue, planning.service, planning.closePending, activeWorkspaces, logger, {
     cron: config.PLANNING_PERIODS_CRON,
-    runOnStart: options.planningPeriodsOnStart ?? true,
+    runOnStart: scheduledJobs && (options.planningPeriodsOnStart ?? true),
   });
 
   // COMMITMENTS (add-recurrence-engine): job `commitments.generate-occurrences` y consumidor de transacciones anuladas.
@@ -500,11 +513,11 @@ export async function createWorkerRuntime(
   });
   await registerCommitmentsJob(queue, commitments.generate, activeWorkspaces, logger, {
     cron: config.COMMITMENTS_SCHEDULER_CRON,
-    runOnStart: options.commitmentsOnStart ?? true,
+    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
   });
   await registerSubscriptionsJob(queue, commitments.subscriptionDaily, activeWorkspaces, logger, {
     cron: config.COMMITMENTS_SUBSCRIPTIONS_CRON,
-    runOnStart: options.commitmentsOnStart ?? true,
+    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
   });
 
   // DEBT (add-credit-cards): job `debt.card-daily` (estados de cuenta, recordatorios y red de seguridad) y consumidor
@@ -512,14 +525,14 @@ export async function createWorkerRuntime(
   // históricos, valoración y el puerto de definiciones administradas) compuestos con el pool del worker.
   await registerDebtCardsJob(queue, finance.cards, activeWorkspaces, logger, {
     cron: config.DEBT_CARDS_CRON,
-    runOnStart: options.commitmentsOnStart ?? true,
+    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
   });
 
   // GOALS (add-savings-goals): job `goals.daily-evaluation` y consumidores (sobre-asignación, anulaciones y revisiones,
   // aportes recurrentes y sugerencias); usan los MISMOS contratos públicos que la API, con el pool del worker.
   await registerGoalsDailyJob(queue, finance.goals, activeWorkspaces, logger, {
     cron: config.GOALS_DAILY_CRON,
-    runOnStart: options.commitmentsOnStart ?? true,
+    runOnStart: scheduledJobs && (options.commitmentsOnStart ?? true),
   });
 
   // IMPORTS (add-basic-csv-import): consumidor `imports.persist` (crea las transacciones por lotes con los MISMOS casos
@@ -542,7 +555,7 @@ export async function createWorkerRuntime(
   });
   await registerImportsJobs(queue, imports.maintenance, activeWorkspaces, logger, {
     cron: config.IMPORT_MAINTENANCE_CRON,
-    runOnStart: options.importsOnStart ?? true,
+    runOnStart: scheduledJobs && (options.importsOnStart ?? true),
   });
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);

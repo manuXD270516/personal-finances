@@ -24,6 +24,14 @@ export interface PgBossJobQueueOptions {
   readonly role: 'producer' | 'consumer';
   readonly poolMax?: number;
   readonly schema?: string;
+  /**
+   * Timekeeper (cron) de pg-boss. Por omisión se deriva del rol como siempre (`consumer` lo enciende). Solo las pruebas
+   * lo apagan en un consumidor (`false`): la instancia no dispara NINGÚN schedule de la tabla `pgboss.schedule`, ni
+   * los propios ni los que dejó registrados otra instancia. Verificado en pg-boss 12.35.1: `PgBoss.start()` arranca el
+   * timekeeper solo si `schedule` es verdadero (`dist/index.js`, `if (this.#config.schedule)`), y `schedule()` solo
+   * escribe la fila, sin evaluar el cron.
+   */
+  readonly schedule?: boolean;
 }
 
 /** Schema de pg-boss. Lo crea la migración de bootstrap y lo instala/actualiza `migrate` (rol pf_migrator). */
@@ -49,7 +57,7 @@ export class PgBossJobQueue implements JobQueue {
       migrate: false,
       supervise: consumer,
       // Timekeeper (cron) solo en el worker: los jobs periódicos del ledger (add-ledger-core 5.6).
-      schedule: consumer,
+      schedule: options.schedule ?? consumer,
       useListenNotify: consumer,
     });
     this.boss.on('error', (err: unknown) =>
