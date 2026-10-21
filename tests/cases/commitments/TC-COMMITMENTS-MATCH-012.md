@@ -35,7 +35,7 @@ expected_result:
   - 'Exactamente 12 sugerencias PROPOSED'
   - 'Drenado dentro de la meta de D112 (≥ 42 eventos/s)'
 created: 2026-10-09
-updated: 2026-10-10
+updated: 2026-10-21
 ---
 
 # TC-COMMITMENTS-MATCH-012 — Las candidatas de una vista previa no se persisten y una ráfaga de 1000 importadas no duplica sugerencias
@@ -55,3 +55,4 @@ Entonces existen exactamente 12 sugerencias propuestas
 ## Notas
 
 - Cubre el scenario "Vista previa de un extracto". Suite perf nightly para la parte de throughput.
+- 2026-10-21 (D290, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el benchmark nocturno del matcher da ~6 ev/s frente a ≥ 42 ev/s (run 39669892721); la causa la investiga el change `investigate-perf-under-load` (síntoma S1; hipótesis principal: la cola del matcher contiene backlog del Large Seed). La meta de D112 no cambia.

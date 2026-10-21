@@ -36,7 +36,7 @@ expected_result:
   - "Ninguna respuesta es 429"
   - "El benchmark mide el p95 frente a su umbral"
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-21
 ---
 
 # TC-PLATFORM-PIPELINE-018 — Los benchmarks del simulador de estrategias y de disponible para gastar no reciben rechazos por cuota
@@ -61,3 +61,4 @@ Entonces ninguna respuesta es un rechazo por cuota
 - Verificado en GitHub (2026-10-20, run 39390841971): en el job `perf` las filas del simulador de estrategias y de disponible para gastar no figuran entre las que quedan en rojo; NFR-PERF-002 p95 = 30 ms (OK frente a 400 ms). Quedan en rojo solo la fila de RLS INCLUDE y TC-COMMITMENTS-MATCH-012, ambos fuera de alcance por decisión.
 - Verificado en GitHub (2026-10-20, run 39401809245): las filas del simulador de estrategias y de disponible para gastar quedan fuera de las rojas; NFR-PERF-002 p95 = 35,6 ms. Rojas: RLS INCLUDE (real), RLS agregado sintético (informativo), RLS «plan distinto» ×2 (falso positivo, corregido) y TC-COMMITMENTS-MATCH-012.
 - Verificado en GitHub (2026-10-21, nightly manual run 39669892721 (2026-10-21 20:23 UTC, commit 68f01e5, tras #154)): loan-simulator pasa (TC-DEBT-AMORT-045 incluido). **El criterio de p95 < 300 ms de disponible para gastar NO se cumple**: por primera vez se mide `spendable.perf.ts` (antes caía con 429 por las cuotas; el helper `perfApiEnv` de #150 las relajó) y dos tests con este TC fallan: `getReportSummary` con el bloque spendable, p95 352,2 ms, y `getSpendable` con 300 ocurrencias, p95 341,1 ms, ambos frente a 300 ms. La parte de este TC (sin rechazos por cuota) sí se cumple; la latencia no. Causa NO determinada: puede ser lentitud real o contención del runner (la suite corre tras benchmarks pesados y con el backlog de ~470 000 eventos del outbox en proceso). Se registra sin maquillar; investigación propuesta en un change aparte junto con `investigate-consumer-throughput` (docs/38 §4). Se mantiene `status: automated` (el test existe y mide); no se considera confirmado en GitHub hasta que el p95 cumpla.
+- 2026-10-21 (D290, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el p95 de disponible para gastar sobre 300 ms lo investiga el change `investigate-perf-under-load` (síntoma S2), que reemplaza la propuesta `investigate-consumer-throughput`. Este TC sigue sin darse por confirmado en GitHub hasta que el p95 cumpla.

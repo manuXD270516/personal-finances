@@ -62,3 +62,40 @@ Trace: NFR-PERF-004 · Priority: Should
 #### Scenario: Una suite nueva sin la configuración compartida
 - **CUANDO** una pull request agrega una suite de benchmarks que configura la API con las cuotas por defecto
 - **ENTONCES** el test de política del pipeline falla indicando el archivo de la suite
+
+### Requirement: Cobertura del núcleo compartido también en el gate de pull request
+El job de tests unitarios del gate de pull request, que ya es un check requerido, DEBE (MUST) medir además la cobertura del núcleo compartido con sus propios tests y fallar si queda por debajo de 95 % de líneas o de 90 % de ramas, los mismos umbrales que el pipeline programado. Esa verificación NO DEBE (MUST NOT) agregar un check requerido, cambiar el nombre del job ni su tiempo máximo, ni marcarse como no bloqueante; el test de política del pipeline DEBE (MUST) rechazar una pull request que la quite del job o la vuelva no bloqueante.
+Trace: NFR-MAINT-002, NFR-MAINT-001 · Priority: Must
+
+#### Scenario: Una pull request baja la cobertura del núcleo compartido
+- **CUANDO** una pull request agrega al núcleo compartido un módulo sin tests propios y la cobertura del núcleo queda en 94.20 % de líneas y 91.00 % de ramas
+- **ENTONCES** el job de tests unitarios del gate falla indicando las líneas medidas frente al umbral de 95 %
+- **Y** la pull request no puede fusionarse mientras ese check siga en rojo
+
+#### Scenario: Se quita la verificación de cobertura del job de tests unitarios
+- **CUANDO** una pull request elimina del job de tests unitarios el paso de cobertura del núcleo compartido, o le agrega una condición o una tolerancia de error que lo vuelve no bloqueante
+- **ENTONCES** el test de política del pipeline falla en el gate indicando el job y el paso modificado
+
+#### Scenario: La verificación no cambia los checks requeridos
+- **CUANDO** se inspecciona el workflow del gate de pull request con la verificación de cobertura agregada
+- **ENTONCES** el job de tests unitarios conserva su identificador y su nombre de check y su tiempo máximo de 15 minutos
+- **Y** la verificación es un paso dentro de ese job y no un job nuevo
+
+### Requirement: Aviso por issue de los fallos de regresión y de mutación del pipeline programado
+Cuando falla el job de la suite de regresión financiera o el de cobertura y mutación del pipeline programado, el pipeline DEBE (MUST) abrir un issue de aviso con un título fijo propio de ese job y el resumen de la corrida, o comentar el issue abierto con ese título si ya existe, sin abrir duplicados. Cada job DEBE (MUST) avisar en su propio issue, sin tocar el de los demás. El permiso de escritura de issues DEBE (MUST) declararse solo en los jobs que avisan y NO DEBE (MUST NOT) concederse a nivel de todo el pipeline.
+Trace: NFR-MAINT-002, NFR-MAINT-005 · Priority: Should
+
+#### Scenario: Falla la suite de regresión sin aviso abierto
+- **CUANDO** el job de la suite de regresión del pipeline programado falla con el grupo de integración de Planning en rojo y no hay un issue abierto titulado "nightly regression: falló"
+- **ENTONCES** se abre un issue con ese título que incluye el enlace a la corrida y el resumen de la suite con el paquete y los archivos de los grupos en rojo
+- **Y** si la corrida siguiente vuelve a fallar con ese issue abierto, se agrega un comentario al mismo issue y no se abre otro
+
+#### Scenario: Falla la cobertura del núcleo compartido
+- **CUANDO** el job de cobertura y mutación del pipeline programado falla porque la cobertura del núcleo compartido queda en 94.10 % de líneas, y en la misma corrida la suite de regresión pasa
+- **ENTONCES** se abre o se comenta el issue titulado "nightly mutation: falló" con el enlace a la corrida y las métricas medidas
+- **Y** el issue "nightly regression: falló" no recibe ningún comentario de esa corrida
+
+#### Scenario: Permisos de los jobs que avisan
+- **CUANDO** se inspecciona el workflow del pipeline programado
+- **ENTONCES** el permiso de escritura de issues está declarado solo en los jobs de regresión, de cobertura y mutación, de rendimiento y de prueba en vivo de providers
+- **Y** el workflow no lo concede a nivel de todo el pipeline

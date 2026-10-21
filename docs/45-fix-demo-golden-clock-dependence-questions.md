@@ -2,6 +2,8 @@
 
 > **Fecha:** 2026-10-20 · **Change:** [`fix-demo-golden-clock-dependence`](../openspec/changes/fix-demo-golden-clock-dependence/proposal.md) · **Relacionado:** [design.md](../openspec/changes/fix-demo-golden-clock-dependence/design.md), [38-estado-y-pendientes.md](38-estado-y-pendientes.md), ADR-0026 (datos demo), D36 ([31](31-phase-1-consolidation-decisions.md)) y D223 ([41](41-phase-5-consolidation-decisions.md))
 
+> **Resueltas el 2026-10-21:** el owner adoptó la recomendación de las dos preguntas (D288 y D289, [docs/46](46-nightly-and-perf-owner-decisions.md)).
+
 El 2026-10-20, TC-IDENTITY-DEMO-007 falló en el nightly con un "Retiro de efectivo" de 600.00 BOB de más. El worker del test usaba el reloj real y ejecutó, en el minuto 10 UTC, el motor de recurrencia sobre una demo con la ancla 2026-09-30, lo que materializó la ocurrencia automática del 2026-10-02. El change corrige las pruebas y endurece la verificación del cargador. Quedan dos preguntas sobre el producto. **Ninguna bloquea el orden de implementación:** el change se implementa con las recomendaciones. Cada respuesta se registra en el siguiente `…-decisions.md` con su número D.
 
 ## 1. ¿La demo sigue el reloj de la instalación después de la carga?

@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Sobrecosto de RLS con un criterio robusto al ruido de medición"
 scenario: "Diferencia pequeña dentro del ruido"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-SEC-003, NFR-PERF-005]
 invariants: []
@@ -37,7 +37,7 @@ expected_result:
   - "El veredicto es \"no demostrada sobre el piso absoluto\""
   - "Las notas incluyen ambas medianas, la diferencia y su intervalo"
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-21
 ---
 
 # TC-PLATFORM-PIPELINE-015 — Una diferencia de RLS de 0.56 ms cuyo intervalo de confianza no alcanza el piso de 0.5 ms no es brecha
@@ -65,3 +65,4 @@ Entonces no es brecha porque 0.31 ms no alcanza el piso de 0.5 ms
 - Verificado en GitHub (2026-10-20, run 39401809245): `perf` con NFR-PERF-002 p95 = 35,6 ms. Las filas `PgBalanceQuery.getAccountBalances` y `getBalance` seguían en «plan distinto» (0,097 y 0,039 ms): la firma de esas sentencias nombra las tablas SIN esquema (`EXPLAIN (FORMAT JSON)` sin `VERBOSE` no trae `Schema`) y el filtro solo conocía `iam.workspace`. Corregido en la rama de seguimiento 2 (2026-10-20): la captura usa `VERBOSE` y `dataAccessSignature` reconoce la tabla con y sin esquema; test con los planes reales. Pendiente de otra corrida de `nightly` para confirmarlo.
 - Verificado en GitHub (2026-10-20, run 39411997796, nightly tras #152, commit db0df05): las filas `PgBalanceQuery.getAccountBalances` y `getBalance` dan veredicto OK (diferencias de 0,159 ms y 0,058 ms): el arreglo de la firma con esquema funcionó y desaparecieron los dos «plan distinto». `perf` siguió en rojo solo por la fila RLS `saldo por cuenta (índice INCLUDE)` (0,813 ms de diferencia, sobrecosto real; pregunta 5 de docs/44).
 - Verificado en GitHub (2026-10-21, nightly manual run 39669892721 (2026-10-21 20:23 UTC, commit 68f01e5, tras #154)): `PgBalanceQuery.getAccountBalances` y `getBalance` dan veredicto OK (0,150 ms y 0,060 ms de diferencia); no reaparecen falsos «plan distinto».
+- Confirmado (2026-10-21, D286 de [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el owner mantiene el piso absoluto de 0.5 ms (pregunta 4 de docs/44); `requirement_status` pasa a `confirmed`.

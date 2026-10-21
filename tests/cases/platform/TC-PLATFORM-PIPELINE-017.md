@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Sobrecosto de RLS con un criterio robusto al ruido de medición"
 scenario: "La política cambia el plan de la consulta"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-SEC-003, NFR-PERF-005]
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "passed = false con veredicto \"plan distinto\""
   - "Las notas muestran ambos métodos de acceso"
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-21
 ---
 
 # TC-PLATFORM-PIPELINE-017 — Si la política RLS cambia el método de acceso del plan, la consulta es brecha aunque el tiempo no lo demuestre
@@ -60,3 +60,4 @@ Entonces es brecha aunque la diferencia de tiempo no esté demostrada
 - Verificado en GitHub (2026-10-20, run 39401809245): los dos «plan distinto» persistían porque las tablas de la política aparecían sin esquema; corregido en la rama de seguimiento 2 con tests con los planes reales (con y sin RLS dan OK; un cambio sobre `posting`, `journal_entry`, `balance_snapshot` o `ledger_account` sigue siendo «plan distinto»). Pendiente de otra corrida para confirmarlo.
 - Verificado en GitHub (2026-10-20, run 39411997796, commit db0df05): `PgBalanceQuery.getAccountBalances` y `getBalance` dan OK (0,159 ms y 0,058 ms de diferencia) con la firma que reconoce las tablas de la política con y sin esquema. Ya no hay falsos «plan distinto».
 - Verificado en GitHub (2026-10-21, nightly manual run 39669892721 (2026-10-21 20:23 UTC, commit 68f01e5, tras #154)): `getAccountBalances` y `getBalance` en OK (0,150 ms y 0,060 ms); sin falsos «plan distinto».
+- Confirmado (2026-10-21, D286 de [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el owner mantiene el piso absoluto de 0.5 ms (pregunta 4 de docs/44); `requirement_status` pasa a `confirmed`.

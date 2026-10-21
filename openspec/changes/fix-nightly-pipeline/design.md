@@ -21,6 +21,7 @@ Decisiones del owner que se aplican:
 | NFR-MAINT-002 | docs/02 | shared-kernel: líneas ≥ 95 %, ramas ≥ 90 %, mutation score ≥ 80 %. "Los umbrales solo pueden subir" (NFR-MAINT-003, mismo criterio) |
 | docs/16 §11.3 | Estrategia de tests | La Financial Regression Suite "se ejecuta completa en cada PR"; su tamaño nunca disminuye sin un change aprobado |
 | CLAUDE.md | Regla del proyecto | Nunca debilitar ni borrar un test existente sin registrar el motivo en el change; cambiar checks requeridos requiere confirmación del owner |
+| D283–D287 | docs/46 | Respuestas del owner a docs/44 (2026-10-21, "Toma mis recomendaciones"): cobertura del shared-kernel en el job `unit` del PR, confirmada de forma explícita (decisión 7); aviso por issue de `regression` y `mutation` (decisión 8); `perf` sigue bloqueante con el issue de D270 comentado cada noche; piso de 0.5 ms; el sobrecosto real de RLS va al change `optimize-rls-policy-overhead` |
 
 | Elemento | Capa | Cambio |
 |---|---|---|
@@ -29,8 +30,10 @@ Decisiones del owner que se aplican:
 | `packages/shared-kernel/src/**/*.test.ts` | tests unitarios | Nuevos tests de los seis módulos (decisión 3) |
 | `apps/api/test/perf/perf-report.ts`, `perf-report.test.ts`, `nightly.perf.ts` | tests de rendimiento | Criterio de RLS (decisión 4) |
 | `apps/api/test/perf/*.perf.ts`, helper compartido de entorno de benchmark | tests de rendimiento | Cuotas relajadas en una sola configuración (decisión 5) |
-| `scripts/delivery-policy/test/nightly-policy.test.ts` | test de política (`pnpm test`, job `unit`) | Reglas nuevas: umbrales de cobertura, paso bloqueante, suites de perf con el helper |
-| `.github/workflows/nightly.yml` | CI | Sin cambios en este change salvo lo que decida el owner en las preguntas 1 y 2 |
+| `scripts/delivery-policy/test/nightly-policy.test.ts` | test de política (`pnpm test`, job `unit`) | Reglas nuevas: umbrales de cobertura, paso bloqueante, suites de perf con el helper; avisos de `regression` y `mutation` (decisión 8) |
+| `scripts/delivery-policy/test/pr-policy.test.ts` (nuevo) | test de política del gate de PR | Paso de cobertura del shared-kernel en el job `unit`, bloqueante, sin cambiar el id, el nombre ni el `timeout-minutes` del job (decisión 7) |
+| `.github/workflows/pr.yml` | CI (gate de PR) | Un paso más en el job `unit` (decisión 7, D283). Sin jobs nuevos ni cambios de nombre |
+| `.github/workflows/nightly.yml` | CI | Pasos de aviso por issue y `permissions` en los jobs `regression` y `mutation` (decisión 8, D284) |
 | Bounded contexts, OpenAPI, eventos, migraciones | — | Sin cambios |
 
 ## Objetivos / No objetivos
@@ -44,10 +47,10 @@ Decisiones del owner que se aplican:
 
 **No objetivos**
 
-- El rendimiento de los consumidores tras el Large Seed (causa 3c, TC-COMMITMENTS-MATCH-012): se investiga en un change aparte, `investigate-consumer-throughput` (nota en docs/38 §4). Hasta entonces el job `perf` puede seguir en rojo por esa fila (pregunta 3).
-- Cambiar umbrales de NFR, la protección de `main`, los checks requeridos o sus nombres.
+- El rendimiento bajo carga del job `perf` (causa 3c, TC-COMMITMENTS-MATCH-012; y los dos benchmarks de `spendable.perf` que dan p95 sobre 300 ms desde el run 39669892721): lo investiga el change `investigate-perf-under-load` (D290). Hasta entonces el job `perf` sigue en rojo y bloqueante, con el issue de D270 comentado cada noche (D285).
+- Cambiar umbrales de NFR, la protección de `main`, la lista de checks requeridos o sus nombres. La decisión 7 cambia lo que ejecuta un check requerido (`unit`), con la confirmación explícita del owner (D283), y nada más.
 - Detectar en general dependencias de orden entre tests (barajar el orden, ejecutar cada TC aislado): ver Riesgos.
-- Optimizar las políticas RLS: si la diferencia de la consulta de índice resulta real, va en un change aparte (pregunta 5).
+- Optimizar las políticas RLS: la diferencia de la consulta de índice resultó real (tarea 5.3); la optimización va en el change `optimize-rls-policy-overhead` (D287).
 
 ## Decisiones
 
@@ -67,7 +70,34 @@ Decisiones del owner que se aplican:
    - Qué consultas son bloqueantes no cambia (D43 más las de índice). El umbral del 10 % y el piso de 0.5 ms no cambian; la pregunta 4 confirma el piso con el owner.
    - Diagnóstico de la fila que falló: `EXPLAIN (ANALYZE, VERBOSE)` de la consulta de índice con y sin RLS para ver si `platform.current_workspace_id()` (plpgsql `STABLE`) se evalúa por fila como `Filter`. Si lo hace y la diferencia queda demostrada, no se esconde: el job sigue en rojo por esa fila y se aplica la pregunta 5.
 5. **Una sola configuración de entorno para los benchmarks.** Un helper compartido en `apps/api/test/perf/` (p. ej. `perfApiEnv(deps, overrides)`) devuelve `baseEnv(deps)` con `RATE_LIMIT_READS_PER_MIN`, `RATE_LIMIT_WRITES_PER_MIN` y `RATE_LIMIT_COSTLY_PER_MIN` en 1 000 000, como ya hace `nightly.perf.ts`. Todas las suites `*.perf.ts` configuran la API a través de él (directamente o vía `portability.ts`, que lo recibe). El limitador de tasa sigue cubierto por sus tests de API (TC-PLATFORM-API-*); el benchmark mide latencia, no la política. El test de política escanea `apps/api/test/perf/*.perf.ts` y falla si una suite llama a `baseEnv(` para la configuración de la API sin el helper (TC-PLATFORM-PIPELINE-019). Las variables son de test: no cambian `config-reference.md` ni los valores por defecto del producto.
-6. **TC-COMMITMENTS-MATCH-012 queda fuera.** 470 165 eventos pendientes en el outbox al terminar la carga y consumidores a 0.1–8 ev/s frente a los 42 ev/s de NFR-PERF-008 apuntan a un cuello de botella real (o a una interacción entre el backlog del Large Seed y la suite siguiente, que comparte la base). Ajustar el benchmark para que pase sin entender la causa escondería un problema del producto. Se deja como pendiente en docs/38 §4 con la propuesta de `investigate-consumer-throughput`; la pregunta 3 decide cómo se ve el job `perf` mientras tanto.
+6. **TC-COMMITMENTS-MATCH-012 queda fuera** (hoy lo investiga `investigate-perf-under-load`, D290). 470 165 eventos pendientes en el outbox al terminar la carga y consumidores a 0.1–8 ev/s frente a los 42 ev/s de NFR-PERF-008 apuntan a un cuello de botella real (o a una interacción entre el backlog del Large Seed y la suite siguiente, que comparte la base). Ajustar el benchmark para que pase sin entender la causa escondería un problema del producto. Se deja como pendiente en docs/38 §4 con la propuesta de `investigate-consumer-throughput`; la pregunta 3 decide cómo se ve el job `perf` mientras tanto.
+7. **Cobertura del shared-kernel dentro del job `unit` del PR (D283, grupo 8.1).** En `.github/workflows/pr.yml`, el job `unit` (hoy: checkout, `setup-workspace` y `run: pnpm test`, `timeout-minutes: 15`) agrega **después** de `pnpm test` un paso:
+
+   ```yaml
+         # D283 (fix-nightly-pipeline 8.1): cobertura del shared-kernel, NFR-MAINT-002 (≥ 95 % líneas, ≥ 90 % ramas).
+         - name: Cobertura del shared-kernel (≥ 95 % líneas, ≥ 90 % ramas)
+           run: pnpm --filter @pf/shared-kernel run test:coverage
+   ```
+
+   Sin `if`, sin `continue-on-error` y sin `timeout-minutes` propio. El script `test:coverage` (`vitest run --coverage`) ya existe y lee los umbrales de `packages/shared-kernel/vitest.config.ts` (95/90), los mismos que usa el job `mutation` del nightly; `@vitest/coverage-v8` ya es dependencia del paquete y el shared-kernel no depende de otros paquetes del workspace, así que no hace falta compilar antes. Va después de `pnpm test` para que un fallo de tests se vea primero y con su propio mensaje. Corre los tests del shared-kernel por segunda vez (con instrumentación); se acepta el costo (segundos) frente a reordenar `turbo run test`. Alternativas descartadas: (a) cambiar el script `test` del paquete a `vitest run --coverage` haría que `pnpm test` local también falle por cobertura y mezclaría dos responsabilidades; (b) un job nuevo sería un check más, que el owner no pidió y obligaría a cambiar la protección de `main`. **No cambian:** el id `unit` (que es el nombre del check requerido, el job no declara `name:`), el `timeout-minutes: 15`, la lista de jobs de `pr.yml`, la protección de `main` ni los checks requeridos. La tarea 8.1 mide la duración del job antes y después; si con el paso nuevo el job pasa de 12 min (80 % del límite) en tres corridas de CI, se detiene y se pregunta al owner en vez de subir el timeout.
+
+   Test de política nuevo `scripts/delivery-policy/test/pr-policy.test.ts` (corre en `pnpm test`, es decir, en el propio job `unit`), con el helper `loadWorkflow` existente:
+   - el job `unit` existe con ese id, no declara `name:` (o declara `unit`) y su `timeout-minutes` es 15;
+   - entre sus pasos hay uno cuyo `run` es exactamente `pnpm --filter @pf/shared-kernel run test:coverage`, sin `if` ni `continue-on-error`, y el job tampoco declara `continue-on-error`;
+   - ese paso va después del paso `pnpm test`;
+   - con un workflow de fixture sin el paso, con `continue-on-error: true` o con `if: false`, la regla falla indicando el job `unit` y el paso (TC-PLATFORM-PIPELINE-021).
+   La regla de umbrales existente (TC-PLATFORM-PIPELINE-014) sigue protegiendo los 95/90 de `vitest.config.ts`, que ahora valen para los dos gates. TC-PLATFORM-PIPELINE-020 verifica el efecto: con la cobertura bajo el umbral el job `unit` falla (test de política sobre el workflow más una verificación manual única en una rama de prueba no fusionada).
+
+8. **Aviso por issue de `regression` y `mutation` (D284, grupo 8.2).** Mismo patrón que el job `perf` (D270), un issue por job:
+
+   | Job | Título fijo | Cuerpo |
+   |---|---|---|
+   | `regression` | `nightly regression: falló` | Enlace a la corrida y `tests/traceability/regression-suite.md` (estado por grupo y sección «Grupos en rojo» con paquete y archivos), o "sin reporte" si no existe |
+   | `mutation` | `nightly mutation: falló` | Enlace a la corrida y las métricas de cobertura del shared-kernel y del dominio IDENTITY y el mutation score (lo mismo que el paso `Resumen` del job), o "sin reporte" |
+
+   Cada job agrega al final un paso con `if: ${{ failure() }}`, `GH_TOKEN: ${{ github.token }}`, que busca con `gh issue list --state open --search "in:title \"<título>\""` el issue abierto con ese título exacto (filtro `select(.title == …)`), comenta si existe y crea si no. Cada job declara `permissions: { contents: read, issues: write }`; el workflow sigue con `permissions: contents: read`. Para no repetir el bloque tres veces, el paso puede extraerse a un script versionado (`scripts/ci/nightly-issue.sh <título> <archivo de resumen>`) que también use `perf`; si se extrae, el test de política verifica el script y que cada job lo invoque con su título. Un job cancelado no avisa (`failure()` es falso al cancelar). Un aviso no se cierra solo: lo cierra quien corrige (igual que D270).
+
+   Test de política (`nightly-policy.test.ts`): (a) `issues: write` solo en `regression`, `mutation`, `perf` y `fx-smoke-live`, nunca a nivel de workflow; (b) los pasos de aviso de `regression` y `mutation` corren solo con `failure()`, usan su título exacto, buscan el abierto antes de crear y van después del paso que puede fallar; (c) los títulos de los tres jobs son distintos. **Cambio de un test existente (motivo registrado):** la aserción `[TC-PLATFORM-PIPELINE-009] el job perf no es un check requerido ni cambia a los demás jobs` exige hoy que `regression` y `mutation` no declaren `permissions`, y la de `solo los jobs perf y fx-smoke-live declaran issues: write` los excluye; con D284 ambas pasan a exigir exactamente `{ contents: read, issues: write }` en esos dos jobs y a admitir los cuatro jobs que avisan. No se debilita: la regla sigue rechazando `issues: write` a nivel de workflow o en cualquier otro job.
 
 ## Contratos
 
@@ -79,7 +109,9 @@ Sin cambios en OpenAPI, eventos ni `ErrorCode`. El formato del reporte de rendim
 - **Dependencias de orden que siguen ocultas:** con archivos completos, un test que depende de otro pasa en ambos gates, igual que hoy en el PR. El change no las elimina en general; solo las cinco conocidas. Detectarlas (barajar el orden con `sequence.shuffle` o ejecutar cada TC aislado) costaría el arranque de Testcontainers por TC (≈ 100 TC de integración) y queda como mejora futura.
 - **Falso negativo del criterio de RLS:** una regresión real pequeña (< 0.5 ms o con mucha varianza) puede no quedar demostrada en una corrida. Se acepta: el piso ya existía, el plan estructural cubre la regresión más grave, y el reporte publica el IC de cada corrida para ver tendencias.
 - **Una suite con cuotas relajadas oculta un 429 legítimo:** no aplica; el limitador no es objeto del benchmark y tiene tests de API propios.
-- **El job `perf` puede seguir en rojo** por TC-COMMITMENTS-MATCH-012 (y por la fila de RLS si la diferencia es real). Mientras esté en rojo, una brecha nueva no cambia el color del job; se ve en el comentario diario del issue de D270, que lleva `perf-summary.md` completo (pregunta 3).
+- **El job `perf` sigue en rojo** por la fila de RLS INCLUDE (real; change `optimize-rls-policy-overhead`), TC-COMMITMENTS-MATCH-012 y los dos benchmarks de `spendable.perf` (change `investigate-perf-under-load`). Mientras esté en rojo, una brecha nueva no cambia el color del job; se ve en el comentario diario del issue de D270, que lleva `perf-summary.md` completo (D285).
+- **Cobertura en el job `unit` (decisión 7):** el gate de PR exige más; una PR que agregue al shared-kernel código sin tests queda en rojo. Es lo buscado (D283). Riesgo menor: la duración del job sube unos segundos; si se acercara a los 15 min se pregunta al owner en vez de subir el límite.
+- **Ruido de issues (decisión 8):** con un rojo persistente cada job comenta su issue cada noche; es el mismo comportamiento aceptado en D270 y separa las causas.
 
 ## Plan de migración
 
@@ -87,7 +119,7 @@ Sin migraciones de base de datos. Orden de aplicación: grupo 2 (ejecutor) y gru
 
 ## Preguntas abiertas
 
-Consolidadas en [docs/44-fix-nightly-pipeline-questions.md](../../../docs/44-fix-nightly-pipeline-questions.md). Ninguna bloquea los grupos 1 a 7, que se implementan con la recomendación de cada pregunta:
+Ninguna. Las cinco preguntas de [docs/44-fix-nightly-pipeline-questions.md](../../../docs/44-fix-nightly-pipeline-questions.md) quedaron resueltas el 2026-10-21 con la recomendación de cada una (D283–D287, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)). Texto original de las preguntas, para referencia:
 
 1. ¿La cobertura del shared-kernel corre también en el gate de PR (job `unit`), para que no vuelva a caer en silencio? Recomendación: sí, dentro del job `unit` existente (sin check nuevo); requiere la confirmación del owner por tocar un check requerido.
 2. ¿Los jobs `regression` y `mutation` avisan por issue al fallar, como `perf` (D270)? Recomendación: sí, un issue por job con título fijo.
