@@ -54,3 +54,4 @@ Entonces ninguna de esas tareas se ejecuta
 
 - Cubre también el scenario "La comparación no depende de la hora de la corrida": con esta guardia, TC-IDENTITY-DEMO-007 deja de depender del minuto 10 de cada hora UTC.
 - Archivo previsto: `apps/api/test/demo/demo-clock.int.test.ts`. `demo-data.int.test.ts` y `DemoWorld` usan la misma opción del worker.
+- Ejecutado en GitHub (2026-10-21): pasó en el CI de #154 (job `integration` verde, 18 min tras subir `timeout-minutes` de 25 a 40 en `pr.yml`; una corrida previa se canceló por timeout a los 25 min, sin fallo de test).

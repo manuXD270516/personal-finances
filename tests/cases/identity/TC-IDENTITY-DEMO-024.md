@@ -59,3 +59,4 @@ Entonces se crea exactamente un "Retiro de efectivo" de 600.00 BOB con fecha 202
 
 - Cubre también los scenarios "Repetir el motor el mismo día no duplica el retiro" y "El día de la ancla no hay nada que materializar".
 - `provisional` hasta la pregunta 1 de [docs/45](../../../docs/45-fix-demo-golden-clock-dependence-questions.md). Si el owner elige congelar la demo, este TC se reescribe (sin retiro nuevo) en un change aparte.
+- Ejecutado en GitHub (2026-10-21): pasó en el CI de #154 (job `integration` verde, 18 min tras subir `timeout-minutes` de 25 a 40 en `pr.yml`; una corrida previa se canceló por timeout a los 25 min, sin fallo de test).

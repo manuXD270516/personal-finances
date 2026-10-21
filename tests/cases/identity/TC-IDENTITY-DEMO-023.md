@@ -53,3 +53,4 @@ Entonces la carga termina READY
 
 - TDD: la prueba se escribe antes del cambio en `demo-data-loader.ts` (design.md decisión 4) y debe fallar con el código actual.
 - `error_code` es el código que la prueba demuestra que ya NO se produce.
+- Ejecutado en GitHub (2026-10-21): pasó en el CI de #154 (job `integration` verde, 18 min tras subir `timeout-minutes` de 25 a 40 en `pr.yml`; una corrida previa se canceló por timeout a los 25 min, sin fallo de test).

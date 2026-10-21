@@ -55,3 +55,4 @@ Entonces las 14 cuentas tienen los saldos del resumen de referencia
 
 - Archivo previsto: `apps/api/test/demo/demo-clock.int.test.ts` (design.md decisión 2).
 - Las tareas programadas están desactivadas en ese worker (TC-IDENTITY-DEMO-022): con el reloj en 2027 el motor de recurrencia crearía 13 meses de ocurrencias.
+- Ejecutado en GitHub (2026-10-21): pasó en el CI de #154 (job `integration` verde, 18 min tras subir `timeout-minutes` de 25 a 40 en `pr.yml`; una corrida previa se canceló por timeout a los 25 min, sin fallo de test).
