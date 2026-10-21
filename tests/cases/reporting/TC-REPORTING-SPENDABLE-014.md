@@ -31,7 +31,7 @@ expected_result:
   - "p95 de reporting_spendable_duration_seconds ≤ 0.30 s"
   - "Métrica sin etiquetas de alta cardinalidad"
 created: 2026-10-10
-updated: 2026-10-12
+updated: 2026-10-21
 ---
 
 # TC-REPORTING-SPENDABLE-014 — El cálculo del disponible cabe en el presupuesto del Home con un workspace grande y expone su métrica
@@ -51,3 +51,4 @@ Entonces el p95 del disponible es como máximo 0.30 s
 ## Notas
 
 - Datos ficticios; fechas fijas con `FixedClock` (TZ America/La_Paz).
+- 2026-10-21 (D290, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): en el nightly manual 39669892721 los dos benchmarks de `spendable.perf.ts` dieron p95 de 352,2 ms y 341,1 ms frente a 300 ms (primera medición; antes caían por 429). Causa sin determinar; la investiga el change `investigate-perf-under-load` (síntoma S2). El umbral no cambia sin decisión del owner.

@@ -5,7 +5,7 @@ spec: identity/demo-data
 related_specs: ["commitments/recurrence-engine", "ledger/journal-posting"]
 requirement: "El workspace demo sigue el reloj de la instalación después de la carga"
 scenario: "El retiro automático del día 2 llega con su fecha"
-requirement_status: provisional
+requirement_status: confirmed
 fr: ["FR-IDENTITY-014", "FR-COMMITMENTS-007"]
 nfr: []
 invariants: ["INV-004", "INV-013"]
@@ -36,7 +36,7 @@ expected_result:
   - "La segunda ejecución del 2026-10-02 no crea nada y los saldos no cambian"
   - "Cada asiento suma 0.00 por moneda"
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-21
 ---
 
 # TC-IDENTITY-DEMO-024 — La demo sigue el reloj de la instalación
@@ -60,3 +60,4 @@ Entonces se crea exactamente un "Retiro de efectivo" de 600.00 BOB con fecha 202
 - Cubre también los scenarios "Repetir el motor el mismo día no duplica el retiro" y "El día de la ancla no hay nada que materializar".
 - `provisional` hasta la pregunta 1 de [docs/45](../../../docs/45-fix-demo-golden-clock-dependence-questions.md). Si el owner elige congelar la demo, este TC se reescribe (sin retiro nuevo) en un change aparte.
 - Ejecutado en GitHub (2026-10-21): pasó en el CI de #154 (job `integration` verde, 18 min tras subir `timeout-minutes` de 25 a 40 en `pr.yml`; una corrida previa se canceló por timeout a los 25 min, sin fallo de test).
+- Confirmado (2026-10-21, D288 de [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el owner adoptó la demo viva (pregunta 1 de docs/45); `requirement_status` pasa a `confirmed` y no se abre el change de demo congelada.

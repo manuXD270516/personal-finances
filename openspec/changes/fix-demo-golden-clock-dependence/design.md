@@ -102,7 +102,7 @@ Sin OpenAPI, eventos, `ErrorCode`, migraciones ni RLS. Las opciones nuevas del r
 - **Las pruebas demo dejan de ejercitar las tareas programadas sobre la demo.** Lo compensa TC-IDENTITY-DEMO-024, que ejecuta el motor con un reloj fijo y un resultado exacto. Las tareas programadas siguen cubiertas por sus propios TC de contexto.
 - **El worker del archivo nuevo usa un reloj fijo y comparte la base con los demás archivos.** Los archivos corren en serie y el worker de cada uno se cierra en `afterAll`. Con `scheduledJobs: false` no hay ejecuciones de arranque que recorran workspaces de archivos anteriores con un reloj de 2027.
 - **El job `integration` dura más:** una carga demo de ~30 s más la espera de consumidores. La tarea 5.3 lo mide frente a NFR-MAINT-007.
-- **Que el comportamiento "demo viva" sea el deseado** depende de la pregunta 1 de docs/45. Si el owner elige congelar la demo, TC-IDENTITY-DEMO-024 se reescribe (sin retiro nuevo) y se agrega el filtro en el directorio de workspaces de las tareas programadas, en un change aparte.
+- **Que el comportamiento "demo viva" sea el deseado:** confirmado por el owner (D288, 2026-10-21). TC-IDENTITY-DEMO-024 pasa a `confirmed`; no hay change de demo congelada.
 
 ## Plan de migración
 
@@ -110,7 +110,7 @@ No aplica: sin migraciones ni cambios de configuración en producción. Desplieg
 
 ## Preguntas abiertas
 
-En [docs/45](../../../docs/45-fix-demo-golden-clock-dependence-questions.md). **Ninguna bloquea la implementación:** los grupos 1 a 6 se hacen con las recomendaciones.
+Ninguna. Las dos preguntas de [docs/45](../../../docs/45-fix-demo-golden-clock-dependence-questions.md) se resolvieron el 2026-10-21 con la recomendación (D288 y D289, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)); el texto original queda como referencia:
 
 1. ¿La demo sigue el reloj de la instalación después de la carga, o se congela? Recomendación: que lo siga (comportamiento actual). Con esa recomendación, TC-IDENTITY-DEMO-024 es `provisional`.
 2. ¿Se recalcula la ancla si el job de carga corre otro día que la solicitud? Recomendación: no.

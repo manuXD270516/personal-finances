@@ -2,6 +2,8 @@
 
 > **Fecha:** 2026-10-20 · **Change:** [`fix-nightly-pipeline`](../openspec/changes/fix-nightly-pipeline/proposal.md) · **Relacionado:** [design.md](../openspec/changes/fix-nightly-pipeline/design.md), [38-estado-y-pendientes.md](38-estado-y-pendientes.md), decisiones D43 ([31](31-phase-1-consolidation-decisions.md)), D224 ([41](41-phase-5-consolidation-decisions.md)) y D270 ([43](43-phase-5-owner-answers-2026-10-16.md))
 
+> **Resueltas el 2026-10-21:** el owner adoptó la recomendación de las cinco preguntas (D283–D287, [docs/46](46-nightly-and-perf-owner-decisions.md)).
+
 El nightly falló en sus 12 corridas desde el 2026-10-05 por tres causas independientes (suite de regresión filtrada por nombre, cobertura del shared-kernel bajo el umbral y tres problemas del benchmark). El change las corrige sin bajar umbrales. Estas preguntas quedan para el owner. **Ninguna bloquea el orden de implementación:** los grupos 1 a 7 del change se implementan con la recomendación de cada una, y el grupo 8 (preguntas 1 y 2) solo se hace si el owner adopta la opción (a). Cada respuesta se registra en el siguiente `…-decisions.md` con su número D.
 
 ## 1. Cobertura del shared-kernel también en el gate de PR

@@ -20,7 +20,7 @@ No es un defecto del producto que la demo siga el reloj real. Desde la app y des
 - **Prueba de independencia de la fecha real.** Un archivo de integración nuevo con un worker de reloj fijo y modificable. Carga la demo con la ancla 2026-09-30 con el reloj del worker en 2027-10-30, espera a que se asienten los consumidores y exige los saldos del resumen de referencia. Así los consumidores no dependen de la fecha real y se detectan antes otras bombas por fecha. También comprueba que en ese archivo no se ejecutó ninguna tarea programada.
 - **La demo sigue el reloj de la instalación (comportamiento actual, ahora explícito y probado).** En el mismo archivo, con el reloj del worker en el 2026-10-02 a las 12:00 en America/La_Paz, una ejecución manual del motor de recurrencia crea exactamente un "Retiro de efectivo" de 600.00 BOB (116919.90 BOB y 9673.69 BOB), y una segunda ejecución ese día no crea nada. Esto reproduce de forma determinista lo que pasó en el nightly.
 - **Verificación de la carga antes de publicar los datos (producto, Should).** El cargador compara los saldos con el oráculo de la ancla y verifica el balance de comprobación dentro de la misma unidad de trabajo del plan, antes de confirmarla. Ningún otro proceso puede modificar el workspace entre la ejecución del plan y su verificación. La verificación de integridad del ledger con su propia conexión sigue después.
-- **Fuera de alcance:** congelar los workspaces demo frente a las tareas programadas (pregunta 1 de docs/45); recalcular la ancla cuando el job de carga corre otro día (pregunta 2); cambiar los crons, el horizonte o el motor de recurrencia; cambiar el dataset, el resumen de referencia o los montos; endpoints, eventos, migraciones o UI.
+- **Fuera de alcance:** congelar los workspaces demo frente a las tareas programadas (descartado por el owner, D288); recalcular la ancla cuando el job de carga corre otro día (descartado, D289); cambiar los crons, el horizonte o el motor de recurrencia; cambiar el dataset, el resumen de referencia o los montos; endpoints, eventos, migraciones o UI.
 
 ## Capabilities
 
@@ -28,7 +28,7 @@ No es un defecto del producto que la demo siga el reloj real. Desde la app y des
 (ninguna)
 
 ### Modified Capabilities
-- `identity/demo-data`: ADDED "Resumen de referencia independiente del reloj real" (Must), "Verificación de la carga antes de publicar sus datos" (Should) y "El workspace demo sigue el reloj de la instalación después de la carga" (Should, provisional hasta la pregunta 1 de docs/45). No modifica requirements existentes.
+- `identity/demo-data`: ADDED "Resumen de referencia independiente del reloj real" (Must), "Verificación de la carga antes de publicar sus datos" (Should) y "El workspace demo sigue el reloj de la instalación después de la carga" (Should; confirmado por el owner el 2026-10-21, D288). No modifica requirements existentes.
 
 ## Impact
 

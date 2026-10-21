@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: []
 requirement: "Sobrecosto de RLS con un criterio robusto al ruido de medición"
 scenario: "Sobrecosto real demostrado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-SEC-003, NFR-PERF-005]
 invariants: []
@@ -33,7 +33,7 @@ expected_result:
   - "passed = false con veredicto \"brecha demostrada\""
   - "El reporte lista la brecha con la consulta y la diferencia medida"
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-10-21
 ---
 
 # TC-PLATFORM-PIPELINE-016 — Un sobrecosto de RLS demostrado sobre el 10 % y el piso absoluto es brecha y hace fallar el benchmark
@@ -59,3 +59,4 @@ Entonces es brecha y el benchmark falla indicando la consulta
 - Verificado en GitHub (2026-10-20, run 39390841971): la fila `saldo por cuenta (índice INCLUDE)` es la única brecha demostrada por tiempo (0,599 ms, IC95 [0,597, 0,602] ms); `perf` sigue en rojo por ella hasta el change aparte (pregunta 5 de docs/44).
 - Verificado en GitHub (2026-10-20, run 39401809245): sigue rojo por `saldo por cuenta (índice INCLUDE)` (1,12 → 1,70 ms, +0,599 ms, IC95 [0,596, 0,603]) y el agregado sintético (informativo). Diagnóstico con EXPLAIN (issue #147): el sobrecosto es un nodo `Result` con `One-Time Filter` de la política sobre el `Index Only Scan` (≈ 55 ns/fila); ver docs/23 §5.5 y pregunta 5 de docs/44.
 - Verificado en GitHub (2026-10-21, nightly manual run 39669892721 (2026-10-21 20:23 UTC, commit 68f01e5, tras #154)): la única fila RLS bloqueante superada sigue siendo `saldo por cuenta (índice INCLUDE)`: diferencia 0,805 ms, IC95 [0,800, 0,811] ms, 2,80 vs 1,99 ms (pregunta 5 de docs/44, decisión del owner).
+- Confirmado (2026-10-21, D286 de [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el owner mantiene el piso absoluto de 0.5 ms (pregunta 4 de docs/44); `requirement_status` pasa a `confirmed`.
