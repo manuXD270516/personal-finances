@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/pr-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["pr-gate", "coverage", "policy"]
@@ -58,3 +59,5 @@ Entonces el test de política falla indicando el job y el paso
 
 - Change `fix-nightly-pipeline`, grupo 8 (D283, docs/46). Cubre también el scenario "La verificación no cambia los checks requeridos".
 - Archivo previsto: `scripts/delivery-policy/test/pr-policy.test.ts` (tarea 8.2).
+
+- 2026-10-21: automatizado en `pr-policy.test.ts` (pr.yml real y fixtures sin el paso, con `continue-on-error: true`, con `if: false`, con otro timeout, con nombre, con el paso antes de `pnpm test`).

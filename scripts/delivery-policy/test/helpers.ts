@@ -103,6 +103,8 @@ export interface Step {
 }
 
 export interface Job {
+  name?: string;
+  'timeout-minutes'?: number;
   'continue-on-error'?: boolean | string;
   permissions?: Record<string, string>;
   steps?: Step[];

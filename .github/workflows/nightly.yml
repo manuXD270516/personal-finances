@@ -2,12 +2,15 @@
 # `main` ni cambia los de `pr.yml`. Jobs independientes (uno que falla no cancela a los demás):
 #   regression     Financial Regression Suite derivada de tests/cases (`regression_suite: true`), unit + integración,
 #                  con NIGHTLY=1 (property-based tests a 10 000 corridas, semilla aleatoria impresa en cada falla).
+#                  Si falla abre o comenta el issue "nightly regression: falló" (D284).
 #   mutation       shared-kernel: cobertura (≥ 95 % líneas / ≥ 90 % ramas) y Stryker (mutation score ≥ 80 %);
-#                  dominio IDENTITY: cobertura ≥ 90 % (add-workspace-identity 4.1).
+#                  dominio IDENTITY: cobertura ≥ 90 % (add-workspace-identity 4.1). Si falla abre o comenta el issue
+#                  "nightly mutation: falló" (D284).
 #   perf           Large Seed (docs/29 §2.3) + benchmarks NFR-PERF-001/002/003/004/005/006 y overhead de RLS (Testcontainers);
 #                  falla si un p95 supera su umbral de docs/02 (incluye NFR-PERF-002, búsqueda de texto). Reporte JSON +
-#                  Markdown como artefacto. Si falla abre o comenta el issue "nightly perf: umbral superado" (único job
-#                  de este tipo con `issues: write`, junto con fx-smoke-live; nunca a nivel de workflow).
+#                  Markdown como artefacto. Si falla abre o comenta el issue "nightly perf: umbral superado" (D270).
+#                  `issues: write` solo en los jobs que avisan (regression, mutation, perf y fx-smoke-live), cada uno con su
+#                  issue y su título; nunca a nivel de workflow.
 #   fx-smoke-live  ÚNICO job con red hacia terceros: smoke de los providers de tasas reales. `continue-on-error`:
 #                  nunca rompe el pipeline; si falla abre o actualiza un issue para revisar el adapter.
 # Acciones fijadas por SHA de commit completo (comentario = tag verificado), igual que pr.yml/main.yml.
@@ -36,6 +39,9 @@ jobs:
     name: regression (Financial Regression Suite)
     runs-on: ubuntu-latest # Docker para Testcontainers
     timeout-minutes: 60
+    permissions:
+      contents: read
+      issues: write # solo para abrir/comentar el aviso "nightly regression: falló" (fix-nightly-pipeline 8.5, D284)
     env:
       NIGHTLY: '1'
     steps:
@@ -57,11 +63,32 @@ jobs:
             tests/traceability/regression-suite.md
           if-no-files-found: error
           retention-days: 30
+      # D284: si el job falla, abre el issue de aviso o comenta el que ya está abierto con ese título exacto (nunca
+      # duplica). Un issue por job: este no se mezcla con los de mutation ni perf.
+      - name: Abrir o comentar el aviso de la suite de regresión
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title='nightly regression: falló'
+          body="$(printf 'El job regression del nightly falló en %s.\n\n%s\n' "$RUN_URL" "$(cat tests/traceability/regression-suite.md 2>/dev/null || echo 'sin reporte')")"
+          number="$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
 
   mutation:
     name: mutation (shared-kernel) + cobertura de dominio
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: write # solo para abrir/comentar el aviso "nightly mutation: falló" (fix-nightly-pipeline 8.5, D284)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -97,6 +124,31 @@ jobs:
             packages/contexts/identity/coverage
           if-no-files-found: warn
           retention-days: 30
+      # D284: aviso por issue del job (cobertura del shared-kernel o del dominio IDENTITY, o mutation score). Mismo patrón
+      # que perf: busca por título exacto, comenta si existe y crea si no.
+      - name: Abrir o comentar el aviso de cobertura y mutación
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title='nightly mutation: falló'
+          metrics="$({
+            echo '### shared-kernel'
+            node -e "const s=require('./packages/shared-kernel/coverage/coverage-summary.json').total;console.log('| métrica | % |\n|---|---|\n| líneas | '+s.lines.pct+' |\n| ramas | '+s.branches.pct+' |')" || true
+            echo '### dominio IDENTITY'
+            node -e "const s=require('./packages/contexts/identity/coverage/coverage-summary.json').total;console.log('| métrica | % |\n|---|---|\n| líneas | '+s.lines.pct+' |\n| ramas | '+s.branches.pct+' |')" || true
+            node -e "const r=require('./packages/shared-kernel/reports/mutation/mutation.json');let k=0,t=0;for(const f of Object.values(r.files))for(const m of f.mutants){if(['Killed','Timeout'].includes(m.status))k++;if(!['CompileError','RuntimeError','Ignored'].includes(m.status))t++;}console.log('\nMutation score: '+(100*k/t).toFixed(2)+' % ('+k+'/'+t+')')" || true
+          } 2>/dev/null)"
+          body="$(printf 'El job mutation del nightly falló en %s.\n\n%s\n' "$RUN_URL" "${metrics:-sin reporte}")"
+          number="$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
 
   perf:
     name: perf (Large Seed + NFR-PERF)

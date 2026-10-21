@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/nightly-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "mutation", "coverage", "issues"]
@@ -55,3 +56,5 @@ Entonces se abre o se comenta el issue "nightly mutation: falló" con las métri
 
 - Change `fix-nightly-pipeline`, grupo 8 (D284, docs/46).
 - El job `mutation` también falla por el mutation score (< 80 %) o por la cobertura del dominio IDENTITY; cualquiera de esos fallos usa el mismo issue.
+
+- 2026-10-21: parte estática automatizada (`nightly-policy.test.ts`). Pendiente de nightly (tarea 8.6b): corrida por `workflow_dispatch` con la cobertura forzada bajo el umbral; anotar aquí el número del issue y que el de regresión no recibe comentario.
