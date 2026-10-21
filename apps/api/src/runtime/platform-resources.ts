@@ -23,6 +23,8 @@ export function createJobQueue(
   connectionString: string,
   logger: Logger,
   role: 'producer' | 'consumer',
+  /** Solo pruebas: `false` apaga el cron de pg-boss en un consumidor (ver `PgBossJobQueueOptions.schedule`). */
+  schedule?: boolean,
 ): JobQueue {
   if (config.JOB_QUEUE_DRIVER !== 'pgboss') {
     throw new Error(`JOB_QUEUE_DRIVER=${config.JOB_QUEUE_DRIVER} todavía no tiene adapter (solo pgboss)`);
@@ -32,6 +34,7 @@ export function createJobQueue(
     pollingIntervalSeconds: config.JOB_QUEUE_POLLING_INTERVAL_SECONDS,
     logger,
     role,
+    ...(schedule !== undefined ? { schedule } : {}),
   });
 }
 

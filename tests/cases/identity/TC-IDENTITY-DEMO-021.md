@@ -12,9 +12,9 @@ invariants: ["INV-004"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests: ["apps/api/test/demo/demo-clock.int.test.ts"]
+status: automated
 regression_suite: false
 phase: 5
 tags: ["demo-data", "determinism", "golden", "clock"]

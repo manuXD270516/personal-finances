@@ -43,6 +43,11 @@ export interface DemoDataLoaderOptions {
   readonly ledgerMaintenance?: Pick<LedgerMaintenance, 'verifyLedgerIntegrity'>;
   /** Tests: falla inyectada al empezar un lote (`<módulo>/<YYYY-MM>`, p. ej. `transactions/2025-06`). */
   readonly failAt?: string;
+  /**
+   * Tests: se ejecuta justo después de confirmar la unidad de trabajo del plan (patrón de `failAt`). Simula a otro
+   * proceso (una tarea programada) que modifica el workspace entre la confirmación y cualquier lectura posterior.
+   */
+  readonly afterPlanCommitted?: () => Promise<void>;
 }
 
 export type DemoLoadOutcome = 'READY' | 'FAILED' | 'SKIPPED';
@@ -345,51 +350,56 @@ export class DemoDataLoader {
         loans: ids.loans,
         goals: ids.goals,
       });
+
+      // ── ledger: golden summary + balance de comprobación (Σ = 0 por moneda) DENTRO de la unidad de trabajo del plan
+      //    (design.md decisión 4): leen lo que escribió el plan antes de confirmar y ningún otro proceso (p. ej. una
+      //    tarea programada) puede modificar esas filas hasta entonces.
+      this.maybeFail('ledger');
+      const expected = summarizeDemoPlan(plan);
+      // Con la ancla fija, el resumen de referencia del dataset (`golden-summary.json`); con otra ancla los saldos
+      // dependen de cuántas ocurrencias y ciclos caen en la ventana y solo se comparan contra el oráculo del plan.
+      if (
+        plan.anchorDate === DEMO_MANIFEST.anchorDate &&
+        JSON.stringify(expected.balances) !== JSON.stringify(golden.balances)
+      ) {
+        throw new DemoLoadError(
+          'DEMO_GOLDEN_MISMATCH',
+          'the dataset generator does not match its golden summary',
+        );
+      }
+      const actual = await r.accounts.accounts.listAccounts({ workspaceId: ws });
+      const balanceTargets: [string, string][] = [
+        ...plan.accounts.map((a): [string, string] => [a.key, account(a.key)]),
+        ...[...loanAccounts].map(([key, id]): [string, string] => [`loan_${key}`, id]),
+      ];
+      for (const [key, id] of balanceTargets) {
+        const view = actual.data.find((v) => v.account.id === id);
+        const wanted = (expected.balances as Record<string, string>)[key];
+        if (view?.balance.amount !== wanted) {
+          throw new DemoLoadError(
+            'DEMO_GOLDEN_MISMATCH',
+            `balance of ${key}: expected ${String(wanted)}, got ${String(view?.balance.amount)}`,
+          );
+        }
+      }
+      const trial = await r.ledger.balances.getTrialBalance({ workspaceId: ws });
+      for (const c of trial.currencies) {
+        if (!/^0(\.0+)?$/.test(c.total.amount.replace('-', ''))) {
+          throw new DemoLoadError(
+            'DEMO_LEDGER_INVARIANT',
+            `trial balance in ${c.currency} is ${c.total.amount}`,
+          );
+        }
+      }
     });
+    await this.options.afterPlanCommitted?.();
     await progress('fx');
     await progress('transactions');
     await progress('commitments');
     await progress('debt');
     await progress('goals');
 
-    // ── ledger: golden summary + invariantes (Σ = 0 por moneda) acotadas al workspace demo.
-    this.maybeFail('ledger');
-    const expected = summarizeDemoPlan(plan);
-    // Con la ancla fija, el resumen de referencia del dataset (`golden-summary.json`); con otra ancla los saldos
-    // dependen de cuántas ocurrencias y ciclos caen en la ventana y solo se comparan contra el oráculo del plan.
-    if (
-      plan.anchorDate === DEMO_MANIFEST.anchorDate &&
-      JSON.stringify(expected.balances) !== JSON.stringify(golden.balances)
-    ) {
-      throw new DemoLoadError(
-        'DEMO_GOLDEN_MISMATCH',
-        'the dataset generator does not match its golden summary',
-      );
-    }
-    const actual = await inDemo(() => r.accounts.accounts.listAccounts({ workspaceId: ws }));
-    const balanceTargets: [string, string][] = [
-      ...plan.accounts.map((a): [string, string] => [a.key, account(a.key)]),
-      ...[...loanAccounts].map(([key, id]): [string, string] => [`loan_${key}`, id]),
-    ];
-    for (const [key, id] of balanceTargets) {
-      const view = actual.data.find((v) => v.account.id === id);
-      const wanted = (expected.balances as Record<string, string>)[key];
-      if (view?.balance.amount !== wanted) {
-        throw new DemoLoadError(
-          'DEMO_GOLDEN_MISMATCH',
-          `balance of ${key}: expected ${String(wanted)}, got ${String(view?.balance.amount)}`,
-        );
-      }
-    }
-    const trial = await inDemo(() => r.ledger.balances.getTrialBalance({ workspaceId: ws }));
-    for (const c of trial.currencies) {
-      if (!/^0(\.0+)?$/.test(c.total.amount.replace('-', ''))) {
-        throw new DemoLoadError(
-          'DEMO_LEDGER_INVARIANT',
-          `trial balance in ${c.currency} is ${c.total.amount}`,
-        );
-      }
-    }
+    // Integridad del ledger (su propia conexión, después de confirmar el plan), acotada al workspace.
     if (this.options.ledgerMaintenance) {
       const { violations } = await this.options.ledgerMaintenance.verifyLedgerIntegrity();
       if (violations.some((v) => v.workspaceId === ws)) {
