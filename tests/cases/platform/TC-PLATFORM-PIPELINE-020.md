@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/pr-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["pr-gate", "coverage", "shared-kernel"]
@@ -56,3 +57,5 @@ Entonces el job unit del gate falla indicando las líneas frente a 95 %
 - Change `fix-nightly-pipeline`, grupo 8 (D283, docs/46). El owner confirmó de forma explícita que el check requerido `unit` exija la cobertura.
 - Solo falla la métrica de líneas en el ejemplo (91.00 % de ramas cumple 90 %): el mensaje debe nombrar la que no cumple.
 - La parte automática es el test de política (`scripts/delivery-policy/test/pr-policy.test.ts`, tarea 8.2); el efecto real en GitHub se verifica una vez en la tarea 8.6.
+
+- 2026-10-21: parte estática automatizada (`pr-policy.test.ts`; `pr.yml` con el paso en el job `unit`, `actionlint` limpio). Pendiente de CI (tarea 8.6a): una PR de prueba no fusionada que baje la cobertura del shared-kernel y deje `unit` en rojo con las líneas medidas frente a 95 %; y la duración de `unit` en el CI del PR (línea base 92–115 s en las últimas tres corridas; si pasa de 12 min en tres corridas, preguntar al owner).

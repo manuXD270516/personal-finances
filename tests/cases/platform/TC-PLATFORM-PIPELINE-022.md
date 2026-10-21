@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/nightly-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "regression", "issues"]
@@ -58,3 +59,5 @@ Entonces se abre ese issue con el enlace y los grupos en rojo
 
 - Change `fix-nightly-pipeline`, grupo 8 (D284, docs/46). Cubre también el scenario "Permisos de los jobs que avisan".
 - Cambia dos aserciones del test de TC-PLATFORM-PIPELINE-009 (tarea 8.4; motivo registrado en el design, decisión 8).
+
+- 2026-10-21: parte estática automatizada (`nightly-policy.test.ts`; `nightly.yml` con `issues: write` en `regression`, `mutation`, `perf` y `fx-smoke-live`, `actionlint` limpio). Pendiente de nightly (tarea 8.6b): dos corridas por `workflow_dispatch` desde una rama de prueba con un fallo forzado; anotar aquí el número del issue.

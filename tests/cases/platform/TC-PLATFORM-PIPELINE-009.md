@@ -29,13 +29,13 @@ input:
   - run: "corrida 2 del job perf, otra vez en rojo, con el issue abierto"
     expected: "se agrega un comentario al mismo issue; no se crea otro"
 steps:
-  - "Test de política: leer nightly.yml y verificar que issues: write está declarado solo en el job perf (y en el fx-smoke-live existente), nunca a nivel de workflow"
+  - "Test de política: leer nightly.yml y verificar que issues: write está declarado solo en los jobs que avisan (regression, mutation, perf y fx-smoke-live), nunca a nivel de workflow"
   - "Test de política: verificar que el paso de aviso del job perf corre solo con failure(), usa el título exacto y busca el issue abierto antes de crear uno"
   - "Verificación manual única: corrida por workflow_dispatch con un umbral forzado (cambio no fusionado) dos veces seguidas"
 expected_result:
   - "La primera corrida fallida crea un único issue con el título fijo, el enlace a la corrida y el resumen del reporte con el benchmark y el valor medido"
   - "La segunda corrida fallida comenta el mismo issue; sigue habiendo un solo issue abierto con ese título"
-  - "El permiso issues: write no se concede a nivel de workflow; los jobs que no avisan por issue no lo tienen"
+  - "El permiso issues: write no se concede a nivel de workflow; ningún otro job lo tiene"
   - "El fallo no bloquea pull requests: el job perf no es check requerido"
 created: 2026-10-16
 updated: 2026-10-16
@@ -63,3 +63,5 @@ Entonces se abre ese issue con el enlace a la corrida y el resumen del reporte
 - No toca la protección de `main` ni los checks requeridos (D224).
 
 - 2026-10-16: la parte estática está automatizada (`scripts/delivery-policy/test/nightly-policy.test.ts`). Pendiente (tarea 4.3): una verificación manual por `workflow_dispatch` con un umbral forzado, dos veces seguidas, y anotar aquí el número del issue.
+
+- 2026-10-21 (D284, `fix-nightly-pipeline` 8.4): `regression` y `mutation` avisan ahora por issue (TC-PLATFORM-PIPELINE-022 y 023), así que se cambiaron dos aserciones de `nightly-policy.test.ts`: la que exigía que solo `perf` y `fx-smoke-live` tuvieran `issues: write` y la que exigía que `regression` y `mutation` no tuvieran permisos. La regla sigue rechazando el permiso a nivel de workflow y en cualquier otro job.

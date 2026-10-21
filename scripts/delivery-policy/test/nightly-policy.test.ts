@@ -14,12 +14,15 @@ describe('nightly.yml: permisos y aviso por issue del job perf (TC-PLATFORM-PIPE
     expect(workflow.permissions).toEqual({ contents: 'read' });
   });
 
-  it('[TC-PLATFORM-PIPELINE-009] solo los jobs perf y fx-smoke-live declaran issues: write', () => {
+  // D284 (fix-nightly-pipeline, decisión 8): `regression` y `mutation` también avisan por issue, cada uno con el suyo,
+  // así que ya no se les niega el permiso; la regla sigue rechazándolo a nivel de workflow y en cualquier otro job.
+  it('[TC-PLATFORM-PIPELINE-009] solo los jobs regression, mutation, perf y fx-smoke-live declaran issues: write', () => {
     const writers = Object.entries(workflow.jobs)
       .filter(([, job]) => job.permissions?.['issues'] === 'write')
       .map(([name]) => name)
       .sort();
-    expect(writers).toEqual(['fx-smoke-live', 'perf']);
+    expect(writers).toEqual(['fx-smoke-live', 'mutation', 'perf', 'regression']);
+    expect(Object.keys(workflow.jobs).sort()).toEqual(['fx-smoke-live', 'mutation', 'perf', 'regression']);
   });
 
   it('[TC-PLATFORM-PIPELINE-009] el job perf tiene exactamente contents: read e issues: write', () => {
@@ -57,9 +60,85 @@ describe('nightly.yml: permisos y aviso por issue del job perf (TC-PLATFORM-PIPE
     expect(notice().env?.['GH_TOKEN']).toBe('${{ github.token }}');
   });
 
-  it('[TC-PLATFORM-PIPELINE-009] el job perf no es un check requerido ni cambia a los demás jobs', () => {
+  it('[TC-PLATFORM-PIPELINE-009] los jobs que avisan por issue declaran exactamente contents: read e issues: write', () => {
     for (const name of ['regression', 'mutation']) {
-      expect(workflow.jobs[name]!.permissions, name).toBeUndefined();
+      expect(workflow.jobs[name]!.permissions, name).toEqual({ contents: 'read', issues: 'write' });
+    }
+  });
+});
+
+// fix-nightly-pipeline, decisión 8 (D284): un issue por job, con el patrón del aviso de perf (D270).
+describe('nightly.yml: aviso por issue de regression y mutation (TC-PLATFORM-PIPELINE-022 y 023)', () => {
+  const TITLES = {
+    regression: 'nightly regression: falló',
+    mutation: 'nightly mutation: falló',
+    perf: TITLE,
+  } as const;
+
+  const noticeOf = (job: 'regression' | 'mutation'): Step => {
+    const found = workflow.jobs[job]!.steps!.find((s) => s.run?.includes(TITLES[job]));
+    expect(found, `${job}: paso de aviso con el título exacto`).toBeDefined();
+    return found!;
+  };
+
+  it.each([
+    ['TC-PLATFORM-PIPELINE-022', 'regression', 'pnpm traceability:regression --run'],
+    ['TC-PLATFORM-PIPELINE-023', 'mutation', 'pnpm --filter @pf/shared-kernel run test:mutation'],
+  ] as const)(
+    '[%s] el paso de aviso de %s corre solo con failure() y va después del paso que puede fallar',
+    (_tc, job, failing) => {
+      const step = noticeOf(job);
+      expect(step.if).toMatch(/failure\(\)/);
+      expect(step['continue-on-error']).toBeUndefined();
+      const steps = workflow.jobs[job]!.steps!;
+      const idx = steps.findIndex((s) => s.run === failing);
+      expect(idx, failing).toBeGreaterThanOrEqual(0);
+      expect(steps.indexOf(step)).toBeGreaterThan(idx);
+      if (job === 'mutation') {
+        const identity = steps.findIndex((s) => s.run === 'pnpm --filter @pf/identity run test:coverage');
+        expect(steps.indexOf(step)).toBeGreaterThan(identity);
+      }
+    },
+  );
+
+  it.each([
+    ['TC-PLATFORM-PIPELINE-022', 'regression', 'tests/traceability/regression-suite.md'],
+    ['TC-PLATFORM-PIPELINE-023', 'mutation', 'packages/shared-kernel/coverage/coverage-summary.json'],
+  ] as const)(
+    '[%s] el aviso de %s busca el issue abierto con el título exacto antes de crear y comenta si existe',
+    (_tc, job, summary) => {
+      const step = noticeOf(job);
+      const run = step.run!;
+      const list = run.indexOf('gh issue list');
+      const comment = run.indexOf('gh issue comment');
+      const create = run.indexOf('gh issue create');
+      expect(list).toBeGreaterThanOrEqual(0);
+      expect(comment).toBeGreaterThan(list);
+      expect(create).toBeGreaterThan(comment);
+      expect(run).toMatch(/--state open/);
+      expect(run).toMatch(/select\(\.title == /);
+      expect(run).toContain(summary);
+      expect(run).toMatch(/sin reporte|sin resumen/);
+      expect(step.env?.['RUN_URL']).toMatch(/actions\/runs\/\$\{\{ github\.run_id \}\}/);
+      expect(step.env?.['GH_TOKEN']).toBe('${{ github.token }}');
+    },
+  );
+
+  it('[TC-PLATFORM-PIPELINE-023] el aviso de mutation incluye la cobertura y el mutation score', () => {
+    const run = noticeOf('mutation').run!;
+    expect(run).toContain('packages/contexts/identity/coverage/coverage-summary.json');
+    expect(run).toContain('packages/shared-kernel/reports/mutation/mutation.json');
+    expect(run).toMatch(/Mutation score/);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-022] los títulos de regression, mutation y perf son distintos y cada uno aparece solo en su job', () => {
+    const titles = Object.values(TITLES);
+    expect(new Set(titles).size).toBe(3);
+    for (const [job, title] of Object.entries(TITLES)) {
+      for (const [other, def] of Object.entries(workflow.jobs)) {
+        const uses = def.steps!.some((s) => s.run?.includes(title));
+        expect(uses, `${other} usa el título de ${job}`).toBe(other === job);
+      }
     }
   });
 });

@@ -143,6 +143,10 @@ jobs:
         with: { persist-credentials: false }
       - uses: ./.github/actions/setup-workspace
       - run: pnpm test
+      # D283 (fix-nightly-pipeline): la cobertura del shared-kernel (umbrales de packages/shared-kernel/vitest.config.ts) se
+      # exige también en el PR, dentro del check requerido `unit`. Sin `if` ni `continue-on-error`; no es un job nuevo.
+      - name: Cobertura del shared-kernel (≥ 95 % líneas, ≥ 90 % ramas)
+        run: pnpm --filter @pf/shared-kernel run test:coverage
 
   integration:
     runs-on: ubuntu-latest # Docker disponible en los runners Linux hospedados
