@@ -57,3 +57,5 @@ Entonces el paso de cobertura del nightly falla frente a 95 % y 90 %
 - Automatizado (2026-10-20): `scripts/delivery-policy/test/nightly-policy.test.ts` (paso de cobertura sin `continue-on-error` ni `if`, antes de Stryker). Cobertura medida del shared-kernel tras los tests nuevos: 99.86 % líneas y 94.69 % ramas (antes 89.86 % / 84.07 %). Verificación en GitHub: corrida de `nightly` por `workflow_dispatch` (tarea 7.3).
 - Verificado en GitHub (2026-10-20, run 39390841971): el job `mutation` pasó, con la cobertura del shared-kernel (umbrales 95/90) y Stryker (`break: 80`) en verde.
 - Verificado en GitHub (2026-10-20, run 39401809245 tras #151): `mutation` en VERDE (cobertura del shared-kernel y Stryker).
+- Verificado en GitHub (2026-10-21, nightly programado run 39590963867 (2026-10-21 11:18 UTC, commit 5b27a10, antes del arreglo del change 47)): `mutation` VERDE.
+- Verificado en GitHub (2026-10-21, nightly manual run 39669892721 (2026-10-21 20:23 UTC, commit 68f01e5, tras #154)): `mutation` VERDE (cobertura del shared-kernel y Stryker, ~41 min).
