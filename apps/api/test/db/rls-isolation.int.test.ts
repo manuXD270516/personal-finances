@@ -299,8 +299,8 @@ describe('RLS por workspace (security/access-control)', () => {
 /**
  * Reescritura de las políticas de aislamiento (openspec optimize-rls-policy-overhead, D287/D294-D296).
  *
- * Escritas ANTES de la migración (TDD, grupo 2). TC-SECURITY-RLS-006 y 007 corren hoy (son regresión del aislamiento
- * y del fail-closed vigentes y comparan «anterior» contra «actual»: iguales mientras no exista la migración).
+ * Escritas ANTES de la migración (TDD, grupo 2). TC-SECURITY-RLS-006 y 007 corren hoy (regresión del aislamiento y del
+ * invariante fail-closed enmendado por D297; el 007 vale antes y después de la migración).
  * TC-SECURITY-RLS-008, 009 y 011 sobre la FORMA NUEVA se omiten con `describe.skipIf(!RLS_POLICY_REWRITE_MIGRATION_PRESENT)`:
  * pasan a activas solas cuando existe `apps/api/db/migrations/<timestamp>_platform_rls_policy_initplan.sql` (tarea 3.1).
  */
@@ -458,43 +458,85 @@ describe('Políticas de aislamiento reescritas: aislamiento cruzado y fail-close
     }
   };
 
+  interface FailClosedResult {
+    /** `tabla|operación -> resultado`. */
+    readonly outcomes: Map<string, Outcome>;
+    /** Tablas cuyo conteo (como superusuario) cambió tras una inserción: no debe haber ninguna. */
+    readonly persisted: string[];
+    /** Estado de cada tabla al empezar: `A` (sin filas) o `B` (con filas; las de W2 se cuentan aparte). */
+    readonly state: Map<string, 'A' | 'B'>;
+    readonly w2Rows: Map<string, number>;
+  }
+
   /**
-   * Para cada tabla registrada y operación (lectura filtrada, lectura sin filtro, inserción) ejecuta, como `pf_app` y
-   * SIN contexto de workspace, dentro de una transacción que se revierte; antes aplica `restore` (las sentencias que
-   * devuelven las políticas a la forma anterior). Devuelve `tabla|operación -> resultado`.
+   * Para cada tabla registrada y operación (lectura filtrada por W1 y por W2, lectura sin filtro, inserción) ejecuta,
+   * como `pf_app` y SIN contexto de workspace, cada una en su SAVEPOINT y dentro de una transacción que se revierte;
+   * antes aplica `restore` (las sentencias que devuelven las políticas a la forma anterior). Tras cada inserción cuenta
+   * las filas de la tabla como superusuario.
    */
   async function failClosedMatrix(
     tables: readonly { schema: string; table: string; column: string | null }[],
     restore: readonly string[],
-  ): Promise<Map<string, Outcome>> {
-    const out = new Map<string, Outcome>();
+  ): Promise<FailClosedResult> {
+    const outcomes = new Map<string, Outcome>();
+    const persisted: string[] = [];
+    const state = new Map<string, 'A' | 'B'>();
+    const w2Rows = new Map<string, number>();
+    const count = async (qualified: string): Promise<number> =>
+      Number((await su.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${qualified}`)).rows[0]!.n);
     await su.query('BEGIN');
     try {
       for (const statement of restore) await su.query(statement);
+      for (const t of tables) {
+        const qualified = `${su.escapeIdentifier(t.schema)}.${su.escapeIdentifier(t.table)}`;
+        const key = `${t.schema}.${t.table}`;
+        state.set(key, (await count(qualified)) > 0 ? 'B' : 'A');
+        w2Rows.set(
+          key,
+          t.column === null
+            ? 0
+            : Number(
+                (
+                  await su.query<{ n: string }>(
+                    `SELECT count(*)::text AS n FROM ${qualified} WHERE ${su.escapeIdentifier(t.column)} = $1`,
+                    [w2],
+                  )
+                ).rows[0]!.n,
+              ),
+        );
+      }
       await su.query('SET LOCAL ROLE pf_app');
       await su.query(`SELECT set_config('app.workspace_id', '', true), set_config('app.user_id', '', true)`);
       for (const t of tables) {
         const qualified = `${su.escapeIdentifier(t.schema)}.${su.escapeIdentifier(t.table)}`;
         const key = `${t.schema}.${t.table}`;
         if (t.column !== null) {
-          out.set(
-            `${key}|lectura filtrada`,
-            await outcomeOf(
-              `SELECT 1 FROM ${qualified} WHERE ${su.escapeIdentifier(t.column)} = $1 LIMIT 1`,
-              [w1],
-            ),
-          );
+          const col = su.escapeIdentifier(t.column);
+          for (const [label, ws] of [
+            ['lectura filtrada W1', w1],
+            ['lectura filtrada W2', w2],
+          ] as const)
+            outcomes.set(
+              `${key}|${label}`,
+              await outcomeOf(`SELECT 1 FROM ${qualified} WHERE ${col} = $1 LIMIT 1`, [ws]),
+            );
         }
-        out.set(`${key}|lectura sin filtro`, await outcomeOf(`SELECT 1 FROM ${qualified} LIMIT 1`));
-        out.set(`${key}|inserción`, await outcomeOf(`INSERT INTO ${qualified} DEFAULT VALUES`));
+        outcomes.set(`${key}|lectura sin filtro`, await outcomeOf(`SELECT 1 FROM ${qualified} LIMIT 1`));
+        await su.query('RESET ROLE');
+        const before = await count(qualified);
+        await su.query('SET LOCAL ROLE pf_app');
+        outcomes.set(`${key}|inserción`, await outcomeOf(`INSERT INTO ${qualified} DEFAULT VALUES`));
+        await su.query('RESET ROLE');
+        if ((await count(qualified)) !== before) persisted.push(key);
+        await su.query('SET LOCAL ROLE pf_app');
       }
     } finally {
       await su.query('ROLLBACK');
     }
-    return out;
+    return { outcomes, persisted, state, w2Rows };
   }
 
-  it('[TC-SECURITY-RLS-007] sin contexto cada tabla registrada responde igual con la política actual que con la anterior; ninguna devuelve filas y los huecos previos se registran como hallazgo', async () => {
+  it('[TC-SECURITY-RLS-007] sin contexto ninguna operación lee ni escribe filas en ninguna tabla registrada, con la tabla sin filas y con filas de W2; la matriz se imprime con la comparación informativa con la política anterior', async () => {
     const { rows: registry } = await su.query<{ schema: string; table: string; column: string | null }>(
       `SELECT w.schema_name AS schema, w.table_name AS "table",
               CASE WHEN EXISTS (SELECT 1 FROM pg_attribute a
@@ -508,40 +550,69 @@ describe('Políticas de aislamiento reescritas: aislamiento cruzado y fail-close
     const restore = await legacyPolicyAlterStatements(su);
     const current = await failClosedMatrix(registry, []);
     // «Anterior»: las políticas devueltas a la forma previa a la reescritura (vacío mientras no exista la migración).
+    // Solo informativa (D297): no se exige que coincida.
     const previous = await failClosedMatrix(registry, restore);
-    expect(current.size).toBe(previous.size);
+    expect(current.outcomes.size).toBe(previous.outcomes.size);
+
+    // Invariante (válido antes y después de la migración): cada operación es PF002, vacío o un rechazo con otro
+    // error, sin fila afectada; ninguna lectura devuelve filas y ninguna inserción persiste.
+    const violations: string[] = [];
+    for (const [label, result] of [
+      ['actual', current],
+      ['anterior', previous],
+    ] as const) {
+      for (const [key, outcome] of result.outcomes) {
+        if (outcome !== 'VACIO' && !outcome.startsWith('ERROR '))
+          violations.push(`${label}: ${key} => ${outcome}`);
+      }
+      for (const table of result.persisted) violations.push(`${label}: ${table} persistió una fila`);
+    }
+    expect(violations, 'operaciones sin contexto que leen o escriben filas').toEqual([]);
+
+    // Estado B: hay tablas con filas de W2 (como mínimo las del ledger) y ninguna lectura las devuelve.
+    const withW2 = [...current.w2Rows].filter(([, n]) => n > 0).map(([t]) => t);
+    for (const t of [
+      'ledger.journal_entry',
+      'ledger.posting',
+      'ledger.ledger_account',
+      'ledger.balance_snapshot',
+    ])
+      expect(withW2, `${t} debe tener filas de W2 en el estado B`).toContain(t);
+    const stateA = [...current.state].filter(([, st]) => st === 'A').length;
+    expect(stateA + [...current.state].filter(([, st]) => st === 'B').length).toBe(registry.length);
 
     const histogram = new Map<string, number>();
     const findings: string[] = [];
-    const worse: string[] = [];
-    for (const [key, before] of previous) {
-      const now = current.get(key)!;
+    const differences: string[] = [];
+    for (const [key, before] of previous.outcomes) {
+      const now = current.outcomes.get(key)!;
       histogram.set(before, (histogram.get(before) ?? 0) + 1);
-      // Hallazgo (D296): la política anterior ya devuelve vacío/filas sin lanzar PF002.
-      if (before === 'VACIO' || before === 'FILAS')
-        findings.push(`${key}: anterior ${before}, actual ${now}`);
-      // No empeora: lo que fallaba con PF002 sigue fallando con PF002; lo demás, igual o mejor (PF002).
-      const ok =
-        before === 'ERROR PF002'
-          ? now === 'ERROR PF002'
-          : now === before || now === 'ERROR PF002' || (before === 'FILAS' && now === 'VACIO');
-      if (!ok) worse.push(`${key}: anterior ${before}, actual ${now}`);
+      // Hallazgo (D296): la política anterior ya devuelve vacío sin lanzar PF002.
+      if (before === 'VACIO') findings.push(`${key}: anterior ${before}, actual ${now}`);
+      if (now !== before) differences.push(`${key}: anterior ${before}, actual ${now}`);
     }
+    const table = registry.map((t) => {
+      const key = `${t.schema}.${t.table}`;
+      const ops = [...current.outcomes]
+        .filter(([k]) => k.startsWith(`${key}|`))
+        .map(([k, v]) => `${k.slice(key.length + 1)}=${v}`)
+        .join('; ');
+      return `  ${key} [estado ${current.state.get(key)}, filas W2 ${current.w2Rows.get(key)}]: ${ops}`;
+    });
     console.log(
       [
         '==== RLS-FAIL-CLOSED-MATRIX (TC-SECURITY-RLS-007) ====',
-        `tablas registradas: ${registry.length}; operaciones: ${previous.size}; políticas restauradas a la forma anterior: ${restore.length}`,
+        `tablas registradas: ${registry.length} (sin filas: ${stateA}; con filas de W2: ${withW2.length}); operaciones: ${current.outcomes.size}; políticas restauradas a la forma anterior: ${restore.length}`,
         `resultados de la política anterior: ${[...histogram].map(([k, v]) => `${k}=${v}`).join(', ')}`,
+        ...table,
         `HALLAZGOS (política anterior sin PF002 sin contexto; se registran, no se corrigen aquí, D296): ${findings.length}`,
         ...findings.map((f) => `  RLS-FAIL-CLOSED-FINDING ${f}`),
+        `DIFERENCIAS INFORMATIVAS con la política anterior (esperadas, D297; no fallan): ${differences.length}`,
+        ...differences.map((d) => `  RLS-FAIL-CLOSED-DIFF ${d}`),
         '==== FIN RLS-FAIL-CLOSED-MATRIX ====',
       ].join('\n'),
     );
-    expect(worse, 'operaciones donde la política actual empeora el fail-closed de la anterior').toEqual([]);
-    // Ninguna operación devuelve filas de negocio con la política actual, salvo las que ya las devolvían antes.
-    const newRows = [...current].filter(([key, r]) => r === 'FILAS' && previous.get(key) !== 'FILAS');
-    expect(newRows).toEqual([]);
-  }, 120_000);
+  }, 180_000);
 });
 
 describe.skipIf(!RLS_POLICY_REWRITE_MIGRATION_PRESENT)(
