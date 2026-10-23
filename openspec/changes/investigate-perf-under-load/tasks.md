@@ -1,6 +1,8 @@
 # Tareas
 
-> Change de investigación: sin dominio, aplicación, API, UI ni migraciones. El entregable de implementación es un informe con la causa medida de cada rojo de `perf` y su camino; los arreglos del producto van en changes de seguimiento. Sin Docker, `pnpm perf:bench` no corre en la sesión: las mediciones las hace el job `perf` por `workflow_dispatch` (rama de experimentos) y se dice en el informe. El job `perf` sigue bloqueante mientras tanto (D285). Preguntas en [docs/47](../../../docs/47-investigate-perf-under-load-questions.md): la 1 bloquea solo el grupo 5.
+> Change de investigación: sin dominio, aplicación, API, UI ni migraciones. El entregable de implementación es un informe con la causa medida de cada rojo de `perf` y su camino; los arreglos del producto van en changes de seguimiento. Sin Docker, `pnpm perf:bench` no corre en la sesión: las mediciones las hace el job `perf` por `workflow_dispatch` (rama de experimentos) y se dice en el informe. El job `perf` sigue bloqueante mientras tanto (D285). Las preguntas de [docs/47](../../../docs/47-investigate-perf-under-load-questions.md) están resueltas ([docs/48](../../../docs/48-perf-and-rls-owner-decisions.md), 2026-10-23): aislamiento por purga del backlog residual (D291), fila de throughput con handler real informativa (D292) y runner estándar (D293). Ningún grupo espera al owner.
+>
+> **Orden de implementación.** (1) Grupo 1, sin Docker. (2) Grupos 2 y 6 en un PR que se fusiona: tests unitarios y de política escritos y verificados sin Docker (`pnpm turbo test`); la foto real de carga de fondo la valida el job `perf` por `workflow_dispatch`. (3) Grupo 3: experimentos solo por `workflow_dispatch` de `nightly` desde la rama `claude/investigate-perf-under-load-experiments`, que no se fusiona. (4) Grupo 4 (informe), sin Docker. (5) Grupo 5 con la purga de D291: tests del veredicto sin Docker; la purga y la precondición se verifican por `workflow_dispatch` (7.2). (6) Grupos 7 y 8.
 
 ## 1. SPEC y TEST CASES
 
@@ -26,14 +28,14 @@
 ## 4. INFORME (decisión 6)
 
 - [ ] 4.1 `docs/NN-perf-under-load-findings.md` (siguiente número libre de `docs/`): por síntoma S1–S3, hipótesis aceptadas y descartadas con medianas y dispersión de las repeticiones, causa, camino (arreglo del benchmark, change de producto con nombre propuesto, ajuste de umbral a decidir por el owner o change de optimización) y responsable
-- [ ] 4.2 Preguntas que abra el informe (ajustes de umbral, changes de producto) en un doc `docs/NN-…-questions.md` con opciones y recomendación; sus respuestas en el siguiente `…-decisions.md`
+- [ ] 4.2 Preguntas que abra el informe (ajustes de umbral, changes de producto, el umbral por consumidor con handler real de D292 si el informe lo propone, el runner si la contención resulta la única causa, D293) en un doc `docs/NN-…-questions.md` con opciones y recomendación; sus respuestas en el siguiente `…-decisions.md`
 - [ ] 4.3 Redactar o proponer en docs/38 los changes de seguimiento que el informe identifique (sin implementarlos aquí)
 
-## 5. AISLAMIENTO del benchmark (decisión 4; requiere la respuesta a la pregunta 1 de docs/47)
+## 5. AISLAMIENTO del benchmark (decisión 4; purga del backlog residual, D291)
 
 - [ ] 5.1 Tests primero: con una base de fixture con eventos pendientes ajenos, la suite falla con el veredicto `interferencia` y la cantidad medida (TC-PLATFORM-PIPELINE-026); sin ellos mide normalmente (TC-PLATFORM-PIPELINE-024)
-- [ ] 5.2 Implementar el mecanismo que elija el owner (recomendado: purga del backlog residual en la base efímera tras la medición de throughput) solo en el harness de pruebas; precondición de aislamiento al empezar cada suite
-- [ ] 5.3 Si el mecanismo cambia `nightly.yml` (p. ej. un job aparte), actualizar el test de política y verificar que no cambia ningún check requerido
+- [ ] 5.2 Implementar la purga del backlog residual (D291) en la base efímera tras la medición de throughput (marcar o borrar los eventos pendientes del outbox y vaciar las colas `events.*`), solo en el harness de pruebas y en el mismo job; precondición de aislamiento al empezar cada suite. Si el informe (grupo 4) muestra que el volumen de la base (H3) también influye, detenerse y preguntar al owner por una base por suite antes de implementar
+- [ ] 5.3 Verificar que la purga no cambia `nightly.yml` ni agrega jobs (D291 descarta el job aparte); si algún paso del job lo requiere, actualizar el test de política y verificar que no cambia ningún check requerido
 
 ## 6. UMBRALES fijados (decisión 5)
 

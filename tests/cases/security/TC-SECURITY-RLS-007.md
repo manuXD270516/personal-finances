@@ -33,7 +33,7 @@ expected_result:
   - "Ninguna operación devuelve filas de negocio"
   - "Toda operación que con la política anterior ya devolvía vacío sin PF002 queda listada como hallazgo y no empeora"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-SECURITY-RLS-007 — Sin contexto, cada tabla registrada responde igual con la política reescrita que con la anterior y ninguna devuelve filas
@@ -53,4 +53,4 @@ Entonces cada operación que fallaba con PF002 sigue fallando igual
 
 ## Notas
 
-- Change `optimize-rls-policy-overhead` (D287). Si la política anterior ya tiene un hueco (vacío sin `PF002`), se aplica la pregunta 6 de docs/47.
+- Change `optimize-rls-policy-overhead` (D287). Si la política anterior ya tiene un hueco (vacío sin `PF002`), se registra como hallazgo en estas notas y en docs/38 y se corrige en un change de seguridad aparte (D296 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)); este TC solo exige que la política nueva no empeore.
