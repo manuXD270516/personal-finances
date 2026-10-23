@@ -34,7 +34,7 @@ catalog:
   '@testcontainers/postgresql': 12.2.0
   supertest: 7.3.0
   '@types/supertest': 7.2.1
-  next: 16.3.8
+  next: 16.4.2
   react: 19.3.0
   react-dom: 19.3.0
   '@types/react': 19.3.0
