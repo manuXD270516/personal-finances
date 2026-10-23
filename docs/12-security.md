@@ -184,7 +184,7 @@ sequenceDiagram
 **Primera línea:** el guard verifica membership para el `{workspaceId}` de la ruta. **Segunda línea (defense-in-depth):** PostgreSQL RLS, de modo que un bug en un repositorio (olvidar `WHERE workspace_id = …`) no pueda filtrar datos.
 
 1. **Contexto por transacción**: el Unit of Work ejecuta, dentro de cada transacción, `SELECT set_config('app.workspace_id', $1, true)` (equivalente a `SET LOCAL`) y `app.user_id`. Al terminar la transacción el valor desaparece → seguro con *connection pooling* (incluido PgBouncer en modo transaction, si se usara).
-2. **Políticas** `USING/WITH CHECK (workspace_id = platform.current_workspace_id())` en **todas** las tablas de negocio, con `FORCE ROW LEVEL SECURITY` (ver [08-data-model.md](08-data-model.md) §1.4, §10.3). Sin setting ⇒ la consulta **falla** con `SQLSTATE PF002` (fail-closed ruidoso, ADR-0023, validado en SPIKE-02); nunca un resultado vacío silencioso.
+2. **Políticas** `USING/WITH CHECK (workspace_id = platform.current_workspace_id())` en **todas** las tablas de negocio, con `FORCE ROW LEVEL SECURITY` (ver [08-data-model.md](08-data-model.md) §1.4, §10.3). Sin setting ⇒ toda operación que evalúa una fila **falla** con `SQLSTATE PF002` (fail-closed ruidoso, ADR-0023, validado en SPIKE-02); nunca se lee ni se escribe una fila de ningún workspace. Con la forma InitPlan de las políticas, una operación que no evalúa filas (tabla vacía) puede devolver vacío sin `PF002` (D297, [docs/49](49-rls-failclosed-decision.md)).
 3. **Roles**:
 
 | Rol | Uso | Atributos |
@@ -202,7 +202,7 @@ sequenceDiagram
 5. **Tests que prueban que la fuga es imposible** (`TC-IDENTITY-RLS-*`, [16-testing-strategy.md](16-testing-strategy.md) §5.5):
    - Catálogo: toda tabla con columna `workspace_id` tiene `relrowsecurity = relforcerowsecurity = true` y al menos una política; ninguna tabla de negocio sin `workspace_id` salvo allowlist explícita.
    - Roles: `pf_app`/`pf_worker` no tienen `rolbypassrls`, no son owners de ninguna tabla.
-   - Por tabla (parametrizado): con WS-A fijado no se leen filas de WS-B; `INSERT` con `workspace_id` de WS-B falla (`WITH CHECK`); sin setting la consulta **falla** con `SQLSTATE PF002` (nunca 0 filas).
+   - Por tabla (parametrizado): con WS-A fijado no se leen filas de WS-B; `INSERT` con `workspace_id` de WS-B falla (`WITH CHECK`); sin setting no se lee ni se escribe ninguna fila y, en tablas con filas, la consulta **falla** con `SQLSTATE PF002` (D297).
    - API (property-based con fast-check): para operaciones aleatorias del contrato con IDs de otro workspace, la respuesta es siempre 403/404/422 y nunca contiene IDs de WS-B.
    - E2E: dos usuarios en dos workspaces; navegación manipulando URLs.
 

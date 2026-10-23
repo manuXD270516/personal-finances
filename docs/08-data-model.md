@@ -40,8 +40,10 @@ Este documento define el **modelo físico** en PostgreSQL 18: un schema por boun
 
 ```sql
 -- Función helper: fail-closed RUIDOSO (ADR-0023, validado en SPIKE-02).
--- Si el setting no existe o está vacío, la query FALLA en vez de devolver 0 filas en silencio:
--- un bug de contexto se detecta de inmediato y nunca se confunde con "workspace vacío".
+-- Si el setting no existe o está vacío, toda operación que evalúa una fila FALLA con PF002:
+-- un bug de contexto se detecta de inmediato y nunca concede acceso. Con la forma InitPlan
+-- de las políticas (D297), una operación que no evalúa ninguna fila (tabla vacía) puede
+-- devolver 0 filas sin error; nunca lee ni escribe una fila de ningún workspace.
 CREATE FUNCTION platform.current_workspace_id() RETURNS uuid
   LANGUAGE plpgsql STABLE PARALLEL SAFE AS
 $$
@@ -62,7 +64,7 @@ CREATE POLICY ws_isolation ON <s>.<t>
   WITH CHECK (workspace_id = ANY (ARRAY[(SELECT platform.current_workspace_id())]));
 ```
 
-> **Forma canónica de las políticas (2026-10-23, change `optimize-rls-policy-overhead`, D294).** Las migraciones nuevas escriben el contexto como `<col> = ANY (ARRAY[(SELECT platform.current_workspace_id())])` (y lo mismo con `platform.current_user_id()`), no `<col> = platform.current_workspace_id()`: así el contexto se evalúa una vez (InitPlan) y el planner no agrega un nodo `Result` con `One-Time Filter` sobre el acceso por índice (+0,805 ms en la consulta de saldo por cuenta). La migración `20261023120000_platform_rls_policy_initplan.sql` reescribió todas las políticas existentes; la regla de catálogo `rlsNonCanonicalPolicies` (TC-SECURITY-RLS-011) falla si una política de `pf_app`/`pf_worker` usa la forma anterior. Las tablas de las secciones siguientes muestran las políticas con la notación abreviada `workspace_id = current_workspace_id()`; en la base se leen en la forma canónica. Una tabla sin filas ya no falla con `PF002` al leerla sin contexto (ver docs/38, pendiente RLS).
+> **Forma canónica de las políticas (2026-10-23, change `optimize-rls-policy-overhead`, D294).** Las migraciones nuevas escriben el contexto como `<col> = ANY (ARRAY[(SELECT platform.current_workspace_id())])` (y lo mismo con `platform.current_user_id()`), no `<col> = platform.current_workspace_id()`: así el contexto se evalúa una vez (InitPlan) y el planner no agrega un nodo `Result` con `One-Time Filter` sobre el acceso por índice (+0,805 ms en la consulta de saldo por cuenta). La migración `20261023120000_platform_rls_policy_initplan.sql` reescribió todas las políticas existentes; la regla de catálogo `rlsNonCanonicalPolicies` (TC-SECURITY-RLS-011) falla si una política de `pf_app`/`pf_worker` usa la forma anterior. Las tablas de las secciones siguientes muestran las políticas con la notación abreviada `workspace_id = current_workspace_id()`; en la base se leen en la forma canónica. Sin contexto, una operación que no llega a evaluar ninguna fila (p. ej. una lectura de una tabla sin filas) devuelve vacío o la rechaza otra restricción en vez de `PF002`; con filas sigue fallando con `PF002` y nunca se lee ni se escribe una fila de ningún workspace. El owner lo aceptó como invariante de seguridad (D297, [docs/49](49-rls-failclosed-decision.md); TC-SECURITY-RLS-007).
 
 Códigos usados en las tablas de este documento:
 
@@ -439,7 +441,7 @@ Códigos SQLSTATE propios de la BD (docs/31 D19; as-built, migraciones `20261002
 | SQLSTATE | Significado | Origen |
 |----------|-------------|--------|
 | `PF001` | Asiento desbalanceado por moneda (`LEDGER_UNBALANCED_ENTRY`, INV-004) | `ledger.assert_entry_balanced()` (constraint trigger diferido) |
-| `PF002` | Contexto de RLS ausente (`app.workspace_id` sin fijar; también `app.user_id` en las tablas **USR**): la consulta **falla**, nunca devuelve 0 filas | `platform.current_workspace_id()` (§1.4), `platform.current_user_id()` |
+| `PF002` | Contexto de RLS ausente (`app.workspace_id` sin fijar; también `app.user_id` en las tablas **USR**): toda operación que evalúa una fila **falla**; nunca se lee ni se escribe una fila de ningún workspace. Una operación que no evalúa filas (tabla vacía) puede devolver 0 filas sin `PF002` (D297, [docs/49](49-rls-failclosed-decision.md)) | `platform.current_workspace_id()` (§1.4), `platform.current_user_id()` |
 | `PF003` | Mutación prohibida sobre una tabla append-only (`IMMUTABLE_RECORD`, INV-007) | `platform.forbid_mutation()` |
 | `PF004` | Periodo cerrado (`PERIOD_CLOSED`, INV-015) | `ledger.assert_period_open()` |
 | `PF005` | Asiento con menos de 2 postings (`LEDGER_ENTRY_TOO_FEW_POSTINGS`, INV-005) | `ledger.assert_entry_has_postings()` (constraint trigger diferido) |
@@ -2218,7 +2220,7 @@ SELECT set_config('app.user_id',      '0192f3c4-...-...', true);
 COMMIT;  -- triggers diferidos se evalúan aquí
 ```
 
-Test obligatorio (ver [16-testing-strategy.md](16-testing-strategy.md) §5.5 y `tests/cases/`, `TC-IDENTITY-RLS-*`): para **cada** tabla con `workspace_id`, un test parametrizado verifica `relrowsecurity AND relforcerowsecurity`, existencia de política, y que con `app.workspace_id` = WS-A no se leen ni insertan filas de WS-B; y que sin setting la consulta **falla** con `SQLSTATE PF002` (nunca 0 filas).
+Test obligatorio (ver [16-testing-strategy.md](16-testing-strategy.md) §5.5 y `tests/cases/`, `TC-IDENTITY-RLS-*`): para **cada** tabla con `workspace_id`, un test parametrizado verifica `relrowsecurity AND relforcerowsecurity`, existencia de política, y que con `app.workspace_id` = WS-A no se leen ni insertan filas de WS-B; y que sin setting la consulta **falla** con `SQLSTATE PF002` en las tablas con filas, y en todas (incluidas las vacías) no se lee ni se escribe ninguna fila (D297, TC-SECURITY-RLS-007).
 
 ---
 

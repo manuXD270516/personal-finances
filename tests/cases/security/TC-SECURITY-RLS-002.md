@@ -63,3 +63,4 @@ Y no obtiene ninguna fila de negocio
 ## Notas
 
 - Variante con la conexión reutilizada (app.workspace_id = '' tras un SET LOCAL previo).
+- Las tablas del caso tienen filas (Minimal Seed), por eso se sigue exigiendo `PF002`. Desde D297 ([docs/49](../../../docs/49-rls-failclosed-decision.md)) el requirement admite vacío o rechazo sin fila afectada cuando la operación no evalúa ninguna fila (tabla sin filas, forma InitPlan V2); ese caso lo cubre TC-SECURITY-RLS-007.

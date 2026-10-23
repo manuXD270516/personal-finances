@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Reescritura de las políticas de aislamiento sin pérdida de aislamiento
-Toda reescritura de las políticas de aislamiento por workspace DEBE (MUST) conservar exactamente su efecto: con el contexto de un workspace, ninguna lectura devuelve filas de otro y toda escritura hacia otro workspace falla o no afecta filas; el aislamiento DEBE (MUST) seguir habilitado y forzado en todas las tablas de negocio con columna de workspace y el registro de esas tablas NO DEBE (MUST NOT) cambiar. En cada tabla de negocio y forma de consulta en que la política anterior fallaba sin contexto de workspace con el error explícito de contexto ausente, la política reescrita DEBE (MUST) fallar con el mismo error y NO DEBE (MUST NOT) devolver un resultado vacío en silencio.
+Toda reescritura de las políticas de aislamiento por workspace DEBE (MUST) conservar su efecto de aislamiento: con el contexto de un workspace, ninguna lectura devuelve filas de otro y toda escritura hacia otro workspace falla o no afecta filas; el aislamiento DEBE (MUST) seguir habilitado y forzado en todas las tablas de negocio con columna de workspace y el registro de esas tablas NO DEBE (MUST NOT) cambiar. Sin contexto de workspace, la política reescrita NO DEBE (MUST NOT) permitir que ninguna operación lea ni escriba una fila de ningún workspace en ninguna tabla registrada: el resultado válido DEBE (MUST) ser el error explícito de contexto ausente, o un resultado vacío o un rechazo sin ninguna fila afectada; el contexto ausente NO DEBE (MUST NOT) conceder acceso. No se exige el mismo error que con la política anterior cuando la operación no llega a evaluar ninguna fila (D297).
 Trace: FR-IDENTITY-006, NFR-SEC-003, NFR-SEC-004 · Priority: Must
 
 #### Scenario: Lectura y escritura cruzadas con las políticas reescritas
@@ -9,10 +9,11 @@ Trace: FR-IDENTITY-006, NFR-SEC-003, NFR-SEC-004 · Priority: Must
 - **ENTONCES** solo se devuelven filas de "W1 Personal Demo" y la cuenta "W2 Bank" con saldo 5000.00 BOB no aparece
 - **Y** la inserción hacia "W2 Other Demo" falla por la política de aislamiento
 
-#### Scenario: Sin contexto el resultado es el mismo que con la política anterior
-- **CUANDO** para cada tabla de negocio registrada se ejecutan, sin workspace fijado, una lectura que filtra por un workspace existente, una lectura sin filtro y una inserción, primero con la política anterior y después con la reescrita
-- **ENTONCES** cada operación que fallaba con el error de contexto ausente sigue fallando con ese error
-- **Y** ninguna operación devuelve filas de negocio
+#### Scenario: Sin contexto ninguna operación lee ni escribe filas en ninguna tabla registrada
+- **CUANDO** con las políticas reescritas, para cada tabla de negocio registrada y sin workspace fijado, se ejecutan una lectura que filtra por un workspace existente, una lectura sin filtro y una inserción, primero con la tabla sin filas y después, en las tablas que tienen filas de "W2 Other Demo", con esas filas
+- **ENTONCES** cada operación falla con el error de contexto ausente, o devuelve un resultado vacío, o es rechazada sin afectar ninguna fila
+- **Y** ninguna lectura devuelve filas de negocio y ninguna inserción persiste una fila
+- **Y** con filas de "W2 Other Demo" en la tabla, ninguna lectura devuelve esas filas
 
 #### Scenario: Catálogo de aislamiento intacto
 - **CUANDO** se inspecciona el catálogo después de aplicar la reescritura
@@ -40,3 +41,23 @@ Trace: NFR-SEC-003 · Priority: Should
 #### Scenario: Migración con una política en la forma anterior
 - **CUANDO** una pull request agrega una tabla de negocio con columna de workspace y una política forzada que compara el workspace con el contexto sin la forma canónica
 - **ENTONCES** el quality gate falla indicando la tabla y la política
+
+## MODIFIED Requirements
+
+### Requirement: Aislamiento fail-closed sin contexto de workspace
+Una transacción de base de datos sin workspace fijado NO DEBE (MUST NOT) leer ni escribir filas de tablas de negocio de ningún workspace ni acceder a todos los workspaces; el contexto ausente NO DEBE (MUST NOT) conceder acceso. Toda consulta o escritura que llegue a evaluar una fila de una tabla de negocio DEBE (MUST) fallar con un error explícito de contexto ausente; una operación que no llega a evaluar ninguna fila (p. ej. sobre una tabla sin filas) PUEDE (MAY) devolver un resultado vacío o ser rechazada por otra restricción, siempre sin ninguna fila leída ni afectada (D297).
+Trace: NFR-SEC-003 · Priority: Must
+
+#### Scenario: Consulta sin contexto
+- **CUANDO** el rol de aplicación consulta la tabla de transacciones, que tiene filas, en una transacción sin workspace fijado
+- **ENTONCES** la consulta falla con un error explícito de contexto de workspace ausente
+- **Y** no se devuelve ninguna fila de negocio
+
+#### Scenario: Inserción sin contexto
+- **CUANDO** el rol de aplicación intenta insertar una transacción de 75.00 BOB sin workspace fijado
+- **ENTONCES** la inserción falla y no se persiste nada
+
+#### Scenario: Tabla sin filas sin contexto
+- **CUANDO** el rol de aplicación lee sin workspace fijado una tabla de negocio registrada que no tiene filas
+- **ENTONCES** la lectura falla con el error de contexto ausente o devuelve un resultado vacío
+- **Y** no se devuelve ninguna fila de negocio
