@@ -14,7 +14,7 @@ type: security
 level: database-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 5
 tags: ["rls", "fail-closed", "policy-rewrite"]
