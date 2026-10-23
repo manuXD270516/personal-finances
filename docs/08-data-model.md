@@ -58,9 +58,11 @@ $$;
 ALTER TABLE <s>.<t> ENABLE ROW LEVEL SECURITY;
 ALTER TABLE <s>.<t> FORCE ROW LEVEL SECURITY;  -- aplica incluso al owner
 CREATE POLICY ws_isolation ON <s>.<t>
-  USING      (workspace_id = platform.current_workspace_id())
-  WITH CHECK (workspace_id = platform.current_workspace_id());
+  USING      (workspace_id = ANY (ARRAY[(SELECT platform.current_workspace_id())]))
+  WITH CHECK (workspace_id = ANY (ARRAY[(SELECT platform.current_workspace_id())]));
 ```
+
+> **Forma canónica de las políticas (2026-10-23, change `optimize-rls-policy-overhead`, D294).** Las migraciones nuevas escriben el contexto como `<col> = ANY (ARRAY[(SELECT platform.current_workspace_id())])` (y lo mismo con `platform.current_user_id()`), no `<col> = platform.current_workspace_id()`: así el contexto se evalúa una vez (InitPlan) y el planner no agrega un nodo `Result` con `One-Time Filter` sobre el acceso por índice (+0,805 ms en la consulta de saldo por cuenta). La migración `20261023120000_platform_rls_policy_initplan.sql` reescribió todas las políticas existentes; la regla de catálogo `rlsNonCanonicalPolicies` (TC-SECURITY-RLS-011) falla si una política de `pf_app`/`pf_worker` usa la forma anterior. Las tablas de las secciones siguientes muestran las políticas con la notación abreviada `workspace_id = current_workspace_id()`; en la base se leen en la forma canónica. Una tabla sin filas ya no falla con `PF002` al leerla sin contexto (ver docs/38, pendiente RLS).
 
 Códigos usados en las tablas de este documento:
 

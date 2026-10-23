@@ -120,20 +120,23 @@ export const RLS_POLICY_REWRITE_MIGRATION_PRESENT: boolean = readdirSync(MIGRATI
 const CONTEXT_CALL = /(?:platform\.)?current_workspace_id\(\)/giu;
 
 /**
- * FORMA CANÓNICA de una mención del contexto (como la devuelve `pg_get_expr`). PROVISIONAL: corresponde a la variante
- * V1 (`(SELECT platform.current_workspace_id())`, InitPlan) y se ajusta a la variante que elija el owner tras leer los
- * planes del experimento `rls-policy-variants.int.test.ts` (tarea 1.3), antes de la migración (tarea 3.1). Es el único
+ * FORMA CANÓNICA de una mención del contexto (como la devuelve `pg_get_expr`): variante V2 del experimento
+ * `rls-policy-variants.int.test.ts` (change `optimize-rls-policy-overhead`, tarea 1.3), elegida porque conserva los
+ * nodos y el acceso por índice del plan sin política y el fail-closed (PF002) de la política anterior:
+ * `<col> = ANY (ARRAY[(SELECT platform.current_workspace_id())])`. La regex cubre solo la parte `ANY (ARRAY[…])` (el
+ * `<col> =` queda fuera) y tolera el espacio tras `(` y el `AS current_workspace_id` que agrega el deparse. Es el único
  * lugar donde cambia la forma: la regla de catálogo, la prueba de equivalencia (TC-SECURITY-RLS-007) y la restauración
  * de la forma anterior se derivan de esta expresión.
  */
 export const RLS_CANONICAL_CONTEXT_FORM =
-  /\(\s*SELECT\s+(?:platform\.)?current_workspace_id\(\)(?:\s+AS\s+current_workspace_id)?\s*\)/giu;
+  /ANY\s*\(\s*ARRAY\s*\[\s*\(\s*SELECT\s+(?:platform\.)?current_workspace_id\(\)(?:\s+AS\s+current_workspace_id)?\s*\)\s*\]\s*\)/giu;
 
 /**
  * Predicado de ejemplo en la forma canónica, para los fixtures de las pruebas (TC-SECURITY-RLS-011/007). Debe
- * cambiar junto con `RLS_CANONICAL_CONTEXT_FORM` cuando se elija la variante.
+ * cambiar junto con `RLS_CANONICAL_CONTEXT_FORM`.
  */
-export const RLS_CANONICAL_PREDICATE_EXAMPLE = 'workspace_id = (SELECT platform.current_workspace_id())';
+export const RLS_CANONICAL_PREDICATE_EXAMPLE =
+  'workspace_id = ANY (ARRAY[(SELECT platform.current_workspace_id())])';
 
 /** Forma anterior (sin envolver) que sustituye a la canónica al reconstruir la política anterior. */
 const LEGACY_CONTEXT_CALL = 'platform.current_workspace_id()';
@@ -146,9 +149,15 @@ export function nonCanonicalContextMentions(expr: string | null): number {
   return Math.max(0, total - canonical);
 }
 
+/** Misma forma aplicada a `platform.current_user_id()` en las políticas que además comparan con el usuario. */
+const CANONICAL_USER_FORM =
+  /ANY\s*\(\s*ARRAY\s*\[\s*\(\s*SELECT\s+(?:platform\.)?current_user_id\(\)(?:\s+AS\s+current_user_id)?\s*\)\s*\]\s*\)/giu;
+
 /** Convierte una expresión de política a la forma anterior (reemplaza cada mención canónica por la llamada directa). */
 export function legacyContextExpr(expr: string): string {
-  return expr.replace(RLS_CANONICAL_CONTEXT_FORM, LEGACY_CONTEXT_CALL);
+  return expr
+    .replace(RLS_CANONICAL_CONTEXT_FORM, LEGACY_CONTEXT_CALL)
+    .replace(CANONICAL_USER_FORM, 'platform.current_user_id()');
 }
 
 interface PolicyRow {

@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: security
 level: architecture
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["rls", "catalog", "ci"]
@@ -50,3 +51,4 @@ Entonces el quality gate falla indicando la tabla y la política
 ## Notas
 
 - Change `optimize-rls-policy-overhead` (D287), decisión 5. La regla aplica a todas las políticas que usan el contexto de workspace (D294 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)).
+- **Forma canónica elegida (2026-10-23, experimento de la tarea 1.3):** `<col> = ANY (ARRAY[(SELECT platform.current_workspace_id())])` (variante V2). `pg_get_expr` la devuelve como `ANY (ARRAY[( SELECT platform.current_workspace_id() AS current_workspace_id)])`; la regla (`RLS_CANONICAL_CONTEXT_FORM` en `apps/api/test/support/db.ts`) tolera ese espacio y el `AS`. Las políticas que además comparan con `platform.current_user_id()` usan la misma forma para esa función.

@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: security
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+  - apps/api/test/db/rls-policy-variants.int.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["rls", "plan", "performance"]
@@ -52,3 +54,4 @@ Entonces ambos usan el mismo acceso solo por índice
 ## Notas
 
 - Change `optimize-rls-policy-overhead` (D287), decisión 4. La cantidad de filas viene del EXPLAIN del issue #147.
+- Variante elegida: V2 (diferencia mediana de la consulta INCLUDE 0,000 ms frente a 0,268 ms de V0; mismos nodos `Aggregate > Index Only Scan` con InitPlan, sin nodo `Result`), medida en el job `integration` de #162 (PostgreSQL 18.6, 13 000 postings). Detalle por variante en la tarea 1.3 de `openspec/changes/optimize-rls-policy-overhead/tasks.md`.
