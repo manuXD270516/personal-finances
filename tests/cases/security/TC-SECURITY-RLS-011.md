@@ -14,7 +14,7 @@ type: security
 level: architecture
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["rls", "catalog", "ci"]

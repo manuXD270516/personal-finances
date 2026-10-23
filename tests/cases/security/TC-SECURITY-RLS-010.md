@@ -14,7 +14,7 @@ type: platform
 level: performance
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["rls", "nightly", "perf"]
@@ -34,7 +34,7 @@ expected_result:
   - "El reporte publica la diferencia y su IC95 para compararlos con la línea base"
   - "Las filas de PgBalanceQuery siguen en OK"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-SECURITY-RLS-010 — En el benchmark nocturno la fila saldo por cuenta (índice INCLUDE) deja de ser brecha demostrada con la política reescrita

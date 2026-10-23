@@ -14,7 +14,7 @@ type: security
 level: database-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["rls", "plan", "performance"]
@@ -31,7 +31,7 @@ expected_result:
   - "Ambos planes usan Index Only Scan sobre el mismo índice"
   - "El plan con política no tiene un nodo Result ni otro nodo entre el acceso por índice y el Aggregate"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-SECURITY-RLS-009 — El plan de la consulta de saldo por cuenta con la política reescrita no agrega un nodo entre el índice y la agregación
