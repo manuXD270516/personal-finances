@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: ["reporting/dashboard", "platform/event-delivery"]
 requirement: "El benchmark nocturno mide sin interferencia de carga de fondo"
 scenario: "Disponible para gastar después del Large Seed"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-PERF-004, NFR-PERF-008]
 invariants: []
@@ -21,7 +21,7 @@ tags: ["nightly", "perf", "background-load", "spendable"]
 error_code: null
 preconditions:
   - "Job perf con el Large Seed cargado y 470 165 eventos pendientes de publicar al terminar la carga"
-  - "Mecanismo de aislamiento elegido por el owner (pregunta 1 de docs/47)"
+  - "Purga del backlog residual en la base efímera tras la medición de throughput (D291)"
 input:
   pending_after_seed: 470165
   suite: "spendable.perf.ts (40 cuentas, 300 ocurrencias, 20 metas, BOB)"
@@ -34,7 +34,7 @@ expected_result:
   - "El reporte publica para la suite los eventos pendientes, los trabajos por cola, las conexiones activas y la carga del host"
   - "El p95 se reporta frente a 300 ms como medición válida"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-PLATFORM-PIPELINE-024 — La suite de disponible para gastar empieza sin backlog del Large Seed y el reporte publica su carga de fondo
@@ -54,5 +54,6 @@ Entonces al empezar no queda ningún evento ni trabajo de la carga anterior
 
 ## Notas
 
-- Change `investigate-perf-under-load` (D290, docs/46). `provisional` hasta que el owner elija el mecanismo de aislamiento (pregunta 1 de docs/47).
+- Change `investigate-perf-under-load` (D290, docs/46). `provisional` hasta que el owner eligiera el mecanismo de aislamiento (pregunta 1 de docs/47).
+- Confirmado (2026-10-23, D291 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)): el owner eligió purgar el backlog residual (outbox y colas `events.*`) en la base efímera tras medir el throughput, solo en el harness; `requirement_status` pasa a `confirmed`.
 - Datos ficticios del benchmark existente; `FixedClock` en America/La_Paz.

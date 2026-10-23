@@ -33,7 +33,7 @@ El diagnóstico (docs/23 §5.5, EXPLAIN del issue #147) muestra que `platform.cu
 
 **APIs impactadas:** ninguna (`contracts/openapi` sin cambios).
 
-**Tablas impactadas:** ninguna en su estructura; cambian las expresiones de las políticas de aislamiento de las tablas registradas en `platform.workspace_scoped_table` que comparan `workspace_id` con `platform.current_workspace_id()` (entre ellas `ledger.posting`, `ledger.journal_entry`, `ledger.balance_snapshot`, `ledger.entry_reversal`, `ledger.ledger_account` y las particiones de `audit.audit_log`). El alcance exacto depende de la pregunta 4 de docs/47.
+**Tablas impactadas:** ninguna en su estructura; cambian las expresiones de las políticas de aislamiento de las tablas registradas en `platform.workspace_scoped_table` que comparan `workspace_id` con `platform.current_workspace_id()` (entre ellas `ledger.posting`, `ledger.journal_entry`, `ledger.balance_snapshot`, `ledger.entry_reversal`, `ledger.ledger_account` y las particiones de `audit.audit_log`). El alcance son **todas** las políticas que usan el contexto de workspace, después de validar la forma en `ledger.posting` (D294, [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)).
 
 **Eventos impactados:** ninguno.
 
@@ -43,6 +43,6 @@ El diagnóstico (docs/23 §5.5, EXPLAIN del issue #147) muestra que `platform.cu
 
 **Impacto de regresión:** toda consulta de la aplicación pasa por las políticas reescritas; la suite de integración completa (Testcontainers) y los tests de aislamiento son la red. El job `perf` debería dejar de fallar por la fila RLS INCLUDE; si no, sigue en rojo (D285).
 
-**Riesgos introducidos:** riesgo de seguridad si la forma nueva debilita el aislamiento o el fail-closed (mitigado por las pruebas de equivalencia por tabla y la regla de catálogo); que ninguna forma quite el nodo `Result` (el design lo trata como hipótesis a medir, con una pregunta condicional al owner); planes distintos en otras consultas (lo detecta la brecha estructural del benchmark de RLS).
+**Riesgos introducidos:** riesgo de seguridad si la forma nueva debilita el aislamiento o el fail-closed (mitigado por las pruebas de equivalencia por tabla y la regla de catálogo); que ninguna forma quite el nodo `Result` (el design lo trata como hipótesis a medir; si se da, el change se detiene antes de migrar y vuelve al owner con la evidencia, D295); planes distintos en otras consultas (lo detecta la brecha estructural del benchmark de RLS).
 
 **Invariantes afectadas:** ninguna financiera (no cambia dinero, ledger, FX, periodos ni redondeo). Protege NFR-SEC-003 (aislamiento por workspace) y NFR-SEC-004.

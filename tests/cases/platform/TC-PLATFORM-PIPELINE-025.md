@@ -5,7 +5,7 @@ spec: platform/delivery-pipeline
 related_specs: ["commitments/recurrence-engine", "platform/event-delivery"]
 requirement: "El benchmark nocturno mide sin interferencia de carga de fondo"
 scenario: "Ráfaga del matcher sin backlog ajeno"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: [NFR-PERF-008]
 invariants: []
@@ -21,7 +21,7 @@ tags: ["nightly", "perf", "background-load", "matcher"]
 error_code: null
 preconditions:
   - "Suite commitments.perf.ts con 12 ocurrencias pendientes compatibles"
-  - "Mecanismo de aislamiento elegido por el owner (pregunta 1 de docs/47)"
+  - "Purga del backlog residual en la base efímera tras la medición de throughput (D291)"
 input:
   burst: "1000 TransactionCreated.v1 de origen IMPORT y 50 reentregados (1 050 eventos)"
   goal_events_per_second: 42
@@ -33,7 +33,7 @@ expected_result:
   - "El throughput se calcula como 1 050 eventos entre los segundos medidos"
   - "Siguen existiendo exactamente 12 sugerencias PROPOSED (TC-COMMITMENTS-MATCH-012)"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-PLATFORM-PIPELINE-025 — La ráfaga de 1 050 eventos del matcher se mide con la cola conteniendo solo sus propios eventos
@@ -55,3 +55,4 @@ Entonces la cola del matcher contiene solo los eventos de la ráfaga
 
 - Change `investigate-perf-under-load` (D290). No cambia la meta de D112 (≥ 42 ev/s) ni las aserciones de TC-COMMITMENTS-MATCH-012.
 - `provisional` hasta la pregunta 1 de docs/47.
+- Confirmado (2026-10-23, D291 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)): aislamiento por purga del backlog residual tras la medición de throughput; `requirement_status` pasa a `confirmed`.

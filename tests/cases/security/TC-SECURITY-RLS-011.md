@@ -30,7 +30,7 @@ expected_result:
   - "Sin fixture la regla no informa violaciones"
   - "Con el fixture la regla falla nombrando la tabla y la política"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-SECURITY-RLS-011 — El quality gate falla si una migración agrega una política de aislamiento sin la forma canónica
@@ -49,4 +49,4 @@ Entonces el quality gate falla indicando la tabla y la política
 
 ## Notas
 
-- Change `optimize-rls-policy-overhead` (D287), decisión 5.
+- Change `optimize-rls-policy-overhead` (D287), decisión 5. La regla aplica a todas las políticas que usan el contexto de workspace (D294 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)).
