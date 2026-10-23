@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - scripts/delivery-policy/test/nightly-policy.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "policy", "thresholds"]
@@ -33,7 +34,7 @@ expected_result:
   - "Con los umbrales reales la regla pasa y las filas bloqueantes siguen siéndolo"
   - "Cada fixture hace fallar la regla con el benchmark, el umbral nuevo y el de docs/02"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-PLATFORM-PIPELINE-028 — El test de política rechaza relajar el umbral de un benchmark sin decisión del owner
@@ -53,3 +54,4 @@ Entonces el test de política falla indicando el benchmark y ambos umbrales
 ## Notas
 
 - Change `investigate-perf-under-load` (D290), tarea 6.1. Cambiar un umbral exige editar la tabla esperada del test con la D-id que lo aprueba.
+- Implementado el 2026-10-23 (tarea 6.1): `scripts/delivery-policy/test/nightly-policy.test.ts` compara `PERF_THRESHOLDS`, `PERF_THROUGHPUT` y las constantes locales de las suites (`BUDGET_MS`, `COST_P95_MS`, `GOAL_EVENTS_PER_SECOND`, `PREVIEW_BUDGET_MS`, `PERSIST_BUDGET_MS`, `DRAIN_BUDGET_MS`) con la tabla esperada, que a su vez se verifica contra la fila de cada NFR de docs/02. `BUDGET_MS` de `spendable.perf.ts` y `GOAL_EVENTS_PER_SECOND` de `commitments.perf.ts` ahora salen de `perf-report.ts` (mismos valores: 300 ms y 42 ev/s). Las filas bloqueantes de `nightly.perf.ts` siguen siéndolo y la de throughput por consumidor, informativa (D43, D292). Con los fixtures 300 → 400 ms y 42 → 5 ev/s la regla falla con el benchmark y ambos valores.

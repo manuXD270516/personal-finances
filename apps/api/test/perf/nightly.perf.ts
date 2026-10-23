@@ -4,14 +4,13 @@ import { writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { fileURLToPath } from 'node:url';
 import { createLedgerMaintenance, createLedgerRuntime } from '@pf/ledger/interface/ledger.module';
 import { runWithRequestContext } from '@pf/platform/api';
 import { loadConfig } from '@pf/platform/config';
 import { systemClock } from '@pf/shared-kernel';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client, Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { createWorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { daysInMonth, monthAt, ymd } from '../../src/demo/dataset/calendar.js';
@@ -19,6 +18,7 @@ import { buildLargePlan, LARGE_MAIN_WORKSPACE_ID, LARGE_MANIFEST } from '../../s
 import { MINIMAL_USERS, runSeed } from '../../src/seed/run-seed.js';
 import { apiConfig, baseEnv, capturingLogger, workerConfig } from '../support/harness.js';
 import {
+  aggregateBackgroundLoad,
   buildReport,
   latencyResult,
   PERF_THRESHOLDS,
@@ -29,6 +29,7 @@ import {
   writeReport,
   type BenchResult,
 } from './perf-report.js';
+import { perfOutDir, readEntries, recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -41,19 +42,22 @@ import { perfApiEnv } from './perf-env.js';
  * PF_PERF_ITERATIONS (por defecto 200), PF_PERF_OUT (por defecto `reports/perf/` en la raíz del repo).
  */
 const deps = inject('deps');
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+const loadRecorder = recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const env = process.env;
 const SCALE = Number(env['PF_PERF_SCALE'] ?? '1');
 const MONTHS = env['PF_PERF_MONTHS'] ? Number(env['PF_PERF_MONTHS']) : undefined;
 const SATELLITES = env['PF_PERF_SATELLITES'] ? Number(env['PF_PERF_SATELLITES']) : undefined;
 const ITERATIONS = Number(env['PF_PERF_ITERATIONS'] ?? '200');
 const WARMUP = 10;
-const OUT = env['PF_PERF_OUT'] ?? fileURLToPath(new URL('../../../../reports/perf/', import.meta.url));
+const OUT = perfOutDir();
 const ISSUER = 'https://idp.test/realms/pfos';
 const AUDIENCE = 'finance-api';
 const WS = LARGE_MAIN_WORKSPACE_ID;
 const W = `/api/v1/workspaces/${WS}`;
 
 const results: BenchResult[] = [];
+let resultsAtTestStart = 0;
 const rlsPlanTexts: string[] = [];
 const dataset: Record<string, string | number> = {};
 const timings: Record<string, number> = {};
@@ -285,6 +289,17 @@ beforeAll(async () => {
   await appClient.connect();
 }, 4 * 3600_000);
 
+// Cada resultado lleva el resumen de la carga de fondo de la foto previa a su benchmark (campo aditivo `backgroundLoad`).
+beforeEach(() => {
+  resultsAtTestStart = results.length;
+});
+afterEach(() => {
+  const load = loadRecorder.lastSummary;
+  if (!load) return;
+  for (let i = resultsAtTestStart; i < results.length; i += 1)
+    results[i] = { ...results[i]!, backgroundLoad: load };
+});
+
 afterAll(async () => {
   const report = buildReport({
     generatedAt: new Date().toISOString(),
@@ -299,6 +314,9 @@ afterAll(async () => {
     },
     dataset,
     results,
+    // Carga de fondo por suite y orden real de los archivos hasta ahora; las suites posteriores (y el cierre de esta)
+    // la completan con `refreshReportFiles` (investigate-perf-under-load, tarea 2.3).
+    backgroundLoad: aggregateBackgroundLoad(readEntries(OUT)),
   });
   // Diagnóstico de RLS (tarea 5.3): planes EXPLAIN (ANALYZE, VERBOSE) con y sin política. Va en `rls-explain.md`
   // (artefacto `perf`) y dentro de `perf-summary.md`, que es lo que pega el aviso por issue (el artefacto no es

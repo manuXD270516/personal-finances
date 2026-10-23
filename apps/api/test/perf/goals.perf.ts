@@ -7,6 +7,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
+import { recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -16,6 +17,8 @@ import { perfApiEnv } from './perf-env.js';
  * (`pnpm perf:bench`); no bloquea los PR.
  */
 const deps = inject('deps');
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const ISSUER = 'https://idp.test/realms/pfos';
 const AUDIENCE = 'finance-api';
 const clock = new FixedClock(Instant.parse('2026-10-20T14:00:00Z'));

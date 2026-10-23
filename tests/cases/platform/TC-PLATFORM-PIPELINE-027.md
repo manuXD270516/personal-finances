@@ -14,7 +14,7 @@ type: platform
 level: smoke
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "review"]
@@ -33,7 +33,7 @@ expected_result:
   - "Las notas de TC-REPORTING-SPENDABLE-014, TC-PLATFORM-PIPELINE-018 y TC-COMMITMENTS-MATCH-012 enlazan ese registro"
   - "Ningún umbral cambió sin una decisión del owner"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-PLATFORM-PIPELINE-027 — Cada benchmark rojo de perf en dos corridas seguidas tiene causa medida, evidencia y camino registrados

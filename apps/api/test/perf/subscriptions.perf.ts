@@ -31,6 +31,7 @@ import {
 } from '../../src/identity/identity-wiring.js';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
+import { recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -41,6 +42,8 @@ import { perfApiEnv } from './perf-env.js';
  * Corre en el job nightly `perf` (`pnpm perf:bench`); no bloquea los PR.
  */
 const deps = inject('deps');
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const ISSUER = 'https://idp.test/realms/pfos';
 const AUDIENCE = 'finance-api';
 const clock = new FixedClock(Instant.parse('2026-11-10T16:00:00Z'));
