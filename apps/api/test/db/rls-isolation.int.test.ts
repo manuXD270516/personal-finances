@@ -1,29 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PgUnitOfWork, requireSqlExecutor } from '@pf/platform/api';
 import { ESLint } from 'eslint';
 import { Pool, type Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
-import {
-  RLS_CANONICAL_PREDICATE_EXAMPLE,
-  RLS_POLICY_REWRITE_MIGRATION_PRESENT,
-  connect,
-  inTx,
-  legacyPolicyAlterStatements,
-  rlsCatalogSnapshot,
-  rlsCatalogViolations,
-  rlsNonCanonicalPolicies,
-  sqlState,
-  withRole,
-  type RlsCatalogSnapshot,
-} from '../support/db.js';
-import {
-  cleanupSeededWorkspaces,
-  seedLedgerWorkspace,
-  vacuumAnalyzeLedger,
-} from '../support/rls-ledger-seed.js';
-import { accessSignature, explainJson, rowNodeTypes } from '../support/rls-plans.js';
+import { connect, inTx, rlsCatalogViolations, sqlState, withRole } from '../support/db.js';
+import { cleanupSeededWorkspaces, seedLedgerWorkspace } from '../support/rls-ledger-seed.js';
 
 const deps = inject('deps');
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -297,16 +279,11 @@ describe('RLS por workspace (security/access-control)', () => {
 });
 
 /**
- * Reescritura de las políticas de aislamiento (openspec optimize-rls-policy-overhead, D287/D294-D296).
- *
- * Escritas ANTES de la migración (TDD, grupo 2). TC-SECURITY-RLS-006 y 007 corren hoy (son regresión del aislamiento
- * y del fail-closed vigentes y comparan «anterior» contra «actual»: iguales mientras no exista la migración).
- * TC-SECURITY-RLS-008, 009 y 011 sobre la FORMA NUEVA se omiten con `describe.skipIf(!RLS_POLICY_REWRITE_MIGRATION_PRESENT)`:
- * pasan a activas solas cuando existe `apps/api/db/migrations/<timestamp>_platform_rls_policy_initplan.sql` (tarea 3.1).
+ * Aislamiento cruzado y fail-closed de las políticas vigentes (openspec optimize-rls-policy-overhead, D287/D294-D296;
+ * sin migración por D298, docs/49): TC-SECURITY-RLS-006 (lectura y escritura cruzadas W1/W2) y 007 (matriz sin
+ * contexto tabla por tabla).
  */
-const CATALOG_BASELINE_FILE = fileURLToPath(new URL('./fixtures/rls-catalog-baseline.json', import.meta.url));
-
-describe('Políticas de aislamiento reescritas: aislamiento cruzado y fail-closed (TC-SECURITY-RLS-006, 007)', () => {
+describe('Políticas de aislamiento vigentes: aislamiento cruzado y fail-closed (TC-SECURITY-RLS-006, 007)', () => {
   let su: Client;
   let app: Client;
   const w1 = randomUUID();
@@ -460,17 +437,14 @@ describe('Políticas de aislamiento reescritas: aislamiento cruzado y fail-close
 
   /**
    * Para cada tabla registrada y operación (lectura filtrada, lectura sin filtro, inserción) ejecuta, como `pf_app` y
-   * SIN contexto de workspace, dentro de una transacción que se revierte; antes aplica `restore` (las sentencias que
-   * devuelven las políticas a la forma anterior). Devuelve `tabla|operación -> resultado`.
+   * SIN contexto de workspace, dentro de una transacción que se revierte. Devuelve `tabla|operación -> resultado`.
    */
   async function failClosedMatrix(
     tables: readonly { schema: string; table: string; column: string | null }[],
-    restore: readonly string[],
   ): Promise<Map<string, Outcome>> {
     const out = new Map<string, Outcome>();
     await su.query('BEGIN');
     try {
-      for (const statement of restore) await su.query(statement);
       await su.query('SET LOCAL ROLE pf_app');
       await su.query(`SELECT set_config('app.workspace_id', '', true), set_config('app.user_id', '', true)`);
       for (const t of tables) {
@@ -494,7 +468,7 @@ describe('Políticas de aislamiento reescritas: aislamiento cruzado y fail-close
     return out;
   }
 
-  it('[TC-SECURITY-RLS-007] sin contexto cada tabla registrada responde igual con la política actual que con la anterior; ninguna devuelve filas y los huecos previos se registran como hallazgo', async () => {
+  it('[TC-SECURITY-RLS-007] sin contexto ninguna tabla registrada devuelve filas y cada vacío sin PF002 queda listado como hallazgo', async () => {
     const { rows: registry } = await su.query<{ schema: string; table: string; column: string | null }>(
       `SELECT w.schema_name AS schema, w.table_name AS "table",
               CASE WHEN EXISTS (SELECT 1 FROM pg_attribute a
@@ -505,208 +479,26 @@ describe('Políticas de aislamiento reescritas: aislamiento cruzado y fail-close
     );
     expect(registry.length).toBeGreaterThan(10);
 
-    const restore = await legacyPolicyAlterStatements(su);
-    const current = await failClosedMatrix(registry, []);
-    // «Anterior»: las políticas devueltas a la forma previa a la reescritura (vacío mientras no exista la migración).
-    const previous = await failClosedMatrix(registry, restore);
-    expect(current.size).toBe(previous.size);
-
+    const matrix = await failClosedMatrix(registry);
     const histogram = new Map<string, number>();
     const findings: string[] = [];
-    const worse: string[] = [];
-    for (const [key, before] of previous) {
-      const now = current.get(key)!;
-      histogram.set(before, (histogram.get(before) ?? 0) + 1);
-      // Hallazgo (D296): la política anterior ya devuelve vacío/filas sin lanzar PF002.
-      if (before === 'VACIO' || before === 'FILAS')
-        findings.push(`${key}: anterior ${before}, actual ${now}`);
-      // No empeora: lo que fallaba con PF002 sigue fallando con PF002; lo demás, igual o mejor (PF002).
-      const ok =
-        before === 'ERROR PF002'
-          ? now === 'ERROR PF002'
-          : now === before || now === 'ERROR PF002' || (before === 'FILAS' && now === 'VACIO');
-      if (!ok) worse.push(`${key}: anterior ${before}, actual ${now}`);
+    const withRows: string[] = [];
+    for (const [key, result] of matrix) {
+      histogram.set(result, (histogram.get(result) ?? 0) + 1);
+      // Hallazgo (D296): la política vigente devuelve vacío sin lanzar PF002 sin contexto.
+      if (result === 'VACIO') findings.push(`${key}: ${result}`);
+      if (result === 'FILAS') withRows.push(key);
     }
     console.log(
       [
         '==== RLS-FAIL-CLOSED-MATRIX (TC-SECURITY-RLS-007) ====',
-        `tablas registradas: ${registry.length}; operaciones: ${previous.size}; políticas restauradas a la forma anterior: ${restore.length}`,
-        `resultados de la política anterior: ${[...histogram].map(([k, v]) => `${k}=${v}`).join(', ')}`,
-        `HALLAZGOS (política anterior sin PF002 sin contexto; se registran, no se corrigen aquí, D296): ${findings.length}`,
+        `tablas registradas: ${registry.length}; operaciones: ${matrix.size}`,
+        `resultados: ${[...histogram].map(([k, v]) => `${k}=${v}`).join(', ')}`,
+        `HALLAZGOS (vacío sin PF002 sin contexto; se registran, no se corrigen aquí, D296): ${findings.length}`,
         ...findings.map((f) => `  RLS-FAIL-CLOSED-FINDING ${f}`),
         '==== FIN RLS-FAIL-CLOSED-MATRIX ====',
       ].join('\n'),
     );
-    expect(worse, 'operaciones donde la política actual empeora el fail-closed de la anterior').toEqual([]);
-    // Ninguna operación devuelve filas de negocio con la política actual, salvo las que ya las devolvían antes.
-    const newRows = [...current].filter(([key, r]) => r === 'FILAS' && previous.get(key) !== 'FILAS');
-    expect(newRows).toEqual([]);
+    expect(withRows, 'operaciones sin contexto que devuelven filas de negocio').toEqual([]);
   }, 120_000);
-});
-
-describe.skipIf(!RLS_POLICY_REWRITE_MIGRATION_PRESENT)(
-  'Catálogo tras la migración de políticas (TC-SECURITY-RLS-008)',
-  () => {
-    let migrator: Client;
-    beforeAll(async () => {
-      migrator = await connect(deps.migratorUrl);
-    });
-    afterAll(async () => {
-      await migrator?.end();
-    });
-
-    it('[TC-SECURITY-RLS-008] toda tabla de negocio sigue con RLS forzada, rlsCatalogViolations vacío y el registro y las políticas por tabla no cambian', async () => {
-      expect(
-        existsSync(CATALOG_BASELINE_FILE),
-        'falta apps/api/test/db/fixtures/rls-catalog-baseline.json: guardar el bloque RLS-CATALOG-BASELINE del log de CI previo a la migración (ver tasks.md, grupo 2)',
-      ).toBe(true);
-      const baseline = JSON.parse(readFileSync(CATALOG_BASELINE_FILE, 'utf8')) as RlsCatalogSnapshot;
-      const now = await rlsCatalogSnapshot(migrator);
-      expect(await rlsCatalogViolations(migrator)).toEqual([]);
-
-      // Mismas tablas y mismo orden de purga que antes (las tablas agregadas después de la foto pueden intercalarse).
-      const tablesBefore = baseline.registry.map((r) => r.table);
-      expect(now.registry.filter((r) => tablesBefore.includes(r.table))).toEqual(baseline.registry);
-      // Misma cantidad (y nombres) de políticas por tabla; RLS habilitada y forzada donde lo estaba.
-      for (const table of tablesBefore) {
-        expect(now.policiesByTable[table] ?? [], `políticas de ${table}`).toEqual(
-          baseline.policiesByTable[table] ?? [],
-        );
-        expect(now.rlsFlags[table], `RLS de ${table}`).toEqual(baseline.rlsFlags[table]);
-      }
-      for (const [table, flags] of Object.entries(baseline.rlsFlags)) {
-        if (flags.enabled && flags.forced)
-          expect(now.rlsFlags[table], table).toEqual({ enabled: true, forced: true });
-      }
-    });
-  },
-);
-
-describe('Foto del catálogo previo a la migración (insumo de TC-SECURITY-RLS-008)', () => {
-  let migrator: Client;
-  beforeAll(async () => {
-    migrator = await connect(deps.migratorUrl);
-  });
-  afterAll(async () => {
-    await migrator?.end();
-  });
-
-  it.skipIf(RLS_POLICY_REWRITE_MIGRATION_PRESENT)(
-    '[TC-SECURITY-RLS-008] imprime la foto del catálogo (registro, políticas por tabla, RLS) para guardarla como línea base antes de la migración',
-    async () => {
-      const snapshot = await rlsCatalogSnapshot(migrator);
-      expect(snapshot.registry.length).toBeGreaterThan(10);
-      console.log(
-        `==== RLS-CATALOG-BASELINE ====\n${JSON.stringify(snapshot)}\n==== FIN RLS-CATALOG-BASELINE ====`,
-      );
-    },
-  );
-});
-
-describe.skipIf(!RLS_POLICY_REWRITE_MIGRATION_PRESENT)(
-  'Plan de la consulta de saldo por cuenta con la política reescrita (TC-SECURITY-RLS-009)',
-  () => {
-    let su: Client;
-    let workspaceId = '';
-    let accountId = '';
-    beforeAll(async () => {
-      su = await connect(deps.superuserUrl);
-      // 10 864 postings (como el EXPLAIN del issue #147): 5 432 asientos de 2 postings.
-      const seeded = await seedLedgerWorkspace(su, { name: 'RLS plan', entries: 5432, assetAccounts: 8 });
-      workspaceId = seeded.workspaceId;
-      accountId = seeded.assetAccountIds[0]!;
-      await vacuumAnalyzeLedger(su);
-    }, 180_000);
-    afterAll(async () => {
-      try {
-        if (workspaceId) await cleanupSeededWorkspaces(su, [workspaceId]);
-      } finally {
-        await su?.end();
-      }
-    }, 120_000);
-
-    it('[TC-SECURITY-RLS-009] con y sin política el plan usa el mismo Index Only Scan y el plan con política no agrega un nodo entre el índice y la agregación', async () => {
-      const sql = `SELECT COALESCE(SUM(p.amount), 0) FROM ledger.posting p
-                    WHERE p.workspace_id = ${su.escapeLiteral(workspaceId)}
-                      AND p.ledger_account_id = ${su.escapeLiteral(accountId)}
-                      AND p.entry_date <= DATE '2026-09-30'`;
-      await su.query('BEGIN');
-      try {
-        await su.query('SET LOCAL ROLE pf_app');
-        await su.query(
-          `SELECT set_config('app.workspace_id', $1, true), set_config('app.user_id', '', true)`,
-          [workspaceId],
-        );
-        const withPolicy = await explainJson(su, sql);
-        await su.query('RESET ROLE');
-        const without = await explainJson(su, sql);
-        expect(accessSignature(without.root)).toMatch(
-          /^Index Only Scan on ledger\.posting \(posting_balance_ix\)$/u,
-        );
-        expect(accessSignature(withPolicy.root)).toBe(accessSignature(without.root));
-        expect(rowNodeTypes(withPolicy.root)).toEqual(rowNodeTypes(without.root));
-        expect(rowNodeTypes(withPolicy.root)).not.toContain('Result');
-      } finally {
-        await su.query('ROLLBACK');
-      }
-    }, 60_000);
-  },
-);
-
-describe('Regla de forma canónica de las políticas (TC-SECURITY-RLS-011)', () => {
-  let migrator: Client;
-  beforeAll(async () => {
-    migrator = await connect(deps.migratorUrl);
-  });
-  afterAll(async () => {
-    await migrator?.end();
-  });
-
-  /** Fixtures en una transacción que se revierte: una tabla con la forma anterior y otra con la canónica. */
-  async function withFixtures<T>(fn: () => Promise<T>): Promise<T> {
-    await migrator.query('BEGIN');
-    try {
-      for (const [table, policy, predicate] of [
-        ['fixture_forma_anterior', 'p_forma_anterior', 'workspace_id = platform.current_workspace_id()'],
-        ['fixture_forma_canonica', 'p_forma_canonica', RLS_CANONICAL_PREDICATE_EXAMPLE],
-      ] as const) {
-        await migrator.query(`CREATE TABLE platform.${table} (workspace_id uuid NOT NULL)`);
-        await migrator.query(`ALTER TABLE platform.${table} ENABLE ROW LEVEL SECURITY`);
-        await migrator.query(`ALTER TABLE platform.${table} FORCE ROW LEVEL SECURITY`);
-        await migrator.query(
-          `CREATE POLICY ${policy} ON platform.${table} TO pf_app USING (${predicate}) WITH CHECK (${predicate})`,
-        );
-      }
-      return await fn();
-    } finally {
-      await migrator.query('ROLLBACK');
-    }
-  }
-
-  it('[TC-SECURITY-RLS-011] la regla señala la política en la forma anterior (tabla y política) y no la canónica; la restauración a la forma anterior la vuelve a señalar', async () => {
-    await withFixtures(async () => {
-      const fixtures = (await rlsNonCanonicalPolicies(migrator)).filter((v) =>
-        v.startsWith('platform.fixture_'),
-      );
-      expect(fixtures).toEqual(['platform.fixture_forma_anterior (p_forma_anterior)']);
-      // La reconstrucción de la política anterior (TC-SECURITY-RLS-007) cubre exactamente la canónica.
-      const restore = (await legacyPolicyAlterStatements(migrator)).filter((st) =>
-        st.includes('fixture_forma_canonica'),
-      );
-      expect(restore).toHaveLength(1);
-      for (const st of restore) await migrator.query(st);
-      expect(
-        (await rlsNonCanonicalPolicies(migrator)).filter((v) => v.startsWith('platform.fixture_')),
-      ).toEqual([
-        'platform.fixture_forma_anterior (p_forma_anterior)',
-        'platform.fixture_forma_canonica (p_forma_canonica)',
-      ]);
-    });
-  });
-
-  describe.skipIf(!RLS_POLICY_REWRITE_MIGRATION_PRESENT)('tras la migración', () => {
-    it('[TC-SECURITY-RLS-011] sin fixture ninguna política de pf_app o pf_worker queda fuera de la forma canónica', async () => {
-      expect(await rlsNonCanonicalPolicies(migrator)).toEqual([]);
-    });
-  });
 });
