@@ -136,6 +136,13 @@ export interface WorkerRuntimeOptions {
   readonly scheduledJobs?: boolean;
   /** Consumidores de eventos registrados por los contextos (y por los tests). */
   readonly eventConsumers?: readonly EventConsumerDefinition[];
+  /**
+   * SOLO la rama de experimentos de investigate-perf-under-load (no se fusiona): transforma la lista final de
+   * consumidores (un solo consumidor, handler trivial, concurrencia) antes de registrarlos.
+   */
+  readonly experimentConsumers?: (
+    defs: readonly EventConsumerDefinition[],
+  ) => readonly EventConsumerDefinition[];
   /** Ajustes del relay (tests: lote, polling, inyección de fallos). */
   readonly relay?: Partial<Pick<OutboxRelayOptions, 'batchSize' | 'pollIntervalMs' | 'afterEnqueue'>>;
   readonly metrics?: EventDeliveryMetrics;
@@ -560,7 +567,7 @@ export async function createWorkerRuntime(
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
   // REPORTING (add-basic-dashboard): versión derivada de los datos por workspace (ETag del resumen del Home).
-  const subscriptions = new EventSubscriptions([
+  const allConsumers: readonly EventConsumerDefinition[] = [
     ...(options.eventConsumers ?? []),
     ...fxConsumers,
     ...fxUserConversionConsumers,
@@ -571,7 +578,10 @@ export async function createWorkerRuntime(
     ...goalsEventConsumers(finance.goals),
     ...importsEventConsumers(imports, logger),
     ...notificationEventConsumers(notifications),
-  ]);
+  ];
+  const subscriptions = new EventSubscriptions(
+    options.experimentConsumers ? options.experimentConsumers(allConsumers) : allConsumers,
+  );
   // Presupuesto de conexiones (improve-event-throughput, TC-PLATFORM-EVENTS-018): la concurrencia sumada de los
   // consumidores cabe en el pool del worker; si no, el arranque falla antes de tomar un solo evento.
   const consumerDefaults = {

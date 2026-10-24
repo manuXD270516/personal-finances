@@ -3,6 +3,7 @@ import { loadavg } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
+import { experiment, purgeBacklog } from './experiment.js';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
 import {
   aggregateBackgroundLoad,
@@ -271,6 +272,8 @@ export class SuiteLoadRecorder {
 export function recordSuiteLoad(metaUrl: string, superuserUrl: string): SuiteLoadRecorder {
   const recorder = new SuiteLoadRecorder(suiteNameOf(metaUrl), superuserUrl);
   beforeAll(async () => {
+    // Rama de experimentos (PF_PERF_PURGE_BACKLOG=1, E3): purga el backlog residual ANTES de la foto de inicio.
+    if (experiment.purgeBacklog) await purgeBacklog(superuserUrl, recorder.suite);
     await recorder.start();
   }, 120_000);
   beforeEach(async ({ task }) => {

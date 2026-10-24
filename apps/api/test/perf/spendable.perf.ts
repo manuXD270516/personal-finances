@@ -8,6 +8,16 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
 import { recordSuiteLoad } from './background-load.js';
+import {
+  captureStatements,
+  dumpTopStatements,
+  experimentActive,
+  explainCaptured,
+  medianOf,
+  recordMetric,
+  resetStatements,
+  startSampler,
+} from './experiment.js';
 import { perfApiEnv } from './perf-env.js';
 import { PERF_THRESHOLDS } from './perf-report.js';
 
@@ -162,15 +172,50 @@ async function measure(path: string): Promise<number[]> {
   return times;
 }
 
+/**
+ * Rama de experimentos (E1–E3): la ventana de medición lleva muestreo de locks/esperas/conexiones, el top 20 de
+ * pg_stat_statements y, al terminar, el EXPLAIN (ANALYZE, BUFFERS) de las consultas reales de una petición. Sin
+ * `PF_PERF_LABEL` es exactamente `measure`.
+ */
+async function measureWindow(name: string, path: string): Promise<number[]> {
+  if (!experimentActive) return measure(path);
+  const tag = `spendable: ${name}`;
+  await resetStatements(deps.superuserUrl);
+  const stopSampler = startSampler(deps.superuserUrl, tag);
+  let times: number[];
+  try {
+    times = await measure(path);
+  } finally {
+    await stopSampler();
+  }
+  await dumpTopStatements(deps.superuserUrl, tag);
+  recordMetric({
+    suite: 'spendable.perf.ts',
+    name,
+    unit: 'ms',
+    value: p95(times),
+    limit: BUDGET_MS,
+    p50: medianOf(times),
+    p95: p95(times),
+    n: times.length,
+  });
+  const { statements } = await captureStatements(() => api('GET', path));
+  await explainCaptured(deps.databaseUrl, name, statements);
+  return times;
+}
+
 describe('NFR-PERF-004: Home con el bloque spendable (Q5)', () => {
   it('[TC-REPORTING-SPENDABLE-014] [TC-PLATFORM-PIPELINE-018] getReportSummary con el bloque spendable: p95 ≤ 300 ms', async () => {
-    const times = await measure(`/api/v1/workspaces/${workspaceId}/reports/summary`);
+    const times = await measureWindow(
+      'getReportSummary',
+      `/api/v1/workspaces/${workspaceId}/reports/summary`,
+    );
     console.info(`home Q5 (summary): p95 ${Math.round(p95(times))} ms (${SAMPLES} muestras)`);
     expect(p95(times)).toBeLessThanOrEqual(BUDGET_MS);
   });
 
   it('[TC-REPORTING-SPENDABLE-014] [TC-PLATFORM-PIPELINE-018] getSpendable con el detalle de 300 ocurrencias: p95 ≤ 300 ms', async () => {
-    const times = await measure(`/api/v1/workspaces/${workspaceId}/reports/spendable`);
+    const times = await measureWindow('getSpendable', `/api/v1/workspaces/${workspaceId}/reports/spendable`);
     console.info(`spendable: p95 ${Math.round(p95(times))} ms (${SAMPLES} muestras)`);
     expect(p95(times)).toBeLessThanOrEqual(BUDGET_MS);
   });

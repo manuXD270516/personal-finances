@@ -1,5 +1,7 @@
 // Levanta UNA vez por corrida las dependencias reales (postgres:18 + SeaweedFS) y comparte sus coordenadas.
 import { randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadConfig } from '@pf/platform/config';
 import { createLogger } from '@pf/platform/logging';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
@@ -7,6 +9,22 @@ import { Client } from 'pg';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 import { runMigrate } from '../../src/migrate/run-migrate.js';
+import { renderExperimentBlock } from '../perf/experiment-block.js';
+import {
+  BLOCK_FILE,
+  EXTRAS_FILE,
+  experiment,
+  experimentActive,
+  experimentOutDir,
+  METRICS_FILE,
+  readNdjson,
+  resetExperimentFiles,
+  SAMPLES_FILE,
+  writeText,
+  type MetricRecord,
+  type SampleRecord,
+} from '../perf/experiment.js';
+import type { BackgroundLoadEntry } from '../perf/perf-report.js';
 import { POSTGRES_IMAGE, SEAWEEDFS_IMAGE } from './images.js';
 
 /** Mismo bootstrap que el init de postgres en Compose (deploy/compose/compose.yaml → configs.postgres-init). */
@@ -70,8 +88,27 @@ export default async function setup(project: TestProject) {
   const exportsBucket = 'pfos-test-exports';
   const exportKeys = `k1:${randomBytes(32).toString('base64url')}`;
 
+  // Rama de experimentos de investigate-perf-under-load (no se fusiona): con PF_PERF_LABEL, PostgreSQL arranca con
+  // pg_stat_statements precargado (y tiempos de E/S en EXPLAIN); `PF_PERF_MAX_CONNECTIONS` cambia max_connections.
+  if (experimentActive) resetExperimentFiles();
+  const postgres = new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('pfos');
+  if (experimentActive) {
+    const maxConnections = (process.env['PF_PERF_MAX_CONNECTIONS'] ?? '').trim();
+    postgres.withCommand([
+      'postgres',
+      '-c',
+      'shared_preload_libraries=pg_stat_statements',
+      '-c',
+      'pg_stat_statements.track=all',
+      '-c',
+      'pg_stat_statements.max=10000',
+      '-c',
+      'track_io_timing=on',
+      ...(maxConnections !== '' ? ['-c', `max_connections=${maxConnections}`] : []),
+    ]);
+  }
   const [pg, s3]: [StartedPostgreSqlContainer, StartedTestContainer] = await Promise.all([
-    new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('pfos').start(),
+    postgres.start(),
     new GenericContainer(SEAWEEDFS_IMAGE)
       .withCommand([
         'mini',
@@ -114,6 +151,15 @@ export default async function setup(project: TestProject) {
     randomBytes(18).toString('hex'),
   );
   await bootstrapMigratorRole(pg.getConnectionUri(), new URL(migratorUrl).password);
+  if (experimentActive) {
+    const admin = new Client({ connectionString: pg.getConnectionUri() });
+    await admin.connect();
+    try {
+      await admin.query('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
+    } finally {
+      await admin.end();
+    }
+  }
   // El comando `migrate` real: dbmate (binario del host) + rol pf_app + pg-boss + bucket.
   await runMigrate(
     loadConfig('migrate', {
@@ -152,6 +198,30 @@ export default async function setup(project: TestProject) {
   });
 
   return async () => {
+    if (experimentActive) {
+      // Bloque que se recoge del log del job (`PERF-EXPERIMENT <label>`); también queda en el directorio del reporte.
+      try {
+        const out = experimentOutDir();
+        const extrasPath = join(out, EXTRAS_FILE);
+        const extras = existsSync(extrasPath) ? readFileSync(extrasPath, 'utf8') : '';
+        const block = renderExperimentBlock({
+          config: experiment,
+          ...(process.env['GITHUB_RUN_ID']
+            ? {
+                runUrl: `${process.env['GITHUB_SERVER_URL'] ?? 'https://github.com'}/${process.env['GITHUB_REPOSITORY'] ?? ''}/actions/runs/${process.env['GITHUB_RUN_ID']}`,
+              }
+            : {}),
+          metrics: readNdjson<MetricRecord>(join(out, METRICS_FILE)),
+          load: readNdjson<BackgroundLoadEntry>(join(out, 'background-load.ndjson')),
+          samples: readNdjson<SampleRecord>(join(out, SAMPLES_FILE)),
+          extras,
+        });
+        writeText(BLOCK_FILE, block);
+        process.stdout.write(`\n${block}\n`);
+      } catch (err) {
+        process.stderr.write(`[experiment] no se pudo escribir el bloque PERF-EXPERIMENT: ${String(err)}\n`);
+      }
+    }
     await Promise.all([pg.stop(), s3.stop()]);
   };
 }

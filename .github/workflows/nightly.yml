@@ -14,12 +14,68 @@
 #   fx-smoke-live  ÚNICO job con red hacia terceros: smoke de los providers de tasas reales. `continue-on-error`:
 #                  nunca rompe el pipeline; si falla abre o actualiza un issue para revisar el adapter.
 # Acciones fijadas por SHA de commit completo (comentario = tag verificado), igual que pr.yml/main.yml.
+#
+# RAMA DE EXPERIMENTOS (claude/investigate-perf-under-load-experiments; NO se fusiona nunca, change 48, tarea 3.1):
+# este workflow es el de la rama, solo para `workflow_dispatch`. Diferencias con `main`:
+#   - `workflow_dispatch` acepta inputs que se exportan como PF_PERF_* (suites, purge, trivial_handler, concurrency,
+#     one_consumer, label y los auxiliares throughput_seconds, worker_pool_max y max_connections).
+#   - Con `workflow_dispatch` solo corre el job `perf` (regression, mutation y fx-smoke-live no).
+#   - El paso de aviso por issue de `perf` está desactivado (no comenta el issue real "nightly perf: umbral superado").
+#   - Cada corrida imprime en el log un bloque `PERF-EXPERIMENT <label> >>>` ... `<<<` con medianas por benchmark,
+#     foto de carga de fondo, muestreo y extras (pg_stat_statements, EXPLAIN): se recoge con get_job_logs.
+# Lanzar fuera de la ventana de las 06:00 UTC: `concurrency: nightly` cancela la corrida en curso.
 name: nightly
 
 on:
   schedule:
     - cron: '0 6 * * *' # 06:00 UTC = 02:00 America/La_Paz (UTC−4, sin horario de verano)
   workflow_dispatch:
+    inputs:
+      suites:
+        description: 'PF_PERF_SUITES: archivos *.perf.ts a correr, en orden y separados por coma (ej. spendable,commitments). Vacío = todos'
+        required: false
+        default: ''
+        type: string
+      purge:
+        description: 'PF_PERF_PURGE_BACKLOG: purga el backlog residual (outbox y colas events.*) al empezar cada suite'
+        required: false
+        default: false
+        type: boolean
+      trivial_handler:
+        description: 'PF_PERF_TRIVIAL_HANDLER: handler trivial en los consumidores medidos'
+        required: false
+        default: false
+        type: boolean
+      concurrency:
+        description: 'PF_PERF_CONCURRENCY: concurrencia por consumidor (vacío = la del producto)'
+        required: false
+        default: ''
+        type: string
+      one_consumer:
+        description: 'PF_PERF_ONE_CONSUMER: un solo consumidor activo (ej. planning.journal-entry-posted)'
+        required: false
+        default: ''
+        type: string
+      label:
+        description: 'PF_PERF_LABEL: etiqueta del experimento (ej. e1-base-1); activa pg_stat_statements, muestreo, EXPLAIN y el bloque PERF-EXPERIMENT'
+        required: false
+        default: ''
+        type: string
+      throughput_seconds:
+        description: 'PF_PERF_THROUGHPUT_SECONDS: duración máxima del throughput por consumidor (vacío = 600)'
+        required: false
+        default: ''
+        type: string
+      worker_pool_max:
+        description: 'PF_PERF_WORKER_POOL_MAX: DATABASE_POOL_MAX del worker del throughput (vacío = el del producto)'
+        required: false
+        default: ''
+        type: string
+      max_connections:
+        description: 'PF_PERF_MAX_CONNECTIONS: max_connections del PostgreSQL de la suite (vacío = 100)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -37,6 +93,7 @@ env:
 jobs:
   regression:
     name: regression (Financial Regression Suite)
+    if: ${{ github.event_name != 'workflow_dispatch' }} # rama de experimentos: solo corre perf
     runs-on: ubuntu-latest # Docker para Testcontainers
     timeout-minutes: 60
     permissions:
@@ -84,6 +141,7 @@ jobs:
 
   mutation:
     name: mutation (shared-kernel) + cobertura de dominio
+    if: ${{ github.event_name != 'workflow_dispatch' }} # rama de experimentos: solo corre perf
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -157,6 +215,17 @@ jobs:
     permissions:
       contents: read
       issues: write # solo para abrir/comentar el aviso "nightly perf: umbral superado" (add-dependency-updates 4.3, D270)
+    # Rama de experimentos: los inputs de workflow_dispatch se exportan como variables PF_PERF_* (vacías en el schedule).
+    env:
+      PF_PERF_SUITES: ${{ inputs.suites }}
+      PF_PERF_PURGE_BACKLOG: ${{ inputs.purge && '1' || '' }}
+      PF_PERF_TRIVIAL_HANDLER: ${{ inputs.trivial_handler && '1' || '' }}
+      PF_PERF_CONCURRENCY: ${{ inputs.concurrency }}
+      PF_PERF_ONE_CONSUMER: ${{ inputs.one_consumer }}
+      PF_PERF_LABEL: ${{ github.event_name == 'workflow_dispatch' && (inputs.label || format('manual-{0}', github.run_id)) || '' }}
+      PF_PERF_THROUGHPUT_SECONDS: ${{ inputs.throughput_seconds }}
+      PF_PERF_WORKER_POOL_MAX: ${{ inputs.worker_pool_max }}
+      PF_PERF_MAX_CONNECTIONS: ${{ inputs.max_connections }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -166,7 +235,9 @@ jobs:
       - run: pnpm perf:bench
       - name: Resumen
         if: ${{ !cancelled() }}
-        run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: |
+          cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          cat reports/perf/experiment-block.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
@@ -176,8 +247,9 @@ jobs:
           retention-days: 90
       # D270: si el job falla (un p95 supera su umbral), abre el issue de aviso o comenta el que ya está abierto con ese
       # título exacto (nunca duplica). No es check requerido: el rojo avisa sin bloquear PR.
+      # Rama de experimentos: DESACTIVADO (`false &&`) para no comentar el issue real; la condición conserva failure().
       - name: Abrir o comentar el aviso de umbral superado
-        if: ${{ failure() }}
+        if: ${{ false && failure() }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -195,6 +267,7 @@ jobs:
 
   fx-smoke-live:
     name: fx-smoke-live (no bloqueante)
+    if: ${{ github.event_name != 'workflow_dispatch' }} # rama de experimentos: solo corre perf
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true # add-market-rate-providers 7.3: nunca rompe el pipeline

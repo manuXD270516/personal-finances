@@ -30,6 +30,8 @@ import {
   type BenchResult,
 } from './perf-report.js';
 import { perfOutDir, readEntries, recordSuiteLoad } from './background-load.js';
+import { dumpTopStatements, experiment, recordMetric, resetStatements, startSampler } from './experiment.js';
+import { applyConsumerExperiment } from './experiment-env.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -322,6 +324,24 @@ afterAll(async () => {
   // (artefacto `perf`) y dentro de `perf-summary.md`, que es lo que pega el aviso por issue (el artefacto no es
   // descargable desde las sesiones).
   const diagnostics = rlsPlanTexts.join('\n');
+  for (const r of results)
+    recordMetric({
+      suite: 'nightly.perf.ts',
+      name: r.id,
+      unit: r.unit,
+      value: r.value,
+      limit: r.limit,
+      p50: r.stats.p50,
+      p95: r.stats.p95,
+      n: r.stats.n,
+      note: r.gate
+        ? r.passed
+          ? 'bloqueante, ok'
+          : 'bloqueante, BRECHA'
+        : r.passed
+          ? 'informativo, ok'
+          : 'informativo, bajo meta',
+    });
   const written = writeReport(report, OUT, diagnostics);
   if (rlsPlanTexts.length > 0) {
     writeFileSync(
@@ -912,10 +932,20 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
     dataset['eventos pendientes en el outbox (antes del worker)'] = pendingBefore;
     if (pendingBefore === 0) return;
 
+    // Rama de experimentos (E6–E8): un solo consumidor, handler trivial y concurrencia por consumidor; el pool del
+    // worker se puede subir (`PF_PERF_WORKER_POOL_MAX`) para que una concurrencia mayor no rompa el presupuesto.
+    const workerPoolMax = (env['PF_PERF_WORKER_POOL_MAX'] ?? '').trim();
+    const workerEnv = {
+      LOG_LEVEL: 'warn',
+      ...(workerPoolMax !== '' ? { DATABASE_POOL_MAX: workerPoolMax } : {}),
+    };
+    await resetStatements(deps.superuserUrl);
+    const stopSampler = startSampler(deps.superuserUrl, 'nightly: throughput por consumidor');
     const runtimeWorker = await createWorkerRuntime(
-      workerConfig(baseEnv(deps, { LOG_LEVEL: 'warn' })),
+      workerConfig(baseEnv(deps, workerEnv)),
       capturingLogger('finance-worker', 'worker', 'warn').logger,
       {
+        experimentConsumers: (defs) => applyConsumerExperiment(defs, experiment),
         ledgerMaintenanceOnStart: false,
         fxGapFillOnStart: false,
         lifecycleBackfillOnStart: false,
@@ -962,6 +992,8 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
       }
     } finally {
       await runtimeWorker.close();
+      await stopSampler();
+      await dumpTopStatements(deps.superuserUrl, 'nightly: throughput por consumidor');
     }
     dataset['duración de la medición de throughput (s)'] = Math.round((performance.now() - t0) / 1000);
     for (const [consumer, e] of [...perConsumer].sort(([a], [b]) => a.localeCompare(b))) {

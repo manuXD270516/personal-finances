@@ -43,6 +43,8 @@ import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { connect } from '../support/db.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
 import { recordSuiteLoad } from './background-load.js';
+import { dumpTopStatements, experiment, recordMetric, resetStatements, startSampler } from './experiment.js';
+import { applyConsumerExperiment } from './experiment-env.js';
 import { perfApiEnv } from './perf-env.js';
 import { burstWindow, PERF_THROUGHPUT } from './perf-report.js';
 
@@ -316,9 +318,11 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
     // Los 50 reentregados llevan otro eventId: el inbox no los frena, los frena el UNIQUE del par.
     const events = [...ids.map(envelope), ...ids.slice(0, REDELIVERED).map(envelope)];
 
-    const def = commitmentsEventConsumers(commitments).find(
-      (d) => d.consumer === 'commitments.occurrence-matcher',
-    )!;
+    // Rama de experimentos: concurrencia y handler trivial sobre el matcher (`PF_PERF_ONE_CONSUMER` no aplica aquí).
+    const [def] = applyConsumerExperiment(
+      commitmentsEventConsumers(commitments).filter((d) => d.consumer === 'commitments.occurrence-matcher'),
+      { ...experiment, oneConsumer: undefined },
+    ) as [ReturnType<typeof commitmentsEventConsumers>[number]];
     const queue = new PgBossJobQueue({
       connectionString: deps.workerDatabaseUrl,
       logger: workerLog.logger,
@@ -375,6 +379,8 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
         subscriptions: new EventSubscriptions([def]),
         logger: workerLog.logger,
       });
+      await resetStatements(deps.superuserUrl);
+      const stopSampler = startSampler(deps.superuserUrl, 'commitments: ráfaga del matcher');
       const started = performance.now();
       await consumers.start();
       const deadline = Date.now() + 300_000;
@@ -384,10 +390,16 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
           [def.consumer, workspaceId],
         );
         if ((rows[0]?.n ?? 0) >= events.length) break;
-        if (Date.now() > deadline) throw new Error('el matcher no drenó la ráfaga a tiempo');
+        if (Date.now() > deadline) {
+          await stopSampler();
+          await dumpTopStatements(deps.superuserUrl, 'commitments: ráfaga del matcher (no drenó)');
+          throw new Error('el matcher no drenó la ráfaga a tiempo');
+        }
         await new Promise((r) => setTimeout(r, 100));
       }
       const seconds = (performance.now() - started) / 1000;
+      await stopSampler();
+      await dumpTopStatements(deps.superuserUrl, 'commitments: ráfaga del matcher');
       const rate = events.length / seconds;
       // Solo los eventos de la ráfaga (inbox del workspace de la suite): del primer al último procesado, sin la espera
       // detrás de un backlog ajeno. Informativo: la aserción de abajo (D112) no cambia.
@@ -413,11 +425,31 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
         `[TC-COMMITMENTS-MATCH-012] ${events.length} eventos en ${seconds.toFixed(1)} s (${String(Math.round(rate))} ev/s)
 `,
       );
+      recordMetric({
+        suite: 'commitments.perf.ts',
+        name: 'matcher: ráfaga (ev/s desde el arranque del consumidor)',
+        unit: 'ev/s',
+        value: rate,
+        limit: GOAL_EVENTS_PER_SECOND,
+        n: events.length,
+        note: `trabajos ajenos en la cola antes de la ráfaga: ${String(foreignJobs)}`,
+      });
+      recordMetric({
+        suite: 'commitments.perf.ts',
+        name: 'matcher: ráfaga (ev/s del primer al último evento)',
+        unit: 'ev/s',
+        value: window.eventsPerSecond,
+        limit: GOAL_EVENTS_PER_SECOND,
+        n: events.length,
+        note: `${String(window.seconds)} s`,
+      });
       expect(rate).toBeGreaterThanOrEqual(GOAL_EVENTS_PER_SECOND);
     } finally {
       await queue.drain();
       await queue.stop();
     }
+    // Con handler trivial no se crean sugerencias: la aserción de resultado no aplica (solo mide la cola).
+    if (experiment.trivialHandler) return;
     const reader = await connect(deps.superuserUrl);
     try {
       const { rows } = await reader.query<{ status: string; n: number }>(
