@@ -14,7 +14,7 @@ type: platform
 level: performance
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "background-load", "spendable"]
@@ -57,3 +57,4 @@ Entonces al empezar no queda ningún evento ni trabajo de la carga anterior
 - Change `investigate-perf-under-load` (D290, docs/46). `provisional` hasta que el owner eligiera el mecanismo de aislamiento (pregunta 1 de docs/47).
 - Confirmado (2026-10-23, D291 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)): el owner eligió purgar el backlog residual (outbox y colas `events.*`) en la base efímera tras medir el throughput, solo en el harness; `requirement_status` pasa a `confirmed`.
 - Datos ficticios del benchmark existente; `FixedClock` en America/La_Paz.
+- Parte 1 implementada el 2026-10-23 (rama `claude/impl-investigate-perf-under-load-a`): `apps/api/test/perf/background-load.ts` toma la foto (outbox pendiente, trabajos `events.*` por cola y estado, conexiones, locks no concedidos, `pg_stat_user_tables`, `os.loadavg()`) al empezar y al terminar cada suite y antes de cada benchmark; `perf-report.ts` la agrega como `backgroundLoad` (aditivo) en `perf-results.json` y como sección «Carga de fondo por suite» de `perf-summary.md`, con el orden real de los archivos. Unitarios en `perf-report.test.ts` y `background-load.test.ts`. Sigue `not_automated`: el 0 de eventos pendientes al empezar depende de la purga de D291 (tarea 5.2) y la tabla real de carga la valida `nightly` por `workflow_dispatch` (tarea 7.2).

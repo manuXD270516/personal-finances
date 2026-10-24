@@ -14,7 +14,7 @@ type: platform
 level: performance
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "background-load", "matcher"]
@@ -56,3 +56,4 @@ Entonces la cola del matcher contiene solo los eventos de la ráfaga
 - Change `investigate-perf-under-load` (D290). No cambia la meta de D112 (≥ 42 ev/s) ni las aserciones de TC-COMMITMENTS-MATCH-012.
 - `provisional` hasta la pregunta 1 de docs/47.
 - Confirmado (2026-10-23, D291 de [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)): aislamiento por purga del backlog residual tras la medición de throughput; `requirement_status` pasa a `confirmed`.
+- Parte 1 implementada el 2026-10-23 (tarea 2.4): `commitments.perf.ts` cuenta los trabajos de la cola del matcher antes de encolar la ráfaga y con la ráfaga encolada, y los publica en la sección de carga de fondo del reporte, junto con el ev/s del primer al último evento de la ráfaga (`burstWindow`, con test unitario) y el ev/s desde el arranque del consumidor. La aserción de D112 (≥ 42 ev/s desde el arranque) no cambia. Sigue `not_automated`: la cola vacía depende de la purga de D291 (tarea 5.2) y la medición real la valida `nightly` por `workflow_dispatch` (tarea 7.2).

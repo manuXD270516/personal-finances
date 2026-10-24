@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import {
   asAdmin,
   money,
@@ -11,7 +11,11 @@ import {
   type Json,
   type User,
 } from '../support/portability.js';
+import { recordSuiteLoad } from './background-load.js';
 import { PERF_RATE_LIMITS } from './perf-env.js';
+
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+recordSuiteLoad(import.meta.url, inject('deps').superuserUrl);
 
 /**
  * NFR-PERF-007 / NFR-PERF-008 (TC-IMPORTS-CSV-029, Should; openspec add-basic-csv-import, decisión 16; docs/33 D112):
