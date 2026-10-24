@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: ready
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/perf-report.test.ts
+status: automated
 regression_suite: false
 phase: 5
 tags: ["rls", "nightly", "perf"]

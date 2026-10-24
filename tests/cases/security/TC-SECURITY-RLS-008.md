@@ -14,7 +14,9 @@ type: security
 level: architecture
 automation_status: not_automated
 automated_tests: []
-status: ready
+status: deprecated
+deprecated_by_change: optimize-rls-policy-overhead
+deprecation_reason: "No se migran las políticas de aislamiento (D298, docs/49): no hay migración cuyo catálogo comparar y TC-SECURITY-RLS-004 sigue cubriendo RLS forzada y política por tabla."
 regression_suite: true
 phase: 5
 tags: ["rls", "catalog", "policy-rewrite"]

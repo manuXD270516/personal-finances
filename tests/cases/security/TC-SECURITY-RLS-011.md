@@ -14,7 +14,9 @@ type: security
 level: architecture
 automation_status: not_automated
 automated_tests: []
-status: ready
+status: deprecated
+deprecated_by_change: optimize-rls-policy-overhead
+deprecation_reason: "No hay forma canónica nueva de las políticas (D298, docs/49): no se adopta la forma V2 ni se agrega una regla de catálogo para ella."
 regression_suite: false
 phase: 5
 tags: ["rls", "catalog", "ci"]

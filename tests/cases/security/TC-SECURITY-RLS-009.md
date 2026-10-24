@@ -14,7 +14,9 @@ type: security
 level: database-integration
 automation_status: not_automated
 automated_tests: []
-status: ready
+status: deprecated
+deprecated_by_change: optimize-rls-policy-overhead
+deprecation_reason: "No se migran las políticas de aislamiento (D298, docs/49): la política vigente conserva el nodo Result y la fila INCLUDE pasa a informativa (TC-SECURITY-RLS-010)."
 regression_suite: false
 phase: 5
 tags: ["rls", "plan", "performance"]
