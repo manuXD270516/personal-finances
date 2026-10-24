@@ -6,6 +6,7 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
+import { recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
 
 /**
@@ -17,6 +18,8 @@ import { perfApiEnv } from './perf-env.js';
  * señal de migrar al read model por eventos.
  */
 const deps = inject('deps');
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const ISSUER = 'https://idp.test/realms/pfos';
 const AUDIENCE = 'finance-api';
 const clock = new FixedClock(Instant.parse('2026-10-20T14:00:00Z'));
