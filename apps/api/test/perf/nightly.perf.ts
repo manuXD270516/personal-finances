@@ -740,13 +740,15 @@ describe('benchmarks nightly con el Large Seed (docs/02 §PERF)', () => {
       await capturePool.end();
     }
 
-    // 2) Consultas de índice (gate) y agregado sintético de todo el workspace (informativo, D43).
+    // 2) Página de transacciones (gate), fila INCLUDE (informativa, D298) y agregado sintético (informativo, D43).
     const queries: Record<string, { sql: string; gate: boolean }> = {
       'saldo por cuenta (índice INCLUDE)': {
         sql: `SELECT COALESCE(SUM(p.amount), 0) FROM ledger.posting p
          WHERE p.workspace_id = ${lit(WS)} AND p.ledger_account_id = ${lit(ledgerAccount)}
            AND p.entry_date <= DATE '2026-09-30'`,
-        gate: true,
+        // Informativa por D298 (docs/49): se conserva la política vigente y esta fila (≈ +0,8 ms sobre ~2 ms) se publica
+        // sin fallar el job; el id no cambia para comparar con las corridas anteriores. La consulta real sigue bloqueante.
+        gate: false,
       },
       'agregado sintético de todo el workspace (informativo)': {
         sql: `SELECT p.ledger_account_id, SUM(p.amount) FROM ledger.posting p

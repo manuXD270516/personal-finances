@@ -104,13 +104,6 @@ export async function seedLedgerWorkspace(su: Client, opts: SeedOptions): Promis
   };
 }
 
-/** `VACUUM (ANALYZE)` de las tablas del ledger sembradas (visibilidad para `Index Only Scan` y estadísticas). */
-export async function vacuumAnalyzeLedger(su: Client): Promise<void> {
-  await su.query(
-    'VACUUM (ANALYZE) ledger.posting, ledger.journal_entry, ledger.ledger_account, ledger.balance_snapshot',
-  );
-}
-
 /**
  * Borra todo lo sembrado para los workspaces dados (superusuario con `replica`: el ledger es inmutable por
  * triggers) y comprueba que no queda ninguna fila. Lanza si queda algo.

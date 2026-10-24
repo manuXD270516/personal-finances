@@ -338,6 +338,75 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     expect(long).toContain('[recortado');
   });
 
+  // Declaración de las consultas de RLS de `nightly.perf.ts` (las filas informativas y las bloqueantes, D298).
+  const NIGHTLY_SRC = readFileSync(new URL('./nightly.perf.ts', import.meta.url), 'utf8');
+  const declaredQueries = [
+    ...NIGHTLY_SRC.slice(
+      NIGHTLY_SRC.indexOf('const queries: Record<string, { sql: string; gate: boolean }>'),
+      NIGHTLY_SRC.indexOf('for (const [name, q] of Object.entries(queries))'),
+    ).matchAll(/^\s{6}'([^']+)': \{[\s\S]*?gate: (true|false),/gmu),
+  ].map((m) => ({ name: m[1]!, gate: m[2] === 'true' }));
+  const realBlock = NIGHTLY_SRC.slice(
+    NIGHTLY_SRC.indexOf('const real: Record<string, CapturedSql[]>'),
+    NIGHTLY_SRC.indexOf('for (const [name, statements] of Object.entries(real))'),
+  );
+
+  it('[TC-SECURITY-RLS-010] la fila INCLUDE con 200 pares (1.99 / 2.80 ms, IC95 [0.800, 0.811]) y gate falso es brecha demostrada informativa que no falla el reporte', () => {
+    const r = rlsResult({
+      id: 'rls-saldo por cuenta (índice INCLUDE)',
+      title: 'Overhead RLS: saldo por cuenta (índice INCLUDE)',
+      plans: SAME_PLAN,
+      gate: false,
+      ...pairsOf(1.99, 0.81, 0.011),
+    });
+    expect(r.verdict).toBe('brecha demostrada');
+    expect(r.gate).toBe(false);
+    expect(r.pairs).toBe(200);
+    expect(r.notes).toContain('mediana con RLS 2.8 ms vs sin RLS 1.99 ms');
+    expect(r.notes).toMatch(/IC95 \[0\.80\d, 0\.81\d\] ms/);
+    const report = buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [r] });
+    expect(report.breaches).toEqual([]);
+    const md = renderMarkdown(report);
+    expect(md).toContain('OK — sin umbrales superados');
+    expect(md).toMatch(/Overhead RLS: saldo por cuenta \(índice INCLUDE\).*\| informativo \|/u);
+  });
+
+  it('[TC-SECURITY-RLS-010] política: las únicas consultas de RLS con gate false en nightly.perf.ts son la INCLUDE y el agregado sintético', () => {
+    expect(declaredQueries.filter((q) => !q.gate).map((q) => q.name)).toEqual([
+      'saldo por cuenta (índice INCLUDE)',
+      'agregado sintético de todo el workspace (informativo)',
+    ]);
+  });
+
+  it('[TC-SECURITY-RLS-012] política: las consultas reales de saldos y la página de transacciones siguen bloqueantes', () => {
+    expect(declaredQueries.find((q) => q.name === 'página de transacciones (1 mes)')?.gate).toBe(true);
+    expect(realBlock).toContain('consulta real de saldos en lote (PgBalanceQuery.getAccountBalances)');
+    expect(realBlock).toContain('consulta real de saldo por cuenta (PgBalanceQuery.getBalance)');
+    // Las consultas reales no pasan `gate`: rlsResult las toma como bloqueantes por defecto.
+    expect(realBlock).not.toMatch(/\bgate\b/u);
+  });
+
+  it('[TC-SECURITY-RLS-012] una consulta real bloqueante con +46.8 % y plan distinto falla el reporte mostrando ambos métodos de acceso', () => {
+    const r = rlsResult({
+      id: 'rls-consulta real de saldos en lote (PgBalanceQuery.getAccountBalances)',
+      title: 'Overhead RLS: consulta real de saldos en lote',
+      plans: {
+        withoutRls: ['Bitmap Heap Scan on ledger.journal_entry'],
+        withRls: ['Index Scan on ledger.journal_entry'],
+      },
+      ...pairsOf(10, 4.68, 0.5),
+    });
+    expect(r.gate).toBe(true);
+    expect(r.verdict).toBe('plan distinto');
+    expect(r.value).toBe(0.468);
+    const report = buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [r] });
+    expect(report.breaches).toHaveLength(1);
+    expect(report.breaches[0]).toContain('getAccountBalances');
+    expect(report.breaches[0]).toContain('Bitmap Heap Scan on ledger.journal_entry');
+    expect(report.breaches[0]).toContain('Index Scan on ledger.journal_entry');
+    expect(renderMarkdown(report)).toContain('FALLA — 1 umbral(es) superado(s)');
+  });
+
   it('el IC95 por bootstrap tiene el ancho teórico de la mediana (≈ 1.96 · 1.2533 · σ/√n) y no es artificialmente estrecho', () => {
     // Diferencias normales (Box-Muller con PRNG fijo): σ = 0.3 ms, n = 200 ⇒ semiancho esperado ≈ 0.052 ms.
     let seed = 12345;
