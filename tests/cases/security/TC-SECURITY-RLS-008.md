@@ -14,7 +14,7 @@ type: security
 level: architecture
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 5
 tags: ["rls", "catalog", "policy-rewrite"]
@@ -30,7 +30,7 @@ expected_result:
   - "platform.workspace_scoped_table tiene las mismas tablas en el mismo orden"
   - "Cada tabla tiene la misma cantidad de políticas, con relrowsecurity y relforcerowsecurity verdaderos"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-SECURITY-RLS-008 — Tras reescribir las políticas toda tabla de negocio sigue con RLS forzada y el registro de tablas no cambia

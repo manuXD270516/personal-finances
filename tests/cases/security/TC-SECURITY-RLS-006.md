@@ -14,7 +14,7 @@ type: security
 level: database-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: true
 phase: 5
 tags: ["rls", "isolation", "policy-rewrite"]
@@ -32,7 +32,7 @@ expected_result:
   - "Solo se devuelven filas de W1 Personal Demo; W2 Bank no aparece"
   - "La inserción hacia W2 falla por la política de aislamiento"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # TC-SECURITY-RLS-006 — Con las políticas reescritas el contexto de W1 no lee filas de W2 y una inserción hacia W2 falla
