@@ -27,9 +27,9 @@
 
 ## 4. INFORME (decisión 6)
 
-- [ ] 4.1 `docs/NN-perf-under-load-findings.md` (siguiente número libre de `docs/`): por síntoma S1–S3, hipótesis aceptadas y descartadas con medianas y dispersión de las repeticiones, causa, camino (arreglo del benchmark, change de producto con nombre propuesto, ajuste de umbral a decidir por el owner o change de optimización) y responsable
-- [ ] 4.2 Preguntas que abra el informe (ajustes de umbral, changes de producto, el umbral por consumidor con handler real de D292 si el informe lo propone, el runner si la contención resulta la única causa, D293) en un doc `docs/NN-…-questions.md` con opciones y recomendación; sus respuestas en el siguiente `…-decisions.md`
-- [ ] 4.3 Redactar o proponer en docs/38 los changes de seguimiento que el informe identifique (sin implementarlos aquí)
+- [x] 4.1 `docs/NN-perf-under-load-findings.md` (siguiente número libre de `docs/`): por síntoma S1–S3, hipótesis aceptadas y descartadas con medianas y dispersión de las repeticiones, causa, camino (arreglo del benchmark, change de producto con nombre propuesto, ajuste de umbral a decidir por el owner o change de optimización) y responsable (2026-10-25: [docs/50](../../../docs/50-perf-under-load-findings.md) con las corridas E1 ×3, E2, E3, efull-1, E9, E10 y E11 y el programado 40085830417; S1 por backlog ajeno en la cola del matcher (H1) y S2 por contención de CPU del host (H2), ambos arreglos del benchmark del grupo 5; H3 y H7 descartadas; S3 sin causa por consumidor (E6–E8 no corrieron); ningún umbral cambia)
+- [x] 4.2 Preguntas que abra el informe (ajustes de umbral, changes de producto, el umbral por consumidor con handler real de D292 si el informe lo propone, el runner si la contención resulta la única causa, D293) en un doc `docs/NN-…-questions.md` con opciones y recomendación; sus respuestas en el siguiente `…-decisions.md` (2026-10-25: [docs/51](../../../docs/51-perf-under-load-questions.md), cinco preguntas; ninguna bloquea el grupo 5, la 5 bloquea el cierre (8.2); las respuestas irán en el siguiente `…-decisions.md`)
+- [x] 4.3 Redactar o proponer en docs/38 los changes de seguimiento que el informe identifique (sin implementarlos aquí) (2026-10-25: propuestos en docs/38 §4 `fix-imports-perf-connection-budget` y, condicional, `optimize-consumer-throughput`)
 
 ## 5. AISLAMIENTO del benchmark (decisión 4; purga del backlog residual, D291)
 
