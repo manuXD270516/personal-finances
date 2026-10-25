@@ -15,6 +15,8 @@ level: performance
 automation_status: automated
 automated_tests:
   - apps/api/test/perf/perf-report.test.ts
+  - apps/api/test/perf/background-load.test.ts
+  - apps/api/test/perf/isolation.test.ts
 status: automated
 regression_suite: false
 phase: 5
@@ -32,7 +34,7 @@ expected_result:
   - "El reporte marca la medición como no válida y no la compara con el umbral de 300 ms"
   - "El job perf queda en rojo (D285): la interferencia no se oculta"
 created: 2026-10-21
-updated: 2026-10-23
+updated: 2026-10-25
 ---
 
 # TC-PLATFORM-PIPELINE-026 — Una suite que empieza con 12 000 eventos pendientes ajenos falla por interferencia y no publica su p95 como válido
@@ -54,3 +56,4 @@ Entonces la suite falla indicando la interferencia y los 12 000 eventos
 
 - Change `investigate-perf-under-load` (D290). Test unitario previsto en `apps/api/test/perf/perf-report.test.ts` (tarea 2.1) y de la precondición (tarea 5.1).
 - Implementado el 2026-10-23 (parte 1 del change, rama `claude/impl-investigate-perf-under-load-a`): `isolationOf` y `applyInterference` de `apps/api/test/perf/perf-report.ts` (unitarios en `perf-report.test.ts`: 12 000 eventos pendientes → veredicto `interferencia` con la cantidad en el mensaje; la medición queda `valid: false`, no se compara con su umbral y cuenta como brecha del job). El cableado de la precondición en cada suite (que la suite falle al empezar) es la tarea 5.1/5.2 del change, después del informe (la purga de D291 la hace posible sin poner en rojo las suites que hoy pasan).
+- Parte 2 (2026-10-25, tarea 5.1): `assertIsolated` (`background-load.test.ts`) hace fallar la suite al empezar con el veredicto `interferencia` y la cantidad (12 000 eventos pendientes de un fixture), y también cuando la carga del host no baja de 3,0 en 5 min (veredicto por host con la carga medida, `perf-report.test.ts` e `isolation.test.ts`). El cableado va en `recordSuiteLoad` (`beforeAll` de cada suite `*.perf.ts`). La ejecución real la valida `nightly` (tarea 7.2).

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
@@ -660,5 +660,47 @@ describe('umbrales de los benchmarks fijados a docs/02 (TC-PLATFORM-PIPELINE-028
     expect(blockingViolations(gated)).toEqual([
       'consumer-throughput: la fila de throughput con handler real es informativa (D292) y pasó a bloqueante',
     ]);
+  });
+});
+
+// investigate-perf-under-load 5.2/5.3 (D291): el aislamiento vive en el harness de pruebas y en el mismo job; no cambia
+// `nightly.yml` ni agrega jobs, y el orden de los archivos de perf es determinista.
+describe('aislamiento del benchmark en el harness (TC-PLATFORM-PIPELINE-024, TC-PLATFORM-PIPELINE-026)', () => {
+  const dir = 'apps/api/test/perf';
+  const perfFiles = readdirSync(join(ROOT, dir)).filter((f) => f.endsWith('.perf.ts'));
+
+  it('[TC-PLATFORM-PIPELINE-024] vitest.perf.config.ts fija el orden con un sequencer sobre PERF_SUITE_ORDER', () => {
+    const config = readText('apps/api/vitest.perf.config.ts');
+    expect(config).toMatch(/import \{ orderPerfSuites \} from '\.\/test\/perf\/suite-order\.js'/u);
+    expect(config).toMatch(/sequencer: PerfSuiteSequencer/u);
+    expect(config).toMatch(/orderPerfSuites\(files, \(f\) => f\.moduleId\)/u);
+    const order = readText(`${dir}/suite-order.ts`);
+    for (const f of perfFiles) expect(order, `${f} en PERF_SUITE_ORDER`).toContain(`'${f}'`);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] cada suite *.perf.ts registra la precondición de aislamiento con recordSuiteLoad', () => {
+    expect(perfFiles.length).toBeGreaterThanOrEqual(8);
+    for (const f of perfFiles) {
+      expect(readText(`${dir}/${f}`), f).toMatch(/recordSuiteLoad\(import\.meta\.url,/u);
+    }
+    const load = readText(`${dir}/background-load.ts`);
+    expect(load).toMatch(/beforeAll\(async \(\) => \{\s*await recorder\.prepare\(\);/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] la purga y la espera de quietud solo viven en el harness de pruebas, nunca en el código del producto', () => {
+    const offenders = ['apps/api/src', 'packages']
+      .flatMap((root) =>
+        // `git grep` sale con 1 si no hay coincidencias.
+        spawnSync('git', ['grep', '-l', '-E', 'purgeBacklog|waitForQuiet|prepareIsolation', '--', root], {
+          cwd: ROOT,
+          encoding: 'utf8',
+        }).stdout.split('\n'),
+      )
+      .filter(Boolean);
+    expect(offenders).toEqual([]);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] nightly.yml sigue con sus cuatro jobs: el aislamiento no agrega un job aparte (D291)', () => {
+    expect(Object.keys(workflow.jobs).sort()).toEqual(['fx-smoke-live', 'mutation', 'perf', 'regression']);
   });
 });

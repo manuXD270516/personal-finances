@@ -204,12 +204,30 @@ export interface BackgroundLoadSummary {
 
 export type IsolationVerdict = 'limpia' | 'interferencia';
 
+/**
+ * Preparación del aislamiento de una suite (D291): lo que hizo el harness antes de su foto de inicio. Purga del backlog
+ * residual, espera de quietud del host (carga de 1 min bajo `hostLoadLimit`) y consultas activas ajenas en la base.
+ */
+export interface IsolationPreparation {
+  readonly purgedOutbox: number;
+  readonly purgedJobs: number;
+  /** `true` si el host quedó en quietud (carga bajo el límite y sin consultas ajenas) dentro del tope de espera. */
+  readonly quiet: boolean;
+  readonly waitedMs: number;
+  /** Carga de 1 min medida en la última muestra de la espera. */
+  readonly hostLoad1m: number;
+  readonly hostLoadLimit: number;
+  readonly foreignActiveQueries: number;
+}
+
 /** Veredicto de aislamiento de una suite al empezar. */
 export interface Isolation {
   readonly verdict: IsolationVerdict;
   readonly outboxPending: number;
   readonly eventJobs: number;
   readonly message: string;
+  /** Solo con preparación: carga del host y datos de la purga y la espera. */
+  readonly preparation?: IsolationPreparation;
 }
 
 /** Línea del registro `background-load.ndjson` que escribe cada suite (una por foto). */
@@ -222,6 +240,8 @@ export interface BackgroundLoadEntry {
   readonly snapshot: BackgroundLoadSnapshot;
   /** Datos propios del benchmark (p. ej. los trabajos de la cola del matcher antes de la ráfaga). */
   readonly extra?: Readonly<Record<string, string | number>>;
+  /** Solo en la foto de inicio: purga y espera de quietud previas (D291). */
+  readonly preparation?: IsolationPreparation;
 }
 
 export interface BenchmarkBackgroundLoad {
@@ -257,24 +277,39 @@ export function jobsOfQueue(snapshot: BackgroundLoadSnapshot, queue: string): nu
 
 /**
  * Aislamiento de una suite al empezar (D291): no debe haber eventos pendientes de publicar ni trabajos de colas
- * `events.*` que provengan de una carga o de una suite anterior. La suite aún no hizo nada, así que todo lo que la foto
- * muestra es ajeno.
+ * `events.*` que provengan de una carga o de una suite anterior, y, si hubo preparación, el host debe haber quedado en
+ * quietud (carga de 1 min bajo el límite y sin consultas activas ajenas) dentro del tope de espera. La suite aún no hizo
+ * nada, así que todo lo que la foto muestra es ajeno.
  */
-export function isolationOf(snapshot: BackgroundLoadSnapshot): Isolation {
+export function isolationOf(snapshot: BackgroundLoadSnapshot, preparation?: IsolationPreparation): Isolation {
   const outboxPending = snapshot.outboxPending;
   const eventJobs = sum(snapshot.eventJobs.map((j) => j.count));
-  if (outboxPending === 0 && eventJobs === 0) {
-    return { verdict: 'limpia', outboxPending, eventJobs, message: 'sin carga de fondo ajena' };
+  const reasons: string[] = [];
+  if (outboxPending > 0 || eventJobs > 0) {
+    const queues = [...new Set(snapshot.eventJobs.filter((j) => j.count > 0).map((j) => j.queue))];
+    reasons.push(
+      `${outboxPending} eventos pendientes de publicar; ${eventJobs} trabajos de colas events.* ajenos${
+        queues.length > 0 ? `: ${queues.join(', ')}` : ''
+      }`,
+    );
   }
-  const queues = [...new Set(snapshot.eventJobs.filter((j) => j.count > 0).map((j) => j.queue))];
-  return {
-    verdict: 'interferencia',
-    outboxPending,
-    eventJobs,
-    message: `interferencia (${outboxPending} eventos pendientes de publicar; ${eventJobs} trabajos de colas events.* ajenos${
-      queues.length > 0 ? `: ${queues.join(', ')}` : ''
-    })`,
-  };
+  if (preparation && !preparation.quiet) {
+    const parts: string[] = [];
+    if (preparation.hostLoad1m >= preparation.hostLoadLimit) {
+      parts.push(
+        `carga del host ${round2(preparation.hostLoad1m)} (1 min) sin bajar de ${preparation.hostLoadLimit} tras esperar ${Math.round(preparation.waitedMs / 1000)} s`,
+      );
+    }
+    if (preparation.foreignActiveQueries > 0) {
+      parts.push(`${preparation.foreignActiveQueries} consultas activas ajenas en la base`);
+    }
+    reasons.push(parts.length > 0 ? `host sin quietud: ${parts.join('; ')}` : 'host sin quietud');
+  }
+  const base = { outboxPending, eventJobs, ...(preparation ? { preparation } : {}) };
+  if (reasons.length === 0) {
+    return { verdict: 'limpia', ...base, message: 'sin carga de fondo ajena' };
+  }
+  return { verdict: 'interferencia', ...base, message: `interferencia (${reasons.join('; ')})` };
 }
 
 export function summarizeSnapshot(snapshot: BackgroundLoadSnapshot): BackgroundLoadSummary {
@@ -335,7 +370,7 @@ export function aggregateBackgroundLoad(entries: readonly BackgroundLoadEntry[])
     return {
       suite,
       start: startEntry.snapshot,
-      isolation: isolationOf(startEntry.snapshot),
+      isolation: isolationOf(startEntry.snapshot, startEntry.preparation),
       benchmarks: list
         .filter((e) => e.phase === 'benchmark')
         .map((e) => ({
@@ -579,6 +614,11 @@ const connectionsDetail = (s: BackgroundLoadSnapshot): string =>
     ? 'ninguna'
     : s.connections.map((c) => `${c.role}/${c.application}/${c.state} ${c.count}`).join(', ');
 
+const preparationDetail = (i: Isolation): string =>
+  i.preparation
+    ? `; purga previa: ${i.preparation.purgedOutbox} eventos del outbox y ${i.preparation.purgedJobs} trabajos events.*; espera de quietud: ${Math.round(i.preparation.waitedMs / 1000)} s, carga ${round2(i.preparation.hostLoad1m)} (límite ${i.preparation.hostLoadLimit}), ${i.preparation.foreignActiveQueries} consultas ajenas activas`
+    : '';
+
 /**
  * Sección "Carga de fondo por suite" de `perf-summary.md` entre marcadores (las suites que corren después de `nightly`
  * la reemplazan con `replaceBackgroundLoadSection`). Va con el orden real de los archivos y, por suite, la foto al
@@ -592,8 +632,8 @@ export function renderBackgroundLoadSection(bl: BackgroundLoadReport): string[] 
     body.push(
       `> Orden real de los archivos: ${bl.fileOrder.join(' → ')}. Foto de la base y del host (investigate-perf-under-load):`,
       '> eventos pendientes del outbox, trabajos `events.*` (created, retry, active), conexiones, locks no concedidos y',
-      '> carga del host. "interferencia" = la suite empezó con eventos o trabajos ajenos; hasta que exista la precondición',
-      '> de aislamiento (D291) es informativo.',
+      '> carga del host. Antes de la foto de inicio el harness purga el backlog residual y espera la quietud del host (D291);',
+      '> "interferencia" = la suite empezó con eventos o trabajos ajenos, o con el host sin quietud, y falla.',
       '',
       '### Al empezar cada suite',
       '',
@@ -608,7 +648,7 @@ export function renderBackgroundLoadSection(bl: BackgroundLoadReport): string[] 
       '',
       ...bl.suites.map(
         (x) =>
-          `- **${x.suite}:** trabajos: ${jobsDetail(x.start)}; conexiones: ${connectionsDetail(x.start)}${
+          `- **${x.suite}:** trabajos: ${jobsDetail(x.start)}; conexiones: ${connectionsDetail(x.start)}${preparationDetail(x.isolation)}${
             x.isolation.verdict === 'interferencia' ? `; ${x.isolation.message}` : ''
           }`,
       ),

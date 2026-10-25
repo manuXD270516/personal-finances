@@ -25,6 +25,7 @@ import {
   throughputResult,
   type BackgroundLoadEntry,
   type BackgroundLoadSnapshot,
+  type IsolationPreparation,
 } from './perf-report.js';
 
 // Los umbrales del benchmark nightly se leen de docs/02 (§PERF): si el NFR cambia, este test obliga a actualizar
@@ -730,5 +731,71 @@ describe('carga de fondo del benchmark (investigate-perf-under-load, decisión 2
     expect(
       burstWindow({ events: 12, firstProcessedAt: new Date(1000), lastProcessedAt: new Date(1000) }),
     ).toEqual({ seconds: 1, eventsPerSecond: 12 });
+  });
+});
+
+describe('aislamiento con preparación: purga y quietud del host (investigate-perf-under-load 5.1, D291)', () => {
+  const prep = (overrides: Partial<IsolationPreparation> = {}): IsolationPreparation => ({
+    purgedOutbox: 470_165,
+    purgedJobs: 1_390_000,
+    quiet: true,
+    waitedMs: 60_000,
+    hostLoad1m: 1.2,
+    hostLoadLimit: 3,
+    foreignActiveQueries: 0,
+    ...overrides,
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] tras la purga, sin eventos ni trabajos y con el host en quietud, la suite mide normalmente y el reporte publica la purga y la espera', () => {
+    const iso = isolationOf(snap(), prep());
+    expect(iso).toMatchObject({ verdict: 'limpia', message: 'sin carga de fondo ajena' });
+    const bl = aggregateBackgroundLoad([
+      entry('spendable.perf.ts', 'start', snap(), { preparation: prep() }),
+    ]);
+    expect(bl.suites[0]!.isolation.verdict).toBe('limpia');
+    const md = renderMarkdown(buildReport({ ...emptyBase, results: [], backgroundLoad: bl }));
+    expect(md).toMatch(
+      /purga previa: 470165 eventos del outbox y 1390000 trabajos events\.\*; espera de quietud: 60 s, carga 1\.2 \(límite 3\), 0 consultas ajenas activas/u,
+    );
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] eventos pendientes ajenos tras la preparación siguen siendo interferencia con la cantidad medida', () => {
+    const iso = isolationOf(snap({ outboxPending: 12_000 }), prep());
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.message).toMatch(/\b12000\b/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] si la carga del host no baja del límite tras esperar, el veredicto es interferencia por host con la carga medida', () => {
+    const iso = isolationOf(
+      snap(),
+      prep({ quiet: false, waitedMs: 300_000, hostLoad1m: 7.96, purgedOutbox: 0, purgedJobs: 0 }),
+    );
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.message).toMatch(/host sin quietud/u);
+    expect(iso.message).toMatch(/carga del host 7\.96 \(1 min\) sin bajar de 3 tras esperar 300 s/u);
+    expect(iso.preparation?.hostLoad1m).toBe(7.96);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] consultas activas ajenas que no terminan también son interferencia por host', () => {
+    const iso = isolationOf(snap(), prep({ quiet: false, hostLoad1m: 0.5, foreignActiveQueries: 2 }));
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.message).toMatch(/2 consultas activas ajenas/u);
+    expect(iso.message).not.toMatch(/carga del host/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] backlog y host a la vez: el mensaje lleva ambas causas', () => {
+    const iso = isolationOf(snap({ outboxPending: 5 }), prep({ quiet: false, hostLoad1m: 4 }));
+    expect(iso.message).toMatch(/5 eventos pendientes/u);
+    expect(iso.message).toMatch(/carga del host 4 /u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] el reporte marca la suite con host sin quietud como interferencia en la tabla y en el detalle', () => {
+    const bl = aggregateBackgroundLoad([
+      entry('spendable.perf.ts', 'start', snap(), { preparation: prep({ quiet: false, hostLoad1m: 7.96 }) }),
+    ]);
+    expect(bl.suites[0]!.isolation.verdict).toBe('interferencia');
+    const md = renderMarkdown(buildReport({ ...emptyBase, results: [], backgroundLoad: bl }));
+    expect(md).toMatch(/\| interferencia \|/u);
+    expect(md).toMatch(/host sin quietud: carga del host 7\.96/u);
   });
 });

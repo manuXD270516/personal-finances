@@ -75,13 +75,25 @@ beforeAll(async () => {
   workspaceId = (me.body['memberships'] as { workspaceId: string }[])[0]!.workspaceId;
   const userId = me.body['id'] as string;
   const W = `/api/v1/workspaces/${workspaceId}`;
-  const account = await api('POST', `${W}/accounts`, {
-    name: 'Banco BOB',
-    type: 'BANK',
-    currency: 'BOB',
-    openingBalance: { amount: { amount: '10000.00', currency: 'BOB' }, date: '2026-09-01' },
-  });
-  const accountId = account.body['id'] as string;
+  // Una cuenta por moneda: una reserva siempre es de la moneda de su cuenta (GOALS la suma por cuenta y SPENDABLE la
+  // compara con el saldo de la cuenta). Con todas las monedas en una sola cuenta BOB el resumen del Home respondía 422
+  // según el orden de las filas del GROUP BY (la primera fila define la moneda de la reserva).
+  const CURRENCIES = ['BOB', 'USD', 'USDT'] as const;
+  const ACCOUNT_TYPES = { BOB: 'BANK', USD: 'BANK', USDT: 'CRYPTO_WALLET' } as const;
+  const accountIds: string[] = [];
+  for (const currency of CURRENCIES) {
+    const account = await api('POST', `${W}/accounts`, {
+      name: `Cuenta ${currency}`,
+      type: ACCOUNT_TYPES[currency],
+      currency,
+      openingBalance: {
+        amount: { amount: currency === 'USDT' ? '10000.000000' : '10000.00', currency },
+        date: '2026-09-01',
+      },
+    });
+    expect(account.status, JSON.stringify(account.body)).toBe(201);
+    accountIds.push(account.body['id'] as string);
+  }
   const goalIds: string[] = [];
   for (let i = 0; i < 20; i += 1) {
     const g = await api('POST', `${W}/goals`, {
@@ -107,9 +119,9 @@ beforeAll(async () => {
       `INSERT INTO goals.goal_movement
          (id, workspace_id, goal_id, fund, movement, amount, currency, account_id, occurred_on, origin, recorded_by)
        SELECT gen_random_uuid(), $1, ($3::uuid[])[1 + (n % 20)], 'EARMARK', 'CONTRIBUTION', 1 + (n % 7),
-              (ARRAY['BOB', 'USD', 'USDT'])[1 + (n % 3)], $2, DATE '2026-04-01' + (n % 180), 'SYSTEM', $4
+              ($2::text[])[1 + (n % 3)], ($5::uuid[])[1 + (n % 3)], DATE '2026-04-01' + (n % 180), 'SYSTEM', $4
          FROM generate_series(1, 2000) n`,
-      [workspaceId, accountId, goalIds, userId],
+      [workspaceId, [...CURRENCIES], goalIds, userId, accountIds],
     );
     await client.query('COMMIT');
   } finally {
@@ -133,7 +145,7 @@ describe('add-savings-goals 5.2: lectura de metas', () => {
     const read = async () => {
       const started = performance.now();
       const r = await api('GET', `${W}/goals`);
-      expect(r.status).toBe(200);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
       return performance.now() - started;
     };
     await read();
@@ -148,7 +160,7 @@ describe('add-savings-goals 5.2: lectura de metas', () => {
     const read = async () => {
       const started = performance.now();
       const r = await api('GET', `${W}/reports/summary`);
-      expect(r.status).toBe(200);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
       return performance.now() - started;
     };
     await read();

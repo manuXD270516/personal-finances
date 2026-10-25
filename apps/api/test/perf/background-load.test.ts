@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   appendEntry,
+  assertIsolated,
   BACKGROUND_LOAD_LOG,
   readEntries,
   refreshReportFiles,
@@ -156,5 +157,39 @@ describe('registro y reporte de la carga de fondo (investigate-perf-under-load, 
     expect(s.processCpuMs).toBeGreaterThanOrEqual(0);
     expect(Date.parse(s.takenAt)).not.toBeNaN();
     expect(seen.length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('la suite falla si empieza con carga ajena (investigate-perf-under-load 5.1, D291)', () => {
+  const prep = {
+    purgedOutbox: 0,
+    purgedJobs: 0,
+    quiet: true,
+    waitedMs: 0,
+    hostLoad1m: 0.5,
+    hostLoadLimit: 3,
+    foreignActiveQueries: 0,
+  };
+
+  it('[TC-PLATFORM-PIPELINE-024] con la base sin eventos ni trabajos ajenos y el host en quietud la suite mide normalmente', () => {
+    expect(() => assertIsolated('spendable.perf.ts', snap('2026-10-23T06:00:00.000Z'), prep)).not.toThrow();
+    expect(() => assertIsolated('spendable.perf.ts', snap('2026-10-23T06:00:00.000Z'))).not.toThrow();
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] con una base de fixture con 12 000 eventos pendientes ajenos la suite falla con interferencia y la cantidad', () => {
+    expect(() => assertIsolated('spendable.perf.ts', snap('2026-10-23T06:00:00.000Z', 12_000), prep)).toThrow(
+      /spendable\.perf\.ts no puede medir: interferencia \(12000 eventos pendientes/u,
+    );
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] con la carga del host alta que no baja tras esperar la suite falla con interferencia y la carga medida', () => {
+    expect(() =>
+      assertIsolated('spendable.perf.ts', snap('2026-10-23T06:00:00.000Z'), {
+        ...prep,
+        quiet: false,
+        waitedMs: 300_000,
+        hostLoad1m: 7.96,
+      }),
+    ).toThrow(/interferencia \(host sin quietud: carga del host 7\.96/u);
   });
 });
