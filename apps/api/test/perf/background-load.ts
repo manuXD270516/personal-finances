@@ -6,13 +6,16 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
 import {
   aggregateBackgroundLoad,
+  isolationOf,
   replaceBackgroundLoadSection,
   summarizeSnapshot,
   type BackgroundLoadEntry,
   type BackgroundLoadSnapshot,
   type BackgroundLoadSummary,
+  type IsolationPreparation,
   type PerfReport,
 } from './perf-report.js';
+import { prepareIsolationFor } from './isolation.js';
 
 /**
  * Foto de la carga de fondo de la base y del host (investigate-perf-under-load, decisión 2). Cada suite `*.perf.ts` la
@@ -184,6 +187,18 @@ export function refreshReportFiles(outDir: string): boolean {
   return true;
 }
 
+/** La suite no puede empezar con carga de fondo ajena: falla con el veredicto `interferencia` y las cantidades medidas. */
+export function assertIsolated(
+  suite: string,
+  snapshot: BackgroundLoadSnapshot,
+  preparation?: IsolationPreparation,
+): void {
+  const isolation = isolationOf(snapshot, preparation);
+  if (isolation.verdict === 'interferencia') {
+    throw new Error(`[TC-PLATFORM-PIPELINE-026] ${suite} no puede medir: ${isolation.message}`);
+  }
+}
+
 /** Toma y registra las fotos de una suite. Un fallo al observar nunca hace fallar el benchmark: se avisa por stderr. */
 export class SuiteLoadRecorder {
   private runId = '';
@@ -219,6 +234,7 @@ export class SuiteLoadRecorder {
     phase: BackgroundLoadEntry['phase'],
     benchmark?: string,
     extra?: BackgroundLoadEntry['extra'],
+    preparation?: IsolationPreparation,
   ): Promise<BackgroundLoadSnapshot | undefined> {
     try {
       const snapshot = await this.observe();
@@ -229,6 +245,7 @@ export class SuiteLoadRecorder {
         ...(benchmark !== undefined ? { benchmark } : {}),
         snapshot,
         ...(extra ? { extra } : {}),
+        ...(preparation ? { preparation } : {}),
       });
       this.lastSnapshot = snapshot;
       if (phase === 'benchmark') this.lastSummary = summarizeSnapshot(snapshot);
@@ -241,8 +258,31 @@ export class SuiteLoadRecorder {
     }
   }
 
-  start(): Promise<BackgroundLoadSnapshot | undefined> {
-    return this.record('start');
+  start(preparation?: IsolationPreparation): Promise<BackgroundLoadSnapshot | undefined> {
+    return this.record('start', undefined, undefined, preparation);
+  }
+
+  /**
+   * Precondición de aislamiento (D291): purga el backlog residual, espera la quietud del host, toma la foto de inicio
+   * (con la preparación registrada) y falla la suite con el veredicto `interferencia` si queda carga ajena. Un fallo al
+   * preparar o al observar no hace fallar la suite por sí solo: se avisa por stderr y manda la foto.
+   */
+  async prepare(): Promise<void> {
+    let preparation: IsolationPreparation | undefined;
+    try {
+      preparation = await prepareIsolationFor(this.connectionString, (m) =>
+        process.stderr.write(`[isolation] ${this.suite}: ${m}\n`),
+      );
+      process.stderr.write(
+        `[isolation] ${this.suite}: purgados ${String(preparation.purgedOutbox)} eventos del outbox y ${String(preparation.purgedJobs)} trabajos events.*; quietud ${String(preparation.quiet)} tras ${String(Math.round(preparation.waitedMs / 1000))} s (carga ${String(preparation.hostLoad1m)})\n`,
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[isolation] no se pudo preparar el aislamiento de ${this.suite}: ${String(err)}\n`,
+      );
+    }
+    const snapshot = await this.start(preparation);
+    if (snapshot) assertIsolated(this.suite, snapshot, preparation);
   }
 
   /** Foto antes de un benchmark, con datos propios opcionales (p. ej. los trabajos de la cola del matcher). */
@@ -270,9 +310,10 @@ export class SuiteLoadRecorder {
  */
 export function recordSuiteLoad(metaUrl: string, superuserUrl: string): SuiteLoadRecorder {
   const recorder = new SuiteLoadRecorder(suiteNameOf(metaUrl), superuserUrl);
+  // Purga + espera de quietud (hasta 5 min) + foto de inicio; falla la suite si queda interferencia.
   beforeAll(async () => {
-    await recorder.start();
-  }, 120_000);
+    await recorder.prepare();
+  }, 900_000);
   beforeEach(async ({ task }) => {
     await recorder.benchmark(task.name);
   }, 120_000);
