@@ -33,7 +33,7 @@ expected_result:
   - "Las notas de TC-REPORTING-SPENDABLE-014, TC-PLATFORM-PIPELINE-018 y TC-COMMITMENTS-MATCH-012 enlazan ese registro"
   - "Ningún umbral cambió sin una decisión del owner"
 created: 2026-10-21
-updated: 2026-10-23
+updated: 2026-10-25
 ---
 
 # TC-PLATFORM-PIPELINE-027 — Cada benchmark rojo de perf en dos corridas seguidas tiene causa medida, evidencia y camino registrados
@@ -54,3 +54,4 @@ Entonces docs/23 registra la causa medida, las mediciones y el camino
 ## Notas
 
 - Change `investigate-perf-under-load` (D290). Revisión manual (tarea 8.2); no tiene test automatizado: al cerrar el change pasa a `automation_status: manual` y `status: ready`.
+- 2026-10-25: informe publicado ([docs/50](../../../docs/50-perf-under-load-findings.md)); notas con causa y camino en TC-COMMITMENTS-MATCH-012, TC-REPORTING-SPENDABLE-014 y TC-PLATFORM-PIPELINE-018. Falta el resumen en docs/23 §5.5 y la revisión de cierre (tarea 8.2).
