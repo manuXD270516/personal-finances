@@ -36,7 +36,7 @@ expected_result:
   - "Ninguna respuesta es 429"
   - "El benchmark mide el p95 frente a su umbral"
 created: 2026-10-20
-updated: 2026-10-25
+updated: 2026-10-27
 ---
 
 # TC-PLATFORM-PIPELINE-018 — Los benchmarks del simulador de estrategias y de disponible para gastar no reciben rechazos por cuota
@@ -63,3 +63,4 @@ Entonces ninguna respuesta es un rechazo por cuota
 - Verificado en GitHub (2026-10-21, nightly manual run 39669892721 (2026-10-21 20:23 UTC, commit 68f01e5, tras #154)): loan-simulator pasa (TC-DEBT-AMORT-045 incluido). **El criterio de p95 < 300 ms de disponible para gastar NO se cumple**: por primera vez se mide `spendable.perf.ts` (antes caía con 429 por las cuotas; el helper `perfApiEnv` de #150 las relajó) y dos tests con este TC fallan: `getReportSummary` con el bloque spendable, p95 352,2 ms, y `getSpendable` con 300 ocurrencias, p95 341,1 ms, ambos frente a 300 ms. La parte de este TC (sin rechazos por cuota) sí se cumple; la latencia no. Causa NO determinada: puede ser lentitud real o contención del runner (la suite corre tras benchmarks pesados y con el backlog de ~470 000 eventos del outbox en proceso). Se registra sin maquillar; investigación propuesta en un change aparte junto con `investigate-consumer-throughput` (docs/38 §4). Se mantiene `status: automated` (el test existe y mide); no se considera confirmado en GitHub hasta que el p95 cumpla.
 - 2026-10-21 (D290, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): el p95 de disponible para gastar sobre 300 ms lo investiga el change `investigate-perf-under-load` (síntoma S2), que reemplaza la propuesta `investigate-consumer-throughput`. Este TC sigue sin darse por confirmado en GitHub hasta que el p95 cumpla.
 - 2026-10-25 (informe del change 48, [docs/50](../../../docs/50-perf-under-load-findings.md), síntoma S2): la latencia sobre 300 ms se debe a la contención de CPU del host al empezar la suite (H2), no al código ni a las cuotas: en limpio, p95 de 54,27 ms de mediana para `getSpendable` [50,68, 56,67] (E1 ×3); con carga del host 7,5–7,96, 200–359 ms. Camino: arreglo del benchmark en el grupo 5 del change 48 (purga, quietud del host y orden determinista). Se dará por confirmado en GitHub cuando la tarea 7.2 del change 48 mida el p95 bajo 300 ms.
+- 2026-10-27 (cierre del change 48, D303 de [docs/52](../../../docs/52-perf-under-load-owner-decisions.md)): registro de causa, mediciones y camino en [docs/23 §5.5](../../../docs/23-ci-cd.md) («Causas medidas y cierre»). **Confirmado en GitHub:** el p95 de `getSpendable` cumplió 300 ms en los nightlies programados 40186569273 (2026-10-25) y 40322158874 (2026-10-26), con la purga, la espera de quietud y el orden fijo de las suites.

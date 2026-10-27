@@ -113,4 +113,12 @@ Las preguntas 1 a 3 de [docs/47](../../../docs/47-investigate-perf-under-load-qu
 2. Fila de throughput por consumidor con handler real: sigue informativa hasta que el informe proponga un umbral por consumidor (D292).
 3. Runner del job `perf`: el estándar de 4 CPU, con los umbrales de docs/02 como locales (D293).
 
-No quedan preguntas abiertas; las que abra el informe van a un doc de preguntas nuevo (tarea 4.2).
+Las preguntas que abrió el informe ([docs/51](../../../docs/51-perf-under-load-questions.md)) se resolvieron el 2026-10-27 con la recomendación de cada una ([docs/52](../../../docs/52-perf-under-load-owner-decisions.md)):
+
+4. `imports.perf.ts`: change de seguimiento `fix-imports-perf-connection-budget`, con el alcance ampliado a las conexiones y al drenado marginal (123,5 s frente a 120 s en el programado 40322158874) (D299).
+5. Fila de throughput con handler real: sigue informativa y sin umbral hasta que un change de optimización mida E6–E8 (D300).
+6. `optimize-consumer-throughput`: diferido a Phase 6 con la escritura masiva del import (D152); la fila informativa es la señal (D301).
+7. Runner: el estándar de 4 CPU con la espera de quietud y su tope; se vuelve a preguntar solo si el job se acerca a `timeout-minutes: 240` (D302).
+8. Cierre: con S1 y S2 confirmados por la tarea 7.2 (nightlies programados 40186569273 y 40322158874) y S3 diferido; sin repetir E10/E11 ni lanzar E6–E8 (D303).
+
+No quedan preguntas abiertas.

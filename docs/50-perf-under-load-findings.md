@@ -114,5 +114,5 @@ Correlación de la carga del host al empezar `spendable` con su p95, sobre las c
 
 | Nombre propuesto | Alcance | Estado |
 |---|---|---|
-| `fix-imports-perf-connection-budget` | Medir las conexiones de `imports.perf.ts` (pools de la API, del worker y del harness frente a `max_connections` del contenedor) y corregir el benchmark o el producto según la causa | Propuesto; espera la pregunta 1 de docs/51 |
-| `optimize-consumer-throughput` | Medir E6–E8 por consumidor con handler real, proponer el umbral por consumidor (D292) y optimizar los consumidores lentos | Condicional; espera las preguntas 2 y 3 de docs/51 |
+| `fix-imports-perf-connection-budget` | Medir las conexiones de `imports.perf.ts` (pools de la API, del worker y del harness frente a `max_connections` del contenedor) y corregir el benchmark o el producto según la causa | Redactado (D299, [docs/52](52-perf-under-load-owner-decisions.md)), con el alcance ampliado al drenado marginal (123,5 s frente a 120 s, programado 40322158874) |
+| `optimize-consumer-throughput` | Medir E6–E8 por consumidor con handler real, proponer el umbral por consumidor (D292) y optimizar los consumidores lentos | Diferido a Phase 6 con la escritura masiva del import (D300, D301, [docs/52](52-perf-under-load-owner-decisions.md)) |
