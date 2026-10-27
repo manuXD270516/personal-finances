@@ -19,6 +19,7 @@ import {
   type Json,
   type Mini,
 } from '../support/portability.js';
+import { leakPattern } from '../support/leak-matcher.js';
 
 // Ciclo de vida del export (openspec add-workspace-export; identity/workspace-portability): una exportación en curso por
 // workspace, instantánea consistente con escrituras concurrentes, retención y eliminación anticipada, auditoría en orden,
@@ -199,7 +200,13 @@ describe('Retención, eliminación anticipada y auditoría del ciclo', () => {
     ]);
     expect((entries[4]!['actor'] as Json)['process']).toBe('identity.export-retention');
     expect(entries.every((x) => x['category'] === 'SECURITY')).toBe(true);
-    expect(JSON.stringify(entries)).not.toMatch(/Bank A|3099/u);
+    // «3099» suelto cae por azar dentro de UUIDv7, hashes o marcas de tiempo: se busca con límites.
+    const leak = leakPattern('Bank A', '3099', '3099.10');
+    expect(JSON.stringify(entries)).not.toMatch(leak);
+    // La aserción sigue siendo capaz de detectar una fuga real y no se confunde con ids.
+    expect('{"changes":{"balance":"3099.10"}}').toMatch(leak);
+    expect('{"name":"Bank A"}').toMatch(leak);
+    expect('{"id":"01a16-3099-7000-ad44","at":"2026-10-23T10:30:45.3099Z","h":"ab3099cd"}').not.toMatch(leak);
   }, 120_000);
 
   it('[TC-IDENTITY-EXPORT-008] el OWNER elimina un export terminado: objeto borrado, registro conservado, descarga 410, idempotente y auditado; un EDITOR no puede', async () => {

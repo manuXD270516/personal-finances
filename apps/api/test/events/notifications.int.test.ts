@@ -16,6 +16,7 @@ import { createEmailSender, type EmailSender } from '@pf/notifications/interface
 import { createWorkerRuntime, type WorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { startMailpit, type Mailpit, type MailpitMessage } from '../support/mailpit.js';
 import { baseEnv, capturingLogger, discardStaleEventBacklog, workerConfig } from '../support/harness.js';
+import { leakPattern } from '../support/leak-matcher.js';
 
 // Notificaciones de punta a punta contra PostgreSQL real, pg-boss real y Mailpit (openspec add-alerts, tareas 4.2, 4.4
 // y 7.2): outbox → relay → consumidores `notifications.*` → entrega por email → job `notifications.email-dispatch` →
@@ -334,7 +335,9 @@ describe('notifications/alerts: de un hecho publicado a un email en Mailpit', ()
         return m.length > 0 ? m : undefined;
       });
       const content = `${mail?.Subject}\n${withoutUrls(mail?.Text ?? '')}\n${withoutUrls(mail?.HTML ?? '')}`;
-      for (const forbidden of ['Restaurantes', '550', '600', 'BOB']) expect(content).not.toContain(forbidden);
+      for (const forbidden of ['Restaurantes', 'BOB']) expect(content).not.toContain(forbidden);
+      // Los montos sueltos se buscan con límites: «600» aparece en CSS (font-weight, width) y en ids.
+      expect(content).not.toMatch(leakPattern('550', '600'));
       expect(mail?.Text).toContain('Una línea de tu presupuesto de 2026-11 alcanzó el 90 %.');
     } finally {
       await worker.close();
