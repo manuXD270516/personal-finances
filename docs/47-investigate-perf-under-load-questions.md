@@ -2,6 +2,8 @@
 
 > **Fecha:** 2026-10-21 · **Changes:** [`investigate-perf-under-load`](../openspec/changes/investigate-perf-under-load/proposal.md) (48) y [`optimize-rls-policy-overhead`](../openspec/changes/optimize-rls-policy-overhead/proposal.md) (49) · **Relacionado:** [46-nightly-and-perf-owner-decisions.md](46-nightly-and-perf-owner-decisions.md) (D283–D290), [44-fix-nightly-pipeline-questions.md](44-fix-nightly-pipeline-questions.md), [38-estado-y-pendientes.md](38-estado-y-pendientes.md), docs/23 §5.5
 
+> **Resueltas el 2026-10-23:** el owner adoptó la recomendación de las seis preguntas (D291–D296, [docs/48](48-perf-and-rls-owner-decisions.md)).
+
 Los dos changes salen de las respuestas del owner del 2026-10-21 (D287 y D290). Estas preguntas son nuevas; cada respuesta se registra en el siguiente `…-decisions.md` con su número D. Ninguna bloquea la redacción. **Bloquean el orden de implementación:** la 1 (grupo 5 del change 48) y la 4 (grupo 3 del change 49). Las demás son condicionales o se pueden responder después del informe.
 
 ## Change 48: investigate-perf-under-load

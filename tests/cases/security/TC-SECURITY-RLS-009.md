@@ -5,7 +5,7 @@ spec: security/access-control
 related_specs: ["ledger/balances"]
 requirement: "Las políticas de aislamiento no agregan trabajo por fila al plan"
 scenario: "Plan de la consulta de saldo por cuenta"
-requirement_status: confirmed
+requirement_status: provisional
 fr: []
 nfr: [NFR-SEC-003, NFR-PERF-005]
 invariants: []
@@ -14,7 +14,9 @@ type: security
 level: database-integration
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: deprecated
+deprecated_by_change: optimize-rls-policy-overhead
+deprecation_reason: "No se migran las políticas de aislamiento (D298, docs/49): la política vigente conserva el nodo Result y la fila INCLUDE pasa a informativa (TC-SECURITY-RLS-010)."
 regression_suite: false
 phase: 5
 tags: ["rls", "plan", "performance"]
@@ -31,7 +33,7 @@ expected_result:
   - "Ambos planes usan Index Only Scan sobre el mismo índice"
   - "El plan con política no tiene un nodo Result ni otro nodo entre el acceso por índice y el Aggregate"
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-10-24
 ---
 
 # TC-SECURITY-RLS-009 — El plan de la consulta de saldo por cuenta con la política reescrita no agrega un nodo entre el índice y la agregación
@@ -52,3 +54,4 @@ Entonces ambos usan el mismo acceso solo por índice
 ## Notas
 
 - Change `optimize-rls-policy-overhead` (D287), decisión 4. La cantidad de filas viene del EXPLAIN del issue #147.
+- **Descartado por decisión del owner (D298, [docs/49](../../../docs/49-rls-no-migration-decision.md), 2026-10-24).** No se migran las políticas, así que el plan de la consulta INCLUDE con la política reescrita no tiene objeto y el requirement «Las políticas de aislamiento no agregan trabajo por fila al plan» salió del delta del change. Queda con `requirement_status: provisional` solo mientras existan en `main` los tests omitidos que lo citan; en la tarea 4.2 pasa a `deprecated` (`deprecated_by_change: optimize-rls-policy-overhead`) en el mismo commit que los retira, para no romper la regla R5 de trazabilidad.

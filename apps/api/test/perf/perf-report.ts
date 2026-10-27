@@ -136,6 +136,257 @@ export interface BenchResult {
   readonly pairs?: number;
   /** Solo filas de RLS: motivo del veredicto. */
   readonly verdict?: RlsVerdict;
+  /**
+   * investigate-perf-under-load: `false` si la suite empezó con carga de fondo ajena (veredicto `interferencia`); la
+   * medición no es válida y no se compara con su umbral. Ausente = válida.
+   */
+  readonly valid?: boolean;
+  /** Mensaje de la interferencia medida (solo con `valid === false`). */
+  readonly interference?: string;
+  /** Carga de fondo (resumen de la foto) antes de este benchmark. Aditivo. */
+  readonly backgroundLoad?: BackgroundLoadSummary;
+}
+
+/** Trabajos pendientes de una cola de consumidor (`events.<consumidor>`) en un estado de pg-boss. */
+export interface EventJobCount {
+  readonly queue: string;
+  readonly state: 'created' | 'retry' | 'active';
+  readonly count: number;
+}
+
+/** Conexiones de `pg_stat_activity` por rol, aplicación y estado. */
+export interface ConnectionCount {
+  readonly role: string;
+  readonly application: string;
+  readonly state: string;
+  readonly count: number;
+}
+
+/** Estado de una tabla citada en el design de investigate-perf-under-load (H3) según `pg_stat_user_tables`. */
+export interface TableStat {
+  readonly table: string;
+  readonly liveTuples: number;
+  readonly deadTuples: number;
+  readonly lastAutovacuum: string | null;
+  readonly lastAutoanalyze: string | null;
+}
+
+/**
+ * Foto de la carga de fondo de la base y del host (investigate-perf-under-load, decisión 2): lo que hay en marcha
+ * mientras un benchmark mide. La toma `background-load.ts`; aquí solo se agrega y se formatea.
+ */
+export interface BackgroundLoadSnapshot {
+  readonly takenAt: string;
+  /** Eventos con `published_at IS NULL` en `platform.outbox`. */
+  readonly outboxPending: number;
+  readonly eventJobs: readonly EventJobCount[];
+  readonly connections: readonly ConnectionCount[];
+  /** Locks de `pg_locks` con `granted = false`. */
+  readonly ungrantedLocks: number;
+  readonly tables: readonly TableStat[];
+  /** `os.loadavg()`: 1, 5 y 15 minutos. */
+  readonly loadAvg: readonly [number, number, number];
+  /** CPU consumida por el proceso de Vitest hasta ahora (usuario + sistema, ms). */
+  readonly processCpuMs: number;
+}
+
+/** Resumen compacto de una foto, el que lleva cada resultado en `perf-results.json`. */
+export interface BackgroundLoadSummary {
+  readonly takenAt: string;
+  readonly outboxPending: number;
+  /** Total de trabajos pendientes en colas `events.*`. */
+  readonly eventJobs: number;
+  /** Total de conexiones activas a la base. */
+  readonly connections: number;
+  readonly ungrantedLocks: number;
+  readonly loadAvg1m: number;
+}
+
+export type IsolationVerdict = 'limpia' | 'interferencia';
+
+/**
+ * Preparación del aislamiento de una suite (D291): lo que hizo el harness antes de su foto de inicio. Purga del backlog
+ * residual, espera de quietud del host (carga de 1 min bajo `hostLoadLimit`) y consultas activas ajenas en la base.
+ */
+export interface IsolationPreparation {
+  readonly purgedOutbox: number;
+  readonly purgedJobs: number;
+  /** `true` si el host quedó en quietud (carga bajo el límite y sin consultas ajenas) dentro del tope de espera. */
+  readonly quiet: boolean;
+  readonly waitedMs: number;
+  /** Carga de 1 min medida en la última muestra de la espera. */
+  readonly hostLoad1m: number;
+  readonly hostLoadLimit: number;
+  readonly foreignActiveQueries: number;
+}
+
+/** Veredicto de aislamiento de una suite al empezar. */
+export interface Isolation {
+  readonly verdict: IsolationVerdict;
+  readonly outboxPending: number;
+  readonly eventJobs: number;
+  readonly message: string;
+  /** Solo con preparación: carga del host y datos de la purga y la espera. */
+  readonly preparation?: IsolationPreparation;
+}
+
+/** Línea del registro `background-load.ndjson` que escribe cada suite (una por foto). */
+export interface BackgroundLoadEntry {
+  /** Identifica la corrida (arranque del PostgreSQL del contenedor): descarta restos de corridas anteriores. */
+  readonly runId: string;
+  readonly suite: string;
+  readonly phase: 'start' | 'benchmark' | 'end';
+  readonly benchmark?: string;
+  readonly snapshot: BackgroundLoadSnapshot;
+  /** Datos propios del benchmark (p. ej. los trabajos de la cola del matcher antes de la ráfaga). */
+  readonly extra?: Readonly<Record<string, string | number>>;
+  /** Solo en la foto de inicio: purga y espera de quietud previas (D291). */
+  readonly preparation?: IsolationPreparation;
+}
+
+export interface BenchmarkBackgroundLoad {
+  readonly benchmark: string;
+  readonly snapshot: BackgroundLoadSnapshot;
+  readonly extra?: Readonly<Record<string, string | number>>;
+}
+
+export interface SuiteBackgroundLoad {
+  readonly suite: string;
+  /** Posición real de la suite en la corrida (1 = la primera en arrancar). */
+  readonly order: number;
+  readonly start: BackgroundLoadSnapshot;
+  readonly isolation: Isolation;
+  readonly benchmarks: readonly BenchmarkBackgroundLoad[];
+  readonly end?: BackgroundLoadSnapshot;
+}
+
+export interface BackgroundLoadReport {
+  readonly runId: string;
+  /** Archivos `*.perf.ts` en el orden real en que arrancaron. */
+  readonly fileOrder: readonly string[];
+  readonly suites: readonly SuiteBackgroundLoad[];
+}
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+const sum = (values: readonly number[]) => values.reduce((a, b) => a + b, 0);
+
+/** Trabajos pendientes (todos los estados) de una cola `events.*`. */
+export function jobsOfQueue(snapshot: BackgroundLoadSnapshot, queue: string): number {
+  return sum(snapshot.eventJobs.filter((j) => j.queue === queue).map((j) => j.count));
+}
+
+/**
+ * Aislamiento de una suite al empezar (D291): no debe haber eventos pendientes de publicar ni trabajos de colas
+ * `events.*` que provengan de una carga o de una suite anterior, y, si hubo preparación, el host debe haber quedado en
+ * quietud (carga de 1 min bajo el límite y sin consultas activas ajenas) dentro del tope de espera. La suite aún no hizo
+ * nada, así que todo lo que la foto muestra es ajeno.
+ */
+export function isolationOf(snapshot: BackgroundLoadSnapshot, preparation?: IsolationPreparation): Isolation {
+  const outboxPending = snapshot.outboxPending;
+  const eventJobs = sum(snapshot.eventJobs.map((j) => j.count));
+  const reasons: string[] = [];
+  if (outboxPending > 0 || eventJobs > 0) {
+    const queues = [...new Set(snapshot.eventJobs.filter((j) => j.count > 0).map((j) => j.queue))];
+    reasons.push(
+      `${outboxPending} eventos pendientes de publicar; ${eventJobs} trabajos de colas events.* ajenos${
+        queues.length > 0 ? `: ${queues.join(', ')}` : ''
+      }`,
+    );
+  }
+  if (preparation && !preparation.quiet) {
+    const parts: string[] = [];
+    if (preparation.hostLoad1m >= preparation.hostLoadLimit) {
+      parts.push(
+        `carga del host ${round2(preparation.hostLoad1m)} (1 min) sin bajar de ${preparation.hostLoadLimit} tras esperar ${Math.round(preparation.waitedMs / 1000)} s`,
+      );
+    }
+    if (preparation.foreignActiveQueries > 0) {
+      parts.push(`${preparation.foreignActiveQueries} consultas activas ajenas en la base`);
+    }
+    reasons.push(parts.length > 0 ? `host sin quietud: ${parts.join('; ')}` : 'host sin quietud');
+  }
+  const base = { outboxPending, eventJobs, ...(preparation ? { preparation } : {}) };
+  if (reasons.length === 0) {
+    return { verdict: 'limpia', ...base, message: 'sin carga de fondo ajena' };
+  }
+  return { verdict: 'interferencia', ...base, message: `interferencia (${reasons.join('; ')})` };
+}
+
+export function summarizeSnapshot(snapshot: BackgroundLoadSnapshot): BackgroundLoadSummary {
+  return {
+    takenAt: snapshot.takenAt,
+    outboxPending: snapshot.outboxPending,
+    eventJobs: sum(snapshot.eventJobs.map((j) => j.count)),
+    connections: sum(snapshot.connections.map((c) => c.count)),
+    ungrantedLocks: snapshot.ungrantedLocks,
+    loadAvg1m: round2(snapshot.loadAvg[0]),
+  };
+}
+
+/**
+ * Una suite que empieza con carga de fondo ajena no publica su medición como válida (TC-PLATFORM-PIPELINE-026): el
+ * resultado queda `valid: false` y `passed: false`, sin compararlo con su umbral, y el reporte lo cuenta como brecha.
+ * Con el aislamiento limpio devuelve el mismo resultado.
+ */
+export function applyInterference(result: BenchResult, isolation: Isolation): BenchResult {
+  if (isolation.verdict === 'limpia') return result;
+  return {
+    ...result,
+    valid: false,
+    passed: false,
+    interference: isolation.message,
+    notes: `medición no válida: ${isolation.message}; el valor ${result.value} no se compara con el umbral${
+      result.notes ? `; ${result.notes}` : ''
+    }`,
+  };
+}
+
+/**
+ * Throughput de una ráfaga con solo los eventos de la ráfaga: del primer al último evento procesado (mínimo 1 s, como
+ * `throughputResult`). El tiempo de espera detrás de un backlog ajeno no cuenta.
+ */
+export function burstWindow(input: { events: number; firstProcessedAt: Date; lastProcessedAt: Date }): {
+  seconds: number;
+  eventsPerSecond: number;
+} {
+  const raw = (input.lastProcessedAt.getTime() - input.firstProcessedAt.getTime()) / 1000;
+  const seconds = Math.max(1, Math.round(raw * 10) / 10);
+  return { seconds, eventsPerSecond: round2(input.events / seconds) };
+}
+
+/**
+ * Agrupa el registro de fotos por suite, en el orden real de arranque. Solo cuenta la última corrida del registro
+ * (`runId` de la última línea): un `reports/perf/` reutilizado no mezcla corridas.
+ */
+export function aggregateBackgroundLoad(entries: readonly BackgroundLoadEntry[]): BackgroundLoadReport {
+  const runId = entries.at(-1)?.runId ?? '';
+  const bySuite = new Map<string, BackgroundLoadEntry[]>();
+  for (const e of entries.filter((x) => x.runId === runId)) {
+    bySuite.set(e.suite, [...(bySuite.get(e.suite) ?? []), e]);
+  }
+  const suites = [...bySuite.entries()].map(([suite, list]) => {
+    const startEntry = list.find((e) => e.phase === 'start') ?? list[0]!;
+    const end = [...list].reverse().find((e) => e.phase === 'end');
+    return {
+      suite,
+      start: startEntry.snapshot,
+      isolation: isolationOf(startEntry.snapshot, startEntry.preparation),
+      benchmarks: list
+        .filter((e) => e.phase === 'benchmark')
+        .map((e) => ({
+          benchmark: e.benchmark ?? '(sin nombre)',
+          snapshot: e.snapshot,
+          ...(e.extra ? { extra: e.extra } : {}),
+        })),
+      ...(end ? { end: end.snapshot } : {}),
+    };
+  });
+  suites.sort((a, b) => a.start.takenAt.localeCompare(b.start.takenAt));
+  return {
+    runId,
+    fileOrder: suites.map((x) => x.suite),
+    suites: suites.map((x, i) => ({ ...x, order: i + 1 })),
+  };
 }
 
 export interface PerfReport {
@@ -145,6 +396,8 @@ export interface PerfReport {
   readonly dataset: Record<string, string | number>;
   readonly results: readonly BenchResult[];
   readonly breaches: readonly string[];
+  /** Carga de fondo por suite (investigate-perf-under-load). Aditivo: ausente en reportes sin fotos. */
+  readonly backgroundLoad?: BackgroundLoadReport;
 }
 
 export function latencyResult(input: {
@@ -321,11 +574,13 @@ export function buildReport(input: Omit<PerfReport, 'version' | 'breaches'>): Pe
   const breaches = input.results
     .filter((r) => r.gate && !r.passed)
     .map((r) =>
-      r.verdict === 'plan distinto'
-        ? `${r.nfr} ${r.id}: plan distinto (${planOf(r.notes)})`
-        : r.unit === 'ev/s'
-          ? `${r.nfr} ${r.id}: ${r.value} ev/s < ${r.limit} ev/s`
-          : `${r.nfr} ${r.id}: ${r.value}${r.unit === 'ms' ? ' ms' : ''} > ${r.limit}${r.unit === 'ms' ? ' ms' : ''}`,
+      r.valid === false
+        ? `${r.nfr} ${r.id}: ${r.interference ?? 'interferencia'}`
+        : r.verdict === 'plan distinto'
+          ? `${r.nfr} ${r.id}: plan distinto (${planOf(r.notes)})`
+          : r.unit === 'ev/s'
+            ? `${r.nfr} ${r.id}: ${r.value} ev/s < ${r.limit} ev/s`
+            : `${r.nfr} ${r.id}: ${r.value}${r.unit === 'ms' ? ' ms' : ''} > ${r.limit}${r.unit === 'ms' ? ' ms' : ''}`,
     );
   return { version: 1, ...input, breaches };
 }
@@ -333,12 +588,133 @@ export function buildReport(input: Omit<PerfReport, 'version' | 'breaches'>): Pe
 /** El aviso por issue pega `perf-summary.md` (límite de GitHub 65 536 caracteres): el diagnóstico se recorta. */
 export const MAX_DIAGNOSTICS_CHARS = 24_000;
 
+export const BACKGROUND_LOAD_START = '<!-- background-load:start -->';
+export const BACKGROUND_LOAD_END = '<!-- background-load:end -->';
+/** La sección de carga de fondo se recorta para que el aviso por issue (65 536 caracteres) no se desborde. */
+export const MAX_BACKGROUND_LOAD_CHARS = 16_000;
+
+const dash = (v: string | null) => v ?? '—';
+const loadOf = (s: BackgroundLoadSnapshot) => s.loadAvg.map(round2).join(' / ');
+const jobsDetail = (s: BackgroundLoadSnapshot): string => {
+  const queues = [...new Set(s.eventJobs.map((j) => j.queue))];
+  return queues.length === 0
+    ? 'ninguno'
+    : queues
+        .map(
+          (q) =>
+            `${q} (${s.eventJobs
+              .filter((j) => j.queue === q)
+              .map((j) => `${j.state} ${j.count}`)
+              .join(', ')})`,
+        )
+        .join('; ');
+};
+const connectionsDetail = (s: BackgroundLoadSnapshot): string =>
+  s.connections.length === 0
+    ? 'ninguna'
+    : s.connections.map((c) => `${c.role}/${c.application}/${c.state} ${c.count}`).join(', ');
+
+const preparationDetail = (i: Isolation): string =>
+  i.preparation
+    ? `; purga previa: ${i.preparation.purgedOutbox} eventos del outbox y ${i.preparation.purgedJobs} trabajos events.*; espera de quietud: ${Math.round(i.preparation.waitedMs / 1000)} s, carga ${round2(i.preparation.hostLoad1m)} (límite ${i.preparation.hostLoadLimit}), ${i.preparation.foreignActiveQueries} consultas ajenas activas`
+    : '';
+
+/**
+ * Sección "Carga de fondo por suite" de `perf-summary.md` entre marcadores (las suites que corren después de `nightly`
+ * la reemplazan con `replaceBackgroundLoadSection`). Va con el orden real de los archivos y, por suite, la foto al
+ * empezar, antes de cada benchmark y al terminar.
+ */
+export function renderBackgroundLoadSection(bl: BackgroundLoadReport): string[] {
+  const body: string[] = ['## Carga de fondo por suite', ''];
+  if (bl.suites.length === 0) {
+    body.push('Sin fotos de carga de fondo en esta corrida.', '');
+  } else {
+    body.push(
+      `> Orden real de los archivos: ${bl.fileOrder.join(' → ')}. Foto de la base y del host (investigate-perf-under-load):`,
+      '> eventos pendientes del outbox, trabajos `events.*` (created, retry, active), conexiones, locks no concedidos y',
+      '> carga del host. Antes de la foto de inicio el harness purga el backlog residual y espera la quietud del host (D291);',
+      '> "interferencia" = la suite empezó con eventos o trabajos ajenos, o con el host sin quietud, y falla.',
+      '',
+      '### Al empezar cada suite',
+      '',
+      '| # | Suite | Eventos pendientes | Trabajos events.* | Conexiones | Locks no concedidos | Carga del host (1/5/15 min) | Aislamiento |',
+      '|---|---|---|---|---|---|---|---|',
+      ...bl.suites.map(
+        (x) =>
+          `| ${x.order} | ${x.suite} | ${x.start.outboxPending} | ${x.isolation.eventJobs} | ${summarizeSnapshot(x.start).connections} | ${x.start.ungrantedLocks} | ${loadOf(x.start)} | ${x.isolation.verdict} |`,
+      ),
+      '',
+      '### Detalle al empezar',
+      '',
+      ...bl.suites.map(
+        (x) =>
+          `- **${x.suite}:** trabajos: ${jobsDetail(x.start)}; conexiones: ${connectionsDetail(x.start)}${preparationDetail(x.isolation)}${
+            x.isolation.verdict === 'interferencia' ? `; ${x.isolation.message}` : ''
+          }`,
+      ),
+      '',
+      '### Tablas citadas al empezar (pg_stat_user_tables)',
+      '',
+      '| Suite | Tabla | Filas vivas | Filas muertas | Último autovacuum | Último autoanalyze |',
+      '|---|---|---|---|---|---|',
+      ...bl.suites.flatMap((x) =>
+        x.start.tables.map(
+          (t) =>
+            `| ${x.suite} | ${t.table} | ${t.liveTuples} | ${t.deadTuples} | ${dash(t.lastAutovacuum)} | ${dash(t.lastAutoanalyze)} |`,
+        ),
+      ),
+      '',
+      '### Al terminar cada suite',
+      '',
+      '| Suite | Eventos pendientes | Trabajos events.* | Conexiones | Locks no concedidos | Carga del host (1/5/15 min) |',
+      '|---|---|---|---|---|---|',
+      ...bl.suites
+        .filter((x) => x.end !== undefined)
+        .map((x) => {
+          const e = summarizeSnapshot(x.end!);
+          return `| ${x.suite} | ${e.outboxPending} | ${e.eventJobs} | ${e.connections} | ${e.ungrantedLocks} | ${loadOf(x.end!)} |`;
+        }),
+      '',
+      '### Antes de cada benchmark',
+      '',
+      '| Suite | Benchmark | Eventos pendientes | Trabajos events.* | Conexiones | Locks no concedidos | Carga 1 min | Datos del benchmark |',
+      '|---|---|---|---|---|---|---|---|',
+      ...bl.suites.flatMap((x) =>
+        x.benchmarks.map((b) => {
+          const m = summarizeSnapshot(b.snapshot);
+          const extra = b.extra
+            ? Object.entries(b.extra)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join('; ')
+            : '';
+          return `| ${x.suite} | ${b.benchmark} | ${m.outboxPending} | ${m.eventJobs} | ${m.connections} | ${m.ungrantedLocks} | ${m.loadAvg1m} | ${extra} |`;
+        }),
+      ),
+      '',
+    );
+  }
+  let text = body.join('\n');
+  if (text.length > MAX_BACKGROUND_LOAD_CHARS) {
+    text = `${text.slice(0, MAX_BACKGROUND_LOAD_CHARS)}\n\n[recortado a ${MAX_BACKGROUND_LOAD_CHARS} caracteres; el registro completo está en background-load.ndjson y perf-results.json del artefacto perf]\n`;
+  }
+  return [BACKGROUND_LOAD_START, text, BACKGROUND_LOAD_END];
+}
+
+/** Reemplaza la sección entre marcadores de un `perf-summary.md`; si no los tiene, la agrega al final. */
+export function replaceBackgroundLoadSection(markdown: string, bl: BackgroundLoadReport): string {
+  const section = renderBackgroundLoadSection(bl).join('\n');
+  const start = markdown.indexOf(BACKGROUND_LOAD_START);
+  const end = markdown.indexOf(BACKGROUND_LOAD_END);
+  if (start === -1 || end === -1 || end < start) return `${markdown.replace(/\n*$/u, '')}\n\n${section}\n`;
+  return `${markdown.slice(0, start)}${section}${markdown.slice(end + BACKGROUND_LOAD_END.length)}`;
+}
+
 export function renderMarkdown(report: PerfReport, diagnostics?: string): string {
   const fmt = (r: BenchResult) =>
     r.unit === 'ms'
-      ? `${r.value} ms`
+      ? `${r.value} ms${r.valid === false ? ' (no válida)' : ''}`
       : r.unit === 'ev/s'
-        ? `${r.value} ev/s`
+        ? `${r.value} ev/s${r.valid === false ? ' (no válida)' : ''}`
         : `${(r.value * 100).toFixed(1)} %`;
   const lim = (r: BenchResult) =>
     r.unit === 'ms' ? `≤ ${r.limit} ms` : r.unit === 'ev/s' ? `≥ ${r.limit} ev/s` : `< ${r.limit * 100} %`;
@@ -362,12 +738,13 @@ export function renderMarkdown(report: PerfReport, diagnostics?: string): string
     '|---|---|---|---|---|---|---|---|---|---|',
     ...report.results.map(
       (r) =>
-        `| ${r.nfr} | ${r.title} | ${r.stats.n} | ${r.stats.p50} | ${r.stats.p95} | ${r.stats.p99} | ${fmt(r)} | ${lim(r)} | ${r.gate ? 'sí' : 'informativo'} | ${r.passed ? 'OK' : 'FALLA'} |`,
+        `| ${r.nfr} | ${r.title} | ${r.stats.n} | ${r.stats.p50} | ${r.stats.p95} | ${r.stats.p99} | ${fmt(r)} | ${lim(r)} | ${r.gate ? 'sí' : 'informativo'} | ${r.valid === false ? 'INTERFERENCIA' : r.passed ? 'OK' : 'FALLA'} |`,
     ),
     '',
     ...(report.results.some((r) => r.notes)
       ? ['## Notas', '', ...report.results.filter((r) => r.notes).map((r) => `- **${r.id}:** ${r.notes}`), '']
       : []),
+    ...(report.backgroundLoad ? [...renderBackgroundLoadSection(report.backgroundLoad), ''] : []),
     '## Entorno',
     '',
     '| Clave | Valor |',

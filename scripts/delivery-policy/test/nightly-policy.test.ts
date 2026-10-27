@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
@@ -314,5 +314,393 @@ describe('tests con NIGHTLY y timeout explícito (seguimiento de TC-PLATFORM-PIP
     expect(nightlyTestsWithoutTimeout('a.test.ts', bad)).toEqual(["a.test.ts: '[TC-X-001] a'"]);
     expect(nightlyTestsWithoutTimeout('b.test.ts', ok)).toEqual([]);
     expect(nightlyTestsWithoutTimeout('c.test.ts', noNightly)).toEqual([]);
+  });
+});
+
+// investigate-perf-under-load, decisión 5 (TC-PLATFORM-PIPELINE-028): los umbrales de los benchmarks son los de docs/02
+// §PERF (NFR-PERF-001..009). Un rojo de `perf` no se cierra subiendo el umbral ni volviendo informativa una fila bloqueante:
+// cambiarlos exige editar esta tabla (EXPECTED_THRESHOLDS / BLOCKING_RESULT_IDS) con la decisión del owner (D-id) que lo
+// aprueba, y la revisión del PR lo comprueba. D43 (docs/31): qué filas son bloqueantes. D112 (docs/33): ≥ 42 ev/s.
+// D152 (docs/33): la persistencia del import ≤ 20 s está diferida a Phase 6 (PERSIST_CEILING_MS es un techo de regresión,
+// no el umbral). D285 y D292 (docs/46, docs/48): la fila de throughput con handler real sigue informativa.
+type ThresholdUnit = 'ms' | 'ev/s';
+
+interface ExpectedThreshold {
+  /** `NFR-PERF-00x` o `NFR-PERF-00x:<variante>`. */
+  readonly key: string;
+  readonly unit: ThresholdUnit;
+  readonly value: number;
+  /** Fragmento que docs/02 debe contener en la fila del NFR. */
+  readonly doc: string;
+}
+
+const EXPECTED_THRESHOLDS: readonly ExpectedThreshold[] = [
+  { key: 'NFR-PERF-001', unit: 'ms', value: 300, doc: 'local ≤ 300 ms p95' },
+  { key: 'NFR-PERF-001:cloud', unit: 'ms', value: 200, doc: 'p95 server time ≤ **200 ms**' },
+  { key: 'NFR-PERF-002', unit: 'ms', value: 400, doc: 'p95 ≤ 400 ms' },
+  { key: 'NFR-PERF-003', unit: 'ms', value: 150, doc: 'p95 ≤ **150 ms**' },
+  { key: 'NFR-PERF-004', unit: 'ms', value: 300, doc: 'p95 ≤ **300 ms**' },
+  { key: 'NFR-PERF-005', unit: 'ms', value: 50, doc: 'p95 ≤ 50 ms por cuenta' },
+  { key: 'NFR-PERF-005:all', unit: 'ms', value: 150, doc: '≤ 150 ms para todas las cuentas' },
+  { key: 'NFR-PERF-006', unit: 'ms', value: 800, doc: 'p95 ≤ 800 ms' },
+  { key: 'NFR-PERF-007:preview', unit: 'ms', value: 30_000, doc: '≤ 30 s end-to-end' },
+  { key: 'NFR-PERF-007:persist', unit: 'ms', value: 20_000, doc: 'persistencia ≤ 20 s' },
+  { key: 'NFR-PERF-008', unit: 'ev/s', value: 42, doc: '≥ 42 eventos/s por consumidor' },
+  { key: 'NFR-PERF-008:drain', unit: 'ms', value: 120_000, doc: '≤ 120 s' },
+  { key: 'NFR-PERF-009', unit: 'ms', value: 10_000, doc: '≤ 10 s por workspace' },
+];
+
+/** Umbral que declara el código del benchmark (en `perf-report.ts` o como constante local de una suite). */
+interface ThresholdFact {
+  /** Dónde está y qué mide: archivo y constante, p. ej. `spendable.perf.ts BUDGET_MS`. */
+  readonly benchmark: string;
+  readonly key: string;
+  readonly unit: ThresholdUnit;
+  readonly value: number;
+}
+
+/** Violaciones de la regla (vacío si cumple); cada mensaje nombra el benchmark, el umbral nuevo y el de docs/02. */
+function thresholdFactViolations(
+  facts: readonly ThresholdFact[],
+  expected: readonly ExpectedThreshold[] = EXPECTED_THRESHOLDS,
+): string[] {
+  return facts.flatMap((fact) => {
+    const want = expected.find((e) => e.key === fact.key);
+    if (!want) return [`${fact.benchmark}: ${fact.key} no está en la tabla de umbrales de docs/02`];
+    if (!Number.isFinite(fact.value))
+      return [
+        `${fact.benchmark}: no se pudo leer su umbral (${fact.key}, docs/02: ${want.value} ${want.unit})`,
+      ];
+    return fact.value === want.value && fact.unit === want.unit
+      ? []
+      : [
+          `${fact.benchmark}: umbral ${fact.value} ${fact.unit} en lugar de los ${want.value} ${want.unit} de docs/02 (${fact.key})`,
+        ];
+  });
+}
+
+const sourceOf = (file: string, text: string) =>
+  ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+const literalNumber = (node: ts.Node): number | undefined =>
+  ts.isNumericLiteral(node) ? Number(node.text.replace(/_/gu, '')) : undefined;
+const propName = (p: ts.ObjectLiteralElementLike): string | undefined =>
+  p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) ? p.name.text : undefined;
+
+function findConst(source: ts.SourceFile, name: string): ts.Expression | undefined {
+  let found: ts.Expression | undefined;
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name)
+      found = node.initializer ?? found;
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+/** `{ ... } as const` -> el literal de objeto. */
+const objectOf = (expr: ts.Expression | undefined): ts.ObjectLiteralExpression | undefined => {
+  let e = expr;
+  while (e && (ts.isAsExpression(e) || ts.isParenthesizedExpression(e))) e = e.expression;
+  return e && ts.isObjectLiteralExpression(e) ? e : undefined;
+};
+
+const REPORT_FILE = 'apps/api/test/perf/perf-report.ts';
+
+/** Umbrales de `PERF_THRESHOLDS` y `PERF_THROUGHPUT` en `perf-report.ts`, por clave de docs/02. */
+function perfReportFacts(text: string): ThresholdFact[] {
+  const source = sourceOf(REPORT_FILE, text);
+  const facts: ThresholdFact[] = [];
+  const thresholds = objectOf(findConst(source, 'PERF_THRESHOLDS'));
+  const variants: Record<string, string> = {
+    limitMs: '',
+    cloudLimitMs: ':cloud',
+    allAccountsLimitMs: ':all',
+  };
+  for (const p of thresholds?.properties ?? []) {
+    const nfr = propName(p);
+    const inner = ts.isPropertyAssignment(p) ? objectOf(p.initializer) : undefined;
+    for (const q of inner?.properties ?? []) {
+      const variant = variants[propName(q) ?? ''];
+      if (nfr && variant !== undefined && ts.isPropertyAssignment(q))
+        facts.push({
+          benchmark: `perf-report.ts PERF_THRESHOLDS['${nfr}'].${propName(q)}`,
+          key: `${nfr}${variant}`,
+          unit: 'ms',
+          value: literalNumber(q.initializer) ?? Number.NaN,
+        });
+    }
+  }
+  const throughput = objectOf(findConst(source, 'PERF_THROUGHPUT'));
+  const min = throughput?.properties.find((p) => propName(p) === 'minEventsPerSecond');
+  facts.push({
+    benchmark: 'perf-report.ts PERF_THROUGHPUT.minEventsPerSecond',
+    key: 'NFR-PERF-008',
+    unit: 'ev/s',
+    value: min && ts.isPropertyAssignment(min) ? (literalNumber(min.initializer) ?? Number.NaN) : Number.NaN,
+  });
+  return facts;
+}
+
+/** Constantes locales de las suites que fijan un umbral de docs/02: archivo -> constante -> clave. */
+const SUITE_THRESHOLD_CONSTANTS: Record<string, Record<string, { key: string; unit: ThresholdUnit }>> = {
+  'spendable.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
+  'goals.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
+  'loan-simulator.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
+  'upcoming-payments.perf.ts': { BUDGET_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
+  'subscriptions.perf.ts': { COST_P95_MS: { key: 'NFR-PERF-004', unit: 'ms' } },
+  'commitments.perf.ts': {
+    BUDGET_MS: { key: 'NFR-PERF-009', unit: 'ms' },
+    GOAL_EVENTS_PER_SECOND: { key: 'NFR-PERF-008', unit: 'ev/s' },
+  },
+  'imports.perf.ts': {
+    PREVIEW_BUDGET_MS: { key: 'NFR-PERF-007:preview', unit: 'ms' },
+    PERSIST_BUDGET_MS: { key: 'NFR-PERF-007:persist', unit: 'ms' },
+    DRAIN_BUDGET_MS: { key: 'NFR-PERF-008:drain', unit: 'ms' },
+  },
+};
+
+/**
+ * Umbrales de las constantes locales de una suite. Un literal numérico se compara tal cual; una referencia a
+ * `PERF_THRESHOLDS['NFR-…'].limitMs` o a `PERF_THROUGHPUT.minEventsPerSecond` toma el valor de `perf-report.ts` (así una
+ * referencia al NFR equivocado también falla).
+ */
+function suiteFacts(file: string, text: string, report: readonly ThresholdFact[]): ThresholdFact[] {
+  const source = sourceOf(file, text);
+  const constants = SUITE_THRESHOLD_CONSTANTS[file.split('/').at(-1)!] ?? {};
+  return Object.entries(constants).map(([name, { key, unit }]) => {
+    const init = findConst(source, name);
+    let value = init ? (literalNumber(init) ?? Number.NaN) : Number.NaN;
+    if (init && Number.isNaN(value)) {
+      const ref =
+        /^PERF_THRESHOLDS\['(NFR-PERF-\d+)'\]\.(limitMs|cloudLimitMs|allAccountsLimitMs)$|^PERF_THROUGHPUT\.minEventsPerSecond$/u.exec(
+          init.getText(source),
+        );
+      const refKey = ref ? (ref[1] ?? 'NFR-PERF-008') : undefined;
+      const suffix = ref?.[2] === 'cloudLimitMs' ? ':cloud' : ref?.[2] === 'allAccountsLimitMs' ? ':all' : '';
+      value = report.find((f) => f.key === `${refKey}${suffix}`)?.value ?? Number.NaN;
+    }
+    return { benchmark: `${file.split('/').at(-1)!} ${name}`, key, unit, value };
+  });
+}
+
+/** Resultados de `nightly.perf.ts` que son bloqueantes (gate) y deben seguir siéndolo (D43). */
+const BLOCKING_RESULT_IDS = [
+  'ledger-balance-account',
+  'ledger-balance-all-accounts',
+  'transactions-list',
+  'transactions-search',
+  'reports-summary',
+  'debts-summary',
+  'budget-vs-actual',
+  'net-worth-history',
+  'conversion-costs',
+  'bulk-edit-500',
+  'reconciliation-cleared-balance',
+] as const;
+
+/**
+ * Filas bloqueantes que dejaron de serlo (`gate: false`) o no se encuentran, y filas de throughput por consumidor que
+ * pasaron a bloqueantes (D292: siguen informativas hasta que el owner decida un umbral por consumidor).
+ */
+function blockingViolations(text: string, ids: readonly string[] = BLOCKING_RESULT_IDS): string[] {
+  const source = sourceOf('nightly.perf.ts', text);
+  const gateOf = new Map<string, boolean>();
+  const throughputGates: boolean[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const fn = node.expression.text;
+      const arg = node.arguments[0];
+      if ((fn === 'latencyResult' || fn === 'throughputResult') && arg && ts.isObjectLiteralExpression(arg)) {
+        const prop = (name: string) => arg.properties.find((p) => propName(p) === name);
+        const gate = prop('gate');
+        const explicit = gate && ts.isPropertyAssignment(gate) ? gate.initializer.kind : undefined;
+        if (fn === 'throughputResult') throughputGates.push(explicit === ts.SyntaxKind.TrueKeyword);
+        else {
+          const id = prop('id');
+          if (id && ts.isPropertyAssignment(id) && ts.isStringLiteralLike(id.initializer))
+            gateOf.set(id.initializer.text, explicit !== ts.SyntaxKind.FalseKeyword);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return [
+    ...ids.flatMap((id) =>
+      !gateOf.has(id)
+        ? [`${id}: no se encontró el resultado bloqueante en nightly.perf.ts`]
+        : gateOf.get(id)
+          ? []
+          : [`${id}: era bloqueante y pasó a informativo (gate: false) sin decisión del owner`],
+    ),
+    ...(throughputGates.some(Boolean)
+      ? [
+          'consumer-throughput: la fila de throughput con handler real es informativa (D292) y pasó a bloqueante',
+        ]
+      : []),
+  ];
+}
+
+describe('umbrales de los benchmarks fijados a docs/02 (TC-PLATFORM-PIPELINE-028)', () => {
+  const dir = 'apps/api/test/perf';
+  const nfrDoc = readText('docs/02-non-functional-requirements.md');
+  const rowOf = (key: string) =>
+    nfrDoc.split('\n').find((l) => l.startsWith(`| ${key.split(':')[0]} |`)) ?? '';
+  const reportFacts = () => perfReportFacts(readText(REPORT_FILE));
+  const suiteFiles = Object.keys(SUITE_THRESHOLD_CONSTANTS);
+  const allFacts = () => [
+    ...reportFacts(),
+    ...suiteFiles.flatMap((f) => suiteFacts(`${dir}/${f}`, readText(`${dir}/${f}`), reportFacts())),
+  ];
+
+  it('[TC-PLATFORM-PIPELINE-028] la tabla esperada coincide con la fila de cada NFR en docs/02 §PERF', () => {
+    for (const e of EXPECTED_THRESHOLDS) expect(rowOf(e.key), e.key).toContain(e.doc);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-028] PERF_THRESHOLDS, PERF_THROUGHPUT y las constantes locales de las suites coinciden con docs/02', () => {
+    const facts = allFacts();
+    // Cobertura: la extracción no se degrada en silencio (un archivo renombrado o una constante movida falla aquí).
+    expect(facts.map((f) => f.key)).toEqual(
+      expect.arrayContaining([
+        'NFR-PERF-001',
+        'NFR-PERF-001:cloud',
+        'NFR-PERF-002',
+        'NFR-PERF-003',
+        'NFR-PERF-004',
+        'NFR-PERF-005',
+        'NFR-PERF-005:all',
+        'NFR-PERF-006',
+        'NFR-PERF-007:preview',
+        'NFR-PERF-007:persist',
+        'NFR-PERF-008',
+        'NFR-PERF-008:drain',
+        'NFR-PERF-009',
+      ]),
+    );
+    expect(facts.filter((f) => f.benchmark.endsWith('GOAL_EVENTS_PER_SECOND'))).toHaveLength(1);
+    expect(facts.filter((f) => f.benchmark.endsWith('BUDGET_MS')).length).toBeGreaterThanOrEqual(5);
+    expect(thresholdFactViolations(facts)).toEqual([]);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-028] las filas bloqueantes de nightly.perf.ts siguen siéndolo y la de throughput por consumidor sigue informativa (D43, D292)', () => {
+    expect(blockingViolations(readText(`${dir}/nightly.perf.ts`))).toEqual([]);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-028] subir el p95 de disponible para gastar de 300 a 400 ms hace fallar la regla indicando el benchmark y ambos umbrales', () => {
+    const real = suiteFacts(`${dir}/spendable.perf.ts`, readText(`${dir}/spendable.perf.ts`), reportFacts());
+    expect(thresholdFactViolations(real)).toEqual([]);
+    const relaxed = readText(`${dir}/spendable.perf.ts`).replace(
+      /const BUDGET_MS = [^;]+;/u,
+      'const BUDGET_MS = 400;',
+    );
+    expect(relaxed).toContain('const BUDGET_MS = 400;');
+    expect(thresholdFactViolations(suiteFacts(`${dir}/spendable.perf.ts`, relaxed, reportFacts()))).toEqual([
+      'spendable.perf.ts BUDGET_MS: umbral 400 ms en lugar de los 300 ms de docs/02 (NFR-PERF-004)',
+    ]);
+    // El mismo cambio en perf-report.ts (PERF_THRESHOLDS) también falla.
+    const reportRelaxed = readText(REPORT_FILE).replace(
+      /('NFR-PERF-004': \{ metric: 'p95', limitMs: )300/u,
+      '$1400',
+    );
+    expect(thresholdFactViolations(perfReportFacts(reportRelaxed))).toEqual([
+      "perf-report.ts PERF_THRESHOLDS['NFR-PERF-004'].limitMs: umbral 400 ms en lugar de los 300 ms de docs/02 (NFR-PERF-004)",
+    ]);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-028] bajar el throughput mínimo por consumidor de 42 a 5 ev/s hace fallar la regla indicando el benchmark y ambos umbrales', () => {
+    const reportRelaxed = readText(REPORT_FILE).replace(/(minEventsPerSecond: )42/u, '$15');
+    expect(thresholdFactViolations(perfReportFacts(reportRelaxed))).toEqual([
+      'perf-report.ts PERF_THROUGHPUT.minEventsPerSecond: umbral 5 ev/s en lugar de los 42 ev/s de docs/02 (NFR-PERF-008)',
+    ]);
+    const matcher = readText(`${dir}/commitments.perf.ts`).replace(
+      /const GOAL_EVENTS_PER_SECOND = [^;]+;/u,
+      'const GOAL_EVENTS_PER_SECOND = 5;',
+    );
+    expect(matcher).toContain('const GOAL_EVENTS_PER_SECOND = 5;');
+    expect(thresholdFactViolations(suiteFacts(`${dir}/commitments.perf.ts`, matcher, reportFacts()))).toEqual(
+      [
+        'commitments.perf.ts GOAL_EVENTS_PER_SECOND: umbral 5 ev/s en lugar de los 42 ev/s de docs/02 (NFR-PERF-008)',
+      ],
+    );
+  });
+
+  it('[TC-PLATFORM-PIPELINE-028] una constante que referencia el NFR equivocado o que no se puede leer también falla', () => {
+    const wrongRef = readText(`${dir}/spendable.perf.ts`).replace(
+      /const BUDGET_MS = [^;]+;/u,
+      "const BUDGET_MS = PERF_THRESHOLDS['NFR-PERF-003'].limitMs;",
+    );
+    expect(thresholdFactViolations(suiteFacts(`${dir}/spendable.perf.ts`, wrongRef, reportFacts()))).toEqual([
+      'spendable.perf.ts BUDGET_MS: umbral 150 ms en lugar de los 300 ms de docs/02 (NFR-PERF-004)',
+    ]);
+    const opaque = readText(`${dir}/spendable.perf.ts`).replace(
+      /const BUDGET_MS = [^;]+;/u,
+      'const BUDGET_MS = Number(process.env.X);',
+    );
+    expect(thresholdFactViolations(suiteFacts(`${dir}/spendable.perf.ts`, opaque, reportFacts()))).toEqual([
+      'spendable.perf.ts BUDGET_MS: no se pudo leer su umbral (NFR-PERF-004, docs/02: 300 ms)',
+    ]);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-028] volver informativa una fila bloqueante, o bloqueante la de throughput, hace fallar la regla indicando el resultado', () => {
+    const nightly = readText(`${dir}/nightly.perf.ts`);
+    const informative = nightly.replace(/(id: 'reports-summary',)/u, '$1 gate: false,');
+    expect(informative).not.toBe(nightly);
+    expect(blockingViolations(informative)).toEqual([
+      'reports-summary: era bloqueante y pasó a informativo (gate: false) sin decisión del owner',
+    ]);
+    const renamed = nightly.replace("id: 'reports-summary'", "id: 'reports-resumen'");
+    expect(blockingViolations(renamed)).toEqual([
+      'reports-summary: no se encontró el resultado bloqueante en nightly.perf.ts',
+    ]);
+    const gated = nightly.replace(
+      /(minEventsPerSecond: PERF_THROUGHPUT\.minEventsPerSecond,)/u,
+      '$1 gate: true,',
+    );
+    expect(gated).not.toBe(nightly);
+    expect(blockingViolations(gated)).toEqual([
+      'consumer-throughput: la fila de throughput con handler real es informativa (D292) y pasó a bloqueante',
+    ]);
+  });
+});
+
+// investigate-perf-under-load 5.2/5.3 (D291): el aislamiento vive en el harness de pruebas y en el mismo job; no cambia
+// `nightly.yml` ni agrega jobs, y el orden de los archivos de perf es determinista.
+describe('aislamiento del benchmark en el harness (TC-PLATFORM-PIPELINE-024, TC-PLATFORM-PIPELINE-026)', () => {
+  const dir = 'apps/api/test/perf';
+  const perfFiles = readdirSync(join(ROOT, dir)).filter((f) => f.endsWith('.perf.ts'));
+
+  it('[TC-PLATFORM-PIPELINE-024] vitest.perf.config.ts fija el orden con un sequencer sobre PERF_SUITE_ORDER', () => {
+    const config = readText('apps/api/vitest.perf.config.ts');
+    expect(config).toMatch(/import \{ orderPerfSuites \} from '\.\/test\/perf\/suite-order\.js'/u);
+    expect(config).toMatch(/sequencer: PerfSuiteSequencer/u);
+    expect(config).toMatch(/orderPerfSuites\(files, \(f\) => f\.moduleId\)/u);
+    const order = readText(`${dir}/suite-order.ts`);
+    for (const f of perfFiles) expect(order, `${f} en PERF_SUITE_ORDER`).toContain(`'${f}'`);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] cada suite *.perf.ts registra la precondición de aislamiento con recordSuiteLoad', () => {
+    expect(perfFiles.length).toBeGreaterThanOrEqual(8);
+    for (const f of perfFiles) {
+      expect(readText(`${dir}/${f}`), f).toMatch(/recordSuiteLoad\(import\.meta\.url,/u);
+    }
+    const load = readText(`${dir}/background-load.ts`);
+    expect(load).toMatch(/beforeAll\(async \(\) => \{\s*await recorder\.prepare\(\);/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] la purga y la espera de quietud solo viven en el harness de pruebas, nunca en el código del producto', () => {
+    const offenders = ['apps/api/src', 'packages']
+      .flatMap((root) =>
+        // `git grep` sale con 1 si no hay coincidencias.
+        spawnSync('git', ['grep', '-l', '-E', 'purgeBacklog|waitForQuiet|prepareIsolation', '--', root], {
+          cwd: ROOT,
+          encoding: 'utf8',
+        }).stdout.split('\n'),
+      )
+      .filter(Boolean);
+    expect(offenders).toEqual([]);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] nightly.yml sigue con sus cuatro jobs: el aislamiento no agrega un job aparte (D291)', () => {
+    expect(Object.keys(workflow.jobs).sort()).toEqual(['fx-smoke-live', 'mutation', 'perf', 'regression']);
   });
 });

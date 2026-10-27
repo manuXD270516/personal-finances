@@ -144,7 +144,19 @@ describe('Propiedad: el matching nunca vincula sin confirmación (FR-COMMITMENTS
             }
           }
         }),
-        { numRuns: process.env['NIGHTLY'] ? 10_000 : 100 },
+        {
+          numRuns: process.env['NIGHTLY'] ? 10_000 : 100,
+          // Ejemplo fijo: garantiza que la guarda de «no vacía» no dependa de la semilla.
+          examples: [
+            [
+              [
+                { t: 'create', slot: 0, units: 199, day: 20, account: false },
+                { t: 'backfill' },
+                { t: 'dismiss', pick: 0 },
+              ],
+            ],
+          ],
+        },
       );
       // La propiedad no es vacía: los generadores sí producen sugerencias y descartes.
       expect(proposedSeen).toBeGreaterThan(0);

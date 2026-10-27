@@ -7,7 +7,9 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApiRuntime, type ApiRuntime } from '../../src/api/create-api-runtime.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
+import { recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
+import { PERF_THRESHOLDS } from './perf-report.js';
 
 /**
  * add-spendable-amount 5.2 (TC-REPORTING-SPENDABLE-014, NFR-PERF-004): el resumen del Home con el bloque `spendable` y
@@ -17,11 +19,14 @@ import { perfApiEnv } from './perf-env.js';
  * `reporting_spendable_duration_seconds` la cubre la alerta `UpcomingPaymentsReadModelRecommended` (docs/18).
  */
 const deps = inject('deps');
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const ISSUER = 'https://idp.test/realms/pfos';
 const AUDIENCE = 'finance-api';
 const clock = new FixedClock(Instant.parse('2026-10-20T14:00:00Z'));
 const apiLog = capturingLogger('finance-api', 'api');
-const BUDGET_MS = 300;
+/** NFR-PERF-004 (docs/02): el umbral sale de `perf-report.ts`, que el test de política fija a docs/02 (TC-PLATFORM-PIPELINE-028). */
+const BUDGET_MS = PERF_THRESHOLDS['NFR-PERF-004'].limitMs;
 const SAMPLES = 40;
 
 let runtime: ApiRuntime;

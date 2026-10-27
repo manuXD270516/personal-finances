@@ -1,19 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  aggregateBackgroundLoad,
+  applyInterference,
+  BACKGROUND_LOAD_END,
+  BACKGROUND_LOAD_START,
   bootstrapMedianCi,
   buildReport,
+  burstWindow,
   dataAccessSignature,
+  isolationOf,
+  jobsOfQueue,
   latencyResult,
   median,
   percentile,
   PERF_THRESHOLDS,
   PERF_THROUGHPUT,
   renderMarkdown,
+  replaceBackgroundLoadSection,
   RLS_OVERHEAD,
   rlsResult,
   stats,
+  summarizeSnapshot,
   throughputResult,
+  type BackgroundLoadEntry,
+  type BackgroundLoadSnapshot,
+  type IsolationPreparation,
 } from './perf-report.js';
 
 // Los umbrales del benchmark nightly se leen de docs/02 (§PERF): si el NFR cambia, este test obliga a actualizar
@@ -327,6 +339,75 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     expect(long).toContain('[recortado');
   });
 
+  // Declaración de las consultas de RLS de `nightly.perf.ts` (las filas informativas y las bloqueantes, D298).
+  const NIGHTLY_SRC = readFileSync(new URL('./nightly.perf.ts', import.meta.url), 'utf8');
+  const declaredQueries = [
+    ...NIGHTLY_SRC.slice(
+      NIGHTLY_SRC.indexOf('const queries: Record<string, { sql: string; gate: boolean }>'),
+      NIGHTLY_SRC.indexOf('for (const [name, q] of Object.entries(queries))'),
+    ).matchAll(/^\s{6}'([^']+)': \{[\s\S]*?gate: (true|false),/gmu),
+  ].map((m) => ({ name: m[1]!, gate: m[2] === 'true' }));
+  const realBlock = NIGHTLY_SRC.slice(
+    NIGHTLY_SRC.indexOf('const real: Record<string, CapturedSql[]>'),
+    NIGHTLY_SRC.indexOf('for (const [name, statements] of Object.entries(real))'),
+  );
+
+  it('[TC-SECURITY-RLS-010] la fila INCLUDE con 200 pares (1.99 / 2.80 ms, IC95 [0.800, 0.811]) y gate falso es brecha demostrada informativa que no falla el reporte', () => {
+    const r = rlsResult({
+      id: 'rls-saldo por cuenta (índice INCLUDE)',
+      title: 'Overhead RLS: saldo por cuenta (índice INCLUDE)',
+      plans: SAME_PLAN,
+      gate: false,
+      ...pairsOf(1.99, 0.81, 0.011),
+    });
+    expect(r.verdict).toBe('brecha demostrada');
+    expect(r.gate).toBe(false);
+    expect(r.pairs).toBe(200);
+    expect(r.notes).toContain('mediana con RLS 2.8 ms vs sin RLS 1.99 ms');
+    expect(r.notes).toMatch(/IC95 \[0\.80\d, 0\.81\d\] ms/);
+    const report = buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [r] });
+    expect(report.breaches).toEqual([]);
+    const md = renderMarkdown(report);
+    expect(md).toContain('OK — sin umbrales superados');
+    expect(md).toMatch(/Overhead RLS: saldo por cuenta \(índice INCLUDE\).*\| informativo \|/u);
+  });
+
+  it('[TC-SECURITY-RLS-010] política: las únicas consultas de RLS con gate false en nightly.perf.ts son la INCLUDE y el agregado sintético', () => {
+    expect(declaredQueries.filter((q) => !q.gate).map((q) => q.name)).toEqual([
+      'saldo por cuenta (índice INCLUDE)',
+      'agregado sintético de todo el workspace (informativo)',
+    ]);
+  });
+
+  it('[TC-SECURITY-RLS-012] política: las consultas reales de saldos y la página de transacciones siguen bloqueantes', () => {
+    expect(declaredQueries.find((q) => q.name === 'página de transacciones (1 mes)')?.gate).toBe(true);
+    expect(realBlock).toContain('consulta real de saldos en lote (PgBalanceQuery.getAccountBalances)');
+    expect(realBlock).toContain('consulta real de saldo por cuenta (PgBalanceQuery.getBalance)');
+    // Las consultas reales no pasan `gate`: rlsResult las toma como bloqueantes por defecto.
+    expect(realBlock).not.toMatch(/\bgate\b/u);
+  });
+
+  it('[TC-SECURITY-RLS-012] una consulta real bloqueante con +46.8 % y plan distinto falla el reporte mostrando ambos métodos de acceso', () => {
+    const r = rlsResult({
+      id: 'rls-consulta real de saldos en lote (PgBalanceQuery.getAccountBalances)',
+      title: 'Overhead RLS: consulta real de saldos en lote',
+      plans: {
+        withoutRls: ['Bitmap Heap Scan on ledger.journal_entry'],
+        withRls: ['Index Scan on ledger.journal_entry'],
+      },
+      ...pairsOf(10, 4.68, 0.5),
+    });
+    expect(r.gate).toBe(true);
+    expect(r.verdict).toBe('plan distinto');
+    expect(r.value).toBe(0.468);
+    const report = buildReport({ generatedAt: 'x', environment: {}, dataset: {}, results: [r] });
+    expect(report.breaches).toHaveLength(1);
+    expect(report.breaches[0]).toContain('getAccountBalances');
+    expect(report.breaches[0]).toContain('Bitmap Heap Scan on ledger.journal_entry');
+    expect(report.breaches[0]).toContain('Index Scan on ledger.journal_entry');
+    expect(renderMarkdown(report)).toContain('FALLA — 1 umbral(es) superado(s)');
+  });
+
   it('el IC95 por bootstrap tiene el ancho teórico de la mediana (≈ 1.96 · 1.2533 · σ/√n) y no es artificialmente estrecho', () => {
     // Diferencias normales (Box-Muller con PRNG fijo): σ = 0.3 ms, n = 200 ⇒ semiancho esperado ≈ 0.052 ms.
     let seed = 12345;
@@ -387,5 +468,334 @@ describe('benchmarks nightly: umbrales y estadísticas', () => {
     );
     expect(Object.keys(r)).toEqual(expect.arrayContaining(['ci95Ms', 'pairs', 'verdict']));
     expect(r.unit).toBe('ratio');
+  });
+});
+
+// investigate-perf-under-load, decisión 2 (tareas 2.1 y 2.4): foto de la carga de fondo por suite y por benchmark.
+const MATCHER_QUEUE = 'events.commitments.occurrence-matcher';
+
+/** Foto sintética: base limpia salvo lo que pida el caso. */
+function snap(overrides: Partial<BackgroundLoadSnapshot> = {}): BackgroundLoadSnapshot {
+  return {
+    takenAt: '2026-10-23T06:00:00.000Z',
+    outboxPending: 0,
+    eventJobs: [],
+    connections: [{ role: 'pf_app', application: 'finance-api', state: 'idle', count: 3 }],
+    ungrantedLocks: 0,
+    tables: [
+      {
+        table: 'platform.outbox',
+        liveTuples: 100,
+        deadTuples: 2,
+        lastAutovacuum: null,
+        lastAutoanalyze: '2026-10-23T05:59:00.000Z',
+      },
+    ],
+    loadAvg: [0.5, 0.4, 0.3],
+    processCpuMs: 1200,
+    ...overrides,
+  };
+}
+
+const entry = (
+  suite: string,
+  phase: BackgroundLoadEntry['phase'],
+  snapshot: BackgroundLoadSnapshot,
+  rest: Partial<BackgroundLoadEntry> = {},
+): BackgroundLoadEntry => ({ runId: 'run-1', suite, phase, snapshot, ...rest });
+
+const emptyBase = { generatedAt: 'x', environment: {}, dataset: {} } as const;
+
+describe('carga de fondo del benchmark (investigate-perf-under-load, decisión 2)', () => {
+  it('[TC-PLATFORM-PIPELINE-024] una foto sin eventos ni trabajos pendientes es "limpia" y el reporte publica la carga junto al p95 frente a 300 ms', () => {
+    expect(isolationOf(snap())).toMatchObject({
+      verdict: 'limpia',
+      outboxPending: 0,
+      eventJobs: 0,
+    });
+    const suites = aggregateBackgroundLoad([
+      entry('spendable.perf.ts', 'start', snap({ connections: [] })),
+      entry('spendable.perf.ts', 'benchmark', snap(), { benchmark: 'getSpendable' }),
+      entry('spendable.perf.ts', 'end', snap({ outboxPending: 800 })),
+    ]);
+    const result = latencyResult({
+      id: 'spendable',
+      nfr: 'NFR-PERF-004',
+      title: 'getSpendable',
+      samples: [120, 140, 352.2],
+      limitMs: PERF_THRESHOLDS['NFR-PERF-004'].limitMs,
+    });
+    const report = buildReport({ ...emptyBase, results: [result], backgroundLoad: suites });
+    const md = renderMarkdown(report);
+    expect(md).toContain('## Carga de fondo por suite');
+    // # | suite | eventos pendientes | trabajos events.* | conexiones | locks | carga del host | aislamiento
+    expect(md).toMatch(
+      /\| 1 \| spendable\.perf\.ts \| 0 \| 0 \| 0 \| 0 \| 0\.5 \/ 0\.4 \/ 0\.3 \| limpia \|/u,
+    );
+    expect(md).toMatch(/\| spendable\.perf\.ts \| getSpendable \| 0 \| 0 \| 3 \|/u);
+    expect(md).toMatch(/\| spendable\.perf\.ts \| 800 \|/u); // foto al terminar la suite
+    expect(md).toContain('| 352.2 ms | ≤ 300 ms |');
+    expect(report.breaches).toEqual(['NFR-PERF-004 spendable: 352.2 ms > 300 ms']);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] 12000 eventos pendientes al empezar es "interferencia" con la cantidad medida en el mensaje', () => {
+    const iso = isolationOf(snap({ outboxPending: 12_000 }));
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.outboxPending).toBe(12_000);
+    expect(iso.message).toMatch(/interferencia/u);
+    expect(iso.message).toMatch(/\b12000\b/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] los trabajos pendientes de colas events.* también son interferencia y el mensaje nombra la cola', () => {
+    const iso = isolationOf(
+      snap({
+        eventJobs: [
+          { queue: MATCHER_QUEUE, state: 'created', count: 340 },
+          { queue: MATCHER_QUEUE, state: 'retry', count: 10 },
+          { queue: 'events.reporting.data-version', state: 'active', count: 5 },
+        ],
+      }),
+    );
+    expect(iso).toMatchObject({ verdict: 'interferencia', outboxPending: 0, eventJobs: 355 });
+    expect(iso.message).toMatch(/\b355\b/u);
+    expect(iso.message).toContain(MATCHER_QUEUE);
+    expect(
+      jobsOfQueue(
+        snap({ eventJobs: [{ queue: MATCHER_QUEUE, state: 'created', count: 340 }] }),
+        MATCHER_QUEUE,
+      ),
+    ).toBe(340);
+    expect(jobsOfQueue(snap(), MATCHER_QUEUE)).toBe(0);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] una medición con interferencia no es válida: no se compara con 300 ms, falla el reporte y lo dice', () => {
+    const measured = latencyResult({
+      id: 'spendable-summary',
+      nfr: 'NFR-PERF-004',
+      title: 'summary',
+      samples: [100, 120, 130],
+      limitMs: PERF_THRESHOLDS['NFR-PERF-004'].limitMs,
+    });
+    expect(measured.passed).toBe(true);
+    const iso = isolationOf(snap({ outboxPending: 12_000 }));
+    const invalid = applyInterference(measured, iso);
+    expect(invalid).toMatchObject({ valid: false, passed: false, id: 'spendable-summary' });
+    expect(invalid.notes).toMatch(/\b12000\b/u);
+    const report = buildReport({ ...emptyBase, results: [invalid] });
+    expect(report.breaches).toHaveLength(1);
+    expect(report.breaches[0]).toMatch(/^NFR-PERF-004 spendable-summary: interferencia .*\b12000\b/u);
+    const md = renderMarkdown(report);
+    expect(md).toMatch(/\| INTERFERENCIA \|/u);
+    expect(md).toContain('no válida');
+    // Una medición limpia no se toca.
+    expect(applyInterference(measured, isolationOf(snap()))).toBe(measured);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] aggregateBackgroundLoad ordena las suites por el orden real de arranque y descarta corridas anteriores', () => {
+    const at = (s: number) => snap({ takenAt: `2026-10-23T06:00:${String(s).padStart(2, '0')}.000Z` });
+    const bl = aggregateBackgroundLoad([
+      { ...entry('viejo.perf.ts', 'start', at(1)), runId: 'run-0' },
+      entry('nightly.perf.ts', 'start', at(10)),
+      entry('nightly.perf.ts', 'benchmark', at(11), { benchmark: 'NFR-PERF-001' }),
+      entry('nightly.perf.ts', 'end', at(30)),
+      entry('commitments.perf.ts', 'start', at(40), { extra: {} }),
+      entry('commitments.perf.ts', 'benchmark', at(41), {
+        benchmark: 'ráfaga',
+        extra: { 'cola del matcher antes de la ráfaga': 0 },
+      }),
+    ]);
+    expect(bl.runId).toBe('run-1');
+    expect(bl.fileOrder).toEqual(['nightly.perf.ts', 'commitments.perf.ts']);
+    expect(bl.suites.map((s) => [s.suite, s.order])).toEqual([
+      ['nightly.perf.ts', 1],
+      ['commitments.perf.ts', 2],
+    ]);
+    expect(bl.suites[0]!.benchmarks.map((b) => b.benchmark)).toEqual(['NFR-PERF-001']);
+    expect(bl.suites[0]!.end?.takenAt).toBe(at(30).takenAt);
+    expect(bl.suites[1]!.end).toBeUndefined();
+    expect(bl.suites[1]!.benchmarks[0]!.extra).toEqual({ 'cola del matcher antes de la ráfaga': 0 });
+    expect(aggregateBackgroundLoad([])).toMatchObject({ fileOrder: [], suites: [] });
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] una suite que empieza con backlog ajeno se marca "interferencia" en la tabla por suite', () => {
+    const bl = aggregateBackgroundLoad([
+      entry(
+        'spendable.perf.ts',
+        'start',
+        snap({ outboxPending: 12_000, takenAt: '2026-10-23T06:10:00.000Z' }),
+      ),
+    ]);
+    expect(bl.suites[0]!.isolation.verdict).toBe('interferencia');
+    const md = renderMarkdown(buildReport({ ...emptyBase, results: [], backgroundLoad: bl }));
+    expect(md).toMatch(/\| 1 \| spendable\.perf\.ts \| 12000 \| 0 \| 3 \| 0 \|.*\| interferencia \|/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] el JSON agrega backgroundLoad como campo aditivo (por reporte y por resultado) y no cambia los campos de siempre', () => {
+    const base = latencyResult({ id: 'a', nfr: 'NFR-PERF-004', title: 't', samples: [10], limitMs: 300 });
+    const plain = buildReport({ ...emptyBase, results: [base] });
+    expect(Object.keys(plain).sort()).toEqual([
+      'breaches',
+      'dataset',
+      'environment',
+      'generatedAt',
+      'results',
+      'version',
+    ]);
+    expect(renderMarkdown(plain)).not.toContain('Carga de fondo');
+    const withLoad = { ...base, backgroundLoad: summarizeSnapshot(snap({ outboxPending: 7 })) };
+    const bl = aggregateBackgroundLoad([entry('a.perf.ts', 'start', snap())]);
+    const report = buildReport({ ...emptyBase, results: [withLoad], backgroundLoad: bl });
+    expect(Object.keys(report)).toEqual(
+      expect.arrayContaining(['version', 'results', 'breaches', 'backgroundLoad']),
+    );
+    expect(report.results[0]!.backgroundLoad).toMatchObject({
+      outboxPending: 7,
+      eventJobs: 0,
+      connections: 3,
+      ungrantedLocks: 0,
+      loadAvg1m: 0.5,
+    });
+    const roundTrip = JSON.parse(JSON.stringify(report)) as typeof report;
+    expect(roundTrip.backgroundLoad?.fileOrder).toEqual(['a.perf.ts']);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] el detalle por cola y el estado de las tablas citadas se publican en el resumen', () => {
+    const start = snap({
+      eventJobs: [
+        { queue: MATCHER_QUEUE, state: 'created', count: 9 },
+        { queue: MATCHER_QUEUE, state: 'active', count: 2 },
+      ],
+      connections: [
+        { role: 'pf_app', application: 'finance-api', state: 'idle', count: 3 },
+        { role: 'pf_worker', application: 'finance-worker', state: 'active', count: 4 },
+      ],
+      ungrantedLocks: 1,
+    });
+    const md = renderMarkdown(
+      buildReport({
+        ...emptyBase,
+        results: [],
+        backgroundLoad: aggregateBackgroundLoad([entry('c.perf.ts', 'start', start)]),
+      }),
+    );
+    expect(md).toContain(`${MATCHER_QUEUE} (created 9, active 2)`);
+    expect(md).toContain('pf_worker/finance-worker/active 4');
+    expect(md).toMatch(/\| c\.perf\.ts \| platform\.outbox \| 100 \| 2 \|/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] la sección va entre marcadores y se reemplaza sin tocar el resto del resumen (las suites posteriores a nightly la actualizan)', () => {
+    const first = buildReport({
+      ...emptyBase,
+      results: [],
+      backgroundLoad: aggregateBackgroundLoad([entry('a.perf.ts', 'start', snap())]),
+    });
+    const md = renderMarkdown(first, 'diag');
+    expect(md).toContain(BACKGROUND_LOAD_START);
+    expect(md).toContain(BACKGROUND_LOAD_END);
+    const next = aggregateBackgroundLoad([
+      entry('a.perf.ts', 'start', snap({ takenAt: '2026-10-23T06:00:00.000Z' })),
+      entry('b.perf.ts', 'start', snap({ takenAt: '2026-10-23T06:05:00.000Z' })),
+    ]);
+    const replaced = replaceBackgroundLoadSection(md, next);
+    expect(replaced).toMatch(/\| 2 \| b\.perf\.ts \|/u);
+    expect(replaced.replace(/<!-- background-load:start -->[\s\S]*<!-- background-load:end -->/u, '')).toBe(
+      md.replace(/<!-- background-load:start -->[\s\S]*<!-- background-load:end -->/u, ''),
+    );
+    // Sin marcadores (reporte de otra versión) se agrega al final en lugar de perder la sección.
+    expect(replaceBackgroundLoadSection('# x\n', next)).toMatch(/# x[\s\S]*Carga de fondo por suite/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] la sección recorta el detalle si excede el límite del aviso por issue', () => {
+    const entries: BackgroundLoadEntry[] = [entry('a.perf.ts', 'start', snap())];
+    for (let i = 0; i < 2000; i += 1) {
+      entries.push(entry('a.perf.ts', 'benchmark', snap(), { benchmark: `benchmark-${i}` }));
+    }
+    const md = renderMarkdown(
+      buildReport({ ...emptyBase, results: [], backgroundLoad: aggregateBackgroundLoad(entries) }),
+    );
+    expect(md.length).toBeLessThan(40_000);
+    expect(md).toContain('[recortado');
+    expect(md).toContain(BACKGROUND_LOAD_END);
+  }, 30_000);
+
+  it('[TC-PLATFORM-PIPELINE-025] la ráfaga del matcher se mide solo con sus eventos: ventana del primer al último evento de la ráfaga', () => {
+    // 1 050 eventos entre el primer y el último procesado (25 s): 42 ev/s; el tiempo de espera del backlog ajeno no cuenta.
+    expect(
+      burstWindow({
+        events: 1050,
+        firstProcessedAt: new Date('2026-10-23T06:00:30.000Z'),
+        lastProcessedAt: new Date('2026-10-23T06:00:55.000Z'),
+      }),
+    ).toEqual({ seconds: 25, eventsPerSecond: 42 });
+    // Todos en el mismo instante: nunca divide por cero (mínimo 1 s, como throughputResult).
+    expect(
+      burstWindow({ events: 12, firstProcessedAt: new Date(1000), lastProcessedAt: new Date(1000) }),
+    ).toEqual({ seconds: 1, eventsPerSecond: 12 });
+  });
+});
+
+describe('aislamiento con preparación: purga y quietud del host (investigate-perf-under-load 5.1, D291)', () => {
+  const prep = (overrides: Partial<IsolationPreparation> = {}): IsolationPreparation => ({
+    purgedOutbox: 470_165,
+    purgedJobs: 1_390_000,
+    quiet: true,
+    waitedMs: 60_000,
+    hostLoad1m: 1.2,
+    hostLoadLimit: 3,
+    foreignActiveQueries: 0,
+    ...overrides,
+  });
+
+  it('[TC-PLATFORM-PIPELINE-024] tras la purga, sin eventos ni trabajos y con el host en quietud, la suite mide normalmente y el reporte publica la purga y la espera', () => {
+    const iso = isolationOf(snap(), prep());
+    expect(iso).toMatchObject({ verdict: 'limpia', message: 'sin carga de fondo ajena' });
+    const bl = aggregateBackgroundLoad([
+      entry('spendable.perf.ts', 'start', snap(), { preparation: prep() }),
+    ]);
+    expect(bl.suites[0]!.isolation.verdict).toBe('limpia');
+    const md = renderMarkdown(buildReport({ ...emptyBase, results: [], backgroundLoad: bl }));
+    expect(md).toMatch(
+      /purga previa: 470165 eventos del outbox y 1390000 trabajos events\.\*; espera de quietud: 60 s, carga 1\.2 \(límite 3\), 0 consultas ajenas activas/u,
+    );
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] eventos pendientes ajenos tras la preparación siguen siendo interferencia con la cantidad medida', () => {
+    const iso = isolationOf(snap({ outboxPending: 12_000 }), prep());
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.message).toMatch(/\b12000\b/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] si la carga del host no baja del límite tras esperar, el veredicto es interferencia por host con la carga medida', () => {
+    const iso = isolationOf(
+      snap(),
+      prep({ quiet: false, waitedMs: 300_000, hostLoad1m: 7.96, purgedOutbox: 0, purgedJobs: 0 }),
+    );
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.message).toMatch(/host sin quietud/u);
+    expect(iso.message).toMatch(/carga del host 7\.96 \(1 min\) sin bajar de 3 tras esperar 300 s/u);
+    expect(iso.preparation?.hostLoad1m).toBe(7.96);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] consultas activas ajenas que no terminan también son interferencia por host', () => {
+    const iso = isolationOf(snap(), prep({ quiet: false, hostLoad1m: 0.5, foreignActiveQueries: 2 }));
+    expect(iso.verdict).toBe('interferencia');
+    expect(iso.message).toMatch(/2 consultas activas ajenas/u);
+    expect(iso.message).not.toMatch(/carga del host/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] backlog y host a la vez: el mensaje lleva ambas causas', () => {
+    const iso = isolationOf(snap({ outboxPending: 5 }), prep({ quiet: false, hostLoad1m: 4 }));
+    expect(iso.message).toMatch(/5 eventos pendientes/u);
+    expect(iso.message).toMatch(/carga del host 4 /u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-026] el reporte marca la suite con host sin quietud como interferencia en la tabla y en el detalle', () => {
+    const bl = aggregateBackgroundLoad([
+      entry('spendable.perf.ts', 'start', snap(), { preparation: prep({ quiet: false, hostLoad1m: 7.96 }) }),
+    ]);
+    expect(bl.suites[0]!.isolation.verdict).toBe('interferencia');
+    const md = renderMarkdown(buildReport({ ...emptyBase, results: [], backgroundLoad: bl }));
+    expect(md).toMatch(/\| interferencia \|/u);
+    expect(md).toMatch(/host sin quietud: carga del host 7\.96/u);
   });
 });

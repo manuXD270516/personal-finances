@@ -42,7 +42,9 @@ import {
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
 import { connect } from '../support/db.js';
 import { apiConfig, capturingLogger } from '../support/harness.js';
+import { recordSuiteLoad } from './background-load.js';
 import { perfApiEnv } from './perf-env.js';
+import { burstWindow, PERF_THROUGHPUT } from './perf-report.js';
 
 /**
  * NFR-PERF-009 (TC-COMMITMENTS-RECUR-017, Should): `GenerateOccurrences(workspace)` de 60 definiciones activas
@@ -50,6 +52,8 @@ import { perfApiEnv } from './perf-env.js';
  * el job nightly `perf` (`pnpm perf:bench`); no bloquea los PR.
  */
 const deps = inject('deps');
+// Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
+const loadRecorder = recordSuiteLoad(import.meta.url, deps.superuserUrl);
 const ISSUER = 'https://idp.test/realms/pfos';
 const AUDIENCE = 'finance-api';
 const clock = new FixedClock(Instant.parse('2026-10-09T16:00:00Z'));
@@ -250,7 +254,7 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
   it('[TC-COMMITMENTS-MATCH-012] 1 000 transacciones (12 compatibles, 50 reentregadas) dejan exactamente 12 sugerencias a ≥ 42 eventos/s', async () => {
     const BURST = 1000;
     const REDELIVERED = 50;
-    const GOAL_EVENTS_PER_SECOND = 42;
+    const GOAL_EVENTS_PER_SECOND = PERF_THROUGHPUT.minEventsPerSecond; // 42 ev/s (D112, NFR-PERF-008)
     const admin = await connect(deps.superuserUrl);
     try {
       await admin.query(`DELETE FROM commitments.occurrence_match_suggestion WHERE workspace_id = $1`, [
@@ -326,6 +330,16 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
       const route = new EventSubscriptions([def]).routesFor('transactions.TransactionCreated', 1)[0]!;
       await queue.ensureQueue(deadLetterQueueName(def.consumer));
       await queue.ensureQueue(route.queue, route.options);
+      // investigate-perf-under-load 2.4 (TC-PLATFORM-PIPELINE-025): trabajos que ya hay en la cola del matcher ANTES de
+      // encolar la ráfaga (backlog ajeno de una carga anterior). Con el aislamiento (D291) deben ser 0.
+      const matcherJobs = async (): Promise<number> =>
+        (
+          await worker.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM pgboss.job WHERE name = $1 AND state IN ('created', 'retry', 'active')`,
+            [eventQueueName(def.consumer)],
+          )
+        ).rows[0]!.n;
+      const foreignJobs = await matcherJobs();
       const client = await worker.connect();
       try {
         await client.query('BEGIN');
@@ -343,6 +357,17 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
         await client.query('COMMIT');
       } finally {
         client.release();
+      }
+      const queuedJobs = await matcherJobs();
+      await loadRecorder.benchmark('commitments.occurrence-matcher: ráfaga encolada', {
+        'trabajos de la cola del matcher antes de la ráfaga': foreignJobs,
+        'trabajos de la cola del matcher con la ráfaga': queuedJobs,
+        'eventos de la ráfaga': events.length,
+      });
+      if (foreignJobs > 0) {
+        process.stderr.write(
+          `[TC-PLATFORM-PIPELINE-025] interferencia: ${String(foreignJobs)} trabajos ajenos en la cola del matcher antes de la ráfaga\n`,
+        );
       }
       const consumers = new EventConsumerRuntime({
         pool: worker,
@@ -364,6 +389,26 @@ describe('NFR-PERF-008: ráfaga de transacciones importadas en el matcher', () =
       }
       const seconds = (performance.now() - started) / 1000;
       const rate = events.length / seconds;
+      // Solo los eventos de la ráfaga (inbox del workspace de la suite): del primer al último procesado, sin la espera
+      // detrás de un backlog ajeno. Informativo: la aserción de abajo (D112) no cambia.
+      const processed = await worker.query<{ first: Date; last: Date }>(
+        `SELECT min(processed_at) AS first, max(processed_at) AS last FROM platform.inbox
+          WHERE consumer = $1 AND workspace_id = $2`,
+        [def.consumer, workspaceId],
+      );
+      const window = burstWindow({
+        events: events.length,
+        firstProcessedAt: processed.rows[0]!.first,
+        lastProcessedAt: processed.rows[0]!.last,
+      });
+      await loadRecorder.benchmark('commitments.occurrence-matcher: ráfaga drenada', {
+        'trabajos ajenos en la cola antes de la ráfaga': foreignJobs,
+        'eventos de la ráfaga': events.length,
+        'segundos desde el arranque del consumidor': Math.round(seconds * 10) / 10,
+        'ev/s desde el arranque': Math.round(rate * 100) / 100,
+        'segundos del primer al último evento de la ráfaga': window.seconds,
+        'ev/s del primer al último evento de la ráfaga': window.eventsPerSecond,
+      });
       process.stderr.write(
         `[TC-COMMITMENTS-MATCH-012] ${events.length} eventos en ${seconds.toFixed(1)} s (${String(Math.round(rate))} ev/s)
 `,
