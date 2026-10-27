@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { AUDIT_POLICIES, financeRuntimes, LIFECYCLE_MACHINES } from '../../src/identity/identity-wiring.js';
 import { PORTABILITY_SECTIONS, resolveExportContractsDir } from '../../src/portability/portability-wiring.js';
 import { apiConfig, baseEnv, capturingLogger } from '../support/harness.js';
+import { leakPattern } from '../support/leak-matcher.js';
 import {
   asAdmin,
   buildW1,
@@ -162,7 +163,7 @@ describe('Exportación del workspace', () => {
       (e) => e['action'] === 'identity.export.requested',
     )!;
     expect(requested['category']).toBe('SECURITY');
-    expect(JSON.stringify(audit.body)).not.toMatch(/Bank A|(?<![0-9A-Za-z])3099(?![0-9A-Za-z])/u);
+    expect(JSON.stringify(audit.body)).not.toMatch(leakPattern('Bank A', '3099', '3099.10'));
   });
 
   it('[TC-IDENTITY-EXPORT-003] manifiesto, SHA-256 por archivo, esquema de cada registro, montos exactos y CSV neutralizado', async () => {
