@@ -12,7 +12,7 @@ invariants: []
 priority: medium
 type: platform
 level: smoke
-automation_status: not_automated
+automation_status: manual
 automated_tests: []
 status: ready
 regression_suite: false
@@ -33,7 +33,7 @@ expected_result:
   - "Las notas de TC-REPORTING-SPENDABLE-014, TC-PLATFORM-PIPELINE-018 y TC-COMMITMENTS-MATCH-012 enlazan ese registro"
   - "Ningún umbral cambió sin una decisión del owner"
 created: 2026-10-21
-updated: 2026-10-25
+updated: 2026-10-27
 ---
 
 # TC-PLATFORM-PIPELINE-027 — Cada benchmark rojo de perf en dos corridas seguidas tiene causa medida, evidencia y camino registrados
@@ -55,3 +55,4 @@ Entonces docs/23 registra la causa medida, las mediciones y el camino
 
 - Change `investigate-perf-under-load` (D290). Revisión manual (tarea 8.2); no tiene test automatizado: al cerrar el change pasa a `automation_status: manual` y `status: ready`.
 - 2026-10-25: informe publicado ([docs/50](../../../docs/50-perf-under-load-findings.md)); notas con causa y camino en TC-COMMITMENTS-MATCH-012, TC-REPORTING-SPENDABLE-014 y TC-PLATFORM-PIPELINE-018. Falta el resumen en docs/23 §5.5 y la revisión de cierre (tarea 8.2).
+- 2026-10-27 (cierre, tarea 8.2; D303 de [docs/52](../../../docs/52-perf-under-load-owner-decisions.md)): revisión manual hecha. [docs/23 §5.5](../../../docs/23-ci-cd.md) («Causas medidas y cierre») registra por benchmark la causa medida, las mediciones sin y con carga de fondo y el camino: MATCH-012 (H1, purga), SPENDABLE-014 y PIPELINE-018 (H2, quietud del host y orden fijo), throughput con handler real (sin causa por consumidor; informativo y diferido a Phase 6, D300 y D301) e `imports.perf` (fuera del alcance; change `fix-imports-perf-connection-budget`, D299). Las notas de los tres TC enlazan ese registro. Ningún umbral cambió (TC-PLATFORM-PIPELINE-028). Pasa a `automation_status: manual` con `status: ready`.

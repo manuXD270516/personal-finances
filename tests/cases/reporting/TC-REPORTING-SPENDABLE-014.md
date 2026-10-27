@@ -31,7 +31,7 @@ expected_result:
   - "p95 de reporting_spendable_duration_seconds ≤ 0.30 s"
   - "Métrica sin etiquetas de alta cardinalidad"
 created: 2026-10-10
-updated: 2026-10-25
+updated: 2026-10-27
 ---
 
 # TC-REPORTING-SPENDABLE-014 — El cálculo del disponible cabe en el presupuesto del Home con un workspace grande y expone su métrica
@@ -53,3 +53,4 @@ Entonces el p95 del disponible es como máximo 0.30 s
 - Datos ficticios; fechas fijas con `FixedClock` (TZ America/La_Paz).
 - 2026-10-21 (D290, [docs/46](../../../docs/46-nightly-and-perf-owner-decisions.md)): en el nightly manual 39669892721 los dos benchmarks de `spendable.perf.ts` dieron p95 de 352,2 ms y 341,1 ms frente a 300 ms (primera medición; antes caían por 429). Causa sin determinar; la investiga el change `investigate-perf-under-load` (síntoma S2). El umbral no cambia sin decisión del owner.
 - 2026-10-25 (informe del change 48, [docs/50](../../../docs/50-perf-under-load-findings.md), síntoma S2): **causa medida, contención de CPU del host (H2); el código está sano (H7 descartada).** En limpio, p95 de 65,26 ms de mediana [53,2, 66,87] (E1 ×3); con el Large Seed y el host tranquilo (carga a 1 min 2,9–3,5), 42–78 ms; con el host ocupado por el trabajo residual de la suite anterior, 200–210 ms (carga 7,5, E11) y 354–359 ms (carga 7,96, `main`). El backlog del outbox por sí solo no degrada la consulta (E2). Camino: arreglo del benchmark (precondición de quietud del host y orden determinista de los archivos; grupo 5 del change 48). El umbral de 300 ms no cambia.
+- 2026-10-27 (cierre del change 48, D303 de [docs/52](../../../docs/52-perf-under-load-owner-decisions.md)): registro de causa, mediciones y camino en [docs/23 §5.5](../../../docs/23-ci-cd.md) («Causas medidas y cierre»). Confirmado en GitHub: p95 bajo 300 ms en los nightlies programados 40186569273 (2026-10-25) y 40322158874 (2026-10-26; la suite esperó 40 s la quietud del host, carga 2,97). El umbral no cambió.
