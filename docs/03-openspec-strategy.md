@@ -170,6 +170,12 @@ Dependencias que fijan el orden: `add-loans` crea `@pf/debt`, el `RecurringDefin
 
 Dependencias que fijan el orden: `add-financial-periods` es la base del plan mensual (`add-budgets`, `add-budget-templates`) y del cierre; `add-reconciliation` y `add-budgets` van antes de `add-month-closing` (ítem de cuentas conciliadas y presupuesto vs real congelado en el snapshot); `add-alerts` va después de `add-month-closing` porque consume `planning.MonthClosePending.v1` y `planning.BudgetThresholdReached.v1`; `add-bulk-edit` reutiliza el alcance de edición en periodo cerrado que fija `add-month-closing`; `add-net-worth-evolution` usa los snapshots de cierre; `add-workspace-export` va al final porque exporta e importa los datos de todos los demás. `improve-event-throughput` (agregado por el owner el 2026-10-09) va después y antes de cualquier change de Phase 6: los imports multiplican el volumen de eventos y el ritmo actual (~2 eventos/s por consumidor) incumpliría NFR-PERF-008.
 
+**Phase 5 y seguridad.** Los changes 37 a 49 (Phase 5, nightly y rendimiento) y su estado se siguen en [docs/38](38-estado-y-pendientes.md) §1.2. El 50 es el change de seguridad que D296 ([docs/48](48-perf-and-rls-owner-decisions.md)) pide para el hueco de fail-closed que encontró TC-SECURITY-RLS-007; respeta D298 ([docs/49](49-rls-no-migration-decision.md)) y sus preguntas están en [docs/55](55-rls-fail-closed-questions.md).
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 50 | `fix-rls-fail-closed-gaps` | `security/access-control` (2 ADDED: fail-closed sin contexto de las claves de idempotencia, con su alcance de usuario, y de las exportaciones del workspace, con el barrido de retención por el rol de mantenimiento; 1 MODIFIED: la matriz tabla por tabla falla ante un vacío sin `PF002`, recorre también el rol del worker y limita la variante tolerante del contexto). Migración expand con dos `ALTER POLICY`, sin reescribir las políticas que ya cumplen | 5 |
+
 ## 8. Integración con CI y herramientas
 
 - CLI fijada como devDependency raíz (`@fission-ai/openspec@1.14.0`) al crear el skeleton; actualizaciones solo vía change dedicado (riesgo de evolución rápida del CLI v1.x).
