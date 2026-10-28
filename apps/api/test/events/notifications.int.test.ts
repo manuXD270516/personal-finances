@@ -12,7 +12,15 @@ import { uuidv7, type Logger } from '@pf/platform/logging';
 import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { eventSchemaRegistry } from '../../src/runtime/event-contracts.js';
-import { createEmailSender, type EmailSender } from '@pf/notifications/interface/notifications.module';
+import { identityWorkspaceRecipients } from '@pf/identity/interface/identity.module';
+import {
+  createEmailSender,
+  createNotificationsWorkerRuntime,
+  type EmailSender,
+} from '@pf/notifications/interface/notifications.module';
+import { otelCounters, otelHistograms } from '@pf/platform/otel';
+import type { JobQueue } from '@pf/platform/queue';
+import { FixedClock, Instant } from '@pf/shared-kernel';
 import { createWorkerRuntime, type WorkerRuntime } from '../../src/worker/create-worker-runtime.js';
 import { startMailpit, type Mailpit, type MailpitMessage } from '../support/mailpit.js';
 import { baseEnv, capturingLogger, discardStaleEventBacklog, workerConfig } from '../support/harness.js';
@@ -519,4 +527,169 @@ describe('notifications/alerts: fallos del proveedor y canal deshabilitado', () 
       await worker.close();
     }
   });
+});
+
+// ───────────────────────────────────────────────────────────────────────── aviso agrupado de tasas retenidas
+
+/**
+ * Email del aviso agrupado de muestras de tasa retenidas (openspec refine-rate-anomaly-alert-grouping, tarea 4.4;
+ * TC-NOTIFICATIONS-FX-020, -021 y -022): puerto de entrada REAL de NOTIFY (el que llama el job de providers de FX) sobre
+ * PostgreSQL real, despachador real y SMTP real contra Mailpit. La cola es un registro vacío (las entregas se despachan
+ * a mano con el reloj en el instante que corresponda, como lo haría el worker al vencer `startAfter`).
+ */
+describe('notifications/alerts: email único del grupo de tasas retenidas en Mailpit', () => {
+  const clock = new FixedClock(Instant.parse('2026-10-14T14:00:00Z'));
+  const queue = {
+    enqueueInTransaction: () => Promise.resolve(),
+  } as unknown as JobQueue;
+  const runtime = () =>
+    createNotificationsWorkerRuntime({
+      pool: workerPool,
+      clock,
+      queue,
+      logger: capturingLogger('finance-worker', 'worker', 'warn').logger,
+      recipients: identityWorkspaceRecipients(workerPool),
+      catalog: { categoryTree: () => Promise.resolve({ groups: [], categories: [], tags: [] }) },
+      sender: createEmailSender({
+        driver: 'smtp',
+        smtp: {
+          host: mailpit.smtpHost,
+          port: mailpit.smtpPort,
+          secure: false,
+          from: 'PFOS <notificaciones@pfos.local>',
+        },
+      }),
+      counters: otelCounters('@pf/notifications'),
+      histograms: otelHistograms('@pf/notifications'),
+      appPublicUrl: 'http://localhost:23000',
+      emailFrom: 'PFOS <notificaciones@pfos.local>',
+      maxAttempts: 5,
+      retentionMonths: 12,
+    });
+
+  const ANCHOR = '01928c4e-0000-7000-8000-00000000a001';
+  const PEAK = '01928c4e-0000-7000-8000-00000000a002';
+  const BASELINE = '01928c4e-0000-7000-8000-00000000a003';
+
+  /** Hecho del grupo de USDT/BOB con `pending` muestras pendientes y mayor variación 12.90 frente a 12.10 (+6.61 %). */
+  const groupFact = (ws: string, pending: number, at: string, firstRetainedAt: string, eventNo: number) =>
+    ({
+      workspaceId: ws,
+      type: 'FX_RATE_ANOMALY_RETAINED' as const,
+      factKey: ANCHOR,
+      sourceEventId: `01928c4e-0000-7000-8000-00000000b${String(eventNo).padStart(3, '0')}`,
+      occurredAt: at,
+      payload: {
+        anchorRateId: ANCHOR,
+        base: 'USDT',
+        quote: 'BOB',
+        pendingCount: pending,
+        retainedCount: pending,
+        providers: ['PARALELO_BO'],
+        reviewRateId: ANCHOR,
+        peak: {
+          rateId: PEAK,
+          base: 'USDT',
+          quote: 'BOB',
+          rateType: 'PARALLEL_SELL',
+          provider: 'PARALELO_BO',
+          value: '12.90',
+          baselineRateId: BASELINE,
+          baselineValue: '12.10',
+          variationPct: '6.6116',
+          thresholdPct: '5',
+          detectedAt: at,
+          timeZone: 'America/La_Paz',
+        },
+        firstRetainedAt,
+        lastRetainedAt: at,
+        detectedAt: at,
+        timeZone: 'America/La_Paz',
+      },
+    }) as const;
+
+  const ownerDeliveries = async (f: Fixture) =>
+    (await deliveriesOf(f.ws)).filter((d) => d.user_id === f.owner.id);
+  const notBeforeOf = (ws: string, deliveryId: string) =>
+    asWorker(ws, async (q) => {
+      const { rows } = await q.query<{ not_before: Date | null }>(
+        'SELECT not_before FROM notifications.notification_delivery WHERE id = $1',
+        [deliveryId],
+      );
+      return rows[0]!.not_before;
+    });
+
+  it('[TC-NOTIFICATIONS-FX-020] sin opt-in el email del grupo dice "una o más tasas" y no incluye valores, monedas, provider ni la cantidad', async () => {
+    const f = await fixture();
+    clock.set(Instant.parse('2026-10-14T14:00:00Z'));
+    const rt = runtime();
+    const outcome = await rt.intake.notify(
+      groupFact(f.ws, 3, '2026-10-14T14:00:00.000Z', '2026-10-14T13:58:00.000Z', 1),
+    );
+    expect(outcome).toMatchObject({ created: 2, deliveries: 2 });
+    const [owner] = await ownerDeliveries(f);
+    expect(await rt.dispatch.run({ workspaceId: f.ws, deliveryId: owner!.id })).toBe('sent');
+    const [mail] = await mailTo(f.owner.email);
+    expect(mail).toBeDefined();
+    const content = withoutUrls(`${mail!.Subject}\n${mail!.Text}\n${mail!.HTML}`);
+    expect(content).toContain('Una o más tasas automáticas quedaron retenidas');
+    for (const secret of ['12.90', '12,90', '12.10', '12,10', '6.61', '6,61', 'USDT', 'BOB', 'paralelo.bo']) {
+      expect(content.toLowerCase(), secret).not.toContain(secret.toLowerCase());
+    }
+    expect(content).not.toMatch(/(^|[^\d.,])3([^\d.,]|$)/);
+    expect(mail!.Text).toMatch(/http:\/\/localhost:23000\/notificaciones\/[0-9a-f-]{36}/);
+  }, 60_000);
+
+  it('[TC-NOTIFICATIONS-FX-021] las muestras posteriores del grupo no programan otro email: el OWNER recibe uno solo', async () => {
+    const f = await fixture();
+    const rt = runtime();
+    clock.set(Instant.parse('2026-10-14T14:00:00Z'));
+    await rt.intake.notify(groupFact(f.ws, 3, '2026-10-14T14:00:00.000Z', '2026-10-14T14:00:00.000Z', 2));
+    for (const [pending, at, no] of [
+      [5, '2026-10-14T14:15:00.000Z', 3],
+      [8, '2026-10-14T14:30:00.000Z', 4],
+    ] as const) {
+      clock.set(Instant.parse(at));
+      const out = await rt.intake.notify(groupFact(f.ws, pending, at, '2026-10-14T14:00:00.000Z', no));
+      expect(out).toEqual({ created: 0, refreshed: 2, deliveries: 0 });
+    }
+    expect(await ownerDeliveries(f)).toHaveLength(1);
+    for (const d of await deliveriesOf(f.ws)) {
+      expect(await rt.dispatch.run({ workspaceId: f.ws, deliveryId: d.id })).toBe('sent');
+    }
+    expect(await mailTo(f.owner.email)).toHaveLength(1);
+    expect(await mailTo(f.editor.email)).toHaveLength(1);
+    expect(await countNotifications(f.ws)).toBe(2);
+  }, 60_000);
+
+  it('[TC-NOTIFICATIONS-FX-022] con silencio de 22:00 a 07:00 el único email del grupo se envía a las 11:00Z con el estado de ese momento (5 muestras)', async () => {
+    const f = await fixture();
+    // Las preferencias son del propio usuario (RLS): se guardan como `pf_app` con su contexto, como lo haría la API.
+    await uow().run({ userId: f.owner.id, workspaceId: f.ws }, () =>
+      requireSqlExecutor().query(
+        `INSERT INTO notifications.user_setting
+           (workspace_id, user_id, quiet_hours_start, quiet_hours_end, include_details_in_email, version)
+         VALUES ($1, $2, '22:00', '07:00', true, 1)`,
+        [f.ws, f.owner.id],
+      ),
+    );
+    const rt = runtime();
+    // 2026-10-13 23:30 en La Paz = 2026-10-14T03:30Z.
+    clock.set(Instant.parse('2026-10-14T03:30:00Z'));
+    await rt.intake.notify(groupFact(f.ws, 3, '2026-10-14T03:30:00.000Z', '2026-10-14T03:30:00.000Z', 5));
+    clock.set(Instant.parse('2026-10-14T05:00:00Z'));
+    await rt.intake.notify(groupFact(f.ws, 5, '2026-10-14T05:00:00.000Z', '2026-10-14T03:30:00.000Z', 6));
+    const [delivery] = await ownerDeliveries(f);
+    expect(delivery).toBeDefined();
+    expect((await notBeforeOf(f.ws, delivery!.id))?.toISOString()).toBe('2026-10-14T11:00:00.000Z');
+    // Dentro del silencio no sale nada: la entrega no vence hasta `not_before`, así que el despacho no la toma.
+    expect(await rt.dispatch.run({ workspaceId: f.ws, deliveryId: delivery!.id })).toBe('noop');
+    expect(await mailTo(f.owner.email)).toHaveLength(0);
+    // 07:00 en La Paz: sale un único email con el estado vigente.
+    clock.set(Instant.parse('2026-10-14T11:00:00Z'));
+    expect(await rt.dispatch.run({ workspaceId: f.ws, deliveryId: delivery!.id })).toBe('sent');
+    const mails = await mailTo(f.owner.email);
+    expect(mails).toHaveLength(1);
+    expect(mails[0]!.Text).toContain('USDT/BOB: 5 tasas automáticas retenidas pendientes de revisión');
+  }, 60_000);
 });

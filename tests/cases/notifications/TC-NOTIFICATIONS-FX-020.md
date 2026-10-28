@@ -16,6 +16,7 @@ automation_status: automated
 automated_tests:
   - packages/contexts/notifications/src/application/fx-rate-email.test.ts
   - packages/contexts/notifications/src/domain/fx-rate-notifications.test.ts
+  - apps/api/test/events/notifications.int.test.ts
 status: automated
 regression_suite: false
 phase: 5
@@ -52,3 +53,4 @@ Entonces no ve valores, monedas, providers ni cantidad
 ## Notas
 
 - Change: `refine-rate-anomaly-alert-grouping`.
+- Con Mailpit (2026-10-27, tarea 4.4): `apps/api/test/events/notifications.int.test.ts` usa el puerto de entrada real de NOTIFY sobre PostgreSQL real, el despachador real y SMTP real contra un Mailpit propio de Testcontainers: sin opt-in el email del OWNER en Mailpit dice «una o más tasas», sin valores, monedas, provider ni cantidad.

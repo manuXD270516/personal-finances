@@ -146,7 +146,7 @@ export class DemoWorld {
     readonly user?: DemoUser;
     readonly catalogDir?: string;
     readonly failAt?: string;
-    readonly afterPlanCommitted?: () => Promise<void>;
+    readonly afterPlanCommitted?: (workspaceId: string) => Promise<void>;
   }): Promise<DemoLoad> {
     const user = input.user ?? (await this.user('demo-v2'));
     const pool = new Pool({ connectionString: this.deps.databaseUrl, max: 2 });

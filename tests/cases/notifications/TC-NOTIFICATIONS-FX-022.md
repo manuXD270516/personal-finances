@@ -15,6 +15,7 @@ level: database-integration
 automation_status: automated
 automated_tests:
   - packages/contexts/notifications/src/application/fx-rate-email.test.ts
+  - apps/api/test/events/notifications.int.test.ts
 status: automated
 regression_suite: false
 phase: 5
@@ -51,3 +52,4 @@ Entonces el email de las 07:00 muestra el estado vigente
 ## Notas
 
 - Change: `refine-rate-anomaly-alert-grouping`.
+- Con Mailpit (2026-10-27, tarea 4.4): `apps/api/test/events/notifications.int.test.ts` usa el puerto de entrada real de NOTIFY sobre PostgreSQL real, el despachador real y SMTP real contra un Mailpit propio de Testcontainers: con silencio de 22:00 a 07:00, `not_before` = 11:00Z, el despacho de las 05:00Z no toma la entrega y el único email sale a las 11:00Z con 5 muestras.
