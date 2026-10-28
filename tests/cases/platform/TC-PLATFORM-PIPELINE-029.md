@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - "apps/api/test/perf/connection-budget.test.ts"
+  - "apps/api/test/perf/imports.perf.ts"
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "connections", "imports"]
@@ -34,7 +36,7 @@ expected_result:
   - "No se publica ninguna medición del import como válida"
   - "Con una suma que cabe, la precondición pasa y la suite mide"
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-28
 ---
 
 # TC-PLATFORM-PIPELINE-029 — La suite del import falla antes de medir si la suma de sus pools (115) no cabe en las 97 conexiones disponibles del servidor
@@ -56,3 +58,4 @@ Entonces la suite falla antes de subir el archivo indicando 115 frente a 97
 
 - Change `fix-imports-perf-connection-budget` (D299, [docs/52](../../../docs/52-perf-under-load-owner-decisions.md)). El presupuesto de 120 s (D112) y los demás umbrales de `imports.perf.ts` no cambian (TC-PLATFORM-PIPELINE-028).
 - Datos ficticios generados por el benchmark; `FixedClock` en America/La_Paz.
+- 2026-10-28 (change 48b, tareas 2.1 y 4.1): automatizado en `connection-budget.test.ts` (115 frente a 97 falla con la suma, el límite y cada pool; una suma que cabe pasa, también justo en el límite; `max_connections` y las reservadas salen de `pg_settings`) y en `imports.perf.ts` (la precondición corre antes de subir el archivo). Medido en 23 corridas del job `perf` ([docs/53](../../../docs/53-imports-perf-findings.md)): con los pools por omisión la suma declarada era 115 frente a 97 (`poolsSum` 115, `fits` false) y con el pool de la API de la plantilla del host (22, `IMPORTS_API_POOL_MAX`) es 85 frente a 97 (`fits` true); el uso real fue de 30–40 conexiones del servidor sobre 100.

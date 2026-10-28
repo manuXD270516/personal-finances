@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - "apps/api/test/perf/connection-budget.test.ts"
+  - "apps/api/test/perf/perf-report.test.ts"
+  - "apps/api/test/perf/imports.perf.ts"
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "drain", "imports"]
@@ -33,7 +36,7 @@ expected_result:
   - "Cada consumidor deja su backlog en 0 en 120 s o menos desde la persistencia"
   - "El reporte publica por consumidor los pendientes al terminar la persistencia, el tiempo de drenado y los eventos por segundo"
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-28
 ---
 
 # TC-PLATFORM-PIPELINE-031 — El import de 5 000 filas drena cada consumidor en 120 s o menos desde la persistencia y el reporte publica el drenado por consumidor
@@ -55,3 +58,4 @@ Entonces ninguna adquisición de conexión vence y cada consumidor drena en 120 
 
 - Change `fix-imports-perf-connection-budget` (D299, [docs/52](../../../docs/52-perf-under-load-owner-decisions.md)). El presupuesto de 120 s (D112) y los demás umbrales de `imports.perf.ts` no cambian (TC-PLATFORM-PIPELINE-028).
 - Datos ficticios generados por el benchmark; `FixedClock` en America/La_Paz.
+- 2026-10-28 (change 48b, tareas 2.2 y 2.4): automatizado en `connection-budget.test.ts` (`DrainTracker`: pendientes al terminar la persistencia, pico, pico en reintento, tiempo hasta 0 con el outbox sin publicar retrasando a todas las colas, ritmo) y en `perf-report.test.ts` (sección de `perf-summary.md`, campo aditivo `imports` de `perf-results.json`, `imports-perf.json` y su idempotencia). Evidencia por `workflow_dispatch` desde la rama no fusionada (23 corridas, [docs/53](../../../docs/53-imports-perf-findings.md)): el reporte publicó el drenado por consumidor y ninguna cola superó 35,8 s. **Pendiente (tarea 6.2):** dos nightlies programados seguidos con `imports.perf.ts` en verde.

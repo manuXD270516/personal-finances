@@ -40,7 +40,7 @@ Estas reglas aplican a cualquier sesión, local o en la nube. Complementan los a
 - Dentro de una unidad de trabajo, nunca consultas en paralelo sobre el mismo cliente pg (`Promise.all`): el harness de integración falla con ese aviso.
 - Migraciones solo expand, con timestamp posterior a la última de `main`; nunca edites una fusionada.
 - Contratos aditivos: oasdiff limpio (`pnpm contract:breaking`), Spectral y Redocly sin errores. En el YAML, las descripciones con comas dentro de un flow mapping van entre comillas.
-- Presupuesto de conexiones: la plantilla del host suma API 22 + worker 33 = 55 sobre 60 de Postgres. No agregues consumidores sin justificarlo y validar el test de arranque del worker.
+- Presupuesto de conexiones: la plantilla del host suma API 22 + worker 34 = 56 sobre `max_connections=70` de Postgres (`deploy/compose/compose.prod.yaml`; con las dos colas pg-boss, 64 de 67 útiles). No agregues consumidores sin justificarlo y validar el test de arranque del worker.
 - Tests: TC-id en el nombre (`it('[TC-…] …')`). Los PBT y los de muchos datos llevan timeout explícito (CI es más lento). No busques números sueltos con `toContain` (aparecen dentro de ids y marcas de tiempo): usa regex con límites. Los consumidores asíncronos (Planning provisiona periodos tras cada asiento) generan filas en segundo plano; las comparaciones de estado deben tenerlo en cuenta.
 
 ## Gates antes de entregar

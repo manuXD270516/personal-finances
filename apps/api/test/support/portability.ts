@@ -56,6 +56,8 @@ export interface Harness {
   readonly baseUrl: string;
   readonly apiLog: ReturnType<typeof capturingLogger>;
   worker: WorkerRuntime | undefined;
+  /** Registro capturado del logger del worker (los benchmarks lo leen para explicar los reintentos). */
+  workerLog: ReturnType<typeof capturingLogger> | undefined;
   /** `discardBacklog: false` conserva los jobs ya encolados (p. ej. una importación recibida con el worker detenido). */
   startWorker(
     options?: Parameters<typeof createWorkerRuntime>[2],
@@ -147,23 +149,21 @@ export async function startHarness(options: {
     baseUrl,
     apiLog,
     worker: undefined,
+    workerLog: undefined,
     async startWorker(extra, flags) {
       if (h.worker) return h.worker;
       if (flags?.discardBacklog !== false) await discardStaleJobs(deps);
-      h.worker = await createWorkerRuntime(
-        workerConfig(baseEnv(deps)),
-        capturingLogger('finance-worker', 'worker').logger,
-        {
-          ...(options.realClock ? {} : { clock }),
-          ledgerMaintenanceOnStart: false,
-          fxGapFillOnStart: false,
-          lifecycleBackfillOnStart: false,
-          planningPeriodsOnStart: false,
-          portability: { scheduleCrons: false },
-          notifications: { scheduleCrons: false, sweepOnStart: false },
-          ...extra,
-        },
-      );
+      h.workerLog = capturingLogger('finance-worker', 'worker');
+      h.worker = await createWorkerRuntime(workerConfig(baseEnv(deps)), h.workerLog.logger, {
+        ...(options.realClock ? {} : { clock }),
+        ledgerMaintenanceOnStart: false,
+        fxGapFillOnStart: false,
+        lifecycleBackfillOnStart: false,
+        planningPeriodsOnStart: false,
+        portability: { scheduleCrons: false },
+        notifications: { scheduleCrons: false, sweepOnStart: false },
+        ...extra,
+      });
       return h.worker;
     },
     async stopWorker() {

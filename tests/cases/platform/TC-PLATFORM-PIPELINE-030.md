@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - "apps/api/test/perf/connection-budget.test.ts"
+  - "apps/api/test/perf/perf-report.test.ts"
+  - "apps/api/test/perf/imports.perf.ts"
+status: automated
 regression_suite: false
 phase: 5
 tags: ["nightly", "perf", "connections", "imports"]
@@ -34,7 +37,7 @@ expected_result:
   - "El reporte publica el pico de conexiones del servidor frente a su máximo, separado del resultado del drenado"
   - "El fallo no se reporta como drenado sobre el presupuesto"
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-28
 ---
 
 # TC-PLATFORM-PIPELINE-030 — Una adquisición de conexión que vence con el pool del worker en 34 de 34 da el veredicto conexiones, separado del drenado
@@ -56,3 +59,4 @@ Entonces la suite falla con el veredicto conexiones, el pool, 34 de 34 y la espe
 
 - Change `fix-imports-perf-connection-budget` (D299, [docs/52](../../../docs/52-perf-under-load-owner-decisions.md)). El presupuesto de 120 s (D112) y los demás umbrales de `imports.perf.ts` no cambian (TC-PLATFORM-PIPELINE-028).
 - Datos ficticios generados por el benchmark; `FixedClock` en America/La_Paz.
+- 2026-10-28 (change 48b, tareas 2.2 y 2.3): automatizado en `perf-report.test.ts` (veredicto `conexiones` con el pool del worker en 34 de 34 y 2 150 ms, aunque el drenado también exceda, sin mencionar el drenado) y en `connection-budget.test.ts` (`instrumentPool` mide la espera de `pool.connect` con callback y con promesa y registra la vencida con pool, uso y máximo; el muestreador publica pico en uso, pico en espera, espera máxima y pico del servidor por aplicación, con consultas en serie). En 23 corridas del job `perf` no venció ninguna adquisición (espera máxima 108 ms, 0 en espera, worker 18–27 de 52, servidor 30–40 de 100): el veredicto `conexiones` no se disparó.
