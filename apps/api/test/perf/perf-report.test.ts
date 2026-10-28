@@ -1000,3 +1000,26 @@ describe('reporte del import: trabajos reintentados', () => {
     expect(md).toMatch(/\| events\.a \| 2 \| 1 \| 7\.2 \| timeout exceeded \/ connect \|/u);
   });
 });
+
+describe('reporte del import: fallos de entrega', () => {
+  it('[TC-PLATFORM-PIPELINE-031] la sección lista los fallos de entrega del worker por cola y error', () => {
+    const md = renderImportsSection({
+      rows: 5000,
+      previewMs: 1,
+      persistMs: 1,
+      drainAfterPersistMs: 1,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [],
+      jobFailures: [
+        {
+          queue: 'events.goals.balance-watch',
+          count: 10,
+          maxAttempt: 2,
+          error: '40P01 error: deadlock detected',
+        },
+      ],
+      verdict: { kind: 'ok', message: 'ok' },
+    }).join('\n');
+    expect(md).toMatch(/\| events\.goals\.balance-watch \| 10 \| 2 \| 40P01 error: deadlock detected \|/u);
+  });
+});

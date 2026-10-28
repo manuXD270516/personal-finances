@@ -840,6 +840,14 @@ export interface RetriedJobs {
   readonly error: string;
 }
 
+/** Fallos de entrega de un consumidor registrados por el worker (`job failed`), agrupados por error. */
+export interface JobFailure {
+  readonly queue: string;
+  readonly count: number;
+  readonly maxAttempt: number;
+  readonly error: string;
+}
+
 export type ImportsVerdict =
   | { readonly kind: 'ok'; readonly message: string }
   | { readonly kind: 'conexiones'; readonly message: string }
@@ -856,6 +864,8 @@ export interface ImportsReport {
   readonly drainByConsumer: readonly ConsumerDrain[];
   /** Trabajos de los consumidores que se reintentaron durante la medición (causa de una cola que tarda en llegar a 0). */
   readonly retries?: readonly RetriedJobs[];
+  /** Por qué fallaron las entregas (registro del worker): causa de los reintentos que alargan una cola. */
+  readonly jobFailures?: readonly JobFailure[];
   readonly verdict: ImportsVerdict;
 }
 
@@ -940,6 +950,19 @@ export function renderImportsSection(r: ImportsReport): string[] {
     ),
     '',
   );
+  if (r.jobFailures && r.jobFailures.length > 0) {
+    out.push(
+      'Fallos de entrega (registro del worker):',
+      '',
+      '| Cola | Fallos | Intento máx. | Error |',
+      '|---|---|---|---|',
+      ...r.jobFailures.map(
+        (j) =>
+          `| ${j.queue} | ${String(j.count)} | ${String(j.maxAttempt)} | ${j.error.replace(/\|/gu, '/')} |`,
+      ),
+      '',
+    );
+  }
   if (r.retries && r.retries.length > 0) {
     out.push(
       'Trabajos reintentados:',
