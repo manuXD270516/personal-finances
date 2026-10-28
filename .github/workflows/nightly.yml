@@ -36,6 +36,11 @@ on:
         required: false
         default: ''
         type: string
+      no_purge:
+        description: 'PF_PERF_NO_PURGE: 1 = sin purga del backlog ni precondicion de aislamiento (reproduce E10)'
+        required: false
+        default: ''
+        type: string
       enforce_budget:
         description: 'PF_PERF_ENFORCE_BUDGET: 1 = la precondicion de presupuesto falla la suite'
         required: false
@@ -192,6 +197,7 @@ jobs:
           PF_PERF_MAX_CONNECTIONS: ${{ inputs.max_connections }}
           PF_PERF_POOL_MAX: ${{ inputs.pool_max }}
           PF_PERF_ENFORCE_BUDGET: ${{ inputs.enforce_budget }}
+          PF_PERF_NO_PURGE: ${{ inputs.no_purge }}
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true

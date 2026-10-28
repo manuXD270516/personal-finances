@@ -37,6 +37,7 @@ export interface PurgeResult {
  * `active`) de las colas `events.*` (no las `.dlq`). Si `pgboss` aún no tiene tablas, no hay nada que purgar.
  */
 export async function purgeBacklog(client: PurgeClient): Promise<PurgeResult> {
+  if (process.env['PF_PERF_NO_PURGE'] === '1') return { outbox: 0, jobs: 0 }; // RAMA DE EXPERIMENTOS: reproduce E10
   const outbox = await client.query(
     'UPDATE platform.outbox SET published_at = clock_timestamp() WHERE published_at IS NULL',
   );

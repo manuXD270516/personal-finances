@@ -194,7 +194,7 @@ export function assertIsolated(
   preparation?: IsolationPreparation,
 ): void {
   const isolation = isolationOf(snapshot, preparation);
-  if (isolation.verdict === 'interferencia') {
+  if (isolation.verdict === 'interferencia' && process.env['PF_PERF_NO_PURGE'] !== '1') {
     throw new Error(`[TC-PLATFORM-PIPELINE-026] ${suite} no puede medir: ${isolation.message}`);
   }
 }
