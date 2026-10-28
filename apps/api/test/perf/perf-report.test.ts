@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   aggregateBackgroundLoad,
@@ -23,6 +25,14 @@ import {
   stats,
   summarizeSnapshot,
   throughputResult,
+  importsVerdict,
+  renderImportsSection,
+  writeImportsReport,
+  writeReport,
+  type ConnectionsReport,
+  type ConsumerDrain,
+  type ImportsReport,
+  type PerfReport,
   type BackgroundLoadEntry,
   type BackgroundLoadSnapshot,
   type IsolationPreparation,
@@ -797,5 +807,219 @@ describe('aislamiento con preparación: purga y quietud del host (investigate-pe
     const md = renderMarkdown(buildReport({ ...emptyBase, results: [], backgroundLoad: bl }));
     expect(md).toMatch(/\| interferencia \|/u);
     expect(md).toMatch(/host sin quietud: carga del host 7\.96/u);
+  });
+});
+
+// ── Benchmark del import: veredictos y reporte de conexiones y drenado (fix-imports-perf-connection-budget) ──
+
+const importsConnections: ConnectionsReport = {
+  samples: 120,
+  budget: { poolsSum: 67, limit: 67, fits: true },
+  pools: [
+    { pool: 'api', max: 22, peakInUse: 9, peakWaiting: 0, maxAcquireMs: 12, timeouts: 0 },
+    { pool: 'worker', max: 34, peakInUse: 34, peakWaiting: 11, maxAcquireMs: 2150, timeouts: 1 },
+  ],
+  server: {
+    maxConnections: 70,
+    reserved: 3,
+    peak: 61,
+    peakByApplication: { 'finance-api': 9, 'finance-worker': 34, 'pfos-consumer': 4 },
+  },
+  timeouts: [{ pool: 'worker', inUse: 34, max: 34, waitedMs: 2150 }],
+};
+
+const importsDrain: ConsumerDrain[] = [
+  {
+    queue: 'events.planning.journal-entry-posted',
+    pendingAtPersist: 5000,
+    peakPending: 5000,
+    drainedAfterPersistMs: 123_458,
+    eventsPerSecond: 40.5,
+  },
+  {
+    queue: 'events.reporting.data-version',
+    pendingAtPersist: 4000,
+    peakPending: 4100,
+    drainedAfterPersistMs: 90_000,
+    eventsPerSecond: 44.4,
+  },
+  {
+    queue: 'outbox',
+    pendingAtPersist: 0,
+    peakPending: 12,
+    drainedAfterPersistMs: 1000,
+    eventsPerSecond: null,
+  },
+];
+
+describe('veredictos del benchmark del import', () => {
+  it('[TC-PLATFORM-PIPELINE-030] una adquisición vencida con el pool del worker en 34 de 34 da el veredicto conexiones, separado del drenado', () => {
+    const verdict = importsVerdict({
+      drainAfterPersistMs: 130_000, // el drenado también excedió: aun así el veredicto es de conexiones
+      drainBudgetMs: 120_000,
+      connections: importsConnections,
+      drainByConsumer: importsDrain,
+    });
+    expect(verdict.kind).toBe('conexiones');
+    expect(verdict.message).toMatch(/pool del worker/u);
+    expect(verdict.message).toMatch(/34 de 34 conexiones en uso/u);
+    expect(verdict.message).toMatch(/venció tras 2150 ms/u);
+    expect(verdict.message).toMatch(/pico del servidor 61 de 70/u);
+    expect(verdict.message).not.toMatch(/drenado/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-032] un drenado de 123 458,95 ms frente a 120 000 ms falla nombrando los consumidores que terminaron después', () => {
+    const verdict = importsVerdict({
+      drainAfterPersistMs: 123_458.95,
+      drainBudgetMs: 120_000,
+      connections: { ...importsConnections, timeouts: [] },
+      drainByConsumer: importsDrain,
+    });
+    expect(verdict.kind).toBe('drenado');
+    expect(verdict.message).toContain('123,5 s frente a 120 s');
+    expect(verdict.message).toContain('events.planning.journal-entry-posted 123,5 s');
+    expect(verdict.message).not.toContain('events.reporting.data-version');
+    expect(verdict.message).not.toMatch(/conexi/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-032] un consumidor que no llegó a 0 se nombra como tal; sin ninguno individual, el mensaje lo dice', () => {
+    const stuck = importsVerdict({
+      drainAfterPersistMs: 180_000,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [{ ...importsDrain[1]!, drainedAfterPersistMs: null, eventsPerSecond: null }],
+    });
+    expect(stuck.message).toContain('events.reporting.data-version sin llegar a 0');
+    const none = importsVerdict({
+      drainAfterPersistMs: 120_400,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [importsDrain[1]!],
+    });
+    expect(none.kind).toBe('drenado');
+    expect(none.message).toContain('ningún consumidor individual');
+  });
+
+  it('[TC-PLATFORM-PIPELINE-031] sin adquisiciones vencidas y con el drenado en el presupuesto, el veredicto es ok (120 s exactos pasan)', () => {
+    const verdict = importsVerdict({
+      drainAfterPersistMs: 120_000,
+      drainBudgetMs: 120_000,
+      connections: { ...importsConnections, timeouts: [] },
+      drainByConsumer: importsDrain,
+    });
+    expect(verdict.kind).toBe('ok');
+  });
+});
+
+describe('reporte del import: conexiones y drenado por consumidor', () => {
+  const report = (verdict: ImportsReport['verdict']): ImportsReport => ({
+    rows: 5000,
+    previewMs: 8200,
+    persistMs: 118_000,
+    drainAfterPersistMs: 123_459,
+    drainBudgetMs: 120_000,
+    connections: importsConnections,
+    drainByConsumer: importsDrain,
+    verdict,
+  });
+
+  it('[TC-PLATFORM-PIPELINE-031] la sección publica el pico por pool, el servidor frente a su máximo y el drenado por consumidor', () => {
+    const verdict = importsVerdict({
+      drainAfterPersistMs: 123_459,
+      drainBudgetMs: 120_000,
+      drainByConsumer: importsDrain,
+    });
+    const md = renderImportsSection(report(verdict)).join('\n');
+    expect(md).toMatch(/\| worker \| 34 \| 34 \| 11 \| 2150 \| 1 \|/u);
+    expect(md).toMatch(/pico del servidor 61/u);
+    expect(md).toMatch(/max_connections 70 menos 3 reservadas/u);
+    expect(md).toMatch(
+      /\| events\.planning\.journal-entry-posted \| 5000 \| 5000 \| 0 \| 123\.5 \| 40\.5 \|/u,
+    );
+    expect(md).toMatch(/\| outbox \| 0 \| 12 \| 0 \| 1\.0 \| — \|/u);
+    expect(md).toMatch(/FALLA \(drenado\)/u);
+  });
+
+  it('[TC-PLATFORM-PIPELINE-031] writeImportsReport agrega imports a perf-results.json y la sección a perf-summary.md sin tocar el resto, y es idempotente', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pf-imports-'));
+    const base = buildReport({ ...emptyBase, results: [] });
+    writeReport(base, dir, 'diagnóstico');
+    const verdict = importsVerdict({
+      drainAfterPersistMs: 1000,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [],
+    });
+    writeImportsReport(report(verdict), dir);
+    writeImportsReport(report(verdict), dir);
+    const json = JSON.parse(readFileSync(join(dir, 'perf-results.json'), 'utf8')) as PerfReport;
+    expect(json.imports?.drainByConsumer).toHaveLength(3);
+    expect(json.imports?.connections?.pools[1]?.peakInUse).toBe(34);
+    expect(json.environment).toEqual(base.environment);
+    const md = readFileSync(join(dir, 'perf-summary.md'), 'utf8');
+    expect(md.match(/<!-- imports:start -->/gu)).toHaveLength(1);
+    expect(md).toContain('diagnóstico');
+    expect(JSON.parse(readFileSync(join(dir, 'imports-perf.json'), 'utf8'))).toMatchObject({ rows: 5000 });
+  });
+
+  it('[TC-PLATFORM-PIPELINE-031] sin perf-results.json solo escribe imports-perf.json (suite del import sola)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pf-imports-'));
+    writeImportsReport(report({ kind: 'ok', message: 'ok' }), dir);
+    expect(existsSync(join(dir, 'imports-perf.json'))).toBe(true);
+    expect(existsSync(join(dir, 'perf-results.json'))).toBe(false);
+  });
+});
+
+describe('reporte del import: trabajos reintentados', () => {
+  it('[TC-PLATFORM-PIPELINE-031] la sección lista las colas con trabajos reintentados y su último error', () => {
+    const md = renderImportsSection({
+      rows: 5000,
+      previewMs: 1,
+      persistMs: 1,
+      drainAfterPersistMs: 1,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [
+        {
+          queue: 'events.a',
+          pendingAtPersist: 5,
+          peakPending: 5,
+          peakRetrying: 2,
+          drainedAfterPersistMs: 1000,
+          eventsPerSecond: 5,
+        },
+      ],
+      retries: [
+        {
+          queue: 'events.a',
+          jobs: 2,
+          maxRetryCount: 1,
+          maxLatencyMs: 7200,
+          error: 'timeout exceeded | connect',
+        },
+      ],
+      verdict: { kind: 'ok', message: 'ok' },
+    }).join('\n');
+    expect(md).toMatch(/\| events\.a \| 5 \| 5 \| 2 \| 1\.0 \| 5 \|/u);
+    expect(md).toMatch(/\| events\.a \| 2 \| 1 \| 7\.2 \| timeout exceeded \/ connect \|/u);
+  });
+});
+
+describe('reporte del import: fallos de entrega', () => {
+  it('[TC-PLATFORM-PIPELINE-031] la sección lista los fallos de entrega del worker por cola y error', () => {
+    const md = renderImportsSection({
+      rows: 5000,
+      previewMs: 1,
+      persistMs: 1,
+      drainAfterPersistMs: 1,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [],
+      jobFailures: [
+        {
+          queue: 'events.goals.balance-watch',
+          count: 10,
+          maxAttempt: 2,
+          error: '40P01 error: deadlock detected',
+        },
+      ],
+      verdict: { kind: 'ok', message: 'ok' },
+    }).join('\n');
+    expect(md).toMatch(/\| events\.goals\.balance-watch \| 10 \| 2 \| 40P01 error: deadlock detected \|/u);
   });
 });
