@@ -46,12 +46,14 @@ let migrator: Client;
 let startedAt: string;
 let main: DemoLoad;
 
-async function balancesOf(load: DemoLoad): Promise<Record<string, string>> {
-  const r = await world.call(
-    'GET',
-    `/api/v1/workspaces/${load.job.demoWorkspaceId}/accounts?limit=50`,
-    load.user.token,
-  );
+async function balancesOf(
+  load: Pick<DemoLoad, 'user'> & { readonly job: { readonly demoWorkspaceId: string } },
+): Promise<Record<string, string>> {
+  return balancesIn(load.job.demoWorkspaceId, load.user.token);
+}
+
+async function balancesIn(workspaceId: string, token: string): Promise<Record<string, string>> {
+  const r = await world.call('GET', `/api/v1/workspaces/${workspaceId}/accounts?limit=50`, token);
   expect(r.status).toBe(200);
   const data = r.body['data'] as { name: string; balance: { amount: string } }[];
   return Object.fromEntries(data.map((a) => [a.name, a.balance.amount]));
@@ -173,9 +175,19 @@ describe('la demo no depende de la fecha real (identity/demo-data)', () => {
     const load = await world.load({
       anchor: ANCHOR,
       user,
-      afterPlanCommitted: async () => {
+      afterPlanCommitted: async (workspaceId) => {
         clock.set(Instant.parse('2026-10-02T16:00:00.000Z'));
         await runJob(JOB);
+        // Se espera a que el retiro ya figure en los saldos del API: la ventana entre confirmar y terminar la carga
+        // queda con el workspace ya modificado por la tarea programada.
+        await world.waitPublished(workspaceId);
+        await eventually(
+          async () =>
+            (await balancesIn(workspaceId, user.token))['Efectivo'] === WITH_WITHDRAWAL['Efectivo']
+              ? true
+              : undefined,
+          { timeoutMs: 120_000, what: 'el retiro en los saldos' },
+        );
       },
     });
     // La verificación de saldos ocurre antes de confirmar: el retiro posterior no la afecta.

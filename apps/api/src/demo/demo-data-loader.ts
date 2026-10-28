@@ -46,8 +46,9 @@ export interface DemoDataLoaderOptions {
   /**
    * Tests: se ejecuta justo después de confirmar la unidad de trabajo del plan (patrón de `failAt`). Simula a otro
    * proceso (una tarea programada) que modifica el workspace entre la confirmación y cualquier lectura posterior.
+   * Recibe el id del workspace demo.
    */
-  readonly afterPlanCommitted?: () => Promise<void>;
+  readonly afterPlanCommitted?: (workspaceId: string) => Promise<void>;
 }
 
 export type DemoLoadOutcome = 'READY' | 'FAILED' | 'SKIPPED';
@@ -392,7 +393,7 @@ export class DemoDataLoader {
         }
       }
     });
-    await this.options.afterPlanCommitted?.();
+    await this.options.afterPlanCommitted?.(ws);
     await progress('fx');
     await progress('transactions');
     await progress('commitments');
