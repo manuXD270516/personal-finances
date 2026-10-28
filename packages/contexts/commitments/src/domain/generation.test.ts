@@ -381,3 +381,8 @@ describe('Pausar, reanudar, terminar y revisar (RevisionPlanner)', () => {
     expect(plan.insert).toEqual([]);
   });
 });
+
+// Rama de prueba de fix-nightly-pipeline 8.6 (NO FUSIONAR): fallo forzado dentro de la Financial Regression Suite.
+it('[TC-COMMITMENTS-RECUR-014] fallo forzado de verificación 8.6', () => {
+  expect(1).toBe(2);
+});
