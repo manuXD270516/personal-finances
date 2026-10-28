@@ -814,7 +814,7 @@ describe('aislamiento con preparación: purga y quietud del host (investigate-pe
 
 const importsConnections: ConnectionsReport = {
   samples: 120,
-  budget: { total: 67, limit: 67, fits: true },
+  budget: { poolsSum: 67, limit: 67, fits: true },
   pools: [
     { pool: 'api', max: 22, peakInUse: 9, peakWaiting: 0, maxAcquireMs: 12, timeouts: 0 },
     { pool: 'worker', max: 34, peakInUse: 34, peakWaiting: 11, maxAcquireMs: 2150, timeouts: 1 },
@@ -931,8 +931,8 @@ describe('reporte del import: conexiones y drenado por consumidor', () => {
     expect(md).toMatch(/\| worker \| 34 \| 34 \| 11 \| 2150 \| 1 \|/u);
     expect(md).toMatch(/pico del servidor 61/u);
     expect(md).toMatch(/max_connections 70 menos 3 reservadas/u);
-    expect(md).toMatch(/\| events\.planning\.journal-entry-posted \| 5000 \| 5000 \| 123\.5 \| 40\.5 \|/u);
-    expect(md).toMatch(/\| outbox \| 0 \| 12 \| 1\.0 \| — \|/u);
+    expect(md).toMatch(/\| events\.planning\.journal-entry-posted \| 5000 \| 5000 \| 0 \| 123\.5 \| 40\.5 \|/u);
+    expect(md).toMatch(/\| outbox \| 0 \| 12 \| 0 \| 1\.0 \| — \|/u);
     expect(md).toMatch(/FALLA \(drenado\)/u);
   });
 
@@ -962,5 +962,31 @@ describe('reporte del import: conexiones y drenado por consumidor', () => {
     writeImportsReport(report({ kind: 'ok', message: 'ok' }), dir);
     expect(existsSync(join(dir, 'imports-perf.json'))).toBe(true);
     expect(existsSync(join(dir, 'perf-results.json'))).toBe(false);
+  });
+});
+
+describe('reporte del import: trabajos reintentados', () => {
+  it('[TC-PLATFORM-PIPELINE-031] la sección lista las colas con trabajos reintentados y su último error', () => {
+    const md = renderImportsSection({
+      rows: 5000,
+      previewMs: 1,
+      persistMs: 1,
+      drainAfterPersistMs: 1,
+      drainBudgetMs: 120_000,
+      drainByConsumer: [
+        {
+          queue: 'events.a',
+          pendingAtPersist: 5,
+          peakPending: 5,
+          peakRetrying: 2,
+          drainedAfterPersistMs: 1000,
+          eventsPerSecond: 5,
+        },
+      ],
+      retries: [{ queue: 'events.a', jobs: 2, maxRetryCount: 1, error: 'timeout exceeded | connect' }],
+      verdict: { kind: 'ok', message: 'ok' },
+    }).join('\n');
+    expect(md).toMatch(/\| events\.a \| 5 \| 5 \| 2 \| 1\.0 \| 5 \|/u);
+    expect(md).toMatch(/\| events\.a \| 2 \| 1 \| timeout exceeded \/ connect \|/u);
   });
 });

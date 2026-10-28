@@ -30,7 +30,7 @@ export interface ServerConnectionLimits {
 
 export interface ConnectionBudgetCheck {
   readonly fits: boolean;
-  readonly total: number;
+  readonly poolsSum: number;
   /** `max_connections` menos las reservadas. */
   readonly limit: number;
   readonly maxConnections: number;
@@ -42,11 +42,11 @@ export function checkConnectionBudget(
   pools: readonly PoolBudget[],
   server: ServerConnectionLimits,
 ): ConnectionBudgetCheck {
-  const total = pools.reduce((sum, p) => sum + p.max, 0);
+  const poolsSum = pools.reduce((sum, p) => sum + p.max, 0);
   const limit = server.maxConnections - server.reserved;
   return {
-    fits: total <= limit,
-    total,
+    fits: poolsSum <= limit,
+    poolsSum,
     limit,
     maxConnections: server.maxConnections,
     reserved: server.reserved,
@@ -57,8 +57,8 @@ export function checkConnectionBudget(
 export function connectionBudgetMessage(check: ConnectionBudgetCheck): string {
   const detail = check.pools.map((p) => `${p.name} ${String(p.max)}`).join(', ');
   return check.fits
-    ? `presupuesto de conexiones: ${String(check.total)} dentro de un límite de ${String(check.limit)} (max_connections ${String(check.maxConnections)} menos ${String(check.reserved)} reservadas); ${detail}`
-    : `presupuesto de conexiones: ${String(check.total)} conexiones frente a un límite de ${String(check.limit)} (max_connections ${String(check.maxConnections)} menos ${String(check.reserved)} reservadas); ${detail}`;
+    ? `presupuesto de conexiones: ${String(check.poolsSum)} dentro de un límite de ${String(check.limit)} (max_connections ${String(check.maxConnections)} menos ${String(check.reserved)} reservadas); ${detail}`
+    : `presupuesto de conexiones: ${String(check.poolsSum)} conexiones frente a un límite de ${String(check.limit)} (max_connections ${String(check.maxConnections)} menos ${String(check.reserved)} reservadas); ${detail}`;
 }
 
 export class ConnectionBudgetError extends Error {
@@ -273,7 +273,7 @@ export class ConnectionSampler {
     return {
       samples: this.samples,
       peakLoad1m: Math.round(this.peakLoad1m * 100) / 100,
-      budget: { total: budget.total, limit: budget.limit, fits: budget.fits },
+      budget: { poolsSum: budget.poolsSum, limit: budget.limit, fits: budget.fits },
       pools,
       server: serverStats,
       timeouts: [...this.recorder.timeouts],
@@ -285,6 +285,7 @@ export class ConnectionSampler {
 export class DrainTracker {
   private readonly pendingAtStart = new Map<string, number>();
   private readonly peak = new Map<string, number>();
+  private readonly peakRetrying = new Map<string, number>();
   private readonly zeroSince = new Map<string, number>();
 
   /**
@@ -292,12 +293,18 @@ export class DrainTracker {
    * `outbox`: hechos sin publicar. Una cola solo se da por drenada cuando ella y el outbox están en 0, porque los eventos
    * aún sin publicar le llegarán después.
    */
-  observe(t: number, backlog: ReadonlyMap<string, number>, outbox: number): void {
+  observe(
+    t: number,
+    backlog: ReadonlyMap<string, number>,
+    outbox: number,
+    retrying: ReadonlyMap<string, number> = new Map(),
+  ): void {
     const names = new Set([...backlog.keys(), ...this.pendingAtStart.keys()]);
     for (const name of names) {
       const pending = backlog.get(name) ?? 0;
       if (!this.pendingAtStart.has(name)) this.pendingAtStart.set(name, pending);
       this.peak.set(name, Math.max(this.peak.get(name) ?? 0, pending));
+      this.peakRetrying.set(name, Math.max(this.peakRetrying.get(name) ?? 0, retrying.get(name) ?? 0));
       this.mark(name, t, pending === 0 && outbox === 0);
     }
     if (!this.pendingAtStart.has('outbox')) this.pendingAtStart.set('outbox', outbox);
@@ -319,6 +326,7 @@ export class DrainTracker {
           queue,
           pendingAtPersist,
           peakPending: this.peak.get(queue) ?? pendingAtPersist,
+          peakRetrying: this.peakRetrying.get(queue) ?? 0,
           drainedAfterPersistMs: drainedAfterPersistMs === null ? null : Math.round(drainedAfterPersistMs),
           eventsPerSecond:
             drainedAfterPersistMs === null || drainedAfterPersistMs <= 0 || pendingAtPersist === 0

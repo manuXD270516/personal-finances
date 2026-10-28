@@ -29,7 +29,13 @@ import {
   type ServerConnectionLimits,
 } from './connection-budget.js';
 import { PERF_RATE_LIMITS } from './perf-env.js';
-import { importsVerdict, writeImportsReport, type ConsumerDrain, type ImportsReport } from './perf-report.js';
+import {
+  importsVerdict,
+  writeImportsReport,
+  type ConsumerDrain,
+  type ImportsReport,
+  type RetriedJobs,
+} from './perf-report.js';
 
 // Foto de la carga de fondo al empezar, antes de cada benchmark y al terminar (investigate-perf-under-load).
 recordSuiteLoad(import.meta.url, inject('deps').superuserUrl);
@@ -76,14 +82,41 @@ function generateCsv(rows: number): Buffer {
   return Buffer.from(`${lines.join('\r\n')}\r\n`, 'latin1');
 }
 
-async function consumerBacklog(): Promise<Map<string, number>> {
+async function consumerBacklog(): Promise<{
+  backlog: Map<string, number>;
+  retrying: Map<string, number>;
+}> {
   return asAdmin(h, async (c) => {
-    const { rows } = await c.query<{ name: string; pending: number }>(
-      `SELECT name, count(*)::int AS pending FROM pgboss.job
+    const { rows } = await c.query<{ name: string; pending: number; retrying: number }>(
+      `SELECT name, count(*)::int AS pending, (count(*) FILTER (WHERE state = 'retry'))::int AS retrying
+         FROM pgboss.job
         WHERE name LIKE 'events.%' AND name NOT LIKE '%.dlq' AND state IN ('created', 'retry', 'active')
         GROUP BY name`,
     );
-    return new Map(rows.map((r) => [r.name, r.pending]));
+    return {
+      backlog: new Map(rows.map((r) => [r.name, r.pending])),
+      retrying: new Map(rows.map((r) => [r.name, r.retrying])),
+    };
+  });
+}
+
+/** Trabajos de los consumidores que fallaron al menos una vez (pg-boss guarda el último error en `output`). */
+async function retriedJobs(): Promise<RetriedJobs[]> {
+  return asAdmin(h, async (c) => {
+    const { rows } = await c.query<{ name: string; jobs: number; max_retry: number; error: string | null }>(
+      `SELECT name, count(*)::int AS jobs, max(retry_count)::int AS max_retry,
+              left(max(COALESCE(output::jsonb ->> 'message', output::text)), 200) AS error
+         FROM pgboss.job
+        WHERE name LIKE 'events.%' AND retry_count > 0
+        GROUP BY name
+        ORDER BY name`,
+    );
+    return rows.map((r) => ({
+      queue: r.name,
+      jobs: r.jobs,
+      maxRetryCount: r.max_retry,
+      error: r.error ?? '(sin mensaje)',
+    }));
   });
 }
 
@@ -99,15 +132,18 @@ function poolBudgets(): PoolBudget[] {
 }
 
 /** Colas de los consumidores (`events.*` sin dead-letter), con 0 las que no tienen trabajos pendientes. */
-async function consumerBacklogWithZeros(): Promise<Map<string, number>> {
+async function consumerBacklogWithZeros(): Promise<{
+  backlog: Map<string, number>;
+  retrying: Map<string, number>;
+}> {
   const queues = await asAdmin(h, async (c) => {
     const { rows } = await c.query<{ name: string }>(
       `SELECT name FROM pgboss.queue WHERE name LIKE 'events.%' AND name NOT LIKE '%.dlq'`,
     );
     return rows.map((r) => r.name);
   });
-  const backlog = await consumerBacklog();
-  return new Map([...queues.map((q) => [q, 0] as const), ...backlog]);
+  const { backlog, retrying } = await consumerBacklog();
+  return { backlog: new Map([...queues.map((q) => [q, 0] as const), ...backlog]), retrying };
 }
 
 beforeAll(async () => {
@@ -227,12 +263,12 @@ describe('import CSV de 5 000 filas', () => {
       // Cada consumidor termina de procesar los eventos de esas transacciones; se mide desde el fin de la persistencia.
       await until(
         async () => {
-          const backlog = await consumerBacklogWithZeros();
+          const { backlog, retrying } = await consumerBacklogWithZeros();
           const outbox = await asAdmin(h, (c) =>
             c.query(`SELECT count(*)::int AS n FROM platform.outbox WHERE published_at IS NULL`),
           );
           const outboxPending = outbox.rows[0]!.n as number;
-          tracker.observe(performance.now() - persistEnd, backlog, outboxPending);
+          tracker.observe(performance.now() - persistEnd, backlog, outboxPending, retrying);
           const pendingTotal = [...backlog.values()].reduce((a, b) => a + b, 0);
           return pendingTotal === 0 && outboxPending === 0 ? true : undefined;
         },
@@ -255,6 +291,7 @@ describe('import CSV de 5 000 filas', () => {
 
     const connectionsReport = connections.report(server, budget);
     const drainByConsumer: ConsumerDrain[] = tracker.result();
+    const retries = await retriedJobs().catch(() => []);
     if (drainAfterPersistMs === 0 && persistMs > 0) {
       // El drenado no terminó (tiempo de espera agotado): se mide hasta ahora para el veredicto.
       drainAfterPersistMs = DRAIN_BUDGET_MS + 60_000;
@@ -273,6 +310,7 @@ describe('import CSV de 5 000 filas', () => {
       drainBudgetMs: DRAIN_BUDGET_MS,
       connections: connectionsReport,
       drainByConsumer,
+      retries,
       verdict,
     };
     writeImportsReport(report, perfOutDir());

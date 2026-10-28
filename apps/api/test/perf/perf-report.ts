@@ -811,7 +811,7 @@ export interface ConnectionsReport {
   readonly samples: number;
   /** Pico de la carga del host (1 min) durante el muestreo; contexto para una conexión lenta (HI4). */
   readonly peakLoad1m?: number;
-  readonly budget: { readonly total: number; readonly limit: number; readonly fits: boolean };
+  readonly budget: { readonly poolsSum: number; readonly limit: number; readonly fits: boolean };
   readonly pools: readonly PoolConnectionStats[];
   readonly server: ServerConnectionStats;
   readonly timeouts: readonly AcquireTimeout[];
@@ -822,10 +822,20 @@ export interface ConsumerDrain {
   readonly queue: string;
   readonly pendingAtPersist: number;
   readonly peakPending: number;
+  /** Pico de trabajos en estado `retry` (reintento con espera) durante el drenado: un fallo transitorio alarga la cola. */
+  readonly peakRetrying?: number;
   /** ms desde el fin de la persistencia hasta dejar el backlog en 0; `null` si no llegó a 0 mientras se observó. */
   readonly drainedAfterPersistMs: number | null;
   /** Ritmo de drenado del backlog al terminar la persistencia (pendientes / tiempo); `null` si no aplica. */
   readonly eventsPerSecond: number | null;
+}
+
+/** Trabajos de una cola `events.*` que fallaron al menos una vez, con el último error registrado por pg-boss. */
+export interface RetriedJobs {
+  readonly queue: string;
+  readonly jobs: number;
+  readonly maxRetryCount: number;
+  readonly error: string;
 }
 
 export type ImportsVerdict =
@@ -842,6 +852,8 @@ export interface ImportsReport {
   readonly drainBudgetMs: number;
   readonly connections?: ConnectionsReport;
   readonly drainByConsumer: readonly ConsumerDrain[];
+  /** Trabajos de los consumidores que se reintentaron durante la medición (causa de una cola que tarda en llegar a 0). */
+  readonly retries?: readonly RetriedJobs[];
   readonly verdict: ImportsVerdict;
 }
 
@@ -902,7 +914,7 @@ export function renderImportsSection(r: ImportsReport): string[] {
   const c = r.connections;
   if (c) {
     out.push(
-      `Presupuesto de pools: ${String(c.budget.total)} frente a un límite de ${String(c.budget.limit)} (max_connections ${String(c.server.maxConnections)} menos ${String(c.server.reserved)} reservadas); pico del servidor ${String(c.server.peak)}; ${String(c.samples)} muestras${c.peakLoad1m === undefined ? '' : `; pico de carga del host ${String(c.peakLoad1m)}`}.`,
+      `Presupuesto de pools: ${String(c.budget.poolsSum)} frente a un límite de ${String(c.budget.limit)} (max_connections ${String(c.server.maxConnections)} menos ${String(c.server.reserved)} reservadas); pico del servidor ${String(c.server.peak)}; ${String(c.samples)} muestras${c.peakLoad1m === undefined ? '' : `; pico de carga del host ${String(c.peakLoad1m)}`}.`,
       '',
       '| Pool | Máximo | Pico en uso | Pico en espera | Espera máx. (ms) | Vencidas |',
       '|---|---|---|---|---|---|',
@@ -918,14 +930,27 @@ export function renderImportsSection(r: ImportsReport): string[] {
     );
   }
   out.push(
-    '| Consumidor | Pendientes al terminar la persistencia | Pico | Drenado (s) | Ritmo (ev/s) |',
-    '|---|---|---|---|---|',
+    '| Consumidor | Pendientes al terminar la persistencia | Pico | Pico en reintento | Drenado (s) | Ritmo (ev/s) |',
+    '|---|---|---|---|---|---|',
     ...r.drainByConsumer.map(
       (d) =>
-        `| ${d.queue} | ${String(d.pendingAtPersist)} | ${String(d.peakPending)} | ${d.drainedAfterPersistMs === null ? 'sin llegar a 0' : (d.drainedAfterPersistMs / 1000).toFixed(1)} | ${d.eventsPerSecond === null ? '—' : String(d.eventsPerSecond)} |`,
+        `| ${d.queue} | ${String(d.pendingAtPersist)} | ${String(d.peakPending)} | ${String(d.peakRetrying ?? 0)} | ${d.drainedAfterPersistMs === null ? 'sin llegar a 0' : (d.drainedAfterPersistMs / 1000).toFixed(1)} | ${d.eventsPerSecond === null ? '—' : String(d.eventsPerSecond)} |`,
     ),
     '',
   );
+  if (r.retries && r.retries.length > 0) {
+    out.push(
+      'Trabajos reintentados:',
+      '',
+      '| Cola | Trabajos | Reintentos máx. | Último error |',
+      '|---|---|---|---|',
+      ...r.retries.map(
+        (j) =>
+          `| ${j.queue} | ${String(j.jobs)} | ${String(j.maxRetryCount)} | ${j.error.replace(/\|/gu, '/')} |`,
+      ),
+      '',
+    );
+  }
   return out;
 }
 

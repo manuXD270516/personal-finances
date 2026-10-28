@@ -27,7 +27,7 @@ const DEFAULT_POOLS: PoolBudget[] = [
 describe('presupuesto de conexiones del benchmark del import (fix-imports-perf-connection-budget)', () => {
   it('[TC-PLATFORM-PIPELINE-029] 115 conexiones frente a un servidor de 100 con 3 reservadas no caben: falla con la suma, el límite y cada pool', () => {
     const check = checkConnectionBudget(DEFAULT_POOLS, { maxConnections: 100, reserved: 3 });
-    expect(check).toMatchObject({ fits: false, total: 115, limit: 97 });
+    expect(check).toMatchObject({ fits: false, poolsSum: 115, limit: 97 });
     let error: unknown;
     try {
       assertConnectionBudget(DEFAULT_POOLS, { maxConnections: 100, reserved: 3 });
@@ -53,7 +53,7 @@ describe('presupuesto de conexiones del benchmark del import (fix-imports-perf-c
     ];
     expect(assertConnectionBudget(pools, { maxConnections: 70, reserved: 3 })).toMatchObject({
       fits: true,
-      total: 67,
+      poolsSum: 67,
       limit: 67,
     });
     expect(() => assertConnectionBudget(pools, { maxConnections: 100, reserved: 3 })).not.toThrow();
@@ -213,7 +213,7 @@ describe('muestreador de conexiones', () => {
       peak: 42,
       peakByApplication: { 'finance-api': 5, 'finance-worker': 34, 'pfos-consumer': 4 },
     });
-    expect(report.budget).toEqual({ total: 115, limit: 97, fits: false });
+    expect(report.budget).toEqual({ poolsSum: 115, limit: 97, fits: false });
   });
 
   it('[TC-PLATFORM-PIPELINE-030] start y stop muestrean periódicamente y detienen el temporizador', async () => {
@@ -280,6 +280,7 @@ describe('drenado por consumidor desde la persistencia', () => {
       queue: 'events.a',
       pendingAtPersist: 1000,
       peakPending: 1000,
+      peakRetrying: 0,
       drainedAfterPersistMs: 20_000,
       eventsPerSecond: 50,
     });
@@ -332,5 +333,17 @@ describe('drenado por consumidor desde la persistencia', () => {
     expect(byQueue['events.a']!.drainedAfterPersistMs).toBe(3000);
     expect(byQueue['events.b']!.drainedAfterPersistMs).toBeNull();
     expect(byQueue['events.b']!.eventsPerSecond).toBeNull();
+  });
+});
+
+describe('reintentos en el drenado', () => {
+  it('[TC-PLATFORM-PIPELINE-031] el pico de trabajos en reintento por cola queda en el drenado', () => {
+    const tracker = new DrainTracker();
+    tracker.observe(0, new Map([['events.a', 3]]), 0, new Map([['events.a', 1]]));
+    tracker.observe(1000, new Map([['events.a', 2]]), 0, new Map([['events.a', 2]]));
+    tracker.observe(2000, new Map([['events.a', 0]]), 0);
+    const a = tracker.result().find((d) => d.queue === 'events.a');
+    expect(a).toMatchObject({ peakRetrying: 2, drainedAfterPersistMs: 2000 });
+    expect(tracker.result().find((d) => d.queue === 'outbox')?.peakRetrying).toBe(0);
   });
 });
