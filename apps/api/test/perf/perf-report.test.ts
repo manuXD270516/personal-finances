@@ -931,7 +931,9 @@ describe('reporte del import: conexiones y drenado por consumidor', () => {
     expect(md).toMatch(/\| worker \| 34 \| 34 \| 11 \| 2150 \| 1 \|/u);
     expect(md).toMatch(/pico del servidor 61/u);
     expect(md).toMatch(/max_connections 70 menos 3 reservadas/u);
-    expect(md).toMatch(/\| events\.planning\.journal-entry-posted \| 5000 \| 5000 \| 0 \| 123\.5 \| 40\.5 \|/u);
+    expect(md).toMatch(
+      /\| events\.planning\.journal-entry-posted \| 5000 \| 5000 \| 0 \| 123\.5 \| 40\.5 \|/u,
+    );
     expect(md).toMatch(/\| outbox \| 0 \| 12 \| 0 \| 1\.0 \| — \|/u);
     expect(md).toMatch(/FALLA \(drenado\)/u);
   });
@@ -983,10 +985,18 @@ describe('reporte del import: trabajos reintentados', () => {
           eventsPerSecond: 5,
         },
       ],
-      retries: [{ queue: 'events.a', jobs: 2, maxRetryCount: 1, error: 'timeout exceeded | connect' }],
+      retries: [
+        {
+          queue: 'events.a',
+          jobs: 2,
+          maxRetryCount: 1,
+          maxLatencyMs: 7200,
+          error: 'timeout exceeded | connect',
+        },
+      ],
       verdict: { kind: 'ok', message: 'ok' },
     }).join('\n');
     expect(md).toMatch(/\| events\.a \| 5 \| 5 \| 2 \| 1\.0 \| 5 \|/u);
-    expect(md).toMatch(/\| events\.a \| 2 \| 1 \| timeout exceeded \/ connect \|/u);
+    expect(md).toMatch(/\| events\.a \| 2 \| 1 \| 7\.2 \| timeout exceeded \/ connect \|/u);
   });
 });

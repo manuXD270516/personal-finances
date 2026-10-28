@@ -28,7 +28,7 @@ import {
   type PoolBudget,
   type ServerConnectionLimits,
 } from './connection-budget.js';
-import { PERF_RATE_LIMITS } from './perf-env.js';
+import { IMPORTS_API_POOL_MAX, PERF_RATE_LIMITS } from './perf-env.js';
 import {
   importsVerdict,
   writeImportsReport,
@@ -100,21 +100,34 @@ async function consumerBacklog(): Promise<{
   });
 }
 
-/** Trabajos de los consumidores que fallaron al menos una vez (pg-boss guarda el último error en `output`). */
-async function retriedJobs(): Promise<RetriedJobs[]> {
+/**
+ * Trabajos de los consumidores creados desde `since` que fallaron al menos una vez, con el último error que pg-boss
+ * guardó en `output` y la latencia máxima de un trabajo reintentado (del alta a su fin): un evento con varios reintentos
+ * espera el backoff exponencial (1, 2, 4... s) y puede alargar el drenado de su cola.
+ */
+async function retriedJobs(since: Date): Promise<RetriedJobs[]> {
   return asAdmin(h, async (c) => {
-    const { rows } = await c.query<{ name: string; jobs: number; max_retry: number; error: string | null }>(
+    const { rows } = await c.query<{
+      name: string;
+      jobs: number;
+      max_retry: number;
+      max_latency_ms: number;
+      error: string | null;
+    }>(
       `SELECT name, count(*)::int AS jobs, max(retry_count)::int AS max_retry,
+              (max(EXTRACT(EPOCH FROM (COALESCE(completed_on, now()) - created_on))) * 1000)::int AS max_latency_ms,
               left(max(COALESCE(output::jsonb ->> 'message', output::text)), 200) AS error
          FROM pgboss.job
-        WHERE name LIKE 'events.%' AND retry_count > 0
+        WHERE name LIKE 'events.%' AND name NOT LIKE '%.dlq' AND retry_count > 0 AND created_on >= $1
         GROUP BY name
         ORDER BY name`,
+      [since],
     );
     return rows.map((r) => ({
       queue: r.name,
       jobs: r.jobs,
       maxRetryCount: r.max_retry,
+      maxLatencyMs: r.max_latency_ms,
       error: r.error ?? '(sin mensaje)',
     }));
   });
@@ -147,13 +160,10 @@ async function consumerBacklogWithZeros(): Promise<{
 }
 
 beforeAll(async () => {
-  // RAMA DE EXPERIMENTOS (no se fusiona): tamaño de los pools por variable de entorno.
-  const poolMax = (process.env['PF_PERF_POOL_MAX'] ?? '').trim();
-  const poolEnv = poolMax === '' ? {} : { DATABASE_POOL_MAX: poolMax };
+  // API con el pool de la plantilla del host (A1): la suma de los pools máximos cabe en el servidor del benchmark.
   h = await startHarness({
     worker: true,
-    apiEnv: { ...PERF_RATE_LIMITS, ...poolEnv },
-    workerEnv: poolEnv,
+    apiEnv: { ...PERF_RATE_LIMITS, DATABASE_POOL_MAX: String(IMPORTS_API_POOL_MAX) },
   });
   // Precondición de presupuesto (TC-PLATFORM-PIPELINE-029): si la suma de los pools máximos no cabe en el servidor, la
   // suite falla ANTES de subir el archivo y no publica ninguna medición como válida.
@@ -164,9 +174,7 @@ beforeAll(async () => {
   await sampler.connect();
   server = await readServerLimits(sampler);
   budget = checkConnectionBudget(poolBudgets(), server);
-  process.stderr.write(`[budget] ${JSON.stringify(budget)}
-`);
-  if (process.env['PF_PERF_ENFORCE_BUDGET'] === '1') assertConnectionBudget(poolBudgets(), server);
+  assertConnectionBudget(poolBudgets(), server);
   restorers.push(instrumentPool('api', h.api.resources.pool, acquisitions));
   restorers.push(instrumentPool('worker', h.worker!.pool, acquisitions));
   owner = await h.user(`kc-imp-perf-${randomUUID()}`);
@@ -205,6 +213,7 @@ describe('import CSV de 5 000 filas', () => {
     let drainAfterPersistMs = 0;
     let events: string[] = [];
     let failure: unknown;
+    const startedAt = new Date(Date.now() - 1000);
     try {
       const csv = generateCsv(ROWS);
       const t0 = performance.now();
@@ -291,7 +300,7 @@ describe('import CSV de 5 000 filas', () => {
 
     const connectionsReport = connections.report(server, budget);
     const drainByConsumer: ConsumerDrain[] = tracker.result();
-    const retries = await retriedJobs().catch(() => []);
+    const retries = await retriedJobs(startedAt).catch(() => []);
     if (drainAfterPersistMs === 0 && persistMs > 0) {
       // El drenado no terminó (tiempo de espera agotado): se mide hasta ahora para el veredicto.
       drainAfterPersistMs = DRAIN_BUDGET_MS + 60_000;

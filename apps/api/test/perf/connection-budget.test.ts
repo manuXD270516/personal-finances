@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   AcquisitionRecorder,
@@ -14,6 +15,7 @@ import {
   type PoolLike,
   type SqlClient,
 } from './connection-budget.js';
+import { IMPORTS_API_POOL_MAX } from './perf-env.js';
 
 // Pools por omisión del benchmark del import: API 52, worker 52, una cola pg-boss de 4 por proceso y 3 del harness.
 const DEFAULT_POOLS: PoolBudget[] = [
@@ -345,5 +347,34 @@ describe('reintentos en el drenado', () => {
     const a = tracker.result().find((d) => d.queue === 'events.a');
     expect(a).toMatchObject({ peakRetrying: 2, drainedAfterPersistMs: 2000 });
     expect(tracker.result().find((d) => d.queue === 'outbox')?.peakRetrying).toBe(0);
+  });
+});
+
+describe('pools de la suite del import (A1)', () => {
+  // El worker conserva el pool por omisión (52): su arranque exige 43 consumidores de concurrencia + 4 reservadas.
+  const suitePools: PoolBudget[] = [
+    { name: 'api', max: IMPORTS_API_POOL_MAX },
+    { name: 'worker', max: 52 },
+    { name: 'api-queue', max: QUEUE_POOL_MAX },
+    { name: 'worker-queue', max: QUEUE_POOL_MAX },
+    { name: 'harness', max: HARNESS_CONNECTIONS },
+  ];
+
+  it('[TC-PLATFORM-PIPELINE-029] con el pool de la API de la plantilla del host la suite cabe en el contenedor por omisión (85 de 97)', () => {
+    expect(IMPORTS_API_POOL_MAX).toBe(22);
+    expect(assertConnectionBudget(suitePools, { maxConnections: 100, reserved: 3 })).toMatchObject({
+      fits: true,
+      poolsSum: 85,
+      limit: 97,
+    });
+  });
+
+  it('[TC-PLATFORM-PIPELINE-029] el pool de la API es el que la plantilla del host documenta (API 22 con max_connections=70)', () => {
+    const compose = readFileSync(
+      new URL('../../../../deploy/compose/compose.prod.yaml', import.meta.url),
+      'utf8',
+    );
+    expect(compose).toMatch(/API 22 \+ worker 34 = 56/u);
+    expect(compose).toMatch(/- max_connections=70/u);
   });
 });

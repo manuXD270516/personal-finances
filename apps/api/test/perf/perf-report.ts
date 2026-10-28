@@ -835,6 +835,8 @@ export interface RetriedJobs {
   readonly queue: string;
   readonly jobs: number;
   readonly maxRetryCount: number;
+  /** Latencia máxima (alta a fin) de un trabajo reintentado de la cola. */
+  readonly maxLatencyMs?: number;
   readonly error: string;
 }
 
@@ -942,11 +944,11 @@ export function renderImportsSection(r: ImportsReport): string[] {
     out.push(
       'Trabajos reintentados:',
       '',
-      '| Cola | Trabajos | Reintentos máx. | Último error |',
-      '|---|---|---|---|',
+      '| Cola | Trabajos | Reintentos máx. | Latencia máx. (s) | Último error |',
+      '|---|---|---|---|---|',
       ...r.retries.map(
         (j) =>
-          `| ${j.queue} | ${String(j.jobs)} | ${String(j.maxRetryCount)} | ${j.error.replace(/\|/gu, '/')} |`,
+          `| ${j.queue} | ${String(j.jobs)} | ${String(j.maxRetryCount)} | ${j.maxLatencyMs === undefined ? '—' : (j.maxLatencyMs / 1000).toFixed(1)} | ${j.error.replace(/\|/gu, '/')} |`,
       ),
       '',
     );
