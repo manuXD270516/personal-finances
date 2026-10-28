@@ -37,7 +37,7 @@
     "@pf/reporting": "workspace:*",
     "@pf/shared-kernel": "workspace:*",
     "@pf/transactions": "workspace:*",
-    "dbmate": "2.36.0",
+    "dbmate": "2.37.0",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:"
