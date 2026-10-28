@@ -17,7 +17,9 @@ export default defineConfig({
   resolve: { conditions: ['@pf/source'] },
   ssr: { resolve: { conditions: ['@pf/source'] } },
   test: {
-    include: ['test/perf/**/*.perf.ts'],
+    include: process.env['PF_PERF_SUITES']
+      ? process.env['PF_PERF_SUITES'].split(',').map((n) => `test/perf/${n.trim()}.perf.ts`)
+      : ['test/perf/**/*.perf.ts'],
     globalSetup: ['test/support/global-setup.ts'],
     testTimeout: 3_600_000,
     hookTimeout: 4 * 3_600_000,

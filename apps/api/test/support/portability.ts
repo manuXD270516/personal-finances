@@ -78,6 +78,8 @@ export async function startHarness(options: {
   /** Emisor OIDC de los tokens (por defecto `ISSUER`): una semilla cargada con otro emisor (`seed --profile=large`). */
   readonly issuer?: string;
   readonly apiEnv?: Record<string, string>;
+  /** Variables del worker (p. ej. `DATABASE_POOL_MAX`); por omisión, solo `baseEnv`. */
+  readonly workerEnv?: Record<string, string>;
   readonly worker?: boolean | Parameters<typeof createWorkerRuntime>[2];
 }): Promise<Harness> {
   const deps = inject('deps');
@@ -151,7 +153,7 @@ export async function startHarness(options: {
       if (h.worker) return h.worker;
       if (flags?.discardBacklog !== false) await discardStaleJobs(deps);
       h.worker = await createWorkerRuntime(
-        workerConfig(baseEnv(deps)),
+        workerConfig(baseEnv(deps, options.workerEnv)),
         capturingLogger('finance-worker', 'worker').logger,
         {
           ...(options.realClock ? {} : { clock }),

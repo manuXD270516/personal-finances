@@ -71,7 +71,10 @@ export default async function setup(project: TestProject) {
   const exportKeys = `k1:${randomBytes(32).toString('base64url')}`;
 
   const [pg, s3]: [StartedPostgreSqlContainer, StartedTestContainer] = await Promise.all([
-    new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('pfos').start(),
+    new PostgreSqlContainer(POSTGRES_IMAGE)
+      .withDatabase('pfos')
+      .withCommand(['postgres', '-c', `max_connections=${process.env['PF_PERF_MAX_CONNECTIONS'] || '100'}`])
+      .start(),
     new GenericContainer(SEAWEEDFS_IMAGE)
       .withCommand([
         'mini',

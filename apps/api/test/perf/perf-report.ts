@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -398,6 +398,8 @@ export interface PerfReport {
   readonly breaches: readonly string[];
   /** Carga de fondo por suite (investigate-perf-under-load). Aditivo: ausente en reportes sin fotos. */
   readonly backgroundLoad?: BackgroundLoadReport;
+  /** Benchmark del import de 5 000 filas (fix-imports-perf-connection-budget). Aditivo: ausente si la suite no corrió. */
+  readonly imports?: ImportsReport;
 }
 
 export function latencyResult(input: {
@@ -776,4 +778,179 @@ export function writeReport(
   writeFileSync(json, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   writeFileSync(md, renderMarkdown(report, diagnostics), 'utf8');
   return { json, md };
+}
+
+// ── Benchmark del import: conexiones y drenado por consumidor (fix-imports-perf-connection-budget) ──
+
+/** Adquisición de conexión que venció (`timeout exceeded when trying to connect`). */
+export interface AcquireTimeout {
+  readonly pool: string;
+  /** Conexiones en uso del pool cuando venció. */
+  readonly inUse: number;
+  readonly max: number;
+  readonly waitedMs: number;
+}
+
+export interface PoolConnectionStats {
+  readonly pool: string;
+  readonly max: number;
+  readonly peakInUse: number;
+  readonly peakWaiting: number;
+  readonly maxAcquireMs: number;
+  readonly timeouts: number;
+}
+
+export interface ServerConnectionStats {
+  readonly maxConnections: number;
+  readonly reserved: number;
+  readonly peak: number;
+  readonly peakByApplication: Readonly<Record<string, number>>;
+}
+
+export interface ConnectionsReport {
+  readonly samples: number;
+  /** Pico de la carga del host (1 min) durante el muestreo; contexto para una conexión lenta (HI4). */
+  readonly peakLoad1m?: number;
+  readonly budget: { readonly total: number; readonly limit: number; readonly fits: boolean };
+  readonly pools: readonly PoolConnectionStats[];
+  readonly server: ServerConnectionStats;
+  readonly timeouts: readonly AcquireTimeout[];
+}
+
+export interface ConsumerDrain {
+  /** Cola `events.<consumidor>` o `outbox`. */
+  readonly queue: string;
+  readonly pendingAtPersist: number;
+  readonly peakPending: number;
+  /** ms desde el fin de la persistencia hasta dejar el backlog en 0; `null` si no llegó a 0 mientras se observó. */
+  readonly drainedAfterPersistMs: number | null;
+  /** Ritmo de drenado del backlog al terminar la persistencia (pendientes / tiempo); `null` si no aplica. */
+  readonly eventsPerSecond: number | null;
+}
+
+export type ImportsVerdict =
+  | { readonly kind: 'ok'; readonly message: string }
+  | { readonly kind: 'conexiones'; readonly message: string }
+  | { readonly kind: 'drenado'; readonly message: string };
+
+export interface ImportsReport {
+  readonly rows: number;
+  readonly previewMs: number;
+  readonly persistMs: number;
+  /** Drenado total medido desde el fin de la persistencia. */
+  readonly drainAfterPersistMs: number;
+  readonly drainBudgetMs: number;
+  readonly connections?: ConnectionsReport;
+  readonly drainByConsumer: readonly ConsumerDrain[];
+  readonly verdict: ImportsVerdict;
+}
+
+const seconds = (ms: number): string => `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+const budgetSeconds = (ms: number): string => `${String(Math.round(ms / 1000))} s`;
+const poolLabel = (pool: string): string => (pool === 'api' || pool === 'worker' ? `del ${pool}` : pool);
+
+/**
+ * Veredicto del benchmark del import. Una adquisición de conexión vencida es `conexiones` y NO se reporta como un fallo
+ * del drenado (aunque este también haya excedido); un drenado sobre el presupuesto nombra los consumidores que terminaron
+ * después de él, con su tiempo.
+ */
+export function importsVerdict(input: {
+  readonly drainAfterPersistMs: number;
+  readonly drainBudgetMs: number;
+  readonly connections?: Pick<ConnectionsReport, 'timeouts' | 'server'>;
+  readonly drainByConsumer: readonly ConsumerDrain[];
+}): ImportsVerdict {
+  const first = input.connections?.timeouts[0];
+  if (first) {
+    const server = input.connections?.server;
+    const peak = server
+      ? `; pico del servidor ${String(server.peak)} de ${String(server.maxConnections)} conexiones`
+      : '';
+    return {
+      kind: 'conexiones',
+      message: `[TC-PLATFORM-PIPELINE-030] veredicto conexiones: la adquisición de conexión del pool ${poolLabel(first.pool)} venció tras ${String(Math.round(first.waitedMs))} ms con ${String(first.inUse)} de ${String(first.max)} conexiones en uso${peak}`,
+    };
+  }
+  if (input.drainAfterPersistMs > input.drainBudgetMs) {
+    const late = input.drainByConsumer
+      .filter((c) => c.drainedAfterPersistMs === null || c.drainedAfterPersistMs > input.drainBudgetMs)
+      .map(
+        (c) =>
+          `${c.queue} ${c.drainedAfterPersistMs === null ? 'sin llegar a 0' : seconds(c.drainedAfterPersistMs)}`,
+      );
+    return {
+      kind: 'drenado',
+      message: `[TC-PLATFORM-PIPELINE-032] veredicto drenado: ${seconds(input.drainAfterPersistMs)} frente a ${budgetSeconds(input.drainBudgetMs)} después de la persistencia; terminaron después del presupuesto: ${late.length > 0 ? late.join(', ') : 'ningún consumidor individual (el total incluye la espera entre observaciones)'}`,
+    };
+  }
+  return { kind: 'ok', message: 'sin adquisiciones vencidas y drenado dentro del presupuesto' };
+}
+
+export const IMPORTS_SECTION_START = '<!-- imports:start -->';
+export const IMPORTS_SECTION_END = '<!-- imports:end -->';
+
+/** Sección "Import de 5 000 filas" de `perf-summary.md` (conexiones por pool, servidor y drenado por consumidor). */
+export function renderImportsSection(r: ImportsReport): string[] {
+  const out: string[] = [
+    '## Import de 5 000 filas: conexiones y drenado por consumidor',
+    '',
+    `**Veredicto:** ${r.verdict.kind === 'ok' ? 'OK' : `FALLA (${r.verdict.kind})`}: ${r.verdict.message}`,
+    '',
+    `Vista previa ${seconds(r.previewMs)}, persistencia ${seconds(r.persistMs)}, drenado ${seconds(r.drainAfterPersistMs)} después de la persistencia (presupuesto ${budgetSeconds(r.drainBudgetMs)}).`,
+    '',
+  ];
+  const c = r.connections;
+  if (c) {
+    out.push(
+      `Presupuesto de pools: ${String(c.budget.total)} frente a un límite de ${String(c.budget.limit)} (max_connections ${String(c.server.maxConnections)} menos ${String(c.server.reserved)} reservadas); pico del servidor ${String(c.server.peak)}; ${String(c.samples)} muestras${c.peakLoad1m === undefined ? '' : `; pico de carga del host ${String(c.peakLoad1m)}`}.`,
+      '',
+      '| Pool | Máximo | Pico en uso | Pico en espera | Espera máx. (ms) | Vencidas |',
+      '|---|---|---|---|---|---|',
+      ...c.pools.map(
+        (p) =>
+          `| ${p.pool} | ${String(p.max)} | ${String(p.peakInUse)} | ${String(p.peakWaiting)} | ${String(p.maxAcquireMs)} | ${String(p.timeouts)} |`,
+      ),
+      '',
+      `Pico del servidor por aplicación: ${Object.entries(c.server.peakByApplication)
+        .map(([app, n]) => `${app} ${String(n)}`)
+        .join(', ')}`,
+      '',
+    );
+  }
+  out.push(
+    '| Consumidor | Pendientes al terminar la persistencia | Pico | Drenado (s) | Ritmo (ev/s) |',
+    '|---|---|---|---|---|',
+    ...r.drainByConsumer.map(
+      (d) =>
+        `| ${d.queue} | ${String(d.pendingAtPersist)} | ${String(d.peakPending)} | ${d.drainedAfterPersistMs === null ? 'sin llegar a 0' : (d.drainedAfterPersistMs / 1000).toFixed(1)} | ${d.eventsPerSecond === null ? '—' : String(d.eventsPerSecond)} |`,
+    ),
+    '',
+  );
+  return out;
+}
+
+/**
+ * Publica el reporte del import: siempre `imports-perf.json` y, si ya existen el `perf-results.json` y el
+ * `perf-summary.md` de la corrida (los escribe `nightly.perf.ts`), agrega `imports` al primero y la sección entre
+ * marcadores al segundo (aditivo: el resto del reporte no cambia).
+ */
+export function writeImportsReport(report: ImportsReport, outDir: string): void {
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'imports-perf.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  const jsonPath = join(outDir, 'perf-results.json');
+  const mdPath = join(outDir, 'perf-summary.md');
+  if (!existsSync(jsonPath) || !existsSync(mdPath)) return;
+  const current = JSON.parse(readFileSync(jsonPath, 'utf8')) as PerfReport;
+  writeFileSync(jsonPath, `${JSON.stringify({ ...current, imports: report }, null, 2)}\n`, 'utf8');
+  const section = [IMPORTS_SECTION_START, ...renderImportsSection(report), IMPORTS_SECTION_END].join('\n');
+  const md = readFileSync(mdPath, 'utf8');
+  const start = md.indexOf(IMPORTS_SECTION_START);
+  const end = md.indexOf(IMPORTS_SECTION_END);
+  writeFileSync(
+    mdPath,
+    start === -1 || end === -1 || end < start
+      ? `${md.replace(/\n*$/u, '')}\n\n${section}\n`
+      : `${md.slice(0, start)}${section}${md.slice(end + IMPORTS_SECTION_END.length)}`,
+    'utf8',
+  );
 }
