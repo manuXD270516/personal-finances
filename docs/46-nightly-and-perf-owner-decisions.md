@@ -42,6 +42,13 @@ Se lee como la adopción de la opción recomendada en cada pregunta abierta de d
 - **48 `investigate-perf-under-load`:** nuevo (D290).
 - **49 `optimize-rls-policy-overhead`:** nuevo (D287).
 
+## Decisiones posteriores
+
+| ID | Pregunta | Decisión |
+|---|---|---|
+| D304 | `fix-demo-golden-clock-dependence` 3.1: TC-IDENTITY-DEMO-023 también pasa con el código anterior al arreglo (el cargador viejo compara saldos a la fecha ancla y el retiro del 2026-10-02 no entra), así que no hubo rojo previo del TDD | **Se acepta como guarda de regresión** (2026-10-28). El arreglo lo respaldan el CI de #154, TC-IDENTITY-DEMO-022 y el diagnóstico de la tarea 5.2, que reproduce el fallo con el código anterior. El change se archiva. |
+| D305 | `fix-nightly-pipeline` 8.6: verificación en GitHub con un PR de prueba que baja la cobertura y fuerza fallos en `regression` y `mutation` | **Autorizada** (2026-10-28): PR en borrador sin auto-merge, se cierra sin fusionar y se borran la rama y los issues de prueba. |
+
 ## Pendiente del owner
 
 Las preguntas nuevas de los changes 48 y 49 están en [docs/47](47-investigate-perf-under-load-questions.md). Ninguna bloquea la redacción; las marcadas allí como bloqueantes condicionan el orden de implementación.
