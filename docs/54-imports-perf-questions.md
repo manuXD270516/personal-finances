@@ -1,6 +1,6 @@
 # 54: Preguntas abiertas tras el informe de `imports.perf.ts` (change 48b)
 
-> **Estado:** Abierto, a la espera del owner · **Fecha:** 2026-10-28 · **Relacionado:** [53-imports-perf-findings.md](53-imports-perf-findings.md) (informe), [52-perf-under-load-owner-decisions.md](52-perf-under-load-owner-decisions.md) (D299–D303), change [`fix-imports-perf-connection-budget`](../openspec/changes/fix-imports-perf-connection-budget/proposal.md)
+> **Estado:** Resuelto por el owner el 2026-10-28 (D306–D307, al final) · **Fecha:** 2026-10-28 · **Relacionado:** [53-imports-perf-findings.md](53-imports-perf-findings.md) (informe), [52-perf-under-load-owner-decisions.md](52-perf-under-load-owner-decisions.md) (D299–D303), change [`fix-imports-perf-connection-budget`](../openspec/changes/fix-imports-perf-connection-budget/proposal.md)
 
 Preguntas que el informe deja sin resolver. Ninguna bloquea el cierre de lo ya corregido (presupuesto de conexiones y reporte por consumidor); la 1 condiciona el criterio de salida del change (dos nightlies programados seguidos con `imports.perf.ts` en verde). Las respuestas irán en el `…-decisions.md` siguiente, con id D304 en adelante.
 
@@ -33,3 +33,10 @@ Preguntas que el informe deja sin resolver. Ninguna bloquea el cierre de lo ya c
 ## No es una pregunta: cifras desactualizadas
 
 CLAUDE.md (sección «Código», presupuesto de conexiones) y `docs/38` §4 citan «API 22 + worker 33 = 55 sobre 60 de Postgres»; la plantilla vigente (`deploy/compose/compose.prod.yaml`, D249) es `max_connections=70` con API 22 + worker 34 = 56, y sin contar las dos colas pg-boss (4 cada una), lo que da 64 de 67 útiles. `docs/38` se corrige en este change; CLAUDE.md queda para que lo corrija quien lo mantiene.
+
+## Decisiones del owner (2026-10-28)
+
+| ID | Pregunta | Decisión |
+|---|---|---|
+| D306 | 1. Drenado marginal (123,5 s frente a 120 s) que no se reproduce en 23 corridas | **Dejar el umbral de 120 s y el benchmark como están** y esperar la próxima ocurrencia, que el reporte ya diagnostica por consumidor. El change se archiva tras dos nightlies programados en verde (tarea 6.2). |
+| D307 | 2. Concurrencia del worker del benchmark (4 del código frente a 1 del host) | **Se deja con la concurrencia del código** y se revisa con `optimize-consumer-throughput` en Phase 6 (D301). |
