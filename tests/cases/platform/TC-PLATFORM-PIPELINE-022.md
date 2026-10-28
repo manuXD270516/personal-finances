@@ -61,3 +61,5 @@ Entonces se abre ese issue con el enlace y los grupos en rojo
 - Cambia dos aserciones del test de TC-PLATFORM-PIPELINE-009 (tarea 8.4; motivo registrado en el design, decisión 8).
 
 - 2026-10-21: parte estática automatizada (`nightly-policy.test.ts`; `nightly.yml` con `issues: write` en `regression`, `mutation`, `perf` y `fx-smoke-live`, `actionlint` limpio). Pendiente de nightly (tarea 8.6b): dos corridas por `workflow_dispatch` desde una rama de prueba con un fallo forzado; anotar aquí el número del issue.
+
+**Verificación en GitHub (fix-nightly-pipeline 8.6):** regression: issue #184 abierto en el run 40767806432 y comentado en 40770392520 (2026-10-28, rama de prueba no fusionada).

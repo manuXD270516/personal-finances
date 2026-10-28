@@ -59,3 +59,5 @@ Entonces el job unit del gate falla indicando las líneas frente a 95 %
 - La parte automática es el test de política (`scripts/delivery-policy/test/pr-policy.test.ts`, tarea 8.2); el efecto real en GitHub se verifica una vez en la tarea 8.6.
 
 - 2026-10-21: parte estática automatizada (`pr-policy.test.ts`; `pr.yml` con el paso en el job `unit`, `actionlint` limpio). Pendiente de CI (tarea 8.6a): una PR de prueba no fusionada que baje la cobertura del shared-kernel y deje `unit` en rojo con las líneas medidas frente a 95 %; y la duración de `unit` en el CI del PR (línea base 92–115 s en las últimas tres corridas; si pasa de 12 min en tres corridas, preguntar al owner).
+
+**Verificación en GitHub (fix-nightly-pipeline 8.6):** (a): job `unit` del run 40633044389 en rojo por cobertura de líneas 73,21 % frente a 95 % (PR de prueba #176, 2026-10-28).

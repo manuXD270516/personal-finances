@@ -58,3 +58,5 @@ Entonces se abre o se comenta el issue "nightly mutation: falló" con las métri
 - El job `mutation` también falla por el mutation score (< 80 %) o por la cobertura del dominio IDENTITY; cualquiera de esos fallos usa el mismo issue.
 
 - 2026-10-21: parte estática automatizada (`nightly-policy.test.ts`). Pendiente de nightly (tarea 8.6b): corrida por `workflow_dispatch` con la cobertura forzada bajo el umbral; anotar aquí el número del issue y que el de regresión no recibe comentario.
+
+**Verificación en GitHub (fix-nightly-pipeline 8.6):** mutation: issue #179 abierto en el run 40642641269 y comentado en las corridas siguientes (2026-10-28, rama de prueba no fusionada).
