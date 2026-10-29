@@ -48,6 +48,7 @@ import {
   type TransactionState,
   type TransactionStatus,
 } from '../domain/index.js';
+import { createdAuditChanges, createdEventPayload, customFieldAudit, recurringRefOf } from './created-support.js';
 import {
   legsPayload,
   linkEntry,
@@ -234,21 +235,6 @@ export interface ListTransactionsQuery extends Omit<TransactionListFilter, 'q' |
 }
 
 const MAX_BULK = 500;
-/**
- * `origin.refId` de `TransactionCreated.v1`: la ocurrencia recurrente que originó la transacción (add-recurrence-engine)
- * o la importación que la creó (add-basic-csv-import).
- */
-const recurringRefOf = (s: {
-  readonly source: string;
-  readonly importJobId?: string | null;
-  readonly externalRef: { readonly namespace: string; readonly id: string } | null;
-}): string | null =>
-  s.source === 'RECURRING' && s.externalRef?.namespace === RECURRING_OCCURRENCE_NAMESPACE
-    ? s.externalRef.id
-    : s.source === 'IMPORT'
-      ? (s.importJobId ?? null)
-      : null;
-
 const notFound = (id: string) => new DomainError('RESOURCE_NOT_FOUND', `transaction ${id} not found`);
 /** 412 con la versión vigente (`currentVersion`, docs/10 §6). */
 const preconditionFailed = (currentVersion: number) =>
@@ -393,45 +379,10 @@ export class TransactionsService {
       if (entryId) await this.link(tx, entryId, 'POSTED');
       const s = tx.snapshot;
       const events: LifecycleEventRefDto[] = [
-        await this.publish(tx, TRANSACTION_EVENTS.created, {
-          transactionId: s.id,
-          kind: s.kind,
-          status: s.status,
-          businessDate: s.businessDate,
-          description: s.description,
-          counterpartyId: s.counterpartyId,
-          origin: { type: s.source, refId: recurringRefOf(s) },
-          legs: legsPayload(s),
-          splits: splitsPayload(s),
-          postingDate: s.postingDate,
-          refundOfTransactionId: s.refundOfTransactionId,
-          paymentMethod: s.paymentMethod,
-          transition: 'RECORD',
-        }),
+        await this.publish(tx, TRANSACTION_EVENTS.created, createdEventPayload(s)),
       ];
       if (entryId) events.push(...(await this.publishPosted(tx, entryId, null, null)));
-      const changes: AuditChangeInput[] = [
-        { field: 'kind', before: null, after: s.kind },
-        { field: 'status', before: null, after: s.status },
-        { field: 'transactionDate', before: null, after: s.businessDate },
-        { field: 'accountId', before: null, after: s.accountId },
-        { field: 'amount', before: null, after: s.amount },
-        { field: 'splits', before: null, after: splitsAudit(s) },
-      ];
-      for (const f of ['description', 'notes', 'counterpartyId', 'paymentMethod', 'postingDate'] as const) {
-        if (s[f] !== null) changes.push({ field: f, before: null, after: s[f] });
-      }
-      changes.push(...customFieldAudit(diffCustomFields([], s.splits)));
-      if (s.refundOfTransactionId) {
-        changes.push({ field: 'refundOfTransactionId', before: null, after: s.refundOfTransactionId });
-        if (s.confirmedRefundExcess)
-          changes.push({ field: 'confirmedRefundExcess', before: null, after: true });
-      }
-      if (s.kind === 'ADJUSTMENT') {
-        changes.push({ field: 'adjustmentDirection', before: null, after: s.direction });
-        changes.push({ field: 'adjustmentReason', before: null, after: s.adjustmentReason });
-      }
-      if (entryId) changes.push({ field: 'journalEntryId', before: null, after: entryId });
+      const changes = createdAuditChanges(s, entryId);
       await this.record(
         tx,
         {
@@ -1755,16 +1706,6 @@ function auditActionForStatus(
  * Cambios de custom fields para la auditoría: un campo `customFields.<clave>` por cada clave que cambió, con el valor
  * antes/después (un split ⇒ el valor; varios ⇒ texto JSON con el valor de cada split, `null` si no lo tiene).
  */
-function customFieldAudit(changes: readonly CustomFieldChange[]): AuditChangeInput[] {
-  const scalar = (values: readonly (string | boolean | null)[]): string | boolean | null =>
-    values.length === 1 ? (values[0] ?? null) : JSON.stringify(values);
-  return changes.map((c) => ({
-    field: `customFields.${c.key}`,
-    before: c.before.every((v) => v === null) ? null : scalar(c.before),
-    after: c.after.every((v) => v === null) ? null : scalar(c.after),
-  }));
-}
-
 export function diff(
   before: TransactionState,
   after: TransactionState,

@@ -108,6 +108,33 @@ export class InMemoryLedger {
           this.entries.push(saved);
           return saved;
         },
+        appendMany: async (entries) => {
+          const saved = [];
+          for (const entry of entries) {
+            if (isDateLocked(this.locksOf(entry.workspaceId), entry.entryDate)) {
+              throw new DomainError('PERIOD_CLOSED', 'PF004');
+            }
+            this.seq += 1;
+            const one = entry.withSequence(String(this.seq));
+            this.entries.push(one);
+            saved.push(one);
+          }
+          return saved;
+        },
+        existingBySources: async (ws, sources, type) =>
+          new Map(
+            this.entries
+              .filter(
+                (e) =>
+                  e.workspaceId === ws &&
+                  e.entryType === type &&
+                  sources.some((s) => s.id === e.sourceRef.id && s.revision === e.sourceRef.revision),
+              )
+              .map((e) => [
+                `${e.sourceRef.id}|${e.sourceRef.revision}`,
+                { id: e.id, sequence: e.sequence ?? '' },
+              ]),
+          ),
         findById: async (ws, id) => this.entries.find((e) => e.workspaceId === ws && e.id === id) ?? null,
         findBySource: async (ws, source: SourceRef, type) =>
           this.entries.find(
@@ -128,6 +155,8 @@ export class InMemoryLedger {
       },
       periods: {
         isLocked: async (ws, date) => isDateLocked(this.locksOf(ws), date),
+        lockedDates: async (ws, dates) =>
+          new Set(dates.filter((d) => isDateLocked(this.locksOf(ws), d)).map((d) => d.toString())),
         lock: async (lock) => {
           const key = `${lock.workspaceId}|${lock.yearMonth.value}`;
           if (this.locks.has(key)) return false;

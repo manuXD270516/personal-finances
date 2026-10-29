@@ -20,12 +20,38 @@ on:
   schedule:
     - cron: '0 6 * * *' # 06:00 UTC = 02:00 America/La_Paz (UTC−4, sin horario de verano)
   workflow_dispatch:
+    inputs:
+      suites:
+        description: 'PF_PERF_SUITES: archivos *.perf.ts a correr, en orden y separados por coma (ej. imports). Vacio = todos'
+        required: false
+        default: ''
+        type: string
+      max_connections:
+        description: 'PF_PERF_MAX_CONNECTIONS: max_connections del PostgreSQL de la suite (vacio = 100)'
+        required: false
+        default: ''
+        type: string
+      pool_max:
+        description: 'DATABASE_POOL_MAX de la API y del worker de imports.perf (vacio = el del producto)'
+        required: false
+        default: ''
+        type: string
+      no_purge:
+        description: 'PF_PERF_NO_PURGE: 1 = sin purga del backlog ni precondicion de aislamiento (reproduce E10)'
+        required: false
+        default: ''
+        type: string
+      enforce_budget:
+        description: 'PF_PERF_ENFORCE_BUDGET: 1 = la precondicion de presupuesto falla la suite'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: nightly
+  group: nightly-exp-${{ github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -37,6 +63,7 @@ env:
 jobs:
   regression:
     name: regression (Financial Regression Suite)
+    if: ${{ github.event_name != 'workflow_dispatch' }} # rama de experimentos: solo corre perf
     runs-on: ubuntu-latest # Docker para Testcontainers
     timeout-minutes: 60
     permissions:
@@ -84,6 +111,7 @@ jobs:
 
   mutation:
     name: mutation (shared-kernel) + cobertura de dominio
+    if: ${{ github.event_name != 'workflow_dispatch' }} # rama de experimentos: solo corre perf
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -164,6 +192,12 @@ jobs:
       - run: pnpm turbo run build --filter=@pf/api...
       # Carga ~97 000 transacciones (principal) + 20 satélites por los casos de uso y mide los p95 (docs/02 §PERF).
       - run: pnpm perf:bench
+        env:
+          PF_PERF_SUITES: ${{ inputs.suites }}
+          PF_PERF_MAX_CONNECTIONS: ${{ inputs.max_connections }}
+          PF_PERF_POOL_MAX: ${{ inputs.pool_max }}
+          PF_PERF_ENFORCE_BUDGET: ${{ inputs.enforce_budget }}
+          PF_PERF_NO_PURGE: ${{ inputs.no_purge }}
       - name: Resumen
         if: ${{ !cancelled() }}
         run: cat reports/perf/perf-summary.md >> "$GITHUB_STEP_SUMMARY" || true
@@ -177,7 +211,7 @@ jobs:
       # D270: si el job falla (un p95 supera su umbral), abre el issue de aviso o comenta el que ya está abierto con ese
       # título exacto (nunca duplica). No es check requerido: el rojo avisa sin bloquear PR.
       - name: Abrir o comentar el aviso de umbral superado
-        if: ${{ failure() }}
+        if: ${{ false }} # rama de experimentos: no comenta el issue real
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -195,6 +229,7 @@ jobs:
 
   fx-smoke-live:
     name: fx-smoke-live (no bloqueante)
+    if: ${{ github.event_name != 'workflow_dispatch' }} # rama de experimentos: solo corre perf
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true # add-market-rate-providers 7.3: nunca rompe el pipeline

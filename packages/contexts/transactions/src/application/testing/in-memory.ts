@@ -100,7 +100,13 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
   const ids = { next: () => `0192f3c4-0000-7000-9000-${(++seq).toString(16).padStart(12, '0')}` };
   const state = {
     txs: new Map<string, TransactionState>(),
-    links: [] as { transactionId: string; revision: number; journalEntryId: string; linkType: string }[],
+    links: [] as {
+      workspaceId?: string;
+      transactionId: string;
+      revision: number;
+      journalEntryId: string;
+      linkType: string;
+    }[],
     entries: [] as Entry[],
     outbox: [] as {
       eventType: string;
@@ -203,6 +209,16 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         state.txs.set(tx.id, tx.snapshot);
         keepLegs(tx.snapshot);
         keepDetail(tx.snapshot);
+      },
+      async insertMany(txs, links) {
+        for (const tx of txs) {
+          state.txs.set(tx.id, tx.snapshot);
+          keepLegs(tx.snapshot);
+          keepDetail(tx.snapshot);
+        }
+        for (const l of links) {
+          state.links.push({ workspaceId: state.txs.get(l.transactionId)?.workspaceId ?? '', ...l });
+        }
       },
       async update(tx) {
         const current = state.txs.get(tx.id);
@@ -500,6 +516,17 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
           })),
         });
         return { journalEntryId: id, sequence: String(state.entries.length), created: true };
+      },
+      async postJournalEntries(commands) {
+        const posted = [];
+        for (const command of commands) {
+          // Como el ledger real: el periodo cerrado rechaza el conjunto completo (el UoW revierte lo ya escrito).
+          if (state.closedMonths.has(command.entryDate.slice(0, 7))) {
+            throw new DomainError('PERIOD_CLOSED', `${command.entryDate} is in a closed period`);
+          }
+          posted.push(await deps.ledger.postJournalEntry(command));
+        }
+        return posted;
       },
       async reverseJournalEntry(command: ReverseJournalEntryCommand) {
         const original = state.entries.find((e) => e.id === command.journalEntryId);

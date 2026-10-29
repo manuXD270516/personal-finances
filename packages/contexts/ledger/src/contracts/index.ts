@@ -28,6 +28,9 @@ export interface PostingLineDto {
   readonly splitId?: string | null;
 }
 
+/** Tope de comandos de `LedgerPostingPort.postJournalEntries`. */
+export const MAX_POST_BATCH = 1000;
+
 export interface SourceRefDto {
   readonly type: 'Transaction';
   readonly id: string;
@@ -67,6 +70,14 @@ export interface PostedEntryDto {
  */
 export interface LedgerPostingPort {
   postJournalEntry(command: PostJournalEntryCommand): Promise<PostedEntryDto>;
+  /**
+   * Varios asientos del mismo workspace en la unidad de trabajo del llamador (openspec add-bulk-imported-transactions,
+   * decisión 3): misma semántica que `postJournalEntry` para cada comando (idempotencia por origen, validación del
+   * dominio, periodos cerrados por las fechas distintas) pero con escrituras multi-fila. Un comando inválido rechaza
+   * el conjunto completo con el mismo código. Devuelve un resultado por comando, en el mismo orden. Tope
+   * 1 000 comandos (`VALIDATION_FAILED` si se supera).
+   */
+  postJournalEntries(commands: readonly PostJournalEntryCommand[]): Promise<readonly PostedEntryDto[]>;
   reverseJournalEntry(command: ReverseJournalEntryCommand): Promise<PostedEntryDto>;
   /** Get-or-create idempotente de la cuenta contable 1:1 de una cuenta del usuario (FR-ACCOUNTS-003). */
   ledgerAccountForUserAccount(input: {

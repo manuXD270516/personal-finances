@@ -116,6 +116,86 @@ describe('PgTransactionRepository', () => {
     expect(await inWs(w1, () => pgCurrencyCatalog.scaleOf('BOB'))).toBe(2);
   });
 
+  it('[TC-TRANSACTIONS-BULKIMPORT-005] (BD) insertMany escribe las mismas filas que insert + linkEntry, también con splits y tags', async () => {
+    const tag = randomUUID();
+    const make = (extra: Partial<RecordTransactionInput> = {}) =>
+      record(w1, {
+        kind: 'INCOME',
+        amount: bob('8000.00'),
+        description: 'ABONO "SUELDO" ñ \ <ref>',
+        source: 'IMPORT',
+        externalRef: { namespace: 'imports.csv-row', id: `fp-${randomUUID()}` },
+        ...extra,
+      });
+    const withSplits = () => ({
+      splits: [
+        { id: randomUUID(), amount: bob('5000.00'), categoryId: randomUUID(), tagIds: [tag] },
+        { id: randomUUID(), amount: bob('3000.00'), categoryId: randomUUID() },
+      ],
+    });
+    const singles = [make(), make(withSplits())];
+    const bulk = [make(), make(withSplits())];
+    await inWs(w1, async () => {
+      for (const tx of singles) {
+        await repo.insert(tx);
+        await repo.linkEntry({
+          workspaceId: w1,
+          transactionId: tx.id,
+          revision: tx.revision,
+          journalEntryId: tx.snapshot.activeEntryId as string,
+          linkType: 'POSTED',
+        });
+      }
+    });
+    await inWs(w1, () =>
+      repo.insertMany(
+        bulk,
+        bulk.map((tx) => ({
+          transactionId: tx.id,
+          revision: tx.revision,
+          journalEntryId: tx.snapshot.activeEntryId as string,
+          linkType: 'POSTED' as const,
+        })),
+      ),
+    );
+    const normalized = async (tx: Transaction) => {
+      const loaded = (await inWs(w1, () => repo.findById(w1, tx.id)))!.snapshot;
+      const legs = await inWs(w1, () => repo.revisionLegs(w1, tx.id));
+      const links = await inWs(w1, () => repo.linkedEntries(w1, tx.id));
+      return JSON.stringify({
+        ...loaded,
+        id: undefined,
+        createdAt: undefined,
+        updatedAt: undefined,
+        externalRef: undefined,
+        activeEntryId: undefined,
+        splits: loaded.splits.map((x) => ({ ...x, id: undefined, amount: x.amount.toFixed() })),
+        amount: loaded.amount.toFixed(),
+        legs: loaded.legs.map((l) => ({ role: l.role, amount: l.amount.toFixed() })),
+        history: [...legs.entries()].map(([r, ls]) => [r, ls.map((l) => [l.role, l.amount.toFixed()])]),
+        linkCount: links.length,
+      }).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '#');
+    };
+    for (let i = 0; i < singles.length; i += 1) {
+      expect(await normalized(bulk[i]!)).toBe(await normalized(singles[i]!));
+    }
+    const loaded = (await inWs(w1, () => repo.findById(w1, bulk[1]!.id)))!;
+    expect(loaded.snapshot.splits.map((x) => [x.amount.toFixed(), x.tagIds.length])).toEqual([
+      ['5000.00', 1],
+      ['3000.00', 0],
+    ]);
+    // La barrera de INV-021 sigue activa para las filas insertadas por conjunto.
+    expect(
+      await pgError(
+        inWs(w1, () =>
+          requireSqlExecutor().query(`UPDATE txn.transaction_split SET amount = 1.00 WHERE id = $1`, [
+            bulk[1]!.snapshot.splits[0]!.id,
+          ]),
+        ),
+      ),
+    ).toBe('23514');
+  });
+
   it('[TC-TRANSACTIONS-STATUS-001] INV-023 en BD: un POSTED sin asiento activo viola el CHECK', async () => {
     const tx = record(w1);
     await inWs(w1, () => repo.insert(tx));

@@ -43,6 +43,20 @@ export interface LedgerAccountRepository {
 export interface JournalEntryRepository {
   /** Inserta asiento + postings; devuelve el asiento con su `sequence`. */
   append(entry: JournalEntry): Promise<JournalEntry>;
+  /**
+   * Varios asientos (+ postings) con sentencias multi-fila (openspec add-bulk-imported-transactions): el `sequence`
+   * crece en el orden dado. Misma traducción de la carrera por origen que `append`.
+   */
+  appendMany(entries: readonly JournalEntry[]): Promise<readonly JournalEntry[]>;
+  /**
+   * Asientos ya registrados de un tipo para esos orígenes (una consulta), indexados por `${id}|${revision}`; solo
+   * `id` y `sequence` (la idempotencia por origen de `postJournalEntries`).
+   */
+  existingBySources(
+    workspaceId: string,
+    sources: readonly SourceRef[],
+    entryType: JournalEntry['entryType'],
+  ): Promise<ReadonlyMap<string, { readonly id: string; readonly sequence: string }>>;
   findById(workspaceId: string, id: string): Promise<JournalEntry | null>;
   findBySource(
     workspaceId: string,
@@ -57,6 +71,8 @@ export interface JournalEntryRepository {
 export interface PeriodLockRepository {
   /** ¿La fecha cae en el RANGO de algún periodo cerrado del workspace? (ADR-0028). */
   isLocked(workspaceId: string, date: LocalDate): Promise<boolean>;
+  /** Las fechas dadas (`YYYY-MM-DD`) que caen en un periodo cerrado, en una consulta (escritura por conjunto). */
+  lockedDates(workspaceId: string, dates: readonly LocalDate[]): Promise<ReadonlySet<string>>;
   /**
    * Idempotente por `year_month`: bloquear un periodo ya bloqueado no hace nada (devuelve si cambió algo). Una colisión
    * de rango con OTRO periodo (exclusión gist) es un error real y se propaga.
@@ -75,6 +91,20 @@ export interface PeriodLockRepository {
 }
 
 /** Puerto del outbox (ADR-0008): escribe el evento en la transacción en curso. */
+export interface LedgerOutboxDraft {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly eventVersion: number;
+  readonly occurredAt: string;
+  readonly workspaceId: string;
+  readonly aggregateType: string;
+  readonly aggregateId: string;
+  readonly aggregateVersion: number;
+  readonly payload: object;
+  readonly correlationId?: string;
+  readonly actor?: { readonly type: 'USER' | 'SYSTEM' | 'SERVICE'; readonly id: string | null };
+}
+
 export interface LedgerOutboxPort {
   append(draft: {
     readonly eventId: string;
@@ -89,6 +119,8 @@ export interface LedgerOutboxPort {
     readonly correlationId?: string;
     readonly actor?: { readonly type: 'USER' | 'SYSTEM' | 'SERVICE'; readonly id: string | null };
   }): Promise<unknown>;
+  /** Varios borradores con una sola sentencia (opcional: sin ella se usa `append` en bucle). */
+  appendMany?(drafts: readonly LedgerOutboxDraft[]): Promise<unknown>;
 }
 
 export interface IdGenerator {

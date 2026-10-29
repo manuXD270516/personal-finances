@@ -144,6 +144,85 @@ type TxRow = Omit<TxnDb['txn.transaction'], 'created_at' | 'updated_at'> & {
 };
 
 const db = (): Kysely<TxnDb> => unitOfWorkKysely<TxnDb>();
+
+/** Tipos PostgreSQL de las columnas que escribe `insertMany` (arreglos tipados de `unnest`). */
+const TX_COLUMN_TYPES: Record<keyof ReturnType<typeof txRow>, string> = {
+  id: 'uuid',
+  workspace_id: 'uuid',
+  kind: 'text',
+  status: 'text',
+  transaction_date: 'date',
+  posting_date: 'date',
+  account_id: 'uuid',
+  amount: 'numeric',
+  currency: 'text',
+  adjustment_direction: 'text',
+  description: 'text',
+  notes: 'text',
+  counterparty_id: 'uuid',
+  payment_method: 'text',
+  source: 'text',
+  external_ref_namespace: 'text',
+  external_ref_id: 'text',
+  loan_payment_breakdown: 'jsonb',
+  refund_of_transaction_id: 'uuid',
+  adjustment_reason: 'text',
+  confirmed_refund_excess: 'boolean',
+  reconciliation_id: 'uuid',
+  reconciliation_mode: 'text',
+  import_job_id: 'uuid',
+  revision: 'int',
+  active_entry_id: 'uuid',
+  voided_at: 'timestamptz',
+  void_reason: 'text',
+  search_text: 'text',
+  version: 'int',
+};
+const SPLIT_COLUMN_TYPES = {
+  id: 'uuid',
+  workspace_id: 'uuid',
+  transaction_id: 'uuid',
+  position: 'int',
+  amount: 'numeric',
+  currency: 'text',
+  category_id: 'uuid',
+  counterparty_id: 'uuid',
+  memo: 'text',
+  revision: 'int',
+  superseded_in_revision: 'int',
+} as const;
+const LEG_COLUMN_TYPES = {
+  id: 'uuid',
+  workspace_id: 'uuid',
+  transaction_id: 'uuid',
+  account_id: 'uuid',
+  account_nature: 'text',
+  role: 'text',
+  amount: 'numeric',
+  currency: 'text',
+  transaction_date: 'date',
+  revision: 'int',
+  superseded_in_revision: 'int',
+} as const;
+
+/**
+ * `INSERT INTO table (cols) SELECT * FROM unnest(arrays)`: una columna = un arreglo tipado (sin concatenar valores en
+ * el SQL; los nombres y tipos son constantes del repositorio). Sin filas no emite sentencia.
+ */
+async function insertUnnest(
+  k: Kysely<TxnDb>,
+  table: string,
+  types: Readonly<Record<string, string>>,
+  rows: readonly Record<string, unknown>[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const columns = Object.keys(types);
+  const arrays = columns.map(
+    (c) => sql`${rows.map((r) => r[c] ?? null)}::${sql.raw(types[c] as string)}[]`,
+  );
+  await sql`INSERT INTO ${sql.table(table)} (${sql.join(columns.map((c) => sql.id(c)))})
+    SELECT * FROM unnest(${sql.join(arrays)})`.execute(k);
+}
 const iso = (column: string) =>
   sql<string | null>`to_char(${sql.ref(column)} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -240,6 +319,117 @@ export class PgTransactionRepository implements TransactionRepository {
     await db().insertInto('txn.transaction').values(txRow(tx.snapshot)).execute();
     await this.writeChildren(tx);
     await this.writeConversion(tx);
+  }
+
+  /**
+   * Inserta transacciones nuevas con splits, legs y vínculos al asiento con una sentencia multi-fila por tabla
+   * (`INSERT … SELECT FROM unnest(…)` de arreglos tipados, openspec add-bulk-imported-transactions decisión 3).
+   * Para transacciones recién registradas (sin conversión): los splits con tags o custom fields también se escriben
+   * por conjunto. Equivale a `insert` + `linkEntry` por transacción.
+   */
+  async insertMany(
+    txs: readonly Transaction[],
+    links: readonly {
+      readonly transactionId: string;
+      readonly revision: number;
+      readonly journalEntryId: string;
+      readonly linkType: 'POSTED' | 'REVERSAL';
+    }[],
+  ): Promise<void> {
+    if (txs.length === 0) return;
+    const states = txs.map((t) => t.snapshot);
+    const rows = states.map((s) => txRow(s));
+    const k = db();
+    await insertUnnest(k, 'txn.transaction', TX_COLUMN_TYPES, rows);
+    const splits = states.flatMap((s) =>
+      s.splits.map((split, position) => ({ s, split, position })),
+    );
+    await insertUnnest(
+      k,
+      'txn.transaction_split',
+      SPLIT_COLUMN_TYPES,
+      splits.map(({ s, split, position }) => ({
+        id: split.id,
+        workspace_id: s.workspaceId,
+        transaction_id: s.id,
+        position,
+        amount: split.amount.toFixed(),
+        currency: split.amount.currency.code,
+        category_id: split.categoryId,
+        counterparty_id: split.counterpartyId,
+        memo: split.memo,
+        revision: s.revision,
+        superseded_in_revision: null,
+      })),
+    );
+    const tags = splits.flatMap(({ s, split }) =>
+      split.tagIds.map((tag_id) => ({ workspace_id: s.workspaceId, split_id: split.id, tag_id })),
+    );
+    await insertUnnest(k, 'txn.split_tag', { workspace_id: 'uuid', split_id: 'uuid', tag_id: 'uuid' }, tags);
+    const values = splits.flatMap(({ s, split }) =>
+      split.customFields.map((v) => ({
+        workspace_id: s.workspaceId,
+        split_id: split.id,
+        field_id: v.fieldId,
+        value_text: v.valueType === 'TEXT' ? (v.value as string) : null,
+        value_number: v.valueType === 'NUMBER' ? (v.value as string) : null,
+        value_date: v.valueType === 'DATE' ? (v.value as string) : null,
+        value_bool: v.valueType === 'BOOLEAN' ? (v.value as boolean) : null,
+      })),
+    );
+    await insertUnnest(
+      k,
+      'txn.split_custom_field_value',
+      {
+        workspace_id: 'uuid',
+        split_id: 'uuid',
+        field_id: 'uuid',
+        value_text: 'text',
+        value_number: 'numeric',
+        value_date: 'date',
+        value_bool: 'boolean',
+      },
+      values,
+    );
+    await insertUnnest(
+      k,
+      'txn.transaction_leg',
+      LEG_COLUMN_TYPES,
+      states.flatMap((s) =>
+        s.legs.map((leg) => ({
+          id: uuidv7(),
+          workspace_id: s.workspaceId,
+          transaction_id: s.id,
+          account_id: leg.accountId,
+          account_nature: leg.nature,
+          role: leg.role,
+          amount: leg.amount.toFixed(),
+          currency: leg.amount.currency.code,
+          transaction_date: s.businessDate,
+          revision: s.revision,
+          superseded_in_revision: null,
+        })),
+      ),
+    );
+    const workspaceOf = new Map(states.map((s) => [s.id, s.workspaceId]));
+    await insertUnnest(
+      k,
+      'txn.transaction_journal_link',
+      {
+        workspace_id: 'uuid',
+        transaction_id: 'uuid',
+        revision: 'int',
+        journal_entry_id: 'uuid',
+        link_type: 'text',
+      },
+      links.map((l) => ({
+        workspace_id: workspaceOf.get(l.transactionId) ?? null,
+        transaction_id: l.transactionId,
+        revision: l.revision,
+        journal_entry_id: l.journalEntryId,
+        link_type: l.linkType,
+      })),
+    );
   }
 
   /** `ConversionDetail` de la revisión vigente (inmutable; una revisión nueva inserta una fila nueva). */

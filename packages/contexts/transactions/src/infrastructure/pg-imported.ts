@@ -10,6 +10,12 @@ import type {
 
 /** Referencias externas de filas importadas (`imports.csv-row`) de transacciones no anuladas de una cuenta. */
 export class PgImportedRefReader implements ImportedRefReader {
+  async lockAccount(input: { readonly workspaceId: string; readonly accountId: string }): Promise<void> {
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${'txn.import:' + input.workspaceId + ':' + input.accountId}, 0))`.execute(
+      unitOfWorkKysely(),
+    );
+  }
+
   async existingByRefs(input: {
     readonly workspaceId: string;
     readonly accountId: string;

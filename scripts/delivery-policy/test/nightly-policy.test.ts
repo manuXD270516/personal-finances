@@ -321,8 +321,8 @@ describe('tests con NIGHTLY y timeout explícito (seguimiento de TC-PLATFORM-PIP
 // §PERF (NFR-PERF-001..009). Un rojo de `perf` no se cierra subiendo el umbral ni volviendo informativa una fila bloqueante:
 // cambiarlos exige editar esta tabla (EXPECTED_THRESHOLDS / BLOCKING_RESULT_IDS) con la decisión del owner (D-id) que lo
 // aprueba, y la revisión del PR lo comprueba. D43 (docs/31): qué filas son bloqueantes. D112 (docs/33): ≥ 42 ev/s.
-// D152 (docs/33): la persistencia del import ≤ 20 s está diferida a Phase 6 (PERSIST_CEILING_MS es un techo de regresión,
-// no el umbral). D285 y D292 (docs/46, docs/48): la fila de throughput con handler real sigue informativa.
+// D152 (docs/33): la persistencia del import ≤ 20 s se exige por omisión desde add-bulk-imported-transactions (sin techo de
+// regresión ni PF_PERF_STRICT_IMPORT). D285 y D292 (docs/46, docs/48): la fila de throughput con handler real sigue informativa.
 type ThresholdUnit = 'ms' | 'ev/s';
 
 interface ExpectedThreshold {
@@ -725,6 +725,15 @@ describe('filas de rendimiento de la entrega de eventos (TC-PLATFORM-THROUGHPUT-
     // La fila informativa vuelve antes de aplicar ningún umbral; las aserciones de los umbrales quedan tras ese retorno.
     expect(imports).toMatch(
       /if \(!cfg\.gate\) return;[\s\S]*expect\(drainAfterPersistMs, verdict\.message\)/u,
+    );
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-014][TC-IMPORTS-CSV-029] la fila de la ráfaga del import (configuración del host) exige la persistencia de 20 s por omisión, sin techo ni variable de relajación (D152, D311, D359)', () => {
+    expect(imports).not.toMatch(/PF_PERF_STRICT_IMPORT|PERSIST_CEILING_MS/u);
+    expect(imports).toMatch(/expect(persistMs).toBeLessThanOrEqual(PERSIST_BUDGET_MS)/u);
+    // Tras el retorno de la fila informativa quedan juntas la persistencia y el drenado por consumidor.
+    expect(imports).toMatch(
+      /if (!cfg.gate) return;[sS]*expect(persistMs).toBeLessThanOrEqual(PERSIST_BUDGET_MS)[sS]*expect(drainAfterPersistMs, verdict.message)/u,
     );
   });
 
