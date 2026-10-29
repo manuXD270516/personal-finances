@@ -176,6 +176,20 @@ Dependencias que fijan el orden: `add-financial-periods` es la base del plan men
 |---|---|---|---|
 | 50 | `fix-rls-fail-closed-gaps` | `security/access-control` (2 ADDED: fail-closed sin contexto de las claves de idempotencia, con su alcance de usuario, y de las exportaciones del workspace, con el barrido de retención por el rol de mantenimiento; 1 MODIFIED: la matriz tabla por tabla falla ante un vacío sin `PF002`, recorre también el rol del worker y limita la variante tolerante del contexto). Migración expand con dos `ALTER POLICY`, sin reescribir las políticas que ya cumplen | 5 |
 
+**Phase 6 (consolidado el 2026-10-29).** Seis changes redactados en paralelo en tres hilos; preguntas al owner en [56-phase-6-consolidation-questions.md](56-phase-6-consolidation-questions.md).
+
+| Orden | Change | Capabilities | Fase |
+|---|---|---|---|
+| 51 | `optimize-consumer-throughput` | `platform/event-delivery` y `platform/delivery-pipeline` (medición E6–E10b y entrega agrupada por workspace con la configuración del host; D300, D301, D307) | 6 |
+| 52 | `add-bulk-imported-transactions` | `transactions/transaction-recording` e `imports/import-pipeline` (escritura por conjunto de `recordBatch`; persistencia ≤ 20 s para 5 000 filas, D152, NFR-PERF-007) | 6 |
+| 53 | `add-document-attachments` | `documents/attachments` y `security/file-upload-security` (nuevas: subida presignada con cuarentena, verificación de tipo real, cifrado de la aplicación, adjuntos N:M, cuotas, retención, suite de uploads maliciosos) + `identity/workspace-portability`, `audit/lifecycle-timeline` | 6 |
+| 54 | `add-import-pipeline` | `imports/import-pipeline` y `transactions/duplicate-detection` (CSV, OFX, QIF, JSON; XLSX Could; perfiles por institución, duplicados con puntaje, compromisos, conversiones, reconciliación del extracto, deshacer) + `audit/lifecycle-timeline` | 6 |
+| 55 | `add-rule-engine` | `rules/rule-engine` (nueva: WHEN/THEN, primer escritor por campo con `stopProcessing`, versiones, dry-run, cobertura del 70 %) + `transactions/transaction-recording`, `identity/workspace-portability` | 6 |
+| 56 | `add-banking-providers` | `imports/banking-providers` (nueva: puerto `BankingProvider`, proveedor simulado, credenciales con sobre X25519, sincronización por cursor; el grupo 9 con exchanges reales depende del owner) + `identity/workspace-portability` | 6 |
+
+Dependencias que fijan el orden: el throughput va primero porque cambia el perfil de eventos de los imports; la escritura por lote antes del pipeline (NFR-PERF-007); los documentos antes de la etapa de subida del pipeline (sus parsers pueden avanzar con fixtures); el motor de reglas expone `RuleEvaluationQuery` a la etapa de clasificación; los proveedores bancarios entran por la normalización del pipeline.
+
+
 ## 8. Integración con CI y herramientas
 
 - CLI fijada como devDependency raíz (`@fission-ai/openspec@1.14.0`) al crear el skeleton; actualizaciones solo vía change dedicado (riesgo de evolución rápida del CLI v1.x).
