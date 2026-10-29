@@ -12,8 +12,10 @@ invariants: []
 priority: high
 type: security
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/idempotency-key.int.test.ts
+status: automated
 regression_suite: true
 phase: 5
 tags: ["rls", "fail-closed", "idempotency"]

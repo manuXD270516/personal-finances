@@ -146,7 +146,16 @@ export class PgIdempotencyStore implements IdempotencyStore {
       );
       if (result.rowCount !== 1) throw new ReservationLostError();
     };
-    if (tx) await update(tx);
+    if (tx && ref.scope.workspaceId === undefined) {
+      // Clave de alcance de usuario completada dentro de la transacción del comando: si el comando re-fijó el
+      // contexto al workspace recién creado (POST /workspaces), la política (`scope_id = current_idempotency_scope_id()`,
+      // fix-rls-fail-closed-gaps) ya no la ve. Se vuelve al contexto de usuario solo para este UPDATE y se restaura.
+      const { rows } = await tx.query(`SELECT coalesce(current_setting('app.workspace_id', true), '') AS ws`);
+      const previous = String((rows[0] as { ws?: string } | undefined)?.ws ?? '');
+      await tx.query(`SELECT set_config('app.workspace_id', '', true)`);
+      await update(tx);
+      await tx.query(`SELECT set_config('app.workspace_id', $1, true)`, [previous]);
+    } else if (tx) await update(tx);
     else await this.inTransaction(ref.scope, update);
   }
 

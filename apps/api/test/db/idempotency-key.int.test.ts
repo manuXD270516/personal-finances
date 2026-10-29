@@ -160,8 +160,9 @@ describe('platform.idempotency_key: RLS, grants y PgIdempotencyStore (tareas 4.1
         'SELECT workspace_id FROM platform.idempotency_key WHERE key = $1',
         [req.key],
       );
-      // Ve la fila de W2 y la propia de usuario (sin workspace), nunca la de W1.
-      expect(visible.rows.map((r) => r.workspace_id).sort()).toEqual([null, w2].sort());
+      // Ve solo la fila de W2: la de alcance de usuario ya no se ve con el workspace fijado (fix-rls-fail-closed-gaps,
+      // TC-SECURITY-RLS-014) y la de W1 nunca.
+      expect(visible.rows.map((r) => r.workspace_id)).toEqual([w2]);
       // Escribir una fila de W1 con contexto de W2 viola la política.
       expect(
         await sqlState(() =>
@@ -178,6 +179,67 @@ describe('platform.idempotency_key: RLS, grants y PgIdempotencyStore (tareas 4.1
     } finally {
       client.release();
     }
+  });
+
+  it('[TC-SECURITY-RLS-014] con solo el usuario fijado se ven sus claves de alcance de usuario; con el workspace, solo las del workspace; el store sigue funcionando en los dos alcances', async () => {
+    const userReq = request({ scope: { userId: user } });
+    const wsReq = request({ scope: { workspaceId: w1, userId: user } });
+    expect((await store.reserve(userReq)).outcome).toBe('reserved');
+    expect((await store.reserve(wsReq)).outcome).toBe('reserved');
+    const read = async (ctx: { userId: string; workspaceId?: string }, where: string, values: unknown[]) => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await applyRlsContext(client, ctx);
+        const { rows } = await client.query<{ key: string }>(
+          `SELECT key FROM platform.idempotency_key WHERE key = ANY($1) ${where}`,
+          [[userReq.key, wsReq.key], ...values],
+        );
+        return rows.map((r) => r.key);
+      } finally {
+        await client.query('ROLLBACK').catch(() => undefined);
+        client.release();
+      }
+    };
+    // Solo el usuario: su clave de alcance de usuario, sin filtro y nunca la de W1 (ni filtrando por W1).
+    expect(await read({ userId: user }, '', [])).toEqual([userReq.key]);
+    expect(await read({ userId: user }, 'AND workspace_id = $2', [w1])).toEqual([]);
+    // Con W1 fijado: solo la clave de W1.
+    expect(await read({ userId: user, workspaceId: w1 }, '', [])).toEqual([wsReq.key]);
+    // El store completa y repite en los dos alcances.
+    for (const req of [userReq, wsReq]) {
+      const reserved = await store.reserve({ ...req, now: new Date() });
+      expect(reserved.outcome).toBe('in-progress');
+    }
+    for (const scope of [userReq.scope, wsReq.scope]) {
+      const req = request({ scope });
+      const reserved = await store.reserve(req);
+      if (reserved.outcome !== 'reserved') throw new Error('esperaba reserva');
+      await store.complete(reserved.ref, { status: 201, headers: {}, body: { ok: true } }, new Date());
+      expect(await store.reserve({ ...req, now: new Date() })).toMatchObject({
+        outcome: 'completed',
+        response: { status: 201, body: { ok: true } },
+      });
+    }
+  });
+
+  it('[TC-SECURITY-RLS-014] la clave de alcance de usuario se completa en la transacción del comando aunque el comando re-fije el contexto al workspace recién creado (POST /workspaces)', async () => {
+    const req = request({ scope: { userId: user } });
+    const reserved = await store.reserve(req);
+    if (reserved.outcome !== 'reserved') throw new Error('esperaba reserva');
+    const tx = new PgCommandTransaction(pool);
+    await tx.run(req.scope, async (exec) => {
+      // Equivale a `uow.bind({ userId, workspaceId })` tras crear el workspace.
+      await exec.query(`SELECT set_config('app.workspace_id', $1, true)`, [w1]);
+      await store.complete(reserved.ref, { status: 201, headers: {}, body: { id: w1 } }, new Date(), exec);
+      // El contexto del comando se conserva para el resto de la transacción.
+      const { rows } = await exec.query(`SELECT current_setting('app.workspace_id', true) AS ws`);
+      expect((rows[0] as { ws: string }).ws).toBe(w1);
+    });
+    expect(await store.reserve({ ...req, now: new Date() })).toMatchObject({
+      outcome: 'completed',
+      response: { status: 201, body: { id: w1 } },
+    });
   });
 
   it('[TC-PLATFORM-API-011] la purga (SET ROLE pf_maintenance) solo borra claves vencidas; pf_app no hereda ese rol', async () => {

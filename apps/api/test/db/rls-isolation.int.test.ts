@@ -441,11 +441,18 @@ describe('Políticas de aislamiento vigentes: aislamiento cruzado y fail-closed 
    */
   async function failClosedMatrix(
     tables: readonly { schema: string; table: string; column: string | null }[],
+    role: 'pf_app' | 'pf_worker' = 'pf_app',
   ): Promise<Map<string, Outcome>> {
     const out = new Map<string, Outcome>();
     await su.query('BEGIN');
     try {
-      await su.query('SET LOCAL ROLE pf_app');
+      // Las dos tablas con evaluación fila por fila hasta fix-rls-fail-closed-gaps (D296) se vacían en la transacción
+      // revertida: el resultado no debe depender de los datos.
+      await su.query("SET LOCAL session_replication_role = 'replica'");
+      await su.query('DELETE FROM platform.idempotency_key');
+      await su.query('DELETE FROM iam.workspace_export');
+      await su.query("SET LOCAL session_replication_role = 'origin'");
+      await su.query(`SET LOCAL ROLE ${role}`);
       await su.query(`SELECT set_config('app.workspace_id', '', true), set_config('app.user_id', '', true)`);
       for (const t of tables) {
         const qualified = `${su.escapeIdentifier(t.schema)}.${su.escapeIdentifier(t.table)}`;
@@ -468,7 +475,7 @@ describe('Políticas de aislamiento vigentes: aislamiento cruzado y fail-closed 
     return out;
   }
 
-  it('[TC-SECURITY-RLS-007] sin contexto ninguna tabla registrada devuelve filas y cada vacío sin PF002 queda listado como hallazgo', async () => {
+  it('[TC-SECURITY-RLS-007] sin contexto ninguna tabla registrada devuelve filas ni un vacío sin PF002', async () => {
     const { rows: registry } = await su.query<{ schema: string; table: string; column: string | null }>(
       `SELECT w.schema_name AS schema, w.table_name AS "table",
               CASE WHEN EXISTS (SELECT 1 FROM pg_attribute a
@@ -494,11 +501,255 @@ describe('Políticas de aislamiento vigentes: aislamiento cruzado y fail-closed 
         '==== RLS-FAIL-CLOSED-MATRIX (TC-SECURITY-RLS-007) ====',
         `tablas registradas: ${registry.length}; operaciones: ${matrix.size}`,
         `resultados: ${[...histogram].map(([k, v]) => `${k}=${v}`).join(', ')}`,
-        `HALLAZGOS (vacío sin PF002 sin contexto; se registran, no se corrigen aquí, D296): ${findings.length}`,
+        `HALLAZGOS (vacío sin PF002 sin contexto; hacen fallar el test): ${findings.length}`,
         ...findings.map((f) => `  RLS-FAIL-CLOSED-FINDING ${f}`),
         '==== FIN RLS-FAIL-CLOSED-MATRIX ====',
       ].join('\n'),
     );
     expect(withRows, 'operaciones sin contexto que devuelven filas de negocio').toEqual([]);
+    expect(findings, 'operaciones sin contexto que devuelven vacío sin PF002').toEqual([]);
   }, 120_000);
+
+  /**
+   * Lectura entre workspaces por diseño del rol del worker: la entrega de eventos (relay del outbox, inbox por
+   * consumidor y dead-letter). Ampliar la lista exige cambiar este test y el requirement de verificación.
+   */
+  const WORKER_DECLARED_OPS = [
+    'platform.outbox|lectura filtrada',
+    'platform.outbox|lectura sin filtro',
+    'platform.inbox|lectura filtrada',
+    'platform.inbox|lectura sin filtro',
+    'platform.dead_letter|lectura filtrada',
+    'platform.dead_letter|lectura sin filtro',
+    // Inserciones de la entrega de eventos (el worker escribe en inbox y dead-letter por diseño) y de las dos tablas
+    // de FX con política de inserción propia del worker: la inserción de prueba (DEFAULT VALUES) choca con las
+    // restricciones de las columnas antes de llegar a la política; la política de las dos de FX se comprueba abajo
+    // en el catálogo.
+    'platform.inbox|inserción',
+    'platform.dead_letter|inserción',
+    'fx.rate_anomaly_review|inserción',
+    'fx.rate_withdrawal|inserción',
+  ];
+
+  it('[TC-SECURITY-RLS-017] sin contexto pf_worker no lee ninguna tabla registrada salvo la entrega de eventos declarada', async () => {
+    const { rows: registry } = await su.query<{ schema: string; table: string; column: string | null }>(
+      `SELECT w.schema_name AS schema, w.table_name AS "table",
+              CASE WHEN EXISTS (SELECT 1 FROM pg_attribute a
+                                 WHERE a.attrelid = format('%I.%I', w.schema_name, w.table_name)::regclass
+                                   AND a.attname = 'workspace_id' AND NOT a.attisdropped) THEN 'workspace_id'
+                   WHEN w.schema_name = 'iam' AND w.table_name = 'workspace' THEN 'id' END AS "column"
+         FROM platform.workspace_scoped_table w ORDER BY w.purge_order, w.schema_name, w.table_name`,
+    );
+    // Las tablas de entrega de eventos pueden no estar en el registro (platform.inbox no tiene workspace_id): se
+    // agregan para que la lista declarada se ejerza siempre.
+    const tables = [...registry];
+    for (const t of ['inbox', 'outbox', 'dead_letter']) {
+      if (!tables.some((r) => r.schema === 'platform' && r.table === t)) {
+        tables.push({ schema: 'platform', table: t, column: t === 'inbox' ? null : 'workspace_id' });
+      }
+    }
+    const matrix = await failClosedMatrix(tables, 'pf_worker');
+    const unexpected: string[] = [];
+    for (const [key, result] of matrix) {
+      if (result === 'ERROR PF002' || result === 'ERROR 42501') continue;
+      if (WORKER_DECLARED_OPS.includes(key)) continue;
+      unexpected.push(`${key}: ${result}`);
+    }
+    console.log(
+      `==== RLS-FAIL-CLOSED-MATRIX pf_worker (TC-SECURITY-RLS-017): operaciones ${matrix.size}; fuera de la lista: ${unexpected.length} ====`,
+    );
+    expect(unexpected, 'operaciones de pf_worker sin contexto que no fallan con PF002 ni 42501').toEqual([]);
+    // Las inserciones de FX exentas arriba siguen atadas al workspace fijado por su política (sin variante tolerante).
+    const { rows: fxPolicies } = await su.query<{ name: string; with_check: string | null }>(
+      `SELECT tablename || '.' || policyname AS name, with_check FROM pg_policies
+        WHERE schemaname = 'fx' AND tablename IN ('rate_anomaly_review', 'rate_withdrawal')
+          AND cmd IN ('ALL', 'INSERT') AND roles && ARRAY['pf_app', 'pf_worker']::name[]`,
+    );
+    expect(fxPolicies.length).toBeGreaterThanOrEqual(2);
+    for (const pol of fxPolicies) expect(pol.with_check, pol.name).toContain('current_workspace_id()');
+  }, 120_000);
+
+  it('[TC-SECURITY-RLS-018] solo dos políticas de usuario usan current_workspace_id_if_set y las dos exigen también current_user_id', async () => {
+    const { rows } = await su.query<{ name: string; qual: string | null; with_check: string | null }>(
+      `SELECT schemaname || '.' || tablename || '.' || policyname AS name, qual, with_check
+         FROM pg_policies
+        WHERE (roles && ARRAY['pf_app', 'pf_worker']::name[])
+          AND (coalesce(qual, '') LIKE '%current_workspace_id_if_set%'
+               OR coalesce(with_check, '') LIKE '%current_workspace_id_if_set%')
+        ORDER BY 1`,
+    );
+    expect(rows.map((r) => r.name)).toEqual([
+      'iam.workspace.workspace_member_read',
+      'iam.workspace_membership.membership_read',
+    ]);
+    for (const r of rows) {
+      expect(`${r.qual ?? ''} ${r.with_check ?? ''}`, r.name).toContain('current_user_id');
+    }
+  });
+});
+
+/**
+ * Fail-closed de las claves de idempotencia y de las exportaciones, y barrido de retención con el rol de
+ * mantenimiento (openspec fix-rls-fail-closed-gaps, D296): TC-SECURITY-RLS-013, 015 y 016.
+ */
+describe('Fail-closed de idempotency_key y workspace_export (TC-SECURITY-RLS-013, 015, 016)', () => {
+  let su: Client;
+  let worker: Client;
+  const w1 = randomUUID();
+  const w2 = randomUUID();
+  const user = randomUUID();
+  const expiredW1 = randomUUID();
+  const currentW2 = randomUUID();
+  const discardedW2 = randomUUID();
+
+  const insertExport = (id: string, ws: string, status: string, expires: string | null) =>
+    su.query(
+      `INSERT INTO iam.workspace_export (id, workspace_id, operation_id, status, format_version, object_key, size_bytes,
+                                         sha256, key_id, wrapped_key, requested_by, completed_at, expires_at)
+       VALUES ($1::uuid, $2::uuid, gen_random_uuid(), $3::text, 1,
+               CASE WHEN $3::text = 'READY' THEN 'k/' || $1::text END, CASE WHEN $3::text = 'READY' THEN 10 END,
+               CASE WHEN $3::text = 'READY' THEN decode(repeat('00', 32), 'hex') END,
+               CASE WHEN $3::text = 'READY' THEN 'k1' END, CASE WHEN $3::text = 'READY' THEN decode('00', 'hex') END,
+               $4::uuid, CASE WHEN $3::text = 'READY' THEN now() END, $5::timestamptz)`,
+      [id, ws, status, user, expires],
+    );
+
+  beforeAll(async () => {
+    su = await connect(deps.superuserUrl);
+    worker = await connect(deps.workerDatabaseUrl);
+    await su.query("SET session_replication_role = 'replica'");
+    try {
+      await insertExport(expiredW1, w1, 'READY', new Date(Date.now() - 3_600_000).toISOString());
+      await insertExport(currentW2, w2, 'READY', new Date(Date.now() + 3_600_000).toISOString());
+      await insertExport(discardedW2, w2, 'DISCARDED', null);
+    } finally {
+      await su.query("SET session_replication_role = 'origin'");
+    }
+  });
+
+  afterAll(async () => {
+    try {
+      await su?.query("SET session_replication_role = 'replica'");
+      await su?.query('DELETE FROM iam.workspace_export WHERE id = ANY($1)', [
+        [expiredW1, currentW2, discardedW2],
+      ]);
+    } finally {
+      await worker?.end();
+      await su?.end();
+    }
+  });
+
+  /** SQLSTATE (o `OK:<filas>`) de cada operación ejecutada sin contexto con `role`, en una transacción revertida. */
+  async function withoutContext(
+    role: 'pf_app' | 'pf_worker',
+    ops: Record<string, { sql: string; values?: unknown[] }>,
+    opts: { empty?: string[] } = {},
+  ): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    await su.query('BEGIN');
+    try {
+      if (opts.empty) {
+        await su.query("SET LOCAL session_replication_role = 'replica'");
+        for (const t of opts.empty) await su.query(`DELETE FROM ${t}`);
+        await su.query("SET LOCAL session_replication_role = 'origin'");
+      }
+      await su.query(`SET LOCAL ROLE ${role}`);
+      await su.query(`SELECT set_config('app.workspace_id', '', true), set_config('app.user_id', '', true)`);
+      for (const [name, op] of Object.entries(ops)) {
+        await su.query('SAVEPOINT op');
+        try {
+          const r = await su.query(op.sql, op.values ?? []);
+          await su.query('RELEASE SAVEPOINT op');
+          out[name] = `OK:${r.rowCount ?? 0}`;
+        } catch (err) {
+          await su.query('ROLLBACK TO SAVEPOINT op');
+          out[name] = (err as { code?: string }).code ?? 'sin-código';
+        }
+      }
+    } finally {
+      await su.query('ROLLBACK');
+    }
+    return out;
+  }
+
+  it('[TC-SECURITY-RLS-013] sin contexto las claves de idempotencia fallan con PF002 aunque la tabla esté vacía o el filtro no encuentre filas', async () => {
+    const ops = {
+      'lectura filtrada': {
+        sql: 'SELECT 1 FROM platform.idempotency_key WHERE workspace_id = $1',
+        values: [w1],
+      },
+      'lectura sin filtro': { sql: 'SELECT 1 FROM platform.idempotency_key' },
+      'búsqueda por scope_id y key': {
+        sql: 'SELECT 1 FROM platform.idempotency_key WHERE scope_id = $1 AND key = $2',
+        values: [w1, 'K-rls013-0000000000'],
+      },
+      inserción: {
+        sql: `INSERT INTO platform.idempotency_key (scope_id, key, workspace_id, user_id, method, route, request_hash,
+                status, response_status, created_at, expires_at)
+              VALUES ($1, 'K-rls013-0000000001', $1, $2, 'POST', '/r', decode(repeat('00', 32), 'hex'), 'COMPLETED',
+                201, now(), now() + interval '24 hours')`,
+        values: [w1, user],
+      },
+    };
+    const result = await withoutContext('pf_app', ops, { empty: ['platform.idempotency_key'] });
+    expect(result).toEqual({
+      'lectura filtrada': 'PF002',
+      'lectura sin filtro': 'PF002',
+      'búsqueda por scope_id y key': 'PF002',
+      inserción: 'PF002',
+    });
+  });
+
+  it('[TC-SECURITY-RLS-015] sin contexto las exportaciones fallan con PF002 para pf_app y pf_worker, con una READY vencida y con la tabla vacía', async () => {
+    const ops = {
+      'lectura filtrada': { sql: 'SELECT 1 FROM iam.workspace_export WHERE workspace_id = $1', values: [w1] },
+      'lectura sin filtro': { sql: 'SELECT 1 FROM iam.workspace_export' },
+    };
+    for (const role of ['pf_app', 'pf_worker'] as const) {
+      const conDatos = await withoutContext(role, ops);
+      expect(conDatos, `${role} con datos`).toEqual({
+        'lectura filtrada': 'PF002',
+        'lectura sin filtro': 'PF002',
+      });
+      const vacia = await withoutContext(role, ops, { empty: ['iam.workspace_export'] });
+      expect(vacia, `${role} con la tabla vacía`).toEqual({
+        'lectura filtrada': 'PF002',
+        'lectura sin filtro': 'PF002',
+      });
+    }
+  });
+
+  it('[TC-SECURITY-RLS-016] el barrido de retención con pf_maintenance ve solo la READY vencida sin claves y no escribe', async () => {
+    await worker.query('BEGIN');
+    try {
+      await worker.query('SET LOCAL ROLE pf_maintenance');
+      await worker.query(
+        `SELECT set_config('app.workspace_id', '', true), set_config('app.user_id', '', true)`,
+      );
+      const { rows } = await worker.query<{ id: string; workspace_id: string; requested_by: string }>(
+        `SELECT id, workspace_id, requested_by FROM iam.workspace_export
+          WHERE status = 'READY' AND expires_at <= now() ORDER BY expires_at, id`,
+      );
+      const seededIds: string[] = [expiredW1, currentW2, discardedW2];
+      const seeded = rows.filter((r) => seededIds.includes(r.id));
+      expect(seeded).toEqual([{ id: expiredW1, workspace_id: w1, requested_by: user }]);
+
+      const state = async (sql: string): Promise<string | undefined> => {
+        await worker.query('SAVEPOINT x');
+        try {
+          await worker.query(sql);
+          await worker.query('RELEASE SAVEPOINT x');
+          return undefined;
+        } catch (err) {
+          await worker.query('ROLLBACK TO SAVEPOINT x');
+          return (err as { code?: string }).code;
+        }
+      };
+      expect(await state('SELECT wrapped_key FROM iam.workspace_export')).toBe('42501');
+      expect(await state('SELECT object_key FROM iam.workspace_export')).toBe('42501');
+      expect(await state("UPDATE iam.workspace_export SET status = 'EXPIRED'")).toBe('42501');
+    } finally {
+      await worker.query('ROLLBACK');
+    }
+  });
 });
