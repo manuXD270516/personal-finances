@@ -156,16 +156,20 @@ export async function startHarness(options: {
       if (h.worker) return h.worker;
       if (flags?.discardBacklog !== false) await discardStaleJobs(deps);
       h.workerLog = capturingLogger('finance-worker', 'worker');
-      h.worker = await createWorkerRuntime(workerConfig(baseEnv(deps, flags?.env ?? options.workerEnv)), h.workerLog.logger, {
-        ...(options.realClock ? {} : { clock }),
-        ledgerMaintenanceOnStart: false,
-        fxGapFillOnStart: false,
-        lifecycleBackfillOnStart: false,
-        planningPeriodsOnStart: false,
-        portability: { scheduleCrons: false },
-        notifications: { scheduleCrons: false, sweepOnStart: false },
-        ...extra,
-      });
+      h.worker = await createWorkerRuntime(
+        workerConfig(baseEnv(deps, flags?.env ?? options.workerEnv)),
+        h.workerLog.logger,
+        {
+          ...(options.realClock ? {} : { clock }),
+          ledgerMaintenanceOnStart: false,
+          fxGapFillOnStart: false,
+          lifecycleBackfillOnStart: false,
+          planningPeriodsOnStart: false,
+          portability: { scheduleCrons: false },
+          notifications: { scheduleCrons: false, sweepOnStart: false },
+          ...extra,
+        },
+      );
       return h.worker;
     },
     async stopWorker() {

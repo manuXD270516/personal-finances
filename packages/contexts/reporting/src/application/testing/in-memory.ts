@@ -293,7 +293,11 @@ export class InMemoryReporting {
           this.categories.filter((c) => categoryIds.includes(c.categoryId)),
       },
       rates: fx,
-      versions: { versionOf: async () => this.version, bump: async () => undefined },
+      versions: {
+        versionOf: async () => this.version,
+        bump: async () => undefined,
+        bumpBy: async () => undefined,
+      },
       clock: this.clock,
       commitments: { hasActiveDefinitions: async () => this.hasActiveDefinitions },
       pending: {

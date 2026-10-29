@@ -88,4 +88,60 @@ describe('reporting.workspace_data_version (PG real)', () => {
       ),
     ).rejects.toMatchObject({ code: '42501' });
   });
+  it('[TC-PLATFORM-THROUGHPUT-007] un grupo de 100 eventos incrementa la versión en 100, igual que 100 entregas individuales', async () => {
+    const projector = new DataVersionProjector(store);
+    const events = Array.from({ length: 100 }, (_, i) => ({
+      eventId: randomUUID(),
+      occurredAt: `2026-10-03T12:00:${String(i % 60).padStart(2, '0')}Z`,
+    }));
+    const run = (ws: string, fn: () => Promise<void>) =>
+      new PgUnitOfWork(worker).run({ userId: null, workspaceId: ws }, fn);
+    const wSingle = randomUUID();
+    const wGroup = randomUUID();
+    for (const ws of [wSingle, wGroup]) {
+      const client = await app.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `SELECT set_config('app.user_id', $1, true), set_config('app.workspace_id', $2, true)`,
+          [user, ws],
+        );
+        await client.query(
+          `INSERT INTO iam.workspace (id, name, base_currency, time_zone, locale) VALUES ($1, 'W', 'BOB', 'America/La_Paz', 'es-BO')`,
+          [ws],
+        );
+        await client.query(
+          `INSERT INTO iam.workspace_membership (workspace_id, user_id, role) VALUES ($1, $2, 'OWNER')`,
+          [ws, user],
+        );
+        await client.query('COMMIT');
+      } finally {
+        client.release();
+      }
+    }
+    for (const e of events) await run(wSingle, () => projector.on({ ...e, workspaceId: wSingle }));
+    await run(wGroup, () => projector.onGroup(events.map((e) => ({ ...e, workspaceId: wGroup }))));
+    expect(await read(wSingle)).toBe('100');
+    expect(await read(wGroup)).toBe('100');
+    const stamps: string[] = [];
+    for (const ws of [wSingle, wGroup]) {
+      const client = await worker.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `SELECT set_config('app.user_id', '', true), set_config('app.workspace_id', $1, true)`,
+          [ws],
+        );
+        const { rows } = await client.query<{ updated_at: Date }>(
+          'SELECT updated_at FROM reporting.workspace_data_version WHERE workspace_id = $1',
+          [ws],
+        );
+        stamps.push(rows[0]!.updated_at.toISOString());
+        await client.query('COMMIT');
+      } finally {
+        client.release();
+      }
+    }
+    expect(stamps[0]).toBe(stamps[1]);
+  });
 });

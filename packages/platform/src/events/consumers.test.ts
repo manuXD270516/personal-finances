@@ -5,7 +5,7 @@ import type { Pool } from 'pg';
 import type { Logger } from '../logging/index.js';
 import type { JobBatchHandler, JobContext, JobHandler, JobQueue, WorkOptions } from '../queue/job-queue.js';
 import type { EventEnvelope } from './envelope.js';
-import { EventDeliveryMetrics } from './metrics.js';
+import type { EventDeliveryMetrics } from './metrics.js';
 import {
   DEFAULT_EVENT_CONSUMER_BATCH_SIZE,
   DEFAULT_EVENT_CONSUMER_CONCURRENCY,
@@ -306,7 +306,8 @@ describe('entrega agrupada de eventos (optimize-consumer-throughput)', () => {
     const single: string[] = [];
     const t = setup({
       groupHandler: async (events) => {
-        if (events.some((e) => e.eventId === poison.eventId)) throw new Error('no puedo aplicar el agregado A');
+        if (events.some((e) => e.eventId === poison.eventId))
+          throw new Error('no puedo aplicar el agregado A');
       },
       handler: async (e) => {
         if (e.eventId === poison.eventId) throw new Error('no puedo aplicar el agregado A');
@@ -375,12 +376,20 @@ describe('entrega agrupada de eventos (optimize-consumer-throughput)', () => {
   });
 
   it('[TC-PLATFORM-THROUGHPUT-006] definir grouping sin groupHandler (o al revés) o un maxBatch fuera de 1–500 falla al registrar', () => {
-    const base = { consumer: 'it.bad', events: [{ type: 'a.B', version: 1 }], handler: async () => undefined };
+    const base = {
+      consumer: 'it.bad',
+      events: [{ type: 'a.B', version: 1 }],
+      handler: async () => undefined,
+    };
     expect(() => new EventSubscriptions([{ ...base, grouping: {} }])).toThrow(/groupHandler/);
-    expect(() => new EventSubscriptions([{ ...base, groupHandler: async () => undefined }])).toThrow(/grouping/);
+    expect(() => new EventSubscriptions([{ ...base, groupHandler: async () => undefined }])).toThrow(
+      /grouping/,
+    );
     expect(
       () =>
-        new EventSubscriptions([{ ...base, grouping: { maxBatch: 501 }, groupHandler: async () => undefined }]),
+        new EventSubscriptions([
+          { ...base, grouping: { maxBatch: 501 }, groupHandler: async () => undefined },
+        ]),
     ).toThrow(/maxBatch/);
   });
 

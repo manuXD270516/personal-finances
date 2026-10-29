@@ -190,8 +190,15 @@ export class PgBossJobQueue implements JobQueue {
       for (const job of jobs) {
         const data: unknown = job.data;
         if (!isJobEnvelope(data)) {
-          this.options.logger.error({ 'job.queue': queue, 'job.id': job.id }, 'job without envelope rejected');
-          results.push({ id: job.id, status: 'failed', output: sanitizeError(new Error('job without envelope')) });
+          this.options.logger.error(
+            { 'job.queue': queue, 'job.id': job.id },
+            'job without envelope rejected',
+          );
+          results.push({
+            id: job.id,
+            status: 'failed',
+            output: sanitizeError(new Error('job without envelope')),
+          });
           continue;
         }
         contexts.push({

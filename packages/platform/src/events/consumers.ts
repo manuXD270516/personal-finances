@@ -337,7 +337,7 @@ export class EventConsumerRuntime {
       );
     const ambient = currentCorrelation();
     const started = performance.now();
-    let applied = 0;
+    let applied: number;
     try {
       applied =
         correlationId && ambient?.correlationId !== correlationId

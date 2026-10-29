@@ -109,7 +109,11 @@ export interface JobQueue {
    * Como `work`, pero el handler recibe el lote completo (hasta `options.batchSize` trabajos) y devuelve un resultado por
    * trabajo: cada uno se confirma o falla por separado. Lo usa la entrega agrupada de eventos.
    */
-  workBatch<P extends object>(queue: string, options: WorkOptions, handler: JobBatchHandler<P>): Promise<void>;
+  workBatch<P extends object>(
+    queue: string,
+    options: WorkOptions,
+    handler: JobBatchHandler<P>,
+  ): Promise<void>;
   /**
    * Programa envíos periódicos (cron de 5 campos, evaluado en `tz`) a `queue` con el reloj de la cola (pg-boss
    * timekeeper, solo en procesos `consumer`). Idempotente entre réplicas y reinicios: reemplaza la programación previa.

@@ -402,7 +402,10 @@ async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
     };
     // La fila del código es `imports` (informativa) y la del host cuelga de ella como `hostConfig` (bloqueante, D311).
     if (cfg.label === 'code') codeReport = report;
-    writeImportsReport(cfg.label === 'host' && codeReport ? { ...codeReport, hostConfig: report } : report, perfOutDir());
+    writeImportsReport(
+      cfg.label === 'host' && codeReport ? { ...codeReport, hostConfig: report } : report,
+      perfOutDir(),
+    );
 
     // Informe para el job nightly (informativo + umbrales de la spec).
     console.log(

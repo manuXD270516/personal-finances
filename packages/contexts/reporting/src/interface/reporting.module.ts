@@ -192,6 +192,9 @@ export function reportingDataVersionConsumer(): EventConsumerDefinition {
     consumer: REPORTING_DATA_VERSION_CONSUMER,
     events: REPORTING_INVALIDATING_EVENTS.map((e) => ({ type: e.type, version: e.version })),
     handler: (event) => projector.on(event),
+    // Entrega agrupada (optimize-consumer-throughput): el efecto es un contador por workspace, igual en cualquier orden.
+    grouping: {},
+    groupHandler: (events) => projector.onGroup(events),
   };
 }
 

@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { PROCESS_USER } from './recorder.js';
 import { BANK, CASH, EDITOR, SAVINGS, WS, GoalsWorld, codeOf, errorOf } from './testing/goals-world.js';
@@ -539,3 +540,31 @@ describe('Sugerencias de aporte (TC-GOALS-SAVINGS-040)', () => {
 });
 
 const recorded = (w: GoalsWorld) => w.eventsOf('goals.SavingsContributionRecorded');
+
+describe('Vigilancia de saldos agrupada (optimize-consumer-throughput)', () => {
+  it('[TC-PLATFORM-THROUGHPUT-007] los mismos asientos entregados de a uno o agrupados, en cualquier orden, dejan el mismo estado de sobre-asignación y los mismos hechos', async () => {
+    const accounts = [BANK, CASH, SAVINGS] as const;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(fc.subarray([...accounts], { minLength: 1 }), { minLength: 1, maxLength: 8 }),
+        fc.integer({ min: 0, max: 3000 }),
+        async (entries, spent) => {
+          const run = async (grouped: boolean) => {
+            const w = world();
+            await fullyReserved(w);
+            w.seedExpense({ account: BANK, amount: `${String(spent)}.00` });
+            const events = entries.map((ids) => w.journalPostedEvent(ids));
+            if (grouped) await w.reactions.onJournalEntriesPosted(WS, [...events].reverse());
+            else for (const e of events) await w.reactions.onJournalEntryPosted(e);
+            return {
+              states: [...w.stateStore.entries()].map(([k, v]) => [k, v.state, v.shortfall]),
+              facts: exceeds(w).length,
+            };
+          };
+          expect(await run(true)).toEqual(await run(false));
+        },
+      ),
+      { numRuns: 30 },
+    );
+  }, 60_000);
+});

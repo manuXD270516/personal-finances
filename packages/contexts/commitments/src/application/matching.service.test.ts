@@ -834,3 +834,53 @@ describe('Confirmar una sugerencia dispara la detección de cambio de precio igu
     });
   });
 });
+
+describe('Entrega agrupada del matcher (optimize-consumer-throughput)', () => {
+  /** 12 compromisos con montos distintos y 40 transacciones: 12 compatibles y 28 que no coinciden con ninguno. */
+  async function burst(s: S) {
+    for (let i = 0; i < 12; i += 1) {
+      await create(s, `Servicio ${String(i)}`, {
+        amount: { type: 'FIXED', amount: bob(`${String(100 * 2 ** i)}.00`) },
+      });
+    }
+    const ids: string[] = [];
+    for (let i = 0; i < 12; i += 1) ids.push(expense(s, { amount: bob(`${String(100 * 2 ** i)}.00`) }));
+    for (let i = 0; i < 28; i += 1)
+      ids.push(expense(s, { accountId: CASH, amount: bob(`${String(7 + i)}.77`) }));
+    return ids;
+  }
+  const keyed = (s: S) =>
+    s.mem
+      .suggestions()
+      .map((x) => `${x.occurrenceId}|${x.transactionId}|${x.status}`)
+      .sort();
+
+  it('[TC-PLATFORM-THROUGHPUT-010] 12 transacciones compatibles entre 40, con reentregas, dejan exactamente 12 sugerencias', async () => {
+    const s = setup();
+    const ids = await burst(s);
+    const items = ids.map((transactionId) => ({ transactionId, eventId: s.eventId() }));
+    await s.matching.onTransactionsChanged(WS, items);
+    // Reentrega: mismos hechos otra vez, en otro orden y repartidos en grupos.
+    await s.matching.onTransactionsChanged(WS, [...items].reverse().slice(0, 25));
+    await s.matching.onTransactionsChanged(WS, items.slice(5, 30));
+    expect(s.mem.suggestions()).toHaveLength(12);
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-007] el mismo conjunto de transacciones entregado de a una o agrupado deja las mismas sugerencias', async () => {
+    const single = setup();
+    const grouped = setup();
+    const idsSingle = await burst(single);
+    const idsGrouped = await burst(grouped);
+    for (const transactionId of idsSingle) await single.created(transactionId);
+    await grouped.matching.onTransactionsChanged(
+      WS,
+      [...idsGrouped].reverse().map((transactionId) => ({ transactionId, eventId: grouped.eventId() })),
+    );
+    expect(keyed(grouped).length).toBe(12);
+    // Los ids se generan en orden por instancia: se comparan por la cantidad y el estado de cada sugerencia.
+    expect(grouped.mem.suggestions().map((x) => x.status)).toEqual(
+      single.mem.suggestions().map((x) => x.status),
+    );
+    expect(keyed(grouped).map((k) => k.split('|')[2])).toEqual(keyed(single).map((k) => k.split('|')[2]));
+  });
+});

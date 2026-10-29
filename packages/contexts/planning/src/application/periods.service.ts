@@ -135,6 +135,26 @@ export class PeriodsService {
     return true;
   }
 
+  /**
+   * Entrega agrupada de `ledger.JournalEntryPosted.v1` (optimize-consumer-throughput): los asientos NUEVOS de un workspace
+   * ejecutan `EnsurePeriods` a lo sumo una vez, si alguna fecha cae fuera del rango cubierto. Equivale a
+   * `onJournalEntryPosted` por cada fecha: `EnsurePeriods` es idempotente y determinista en el instante actual, así que
+   * repetirlo por cada fecha fuera de rango no cambia el estado. Devuelve si actuó.
+   */
+  async onJournalEntriesPosted(input: {
+    readonly workspaceId: string;
+    readonly entryDates: readonly string[];
+  }): Promise<boolean> {
+    const dates = [...new Set(input.entryDates)];
+    if (dates.length === 0) return false;
+    const covered = await this.deps.uow.run(input.workspaceId, () =>
+      this.deps.periods.coveredRange(input.workspaceId),
+    );
+    if (covered && dates.every((d) => covered.start <= d && d <= covered.end)) return false;
+    await this.ensurePeriods({ workspaceId: input.workspaceId });
+    return true;
+  }
+
   /** `ActivatePeriod` manual (EDITOR/OWNER, `If-Match`): `PERIOD_NOT_STARTED` si su inicio es posterior a hoy. */
   async activatePeriod(input: {
     readonly workspaceId: string;

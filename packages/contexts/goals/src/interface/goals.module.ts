@@ -196,6 +196,19 @@ export function goalsEventConsumers(runtime: Pick<GoalsRuntime, 'reactions'>): E
       concurrency: 1,
       events: [{ type: 'ledger.JournalEntryPosted', version: 1 }],
       handler: wrap((e) => r.onJournalEntryPosted(e)),
+      // Entrega agrupada (optimize-consumer-throughput): cada cuenta distinta del grupo se reevalúa una vez.
+      grouping: {},
+      groupHandler: async (events) => {
+        await r.onJournalEntriesPosted(
+          events[0]!.workspaceId,
+          events.map((e) => ({
+            workspaceId: e.workspaceId,
+            eventType: e.eventType,
+            eventId: e.eventId,
+            payload: e.payload,
+          })),
+        );
+      },
     },
     {
       consumer: GOALS_CONSUMERS.recurringContributions,

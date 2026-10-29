@@ -4,13 +4,7 @@ import { performance } from 'node:perf_hooks';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
-import {
-  money,
-  startHarness,
-  until,
-  type Harness,
-  type User,
-} from '../support/portability.js';
+import { money, startHarness, until, type Harness, type User } from '../support/portability.js';
 import { perfOutDir, recordSuiteLoad } from './background-load.js';
 import {
   BURST_EVENT_TYPES,
@@ -173,7 +167,6 @@ describe('ráfaga del import y costo por consumidor', () => {
     const t0 = performance.now();
     await startWorker();
     burstDefs = h.worker!.subscriptions.definitions().filter(isBurst);
-    let totalMs = 0;
     try {
       await until(
         async () => {
@@ -189,14 +182,14 @@ describe('ráfaga del import y costo por consumidor', () => {
     } catch {
       // Se publica lo observado: las colas que no llegaron a 0 figuran como «sin llegar a 0».
     }
-    totalMs = performance.now() - t0;
+    const totalMs = performance.now() - t0;
     const lockWaits = locks.stop();
-    const drainByConsumer: ConsumerDrain[] = tracker.result().filter((d) => burstQueues.includes(d.queue) || d.queue === 'outbox');
+    const drainByConsumer: ConsumerDrain[] = tracker
+      .result()
+      .filter((d) => burstQueues.includes(d.queue) || d.queue === 'outbox');
     const retries: RetriedJobs[] = await retriedJobs(h, startedAt).catch(() => []);
     const failures: JobFailure[] = jobFailures(h);
-    const durations = Object.fromEntries(
-      [...metrics.samples.keys()].map((c) => [c, metrics.percentiles(c)]),
-    );
+    const durations = Object.fromEntries([...metrics.samples.keys()].map((c) => [c, metrics.percentiles(c)]));
     artifacts['burstHost'] = {
       rows: ROWS,
       persistMs: Math.round(persistMs),
@@ -210,7 +203,9 @@ describe('ráfaga del import y costo por consumidor', () => {
       jobFailures: failures,
     };
     writeArtifacts();
-    console.log(JSON.stringify({ test: 'TC-PLATFORM-THROUGHPUT-008', ...(artifacts['burstHost'] as object) }));
+    console.log(
+      JSON.stringify({ test: 'TC-PLATFORM-THROUGHPUT-008', ...(artifacts['burstHost'] as object) }),
+    );
     expect(drainByConsumer.length).toBeGreaterThan(0);
   }, 3_600_000);
 

@@ -1047,7 +1047,11 @@ describe('benchmark del import con la configuración del host (optimize-consumer
       drainAfterPersistMs: worst,
       drainBudgetMs: 120_000,
       drainByConsumer: drains,
-      verdict: importsVerdict({ drainAfterPersistMs: worst, drainBudgetMs: 120_000, drainByConsumer: drains }),
+      verdict: importsVerdict({
+        drainAfterPersistMs: worst,
+        drainBudgetMs: 120_000,
+        drainByConsumer: drains,
+      }),
       configuration: cfg,
     };
   };
@@ -1076,11 +1080,15 @@ describe('benchmark del import con la configuración del host (optimize-consumer
       hostConfig: row(host, [drain('events.a', 95_000)]),
     };
     const md = renderImportsSection(report).join('\n');
-    expect(md).toMatch(/Configuración del código:\*\* concurrencia 4 por consumidor, pool de 52 en el worker y de 22 en la API/u);
+    expect(md).toMatch(
+      /Configuración del código:\*\* concurrencia 4 por consumidor, pool de 52 en el worker y de 22 en la API/u,
+    );
     expect(md).toMatch(
       /Configuración de la plantilla del host:\*\* concurrencia 1 por consumidor, pool de 34 en el worker y de 22 en la API; suma de pools de 67 conexiones frente a 97 útiles/u,
     );
-    expect(md.indexOf('Configuración del código')).toBeLessThan(md.indexOf('Configuración de la plantilla del host'));
+    expect(md.indexOf('Configuración del código')).toBeLessThan(
+      md.indexOf('Configuración de la plantilla del host'),
+    );
   });
 
   it('[TC-PLATFORM-THROUGHPUT-015] con el host en 130 s la fila del código a 40 s queda informativa y la fila del host es la bloqueante que falla, con el consumidor y su tiempo', () => {
@@ -1101,9 +1109,15 @@ describe('benchmark del import con la configuración del host (optimize-consumer
   it('[TC-PLATFORM-THROUGHPUT-014] writeImportsReport conserva imports.hostConfig en perf-results.json', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pf-imports-host-'));
     writeReport(buildReport({ ...emptyBase, results: [] }), dir, '');
-    writeImportsReport({ ...row(code, [drain('events.a', 1000)]), hostConfig: row(host, [drain('events.a', 2000)]) }, dir);
+    writeImportsReport(
+      { ...row(code, [drain('events.a', 1000)]), hostConfig: row(host, [drain('events.a', 2000)]) },
+      dir,
+    );
     const json = JSON.parse(readFileSync(join(dir, 'perf-results.json'), 'utf8')) as PerfReport;
-    expect(json.imports?.hostConfig?.configuration).toMatchObject({ label: 'host', eventConsumerConcurrency: 1 });
+    expect(json.imports?.hostConfig?.configuration).toMatchObject({
+      label: 'host',
+      eventConsumerConcurrency: 1,
+    });
   });
 
   it('[TC-PLATFORM-THROUGHPUT-012] el motivo de un reintento distingue la expiración del fallo del handler (E10b)', () => {

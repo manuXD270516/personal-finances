@@ -851,7 +851,9 @@ export type RetryReason = 'expiración' | 'fallo del handler';
  * reintenta SIN excepción del handler (expiración); cualquier otro mensaje es un fallo del handler.
  */
 export function classifyRetryReason(error: string): RetryReason {
-  return /expire|expir|timed out|handler execution exceeded/iu.test(error) ? 'expiración' : 'fallo del handler';
+  return /expire|expir|timed out|handler execution exceeded/iu.test(error)
+    ? 'expiración'
+    : 'fallo del handler';
 }
 
 /** Fallos de entrega de un consumidor registrados por el worker (`job failed`), agrupados por error. */
@@ -1097,7 +1099,10 @@ export function renderConsumerCostSection(rows: readonly ConsumerCost[]): string
     'Duración por evento con el handler real, ritmo con el consumidor como único activo y esperas por bloqueos de base de datos durante su drenado. Ninguna fila decide el veredicto del job (D300).',
     '',
     ...(slowest
-      ? [`El consumidor más lento es \`${slowest.consumer}\` con ${String(slowest.soloEventsPerSecond)} ev/s.`, '']
+      ? [
+          `El consumidor más lento es \`${slowest.consumer}\` con ${String(slowest.soloEventsPerSecond)} ev/s.`,
+          '',
+        ]
       : []),
     '| Consumidor | p50 (ms) | p95 (ms) | Ritmo aislado (ev/s) | Esperas por bloqueos (ms) | Eventos por invocación | Gate |',
     '|---|---|---|---|---|---|---|',
@@ -1121,9 +1126,11 @@ export function writeConsumerCostReport(rows: readonly ConsumerCost[], outDir: s
   if (!existsSync(jsonPath) || !existsSync(mdPath)) return;
   const current = JSON.parse(readFileSync(jsonPath, 'utf8')) as PerfReport;
   writeFileSync(jsonPath, `${JSON.stringify({ ...current, consumerCost: rows }, null, 2)}\n`, 'utf8');
-  const section = [CONSUMER_COST_SECTION_START, ...renderConsumerCostSection(rows), CONSUMER_COST_SECTION_END].join(
-    '\n',
-  );
+  const section = [
+    CONSUMER_COST_SECTION_START,
+    ...renderConsumerCostSection(rows),
+    CONSUMER_COST_SECTION_END,
+  ].join('\n');
   const md = readFileSync(mdPath, 'utf8');
   const start = md.indexOf(CONSUMER_COST_SECTION_START);
   const end = md.indexOf(CONSUMER_COST_SECTION_END);

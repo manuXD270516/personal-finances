@@ -1,4 +1,5 @@
 import { Instant } from '@pf/shared-kernel';
+import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 import { BudgetQueries } from './budget.queries.js';
 import { BudgetThresholdService } from './budget-thresholds.service.js';
@@ -455,6 +456,30 @@ describe('Umbrales: emisión única por objetivo, umbral y periodo', () => {
     });
     expect(ctx.env.crossingRows.map((c) => c.threshold)).toEqual(['50']);
   });
+
+  it('[TC-PLATFORM-THROUGHPUT-007] evaluar el workspace una vez por grupo deja los mismos cruces y hechos que evaluarlo tras cada evento del grupo', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(fc.integer({ min: 1, max: 400 }), { minLength: 1, maxLength: 6 }),
+        async (amounts) => {
+          const run = async (perEvent: boolean) => {
+            const ctx = setup();
+            await restaurants(ctx, '0.00');
+            // Los gastos del grupo ya están confirmados cuando el consumidor corre (lee el estado, no el evento).
+            amounts.forEach((a, i) =>
+              ctx.env.flow(`2026-11-0${String(i + 1)}`, 'EXPENSE', REST, `${String(a)}.00`),
+            );
+            if (perEvent)
+              for (let i = 0; i < amounts.length; i += 1) await ctx.thresholds.evaluateWorkspace(W);
+            else await ctx.thresholds.evaluateWorkspace(W);
+            return { events: reached(ctx), rows: ctx.env.crossingRows.map((c) => c.threshold) };
+          };
+          expect(await run(false)).toEqual(await run(true));
+        },
+      ),
+      { numRuns: 25 },
+    );
+  }, 60_000);
 
   it('[TC-PLANNING-THRESHOLD-004] bajar (reembolso) y volver a subir no re-emite el 50 %', async () => {
     const ctx = setup();

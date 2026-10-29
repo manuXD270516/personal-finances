@@ -41,7 +41,10 @@ export async function consumerBacklogWithZeros(
         GROUP BY name`,
     );
     return {
-      backlog: new Map([...queues.rows.map((r) => [r.name, 0] as const), ...rows.map((r) => [r.name, r.pending] as const)]),
+      backlog: new Map([
+        ...queues.rows.map((r) => [r.name, 0] as const),
+        ...rows.map((r) => [r.name, r.pending] as const),
+      ]),
       retrying: new Map(rows.map((r) => [r.name, r.retrying] as const)),
     };
   });
