@@ -193,7 +193,7 @@ sequenceDiagram
 | `pf_app` | Proceso `api` | `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`; grants DML mínimos por tabla; sin DDL |
 | `pf_worker` | Proceso `worker` | Igual a `pf_app` + políticas del relay de outbox y escritura de read models |
 | `pf_bff` | BFF (`finance-web`): store de sesiones | `LOGIN NOSUPERUSER NOBYPASSRLS`; `SELECT/INSERT/UPDATE/DELETE` **solo** sobre `iam.bff_session`; sin acceso a tablas de negocio; credencial separada (`BFF_DATABASE_URL`; `migrate` alinea su contraseña) |
-| `pf_maintenance` | Purgas por retención (incl. sesiones expiradas de `iam.bff_session`) | DELETE solo en tablas técnicas/purgables |
+| `pf_maintenance` | Purgas por retención (incl. sesiones expiradas de `iam.bff_session`) y lectura de los exports vencidos (`iam.workspace_export`, barrido `identity.export-retention`) | DELETE solo en tablas técnicas/purgables; `SELECT` de cinco columnas (sin `wrapped_key` ni `object_key`) de los `READY` vencidos, sin escritura (fix-rls-fail-closed-gaps) |
 | `pf_purge` | Borrado de workspace a pedido del usuario (función `SECURITY DEFINER`) | Único que desactiva triggers de inmutabilidad dentro de la función; auditado |
 | `pf_backup` | Dumps lógicos | `BYPASSRLS`, solo lectura, usado únicamente por el job de backup |
 | `pf_readonly` (opcional) | Soporte / análisis manual | `NOBYPASSRLS`; requiere fijar workspace explícitamente |

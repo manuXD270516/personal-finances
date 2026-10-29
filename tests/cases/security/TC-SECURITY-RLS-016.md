@@ -12,8 +12,10 @@ invariants: []
 priority: high
 type: security
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: true
 phase: 5
 tags: ["rls", "export", "retention"]
@@ -56,3 +58,4 @@ Entonces solo ve la de "W1 Personal Demo", sin la clave envuelta ni la ubicació
 ## Notas
 
 - Change `fix-rls-fail-closed-gaps`, tarea 2.4. La expiración por la cola real del worker la sigue cubriendo TC-IDENTITY-EXPORT-007.
+- Automatizado (2026-10-28) en `rls-isolation.int.test.ts`: la consulta del barrido, las lecturas prohibidas y el `UPDATE` con una conexión real de `pf_worker` y `SET LOCAL ROLE pf_maintenance`. La expiración completa con los adapters reales (`WorkspaceExportService.expireDue`, contexto de W1 y auditoría `identity.export.expired`) la ejercita TC-IDENTITY-EXPORT-007 por la cola real del worker (`workspace-export-lifecycle.api.test.ts`), que ahora pasa por `findExpired` con `pf_maintenance`.

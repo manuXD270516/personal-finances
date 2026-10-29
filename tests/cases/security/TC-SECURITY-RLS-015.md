@@ -12,8 +12,10 @@ invariants: [INV-025]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: true
 phase: 5
 tags: ["rls", "fail-closed", "export"]
@@ -53,4 +55,4 @@ Entonces todas las lecturas fallan con el error de contexto ausente (PF002)
 
 ## Notas
 
-- Change `fix-rls-fail-closed-gaps` (D296), tarea 2.3. Debe fallar antes de la migración y pasar después.
+- Change `fix-rls-fail-closed-gaps` (D296), tarea 2.3. Falló antes de la migración (con `pf_app` y `pf_worker` las lecturas devolvían `OK:0`) y pasa con ella (2026-10-28).

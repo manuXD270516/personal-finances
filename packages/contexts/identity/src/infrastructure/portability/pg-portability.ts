@@ -155,7 +155,11 @@ export class PgExportRepository implements ExportRepository {
   }
 
   async findExpired(now: Instant, limit: number): Promise<readonly ExpiredExportRef[]> {
-    // Sin workspace en contexto: solo la política `retention_scan` (READY vencidos) lo permite al rol del worker.
+    // Sin workspace en contexto: el barrido lee entre workspaces como `pf_maintenance` (ADR-0023), asumido solo en esta
+    // transacción (`SET LOCAL ROLE`, el worker lo tiene concedido sin heredarlo). Ese rol solo ve por `retention_scan`
+    // los READY vencidos y solo cinco columnas (sin `object_key`, `key_id` ni `wrapped_key`); `ws_isolation` de
+    // `pf_app` y `pf_worker` falla con PF002 sin contexto (fix-rls-fail-closed-gaps, D296).
+    await exec().query('SET LOCAL ROLE pf_maintenance');
     const { rows } = await exec().query(
       `SELECT id, workspace_id, requested_by FROM iam.workspace_export
         WHERE status = 'READY' AND expires_at <= $1::timestamptz ORDER BY expires_at, id LIMIT $2`,

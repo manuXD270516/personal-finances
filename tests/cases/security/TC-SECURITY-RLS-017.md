@@ -12,8 +12,10 @@ invariants: [INV-025]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: true
 phase: 5
 tags: ["rls", "fail-closed", "worker"]
@@ -53,3 +55,4 @@ Entonces toda operación falla con el error de contexto ausente o de permisos, s
 ## Notas
 
 - Change `fix-rls-fail-closed-gaps`, tarea 2.6. Ampliar la lista exige cambiar el test y el requirement.
+- Automatizado (2026-10-28). Además de las lecturas de outbox, inbox y dead-letter, la lista declarada admite la inserción de prueba (`DEFAULT VALUES`) en `platform.inbox` y `platform.dead_letter` (el worker escribe ahí por diseño) y en `fx.rate_anomaly_review` y `fx.rate_withdrawal`: esa inserción choca con las restricciones de las columnas (23502/23514) antes de llegar a la política. Para las dos de FX el test comprueba en el catálogo que su `WITH CHECK` usa `current_workspace_id()`. Antes de la migración el test falló con las lecturas de `platform.idempotency_key` e `iam.workspace_export` sin `PF002`.

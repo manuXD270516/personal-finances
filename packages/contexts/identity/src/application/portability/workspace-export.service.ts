@@ -403,7 +403,8 @@ export class WorkspaceExportService {
   async expireDue(limit = 100): Promise<number> {
     const { uow, exports, store, clock, audit } = this.deps;
     const now: Instant = clock.now();
-    // Sin workspace en contexto: solo la política de retención del rol del worker permite leer los vencidos.
+    // Sin workspace en contexto: los vencidos se leen con el rol de mantenimiento (`pf_maintenance`, solo los READY
+    // vencidos y sin claves); cada expiración corre después con el contexto de su workspace.
     const due = await uow.run({ userId: null, workspaceId: null }, () => exports.findExpired(now, limit));
     let expired = 0;
     for (const ref of due) {

@@ -12,8 +12,10 @@ invariants: [INV-025]
 priority: critical
 type: security
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/db/rls-isolation.int.test.ts
+status: automated
 regression_suite: true
 phase: 5
 tags: ["rls", "fail-closed", "idempotency"]
@@ -58,4 +60,4 @@ Entonces las dos lecturas fallan con el error de contexto ausente (PF002)
 
 ## Notas
 
-- Change `fix-rls-fail-closed-gaps` (D296, [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)), tarea 2.1. Debe fallar antes de la migración (lectura filtrada y tabla vacía) y pasar después.
+- Change `fix-rls-fail-closed-gaps` (D296, [docs/48](../../../docs/48-perf-and-rls-owner-decisions.md)), tarea 2.1. Falló antes de la migración (lectura filtrada y tabla vacía devolvían `OK:0`) y pasa con ella (2026-10-28).
