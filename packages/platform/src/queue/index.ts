@@ -2,6 +2,8 @@ export {
   PLATFORM_PING_QUEUE,
   PLATFORM_PROBE_QUEUE,
   isJobEnvelope,
+  type BatchJobResult,
+  type JobBatchHandler,
   type JobContext,
   type JobEnvelope,
   type JobHandler,

@@ -32,6 +32,11 @@ export interface DataVersionStore {
   versionOf(workspaceId: string): Promise<string>;
   /** Incrementa la versión (solo el consumidor del worker, dentro de su transacción con inbox). */
   bump(workspaceId: string, at: string): Promise<void>;
+  /**
+   * Incrementa la versión en `count` (≥ 1) de una vez: equivale a `count` llamadas a `bump` con instantes cuyo máximo es
+   * `at` (entrega agrupada, optimize-consumer-throughput).
+   */
+  bumpBy(workspaceId: string, count: number, at: string): Promise<void>;
 }
 
 /**

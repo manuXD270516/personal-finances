@@ -5,16 +5,18 @@ spec: platform/event-delivery
 related_specs: ["imports/import-pipeline"]
 requirement: "Métricas de la entrega agrupada"
 scenario: "Grupo aplicado y grupo reintentado"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-OBS-004", "NFR-PERF-008"]
 invariants: []
 priority: medium
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/platform/src/events/consumers.test.ts
+  - packages/platform/src/events/metrics.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301", "metrics"]

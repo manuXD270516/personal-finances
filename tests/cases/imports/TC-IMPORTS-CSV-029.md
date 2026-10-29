@@ -55,5 +55,7 @@ Entonces la vista previa y la persistencia cumplen sus tiempos
 
 ## Notas
 
+- `optimize-consumer-throughput` (D307, D311): el benchmark mide dos configuraciones. La del código (concurrencia 4, pool del worker 52, API 22; 85 de 97 útiles) es **informativa**; la de la plantilla del host (concurrencia 1, pool 34 en el worker y 22 en la API; 67 de 97 útiles) es **bloqueante** (drenado ≤ 120 s por consumidor). Ver TC-PLATFORM-THROUGHPUT-008 y 014.
+
 - Datos ficticios; fechas fijas con `FixedClock` (TZ America/La_Paz).
 - 2026-10-28 (change 48b `fix-imports-perf-connection-budget`, D299): los dos rojos del benchmark nocturno se midieron en 23 corridas por `workflow_dispatch` ([docs/53](../../../docs/53-imports-perf-findings.md)). Conexiones (`timeout exceeded when trying to connect`, E10): no se reprodujo; el defecto era el presupuesto declarado del benchmark (115 conexiones de pools frente a 97 útiles del contenedor) y se corrigió con el pool de la API de la plantilla del host (22), la precondición de presupuesto y el veredicto `conexiones` (TC-PLATFORM-PIPELINE-029 y 030). Drenado marginal (123,5 s frente a 120 s): sin causa medida (1,3–35,8 s en 23 corridas); el reporte publica ahora el drenado por consumidor (TC-PLATFORM-PIPELINE-031 y 032) y queda como pregunta al owner ([docs/54](../../../docs/54-imports-perf-questions.md)). Los umbrales (30 s, 300 s de techo de persistencia y 120 s) no cambiaron.

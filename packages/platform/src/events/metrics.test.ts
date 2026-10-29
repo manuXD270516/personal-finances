@@ -122,4 +122,34 @@ describe('métricas de entrega de eventos (docs/18 §5.3)', () => {
       },
     ]);
   });
+  it('[TC-PLATFORM-THROUGHPUT-011] event_group_size y los grupos reintentados usan solo el label consumer', () => {
+    const records: { name: string; kind: string; value: number; attributes: Record<string, unknown> }[] = [];
+    const meter = {
+      createCounter: (name: string) => ({
+        add: (value: number, attributes: Record<string, unknown>) =>
+          records.push({ name, kind: 'counter', value, attributes }),
+      }),
+      createHistogram: (name: string) => ({
+        record: (value: number, attributes: Record<string, unknown>) =>
+          records.push({ name, kind: 'histogram', value, attributes }),
+      }),
+    } as unknown as Meter;
+    const m = new EventDeliveryMetrics(undefined, meter);
+    m.groupApplied('reporting.data-version', 100);
+    m.groupFallback('reporting.data-version');
+    expect(records).toEqual([
+      {
+        name: EVENT_METRICS.groupSize,
+        kind: 'histogram',
+        value: 100,
+        attributes: { consumer: 'reporting.data-version' },
+      },
+      {
+        name: EVENT_METRICS.groupFallbacks,
+        kind: 'counter',
+        value: 1,
+        attributes: { consumer: 'reporting.data-version' },
+      },
+    ]);
+  });
 });

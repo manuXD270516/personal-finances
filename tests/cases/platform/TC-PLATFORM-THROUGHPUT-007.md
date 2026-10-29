@@ -5,16 +5,23 @@ spec: platform/event-delivery
 related_specs: ["imports/import-pipeline"]
 requirement: "Entrega agrupada para consumidores que recalculan estado"
 scenario: "Ráfaga del mismo workspace aplicada en una transacción"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-008", "NFR-REL-008"]
 invariants: ["INV-028"]
 priority: high
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+  - packages/contexts/debt/src/application/card-activity.grouped.test.ts
+  - packages/contexts/goals/src/application/reactions.test.ts
+  - packages/contexts/planning/src/application/budgets.service.test.ts
+  - packages/contexts/planning/src/application/periods.service.test.ts
+  - packages/contexts/reporting/src/application/data-version-projector.test.ts
+  - packages/contexts/reporting/test/integration/pg-data-version.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301"]

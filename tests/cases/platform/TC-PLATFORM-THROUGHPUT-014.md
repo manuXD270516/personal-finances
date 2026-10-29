@@ -5,16 +5,19 @@ spec: platform/delivery-pipeline
 related_specs: ["imports/import-pipeline"]
 requirement: "El benchmark del import mide también con la configuración del host"
 scenario: "Dos configuraciones en el reporte"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-007", "NFR-PERF-008"]
 invariants: []
 priority: medium
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/imports.perf.ts
+  - apps/api/test/perf/perf-report.test.ts
+  - scripts/delivery-policy/test/nightly-policy.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301", "nightly", "perf", "D307"]
@@ -36,7 +39,7 @@ updated: 2026-10-29
 
 ## Intención
 
-El benchmark nocturno del import de 5 000 filas DEBERÍA (SHOULD) medir, además de la configuración por omisión del código, la configuración de la plantilla del host (concurrencia 1 por consumidor, pool de 34 en el worker y de 22 en la API), con la misma precondición de presupuesto de conexiones y el mismo drenado por consumidor; el reporte DEBE (MUST) mostrar ambas configuraciones por separado y la de la plantilla del host DEBE (MUST) quedar informativa mientras el owner no decida que sea bloqueante.
+El benchmark nocturno del import de 5 000 filas DEBE (MUST) medir, además de la configuración por omisión del código, la configuración de la plantilla del host (concurrencia 1 por consumidor, pool de 34 en el worker y de 22 en la API), con la misma precondición de presupuesto de conexiones y el mismo drenado por consumidor; el reporte DEBE (MUST) mostrar ambas configuraciones por separado; por D311 la fila del host es bloqueante y la del código informativa.
 
 ## Escenario
 

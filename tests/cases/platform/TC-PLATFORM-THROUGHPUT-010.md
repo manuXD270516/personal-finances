@@ -5,16 +5,17 @@ spec: platform/event-delivery
 related_specs: ["commitments/recurrence-engine"]
 requirement: "Ráfaga de un import grande con la configuración del host"
 scenario: "Sin sugerencias duplicadas en la ráfaga"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-007", "NFR-PERF-008", "NFR-REL-008"]
 invariants: ["INV-028"]
 priority: high
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/commitments/src/application/matching.service.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301"]

@@ -15,8 +15,8 @@ Trace: NFR-PERF-008 · Priority: Should
 - **Y** el veredicto del job no cambia por esa fila
 
 ### Requirement: El benchmark del import mide también con la configuración del host
-El benchmark nocturno del import de 5 000 filas DEBERÍA (SHOULD) medir, además de la configuración por omisión del código, la configuración de la plantilla del host (concurrencia 1 por consumidor, pool de 34 en el worker y de 22 en la API), con la misma precondición de presupuesto de conexiones y el mismo drenado por consumidor; el reporte DEBE (MUST) mostrar ambas configuraciones por separado y la de la plantilla del host DEBE (MUST) quedar informativa mientras el owner no decida que sea bloqueante. Ningún umbral existente DEBE (MUST) cambiar por esta medición.
-Trace: NFR-PERF-007, NFR-PERF-008 · Priority: Should
+El benchmark nocturno del import de 5 000 filas DEBE (MUST) medir, además de la configuración por omisión del código, la configuración de la plantilla del host (concurrencia 1 por consumidor, pool de 34 en el worker y de 22 en la API), con la misma precondición de presupuesto de conexiones y el mismo drenado por consumidor; el reporte DEBE (MUST) mostrar ambas configuraciones por separado. Por decisión del owner (D311) la fila con la configuración de la plantilla del host DEBE (MUST) ser bloqueante —decide el veredicto del nightly— y la fila con la configuración por omisión del código DEBE (MUST) quedar informativa. Ningún umbral existente DEBE (MUST) cambiar por esta medición.
+Trace: NFR-PERF-007, NFR-PERF-008 · Priority: Must
 
 #### Scenario: Dos configuraciones en el reporte
 - **CUANDO** el job de rendimiento corre el benchmark del import
@@ -25,5 +25,10 @@ Trace: NFR-PERF-007, NFR-PERF-008 · Priority: Should
 
 #### Scenario: Fila del host por encima de 120 segundos
 - **CUANDO** con la configuración del host un consumidor tarda 130 segundos en drenar y con la del código todos drenan en 40 segundos
-- **ENTONCES** la fila del host se publica como informativa excedida, con el consumidor y su tiempo
-- **Y** el veredicto del job lo decide la fila de la configuración del código
+- **ENTONCES** la fila del host se publica como bloqueante fallida, con el consumidor y su tiempo
+- **Y** el veredicto del job lo decide la fila de la configuración del host
+
+#### Scenario: Fila del código por encima de 120 segundos
+- **CUANDO** con la configuración del código un consumidor tarda 130 segundos en drenar y con la del host todos drenan en 40 segundos
+- **ENTONCES** la fila del código se publica como informativa excedida, con el consumidor y su tiempo
+- **Y** el veredicto del job no cambia por esa fila

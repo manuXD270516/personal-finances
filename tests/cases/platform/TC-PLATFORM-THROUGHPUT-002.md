@@ -5,16 +5,17 @@ spec: platform/event-delivery
 related_specs: ["imports/import-pipeline"]
 requirement: "Entrega agrupada para consumidores que recalculan estado"
 scenario: "Eventos ya procesados dentro del lote"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-008", "NFR-REL-008"]
 invariants: ["INV-028"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/platform/src/events/consumers.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301"]

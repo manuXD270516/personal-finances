@@ -82,6 +82,10 @@ export const EVENT_METRICS = {
   consumerBacklog: 'pf.events.consumer.backlog',
   /** NFR-OBS-004 `event_consumer_duration_seconds` (Prometheus: `pf_events_consumer_duration_seconds`). */
   consumerDuration: 'pf.events.consumer.duration',
+  /** `event_group_size` (optimize-consumer-throughput): eventos aplicados por invocación del efecto agrupado. */
+  groupSize: 'pf.events.consumer.group_size',
+  /** `event_consumer_group_fallbacks_total`: grupos que fallaron y se reintentaron evento por evento. */
+  groupFallbacks: 'pf.events.consumer.group_fallbacks',
 } as const;
 
 /**
@@ -94,6 +98,8 @@ export class EventDeliveryMetrics {
   private readonly duplicatesCounter: Counter;
   private readonly deadLetteredCounter: Counter;
   private readonly durationHistogram: Histogram;
+  private readonly groupSizeHistogram: Histogram;
+  private readonly groupFallbacksCounter: Counter;
   private consumers:
     { readonly names: readonly string[]; readonly queueOf: (c: string) => string } | undefined;
 
@@ -117,6 +123,12 @@ export class EventDeliveryMetrics {
       description:
         'Duración del procesamiento de un evento por un consumidor (transacción con inbox y efecto)',
       unit: 's',
+    });
+    this.groupSizeHistogram = meter.createHistogram(EVENT_METRICS.groupSize, {
+      description: 'Eventos aplicados por cada invocación del efecto de un consumidor agrupado',
+    });
+    this.groupFallbacksCounter = meter.createCounter(EVENT_METRICS.groupFallbacks, {
+      description: 'Grupos de un consumidor agrupado que fallaron y se reintentaron evento por evento',
     });
     if (db) {
       const backlogGauge = meter.createObservableGauge(EVENT_METRICS.consumerBacklog, {
@@ -167,6 +179,16 @@ export class EventDeliveryMetrics {
   /** Duración (s) del procesamiento de un evento por un consumidor, con cualquier resultado. */
   consumed(consumer: string, seconds: number): void {
     this.durationHistogram.record(seconds, { consumer });
+  }
+
+  /** Eventos aplicados por una invocación del efecto agrupado de `consumer`. */
+  groupApplied(consumer: string, events: number): void {
+    this.groupSizeHistogram.record(events, { consumer });
+  }
+
+  /** Un grupo de `consumer` falló y sus eventos se reintentan de a uno. */
+  groupFallback(consumer: string): void {
+    this.groupFallbacksCounter.add(1, { consumer });
   }
 
   published(eventType: string): void {

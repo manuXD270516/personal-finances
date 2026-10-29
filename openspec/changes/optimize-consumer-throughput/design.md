@@ -78,7 +78,7 @@ Exigencia que se deriva: con concurrencia 1 y 120 s, `reporting.data-version` ne
 
 5. **Relay del outbox.** E9 mide también el tiempo hasta `outbox_pending = 0`. Si el relay (lotes de 200, `OutboxRelay`) es el que excede el plazo, el arreglo es del relay (inserción de los trabajos de un lote en una sola sentencia por cola), con su propio test; no se agregan conexiones (el relay ya tiene la suya, dentro de las 4 reservadas).
 
-6. **Benchmark con dos configuraciones (D307, opción c).** `imports.perf.ts` mide dos veces: la configuración del código (fila bloqueante actual, TC-IMPORTS-CSV-029, sin cambios) y la del host (`EVENT_CONSUMER_CONCURRENCY=1`, `DATABASE_POOL_MAX=34` en el worker, 22 en la API), con la precondición de presupuesto de `fix-imports-perf-connection-budget` (suma 22 + 34 + 4 + 4 + 3 = 67 de 97) y el drenado por consumidor. La fila del host es informativa hasta la pregunta 1. Además, la suite publica las filas de costo por evento (E6–E8) como informativas. Tiempo extra estimado: ≈ 3–4 min por corrida (docs/54 pregunta 2), lejos del tope de 240 min (D302).
+6. **Benchmark con dos configuraciones (D307, opción c).** `imports.perf.ts` mide dos veces: la configuración del código (informativa desde D311, TC-IMPORTS-CSV-029) y la del host (`EVENT_CONSUMER_CONCURRENCY=1`, `DATABASE_POOL_MAX=34` en el worker, 22 en la API), con la precondición de presupuesto de `fix-imports-perf-connection-budget` (suma 22 + 34 + 4 + 4 + 3 = 67 de 97) y el drenado por consumidor. **D311 (docs/57): la fila del host es la bloqueante y la del código queda informativa.** Además, la suite publica las filas de costo por evento (E6–E8) como informativas. Tiempo extra estimado: ≈ 3–4 min por corrida (docs/54 pregunta 2), lejos del tope de 240 min (D302).
 
 7. **Métricas.** `event_consumer_group_size` (histograma de eventos por invocación) y `event_consumer_group_fallbacks_total` (grupos reintentados evento por evento), etiquetados solo por `consumer`. `event_consumer_duration_seconds` sigue observando por evento (la duración del grupo se reparte en partes iguales entre sus eventos, para que la serie siga siendo comparable).
 
@@ -99,7 +99,7 @@ Exigencia que se deriva: con concurrencia 1 y 120 s, `reporting.data-version` ne
 - **Efecto agrupado no equivalente:** un consumidor cuyo efecto dependa del orden entre agregados daría un estado distinto. Mitigación: opt-in explícito, test de equivalencia por consumidor (decisión 3) y, ante la duda (p. ej. `debt.card-activity`), dejarlo fuera.
 - **Lotes más largos y expiración de trabajos:** un grupo de 100 retiene sus trabajos más tiempo; si superara `expireInSeconds` (300 s) pg-boss los reintentaría sin excepción (posible origen de HI6). Mitigación: E10b mide el motivo de cada reintento y `maxBatch` tiene tope 500.
 - **Respaldo costoso:** un grupo que falla se reprocesa de a uno (100 transacciones). Es aceptable porque un fallo del efecto es excepcional; la métrica de respaldos lo hace visible.
-- **La fila del host puede quedar roja:** es informativa hasta la pregunta 1; el informe nombra al consumidor y la causa.
+- **La fila del host puede quedar roja:** es bloqueante (D311); el informe nombra al consumidor y la causa.
 - **Corridas caras:** ≈ 60 min por nightly (D302). Mitigación: filtro de suites en la rama de experimentos.
 
 ## Plan de migración
@@ -113,6 +113,8 @@ Sin migraciones. Orden: (1) grupo 2 de tasks (instrumentación y perfil de ráfa
 - **Independiente de:** `add-rule-engine` y `add-document-attachments` (no agregan consumidores según sus diseños; si alguno agregara uno, debe justificarlo contra el presupuesto de 32 de 34).
 
 ## Preguntas abiertas
+
+> **Resueltas por el owner (docs/57):** la pregunta 1 con D311 (la fila del host bloquea el nightly; la del código queda informativa) y la pregunta 2 con D312 (umbral por consumidor: drenado de la ráfaga del import ≤ 120 s con la configuración del host; el throughput sobre el backlog del Large Seed sigue informativo).
 
 1. **[B para archivar este change, no para empezarlo] ¿La fila del benchmark del import con la configuración del host pasa a bloqueante?** Contexto: D307 dejó el benchmark con la concurrencia del código y pidió revisarlo aquí; producción corre con concurrencia 1. Opciones: (a) la fila del host pasa a bloqueante y la del código queda informativa; (b) ambas bloqueantes; (c) la del host queda informativa y la del código sigue bloqueante (estado actual más una fila). **Recomendación: (a)** una vez que el grupo 6 la muestre verde en dos nightlies: el benchmark debe proteger lo que corre en producción, y la configuración del código es más rápida (si pasa la del host, pasa la otra). Se pregunta con la evidencia de E9 en el doc de preguntas de la decisión 8.
 2. **Umbrales por consumidor de la fila de throughput con handler real (D300).** Se redacta con la medición (decisión 8); no bloquea la implementación. **Recomendación preliminar:** usar como umbral el drenado de la ráfaga del import (≤ 120 s por consumidor, configuración del host) y dejar el throughput sobre el backlog de 1,39 M del Large Seed como informativo, porque mide un estado que el producto no produce en uso real.

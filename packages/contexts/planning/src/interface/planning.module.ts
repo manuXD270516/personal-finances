@@ -37,7 +37,6 @@ import {
 import { BudgetQueries } from '../application/budget.queries.js';
 import { BudgetCalculator } from '../application/budget-calculator.js';
 import { BudgetThresholdService } from '../application/budget-thresholds.service.js';
-import { WorkspaceCoalescer } from '../application/workspace-coalescer.js';
 import { BudgetsService } from '../application/budgets.service.js';
 import { ClosePendingService } from '../application/close-pending-publisher.js';
 import { ClosingQueries, type CloseReportPdfRenderer } from '../application/closing.queries.js';
@@ -442,6 +441,14 @@ export function planningEventConsumers(runtime: PlanningRuntime): EventConsumerD
     {
       consumer: PLANNING_CONSUMERS.journalEntryPosted,
       events: [{ type: 'ledger.JournalEntryPosted', version: 1 }],
+      // Entrega agrupada (optimize-consumer-throughput): EnsurePeriods a lo sumo una vez por grupo.
+      grouping: {},
+      groupHandler: async (events) => {
+        const entryDates = events
+          .map((e) => payloadOf(e)['entryDate'])
+          .filter((d): d is string => typeof d === 'string');
+        await runtime.service.onJournalEntriesPosted({ workspaceId: events[0]!.workspaceId, entryDates });
+      },
       handler: async (event) => {
         const entryDate = payloadOf(event)['entryDate'];
         if (typeof entryDate !== 'string') return;
@@ -470,15 +477,19 @@ export function budgetEventConsumers(budgets: BudgetsRuntime): EventConsumerDefi
     'transactions.ConversionRevised',
     'fx.RateRecorded',
   ];
-  // Coalescencia por workspace (add-basic-csv-import decisión 11): una ráfaga de hechos de gasto (un import de miles de
-  // filas) comparte la reevaluación de los planes en lugar de repetirla por cada hecho.
-  const coalescer = new WorkspaceCoalescer();
   return [
     {
       consumer: PLANNING_CONSUMERS.budgetThresholds,
       events: spendEvents.map((type) => ({ type, version: 1 })),
       handler: async (event) => {
-        await coalescer.run(event.workspaceId, () => budgets.thresholds.evaluateWorkspace(event.workspaceId));
+        await budgets.thresholds.evaluateWorkspace(event.workspaceId);
+      },
+      // Entrega agrupada (optimize-consumer-throughput): una ráfaga de hechos de gasto (un import de miles de filas)
+      // comparte UNA reevaluación de los planes del workspace por grupo, en lugar de repetirla por cada hecho. Sustituye
+      // a la coalescencia en memoria, que con concurrencia 1 no ahorraba nada.
+      grouping: {},
+      groupHandler: async (events) => {
+        await budgets.thresholds.evaluateWorkspace(events[0]!.workspaceId);
       },
     },
     {

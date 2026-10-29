@@ -89,43 +89,82 @@ export class MatchingService {
     readonly transactionId: string;
     readonly eventId: string | null;
   }): Promise<MatchRunResult> {
+    return this.onTransactionsChanged(input.workspaceId, [input]);
+  }
+
+  /**
+   * Entrega agrupada (optimize-consumer-throughput): evalúa varias transacciones de UN workspace en una sola unidad de
+   * trabajo. Relee todas las transacciones y sus vínculos con una consulta cada una y comparte la búsqueda de
+   * ocurrencias candidatas entre las transacciones con la misma cuenta, tipo y ventana de fechas. El resultado por
+   * transacción es el de `onTransactionChanged`: cada una se reconcilia con SUS sugerencias y la idempotencia por par
+   * (transacción, ocurrencia) sigue vigente, así que una reentrega no duplica sugerencias.
+   */
+  onTransactionsChanged(
+    workspaceId: string,
+    items: readonly { readonly transactionId: string; readonly eventId: string | null }[],
+  ): Promise<MatchRunResult> {
     const { deps } = this;
-    const { workspaceId } = input;
+    if (items.length === 0) return Promise.resolve(NOTHING);
     return deps.uow.run(workspaceId, async () => {
-      const [found] = await deps.links.getManyForLink({ workspaceId, transactionIds: [input.transactionId] });
-      const existing = await deps.matching.listByTransaction(workspaceId, input.transactionId);
-      if (!found) return NOTHING;
-      const tx = toMatchTransaction(found);
-      let candidates: readonly MatchCandidate[] = [];
-      let dropReason: ExpireReason = 'INCOMPATIBLE';
-      if (found.status === 'VOIDED') {
-        dropReason = 'TRANSACTION_VOIDED';
-      } else if (!isEligibleTransaction(tx)) {
-        dropReason = 'INCOMPATIBLE';
-      } else if ((await deps.matching.linkedTransactionIds(workspaceId, [tx.transactionId])).size > 0) {
-        dropReason = 'SUPERSEDED';
-      } else {
-        const occurrences = await deps.matching.candidateOccurrences(workspaceId, {
-          kind: tx.kind,
-          accountId: tx.accountId,
-          toAccountId: tx.toAccountId,
-          from: LocalDate.parse(tx.businessDate).plusDays(-MAX_DATE_WINDOW_DAYS).toString(),
-          to: LocalDate.parse(tx.businessDate).plusDays(MAX_DATE_WINDOW_DAYS).toString(),
-        });
-        candidates = OccurrenceMatcher.forTransaction(
-          tx,
-          occurrences.map((row) => row.occurrence),
-        );
-      }
-      return this.reconcile({
+      const ids = [...new Set(items.map((i) => i.transactionId))];
+      const foundAll = await deps.links.getManyForLink({ workspaceId, transactionIds: ids });
+      const foundById = new Map(foundAll.map((t) => [t.transactionId, t] as const));
+      const eligible = foundAll.filter(
+        (t) => t.status !== 'VOIDED' && isEligibleTransaction(toMatchTransaction(t)),
+      );
+      const linked = await deps.matching.linkedTransactionIds(
         workspaceId,
-        candidates,
-        existing,
-        expireMissing: true,
-        dropReason,
-        eventId: input.eventId,
-        sources: new Map([[tx.transactionId, found.source]]),
-      });
+        eligible.map((t) => t.transactionId),
+      );
+      const candidatesCache = new Map<string, Promise<readonly MatchOccurrenceRow[]>>();
+      const total = { proposed: 0, refreshed: 0, expired: 0 };
+      for (const item of items) {
+        const found = foundById.get(item.transactionId);
+        const existing = await deps.matching.listByTransaction(workspaceId, item.transactionId);
+        if (!found) continue;
+        const tx = toMatchTransaction(found);
+        let candidates: readonly MatchCandidate[] = [];
+        let dropReason: ExpireReason = 'INCOMPATIBLE';
+        if (found.status === 'VOIDED') {
+          dropReason = 'TRANSACTION_VOIDED';
+        } else if (!isEligibleTransaction(tx)) {
+          dropReason = 'INCOMPATIBLE';
+        } else if (linked.has(tx.transactionId)) {
+          dropReason = 'SUPERSEDED';
+        } else {
+          const from = LocalDate.parse(tx.businessDate).plusDays(-MAX_DATE_WINDOW_DAYS).toString();
+          const to = LocalDate.parse(tx.businessDate).plusDays(MAX_DATE_WINDOW_DAYS).toString();
+          const key = `${tx.kind}|${tx.accountId}|${tx.toAccountId ?? ''}|${from}|${to}`;
+          let rows = candidatesCache.get(key);
+          if (!rows) {
+            rows = deps.matching.candidateOccurrences(workspaceId, {
+              kind: tx.kind,
+              accountId: tx.accountId,
+              toAccountId: tx.toAccountId,
+              from,
+              to,
+            });
+            candidatesCache.set(key, rows);
+          }
+          candidates = OccurrenceMatcher.forTransaction(
+            tx,
+            (await rows).map((row) => row.occurrence),
+          );
+        }
+        const result = await this.reconcile({
+          workspaceId,
+          candidates,
+          existing,
+          expireMissing: true,
+          dropReason,
+          eventId: item.eventId,
+          sources: new Map([[tx.transactionId, found.source]]),
+        });
+        total.proposed += result.proposed;
+        total.refreshed += result.refreshed;
+        total.expired += result.expired;
+      }
+      return total;
     });
   }
 

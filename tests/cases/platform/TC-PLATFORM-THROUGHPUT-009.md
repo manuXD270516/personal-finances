@@ -5,16 +5,17 @@ spec: platform/event-delivery
 related_specs: ["imports/import-pipeline"]
 requirement: "Ráfaga de un import grande con la configuración del host"
 scenario: "El worker de la plantilla arranca sin conexiones nuevas"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-007", "NFR-PERF-008", "NFR-REL-008"]
 invariants: []
 priority: high
 type: unit
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/events/event-throughput.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301", "connections", "D249"]
