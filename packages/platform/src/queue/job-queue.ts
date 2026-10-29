@@ -23,6 +23,20 @@ export interface JobContext<P extends object> {
 
 export type JobHandler<P extends object> = (job: JobContext<P>) => Promise<void>;
 
+/** Resultado de un trabajo dentro de un lote: sin `error` se confirma; con `error` falla (y se reintenta) solo él. */
+export interface BatchJobResult {
+  readonly id: string;
+  readonly error?: unknown;
+}
+
+/**
+ * Procesa un lote completo y devuelve un resultado por trabajo (optimize-consumer-throughput, decisión 2). Si lanza,
+ * todos los trabajos del lote fallan.
+ */
+export type JobBatchHandler<P extends object> = (
+  jobs: readonly JobContext<P>[],
+) => Promise<readonly BatchJobResult[]>;
+
 export interface WorkOptions {
   /** Workers en paralelo sobre la cola (cada uno trae su propio lote). */
   readonly concurrency: number;
@@ -91,6 +105,11 @@ export interface JobQueue {
   /** Encola con el `correlationId` del contexto actual (o uno nuevo si no hay). Devuelve el id del job. */
   send<P extends object>(queue: string, payload: P): Promise<string>;
   work<P extends object>(queue: string, options: WorkOptions, handler: JobHandler<P>): Promise<void>;
+  /**
+   * Como `work`, pero el handler recibe el lote completo (hasta `options.batchSize` trabajos) y devuelve un resultado por
+   * trabajo: cada uno se confirma o falla por separado. Lo usa la entrega agrupada de eventos.
+   */
+  workBatch<P extends object>(queue: string, options: WorkOptions, handler: JobBatchHandler<P>): Promise<void>;
   /**
    * Programa envíos periódicos (cron de 5 campos, evaluado en `tz`) a `queue` con el reloj de la cola (pg-boss
    * timekeeper, solo en procesos `consumer`). Idempotente entre réplicas y reinicios: reemplaza la programación previa.

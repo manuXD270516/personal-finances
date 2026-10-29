@@ -25,12 +25,18 @@ import {
   stats,
   summarizeSnapshot,
   throughputResult,
+  importsRowStatus,
   importsVerdict,
+  classifyRetryReason,
+  renderConsumerCostSection,
   renderImportsSection,
+  writeConsumerCostReport,
   writeImportsReport,
   writeReport,
   type ConnectionsReport,
+  type ConsumerCost,
   type ConsumerDrain,
+  type ImportsConfiguration,
   type ImportsReport,
   type PerfReport,
   type BackgroundLoadEntry,
@@ -1021,5 +1027,123 @@ describe('reporte del import: fallos de entrega', () => {
       verdict: { kind: 'ok', message: 'ok' },
     }).join('\n');
     expect(md).toMatch(/\| events\.goals\.balance-watch \| 10 \| 2 \| 40P01 error: deadlock detected \|/u);
+  });
+});
+
+describe('benchmark del import con la configuración del host (optimize-consumer-throughput, D307 y D311)', () => {
+  const drain = (queue: string, ms: number): ConsumerDrain => ({
+    queue,
+    pendingAtPersist: 5000,
+    peakPending: 5000,
+    drainedAfterPersistMs: ms,
+    eventsPerSecond: Math.round(5000 / (ms / 1000)),
+  });
+  const row = (cfg: ImportsConfiguration, drains: ConsumerDrain[]): ImportsReport => {
+    const worst = Math.max(...drains.map((d) => d.drainedAfterPersistMs ?? 0));
+    return {
+      rows: 5000,
+      previewMs: 8000,
+      persistMs: 118_000,
+      drainAfterPersistMs: worst,
+      drainBudgetMs: 120_000,
+      drainByConsumer: drains,
+      verdict: importsVerdict({ drainAfterPersistMs: worst, drainBudgetMs: 120_000, drainByConsumer: drains }),
+      configuration: cfg,
+    };
+  };
+  const code: ImportsConfiguration = {
+    label: 'code',
+    eventConsumerConcurrency: 4,
+    workerPoolMax: 52,
+    apiPoolMax: 22,
+    poolsSum: 85,
+    usableConnections: 97,
+    gate: false,
+  };
+  const host: ImportsConfiguration = {
+    label: 'host',
+    eventConsumerConcurrency: 1,
+    workerPoolMax: 34,
+    apiPoolMax: 22,
+    poolsSum: 67,
+    usableConnections: 97,
+    gate: true,
+  };
+
+  it('[TC-PLATFORM-THROUGHPUT-014] el reporte muestra por separado la configuración del código y la del host con sus pools y el presupuesto de conexiones', () => {
+    const report: ImportsReport = {
+      ...row(code, [drain('events.a', 40_000)]),
+      hostConfig: row(host, [drain('events.a', 95_000)]),
+    };
+    const md = renderImportsSection(report).join('\n');
+    expect(md).toMatch(/Configuración del código:\*\* concurrencia 4 por consumidor, pool de 52 en el worker y de 22 en la API/u);
+    expect(md).toMatch(
+      /Configuración de la plantilla del host:\*\* concurrencia 1 por consumidor, pool de 34 en el worker y de 22 en la API; suma de pools de 67 conexiones frente a 97 útiles/u,
+    );
+    expect(md.indexOf('Configuración del código')).toBeLessThan(md.indexOf('Configuración de la plantilla del host'));
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-015] con el host en 130 s la fila del código a 40 s queda informativa y la fila del host es la bloqueante que falla, con el consumidor y su tiempo', () => {
+    const hostRow = row(host, [drain('events.reporting.data-version', 130_000), drain('events.b', 40_000)]);
+    const codeRow = row(code, [drain('events.reporting.data-version', 40_000)]);
+    expect(importsRowStatus(codeRow)).toBe('informativa, dentro del presupuesto');
+    expect(importsRowStatus(hostRow)).toBe('bloqueante, FALLA (drenado)');
+    expect(hostRow.verdict.message).toMatch(/events\.reporting\.data-version 130,0 s/u);
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-015] una fila informativa excedida se publica con el consumidor y su tiempo sin ser bloqueante', () => {
+    const codeRow = row(code, [drain('events.reporting.data-version', 130_000)]);
+    expect(importsRowStatus(codeRow)).toBe(
+      'informativa, excedida (drenado): events.reporting.data-version 130,0 s',
+    );
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-014] writeImportsReport conserva imports.hostConfig en perf-results.json', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pf-imports-host-'));
+    writeReport(buildReport({ ...emptyBase, results: [] }), dir, '');
+    writeImportsReport({ ...row(code, [drain('events.a', 1000)]), hostConfig: row(host, [drain('events.a', 2000)]) }, dir);
+    const json = JSON.parse(readFileSync(join(dir, 'perf-results.json'), 'utf8')) as PerfReport;
+    expect(json.imports?.hostConfig?.configuration).toMatchObject({ label: 'host', eventConsumerConcurrency: 1 });
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-012] el motivo de un reintento distingue la expiración del fallo del handler (E10b)', () => {
+    expect(classifyRetryReason('job timed out after 300 seconds')).toBe('expiración');
+    expect(classifyRetryReason('handler execution exceeded 300000ms')).toBe('expiración');
+    expect(classifyRetryReason('40P01 error: deadlock detected')).toBe('fallo del handler');
+  });
+});
+
+describe('costo por evento de cada consumidor (optimize-consumer-throughput, D300)', () => {
+  const cost = (consumer: string, solo: number | null, extra: Partial<ConsumerCost> = {}): ConsumerCost => ({
+    consumer,
+    p50Ms: 4,
+    p95Ms: 11,
+    soloEventsPerSecond: solo,
+    lockWaitsMs: 0,
+    gate: false,
+    ...extra,
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-012] el resumen publica p50, p95, ritmo aislado y esperas por bloqueos de cada consumidor, todos informativos', () => {
+    const md = renderConsumerCostSection([
+      cost('reporting.data-version', 120, { lockWaitsMs: 3000, groupSize: 100 }),
+      cost('debt.card-activity', 80),
+    ]).join('\n');
+    expect(md).toMatch(/\| reporting\.data-version \| 4 \| 11 \| 120 \| 3000 \| 100 \| informativo \|/u);
+    expect(md).toMatch(/\| debt\.card-activity \(más lento\) \| 4 \| 11 \| 80 \| 0 \| — \| informativo \|/u);
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-013] un consumidor a 30 ev/s sin umbral decidido aparece como el más lento y no cambia el veredicto del job', () => {
+    const rows = [cost('a.fast', 150), cost('goals.balance-watch', 30), cost('b.mid', 90)];
+    const md = renderConsumerCostSection(rows).join('\n');
+    expect(md).toMatch(/El consumidor más lento es `goals\.balance-watch` con 30 ev\/s/u);
+    const dir = mkdtempSync(join(tmpdir(), 'pf-cost-'));
+    const base = buildReport({ ...emptyBase, results: [] });
+    writeReport(base, dir, '');
+    writeConsumerCostReport(rows, dir);
+    const json = JSON.parse(readFileSync(join(dir, 'perf-results.json'), 'utf8')) as PerfReport;
+    expect(json.consumerCost).toHaveLength(3);
+    expect(json.breaches).toEqual([]);
+    expect(readFileSync(join(dir, 'perf-summary.md'), 'utf8')).toContain('OK — sin umbrales superados');
   });
 });

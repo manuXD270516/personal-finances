@@ -136,6 +136,11 @@ export interface WorkerRuntimeOptions {
   readonly scheduledJobs?: boolean;
   /** Consumidores de eventos registrados por los contextos (y por los tests). */
   readonly eventConsumers?: readonly EventConsumerDefinition[];
+  /**
+   * Solo pruebas y benchmarks (optimize-consumer-throughput): filtro de los consumidores que se ponen a trabajar (los
+   * demás conservan su cola, que el relay sigue llenando, sin consumirla). Por omisión, todos.
+   */
+  readonly startConsumers?: (def: EventConsumerDefinition) => boolean;
   /** Ajustes del relay (tests: lote, polling, inyección de fallos). */
   readonly relay?: Partial<Pick<OutboxRelayOptions, 'batchSize' | 'pollIntervalMs' | 'afterEnqueue'>>;
   readonly metrics?: EventDeliveryMetrics;
@@ -598,6 +603,8 @@ export async function createWorkerRuntime(
     logger,
     metrics,
     ...consumerDefaults,
+    groupBatchSize: config.EVENT_CONSUMER_GROUP_BATCH_SIZE,
+    ...(options.startConsumers ? { only: options.startConsumers } : {}),
   });
   const relay = new OutboxRelay({
     pool,

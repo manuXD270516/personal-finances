@@ -30,6 +30,7 @@ import {
 } from './connection-budget.js';
 import { IMPORTS_API_POOL_MAX, PERF_RATE_LIMITS } from './perf-env.js';
 import {
+  classifyRetryReason,
   importsVerdict,
   writeImportsReport,
   type ConsumerDrain,
@@ -67,8 +68,38 @@ let accountId = '';
 let sampler: Client | undefined;
 let server: ServerConnectionLimits;
 let budget: ConnectionBudgetCheck;
-const acquisitions = new AcquisitionRecorder();
+let acquisitions = new AcquisitionRecorder();
 const restorers: (() => void)[] = [];
+
+/**
+ * Configuraciones que mide la suite (optimize-consumer-throughput, D307 y D311): la del código (concurrencia 4 y pool del
+ * worker 52, los valores por omisión; INFORMATIVA) y la de la plantilla del host (`EVENT_CONSUMER_CONCURRENCY=1`,
+ * `DATABASE_POOL_MAX=34` en el worker y 22 en la API: la que corre en producción; BLOQUEANTE). Las dos con la misma
+ * precondición de presupuesto de conexiones.
+ */
+interface ImportConfig {
+  readonly label: 'code' | 'host';
+  readonly title: string;
+  readonly concurrency: number;
+  readonly workerEnv: Record<string, string>;
+  /** `true`: el drenado fuera de presupuesto hace fallar la suite (D311); `false`: se publica sin decidir el veredicto. */
+  readonly gate: boolean;
+}
+const CODE_CONFIG: ImportConfig = {
+  label: 'code',
+  title: 'configuración del código (informativa)',
+  concurrency: 4,
+  workerEnv: {},
+  gate: false,
+};
+const HOST_CONFIG: ImportConfig = {
+  label: 'host',
+  title: 'configuración de la plantilla del host (bloqueante)',
+  concurrency: 1,
+  workerEnv: { EVENT_CONSUMER_CONCURRENCY: '1', DATABASE_POOL_MAX: '34' },
+  gate: true,
+};
+let codeReport: ImportsReport | undefined;
 
 const W = () => `/api/v1/workspaces/${owner.ws}`;
 
@@ -130,6 +161,7 @@ async function retriedJobs(since: Date): Promise<RetriedJobs[]> {
       maxRetryCount: r.max_retry,
       maxLatencyMs: r.max_latency_ms,
       error: r.error ?? '(sin mensaje)',
+      reason: classifyRetryReason(r.error ?? ''),
     }));
   });
 }
@@ -183,24 +215,34 @@ async function consumerBacklogWithZeros(): Promise<{
 }
 
 beforeAll(async () => {
-  // API con el pool de la plantilla del host (A1): la suma de los pools máximos cabe en el servidor del benchmark.
+  // API con el pool de la plantilla del host (A1): la suma de los pools máximos cabe en el servidor del benchmark. El
+  // worker se levanta por configuración dentro de cada test (`prepare`).
   h = await startHarness({
-    worker: true,
     apiEnv: { ...PERF_RATE_LIMITS, DATABASE_POOL_MAX: String(IMPORTS_API_POOL_MAX) },
   });
-  // Precondición de presupuesto [TC-PLATFORM-PIPELINE-029]: si la suma de los pools máximos no cabe en el servidor, la
-  // suite falla ANTES de subir el archivo y no publica ninguna medición como válida.
   sampler = new Client({
     connectionString: inject('deps').superuserUrl,
     application_name: 'pf-perf-conn-sampler',
   });
   await sampler.connect();
   server = await readServerLimits(sampler);
+}, 300_000);
+
+/**
+ * Levanta el worker con la configuración dada, verifica la precondición de presupuesto [TC-PLATFORM-PIPELINE-029] (si la
+ * suma de los pools máximos no cabe en el servidor, falla ANTES de subir el archivo y no publica ninguna medición como
+ * válida) y crea el usuario y la cuenta de la corrida.
+ */
+async function prepare(cfg: ImportConfig): Promise<void> {
+  for (const restore of restorers.splice(0)) restore();
+  await h.stopWorker();
+  acquisitions = new AcquisitionRecorder();
+  await h.startWorker({}, { env: cfg.workerEnv });
   budget = checkConnectionBudget(poolBudgets(), server);
   assertConnectionBudget(poolBudgets(), server);
   restorers.push(instrumentPool('api', h.api.resources.pool, acquisitions));
   restorers.push(instrumentPool('worker', h.worker!.pool, acquisitions));
-  owner = await h.user(`kc-imp-perf-${randomUUID()}`);
+  owner = await h.user(`kc-imp-perf-${cfg.label}-${randomUUID()}`);
   const account = await h.call('POST', `${W()}/accounts`, {
     token: owner.token,
     body: {
@@ -213,7 +255,7 @@ beforeAll(async () => {
   });
   expect(account.status).toBe(201);
   accountId = account.body['id'] as string;
-}, 300_000);
+}
 
 afterAll(async () => {
   for (const restore of restorers) restore();
@@ -221,8 +263,10 @@ afterAll(async () => {
   await sampler?.end();
 });
 
-describe('import CSV de 5 000 filas', () => {
-  it('[TC-IMPORTS-CSV-029] vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena su backlog en ≤ 120 s', async () => {
+/** Una corrida completa del benchmark con la configuración `cfg`; publica su fila y aplica sus umbrales. */
+async function runImportBenchmark(cfg: ImportConfig): Promise<void> {
+  await prepare(cfg);
+  {
     const connections = new ConnectionSampler(
       { api: h.api.resources.pool, worker: h.worker!.pool },
       sampler!,
@@ -346,13 +390,25 @@ describe('import CSV de 5 000 filas', () => {
       retries,
       jobFailures: jobFailures(),
       verdict,
+      configuration: {
+        label: cfg.label,
+        eventConsumerConcurrency: cfg.concurrency,
+        workerPoolMax: h.worker!.pool.options.max ?? 10,
+        apiPoolMax: h.api.resources.pool.options.max ?? 10,
+        poolsSum: budget.poolsSum,
+        usableConnections: budget.limit,
+        gate: cfg.gate,
+      },
     };
-    writeImportsReport(report, perfOutDir());
+    // La fila del código es `imports` (informativa) y la del host cuelga de ella como `hostConfig` (bloqueante, D311).
+    if (cfg.label === 'code') codeReport = report;
+    writeImportsReport(cfg.label === 'host' && codeReport ? { ...codeReport, hostConfig: report } : report, perfOutDir());
 
     // Informe para el job nightly (informativo + umbrales de la spec).
     console.log(
       JSON.stringify({
         test: 'TC-IMPORTS-CSV-029',
+        configuration: cfg.label,
         rows: ROWS,
         uploadMs: Math.round(uploadedMs),
         previewMs: Math.round(previewMs),
@@ -365,11 +421,16 @@ describe('import CSV de 5 000 filas', () => {
       }),
     );
 
-    // Una adquisición de conexión vencida es un fallo de conexiones, no del drenado (TC-PLATFORM-PIPELINE-030).
-    if (
+    // Un fallo del propio import (no del drenado ni de las conexiones) invalida la medición en cualquier configuración.
+    const connectionFailure =
       verdict.kind === 'conexiones' ||
-      (failure instanceof Error && ACQUIRE_TIMEOUT_MESSAGE.test(failure.message))
-    ) {
+      (failure instanceof Error && ACQUIRE_TIMEOUT_MESSAGE.test(failure.message));
+    if (failure && !connectionFailure) throw failure;
+    // La fila del código es informativa (D311): se publica y no decide el veredicto.
+    if (!cfg.gate) return;
+
+    // Una adquisición de conexión vencida es un fallo de conexiones, no del drenado (TC-PLATFORM-PIPELINE-030).
+    if (connectionFailure) {
       const detail = failure instanceof Error ? `; error: ${failure.message}` : '';
       throw new Error(
         `${verdict.kind === 'conexiones' ? verdict.message : '[TC-PLATFORM-PIPELINE-030] veredicto conexiones: la adquisición de conexión venció'}${detail}`,
@@ -378,7 +439,6 @@ describe('import CSV de 5 000 filas', () => {
         },
       );
     }
-    if (failure) throw failure;
 
     expect(previewMs).toBeLessThanOrEqual(PREVIEW_BUDGET_MS);
     // Objetivo de la spec: ≤ 20 s. Estricto con PF_PERF_STRICT_IMPORT=1; por omisión solo el techo de regresión.
@@ -389,5 +449,15 @@ describe('import CSV de 5 000 filas', () => {
     // los consumidores que terminaron después del presupuesto [TC-PLATFORM-PIPELINE-032].
     expect(drainAfterPersistMs, verdict.message).toBeLessThanOrEqual(DRAIN_BUDGET_MS);
     expect(events).toEqual(['imports.ImportApproved', 'imports.ImportCompleted']);
+  }
+}
+
+describe('import CSV de 5 000 filas', () => {
+  it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-014] ${CODE_CONFIG.title}: se publica la fila sin decidir el veredicto`, async () => {
+    await runImportBenchmark(CODE_CONFIG);
+  }, 1_800_000);
+
+  it(`[TC-IMPORTS-CSV-029][TC-PLATFORM-THROUGHPUT-008][TC-PLATFORM-THROUGHPUT-014] ${HOST_CONFIG.title}: vista previa ≤ 30 s, persistencia ≤ 20 s y cada consumidor drena en ≤ 120 s`, async () => {
+    await runImportBenchmark(HOST_CONFIG);
   }, 1_800_000);
 });

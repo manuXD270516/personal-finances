@@ -61,7 +61,7 @@ export interface Harness {
   /** `discardBacklog: false` conserva los jobs ya encolados (p. ej. una importación recibida con el worker detenido). */
   startWorker(
     options?: Parameters<typeof createWorkerRuntime>[2],
-    flags?: { discardBacklog?: boolean },
+    flags?: { discardBacklog?: boolean; env?: Record<string, string> },
   ): Promise<WorkerRuntime>;
   stopWorker(): Promise<void>;
   token(sub: string, authAgeSeconds?: number): Promise<string>;
@@ -80,6 +80,8 @@ export async function startHarness(options: {
   /** Emisor OIDC de los tokens (por defecto `ISSUER`): una semilla cargada con otro emisor (`seed --profile=large`). */
   readonly issuer?: string;
   readonly apiEnv?: Record<string, string>;
+  /** Entorno del worker (p. ej. `EVENT_CONSUMER_CONCURRENCY`, `DATABASE_POOL_MAX`); `startWorker` puede pasar otro. */
+  readonly workerEnv?: Record<string, string>;
   readonly worker?: boolean | Parameters<typeof createWorkerRuntime>[2];
 }): Promise<Harness> {
   const deps = inject('deps');
@@ -154,7 +156,7 @@ export async function startHarness(options: {
       if (h.worker) return h.worker;
       if (flags?.discardBacklog !== false) await discardStaleJobs(deps);
       h.workerLog = capturingLogger('finance-worker', 'worker');
-      h.worker = await createWorkerRuntime(workerConfig(baseEnv(deps)), h.workerLog.logger, {
+      h.worker = await createWorkerRuntime(workerConfig(baseEnv(deps, flags?.env ?? options.workerEnv)), h.workerLog.logger, {
         ...(options.realClock ? {} : { clock }),
         ledgerMaintenanceOnStart: false,
         fxGapFillOnStart: false,

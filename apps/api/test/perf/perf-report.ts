@@ -400,6 +400,8 @@ export interface PerfReport {
   readonly backgroundLoad?: BackgroundLoadReport;
   /** Benchmark del import de 5 000 filas (fix-imports-perf-connection-budget). Aditivo: ausente si la suite no corrió. */
   readonly imports?: ImportsReport;
+  /** Costo por evento de cada consumidor con handler real (optimize-consumer-throughput). Informativo, aditivo. */
+  readonly consumerCost?: readonly ConsumerCost[];
 }
 
 export function latencyResult(input: {
@@ -838,6 +840,18 @@ export interface RetriedJobs {
   /** Latencia máxima (alta a fin) de un trabajo reintentado de la cola. */
   readonly maxLatencyMs?: number;
   readonly error: string;
+  /** Motivo del reintento (E10b, HI6 de docs/53): `expiración` del trabajo activo o `fallo del handler`. */
+  readonly reason?: RetryReason;
+}
+
+export type RetryReason = 'expiración' | 'fallo del handler';
+
+/**
+ * Clasifica un reintento por el último error que pg-boss guardó: un trabajo activo que superó `expireInSeconds` se
+ * reintenta SIN excepción del handler (expiración); cualquier otro mensaje es un fallo del handler.
+ */
+export function classifyRetryReason(error: string): RetryReason {
+  return /expire|expir|timed out|handler execution exceeded/iu.test(error) ? 'expiración' : 'fallo del handler';
 }
 
 /** Fallos de entrega de un consumidor registrados por el worker (`job failed`), agrupados por error. */
@@ -853,6 +867,19 @@ export type ImportsVerdict =
   | { readonly kind: 'conexiones'; readonly message: string }
   | { readonly kind: 'drenado'; readonly message: string };
 
+/** Configuración con la que corrió una fila del benchmark del import (D307, D311). */
+export interface ImportsConfiguration {
+  readonly label: 'code' | 'host';
+  readonly eventConsumerConcurrency: number;
+  readonly workerPoolMax: number;
+  readonly apiPoolMax: number;
+  /** Suma de los pools máximos de la suite (API, worker, colas y harness) frente a `usableConnections`. */
+  readonly poolsSum: number;
+  readonly usableConnections: number;
+  /** `true`: la fila decide el veredicto del job (la de la plantilla del host, D311); `false`: informativa. */
+  readonly gate: boolean;
+}
+
 export interface ImportsReport {
   readonly rows: number;
   readonly previewMs: number;
@@ -867,6 +894,23 @@ export interface ImportsReport {
   /** Por qué fallaron las entregas (registro del worker): causa de los reintentos que alargan una cola. */
   readonly jobFailures?: readonly JobFailure[];
   readonly verdict: ImportsVerdict;
+  readonly configuration?: ImportsConfiguration;
+  /** Fila con la configuración de la plantilla del host (misma forma que la raíz): bloqueante desde D311. */
+  readonly hostConfig?: ImportsReport;
+}
+
+/** Costo por evento de un consumidor con su handler real (optimize-consumer-throughput, E6–E8). Siempre informativo. */
+export interface ConsumerCost {
+  readonly consumer: string;
+  readonly p50Ms: number;
+  readonly p95Ms: number;
+  /** Ritmo con el consumidor como único activo (eventos por segundo); `null` si no se midió. */
+  readonly soloEventsPerSecond: number | null;
+  /** Milisegundos acumulados de muestras con esperas por bloqueos durante su drenado. */
+  readonly lockWaitsMs: number;
+  /** Eventos por invocación del efecto, si el consumidor está agrupado. */
+  readonly groupSize?: number;
+  readonly gate: false;
 }
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
@@ -915,9 +959,38 @@ export const IMPORTS_SECTION_END = '<!-- imports:end -->';
 
 /** Sección "Import de 5 000 filas" de `perf-summary.md` (conexiones por pool, servidor y drenado por consumidor). */
 export function renderImportsSection(r: ImportsReport): string[] {
+  const out = renderImportsRow(r, '## Import de 5 000 filas: conexiones y drenado por consumidor');
+  if (r.hostConfig) {
+    out.push(...renderImportsRow(r.hostConfig, '### Configuración de la plantilla del host'));
+  }
+  return out;
+}
+
+/** Estado de una fila del benchmark del import: bloqueante (decide el veredicto) o informativa (se publica sin decidir). */
+export function importsRowStatus(r: ImportsReport): string {
+  const gate = r.configuration?.gate ?? true;
+  if (gate) return r.verdict.kind === 'ok' ? 'bloqueante, OK' : `bloqueante, FALLA (${r.verdict.kind})`;
+  if (r.verdict.kind === 'ok') return 'informativa, dentro del presupuesto';
+  const late = r.drainByConsumer
+    .filter((c) => c.drainedAfterPersistMs === null || c.drainedAfterPersistMs > r.drainBudgetMs)
+    .map(
+      (c) =>
+        `${c.queue} ${c.drainedAfterPersistMs === null ? 'sin llegar a 0' : seconds(c.drainedAfterPersistMs)}`,
+    );
+  return `informativa, excedida (${r.verdict.kind})${late.length > 0 ? `: ${late.join(', ')}` : ''}`;
+}
+
+function renderImportsRow(r: ImportsReport, heading: string): string[] {
+  const cfg = r.configuration;
   const out: string[] = [
-    '## Import de 5 000 filas: conexiones y drenado por consumidor',
+    heading,
     '',
+    ...(cfg
+      ? [
+          `**Configuración ${cfg.label === 'host' ? 'de la plantilla del host' : 'del código'}:** concurrencia ${String(cfg.eventConsumerConcurrency)} por consumidor, pool de ${String(cfg.workerPoolMax)} en el worker y de ${String(cfg.apiPoolMax)} en la API; suma de pools de ${String(cfg.poolsSum)} conexiones frente a ${String(cfg.usableConnections)} útiles. **Fila:** ${importsRowStatus(r)}.`,
+          '',
+        ]
+      : []),
     `**Veredicto:** ${r.verdict.kind === 'ok' ? 'OK' : `FALLA (${r.verdict.kind})`}: ${r.verdict.message}`,
     '',
     `Vista previa ${seconds(r.previewMs)}, persistencia ${seconds(r.persistMs)}, drenado ${seconds(r.drainAfterPersistMs)} después de la persistencia (presupuesto ${budgetSeconds(r.drainBudgetMs)}).`,
@@ -971,7 +1044,7 @@ export function renderImportsSection(r: ImportsReport): string[] {
       '|---|---|---|---|---|',
       ...r.retries.map(
         (j) =>
-          `| ${j.queue} | ${String(j.jobs)} | ${String(j.maxRetryCount)} | ${j.maxLatencyMs === undefined ? '—' : (j.maxLatencyMs / 1000).toFixed(1)} | ${j.error.replace(/\|/gu, '/')} |`,
+          `| ${j.queue} | ${String(j.jobs)} | ${String(j.maxRetryCount)} | ${j.maxLatencyMs === undefined ? '—' : (j.maxLatencyMs / 1000).toFixed(1)} | ${j.error.replace(/\|/gu, '/')}${j.reason ? ` (${j.reason})` : ''} |`,
       ),
       '',
     );
@@ -1001,6 +1074,64 @@ export function writeImportsReport(report: ImportsReport, outDir: string): void 
     start === -1 || end === -1 || end < start
       ? `${md.replace(/\n*$/u, '')}\n\n${section}\n`
       : `${md.slice(0, start)}${section}${md.slice(end + IMPORTS_SECTION_END.length)}`,
+    'utf8',
+  );
+}
+
+// ── Costo por evento de cada consumidor con handler real (optimize-consumer-throughput, TC-PLATFORM-THROUGHPUT-012/013) ──
+
+export const CONSUMER_COST_SECTION_START = '<!-- consumer-cost:start -->';
+export const CONSUMER_COST_SECTION_END = '<!-- consumer-cost:end -->';
+
+/**
+ * Sección "Costo por evento de cada consumidor" de `perf-summary.md`. Todas las filas son informativas: no entran en
+ * `breaches` ni cambian el veredicto del job (D300, D312). Ordenadas del más lento al más rápido por ritmo aislado.
+ */
+export function renderConsumerCostSection(rows: readonly ConsumerCost[]): string[] {
+  const rank = (c: ConsumerCost): number => c.soloEventsPerSecond ?? Number.POSITIVE_INFINITY;
+  const sorted = [...rows].sort((a, b) => rank(a) - rank(b) || a.consumer.localeCompare(b.consumer));
+  const slowest = sorted.find((c) => c.soloEventsPerSecond !== null);
+  return [
+    '## Costo por evento de cada consumidor (informativo)',
+    '',
+    'Duración por evento con el handler real, ritmo con el consumidor como único activo y esperas por bloqueos de base de datos durante su drenado. Ninguna fila decide el veredicto del job (D300).',
+    '',
+    ...(slowest
+      ? [`El consumidor más lento es \`${slowest.consumer}\` con ${String(slowest.soloEventsPerSecond)} ev/s.`, '']
+      : []),
+    '| Consumidor | p50 (ms) | p95 (ms) | Ritmo aislado (ev/s) | Esperas por bloqueos (ms) | Eventos por invocación | Gate |',
+    '|---|---|---|---|---|---|---|',
+    ...sorted.map(
+      (c) =>
+        `| ${c.consumer}${c === slowest ? ' (más lento)' : ''} | ${String(c.p50Ms)} | ${String(c.p95Ms)} | ${c.soloEventsPerSecond === null ? '—' : String(c.soloEventsPerSecond)} | ${String(c.lockWaitsMs)} | ${c.groupSize === undefined ? '—' : String(c.groupSize)} | informativo |`,
+    ),
+    '',
+  ];
+}
+
+/**
+ * Publica el costo por consumidor: siempre `consumer-cost-perf.json` y, si ya existen el `perf-results.json` y el
+ * `perf-summary.md` de la corrida, agrega `consumerCost` al primero y la sección entre marcadores al segundo (aditivo).
+ */
+export function writeConsumerCostReport(rows: readonly ConsumerCost[], outDir: string): void {
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'consumer-cost-perf.json'), `${JSON.stringify(rows, null, 2)}\n`, 'utf8');
+  const jsonPath = join(outDir, 'perf-results.json');
+  const mdPath = join(outDir, 'perf-summary.md');
+  if (!existsSync(jsonPath) || !existsSync(mdPath)) return;
+  const current = JSON.parse(readFileSync(jsonPath, 'utf8')) as PerfReport;
+  writeFileSync(jsonPath, `${JSON.stringify({ ...current, consumerCost: rows }, null, 2)}\n`, 'utf8');
+  const section = [CONSUMER_COST_SECTION_START, ...renderConsumerCostSection(rows), CONSUMER_COST_SECTION_END].join(
+    '\n',
+  );
+  const md = readFileSync(mdPath, 'utf8');
+  const start = md.indexOf(CONSUMER_COST_SECTION_START);
+  const end = md.indexOf(CONSUMER_COST_SECTION_END);
+  writeFileSync(
+    mdPath,
+    start === -1 || end === -1 || end < start
+      ? `${md.replace(/\n*$/u, '')}\n\n${section}\n`
+      : `${md.slice(0, start)}${section}${md.slice(end + CONSUMER_COST_SECTION_END.length)}`,
     'utf8',
   );
 }
