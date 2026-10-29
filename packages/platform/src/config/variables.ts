@@ -522,6 +522,12 @@ export const VARIABLES = {
       'Eventos que cada consumidor trae por consulta a la cola; cada uno se confirma o falla por separado. Con 1 vuelve al ritmo previo (~2 eventos/s por worker).',
     default: '10',
   }),
+  EVENT_CONSUMER_GROUP_BATCH_SIZE: variable(z.coerce.number().int().min(1).max(500), {
+    group: 'Worker',
+    description:
+      'Eventos que cada consumidor de entrega agrupada (opt-in, optimize-consumer-throughput) trae por consulta a la cola y aplica en una sola transacción por workspace (1–500). Un consumidor puede fijar el suyo. No agrega conexiones: la concurrencia no cambia.',
+    default: '100',
+  }),
   WORKER_HEALTH_PORT: variable(port, {
     group: 'Worker',
     description:
@@ -1151,6 +1157,7 @@ export const APP_VARIABLES = {
     'WORKER_CONCURRENCY',
     'EVENT_CONSUMER_CONCURRENCY',
     'EVENT_CONSUMER_BATCH_SIZE',
+    'EVENT_CONSUMER_GROUP_BATCH_SIZE',
     'WORKER_HEALTH_PORT',
     'WORKER_HEALTH_BIND_ADDRESS',
     'LEDGER_INTEGRITY_CRON',

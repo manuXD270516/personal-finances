@@ -8,6 +8,8 @@ const obj = (v: unknown): Json => (typeof v === 'object' && v !== null ? (v as J
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const text = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
+type CancelReason = 'PURCHASE_VOIDED' | 'PURCHASE_REVISED';
+
 export interface CardActivityEvent {
   readonly workspaceId: string;
   readonly eventType: string;
@@ -62,40 +64,62 @@ export class CardActivityService {
   }
 
   async onEvent(event: CardActivityEvent): Promise<void> {
+    await this.onEvents(event.workspaceId, [event]);
+  }
+
+  /**
+   * Entrega agrupada (optimize-consumer-throughput): los eventos NUEVOS de UN workspace en una sola unidad de trabajo.
+   * Resuelve las cuentas de tarjeta una vez, cancela los planes de cuotas de las compras anuladas o corregidas y
+   * sincroniza UNA vez cada tarjeta tocada. Equivale a `onEvent` por cada evento en cualquier orden: la sincronización
+   * lee el estado vigente (los asientos ya están confirmados cuando el consumidor corre), es idempotente y el cruce de
+   * umbrales se emite una sola vez por cruce.
+   */
+  async onEvents(workspaceId: string, events: readonly CardActivityEvent[]): Promise<void> {
     const { deps } = this;
-    const { workspaceId } = event;
+    if (events.length === 0) return;
     await deps.uow.run(workspaceId, async () => {
-      const p = obj(event.payload);
       const index = await deps.cards.activeAccountIndex(workspaceId);
       if (index.size === 0) return;
       const cardIds = new Set<string>();
-      for (const accountId of await this.accountsOf(event)) {
-        const cardId = index.get(accountId);
-        if (cardId) cardIds.add(cardId);
-      }
-      // Compra con plan de cuotas anulada o corregida con otro monto.
-      const transactionId = text(p['transactionId']);
-      let cancelReason: 'PURCHASE_VOIDED' | 'PURCHASE_REVISED' | null = null;
-      if (event.eventType === 'transactions.TransactionVoided') cancelReason = 'PURCHASE_VOIDED';
-      else if (
-        event.eventType === 'transactions.TransactionUpdated' &&
-        arr(p['changedFields']).some((f) => f === 'amount' || f === 'accountId')
-      ) {
-        cancelReason = 'PURCHASE_REVISED';
-      }
-      let planCard: string | null = null;
-      if (cancelReason && transactionId) {
-        const plan = await deps.plans.findByPurchase(workspaceId, transactionId);
-        if (plan) planCard = await deps.cards.cardIdOfCardAccount(workspaceId, plan.snapshot.cardAccountId);
-        if (planCard) cardIds.add(planCard);
+      const cancels: {
+        readonly transactionId: string;
+        readonly reason: CancelReason;
+        readonly card: string;
+      }[] = [];
+      for (const event of events) {
+        const p = obj(event.payload);
+        for (const accountId of await this.accountsOf(event)) {
+          const cardId = index.get(accountId);
+          if (cardId) cardIds.add(cardId);
+        }
+        // Compra con plan de cuotas anulada o corregida con otro monto.
+        const transactionId = text(p['transactionId']);
+        let cancelReason: CancelReason | null = null;
+        if (event.eventType === 'transactions.TransactionVoided') cancelReason = 'PURCHASE_VOIDED';
+        else if (
+          event.eventType === 'transactions.TransactionUpdated' &&
+          arr(p['changedFields']).some((f) => f === 'amount' || f === 'accountId')
+        ) {
+          cancelReason = 'PURCHASE_REVISED';
+        }
+        if (cancelReason && transactionId) {
+          const plan = await deps.plans.findByPurchase(workspaceId, transactionId);
+          const planCard = plan
+            ? await deps.cards.cardIdOfCardAccount(workspaceId, plan.snapshot.cardAccountId)
+            : null;
+          if (planCard) {
+            cardIds.add(planCard);
+            cancels.push({ transactionId, reason: cancelReason, card: planCard });
+          }
+        }
       }
       for (const cardId of cardIds) {
         const card = await deps.cards.findById(workspaceId, cardId, { lock: 'update' });
         if (!card || card.status !== 'ACTIVE') continue;
         const clock = await this.engine.clockOf(workspaceId);
-        if (cancelReason && transactionId && planCard === cardId) {
-          const plan = await deps.plans.findByPurchase(workspaceId, transactionId);
-          if (plan) await this.installments.cancelPlan(plan, cancelReason, clock.at, workspaceId);
+        for (const c of cancels.filter((x) => x.card === cardId)) {
+          const plan = await deps.plans.findByPurchase(workspaceId, c.transactionId);
+          if (plan) await this.installments.cancelPlan(plan, c.reason, clock.at, workspaceId);
         }
         await this.sync(card, clock);
       }

@@ -24,6 +24,8 @@ export {
 export {
   DEFAULT_EVENT_CONSUMER_BATCH_SIZE,
   DEFAULT_EVENT_CONSUMER_CONCURRENCY,
+  DEFAULT_EVENT_CONSUMER_GROUP_BATCH_SIZE,
+  MAX_EVENT_CONSUMER_GROUP_BATCH_SIZE,
   DEFAULT_EVENT_RETRY_LIMIT,
   RESERVED_WORKER_CONNECTIONS,
   assertConsumerConnectionBudget,
@@ -36,6 +38,7 @@ export {
   type DeliveryOutcome,
   type EventConsumerDefinition,
   type EventConsumerRuntimeOptions,
+  type EventGroupHandler,
   type EventHandler,
   type EventHandlerContext,
 } from './consumers.js';

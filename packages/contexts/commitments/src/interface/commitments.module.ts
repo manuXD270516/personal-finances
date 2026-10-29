@@ -5,7 +5,7 @@ import type { ClassificationValidator } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import { runWithRequestContext } from '@pf/platform/api';
-import type { EventConsumerDefinition } from '@pf/platform/events';
+import type { EventConsumerDefinition, EventEnvelope } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
 import type { CounterMetrics, HistogramMetrics } from '@pf/platform/otel';
@@ -289,6 +289,22 @@ const MATCH_RELEVANT_FIELDS: ReadonlySet<string> = new Set([
   'splits',
 ]);
 
+/** Qué hace el matcher con un hecho de Transactions: expirar propuestas (anulada), reevaluar o nada. */
+function matcherActionOf(event: EventEnvelope): { kind: 'voided' | 'changed'; transactionId: string } | null {
+  const p = payloadOf(event);
+  const transactionId = p['transactionId'];
+  if (typeof transactionId !== 'string') return null;
+  if (event.eventType === 'transactions.TransactionVoided') return { kind: 'voided', transactionId };
+  if (event.eventType === 'transactions.TransactionUpdated') {
+    const changed = Array.isArray(p['changedFields']) ? (p['changedFields'] as unknown[]) : [];
+    if (!changed.some((f) => typeof f === 'string' && MATCH_RELEVANT_FIELDS.has(f))) return null;
+  } else if ((p['origin'] as { type?: unknown } | undefined)?.type === 'RECURRING') {
+    // La creó una ocurrencia: nunca es candidata (externalRef `commitments.occurrence`).
+    return null;
+  }
+  return { kind: 'changed', transactionId };
+}
+
 /**
  * Consumidores idempotentes del worker (inbox en la misma transacción, INV-028):
  *  - `commitments.transaction-voided`: `transactions.TransactionVoided.v1` libera la ocurrencia creada o vinculada.
@@ -321,22 +337,36 @@ export function commitmentsEventConsumers(runtime: CommitmentsRuntime): EventCon
         { type: 'transactions.TransactionVoided', version: 1 },
       ],
       handler: async (event) => {
-        const p = payloadOf(event);
-        const transactionId = p['transactionId'];
-        if (typeof transactionId !== 'string') return;
+        const action = matcherActionOf(event);
+        if (!action) return;
         const { workspaceId, eventId } = event;
-        if (event.eventType === 'transactions.TransactionVoided') {
-          await runtime.matching.onTransactionVoided({ workspaceId, transactionId });
+        if (action.kind === 'voided') {
+          await runtime.matching.onTransactionVoided({ workspaceId, transactionId: action.transactionId });
           return;
         }
-        if (event.eventType === 'transactions.TransactionUpdated') {
-          const changed = Array.isArray(p['changedFields']) ? (p['changedFields'] as unknown[]) : [];
-          if (!changed.some((f) => typeof f === 'string' && MATCH_RELEVANT_FIELDS.has(f))) return;
-        } else if ((p['origin'] as { type?: unknown } | undefined)?.type === 'RECURRING') {
-          // La creó una ocurrencia: nunca es candidata (externalRef `commitments.occurrence`).
-          return;
+        await runtime.matching.onTransactionChanged({
+          workspaceId,
+          transactionId: action.transactionId,
+          eventId,
+        });
+      },
+      // Entrega agrupada (optimize-consumer-throughput): las anulaciones expiran sus propuestas y las transacciones
+      // creadas o corregidas se evalúan juntas (una lectura de transacciones y vínculos, búsqueda de candidatas
+      // compartida). Las sugerencias siguen siendo idempotentes por par (transacción, ocurrencia).
+      grouping: {},
+      groupHandler: async (events) => {
+        const workspaceId = events[0]!.workspaceId;
+        const changed: { transactionId: string; eventId: string }[] = [];
+        for (const event of events) {
+          const action = matcherActionOf(event);
+          if (!action) continue;
+          if (action.kind === 'voided') {
+            await runtime.matching.onTransactionVoided({ workspaceId, transactionId: action.transactionId });
+          } else {
+            changed.push({ transactionId: action.transactionId, eventId: event.eventId });
+          }
         }
-        await runtime.matching.onTransactionChanged({ workspaceId, transactionId, eventId });
+        await runtime.matching.onTransactionsChanged(workspaceId, changed);
       },
     },
     {

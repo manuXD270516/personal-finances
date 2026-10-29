@@ -382,6 +382,19 @@ export function debtEventConsumers(runtime: CardsRuntime): EventConsumerDefiniti
           payload: event.payload,
         });
       },
+      // Entrega agrupada (optimize-consumer-throughput): cada tarjeta tocada por el grupo se sincroniza una vez.
+      grouping: {},
+      groupHandler: async (events) => {
+        await runtime.activity.onEvents(
+          events[0]!.workspaceId,
+          events.map((event) => ({
+            workspaceId: event.workspaceId,
+            eventType: event.eventType,
+            eventId: event.eventId,
+            payload: event.payload,
+          })),
+        );
+      },
     },
   ];
 }

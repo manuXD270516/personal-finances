@@ -9,7 +9,8 @@
  *  2. Suites de latencia (`spendable`, `goals`, `loan-simulator`, `upcoming-payments`, `subscriptions`): sensibles a la
  *     carga del host; corren primero tras `nightly`, con la purga y la espera de quietud.
  *  3. `commitments`: mide el throughput del matcher y deja su inbox y sus ocurrencias.
- *  4. `imports`: deja la mayor carga del host (7,5–8) y ~112 000 filas muertas en `pgboss.job`; va al final para que no
+ *  4. `throughput`: ráfaga del import y costo por consumidor (informativo); deja backlog consumido y carga alta.
+ *  5. `imports`: deja la mayor carga del host (7,5–8) y ~112 000 filas muertas en `pgboss.job`; va al final para que no
  *     contamine a ninguna otra.
  */
 export const PERF_SUITE_ORDER: readonly string[] = [
@@ -20,6 +21,7 @@ export const PERF_SUITE_ORDER: readonly string[] = [
   'upcoming-payments.perf.ts',
   'subscriptions.perf.ts',
   'commitments.perf.ts',
+  'throughput.perf.ts',
   'imports.perf.ts',
 ];
 

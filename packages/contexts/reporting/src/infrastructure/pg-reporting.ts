@@ -41,11 +41,15 @@ export class PgDataVersionStore implements DataVersionStore {
   }
 
   async bump(workspaceId: string, at: string): Promise<void> {
+    await this.bumpBy(workspaceId, 1, at);
+  }
+
+  async bumpBy(workspaceId: string, count: number, at: string): Promise<void> {
     await sql`
       INSERT INTO reporting.workspace_data_version AS v (workspace_id, version, updated_at)
-      VALUES (${workspaceId}, 1, ${at}::timestamptz)
+      VALUES (${workspaceId}, ${count}, ${at}::timestamptz)
       ON CONFLICT (workspace_id) DO UPDATE
-        SET version = v.version + 1, updated_at = GREATEST(v.updated_at, EXCLUDED.updated_at)`.execute(
+        SET version = v.version + ${count}, updated_at = GREATEST(v.updated_at, EXCLUDED.updated_at)`.execute(
       unitOfWorkKysely(),
     );
   }

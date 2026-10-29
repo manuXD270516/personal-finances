@@ -5,7 +5,7 @@ spec: platform/event-delivery
 related_specs: ["imports/import-pipeline"]
 requirement: "Ráfaga de un import grande con la configuración del host"
 scenario: "Cinco mil transacciones importadas con concurrencia 1"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-007", "NFR-PERF-008", "NFR-REL-008"]
 invariants: []
@@ -14,7 +14,7 @@ type: platform
 level: performance
 automation_status: not_automated
 automated_tests: []
-status: draft
+status: ready
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301", "nightly", "perf"]
@@ -51,5 +51,7 @@ Entonces cada consumidor termina de procesar sus eventos en 120 segundos o menos
 ```
 
 ## Notas
+
+- Se automatiza al cerrar el change (tarea 6.3): la medición vive en `apps/api/test/perf/imports.perf.ts` (fila del host, bloqueante por D311) y `apps/api/test/perf/throughput.perf.ts`; pasa a `automated` con la evidencia de dos nightlies programados seguidos con la ráfaga ≤ 120 s por consumidor. Mediciones previas a la entrega agrupada en `docs/59-consumer-throughput-findings.md`.
 
 - Change: `optimize-consumer-throughput` (Phase 6). Datos ficticios; fechas fijas con `FixedClock` en America/La_Paz; ningún dato de extractos reales del owner (D255, D281).

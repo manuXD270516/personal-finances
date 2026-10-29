@@ -3,6 +3,9 @@ import { PgBoss, type JobResult, type JobWithMetadata } from 'pg-boss';
 import { currentCorrelation, runWithCorrelation, uuidv7, type Logger } from '../logging/index.js';
 import {
   isJobEnvelope,
+  type BatchJobResult,
+  type JobBatchHandler,
+  type JobContext,
   type JobEnvelope,
   type JobHandler,
   type JobQueue,
@@ -159,6 +162,79 @@ export class PgBossJobQueue implements JobQueue {
           results.push({ id: job.id, status: 'failed', output: sanitizeError(err) });
         }
       }
+      return results;
+    });
+    this.working.add(queue);
+  }
+
+  async workBatch<P extends object>(
+    queue: string,
+    options: WorkOptions,
+    handler: JobBatchHandler<P>,
+  ): Promise<void> {
+    await this.ensureQueue(queue);
+    const interval = this.options.pollingIntervalSeconds;
+    const batchSize = Math.max(1, Math.floor(options.batchSize ?? 1));
+    const workOptions = {
+      localConcurrency: options.concurrency,
+      batchSize,
+      burstWhenBatchFull: batchSize > 1,
+      perJobResults: true,
+      pollingIntervalSeconds: interval,
+      notifyPollingIntervalSeconds: interval,
+      includeMetadata: true,
+    } as const;
+    await this.boss.work<JobEnvelope<P>, unknown, typeof workOptions>(queue, workOptions, async (jobs) => {
+      const results: JobResult[] = [];
+      const contexts: JobContext<P>[] = [];
+      for (const job of jobs) {
+        const data: unknown = job.data;
+        if (!isJobEnvelope(data)) {
+          this.options.logger.error(
+            { 'job.queue': queue, 'job.id': job.id },
+            'job without envelope rejected',
+          );
+          results.push({
+            id: job.id,
+            status: 'failed',
+            output: sanitizeError(new Error('job without envelope')),
+          });
+          continue;
+        }
+        contexts.push({
+          id: job.id,
+          queue,
+          attempt: job.retryCount + 1,
+          payload: data.payload as P,
+          correlationId: data.correlationId,
+          signal: job.signal,
+        });
+      }
+      if (contexts.length === 0) return results;
+      const started = Date.now();
+      const fields = { 'job.queue': queue, 'job.batch_size': contexts.length };
+      this.options.logger.info(fields, 'job batch started');
+      let outcomes: readonly BatchJobResult[];
+      try {
+        outcomes = await handler(contexts);
+      } catch (err) {
+        outcomes = contexts.map((c) => ({ id: c.id, error: err }));
+      }
+      const byId = new Map(outcomes.map((o) => [o.id, o]));
+      for (const ctx of contexts) {
+        const outcome = byId.get(ctx.id);
+        if (outcome && outcome.error === undefined) {
+          results.push({ id: ctx.id, status: 'completed' });
+          continue;
+        }
+        const error = outcome?.error ?? new Error('batch handler returned no result for the job');
+        this.options.logger.error(
+          { 'job.queue': queue, 'job.id': ctx.id, 'job.attempt': ctx.attempt, err: sanitizeError(error) },
+          'job failed',
+        );
+        results.push({ id: ctx.id, status: 'failed', output: sanitizeError(error) });
+      }
+      this.options.logger.info({ ...fields, duration_ms: Date.now() - started }, 'job batch completed');
       return results;
     });
     this.working.add(queue);

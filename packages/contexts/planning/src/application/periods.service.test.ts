@@ -1,4 +1,5 @@
 import { DomainError, Instant } from '@pf/shared-kernel';
+import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PeriodQueries } from './period.queries.js';
 import { PeriodsService } from './periods.service.js';
@@ -434,5 +435,49 @@ describe('Consumidor de asientos (JournalEntryPosted)', () => {
     mem.entries(W1, '2026-08-10');
     expect(await svc.onJournalEntryPosted({ workspaceId: W1, entryDate: '2026-08-10' })).toBe(true);
     expect(mem.labels(W1)[0]).toBe('2026-08:ACTIVE');
+  });
+});
+
+describe('Consumidor de asientos agrupado (optimize-consumer-throughput)', () => {
+  const dateArb = fc
+    .date({
+      min: new Date('2025-01-01T00:00:00Z'),
+      max: new Date('2030-12-31T00:00:00Z'),
+      noInvalidDate: true,
+    })
+    .map((d) => d.toISOString().slice(0, 10));
+
+  it('[TC-PLATFORM-THROUGHPUT-007] las mismas fechas de asientos entregadas de a una o agrupadas, en cualquier orden, dejan los mismos periodos', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.array(dateArb, { minLength: 1, maxLength: 12 }), fc.nat(10), async (dates, rot) => {
+        const single = setup();
+        await single.svc.ensurePeriods({ workspaceId: W1 });
+        const grouped = setup();
+        await grouped.svc.ensurePeriods({ workspaceId: W1 });
+        for (const d of dates) {
+          single.mem.entries(W1, d);
+          grouped.mem.entries(W1, d);
+        }
+        for (const d of dates) await single.svc.onJournalEntryPosted({ workspaceId: W1, entryDate: d });
+        const k = rot % dates.length;
+        const rotated = [...dates.slice(k), ...dates.slice(0, k)].reverse();
+        await grouped.svc.onJournalEntriesPosted({ workspaceId: W1, entryDates: rotated });
+        expect(grouped.mem.labels(W1)).toEqual(single.mem.labels(W1));
+      }),
+      { numRuns: 40 },
+    );
+  }, 60_000);
+
+  it('[TC-PLATFORM-THROUGHPUT-001] un grupo con todas las fechas cubiertas no ejecuta EnsurePeriods ni toma bloqueos', async () => {
+    const { mem, svc } = setup();
+    await svc.ensurePeriods({ workspaceId: W1 });
+    const locks = mem.locks;
+    expect(
+      await svc.onJournalEntriesPosted({
+        workspaceId: W1,
+        entryDates: ['2026-10-15', '2026-10-16', '2026-11-02'],
+      }),
+    ).toBe(false);
+    expect(mem.locks).toBe(locks);
   });
 });

@@ -704,3 +704,39 @@ describe('aislamiento del benchmark en el harness (TC-PLATFORM-PIPELINE-024, TC-
     expect(Object.keys(workflow.jobs).sort()).toEqual(['fx-smoke-live', 'mutation', 'perf', 'regression']);
   });
 });
+
+// optimize-consumer-throughput (D300, D311, TC-PLATFORM-THROUGHPUT-012..015): las filas nuevas del benchmark y los
+// umbrales de docs/02 (TC-PLATFORM-PIPELINE-028 sigue verde: las constantes de arriba no cambian).
+describe('filas de rendimiento de la entrega de eventos (TC-PLATFORM-THROUGHPUT-012..015)', () => {
+  const dir = 'apps/api/test/perf';
+  const imports = readText(`${dir}/imports.perf.ts`);
+  const throughput = readText(`${dir}/throughput.perf.ts`);
+  const report = readText(`${dir}/perf-report.ts`);
+
+  /** Bloque `const <NAME>: ImportConfig = { ... };` de imports.perf.ts. */
+  const configBlock = (name: string): string =>
+    new RegExp(String.raw`const ${name}: ImportConfig = \{[\s\S]*?\n\};`, 'u').exec(imports)?.[0] ?? '';
+
+  it('[TC-PLATFORM-THROUGHPUT-014] el benchmark del import mide dos configuraciones: la del código informativa y la de la plantilla del host bloqueante (D311)', () => {
+    expect(configBlock('CODE_CONFIG')).toMatch(/gate: false/u);
+    expect(configBlock('HOST_CONFIG')).toMatch(/gate: true/u);
+    expect(configBlock('HOST_CONFIG')).toMatch(/EVENT_CONSUMER_CONCURRENCY: '1'/u);
+    expect(configBlock('HOST_CONFIG')).toMatch(/DATABASE_POOL_MAX: '34'/u);
+    // La fila informativa vuelve antes de aplicar ningún umbral; las aserciones de los umbrales quedan tras ese retorno.
+    expect(imports).toMatch(
+      /if \(!cfg\.gate\) return;[\s\S]*expect\(drainAfterPersistMs, verdict\.message\)/u,
+    );
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-012] las filas de costo por consumidor son siempre informativas: el tipo lo fija y la suite no afirma ningún umbral', () => {
+    expect(report).toMatch(/export interface ConsumerCost \{[\s\S]*readonly gate: false;/u);
+    expect(throughput).toMatch(/gate: false/u);
+    expect(throughput).not.toMatch(/toBeLessThan|toBeGreaterThan\(\w*(?:DRAIN|BUDGET|CEILING)/u);
+  });
+
+  it('[TC-PLATFORM-THROUGHPUT-013] el costo por consumidor no entra en las brechas del reporte (buildReport solo mira los resultados con gate)', () => {
+    const build = /export function buildReport[\s\S]*?\n\}/u.exec(report)?.[0] ?? '';
+    expect(build).toMatch(/\.filter\(\(r\) => r\.gate && !r\.passed\)/u);
+    expect(build).not.toMatch(/consumerCost/u);
+  });
+});

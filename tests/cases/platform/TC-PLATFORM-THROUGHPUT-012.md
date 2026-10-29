@@ -5,16 +5,19 @@ spec: platform/delivery-pipeline
 related_specs: ["imports/import-pipeline"]
 requirement: "Costo por evento de cada consumidor con handler real publicado"
 scenario: "Publicación del costo por consumidor"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr: ["NFR-PERF-008"]
 invariants: []
 priority: medium
 type: platform
 level: unit
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/perf/perf-report.test.ts
+  - apps/api/test/perf/throughput.perf.ts
+  - scripts/delivery-policy/test/nightly-policy.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["event-delivery", "throughput", "D301", "nightly", "perf", "D300"]

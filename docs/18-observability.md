@@ -133,6 +133,8 @@ Rate = conteo del histograma; Errors = status ≥ 500 (4xx contabilizados aparte
 | `pf.events.dead_lettered` | Counter | `consumer` — eventos que agotaron sus reintentos |
 | `pf.events.consumer.backlog` | Gauge | `consumer` — eventos publicados aún sin procesar (en la cola, en reintento o en curso) por consumidor, leídos de PostgreSQL (`pgboss.job`); 0 sin pendientes (NFR-OBS-004 `event_consumer_backlog`; Prometheus: `pf_events_consumer_backlog`). Sin etiquetas de workspace, usuario ni agregado |
 | `pf.events.consumer.duration` (s) | Histogram | `consumer` — duración del procesamiento de un evento (transacción con inbox y efecto del handler) con cualquier resultado (NFR-OBS-004 `event_consumer_duration_seconds`; Prometheus: `pf_events_consumer_duration_seconds`) |
+| `pf.events.consumer.group_size` | Histogram | `consumer` — eventos aplicados por cada invocación del efecto de un consumidor agrupado (`event_consumer_group_size`; optimize-consumer-throughput) |
+| `pf.events.consumer.group_fallbacks` | Counter | `consumer` — grupos que fallaron y se reintentaron evento por evento (`event_consumer_group_fallbacks_total`; Prometheus: `pf_events_consumer_group_fallbacks_total`) |
 | `pf.queue.depth` | Gauge | `queue`, `state` (waiting/active/delayed/failed) |
 | `pf.queue.job.wait_time` (s) | Histogram | `queue` — de encolado a inicio |
 | `pf.queue.job.duration` (s) | Histogram | `queue`, `outcome` (completed/failed/retried) |

@@ -62,6 +62,25 @@ export class GoalReactions {
     );
   }
 
+  /**
+   * Entrega agrupada de `ledger.JournalEntryPosted.v1` (optimize-consumer-throughput): reevalúa UNA vez cada cuenta
+   * distinta de los asientos del grupo. Equivale a `onJournalEntryPosted` por evento: la evaluación lee el estado vigente
+   * de la cuenta (no el evento), es idempotente y las cuentas se evalúan en orden estable.
+   */
+  async onJournalEntriesPosted(workspaceId: string, events: readonly DomainEventInput[]): Promise<void> {
+    const accountIds = new Set<string>();
+    for (const event of events) {
+      const postings = obj(event.payload)?.['postings'];
+      if (!Array.isArray(postings)) continue;
+      for (const p of postings) {
+        const id = text(obj(p)?.['accountId']);
+        if (id !== null) accountIds.add(id);
+      }
+    }
+    if (accountIds.size === 0) return;
+    await this.deps.uow.run(workspaceId, () => this.watch.evaluateAccounts(workspaceId, [...accountIds]));
+  }
+
   // ───────────────────────────────────────────────────────────── goals.transaction-changes
 
   /** `TransactionVoided`, `TransferRevised` y `TransactionUpdated`: movimientos inversos (decisión 8). */
