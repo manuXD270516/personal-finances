@@ -1,5 +1,6 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { DocumentsRuntime } from '@pf/documents/interface/documents.module';
 import type { WorkerConfig } from '@pf/platform/config';
 import {
   EventConsumerRuntime,
@@ -72,7 +73,7 @@ import { reportingDataVersionConsumer } from '@pf/reporting/interface/reporting.
 import { otelCounters, otelHistograms, shutdownTelemetry } from '@pf/platform/otel';
 import type { JobQueue } from '@pf/platform/queue';
 import { createObjectStorageClient } from '@pf/platform/storage';
-import { systemClock, type Clock } from '@pf/shared-kernel';
+import { DomainError, systemClock, type Clock } from '@pf/shared-kernel';
 import { Pool } from 'pg';
 import { eventSchemaRegistry } from '../runtime/event-contracts.js';
 import { createJobQueue } from '../runtime/platform-resources.js';
@@ -89,6 +90,8 @@ import { registerCommitmentsJob, registerSubscriptionsJob } from './commitments-
 import { registerDebtCardsJob } from './debt-jobs.js';
 import { registerGoalsDailyJob } from './goals-jobs.js';
 import { registerImportsJobs } from './imports-jobs.js';
+import { registerDocumentsJobs } from './documents-jobs.js';
+import { documentsRuntimeFor } from '../documents/documents-wiring.js';
 import { registerNotificationsJobs } from './notifications-jobs.js';
 import { registerPlanningPeriodsJob } from './planning-jobs.js';
 import { registerDemoJobs } from './demo-jobs.js';
@@ -387,8 +390,21 @@ export async function createWorkerRuntime(
     }),
   });
 
+  // DOCUMENTS se construye más abajo; el export con contenidos (D315) lo consulta de forma diferida.
+  const documentsRef: { current?: DocumentsRuntime } = {};
   // Exportación/importación del workspace (add-workspace-export): sin llavero de claves maestras no se registran los jobs.
   const portability = portabilityOptions({
+    contents: {
+      open: (workspaceId) => {
+        if (!documentsRef.current) {
+          throw new DomainError(
+            'SERVICE_UNAVAILABLE',
+            'documents are disabled: DOCUMENT_ENCRYPTION_KEYS is not configured',
+          );
+        }
+        return documentsRef.current.contents.open(workspaceId);
+      },
+    },
     storage,
     bucket: config.OBJECT_STORAGE_EXPORTS_BUCKET,
     keys: config.EXPORT_ENCRYPTION_KEYS,
@@ -562,6 +578,35 @@ export async function createWorkerRuntime(
     cron: config.IMPORT_MAINTENANCE_CRON,
     runOnStart: scheduledJobs && (options.importsOnStart ?? true),
   });
+
+  // DOCUMENTS (add-document-attachments): UN job secuencial de mantenimiento (expiración, cuarentena, huérfanos, purga y
+  // rotación); sin consumidores de eventos nuevos, así que no cambia el presupuesto de conexiones del worker.
+  const documents = documentsRuntimeFor({
+    config,
+    pool,
+    clock: options.clock ?? systemClock,
+    storage,
+    audit: demoAudit.port,
+    lifecycle: demoAudit.lifecycle,
+    lifecycleQuery: demoAudit.lifecycleQuery,
+    outbox: outboxPort(fxOutbox),
+  });
+  if (documents) documentsRef.current = documents;
+  if (documents) {
+    try {
+      await documents.maintenance.assertKeysAvailable();
+    } catch (err) {
+      await queue.stop().catch(() => undefined);
+      await context.close().catch(() => undefined);
+      await pool.end().catch(() => undefined);
+      storage.destroy();
+      throw err;
+    }
+    await registerDocumentsJobs(queue, documents, logger, {
+      cron: config.DOCUMENT_MAINTENANCE_CRON,
+      runOnStart: scheduledJobs && (options.importsOnStart ?? true),
+    });
+  }
 
   const metrics = options.metrics ?? new EventDeliveryMetrics(pool);
   // REPORTING (add-basic-dashboard): versión derivada de los datos por workspace (ETag del resumen del Home).

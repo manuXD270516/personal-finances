@@ -26,6 +26,9 @@ describe('navegación principal del marco', () => {
     expect(activeNav('/planificacion/periodos')).toBe('planning');
     expect(activeNav('/en/planificacion')).toBe('planning');
     expect(activeNav('/pt/configuracion')).toBe('settings');
+    // Phase 6 (add-document-attachments): página de documentos.
+    expect(activeNav('/documentos')).toBe('documents');
+    expect(activeNav('/en/documentos')).toBe('documents');
     // Phase 3 (add-recurrence-engine): detalle de definición y de ocurrencia (enlace de las notificaciones).
     expect(activeNav('/recurring')).toBe('recurring');
     expect(activeNav('/en/recurring/0198f0aa')).toBe('recurring');

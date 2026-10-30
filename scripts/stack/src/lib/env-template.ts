@@ -9,7 +9,9 @@ export function generateSecret(key: string): string {
   // Las access keys S3 suelen validarse como alfanuméricas.
   if (key.endsWith('_ACCESS_KEY')) return `pfosdev${randomBytes(8).toString('hex')}`;
   // Clave maestra AES-256 de los exports: exactamente 32 bytes (43 caracteres en base64url).
-  if (key === 'PF_DEV_EXPORT_MASTER_KEY') return randomBytes(32).toString('base64url');
+  if (key === 'PF_DEV_EXPORT_MASTER_KEY' || key === 'PF_DEV_DOCUMENT_MASTER_KEY') {
+    return randomBytes(32).toString('base64url');
+  }
   return randomBytes(24).toString('base64url');
 }
 

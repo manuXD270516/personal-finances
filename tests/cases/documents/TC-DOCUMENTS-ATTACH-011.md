@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Límite de adjuntos por elemento"
 scenario: "Vínculo número 21"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-003"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/documents.service.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

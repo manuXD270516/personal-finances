@@ -15,7 +15,7 @@ Phase 6 incluye el puerto `BankingProvider` y un adapter de exchange (docs/24 §
 - **Mapeo a transacciones**: trades spot ⇒ conversiones con precio, montos y comisiones tal como los informa el exchange (contrato nuevo `ImportedConversionsCommand`); depósitos y retiros ⇒ ingresos y gastos con señal "posible transferencia" y comisión de red aparte; recompensas ⇒ ingresos; P2P y otros ⇒ excluidos (`CONNECTION_RECORD_UNSUPPORTED`); idempotencia por `imports.provider:<exchange>:<tipo>` compartida entre archivo y API.
 - **Archivo de historial** de exchange como proveedor sin credenciales, con formato versionado y verificado contra una muestra real (`IMPORT_UNSUPPORTED_FORMAT`).
 - **Portabilidad**: conexiones en el export sin credenciales; al importar quedan "requiere credencial".
-- **Puerta del owner (no bloquea Phase 6):** decidir el alcance de datos privados (ADR-0030, extiende ADR-0029), leer los términos de la API privada y de la exportación, compartir muestras reales y grabar fixtures; recién entonces se habilitan `EXCHANGE_FILE_*` y `EXCHANGE_API_*` de Binance y Bybit.
+- **Puerta del owner (no bloquea Phase 6):** decidir el alcance de datos privados (ADR-0031, extiende ADR-0029), leer los términos de la API privada y de la exportación, compartir muestras reales y grabar fixtures; recién entonces se habilitan `EXCHANGE_FILE_*` y `EXCHANGE_API_*` de Binance y Bybit.
 - **Sin consumidores ni eventos nuevos**: tres jobs en la cola existente del worker con concurrencia 1, sin ampliar el pool (D249).
 - **Fuera de alcance:** adapters de bancos y agregadores (FR-IMPORTS-015, Phase 11), webhooks, auto-aprobación, P2P, futuros, margen, wallets on-chain, Bitget, KMS en la nube (Phase 9).
 

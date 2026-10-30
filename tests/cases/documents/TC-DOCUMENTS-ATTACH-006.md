@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Expiración de subidas no completadas"
 scenario: "Subida abandonada"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-001"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: medium
 type: integration
 level: repository-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

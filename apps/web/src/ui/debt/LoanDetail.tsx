@@ -37,6 +37,7 @@ import type {
   ReferenceSchedule,
   ScheduleVersion,
 } from './types';
+import { AttachmentsSection } from '../documents/AttachmentsSection';
 
 export interface PaymentPrefill {
   readonly open: boolean;
@@ -603,6 +604,7 @@ function Detail({
           },
         ]}
       />
+      <AttachmentsSection targetType="LOAN" targetId={loan.id} />
     </section>
   );
 }

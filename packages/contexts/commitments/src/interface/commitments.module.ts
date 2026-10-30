@@ -4,7 +4,7 @@ import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } fr
 import type { ClassificationValidator } from '@pf/classification/contracts';
 import type { FxValuationPort } from '@pf/fx/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
-import { runWithRequestContext } from '@pf/platform/api';
+import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition, EventEnvelope } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -52,6 +52,7 @@ import {
   type ResolvedOccurrencesQuery,
   type SubscriptionsQuery,
   type UpcomingPaymentsQuery,
+  type SubscriptionExistenceQuery,
 } from '../contracts/index.js';
 import {
   RECURRING_DEFINITION_LIFECYCLE,
@@ -560,3 +561,8 @@ export type { GenerateOccurrencesService } from '../application/generate-occurre
 export type { FinancialPeriodPort, OutboxPort, WorkspaceSettingsPort } from '../application/ports/index.js';
 export type { CounterpartyNames } from '../application/ports/subscriptions.js';
 export type { SubscriptionDailyService } from '../application/subscription-daily.service.js';
+
+/** SubscriptionExistenceQuery: ids existentes en el workspace (`commitments.subscription`, bajo RLS en la unidad de trabajo en curso). */
+export const subscriptionExistenceQuery: SubscriptionExistenceQuery = {
+  existing: pgExistingIds('commitments.subscription'),
+};

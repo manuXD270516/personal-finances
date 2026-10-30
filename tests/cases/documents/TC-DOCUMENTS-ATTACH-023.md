@@ -5,7 +5,7 @@ spec: identity/workspace-portability
 related_specs: []
 requirement: "Documentos y adjuntos en el export"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-IDENTITY-010"
   - "FR-DOCUMENTS-003"
@@ -15,8 +15,9 @@ invariants: []
 priority: high
 type: integration
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents-portability.api.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

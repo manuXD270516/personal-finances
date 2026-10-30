@@ -5,6 +5,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   DecryptStream,
+  EncryptStream,
   ENVELOPE_CHUNK_BYTES,
   ENVELOPE_HEADER_BYTES,
   EnvelopeIntegrityError,
@@ -135,6 +136,31 @@ describe('cifrado de sobre AES-256-GCM por bloques (identity/workspace-portabili
     bad[enc.length - 3] = (bad[enc.length - 3] as number) ^ 0xff;
     await expect(streamDecrypt(bad, key)).rejects.toThrow(EnvelopeIntegrityError);
     await expect(streamDecrypt(enc.subarray(0, 5), key)).rejects.toThrow(EnvelopeIntegrityError);
+  });
+
+  it('[TC-SECURITY-UPLOAD-016] EncryptStream produce el mismo formato: lo descifran decryptEnvelope y DecryptStream, en los bordes de bloque', async () => {
+    const key = newDataKey();
+    for (const size of [
+      0,
+      1,
+      ENVELOPE_CHUNK_BYTES - 1,
+      ENVELOPE_CHUNK_BYTES,
+      ENVELOPE_CHUNK_BYTES + 1,
+      200_000,
+    ]) {
+      const plain = randomBytes(size);
+      // Fragmentos irregulares para ejercitar el acumulador.
+      const pieces: Buffer[] = [];
+      for (let i = 0; i < plain.length; i += 7001) pieces.push(plain.subarray(i, i + 7001));
+      const out: Buffer[] = [];
+      await pipeline(Readable.from(pieces), new EncryptStream(key), async (source) => {
+        for await (const chunk of source) out.push(chunk as Buffer);
+      });
+      const enc = Buffer.concat(out);
+      expect(decryptEnvelope(enc, key).equals(plain), `memoria ${size}`).toBe(true);
+      expect((await streamDecrypt(enc, key)).equals(plain), `streaming ${size}`).toBe(true);
+      expect(enc.length).toBe(encryptEnvelope(plain, key).length);
+    }
   });
 
   it('sha256Of es el SHA-256 del contenido', () => {

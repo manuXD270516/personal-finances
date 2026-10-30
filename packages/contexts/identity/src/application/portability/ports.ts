@@ -1,30 +1,21 @@
 import type { Readable } from 'node:stream';
+import type { DataKeyProvider, WrappedDataKey } from '@pf/platform/crypto';
 import type { Instant } from '@pf/shared-kernel';
 import type { ExportManifest } from '../../domain/export-manifest.js';
 import type { WorkspaceExport } from '../../domain/workspace-export.js';
 import type { WorkspaceImport } from '../../domain/workspace-import.js';
 import type { IdentityDeps } from '../ports/index.js';
 
-/** Clave de datos envuelta con una clave maestra identificada (cifrado de sobre, design decisión 4). */
-export interface WrappedDataKey {
-  readonly keyId: string;
-  readonly wrappedKey: Uint8Array;
-}
+export type { WrappedDataKey } from '@pf/platform/crypto';
 
-/**
- * Proveedor de claves maestras rotables. Local/CI: llavero `EXPORT_ENCRYPTION_KEYS`; cloud: adapter KMS
- * (`GenerateDataKey`/`Decrypt`). La clave maestra nunca viaja a la base ni al bucket. `context` (workspace + export) va
- * como dato autenticado: un envoltorio copiado a otro registro no descifra.
- */
-export interface ExportKeyProvider {
-  readonly activeKeyId: string;
-  wrap(dataKey: Buffer, context: string): Promise<WrappedDataKey>;
-  unwrap(wrapped: WrappedDataKey, context: string): Promise<Buffer>;
-}
+/** Proveedor de claves maestras del export (llavero `EXPORT_ENCRYPTION_KEYS` o KMS); ver `DataKeyProvider`. */
+export type ExportKeyProvider = DataKeyProvider;
 
 /** Almacén de objetos S3 del bucket de exports (cifrados; jamás el ZIP en claro). */
 export interface ExportObjectStore {
   put(key: string, body: Buffer): Promise<void>;
+  /** Sube un flujo por multipart sin cargarlo en memoria (archivo de contenidos de documentos). */
+  putStream(key: string, source: AsyncIterable<Buffer | Uint8Array>): Promise<void>;
   /** Flujo del objeto cifrado; lanza `ObjectMissingError` si no existe. */
   openStream(key: string): Promise<Readable>;
   get(key: string): Promise<Buffer>;
@@ -49,6 +40,19 @@ export interface SealedArchive {
 /** Sobre cifrado (`ExportKeyProvider` + formato por bloques); implementado en infraestructura. */
 export interface EnvelopeCipher {
   seal(plain: Buffer, context: string): Promise<SealedArchive>;
+  /**
+   * Cifra un flujo en claro SIN cargarlo en memoria: devuelve el flujo cifrado, la clave de datos envuelta y, al
+   * terminar de leerlo, la suma y el tamaño del contenido en claro (`stats`).
+   */
+  sealStream(
+    plain: Readable,
+    context: string,
+  ): Promise<{
+    readonly encrypted: Readable;
+    readonly keyId: string;
+    readonly wrappedKey: Uint8Array;
+    stats(): { readonly sha256: string; readonly size: number };
+  }>;
   /** Descifra un objeto completo en memoria; `EXPORT_FILE_CORRUPTED` ante cualquier alteración. */
   open(encrypted: Buffer, wrapped: WrappedDataKey, context: string): Promise<Buffer>;
   /**
@@ -62,6 +66,14 @@ export interface EnvelopeCipher {
   ): Promise<{ sha256: string; size: number }>;
   /** Segunda pasada: flujo en claro (un bloque solo se emite tras validar su tag). */
   decryptStream(source: Readable, wrapped: WrappedDataKey, context: string): Promise<Readable>;
+}
+
+/**
+ * Contenidos de los documentos del workspace como un ZIP en claro y en streaming (puerto hacia DOCUMENTS; lo implementa la
+ * raíz de composición con `@pf/documents/contracts`). IDENTITY solo lo cifra y lo guarda.
+ */
+export interface DocumentContentsExporter {
+  open(workspaceId: string): Promise<{ readonly stream: Readable; readonly count: number }>;
 }
 
 export interface BuiltArchive {
@@ -120,7 +132,8 @@ export interface WorkspaceImporter {
 
 export interface OperationView {
   readonly id: string;
-  readonly kind: 'EXPORT';
+  /** `EXPORT` o `DOCUMENT_CONTENTS_RESTORE` (la crea DOCUMENTS; se consulta por la misma ruta). */
+  readonly kind: 'EXPORT' | 'DOCUMENT_CONTENTS_RESTORE';
   readonly status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
   readonly progressPct: number;
   readonly resourceType: string;
@@ -189,6 +202,8 @@ export interface ExportJob {
   readonly workspaceId: string;
   readonly exportId: string;
   readonly requestedBy: string;
+  /** Genera además el archivo de contenidos de documentos (`includeDocumentContents`, D315). */
+  readonly includeDocumentContents?: true;
 }
 
 export interface ImportJob {
@@ -221,6 +236,8 @@ export interface PortabilityDeps extends IdentityDeps {
   readonly store: ExportObjectStore;
   readonly cipher: EnvelopeCipher;
   readonly builder: ExportArchiveBuilder;
+  /** Ausente ⇒ el export con contenidos de documentos responde 503. */
+  readonly contents?: DocumentContentsExporter;
   readonly inspector: ArchiveInspector;
   readonly importer: WorkspaceImporter;
   readonly reauth: ReauthPolicy;

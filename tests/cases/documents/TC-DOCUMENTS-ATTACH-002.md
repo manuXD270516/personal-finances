@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Solicitar la subida de un documento"
 scenario: "Un VIEWER no puede subir"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-001"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

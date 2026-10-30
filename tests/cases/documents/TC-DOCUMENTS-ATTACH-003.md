@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Confirmar la subida y verificar el archivo"
 scenario: "Confirmación de un PDF válido"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-001"
   - "FR-DOCUMENTS-002"
@@ -15,8 +15,9 @@ invariants: []
 priority: critical
 type: integration
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

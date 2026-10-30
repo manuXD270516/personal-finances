@@ -43,7 +43,8 @@
     "language": "Language",
     "recurringPending": "{count, plural, one {# payment to approve} other {# payments to approve}}",
     "debt": "Debts",
-    "goals": "Goals"
+    "goals": "Goals",
+    "documents": "Documents"
   },
   "Workspace": {
     "settingsTitle": "Workspace settings",
@@ -5406,5 +5407,111 @@
     "episode": "No automatic rate since {since}",
     "episodeNever": "No accepted automatic rate at all (opened {since})",
     "episodeLabel": "Stale-rate alert"
+  },
+  "Documents": {
+    "title": "Attachments",
+    "loading": "Loading…",
+    "empty": "There are no attached documents yet.",
+    "uploadedOn": "uploaded on {date}",
+    "contentPending": "content pending restore",
+    "download": "Download",
+    "downloadNamed": "Download {name}",
+    "remove": "Remove",
+    "removeNamed": "Remove {name}",
+    "removeTitle": "Remove attachment",
+    "removeBody": "Remove “{name}” from this item? The document stays in Documents and can be attached again.",
+    "cancel": "Cancel",
+    "choose": "Attach a file",
+    "viewerNotice": "Your role only allows viewing and downloading attachments.",
+    "archiveNamed": "Archive {name}",
+    "unarchiveNamed": "Unarchive {name}",
+    "deleteNamed": "Delete {name}",
+    "progress": {
+      "hashing": "Computing the file checksum…",
+      "requesting": "Preparing the upload…",
+      "uploading": "Uploading the file: {percent}%",
+      "verifying": "Verifying the file…",
+      "linking": "Attaching…",
+      "label": "Upload progress"
+    },
+    "invalid": {
+      "EMPTY": "The file is empty.",
+      "TYPE": "That file type is not supported. Accepted: PDF, images (PNG, JPG, WebP, HEIC), CSV, OFX, QFX, QIF, JSON and XLSX.",
+      "TOO_LARGE": "The file exceeds the maximum allowed size."
+    },
+    "rejected": "The file “{name}” was rejected: {reason} It was not attached.",
+    "reasons": {
+      "UPLOAD_NOT_COMPLETED": "the upload was not completed in time.",
+      "SIZE_MISMATCH": "its size does not match the declared one.",
+      "CHECKSUM_MISMATCH": "its content does not match the declared checksum.",
+      "TYPE_NOT_ALLOWED": "its file type is not allowed.",
+      "TYPE_MISMATCH": "its content does not match its type.",
+      "ACTIVE_CONTENT": "it contains active content (scripts, actions or embedded files).",
+      "ENCRYPTED_CONTENT": "it is password protected.",
+      "MACROS_PRESENT": "it contains macros.",
+      "ARCHIVE_LIMITS_EXCEEDED": "it exceeds the limits of a compressed file.",
+      "MALFORMED_CONTENT": "its content is malformed.",
+      "MALWARE_DETECTED": "malware was detected.",
+      "UNKNOWN": "it did not pass the security check."
+    },
+    "usage": {
+      "text": "You are using {used} of {quota} ({percent}%).",
+      "label": "Document storage usage",
+      "pending": "{count, plural, one {# pending upload} other {# pending uploads}} out of {max} at most."
+    },
+    "purposes": {
+      "RECEIPT": "Receipt",
+      "INVOICE": "Invoice",
+      "STATEMENT": "Statement",
+      "CONTRACT": "Contract",
+      "IMPORT_SOURCE": "Statement to import",
+      "OTHER": "Other"
+    },
+    "statuses": {
+      "PENDING_UPLOAD": "Pending upload",
+      "UPLOADED": "Being verified",
+      "AVAILABLE": "Available",
+      "CONTENT_PENDING": "Content pending",
+      "REJECTED": "Rejected",
+      "DELETED": "Deleted"
+    },
+    "targets": {
+      "TRANSACTION": "Transaction",
+      "CONVERSION": "Conversion",
+      "LOAN": "Loan",
+      "SUBSCRIPTION": "Subscription",
+      "ACCOUNT": "Account",
+      "IMPORT_JOB": "Import",
+      "MONTH_CLOSING": "Month closing"
+    },
+    "page": {
+      "title": "Documents",
+      "intro": "Receipts, invoices, contracts and statements of the workspace. They are stored encrypted and only downloaded through the application.",
+      "filters": "Document filters",
+      "purpose": "Purpose",
+      "status": "Status",
+      "element": "Linked item",
+      "archived": "Archived",
+      "all": "All",
+      "usable": "Available and to restore",
+      "archivedExclude": "Hide archived",
+      "archivedOnly": "Archived only",
+      "archivedInclude": "Include archived",
+      "empty": "There are no documents with these filters.",
+      "region": "Documents table",
+      "caption": "Workspace documents",
+      "name": "Name",
+      "size": "Size",
+      "links": "Attachments",
+      "actions": "Actions",
+      "archivedTag": "archived",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "delete": "Delete",
+      "deleteTitle": "Delete document",
+      "deleteBody": "Delete “{name}”? Its content becomes unrecoverable and its links are removed. This cannot be undone.",
+      "contentPendingNotice": "Some documents have their content pending restore from the export contents file. Until then they cannot be downloaded or attached.",
+      "purgeNotice": "Documents with no links that are not archived are deleted automatically after 30 days. Archive them to keep them."
+    }
   }
 }

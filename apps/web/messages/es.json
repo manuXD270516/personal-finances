@@ -43,7 +43,8 @@
     "language": "Idioma",
     "recurringPending": "{count, plural, one {# pago por aprobar} other {# pagos por aprobar}}",
     "debt": "Deudas",
-    "goals": "Metas"
+    "goals": "Metas",
+    "documents": "Documentos"
   },
   "Workspace": {
     "settingsTitle": "Configuración del espacio de trabajo",
@@ -5406,5 +5407,111 @@
     "episode": "Sin tasa automática desde el {since}",
     "episodeNever": "Sin ninguna tasa automática aceptada (abierto el {since})",
     "episodeLabel": "Aviso de obsolescencia"
+  },
+  "Documents": {
+    "title": "Adjuntos",
+    "loading": "Cargando…",
+    "empty": "Todavía no hay documentos adjuntos.",
+    "uploadedOn": "subido el {date}",
+    "contentPending": "contenido pendiente de restaurar",
+    "download": "Descargar",
+    "downloadNamed": "Descargar {name}",
+    "remove": "Quitar",
+    "removeNamed": "Quitar {name}",
+    "removeTitle": "Quitar adjunto",
+    "removeBody": "¿Quitar «{name}» de este elemento? El documento se conserva en Documentos y puede adjuntarse de nuevo.",
+    "cancel": "Cancelar",
+    "choose": "Adjuntar un archivo",
+    "viewerNotice": "Tu rol solo permite ver y descargar los adjuntos.",
+    "archiveNamed": "Archivar {name}",
+    "unarchiveNamed": "Desarchivar {name}",
+    "deleteNamed": "Eliminar {name}",
+    "progress": {
+      "hashing": "Calculando la suma de verificación del archivo…",
+      "requesting": "Preparando la subida…",
+      "uploading": "Subiendo el archivo: {percent} %",
+      "verifying": "Verificando el archivo…",
+      "linking": "Adjuntando…",
+      "label": "Progreso de la subida"
+    },
+    "invalid": {
+      "EMPTY": "El archivo está vacío.",
+      "TYPE": "Ese tipo de archivo no se admite. Se aceptan PDF, imágenes (PNG, JPG, WebP, HEIC), CSV, OFX, QFX, QIF, JSON y XLSX.",
+      "TOO_LARGE": "El archivo supera el tamaño máximo permitido."
+    },
+    "rejected": "El archivo «{name}» fue rechazado: {reason} No se adjuntó.",
+    "reasons": {
+      "UPLOAD_NOT_COMPLETED": "la subida no se completó a tiempo.",
+      "SIZE_MISMATCH": "su tamaño no coincide con el declarado.",
+      "CHECKSUM_MISMATCH": "su contenido no coincide con la suma de verificación declarada.",
+      "TYPE_NOT_ALLOWED": "su tipo de archivo no está permitido.",
+      "TYPE_MISMATCH": "su contenido no coincide con su tipo.",
+      "ACTIVE_CONTENT": "contiene contenido activo (scripts, acciones o archivos incrustados).",
+      "ENCRYPTED_CONTENT": "está protegido con contraseña.",
+      "MACROS_PRESENT": "contiene macros.",
+      "ARCHIVE_LIMITS_EXCEEDED": "excede los límites de un archivo comprimido.",
+      "MALFORMED_CONTENT": "su contenido está mal formado.",
+      "MALWARE_DETECTED": "se detectó software malicioso.",
+      "UNKNOWN": "no pasó la verificación de seguridad."
+    },
+    "usage": {
+      "text": "Usas {used} de {quota} ({percent} %).",
+      "label": "Uso del almacenamiento de documentos",
+      "pending": "{count, plural, one {# subida pendiente} other {# subidas pendientes}} de {max} como máximo."
+    },
+    "purposes": {
+      "RECEIPT": "Comprobante",
+      "INVOICE": "Factura",
+      "STATEMENT": "Extracto",
+      "CONTRACT": "Contrato",
+      "IMPORT_SOURCE": "Extracto para importar",
+      "OTHER": "Otro"
+    },
+    "statuses": {
+      "PENDING_UPLOAD": "Pendiente de subida",
+      "UPLOADED": "En verificación",
+      "AVAILABLE": "Disponible",
+      "CONTENT_PENDING": "Contenido pendiente",
+      "REJECTED": "Rechazado",
+      "DELETED": "Eliminado"
+    },
+    "targets": {
+      "TRANSACTION": "Transacción",
+      "CONVERSION": "Conversión",
+      "LOAN": "Préstamo",
+      "SUBSCRIPTION": "Suscripción",
+      "ACCOUNT": "Cuenta",
+      "IMPORT_JOB": "Importación",
+      "MONTH_CLOSING": "Cierre de mes"
+    },
+    "page": {
+      "title": "Documentos",
+      "intro": "Comprobantes, facturas, contratos y extractos del espacio de trabajo. Se almacenan cifrados y solo se descargan a través de la aplicación.",
+      "filters": "Filtros de documentos",
+      "purpose": "Propósito",
+      "status": "Estado",
+      "element": "Elemento vinculado",
+      "archived": "Archivados",
+      "all": "Todos",
+      "usable": "Disponibles y por restaurar",
+      "archivedExclude": "Ocultar archivados",
+      "archivedOnly": "Solo archivados",
+      "archivedInclude": "Incluir archivados",
+      "empty": "No hay documentos con estos filtros.",
+      "region": "Tabla de documentos",
+      "caption": "Documentos del espacio de trabajo",
+      "name": "Nombre",
+      "size": "Tamaño",
+      "links": "Adjuntos",
+      "actions": "Acciones",
+      "archivedTag": "archivado",
+      "archive": "Archivar",
+      "unarchive": "Desarchivar",
+      "delete": "Eliminar",
+      "deleteTitle": "Eliminar documento",
+      "deleteBody": "¿Eliminar «{name}»? Su contenido se vuelve irrecuperable y se quitan sus vínculos. Esta acción no se puede deshacer.",
+      "contentPendingNotice": "Hay documentos con el contenido pendiente de restaurar desde el archivo de contenidos del export. Hasta entonces no se pueden descargar ni adjuntar.",
+      "purgeNotice": "Los documentos sin vínculo y sin archivar se eliminan automáticamente a los 30 días. Archívalos para conservarlos."
+    }
   }
 }

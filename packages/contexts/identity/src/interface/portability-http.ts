@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -94,6 +95,7 @@ export const exportDto = (v: ExportView) => ({
   discardedAt: v.discardedAt,
   expiredAt: v.expiredAt,
   errorCode: v.errorCode,
+  documentContents: v.documentContents,
 });
 
 /** `Operation` del contrato: el fallo se expresa como `Problem` (RFC 9457) con el código estable. */
@@ -222,12 +224,16 @@ export class PortabilityController {
     @Req() req: ApiRequest,
     @Res({ passthrough: true }) res: ApiResponse,
     @Param('workspaceId') workspaceId: string,
+    @Body() raw?: unknown,
   ) {
     const p = this.principal(req);
+    const include =
+      (raw as { includeDocumentContents?: unknown } | null | undefined)?.includeDocumentContents === true;
     const view = await this.exports.requestExport({
       userId: p.userId,
       workspaceId,
       authTimeSeconds: p.authTime,
+      ...(include ? { includeDocumentContents: true } : {}),
     });
     res.setHeader('location', `/api/v1/workspaces/${workspaceId}/operations/${view.operationId}`);
     return exportDto(view);
@@ -266,6 +272,32 @@ export class PortabilityController {
     res.setHeader('cache-control', 'no-store');
     res.setHeader('x-content-type-options', 'nosniff');
     // RFC 9530: suma SHA-256 del ZIP en claro (representación), en base64 entre ':'.
+    res.setHeader('repr-digest', `sha-256=:${Buffer.from(file.sha256, 'hex').toString('base64')}:`);
+    return new StreamableFile(file.stream, {
+      type: 'application/zip',
+      disposition: `attachment; filename="${file.fileName}"`,
+      length: file.size,
+    });
+  }
+
+  /** Archivo de contenidos de documentos del export (D315): mismos requisitos, retención y descarte que el ZIP. */
+  @Get('workspaces/:workspaceId/exports/:exportId/document-contents/download')
+  async downloadExportDocumentContents(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: ApiResponse,
+    @Param('workspaceId') workspaceId: string,
+    @Param('exportId') exportId: string,
+  ): Promise<StreamableFile> {
+    const p = this.principal(req);
+    const file = await this.exports.download({
+      userId: p.userId,
+      workspaceId,
+      exportId,
+      authTimeSeconds: p.authTime,
+      part: 'contents',
+    });
+    res.setHeader('cache-control', 'no-store');
+    res.setHeader('x-content-type-options', 'nosniff');
     res.setHeader('repr-digest', `sha-256=:${Buffer.from(file.sha256, 'hex').toString('base64')}:`);
     return new StreamableFile(file.stream, {
       type: 'application/zip',

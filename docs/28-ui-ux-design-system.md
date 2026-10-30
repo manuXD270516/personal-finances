@@ -431,3 +431,8 @@ Skeletons para cargas < 1 s; nunca spinner de pantalla completa en el dashboard.
 5. ¿PWA instalable en Phase 2 y offline quick-add más adelante?
 6. ¿Fuente Inter autohospedada (privacidad, sin Google Fonts en runtime)? Propuesta: sí, vía `next/font` local.
 7. ¿En qué fase se completan las traducciones `en`/`pt-BR`? (La arquitectura las soporta desde Phase 1.)
+
+## Adjuntos y página de documentos (add-document-attachments)
+
+- **Componente «Adjuntos»** en los detalles de transacción, conversión, préstamo, suscripción, cuenta, importación y cierre de mes: lista (nombre, tamaño, fecha, estado), «Adjuntar un archivo» (calcula el SHA-256 en el navegador, sube directo con `XMLHttpRequest` y muestra el avance en una región `aria-live="polite"` más una barra `progress`), «Descargar» (siempre por el BFF, como adjunto) y «Quitar» con confirmación. Un archivo rechazado muestra su motivo traducido («su contenido no coincide con su tipo», «contiene contenido activo», «está protegido con contraseña»…) y no se adjunta. Un VIEWER solo ve y descarga.
+- **Página `/documentos`** (entrada «Documentos» en la navegación): tabla con filtros por propósito, estado, elemento vinculado y archivados; uso de la cuota con barra y texto; archivar, desarchivar y eliminar (con confirmación); aviso de purga de los documentos sin vínculo (30 días) y de los que tienen el contenido pendiente de restaurar. Textos en es/en/pt (`Documents`), tamaños con el locale del workspace.

@@ -3,7 +3,7 @@ import type { Readable } from 'node:stream';
 import type { AuditChangeInput } from '@pf/audit/contracts';
 import { DomainError, type Instant } from '@pf/shared-kernel';
 import type { Role } from '../../domain/role.js';
-import { WorkspaceExport } from '../../domain/workspace-export.js';
+import { WorkspaceExport, type ExportResult } from '../../domain/workspace-export.js';
 import {
   ObjectMissingError,
   type ExportJob,
@@ -33,6 +33,12 @@ export interface ExportView {
   readonly discardedAt: string | null;
   readonly expiredAt: string | null;
   readonly errorCode: string | null;
+  /** Archivo de contenidos de documentos (D315); `null` si el export no los incluyó. */
+  readonly documentContents: {
+    readonly sizeBytes: number;
+    readonly sha256: string;
+    readonly count: number;
+  } | null;
 }
 
 export const exportView = (e: WorkspaceExport): ExportView => {
@@ -53,6 +59,9 @@ export const exportView = (e: WorkspaceExport): ExportView => {
     discardedAt: p.discardedAt,
     expiredAt: p.expiredAt,
     errorCode: p.error?.code ?? null,
+    documentContents: p.contents
+      ? { sizeBytes: p.contents.sizeBytes, sha256: p.contents.sha256, count: p.contents.count }
+      : null,
   };
 };
 
@@ -71,6 +80,14 @@ const notFound = () => new DomainError('RESOURCE_NOT_FOUND', 'export not found')
 /** Clave del objeto en el bucket de exports (nunca contiene datos del usuario más allá de ids). */
 export const exportObjectKey = (workspaceId: string, exportId: string): string =>
   `exports/${workspaceId}/${exportId}.pfxe`;
+
+/** Clave del objeto del archivo de contenidos de documentos (aparte del ZIP principal, D315). */
+export const exportContentsObjectKey = (workspaceId: string, exportId: string): string =>
+  `exports/${workspaceId}/${exportId}.documents.pfxe`;
+
+/** AAD del archivo de contenidos: distinto del principal para que un envoltorio no sirva para el otro. */
+export const exportContentsKeyContext = (workspaceId: string, exportId: string): string =>
+  `${workspaceId}|${exportId}|documents`;
 
 /** Contexto autenticado (AAD) que liga la clave de datos envuelta a su export. */
 export const exportKeyContext = (workspaceId: string, exportId: string): string =>
@@ -94,10 +111,15 @@ export class WorkspaceExportService {
     readonly userId: string;
     readonly workspaceId: string;
     readonly authTimeSeconds: number | undefined;
+    /** Incluir además el archivo de contenidos de los documentos (defecto `false`). */
+    readonly includeDocumentContents?: boolean;
   }): Promise<ExportView> {
     const { userId, workspaceId } = input;
     await this.requireOwner(userId, workspaceId);
     this.deps.reauth.assertRecent(input.authTimeSeconds, this.deps.clock.now());
+    if (input.includeDocumentContents && !this.deps.contents) {
+      throw new DomainError('SERVICE_UNAVAILABLE', 'document contents are not available in this environment');
+    }
     const { uow, exports, operations, ids, clock, audit, jobs, settings } = this.deps;
     return uow.run({ userId, workspaceId }, async () => {
       if (await exports.hasInProgress(workspaceId)) {
@@ -132,10 +154,18 @@ export class WorkspaceExportService {
         changes: [
           { field: 'status', before: null, after: 'REQUESTED' },
           { field: 'formatVersion', before: null, after: settings.formatVersion },
+          ...(input.includeDocumentContents
+            ? [{ field: 'includeDocumentContents', before: null, after: true }]
+            : []),
         ],
         actor: { type: 'USER', userId },
       });
-      await jobs.enqueueExport({ workspaceId, exportId, requestedBy: userId });
+      await jobs.enqueueExport({
+        workspaceId,
+        exportId,
+        requestedBy: userId,
+        ...(input.includeDocumentContents ? { includeDocumentContents: true as const } : {}),
+      });
       return exportView(record);
     });
   }
@@ -177,8 +207,11 @@ export class WorkspaceExportService {
     readonly workspaceId: string;
     readonly exportId: string;
     readonly authTimeSeconds: number | undefined;
+    /** `contents` descarga el archivo de contenidos de documentos (mismos requisitos y retención). */
+    readonly part?: 'main' | 'contents';
   }): Promise<ExportDownload> {
     const { userId, workspaceId, exportId } = input;
+    const part = input.part ?? 'main';
     await this.requireOwner(userId, workspaceId);
     this.deps.reauth.assertRecent(input.authTimeSeconds, this.deps.clock.now());
     const { uow, exports, store, cipher, clock, audit } = this.deps;
@@ -186,11 +219,32 @@ export class WorkspaceExportService {
       const found = await exports.find(workspaceId, exportId);
       if (!found) throw notFound();
       found.assertDownloadable(clock.now());
+      if (part === 'contents' && !found.hasContentsFile) {
+        throw new DomainError('RESOURCE_NOT_FOUND', 'this export does not include document contents');
+      }
       return found.snapshot();
     });
-    const wrapped = wrappedOf(record.keyId, record.wrappedKey);
-    const key = record.objectKey as string;
-    const context = exportKeyContext(workspaceId, exportId);
+    const file =
+      part === 'contents'
+        ? {
+            keyId: record.contents?.keyId ?? null,
+            wrappedKey: record.contents?.wrappedKey ?? null,
+            key: record.contents?.objectKey as string,
+            sha256: record.contents?.sha256 ?? null,
+            context: exportContentsKeyContext(workspaceId, exportId),
+            action: 'identity.export.contents_downloaded',
+          }
+        : {
+            keyId: record.keyId,
+            wrappedKey: record.wrappedKey,
+            key: record.objectKey as string,
+            sha256: record.sha256,
+            context: exportKeyContext(workspaceId, exportId),
+            action: 'identity.export.downloaded',
+          };
+    const wrapped = wrappedOf(file.keyId, file.wrappedKey);
+    const key = file.key;
+    const context = file.context;
     let verified: { sha256: string; size: number };
     try {
       verified = await cipher.verify(await store.openStream(key), wrapped, context);
@@ -200,18 +254,18 @@ export class WorkspaceExportService {
         throw new DomainError('EXPORT_EXPIRED', 'the export file is gone');
       throw err;
     }
-    if (verified.sha256 !== record.sha256) {
+    if (verified.sha256 !== file.sha256) {
       throw new DomainError('EXPORT_FILE_CORRUPTED', 'the export file does not match its recorded checksum');
     }
     await uow.run({ userId, workspaceId }, () =>
       audit.append({
         workspaceId,
-        action: 'identity.export.downloaded',
+        action: file.action,
         aggregateType: 'WorkspaceExport',
         aggregateId: exportId,
         aggregateVersion: record.version,
         changes: [
-          { field: 'sha256', before: null, after: record.sha256 },
+          { field: 'sha256', before: null, after: file.sha256 },
           { field: 'sizeBytes', before: null, after: verified.size },
         ],
         actor: { type: 'USER', userId },
@@ -219,7 +273,7 @@ export class WorkspaceExportService {
     );
     const stream = await cipher.decryptStream(await store.openStream(key), wrapped, context);
     return {
-      fileName: `pfos-export-${workspaceId.slice(0, 8)}-${(record.completedAt ?? clock.now().toString()).slice(0, 10)}.zip`,
+      fileName: `pfos-export-${workspaceId.slice(0, 8)}-${(record.completedAt ?? clock.now().toString()).slice(0, 10)}${part === 'contents' ? '-documentos' : ''}.zip`,
       sha256: verified.sha256,
       size: verified.size,
       stream,
@@ -235,8 +289,10 @@ export class WorkspaceExportService {
       if (!record) throw notFound();
       const expected = record.version;
       const key = record.snapshot().objectKey;
+      const contentsKey = record.snapshot().contents?.objectKey;
       if (record.discard(userId, clock.now())) {
         if (key) await store.delete(key);
+        if (contentsKey) await store.delete(contentsKey);
         if (!(await exports.save(record, expected))) {
           throw new DomainError('CONCURRENCY_CONFLICT', 'the export was modified concurrently');
         }
@@ -281,7 +337,9 @@ export class WorkspaceExportService {
     if (started === null) return 'SKIPPED';
     const operationId = started;
     const objectKey = exportObjectKey(workspaceId, exportId);
+    const contentsKey = exportContentsObjectKey(workspaceId, exportId);
     let uploaded = false;
+    let contentsUploaded = false;
     try {
       const exportedAt = clock.now();
       const built = await builder.build({
@@ -299,6 +357,34 @@ export class WorkspaceExportService {
       await store.put(objectKey, sealed.encrypted);
       uploaded = true;
       const sha256 = createHash('sha256').update(built.zip).digest('hex');
+      let contents: ExportResult['contents'];
+      if (job.includeDocumentContents) {
+        if (!this.deps.contents) {
+          throw new DomainError(
+            'SERVICE_UNAVAILABLE',
+            'document contents are not available in this environment',
+          );
+        }
+        await uow.run({ userId: requestedBy, workspaceId }, () =>
+          operations.update(workspaceId, operationId, { progressPct: 96 }),
+        );
+        const source = await this.deps.contents.open(workspaceId);
+        const sealedContents = await cipher.sealStream(
+          source.stream,
+          exportContentsKeyContext(workspaceId, exportId),
+        );
+        contentsUploaded = true;
+        await store.putStream(contentsKey, sealedContents.encrypted);
+        const stats = sealedContents.stats();
+        contents = {
+          objectKey: contentsKey,
+          sizeBytes: stats.size,
+          sha256: stats.sha256,
+          keyId: sealedContents.keyId,
+          wrappedKey: sealedContents.wrappedKey,
+          count: source.count,
+        };
+      }
       await this.finish(job, operationId, {
         ok: {
           objectKey,
@@ -307,12 +393,14 @@ export class WorkspaceExportService {
           keyId: sealed.keyId,
           wrappedKey: sealed.wrappedKey,
           counts: built.counts,
+          ...(contents ? { contents } : {}),
         },
         retentionMs: settings.retentionMs,
       });
       return 'READY';
     } catch (err) {
       if (uploaded) await store.delete(objectKey).catch(() => undefined);
+      if (contentsUploaded) await store.delete(contentsKey).catch(() => undefined);
       await this.finish(job, operationId, {
         failure: {
           code: err instanceof DomainError ? err.code : 'EXPORT_FAILED',
@@ -414,8 +502,10 @@ export class WorkspaceExportService {
           if (!record) return;
           const before = record.version;
           const key = record.snapshot().objectKey;
+          const contentsKey = record.snapshot().contents?.objectKey;
           if (!record.expire(now)) return;
           if (key) await store.delete(key);
+          if (contentsKey) await store.delete(contentsKey);
           if (!(await exports.save(record, before))) return;
           await audit.append({
             workspaceId: ref.workspaceId,

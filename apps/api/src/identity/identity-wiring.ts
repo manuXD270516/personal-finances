@@ -50,6 +50,13 @@ import {
   FxModule,
   parseFxProviderSettings,
 } from '@pf/fx/interface/fx.module';
+import { DOCUMENTS_AUDIT_POLICY } from '@pf/documents/contracts';
+import {
+  DOCUMENT_LIFECYCLE_MACHINE,
+  DocumentsModule,
+  disabledDocumentsRuntime,
+  type DocumentsRuntime,
+} from '@pf/documents/interface/documents.module';
 import { IDENTITY_AUDIT_POLICY, type WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import { IMPORTS_AUDIT_POLICY } from '@pf/imports/contracts';
 import {
@@ -68,6 +75,7 @@ import {
   identityWorkspaceSettingsQuery,
   identityUserDisplayNames,
   identityWorkspaceTimeZones,
+  RecentAuthPolicy,
   type DemoDataOptions,
   type OutboxPort,
 } from '@pf/identity/interface/identity.module';
@@ -127,6 +135,8 @@ import {
 import { LedgerHttpModule } from '../ledger/ledger-http.js';
 import { workspaceCreatedHook } from './workspace-provisioning.js';
 import { portabilityOptions } from '../portability/portability-wiring.js';
+import { documentsRuntimeFor } from '../documents/documents-wiring.js';
+import { documentsRestoreJobsPort } from '../documents/restore-jobs.js';
 import type { S3Client } from '@aws-sdk/client-s3';
 
 /**
@@ -235,6 +245,8 @@ export const LIFECYCLE_MACHINES = [
   LOAN_LIFECYCLE_MACHINE,
   // add-savings-goals (Phase 4): meta de ahorro de GOALS.
   GOAL_LIFECYCLE_MACHINE,
+  // add-document-attachments (Phase 6): documento adjunto de DOCUMENTS.
+  DOCUMENT_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -255,6 +267,8 @@ export const AUDIT_POLICIES = [
   DEBT_AUDIT_POLICY,
   // add-savings-goals (Phase 4): metas, movimientos, reservas y sugerencias.
   GOALS_AUDIT_POLICY,
+  // add-document-attachments (Phase 6): documentos y vínculos (nunca el nombre original ni el contenido).
+  DOCUMENTS_AUDIT_POLICY,
 ];
 
 /**
@@ -727,6 +741,8 @@ export function identityImports(input: {
   readonly queue?: JobQueue;
   /** Cliente S3 del proceso (add-workspace-export: bucket de exports). */
   readonly storage?: S3Client;
+  /** Recibe el runtime de DOCUMENTS (la API verifica el llavero al arrancar). */
+  readonly onDocuments?: (runtime: DocumentsRuntime | undefined) => void;
 }): NonNullable<ModuleMetadata['imports']> {
   const jwt = input.jwt ?? jwtOptionsFromConfig(input.config, input.logger);
   if (!jwt) {
@@ -766,6 +782,23 @@ export function identityImports(input: {
     logger: input.logger,
     config: input.config,
   });
+  // DOCUMENTS (add-document-attachments): sin DOCUMENT_ENCRYPTION_KEYS o sin cliente S3 queda deshabilitado (503).
+  const documents = input.storage
+    ? documentsRuntimeFor({
+        config: input.config,
+        pool: input.pool,
+        clock: input.conventions.clock,
+        storage: input.storage,
+        audit: auditPort,
+        lifecycle: lifecyclePort,
+        lifecycleQuery: audit.lifecycleQuery,
+        outbox: classificationOutbox(),
+        // Restauración del archivo de contenidos del export: el job se encola en la transacción del comando.
+        ...(input.queue ? { restoreJobs: documentsRestoreJobsPort(input.queue) } : {}),
+      })
+    : undefined;
+  input.onDocuments?.(documents);
+  const reauthPolicy = new RecentAuthPolicy(input.config.REAUTH_MAX_AGE);
   return [
     IdentityModule.register({
       pool: input.pool,
@@ -798,6 +831,7 @@ export function identityImports(input: {
               reauthMaxAgeMs: input.config.REAUTH_MAX_AGE,
               maxImportBytes: input.config.WORKSPACE_IMPORT_MAX_BYTES,
               queue: input.queue,
+              ...(documents ? { contents: documents.contents } : {}),
             });
             return portability ? { portability } : {};
           })()
@@ -838,6 +872,12 @@ export function identityImports(input: {
     DebtModule.register({ runtime: debt, cards, summary: debtSummary, conventions: input.conventions }),
     // GOALS — openspec add-savings-goals (Phase 4): `/goals*`.
     GoalsModule.register({ runtime: goals, conventions: input.conventions }),
+    // DOCUMENTS — openspec add-document-attachments (Phase 6): `/documents*`.
+    DocumentsModule.register({
+      runtime: documents ?? disabledDocumentsRuntime(),
+      conventions: input.conventions,
+      reauth: (authTimeSeconds) => reauthPolicy.assertRecent(authTimeSeconds, input.conventions.clock.now()),
+    }),
   ];
 }
 

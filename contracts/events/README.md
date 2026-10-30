@@ -64,6 +64,7 @@ contracts/events/
 │  ├─ CardPaymentDue.v1.schema.json         # add-credit-cards: recordatorio de vencimiento (lo consume NOTIFY)
 │  └─ CreditUtilizationThresholdReached.v1.schema.json  # add-credit-cards: umbral de utilización cruzado (lo consume NOTIFY)
 ├─ goals/                               # add-savings-goals (metas de ahorro)
+├─ documents/                           # add-document-attachments (documentos adjuntos)
 │  ├─ SavingsContributionRecorded.v1.schema.json  # un hecho por movimiento (aporte, retiro, reversa, reasignación) con avance antes y después
 │  ├─ GoalReached.v1.schema.json         # la meta alcanzó su objetivo (cada vez que pasa a ACHIEVED; lo consume NOTIFY)
 │  └─ EarmarkExceedsBalance.v1.schema.json  # cuenta sobre-asignada, una vez por episodio (aggregateType Account; lo consume NOTIFY)
@@ -165,3 +166,10 @@ Notas: el agregado de `SavingsContributionRecorded` y `GoalReached` es `SavingsG
 | `fx.RateAnomalyRetained.v1` | FX | Ninguno en Phase 5; aviso `FX_RATE_ANOMALY_RETAINED` por el puerto, agrupado por par |
 
 Un consumidor futuro tendría su propia justificación de conexiones (presupuesto de conexiones del worker, D249).
+
+## Eventos Phase 6 — Documents (`add-document-attachments`)
+
+| Evento | Productor | Consumidores | Cuándo |
+|---|---|---|---|
+| `documents.AttachmentUploaded.v1` | DOCUMENTS | ninguno obligatorio (IMPORTS no lo consume) | El documento queda `AVAILABLE` (verificación o restauración de contenido); payload sin nombre original |
+| `documents.DocumentRejected.v1` | DOCUMENTS | ninguno obligatorio | El documento queda `REJECTED` (verificación o subida vencida); reemplaza al `DocumentQuarantined` de docs/05 |

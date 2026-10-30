@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Cuota de almacenamiento por workspace"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
   - "NFR-SEC-011"
@@ -14,8 +14,9 @@ invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "packages/contexts/documents/src/application/documents.service.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

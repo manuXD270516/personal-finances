@@ -4,7 +4,7 @@ import type { AuditPort } from '@pf/audit/contracts';
 import type { WorkspaceCalendarQuery } from '@pf/identity/contracts';
 import type { AccountBalancesQuery } from '@pf/ledger/contracts';
 import type { PeriodQuery } from '@pf/planning/contracts';
-import { runWithRequestContext } from '@pf/platform/api';
+import { pgExistingIds, runWithRequestContext } from '@pf/platform/api';
 import type { EventConsumerDefinition } from '@pf/platform/events';
 import type { Logger } from '@pf/platform/logging';
 import { API_CONVENTIONS, type ApiConventionsOptions } from '@pf/platform/nest';
@@ -33,6 +33,7 @@ import {
   IMPORTS_EXPIRE_JOB,
   IMPORTS_EVENTS,
   IMPORTS_PURGE_JOB,
+  type ImportJobExistenceQuery,
 } from '../contracts/index.js';
 import {
   PgImportJobRepository,
@@ -287,3 +288,8 @@ export { IMPORTS_CONSUMERS, IMPORTS_EVENTS, IMPORTS_EXPIRE_JOB, IMPORTS_PURGE_JO
 export { IMPORTS_AUDIT_POLICY } from '../contracts/index.js';
 export type { ImportsMaintenanceService } from '../application/imports-maintenance.service.js';
 export type { ImportsSettings, OutboxPort } from '../application/ports/index.js';
+
+/** ImportJobExistenceQuery: ids existentes en el workspace (`imports.import_job`, bajo RLS en la unidad de trabajo en curso). */
+export const importJobExistenceQuery: ImportJobExistenceQuery = {
+  existing: pgExistingIds('imports.import_job'),
+};

@@ -1,7 +1,11 @@
 import { Instant, isDomainError } from '@pf/shared-kernel';
 import { describe, expect, it } from 'vitest';
 import { InMemoryPortability } from '../testing/in-memory-portability.js';
-import { WorkspaceExportService, exportObjectKey } from './workspace-export.service.js';
+import {
+  WorkspaceExportService,
+  exportContentsObjectKey,
+  exportObjectKey,
+} from './workspace-export.service.js';
 
 const setup = () => {
   const p = new InMemoryPortability();
@@ -313,5 +317,137 @@ describe('WorkspaceExportService — ejecución, descarga, retención y auditor�
       'status',
       'workspaceId',
     ]);
+  });
+});
+
+describe('WorkspaceExportService — archivo de contenidos de documentos (D315)', () => {
+  const withContents = async (ctx = setup()) => {
+    const view = await ctx.service.requestExport({
+      userId: ctx.owner.id,
+      workspaceId: ctx.ws.id,
+      authTimeSeconds: ctx.p.authTime(1),
+      includeDocumentContents: true,
+    });
+    return { ...ctx, view };
+  };
+
+  it('[TC-DOCUMENTS-ATTACH-024] pedir los contenidos encola el job con la bandera; sin pedirlos el job no la lleva', async () => {
+    const { p, owner, ws, view } = await withContents();
+    expect(p.exportJobs).toEqual([
+      { workspaceId: ws.id, exportId: view.id, requestedBy: owner.id, includeDocumentContents: true },
+    ]);
+    expect(p.base.auditEntries[0]?.changes).toContainEqual({
+      field: 'includeDocumentContents',
+      before: null,
+      after: true,
+    });
+  });
+
+  it('[TC-DOCUMENTS-ATTACH-024] el job guarda los contenidos CIFRADOS en un objeto aparte y el ZIP principal no cambia', async () => {
+    const { p, owner, ws, service, view } = await withContents();
+    expect(await service.run(p.exportJobs.at(-1)!)).toBe('READY');
+    const main = p.objects.get(exportObjectKey(ws.id, view.id));
+    const contents = p.objects.get(exportContentsObjectKey(ws.id, view.id));
+    expect(main).toBeDefined();
+    expect(contents).toBeDefined();
+    expect(contents?.toString('utf8')).not.toContain('PK-fake-contents-zip');
+    const done = await service.getExport(owner.id, ws.id, view.id);
+    expect(done.sizeBytes).toBe(p.zipContent.length);
+    expect(done.documentContents).toMatchObject({ count: 3, sizeBytes: p.contentsZip.length });
+    expect(done.documentContents?.sha256).toMatch(/^[0-9a-f]{64}$/u);
+  });
+
+  it('[TC-DOCUMENTS-ATTACH-024] un export sin contenidos no los reporta y su descarga de contenidos da RESOURCE_NOT_FOUND', async () => {
+    const { p, owner, ws, service } = setup();
+    const view = await service.requestExport({
+      userId: owner.id,
+      workspaceId: ws.id,
+      authTimeSeconds: p.authTime(1),
+    });
+    await service.run(p.exportJobs.at(-1)!);
+    expect((await service.getExport(owner.id, ws.id, view.id)).documentContents).toBeNull();
+    expect(
+      await codeOf(() =>
+        service.download({
+          userId: owner.id,
+          workspaceId: ws.id,
+          exportId: view.id,
+          authTimeSeconds: p.authTime(1),
+          part: 'contents',
+        }),
+      ),
+    ).toBe('RESOURCE_NOT_FOUND');
+  });
+
+  it('[TC-DOCUMENTS-ATTACH-024] la descarga de contenidos exige OWNER y reauth, entrega el ZIP en claro y se audita aparte', async () => {
+    const { p, owner, editor, ws, service, view } = await withContents();
+    await service.run(p.exportJobs.at(-1)!);
+    const args = (userId: string, age: number) => ({
+      userId,
+      workspaceId: ws.id,
+      exportId: view.id,
+      authTimeSeconds: p.authTime(age),
+      part: 'contents' as const,
+    });
+    expect(await codeOf(() => service.download(args(editor.id, 1)))).toBe('INSUFFICIENT_ROLE');
+    expect(await codeOf(() => service.download(args(owner.id, 60)))).toBe('REAUTHENTICATION_REQUIRED');
+    const dl = await service.download(args(owner.id, 1));
+    const chunks: Buffer[] = [];
+    for await (const c of dl.stream) chunks.push(c as Buffer);
+    expect(Buffer.concat(chunks).equals(p.contentsZip)).toBe(true);
+    expect(dl.fileName).toMatch(/-documentos\.zip$/u);
+    expect(
+      p.base.auditEntries.filter((e) => e.action === 'identity.export.contents_downloaded'),
+    ).toHaveLength(1);
+    expect(p.base.auditEntries.filter((e) => e.action === 'identity.export.downloaded')).toHaveLength(0);
+  });
+
+  it('[TC-DOCUMENTS-ATTACH-024] un archivo de contenidos alterado en el almacenamiento da EXPORT_FILE_CORRUPTED sin entregar nada', async () => {
+    const { p, owner, ws, service, view } = await withContents();
+    await service.run(p.exportJobs.at(-1)!);
+    const key = exportContentsObjectKey(ws.id, view.id);
+    const stored = Buffer.from(p.objects.get(key) ?? Buffer.alloc(0));
+    stored[stored.length - 1] = (stored[stored.length - 1] ?? 0) ^ 0xff;
+    p.objects.set(key, stored);
+    expect(
+      await codeOf(() =>
+        service.download({
+          userId: owner.id,
+          workspaceId: ws.id,
+          exportId: view.id,
+          authTimeSeconds: p.authTime(1),
+          part: 'contents',
+        }),
+      ),
+    ).toBe('EXPORT_FILE_CORRUPTED');
+    expect(
+      p.base.auditEntries.filter((e) => e.action === 'identity.export.contents_downloaded'),
+    ).toHaveLength(0);
+  });
+
+  it('[TC-DOCUMENTS-ATTACH-024] una falla al generar los contenidos deja FAILED y sin NINGÚN objeto huérfano', async () => {
+    const { p, owner, ws, service, view } = await withContents();
+    p.contentsFailure = new Error('contents boom');
+    await expect(service.run(p.exportJobs.at(-1)!)).rejects.toThrow('contents boom');
+    expect(p.objects.size).toBe(0);
+    expect((await service.getExport(owner.id, ws.id, view.id)).status).toBe('FAILED');
+  });
+
+  it('[TC-DOCUMENTS-ATTACH-024] misma retención y descarte: expirar o eliminar borra también el archivo de contenidos', async () => {
+    const one = await withContents();
+    await one.service.run(one.p.exportJobs.at(-1)!);
+    expect(one.p.objects.size).toBe(2);
+    await one.service.discard(one.owner.id, one.ws.id, one.view.id);
+    expect(one.p.objects.size).toBe(0);
+    expect(
+      (await one.service.getExport(one.owner.id, one.ws.id, one.view.id)).documentContents,
+    ).toMatchObject({
+      count: 3,
+    });
+    const two = await withContents();
+    await two.service.run(two.p.exportJobs.at(-1)!);
+    two.p.base.clock.set(Instant.parse('2026-10-09T12:00:01.000Z'));
+    expect(await two.service.expireDue()).toBe(1);
+    expect(two.p.objects.size).toBe(0);
   });
 });

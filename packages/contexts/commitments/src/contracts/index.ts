@@ -739,3 +739,10 @@ export const COMMITMENTS_AUDIT_POLICY = {
 } as const satisfies AuditFieldPoliciesDto;
 
 export * from './portability.js';
+
+// ───────────────────────────────────────────── add-document-attachments (DOCUMENTS)
+
+/** Existencia de suscripciones en el workspace (consulta aditiva para los adjuntos de DOCUMENTS; sin FK cruzadas). */
+export interface SubscriptionExistenceQuery {
+  existing(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
+}

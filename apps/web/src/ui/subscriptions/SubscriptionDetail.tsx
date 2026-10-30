@@ -26,6 +26,7 @@ import {
   type CancelMode,
 } from './logic';
 import type { Subscription, SubscriptionPrice } from './types';
+import { AttachmentsSection } from '../documents/AttachmentsSection';
 
 export function SubscriptionDetailPage({
   subscriptionId,
@@ -457,6 +458,7 @@ function Detail({
             : []),
         ]}
       />
+      <AttachmentsSection targetType="SUBSCRIPTION" targetId={sub.id} />
     </section>
   );
 }

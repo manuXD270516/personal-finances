@@ -36,6 +36,8 @@ services:
     environment:
       PF_DOMAIN_APP: ${PF_DOMAIN_APP:?definir en /etc/pfos/pfos.env}
       PF_DOMAIN_AUTH: ${PF_DOMAIN_AUTH:?definir en /etc/pfos/pfos.env}
+      PF_DOMAIN_FILES: ${PF_DOMAIN_FILES:?definir en /etc/pfos/pfos.env}
+      PF_QUARANTINE_BUCKET: ${OBJECT_STORAGE_QUARANTINE_BUCKET:?definir en /etc/pfos/pfos.env}
       PF_ACME_EMAIL: ${PF_ACME_EMAIL:?definir en /etc/pfos/pfos.env}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro

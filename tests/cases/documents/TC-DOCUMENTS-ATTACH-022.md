@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Adjuntos en la interfaz"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-003"
   - "FR-DOCUMENTS-004"
@@ -14,8 +14,9 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/web/src/ui/documents/logic.test.ts", "tests/e2e/specs/documents.spec.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

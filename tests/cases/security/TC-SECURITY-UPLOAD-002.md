@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Lista permitida de tipos de archivo"
 scenario: "Extensión y tipo declarado que no corresponden"
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-002"
 nfr:
@@ -14,8 +14,9 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/domain/file-policy.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

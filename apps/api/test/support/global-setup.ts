@@ -54,6 +54,10 @@ export interface Dependencies {
   readonly exportsBucket: string;
   /** Llavero de claves maestras de PRUEBA (generado por corrida, nunca en el repo): `k1:<base64url 32 bytes>`. */
   readonly exportKeys: string;
+  /** Bucket de cuarentena de las subidas de documentos (add-document-attachments; sin versioning). */
+  readonly quarantineBucket: string;
+  /** Llavero PROPIO de documentos de PRUEBA (distinto del de exports): `k1:<base64url 32 bytes>`. */
+  readonly documentKeys: string;
 }
 
 declare module 'vitest' {
@@ -69,6 +73,8 @@ export default async function setup(project: TestProject) {
   const bucket = 'pfos-test-documents';
   const exportsBucket = 'pfos-test-exports';
   const exportKeys = `k1:${randomBytes(32).toString('base64url')}`;
+  const quarantineBucket = 'pfos-test-quarantine';
+  const documentKeys = `k1:${randomBytes(32).toString('base64url')}`;
 
   const [pg, s3]: [StartedPostgreSqlContainer, StartedTestContainer] = await Promise.all([
     new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase('pfos').start(),
@@ -126,6 +132,8 @@ export default async function setup(project: TestProject) {
       OBJECT_STORAGE_ENDPOINT: s3Endpoint,
       OBJECT_STORAGE_BUCKET: bucket,
       OBJECT_STORAGE_EXPORTS_BUCKET: exportsBucket,
+      OBJECT_STORAGE_QUARANTINE_BUCKET: quarantineBucket,
+      OBJECT_STORAGE_CORS_ORIGINS: 'http://localhost:23000',
       OBJECT_STORAGE_ACCESS_KEY: s3AccessKey,
       OBJECT_STORAGE_SECRET_KEY: s3SecretKey,
       OBJECT_STORAGE_ENSURE_BUCKET: 'true',
@@ -149,6 +157,8 @@ export default async function setup(project: TestProject) {
     bucket,
     exportsBucket,
     exportKeys,
+    quarantineBucket,
+    documentKeys,
   });
 
   return async () => {

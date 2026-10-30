@@ -9,6 +9,7 @@ import type { Pool, PoolClient } from 'pg';
 import { DemoDataService } from '../application/demo-data.service.js';
 import type {
   ArchiveInspector,
+  DocumentContentsExporter,
   EnvelopeCipher,
   ExportArchiveBuilder,
   ExportObjectStore,
@@ -95,6 +96,8 @@ export interface PortabilityOptions {
   readonly store: ExportObjectStore;
   readonly cipher: EnvelopeCipher;
   readonly builder: ExportArchiveBuilder;
+  /** Contenidos de documentos del export (opcional: sin DOCUMENTS configurado el export con contenidos responde 503). */
+  readonly contents?: DocumentContentsExporter;
   readonly importer: WorkspaceImporter;
   readonly inspector: ArchiveInspector;
   readonly jobs: PortabilityJobPort;
@@ -113,6 +116,7 @@ export function portabilityDeps(deps: IdentityDeps, options: PortabilityOptions)
     store: options.store,
     cipher: options.cipher,
     builder: options.builder,
+    ...(options.contents ? { contents: options.contents } : {}),
     inspector: options.inspector,
     importer: options.importer,
     reauth: new RecentAuthPolicy(options.reauthMaxAgeMs),
@@ -565,6 +569,7 @@ export type { ExportView } from '../application/portability/workspace-export.ser
 export type { ImportView } from '../application/portability/workspace-import.service.js';
 export type {
   ArchiveInspector,
+  DocumentContentsExporter,
   EnvelopeCipher,
   ExportArchiveBuilder,
   ExportJob,
@@ -579,7 +584,8 @@ export {
   KeyringEnvelopeCipher,
   S3ExportObjectStore,
 } from '../infrastructure/portability/s3-store-and-cipher.js';
-export { LocalKeyringProvider } from '../infrastructure/portability/key-provider.js';
+export { LocalKeyringProvider } from '@pf/platform/crypto';
+export { RecentAuthPolicy } from '../application/portability/reauth.js';
 export { PgExportArchiveBuilder } from '../infrastructure/portability/pg-archive-builder.js';
 export {
   PgWorkspaceImporter,
@@ -595,4 +601,4 @@ export {
 export { loadColumns, type ColumnInfo, type SqlExec } from '../infrastructure/portability/section-sql.js';
 export { ZipReader, ZipWriter } from '../infrastructure/portability/zip.js';
 export { RecordValidators, inspectArchive } from '../infrastructure/portability/archive-inspector.js';
-export { DATA_KEY_BYTES, decryptEnvelope, encryptEnvelope } from '../infrastructure/portability/envelope.js';
+export { DATA_KEY_BYTES, decryptEnvelope, encryptEnvelope } from '@pf/platform/crypto';

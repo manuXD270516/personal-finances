@@ -131,6 +131,8 @@ export const LIFECYCLE_AGGREGATE_TYPES = [
   'Subscription',
   'Loan',
   'SavingsGoal',
+  // add-document-attachments (Phase 6): documento adjunto de DOCUMENTS.
+  'Document',
 ] as const;
 export type LifecycleAggregateType = (typeof LIFECYCLE_AGGREGATE_TYPES)[number];
 

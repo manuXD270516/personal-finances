@@ -3,7 +3,7 @@ import type { Logger } from '@pf/platform/logging';
 import { createObjectStorageClient } from '@pf/platform/storage';
 import { Client } from 'pg';
 import { ensureAppRolePassword, ensureBffRolePassword, ensureWorkerRolePassword } from './app-role.js';
-import { ensureBucket, ensureExportsBucket } from './bucket.js';
+import { ensureBucket, ensureExportsBucket, ensureQuarantineBucket } from './bucket.js';
 import { runDbmateUp } from './dbmate.js';
 import { installJobQueueSchema } from './pgboss.js';
 
@@ -58,6 +58,14 @@ export async function runMigrate(
         logger,
       });
       await ensureExportsBucket(s3, { bucket: config.OBJECT_STORAGE_EXPORTS_BUCKET, logger });
+      await ensureQuarantineBucket(s3, {
+        bucket: config.OBJECT_STORAGE_QUARANTINE_BUCKET,
+        corsOrigins: (config.OBJECT_STORAGE_CORS_ORIGINS ?? '')
+          .split(',')
+          .map((o) => o.trim())
+          .filter(Boolean),
+        logger,
+      });
     } finally {
       s3.destroy();
     }

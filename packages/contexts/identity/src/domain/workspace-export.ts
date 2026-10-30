@@ -15,6 +15,18 @@ export interface ExportFailure {
   readonly message: string;
 }
 
+/** Archivo de contenidos de documentos del export (D315): objeto cifrado aparte, sin tocar el ZIP principal (D100). */
+export interface DocumentContentsFile {
+  /** `null` cuando el archivo se eliminó (expiración o descarte); el resto del registro se conserva. */
+  readonly objectKey: string | null;
+  readonly sizeBytes: number;
+  /** SHA-256 del ZIP de contenidos en claro, en hexadecimal. */
+  readonly sha256: string;
+  readonly keyId: string;
+  readonly wrappedKey: Uint8Array;
+  readonly count: number;
+}
+
 export interface WorkspaceExportProps {
   readonly id: string;
   readonly workspaceId: string;
@@ -28,6 +40,7 @@ export interface WorkspaceExportProps {
   readonly keyId: string | null;
   readonly wrappedKey: Uint8Array | null;
   readonly counts: Readonly<Record<string, number>>;
+  readonly contents: DocumentContentsFile | null;
   readonly requestedBy: string;
   readonly requestedAt: string;
   readonly completedAt: string | null;
@@ -46,6 +59,8 @@ export interface ExportResult {
   readonly keyId: string;
   readonly wrappedKey: Uint8Array;
   readonly counts: Readonly<Record<string, number>>;
+  /** Presente si el export incluyó los contenidos de los documentos. */
+  readonly contents?: DocumentContentsFile | undefined;
 }
 
 export class WorkspaceExport {
@@ -71,6 +86,7 @@ export class WorkspaceExport {
       keyId: null,
       wrappedKey: null,
       counts: {},
+      contents: null,
       requestedBy: input.requestedBy,
       requestedAt: input.at.toString(),
       completedAt: null,
@@ -138,9 +154,15 @@ export class WorkspaceExport {
       keyId: result.keyId,
       wrappedKey: result.wrappedKey,
       counts: result.counts,
+      contents: result.contents ?? null,
       completedAt: at.toString(),
       expiresAt: at.plusMillis(retentionMs).toString(),
     });
+  }
+
+  /** ¿Este export incluyó el archivo de contenidos y sigue existiendo? */
+  get hasContentsFile(): boolean {
+    return (this.props.contents?.objectKey ?? null) !== null;
   }
 
   /** `REQUESTED | RUNNING → FAILED`: sin archivo; el motivo no incluye contenido exportado. */
@@ -176,7 +198,12 @@ export class WorkspaceExport {
   /** `READY → EXPIRED` (job de retención, actor SYSTEM). `false` si no corresponde (aún vigente o ya cerrado). */
   expire(at: Instant): boolean {
     if (this.props.status !== 'READY' || !this.isPastExpiry(at)) return false;
-    this.next({ status: 'EXPIRED', objectKey: null, expiredAt: at.toString() });
+    this.next({
+      status: 'EXPIRED',
+      objectKey: null,
+      contents: this.props.contents && { ...this.props.contents, objectKey: null },
+      expiredAt: at.toString(),
+    });
     return true;
   }
 
@@ -194,7 +221,13 @@ export class WorkspaceExport {
       case 'FAILED':
         throw new DomainError('EXPORT_NOT_READY', 'only a finished export can be discarded');
       case 'READY':
-        this.next({ status: 'DISCARDED', objectKey: null, discardedAt: at.toString(), discardedBy: by });
+        this.next({
+          status: 'DISCARDED',
+          objectKey: null,
+          contents: this.props.contents && { ...this.props.contents, objectKey: null },
+          discardedAt: at.toString(),
+          discardedBy: by,
+        });
         return true;
     }
   }

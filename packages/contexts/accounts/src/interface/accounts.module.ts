@@ -1,3 +1,4 @@
+import { pgExistingIds } from '@pf/platform/api';
 import { Module, type DynamicModule } from '@nestjs/common';
 import type { AuditPort, LifecycleMachineDto, LifecyclePort, LifecycleQuery } from '@pf/audit/contracts';
 import type { BalanceQuery } from '@pf/ledger/contracts';
@@ -34,6 +35,7 @@ import {
   type AccountOpeningBalancePort,
   type AccountsQueryPort,
   type InstitutionSupportQuery,
+  type AccountExistenceQuery,
 } from '../contracts/index.js';
 import {
   FileInstitutionCatalogReader,
@@ -217,4 +219,9 @@ export type {
   ValidatedCustomFieldValue,
   WorkspaceCalendar,
   WorkspaceCurrenciesPort,
+};
+
+/** AccountExistenceQuery: ids existentes en el workspace (`accounts.account`, bajo RLS en la unidad de trabajo en curso). */
+export const accountExistenceQuery: AccountExistenceQuery = {
+  existing: pgExistingIds('accounts.account'),
 };

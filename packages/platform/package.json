@@ -39,6 +39,11 @@
       "types": "./dist/storage/index.d.ts",
       "default": "./dist/storage/index.js"
     },
+    "./crypto": {
+      "@pf/source": "./src/crypto/index.ts",
+      "types": "./dist/crypto/index.d.ts",
+      "default": "./dist/crypto/index.js"
+    },
     "./lifecycle": {
       "@pf/source": "./src/lifecycle/index.ts",
       "types": "./dist/lifecycle/index.d.ts",
@@ -106,6 +111,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "fast-check": "4.10.2",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

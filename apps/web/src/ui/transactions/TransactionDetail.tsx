@@ -36,6 +36,7 @@ import { isWithoutStatement } from '../reconciliation/logic';
 import type { TransactionLifecycle } from '../lifecycle/types';
 import { describe, SignedAmount, StatusBadge, WithoutStatementBadge } from './TransactionsListView';
 import { TransactionTimeline } from './TransactionTimeline';
+import { AttachmentsSection } from '../documents/AttachmentsSection';
 
 export function TransactionDetailPage({ transactionId, notice }: { transactionId: string; notice?: string }) {
   return (
@@ -625,6 +626,12 @@ function Detail({
           },
         ]}
       />
+      {tx ? (
+        <AttachmentsSection
+          targetType={tx.kind === 'CONVERSION' ? 'CONVERSION' : 'TRANSACTION'}
+          targetId={tx.id}
+        />
+      ) : null}
     </section>
   );
 }

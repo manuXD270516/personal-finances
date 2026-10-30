@@ -47,6 +47,7 @@ docs_replica() {
   bucket="$(value_of "${PGBR_ENV_FILE}" PGBACKREST_REPO1_S3_BUCKET)"
   endpoint="$(value_of "${PGBR_ENV_FILE}" PGBACKREST_REPO1_S3_ENDPOINT)"
   # Credenciales solo por variables de entorno del contenedor efímero (nada en disco ni en la línea de comandos).
+  # Solo el bucket de documentos (CIFRADO por la aplicación): la cuarentena (texto plano transitorio) y los exports NO se replican.
   # `-e NOMBRE` sin valor: docker toma el valor del entorno de este proceso (asignado en el prefijo).
   RCLONE_CONFIG_SRC_ACCESS_KEY_ID="$(value_of "${ENV_FILE}" PF_DEV_S3_ACCESS_KEY)" \
     RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY="$(value_of "${ENV_FILE}" PF_DEV_S3_SECRET_KEY)" \

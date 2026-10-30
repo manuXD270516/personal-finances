@@ -41,7 +41,7 @@ updated: 2026-10-29
 
 ## Intención
 
-NFR-COMP-007; ADR-0029 C4 sigue vigente hasta ADR-0030.
+NFR-COMP-007; ADR-0029 C4 sigue vigente hasta ADR-0031.
 
 ## Escenario
 

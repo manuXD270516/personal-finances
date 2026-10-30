@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/documents/DocumentRejected.v1.schema.json",
+  "title": "documents.DocumentRejected.v1",
+  "description": "Un documento quedó rechazado: la verificación de la confirmación lo rechazó (suma o tamaño distintos, tipo no permitido o distinto, contenido activo, cifrado, macros, límites de archivo comprimido, contenido mal formado o malware) o la subida venció sin confirmarse. Reemplaza al DocumentQuarantined de docs/05, que no tenía definición. Productor: DOCUMENTS. Sin consumidores obligatorios. Idempotencia: documentId. NUNCA lleva el nombre original del archivo.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "documents.DocumentRejected"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "Document"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentId",
+        "purpose",
+        "reason"
+      ],
+      "properties": {
+        "documentId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Conjunto abierto: RECEIPT, INVOICE, STATEMENT, CONTRACT, IMPORT_SOURCE, OTHER.",
+          "pattern": "^[A-Z][A-Z_]{1,31}$"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Motivo (conjunto abierto): UPLOAD_NOT_COMPLETED, SIZE_MISMATCH, CHECKSUM_MISMATCH, TYPE_NOT_ALLOWED, TYPE_MISMATCH, ACTIVE_CONTENT, ENCRYPTED_CONTENT, MACROS_PRESENT, ARCHIVE_LIMITS_EXCEEDED, MALFORMED_CONTENT, MALWARE_DETECTED.",
+          "pattern": "^[A-Z][A-Z_]{1,47}$"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000d02",
+      "eventType": "documents.DocumentRejected",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-29T14:00:04.480Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "Document",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000d0002",
+      "aggregateVersion": 3,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000f2",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "documentId": "01928c4e-0000-7000-8000-0000000d0002",
+        "purpose": "RECEIPT",
+        "reason": "TYPE_MISMATCH"
+      }
+    }
+  ]
+}

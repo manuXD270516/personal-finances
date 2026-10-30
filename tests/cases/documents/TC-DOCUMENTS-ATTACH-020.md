@@ -5,7 +5,7 @@ spec: documents/attachments
 related_specs: []
 requirement: "Lectura de documentos para el pipeline de importación"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr:
   - "FR-DOCUMENTS-003"
   - "FR-IMPORTS-002"
@@ -15,8 +15,9 @@ invariants:
 priority: critical
 type: integration
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/documents.service.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

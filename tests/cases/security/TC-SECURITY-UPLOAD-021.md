@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Límite de frecuencia de subidas"
 scenario: "Undécima solicitud en un minuto"
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
   - "NFR-SEC-011"
@@ -13,8 +13,9 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["apps/api/test/api/documents.api.test.ts", "apps/api/test/api/upload-security.api.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

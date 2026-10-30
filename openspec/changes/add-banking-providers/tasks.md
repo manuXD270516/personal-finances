@@ -1,6 +1,6 @@
 # Tareas
 
-> Phase 6. Los grupos 1–4 (puerto, conexiones, credenciales, verificación, revocación, sincronización con el proveedor simulado) **no dependen del owner ni de otros changes de Phase 6**. Los grupos 5 y 7 (integración con la vista previa y la persistencia) requieren `add-import-pipeline` (design § Dependencias). **El grupo 9 (adapters reales) depende del owner** (preguntas 1–3 de design.md, ADR-0030, términos, muestras y fixtures) y **no bloquea** el cierre de Phase 6: si sigue abierto al archivar, sus tareas se marcan `[x]` con la nota de diferimiento por decisión del owner. Sin consumidores nuevos (D249).
+> Phase 6. Los grupos 1–4 (puerto, conexiones, credenciales, verificación, revocación, sincronización con el proveedor simulado) **no dependen del owner ni de otros changes de Phase 6**. Los grupos 5 y 7 (integración con la vista previa y la persistencia) requieren `add-import-pipeline` (design § Dependencias). **El grupo 9 (adapters reales) depende del owner** (preguntas 1–3 de design.md, ADR-0031, términos, muestras y fixtures) y **no bloquea** el cierre de Phase 6: si sigue abierto al archivar, sus tareas se marcan `[x]` con la nota de diferimiento por decisión del owner. Sin consumidores nuevos (D249).
 
 ## 1. SPEC y TEST CASES
 
@@ -60,8 +60,8 @@
 
 ## 9. ADAPTERS REALES — puerta del owner (no bloquea Phase 6)
 
-- [ ] 9.1 **[owner]** Responder las preguntas 1–3 de design.md; si aprueba la lectura con claves de solo lectura, redactar y aceptar **ADR-0030** "Lectura de movimientos de exchanges con claves de solo lectura" (extiende ADR-0029, cuya C4 sigue vigente para precios)
-- [ ] 9.2 **[owner/red]** Desde una red con acceso (máquina del owner o VPS N1; misma limitación que la tarea 1.5 de `add-crypto-rate-providers`): leer el texto vigente de los términos de la API privada y de la exportación de historial de Binance y Bybit; registrar fecha, URLs y resultado en ADR-0030
+- [ ] 9.1 **[owner]** Responder las preguntas 1–3 de design.md; si aprueba la lectura con claves de solo lectura, redactar y aceptar **ADR-0031** "Lectura de movimientos de exchanges con claves de solo lectura" (extiende ADR-0029, cuya C4 sigue vigente para precios)
+- [ ] 9.2 **[owner/red]** Desde una red con acceso (máquina del owner o VPS N1; misma limitación que la tarea 1.5 de `add-crypto-rate-providers`): leer el texto vigente de los términos de la API privada y de la exportación de historial de Binance y Bybit; registrar fecha, URLs y resultado en ADR-0031
 - [ ] 9.3 **[owner]** Compartir en la conversación (nunca en el repositorio, D255) una exportación real de trades y de depósitos y retiros de cada exchange; fijar las fichas de formato en `docs/statement-formats/exchanges/` con fixtures anonimizados y pasar `formatStatus` a `VERIFIED`
 - [ ] 9.4 Adapters `EXCHANGE_FILE_BINANCE` y `EXCHANGE_FILE_BYBIT` con los fixtures de 9.3 y la suite de contrato (requiere 9.3)
 - [ ] 9.5 **[owner]** Grabar fixtures anonimizados de los endpoints privados con una clave de solo lectura del owner (la clave nunca en el repositorio ni en la conversación con el agente: la carga el owner en su instancia)

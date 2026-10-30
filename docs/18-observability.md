@@ -294,3 +294,8 @@ Burn-rate alerts (multi-window 1 h/6 h) cuando haya volumen suficiente (Phase 7+
 3. ¿Retención de logs en prod: 30 días es suficiente (auditoría vive en BD)?
 4. ¿Se instrumenta el navegador (RUM / web vitals) o solo el BFF?
 5. ¿El worker expone un puerto HTTP de admin para health/metrics o se usa solo el comando `healthcheck` del contenedor?
+
+
+## Métricas de DOCUMENTS (add-document-attachments, Phase 6)
+
+Sin etiqueta de workspace ni de nombre de archivo (NFR-SEC-015): `documents_uploads_total{result,reason,format}`, `documents_verification_duration_seconds{format}`, `documents_verify_inflight`, `documents_downloads_total`, `documents_storage_used_bytes` (agregado global), `documents_quarantine_objects`, `documents_orphan_links_total` y `documents_storage_usage_drift_bytes`. Los logs llevan solo `documentId`, `workspaceId`, códigos y tamaños; un test canario con un nombre con datos personales verifica que ninguno llega a logs, métricas ni trazas (TC-SECURITY-UPLOAD-014). El mantenimiento (`documents.maintenance`) registra solo conteos por paso.

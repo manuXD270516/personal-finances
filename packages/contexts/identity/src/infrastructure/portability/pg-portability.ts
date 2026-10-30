@@ -28,6 +28,12 @@ interface ExportRow {
   key_id: string | null;
   wrapped_key: Buffer | null;
   counts: Record<string, number>;
+  contents_object_key: string | null;
+  contents_size_bytes: string | null;
+  contents_sha256: string | null;
+  contents_key_id: string | null;
+  contents_wrapped_key: Buffer | null;
+  contents_count: number | null;
   requested_by: string;
   requested_at: string;
   completed_at: string | null;
@@ -40,7 +46,9 @@ interface ExportRow {
 }
 
 const EXPORT_COLUMNS = `id, workspace_id, operation_id, status, format_version, object_key, size_bytes::text AS size_bytes,
-  encode(sha256, 'hex') AS sha256, key_id, wrapped_key, counts, requested_by, ${iso('requested_at')} AS requested_at,
+  encode(sha256, 'hex') AS sha256, key_id, wrapped_key, counts,
+  contents_object_key, contents_size_bytes::text AS contents_size_bytes,
+  encode(contents_sha256, 'hex') AS contents_sha256, contents_key_id, contents_wrapped_key, contents_count, requested_by, ${iso('requested_at')} AS requested_at,
   ${iso('completed_at')} AS completed_at, ${iso('expires_at')} AS expires_at, ${iso('discarded_at')} AS discarded_at,
   discarded_by, ${iso('expired_at')} AS expired_at, error, version`;
 
@@ -57,6 +65,17 @@ const toExport = (r: ExportRow): WorkspaceExport =>
     keyId: r.key_id,
     wrappedKey: r.wrapped_key,
     counts: r.counts,
+    contents:
+      r.contents_sha256 === null || r.contents_key_id === null || r.contents_wrapped_key === null
+        ? null
+        : {
+            objectKey: r.contents_object_key,
+            sizeBytes: Number(r.contents_size_bytes),
+            sha256: r.contents_sha256,
+            keyId: r.contents_key_id,
+            wrappedKey: r.contents_wrapped_key,
+            count: Number(r.contents_count ?? 0),
+          },
     requestedBy: r.requested_by,
     requestedAt: r.requested_at,
     completedAt: r.completed_at,
@@ -121,7 +140,8 @@ export class PgExportRepository implements ExportRepository {
           SET status = $3, object_key = $4, size_bytes = $5, sha256 = decode($6, 'hex'), key_id = $7, wrapped_key = $8,
               counts = $9::jsonb, completed_at = $10::timestamptz, expires_at = $11::timestamptz,
               discarded_at = $12::timestamptz, discarded_by = $13, expired_at = $14::timestamptz, error = $15::jsonb,
-              version = $16
+              version = $16, contents_object_key = $18, contents_size_bytes = $19,
+              contents_sha256 = decode($20, 'hex'), contents_key_id = $21, contents_wrapped_key = $22, contents_count = $23
         WHERE workspace_id = $1 AND id = $2 AND version = $17`,
       [
         p.workspaceId,
@@ -141,6 +161,12 @@ export class PgExportRepository implements ExportRepository {
         p.error === null ? null : JSON.stringify(p.error),
         p.version,
         expectedVersion,
+        p.contents?.objectKey ?? null,
+        p.contents?.sizeBytes ?? null,
+        p.contents?.sha256 ?? null,
+        p.contents?.keyId ?? null,
+        p.contents ? Buffer.from(p.contents.wrappedKey) : null,
+        p.contents?.count ?? null,
       ],
     );
     return rowCount === 1;
@@ -287,7 +313,7 @@ export class PgImportRepository implements ImportRepository {
 
 interface OperationRow {
   id: string;
-  kind: 'EXPORT';
+  kind: 'EXPORT' | 'DOCUMENT_CONTENTS_RESTORE';
   status: OperationView['status'];
   progress_pct: number;
   resource_type: string;

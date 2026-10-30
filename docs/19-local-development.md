@@ -490,3 +490,8 @@ Los puertos de host ya no son los canónicos: defaults "2 + puerto canónico" (2
 4. Al terminar: Configuración → "Limpiar datos de demostración" (confirmar). El demo desaparece al instante y el worker lo purga.
    Alternativa sin UI: `pnpm db:seed -- --profile=demo`. `DEMO_DATA_ENABLED=false` oculta la carga (por defecto en staging/production).
 
+
+
+## Documentos adjuntos en local (add-document-attachments)
+
+`migrate` crea, con `OBJECT_STORAGE_ENSURE_BUCKET=true`, el bucket de **cuarentena** `OBJECT_STORAGE_QUARANTINE_BUCKET` (sin versioning y con CORS solo `PUT`/`HEAD` de `OBJECT_STORAGE_CORS_ORIGINS`) además del bucket de documentos y el de exports. La URL de subida se firma con `OBJECT_STORAGE_PUBLIC_ENDPOINT` (en modo A y en el stack, el S3 publicado en el host: debe ser alcanzable por el navegador). `pnpm env:init`/`setup:env` genera `PF_DEV_DOCUMENT_MASTER_KEY` para el llavero propio de documentos (`DOCUMENT_ENCRYPTION_KEYS=dev1:…`). El antimalware está apagado (`DOCUMENT_MALWARE_SCANNER=none`); el perfil opcional `clamav` de Compose (imagen `clamav/clamav`, no incluida en `core`) lo habilita junto con `CLAMAV_HOST`.

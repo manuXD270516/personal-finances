@@ -5,7 +5,7 @@ spec: security/file-upload-security
 related_specs: []
 requirement: "Rotación de la clave maestra de documentos"
 scenario: null
-requirement_status: provisional
+requirement_status: confirmed
 fr: []
 nfr:
   - "NFR-SEC-006"
@@ -13,8 +13,9 @@ invariants: []
 priority: medium
 type: security
 level: container-integration
-automation_status: not_automated
-status: draft
+automation_status: automated
+automated_tests: ["packages/contexts/documents/src/application/documents.service.test.ts", "packages/contexts/documents/src/application/uploads.service.test.ts", "packages/contexts/documents/src/domain/document.test.ts"]
+status: automated
 regression_suite: false
 phase: 6
 tags:

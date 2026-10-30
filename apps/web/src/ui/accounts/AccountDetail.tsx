@@ -18,6 +18,7 @@ import { ReconciliationIndicator } from '../reconciliation/ReconciliationView';
 import { AccountForm } from './AccountForm';
 import { AccountStatusBadge, BalanceText, BaseEquivalent } from './AccountsListView';
 import { maskedIdentifier } from './logic';
+import { AttachmentsSection } from '../documents/AttachmentsSection';
 
 export function NewAccountPage() {
   return <WithWorkspace>{(ctx) => <NewAccount ctx={ctx} />}</WithWorkspace>;
@@ -345,6 +346,7 @@ function AccountDetail({
             : []),
         ]}
       />
+      <AttachmentsSection targetType="ACCOUNT" targetId={account.id} />
     </section>
   );
 }

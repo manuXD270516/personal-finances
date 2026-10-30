@@ -69,3 +69,10 @@ export const IMPORTS_PORTABILITY_EXCLUSIONS: readonly PortabilityExclusion[] = [
       'Dato técnico purgable (celdas crudas del archivo, retención de 90 días): no es dato financiero (docs/13 §11).',
   },
 ];
+
+// ───────────────────────────────────────────── add-document-attachments (DOCUMENTS)
+
+/** Existencia de importaciones en el workspace (consulta aditiva para los adjuntos de DOCUMENTS; sin FK cruzadas). */
+export interface ImportJobExistenceQuery {
+  existing(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
+}
