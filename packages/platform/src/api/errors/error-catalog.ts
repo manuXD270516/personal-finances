@@ -155,6 +155,13 @@ export const ERROR_CATALOG = {
   // imports / pipeline (Phase 6, add-import-pipeline)
   IMPORT_PARSE_FAILED: { status: 422, title: 'The statement file could not be read' },
   IMPORT_REVERT_BLOCKED: { status: 409, title: 'Some transactions of the import cannot be undone' },
+  // imports / PDF statements (Phase 6, add-pdf-statement-parser)
+  IMPORT_PDF_NO_TEXT: { status: 422, title: 'The PDF has no text (scanned or photographed)' },
+  IMPORT_PDF_LAYOUT_UNKNOWN: { status: 422, title: 'The PDF does not match any known statement layout' },
+  IMPORT_PDF_EXTRACTION_FAILED: { status: 422, title: 'The PDF could not be read within the safety limits' },
+  IMPORT_PDF_TOTALS_MISMATCH: { status: 422, title: 'The statement totals do not match the rows read' },
+  IMPORT_PDF_PAGE_COUNT_MISMATCH: { status: 422, title: 'Fewer pages were read than the statement declares' },
+  IMPORT_PDF_ACCOUNT_MISMATCH: { status: 422, title: 'The statement belongs to a different account' },
   // transactions / bulk edit (Phase 2)
   BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
   // commitments / recurrence engine (Phase 3)

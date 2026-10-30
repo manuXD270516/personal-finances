@@ -12,9 +12,11 @@ invariants: ["INV-001"]
 priority: critical
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/pdf/pdf-statement-reader.pdf.test.ts
+  - packages/contexts/imports/src/testing/pdf-statement-reader.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -32,7 +34,7 @@ steps:
 expected_result:
   - "la vista previa tiene los mismos 6 movimientos, con las mismas fechas, horas, montos y referencias, que cuando los dibuja en orden de lectura"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-016 — Dibujar los fragmentos en orden aleatorio produce los mismos movimientos que el orden de lectura

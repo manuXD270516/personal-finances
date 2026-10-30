@@ -80,6 +80,8 @@ export interface ProfileOptions {
   readonly descriptionCleanup: readonly string[];
   /** QIF: orden de día y mes. */
   readonly dateOrder: 'DMY' | 'MDY' | null;
+  /** PDF: diseño de extracto que fija el perfil (id y versión publicados); sin edición de columnas. */
+  readonly pdfLayout: { readonly id: string; readonly version: number } | null;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -354,10 +356,31 @@ export function parseProfileOptions(
     throw invalid('/dateOrder', 'dateOrder must be DMY or MDY');
   }
   if (dateOrder !== null && format !== 'QIF') throw invalid('/dateOrder', 'dateOrder only applies to QIF');
+  const pdfLayout = parsePdfLayoutRef(input['pdfLayout'], format);
   const cleanup = mapping
     ? mapping.descriptionCleanup
     : strings(input['descriptionCleanup'] ?? [], '/descriptionCleanup', MAX_CLEANUP_PREFIXES);
-  return { version: PROFILE_OPTIONS_VERSION, mapping, descriptionCleanup: cleanup, dateOrder };
+  return { version: PROFILE_OPTIONS_VERSION, mapping, descriptionCleanup: cleanup, dateOrder, pdfLayout };
+}
+
+/** `pdfLayout: { id, version }` solo en perfiles PDF (y obligatorio allí): el perfil fija la versión del diseño. */
+function parsePdfLayoutRef(value: unknown, format: StatementFormat): { id: string; version: number } | null {
+  if (format !== 'PDF') {
+    if (value !== undefined && value !== null) {
+      throw invalid('/pdfLayout', 'pdfLayout only applies to PDF profiles');
+    }
+    return null;
+  }
+  if (!isObject(value)) throw invalid('/pdfLayout', 'a PDF profile must fix the layout as { id, version }');
+  const id = value['id'];
+  const version = value['version'];
+  if (typeof id !== 'string' || id.trim() === '' || id.length > 120) {
+    throw invalid('/pdfLayout/id', 'the layout id must be a non-empty string');
+  }
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    throw invalid('/pdfLayout/version', 'the layout version must be a positive integer');
+  }
+  return { id, version };
 }
 
 // ───────────────────────────────────────────────────────────── forma de entrada (API) ⇄ forma validada
@@ -411,5 +434,6 @@ export function serializeProfileOptions(o: ProfileOptions): Record<string, unkno
     ...(o.mapping ? { mapping: serializeProfileMapping(o.mapping) } : {}),
     descriptionCleanup: [...o.descriptionCleanup],
     dateOrder: o.dateOrder,
+    ...(o.pdfLayout ? { pdfLayout: { id: o.pdfLayout.id, version: o.pdfLayout.version } } : {}),
   };
 }

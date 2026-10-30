@@ -1,6 +1,7 @@
 import type { FormatContext } from '../dashboard/types';
 import { cardStyle, mutedStyle, rowStyle } from '../common/ui';
 import { IMPORT_STAGES, type ImportJob } from './types';
+import { PdfFailureDetails } from './PdfReadingPanel';
 import { stageProgressOf } from './pipeline-logic';
 
 /**
@@ -100,6 +101,7 @@ export function ParseFailedPanel({
           {f.t('parseFailed.where')} <code>{pointer}</code>
         </p>
       ) : null}
+      <PdfFailureDetails job={job} f={f} />
       <p style={{ ...mutedStyle, margin: 0 }}>{f.t('parseFailed.noRows')}</p>
       <p style={{ margin: 0 }}>
         <a href={newHref}>{f.t('result.importAnother')}</a>

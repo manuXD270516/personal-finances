@@ -12,6 +12,7 @@ import {
   type ImportDuplicateCandidate,
   type ImportFormat,
   type ImportJob,
+  type ImportPdfInfo,
   type ImportPreviewRow,
   type ImportProfile,
   type ImportProposedField,
@@ -21,8 +22,34 @@ import {
 } from './types';
 
 /** Extensiones que ofrece el selector de archivo: el formato real lo fija el CONTENIDO (DOCUMENTS), no el nombre. */
-export const DOCUMENT_ACCEPT = '.csv,.txt,.tsv,.ofx,.qfx,.qif,.json,.xlsx';
-export const IMPORT_FORMATS: readonly ImportFormat[] = ['CSV', 'OFX', 'QIF', 'JSON', 'XLSX'];
+export const DOCUMENT_ACCEPT = '.csv,.txt,.tsv,.ofx,.qfx,.qif,.json,.xlsx,.pdf';
+export const IMPORT_FORMATS: readonly ImportFormat[] = ['CSV', 'OFX', 'QIF', 'JSON', 'XLSX', 'PDF'];
+
+/**
+ * Líneas del detalle de una lectura PDF fallida (add-pdf-statement-parser): solo estructura (páginas y números de
+ * línea, conteos); `null` cuando no hay nada que mostrar. Los números de línea se listan hasta 10.
+ */
+export function pdfFailureLines(pdf: ImportPdfInfo): {
+  readonly layout: { readonly id: string; readonly version: number } | null;
+  readonly noText: string | null;
+  readonly unrecognized: string | null;
+  readonly pages: { readonly read: number; readonly declared: number } | null;
+  readonly reason: ImportPdfInfo['extractionFailure'];
+} {
+  const unrecognized = pdf.coherence?.unrecognizedLines ?? [];
+  const shown = unrecognized.slice(0, 10).map((l) => `${l.page}:${l.line}`);
+  return {
+    layout: pdf.layout,
+    noText: pdf.pagesWithoutText.length > 0 ? pdf.pagesWithoutText.join(', ') : null,
+    unrecognized:
+      unrecognized.length === 0 ? null : shown.join(', ') + (unrecognized.length > 10 ? ', …' : ''),
+    pages:
+      pdf.pagesDeclared !== null && pdf.pagesDeclared !== pdf.pagesRead && pdf.pagesRead > 0
+        ? { read: pdf.pagesRead, declared: pdf.pagesDeclared }
+        : null,
+    reason: pdf.extractionFailure,
+  };
+}
 
 /** ¿La importación viene de un documento (se procesa en el worker)? */
 export const isDocumentJob = (job: Pick<ImportJob, 'documentId'>): boolean =>

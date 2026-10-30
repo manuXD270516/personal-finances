@@ -368,6 +368,12 @@ export function financeRuntimes(input: {
         | 'IMPORT_DUPLICATE_HIGH_SCORE'
         | 'IMPORT_DUPLICATE_LOW_SCORE'
         | 'DOCUMENT_IMPORT_SOURCE_MAX_BYTES'
+        | 'IMPORT_PDF_EXTRACTION_TIMEOUT'
+        | 'IMPORT_PDF_MAX_PAGES'
+        | 'IMPORT_PDF_MAX_TEXT_ITEMS'
+        | 'IMPORT_PDF_MAX_TEXT_CHARS'
+        | 'IMPORT_PDF_WORKER_MAX_OLD_MB'
+        | 'IMPORT_PDF_MIN_PAGE_TEXT_CHARS'
       >
     > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>> &
@@ -1110,6 +1116,12 @@ export function importsSettingsFrom(
       | 'IMPORT_DUPLICATE_HIGH_SCORE'
       | 'IMPORT_DUPLICATE_LOW_SCORE'
       | 'DOCUMENT_IMPORT_SOURCE_MAX_BYTES'
+      | 'IMPORT_PDF_EXTRACTION_TIMEOUT'
+      | 'IMPORT_PDF_MAX_PAGES'
+      | 'IMPORT_PDF_MAX_TEXT_ITEMS'
+      | 'IMPORT_PDF_MAX_TEXT_CHARS'
+      | 'IMPORT_PDF_WORKER_MAX_OLD_MB'
+      | 'IMPORT_PDF_MIN_PAGE_TEXT_CHARS'
     >
   > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>>,
@@ -1118,6 +1130,18 @@ export function importsSettingsFrom(
   const maxRows = config.IMPORT_MAX_ROWS ?? config.IMPORT_CSV_MAX_ROWS;
   return {
     ...(config.IMPORT_PROCESSING_TIMEOUT ? { processingTimeoutMs: config.IMPORT_PROCESSING_TIMEOUT } : {}),
+    ...(config.IMPORT_PDF_EXTRACTION_TIMEOUT
+      ? { pdfExtractionTimeoutMs: config.IMPORT_PDF_EXTRACTION_TIMEOUT }
+      : {}),
+    ...(config.IMPORT_PDF_MAX_PAGES ? { pdfMaxPages: config.IMPORT_PDF_MAX_PAGES } : {}),
+    ...(config.IMPORT_PDF_MAX_TEXT_ITEMS ? { pdfMaxTextItems: config.IMPORT_PDF_MAX_TEXT_ITEMS } : {}),
+    ...(config.IMPORT_PDF_MAX_TEXT_CHARS ? { pdfMaxTextChars: config.IMPORT_PDF_MAX_TEXT_CHARS } : {}),
+    ...(config.IMPORT_PDF_WORKER_MAX_OLD_MB
+      ? { pdfWorkerMaxOldMb: config.IMPORT_PDF_WORKER_MAX_OLD_MB }
+      : {}),
+    ...(config.IMPORT_PDF_MIN_PAGE_TEXT_CHARS
+      ? { pdfMinPageTextChars: config.IMPORT_PDF_MIN_PAGE_TEXT_CHARS }
+      : {}),
     ...(config.IMPORT_DUPLICATE_HIGH_SCORE !== undefined
       ? { duplicateHighScore: config.IMPORT_DUPLICATE_HIGH_SCORE.toFixed(4) }
       : {}),

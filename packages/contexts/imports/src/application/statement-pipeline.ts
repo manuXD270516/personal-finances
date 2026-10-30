@@ -6,6 +6,7 @@ import {
   occurrenceIndexes,
   rowFingerprint,
   selectDataRecords,
+  stripVolatileFragments,
   validateRow,
   verifyRunningBalance,
   type ClassificationProposal,
@@ -41,6 +42,8 @@ export interface PipelineContext {
   readonly mapping: ProfileMapping | null;
   /** Limpieza de descripción de un perfil aplicado a un formato autodescrito (prefijos literales). */
   readonly descriptionCleanup: readonly string[];
+  /** PDF: fragmentos variables del diseño; se quitan SOLO de la descripción que alimenta la huella. */
+  readonly volatileFragments?: readonly string[];
   readonly closedPeriods: readonly ClosedPeriodRange[];
   /** Saldo inicial del extracto, si se conoce (verificación del saldo corrido). */
   readonly openingBalance: string | null;
@@ -215,12 +218,15 @@ export async function runStatementPipeline(
     }
   }
 
-  // Huellas y ordinales de ocurrencia.
+  // Huellas y ordinales de ocurrencia. La descripción de la huella no lleva los fragmentos variables (PDF, decisión 12).
+  const volatile = ctx.volatileFragments ?? [];
+  const fingerprintText = (p: Prepared): string | null =>
+    stripVolatileFragments(p.normalized.description, volatile);
   const indexes = occurrenceIndexes(
     valid.map((p) => ({
       bookingDate: p.normalized.bookingDate as string,
       signedAmount: p.normalized.signedAmount as string,
-      description: p.normalized.description,
+      description: fingerprintText(p),
     })),
   );
   const fingerprints = new Map<string, { fingerprint: string; occurrenceIndex: number }>();
@@ -234,7 +240,7 @@ export async function runStatementPipeline(
         bookingDate: p.normalized.bookingDate as string,
         signedAmount: p.normalized.signedAmount as string,
         currency: ctx.currencyCode,
-        description: p.normalized.description,
+        description: fingerprintText(p),
         ...(p.record.externalId ? { externalId: p.record.externalId } : {}),
         occurrenceIndex,
       }),

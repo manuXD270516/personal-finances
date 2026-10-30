@@ -54,9 +54,10 @@
             "OFX",
             "QIF",
             "JSON",
-            "XLSX"
+            "XLSX",
+            "PDF"
           ],
-          "description": "Formato detectado por contenido. Enum abierto: se pueden agregar formatos (PDF en un change propio)."
+          "description": "Formato detectado por contenido. Enum abierto: se pueden agregar formatos (PDF con texto desde add-pdf-statement-parser)."
         }
       }
     }

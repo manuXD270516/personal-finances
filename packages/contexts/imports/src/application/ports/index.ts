@@ -22,6 +22,7 @@ import type {
   RowIssue,
   RowKind,
 } from '../../domain/index.js';
+import type { PdfStatementReader } from '../pdf/pdf-statement-reader.js';
 import type {
   BulkEditSet,
   CounterpartyResolverPort,
@@ -40,6 +41,7 @@ import type {
 } from './pipeline.js';
 
 export * from './pipeline.js';
+export * from '../pdf/ports.js';
 
 /**
  * Puertos de IMPORTS (hexagonal). Los repositorios los implementa `infrastructure/` sobre PostgreSQL; los de otros
@@ -457,6 +459,13 @@ export interface ImportsSettings {
   readonly duplicateLowScore: string;
   /** Tope de bytes de un documento a importar (`DOCUMENT_IMPORT_SOURCE_MAX_BYTES`). */
   readonly documentMaxBytes: number;
+  // ── add-pdf-statement-parser (`IMPORT_PDF_*`)
+  readonly pdfExtractionTimeoutMs: number;
+  readonly pdfMaxPages: number;
+  readonly pdfMaxTextItems: number;
+  readonly pdfMaxTextChars: number;
+  readonly pdfWorkerMaxOldMb: number;
+  readonly pdfMinPageTextChars: number;
 }
 
 export interface ImportsDeps {
@@ -491,6 +500,8 @@ export interface ImportsDeps {
   readonly conversions: ImportedConversionsPort;
   readonly readers: StatementReaderPort;
   readonly refs: ReferenceCatalogPort;
+  /** Lector de extractos PDF (add-pdf-statement-parser); ausente ⇒ un PDF se rechaza como formato no importable. */
+  readonly pdf?: PdfStatementReader;
 }
 
 /** `ImportedConversionsCommand.recordBatch` (lo implementa TRANSACTIONS; el mismo comando usa `add-banking-providers`). */

@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: e2e
 level: e2e
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pdf.test.tsx
+  - tests/e2e/specs/import-pdf.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf", "ui"]
@@ -32,7 +34,7 @@ expected_result:
   - "la importación registra el saldo del extracto de 155.00 a 1019.32 BOB del 2026-03-01 al 2026-03-31"
   - "queda \"en revisión\" con 4 filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-048 — Desde el asistente, un extracto PDF coherente muestra el diseño, el saldo del extracto y la vista previa

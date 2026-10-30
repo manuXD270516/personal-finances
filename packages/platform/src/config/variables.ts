@@ -921,6 +921,65 @@ export const VARIABLES = {
       'Puntaje bajo el cual un posible duplicado se rotula «confianza baja» (0.60): sigue exigiendo decisión (docs/57 D325); solo cambia el rótulo.',
     default: '0.60',
   }),
+  // ── Imports: lectura de extractos PDF (openspec add-pdf-statement-parser decisión 3, D351) ──
+  IMPORT_PDF_EXTRACTION_TIMEOUT: variable(
+    z
+      .string()
+      .regex(/^PT\d+[MS]$/, 'duración ISO 8601 en minutos o segundos (`PT30S`)')
+      .transform((v) => Number(v.slice(2, -1)) * (v.endsWith('M') ? 60_000 : 1000))
+      .refine((ms) => ms >= 1000 && ms <= 120_000, 'entre PT1S y PT2M'),
+    {
+      group: 'Imports',
+      description:
+        'Tiempo máximo de la extracción de texto de un PDF (`PT30S`): vencido, el hilo aislado se termina y la importación falla con `IMPORT_PDF_EXTRACTION_FAILED` (motivo `TIMEOUT`).',
+      default: 'PT30S',
+    },
+  ),
+  IMPORT_PDF_MAX_PAGES: variable(
+    positiveInt.refine((n) => n <= 1000, 'hasta 1000 páginas'),
+    {
+      group: 'Imports',
+      description:
+        'Máximo de páginas de un extracto PDF (200, D351): más ⇒ `IMPORT_PDF_EXTRACTION_FAILED` (`PAGE_LIMIT`) sin leer el contenido de ninguna página. Un extracto mensual real tiene de 1 a 6.',
+      default: '200',
+    },
+  ),
+  IMPORT_PDF_MAX_TEXT_ITEMS: variable(
+    positiveInt.refine((n) => n <= 5_000_000, 'hasta 5000000 fragmentos'),
+    {
+      group: 'Imports',
+      description:
+        'Máximo de fragmentos de texto que la extracción de un PDF acumula (300000): más ⇒ `IMPORT_PDF_EXTRACTION_FAILED` (`TEXT_LIMIT`).',
+      default: '300000',
+    },
+  ),
+  IMPORT_PDF_MAX_TEXT_CHARS: variable(
+    positiveInt.refine((n) => n <= 67_108_864, 'hasta 67108864 caracteres (64 MiB)'),
+    {
+      group: 'Imports',
+      description:
+        'Máximo de caracteres de texto que la extracción de un PDF acumula (4194304, 4 MiB): más ⇒ `IMPORT_PDF_EXTRACTION_FAILED` (`TEXT_LIMIT`).',
+      default: '4194304',
+    },
+  ),
+  IMPORT_PDF_WORKER_MAX_OLD_MB: variable(
+    positiveInt.refine((n) => n >= 64 && n <= 512, 'entre 64 y 512 MiB'),
+    {
+      group: 'Imports',
+      description:
+        'Tope de memoria (heap de V8, MiB) del hilo aislado que lee un PDF (192): superarlo termina solo ese hilo y la importación falla con `IMPORT_PDF_EXTRACTION_FAILED` (`MEMORY`). Se suma al presupuesto de memoria del worker (una extracción a la vez).',
+      default: '192',
+    },
+  ),
+  IMPORT_PDF_MIN_PAGE_TEXT_CHARS: variable(
+    positiveInt.refine((n) => n <= 1000, 'hasta 1000 caracteres'),
+    {
+      group: 'Imports',
+      description:
+        'Caracteres no blancos mínimos de una página de un extracto PDF (20, D351): una página con menos (y que no sea una página en blanco declarada) es «sin texto» y el PDF se rechaza con `IMPORT_PDF_NO_TEXT` (sin OCR).',
+      default: '20',
+    },
+  ),
   IMPORT_CSV_MAX_COLUMNS: variable(
     positiveInt.refine((n) => n <= 200, 'hasta 200 columnas'),
     {
@@ -1407,6 +1466,13 @@ export const APP_VARIABLES = {
     'IMPORT_PROCESSING_TIMEOUT',
     'IMPORT_DUPLICATE_HIGH_SCORE',
     'IMPORT_DUPLICATE_LOW_SCORE',
+    // add-pdf-statement-parser: límites del lector de extractos PDF.
+    'IMPORT_PDF_EXTRACTION_TIMEOUT',
+    'IMPORT_PDF_MAX_PAGES',
+    'IMPORT_PDF_MAX_TEXT_ITEMS',
+    'IMPORT_PDF_MAX_TEXT_CHARS',
+    'IMPORT_PDF_WORKER_MAX_OLD_MB',
+    'IMPORT_PDF_MIN_PAGE_TEXT_CHARS',
     'IMPORT_PERSIST_BATCH_SIZE',
     'IMPORT_REVIEW_TTL',
     'IMPORT_FUTURE_DATE_TOLERANCE_DAYS',
@@ -1459,6 +1525,13 @@ export const APP_VARIABLES = {
     'IMPORT_PROCESSING_TIMEOUT',
     'IMPORT_DUPLICATE_HIGH_SCORE',
     'IMPORT_DUPLICATE_LOW_SCORE',
+    // add-pdf-statement-parser: el hilo aislado de extracción corre en el consumidor `imports.persist`.
+    'IMPORT_PDF_EXTRACTION_TIMEOUT',
+    'IMPORT_PDF_MAX_PAGES',
+    'IMPORT_PDF_MAX_TEXT_ITEMS',
+    'IMPORT_PDF_MAX_TEXT_CHARS',
+    'IMPORT_PDF_WORKER_MAX_OLD_MB',
+    'IMPORT_PDF_MIN_PAGE_TEXT_CHARS',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).

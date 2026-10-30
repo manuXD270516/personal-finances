@@ -165,5 +165,11 @@
   "ATTACHMENT_LIMIT_EXCEEDED": "Este elemento ya tiene el máximo de adjuntos. Quita alguno para agregar otro.",
   "RULE_INVALID_REGEX": "La expresión regular no es válida o usa construcciones sin evaluación de tiempo lineal (referencias hacia atrás, lookaround o más de 200 caracteres).",
   "RULE_LIMIT_EXCEEDED": "El espacio de trabajo alcanzó el máximo de reglas. Archiva alguna para crear otra.",
-  "RULE_DRY_RUN_STALE": "Una regla o una transacción cambió después de la ejecución. No se aplicó nada: vuelve a ejecutar."
+  "RULE_DRY_RUN_STALE": "Una regla o una transacción cambió después de la ejecución. No se aplicó nada: vuelve a ejecutar.",
+  "IMPORT_PDF_NO_TEXT": "Este PDF no tiene texto (parece escaneado o fotografiado). Descarga el extracto digital desde tu banca por internet o registra los movimientos a mano.",
+  "IMPORT_PDF_LAYOUT_UNKNOWN": "Este PDF tiene texto pero no coincide con ningún formato de extracto conocido. Descarga el extracto de cuenta (no el de tarjeta) desde la banca por internet; si el banco cambió su formato, avísanos.",
+  "IMPORT_PDF_EXTRACTION_FAILED": "No pudimos leer el PDF dentro de los límites de seguridad (tiempo, memoria, páginas o archivo dañado). Descárgalo de nuevo desde la banca por internet.",
+  "IMPORT_PDF_TOTALS_MISMATCH": "Los saldos y totales del extracto no cuadran con los movimientos que leímos, así que no importamos nada para no dejar un saldo erróneo. El detalle indica las páginas y líneas a revisar.",
+  "IMPORT_PDF_PAGE_COUNT_MISMATCH": "El extracto declara más páginas de las que tiene el PDF. Descárgalo completo de nuevo.",
+  "IMPORT_PDF_ACCOUNT_MISMATCH": "El extracto es de otra cuenta que la elegida (los últimos 4 dígitos no coinciden). Elige la cuenta correcta e inténtalo de nuevo."
 }

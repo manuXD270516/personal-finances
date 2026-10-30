@@ -57,6 +57,16 @@ Al final de cada página: `Página Actual: N` y `Total Páginas: M`. En la últi
 - Saldo corrido fila a fila en el orden impreso (incluidas las filas fuera de orden y la fila cortada entre páginas).
 - Número de páginas leídas = `Total Páginas`.
 
+
+## Diseño publicado (change 57, `add-pdf-statement-parser`)
+
+- **Diseño:** `bo.ganadero.cuenta` **versión 1** (`packages/contexts/imports/src/infrastructure/pdf/layouts/bo.ganadero.cuenta.v1.json`, inmutable; un formato nuevo del banco es la versión 2). Los literales de detección son rótulos fijos de la primera página, sin el nombre del banco ni datos del titular.
+- **Extracción:** por **coordenadas** con PDF.js (decisión del change, ya no hipótesis): el motor ordena los fragmentos por posición, arma las bandas de columna con los rótulos de cada página y reconstruye cada fila; el orden del flujo de contenido no cuenta.
+- **Lectura:** ancla por fecha (`DD/MM/AAAA`); columnas Débito y Crédito (signo = crédito − débito; ambos distintos de cero ⇒ fila inválida `IMPORT_PDF_BOTH_DEBIT_AND_CREDIT`); la fila `Saldo anterior` aporta el saldo inicial y `TOTAL SALDO ACTUAL` del pie de la última página el final (no son movimientos); la glosa cortada por el salto de página se une al último movimiento de la página anterior; los pies `Página Actual:` y `Total Páginas:` se descartan y el total se comprueba contra las páginas leídas.
+- **Fragmentos variables:** `Aún falta {n}` y `Completado` (pregunta 8, D354) se quitan SOLO de la descripción usada en la huella: volver a descargar el mismo mes da 0 transacciones nuevas aunque el banco recalcule esas anotaciones.
+- **Referencia:** la columna `TRANSACCIÓN` no es única (`reference.unique = false`): no se usa como identificador externo.
+- **Verificación con extractos reales:** pendiente del owner con `pnpm imports:pdf:probe <ruta-absoluta-al-pdf>` (solo imprime estructura, nunca montos ni nombres; tarea 9.1). `statementImport` sigue en `PENDING_SAMPLE` hasta entonces.
+
 ## Valor recomendado de `statementImport`
 
 **`PENDING_SAMPLE`.** Texto extraíble (no `IMAGE_ONLY_STATEMENT`) pero sin evidencia de una exportación CSV/XLS, de modo que no es `GENERIC_ONLY`. Pasa a `GENERIC_ONLY` si el owner confirma que la banca por internet exporta CSV/XLS compatible, y a `SUPPORTED` con el parser de PDF de Phase 6/11. Es el formato con más riesgo de parseo por cortes de página y orden no cronológico.

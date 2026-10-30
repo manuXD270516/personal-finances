@@ -261,7 +261,7 @@ export class ImportsService {
         );
       }
       const format = document.detectedFormat as StatementFormat | null;
-      if (format === null || !IMPORTABLE.includes(format)) {
+      if (format === null || !(IMPORTABLE.includes(format) || (format === 'PDF' && deps.pdf !== undefined))) {
         throw new DomainError('IMPORT_UNSUPPORTED_FORMAT', 'the document format cannot be imported').at(
           '/documentId',
         );

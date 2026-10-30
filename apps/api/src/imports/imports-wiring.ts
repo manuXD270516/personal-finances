@@ -150,6 +150,10 @@ export function importsPortsFor(input: {
         const accounts = await input.accountCatalog.listAccounts({ workspaceId, includeArchived: true });
         return accounts.find((a) => a.accountId === accountId)?.institutionId ?? null;
       },
+      async accountNumberLast4Of(workspaceId, accountId) {
+        const accounts = await input.accountCatalog.listAccounts({ workspaceId, includeArchived: true });
+        return accounts.find((a) => a.accountId === accountId)?.accountNumberLast4 ?? null;
+      },
     },
     refs: {
       async assertCategory(workspaceId, categoryId, kind, pointer) {

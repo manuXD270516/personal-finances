@@ -31,6 +31,9 @@ export class DefaultStatementReader implements StatementReaderPort {
       dateOrder: options.dateOrder,
     };
     switch (format) {
+      case 'PDF':
+        // El PDF necesita extracción asíncrona en un hilo aislado: lo lee `ProcessImportService` con el puerto de PDF.
+        return { kind: 'FAILED', failure: { code: 'IMPORT_UNSUPPORTED_FORMAT', pointer: null } };
       case 'OFX':
         return { kind: 'RECORDS', parsed: this.ofx.parse(bytes, parseOptions) };
       case 'QIF':

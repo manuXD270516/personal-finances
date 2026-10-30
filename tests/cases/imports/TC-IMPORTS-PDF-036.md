@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: integration
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pdf.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "pdf"]
@@ -33,7 +34,7 @@ expected_result:
   - "la vista previa muestra una diferencia de saldo inicial de 640.00 BOB"
   - "la importación se puede aprobar"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PDF-036 — La vista previa muestra la diferencia entre el saldo inicial del extracto y el de la cuenta

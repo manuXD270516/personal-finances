@@ -122,13 +122,31 @@ export const IMPORT_STAGES: readonly ImportStage[] = [
   'DEDUPE',
   'MATCH',
 ];
-export type ImportFormat = 'CSV' | 'OFX' | 'QIF' | 'JSON' | 'XLSX';
+export type ImportFormat = 'CSV' | 'OFX' | 'QIF' | 'JSON' | 'XLSX' | 'PDF';
 
 export interface ImportProfileCandidate {
   readonly profileId: string;
   readonly version: number;
   readonly name: string;
   readonly missingColumns: readonly string[];
+}
+
+/** Lectura de un extracto PDF (`ImportJob.pdf`; add-pdf-statement-parser): solo estructura y conteos. */
+export interface ImportPdfInfo {
+  readonly layout: { readonly id: string; readonly version: number } | null;
+  readonly pagesRead: number;
+  readonly pagesDeclared: number | null;
+  readonly pagesWithoutText: readonly number[];
+  readonly coherence: {
+    readonly totals: 'OK' | 'MISMATCH' | 'NOT_AVAILABLE';
+    readonly difference: Money | null;
+    readonly balanceChain: 'OK' | 'GAPS' | 'NOT_AVAILABLE';
+    readonly unrecognizedLines: readonly { readonly page: number; readonly line: number }[];
+  } | null;
+  readonly openingDifference: Money | null;
+  readonly extractionFailure:
+    'TIMEOUT' | 'MEMORY' | 'PAGE_LIMIT' | 'TEXT_LIMIT' | 'MALFORMED' | 'ENCRYPTED' | null;
+  readonly warnings: readonly 'IMPORT_PDF_ACCOUNT_UNVERIFIED'[];
 }
 
 export interface ImportStatement {
@@ -217,6 +235,8 @@ export interface ImportJob {
   readonly reconciliationOffer?: ImportReconciliationOffer | null;
   readonly revertSummary?: ImportRevertSummary | null;
   readonly ruleCoverage?: ImportRuleCoverage | null;
+  /** Extractos PDF: diseño, páginas, coherencia y avisos (`null` en los demás formatos). */
+  readonly pdf?: ImportPdfInfo | null;
 }
 
 export interface ImportCreated extends ImportJob {

@@ -210,7 +210,7 @@ describe('subida como documento', () => {
         onSubmit={noop}
       />,
     );
-    expect(html).toContain('accept=".csv,.txt,.tsv,.ofx,.qfx,.qif,.json,.xlsx"');
+    expect(html).toContain('accept=".csv,.txt,.tsv,.ofx,.qfx,.qif,.json,.xlsx,.pdf"');
     expect(html).toContain('aria-live="polite"');
     expect(textOf(html)).toContain('Subiendo el archivo: 40 %');
     expect(textOf(html)).toContain('Cumbre CSV (CSV)');
