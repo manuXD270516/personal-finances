@@ -58,6 +58,15 @@ export interface JournalEntryRepository {
     entryType: JournalEntry['entryType'],
   ): Promise<ReadonlyMap<string, { readonly id: string; readonly sequence: string }>>;
   findById(workspaceId: string, id: string): Promise<JournalEntry | null>;
+  /** Asientos por id (una consulta de asientos y otra de postings); los que no existen se omiten. */
+  findManyById(workspaceId: string, ids: readonly string[]): Promise<readonly JournalEntry[]>;
+  /** Cuáles de estos asientos ya tienen reversa (una consulta). */
+  reversedAmong(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>>;
+  /** Vincula original → reversa por conjunto; `LEDGER_ENTRY_ALREADY_REVERSED` si alguno ya estaba revertido. */
+  recordReversals(
+    workspaceId: string,
+    pairs: readonly { readonly originalId: string; readonly reversalId: string }[],
+  ): Promise<void>;
   findBySource(
     workspaceId: string,
     source: SourceRef,

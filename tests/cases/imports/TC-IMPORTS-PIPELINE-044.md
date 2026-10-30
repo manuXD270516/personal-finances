@@ -12,9 +12,15 @@ invariants: ["INV-004", "INV-009"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imported-movements.api.test.ts
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/domain/row-edits.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -33,7 +39,7 @@ expected_result:
   - "se crea una transferencia de 400.00 BOB de \"Banco BOB\" a \"Visa\" y ningún gasto"
   - "la deuda de \"Visa\" baja 400.00 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-044 — Una fila marcada como transferencia a la tarjeta crea una transferencia y ningún gasto

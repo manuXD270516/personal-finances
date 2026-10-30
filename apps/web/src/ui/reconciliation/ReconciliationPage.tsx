@@ -30,10 +30,26 @@ import {
   type Reconciliation,
 } from './logic';
 
-export function ReconciliationPage({ accountId, sessionId }: { accountId: string; sessionId?: string }) {
+export function ReconciliationPage({
+  accountId,
+  sessionId,
+  prefill,
+}: {
+  accountId: string;
+  sessionId?: string;
+  /** Fecha y saldo del extracto (oferta de una importación); solo precargan el formulario. */
+  prefill?: { date?: string; balance?: string };
+}) {
   return (
     <WithWorkspace>
-      {(ctx) => <Reconcile ctx={ctx} accountId={accountId} {...(sessionId ? { sessionId } : {})} />}
+      {(ctx) => (
+        <Reconcile
+          ctx={ctx}
+          accountId={accountId}
+          {...(sessionId ? { sessionId } : {})}
+          {...(prefill ? { prefill } : {})}
+        />
+      )}
     </WithWorkspace>
   );
 }
@@ -50,10 +66,12 @@ function Reconcile({
   ctx,
   accountId,
   sessionId,
+  prefill,
 }: {
   ctx: WorkspaceContext;
   accountId: string;
   sessionId?: string;
+  prefill?: { date?: string; balance?: string };
 }) {
   const f = useFormat('Reconciliation', ctx);
   const txf = useFormat('Transactions', ctx);
@@ -296,6 +314,8 @@ function Reconcile({
           today={today}
           busy={busy}
           error={fieldError}
+          initialDate={prefill?.date}
+          initialBalance={prefill?.balance}
           onSubmit={start}
         />
       ) : (

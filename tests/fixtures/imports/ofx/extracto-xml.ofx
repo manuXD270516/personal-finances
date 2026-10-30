@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?OFX OFXHEADER="200" VERSION="220" SECURITY="NONE" OLDFILEUID="NONE" NEWFILEUID="NONE"?>
+<!-- SINTETICO: extracto ficticio, sin datos reales -->
+<OFX>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <STMTRS>
+        <CURDEF>BOB</CURDEF>
+        <BANKTRANLIST>
+          <DTSTART>20260401000000</DTSTART>
+          <DTEND>20260430000000</DTEND>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260402100000[-4:BOT]</DTPOSTED>
+            <TRNAMT>-120.00</TRNAMT>
+            <FITID>2026040200001</FITID>
+            <NAME>CAFE CENTRAL</NAME>
+            <MEMO></MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>CREDIT</TRNTYPE>
+            <DTPOSTED>20260415</DTPOSTED>
+            <TRNAMT>300.50</TRNAMT>
+            <FITID>2026041500002</FITID>
+            <NAME>TRANSFERENCIA RECIBIDA</NAME>
+          </STMTTRN>
+        </BANKTRANLIST>
+        <LEDGERBAL>
+          <BALAMT>180.50</BALAMT>
+          <DTASOF>20260430000000</DTASOF>
+        </LEDGERBAL>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>

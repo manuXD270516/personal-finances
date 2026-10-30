@@ -152,6 +152,9 @@ export const ERROR_CATALOG = {
   IMPORT_TOO_MANY_ROWS: { status: 422, title: 'The file has more data rows than allowed' },
   IMPORT_MAPPING_INVALID: { status: 422, title: 'The column mapping is not valid for this file' },
   IMPORT_REVIEW_INCOMPLETE: { status: 409, title: 'The import still has rows waiting for a decision' },
+  // imports / pipeline (Phase 6, add-import-pipeline)
+  IMPORT_PARSE_FAILED: { status: 422, title: 'The statement file could not be read' },
+  IMPORT_REVERT_BLOCKED: { status: 409, title: 'Some transactions of the import cannot be undone' },
   // transactions / bulk edit (Phase 2)
   BULK_EDIT_NOT_APPLICABLE: { status: 422, title: 'The change does not apply to the transaction' },
   // commitments / recurrence engine (Phase 3)

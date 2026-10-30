@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: domain
 level: application
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +33,7 @@ expected_result:
   - "las filas quedan sin propuesta de reglas con la advertencia `IMPORT_RULES_UNAVAILABLE`"
   - "la importación llega a \"en revisión\" y se puede aprobar"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-040 — Una falla de la evaluación de reglas deja las filas sin propuesta y no impide aprobar

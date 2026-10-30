@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "existen dos registros de auditoría, de la versión 1 y de la versión 2, con el EDITOR como actor"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-065 — Crear y editar un perfil deja un registro de auditoría por versión

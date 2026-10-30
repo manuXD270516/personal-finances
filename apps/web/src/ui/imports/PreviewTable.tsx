@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { formatMoney } from '../dashboard/format';
 import { formatBusinessDate } from '../planning/logic';
 import type { FormatContext } from '../dashboard/types';
@@ -117,7 +117,10 @@ export function PreviewTable({
   canEdit,
   busyRowId,
   onDecide,
+  renderExtras,
 }: {
+  /** Detalle adicional por fila (pipeline de documentos): origen por campo, candidatos con puntaje, editor. */
+  renderExtras?: ((row: ImportPreviewRow) => ReactNode) | undefined;
   rows: readonly ImportPreviewRow[];
   f: FormatContext;
   status: ImportJobStatus;
@@ -153,7 +156,12 @@ export function PreviewTable({
         </thead>
         <tbody>
           {rows.map((row) => {
-            const detail = row.candidate !== null || row.issues.length > 0 || row.failure !== null;
+            const extras = renderExtras ? renderExtras(row) : null;
+            const detail =
+              row.candidate !== null ||
+              row.issues.length > 0 ||
+              row.failure !== null ||
+              (extras !== null && extras !== undefined);
             return (
               <Fragment key={row.id}>
                 <tr
@@ -212,7 +220,10 @@ export function PreviewTable({
                     <td style={cellStyle} colSpan={5}>
                       <div style={{ display: 'grid', gap: 'var(--pf-space-2)' }}>
                         <Issues row={row} f={f} />
-                        {row.candidate ? <CandidateCard candidate={row.candidate} f={f} /> : null}
+                        {row.candidate && (row.candidates?.length ?? 0) === 0 ? (
+                          <CandidateCard candidate={row.candidate} f={f} />
+                        ) : null}
+                        {extras}
                         {row.failure ? (
                           <p role="note" style={{ margin: 0 }} data-testid="import-row-failure">
                             {f.t('row.failed', { reason: f.t(issueKey(row.failure.code)) })}

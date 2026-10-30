@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - packages/contexts/imports/src/infrastructure/readers/statement-sniffer.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "se rechaza con `IMPORT_UNSUPPORTED_FORMAT` y no se crea ninguna importación"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-012 — Un extracto PDF se rechaza con IMPORT_UNSUPPORTED_FORMAT al crear la importación

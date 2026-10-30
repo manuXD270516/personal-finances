@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/contracts/duplicate-confidence.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]

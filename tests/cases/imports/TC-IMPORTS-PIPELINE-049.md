@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +33,7 @@ steps:
 expected_result:
   - "se crea el gasto de 199.00 BOB y la ocurrencia del \"Internet\" sigue sin resolver"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-049 — Sin confirmación del usuario la ocurrencia no se vincula a la transacción importada

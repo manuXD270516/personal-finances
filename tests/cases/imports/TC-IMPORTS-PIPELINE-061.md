@@ -12,9 +12,13 @@ invariants: ["INV-008"]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/src/domain/row-edits.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +36,7 @@ expected_result:
   - "los 2 gastos de 18.00 BOB quedan anulados y el saldo de \"Banco BOB\" es 12000.00 BOB"
   - "la importación queda \"deshecha parcialmente\" con 1 fila bloqueada"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-061 — El deshacer parcial explícito anula las transacciones no bloqueadas y deja el saldo en 12000.00 BOB

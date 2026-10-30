@@ -41,6 +41,7 @@ import {
 import { debtEventConsumers } from '@pf/debt/interface/debt.module';
 import { goalsEventConsumers } from '@pf/goals/interface/goals.module';
 import { createImportsRuntime, importsEventConsumers } from '@pf/imports/interface/imports.module';
+import { importsPortsFor } from '../imports/imports-wiring.js';
 import {
   createDemoDataRuntime,
   createPortabilityRuntime,
@@ -508,6 +509,7 @@ export async function createWorkerRuntime(
     logger,
     config,
     outbox: fxOutbox,
+    documentsRef,
   });
   const commitments = createCommitmentsRuntime({
     pool,
@@ -571,7 +573,17 @@ export async function createWorkerRuntime(
       imported: finance.transactions.imported,
       duplicateCandidates: finance.transactions.duplicateCandidates,
       statuses: finance.transactions.statuses,
+      importedConversions: finance.transactions.importedConversions,
     },
+    lifecycle: demoAudit.lifecycle,
+    lifecycleQuery: demoAudit.lifecycleQuery,
+    ...importsPortsFor({
+      documents: documentsRef,
+      commitments: finance.commitments,
+      classification: finance.classification.validator,
+      rules: finance.rules.evaluation,
+      accountCatalog: finance.accounts.catalog,
+    }),
     settings: importsSettingsFrom(config),
   });
   await registerImportsJobs(queue, imports.maintenance, activeWorkspaces, logger, {

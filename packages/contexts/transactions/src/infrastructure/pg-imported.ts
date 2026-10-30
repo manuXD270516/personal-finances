@@ -7,6 +7,9 @@ import type {
   DuplicateCandidatesQuery,
   TransactionStatusQuery,
 } from '../contracts/index.js';
+import { scoreToUnits } from '../contracts/duplicate-confidence.js';
+import { daysBetween } from '../domain/duplicate-detector.js';
+import { DuplicateScore } from '../domain/duplicate-score.js';
 
 /** Referencias externas de filas importadas (`imports.csv-row`) de transacciones no anuladas de una cuenta. */
 export class PgImportedRefReader implements ImportedRefReader {
@@ -27,7 +30,10 @@ export class PgImportedRefReader implements ImportedRefReader {
       SELECT t.external_ref_id, t.id
         FROM txn.transaction t
        WHERE t.workspace_id = ${input.workspaceId}
-         AND t.account_id = ${input.accountId}
+         AND (t.account_id = ${input.accountId}
+              OR EXISTS (SELECT 1 FROM txn.transaction_leg l
+                          WHERE l.workspace_id = t.workspace_id AND l.transaction_id = t.id
+                            AND l.account_id = ${input.accountId} AND l.superseded_in_revision IS NULL))
          AND t.external_ref_namespace = ${input.namespace}
          AND t.external_ref_id = ANY(${[...input.ids]}::text[])
          AND t.status <> 'VOIDED'`.execute(unitOfWorkKysely());
@@ -45,7 +51,13 @@ interface CandidateRow {
   currency: string;
   description: string | null;
   counterparty_id: string | null;
+  external_ref_namespace: string | null;
+  external_ref_id: string | null;
 }
+
+/** Referencias que identifican el movimiento ante el banco o un proveedor (no las huellas de fila CSV). */
+const isBankNamespace = (namespace: string | null): boolean =>
+  namespace !== null && (namespace.startsWith('imports.ext:') || namespace.startsWith('imports.provider:'));
 
 /**
  * `DuplicateCandidatesQuery.findForImport` (add-basic-csv-import, decisión 8): una sola sentencia set-based por lote
@@ -74,7 +86,8 @@ export class PgDuplicateCandidatesQuery implements DuplicateCandidatesQuery {
             ${refs}::text[], ${dates}::date[], ${directions}::text[], ${amounts}::numeric[], ${currencies}::text[])
         )
         SELECT p.row_ref, t.id AS transaction_id, t.kind, t.status, t.transaction_date::text AS transaction_date,
-               abs(l.amount)::text AS amount, l.currency, t.description, t.counterparty_id
+               abs(l.amount)::text AS amount, l.currency, t.description, t.counterparty_id,
+               t.external_ref_namespace, t.external_ref_id
           FROM probe p
           JOIN txn.transaction_leg l
             ON l.workspace_id = ${input.workspaceId}
@@ -89,11 +102,28 @@ export class PgDuplicateCandidatesQuery implements DuplicateCandidatesQuery {
             ON t.workspace_id = l.workspace_id AND t.id = l.transaction_id AND t.status <> 'VOIDED'
          WHERE NOT (t.id = ANY(${exclude}::uuid[]))
          ORDER BY p.row_ref, t.transaction_date, t.id`.execute(unitOfWorkKysely());
+      const scoringOf = new Map(
+        input.rows.map((r) => [
+          r.rowRef,
+          r.scoring === true ||
+          r.description !== undefined ||
+          r.counterpartyId !== undefined ||
+          r.externalId !== undefined
+            ? r
+            : null,
+        ]),
+      );
+      const scales = new Map<string, number>();
       const byRow = new Map<string, DuplicateCandidateDto[]>();
       for (const r of rows) {
-        const scale = (await this.currencies.scaleOf(r.currency)) ?? 18;
+        let scale = scales.get(r.currency);
+        if (scale === undefined) {
+          scale = (await this.currencies.scaleOf(r.currency)) ?? 18;
+          scales.set(r.currency, scale);
+        }
         const list = byRow.get(r.row_ref) ?? [];
-        list.push({
+        const bank = isBankNamespace(r.external_ref_namespace);
+        const base: DuplicateCandidateDto = {
           transactionId: r.transaction_id,
           kind: r.kind,
           status: r.status,
@@ -101,10 +131,45 @@ export class PgDuplicateCandidatesQuery implements DuplicateCandidatesQuery {
           amount: Money.parse(r.amount, makeCurrency(r.currency, scale)).toJSON(),
           description: r.description,
           counterpartyId: r.counterparty_id,
-        });
+        };
+        const probe = scoringOf.get(r.row_ref);
+        if (probe) {
+          const rowDate = LocalDate.parse(probe.date).toString();
+          const scored = DuplicateScore.of(
+            {
+              date: rowDate,
+              description: probe.description ?? null,
+              counterpartyId: probe.counterpartyId ?? null,
+              externalId: probe.externalId ?? null,
+            },
+            {
+              transactionId: r.transaction_id,
+              date: r.transaction_date,
+              description: r.description,
+              counterpartyId: r.counterparty_id,
+              bankExternalId: bank ? r.external_ref_id : null,
+            },
+          );
+          list.push({ ...base, score: scored.score, signals: scored.signals, hasBankExternalRef: bank });
+        } else {
+          list.push(base);
+        }
         byRow.set(r.row_ref, list);
       }
-      return refs.map((rowRef) => ({ rowRef, candidates: byRow.get(rowRef) ?? [] }));
+      return refs.map((rowRef) => {
+        const probe = scoringOf.get(rowRef);
+        const list = byRow.get(rowRef) ?? [];
+        if (!probe) return { rowRef, candidates: list };
+        // Orden determinista: puntaje desc, menor diferencia de días, id (add-import-pipeline).
+        const sorted = [...list].sort((x, y) => {
+          const dScore = scoreToUnits(y.score as string) - scoreToUnits(x.score as string);
+          if (dScore !== 0n) return dScore > 0n ? 1 : -1;
+          const dDays = daysBetween(x.date, probe.date) - daysBetween(y.date, probe.date);
+          if (dDays !== 0) return dDays;
+          return x.transactionId < y.transactionId ? -1 : x.transactionId > y.transactionId ? 1 : 0;
+        });
+        return { rowRef, candidates: sorted };
+      });
     });
   }
 }

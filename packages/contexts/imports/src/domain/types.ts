@@ -1,13 +1,20 @@
 /** Tipos compartidos del dominio de IMPORTS (subconjunto CSV básico, openspec add-basic-csv-import). */
 
 export const IMPORT_STATUSES = [
+  'UPLOADED',
+  'PROCESSING',
+  'PARSE_FAILED',
   'AWAITING_MAPPING',
   'AWAITING_REVIEW',
   'APPROVED',
   'PERSISTING',
   'COMPLETED',
   'PARTIALLY_FAILED',
+  'COMPLETED_WITH_DIFFERENCE',
   'COMPLETED_WITH_ERRORS',
+  'REVERTING',
+  'ROLLED_BACK',
+  'PARTIALLY_ROLLED_BACK',
   'CANCELLED',
 ] as const;
 export type ImportStatus = (typeof IMPORT_STATUSES)[number];
@@ -29,6 +36,13 @@ export const ROW_ISSUE_CODES = [
   'PERIOD_CLOSED',
   'ACCOUNT_CLOSED',
   'IMPORT_DESCRIPTION_TRUNCATED',
+  // Phase 6 (add-import-pipeline): enum abierto `ImportRowIssueCode`.
+  'IMPORT_CURRENCY_MISMATCH',
+  'IMPORT_AMBIGUOUS_DATE',
+  'IMPORT_AMBIGUOUS_NUMBER',
+  'IMPORT_RUNNING_BALANCE_GAP',
+  'IMPORT_RULES_UNAVAILABLE',
+  'IMPORT_OCCURRENCE_LINK_SKIPPED',
 ] as const;
 export type RowIssueCode = (typeof ROW_ISSUE_CODES)[number];
 
@@ -36,6 +50,8 @@ export interface RowIssue {
   readonly code: RowIssueCode;
   /** Advertencia (no bloquea) o error (la fila queda inválida). */
   readonly severity: 'ERROR' | 'WARNING';
+  /** Dato técnico sin texto del archivo (p. ej. la diferencia de un quiebre del saldo corrido). */
+  readonly detail?: string;
 }
 
 export const IMPORT_FILE_ALREADY_IMPORTED = 'IMPORT_FILE_ALREADY_IMPORTED' as const;

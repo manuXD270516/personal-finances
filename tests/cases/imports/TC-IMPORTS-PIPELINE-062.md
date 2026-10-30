@@ -12,9 +12,12 @@ invariants: ["INV-014"]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "las 3 filas son nuevas y al aprobar se crean 3 transacciones"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-062 — Reimportar después de deshacer vuelve a crear las 3 transacciones

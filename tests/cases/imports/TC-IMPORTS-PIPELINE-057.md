@@ -12,9 +12,14 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +36,7 @@ steps:
 expected_result:
   - "la importación termina completada y ofrece iniciar la reconciliación de \"Banco BOB\" al 2026-03-31 por 1019.32 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-057 — Un import cuyo saldo coincide con el extracto termina completado y ofrece la reconciliación

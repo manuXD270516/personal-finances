@@ -1085,6 +1085,33 @@ describe('Persistencia del ledger con PostgreSQL 18 real (rol pf_app, RLS forzad
       expect(await outboxCount(ids)).toBe(50);
     });
 
+    it('[TC-IMPORTS-PIPELINE-059] (BD) reverseJournalEntries niega un conjunto de asientos, deja el saldo exacto y rechaza repetir', async () => {
+      const before = await balance(w1, bankA);
+      const commands = Array.from({ length: 20 }, (_, i) =>
+        expenseCmd(`${i + 1}.50`, { entryDate: '2026-04-12' }),
+      );
+      const posted = await asUser(() => ledger.posting.postJournalEntries(commands));
+      const reverse = posted.map((p) => ({
+        workspaceId: w1,
+        journalEntryId: p.journalEntryId,
+        reverseDate: '2026-04-12',
+        reason: 'IMPORT_REVERTED',
+      }));
+      const reversed = await asUser(() => ledger.posting.reverseJournalEntries(reverse));
+      expect(reversed).toHaveLength(20);
+      expect(await balance(w1, bankA)).toBe(before);
+      const { rows } = await inCtx(app, w1, (c) =>
+        c.query<{ n: string }>(
+          `SELECT count(*)::text AS n FROM ledger.entry_reversal WHERE original_entry_id = ANY($1::uuid[])`,
+          [posted.map((p) => p.journalEntryId)],
+        ),
+      );
+      expect(rows[0]?.n).toBe('20');
+      expect(await domainCode(asUser(() => ledger.posting.reverseJournalEntries(reverse)))).toBe(
+        'LEDGER_ENTRY_ALREADY_REVERSED',
+      );
+    });
+
     it('[TC-TRANSACTIONS-BULKIMPORT-002] (BD) una fecha en periodo cerrado rechaza el conjunto con PERIOD_CLOSED y no deja asientos', async () => {
       await asUser(() =>
         ledger.periodLock.lockPeriod({ workspaceId: w1, yearMonth: '2026-05', periodId: randomUUID() }),

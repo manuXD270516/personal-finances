@@ -440,6 +440,105 @@ export class PgJournalEntryRepository implements JournalEntryRepository {
     return row ? this.hydrate(row) : null;
   }
 
+  async findManyById(workspaceId: string, ids: readonly string[]): Promise<readonly JournalEntry[]> {
+    const valid = ids.filter((id) => UUID.test(id));
+    if (valid.length === 0) return [];
+    const rows = await this.entries()
+      .where('workspace_id', '=', workspaceId)
+      .where('id', 'in', valid)
+      .execute();
+    if (rows.length === 0) return [];
+    const postings = await db()
+      .selectFrom('ledger.posting')
+      .select([
+        'id',
+        'journal_entry_id',
+        'ledger_account_id',
+        'currency',
+        sql<string>`amount::text`.as('amount'),
+        'split_id',
+        'line_no',
+      ])
+      .where('workspace_id', '=', workspaceId)
+      .where(
+        'journal_entry_id',
+        'in',
+        rows.map((r) => r.id),
+      )
+      .orderBy('line_no')
+      .execute();
+    const accountCache = new Map<string, LedgerAccount>();
+    const result: JournalEntry[] = [];
+    for (const row of rows) {
+      const resolved = [];
+      for (const p of postings.filter((x) => x.journal_entry_id === row.id)) {
+        let account = accountCache.get(p.ledger_account_id);
+        if (!account) {
+          const found = await this.accounts.findById(workspaceId, p.ledger_account_id);
+          if (!found) throw new DomainError('INTERNAL_ERROR', `posting ${p.id} without ledger account`);
+          accountCache.set(p.ledger_account_id, found);
+          account = found;
+        }
+        resolved.push({
+          id: p.id,
+          account,
+          amount: Money.parse(p.amount, account.currency),
+          splitId: p.split_id,
+        });
+      }
+      result.push(
+        JournalEntry.restore(
+          {
+            id: row.id,
+            workspaceId: row.workspace_id,
+            entryDate: LocalDate.parse(row.entry_date),
+            entryType: row.entry_type,
+            sourceRef: {
+              context: 'TRANSACTIONS',
+              type: 'Transaction',
+              id: row.source_id,
+              revision: row.source_revision,
+            },
+            reversesEntryId: row.reverses_entry_id,
+            memo: row.memo,
+            correlationId: row.correlation_id,
+            createdBy: row.created_by,
+            postings: resolved,
+          },
+          row.sequence,
+        ),
+      );
+    }
+    return result;
+  }
+
+  async reversedAmong(workspaceId: string, ids: readonly string[]): Promise<ReadonlySet<string>> {
+    const valid = ids.filter((id) => UUID.test(id));
+    if (valid.length === 0) return new Set();
+    const rows = await db()
+      .selectFrom('ledger.entry_reversal')
+      .select('original_entry_id')
+      .where('workspace_id', '=', workspaceId)
+      .where('original_entry_id', 'in', valid)
+      .execute();
+    return new Set(rows.map((r) => r.original_entry_id));
+  }
+
+  async recordReversals(
+    workspaceId: string,
+    pairs: readonly { readonly originalId: string; readonly reversalId: string }[],
+  ): Promise<void> {
+    if (pairs.length === 0) return;
+    const res = await sql`
+      INSERT INTO ledger.entry_reversal (original_entry_id, reversal_entry_id, workspace_id)
+      SELECT t.o, t.r, ${workspaceId}::uuid
+        FROM unnest(${pairs.map((p) => p.originalId)}::uuid[], ${pairs.map((p) => p.reversalId)}::uuid[]) AS t(o, r)
+      ON CONFLICT (original_entry_id) DO NOTHING`.execute(db());
+    if (Number(res.numAffectedRows ?? 0n) !== pairs.length) {
+      throw new DomainError('LEDGER_ENTRY_ALREADY_REVERSED', 'an entry of the batch was already reversed');
+    }
+  }
+
   async isReversed(workspaceId: string, entryId: string): Promise<boolean> {
     const row = await db()
       .selectFrom('ledger.entry_reversal')

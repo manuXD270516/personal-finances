@@ -145,6 +145,20 @@ export class InMemoryLedger {
               e.sourceRef.type === source.type &&
               e.sourceRef.revision === source.revision,
           ) ?? null,
+        findManyById: async (ws, ids) =>
+          this.entries.filter((e) => e.workspaceId === ws && ids.includes(e.id)),
+        reversedAmong: async (_ws, ids) => new Set(ids.filter((id) => this.reversals.has(id))),
+        recordReversals: async (_ws, pairs) => {
+          for (const { originalId, reversalId } of pairs) {
+            if (this.reversals.has(originalId)) {
+              throw new DomainError(
+                'LEDGER_ENTRY_ALREADY_REVERSED',
+                `entry ${originalId} was already reversed`,
+              );
+            }
+            this.reversals.set(originalId, reversalId);
+          }
+        },
         isReversed: async (_ws, id) => this.reversals.has(id),
         recordReversal: async (_ws, original, reversal) => {
           if (this.reversals.has(original)) {

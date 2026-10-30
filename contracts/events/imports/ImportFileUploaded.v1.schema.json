@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/imports/ImportFileUploaded.v1.schema.json",
+  "title": "imports.ImportFileUploaded.v1",
+  "description": "Se creó una importación desde un documento disponible (estado UPLOADED): el consumidor imports.persist del worker la procesa por etapas. Productor: IMPORTS (CreateImportFromDocument, misma transacción que el job y el vínculo del documento). Consumidor: IMPORTS (worker). Idempotencia: inbox (consumer, eventId) + estado del job (una etapa ya pasada es no-op). Sin PII: no lleva nombre del archivo ni contenido.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "imports.ImportFileUploaded"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "ImportJob"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "importJobId",
+        "accountId",
+        "documentId",
+        "format"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "importJobId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "documentId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "format": {
+          "type": "string",
+          "examples": [
+            "CSV",
+            "OFX",
+            "QIF",
+            "JSON",
+            "XLSX"
+          ],
+          "description": "Formato detectado por contenido. Enum abierto: se pueden agregar formatos (PDF en un change propio)."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a01",
+      "eventType": "imports.ImportFileUploaded",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ImportJob",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b1001",
+      "aggregateVersion": 1,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "USER",
+        "id": "01928c4e-0000-7000-8000-00000000b001"
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "importJobId": "01928c4e-0000-7000-8000-0000000b1001",
+        "accountId": "01928c4e-0000-7000-8000-0000000ac001",
+        "documentId": "01928c4e-0000-7000-8000-0000000d0001",
+        "format": "OFX"
+      }
+    }
+  ]
+}

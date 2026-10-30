@@ -119,6 +119,8 @@
   "IMPORT_TOO_MANY_ROWS": "O arquivo tem mais linhas do que o permitido (5.000). Divida-o em vários arquivos e importe-os separadamente.",
   "IMPORT_MAPPING_INVALID": "A atribuição de colunas não é válida para este arquivo. Verifique as colunas de data, descrição e valor.",
   "IMPORT_REVIEW_INCOMPLETE": "Ainda há possíveis duplicatas sem decisão. Decida cada uma (criar, pular ou excluir) antes de aprovar.",
+  "IMPORT_PARSE_FAILED": "Não foi possível ler o arquivo do extrato. Verifique se o formato é válido e envie-o novamente.",
+  "IMPORT_REVERT_BLOCKED": "Não é possível desfazer toda a importação: algumas transações estão conciliadas ou em um período fechado. Revise a lista ou escolha desfazer apenas as demais.",
   "LOAN_METHOD_NOT_AVAILABLE": "Este método de amortização ainda não está disponível. Por enquanto só o sistema francês (parcela constante) é aceito.",
   "LOAN_ACCOUNT_INVALID": "A conta do empréstimo deve ser uma conta ativa do tipo empréstimo e na mesma moeda.",
   "LOAN_ACCOUNT_IN_USE": "Essa conta já pertence a outro empréstimo. Escolha outra ou crie uma conta nova.",

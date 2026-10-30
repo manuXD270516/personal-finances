@@ -1,0 +1,27 @@
+{
+  "schema": "pfos.import-file",
+  "version": 1,
+  "currency": "BOB",
+  "statement": {
+    "openingBalance": "1000.00",
+    "closingBalance": "1236.50",
+    "from": "2026-05-01",
+    "to": "2026-05-31"
+  },
+  "movements": [
+    {
+      "date": "2026-05-02",
+      "time": "09:30",
+      "amount": "-18.50",
+      "description": "COMPRA SINTETICA",
+      "externalId": "J-0001"
+    },
+    {
+      "date": "2026-05-10",
+      "amount": "500.00",
+      "description": "ABONO SINTETICO",
+      "counterparty": "Empleador Demo"
+    },
+    { "date": "2026-05-20", "amount": "-245.00", "description": "SERVICIOS SINTETICOS" }
+  ]
+}

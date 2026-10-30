@@ -552,6 +552,11 @@ export function inMemoryTransactionsDeps(options: { readonly accounts?: PostingE
         });
         return { journalEntryId: id, sequence: String(state.entries.length), created: true };
       },
+      async reverseJournalEntries(commands: readonly ReverseJournalEntryCommand[]) {
+        const out = [];
+        for (const command of commands) out.push(await deps.ledger.reverseJournalEntry(command));
+        return out;
+      },
       async ledgerAccountForUserAccount() {
         throw new Error('not used');
       },

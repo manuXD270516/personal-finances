@@ -12,6 +12,7 @@ import type { AccountsRuntime } from '@pf/accounts/interface/accounts.module';
 import { ACCOUNT_LIFECYCLE_MACHINE } from '@pf/accounts/interface/accounts.module';
 import { CLASSIFICATION_AUDIT_POLICY, type CounterpartyCatalogQuery } from '@pf/classification/contracts';
 import { COMMITMENTS_AUDIT_POLICY } from '@pf/commitments/contracts';
+import { importsPortsFor, type DocumentsRef } from '../imports/imports-wiring.js';
 import {
   CommitmentsModule,
   createCommitmentsRuntime,
@@ -63,6 +64,7 @@ import { RULES_AUDIT_POLICY } from '@pf/rules/contracts';
 import { RulesModule, createRulesRuntime, type RulesRuntime } from '@pf/rules/interface/rules.module';
 import {
   createImportsRuntime,
+  IMPORT_JOB_LIFECYCLE_MACHINE,
   ImportsModule,
   type ImportsRuntime,
 } from '@pf/imports/interface/imports.module';
@@ -249,6 +251,8 @@ export const LIFECYCLE_MACHINES = [
   GOAL_LIFECYCLE_MACHINE,
   // add-document-attachments (Phase 6): documento adjunto de DOCUMENTS.
   DOCUMENT_LIFECYCLE_MACHINE,
+  // add-import-pipeline (Phase 6): importación de IMPORTS (D151).
+  IMPORT_JOB_LIFECYCLE_MACHINE,
 ];
 
 /** Allow-lists de redacción de auditoría de cada contexto (add-audit-trail). */
@@ -359,11 +363,18 @@ export function financeRuntimes(input: {
         | 'RULES_DRY_RUN_MAX_DAYS'
         | 'RULES_DRY_RUN_MAX_TRANSACTIONS'
         | 'RULES_APPLY_MAX_ITEMS'
+        | 'IMPORT_MAX_ROWS'
+        | 'IMPORT_PROCESSING_TIMEOUT'
+        | 'IMPORT_DUPLICATE_HIGH_SCORE'
+        | 'IMPORT_DUPLICATE_LOW_SCORE'
+        | 'DOCUMENT_IMPORT_SOURCE_MAX_BYTES'
       >
     > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>> &
     Parameters<typeof parseFxProviderSettings>[0];
   readonly outbox?: OutboxWriter;
+  /** Runtime de DOCUMENTS (se crea después; IMPORTS lo consulta de forma diferida). */
+  readonly documentsRef?: DocumentsRef;
 }) {
   const writer = input.outbox ?? new PgOutboxWriter(eventSchemaRegistry());
   // IDENTITY según el actor: la API lee el workspace con la membresía del usuario de la petición; el job y los
@@ -738,7 +749,17 @@ export function financeRuntimes(input: {
       imported: transactions.imported,
       duplicateCandidates: transactions.duplicateCandidates,
       statuses: transactions.statuses,
+      importedConversions: transactions.importedConversions,
     },
+    lifecycle: input.lifecycle,
+    lifecycleQuery: input.lifecycleQuery,
+    ...importsPortsFor({
+      documents: input.documentsRef ?? {},
+      commitments,
+      classification: classification.validator,
+      rules: rules.evaluation,
+      accountCatalog: accounts.catalog,
+    }),
     settings: importsSettingsFrom(input.config),
   });
   return {
@@ -796,6 +817,8 @@ export function identityImports(input: {
   const lifecyclePort = input.lifecycle
     ? input.lifecycle(audit.lifecycleFor(auditPort))
     : audit.lifecycleFor(auditPort);
+  // DOCUMENTS se crea después que IMPORTS: este puntero diferido le da acceso a sus contratos.
+  const documentsRef: DocumentsRef = {};
   const {
     classification,
     fx,
@@ -821,6 +844,7 @@ export function identityImports(input: {
     history: audit.history,
     logger: input.logger,
     config: input.config,
+    documentsRef,
   });
   // DOCUMENTS (add-document-attachments): sin DOCUMENT_ENCRYPTION_KEYS o sin cliente S3 queda deshabilitado (503).
   const documents = input.storage
@@ -837,6 +861,7 @@ export function identityImports(input: {
         ...(input.queue ? { restoreJobs: documentsRestoreJobsPort(input.queue) } : {}),
       })
     : undefined;
+  documentsRef.current = documents;
   input.onDocuments?.(documents);
   const reauthPolicy = new RecentAuthPolicy(input.config.REAUTH_MAX_AGE);
   return [
@@ -1080,13 +1105,30 @@ export function importsSettingsFrom(
       | 'IMPORT_PERSIST_BATCH_SIZE'
       | 'IMPORT_REVIEW_TTL'
       | 'IMPORT_FUTURE_DATE_TOLERANCE_DAYS'
+      | 'IMPORT_MAX_ROWS'
+      | 'IMPORT_PROCESSING_TIMEOUT'
+      | 'IMPORT_DUPLICATE_HIGH_SCORE'
+      | 'IMPORT_DUPLICATE_LOW_SCORE'
+      | 'DOCUMENT_IMPORT_SOURCE_MAX_BYTES'
     >
   > &
     Partial<Pick<WorkerConfig, 'IMPORT_STAGING_RETENTION'>>,
 ): Partial<ImportsRuntime['settings']> {
+  // `IMPORT_MAX_ROWS` manda; `IMPORT_CSV_MAX_ROWS` queda como alias de compatibilidad (add-import-pipeline decisión 17).
+  const maxRows = config.IMPORT_MAX_ROWS ?? config.IMPORT_CSV_MAX_ROWS;
   return {
+    ...(config.IMPORT_PROCESSING_TIMEOUT ? { processingTimeoutMs: config.IMPORT_PROCESSING_TIMEOUT } : {}),
+    ...(config.IMPORT_DUPLICATE_HIGH_SCORE !== undefined
+      ? { duplicateHighScore: config.IMPORT_DUPLICATE_HIGH_SCORE.toFixed(4) }
+      : {}),
+    ...(config.IMPORT_DUPLICATE_LOW_SCORE !== undefined
+      ? { duplicateLowScore: config.IMPORT_DUPLICATE_LOW_SCORE.toFixed(4) }
+      : {}),
+    ...(config.DOCUMENT_IMPORT_SOURCE_MAX_BYTES
+      ? { documentMaxBytes: config.DOCUMENT_IMPORT_SOURCE_MAX_BYTES }
+      : {}),
     ...(config.IMPORT_CSV_MAX_BYTES ? { maxBytes: config.IMPORT_CSV_MAX_BYTES } : {}),
-    ...(config.IMPORT_CSV_MAX_ROWS ? { maxRows: config.IMPORT_CSV_MAX_ROWS } : {}),
+    ...(maxRows ? { maxRows } : {}),
     ...(config.IMPORT_CSV_MAX_COLUMNS ? { maxColumns: config.IMPORT_CSV_MAX_COLUMNS } : {}),
     ...(config.IMPORT_PERSIST_BATCH_SIZE ? { batchSize: config.IMPORT_PERSIST_BATCH_SIZE } : {}),
     ...(config.IMPORT_REVIEW_TTL ? { reviewTtlMs: config.IMPORT_REVIEW_TTL } : {}),

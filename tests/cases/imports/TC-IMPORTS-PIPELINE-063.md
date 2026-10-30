@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: security
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "se rechaza con `INSUFFICIENT_ROLE` y ninguna transacción cambia"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-063 — Un VIEWER que intenta deshacer una importación recibe INSUFFICIENT_ROLE

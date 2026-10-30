@@ -12,9 +12,12 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/domain/mapping-profile.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "la importación queda esperando mapeo con ese perfil como candidato y la columna \"Monto\" como faltante"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-031 — Un encabezado renombrado por el banco deja la importación esperando mapeo con la columna faltante

@@ -119,6 +119,8 @@
   "IMPORT_TOO_MANY_ROWS": "The file has more rows than allowed (5,000). Split it into several files and import them separately.",
   "IMPORT_MAPPING_INVALID": "The column mapping is not valid for this file. Check the date, description and amount columns.",
   "IMPORT_REVIEW_INCOMPLETE": "There are still possible duplicates without a decision. Decide each one (create, skip or exclude) before approving.",
+  "IMPORT_PARSE_FAILED": "We could not read the statement file. Check that the format is valid and upload it again.",
+  "IMPORT_REVERT_BLOCKED": "The whole import cannot be undone: some transactions are reconciled or in a closed period. Review the list or choose to undo only the rest.",
   "LOAN_METHOD_NOT_AVAILABLE": "This amortization method is not available yet. For now only the French system (constant installment) is supported.",
   "LOAN_ACCOUNT_INVALID": "The loan account must be an active loan-type account in the same currency.",
   "LOAN_ACCOUNT_IN_USE": "That account already belongs to another loan. Choose another one or create a new account.",

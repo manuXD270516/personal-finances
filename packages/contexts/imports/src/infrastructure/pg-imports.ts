@@ -4,13 +4,18 @@ import { dec } from '@pf/shared-kernel';
 import { sql } from 'kysely';
 import type { Pool } from 'pg';
 import type {
+  BulkEditSet,
   CurrencyCatalogPort,
   IdGenerator,
   ImportJobFilter,
   ImportJobRepository,
+  PipelineRowResult,
+  PreviewFilter,
+  RevertLink,
   RowLinkInsert,
   RowLinkRepository,
   RowNormalization,
+  StagedInsert,
   StagedRow,
   StagingRepository,
   StagingSummary,
@@ -19,10 +24,16 @@ import type {
 import {
   ImportJob,
   type Classification,
+  type ClassificationProposal,
   type CsvMapping,
   type Decision,
   type ImportJobState,
+  type OccurrenceCandidateEntry,
+  type OccurrenceLinkState,
+  type RowCandidate,
+  type RowEdits,
   type RowIssue,
+  type RowKind,
 } from '../domain/index.js';
 
 const db = () => unitOfWorkKysely<Record<string, never>>();
@@ -97,6 +108,21 @@ interface JobRow {
   created_at: string;
   updated_at: string;
   version: number;
+  source: ImportJobState['source'];
+  document_id: string | null;
+  format: ImportJobState['format'];
+  mapping_profile_id: string | null;
+  mapping_profile_version: number | null;
+  profile_mapping: ImportJobState['profileMapping'];
+  read_options: ImportJobState['readOptions'];
+  mapping_help: ImportJobState['mappingHelp'];
+  statement: ImportJobState['statement'];
+  reconciliation: ImportJobState['reconciliation'];
+  revert: ImportJobState['revert'];
+  reverted_at: string | null;
+  reverted_by: string | null;
+  rules_summary: ImportJobState['rulesSummary'];
+  failure: ImportJobState['failure'];
 }
 
 const JOB_COLUMNS = sql`
@@ -111,7 +137,10 @@ const JOB_COLUMNS = sql`
   j.created_by,
   to_char(j.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
   to_char(j.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at,
-  j.version`;
+  j.version, j.source, j.document_id, j.format, j.mapping_profile_id, j.mapping_profile_version, j.profile_mapping,
+  j.read_options, j.mapping_help, j.statement, j.reconciliation, j.revert,
+  to_char(j.reverted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS reverted_at,
+  j.reverted_by, j.rules_summary, j.failure`;
 
 const toJob = (r: JobRow): ImportJob =>
   ImportJob.rehydrate({
@@ -147,9 +176,28 @@ const toJob = (r: JobRow): ImportJob =>
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     version: Number(r.version),
+    source: r.source,
+    documentId: r.document_id,
+    format: r.format,
+    mappingProfile:
+      r.mapping_profile_id === null
+        ? null
+        : { id: r.mapping_profile_id, version: Number(r.mapping_profile_version) },
+    profileMapping: r.profile_mapping,
+    readOptions: r.read_options,
+    mappingHelp: r.mapping_help,
+    statement: r.statement,
+    reconciliation: r.reconciliation,
+    revert: r.revert,
+    revertedAt: r.reverted_at,
+    revertedBy: r.reverted_by,
+    rulesSummary: r.rules_summary,
+    failure: r.failure,
   });
 
 const json = (value: unknown): string => JSON.stringify(value);
+const jsonOrNull = (value: unknown): string | null =>
+  value === null || value === undefined ? null : JSON.stringify(value);
 
 export class PgImportJobRepository implements ImportJobRepository {
   async insert(job: ImportJob): Promise<void> {
@@ -158,7 +206,9 @@ export class PgImportJobRepository implements ImportJobRepository {
       INSERT INTO imports.import_job
         (id, workspace_id, target_account_id, status, original_name, file_checksum, file_size_bytes, encoding, delimiter,
          row_count, column_count, header, mapping, counters, progress, errors, warnings, approved_by, approved_at,
-         completed_at, cancelled_at, cancelled_by, expires_at, created_by, created_at, updated_at, version)
+         completed_at, cancelled_at, cancelled_by, expires_at, created_by, created_at, updated_at, version,
+         source, document_id, format, mapping_profile_id, mapping_profile_version, profile_mapping, read_options, mapping_help,
+         statement, reconciliation, revert, reverted_at, reverted_by, rules_summary, failure)
       VALUES
         (${s.id}, ${s.workspaceId}, ${s.accountId}, ${s.status}, ${s.originalName}, decode(${s.fileChecksum}, 'hex'),
          ${s.fileSizeBytes}, ${s.encoding}, ${s.delimiter}, ${s.rowCount}, ${s.columnCount}, ${json(s.header)}::jsonb,
@@ -167,7 +217,11 @@ export class PgImportJobRepository implements ImportJobRepository {
          ${s.completedAt}::timestamptz, ${s.cancelledAt}::timestamptz,
          ${s.cancelledBy && s.cancelledBy.type === 'USER' ? s.cancelledBy.userId : null},
          ${s.expiresAt}::timestamptz, ${s.createdBy}, ${s.createdAt}::timestamptz, ${s.updatedAt}::timestamptz,
-         ${s.version})`.execute(db());
+         ${s.version}, ${s.source}, ${s.documentId}, ${s.format}, ${s.mappingProfile?.id ?? null},
+         ${s.mappingProfile?.version ?? null}, ${jsonOrNull(s.profileMapping)}::jsonb, ${jsonOrNull(s.readOptions)}::jsonb, ${jsonOrNull(s.mappingHelp)}::jsonb,
+         ${jsonOrNull(s.statement)}::jsonb, ${jsonOrNull(s.reconciliation)}::jsonb, ${jsonOrNull(s.revert)}::jsonb,
+         ${s.revertedAt}::timestamptz, ${s.revertedBy}, ${jsonOrNull(s.rulesSummary)}::jsonb,
+         ${jsonOrNull(s.failure)}::jsonb)`.execute(db());
   }
 
   async findById(workspaceId: string, id: string, options?: { readonly lock?: 'update' }) {
@@ -183,6 +237,13 @@ export class PgImportJobRepository implements ImportJobRepository {
     const result = await sql`
       UPDATE imports.import_job SET
         status = ${s.status}, mapping = ${s.mapping === null ? null : json(s.mapping)}::jsonb,
+        encoding = ${s.encoding}, delimiter = ${s.delimiter}, row_count = ${s.rowCount}, column_count = ${s.columnCount},
+        header = ${json(s.header)}::jsonb,
+        mapping_profile_id = ${s.mappingProfile?.id ?? null}, mapping_profile_version = ${s.mappingProfile?.version ?? null},
+        profile_mapping = ${jsonOrNull(s.profileMapping)}::jsonb, read_options = ${jsonOrNull(s.readOptions)}::jsonb, mapping_help = ${jsonOrNull(s.mappingHelp)}::jsonb,
+        statement = ${jsonOrNull(s.statement)}::jsonb, reconciliation = ${jsonOrNull(s.reconciliation)}::jsonb,
+        revert = ${jsonOrNull(s.revert)}::jsonb, reverted_at = ${s.revertedAt}::timestamptz, reverted_by = ${s.revertedBy},
+        rules_summary = ${jsonOrNull(s.rulesSummary)}::jsonb, failure = ${jsonOrNull(s.failure)}::jsonb,
         counters = ${json(s.counters)}::jsonb, progress = ${json(s.progress)}::jsonb, errors = ${json(s.errors)}::jsonb,
         warnings = ${json(s.warnings)}::jsonb, approved_by = ${s.approvedBy}, approved_at = ${s.approvedAt}::timestamptz,
         completed_at = ${s.completedAt}::timestamptz, cancelled_at = ${s.cancelledAt}::timestamptz,
@@ -215,7 +276,7 @@ export class PgImportJobRepository implements ImportJobRepository {
         FROM imports.import_job j
        WHERE j.workspace_id = ${workspaceId} AND j.target_account_id = ${accountId}
          AND j.file_checksum = decode(${fileChecksum}, 'hex')
-         AND j.status IN ('COMPLETED', 'COMPLETED_WITH_ERRORS', 'PARTIALLY_FAILED')
+         AND j.status IN ('COMPLETED', 'COMPLETED_WITH_DIFFERENCE', 'COMPLETED_WITH_ERRORS', 'PARTIALLY_FAILED')
        ORDER BY COALESCE(j.completed_at, j.updated_at) DESC, j.id DESC
        LIMIT 1`.execute(db());
     return rows[0] ? { id: rows[0].id, completedAt: rows[0].completed_at } : null;
@@ -242,7 +303,9 @@ export class PgImportJobRepository implements ImportJobRepository {
     const { rows } = await sql<{ id: string }>`
       SELECT j.id FROM imports.import_job j
        WHERE j.workspace_id = ${workspaceId}
-         AND ((j.status IN ('COMPLETED', 'COMPLETED_WITH_ERRORS') AND j.completed_at <= ${cutoff}::timestamptz)
+         AND ((j.status IN ('COMPLETED', 'COMPLETED_WITH_DIFFERENCE', 'COMPLETED_WITH_ERRORS') AND j.completed_at <= ${cutoff}::timestamptz)
+              OR (j.status IN ('ROLLED_BACK', 'PARTIALLY_ROLLED_BACK') AND j.reverted_at <= ${cutoff}::timestamptz)
+              OR (j.status = 'PARSE_FAILED' AND j.updated_at <= ${cutoff}::timestamptz)
               OR (j.status = 'CANCELLED' AND j.cancelled_at <= ${cutoff}::timestamptz))
          AND EXISTS (SELECT 1 FROM imports.staged_transaction s
                       WHERE s.workspace_id = j.workspace_id AND s.import_job_id = j.id)
@@ -272,12 +335,34 @@ interface StagedDbRow {
   transaction_id: string | null;
   batch_no: number | null;
   batch_error: { code: string } | null;
+  external_id: string | null;
+  booking_time: string | null;
+  value_date: string | null;
+  running_balance: string | null;
+  reference: string | null;
+  counterparty_text: string | null;
+  kind: RowKind | null;
+  proposal: ClassificationProposal | null;
+  edits: RowEdits | null;
+  candidates: RowCandidate[] | null;
+  occurrence_candidates: OccurrenceCandidateEntry[] | null;
+  occurrence_link: OccurrenceLinkState | null;
+  duplicate_of_row: number | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decided_score: string | null;
+  warnings: RowIssue[] | null;
 }
 
 const STAGED_COLUMNS = sql`
   s.id, s.row_number, s.raw, s.booking_date::text AS booking_date, s.amount::text AS amount, c.scale AS scale,
   s.currency, s.direction, s.description, s.occurrence_index, encode(s.fingerprint, 'hex') AS fingerprint,
-  s.classification, s.decision, s.issues, s.matched_transaction_id, s.transaction_id, s.batch_no, s.batch_error`;
+  s.classification, s.decision, s.issues, s.matched_transaction_id, s.transaction_id, s.batch_no, s.batch_error,
+  s.external_id, s.booking_time::text AS booking_time, s.value_date::text AS value_date,
+  s.running_balance::text AS running_balance, s.reference, s.counterparty_text, s.kind, s.proposal, s.edits,
+  s.candidates, s.occurrence_candidates, s.occurrence_link, s.duplicate_of_row, s.decided_by,
+  to_char(s.decided_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS decided_at,
+  s.decided_score::text AS decided_score, s.warnings`;
 
 const toStaged = (r: StagedDbRow): StagedRow => ({
   id: r.id,
@@ -297,7 +382,46 @@ const toStaged = (r: StagedDbRow): StagedRow => ({
   transactionId: r.transaction_id,
   batchNo: r.batch_no === null ? null : Number(r.batch_no),
   batchError: r.batch_error,
+  externalId: r.external_id,
+  bookingTime: r.booking_time,
+  valueDate: r.value_date,
+  runningBalance: r.running_balance === null ? null : dec(r.running_balance).toString(),
+  reference: r.reference,
+  counterpartyText: r.counterparty_text,
+  kind: r.kind,
+  proposal: r.proposal,
+  edits: r.edits ?? {},
+  candidates: r.candidates ?? [],
+  occurrenceCandidates: r.occurrence_candidates ?? [],
+  occurrenceLink: r.occurrence_link,
+  duplicateOfRow: r.duplicate_of_row === null ? null : Number(r.duplicate_of_row),
+  decidedBy: r.decided_by,
+  decidedAt: r.decided_at,
+  decidedScore: r.decided_score,
+  warnings: r.warnings ?? [],
 });
+
+/** Categoría efectiva de la fila: la editada (aunque sea vacía) o, si no, la de la propuesta. */
+const EFFECTIVE_CATEGORY = sql`(CASE WHEN s.edits ? 'categoryId' THEN s.edits->>'categoryId'
+                                       ELSE s.proposal->'category'->>'value' END)`;
+
+/** Condiciones SQL del filtro de la vista previa (solo filas de datos del archivo). */
+function filterConditions(filter: PreviewFilter) {
+  const conds = [sql`s.classification IS NOT NULL`];
+  if (filter.classification) conds.push(sql`s.classification = ${filter.classification}`);
+  if (filter.decision) conds.push(sql`s.decision = ${filter.decision}`);
+  if (filter.needsCategory === true) conds.push(sql`${EFFECTIVE_CATEGORY} IS NULL`);
+  if (filter.needsCategory === false) conds.push(sql`${EFFECTIVE_CATEGORY} IS NOT NULL`);
+  if (filter.ruleId) {
+    conds.push(
+      sql`s.proposal IS NOT NULL AND jsonb_path_exists(s.proposal, '$.** ? (@.ruleId == $r)', jsonb_build_object('r', ${filter.ruleId}::text))`,
+    );
+  }
+  if (filter.candidateConfidence) {
+    conds.push(sql`s.candidates->0->>'confidence' = ${filter.candidateConfidence}`);
+  }
+  return conds;
+}
 
 export class PgStagingRepository implements StagingRepository {
   async insertRaw(
@@ -414,18 +538,16 @@ export class PgStagingRepository implements StagingRepository {
   async page(
     workspaceId: string,
     jobId: string,
-    options: {
-      classification?: Classification | undefined;
-      afterRowNumber?: number | undefined;
-      limit: number;
-    },
+    options: PreviewFilter & { afterRowNumber?: number | undefined; limit: number },
   ): Promise<StagedRow[]> {
+    const conds = [
+      ...filterConditions(options),
+      ...(options.afterRowNumber !== undefined ? [sql`s.row_number > ${options.afterRowNumber}::int`] : []),
+    ];
     const { rows } = await sql<StagedDbRow>`
       SELECT ${STAGED_COLUMNS}
         FROM imports.staged_transaction s LEFT JOIN fx.currency c ON c.code = s.currency
-       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.classification IS NOT NULL
-         AND (${options.classification ?? null}::text IS NULL OR s.classification = ${options.classification ?? null}::text)
-         AND (${options.afterRowNumber ?? null}::int IS NULL OR s.row_number > ${options.afterRowNumber ?? null}::int)
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND ${sql.join(conds, sql` AND `)}
        ORDER BY s.row_number LIMIT ${options.limit}`.execute(db());
     return rows.map(toStaged);
   }
@@ -473,8 +595,16 @@ export class PgStagingRepository implements StagingRepository {
   }
 
   async skippedProbableRows(workspaceId: string, jobId: string) {
-    const { rows } = await sql<{ id: string; fingerprint: string; matched_transaction_id: string }>`
-      SELECT s.id, encode(s.fingerprint, 'hex') AS fingerprint, s.matched_transaction_id
+    const { rows } = await sql<{
+      id: string;
+      fingerprint: string;
+      matched_transaction_id: string;
+      row_number: number;
+      decided_score: string | null;
+      external_id: string | null;
+    }>`
+      SELECT s.id, encode(s.fingerprint, 'hex') AS fingerprint, s.matched_transaction_id, s.row_number,
+             s.decided_score::text AS decided_score, s.external_id
         FROM imports.staged_transaction s
        WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId}
          AND s.classification = 'DUPLICATE_PROBABLE' AND s.decision = 'SKIP'
@@ -484,6 +614,9 @@ export class PgStagingRepository implements StagingRepository {
       rowId: r.id,
       fingerprint: r.fingerprint,
       matchedTransactionId: r.matched_transaction_id,
+      lineNumber: Number(r.row_number),
+      decidedScore: r.decided_score,
+      externalId: r.external_id,
     }));
   }
 
@@ -559,6 +692,231 @@ export class PgStagingRepository implements StagingRepository {
     return r?.d_from && r.d_to ? { from: r.d_from, to: r.d_to } : null;
   }
 
+  // ── Phase 6: lectura por bloques y etapas del worker
+
+  async insertRecords(workspaceId: string, jobId: string, rows: readonly StagedInsert[]): Promise<void> {
+    for (const part of chunks(rows)) {
+      const payload = part.map((r) => ({
+        id: r.id,
+        n: r.rowNumber,
+        raw: r.raw,
+        rec: r.record
+          ? {
+              date: r.record.bookingDate,
+              time: r.record.bookingTime,
+              valueDate: r.record.valueDate,
+              amount: r.record.signedAmount,
+              description: r.record.description,
+              externalId: r.record.externalId,
+              reference: r.record.reference,
+              counterparty: r.record.counterpartyText,
+              runningBalance: r.record.runningBalance,
+              issues: r.record.issues,
+            }
+          : null,
+      }));
+      await sql`
+        INSERT INTO imports.staged_transaction
+          (id, workspace_id, import_job_id, row_number, raw, booking_date, booking_time, value_date, amount, direction,
+           description, external_id, reference, counterparty_text, running_balance, issues)
+        SELECT (e->>'id')::uuid, ${workspaceId}::uuid, ${jobId}::uuid, (e->>'n')::int, e->'raw',
+               (e#>>'{rec,date}')::date, (e#>>'{rec,time}')::time, (e#>>'{rec,valueDate}')::date,
+               abs((e#>>'{rec,amount}')::numeric),
+               CASE WHEN (e#>>'{rec,amount}')::numeric < 0 THEN 'OUT'
+                    WHEN (e#>>'{rec,amount}')::numeric > 0 THEN 'IN' END,
+               e#>>'{rec,description}', e#>>'{rec,externalId}', e#>>'{rec,reference}', e#>>'{rec,counterparty}',
+               (e#>>'{rec,runningBalance}')::numeric, COALESCE(e#>'{rec,issues}', '[]'::jsonb)
+          FROM jsonb_array_elements(${json(payload)}::jsonb) e
+        ON CONFLICT (import_job_id, row_number) DO NOTHING`.execute(db());
+    }
+  }
+
+  async countRows(workspaceId: string, jobId: string): Promise<number> {
+    const { rows } = await sql<{ n: string }>`
+      SELECT count(*) AS n FROM imports.staged_transaction
+       WHERE workspace_id = ${workspaceId} AND import_job_id = ${jobId}`.execute(db());
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async loadAll(workspaceId: string, jobId: string): Promise<StagedRow[]> {
+    const { rows } = await sql<StagedDbRow>`
+      SELECT ${STAGED_COLUMNS}
+        FROM imports.staged_transaction s LEFT JOIN fx.currency c ON c.code = s.currency
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId}
+       ORDER BY s.row_number`.execute(db());
+    return rows.map(toStaged);
+  }
+
+  async applyPipeline(
+    workspaceId: string,
+    jobId: string,
+    items: readonly PipelineRowResult[],
+    resetIds: readonly string[],
+  ): Promise<void> {
+    for (const part of chunks(items)) {
+      await sql`
+        UPDATE imports.staged_transaction s SET
+          booking_date = (v->>'bookingDate')::date, booking_time = (v->>'bookingTime')::time,
+          value_date = (v->>'valueDate')::date, amount = (v->>'amount')::numeric, currency = v->>'currency',
+          direction = v->>'direction', description = v->>'description', external_id = v->>'externalId',
+          reference = v->>'reference', counterparty_text = v->>'counterpartyText',
+          running_balance = (v->>'runningBalance')::numeric, occurrence_index = (v->>'occurrenceIndex')::int,
+          fingerprint = decode(v->>'fingerprint', 'hex'), classification = v->>'classification',
+          decision = v->>'decision', issues = v->'issues',
+          matched_transaction_id = (v->>'matchedTransactionId')::uuid,
+          proposal = NULLIF(v->'proposal', 'null'::jsonb), candidates = v->'candidates',
+          occurrence_candidates = v->'occurrenceCandidates', duplicate_of_row = (v->>'duplicateOfRow')::int,
+          decided_score = (v->>'decidedScore')::numeric, warnings = v->'warnings', kind = v->>'kind',
+          decided_by = NULL, decided_at = NULL, occurrence_link = NULL,
+          transaction_id = NULL, batch_no = NULL, batch_error = NULL
+          FROM jsonb_array_elements(${json(part)}::jsonb) v
+         WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.id = (v->>'id')::uuid`.execute(
+        db(),
+      );
+    }
+    for (const part of chunks(resetIds)) {
+      await sql`
+        UPDATE imports.staged_transaction s SET
+          booking_date = NULL, booking_time = NULL, value_date = NULL, amount = NULL, currency = NULL,
+          direction = NULL, description = NULL, external_id = NULL, reference = NULL, counterparty_text = NULL,
+          running_balance = NULL, occurrence_index = NULL, fingerprint = NULL, classification = NULL, decision = NULL,
+          issues = '[]'::jsonb, matched_transaction_id = NULL, proposal = NULL, candidates = NULL,
+          occurrence_candidates = NULL, occurrence_link = NULL, duplicate_of_row = NULL, decided_score = NULL,
+          decided_by = NULL, decided_at = NULL, warnings = NULL, kind = NULL,
+          transaction_id = NULL, batch_no = NULL, batch_error = NULL
+         WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.id = ANY(${part}::uuid[])`.execute(
+        db(),
+      );
+    }
+  }
+
+  async applyProposals(
+    workspaceId: string,
+    jobId: string,
+    items: readonly {
+      readonly id: string;
+      readonly proposal: ClassificationProposal | null;
+      readonly warnings: readonly RowIssue[];
+    }[],
+  ): Promise<void> {
+    for (const part of chunks(items)) {
+      await sql`
+        UPDATE imports.staged_transaction s SET
+          proposal = NULLIF(v->'proposal', 'null'::jsonb), warnings = v->'warnings'
+          FROM jsonb_array_elements(${json(part)}::jsonb) v
+         WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.id = (v->>'id')::uuid`.execute(
+        db(),
+      );
+    }
+  }
+
+  async applyEdit(
+    workspaceId: string,
+    jobId: string,
+    rowId: string,
+    change: {
+      readonly edits: RowEdits;
+      readonly kind: RowKind | null;
+      readonly decision?: Decision | undefined;
+      readonly decidedBy: string;
+      readonly decidedAt: string;
+      readonly occurrenceLink: OccurrenceLinkState | null;
+      readonly matchedTransactionId?: string | undefined;
+      readonly decidedScore?: string | null | undefined;
+    },
+  ): Promise<void> {
+    const decision = change.decision ?? null;
+    const matched = change.matchedTransactionId ?? null;
+    await sql`
+      UPDATE imports.staged_transaction SET
+        edits = ${json(change.edits)}::jsonb, kind = ${change.kind},
+        occurrence_link = ${jsonOrNull(change.occurrenceLink)}::jsonb,
+        decision = COALESCE(${decision}::text, decision),
+        matched_transaction_id = COALESCE(${matched}::uuid, matched_transaction_id),
+        decided_score = CASE WHEN ${decision}::text IS NULL THEN decided_score ELSE ${change.decidedScore ?? null}::numeric END,
+        decided_by = CASE WHEN ${decision}::text IS NULL THEN decided_by ELSE ${change.decidedBy}::uuid END,
+        decided_at = CASE WHEN ${decision}::text IS NULL THEN decided_at ELSE ${change.decidedAt}::timestamptz END
+       WHERE workspace_id = ${workspaceId} AND import_job_id = ${jobId} AND id = ${rowId}`.execute(db());
+  }
+
+  async bulkEdit(
+    workspaceId: string,
+    jobId: string,
+    filter: PreviewFilter,
+    set: BulkEditSet,
+    by: { readonly userId: string; readonly at: string },
+  ): Promise<number> {
+    const patch: Record<string, unknown> = {};
+    if (set.categoryId !== undefined) patch['categoryId'] = set.categoryId;
+    if (set.counterpartyId !== undefined) patch['counterpartyId'] = set.counterpartyId;
+    if (set.tagIds !== undefined) patch['tagIds'] = set.tagIds;
+    const decision = set.decision ?? null;
+    const conds = [...filterConditions(filter), sql`s.classification IN ('NEW', 'DUPLICATE_PROBABLE')`];
+    const result = await sql`
+      UPDATE imports.staged_transaction s SET
+        edits = COALESCE(s.edits, '{}'::jsonb) || ${json(patch)}::jsonb,
+        decision = CASE
+          WHEN ${decision}::text IS NULL THEN s.decision
+          WHEN ${decision}::text = 'SKIP'
+               AND (s.classification <> 'DUPLICATE_PROBABLE' OR s.matched_transaction_id IS NULL) THEN s.decision
+          ELSE ${decision}::text END,
+        decided_by = CASE WHEN ${decision}::text IS NULL THEN s.decided_by ELSE ${by.userId}::uuid END,
+        decided_at = CASE WHEN ${decision}::text IS NULL THEN s.decided_at ELSE ${by.at}::timestamptz END
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND ${sql.join(conds, sql` AND `)}`.execute(
+      db(),
+    );
+    return Number(result.numAffectedRows ?? 0);
+  }
+
+  async confirmHighConfidenceMatches(workspaceId: string, jobId: string): Promise<number> {
+    const result = await sql`
+      UPDATE imports.staged_transaction s SET
+        occurrence_link = jsonb_build_object('occurrenceId', s.occurrence_candidates->0->>'occurrenceId')
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId}
+         AND s.occurrence_link IS NULL AND s.decision = 'CREATE'
+         AND s.classification IN ('NEW', 'DUPLICATE_PROBABLE')
+         AND jsonb_array_length(COALESCE(s.occurrence_candidates, '[]'::jsonb)) = 1
+         AND s.occurrence_candidates->0->>'confidence' = 'HIGH'
+         AND COALESCE((s.occurrence_candidates->0->>'ambiguous')::boolean, false) = false`.execute(db());
+    return Number(result.numAffectedRows ?? 0);
+  }
+
+  async markOccurrenceOutcome(
+    workspaceId: string,
+    items: readonly { readonly rowId: string; readonly outcome: 'LINKED' | 'SKIPPED' }[],
+  ): Promise<void> {
+    for (const part of chunks(items)) {
+      await sql`
+        UPDATE imports.staged_transaction s SET
+          occurrence_link = COALESCE(s.occurrence_link, '{}'::jsonb) || jsonb_build_object('outcome', v->>'o'),
+          warnings = CASE WHEN v->>'o' = 'SKIPPED'
+            THEN COALESCE(s.warnings, '[]'::jsonb)
+                 || '[{"code":"IMPORT_OCCURRENCE_LINK_SKIPPED","severity":"WARNING"}]'::jsonb
+            ELSE s.warnings END
+          FROM jsonb_array_elements(${json(part.map((i) => ({ id: i.rowId, o: i.outcome })))}::jsonb) v
+         WHERE s.workspace_id = ${workspaceId} AND s.id = (v->>'id')::uuid`.execute(db());
+    }
+  }
+
+  async rulesCoverage(workspaceId: string, jobId: string) {
+    const { rows } = await sql<{ created: string; by_rule: string; without_category: string }>`
+      SELECT count(*) AS created,
+             count(*) FILTER (WHERE NOT (COALESCE(s.edits, '{}'::jsonb) ? 'categoryId')
+                                AND s.proposal->'category'->'origin'->>'type' = 'RULE'
+                                AND s.proposal->'category'->>'value' IS NOT NULL) AS by_rule,
+             count(*) FILTER (WHERE ${EFFECTIVE_CATEGORY} IS NULL) AS without_category
+        FROM imports.staged_transaction s
+       WHERE s.workspace_id = ${workspaceId} AND s.import_job_id = ${jobId} AND s.transaction_id IS NOT NULL`.execute(
+      db(),
+    );
+    const r = rows[0];
+    return {
+      created: Number(r?.created ?? 0),
+      byRule: Number(r?.by_rule ?? 0),
+      withoutCategory: Number(r?.without_category ?? 0),
+    };
+  }
+
   async deleteAll(workspaceId: string, jobId: string): Promise<number> {
     const result = await sql`
       DELETE FROM imports.staged_transaction WHERE workspace_id = ${workspaceId} AND import_job_id = ${jobId}`.execute(
@@ -587,9 +945,11 @@ export class PgRowLinkRepository implements RowLinkRepository {
   async insertMany(workspaceId: string, links: readonly RowLinkInsert[]): Promise<void> {
     for (const part of chunks(links)) {
       await sql`
-        INSERT INTO imports.row_link (id, workspace_id, account_id, fingerprint, transaction_id, staged_transaction_id, kind)
+        INSERT INTO imports.row_link
+          (id, workspace_id, account_id, fingerprint, transaction_id, staged_transaction_id, kind, import_job_id,
+           external_ref_namespace, external_ref_id)
         SELECT (e->>'id')::uuid, ${workspaceId}::uuid, (e->>'account')::uuid, decode(e->>'fp', 'hex'),
-               (e->>'txn')::uuid, (e->>'staged')::uuid, e->>'kind'
+               (e->>'txn')::uuid, (e->>'staged')::uuid, e->>'kind', (e->>'job')::uuid, e->>'ns', e->>'ext'
           FROM jsonb_array_elements(${json(
             part.map((l) => ({
               id: l.id,
@@ -598,10 +958,79 @@ export class PgRowLinkRepository implements RowLinkRepository {
               txn: l.transactionId,
               staged: l.stagedTransactionId,
               kind: l.kind,
+              job: l.importJobId ?? null,
+              ns: l.externalRef?.namespace ?? null,
+              ext: l.externalRef?.id ?? null,
             })),
           )}::jsonb) e
         ON CONFLICT DO NOTHING`.execute(db());
     }
+  }
+
+  async mergedTransactionIds(
+    workspaceId: string,
+    accountId: string,
+    transactionIds: readonly string[],
+  ): Promise<ReadonlySet<string>> {
+    const out = new Set<string>();
+    for (const part of chunks(transactionIds)) {
+      const { rows } = await sql<{ transaction_id: string }>`
+        SELECT DISTINCT l.transaction_id FROM imports.row_link l
+         WHERE l.workspace_id = ${workspaceId} AND l.account_id = ${accountId} AND l.status = 'ACTIVE'
+           AND l.kind = 'SKIPPED_AS_DUPLICATE' AND l.transaction_id = ANY(${part}::uuid[])`.execute(db());
+      for (const r of rows) out.add(r.transaction_id);
+    }
+    return out;
+  }
+
+  async findActiveByExternal(workspaceId: string, accountId: string, externalIds: readonly string[]) {
+    const out: { externalId: string; transactionId: string }[] = [];
+    for (const part of chunks(externalIds)) {
+      const { rows } = await sql<{ external_ref_id: string; transaction_id: string }>`
+        SELECT l.external_ref_id, l.transaction_id FROM imports.row_link l
+         WHERE l.workspace_id = ${workspaceId} AND l.account_id = ${accountId} AND l.status = 'ACTIVE'
+           AND l.external_ref_id = ANY(${part}::text[])`.execute(db());
+      out.push(...rows.map((r) => ({ externalId: r.external_ref_id, transactionId: r.transaction_id })));
+    }
+    return out;
+  }
+
+  async activeByJob(workspaceId: string, jobId: string): Promise<readonly RevertLink[]> {
+    const { rows } = await sql<{
+      id: string;
+      transaction_id: string;
+      row_id: string | null;
+      row_number: number | null;
+      booking_date: string | null;
+      kind: RevertLink['kind'];
+    }>`
+      SELECT l.id, l.transaction_id, s.id AS row_id, s.row_number, s.booking_date::text AS booking_date, l.kind
+        FROM imports.row_link l
+        LEFT JOIN imports.staged_transaction s
+          ON s.workspace_id = l.workspace_id AND s.id = l.staged_transaction_id
+       WHERE l.workspace_id = ${workspaceId} AND l.import_job_id = ${jobId} AND l.status = 'ACTIVE'
+       ORDER BY s.row_number NULLS LAST, l.id`.execute(db());
+    return rows.map((r) => ({
+      linkId: r.id,
+      transactionId: r.transaction_id,
+      rowId: r.row_id,
+      lineNumber: r.row_number === null ? null : Number(r.row_number),
+      bookingDate: r.booking_date,
+      kind: r.kind,
+    }));
+  }
+
+  async supersedeByJob(
+    workspaceId: string,
+    jobId: string,
+    now: string,
+    keepTransactionIds: readonly string[] = [],
+  ): Promise<number> {
+    const result = await sql`
+      UPDATE imports.row_link SET status = 'SUPERSEDED', superseded_at = ${now}::timestamptz
+       WHERE workspace_id = ${workspaceId} AND import_job_id = ${jobId} AND status = 'ACTIVE'
+         AND NOT (transaction_id = ANY(${[...keepTransactionIds]}::uuid[]))`.execute(db());
+    return Number(result.numAffectedRows ?? 0);
   }
 
   async supersede(

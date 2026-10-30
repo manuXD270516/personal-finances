@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CsvMapping } from './csv-mapping.js';
-import { EMPTY_COUNTERS, ImportJob } from './import-job.js';
+import { EMPTY_COUNTERS, IMPORT_JOB_LIFECYCLE, ImportJob } from './import-job.js';
 import { IMPORT_STATUSES, type ImportStatus } from './types.js';
 
 const MAPPING: CsvMapping = {
@@ -37,6 +37,29 @@ function newJob(): ImportJob {
   });
 }
 const counters = { ...EMPTY_COUNTERS, rows: 4, newRows: 4, toCreate: 4 };
+const EXPIRES = '2026-11-19T14:00:00.000Z';
+
+export function documentJob(): ImportJob {
+  return ImportJob.createFromDocument({
+    id: 'j2',
+    workspaceId: 'w1',
+    accountId: 'a1',
+    createdBy: 'u1',
+    now: NOW,
+    documentId: 'd1',
+    format: 'OFX',
+    originalName: 'extracto.ofx',
+    fileChecksum: 'cd'.repeat(32),
+    fileSizeBytes: 900,
+    warnings: [],
+    mappingProfile: null,
+  });
+}
+function processingJob(): ImportJob {
+  const job = documentJob();
+  job.beginProcessing(NOW);
+  return job;
+}
 
 function inReview(): ImportJob {
   const job = newJob();
@@ -50,6 +73,12 @@ function persisting(): ImportJob {
   return job;
 }
 
+function completedJob(): ImportJob {
+  const j = persisting();
+  j.finish({ failed: 0, errors: [], now: NOW });
+  return j;
+}
+
 const codeOf = (fn: () => unknown) => {
   try {
     fn();
@@ -58,6 +87,145 @@ const codeOf = (fn: () => unknown) => {
   }
   return 'OK';
 };
+
+describe('ImportJob (pipeline de documentos)', () => {
+  it('[TC-IMPORTS-PIPELINE-007] el job de documento informa etapa y filas procesadas mientras se procesa', () => {
+    const job = documentJob();
+    expect(job.state).toMatchObject({
+      status: 'UPLOADED',
+      documentId: 'd1',
+      source: 'FILE_OFX',
+      format: 'OFX',
+    });
+    expect(job.lastTransition).toEqual({ transition: 'CREATE_FROM_DOCUMENT', from: null, to: 'UPLOADED' });
+    job.beginProcessing(NOW);
+    expect(job.lastTransition).toEqual({ transition: 'START', from: 'UPLOADED', to: 'PROCESSING' });
+    job.checkpoint({ stage: 'NORMALIZE', processedRows: 1000, totalRows: 3000, now: NOW });
+    expect(job.state.status).toBe('PROCESSING');
+    expect(job.state.progress).toMatchObject({ stage: 'NORMALIZE', processedRows: 1000, totalRows: 3000 });
+    expect(job.lastTransition).toBeNull();
+    job.readyForReview({
+      counters,
+      rowCount: 3000,
+      statement: null,
+      rulesSummary: null,
+      expiresAt: EXPIRES,
+      now: NOW,
+    });
+    expect(job.state).toMatchObject({ status: 'AWAITING_REVIEW', rowCount: 3000, expiresAt: EXPIRES });
+    expect(job.state.progress.stage).toBeNull();
+  });
+
+  it('beginProcessing es idempotente en PROCESSING y no actúa en otros estados', () => {
+    const job = processingJob();
+    const version = job.state.version;
+    expect(job.beginProcessing(NOW)).toBe(true);
+    expect(job.state.version).toBe(version);
+    expect(inReview().beginProcessing(NOW)).toBe(false);
+  });
+
+  it('[TC-IMPORTS-PIPELINE-009] un error estructural deja PARSE_FAILED con código y ubicación', () => {
+    const job = processingJob();
+    job.failParse({ failure: { code: 'IMPORT_PARSE_FAILED', pointer: 'line:14' }, now: NOW });
+    expect(job.state).toMatchObject({
+      status: 'PARSE_FAILED',
+      failure: { code: 'IMPORT_PARSE_FAILED', pointer: 'line:14' },
+    });
+    expect(codeOf(() => job.cancel({ actor: USER, now: NOW }))).toBe('INVALID_STATUS_TRANSITION');
+  });
+
+  it('[TC-IMPORTS-PIPELINE-010] cancelar durante el procesamiento deja la importación cancelada', () => {
+    const job = processingJob();
+    job.cancel({ actor: USER, now: NOW });
+    expect(job.state).toMatchObject({ status: 'CANCELLED', cancelledBy: USER });
+    expect(job.lastTransition).toMatchObject({ transition: 'CANCEL', from: 'PROCESSING', to: 'CANCELLED' });
+  });
+
+  it('un job de documento esperando mapeo reprocesa al aplicar el mapeo (AWAITING_MAPPING → PROCESSING)', () => {
+    const job = processingJob();
+    job.awaitMapping({
+      help: { profileCandidates: [], missingColumns: ['Monto'], needs: [] },
+      rowCount: 10,
+      columnCount: 3,
+      header: ['Fecha', 'Descripción', 'Importe'],
+      encoding: 'utf-8',
+      delimiter: ';',
+      statement: null,
+      expiresAt: EXPIRES,
+      now: NOW,
+    });
+    expect(job.state).toMatchObject({
+      status: 'AWAITING_MAPPING',
+      mappingHelp: { missingColumns: ['Monto'] },
+    });
+    job.applyMapping({ mapping: MAPPING, counters, now: NOW, profile: { id: 'p1', version: 2 } });
+    expect(job.state).toMatchObject({
+      status: 'PROCESSING',
+      mappingProfile: { id: 'p1', version: 2 },
+      mappingHelp: null,
+      expiresAt: null,
+    });
+    expect(job.state.progress.stage).toBe('NORMALIZE');
+  });
+
+  it('[TC-IMPORTS-PIPELINE-058] con diferencia contra el extracto termina COMPLETED_WITH_DIFFERENCE', () => {
+    const job = persisting();
+    const status = job.finish({
+      failed: 0,
+      errors: [],
+      now: NOW,
+      reconciliation: {
+        outcome: 'DIFFERENCE',
+        statementBalance: '1019.32',
+        accountBalance: '1001.32',
+        difference: '18.00',
+        statementDate: '2026-03-31',
+      },
+    });
+    expect(status).toBe('COMPLETED_WITH_DIFFERENCE');
+    expect(job.state.reconciliation?.difference).toBe('18.00');
+    expect(job.lastTransition?.transition).toBe('COMPLETE_WITH_DIFFERENCE');
+  });
+
+  it('[TC-IMPORTS-PIPELINE-059] deshacer: COMPLETED → REVERTING → ROLLED_BACK, con actor y resumen', () => {
+    const job = completedJob();
+    job.requestRevert({ userId: 'ana', allowPartial: false, requested: 3, blocked: 0, now: NOW });
+    expect(job.state.status).toBe('REVERTING');
+    job.recordRevertBatch({ voided: 2, alreadyVoided: 0, now: NOW });
+    job.recordRevertBatch({ voided: 1, alreadyVoided: 0, now: NOW });
+    expect(job.finishRevert({ blocked: 0, now: NOW })).toBe('ROLLED_BACK');
+    expect(job.state).toMatchObject({
+      revertedBy: 'ana',
+      revertedAt: NOW,
+      revert: { voided: 3, blocked: 0, requested: 3 },
+    });
+  });
+
+  it('[TC-IMPORTS-PIPELINE-061] con bloqueadas el deshacer parcial termina PARTIALLY_ROLLED_BACK y puede repetirse', () => {
+    const job = completedJob();
+    job.requestRevert({ userId: 'ana', allowPartial: true, requested: 2, blocked: 1, now: NOW });
+    job.recordRevertBatch({ voided: 2, alreadyVoided: 0, now: NOW });
+    expect(job.finishRevert({ blocked: 1, now: NOW })).toBe('PARTIALLY_ROLLED_BACK');
+    job.requestRevert({ userId: 'ana', allowPartial: true, requested: 1, blocked: 0, now: NOW });
+    expect(job.state.status).toBe('REVERTING');
+  });
+
+  it('[TC-IMPORTS-PIPELINE-071] aprobar una importación deshecha es INVALID_STATUS_TRANSITION y no cambia nada', () => {
+    const job = completedJob();
+    job.requestRevert({ userId: 'ana', allowPartial: false, requested: 3, blocked: 0, now: NOW });
+    job.finishRevert({ blocked: 0, now: NOW });
+    const before = job.state;
+    expect(codeOf(() => job.approve({ userId: 'u', now: NOW, batchCount: 1 }))).toBe(
+      'INVALID_STATUS_TRANSITION',
+    );
+    expect(job.state).toBe(before);
+  });
+
+  it('la máquina IMPORT_JOB_LIFECYCLE declara todos los estados del job', () => {
+    const codes = IMPORT_JOB_LIFECYCLE.definition.states.map((st) => st.code).sort();
+    expect(codes).toEqual([...IMPORT_STATUSES].sort());
+  });
+});
 
 describe('ImportJob', () => {
   it('nace esperando mapeo, con expiración y versión 1', () => {
@@ -169,6 +337,44 @@ describe('ImportJob', () => {
         j.cancel({ actor: USER, now: NOW });
         return j;
       },
+      UPLOADED: documentJob,
+      PROCESSING: processingJob,
+      PARSE_FAILED: () => {
+        const j = processingJob();
+        j.failParse({ failure: { code: 'IMPORT_PARSE_FAILED', pointer: 'x' }, now: NOW });
+        return j;
+      },
+      COMPLETED_WITH_DIFFERENCE: () => {
+        const j = persisting();
+        j.finish({
+          failed: 0,
+          errors: [],
+          now: NOW,
+          reconciliation: {
+            outcome: 'DIFFERENCE',
+            statementBalance: '1.00',
+            accountBalance: '0.00',
+            difference: '1.00',
+            statementDate: '2026-03-31',
+          },
+        });
+        return j;
+      },
+      REVERTING: () => {
+        const j = completedJob();
+        j.requestRevert({ userId: 'u1', allowPartial: false, requested: 3, blocked: 0, now: NOW });
+        return j;
+      },
+      ROLLED_BACK: () => {
+        const j = build.REVERTING();
+        j.finishRevert({ blocked: 0, now: NOW });
+        return j;
+      },
+      PARTIALLY_ROLLED_BACK: () => {
+        const j = build.REVERTING();
+        j.finishRevert({ blocked: 1, now: NOW });
+        return j;
+      },
     };
     const actions: Record<string, [(j: ImportJob) => void, ImportStatus[]]> = {
       applyMapping: [
@@ -176,12 +382,24 @@ describe('ImportJob', () => {
         ['AWAITING_MAPPING', 'AWAITING_REVIEW'],
       ],
       approve: [(j) => j.approve({ userId: 'u', now: NOW, batchCount: 1 }), ['AWAITING_REVIEW']],
-      cancel: [(j) => j.cancel({ actor: USER, now: NOW }), ['AWAITING_MAPPING', 'AWAITING_REVIEW']],
+      cancel: [
+        (j) => j.cancel({ actor: USER, now: NOW }),
+        ['UPLOADED', 'PROCESSING', 'AWAITING_MAPPING', 'AWAITING_REVIEW'],
+      ],
       beginPersisting: [(j) => j.beginPersisting(NOW), ['APPROVED', 'PERSISTING']],
       recordBatch: [(j) => j.recordBatch({ created: 1, now: NOW }), ['PERSISTING']],
       finish: [(j) => void j.finish({ failed: 0, errors: [], now: NOW }), ['PERSISTING']],
       retry: [(j) => j.retry(NOW), ['PARTIALLY_FAILED']],
       acceptErrors: [(j) => j.acceptErrors(NOW), ['PARTIALLY_FAILED']],
+      failParse: [
+        (j) => j.failParse({ failure: { code: 'IMPORT_PARSE_FAILED', pointer: null }, now: NOW }),
+        ['UPLOADED', 'PROCESSING'],
+      ],
+      requestRevert: [
+        (j) => j.requestRevert({ userId: 'u', allowPartial: false, requested: 1, blocked: 0, now: NOW }),
+        ['COMPLETED', 'COMPLETED_WITH_DIFFERENCE', 'COMPLETED_WITH_ERRORS', 'PARTIALLY_ROLLED_BACK'],
+      ],
+      finishRevert: [(j) => void j.finishRevert({ blocked: 0, now: NOW }), ['REVERTING']],
     };
     for (const [name, [run, allowed]] of Object.entries(actions)) {
       for (const status of IMPORT_STATUSES) {

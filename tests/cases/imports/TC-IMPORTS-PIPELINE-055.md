@@ -12,9 +12,12 @@ invariants: ["INV-014"]
 priority: critical
 type: integration
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/infrastructure/readers/ofx-reader.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline", "exit-criteria"]
@@ -32,7 +35,7 @@ expected_result:
   - "esas 12 filas son posibles duplicados con su transacción del CSV como candidato"
   - "al omitirlas vinculándolas y aprobar se crean 63 transacciones y la cuenta tiene 115 transacciones importadas, ninguna duplicada"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-055 — Tres meses en CSV y OFX con 12 movimientos solapados dejan 115 transacciones sin duplicados

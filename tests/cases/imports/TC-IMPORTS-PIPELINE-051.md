@@ -12,9 +12,10 @@ invariants: []
 priority: medium
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "el gasto importado de 199.00 BOB se crea sin vínculo con la advertencia `IMPORT_OCCURRENCE_LINK_SKIPPED`"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-051 — Si la ocurrencia se resolvió antes de persistir la transacción se crea sin vínculo y con advertencia

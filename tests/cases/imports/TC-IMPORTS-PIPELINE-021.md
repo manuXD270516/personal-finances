@@ -12,9 +12,11 @@ invariants: ["INV-001"]
 priority: high
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/infrastructure/readers/json-statement-reader.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PARSE_FAILED` en la ubicación del monto del segundo movimiento"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-021 — Un monto JSON escrito como número hace fallar la lectura con la ubicación del error

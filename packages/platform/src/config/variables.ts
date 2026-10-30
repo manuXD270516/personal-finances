@@ -887,6 +887,40 @@ export const VARIABLES = {
       default: '5000',
     },
   ),
+  IMPORT_MAX_ROWS: variable(
+    positiveInt.refine((n) => n <= 100_000, 'hasta 100000 filas'),
+    {
+      group: 'Imports',
+      description:
+        'Máximo de filas de datos de un import (docs/57 D329, 5000; add-import-pipeline): la lectura se corta al excederlo y el import falla con `IMPORT_TOO_MANY_ROWS`. Si no se define, rige `IMPORT_CSV_MAX_ROWS` (alias de compatibilidad, 5000 por defecto). Subir el tope exige medir de nuevo la vista previa y la ráfaga de eventos.',
+      optional: true,
+    },
+  ),
+  IMPORT_PROCESSING_TIMEOUT: variable(
+    z
+      .string()
+      .regex(/^PT\d+[MS]$/, 'duración ISO 8601 en minutos o segundos (`PT10M`)')
+      .transform((v) => Number(v.slice(2, -1)) * (v.endsWith('M') ? 60_000 : 1000))
+      .refine((ms) => ms >= 10_000 && ms <= 3_600_000, 'entre PT10S y PT60M'),
+    {
+      group: 'Imports',
+      description:
+        'Tiempo máximo del procesamiento de un import hasta la vista previa (`PT10M`): al superarlo el job pasa a `PARSE_FAILED` con `IMPORT_PARSE_FAILED`.',
+      default: 'PT10M',
+    },
+  ),
+  IMPORT_DUPLICATE_HIGH_SCORE: variable(z.coerce.number().min(0.5).max(1), {
+    group: 'Imports',
+    description:
+      'Puntaje desde el cual un posible duplicado es de confianza alta (0.90): un único candidato en o sobre este valor se preselecciona como «omitir» (siempre editable; la decisión sigue siendo obligatoria).',
+    default: '0.90',
+  }),
+  IMPORT_DUPLICATE_LOW_SCORE: variable(z.coerce.number().min(0).max(1), {
+    group: 'Imports',
+    description:
+      'Puntaje bajo el cual un posible duplicado se rotula «confianza baja» (0.60): sigue exigiendo decisión (docs/57 D325); solo cambia el rótulo.',
+    default: '0.60',
+  }),
   IMPORT_CSV_MAX_COLUMNS: variable(
     positiveInt.refine((n) => n <= 200, 'hasta 200 columnas'),
     {
@@ -1368,6 +1402,11 @@ export const APP_VARIABLES = {
     'IMPORT_CSV_MAX_BYTES',
     'IMPORT_CSV_MAX_ROWS',
     'IMPORT_CSV_MAX_COLUMNS',
+    // add-import-pipeline: topes y umbrales del pipeline (la API crea el job; el worker lo procesa).
+    'IMPORT_MAX_ROWS',
+    'IMPORT_PROCESSING_TIMEOUT',
+    'IMPORT_DUPLICATE_HIGH_SCORE',
+    'IMPORT_DUPLICATE_LOW_SCORE',
     'IMPORT_PERSIST_BATCH_SIZE',
     'IMPORT_REVIEW_TTL',
     'IMPORT_FUTURE_DATE_TOLERANCE_DAYS',
@@ -1413,6 +1452,13 @@ export const APP_VARIABLES = {
     // add-basic-csv-import: jobs diarios de expiración y purga del staging.
     'IMPORT_STAGING_RETENTION',
     'IMPORT_MAINTENANCE_CRON',
+    // add-import-pipeline: las etapas corren en el consumidor `imports.persist` del worker.
+    'IMPORT_CSV_MAX_ROWS',
+    'IMPORT_CSV_MAX_COLUMNS',
+    'IMPORT_MAX_ROWS',
+    'IMPORT_PROCESSING_TIMEOUT',
+    'IMPORT_DUPLICATE_HIGH_SCORE',
+    'IMPORT_DUPLICATE_LOW_SCORE',
     // add-budgets: el consumidor de umbrales valora el gastado con la MISMA ventana que el Home (docs/33 D109).
     'REPORTING_RATE_VALIDITY_WINDOW',
     // add-alerts: el canal email y la retención de notificaciones viven en el worker (la API solo guarda el in-app).

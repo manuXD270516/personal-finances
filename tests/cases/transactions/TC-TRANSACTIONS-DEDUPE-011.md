@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/application/duplicate-matching.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]
@@ -31,7 +32,7 @@ expected_result:
   - "no se crea ninguna transacción para esa fila"
   - "en la reimportación la fila vuelve a ser un posible duplicado del gasto manual"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-TRANSACTIONS-DEDUPE-011 — Excluir una fila no la recuerda y la reimportación vuelve a mostrarla como posible duplicado

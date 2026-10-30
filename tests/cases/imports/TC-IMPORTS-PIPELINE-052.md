@@ -12,9 +12,12 @@ invariants: ["INV-014"]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/application/duplicate-matching.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "la fila se clasifica como ya importada y no se crea otra transacción"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-052 — Un movimiento con el mismo identificador del banco y otra descripción se clasifica como ya importado

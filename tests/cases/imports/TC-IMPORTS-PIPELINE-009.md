@@ -12,9 +12,14 @@ invariants: []
 priority: high
 type: domain
 level: import
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.test.ts
+  - packages/contexts/imports/test/integration/pg-pipeline.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +37,7 @@ expected_result:
   - "la importación queda en \"falló la lectura\" con `IMPORT_PARSE_FAILED` y la ubicación del error"
   - "no tiene filas"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-009 — Un OFX con el bloque de movimientos sin cerrar deja la importación en falló la lectura sin filas

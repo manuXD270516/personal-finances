@@ -79,9 +79,10 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
     await page.getByTestId('import-csv').click();
     await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '1');
     await expect(page.getByTestId('import-steps').locator('[aria-current="step"]')).toContainText('Archivo');
-    await expect(page.getByTestId('import-account')).toHaveValue(bank);
-    await page.getByTestId('import-file').setInputFiles(CSV);
-    await page.getByTestId('import-upload-submit').click();
+    await page.getByTestId('import-legacy-toggle').click();
+    await expect(page.getByTestId('import-legacy-account')).toHaveValue(bank);
+    await page.getByTestId('import-legacy-file').setInputFiles(CSV);
+    await page.getByTestId('import-legacy-upload-submit').click();
 
     // Paso 2 (Columnas): codificación y separador detectados, muestra con tildes bien leídas y el foco en el paso.
     await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '2');
@@ -181,8 +182,9 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
 
     // Reimportar el mismo archivo: aviso no bloqueante, mapeo precargado y las 4 filas ya importadas.
     await go(page, `/imports/nueva?cuenta=${bank}`);
-    await page.getByTestId('import-file').setInputFiles(CSV);
-    await page.getByTestId('import-upload-submit').click();
+    await page.getByTestId('import-legacy-toggle').click();
+    await page.getByTestId('import-legacy-file').setInputFiles(CSV);
+    await page.getByTestId('import-legacy-upload-submit').click();
     await expect(page.getByTestId('import-wizard')).toHaveAttribute('data-step', '2');
     await expect(page.getByTestId('import-already-warning')).toContainText('ya se importó en esta cuenta');
     await expect(page.getByTestId('import-previous-link')).toBeVisible();
@@ -222,17 +224,18 @@ test.describe('Importar CSV (imports/import-pipeline)', () => {
     const { context, page, W } = await newFinanceUser(browser, 'csvval');
     await openAccount(page, W, 'Banco BOB', 'BANK', 'BOB', '100.00');
     await go(page, '/imports/nueva');
-    await page.getByTestId('import-upload-submit').click();
+    await page.getByTestId('import-legacy-toggle').click();
+    await page.getByTestId('import-legacy-upload-submit').click();
     const errors = page.getByTestId('field-error');
     await expect(errors).toHaveCount(2);
     await expect(errors.first()).toContainText('Elige la cuenta destino.');
-    await page.getByTestId('import-account').selectOption({ label: 'Banco BOB (BOB)' });
-    await page.getByTestId('import-file').setInputFiles({
+    await page.getByTestId('import-legacy-account').selectOption({ label: 'Banco BOB (BOB)' });
+    await page.getByTestId('import-legacy-file').setInputFiles({
       name: 'foto.png',
       mimeType: 'image/png',
       buffer: Buffer.from('no es un csv'),
     });
-    await page.getByTestId('import-upload-submit').click();
+    await page.getByTestId('import-legacy-upload-submit').click();
     await expect(page.getByTestId('field-error')).toContainText('El archivo debe ser .csv, .txt o .tsv.');
     expect(await seriousViolations(page)).toEqual([]);
     await context.close();

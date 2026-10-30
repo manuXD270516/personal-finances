@@ -561,6 +561,8 @@ export interface RecordTransferInput {
   readonly paymentMethod?: PaymentMethod | null;
   readonly source?: TransactionSource;
   readonly externalRef?: ExternalRef | null;
+  /** Import que la creó (`source = 'IMPORT'`, add-import-pipeline). */
+  readonly importJobId?: string | null;
 }
 
 /**
@@ -793,6 +795,10 @@ export interface RecordConversionInput extends ConversionData {
   readonly workspaceId: string;
   readonly status?: 'PENDING' | 'POSTED' | 'CLEARED';
   readonly origin?: TransactionSource;
+  /** Referencia externa de la TRANSACCIÓN (no del detalle): conversiones importadas (add-import-pipeline). */
+  readonly transactionRef?: ExternalRef | null;
+  /** Import que la creó (`origin = 'IMPORT'`). */
+  readonly importJobId?: string | null;
 }
 
 /**
@@ -1078,7 +1084,7 @@ export class Transaction {
         confirmedRefundExcess: false,
         reconciliationMode: null,
         reconciliationId: null,
-        importJobId: null,
+        importJobId: input.importJobId ?? null,
         legs: transferLegs(from, to, amount, fee?.amount ?? null),
         splits,
         revision: 1,
@@ -1235,13 +1241,13 @@ export class Transaction {
         counterpartyId: input.provider.counterpartyId,
         paymentMethod: null,
         source: input.origin ?? 'MANUAL',
-        externalRef: null,
+        externalRef: input.transactionRef ?? null,
         refundOfTransactionId: null,
         adjustmentReason: null,
         confirmedRefundExcess: false,
         reconciliationMode: null,
         reconciliationId: null,
-        importJobId: null,
+        importJobId: input.importJobId ?? null,
         revision: 1,
         version: 1,
         activeEntryId: null,

@@ -12,9 +12,11 @@ invariants: ["INV-014"]
 priority: critical
 type: property
 level: property
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline", "exit-criteria"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "todas las filas se clasifican como ya importadas y se crean 0 transacciones"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-056 — Reimportar los extractos de los tres meses crea 0 transacciones

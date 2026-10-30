@@ -12,9 +12,11 @@ invariants: ["INV-014"]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/application/duplicate-matching.test.ts
+  - packages/contexts/imports/src/domain/statement-normalizer.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "las dos filas son nuevas y al aprobar se crean dos transacciones"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-053 — Una referencia declarada no única no se usa como identificador y ambas filas se crean

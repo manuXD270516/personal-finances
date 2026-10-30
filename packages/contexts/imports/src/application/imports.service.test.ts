@@ -363,7 +363,9 @@ describe('Idempotencia y deduplicación', () => {
     });
     expect(ctx.world.audit.map((a) => a.action)).toEqual([
       'imports.import.created',
+      'imports.import.mapped',
       'imports.import.approved',
+      'imports.import.persisting',
       'imports.import.completed',
     ]);
     // Los logs de auditoría no llevan descripciones ni montos de filas.

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/imports/ImportReverted.v1.schema.json",
+  "title": "imports.ImportReverted.v1",
+  "description": "Terminó el deshacer de una importación: ROLLED_BACK (todas anuladas) o PARTIALLY_ROLLED_BACK (quedaron bloqueadas por conciliación o periodo cerrado). Productor: IMPORTS (worker). Sin consumidores obligatorios (REPORTING y NOTIFY podrán suscribirse; las anulaciones emiten sus propios eventos de transacción). Idempotencia natural: (importJobId, status, aggregateVersion). Sin PII: solo conteos.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "imports.ImportReverted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "ImportJob"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "importJobId",
+        "accountId",
+        "voided",
+        "alreadyVoided",
+        "blocked",
+        "status"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "importJobId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "voided": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "alreadyVoided": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "ROLLED_BACK",
+            "PARTIALLY_ROLLED_BACK"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a05",
+      "eventType": "imports.ImportReverted",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ImportJob",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b1001",
+      "aggregateVersion": 11,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "importJobId": "01928c4e-0000-7000-8000-0000000b1001",
+        "accountId": "01928c4e-0000-7000-8000-0000000ac001",
+        "voided": 115,
+        "alreadyVoided": 0,
+        "blocked": 0,
+        "status": "ROLLED_BACK"
+      }
+    }
+  ]
+}

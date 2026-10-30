@@ -83,6 +83,8 @@ export interface AccountSummaryDto {
   readonly liquidity: AccountLiquidityDto;
   readonly includeInNetWorth: boolean;
   readonly displayOrder: number;
+  /** Institución de la cuenta (perfiles de mapeo de IMPORTS; aditivo). */
+  readonly institutionId?: string | null;
 }
 
 /**

@@ -12,9 +12,12 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/domain/running-balance.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +34,7 @@ steps:
 expected_result:
   - "la vista previa muestra una diferencia de 18.00 BOB"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-037 — La vista previa muestra la diferencia entre el saldo final del extracto y el saldo resultante

@@ -12,9 +12,10 @@ invariants: []
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -31,7 +32,7 @@ steps:
 expected_result:
   - "se crea un gasto posteado de 60.00 BOB con la categoría \"Transporte\" y origen import"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-003 — La transacción creada toma la categoría que la vista previa mostró para la fila

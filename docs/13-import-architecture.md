@@ -73,6 +73,8 @@ ImportJob (aggregate root, schema imports)
 
 ### 3.2 Máquina de estados
 
+> **Phase 6 (`add-import-pipeline`, decisión 4):** los estados de etapa `PARSING`, `NORMALIZING`, `VALIDATING`, `MATCHING` y `CLASSIFYING` del diagrama son **etapas (`stage`) del estado `PROCESSING`** (`PARSE`, `NORMALIZE`, `VALIDATE`, `CLASSIFY`, `DEDUPE`, `MATCH`) para no multiplicar transiciones de sistema en el recorrido; `RECONCILING` es el **último paso de `PERSISTING`** (sin estado propio). Estados vigentes: `UPLOADED`, `PROCESSING`, `PARSE_FAILED`, `AWAITING_MAPPING`, `AWAITING_REVIEW`, `APPROVED`, `PERSISTING`, `PARTIALLY_FAILED`, `COMPLETED`, `COMPLETED_WITH_DIFFERENCE`, `COMPLETED_WITH_ERRORS`, `REVERTING`, `ROLLED_BACK`, `PARTIALLY_ROLLED_BACK`, `CANCELLED`. Máquina `IMPORT_JOB_LIFECYCLE` en AUDIT; las transiciones del worker tienen actor `SYSTEM`.
+
 ```mermaid
 stateDiagram-v2
     [*] --> CREATED: CreateImportJob
@@ -127,6 +129,8 @@ Reglas:
 Las transacciones creadas emiten sus propios eventos (`transactions.TransactionPosted.v1` con `origin = IMPORT`, `importJobId`) — Reporting no necesita escuchar Imports para sus números.
 
 ## 4. Pipeline
+
+> **Phase 6 (`add-import-pipeline`, decisión 8):** el orden queda **lectura → normalización → validación → clasificación (alias, reglas, categoría por defecto) → duplicados → coincidencias con compromisos → vista previa**. Las reglas van **antes** de duplicados y compromisos (docs/13 los ponía al revés) para que la contraparte y el tipo propuestos entren en el puntaje y en el matching. Las etapas corren en el consumidor `imports.persist` (sin consumidores nuevos, D249), por bloques de 1 000 filas con punto de control y reanudables.
 
 ```mermaid
 flowchart LR
@@ -205,6 +209,8 @@ sequenceDiagram
 ```
 
 ## 5. Adapters de entrada (parsers)
+
+> **Phase 6 (`add-import-pipeline`, decisiones 5 y 7):** puerto `StatementParser` por formato (CSV, OFX 1.x SGML y 2.x XML sin DTD ni entidades externas, QIF, JSON con el esquema real `contracts/imports/import-file.v1.schema.json`, XLSX Could). XLSX lee el **valor guardado** de la celda (nunca evalúa fórmulas) y toma la representación decimal más corta que reconstruye el `double`, con la regla de escala (exceso de decimales ⇒ `IMPORT_INVALID_AMOUNT`, INV-003). La limpieza de descripción (`descriptionCleanup`) usa **prefijos literales**, no expresiones regulares (evita ReDoS; las expresiones viven en las reglas). Los perfiles de mapeo tienen forma `imports.profile.v1` (`contracts/imports/imports.profile.v1.schema.json`). El PDF queda fuera (change propio).
 
 Puerto de application:
 
@@ -340,6 +346,8 @@ fingerprint = SHA-256( canonical_json([
 
 ### 7.3 Nivel proveedor — `external_id`
 
+> **Phase 6 (`add-import-pipeline`, decisión 10):** el namespace es `imports.ext:<FORMAT>` (p. ej. `imports.ext:OFX`), **sin** `institutionId`: el índice único parcial nuevo `transaction_import_ext_ref_uk (workspace_id, account_id, external_ref_namespace, external_ref_id) WHERE external_ref_namespace LIKE 'imports.ext:%' AND status <> 'VOIDED'` ya es por cuenta y una cuenta tiene una sola institución. La huella de §7.2 se sigue guardando en `row_link` para todas las filas.
+
 > **Phase 3 (`add-basic-csv-import`):** el CSV básico no tiene id estable del banco; Transactions recibe `externalRef = ('imports.csv-row', hex(fingerprint))` y lo protege con el índice único parcial `transaction_import_ref_uk` (una transacción activa por cuenta y huella; anulada, deja de ocupar la huella). `fingerprint` incluye `workspaceId` y `accountId`: tras restaurar un export en un workspace nuevo, las huellas anteriores no coinciden con las recalculadas y un reimport del mismo archivo se clasifica como posible duplicado (nunca se crea en silencio).
 
 - Cuando la fuente provee id estable (OFX `FITID`, Plaid `transaction_id`, trade id del exchange, nº de documento bancario fiable): `UNIQUE (workspace_id, account_id, source_namespace, external_id)` en `txn` (propiedad de Transactions; Imports pasa `externalRef = {namespace, id}` en el comando).
@@ -375,6 +383,8 @@ Implementada en **Transactions** (`transactions/duplicate-detection`); aquí se 
 Búsqueda en la **misma cuenta**, transacciones no anuladas con `|bookingDate − d| ≤ 3 días` (configurable; 5 para tarjetas de crédito por diferencia fecha de compra/fecha de proceso) y monto igual o dentro de tolerancia por FX (para cuentas multi-moneda/tarjeta en USD cobrada en BOB: ±2 %).
 
 ### 8.2 Score
+
+> **Phase 6 (`add-import-pipeline`, decisión 9; D325–D327):** el puntaje lo calcula `DuplicateScore` (dominio puro de TRANSACTIONS, `Decimal` de 4 decimales HALF_EVEN). Ventana ±3 días y monto exacto para todas las cuentas. **Todo candidato en la ventana sigue exigiendo decisión** (también bajo `IMPORT_DUPLICATE_LOW_SCORE`, 0.60: solo se rotula «confianza baja»); un único candidato ≥ `IMPORT_DUPLICATE_HIGH_SCORE` (0.90) se preselecciona como «omitir». **Fusionar = vincular** la fila con el movimiento existente (`row_link`) **sin modificarlo** (ni monto ni estado `cleared`; D149): lo que docs/13 proponía (pasar la manual a `cleared`, corregir montos) se descarta porque cambiaría datos del usuario sin su edición; la reconciliación es el camino para `cleared`. La decisión guarda `decided_by`, `decided_at` y `decided_score`.
 
 ```
 score = 0.40·S_amount + 0.25·S_date + 0.20·S_desc + 0.10·S_counterparty + 0.05·S_origin
@@ -425,6 +435,8 @@ difference       = statement.closingBalance − expected_closing
 - Para tarjetas de crédito (LIABILITY) la comparación usa el signo de la cuenta (saldo adeudado positivo en UI, negativo en ledger; ver 09-ledger-design.md).
 
 ## 10. Workers (BullMQ) y progreso
+
+> **Phase 6 (`add-import-pipeline`, decisión 3):** no hay colas nuevas. El consumidor `imports.persist` se suscribe además a `imports.ImportFileUploaded.v1` (etapas) e `imports.ImportRevertRequested.v1` (deshacer) y despacha por tipo; el presupuesto de conexiones no cambia. Cancelar marca el job y el handler lo verifica entre bloques. Tiempo máximo `IMPORT_PROCESSING_TIMEOUT` (`PT10M`) ⇒ `PARSE_FAILED`.
 
 | Cola | Job | Concurrencia | Reintentos | Timeout |
 |---|---|---|---|---|

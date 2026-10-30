@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.pfos.local/events/imports/ImportCompleted.v1.schema.json",
   "title": "imports.ImportCompleted.v1",
-  "description": "Fin de la persistencia de una importación CSV: COMPLETED, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS (aceptar el resultado parcial). Productor: IMPORTS. Sin consumidores obligatorios en Phase 3 (NOTIFY y REPORTING en Phase 6). Idempotencia natural: (importJobId, status). Sin PII: solo conteos y el rango de fechas.",
+  "description": "Fin de la persistencia de una importación: COMPLETED, COMPLETED_WITH_DIFFERENCE, PARTIALLY_FAILED o COMPLETED_WITH_ERRORS (aceptar el resultado parcial). `sourceType` y `status` son enums abiertos (cambio aditivo de add-import-pipeline): los consumidores DEBEN (MUST) tolerar valores desconocidos. Productor: IMPORTS. Sin consumidores obligatorios (NOTIFY y REPORTING pueden suscribirse). Idempotencia natural: (importJobId, status). Sin PII: solo conteos y el rango de fechas.",
   "type": "object",
   "allOf": [
     {
@@ -47,16 +47,25 @@
           "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
         },
         "sourceType": {
-          "enum": [
-            "FILE_CSV"
-          ]
+          "type": "string",
+          "examples": [
+            "FILE_CSV",
+            "FILE_OFX",
+            "FILE_QIF",
+            "FILE_JSON",
+            "FILE_XLSX"
+          ],
+          "description": "Origen del import. Enum abierto (add-import-pipeline agrega los formatos de archivo; add-banking-providers, las sincronizaciones)."
         },
         "status": {
-          "enum": [
+          "type": "string",
+          "examples": [
             "COMPLETED",
+            "COMPLETED_WITH_DIFFERENCE",
             "PARTIALLY_FAILED",
             "COMPLETED_WITH_ERRORS"
-          ]
+          ],
+          "description": "Estado final. Enum abierto: COMPLETED_WITH_DIFFERENCE (terminó pero el saldo no coincide con el del extracto) se agregó en add-import-pipeline."
         },
         "stats": {
           "type": "object",

@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: critical
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.dedupe.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]
@@ -32,7 +33,7 @@ expected_result:
   - "el gasto manual conserva su monto, su descripción, su fecha y su estado posteado"
   - "la decisión queda guardada con el EDITOR, el instante y el puntaje 0.9000"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-TRANSACTIONS-DEDUPE-009 — Fusionar una fila con el gasto manual no crea transacción ni modifica el gasto y registra la decisión

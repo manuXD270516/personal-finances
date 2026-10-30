@@ -12,9 +12,15 @@ invariants: ["INV-008"]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imported-movements.api.test.ts
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - packages/contexts/imports/src/domain/row-edits.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.lifecycle.test.ts
+  - packages/contexts/ledger/src/application/ledger.service.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +38,7 @@ expected_result:
   - "se rechaza con `IMPORT_REVERT_BLOCKED` indicando 1 fila bloqueada"
   - "ninguna de las 3 transacciones se anula"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-060 — Una transacción reconciliada bloquea el deshacer completo con IMPORT_REVERT_BLOCKED

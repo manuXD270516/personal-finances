@@ -150,6 +150,8 @@ export interface RecordTransferCommand {
   readonly paymentMethod?: PaymentMethod | null;
   readonly source?: TransactionSource;
   readonly externalRef?: ExternalRef | null;
+  /** Import que la crea (`source = 'IMPORT'`, add-import-pipeline). */
+  readonly importJobId?: string | null;
 }
 
 /** `LOAN_DISBURSEMENT` administrado por DEBT (add-loans): no pasa por la API de transacciones. */
@@ -497,6 +499,7 @@ export class TransactionsService {
         paymentMethod: cmd.paymentMethod ?? null,
         source: cmd.source ?? 'MANUAL',
         externalRef: cmd.externalRef ?? null,
+        importJobId: cmd.importJobId ?? null,
       });
       let entryId: string | null = null;
       if (tx.needsEntry) {

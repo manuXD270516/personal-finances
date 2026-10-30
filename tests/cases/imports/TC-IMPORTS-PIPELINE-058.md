@@ -12,9 +12,13 @@ invariants: []
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/domain/import-job.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +36,7 @@ expected_result:
   - "la importación termina \"completada con diferencia\" con una diferencia de 18.00 BOB"
   - "no se crea ningún ajuste"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-058 — Un import con diferencia de 18.00 BOB termina completado con diferencia y sin ajuste

@@ -12,9 +12,14 @@ invariants: ["INV-014"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - apps/web/src/ui/imports/pipeline.test.tsx
+  - packages/contexts/imports/src/application/duplicate-matching.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - tests/e2e/specs/import-pipeline.spec.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -32,7 +37,7 @@ expected_result:
   - "la aprobación no se rechaza por decisiones pendientes"
   - "la fila queda vinculada al movimiento existente sin crear una transacción"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-002 — Una vinculación preseleccionada de confianza alta cuenta como decisión al aprobar

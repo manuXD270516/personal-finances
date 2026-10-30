@@ -12,9 +12,11 @@ invariants: []
 priority: high
 type: platform
 level: performance
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imports-pipeline.api.test.ts
+  - apps/api/test/perf/imports.perf.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline", "nightly", "perf"]
@@ -31,7 +33,7 @@ steps:
 expected_result:
   - "la importación queda \"en revisión\" en 30 segundos o menos desde su creación"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-066 — Un OFX de 5 000 movimientos con 200 reglas activas llega a revisión en 30 s o menos

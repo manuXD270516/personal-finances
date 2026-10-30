@@ -12,9 +12,10 @@ invariants: ["INV-014"]
 priority: medium
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/imports/src/testing/import-pipeline.dedupe.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]
@@ -31,7 +32,7 @@ expected_result:
   - "las 2 filas de los gastos anulados son nuevas"
   - "la fila fusionada vuelve a ser un posible duplicado del gasto manual"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-TRANSACTIONS-DEDUPE-014 — Deshacer un import olvida sus vínculos y la reimportación vuelve a mostrar la fila fusionada como posible duplicado

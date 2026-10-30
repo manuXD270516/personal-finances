@@ -12,9 +12,14 @@ invariants: ["INV-004", "INV-010", "INV-011"]
 priority: high
 type: api
 level: api
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - apps/api/test/api/imported-movements.api.test.ts
+  - apps/web/src/ui/imports/pipeline-logic.test.ts
+  - packages/contexts/imports/src/domain/row-edits.test.ts
+  - packages/contexts/imports/src/testing/import-pipeline.review.test.ts
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "import-pipeline"]
@@ -34,7 +39,7 @@ expected_result:
   - "se crea una conversión con \"Banco BOB\" −696.00 BOB y \"Caja USD\" +100.00 USD y tasa efectiva USD/BOB 6.96"
   - "la conversión queda vinculada a la tasa de referencia vigente el 2026-03-10 a las 14:05 en America/La_Paz"
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # TC-IMPORTS-PIPELINE-046 — Una fila marcada como conversión crea la conversión con su tasa efectiva y la referencia del instante

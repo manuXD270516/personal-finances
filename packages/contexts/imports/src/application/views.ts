@@ -1,12 +1,24 @@
 import type {
+  ClassificationProposal,
   CsvMapping,
+  FieldOrigin,
   ImportCounters,
   ImportErrorGroup,
+  ImportFailure,
   ImportJobState,
+  ImportMappingRef,
   ImportProgress,
+  ImportSource,
   ImportStatus,
   ImportWarning,
+  OccurrenceCandidateEntry,
+  OccurrenceLinkState,
+  ProfileCandidateInfo,
+  RowCandidate,
+  RowEdits,
   RowIssue,
+  RowKind,
+  StatementFormat,
 } from '../domain/index.js';
 
 /** `ImportJob` del contrato (sin celdas del archivo ni nada que no deba viajar). */
@@ -36,9 +48,53 @@ export interface ImportJobView {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly version: number;
+  // ── Phase 6
+  readonly source: ImportSource;
+  readonly documentId: string | null;
+  readonly format: StatementFormat | null;
+  readonly stage: ImportProgress['stage'] | null;
+  readonly failure: ImportFailure | null;
+  readonly mappingProfile: ImportMappingRef | null;
+  readonly profileCandidates: readonly ProfileCandidateInfo[];
+  readonly missingColumns: readonly string[];
+  readonly statement: StatementView | null;
+  /** `closingBalance − resultingBalance` (se completa en las consultas con el staging a la vista). */
+  readonly statementDifference: MoneyView | null;
+  readonly reconciliationOffer: ReconciliationOfferView | null;
+  readonly revertSummary: RevertSummaryView | null;
+  readonly ruleCoverage: RuleCoverageView | null;
 }
 
-export function toJobView(s: ImportJobState): ImportJobView {
+export interface StatementView {
+  readonly openingBalance: MoneyView | null;
+  readonly closingBalance: MoneyView | null;
+  readonly periodFrom: string | null;
+  readonly periodTo: string | null;
+}
+
+export interface ReconciliationOfferView {
+  readonly accountId: string;
+  readonly statementDate: string;
+  readonly statementBalance: MoneyView;
+}
+
+export interface RevertSummaryView {
+  readonly voided: number;
+  readonly alreadyVoided: number;
+  readonly blocked: number;
+  readonly revertedAt: string | null;
+  readonly revertedBy: string | null;
+}
+
+export interface RuleCoverageView {
+  readonly rows: number;
+  readonly classifiedByRule: number;
+  readonly withoutCategory: number;
+  readonly ratio: string;
+}
+
+export function toJobView(s: ImportJobState, currency = ''): ImportJobView {
+  const money = (amount: string | null): MoneyView | null => (amount === null ? null : { amount, currency });
   return {
     id: s.id,
     accountId: s.accountId,
@@ -66,6 +122,51 @@ export function toJobView(s: ImportJobState): ImportJobView {
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     version: s.version,
+    source: s.source,
+    documentId: s.documentId,
+    format: s.format,
+    stage: s.progress.stage ?? null,
+    failure: s.failure,
+    mappingProfile: s.mappingProfile,
+    profileCandidates: s.mappingHelp?.profileCandidates ?? [],
+    missingColumns: s.mappingHelp?.missingColumns ?? [],
+    statement:
+      s.statement === null
+        ? null
+        : {
+            openingBalance: money(s.statement.openingBalance),
+            closingBalance: money(s.statement.closingBalance),
+            periodFrom: s.statement.periodFrom,
+            periodTo: s.statement.periodTo,
+          },
+    statementDifference: null,
+    reconciliationOffer:
+      s.reconciliation?.outcome === 'MATCHED'
+        ? {
+            accountId: s.accountId,
+            statementDate: s.reconciliation.statementDate,
+            statementBalance: { amount: s.reconciliation.statementBalance, currency },
+          }
+        : null,
+    revertSummary:
+      s.revert === null
+        ? null
+        : {
+            voided: s.revert.voided,
+            alreadyVoided: s.revert.alreadyVoided,
+            blocked: s.revert.blocked,
+            revertedAt: s.revertedAt,
+            revertedBy: s.revertedBy,
+          },
+    ruleCoverage:
+      s.rulesSummary === null
+        ? null
+        : {
+            rows: s.rulesSummary.rows,
+            classifiedByRule: s.rulesSummary.classifiedByRule,
+            withoutCategory: s.rulesSummary.withoutCategory,
+            ratio: s.rulesSummary.ratio,
+          },
   };
 }
 
@@ -105,7 +206,7 @@ export interface PreviewCandidateView {
   readonly description: string | null;
 }
 
-export interface PreviewRowView {
+export interface PreviewRowView extends RowPhase6View {
   readonly id: string;
   readonly lineNumber: number;
   readonly date: string | null;
@@ -124,4 +225,84 @@ export interface PreviewView {
   readonly summary: PreviewSummaryView;
   readonly rows: readonly PreviewRowView[];
   readonly nextCursor: number | null;
+}
+
+// ───────────────────────────────────────────────────────────── filas de la vista previa (Phase 6)
+
+export interface ProposedFieldView {
+  readonly value: string | readonly string[] | null;
+  readonly origin: 'ALIAS' | 'RULE' | 'DEFAULT' | 'MANUAL';
+  readonly ruleId: string | null;
+  readonly ruleVersion: number | null;
+}
+
+export interface RowProposalView {
+  readonly categoryId?: ProposedFieldView;
+  readonly counterpartyId?: ProposedFieldView;
+  readonly tagIds?: ProposedFieldView;
+  readonly description?: ProposedFieldView;
+  readonly excluded?: boolean;
+  readonly needsCategory: boolean;
+}
+
+const originView = (origin: FieldOrigin): Pick<ProposedFieldView, 'origin' | 'ruleId' | 'ruleVersion'> =>
+  origin.type === 'RULE'
+    ? { origin: 'RULE', ruleId: origin.ruleId, ruleVersion: origin.ruleVersion }
+    : {
+        origin: origin.type === 'MANUAL' ? 'MANUAL' : origin.type === 'ALIAS' ? 'ALIAS' : 'DEFAULT',
+        ruleId: null,
+        ruleVersion: null,
+      };
+
+/** Propuesta con el origen de cada campo; `needsCategory` mira lo EFECTIVO (edición sobre propuesta). */
+export function toProposalView(proposal: ClassificationProposal | null, edits: RowEdits): RowProposalView {
+  const field = <T extends string | readonly string[] | null>(
+    p: { readonly value: T; readonly origin: FieldOrigin } | null,
+  ): ProposedFieldView | undefined => (p === null ? undefined : { value: p.value, ...originView(p.origin) });
+  const effectiveCategory =
+    edits.categoryId !== undefined ? edits.categoryId : (proposal?.category?.value ?? null);
+  return {
+    ...(proposal?.category ? { categoryId: field(proposal.category) as ProposedFieldView } : {}),
+    ...(proposal?.counterparty ? { counterpartyId: field(proposal.counterparty) as ProposedFieldView } : {}),
+    ...(proposal?.tags ? { tagIds: field(proposal.tags) as ProposedFieldView } : {}),
+    ...(proposal?.description ? { description: field(proposal.description) as ProposedFieldView } : {}),
+    ...(proposal?.exclude ? { excluded: true } : {}),
+    needsCategory: effectiveCategory === null,
+  };
+}
+
+export interface OccurrenceCandidateView {
+  readonly occurrenceId: string;
+  readonly confidence: string;
+  readonly dueDate: string;
+  readonly expectedAmount: MoneyView | null;
+  readonly label: string;
+}
+
+export const toOccurrenceCandidateView = (c: OccurrenceCandidateEntry): OccurrenceCandidateView => ({
+  occurrenceId: c.occurrenceId,
+  confidence: c.confidence,
+  dueDate: c.dueDate,
+  expectedAmount: null,
+  label: c.definitionName,
+});
+
+export type DuplicateCandidateView = RowCandidate;
+
+export interface RowPhase6View {
+  readonly kind: RowKind;
+  readonly externalId: string | null;
+  readonly time: string | null;
+  readonly runningBalance: MoneyView | null;
+  readonly proposal: RowProposalView | null;
+  readonly edits: RowEdits | null;
+  readonly candidates: readonly DuplicateCandidateView[];
+  readonly decidedBy: string | null;
+  readonly decidedAt: string | null;
+  readonly decidedScore: string | null;
+  readonly duplicateOfRow: number | null;
+  readonly occurrenceCandidates: readonly OccurrenceCandidateView[];
+  readonly occurrenceLink: OccurrenceLinkState | null;
+  readonly transfer: { readonly counterAccountId: string } | null;
+  readonly conversion: NonNullable<RowEdits['conversion']> | null;
 }

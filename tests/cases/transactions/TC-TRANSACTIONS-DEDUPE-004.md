@@ -12,9 +12,11 @@ invariants: ["INV-014"]
 priority: critical
 type: integration
 level: database-integration
-automation_status: not_automated
-automated_tests: []
-status: draft
+automation_status: automated
+automated_tests:
+  - packages/contexts/transactions/src/application/record-imported-transactions.test.ts
+  - packages/contexts/transactions/test/integration/pg-imported.int.test.ts
+status: automated
 regression_suite: false
 phase: 6
 tags: ["imports", "duplicate-detection"]

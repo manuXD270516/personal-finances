@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.pfos.local/events/imports/ImportPreviewReady.v1.schema.json",
+  "title": "imports.ImportPreviewReady.v1",
+  "description": "El worker terminó las etapas y la importación quedó en AWAITING_REVIEW (vista previa lista). Productor: IMPORTS (worker). Sin consumidores obligatorios (NOTIFY podrá suscribirse). Idempotencia natural: (importJobId, aggregateVersion). Sin PII: solo conteos.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../envelope.v1.schema.json"
+    }
+  ],
+  "properties": {
+    "eventType": {
+      "const": "imports.ImportPreviewReady"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "aggregateType": {
+      "const": "ImportJob"
+    },
+    "payload": {
+      "$ref": "#/$defs/Payload"
+    }
+  },
+  "$defs": {
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceId",
+        "importJobId",
+        "accountId",
+        "counts"
+      ],
+      "properties": {
+        "workspaceId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "importJobId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "accountId": {
+          "$ref": "../envelope.v1.schema.json#/$defs/Uuid"
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rows",
+            "newRows",
+            "alreadyImported",
+            "probableDuplicates",
+            "invalid"
+          ],
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "newRows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "alreadyImported": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "probableDuplicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "invalid": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "eventId": "01928c4e-7a3b-7c11-8f00-000000000a02",
+      "eventType": "imports.ImportPreviewReady",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-20T14:00:00.000Z",
+      "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+      "aggregateType": "ImportJob",
+      "aggregateId": "01928c4e-0000-7000-8000-0000000b1001",
+      "aggregateVersion": 5,
+      "correlationId": "01928c4e-7a3b-7c11-8f00-0000000000c9",
+      "causationId": null,
+      "actor": {
+        "type": "SYSTEM",
+        "id": null
+      },
+      "payload": {
+        "workspaceId": "01928c4e-0000-7000-8000-00000000a001",
+        "importJobId": "01928c4e-0000-7000-8000-0000000b1001",
+        "accountId": "01928c4e-0000-7000-8000-0000000ac001",
+        "counts": {
+          "rows": 127,
+          "newRows": 115,
+          "alreadyImported": 8,
+          "probableDuplicates": 3,
+          "invalid": 1
+        }
+      }
+    }
+  ]
+}

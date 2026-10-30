@@ -3564,9 +3564,9 @@
     }
   },
   "Imports": {
-    "title": "Importar extracto (CSV)",
+    "title": "Importar extracto",
     "listTitle": "Importaciones de extractos",
-    "intro": "Sube el extracto CSV de tu banco, indica qué columna es cada dato, revisa lo que se va a crear y apruébalo. Hasta que apruebes no se crea ninguna transacción ni cambia ningún saldo.",
+    "intro": "Sube el extracto de tu banco (CSV, OFX, QIF, JSON o XLSX), revisa lo que se va a crear y apruébalo. Hasta que apruebes no se crea ninguna transacción ni cambia ningún saldo.",
     "newImport": "Nueva importación",
     "backToList": "Volver a las importaciones",
     "loading": "Cargando…",
@@ -3602,7 +3602,14 @@
       "COMPLETED": "Completada",
       "PARTIALLY_FAILED": "Con filas fallidas",
       "COMPLETED_WITH_ERRORS": "Completada con errores",
-      "CANCELLED": "Cancelada"
+      "CANCELLED": "Cancelada",
+      "UPLOADED": "Subida, en cola",
+      "PROCESSING": "Procesando",
+      "PARSE_FAILED": "Falló la lectura",
+      "COMPLETED_WITH_DIFFERENCE": "Completada con diferencia",
+      "REVERTING": "Deshaciendo",
+      "ROLLED_BACK": "Deshecha",
+      "PARTIALLY_ROLLED_BACK": "Deshecha parcialmente"
     },
     "info": {
       "file": "Archivo",
@@ -3722,7 +3729,13 @@
       "NEW": "Nuevas ({count})",
       "DUPLICATE_PROBABLE": "Posibles duplicados ({count})",
       "DUPLICATE_EXACT": "Ya importadas ({count})",
-      "INVALID": "Con errores ({count})"
+      "INVALID": "Con errores ({count})",
+      "needsCategory": "Sin categoría",
+      "confidence": "Confianza del candidato",
+      "anyConfidence": "Cualquiera",
+      "rule": "Regla",
+      "anyRule": "Todas las reglas",
+      "ruleOption": "Regla {id}… (versión {version})"
     },
     "classification": {
       "NEW": "Nueva",
@@ -3790,7 +3803,13 @@
       "PERIOD_CLOSED": "La fecha cae en un periodo cerrado.",
       "ACCOUNT_CLOSED": "La cuenta está cerrada.",
       "IMPORT_DESCRIPTION_TRUNCATED": "La descripción era muy larga y se recortó.",
-      "UNKNOWN": "La fila tiene un problema."
+      "UNKNOWN": "La fila tiene un problema.",
+      "IMPORT_CURRENCY_MISMATCH": "La moneda del archivo no es la de la cuenta.",
+      "IMPORT_AMBIGUOUS_DATE": "La fecha es ambigua: indica el orden día/mes.",
+      "IMPORT_AMBIGUOUS_NUMBER": "El número es ambiguo: indica el separador decimal.",
+      "IMPORT_RUNNING_BALANCE_GAP": "El saldo corrido del archivo no cuadra con esta fila.",
+      "IMPORT_RULES_UNAVAILABLE": "Las reglas no estuvieron disponibles: la fila queda sin propuesta.",
+      "IMPORT_OCCURRENCE_LINK_SKIPPED": "El compromiso ya se había resuelto: la transacción se creó sin vínculo."
     },
     "warnings": {
       "IMPORT_FILE_ALREADY_IMPORTED": "Este mismo archivo ya se importó en esta cuenta el {date}. Puedes continuar: las filas ya importadas no se duplican.",
@@ -3838,7 +3857,231 @@
       "accept": "Aceptar el resultado parcial",
       "linksLabel": "Siguientes pasos",
       "viewTransactions": "Ver las transacciones de la cuenta",
-      "importAnother": "Importar otro archivo"
+      "importAnother": "Importar otro archivo",
+      "difference": "La importación terminó con una diferencia de {amount} contra el saldo final del extracto.",
+      "noAdjustment": "No se creó ningún ajuste automático.",
+      "reconcileOffer": "El saldo coincide con el extracto del {date} ({balance}). Puedes abrir la reconciliación ya preparada.",
+      "reconcileLink": "Reconciliar con este extracto",
+      "coverage": "Clasificadas por reglas: {byRule} de {rows} ({percent} %). Sin categoría: {without}.",
+      "reverting": "Deshaciendo la importación: anulando sus transacciones…",
+      "rolledBack": "{count, plural, one {Importación deshecha: se anuló # transacción.} other {Importación deshecha: se anularon # transacciones.}}",
+      "partiallyRolledBack": "Importación deshecha parcialmente: {voided} transacciones anuladas y {blocked} bloqueadas."
+    },
+    "legacy": {
+      "summary": "Subida directa de un CSV (obsoleta)",
+      "note": "Esta vía solo admite CSV de hasta 2 MiB y se conserva por compatibilidad. Sube el extracto como documento: admite más formatos, perfiles por institución y deshacer."
+    },
+    "docUpload": {
+      "intro": "Elige la cuenta del extracto y su archivo (hasta {max}). El archivo se guarda cifrado como documento del espacio de trabajo y se procesa en segundo plano; el formato se detecta por su contenido.",
+      "file": "Extracto",
+      "fileHint": "CSV, OFX, QIF, JSON del esquema propio o XLSX.",
+      "profile": "Perfil de mapeo",
+      "profileHint": "Opcional: por omisión se aplica solo el de la cuenta o el de su institución.",
+      "profileAuto": "Automático",
+      "submit": "Subir y procesar",
+      "errors": {
+        "account": "Elige la cuenta destino.",
+        "none": "Elige un archivo.",
+        "empty": "El archivo está vacío.",
+        "tooLarge": "El archivo supera el máximo de {max}.",
+        "type": "El formato del archivo no se puede importar (usa CSV, OFX, QIF, JSON o XLSX)."
+      },
+      "phase": {
+        "hashing": "Calculando la suma de verificación…",
+        "requesting": "Pidiendo la subida…",
+        "uploading": "Subiendo el archivo: {percent} %",
+        "verifying": "Verificando el archivo…"
+      }
+    },
+    "processing": {
+      "stages": "Etapas del procesamiento",
+      "bar": "Progreso del procesamiento",
+      "queued": "El extracto está en cola; empezará a procesarse en unos segundos.",
+      "starting": "Preparando el procesamiento…",
+      "live": "Etapa «{stage}»: {processed} de {total} filas.",
+      "stage": {
+        "PARSE": "Lectura",
+        "NORMALIZE": "Normalización",
+        "VALIDATE": "Validación",
+        "CLASSIFY": "Clasificación",
+        "DEDUPE": "Duplicados",
+        "MATCH": "Compromisos"
+      }
+    },
+    "parseFailed": {
+      "title": "No se pudo leer el archivo.",
+      "where": "Ubicación del error:",
+      "noRows": "La importación no tiene filas y no se creó ninguna transacción."
+    },
+    "mappingHelp": {
+      "title": "Perfiles y columnas",
+      "missing": "Columnas que los perfiles necesitan y el archivo no tiene:",
+      "candidates": "Perfiles que casi coinciden con este archivo:",
+      "lacks": "les falta: {columns}",
+      "applyNamed": "Aplicar el perfil {name}, versión {version}",
+      "apply": "Aplicar",
+      "dateOrder": "Orden de la fecha",
+      "dateOrderHint": "El archivo QIF no dice si la fecha es día/mes o mes/día.",
+      "dmy": "Día/mes/año",
+      "mdy": "Mes/día/año",
+      "applyOrder": "Usar este orden"
+    },
+    "saveProfile": {
+      "toggle": "Guardar este mapeo como perfil de la institución de la cuenta",
+      "name": "Nombre del perfil",
+      "hint": "Se aplicará solo a los próximos extractos con las mismas columnas.",
+      "saved": "El mapeo se guardó como perfil."
+    },
+    "confidence": {
+      "HIGH": "Confianza alta",
+      "MEDIUM": "Confianza media",
+      "LOW": "Confianza baja"
+    },
+    "origin": {
+      "MANUAL": "manual",
+      "RULE": "regla",
+      "ALIAS": "alias",
+      "DEFAULT": "categoría por defecto",
+      "NONE": "sin origen"
+    },
+    "detail": {
+      "none": "sin asignar",
+      "ruleRef": "regla {id}…, versión {version}",
+      "score": "Puntaje {score}",
+      "preselected": "Vinculado de entrada (preseleccionado)",
+      "linked": "Vinculado",
+      "ruleExcluded": "Una regla propone excluir esta fila; puedes volver a incluirla.",
+      "kind": "Tipo",
+      "kinds": {
+        "EXPENSE": "Gasto",
+        "INCOME": "Ingreso",
+        "TRANSFER": "Transferencia",
+        "CONVERSION": "Conversión"
+      },
+      "category": "Categoría",
+      "counterparty": "Contraparte",
+      "description": "Descripción",
+      "duplicateOfRow": "Repite el movimiento de la línea {line} del archivo (mismo identificador del banco).",
+      "lowConfidence": "Confianza baja: ningún candidato es claramente el mismo movimiento. Decide tú; no se omite sola.",
+      "preselectedNote": "El sistema vinculó esta fila con el único candidato de confianza alta. Cuenta como decisión y puedes cambiarla.",
+      "signal": {
+        "amount": "monto",
+        "date": "fecha",
+        "description": "descripción",
+        "counterparty": "contraparte",
+        "origin": "origen"
+      },
+      "commitments": "Coincide con compromisos",
+      "confirmed": "Vínculo confirmado.",
+      "confirm": "Confirmar vínculo",
+      "unlink": "Quitar vínculo",
+      "confirmAria": "Confirmar el vínculo de la línea {line} con {name}",
+      "unlinkAria": "Quitar el vínculo de la línea {line} con {name}",
+      "commitmentsNote": "Ninguna ocurrencia se vincula sin tu confirmación; si ya se resolvió por otra vía, la transacción se crea igual, sin vínculo.",
+      "edit": "Editar fila",
+      "closeEditor": "Cerrar el editor",
+      "editAria": "Editar la línea {line}"
+    },
+    "editor": {
+      "fields": "Datos de la fila",
+      "description": "Descripción",
+      "note": "Nota",
+      "category": "Categoría",
+      "noCategory": "Sin categoría",
+      "counterparty": "Contraparte",
+      "noCounterparty": "Sin contraparte",
+      "saveFields": "Guardar datos",
+      "movement": "Tipo de movimiento",
+      "movementKind": "Registrar como",
+      "transferTo": "Cuenta destino",
+      "transferFrom": "Cuenta de origen",
+      "transferHint": "Debe ser otra cuenta propia en {currency}.",
+      "counterAmount": "Monto en la otra cuenta ({currency})",
+      "fee": "Comisión ({currency}, opcional)",
+      "quotedRate": "Tasa cotizada (opcional)",
+      "ratePreview": "Tasa efectiva aproximada: {rate}",
+      "conversionNote": "La tasa de referencia se resuelve al instante del movimiento.",
+      "saveMovement": "Guardar tipo",
+      "errors": {
+        "account": "Elige la otra cuenta.",
+        "amount": "Escribe un número positivo."
+      }
+    },
+    "statement": {
+      "title": "Saldo del extracto",
+      "closing": "Saldo final del extracto",
+      "difference": "Diferencia con el saldo resultante",
+      "matches": "coincide",
+      "differs": "no coincide",
+      "none": "El archivo no trae saldo final. Puedes escribirlo para ver la diferencia.",
+      "closingInput": "Saldo final ({currency})",
+      "dateInput": "Fecha del saldo",
+      "save": "Guardar saldo",
+      "cancel": "Cancelar",
+      "edit": "Cambiar el saldo",
+      "set": "Indicar el saldo final",
+      "errors": {
+        "amount": "Escribe un número, con punto decimal."
+      }
+    },
+    "bulk": {
+      "title": "Acciones en lote",
+      "category": "Categoría para las filas filtradas",
+      "hint": "Se aplica a: {filter}.",
+      "chooseCategory": "Elige una categoría",
+      "apply": "Asignar a las filas filtradas",
+      "unsupported": "El filtro por confianza no se puede usar en lote: quítalo para asignar la categoría.",
+      "reevaluate": "Reevaluar reglas",
+      "reevaluateHint": "Recalcula la propuesta de las reglas; lo que editaste a mano se conserva.",
+      "confirmMatches": "Confirmar las de confianza alta ({count})",
+      "done": "{count, plural, one {Se actualizó # fila.} other {Se actualizaron # filas.}}",
+      "reevaluated": "Reglas reevaluadas.",
+      "confirmed": "{count, plural, one {Se confirmó # vínculo.} other {Se confirmaron # vínculos.}}",
+      "currentFilter": "el filtro vigente"
+    },
+    "revert": {
+      "title": "Deshacer la importación",
+      "open": "Ver qué se anularía",
+      "counts": "Se anularán {toVoid} transacciones; {already} ya estaban anuladas; {blocked} están bloqueadas.",
+      "edited": "{count, plural, one {# transacción se editó después de importarla y se anula igual.} other {# transacciones se editaron después de importarlas y se anulan igual.}}",
+      "blockedTitle": "{count, plural, one {# fila bloqueada} other {# filas bloqueadas}}",
+      "blockedItem": "Línea {line}: {reason}",
+      "reason": {
+        "RECONCILED": "la transacción está reconciliada",
+        "PERIOD_CLOSED": "cae en un periodo cerrado",
+        "UNKNOWN": "no se puede anular"
+      },
+      "partialHint": "El deshacer completo se rechaza mientras haya filas bloqueadas. Si lo pides expresamente, el deshacer parcial anula las demás.",
+      "confirmAllTitle": "Deshacer toda la importación",
+      "confirmAllBody": "Se anulan {count} transacciones con su reversa; nada se borra.",
+      "confirmPartialTitle": "Deshacer solo las que se pueden anular",
+      "confirmPartialBody": "Se anulan {count} transacciones; las {blocked} bloqueadas quedan como están y la importación queda «deshecha parcialmente».",
+      "confirm": "Deshacer",
+      "keep": "Conservar la importación",
+      "all": "Deshacer todo",
+      "partial": "Deshacer parcialmente",
+      "close": "Cerrar"
+    },
+    "timeline": {
+      "summary": "Recorrido de la importación"
+    },
+    "profiles": {
+      "link": "Perfiles de mapeo",
+      "title": "Perfiles de mapeo",
+      "intro": "Un perfil recuerda las columnas y opciones de los extractos de una institución. Cada cambio crea una versión nueva; las importaciones anteriores conservan la que usaron.",
+      "empty": "Todavía no hay perfiles. Se guardan desde el paso de columnas de una importación.",
+      "includeArchived": "Mostrar archivados",
+      "noInstitution": "Sin institución (solo de una cuenta)",
+      "unknownInstitution": "Institución",
+      "ofAccount": "cuenta {account}",
+      "archived": "Archivado",
+      "versions": "{count, plural, one {# versión} other {# versiones}}",
+      "versionItem": "Versión {version}, creada el {date}",
+      "archive": "Archivar",
+      "archiveNamed": "Archivar el perfil {name}",
+      "archiveTitle": "Archivar el perfil «{name}»",
+      "archiveBody": "Deja de sugerirse y aplicarse a importaciones nuevas; las ya hechas no cambian.",
+      "keep": "Conservar"
     }
   },
   "Debt": {

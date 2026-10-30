@@ -12,6 +12,17 @@ export default function Page({
 }) {
   const { locale, accountId } = use(params);
   setRequestLocale(locale);
-  const sessionId = one(use(searchParams)['sesion']);
-  return <ReconciliationPage accountId={accountId} {...(sessionId ? { sessionId } : {})} />;
+  const query = use(searchParams);
+  const sessionId = one(query['sesion']);
+  const date = one(query['fecha']);
+  const balance = one(query['saldo']);
+  const prefill =
+    date || balance ? { ...(date ? { date } : {}), ...(balance ? { balance } : {}) } : undefined;
+  return (
+    <ReconciliationPage
+      accountId={accountId}
+      {...(sessionId ? { sessionId } : {})}
+      {...(prefill ? { prefill } : {})}
+    />
+  );
 }
