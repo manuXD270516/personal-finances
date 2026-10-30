@@ -36,8 +36,8 @@
 
 ## 6. VERIFICACIÓN en GitHub
 
-- [ ] 6.1 Tras fusionar el arreglo: `nightly` por `workflow_dispatch`; anotar en TC-PLATFORM-PIPELINE-029..032 las conexiones y el drenado por consumidor publicados (2026-10-28: ejecutado antes de fusionar desde la rama de experimentos con el código final, 13 corridas con el veredicto `ok`, anotadas en los TC; queda repetirlo sobre `main` tras fusionar)
-- [ ] 6.2 (pendiente de los nightlies programados; el drenado marginal sin causa medida está en [docs/54](../../../docs/54-imports-perf-questions.md)) Criterio de salida: `imports.perf.ts` en verde en dos nightlies programados seguidos, con el reporte de conexiones y de drenado; las demás suites siguen en verde y ningún umbral cambió (TC-PLATFORM-PIPELINE-028)
+- [x] 6.1 *(2026-10-30: `workflow_dispatch` de `nightly` sobre `main`, run 40833208469: job `perf` en verde)* Tras fusionar el arreglo: `nightly` por `workflow_dispatch`; anotar en TC-PLATFORM-PIPELINE-029..032 las conexiones y el drenado por consumidor publicados (2026-10-28: ejecutado antes de fusionar desde la rama de experimentos con el código final, 13 corridas con el veredicto `ok`, anotadas en los TC; queda repetirlo sobre `main` tras fusionar)
+- [x] 6.2 *(2026-10-30: nightlies programados 40686230101 del 2026-10-28 y 40873078888 del 2026-10-29 en verde tras #178)* (pendiente de los nightlies programados; el drenado marginal sin causa medida está en [docs/54](../../../docs/54-imports-perf-questions.md)) Criterio de salida: `imports.perf.ts` en verde en dos nightlies programados seguidos, con el reporte de conexiones y de drenado; las demás suites siguen en verde y ningún umbral cambió (TC-PLATFORM-PIPELINE-028)
 
 ## 7. DOCS y cierre
 
