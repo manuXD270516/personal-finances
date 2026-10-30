@@ -11997,6 +11997,7 @@ components:
       in: path
       required: true
       description: Attachment link UUIDv7.
+      schema: { $ref: '#/components/schemas/Uuid' }
     RuleId:
       name: ruleId
       in: path
