@@ -730,10 +730,10 @@ describe('filas de rendimiento de la entrega de eventos (TC-PLATFORM-THROUGHPUT-
 
   it('[TC-PLATFORM-THROUGHPUT-014][TC-IMPORTS-CSV-029] la fila de la ráfaga del import (configuración del host) exige la persistencia de 20 s por omisión, sin techo ni variable de relajación (D152, D311, D359)', () => {
     expect(imports).not.toMatch(/PF_PERF_STRICT_IMPORT|PERSIST_CEILING_MS/u);
-    expect(imports).toMatch(/expect(persistMs).toBeLessThanOrEqual(PERSIST_BUDGET_MS)/u);
+    expect(imports).toMatch(/expect\(persistMs\)\.toBeLessThanOrEqual\(PERSIST_BUDGET_MS\)/u);
     // Tras el retorno de la fila informativa quedan juntas la persistencia y el drenado por consumidor.
     expect(imports).toMatch(
-      /if (!cfg.gate) return;[sS]*expect(persistMs).toBeLessThanOrEqual(PERSIST_BUDGET_MS)[sS]*expect(drainAfterPersistMs, verdict.message)/u,
+      /if \(!cfg\.gate\) return;[\s\S]*expect\(persistMs\)\.toBeLessThanOrEqual\(PERSIST_BUDGET_MS\)[\s\S]*expect\(drainAfterPersistMs, verdict\.message\)/u,
     );
   });
 
