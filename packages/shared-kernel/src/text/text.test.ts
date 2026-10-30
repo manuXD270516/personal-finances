@@ -34,9 +34,9 @@ describe('LinearRegex', () => {
     // El mínimo de varias corridas descarta el calentamiento del JIT y la carga del runner sin relajar los 50 ms.
     let fastest = Number.POSITIVE_INFINITY;
     for (let run = 0; run < 5; run += 1) {
-      const started = performance.now();
+      const started = Date.now();
       expect(re.test('a'.repeat(500))).toBe(false);
-      fastest = Math.min(fastest, performance.now() - started);
+      fastest = Math.min(fastest, Date.now() - started);
     }
     expect(fastest).toBeLessThan(50);
   });
